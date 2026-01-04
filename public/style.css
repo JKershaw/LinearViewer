@@ -1,0 +1,225 @@
+:root {
+  --bg: #1a1a1a;
+  --fg: #e8e8e8;
+  --fg-dim: #888888;
+  --green: #5bdfc4;
+  --yellow: #f0e070;
+  --blue: #6ab0f3;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  overflow-x: hidden;
+}
+
+body {
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 15px;
+  line-height: 1.7;
+  background: var(--bg);
+  color: var(--fg);
+  padding: 2rem;
+  max-width: 120ch;
+  overflow-x: hidden;
+  width: 100%;
+}
+
+h1 {
+  color: var(--fg);
+  margin-bottom: 2rem;
+  font-weight: normal;
+}
+
+.project {
+  margin-bottom: 2rem;
+  overflow: hidden;
+}
+
+.project-header {
+  color: var(--blue);
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0.25rem 0;
+}
+
+.project-description {
+  color: var(--fg-dim);
+  margin-left: 3ch;
+  margin-bottom: 0.5rem;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Line layout with flexbox */
+.line {
+  display: flex;
+  align-items: baseline;
+  min-height: 1.6em;
+}
+
+.prefix {
+  color: var(--fg-dim);
+  white-space: pre;
+  flex-shrink: 0;
+}
+
+.state {
+  flex-shrink: 0;
+  margin-right: 0.5ch;
+}
+.state.done { color: var(--green); }
+.state.in-progress { color: var(--yellow); }
+.state.todo { color: var(--fg-dim); }
+
+.title {
+  flex: 1;
+  min-width: 0;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+.title.done { color: #999999; }
+
+.toggle {
+  color: var(--fg-dim);
+  cursor: pointer;
+  margin-left: 1ch;
+  flex-shrink: 0;
+  padding: 0.25rem 0.5rem;
+  margin-right: -0.5rem;
+}
+
+.completed-toggle {
+  color: var(--fg-dim);
+  cursor: pointer;
+  margin-left: 3ch;
+  font-style: italic;
+  padding: 0.5rem 0;
+}
+
+.hidden { display: none !important; }
+
+.child-count {
+  color: var(--fg-dim);
+  font-size: 12px;
+}
+
+/* Clickable items with details */
+.line.has-details {
+  cursor: pointer;
+}
+
+.line.has-details:hover .title {
+  text-decoration: underline;
+  text-decoration-color: var(--fg-dim);
+  text-underline-offset: 2px;
+}
+
+/* Details section */
+.details {
+  line-height: 1.5;
+  padding: 0.2rem 0;
+  overflow: hidden;
+}
+
+.detail-line {
+  display: flex;
+  align-items: baseline;
+}
+
+.detail-text {
+  color: var(--fg-dim);
+  flex: 1;
+  min-width: 0;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.detail-meta {
+  color: var(--fg-dim);
+  font-size: 0.9em;
+  flex: 1;
+  min-width: 0;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Mobile styles */
+@media (max-width: 640px) {
+  body {
+    padding: 1rem;
+    font-size: 14px;
+  }
+
+  h1 {
+    font-size: 1.3rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .project-header {
+    padding: 0.5rem 0;
+  }
+
+  .project-description {
+    margin-bottom: 0.75rem;
+  }
+
+  /* Larger tap targets */
+  .toggle {
+    padding: 0.5rem 0.75rem;
+    margin: -0.5rem -0.75rem -0.5rem 0.5rem;
+    font-size: 1rem;
+  }
+
+  .completed-toggle {
+    margin-left: 0;
+    padding: 0.75rem 0;
+    display: block;
+  }
+
+  .details {
+    padding-left: 1rem;
+  }
+
+  .line.has-details:hover .title {
+    text-decoration: none;
+  }
+}
+
+/* Even smaller screens */
+@media (max-width: 400px) {
+  body {
+    padding: 0.75rem;
+    font-size: 13px;
+  }
+
+  h1 {
+    font-size: 1.2rem;
+    margin-bottom: 1rem;
+  }
+}
+
+/* Login page */
+.login-container {
+  text-align: center;
+  margin-top: 4rem;
+}
+
+.login-container p {
+  color: var(--fg-dim);
+  margin-bottom: 1.5rem;
+}
+
+.login-button {
+  display: inline-block;
+  padding: 0.75rem 1.5rem;
+  background: #5e6ad2;
+  color: white;
+  text-decoration: none;
+  border-radius: 4px;
+  font-family: inherit;
+}
+
+.login-button:hover {
+  background: #4e5bc2;
+}
