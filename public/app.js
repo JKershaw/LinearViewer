@@ -179,18 +179,34 @@ function applyState(state) {
   })
 }
 
+// Get default collapsed project IDs from HTML data attributes
+function getDefaultCollapsedProjects() {
+  const ids = []
+  document.querySelectorAll('.project[data-default-collapsed="true"]').forEach(el => {
+    ids.push(el.dataset.id)
+  })
+  return ids
+}
+
 function init() {
   let state = loadState()
+
+  // On first load (no saved state), apply default collapsed projects from HTML
+  if (!localStorage.getItem(STORAGE_KEY)) {
+    state.collapsedProjects = getDefaultCollapsedProjects()
+  }
+
   applyState(state)
 
-  // Reset view to defaults
+  // Reset view to defaults (including default collapsed projects)
   const resetBtn = document.querySelector('.reset-view')
   if (resetBtn) {
     resetBtn.addEventListener('click', (e) => {
       e.preventDefault()
       state = getDefaultState()
+      state.collapsedProjects = getDefaultCollapsedProjects()
       saveState(state)
-      resetDOM()
+      applyState(state)
     })
   }
 

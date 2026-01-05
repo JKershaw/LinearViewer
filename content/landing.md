@@ -25,6 +25,7 @@ title: Linear Projects Viewer
 
 # Self-Host
 > Full privacy in under 5 minutes
+@collapsed: true
 
 - ○ Run it yourself
   Node.js + a Linear OAuth app—that's it
@@ -36,6 +37,7 @@ title: Linear Projects Viewer
 
 # Use Cases
 > When a focused view helps
+@collapsed: true
 
 - ○ Daily standups
   Quick scan of in-progress work across projects
@@ -45,6 +47,7 @@ title: Linear Projects Viewer
   Share a clean read-only view with stakeholders
 
 # Source
+@collapsed: true
 
 - ○ View on GitHub
   @url: https://github.com/JKershaw/LinearViewer
