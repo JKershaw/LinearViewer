@@ -1,0 +1,66 @@
+import { test, expect } from '@playwright/test';
+
+test.describe('Authenticated Dashboard', () => {
+  test.beforeEach(async ({ page }) => {
+    // Set up test session (server will use mock data in test mode)
+    await page.goto('/test/set-session');
+
+    // Navigate to main page
+    await page.goto('/');
+  });
+
+  test('renders project tree with issues', async ({ page }) => {
+    // Wait for page to fully load
+    await page.waitForLoadState('networkidle');
+
+    // Should show both projects from mock data
+    await expect(page.locator('.project-header:has-text("Project Alpha")')).toBeVisible();
+    await expect(page.locator('.project-header:has-text("Project Beta")')).toBeVisible();
+  });
+
+  test('shows In Progress section with active issues', async ({ page }) => {
+    // Should have In Progress section header
+    const inProgressHeader = page.locator('.in-progress-header');
+    await expect(inProgressHeader).toBeVisible();
+    await expect(inProgressHeader).toContainText('In Progress');
+
+    // Should show in-progress issues (2 issues: issue-1 and issue-4)
+    await expect(page.locator('.in-progress-item')).toHaveCount(2);
+    await expect(page.locator('.in-progress-item:has-text("Parent task in progress")')).toBeVisible();
+    await expect(page.locator('.in-progress-item:has-text("Beta task in progress")')).toBeVisible();
+  });
+
+  test('displays correct state indicators', async ({ page }) => {
+    // Should have in-progress states (in both In Progress section and project trees)
+    const inProgressStates = page.locator('.state.in-progress');
+    await expect(inProgressStates).toHaveCount(4); // 2 in In Progress + 2 in project trees
+
+    // Should have todo states in project trees
+    await expect(page.locator('.state.todo')).toHaveCount(2);
+  });
+
+  test('shows logout link when authenticated', async ({ page }) => {
+    const logoutLink = page.locator('a.logout');
+    await expect(logoutLink).toBeVisible();
+    await expect(logoutLink).toHaveAttribute('href', '/logout');
+  });
+
+  test('shows organization name from mock data', async ({ page }) => {
+    // The h1 should contain the organization name from mock data
+    // (not the landing page title "Linear Projects Viewer")
+    const h1 = page.locator('h1');
+    await expect(h1).toBeVisible();
+    // Check it's not the landing page
+    await expect(h1).not.toContainText('Linear Projects Viewer');
+  });
+
+  test('renders box-drawing characters for tree structure', async ({ page }) => {
+    // Should have prefix elements with box-drawing characters
+    const prefixes = page.locator('.prefix');
+    await expect(prefixes.first()).toBeVisible();
+
+    // The prefix should contain box-drawing characters
+    const prefixText = await prefixes.first().textContent();
+    expect(prefixText).toMatch(/[├└│─]/);
+  });
+});

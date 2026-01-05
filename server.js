@@ -47,6 +47,37 @@ app.use(session({
   cookie: { maxAge: 24 * 60 * 60 * 1000 } // 24 hours
 }))
 
+// Test-only route and mock data (only available in test mode)
+if (process.env.NODE_ENV === 'test') {
+  app.get('/test/set-session', (req, res) => {
+    req.session.accessToken = 'test-token'
+    // Explicitly save session before responding to ensure it's persisted
+    req.session.save((err) => {
+      if (err) {
+        res.status(500).send('session error')
+      } else {
+        res.send('ok')
+      }
+    })
+  })
+}
+
+// Mock data for testing
+const testMockData = {
+  organizationName: 'Test Workspace',
+  projects: [
+    { id: 'proj-alpha', name: 'Project Alpha', content: 'First test project', url: 'https://linear.app/test/project/proj-alpha', sortOrder: 1 },
+    { id: 'proj-beta', name: 'Project Beta', content: 'Second test project', url: 'https://linear.app/test/project/proj-beta', sortOrder: 2 }
+  ],
+  issues: [
+    { id: 'issue-1', title: 'Parent task in progress', description: 'This is a parent task', estimate: 5, priority: 2, sortOrder: 1, createdAt: '2024-01-01T00:00:00Z', dueDate: '2024-02-01', completedAt: null, url: 'https://linear.app/test/issue/TEST-1', parent: null, project: { id: 'proj-alpha' }, state: { name: 'In Progress', type: 'started' }, assignee: { name: 'Alice' }, labels: { nodes: [{ name: 'feature' }] } },
+    { id: 'issue-2', title: 'Child task todo', description: 'A child task', estimate: 2, priority: 3, sortOrder: 2, createdAt: '2024-01-02T00:00:00Z', dueDate: null, completedAt: null, url: 'https://linear.app/test/issue/TEST-2', parent: { id: 'issue-1' }, project: { id: 'proj-alpha' }, state: { name: 'Todo', type: 'unstarted' }, assignee: null, labels: { nodes: [] } },
+    { id: 'issue-3', title: 'Completed task', description: 'This task is done', estimate: 1, priority: 4, sortOrder: 3, createdAt: '2024-01-03T00:00:00Z', dueDate: null, completedAt: '2024-01-10T00:00:00Z', url: 'https://linear.app/test/issue/TEST-3', parent: null, project: { id: 'proj-alpha' }, state: { name: 'Done', type: 'completed' }, assignee: { name: 'Bob' }, labels: { nodes: [{ name: 'bug' }] } },
+    { id: 'issue-4', title: 'Beta task in progress', description: 'An in-progress task in Beta', estimate: 3, priority: 1, sortOrder: 1, createdAt: '2024-01-04T00:00:00Z', dueDate: '2024-03-01', completedAt: null, url: 'https://linear.app/test/issue/TEST-4', parent: null, project: { id: 'proj-beta' }, state: { name: 'In Progress', type: 'started' }, assignee: { name: 'Charlie' }, labels: { nodes: [{ name: 'urgent' }] } },
+    { id: 'issue-5', title: 'Beta todo task', description: 'A todo task in Beta', estimate: null, priority: 0, sortOrder: 2, createdAt: '2024-01-05T00:00:00Z', dueDate: null, completedAt: null, url: 'https://linear.app/test/issue/TEST-5', parent: null, project: { id: 'proj-beta' }, state: { name: 'Backlog', type: 'backlog' }, assignee: null, labels: { nodes: [] } }
+  ]
+}
+
 // OAuth: Redirect to Linear
 app.get('/auth/linear', (req, res) => {
   sessionStore.cleanup()
@@ -120,7 +151,11 @@ app.get('/', async (req, res) => {
   }
 
   try {
-    const { organizationName, projects, issues } = await fetchProjects(req.session.accessToken)
+    // Use mock data in test mode
+    const isTestMode = process.env.NODE_ENV === 'test' && req.session.accessToken === 'test-token'
+    const { organizationName, projects, issues } = isTestMode
+      ? testMockData
+      : await fetchProjects(req.session.accessToken)
     const forest = buildForest(issues)
 
     // Extract in-progress issues with project names
