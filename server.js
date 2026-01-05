@@ -200,7 +200,9 @@ app.get('/auth/callback', async (req, res) => {
 
     // Store access token in session (no refresh token handling - tokens expire after 24h)
     req.session.accessToken = data.access_token
-    res.redirect('/')
+    req.session.save(() => {
+      res.redirect('/')
+    })
   } catch (err) {
     console.error('OAuth callback error:', err)
     res.status(500).send(`<pre>Error: ${err.message}</pre>`)
