@@ -1,11 +1,14 @@
 const STORAGE_KEY = 'linear-projects-state'
 
-const DEFAULT_STATE = {
-  expanded: [],
-  expandedProjectMeta: [],
-  hideCompleted: [],
-  collapsedProjects: [],
-  inProgressCollapsed: false
+// Factory function to create fresh default state (avoids shared array references)
+function getDefaultState() {
+  return {
+    expanded: [],
+    expandedProjectMeta: [],
+    hideCompleted: [],
+    collapsedProjects: [],
+    inProgressCollapsed: false
+  }
 }
 
 // DOM helpers
@@ -19,7 +22,7 @@ const setArrow = (el, expanded) => {
 
 function loadState() {
   const raw = localStorage.getItem(STORAGE_KEY)
-  return raw ? JSON.parse(raw) : { ...DEFAULT_STATE }
+  return raw ? JSON.parse(raw) : getDefaultState()
 }
 
 function saveState(state) {
@@ -185,7 +188,7 @@ function init() {
   if (resetBtn) {
     resetBtn.addEventListener('click', (e) => {
       e.preventDefault()
-      state = { ...DEFAULT_STATE }
+      state = getDefaultState()
       saveState(state)
       resetDOM()
     })
