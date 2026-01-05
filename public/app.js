@@ -185,4 +185,21 @@ function init() {
   })
 }
 
-document.addEventListener('DOMContentLoaded', init)
+// Toggle project description expand/collapse
+function initDescriptionToggles() {
+  document.querySelectorAll('.desc-toggle').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation()
+      const container = e.target.closest('.project-description')
+      const truncated = container.querySelector('.desc-truncated')
+      const full = container.querySelector('.desc-full')
+      truncated.classList.toggle('hidden')
+      full.classList.toggle('hidden')
+    })
+  })
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  init()
+  initDescriptionToggles()
+})

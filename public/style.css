@@ -1,10 +1,10 @@
 :root {
-  --bg: #1a1a1a;
-  --fg: #e8e8e8;
-  --fg-dim: #888888;
-  --green: #5bdfc4;
-  --yellow: #f0e070;
-  --blue: #6ab0f3;
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --fg-dim: #666666;
+  --green: #16a085;
+  --yellow: #d4a600;
+  --blue: #2563eb;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -15,8 +15,8 @@ html {
 
 body {
   font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-  font-size: 15px;
-  line-height: 1.7;
+  font-size: 16px;
+  line-height: 1.6;
   background: var(--bg);
   color: var(--fg);
   padding: 2rem;
@@ -25,22 +25,38 @@ body {
   width: 100%;
 }
 
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 2rem;
+}
+
 h1 {
   color: var(--fg);
-  margin-bottom: 2rem;
   font-weight: normal;
 }
 
+.logout {
+  color: var(--fg-dim);
+  text-decoration: none;
+  font-size: 0.9em;
+}
+
+.logout:hover {
+  color: var(--fg);
+}
+
 .project {
-  margin-bottom: 2rem;
+  margin-bottom: 2.5rem;
   overflow: hidden;
 }
 
 .project-header {
   color: var(--blue);
-  font-weight: bold;
+  font-weight: 600;
   cursor: pointer;
-  padding: 0.25rem 0;
+  padding: 0.5rem 0;
 }
 
 .project-description {
@@ -51,11 +67,31 @@ h1 {
   overflow-wrap: break-word;
 }
 
+.desc-toggle {
+  background: none;
+  border: none;
+  color: var(--blue);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+  padding: 0;
+}
+
+.desc-toggle:hover {
+  text-decoration: underline;
+}
+
 /* Line layout with flexbox */
 .line {
   display: flex;
   align-items: baseline;
   min-height: 1.6em;
+  padding: 4px 0;
+}
+
+/* Parent items (with children) get bolder weight */
+.line.has-children .title {
+  font-weight: 500;
 }
 
 .prefix {
@@ -78,15 +114,20 @@ h1 {
   word-wrap: break-word;
   overflow-wrap: break-word;
 }
-.title.done { color: #999999; }
+.title.done { color: var(--fg-dim); }
 
 .toggle {
-  color: var(--fg-dim);
+  color: var(--fg);
   cursor: pointer;
   margin-left: 1ch;
   flex-shrink: 0;
   padding: 0.25rem 0.5rem;
   margin-right: -0.5rem;
+  font-size: 0.85em;
+}
+
+.toggle:hover {
+  color: var(--blue);
 }
 
 .completed-toggle {
