@@ -153,7 +153,9 @@ app.get('/auth/linear', (req, res) => {
     state
   })
 
-  res.redirect(`https://linear.app/oauth/authorize?${params}`)
+  req.session.save(() => {
+    res.redirect(`https://linear.app/oauth/authorize?${params}`)
+  })
 })
 
 /**
@@ -214,8 +216,9 @@ app.get('/auth/callback', async (req, res) => {
  * Destroys the session, effectively logging the user out.
  */
 app.get('/logout', (req, res) => {
-  req.session.destroy()
-  res.redirect('/')
+  req.session.destroy(() => {
+    res.redirect('/')
+  })
 })
 
 // =============================================================================
@@ -281,9 +284,10 @@ app.get('/', async (req, res) => {
     // If token is invalid/expired (401), clear session and show landing page
     // This gracefully handles expired tokens without showing an error
     if (error.response?.status === 401) {
-      req.session.destroy()
-      const html = renderPage(landingTrees, [], landingData.organizationName, { isLanding: true })
-      return res.send(html)
+      return req.session.destroy(() => {
+        const html = renderPage(landingTrees, [], landingData.organizationName, { isLanding: true })
+        res.send(html)
+      })
     }
 
     res.status(500).send(`<pre>Error: ${error.message}</pre>`)
