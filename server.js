@@ -37,6 +37,19 @@ const sessionStore = new MongoSessionStore({
 
 const app = express()
 
+// Trust Heroku's proxy for X-Forwarded-* headers
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1)
+}
+
+// Force HTTPS in production
+app.use((req, res, next) => {
+  if (process.env.NODE_ENV === 'production' && req.headers['x-forwarded-proto'] !== 'https') {
+    return res.redirect(301, `https://${req.hostname}${req.url}`)
+  }
+  next()
+})
+
 app.use(express.static('public'))
 
 app.use(session({
@@ -44,7 +57,10 @@ app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 24 * 60 * 60 * 1000 } // 24 hours
+  cookie: {
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    secure: process.env.NODE_ENV === 'production'
+  }
 }))
 
 // Test-only route and mock data (only available in test mode)
