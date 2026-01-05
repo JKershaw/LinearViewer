@@ -6,6 +6,8 @@ A minimal, CLI-aesthetic web app that displays Linear projects and issues as a c
 
 - `npm start` - Start the server (runs on PORT from .env, default 3000)
 - `npm install` - Install dependencies
+- `npm test` - Run Playwright E2E tests
+- `npm test:ui` - Run tests with Playwright UI
 
 ## Architecture
 
@@ -22,6 +24,11 @@ content/
 public/
   style.css            Light theme, mobile-responsive
   app.js               Client-side collapse/expand, localStorage persistence
+tests/e2e/
+  landing.spec.js      Landing page tests
+  dashboard.spec.js    Authenticated dashboard tests
+  interactions.spec.js Collapse/expand interaction tests
+playwright.config.js   Playwright test configuration
 ```
 
 ## Code Style
