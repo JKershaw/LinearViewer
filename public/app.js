@@ -189,12 +189,24 @@ function getDefaultCollapsedProjects() {
 }
 
 function init() {
-  let state = loadState()
+  const isLanding = document.body.classList.contains('is-landing')
 
-  // On first load (no saved state), apply default collapsed projects from HTML
-  if (!localStorage.getItem(STORAGE_KEY)) {
+  // On landing page, always use defaults (no persistence)
+  // On authenticated page, load from localStorage
+  let state
+  if (isLanding) {
+    state = getDefaultState()
     state.collapsedProjects = getDefaultCollapsedProjects()
+  } else {
+    state = loadState()
+    // On first load (no saved state), apply default collapsed projects from HTML
+    if (!localStorage.getItem(STORAGE_KEY)) {
+      state.collapsedProjects = getDefaultCollapsedProjects()
+    }
   }
+
+  // Wrap saveState to be a no-op on landing
+  const persistState = isLanding ? () => {} : saveState
 
   applyState(state)
 
@@ -205,7 +217,7 @@ function init() {
       e.preventDefault()
       state = getDefaultState()
       state.collapsedProjects = getDefaultCollapsedProjects()
-      saveState(state)
+      persistState(state)
       applyState(state)
     })
   }
@@ -219,7 +231,7 @@ function init() {
       const project = desc.closest('.project')
       const projectId = project.dataset.id
       toggleInArray(state.expandedProjectMeta, projectId)
-      saveState(state)
+      persistState(state)
 
       const meta = project.querySelector('.project-meta')
       setHidden(meta, !state.expandedProjectMeta.includes(projectId))
@@ -230,7 +242,7 @@ function init() {
   function toggleItem(line) {
     const id = line.dataset.id
     toggleInArray(state.expanded, id)
-    saveState(state)
+    persistState(state)
 
     const isExpanded = state.expanded.includes(id)
     const details = line.nextElementSibling
@@ -270,7 +282,7 @@ function init() {
   if (inProgressHeader) {
     inProgressHeader.addEventListener('click', () => {
       state.inProgressCollapsed = !state.inProgressCollapsed
-      saveState(state)
+      persistState(state)
 
       const items = document.querySelector('.in-progress-items')
       setHidden(items, state.inProgressCollapsed)
@@ -283,7 +295,7 @@ function init() {
     el.addEventListener('click', (e) => {
       const projectId = e.target.dataset.projectId
       toggleInArray(state.hideCompleted, projectId)
-      saveState(state)
+      persistState(state)
 
       const isShown = state.hideCompleted.includes(projectId)
       const section = document.querySelector(`[data-completed-for="${projectId}"]`)
@@ -300,7 +312,7 @@ function init() {
       const project = e.target.closest('.project')
       const projectId = project.dataset.id
       toggleInArray(state.collapsedProjects, projectId)
-      saveState(state)
+      persistState(state)
 
       const isCollapsed = state.collapsedProjects.includes(projectId)
 

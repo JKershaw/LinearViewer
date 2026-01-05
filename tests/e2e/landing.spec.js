@@ -14,13 +14,12 @@ test.describe('Landing Page', () => {
     await expect(page.locator('h1')).toContainText('Linear Projects Viewer');
   });
 
-  test('shows login link', async ({ page }) => {
+  test('does not show login or reset in header', async ({ page }) => {
     await page.goto('/');
 
-    // Should have a login link pointing to OAuth
-    const loginLink = page.locator('a.login');
-    await expect(loginLink).toBeVisible();
-    await expect(loginLink).toHaveAttribute('href', '/auth/linear');
+    // Header should not have login or reset links (login is in page content instead)
+    await expect(page.locator('header a.login')).not.toBeVisible();
+    await expect(page.locator('header .reset-view')).not.toBeVisible();
   });
 
   test('displays static project preview from landing.md', async ({ page }) => {
@@ -110,7 +109,7 @@ test.describe('Landing Page', () => {
     await expect(collapsedProjects).toHaveCount(3);
   });
 
-  test('reset button applies default collapsed state', async ({ page }) => {
+  test('page reload resets to default state', async ({ page }) => {
     await page.goto('/');
 
     // Get the Self-Host project and expand it
@@ -122,11 +121,10 @@ test.describe('Landing Page', () => {
     await selfHostHeader.click();
     await expect(linesInProject.first()).toBeVisible();
 
-    // Click reset
-    const resetButton = page.locator('.reset-view');
-    await resetButton.click();
+    // Reload the page
+    await page.reload();
 
-    // Should be collapsed again (default state)
+    // Should be collapsed again (landing page doesn't persist state)
     await expect(linesInProject.first()).not.toBeVisible();
     await expect(selfHostHeader).toContainText('▶');
   });
