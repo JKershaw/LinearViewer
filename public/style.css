@@ -323,17 +323,46 @@ h1 {
     font-size: 14px;
   }
 
-  h1 {
-    font-size: 1.3rem;
+  /* Stack header on mobile: title on top, actions below */
+  header {
+    flex-wrap: wrap;
+    gap: 0.5rem;
     margin-bottom: 1.5rem;
   }
 
+  h1 {
+    font-size: 1.3rem;
+    width: 100%;
+  }
+
+  .header-actions {
+    width: 100%;
+  }
+
+  /* Reduce vertical spacing on issue lines */
+  .line {
+    padding: 2px 0;
+  }
+
+  .in-progress-item {
+    padding: 2px 0;
+    padding-left: 1.5ch;
+  }
+
+  .project {
+    margin-bottom: 2rem;
+  }
+
+  .in-progress-section {
+    margin-bottom: 2rem;
+  }
+
   .project-header {
-    padding: 0.5rem 0;
+    padding: 0.4rem 0;
   }
 
   .project-description {
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.5rem;
   }
 
   /* Larger tap targets for touch devices (44px minimum recommended) */
@@ -345,7 +374,7 @@ h1 {
 
   .completed-toggle {
     margin-left: 0;
-    padding: 0.75rem 0;
+    padding: 0.5rem 0;
     display: block;
   }
 
@@ -366,9 +395,20 @@ h1 {
     font-size: 13px;
   }
 
+  header {
+    margin-bottom: 1rem;
+  }
+
   h1 {
     font-size: 1.2rem;
-    margin-bottom: 1rem;
+  }
+
+  .project {
+    margin-bottom: 1.5rem;
+  }
+
+  .in-progress-section {
+    margin-bottom: 1.5rem;
   }
 }
 
