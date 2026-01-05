@@ -137,9 +137,9 @@ const testMockData = {
  * Generates a CSRF-prevention state token, stores it in session,
  * and redirects user to Linear's OAuth authorization page.
  */
-app.get('/auth/linear', (req, res) => {
-  // Clean up expired sessions opportunistically
-  sessionStore.cleanup()
+app.get('/auth/linear', async (req, res) => {
+  // Clean up expired sessions before proceeding (must await to avoid race conditions)
+  await sessionStore.cleanup()
 
   // Generate random state token to prevent CSRF attacks
   const state = crypto.randomUUID()
@@ -166,7 +166,8 @@ app.get('/auth/linear', (req, res) => {
  * 3. Store the access token in the session
  */
 app.get('/auth/callback', async (req, res) => {
-  sessionStore.cleanup()
+  // Clean up expired sessions before proceeding (must await to avoid race conditions)
+  await sessionStore.cleanup()
 
   const { code, state, error } = req.query
 
