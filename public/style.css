@@ -1,18 +1,38 @@
+/**
+ * Linear Projects Viewer - Stylesheet
+ *
+ * Design: CLI/terminal aesthetic with monospace fonts and box-drawing characters.
+ * Theme: Light mode with clean, minimal colors.
+ * Layout: Single-column, max 120ch wide for readability.
+ */
+
+/* =============================================================================
+   CSS Custom Properties (Theme Colors)
+   =============================================================================
+   Using CSS variables for consistent theming and easy customization.
+   - bg/fg: Background and foreground (text) colors
+   - fg-dim: Muted text for secondary information
+   - green/yellow/blue: Status and accent colors matching Linear's palette
+*/
 :root {
   --bg: #ffffff;
   --fg: #1a1a1a;
   --fg-dim: #666666;
-  --green: #16a085;
-  --yellow: #d4a600;
-  --blue: #2563eb;
+  --green: #16a085;    /* Completed status */
+  --yellow: #d4a600;   /* In-progress status */
+  --blue: #2563eb;     /* Links and project headers */
 }
 
+/* =============================================================================
+   Base Reset & Typography
+   ============================================================================= */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 html {
   overflow-x: hidden;
 }
 
+/* Terminal-style monospace typography with comfortable line height */
 body {
   font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
   font-size: 16px;
@@ -20,11 +40,14 @@ body {
   background: var(--bg);
   color: var(--fg);
   padding: 2rem;
-  max-width: 120ch;
+  max-width: 120ch;  /* Optimal reading width for monospace */
   overflow-x: hidden;
   width: 100%;
 }
 
+/* =============================================================================
+   Header Layout
+   ============================================================================= */
 header {
   display: flex;
   justify-content: space-between;
@@ -37,9 +60,10 @@ h1 {
   font-weight: normal;
 }
 
+/* Navigation links (reset, logout) aligned to the right */
 .header-actions {
   display: flex;
-  gap: 1.5ch;
+  gap: 1.5ch;  /* Character-based spacing for monospace alignment */
 }
 
 .header-actions a {
@@ -52,7 +76,12 @@ h1 {
   color: var(--fg);
 }
 
-/* In Progress section */
+/* =============================================================================
+   "In Progress" Section
+   =============================================================================
+   Displays all in-progress issues across projects in a single collapsible list.
+   Yellow accent color matches Linear's "started" state.
+*/
 .in-progress-section {
   margin-bottom: 2.5rem;
 }
@@ -81,6 +110,7 @@ h1 {
   text-underline-offset: 2px;
 }
 
+/* Project name badge shown after issue title */
 .in-progress-project {
   color: var(--fg-dim);
   margin-left: 1ch;
@@ -96,6 +126,11 @@ h1 {
   padding-left: 3.5ch;
 }
 
+/* =============================================================================
+   Project Sections
+   =============================================================================
+   Each project is a collapsible section with header, description, and issue tree.
+*/
 .project {
   margin-bottom: 2.5rem;
   overflow: hidden;
@@ -110,7 +145,7 @@ h1 {
 
 .project-description {
   color: var(--fg-dim);
-  margin-left: 3ch;
+  margin-left: 3ch;  /* Indent under project header */
   margin-bottom: 0.5rem;
   word-wrap: break-word;
   overflow-wrap: break-word;
@@ -135,7 +170,15 @@ h1 {
   text-decoration: underline;
 }
 
-/* Line layout with flexbox */
+/* =============================================================================
+   Issue Tree Lines
+   =============================================================================
+   Each issue is rendered as a "line" with:
+   - prefix: Box-drawing characters (├─ └─ │) showing tree structure
+   - state: Status indicator (✓ ◐ ○)
+   - title: Issue title (clickable to expand details)
+   - toggle: Collapse/expand arrow for parent issues
+*/
 .line {
   display: flex;
   align-items: baseline;
@@ -143,17 +186,19 @@ h1 {
   padding: 4px 0;
 }
 
-/* Parent items (with children) get bolder weight */
+/* Parent items (with children) get bolder weight for visual hierarchy */
 .line.has-children .title {
   font-weight: 500;
 }
 
+/* Box-drawing prefix (├─ └─ │) - preserves whitespace for alignment */
 .prefix {
   color: var(--fg-dim);
   white-space: pre;
   flex-shrink: 0;
 }
 
+/* Status indicators: ✓ (done), ◐ (in-progress), ○ (todo) */
 .state {
   flex-shrink: 0;
   margin-right: 0.5ch;
@@ -162,14 +207,16 @@ h1 {
 .state.in-progress { color: var(--yellow); }
 .state.todo { color: var(--fg-dim); }
 
+/* Issue title - fills remaining space, wraps on overflow */
 .title {
   flex: 1;
-  min-width: 0;
+  min-width: 0;  /* Allow flex item to shrink below content size */
   word-wrap: break-word;
   overflow-wrap: break-word;
 }
 .title.done { color: var(--fg-dim); }
 
+/* Collapse/expand toggle arrow (▼/▶) */
 .toggle {
   color: var(--fg);
   cursor: pointer;
@@ -200,6 +247,7 @@ h1 {
   margin-bottom: 0.75rem;
 }
 
+/* "Show N completed" toggle link */
 .completed-toggle {
   color: var(--fg-dim);
   cursor: pointer;
@@ -208,6 +256,7 @@ h1 {
   padding: 0.5rem 0;
 }
 
+/* Utility class for hiding elements (used by JS for expand/collapse) */
 .hidden { display: none !important; }
 
 .child-count {
@@ -215,7 +264,12 @@ h1 {
   font-size: 12px;
 }
 
-/* Clickable items with details */
+/* =============================================================================
+   Expandable Items & Details Panel
+   =============================================================================
+   Clicking an issue line expands a details panel showing description,
+   assignee, dates, labels, and Linear link.
+*/
 .line.expandable {
   cursor: pointer;
 }
@@ -226,7 +280,7 @@ h1 {
   text-underline-offset: 2px;
 }
 
-/* Details section */
+/* Details panel shown when issue is expanded */
 .details {
   line-height: 1.5;
   padding: 0.2rem 0;
@@ -255,7 +309,14 @@ h1 {
   overflow-wrap: break-word;
 }
 
-/* Mobile styles */
+/* =============================================================================
+   Responsive Breakpoints
+   =============================================================================
+   640px: Tablets and large phones - reduce padding, increase tap targets
+   400px: Small phones - further reduce padding and font sizes
+*/
+
+/* Tablets and large phones */
 @media (max-width: 640px) {
   body {
     padding: 1rem;
@@ -275,7 +336,7 @@ h1 {
     margin-bottom: 0.75rem;
   }
 
-  /* Larger tap targets */
+  /* Larger tap targets for touch devices (44px minimum recommended) */
   .toggle {
     padding: 0.5rem 0.75rem;
     margin: -0.5rem -0.75rem -0.5rem 0.5rem;
@@ -292,12 +353,13 @@ h1 {
     padding-left: 1rem;
   }
 
+  /* Disable hover underline on touch devices (no hover state) */
   .line.expandable:hover .title {
     text-decoration: none;
   }
 }
 
-/* Even smaller screens */
+/* Small phones */
 @media (max-width: 400px) {
   body {
     padding: 0.75rem;
@@ -310,7 +372,12 @@ h1 {
   }
 }
 
-/* Login page */
+/* =============================================================================
+   Login Page (Landing Page CTA)
+   =============================================================================
+   Shown at the bottom of the landing page for unauthenticated users.
+   Button uses Linear's brand purple color.
+*/
 .login-container {
   text-align: center;
   margin-top: 4rem;
@@ -324,7 +391,7 @@ h1 {
 .login-button {
   display: inline-block;
   padding: 0.75rem 1.5rem;
-  background: #5e6ad2;
+  background: #5e6ad2;  /* Linear's brand purple */
   color: white;
   text-decoration: none;
   border-radius: 4px;
