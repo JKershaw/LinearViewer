@@ -28,12 +28,14 @@ title: Linear Projects Viewer
 @collapsed: true
 
 - ○ Run it yourself
-  Node.js + a Linear OAuth app—that's it
+  Node.js + a Linear OAuth app, that's it
 - ○ AI-assisted setup
   Copy this prompt into your preferred AI assistant:
   ---
   I want to self-host Linear Projects Viewer. Repo: https://github.com/JKershaw/LinearViewer — Help me: 1) Clone and install dependencies, 2) Create a Linear OAuth app at linear.app/settings/api/applications with callback http://localhost:3000/auth/callback, 3) Create .env with the required variables, 4) Run it. Walk me through each step.
   ---
+  - ○ Customize it
+    Ask your AI to modify the code—add features or change styling
 
 # Use Cases
 > When a focused view helps
@@ -49,6 +51,10 @@ title: Linear Projects Viewer
 # Source
 @collapsed: true
 
+- ○ What is Linear?
+  A modern project management tool for software teams
+  @url: https://linear.app
+  @linkText: linear.app
 - ○ View on GitHub
   @url: https://github.com/JKershaw/LinearViewer
   @linkText: github.com/JKershaw/LinearViewer
