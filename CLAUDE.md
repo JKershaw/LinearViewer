@@ -10,14 +10,18 @@ A minimal, CLI-aesthetic web app that displays Linear projects and issues as a c
 ## Architecture
 
 ```
-server.js          Express server, OAuth routes, main entry point
+server.js              Express server, OAuth routes, main entry point
 lib/
-  linear.js        GraphQL client for Linear API
-  tree.js          Transforms flat issues → nested tree structure
-  render.js        Generates HTML with box-drawing characters
+  linear.js            GraphQL client for Linear API
+  tree.js              Transforms flat issues → nested tree structure
+  render.js            Generates HTML with box-drawing characters
+  session-store.js     MongoDB/MangoDB session store
+  parse-landing.js     Parses markdown content for landing page
+content/
+  landing.md           Static roadmap preview for unauthenticated users
 public/
-  style.css        Dark theme, mobile-responsive
-  app.js           Client-side collapse/expand, localStorage persistence
+  style.css            Light theme, mobile-responsive
+  app.js               Client-side collapse/expand, localStorage persistence
 ```
 
 ## Code Style
@@ -30,9 +34,9 @@ public/
 ## Design Principles
 
 - CLI/terminal aesthetic: monospace font, box-drawing characters (├─ └─ │)
-- Dark theme with muted colors
+- Light theme with clean colors
 - State indicators: ✓ (done/green), ◐ (in-progress/yellow), ○ (todo/dim)
-- Mobile: hide box chars, use left-border + padding for depth indication
+- Mobile-responsive layout
 - Keep it minimal - no frameworks, no build step
 
 ## Authentication
@@ -45,7 +49,7 @@ GET /auth/callback   → Exchange code for access token, store in session
 GET /logout          → Destroy session, redirect to login
 ```
 
-- Sessions stored in-memory via `express-session`
+- Sessions stored in MongoDB (production) or MangoDB file-based storage (development)
 - Tokens expire after 24 hours (no refresh token handling)
 - State parameter validated to prevent CSRF
 
@@ -57,6 +61,7 @@ LINEAR_CLIENT_SECRET  OAuth client secret from Linear
 LINEAR_REDIRECT_URI   Callback URL (must match Linear OAuth app config)
 SESSION_SECRET        Secret for signing session cookies
 PORT                  Server port (default: 3000)
+MONGODB_URI           MongoDB connection string (optional, uses file storage if not set)
 ```
 
 ## Linear API
@@ -68,9 +73,11 @@ PORT                  Server port (default: 3000)
 
 ## Key Behaviors
 
-- Unauthenticated users see login page
+- Unauthenticated users see landing page with static roadmap preview
+- In Progress section shows all in-progress issues across projects
 - Click issue line → toggle details (description, assignee, dates, labels)
 - Click ▼ arrow → collapse/expand children
 - Click project header → collapse entire project
+- Click "reset" → restore default collapse state
 - Collapse state persisted in localStorage
-- 401 errors clear session and redirect to login
+- 401 errors clear session and redirect to landing page
