@@ -14,6 +14,8 @@ title: Linear Projects Viewer
 # What This Is
 > Linear is powerful but busy. This gives you just the tree.
 
+- ○ You're looking at it
+  This landing page uses the same tree UI
 - ✓ Collapsible tree view
   Expand issues to see descriptions, assignees, and dates
 - ✓ Always fresh
