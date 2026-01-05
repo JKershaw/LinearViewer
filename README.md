@@ -1,9 +1,9 @@
-# Linear Roadmap Viewer
+# Linear Projects Viewer
 
 A minimal, CLI-aesthetic web app that displays your Linear projects and issues as a collapsible tree.
 
 ```
-Platform Roadmap
+Platform Projects
 
 ▼ Backend Refactor
 ├─ ◐ Migrate to new database schema
@@ -26,7 +26,7 @@ Platform Roadmap
 - **Issue Details** - Click any issue to see description, assignee, dates, labels
 - **Persistent State** - Collapse state saved in localStorage
 - **Reset View** - One-click reset to default collapse state
-- **Landing Preview** - Static roadmap preview for unauthenticated users
+- **Landing Preview** - Static projects preview for unauthenticated users
 - **Mobile Friendly** - Responsive design for all screen sizes
 
 ## Setup
@@ -36,7 +36,7 @@ Platform Roadmap
 1. Go to [Linear Settings](https://linear.app/settings) → **API** → **OAuth Applications**
 2. Click **Create new OAuth Application**
 3. Fill in:
-   - **Name**: e.g., "Roadmap Viewer"
+   - **Name**: e.g., "Projects Viewer"
    - **Redirect URI**: `http://localhost:3000/auth/callback`
 4. Save and copy your **Client ID** and **Client Secret**
 

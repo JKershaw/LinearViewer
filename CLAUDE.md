@@ -1,4 +1,4 @@
-# Linear Roadmap Viewer
+# Linear Projects Viewer
 
 A minimal, CLI-aesthetic web app that displays Linear projects and issues as a collapsible tree.
 
@@ -18,7 +18,7 @@ lib/
   session-store.js     MongoDB/MangoDB session store
   parse-landing.js     Parses markdown content for landing page
 content/
-  landing.md           Static roadmap preview for unauthenticated users
+  landing.md           Static projects preview for unauthenticated users
 public/
   style.css            Light theme, mobile-responsive
   app.js               Client-side collapse/expand, localStorage persistence
@@ -73,7 +73,7 @@ MONGODB_URI           MongoDB connection string (optional, uses file storage if 
 
 ## Key Behaviors
 
-- Unauthenticated users see landing page with static roadmap preview
+- Unauthenticated users see landing page with static projects preview
 - In Progress section shows all in-progress issues across projects
 - Click issue line → toggle details (description, assignee, dates, labels)
 - Click ▼ arrow → collapse/expand children

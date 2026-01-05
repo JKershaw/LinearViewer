@@ -1,4 +1,4 @@
-const STORAGE_KEY = 'roadmap-state'
+const STORAGE_KEY = 'linear-projects-state'
 
 const DEFAULT_STATE = {
   expanded: [],

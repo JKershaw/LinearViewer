@@ -5,7 +5,7 @@ import session from 'express-session'
 import { MongoClient } from 'mongodb'
 import { MangoClient } from '@jkershaw/mangodb'
 import { MongoSessionStore } from './lib/session-store.js'
-import { fetchRoadmap } from './lib/linear.js'
+import { fetchProjects } from './lib/linear.js'
 import { buildForest, partitionCompleted } from './lib/tree.js'
 import { renderPage } from './lib/render.js'
 import { parseLandingPage } from './lib/parse-landing.js'
@@ -120,7 +120,7 @@ app.get('/', async (req, res) => {
   }
 
   try {
-    const { organizationName, projects, issues } = await fetchRoadmap(req.session.accessToken)
+    const { organizationName, projects, issues } = await fetchProjects(req.session.accessToken)
     const forest = buildForest(issues)
 
     // Extract in-progress issues with project names
@@ -151,7 +151,7 @@ app.get('/', async (req, res) => {
     const html = renderPage(trees, inProgressIssues, organizationName)
     res.send(html)
   } catch (error) {
-    console.error('Error fetching roadmap:', error)
+    console.error('Error fetching projects:', error)
 
     // If unauthorized, clear session and show landing
     if (error.response?.status === 401) {
@@ -166,5 +166,5 @@ app.get('/', async (req, res) => {
 
 const PORT = process.env.PORT || 3000
 app.listen(PORT, () => {
-  console.log(`Roadmap server running at http://localhost:${PORT}`)
+  console.log(`Linear Projects Viewer running at http://localhost:${PORT}`)
 })

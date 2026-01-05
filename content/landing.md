@@ -1,9 +1,9 @@
 ---
-title: Linear Roadmap Viewer
+title: Linear Projects Viewer
 ---
 
 # Login
-> Read-only viewer for your Linear roadmap
+> Read-only viewer for your Linear projects
 
 - ◐ Connect with Linear
   OAuth with read-only scope
@@ -28,10 +28,10 @@ title: Linear Roadmap Viewer
 
 - ○ Clone and run locally
   Node.js + a Linear OAuth app + ~5 minutes
-- ○ Setup with Claude
-  Copy this prompt into Claude Code or claude.ai:
+- ○ AI-assisted setup
+  Copy this prompt into your preferred AI assistant:
   ---
-  I want to self-host Linear Roadmap Viewer. Repo: https://github.com/JKershaw/LinearViewer — Help me: 1) Clone and install dependencies, 2) Create a Linear OAuth app at linear.app/settings/api/applications with callback http://localhost:3000/auth/callback, 3) Create .env with the required variables, 4) Run it. Walk me through each step.
+  I want to self-host Linear Projects Viewer. Repo: https://github.com/JKershaw/LinearViewer — Help me: 1) Clone and install dependencies, 2) Create a Linear OAuth app at linear.app/settings/api/applications with callback http://localhost:3000/auth/callback, 3) Create .env with the required variables, 4) Run it. Walk me through each step.
   ---
 
 # Source
