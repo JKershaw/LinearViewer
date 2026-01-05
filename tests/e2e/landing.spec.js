@@ -21,10 +21,11 @@ test.describe('Landing Page', () => {
     await page.goto('/');
 
     // Should show project headers from landing.md
-    await expect(page.locator('.project-header')).toHaveCount(4);
+    await expect(page.locator('.project-header')).toHaveCount(5);
     await expect(page.locator('.project-header:has-text("Login")')).toBeVisible();
     await expect(page.locator('.project-header:has-text("What This Is")')).toBeVisible();
     await expect(page.locator('.project-header:has-text("Self-Host")')).toBeVisible();
+    await expect(page.locator('.project-header:has-text("Use Cases")')).toBeVisible();
     await expect(page.locator('.project-header:has-text("Source")')).toBeVisible();
   });
 
@@ -34,7 +35,7 @@ test.describe('Landing Page', () => {
     // Should have different state indicators
     await expect(page.locator('.state.done')).toHaveCount(4); // ✓ indicators
     await expect(page.locator('.state.in-progress')).toHaveCount(1); // ◐ indicator
-    await expect(page.locator('.state.todo')).toHaveCount(4); // ○ indicators
+    await expect(page.locator('.state.todo')).toHaveCount(8); // ○ indicators
   });
 
   test('does not show logout link on landing page', async ({ page }) => {
