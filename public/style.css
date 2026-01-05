@@ -37,14 +37,63 @@ h1 {
   font-weight: normal;
 }
 
-.logout {
+.header-actions {
+  display: flex;
+  gap: 1.5ch;
+}
+
+.header-actions a {
   color: var(--fg-dim);
   text-decoration: none;
   font-size: 0.9em;
 }
 
-.logout:hover {
+.header-actions a:hover {
   color: var(--fg);
+}
+
+/* In Progress section */
+.in-progress-section {
+  margin-bottom: 2.5rem;
+}
+
+.in-progress-header {
+  color: var(--yellow);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.5rem 0;
+}
+
+.in-progress-item {
+  display: flex;
+  align-items: baseline;
+  padding: 4px 0;
+  padding-left: 1.5ch;
+}
+
+.in-progress-item.expandable {
+  cursor: pointer;
+}
+
+.in-progress-item.expandable:hover .title {
+  text-decoration: underline;
+  text-decoration-color: var(--fg-dim);
+  text-underline-offset: 2px;
+}
+
+.in-progress-project {
+  color: var(--fg-dim);
+  margin-left: 1ch;
+  font-size: 0.9em;
+}
+
+.in-progress-assignee {
+  color: var(--fg-dim);
+  font-size: 0.9em;
+}
+
+.in-progress-items .details {
+  padding-left: 3.5ch;
 }
 
 .project {
@@ -65,6 +114,11 @@ h1 {
   margin-bottom: 0.5rem;
   word-wrap: break-word;
   overflow-wrap: break-word;
+  cursor: pointer;
+}
+
+.project-description:hover {
+  color: var(--fg);
 }
 
 .desc-toggle {
@@ -130,6 +184,22 @@ h1 {
   color: var(--blue);
 }
 
+.detail-link {
+  color: var(--blue);
+  text-decoration: none;
+  font-size: 0.9em;
+}
+
+.detail-link:hover {
+  text-decoration: underline;
+}
+
+.project-meta {
+  color: var(--fg-dim);
+  margin-left: 3ch;
+  margin-bottom: 0.75rem;
+}
+
 .completed-toggle {
   color: var(--fg-dim);
   cursor: pointer;
@@ -146,11 +216,11 @@ h1 {
 }
 
 /* Clickable items with details */
-.line.has-details {
+.line.expandable {
   cursor: pointer;
 }
 
-.line.has-details:hover .title {
+.line.expandable:hover .title {
   text-decoration: underline;
   text-decoration-color: var(--fg-dim);
   text-underline-offset: 2px;
@@ -222,7 +292,7 @@ h1 {
     padding-left: 1rem;
   }
 
-  .line.has-details:hover .title {
+  .line.expandable:hover .title {
     text-decoration: none;
   }
 }
