@@ -7,7 +7,19 @@ import { MangoClient } from '@jkershaw/mangodb'
 import { MongoSessionStore } from './lib/session-store.js'
 import { fetchRoadmap } from './lib/linear.js'
 import { buildForest, partitionCompleted } from './lib/tree.js'
-import { renderPage, renderLoginPage } from './lib/render.js'
+import { renderPage } from './lib/render.js'
+import { parseLandingPage } from './lib/parse-landing.js'
+
+// Parse landing page content at startup
+const landingData = parseLandingPage('./content/landing.md')
+const landingForest = buildForest(landingData.issues)
+const landingTrees = landingData.projects
+  .sort((a, b) => a.sortOrder - b.sortOrder)
+  .map(project => {
+    const { roots } = landingForest.get(project.id) || { roots: [] }
+    const { incomplete, completed, completedCount } = partitionCompleted(roots)
+    return { project, incomplete, completed, completedCount }
+  })
 
 // Initialize DB client (MongoDB in production, MangoDB in development)
 const dbClient = process.env.MONGODB_URI
@@ -103,11 +115,12 @@ app.get('/logout', (req, res) => {
 // Main page
 app.get('/', async (req, res) => {
   if (!req.session.accessToken) {
-    return res.send(renderLoginPage())
+    const html = renderPage(landingTrees, [], landingData.organizationName, { isLanding: true })
+    return res.send(html)
   }
 
   try {
-    const { projects, issues } = await fetchRoadmap(req.session.accessToken)
+    const { organizationName, projects, issues } = await fetchRoadmap(req.session.accessToken)
     const forest = buildForest(issues)
 
     // Extract in-progress issues with project names
@@ -135,15 +148,16 @@ app.get('/', async (req, res) => {
         return { project, incomplete, completed, completedCount }
       })
 
-    const html = renderPage(trees, inProgressIssues)
+    const html = renderPage(trees, inProgressIssues, organizationName)
     res.send(html)
   } catch (error) {
     console.error('Error fetching roadmap:', error)
 
-    // If unauthorized, clear session and show login
+    // If unauthorized, clear session and show landing
     if (error.response?.status === 401) {
       req.session.destroy()
-      return res.send(renderLoginPage())
+      const html = renderPage(landingTrees, [], landingData.organizationName, { isLanding: true })
+      return res.send(html)
     }
 
     res.status(500).send(`<pre>Error: ${error.message}</pre>`)
