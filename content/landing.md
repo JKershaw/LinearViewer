@@ -8,6 +8,8 @@ title: Linear Roadmap Viewer
 - ◐ Connect with Linear
   OAuth with read-only scope
   @url: /auth/linear
+  @linkText: Login with Linear →
+  @sameTab: true
 
 # What This Is
 > A minimal, CLI-aesthetic view of your Linear projects
@@ -33,7 +35,10 @@ title: Linear Roadmap Viewer
   ---
 
 # Source
-> MIT License
 
-- ✓ View on GitHub
+- ○ View on GitHub
   @url: https://github.com/JKershaw/LinearViewer
+  @linkText: github.com/JKershaw/LinearViewer
+- ○ Built by John Kershaw
+  @url: https://jkershaw.com
+  @linkText: jkershaw.com
