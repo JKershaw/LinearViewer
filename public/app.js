@@ -388,42 +388,6 @@ function init() {
       setArrow(el, !isCollapsed)
     })
   })
-
-  // Team selector - switch teams by navigating to new URL
-  const teamSelector = document.getElementById('team-filter')
-  if (teamSelector) {
-    // Sync URL with localStorage on initial load
-    const urlParams = new URLSearchParams(window.location.search)
-    const urlTeam = urlParams.get('team')
-    const savedTeam = localStorage.getItem(TEAM_STORAGE_KEY)
-
-    // Check if saved team still exists in dropdown (prevents redirect loop if team was deleted)
-    const savedTeamExists = savedTeam === 'all' ||
-      [...teamSelector.options].some(opt => opt.value === savedTeam)
-
-    // If URL has no team but localStorage does (and team still exists), redirect to saved team
-    if (!urlTeam && savedTeam && savedTeam !== 'all' && savedTeamExists) {
-      window.location.href = `/?team=${savedTeam}`
-      return
-    }
-
-    // Clear invalid saved team from localStorage
-    if (savedTeam && !savedTeamExists) {
-      localStorage.removeItem(TEAM_STORAGE_KEY)
-    }
-
-    // Save current selection to localStorage
-    const currentTeam = urlTeam || 'all'
-    localStorage.setItem(TEAM_STORAGE_KEY, currentTeam)
-
-    // Handle team selection change
-    teamSelector.addEventListener('change', (e) => {
-      const teamId = e.target.value
-      localStorage.setItem(TEAM_STORAGE_KEY, teamId)
-      const url = teamId === 'all' ? '/' : `/?team=${teamId}`
-      window.location.href = url
-    })
-  }
 }
 
 // Toggle project description expand/collapse
@@ -440,37 +404,154 @@ function initDescriptionToggles() {
   })
 }
 
-// Workspace switcher dropdown
-function initWorkspaceSwitcher() {
-  const switcher = document.getElementById('workspace-switcher')
-  if (!switcher) return
+// Navigation bar interactions (workspace/team selectors)
+function initNavBar() {
+  const navBar = document.querySelector('.nav-bar')
+  if (!navBar) return
 
-  const button = switcher.querySelector('.current-workspace')
-  const dropdown = switcher.querySelector('.workspace-dropdown')
+  const workspaceToggle = document.getElementById('workspace-toggle')
+  const teamToggle = document.getElementById('team-toggle')
+  const workspaceOptions = document.getElementById('workspace-options')
+  const teamOptions = document.getElementById('team-options')
 
-  button.addEventListener('click', (e) => {
-    e.stopPropagation()
-    const expanded = button.getAttribute('aria-expanded') === 'true'
-    button.setAttribute('aria-expanded', !expanded)
-    dropdown.classList.toggle('open')
-  })
+  // Track currently open selector
+  let openSelector = null
+
+  function closeAllSelectors() {
+    ;[workspaceToggle, teamToggle].forEach(btn => {
+      if (btn) btn.setAttribute('aria-expanded', 'false')
+    })
+    ;[workspaceOptions, teamOptions].forEach(panel => {
+      if (panel) panel.classList.add('hidden')
+    })
+    openSelector = null
+  }
+
+  function toggleSelector(toggle, options, selectorName) {
+    const isOpen = toggle.getAttribute('aria-expanded') === 'true'
+
+    if (isOpen) {
+      closeAllSelectors()
+    } else {
+      closeAllSelectors()
+      toggle.setAttribute('aria-expanded', 'true')
+      options.classList.remove('hidden')
+      openSelector = selectorName
+    }
+  }
+
+  // Workspace toggle
+  if (workspaceToggle && workspaceOptions) {
+    workspaceToggle.addEventListener('click', (e) => {
+      e.stopPropagation()
+      toggleSelector(workspaceToggle, workspaceOptions, 'workspace')
+    })
+  }
+
+  // Team toggle
+  if (teamToggle && teamOptions) {
+    teamToggle.addEventListener('click', (e) => {
+      e.stopPropagation()
+      toggleSelector(teamToggle, teamOptions, 'team')
+    })
+  }
+
+  // Team option selection (workspace uses form submission)
+  if (teamOptions) {
+    teamOptions.addEventListener('click', (e) => {
+      const option = e.target.closest('.nav-option[data-team]')
+      if (!option) return
+
+      e.stopPropagation()
+      const teamId = option.dataset.team
+      localStorage.setItem(TEAM_STORAGE_KEY, teamId)
+      const url = teamId === 'all' ? '/' : `/?team=${teamId}`
+      window.location.href = url
+    })
+  }
 
   // Close on outside click
   document.addEventListener('click', () => {
-    button.setAttribute('aria-expanded', 'false')
-    dropdown.classList.remove('open')
+    if (openSelector) closeAllSelectors()
   })
 
-  // Prevent dropdown clicks from closing (except form submissions)
-  dropdown.addEventListener('click', (e) => {
-    // Allow form submissions to proceed
-    if (e.target.closest('form')) return
-    e.stopPropagation()
+  // Prevent clicks inside options panels from triggering "close on outside click"
+  // Links still navigate, forms still submit - we just don't hide the panel first
+  ;[workspaceOptions, teamOptions].forEach(panel => {
+    if (panel) {
+      panel.addEventListener('click', (e) => e.stopPropagation())
+    }
   })
+
+  // Keyboard navigation
+  function handleKeyboard(e, toggle, options) {
+    if (!options || options.classList.contains('hidden')) return
+
+    const allOptions = [...options.querySelectorAll('.nav-option')]
+    const focusedOption = document.activeElement
+    const currentIndex = allOptions.indexOf(focusedOption)
+
+    switch (e.key) {
+      case 'Escape':
+        closeAllSelectors()
+        toggle?.focus()
+        break
+      case 'ArrowDown':
+        e.preventDefault()
+        if (currentIndex < allOptions.length - 1) {
+          allOptions[currentIndex + 1]?.focus()
+        } else {
+          allOptions[0]?.focus()
+        }
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        if (currentIndex > 0) {
+          allOptions[currentIndex - 1]?.focus()
+        } else {
+          allOptions[allOptions.length - 1]?.focus()
+        }
+        break
+    }
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (openSelector === 'workspace') {
+      handleKeyboard(e, workspaceToggle, workspaceOptions)
+    } else if (openSelector === 'team') {
+      handleKeyboard(e, teamToggle, teamOptions)
+    }
+  })
+
+  // Sync team selection with localStorage on initial load
+  if (teamToggle) {
+    const urlParams = new URLSearchParams(window.location.search)
+    const urlTeam = urlParams.get('team')
+    const savedTeam = localStorage.getItem(TEAM_STORAGE_KEY)
+
+    // Check if saved team still exists in options
+    const teamOptionsAll = document.querySelectorAll('#team-options .nav-option[data-team]')
+    const savedTeamExists = savedTeam === 'all' ||
+      [...teamOptionsAll].some(opt => opt.dataset.team === savedTeam)
+
+    // If URL has no team but localStorage does (and team still exists), redirect
+    if (!urlTeam && savedTeam && savedTeam !== 'all' && savedTeamExists) {
+      window.location.href = `/?team=${savedTeam}`
+      return
+    }
+
+    // Clear invalid saved team
+    if (savedTeam && !savedTeamExists) {
+      localStorage.removeItem(TEAM_STORAGE_KEY)
+    }
+
+    // Save current selection
+    localStorage.setItem(TEAM_STORAGE_KEY, urlTeam || 'all')
+  }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
   init()
   initDescriptionToggles()
-  initWorkspaceSwitcher()
+  initNavBar()
 })

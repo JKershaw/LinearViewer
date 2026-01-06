@@ -40,9 +40,18 @@ test.describe('Authenticated Dashboard', () => {
   });
 
   test('shows logout link when authenticated', async ({ page }) => {
-    const logoutLink = page.locator('a.logout');
+    const logoutLink = page.locator('.nav-action[href="/logout"]');
     await expect(logoutLink).toBeVisible();
-    await expect(logoutLink).toHaveAttribute('href', '/logout');
+    await expect(logoutLink).toContainText('logout');
+  });
+
+  test('shows text-based navigation bar', async ({ page }) => {
+    // Should have nav bar
+    await expect(page.locator('.nav-bar')).toBeVisible();
+
+    // Should have reset and logout actions
+    await expect(page.locator('.nav-action.reset-view')).toBeVisible();
+    await expect(page.locator('.nav-action[href="/logout"]')).toBeVisible();
   });
 
   test('shows organization name from mock data', async ({ page }) => {
