@@ -12,8 +12,11 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   webServer: {
-    command: 'NODE_ENV=test PORT=3001 npm start',
+    command: 'NODE_ENV=test PORT=3001 SESSION_SECRET=test-secret-for-playwright node server.js',
     url: 'http://localhost:3001',
-    reuseExistingServer: false,
+    reuseExistingServer: !process.env.CI,
+    timeout: 120000,
+    stdout: 'pipe',
+    stderr: 'pipe',
   },
 });

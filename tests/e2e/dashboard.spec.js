@@ -42,13 +42,18 @@ test.describe('Authenticated Dashboard', () => {
   });
 
   test('displays correct state indicators', async ({ page }) => {
-    // Should have in-progress states (in both In Progress section and project trees)
-    const inProgressStates = page.locator('.state.in-progress');
-    await expect(inProgressStates).toHaveCount(4); // 2 in In Progress + 2 in project trees
+    // Mock data defines 5 issues:
+    // - issue-1: in-progress (appears in In Progress + Project Alpha)
+    // - issue-2: todo, child of issue-1 (appears in In Progress as child + Project Alpha)
+    // - issue-3: completed (hidden by default, only in Project Alpha)
+    // - issue-4: in-progress (appears in In Progress + Project Beta)
+    // - issue-5: backlog/todo (only in Project Beta)
 
-    // Should have todo states (in In Progress section as descendants + project trees)
-    // issue-2 appears in both In Progress (child of in-progress issue-1) and Project Alpha
-    // issue-5 appears in Project Beta only
+    // In-progress count: issue-1 x2 + issue-4 x2 = 4
+    const inProgressStates = page.locator('.state.in-progress');
+    await expect(inProgressStates).toHaveCount(4);
+
+    // Todo count: issue-2 x2 (In Progress + Alpha) + issue-5 x1 (Beta only) = 3
     await expect(page.locator('.state.todo')).toHaveCount(3);
   });
 
