@@ -282,22 +282,6 @@ function init() {
     })
   }
 
-  // Toggle project meta visibility
-  document.querySelectorAll('.project-description').forEach(desc => {
-    desc.addEventListener('click', (e) => {
-      // Don't toggle if clicking the truncation button
-      if (e.target.closest('.desc-toggle')) return
-
-      const project = desc.closest('.project')
-      const projectId = project.dataset.id
-      toggleInArray(state.expandedProjectMeta, projectId)
-      persistState(state)
-
-      const meta = project.querySelector('.project-meta')
-      setHidden(meta, !state.expandedProjectMeta.includes(projectId))
-    })
-  })
-
   // Toggle expand/collapse - controls both details AND children
   function toggleItem(line) {
     const id = line.dataset.id
@@ -323,120 +307,136 @@ function init() {
     if (toggle) toggle.textContent = nowExpanded ? '▼' : '▶'
   }
 
-  // Arrow click
-  document.querySelectorAll('.toggle').forEach(el => {
-    el.addEventListener('click', (e) => {
-      e.stopPropagation()
-      toggleItem(e.target.closest('[data-id]'))
-    })
-  })
+  // Handle project header collapse/expand
+  function handleProjectHeaderClick(header) {
+    const project = header.closest('.project')
+    const projectId = project.dataset.id
+    toggleInArray(state.collapsedProjects, projectId)
+    persistState(state)
 
-  // Line click (for expandable items)
-  document.querySelectorAll('.line.expandable').forEach(el => {
-    el.addEventListener('click', (e) => {
-      // Don't toggle if clicking a link
-      if (e.target.closest('a')) return
-      toggleItem(el)
-    })
-  })
+    const isCollapsed = state.collapsedProjects.includes(projectId)
 
-  // Toggle in-progress section collapse
-  const inProgressHeader = document.querySelector('.in-progress-header')
-  if (inProgressHeader) {
-    inProgressHeader.addEventListener('click', () => {
-      state.inProgressCollapsed = !state.inProgressCollapsed
-      persistState(state)
+    if (isCollapsed) {
+      // Hide all project content (including .node containers)
+      project.querySelectorAll('.node, .project-description, .project-meta, .completed-toggle, [data-completed-for]')
+        .forEach(hide)
+    } else {
+      // Show project description, meta, and completed toggle
+      show(project.querySelector('.project-description'))
+      show(project.querySelector('.project-meta'))
+      show(project.querySelector('.completed-toggle'))
 
-      const items = document.querySelector('.in-progress-items')
-      setHidden(items, state.inProgressCollapsed)
-      setArrow(inProgressHeader, !state.inProgressCollapsed)
-    })
-  }
+      // Show top-level nodes (but keep them collapsed unless explicitly expanded)
+      project.querySelectorAll(':scope > .node').forEach(node => {
+        show(node)
+        const nodeId = node.dataset.id
+        // Show details and children only if this task is expanded
+        if (nodeId && isExpanded(state.expanded, nodeId, 'project')) {
+          const details = node.querySelector(':scope > .details')
+          if (details) show(details)
+          showDescendantsRespectingExpanded(nodeId, state.expanded, 'project')
+          const toggle = node.querySelector('.line .toggle')
+          if (toggle) toggle.textContent = '▼'
+        }
+      })
 
-  // Toggle completed (hideCompleted actually stores "shown" projects due to HTML defaulting to hidden)
-  document.querySelectorAll('.completed-toggle').forEach(el => {
-    el.addEventListener('click', (e) => {
-      const projectId = e.target.dataset.projectId
-      toggleInArray(state.hideCompleted, projectId)
-      persistState(state)
-
-      const isShown = state.hideCompleted.includes(projectId)
-      const section = document.querySelector(`[data-completed-for="${projectId}"]`)
-      setHidden(section, !isShown)
-      e.target.textContent = isShown
-        ? 'hide completed'
-        : `show ${e.target.dataset.count} completed`
-    })
-  })
-
-  // Toggle project collapse
-  document.querySelectorAll('.project-header').forEach(el => {
-    el.addEventListener('click', (e) => {
-      const project = e.target.closest('.project')
-      const projectId = project.dataset.id
-      toggleInArray(state.collapsedProjects, projectId)
-      persistState(state)
-
-      const isCollapsed = state.collapsedProjects.includes(projectId)
-
-      if (isCollapsed) {
-        // Hide all project content (including .node containers)
-        project.querySelectorAll('.node, .project-description, .project-meta, .completed-toggle, [data-completed-for]')
-          .forEach(hide)
-      } else {
-        // Show project description, meta, and completed toggle
-        show(project.querySelector('.project-description'))
-        show(project.querySelector('.project-meta'))
-        show(project.querySelector('.completed-toggle'))
-
-        // Show top-level nodes (but keep them collapsed unless explicitly expanded)
-        project.querySelectorAll(':scope > .node').forEach(node => {
+      // Completed section: only show if in hideCompleted (which tracks "shown" projects)
+      const completedSection = project.querySelector('[data-completed-for]')
+      if (completedSection && state.hideCompleted.includes(projectId)) {
+        show(completedSection)
+        // Show top-level completed nodes
+        completedSection.querySelectorAll(':scope > .node').forEach(node => {
           show(node)
           const nodeId = node.dataset.id
-          // Show details and children only if this task is expanded
+          // Show details and children only if expanded
           if (nodeId && isExpanded(state.expanded, nodeId, 'project')) {
             const details = node.querySelector(':scope > .details')
             if (details) show(details)
             showDescendantsRespectingExpanded(nodeId, state.expanded, 'project')
-            const toggle = node.querySelector('.line .toggle')
-            if (toggle) toggle.textContent = '▼'
           }
         })
-
-        // Completed section: only show if in hideCompleted (which tracks "shown" projects)
-        const completedSection = project.querySelector('[data-completed-for]')
-        if (completedSection && state.hideCompleted.includes(projectId)) {
-          show(completedSection)
-          // Show top-level completed nodes
-          completedSection.querySelectorAll(':scope > .node').forEach(node => {
-            show(node)
-            const nodeId = node.dataset.id
-            // Show details and children only if expanded
-            if (nodeId && isExpanded(state.expanded, nodeId, 'project')) {
-              const details = node.querySelector(':scope > .details')
-              if (details) show(details)
-              showDescendantsRespectingExpanded(nodeId, state.expanded, 'project')
-            }
-          })
-        }
       }
+    }
 
-      setArrow(el, !isCollapsed)
-    })
-  })
-}
+    setArrow(header, !isCollapsed)
+  }
 
-// Toggle project description expand/collapse
-function initDescriptionToggles() {
-  document.querySelectorAll('.desc-toggle').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+  // ==========================================================================
+  // Delegated click handler - replaces individual event listeners
+  // ==========================================================================
+  // Using event delegation: one listener on document handles all interactive
+  // elements. Order matters - check more specific selectors first.
+  document.addEventListener('click', (e) => {
+    // 1. Description toggle (show more/less) - must check before .project-description
+    if (e.target.closest('.desc-toggle')) {
       e.stopPropagation()
       const container = e.target.closest('.project-description')
       const truncated = container.querySelector('.desc-truncated')
       const full = container.querySelector('.desc-full')
       truncated.classList.toggle('hidden')
       full.classList.toggle('hidden')
-    })
+      return
+    }
+
+    // 2. Toggle arrow click (expand/collapse children)
+    const toggle = e.target.closest('.toggle')
+    if (toggle) {
+      e.stopPropagation()
+      toggleItem(toggle.closest('[data-id]'))
+      return
+    }
+
+    // 3. Project description click (show/hide meta)
+    const desc = e.target.closest('.project-description')
+    if (desc) {
+      const project = desc.closest('.project')
+      const projectId = project.dataset.id
+      toggleInArray(state.expandedProjectMeta, projectId)
+      persistState(state)
+      const meta = project.querySelector('.project-meta')
+      setHidden(meta, !state.expandedProjectMeta.includes(projectId))
+      return
+    }
+
+    // 4. Line click (expand issue details) - skip if clicking a link
+    const line = e.target.closest('.line.expandable')
+    if (line && !e.target.closest('a')) {
+      toggleItem(line)
+      return
+    }
+
+    // 5. Completed toggle click
+    const completedToggle = e.target.closest('.completed-toggle')
+    if (completedToggle) {
+      const projectId = completedToggle.dataset.projectId
+      toggleInArray(state.hideCompleted, projectId)
+      persistState(state)
+      const isShown = state.hideCompleted.includes(projectId)
+      const section = document.querySelector(`[data-completed-for="${projectId}"]`)
+      setHidden(section, !isShown)
+      completedToggle.textContent = isShown
+        ? 'hide completed'
+        : `show ${completedToggle.dataset.count} completed`
+      return
+    }
+
+    // 6. Project header click (collapse project)
+    const header = e.target.closest('.project-header')
+    if (header) {
+      handleProjectHeaderClick(header)
+      return
+    }
+
+    // 7. In-progress header click
+    const inProgressHeader = e.target.closest('.in-progress-header')
+    if (inProgressHeader) {
+      state.inProgressCollapsed = !state.inProgressCollapsed
+      persistState(state)
+      const items = document.querySelector('.in-progress-items')
+      setHidden(items, state.inProgressCollapsed)
+      setArrow(inProgressHeader, !state.inProgressCollapsed)
+      return
+    }
   })
 }
 
@@ -588,6 +588,5 @@ function initNavBar() {
 
 document.addEventListener('DOMContentLoaded', () => {
   init()
-  initDescriptionToggles()
   initNavBar()
 })
