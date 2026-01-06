@@ -641,3 +641,15 @@ h1 {
   font-family: var(--font-content);
   line-height: 1.5;
 }
+
+.error-home-link {
+  display: block;
+  margin-top: 1rem;
+  color: var(--fg-dim);
+  font-family: var(--font-content);
+  font-size: 0.9em;
+}
+
+.error-home-link:hover {
+  color: var(--fg);
+}
