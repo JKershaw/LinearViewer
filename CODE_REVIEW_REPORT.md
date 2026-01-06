@@ -14,9 +14,9 @@ Linear Projects Viewer is a well-designed minimal web application with a clean C
 | Category | Rating | Summary |
 |----------|--------|---------|
 | Test Coverage | B+ | 51 tests covering auth, workspaces, errors |
-| Backend Code | B- | Functional but needs refactoring |
-| Frontend Code | B- | Works well, needs error handling |
-| Security | B | Good basics but missing validations |
+| Backend Code | B | Functional, error handling improved |
+| Frontend Code | B | Works well, localStorage errors handled |
+| Security | B+ | Session fixation fixed, env vars validated |
 
 ---
 
@@ -212,42 +212,39 @@ Environment variables are used without checking they exist:
 
 ### Completed ✅
 
+**Test Coverage:**
 - ~~Add authentication flow tests~~ - Created `auth.spec.js` with 7 tests
 - ~~Add error scenario tests~~ - Created `error-handling.spec.js` with 10 tests
 - ~~Add workspace/team switching tests~~ - Created `workspace.spec.js` with 8 tests
 - ~~Document test magic numbers~~ - Added comments explaining expected counts
 
-### Priority 1: Error Handling
+**Error Handling:**
+- ~~Validate environment variables at startup~~ - Fail fast with clear messages
+- ~~Add error handling to localStorage operations~~ - Safe helpers with try-catch
+- ~~Add error handling to parse-landing.js~~ - Fallback content on file errors
+- ~~Regenerate session on authentication~~ - Prevents session fixation attacks
 
-1. **Validate environment variables at startup** - Check `SESSION_SECRET`, `LINEAR_CLIENT_ID`, and `LINEAR_CLIENT_SECRET` exist before starting server
+### Priority 1: Code Quality
 
-2. **Add error handling to localStorage operations** - Wrap `JSON.parse()` and `localStorage.setItem()` in try-catch blocks
+1. **Extract duplicate functions from tree.js** - Move `assignDepth()` and `sortNodes()` to shared helpers
 
-3. **Add error handling to parse-landing.js** - Wrap `readFileSync()` in try-catch
+2. **Use event delegation** - Replace individual event listeners with delegated listeners on document or container
 
-4. **Regenerate session on authentication** - Call `req.session.regenerate()` after successful OAuth
+3. **Split server.js** - Extract OAuth routes, workspace management, and data fetching into separate modules
 
-### Priority 2: Code Quality
+4. **Use CSS variables consistently** - Replace hard-coded colors with CSS custom properties
 
-5. **Extract duplicate functions from tree.js** - Move `assignDepth()` and `sortNodes()` to shared helpers
+### Priority 2: Cleanup
 
-6. **Use event delegation** - Replace individual event listeners with delegated listeners on document or container
+5. **Remove test.skip() calls** - Either fix the two skipped tests (lines 92, 178) or remove the incomplete features
 
-7. **Split server.js** - Extract OAuth routes, workspace management, and data fetching into separate modules
+6. **Move test fixtures** - Extract `testMockData` and `testMockTeams` to `tests/fixtures/`
 
-8. **Use CSS variables consistently** - Replace hard-coded colors with CSS custom properties
+7. **Remove inline event handlers** - Move `onsubmit` handler from HTML to JavaScript
 
-### Priority 3: Cleanup
+8. **Consider immutable state updates** - Replace `push()`/`splice()` with spread operator patterns
 
-9. **Remove test.skip() calls** - Either fix the two skipped tests (lines 92, 178) or remove the incomplete features
-
-10. **Move test fixtures** - Extract `testMockData` and `testMockTeams` to `tests/fixtures/`
-
-11. **Remove inline event handlers** - Move `onsubmit` handler from HTML to JavaScript
-
-12. **Consider immutable state updates** - Replace `push()`/`splice()` with spread operator patterns
-
-13. **Add JSDoc types** - Document complex data structures like the forest Map
+9. **Add JSDoc types** - Document complex data structures like the forest Map
 
 ---
 
@@ -255,11 +252,11 @@ Environment variables are used without checking they exist:
 
 | File | Lines | Issues Found | Severity |
 |------|-------|--------------|----------|
-| `server.js` | 632 | 6 | High |
+| `server.js` | ~680 | 3 | Medium |
 | `lib/tree.js` | 287 | 3 | Medium |
 | `lib/render.js` | 522 | 2 | Medium |
-| `lib/parse-landing.js` | 199 | 1 | Medium |
-| `public/app.js` | 549 | 4 | High |
+| `lib/parse-landing.js` | ~210 | 0 | ✅ Fixed |
+| `public/app.js` | ~590 | 2 | Low |
 | `public/style.css` | 628 | 2 | Low |
 | `tests/e2e/*.spec.js` | ~750 | 2 | Low |
 
