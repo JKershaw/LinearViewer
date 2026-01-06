@@ -16,7 +16,7 @@ import { MangoClient } from '@jkershaw/mangodb'
 import { MongoSessionStore } from './lib/session-store.js'
 import { fetchProjects, fetchTeams, fetchOrganization } from './lib/linear.js'
 import { buildForest, partitionCompleted } from './lib/tree.js'
-import { renderPage } from './lib/render.js'
+import { renderPage, renderErrorPage } from './lib/render.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken, calculateExpiresAt } from './lib/token-refresh.js'
 
@@ -322,12 +322,27 @@ app.get('/auth/callback', async (req, res) => {
 
   // Handle user denial or OAuth errors
   if (error) {
-    return res.status(400).send(`<pre>OAuth error: ${error}</pre>`)
+    const errorMessages = {
+      'access_denied': 'You cancelled the authorization request.',
+      'invalid_request': 'The authorization request was invalid.',
+      'unauthorized_client': 'This application is not authorized.',
+      'server_error': 'Linear encountered an error. Please try again.',
+    };
+    const message = errorMessages[error] || `Authorization failed: ${error}`;
+    const html = renderErrorPage('Authorization Cancelled', message, {
+      action: 'Try again',
+      actionUrl: '/auth/linear'
+    });
+    return res.status(400).send(html);
   }
 
   // Validate state token matches what we stored (CSRF protection)
   if (state !== req.session.oauthState) {
-    return res.status(400).send('<pre>Invalid state parameter</pre>')
+    const html = renderErrorPage('Session Expired', 'Your session expired or was invalid. This can happen if you took too long to authorize, or if your browser restarted.', {
+      action: 'Try again',
+      actionUrl: '/auth/linear'
+    });
+    return res.status(400).send(html);
   }
 
   try {
@@ -347,16 +362,25 @@ app.get('/auth/callback', async (req, res) => {
     const data = await response.json()
 
     if (!response.ok) {
-      return res.status(400).send(`<pre>Token error: ${data.error || 'Unknown error'}</pre>`)
+      console.error('Token exchange error:', data.error);
+      const html = renderErrorPage('Authentication Failed', 'Could not complete authentication with Linear. Please try again.', {
+        action: 'Try again',
+        actionUrl: '/auth/linear'
+      });
+      return res.status(400).send(html);
     }
 
     // Fetch organization info to identify workspace
-    let org
+    let org;
     try {
-      org = await fetchOrganization(data.access_token)
+      org = await fetchOrganization(data.access_token);
     } catch (orgError) {
-      console.error('Failed to fetch organization:', orgError)
-      return res.status(500).send('<pre>Failed to fetch workspace information</pre>')
+      console.error('Failed to fetch organization:', orgError);
+      const html = renderErrorPage('Connection Error', 'Could not fetch workspace information from Linear. Please try again.', {
+        action: 'Try again',
+        actionUrl: '/auth/linear'
+      });
+      return res.status(500).send(html);
     }
 
     // Build workspace object
@@ -372,9 +396,13 @@ app.get('/auth/callback', async (req, res) => {
 
     // Add/update workspace in session
     try {
-      upsertWorkspace(req.session, workspace)
+      upsertWorkspace(req.session, workspace);
     } catch (limitError) {
-      return res.status(400).send(`<pre>${limitError.message}</pre>`)
+      const html = renderErrorPage('Workspace Limit Reached', 'You have reached the maximum number of connected workspaces. Please remove one before adding another.', {
+        action: 'Go to dashboard',
+        actionUrl: '/'
+      });
+      return res.status(400).send(html);
     }
 
     req.session.activeWorkspaceId = workspace.id
@@ -384,10 +412,11 @@ app.get('/auth/callback', async (req, res) => {
     res.redirect('/')
   } catch (err) {
     console.error('OAuth callback error:', err);
-    const errorMessage = process.env.NODE_ENV === 'production'
-      ? 'Authentication error occurred'
-      : err.message;
-    res.status(500).send(`<pre>Error: ${errorMessage}</pre>`);
+    const html = renderErrorPage('Something Went Wrong', 'An unexpected error occurred during authentication. Please try again.', {
+      action: 'Try again',
+      actionUrl: '/auth/linear'
+    });
+    res.status(500).send(html);
   }
 })
 
@@ -599,10 +628,12 @@ app.get('/', async (req, res) => {
       });
     }
 
-    const errorMessage = process.env.NODE_ENV === 'production'
-      ? 'Internal Server Error'
-      : error.message;
-    res.status(500).send(`<pre>Error: ${errorMessage}</pre>`);
+    console.error('Main route error:', error);
+    const html = renderErrorPage('Something Went Wrong', 'Could not load your projects. Please try again or re-authenticate.', {
+      action: 'Try again',
+      actionUrl: '/'
+    });
+    res.status(500).send(html);
   }
 })
 

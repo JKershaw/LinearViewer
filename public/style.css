@@ -613,3 +613,31 @@ h1 {
 .login-button:hover {
   background: #4e5bc2;
 }
+
+/* =============================================================================
+   Error Page
+   =============================================================================
+   Friendly error display for OAuth and other errors.
+*/
+.error-container {
+  text-align: center;
+  margin-top: 4rem;
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.error-title {
+  font-family: var(--font-content);
+  font-size: 1.25rem;
+  font-weight: 500;
+  color: var(--fg);
+  margin-bottom: 1rem;
+}
+
+.error-message {
+  color: var(--fg-dim);
+  margin-bottom: 2rem;
+  font-family: var(--font-content);
+  line-height: 1.5;
+}
