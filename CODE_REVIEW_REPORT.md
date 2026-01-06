@@ -226,26 +226,25 @@ Environment variables are used without checking they exist:
 
 **Code Quality:**
 - ~~Extract duplicate functions from tree.js~~ - `assignDepth()`, `sortNodesWithStatus()`, `sortNodesByPriority()`
+- ~~Split server.js~~ - Extracted to `lib/workspace.js`, `routes/auth.js`, `routes/workspace.js` (721 → 444 lines)
 
 ### Priority 1: Code Quality
 
 1. **Use event delegation** - Replace individual event listeners with delegated listeners on document or container
 
-2. **Split server.js** - Extract OAuth routes, workspace management, and data fetching into separate modules
-
-3. **Use CSS variables consistently** - Replace hard-coded colors with CSS custom properties
+2. **Use CSS variables consistently** - Replace hard-coded colors with CSS custom properties
 
 ### Priority 2: Cleanup
 
-4. **Remove test.skip() calls** - Either fix the two skipped tests (lines 92, 178) or remove the incomplete features
+3. **Remove test.skip() calls** - Either fix the two skipped tests (lines 92, 178) or remove the incomplete features
 
-5. **Move test fixtures** - Extract `testMockData` and `testMockTeams` to `tests/fixtures/`
+4. **Move test fixtures** - Extract `testMockData` and `testMockTeams` to `tests/fixtures/`
 
-6. **Remove inline event handlers** - Move `onsubmit` handler from HTML to JavaScript
+5. **Remove inline event handlers** - Move `onsubmit` handler from HTML to JavaScript
 
-7. **Consider immutable state updates** - Replace `push()`/`splice()` with spread operator patterns
+6. **Consider immutable state updates** - Replace `push()`/`splice()` with spread operator patterns
 
-8. **Add JSDoc types** - Document complex data structures like the forest Map
+7. **Add JSDoc types** - Document complex data structures like the forest Map
 
 ---
 
@@ -253,7 +252,10 @@ Environment variables are used without checking they exist:
 
 | File | Lines | Issues Found | Severity |
 |------|-------|--------------|----------|
-| `server.js` | ~680 | 3 | Medium |
+| `server.js` | 444 | 1 | Low |
+| `lib/workspace.js` | 83 | 0 | ✅ New |
+| `routes/auth.js` | 190 | 0 | ✅ New |
+| `routes/workspace.js` | 54 | 0 | ✅ New |
 | `lib/tree.js` | ~305 | 0 | ✅ Fixed |
 | `lib/render.js` | 522 | 2 | Medium |
 | `lib/parse-landing.js` | ~210 | 0 | ✅ Fixed |
