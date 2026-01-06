@@ -14,7 +14,7 @@ import session from 'express-session'
 import { MongoClient } from 'mongodb'
 import { MangoClient } from '@jkershaw/mangodb'
 import { MongoSessionStore } from './lib/session-store.js'
-import { fetchProjects } from './lib/linear.js'
+import { fetchProjects, fetchTeams } from './lib/linear.js'
 import { buildForest, partitionCompleted } from './lib/tree.js'
 import { renderPage } from './lib/render.js'
 import { parseLandingPage } from './lib/parse-landing.js'
@@ -120,6 +120,11 @@ if (process.env.NODE_ENV === 'test') {
 }
 
 // Mock data matching Linear API structure for testing
+const testMockTeams = [
+  { id: 'team-eng', name: 'Engineering', key: 'ENG' },
+  { id: 'team-design', name: 'Design', key: 'DES' }
+]
+
 const testMockData = {
   organizationName: 'Test Workspace',
   projects: [
@@ -127,11 +132,11 @@ const testMockData = {
     { id: 'proj-beta', name: 'Project Beta', content: 'Second test project', url: 'https://linear.app/test/project/proj-beta', sortOrder: 2 }
   ],
   issues: [
-    { id: 'issue-1', title: 'Parent task in progress', description: 'This is a parent task', estimate: 5, priority: 2, sortOrder: 1, createdAt: '2024-01-01T00:00:00Z', dueDate: '2024-02-01', completedAt: null, url: 'https://linear.app/test/issue/TEST-1', parent: null, project: { id: 'proj-alpha' }, state: { name: 'In Progress', type: 'started' }, assignee: { name: 'Alice' }, labels: { nodes: [{ name: 'feature' }] } },
-    { id: 'issue-2', title: 'Child task todo', description: 'A child task', estimate: 2, priority: 3, sortOrder: 2, createdAt: '2024-01-02T00:00:00Z', dueDate: null, completedAt: null, url: 'https://linear.app/test/issue/TEST-2', parent: { id: 'issue-1' }, project: { id: 'proj-alpha' }, state: { name: 'Todo', type: 'unstarted' }, assignee: null, labels: { nodes: [] } },
-    { id: 'issue-3', title: 'Completed task', description: 'This task is done', estimate: 1, priority: 4, sortOrder: 3, createdAt: '2024-01-03T00:00:00Z', dueDate: null, completedAt: '2024-01-10T00:00:00Z', url: 'https://linear.app/test/issue/TEST-3', parent: null, project: { id: 'proj-alpha' }, state: { name: 'Done', type: 'completed' }, assignee: { name: 'Bob' }, labels: { nodes: [{ name: 'bug' }] } },
-    { id: 'issue-4', title: 'Beta task in progress', description: 'An in-progress task in Beta', estimate: 3, priority: 1, sortOrder: 1, createdAt: '2024-01-04T00:00:00Z', dueDate: '2024-03-01', completedAt: null, url: 'https://linear.app/test/issue/TEST-4', parent: null, project: { id: 'proj-beta' }, state: { name: 'In Progress', type: 'started' }, assignee: { name: 'Charlie' }, labels: { nodes: [{ name: 'urgent' }] } },
-    { id: 'issue-5', title: 'Beta todo task', description: 'A todo task in Beta', estimate: null, priority: 0, sortOrder: 2, createdAt: '2024-01-05T00:00:00Z', dueDate: null, completedAt: null, url: 'https://linear.app/test/issue/TEST-5', parent: null, project: { id: 'proj-beta' }, state: { name: 'Backlog', type: 'backlog' }, assignee: null, labels: { nodes: [] } }
+    { id: 'issue-1', title: 'Parent task in progress', description: 'This is a parent task', estimate: 5, priority: 2, sortOrder: 1, createdAt: '2024-01-01T00:00:00Z', dueDate: '2024-02-01', completedAt: null, url: 'https://linear.app/test/issue/TEST-1', parent: null, project: { id: 'proj-alpha' }, state: { name: 'In Progress', type: 'started' }, assignee: { name: 'Alice' }, labels: { nodes: [{ name: 'feature' }] }, team: { id: 'team-eng' } },
+    { id: 'issue-2', title: 'Child task todo', description: 'A child task', estimate: 2, priority: 3, sortOrder: 2, createdAt: '2024-01-02T00:00:00Z', dueDate: null, completedAt: null, url: 'https://linear.app/test/issue/TEST-2', parent: { id: 'issue-1' }, project: { id: 'proj-alpha' }, state: { name: 'Todo', type: 'unstarted' }, assignee: null, labels: { nodes: [] }, team: { id: 'team-eng' } },
+    { id: 'issue-3', title: 'Completed task', description: 'This task is done', estimate: 1, priority: 4, sortOrder: 3, createdAt: '2024-01-03T00:00:00Z', dueDate: null, completedAt: '2024-01-10T00:00:00Z', url: 'https://linear.app/test/issue/TEST-3', parent: null, project: { id: 'proj-alpha' }, state: { name: 'Done', type: 'completed' }, assignee: { name: 'Bob' }, labels: { nodes: [{ name: 'bug' }] }, team: { id: 'team-eng' } },
+    { id: 'issue-4', title: 'Beta task in progress', description: 'An in-progress task in Beta', estimate: 3, priority: 1, sortOrder: 1, createdAt: '2024-01-04T00:00:00Z', dueDate: '2024-03-01', completedAt: null, url: 'https://linear.app/test/issue/TEST-4', parent: null, project: { id: 'proj-beta' }, state: { name: 'In Progress', type: 'started' }, assignee: { name: 'Charlie' }, labels: { nodes: [{ name: 'urgent' }] }, team: { id: 'team-design' } },
+    { id: 'issue-5', title: 'Beta todo task', description: 'A todo task in Beta', estimate: null, priority: 0, sortOrder: 2, createdAt: '2024-01-05T00:00:00Z', dueDate: null, completedAt: null, url: 'https://linear.app/test/issue/TEST-5', parent: null, project: { id: 'proj-beta' }, state: { name: 'Backlog', type: 'backlog' }, assignee: null, labels: { nodes: [] }, team: { id: 'team-design' } }
   ]
 }
 
@@ -347,14 +352,27 @@ app.get('/logout', (req, res) => {
  * Handles both test mode and real API calls.
  *
  * @param {string} accessToken - The access token for Linear API
- * @returns {Promise<{trees, inProgressIssues, organizationName}>} Prepared data for rendering
+ * @param {string|null} teamId - Optional team ID to filter issues by
+ * @returns {Promise<{trees, inProgressIssues, organizationName, teams, selectedTeamId}>} Prepared data for rendering
  */
-async function fetchAndPrepareProjects(accessToken) {
+async function fetchAndPrepareProjects(accessToken, teamId = null) {
   // Use mock data in test mode to avoid hitting Linear API
   const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
-  const { organizationName, projects, issues } = isTestMode
+
+  // Fetch teams
+  const teams = isTestMode
+    ? testMockTeams
+    : await fetchTeams(accessToken);
+
+  // Fetch projects and issues (filtered by team if specified)
+  let { organizationName, projects, issues } = isTestMode
     ? testMockData
-    : await fetchProjects(accessToken);
+    : await fetchProjects(accessToken, teamId);
+
+  // In test mode, manually filter issues by team
+  if (isTestMode && teamId) {
+    issues = issues.filter(i => i.team?.id === teamId);
+  }
 
   // Build issue tree structure (parent-child relationships)
   const forest = buildForest(issues);
@@ -386,7 +404,7 @@ async function fetchAndPrepareProjects(accessToken) {
       return { project, incomplete, completed, completedCount };
     });
 
-  return { trees, inProgressIssues, organizationName };
+  return { trees, inProgressIssues, organizationName, teams, selectedTeamId: teamId };
 }
 
 /**
@@ -395,6 +413,9 @@ async function fetchAndPrepareProjects(accessToken) {
  * For unauthenticated users: Shows pre-rendered static landing page.
  * For authenticated users: Fetches projects/issues from Linear API and renders
  * the interactive tree view with "In Progress" section.
+ *
+ * Query parameters:
+ * - team: Optional team ID to filter issues by (or 'all' for all teams)
  */
 app.get('/', async (req, res) => {
   // Unauthenticated users see the static landing page
@@ -403,9 +424,12 @@ app.get('/', async (req, res) => {
     return res.send(html)
   }
 
+  // Parse team filter from query string
+  const teamId = req.query.team && req.query.team !== 'all' ? req.query.team : null;
+
   try {
-    const { trees, inProgressIssues, organizationName } = await fetchAndPrepareProjects(req.session.accessToken);
-    const html = renderPage(trees, inProgressIssues, organizationName);
+    const { trees, inProgressIssues, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(req.session.accessToken, teamId);
+    const html = renderPage(trees, inProgressIssues, organizationName, { teams, selectedTeamId });
     res.send(html);
   } catch (error) {
     console.error('Error fetching projects:', error)
@@ -427,8 +451,8 @@ app.get('/', async (req, res) => {
         console.log('Token refreshed after 401, retrying request');
 
         // Retry the request with the new token
-        const { trees, inProgressIssues, organizationName } = await fetchAndPrepareProjects(req.session.accessToken);
-        const html = renderPage(trees, inProgressIssues, organizationName);
+        const { trees, inProgressIssues, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(req.session.accessToken, teamId);
+        const html = renderPage(trees, inProgressIssues, organizationName, { teams, selectedTeamId });
         return res.send(html);
       } catch (refreshError) {
         // Refresh failed, clear session and show landing page
