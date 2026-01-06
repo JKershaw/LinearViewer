@@ -55,23 +55,27 @@ test.describe('Workspace Selector', () => {
 });
 
 test.describe('Workspace Switching', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/test/set-session?multiWorkspace=true');
-  });
-
   test('can switch to second workspace', async ({ page }) => {
+    // Set up multiWorkspace session
+    await page.goto('/test/set-session?multiWorkspace=true');
     await page.goto('/');
 
     // Initially showing first workspace
     await expect(page.locator('#workspace-toggle')).toHaveText('test-workspace');
 
-    // Use request API to switch workspace (more reliable than form click)
-    const secondWorkspaceId = '22222222-2222-2222-2222-222222222222';
-    const response = await page.request.post(`/workspace/${secondWorkspaceId}/switch`);
-    expect(response.ok()).toBeTruthy();
+    // Open workspace selector
+    await page.locator('#workspace-toggle').click();
+    await expect(page.locator('#workspace-options')).toBeVisible();
 
-    // Reload the page to see the change
-    await page.goto('/');
+    // Click the second workspace and wait for a fresh page load (not cached)
+    // Use waitForURL which waits for the navigation to complete
+    await Promise.all([
+      page.waitForURL('/'),
+      page.getByRole('option', { name: /second-workspace/ }).click()
+    ]);
+
+    // Force a reload to bypass any caching issues
+    await page.reload();
 
     // Should now show second workspace
     await expect(page.locator('#workspace-toggle')).toHaveText('second-workspace');
