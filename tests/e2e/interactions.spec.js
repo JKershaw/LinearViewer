@@ -83,16 +83,8 @@ test.describe('Interactive Features', () => {
   });
 
   test('shows completed issues when toggle clicked', async ({ page }) => {
-    // Find completed toggle button
+    // Find completed toggle button (mock data has completed issues, so this should exist)
     const completedToggle = page.locator('.completed-toggle').first();
-
-    // Skip if no completed toggle exists
-    const toggleCount = await completedToggle.count();
-    if (toggleCount === 0) {
-      test.skip();
-      return;
-    }
-
     await expect(completedToggle).toBeVisible();
     await expect(completedToggle).toContainText('show');
 
@@ -172,7 +164,7 @@ test.describe('Landing Page Interactions', () => {
     // Find an expandable issue
     const issueLine = page.locator('.line.expandable').first();
 
-    // Skip if no expandable issues
+    // Landing page uses content/landing.md (not mock data) - skip if no expandable issues
     const count = await issueLine.count();
     if (count === 0) {
       test.skip();
