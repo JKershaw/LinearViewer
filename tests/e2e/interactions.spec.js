@@ -143,7 +143,8 @@ test.describe('Interactive Features', () => {
     });
     expect(storageState).toBeTruthy();
     const parsed = JSON.parse(storageState);
-    expect(parsed.expanded).toContain(issueId);
+    // expanded is now an array of { id, section } objects
+    expect(parsed.expanded).toContainEqual({ id: issueId, section: 'project' });
 
     // Reload page
     await page.reload();
