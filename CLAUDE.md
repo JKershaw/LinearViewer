@@ -4,8 +4,9 @@ A minimal, CLI-aesthetic web app that displays Linear projects and issues as a c
 
 ## Commands
 
-- `npm start` - Start the server (runs on PORT from .env, default 3000)
 - `npm install` - Install dependencies
+- `npx playwright install` - Install Playwright browsers (first-time setup)
+- `npm start` - Start the server (runs on PORT from .env, default 3000)
 - `npm test` - Run Playwright E2E tests
 - `npm test:ui` - Run tests with Playwright UI
 
