@@ -375,10 +375,19 @@ function init() {
     const urlTeam = urlParams.get('team')
     const savedTeam = localStorage.getItem(TEAM_STORAGE_KEY)
 
-    // If URL has no team but localStorage does, redirect to saved team
-    if (!urlTeam && savedTeam && savedTeam !== 'all') {
+    // Check if saved team still exists in dropdown (prevents redirect loop if team was deleted)
+    const savedTeamExists = savedTeam === 'all' ||
+      [...teamSelector.options].some(opt => opt.value === savedTeam)
+
+    // If URL has no team but localStorage does (and team still exists), redirect to saved team
+    if (!urlTeam && savedTeam && savedTeam !== 'all' && savedTeamExists) {
       window.location.href = `/?team=${savedTeam}`
       return
+    }
+
+    // Clear invalid saved team from localStorage
+    if (savedTeam && !savedTeamExists) {
+      localStorage.removeItem(TEAM_STORAGE_KEY)
     }
 
     // Save current selection to localStorage

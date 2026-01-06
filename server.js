@@ -24,6 +24,7 @@ import { refreshAccessToken, needsRefresh, calculateExpiresAt } from './lib/toke
 // Constants
 // =============================================================================
 const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SESSION_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const TOKEN_REFRESH_MAX_WAIT_RETRIES = 50; // Max retries for concurrent request waiting
 const TOKEN_REFRESH_WAIT_DELAY_MS = 100; // Delay between retries when waiting
@@ -424,8 +425,9 @@ app.get('/', async (req, res) => {
     return res.send(html)
   }
 
-  // Parse team filter from query string
-  const teamId = req.query.team && req.query.team !== 'all' ? req.query.team : null;
+  // Parse and validate team filter from query string (must be valid UUID)
+  const rawTeam = req.query.team;
+  const teamId = rawTeam && rawTeam !== 'all' && UUID_REGEX.test(rawTeam) ? rawTeam : null;
 
   try {
     const { trees, inProgressIssues, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(req.session.accessToken, teamId);
