@@ -9,15 +9,14 @@
 
 ## Executive Summary
 
-Linear Projects Viewer is a well-designed minimal web application with a clean CLI aesthetic. The codebase demonstrates good practices in many areas (HTML escaping, CSRF protection, clean CSS organization) but has gaps in code duplication and accessibility.
+Linear Projects Viewer is a well-designed minimal web application with a clean CLI aesthetic. The codebase demonstrates good practices in many areas (HTML escaping, CSRF protection, clean CSS organization) but has gaps in error handling and code duplication.
 
 | Category | Rating | Summary |
 |----------|--------|---------|
 | Test Coverage | B+ | 51 tests covering auth, workspaces, errors |
 | Backend Code | B- | Functional but needs refactoring |
-| Frontend Code | C+ | Works well but critical a11y issues |
+| Frontend Code | B- | Works well, needs error handling |
 | Security | B | Good basics but missing validations |
-| Accessibility | D | ARIA present but keyboard navigation broken |
 
 ---
 
@@ -42,7 +41,6 @@ Linear Projects Viewer is a well-designed minimal web application with a clean C
 | Authentication Flow | ✅ Good | OAuth redirect, logout, state validation tested |
 | Error Handling | ✅ Good | 401 responses, session expiry, validation errors tested |
 | Workspace/Team Switching | ✅ Good | Selector, switching, removal, limits tested |
-| Accessibility | ❌ None | No keyboard navigation or screen reader tests |
 
 ### 1.3 Remaining Test Quality Issues
 
@@ -176,7 +174,6 @@ While functional, immutable updates would be safer and easier to debug.
 |----------|-------|-------|
 | `style.css` | 159, 206-211 | Hard-coded colors not using CSS variables |
 | `style.css` | 375 | Uses `!important` which can cause specificity issues |
-| `style.css` | 23 | `--fg-dim: #666666` has borderline contrast ratio (~4.47:1) |
 
 ---
 
@@ -211,36 +208,7 @@ Environment variables are used without checking they exist:
 
 ---
 
-## 5. Accessibility Assessment
-
-### 5.1 Current State
-
-**Present:**
-- ARIA attributes: `aria-expanded`, `aria-haspopup`, `aria-controls`, `aria-label`
-- Role attributes: `role="listbox"`, `role="region"`, `role="option"`
-- Status indicators have `aria-label`
-- Keyboard support for navigation dropdowns
-
-**Missing:**
-
-| Issue | Location | Impact |
-|-------|----------|--------|
-| No keyboard support for expandable items | `app.js:290-296` | Users cannot expand/collapse issues with keyboard |
-| No visible focus indicators | `style.css:333-341` | Users cannot see which element has focus |
-| No focus management | `app.js:257-279` | Focus lost after expand/collapse actions |
-| Touch feedback removed without keyboard alternative | `style.css:529-531` | Keyboard users get no visual feedback on touch devices |
-
-### 5.2 WCAG 2.1 Compliance Estimate
-
-| Level | Compliance | Notes |
-|-------|------------|-------|
-| Level A | ~40-50% | Keyboard navigation broken |
-| Level AA | ~30-40% | Contrast issues, focus indicators missing |
-| Level AAA | Not assessed | |
-
----
-
-## 6. Recommendations
+## 5. Recommendations
 
 ### Completed ✅
 
@@ -249,47 +217,37 @@ Environment variables are used without checking they exist:
 - ~~Add workspace/team switching tests~~ - Created `workspace.spec.js` with 8 tests
 - ~~Document test magic numbers~~ - Added comments explaining expected counts
 
-### Priority 1: Critical
+### Priority 1: Error Handling
 
-1. **Add keyboard support for expandable items** - Add `keydown` event handlers for Enter and Space keys on `.line.expandable` elements
+1. **Validate environment variables at startup** - Check `SESSION_SECRET`, `LINEAR_CLIENT_ID`, and `LINEAR_CLIENT_SECRET` exist before starting server
 
-2. **Add visible focus indicators** - Add CSS `:focus-visible` styles for `.toggle`, `.line.expandable`, and `.project-header`
+2. **Add error handling to localStorage operations** - Wrap `JSON.parse()` and `localStorage.setItem()` in try-catch blocks
 
-3. **Validate environment variables at startup** - Check `SESSION_SECRET`, `LINEAR_CLIENT_ID`, and `LINEAR_CLIENT_SECRET` exist before starting server
+3. **Add error handling to parse-landing.js** - Wrap `readFileSync()` in try-catch
 
-4. **Add error handling to localStorage operations** - Wrap `JSON.parse()` and `localStorage.setItem()` in try-catch blocks
+4. **Regenerate session on authentication** - Call `req.session.regenerate()` after successful OAuth
 
-### Priority 2: High
+### Priority 2: Code Quality
 
 5. **Extract duplicate functions from tree.js** - Move `assignDepth()` and `sortNodes()` to shared helpers
 
 6. **Use event delegation** - Replace individual event listeners with delegated listeners on document or container
 
-7. **Add error handling to parse-landing.js** - Wrap `readFileSync()` in try-catch
+7. **Split server.js** - Extract OAuth routes, workspace management, and data fetching into separate modules
 
-8. **Regenerate session on authentication** - Call `req.session.regenerate()` after successful OAuth
+8. **Use CSS variables consistently** - Replace hard-coded colors with CSS custom properties
 
-### Priority 3: Medium
+### Priority 3: Cleanup
 
-9. **Split server.js** - Extract OAuth routes, workspace management, and data fetching into separate modules
+9. **Remove test.skip() calls** - Either fix the two skipped tests (lines 92, 178) or remove the incomplete features
 
-10. **Remove test.skip() calls** - Either fix the two skipped tests (lines 92, 178) or remove the incomplete features
+10. **Move test fixtures** - Extract `testMockData` and `testMockTeams` to `tests/fixtures/`
 
-11. **Move test fixtures** - Extract `testMockData` and `testMockTeams` to `tests/fixtures/`
+11. **Remove inline event handlers** - Move `onsubmit` handler from HTML to JavaScript
 
-12. **Use CSS variables consistently** - Replace hard-coded colors with CSS custom properties
+12. **Consider immutable state updates** - Replace `push()`/`splice()` with spread operator patterns
 
-### Priority 4: Low
-
-13. **Consider immutable state updates** - Replace `push()`/`splice()` with spread operator patterns
-
-14. **Add Page Object Model** - Create reusable page objects for test selectors
-
-15. **Remove inline event handlers** - Move `onsubmit` handler from HTML to JavaScript
-
-16. **Improve color contrast** - Adjust `--fg-dim` color for better accessibility
-
-17. **Add JSDoc types** - Document complex data structures like the forest Map
+13. **Add JSDoc types** - Document complex data structures like the forest Map
 
 ---
 
@@ -301,8 +259,8 @@ Environment variables are used without checking they exist:
 | `lib/tree.js` | 287 | 3 | Medium |
 | `lib/render.js` | 522 | 2 | Medium |
 | `lib/parse-landing.js` | 199 | 1 | Medium |
-| `public/app.js` | 549 | 5 | High |
-| `public/style.css` | 628 | 4 | Medium |
+| `public/app.js` | 549 | 4 | High |
+| `public/style.css` | 628 | 2 | Low |
 | `tests/e2e/*.spec.js` | ~750 | 2 | Low |
 
 ---
