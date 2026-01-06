@@ -1,0 +1,71 @@
+# Linear Projects Viewer
+
+> A minimal web app that displays Linear projects and issues as a collapsible tree with a CLI aesthetic.
+
+## Overview
+
+- Syncs with Linear via OAuth
+- Supports multiple workspaces
+- Displays projects and issues in a tree structure with box-drawing characters
+
+## Navigation
+
+- **Workspace selector**: `workspace: {name}` in nav bar - click to switch
+- **Team filter**: `team: {name}` in nav bar - filter issues by team
+- **Expand/collapse**: Click task row or ▶/▼ arrow
+- **Project collapse**: Click project header
+- **Reset**: Click "reset" to restore default view state
+
+## Status Indicators
+
+- ○ (todo) - `data-status="todo"` - Not started
+- ◐ (in-progress) - `data-status="in-progress"` - In progress
+- ✓ (done) - `data-status="done"` - Completed
+
+## DOM Structure
+
+### Landmarks
+- `main` - main content area
+- `[role="region"][aria-label="In Progress Tasks"]` - in-progress section
+- `[role="region"][aria-label="Projects"]` - projects section
+
+### Task Selectors
+- `[data-id="{linear-issue-id}"]` - task by Linear issue ID
+- `[data-status="todo|in-progress|done"]` - filter by status
+- `[data-section="in-progress|project"]` - scope to section
+- `[data-parent="{id}"]` - child tasks of a parent
+- `[data-depth="{n}"]` - tasks at nesting level (0 = top-level)
+- `[data-details-for="{id}"]` - expanded details panel for a task
+- `.expandable` - tasks that can be clicked to expand
+
+### Project Selectors
+- `.project[data-id="{project-id}"]` - project container
+- `.project-header` - clickable project header
+- `[data-completed-for="{project-id}"]` - completed tasks section
+
+### Navigation Selectors
+- `#workspace-toggle` - workspace dropdown button
+- `#team-toggle` - team dropdown button
+- `#workspace-options` - workspace dropdown panel
+- `#team-options` - team dropdown panel
+- `[data-team="{id}"]` - team filter option (use "all" for all teams)
+- `.reset-view` - reset button
+
+### Interactive Elements
+- `.toggle` - expand/collapse arrow (▶/▼)
+- `.in-progress-header` - collapsible section header
+
+## Common Workflows
+
+1. **Find in-progress tasks**: Look in "In Progress" section at top
+2. **Drill into project**: Click project header to expand, click task to see details
+3. **Filter by team**: Use team selector in nav bar
+4. **Open in Linear**: Expand task details, click "View in Linear →"
+
+## Limitations
+
+- Read-only view (no editing tasks)
+- Logout requires re-authentication via Linear OAuth
+- Expand/collapse state persists in localStorage (reset restores defaults)
+- Team filter selection persists in localStorage across sessions
+- Landing page shows static demo data for unauthenticated users

@@ -25,6 +25,7 @@ content/
 public/
   style.css            Light theme, mobile-responsive
   app.js               Client-side collapse/expand, localStorage persistence
+  llms.txt             AI agent guidance (DOM selectors, navigation patterns)
 tests/e2e/
   landing.spec.js      Landing page tests
   dashboard.spec.js    Authenticated dashboard tests
@@ -89,3 +90,12 @@ MONGODB_URI           MongoDB connection string (optional, uses file storage if 
 - Click "reset" → restore default collapse state
 - Collapse state persisted in localStorage
 - 401 errors clear session and redirect to landing page
+
+## AI Agent Support
+
+The `/llms.txt` file provides guidance for AI agents navigating the site, including:
+- DOM selectors (`data-id`, `data-status`, `data-section`, `data-parent`)
+- Navigation patterns and interactive elements
+- Status indicators and their meanings
+
+**Keep llms.txt updated** when modifying DOM structure or data attributes in `render.js`.
