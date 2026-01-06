@@ -297,7 +297,8 @@ app.get('/auth/linear', async (req, res) => {
     redirect_uri: process.env.LINEAR_REDIRECT_URI,
     response_type: 'code',
     scope: 'read',  // Read-only access to Linear data
-    state
+    state,
+    prompt: 'consent'  // Always show consent screen with workspace picker
   })
 
   req.session.save(() => {
