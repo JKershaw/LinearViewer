@@ -18,6 +18,7 @@ import { fetchProjects } from './lib/linear.js'
 import { buildForest, partitionCompleted } from './lib/tree.js'
 import { renderPage } from './lib/render.js'
 import { parseLandingPage } from './lib/parse-landing.js'
+import { refreshAccessToken, needsRefresh, calculateExpiresAt } from './lib/token-refresh.js'
 
 // =============================================================================
 // Landing Page Setup
@@ -49,7 +50,7 @@ const sessionsCollection = db.collection('sessions')
 
 const sessionStore = new MongoSessionStore({
   collection: sessionsCollection,
-  ttl: 24 * 60 * 60 // 24 hours in seconds
+  ttl: 30 * 24 * 60 * 60 // 30 days in seconds (refresh token based)
 })
 
 // =============================================================================
@@ -83,7 +84,7 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days (refresh token based)
     secure: process.env.NODE_ENV === 'production'
   }
 }))
@@ -97,6 +98,8 @@ if (process.env.NODE_ENV === 'test') {
   // Endpoint to set a test session without going through OAuth flow
   app.get('/test/set-session', (req, res) => {
     req.session.accessToken = 'test-token'
+    req.session.refreshToken = 'test-refresh-token'
+    req.session.tokenExpiresAt = Date.now() + (24 * 60 * 60 * 1000) // 24 hours from now
     // Explicitly save session before responding to ensure it's persisted
     req.session.save((err) => {
       if (err) {
@@ -123,6 +126,80 @@ const testMockData = {
     { id: 'issue-5', title: 'Beta todo task', description: 'A todo task in Beta', estimate: null, priority: 0, sortOrder: 2, createdAt: '2024-01-05T00:00:00Z', dueDate: null, completedAt: null, url: 'https://linear.app/test/issue/TEST-5', parent: null, project: { id: 'proj-beta' }, state: { name: 'Backlog', type: 'backlog' }, assignee: null, labels: { nodes: [] } }
   ]
 }
+
+// =============================================================================
+// Token Refresh Middleware
+// =============================================================================
+// Automatically refreshes access tokens before they expire (5-minute buffer).
+// Prevents race conditions with tokenRefreshInProgress flag.
+
+/**
+ * Middleware to ensure access token is valid before each authenticated request.
+ * Automatically refreshes token if it's expired or about to expire (5-minute buffer).
+ */
+async function ensureValidToken(req, res, next) {
+  // Skip if no access token (unauthenticated user)
+  if (!req.session.accessToken) {
+    return next();
+  }
+
+  // Skip if no refresh token (shouldn't happen with new flow)
+  if (!req.session.refreshToken) {
+    return next();
+  }
+
+  // Check if token needs refresh (5-minute buffer)
+  if (!needsRefresh(req.session.tokenExpiresAt)) {
+    return next();
+  }
+
+  // Prevent concurrent refresh attempts
+  if (req.session.tokenRefreshInProgress) {
+    // Wait briefly and recheck (simple approach for concurrent requests)
+    return setTimeout(() => ensureValidToken(req, res, next), 100);
+  }
+
+  try {
+    req.session.tokenRefreshInProgress = true;
+
+    const tokenData = await refreshAccessToken(req.session.refreshToken);
+
+    // Update session with new tokens
+    req.session.accessToken = tokenData.access_token;
+    req.session.refreshToken = tokenData.refresh_token;
+    req.session.tokenExpiresAt = calculateExpiresAt(tokenData.expires_in);
+    req.session.tokenRefreshInProgress = false;
+
+    // Save session before proceeding
+    await new Promise((resolve, reject) => {
+      req.session.save((err) => err ? reject(err) : resolve());
+    });
+
+    console.log('Token refreshed successfully');
+    next();
+  } catch (error) {
+    req.session.tokenRefreshInProgress = false;
+    console.error('Token refresh failed:', error);
+
+    // If refresh token expired/invalid, clear session and redirect to landing
+    if (error.code === 'EXPIRED' || error.code === 'INVALID') {
+      return req.session.destroy(() => {
+        res.redirect('/');
+      });
+    }
+
+    // For network errors, allow request to proceed (will fail with 401 if needed)
+    next();
+  }
+}
+
+// Apply middleware to all routes except auth and logout routes
+app.use((req, res, next) => {
+  if (req.path.startsWith('/auth/') || req.path === '/logout') {
+    return next();
+  }
+  ensureValidToken(req, res, next);
+});
 
 // =============================================================================
 // OAuth 2.0 Routes
@@ -201,8 +278,10 @@ app.get('/auth/callback', async (req, res) => {
       return res.status(400).send(`<pre>Token error: ${data.error || 'Unknown error'}</pre>`)
     }
 
-    // Store access token in session (no refresh token handling - tokens expire after 24h)
+    // Store access token, refresh token, and expiration in session
     req.session.accessToken = data.access_token
+    req.session.refreshToken = data.refresh_token
+    req.session.tokenExpiresAt = calculateExpiresAt(data.expires_in || 86400)
     req.session.save(() => {
       res.redirect('/')
     })
@@ -282,13 +361,72 @@ app.get('/', async (req, res) => {
   } catch (error) {
     console.error('Error fetching projects:', error)
 
-    // If token is invalid/expired (401), clear session and show landing page
-    // This gracefully handles expired tokens without showing an error
+    // If token is invalid/expired (401), attempt refresh and retry
+    if (error.response?.status === 401 && req.session.refreshToken) {
+      try {
+        // Attempt to refresh the token
+        const tokenData = await refreshAccessToken(req.session.refreshToken);
+        req.session.accessToken = tokenData.access_token;
+        req.session.refreshToken = tokenData.refresh_token;
+        req.session.tokenExpiresAt = calculateExpiresAt(tokenData.expires_in);
+
+        // Save session with new tokens
+        await new Promise((resolve, reject) => {
+          req.session.save((err) => err ? reject(err) : resolve());
+        });
+
+        console.log('Token refreshed after 401, retrying request');
+
+        // Retry the request with the new token
+        const isTestMode = process.env.NODE_ENV === 'test' && req.session.accessToken === 'test-token';
+        const { organizationName, projects, issues } = isTestMode
+          ? testMockData
+          : await fetchProjects(req.session.accessToken);
+
+        // Build issue tree structure (parent-child relationships)
+        const forest = buildForest(issues);
+
+        // Extract in-progress issues for the dedicated "In Progress" section
+        const inProgressIssues = issues
+          .filter(i => i.state?.type === 'started')
+          .map(issue => ({
+            ...issue,
+            projectName: projects.find(p => p.id === issue.project?.id)?.name
+          }))
+          .sort((a, b) => {
+            const aPriority = a.priority || 5;
+            const bPriority = b.priority || 5;
+            if (aPriority !== bPriority) return aPriority - bPriority;
+            return new Date(a.createdAt) - new Date(b.createdAt);
+          });
+
+        // Build tree structure for each project
+        const trees = projects
+          .sort((a, b) => a.sortOrder - b.sortOrder)
+          .map(project => {
+            const { roots } = forest.get(project.id) || { roots: [] };
+            const { incomplete, completed, completedCount } = partitionCompleted(roots);
+            return { project, incomplete, completed, completedCount };
+          });
+
+        const html = renderPage(trees, inProgressIssues, organizationName);
+        return res.send(html);
+      } catch (refreshError) {
+        // Refresh failed, clear session and show landing page
+        console.error('Token refresh failed after 401:', refreshError);
+        return req.session.destroy(() => {
+          const html = renderPage(landingTrees, [], landingData.organizationName, { isLanding: true });
+          res.send(html);
+        });
+      }
+    }
+
+    // If 401 but no refresh token, or other errors, clear session and show landing
     if (error.response?.status === 401) {
       return req.session.destroy(() => {
-        const html = renderPage(landingTrees, [], landingData.organizationName, { isLanding: true })
-        res.send(html)
-      })
+        const html = renderPage(landingTrees, [], landingData.organizationName, { isLanding: true });
+        res.send(html);
+      });
     }
 
     res.status(500).send(`<pre>Error: ${error.message}</pre>`)
