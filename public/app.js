@@ -1,4 +1,5 @@
 const STORAGE_KEY = 'linear-projects-state'
+const TEAM_STORAGE_KEY = 'linear-projects-selected-team'
 
 // Factory function to create fresh default state (avoids shared array references)
 function getDefaultState() {
@@ -365,6 +366,42 @@ function init() {
       setArrow(el, !isCollapsed)
     })
   })
+
+  // Team selector - switch teams by navigating to new URL
+  const teamSelector = document.getElementById('team-filter')
+  if (teamSelector) {
+    // Sync URL with localStorage on initial load
+    const urlParams = new URLSearchParams(window.location.search)
+    const urlTeam = urlParams.get('team')
+    const savedTeam = localStorage.getItem(TEAM_STORAGE_KEY)
+
+    // Check if saved team still exists in dropdown (prevents redirect loop if team was deleted)
+    const savedTeamExists = savedTeam === 'all' ||
+      [...teamSelector.options].some(opt => opt.value === savedTeam)
+
+    // If URL has no team but localStorage does (and team still exists), redirect to saved team
+    if (!urlTeam && savedTeam && savedTeam !== 'all' && savedTeamExists) {
+      window.location.href = `/?team=${savedTeam}`
+      return
+    }
+
+    // Clear invalid saved team from localStorage
+    if (savedTeam && !savedTeamExists) {
+      localStorage.removeItem(TEAM_STORAGE_KEY)
+    }
+
+    // Save current selection to localStorage
+    const currentTeam = urlTeam || 'all'
+    localStorage.setItem(TEAM_STORAGE_KEY, currentTeam)
+
+    // Handle team selection change
+    teamSelector.addEventListener('change', (e) => {
+      const teamId = e.target.value
+      localStorage.setItem(TEAM_STORAGE_KEY, teamId)
+      const url = teamId === 'all' ? '/' : `/?team=${teamId}`
+      window.location.href = url
+    })
+  }
 }
 
 // Toggle project description expand/collapse
