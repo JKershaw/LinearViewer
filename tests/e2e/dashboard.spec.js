@@ -24,10 +24,18 @@ test.describe('Authenticated Dashboard', () => {
     await expect(inProgressHeader).toBeVisible();
     await expect(inProgressHeader).toContainText('In Progress');
 
-    // Should show in-progress issues (2 issues: issue-1 and issue-4)
-    await expect(page.locator('.in-progress-item')).toHaveCount(2);
-    await expect(page.locator('.in-progress-item:has-text("Parent task in progress")')).toBeVisible();
-    await expect(page.locator('.in-progress-item:has-text("Beta task in progress")')).toBeVisible();
+    // Should show in-progress issues as tree with their descendants
+    // issue-1 (in-progress) + issue-2 (child of issue-1, hidden) + issue-4 (in-progress) = 3 lines total
+    await expect(page.locator('.in-progress-items .line')).toHaveCount(3);
+
+    // Top-level items are visible
+    await expect(page.locator('.in-progress-items .line:has-text("Parent task in progress")')).toBeVisible();
+    await expect(page.locator('.in-progress-items .line:has-text("Beta task in progress")')).toBeVisible();
+
+    // Child task exists but is hidden (depth > 0) until parent is expanded
+    const childTask = page.locator('.in-progress-items .line:has-text("Child task todo")');
+    await expect(childTask).toHaveCount(1);
+    await expect(childTask).toHaveClass(/hidden/);
   });
 
   test('displays correct state indicators', async ({ page }) => {
@@ -35,8 +43,10 @@ test.describe('Authenticated Dashboard', () => {
     const inProgressStates = page.locator('.state.in-progress');
     await expect(inProgressStates).toHaveCount(4); // 2 in In Progress + 2 in project trees
 
-    // Should have todo states in project trees
-    await expect(page.locator('.state.todo')).toHaveCount(2);
+    // Should have todo states (in In Progress section as descendants + project trees)
+    // issue-2 appears in both In Progress (child of in-progress issue-1) and Project Alpha
+    // issue-5 appears in Project Beta only
+    await expect(page.locator('.state.todo')).toHaveCount(3);
   });
 
   test('shows logout link when authenticated', async ({ page }) => {

@@ -46,7 +46,7 @@ function saveState(state) {
 
 function resetDOM() {
   // Reset all issue toggles to collapsed (▶)
-  document.querySelectorAll('.line .toggle, .in-progress-item .toggle').forEach(t => {
+  document.querySelectorAll('.line .toggle').forEach(t => {
     t.textContent = '▶'
   })
 
@@ -91,13 +91,13 @@ function toggleInArray(arr, id) {
   else arr.splice(idx, 1)
 }
 
-function getDescendants(id) {
+function getDescendants(id, section) {
   const descendants = []
   const queue = [id]
 
   while (queue.length > 0) {
     const parentId = queue.shift()
-    const children = document.querySelectorAll(`[data-parent="${parentId}"]`)
+    const children = document.querySelectorAll(`[data-parent="${parentId}"][data-section="${section}"]`)
     children.forEach(el => {
       descendants.push(el)
       // Also include the details element if it exists
@@ -112,21 +112,21 @@ function getDescendants(id) {
   return descendants
 }
 
-function showDescendantsRespectingExpanded(id, expandedArr) {
-  const directChildren = document.querySelectorAll(`[data-parent="${id}"]`)
+function showDescendantsRespectingExpanded(id, expandedArr, section) {
+  const directChildren = document.querySelectorAll(`[data-parent="${id}"][data-section="${section}"]`)
   directChildren.forEach(child => {
     show(child)
     const childId = child.dataset.id
 
-    // Show details only if this child is expanded (project section)
+    // Show details only if this child is expanded
     const details = child.nextElementSibling
-    if (details && details.dataset.detailsFor === childId && isExpanded(expandedArr, childId, 'project')) {
+    if (details && details.dataset.detailsFor === childId && isExpanded(expandedArr, childId, section)) {
       show(details)
     }
 
     // Only recurse if this child is expanded
-    if (childId && isExpanded(expandedArr, childId, 'project')) {
-      showDescendantsRespectingExpanded(childId, expandedArr)
+    if (childId && isExpanded(expandedArr, childId, section)) {
+      showDescendantsRespectingExpanded(childId, expandedArr, section)
     }
   })
 }
@@ -161,12 +161,10 @@ function applyState(state) {
     // Show this item's own details (scoped by section)
     document.querySelectorAll(`[data-section="${section}"][data-details-for="${id}"]`).forEach(show)
 
-    // Show direct children (and recurse for expanded ones) - only for project section
-    if (section === 'project') {
-      const line = document.querySelector(`[data-section="project"][data-id="${id}"]`)
-      if (line) {
-        showDescendantsRespectingExpanded(id, state.expanded)
-      }
+    // Show direct children (and recurse for expanded ones) - for both sections
+    const line = document.querySelector(`[data-section="${section}"][data-id="${id}"]`)
+    if (line) {
+      showDescendantsRespectingExpanded(id, state.expanded, section)
     }
 
     // Update toggle arrow (scoped by section)
@@ -267,16 +265,12 @@ function init() {
 
     if (nowExpanded) {
       if (hasDetails) show(details)
-      // Only project items have children
-      if (section === 'project') {
-        showDescendantsRespectingExpanded(id, state.expanded)
-      }
+      // Both sections can have children
+      showDescendantsRespectingExpanded(id, state.expanded, section)
     } else {
       if (hasDetails) hide(details)
-      // Only project items have children
-      if (section === 'project') {
-        getDescendants(id).forEach(hide)
-      }
+      // Both sections can have children
+      getDescendants(id, section).forEach(hide)
     }
 
     const toggle = line.querySelector('.toggle')
@@ -292,7 +286,7 @@ function init() {
   })
 
   // Line click (for expandable items)
-  document.querySelectorAll('.line.expandable, .in-progress-item.expandable').forEach(el => {
+  document.querySelectorAll('.line.expandable').forEach(el => {
     el.addEventListener('click', (e) => {
       // Don't toggle if clicking a link
       if (e.target.closest('a')) return

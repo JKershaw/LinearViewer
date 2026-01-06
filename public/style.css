@@ -228,39 +228,12 @@ h1 {
   font-family: var(--font-content);
 }
 
-.in-progress-item {
-  display: flex;
-  align-items: baseline;
-  padding: 4px 0;
-  padding-left: 1.5ch;
-}
-
-.in-progress-item.expandable {
-  cursor: pointer;
-}
-
-.in-progress-item.expandable:hover .title {
-  text-decoration: underline;
-  text-decoration-color: var(--fg-dim);
-  text-underline-offset: 2px;
-}
-
-/* Project name badge shown after issue title */
+/* Project name badge shown after issue title in In Progress section */
 .in-progress-project {
   color: var(--fg-dim);
   margin-left: 1ch;
   font-size: 0.9em;
   font-family: var(--font-content);
-}
-
-.in-progress-assignee {
-  color: var(--fg-dim);
-  font-size: 0.9em;
-  font-family: var(--font-content);
-}
-
-.in-progress-items .details {
-  padding-left: 3.5ch;
 }
 
 /* =============================================================================
@@ -332,7 +305,7 @@ h1 {
 
 /* Box-drawing prefix (├─ └─ │) - preserves whitespace for alignment */
 .prefix {
-  color: var(--fg-dim);
+  color: #eeeeee;
   white-space: pre;
   flex-shrink: 0;
 }
@@ -496,11 +469,6 @@ h1 {
   /* Reduce vertical spacing on issue lines */
   .line {
     padding: 2px 0;
-  }
-
-  .in-progress-item {
-    padding: 2px 0;
-    padding-left: 1.5ch;
   }
 
   .project {

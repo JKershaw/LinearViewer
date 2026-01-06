@@ -15,7 +15,7 @@ import { MongoClient } from 'mongodb'
 import { MangoClient } from '@jkershaw/mangodb'
 import { MongoSessionStore } from './lib/session-store.js'
 import { fetchProjects, fetchTeams, fetchOrganization } from './lib/linear.js'
-import { buildForest, partitionCompleted } from './lib/tree.js'
+import { buildForest, partitionCompleted, buildInProgressForest } from './lib/tree.js'
 import { renderPage, renderErrorPage } from './lib/render.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken, calculateExpiresAt } from './lib/token-refresh.js'
@@ -483,7 +483,7 @@ app.post('/workspace/:id/remove', async (req, res) => {
  *
  * @param {string} accessToken - The access token for Linear API
  * @param {string|null} teamId - Optional team ID to filter issues by
- * @returns {Promise<{trees, inProgressIssues, organizationName, teams, selectedTeamId}>} Prepared data for rendering
+ * @returns {Promise<{trees, inProgressTrees, organizationName, teams, selectedTeamId}>} Prepared data for rendering
  */
 async function fetchAndPrepareProjects(accessToken, teamId = null) {
   // Use mock data in test mode to avoid hitting Linear API
@@ -507,23 +507,8 @@ async function fetchAndPrepareProjects(accessToken, teamId = null) {
   // Build issue tree structure (parent-child relationships)
   const forest = buildForest(issues);
 
-  // Extract in-progress issues for the dedicated "In Progress" section
-  // Sorted by priority (urgent first) with creation date as tiebreaker
-  const inProgressIssues = issues
-    .filter(i => i.state?.type === 'started')
-    .map(issue => ({
-      ...issue,
-      projectName: projects.find(p => p.id === issue.project?.id)?.name
-    }))
-    .sort((a, b) => {
-      // Priority: 1=Urgent, 2=High, 3=Medium, 4=Low, 0=None
-      // Lower number = higher priority, but 0 (none) should sort last
-      const aPriority = a.priority || 5;
-      const bPriority = b.priority || 5;
-      if (aPriority !== bPriority) return aPriority - bPriority;
-      // Tiebreaker: createdAt (oldest first, matching Linear's default)
-      return new Date(a.createdAt) - new Date(b.createdAt);
-    });
+  // Build in-progress tree with ancestor chains for context
+  const inProgressTrees = buildInProgressForest(issues, projects);
 
   // Build tree structure for each project, separating complete from incomplete
   const trees = projects
@@ -534,7 +519,7 @@ async function fetchAndPrepareProjects(accessToken, teamId = null) {
       return { project, incomplete, completed, completedCount };
     });
 
-  return { trees, inProgressIssues, organizationName, teams, selectedTeamId: teamId };
+  return { trees, inProgressTrees, organizationName, teams, selectedTeamId: teamId };
 }
 
 /**
@@ -562,8 +547,8 @@ app.get('/', async (req, res) => {
   const teamId = rawTeam && rawTeam !== 'all' && UUID_REGEX.test(rawTeam) ? rawTeam : null;
 
   try {
-    const { trees, inProgressIssues, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace.accessToken, teamId);
-    const html = renderPage(trees, inProgressIssues, organizationName, {
+    const { trees, inProgressTrees, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace.accessToken, teamId);
+    const html = renderPage(trees, inProgressTrees, organizationName, {
       teams,
       selectedTeamId,
       workspaces: req.session.workspaces,
@@ -586,8 +571,8 @@ app.get('/', async (req, res) => {
         console.log('Token refreshed after 401, retrying request');
 
         // Retry the request with the new token
-        const { trees, inProgressIssues, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace.accessToken, teamId);
-        const html = renderPage(trees, inProgressIssues, organizationName, {
+        const { trees, inProgressTrees, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace.accessToken, teamId);
+        const html = renderPage(trees, inProgressTrees, organizationName, {
           teams,
           selectedTeamId,
           workspaces: req.session.workspaces,

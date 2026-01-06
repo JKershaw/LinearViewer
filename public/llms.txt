@@ -30,13 +30,16 @@
 - `[role="region"][aria-label="Projects"]` - projects section
 
 ### Task Selectors
+Both In Progress and Projects sections use the same `.line` structure with tree hierarchy:
+- `.line` - task row element
 - `[data-id="{linear-issue-id}"]` - task by Linear issue ID
 - `[data-status="todo|in-progress|done"]` - filter by status
-- `[data-section="in-progress|project"]` - scope to section
-- `[data-parent="{id}"]` - child tasks of a parent
+- `[data-section="in-progress|project"]` - scope to section (expand state is independent per section)
+- `[data-parent="{id}"]` - child tasks of a parent (use "in-progress-root" or project ID for top-level)
 - `[data-depth="{n}"]` - tasks at nesting level (0 = top-level)
 - `[data-details-for="{id}"]` - expanded details panel for a task
 - `.expandable` - tasks that can be clicked to expand
+- `.in-progress-project` - project name badge shown in brackets for In Progress items
 
 ### Project Selectors
 - `.project[data-id="{project-id}"]` - project container
@@ -57,10 +60,11 @@
 
 ## Common Workflows
 
-1. **Find in-progress tasks**: Look in "In Progress" section at top
+1. **Find in-progress tasks**: Look in "In Progress" section at top (displays as tree with subtasks)
 2. **Drill into project**: Click project header to expand, click task to see details
-3. **Filter by team**: Use team selector in nav bar
-4. **Open in Linear**: Expand task details, click "View in Linear →"
+3. **Expand subtasks**: Click parent task or ▶ arrow to show child tasks (works in both sections)
+4. **Filter by team**: Use team selector in nav bar
+5. **Open in Linear**: Expand task details, click "View in Linear →"
 
 ## Limitations
 
