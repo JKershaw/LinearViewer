@@ -87,8 +87,8 @@ test.describe('Team Filtering', () => {
   });
 
   test('selecting "all" removes team filter', async ({ page }) => {
-    // Start with team filter
-    await page.goto('/?team=team-eng');
+    // Start with Engineering team filter (UUID format)
+    await page.goto('/?team=eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee');
 
     await page.locator('#team-toggle').click();
     await page.locator('#team-options .nav-option[data-team="all"]').click();
@@ -96,6 +96,26 @@ test.describe('Team Filtering', () => {
     // URL should not have team parameter
     await expect(page).not.toHaveURL(/team=/);
     await expect(page.locator('#team-toggle')).toHaveText('all');
+  });
+
+  test('team filter shows only issues from selected team', async ({ page }) => {
+    // Filter to Engineering team - should show Project Alpha issues only
+    await page.goto('/?team=eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee');
+
+    // Team toggle should show Engineering
+    await expect(page.locator('#team-toggle')).toHaveText('Engineering');
+
+    // Project Alpha has Engineering issues, Project Beta has Design issues
+    // With Engineering filter, Beta project should have no visible issues
+    const alphaProject = page.locator('.project[data-id="proj-alpha"]');
+    const betaProject = page.locator('.project[data-id="proj-beta"]');
+
+    // Alpha should have issues visible
+    await expect(alphaProject.locator('.node')).not.toHaveCount(0);
+
+    // Beta should exist but have no issues (empty project)
+    await expect(betaProject).toBeVisible();
+    await expect(betaProject.locator('.node')).toHaveCount(0);
   });
 });
 
