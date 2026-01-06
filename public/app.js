@@ -1,6 +1,40 @@
 const STORAGE_KEY = 'linear-projects-state'
 const TEAM_STORAGE_KEY = 'linear-projects-selected-team'
 
+// Safe localStorage helpers for team selection
+function getTeamSelection() {
+  try {
+    return localStorage.getItem(TEAM_STORAGE_KEY)
+  } catch (e) {
+    console.warn('Failed to read team selection:', e)
+    return null
+  }
+}
+
+function setTeamSelection(teamId) {
+  try {
+    localStorage.setItem(TEAM_STORAGE_KEY, teamId)
+  } catch (e) {
+    console.warn('Failed to save team selection:', e)
+  }
+}
+
+function clearTeamSelection() {
+  try {
+    localStorage.removeItem(TEAM_STORAGE_KEY)
+  } catch (e) {
+    console.warn('Failed to clear team selection:', e)
+  }
+}
+
+function hasStoredState() {
+  try {
+    return localStorage.getItem(STORAGE_KEY) !== null
+  } catch (e) {
+    return false
+  }
+}
+
 // Factory function to create fresh default state (avoids shared array references)
 function getDefaultState() {
   return {
@@ -36,12 +70,23 @@ const toggleExpanded = (arr, id, section) => {
 }
 
 function loadState() {
-  const raw = localStorage.getItem(STORAGE_KEY)
-  return raw ? JSON.parse(raw) : getDefaultState()
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    return raw ? JSON.parse(raw) : getDefaultState()
+  } catch (e) {
+    // Handle corrupted data or localStorage errors
+    console.warn('Failed to load state from localStorage:', e)
+    return getDefaultState()
+  }
 }
 
 function saveState(state) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+  } catch (e) {
+    // Can fail in private browsing or when storage is full
+    console.warn('Failed to save state to localStorage:', e)
+  }
 }
 
 function resetDOM() {
@@ -215,7 +260,7 @@ function init() {
   } else {
     state = loadState()
     // On first load (no saved state), apply default collapsed projects from HTML
-    if (!localStorage.getItem(STORAGE_KEY)) {
+    if (!hasStoredState()) {
       state.collapsedProjects = getDefaultCollapsedProjects()
     }
   }
@@ -455,7 +500,7 @@ function initNavBar() {
 
       e.stopPropagation()
       const teamId = option.dataset.team
-      localStorage.setItem(TEAM_STORAGE_KEY, teamId)
+      setTeamSelection(teamId)
       const url = teamId === 'all' ? '/' : `/?team=${teamId}`
       window.location.href = url
     })
@@ -518,7 +563,7 @@ function initNavBar() {
   if (teamToggle) {
     const urlParams = new URLSearchParams(window.location.search)
     const urlTeam = urlParams.get('team')
-    const savedTeam = localStorage.getItem(TEAM_STORAGE_KEY)
+    const savedTeam = getTeamSelection()
 
     // Check if saved team still exists in options
     const teamOptionsAll = document.querySelectorAll('#team-options .nav-option[data-team]')
@@ -533,11 +578,11 @@ function initNavBar() {
 
     // Clear invalid saved team
     if (savedTeam && !savedTeamExists) {
-      localStorage.removeItem(TEAM_STORAGE_KEY)
+      clearTeamSelection()
     }
 
     // Save current selection
-    localStorage.setItem(TEAM_STORAGE_KEY, urlTeam || 'all')
+    setTeamSelection(urlTeam || 'all')
   }
 }
 

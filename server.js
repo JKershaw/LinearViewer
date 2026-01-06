@@ -21,6 +21,31 @@ import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken, calculateExpiresAt } from './lib/token-refresh.js'
 
 // =============================================================================
+// Environment Variable Validation
+// =============================================================================
+// Validate required environment variables at startup to fail fast with clear errors
+const requiredEnvVars = ['SESSION_SECRET'];
+const oauthEnvVars = ['LINEAR_CLIENT_ID', 'LINEAR_CLIENT_SECRET', 'LINEAR_REDIRECT_URI'];
+
+// SESSION_SECRET is always required (even in test mode, sessions need a secret)
+for (const envVar of requiredEnvVars) {
+  if (!process.env[envVar]) {
+    console.error(`Error: Missing required environment variable: ${envVar}`);
+    process.exit(1);
+  }
+}
+
+// OAuth vars only required in non-test mode (tests use mock auth)
+if (process.env.NODE_ENV !== 'test') {
+  for (const envVar of oauthEnvVars) {
+    if (!process.env[envVar]) {
+      console.error(`Error: Missing required environment variable: ${envVar}`);
+      process.exit(1);
+    }
+  }
+}
+
+// =============================================================================
 // Constants
 // =============================================================================
 const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
@@ -441,22 +466,39 @@ app.get('/auth/callback', async (req, res) => {
       addedAt: Date.now()
     }
 
-    // Add/update workspace in session
-    try {
-      upsertWorkspace(req.session, workspace);
-    } catch (limitError) {
-      const html = renderErrorPage('Workspace Limit Reached', 'You have reached the maximum number of connected workspaces. Please remove one before adding another.', {
-        action: 'Go to dashboard',
-        actionUrl: '/'
-      });
-      return res.status(400).send(html);
-    }
+    // Preserve existing workspaces before regenerating session (for multi-workspace support)
+    const existingWorkspaces = req.session.workspaces || [];
 
-    req.session.activeWorkspaceId = workspace.id
-    delete req.session.oauthState  // Clean up CSRF token after use
+    // Regenerate session ID to prevent session fixation attacks
+    req.session.regenerate(async (regenerateErr) => {
+      if (regenerateErr) {
+        console.error('Session regeneration error:', regenerateErr);
+        const html = renderErrorPage('Session Error', 'Could not create a secure session. Please try again.', {
+          action: 'Try again',
+          actionUrl: '/auth/linear'
+        });
+        return res.status(500).send(html);
+      }
 
-    await saveSession(req.session)
-    res.redirect('/')
+      // Restore preserved workspaces to regenerated session
+      req.session.workspaces = existingWorkspaces;
+
+      // Add/update workspace in session
+      try {
+        upsertWorkspace(req.session, workspace);
+      } catch (limitError) {
+        const html = renderErrorPage('Workspace Limit Reached', 'You have reached the maximum number of connected workspaces. Please remove one before adding another.', {
+          action: 'Go to dashboard',
+          actionUrl: '/'
+        });
+        return res.status(400).send(html);
+      }
+
+      req.session.activeWorkspaceId = workspace.id
+
+      await saveSession(req.session)
+      res.redirect('/')
+    })
   } catch (err) {
     console.error('OAuth callback error:', err);
     const html = renderErrorPage('Something Went Wrong', 'An unexpected error occurred during authentication. Please try again.', {
