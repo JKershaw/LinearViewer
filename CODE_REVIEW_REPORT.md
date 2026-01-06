@@ -1,6 +1,7 @@
 # Code Review Report: Linear Projects Viewer
 
 **Date:** January 2026
+**Last Updated:** January 2026 (post-test improvements)
 **Reviewers:** Automated analysis with manual verification
 **Scope:** Full codebase review covering test quality, code quality, and security
 
@@ -8,11 +9,11 @@
 
 ## Executive Summary
 
-Linear Projects Viewer is a well-designed minimal web application with a clean CLI aesthetic. The codebase demonstrates good practices in many areas (HTML escaping, CSRF protection, clean CSS organization) but has notable gaps in test coverage, code duplication, and accessibility.
+Linear Projects Viewer is a well-designed minimal web application with a clean CLI aesthetic. The codebase demonstrates good practices in many areas (HTML escaping, CSRF protection, clean CSS organization) but has gaps in code duplication and accessibility.
 
 | Category | Rating | Summary |
 |----------|--------|---------|
-| Test Coverage | C | ~50% - Major gaps in auth and error testing |
+| Test Coverage | B+ | 51 tests covering auth, workspaces, errors |
 | Backend Code | B- | Functional but needs refactoring |
 | Frontend Code | C+ | Works well but critical a11y issues |
 | Security | B | Good basics but missing validations |
@@ -29,37 +30,33 @@ Linear Projects Viewer is a well-designed minimal web application with a clean C
 | `landing.spec.js` | 10 | Landing page rendering and interactions |
 | `dashboard.spec.js` | 8 | Authenticated dashboard rendering |
 | `interactions.spec.js` | 10 | Expand/collapse, state persistence |
-| **Total** | **28** | |
+| `auth.spec.js` | 7 | ✅ Authentication flow and logout |
+| `workspace.spec.js` | 8 | ✅ Workspace selector, switching, removal |
+| `error-handling.spec.js` | 10 | ✅ Input validation, session state, OAuth errors |
+| **Total** | **51** | |
 
-### 1.2 Coverage Gaps
+### 1.2 Coverage Status
 
-#### Critical Missing Test Categories
+| Category | Coverage | Notes |
+|----------|----------|-------|
+| Authentication Flow | ✅ Good | OAuth redirect, logout, state validation tested |
+| Error Handling | ✅ Good | 401 responses, session expiry, validation errors tested |
+| Workspace/Team Switching | ✅ Good | Selector, switching, removal, limits tested |
+| Accessibility | ❌ None | No keyboard navigation or screen reader tests |
 
-| Category | Coverage | Impact |
-|----------|----------|--------|
-| Authentication Flow | 0% | No tests for OAuth redirect, callback, or state validation |
-| Error Handling | 0% | No tests for 401 responses, network failures, or session expiry |
-| Workspace/Team Switching | 0% | Feature exists but completely untested |
-| Accessibility | 0% | No keyboard navigation or screen reader tests |
-
-#### Specific Issues
+### 1.3 Remaining Test Quality Issues
 
 **`tests/e2e/interactions.spec.js:92, 178`** - Contains two `test.skip()` calls indicating incomplete features or flaky tests (completed toggle and landing page interactions).
-
-**Hard-coded magic numbers** throughout tests without documentation:
-- `landing.spec.js:29` - `toHaveCount(5)` with no explanation of why 5 projects
-- `landing.spec.js:41-43` - State counts (4 done, 1 in-progress, 11 todo) undocumented
-- `dashboard.spec.js:47-52` - Similar undocumented counts
 
 **Regex assertions** where exact matches would be clearer:
 - Multiple uses of `.toHaveClass(/hidden/)` instead of `.toHaveClass('hidden')`
 
-### 1.3 Test Quality Issues
+### 1.4 Test Infrastructure Improvements Made
 
-- No test utilities or helpers for common operations
-- No Page Object Model - selectors duplicated across files
-- Landing page tests mixed with authenticated tests in `interactions.spec.js`
-- No `afterEach` cleanup hooks
+- Extended `/test/set-session` with query params for error scenarios
+- Added `/test/clear-session` endpoint for session destruction
+- Used Playwright request API for reliable form submission tests
+- Documented magic numbers with comments explaining expected counts
 
 ---
 
@@ -245,53 +242,54 @@ Environment variables are used without checking they exist:
 
 ## 6. Recommendations
 
+### Completed ✅
+
+- ~~Add authentication flow tests~~ - Created `auth.spec.js` with 7 tests
+- ~~Add error scenario tests~~ - Created `error-handling.spec.js` with 10 tests
+- ~~Add workspace/team switching tests~~ - Created `workspace.spec.js` with 8 tests
+- ~~Document test magic numbers~~ - Added comments explaining expected counts
+
 ### Priority 1: Critical
 
-1. **Add authentication flow tests** - Create `auth.spec.js` covering OAuth redirect, callback, state validation, and error scenarios
+1. **Add keyboard support for expandable items** - Add `keydown` event handlers for Enter and Space keys on `.line.expandable` elements
 
-2. **Add keyboard support for expandable items** - Add `keydown` event handlers for Enter and Space keys on `.line.expandable` elements
+2. **Add visible focus indicators** - Add CSS `:focus-visible` styles for `.toggle`, `.line.expandable`, and `.project-header`
 
-3. **Add visible focus indicators** - Add CSS `:focus-visible` styles for `.toggle`, `.line.expandable`, and `.project-header`
+3. **Validate environment variables at startup** - Check `SESSION_SECRET`, `LINEAR_CLIENT_ID`, and `LINEAR_CLIENT_SECRET` exist before starting server
 
-4. **Validate environment variables at startup** - Check `SESSION_SECRET`, `LINEAR_CLIENT_ID`, and `LINEAR_CLIENT_SECRET` exist before starting server
-
-5. **Add error handling to localStorage operations** - Wrap `JSON.parse()` and `localStorage.setItem()` in try-catch blocks
+4. **Add error handling to localStorage operations** - Wrap `JSON.parse()` and `localStorage.setItem()` in try-catch blocks
 
 ### Priority 2: High
 
-6. **Extract duplicate functions from tree.js** - Move `assignDepth()` and `sortNodes()` to shared helpers
+5. **Extract duplicate functions from tree.js** - Move `assignDepth()` and `sortNodes()` to shared helpers
 
-7. **Use event delegation** - Replace individual event listeners with delegated listeners on document or container
+6. **Use event delegation** - Replace individual event listeners with delegated listeners on document or container
 
-8. **Add error handling to parse-landing.js** - Wrap `readFileSync()` in try-catch
+7. **Add error handling to parse-landing.js** - Wrap `readFileSync()` in try-catch
 
-9. **Regenerate session on authentication** - Call `req.session.regenerate()` after successful OAuth
-
-10. **Add error scenario tests** - Test 401 handling, network failures, malformed data
+8. **Regenerate session on authentication** - Call `req.session.regenerate()` after successful OAuth
 
 ### Priority 3: Medium
 
-11. **Split server.js** - Extract OAuth routes, workspace management, and data fetching into separate modules
+9. **Split server.js** - Extract OAuth routes, workspace management, and data fetching into separate modules
 
-12. **Document test magic numbers** - Add comments explaining expected counts in test assertions
+10. **Remove test.skip() calls** - Either fix the two skipped tests (lines 92, 178) or remove the incomplete features
 
-13. **Remove test.skip() calls** - Either fix the two skipped tests (lines 92, 178) or remove the incomplete features
+11. **Move test fixtures** - Extract `testMockData` and `testMockTeams` to `tests/fixtures/`
 
-14. **Move test fixtures** - Extract `testMockData` and `testMockTeams` to `tests/fixtures/`
-
-15. **Use CSS variables consistently** - Replace hard-coded colors with CSS custom properties
+12. **Use CSS variables consistently** - Replace hard-coded colors with CSS custom properties
 
 ### Priority 4: Low
 
-16. **Consider immutable state updates** - Replace `push()`/`splice()` with spread operator patterns
+13. **Consider immutable state updates** - Replace `push()`/`splice()` with spread operator patterns
 
-17. **Add Page Object Model** - Create reusable page objects for test selectors
+14. **Add Page Object Model** - Create reusable page objects for test selectors
 
-18. **Remove inline event handlers** - Move `onsubmit` handler from HTML to JavaScript
+15. **Remove inline event handlers** - Move `onsubmit` handler from HTML to JavaScript
 
-19. **Improve color contrast** - Adjust `--fg-dim` color for better accessibility
+16. **Improve color contrast** - Adjust `--fg-dim` color for better accessibility
 
-20. **Add JSDoc types** - Document complex data structures like the forest Map
+17. **Add JSDoc types** - Document complex data structures like the forest Map
 
 ---
 
@@ -305,8 +303,9 @@ Environment variables are used without checking they exist:
 | `lib/parse-landing.js` | 199 | 1 | Medium |
 | `public/app.js` | 549 | 5 | High |
 | `public/style.css` | 628 | 4 | Medium |
-| `tests/e2e/*.spec.js` | ~400 | 5 | Medium |
+| `tests/e2e/*.spec.js` | ~750 | 2 | Low |
 
 ---
 
 *Report generated from automated analysis with manual verification of all findings.*
+*Updated January 2026 after test coverage improvements (28 → 51 tests).*
