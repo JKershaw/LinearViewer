@@ -21,6 +21,14 @@ import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken, needsRefresh, calculateExpiresAt } from './lib/token-refresh.js'
 
 // =============================================================================
+// Constants
+// =============================================================================
+const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
+const SESSION_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const TOKEN_REFRESH_MAX_WAIT_RETRIES = 50; // Max retries for concurrent request waiting
+const TOKEN_REFRESH_WAIT_DELAY_MS = 100; // Delay between retries when waiting
+
+// =============================================================================
 // Landing Page Setup
 // =============================================================================
 // Pre-render static content for unauthenticated users from content/landing.md.
@@ -50,7 +58,7 @@ const sessionsCollection = db.collection('sessions')
 
 const sessionStore = new MongoSessionStore({
   collection: sessionsCollection,
-  ttl: 30 * 24 * 60 * 60 // 30 days in seconds (refresh token based)
+  ttl: SESSION_TTL_SECONDS
 })
 
 // =============================================================================
@@ -84,7 +92,7 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days (refresh token based)
+    maxAge: SESSION_COOKIE_MAX_AGE_MS,
     secure: process.env.NODE_ENV === 'production'
   }
 }))
@@ -155,20 +163,35 @@ async function ensureValidToken(req, res, next) {
 
   // Prevent concurrent refresh attempts
   if (req.session.tokenRefreshInProgress) {
+    // Track retry attempts to prevent infinite loops
+    if (!req._tokenRefreshRetries) req._tokenRefreshRetries = 0;
+
+    if (req._tokenRefreshRetries >= TOKEN_REFRESH_MAX_WAIT_RETRIES) {
+      console.error('Token refresh timeout - exceeded max retries');
+      // Reset and let the 401 handler deal with it
+      delete req._tokenRefreshRetries;
+      return next();
+    }
+
+    req._tokenRefreshRetries++;
     // Wait briefly and recheck (simple approach for concurrent requests)
-    return setTimeout(() => ensureValidToken(req, res, next), 100);
+    return setTimeout(() => ensureValidToken(req, res, next), TOKEN_REFRESH_WAIT_DELAY_MS);
   }
 
   try {
+    // Set flag and save it before starting refresh
     req.session.tokenRefreshInProgress = true;
+    await new Promise((resolve, reject) => {
+      req.session.save((err) => err ? reject(err) : resolve());
+    });
 
     const tokenData = await refreshAccessToken(req.session.refreshToken);
 
-    // Update session with new tokens
+    // Update session with new tokens and remove the flag
     req.session.accessToken = tokenData.access_token;
     req.session.refreshToken = tokenData.refresh_token;
     req.session.tokenExpiresAt = calculateExpiresAt(tokenData.expires_in);
-    req.session.tokenRefreshInProgress = false;
+    delete req.session.tokenRefreshInProgress; // Remove flag entirely
 
     // Save session before proceeding
     await new Promise((resolve, reject) => {
@@ -178,12 +201,19 @@ async function ensureValidToken(req, res, next) {
     console.log('Token refreshed successfully');
     next();
   } catch (error) {
-    req.session.tokenRefreshInProgress = false;
+    // Clean up flag on error
+    delete req.session.tokenRefreshInProgress;
+    // Best effort to persist the cleanup
+    await new Promise((resolve) => {
+      req.session.save(() => resolve());
+    }).catch(() => {}); // Ignore save errors during cleanup
+
     console.error('Token refresh failed:', error);
 
     // If refresh token expired/invalid, clear session and redirect to landing
     if (error.code === 'EXPIRED' || error.code === 'INVALID') {
-      return req.session.destroy(() => {
+      return req.session.destroy((err) => {
+        if (err) console.error('Session destroy error:', err);
         res.redirect('/');
       });
     }
@@ -279,15 +309,19 @@ app.get('/auth/callback', async (req, res) => {
     }
 
     // Store access token, refresh token, and expiration in session
-    req.session.accessToken = data.access_token
-    req.session.refreshToken = data.refresh_token
-    req.session.tokenExpiresAt = calculateExpiresAt(data.expires_in || 86400)
+    req.session.accessToken = data.access_token;
+    req.session.refreshToken = data.refresh_token;
+    req.session.tokenExpiresAt = calculateExpiresAt(data.expires_in || 86400);
+    delete req.session.oauthState; // Clean up CSRF token after use
     req.session.save(() => {
-      res.redirect('/')
-    })
+      res.redirect('/');
+    });
   } catch (err) {
-    console.error('OAuth callback error:', err)
-    res.status(500).send(`<pre>Error: ${err.message}</pre>`)
+    console.error('OAuth callback error:', err);
+    const errorMessage = process.env.NODE_ENV === 'production'
+      ? 'Authentication error occurred'
+      : err.message;
+    res.status(500).send(`<pre>Error: ${errorMessage}</pre>`);
   }
 })
 
@@ -296,14 +330,64 @@ app.get('/auth/callback', async (req, res) => {
  * Destroys the session, effectively logging the user out.
  */
 app.get('/logout', (req, res) => {
-  req.session.destroy(() => {
-    res.redirect('/')
-  })
-})
+  req.session.destroy((err) => {
+    if (err) {
+      console.error('Session destroy error during logout:', err);
+    }
+    res.redirect('/');
+  });
+});
 
 // =============================================================================
 // Main Application Route
 // =============================================================================
+
+/**
+ * Helper function to fetch and prepare project data for rendering.
+ * Handles both test mode and real API calls.
+ *
+ * @param {string} accessToken - The access token for Linear API
+ * @returns {Promise<{trees, inProgressIssues, organizationName}>} Prepared data for rendering
+ */
+async function fetchAndPrepareProjects(accessToken) {
+  // Use mock data in test mode to avoid hitting Linear API
+  const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
+  const { organizationName, projects, issues } = isTestMode
+    ? testMockData
+    : await fetchProjects(accessToken);
+
+  // Build issue tree structure (parent-child relationships)
+  const forest = buildForest(issues);
+
+  // Extract in-progress issues for the dedicated "In Progress" section
+  // Sorted by priority (urgent first) with creation date as tiebreaker
+  const inProgressIssues = issues
+    .filter(i => i.state?.type === 'started')
+    .map(issue => ({
+      ...issue,
+      projectName: projects.find(p => p.id === issue.project?.id)?.name
+    }))
+    .sort((a, b) => {
+      // Priority: 1=Urgent, 2=High, 3=Medium, 4=Low, 0=None
+      // Lower number = higher priority, but 0 (none) should sort last
+      const aPriority = a.priority || 5;
+      const bPriority = b.priority || 5;
+      if (aPriority !== bPriority) return aPriority - bPriority;
+      // Tiebreaker: createdAt (oldest first, matching Linear's default)
+      return new Date(a.createdAt) - new Date(b.createdAt);
+    });
+
+  // Build tree structure for each project, separating complete from incomplete
+  const trees = projects
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map(project => {
+      const { roots } = forest.get(project.id) || { roots: [] };
+      const { incomplete, completed, completedCount } = partitionCompleted(roots);
+      return { project, incomplete, completed, completedCount };
+    });
+
+  return { trees, inProgressIssues, organizationName };
+}
 
 /**
  * Home page - renders either landing page or authenticated project view.
@@ -320,44 +404,9 @@ app.get('/', async (req, res) => {
   }
 
   try {
-    // Use mock data in test mode to avoid hitting Linear API
-    const isTestMode = process.env.NODE_ENV === 'test' && req.session.accessToken === 'test-token'
-    const { organizationName, projects, issues } = isTestMode
-      ? testMockData
-      : await fetchProjects(req.session.accessToken)
-
-    // Build issue tree structure (parent-child relationships)
-    const forest = buildForest(issues)
-
-    // Extract in-progress issues for the dedicated "In Progress" section
-    // Sorted by priority (urgent first) with creation date as tiebreaker
-    const inProgressIssues = issues
-      .filter(i => i.state?.type === 'started')
-      .map(issue => ({
-        ...issue,
-        projectName: projects.find(p => p.id === issue.project?.id)?.name
-      }))
-      .sort((a, b) => {
-        // Priority: 1=Urgent, 2=High, 3=Medium, 4=Low, 0=None
-        // Lower number = higher priority, but 0 (none) should sort last
-        const aPriority = a.priority || 5
-        const bPriority = b.priority || 5
-        if (aPriority !== bPriority) return aPriority - bPriority
-        // Tiebreaker: createdAt (oldest first, matching Linear's default)
-        return new Date(a.createdAt) - new Date(b.createdAt)
-      })
-
-    // Build tree structure for each project, separating complete from incomplete
-    const trees = projects
-      .sort((a, b) => a.sortOrder - b.sortOrder)
-      .map(project => {
-        const { roots } = forest.get(project.id) || { roots: [] }
-        const { incomplete, completed, completedCount } = partitionCompleted(roots)
-        return { project, incomplete, completed, completedCount }
-      })
-
-    const html = renderPage(trees, inProgressIssues, organizationName)
-    res.send(html)
+    const { trees, inProgressIssues, organizationName } = await fetchAndPrepareProjects(req.session.accessToken);
+    const html = renderPage(trees, inProgressIssues, organizationName);
+    res.send(html);
   } catch (error) {
     console.error('Error fetching projects:', error)
 
@@ -378,43 +427,14 @@ app.get('/', async (req, res) => {
         console.log('Token refreshed after 401, retrying request');
 
         // Retry the request with the new token
-        const isTestMode = process.env.NODE_ENV === 'test' && req.session.accessToken === 'test-token';
-        const { organizationName, projects, issues } = isTestMode
-          ? testMockData
-          : await fetchProjects(req.session.accessToken);
-
-        // Build issue tree structure (parent-child relationships)
-        const forest = buildForest(issues);
-
-        // Extract in-progress issues for the dedicated "In Progress" section
-        const inProgressIssues = issues
-          .filter(i => i.state?.type === 'started')
-          .map(issue => ({
-            ...issue,
-            projectName: projects.find(p => p.id === issue.project?.id)?.name
-          }))
-          .sort((a, b) => {
-            const aPriority = a.priority || 5;
-            const bPriority = b.priority || 5;
-            if (aPriority !== bPriority) return aPriority - bPriority;
-            return new Date(a.createdAt) - new Date(b.createdAt);
-          });
-
-        // Build tree structure for each project
-        const trees = projects
-          .sort((a, b) => a.sortOrder - b.sortOrder)
-          .map(project => {
-            const { roots } = forest.get(project.id) || { roots: [] };
-            const { incomplete, completed, completedCount } = partitionCompleted(roots);
-            return { project, incomplete, completed, completedCount };
-          });
-
+        const { trees, inProgressIssues, organizationName } = await fetchAndPrepareProjects(req.session.accessToken);
         const html = renderPage(trees, inProgressIssues, organizationName);
         return res.send(html);
       } catch (refreshError) {
         // Refresh failed, clear session and show landing page
         console.error('Token refresh failed after 401:', refreshError);
-        return req.session.destroy(() => {
+        return req.session.destroy((err) => {
+          if (err) console.error('Session destroy error:', err);
           const html = renderPage(landingTrees, [], landingData.organizationName, { isLanding: true });
           res.send(html);
         });
@@ -423,13 +443,17 @@ app.get('/', async (req, res) => {
 
     // If 401 but no refresh token, or other errors, clear session and show landing
     if (error.response?.status === 401) {
-      return req.session.destroy(() => {
+      return req.session.destroy((err) => {
+        if (err) console.error('Session destroy error:', err);
         const html = renderPage(landingTrees, [], landingData.organizationName, { isLanding: true });
         res.send(html);
       });
     }
 
-    res.status(500).send(`<pre>Error: ${error.message}</pre>`)
+    const errorMessage = process.env.NODE_ENV === 'production'
+      ? 'Internal Server Error'
+      : error.message;
+    res.status(500).send(`<pre>Error: ${errorMessage}</pre>`);
   }
 })
 
