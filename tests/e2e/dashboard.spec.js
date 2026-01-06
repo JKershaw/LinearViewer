@@ -33,9 +33,12 @@ test.describe('Authenticated Dashboard', () => {
     await expect(page.locator('.in-progress-items .line:has-text("Beta task in progress")')).toBeVisible();
 
     // Child task exists but is hidden (depth > 0) until parent is expanded
+    // Note: hidden class is now on .node wrapper, not .line
     const childTask = page.locator('.in-progress-items .line:has-text("Child task todo")');
     await expect(childTask).toHaveCount(1);
-    await expect(childTask).toHaveClass(/hidden/);
+    // Use data-id to get the specific node wrapper
+    const childNode = page.locator('.in-progress-items .node[data-id="issue-2"]');
+    await expect(childNode).toHaveClass(/hidden/);
   });
 
   test('displays correct state indicators', async ({ page }) => {

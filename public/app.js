@@ -53,10 +53,11 @@ function resetDOM() {
   // Hide all details
   document.querySelectorAll('.details').forEach(hide)
 
-  // Hide child lines (depth > 0), show top-level lines
-  document.querySelectorAll('.line').forEach(line => {
-    const depth = parseInt(line.dataset.depth, 10)
-    setHidden(line, depth > 0)
+  // Hide child nodes (depth > 0), show top-level nodes
+  document.querySelectorAll('.node').forEach(node => {
+    const line = node.querySelector(':scope > .line')
+    const depth = parseInt(line?.dataset.depth, 10)
+    setHidden(node, depth > 0)
   })
 
   // Expand all projects (show content, ▼ arrow)
@@ -73,7 +74,7 @@ function resetDOM() {
   // Hide all completed sections, reset toggle text
   document.querySelectorAll('[data-completed-for]').forEach(hide)
   document.querySelectorAll('.completed-toggle').forEach(toggle => {
-    toggle.textContent = `┄ show ${toggle.dataset.count} completed ┄`
+    toggle.textContent = `show ${toggle.dataset.count} completed`
   })
 
   // Expand in-progress section
@@ -92,40 +93,38 @@ function toggleInArray(arr, id) {
 }
 
 function getDescendants(id, section) {
-  const descendants = []
-  const queue = [id]
+  // With nested .node structure, find the parent's .children container
+  const line = document.querySelector(`.line[data-id="${id}"][data-section="${section}"]`)
+  if (!line) return []
 
-  while (queue.length > 0) {
-    const parentId = queue.shift()
-    const children = document.querySelectorAll(`[data-parent="${parentId}"][data-section="${section}"]`)
-    children.forEach(el => {
-      descendants.push(el)
-      // Also include the details element if it exists
-      const details = el.nextElementSibling
-      if (details && details.dataset.detailsFor === el.dataset.id) {
-        descendants.push(details)
-      }
-      queue.push(el.dataset.id)
-    })
-  }
+  const node = line.closest('.node')
+  const childrenContainer = node?.querySelector(':scope > .children')
+  if (!childrenContainer) return []
 
-  return descendants
+  // Return all descendant nodes (they contain their own line and details)
+  return [...childrenContainer.querySelectorAll('.node')]
 }
 
 function showDescendantsRespectingExpanded(id, expandedArr, section) {
-  const directChildren = document.querySelectorAll(`[data-parent="${id}"][data-section="${section}"]`)
-  directChildren.forEach(child => {
-    show(child)
-    const childId = child.dataset.id
+  // With nested .node structure, find direct child nodes
+  const line = document.querySelector(`.line[data-id="${id}"][data-section="${section}"]`)
+  if (!line) return
+
+  const node = line.closest('.node')
+  const childrenContainer = node?.querySelector(':scope > .children')
+  if (!childrenContainer) return
+
+  // Show direct child nodes
+  childrenContainer.querySelectorAll(':scope > .node').forEach(childNode => {
+    show(childNode)
+    const childId = childNode.dataset.id
 
     // Show details only if this child is expanded
-    const details = child.nextElementSibling
-    if (details && details.dataset.detailsFor === childId && isExpanded(expandedArr, childId, section)) {
-      show(details)
-    }
+    if (isExpanded(expandedArr, childId, section)) {
+      const details = childNode.querySelector(':scope > .details')
+      if (details) show(details)
 
-    // Only recurse if this child is expanded
-    if (childId && isExpanded(expandedArr, childId, section)) {
+      // Recurse for expanded children
       showDescendantsRespectingExpanded(childId, expandedArr, section)
     }
   })
@@ -178,7 +177,7 @@ function applyState(state) {
     const section = document.querySelector(`[data-completed-for="${id}"]`)
     show(section)
     const toggle = document.querySelector(`.completed-toggle[data-project-id="${id}"]`)
-    if (toggle) toggle.textContent = '┄ hide completed ┄'
+    if (toggle) toggle.textContent = 'hide completed'
   })
 
   // Collapse projects
@@ -189,7 +188,8 @@ function applyState(state) {
     const header = project.querySelector('.project-header')
     setArrow(header, false)
 
-    const children = project.querySelectorAll('.line, .details, .project-description, .project-meta, .completed-toggle, [data-completed-for]')
+    // Hide all project content (including .node containers)
+    const children = project.querySelectorAll('.node, .project-description, .project-meta, .completed-toggle, [data-completed-for]')
     children.forEach(hide)
   })
 }
@@ -260,15 +260,16 @@ function init() {
     const nowExpanded = toggleExpanded(state.expanded, id, section)
     persistState(state)
 
-    const details = line.nextElementSibling
-    const hasDetails = details && details.dataset.detailsFor === id
+    // With nested .node structure, find details within the node
+    const node = line.closest('.node')
+    const details = node?.querySelector(':scope > .details')
 
     if (nowExpanded) {
-      if (hasDetails) show(details)
+      if (details) show(details)
       // Both sections can have children
       showDescendantsRespectingExpanded(id, state.expanded, section)
     } else {
-      if (hasDetails) hide(details)
+      if (details) hide(details)
       // Both sections can have children
       getDescendants(id, section).forEach(hide)
     }
@@ -318,8 +319,8 @@ function init() {
       const section = document.querySelector(`[data-completed-for="${projectId}"]`)
       setHidden(section, !isShown)
       e.target.textContent = isShown
-        ? `┄ hide completed ┄`
-        : `┄ show ${e.target.dataset.count} completed ┄`
+        ? 'hide completed'
+        : `show ${e.target.dataset.count} completed`
     })
   })
 
@@ -334,8 +335,8 @@ function init() {
       const isCollapsed = state.collapsedProjects.includes(projectId)
 
       if (isCollapsed) {
-        // Hide all project content
-        project.querySelectorAll('.line, .details, .project-description, .project-meta, .completed-toggle, [data-completed-for]')
+        // Hide all project content (including .node containers)
+        project.querySelectorAll('.node, .project-description, .project-meta, .completed-toggle, [data-completed-for]')
           .forEach(hide)
       } else {
         // Show project description, meta, and completed toggle
@@ -343,18 +344,16 @@ function init() {
         show(project.querySelector('.project-meta'))
         show(project.querySelector('.completed-toggle'))
 
-        // Show top-level lines (but keep them collapsed unless explicitly expanded)
-        project.querySelectorAll(`[data-parent="${projectId}"]`).forEach(line => {
-          show(line)
-          const lineId = line.dataset.id
+        // Show top-level nodes (but keep them collapsed unless explicitly expanded)
+        project.querySelectorAll(':scope > .node').forEach(node => {
+          show(node)
+          const nodeId = node.dataset.id
           // Show details and children only if this task is expanded
-          if (lineId && isExpanded(state.expanded, lineId, 'project')) {
-            const details = line.nextElementSibling
-            if (details && details.dataset.detailsFor === lineId) {
-              show(details)
-            }
-            showDescendantsRespectingExpanded(lineId, state.expanded)
-            const toggle = line.querySelector('.toggle')
+          if (nodeId && isExpanded(state.expanded, nodeId, 'project')) {
+            const details = node.querySelector(':scope > .details')
+            if (details) show(details)
+            showDescendantsRespectingExpanded(nodeId, state.expanded, 'project')
+            const toggle = node.querySelector('.line .toggle')
             if (toggle) toggle.textContent = '▼'
           }
         })
@@ -363,17 +362,15 @@ function init() {
         const completedSection = project.querySelector('[data-completed-for]')
         if (completedSection && state.hideCompleted.includes(projectId)) {
           show(completedSection)
-          // Show top-level completed lines
-          completedSection.querySelectorAll(`[data-parent="${projectId}"]`).forEach(line => {
-            show(line)
-            const lineId = line.dataset.id
+          // Show top-level completed nodes
+          completedSection.querySelectorAll(':scope > .node').forEach(node => {
+            show(node)
+            const nodeId = node.dataset.id
             // Show details and children only if expanded
-            if (lineId && isExpanded(state.expanded, lineId, 'project')) {
-              const details = line.nextElementSibling
-              if (details && details.dataset.detailsFor === lineId) {
-                show(details)
-              }
-              showDescendantsRespectingExpanded(lineId, state.expanded)
+            if (nodeId && isExpanded(state.expanded, nodeId, 'project')) {
+              const details = node.querySelector(':scope > .details')
+              if (details) show(details)
+              showDescendantsRespectingExpanded(nodeId, state.expanded, 'project')
             }
           })
         }

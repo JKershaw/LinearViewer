@@ -366,14 +366,35 @@ h1 {
 .completed-toggle {
   color: var(--fg-dim);
   cursor: pointer;
-  margin-left: 3ch;
-  font-style: italic;
+  margin-left: 4ch;
   padding: 0.5rem 0;
   font-family: var(--font-content);
 }
 
 /* Utility class for hiding elements (used by JS for expand/collapse) */
 .hidden { display: none !important; }
+
+/* =============================================================================
+   Node Container Structure
+   =============================================================================
+   Each issue is wrapped in a .node container that holds:
+   - .line (the clickable row)
+   - .details (expandable details panel)
+   - .children (nested child nodes)
+*/
+.node {
+  /* Structural container only */
+}
+
+/* Hover highlighting for issue groups */
+.node:hover > .line {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+/* Children container for nested nodes */
+.children {
+  /* Structural container */
+}
 
 .child-count {
   color: var(--fg-dim);

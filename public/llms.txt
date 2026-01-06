@@ -29,17 +29,35 @@
 - `[role="region"][aria-label="In Progress Tasks"]` - in-progress section
 - `[role="region"][aria-label="Projects"]` - projects section
 
+### Node Container Structure
+Issues are wrapped in nested `.node` containers:
+```
+.node[data-id="{id}"]           - node container
+  .line[data-id="{id}"]         - task row (clickable)
+  .details[data-details-for]    - details panel (hidden by default)
+  .children                     - container for nested child nodes
+    .node[data-id="{child-id}"] - child node (same structure)
+```
+
 ### Task Selectors
-Both In Progress and Projects sections use the same `.line` structure with tree hierarchy:
-- `.line` - task row element
-- `[data-id="{linear-issue-id}"]` - task by Linear issue ID
+Both In Progress and Projects sections use the same nested structure:
+- `.node[data-id="{id}"]` - node container wrapping line, details, and children
+- `.node > .line` - task row element within a node
+- `.node > .details` - details panel (sibling of .line within same node)
+- `.node > .children` - container for nested child nodes
+- `[data-id="{linear-issue-id}"]` - task by Linear issue ID (on both .node and .line)
 - `[data-status="todo|in-progress|done"]` - filter by status
 - `[data-section="in-progress|project"]` - scope to section (expand state is independent per section)
-- `[data-parent="{id}"]` - child tasks of a parent (use "in-progress-root" or project ID for top-level)
-- `[data-depth="{n}"]` - tasks at nesting level (0 = top-level)
-- `[data-details-for="{id}"]` - expanded details panel for a task
+- `[data-parent="{id}"]` - parent ID (on .line element)
+- `[data-depth="{n}"]` - nesting level (0 = top-level, on .line element)
 - `.expandable` - tasks that can be clicked to expand
 - `.in-progress-project` - project name badge shown in brackets for In Progress items
+
+### Traversing the Tree
+- Find node by ID: `.node[data-id="{id}"]`
+- Find node's details: `.node[data-id="{id}"] > .details`
+- Find node's direct children: `.node[data-id="{id}"] > .children > .node`
+- Find all descendants: `.node[data-id="{id}"] .node`
 
 ### Project Selectors
 - `.project[data-id="{project-id}"]` - project container
