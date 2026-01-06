@@ -44,7 +44,7 @@ Linear Projects Viewer is a well-designed minimal web application with a clean C
 
 ### 1.3 Remaining Test Quality Issues
 
-**`tests/e2e/interactions.spec.js:92, 178`** - Contains two `test.skip()` calls indicating incomplete features or flaky tests (completed toggle and landing page interactions).
+**`tests/e2e/interactions.spec.js:168-172`** - Contains one legitimate `test.skip()` for landing page test that depends on content/landing.md having expandable issues.
 
 **Regex assertions** where exact matches would be clearer:
 - Multiple uses of `.toHaveClass(/hidden/)` instead of `.toHaveClass('hidden')`
@@ -86,9 +86,9 @@ Duplicate functions have been extracted to shared helpers:
 - `parse-landing.js` has try-catch with fallback content
 - localStorage operations wrapped in safe helpers
 
-### 2.4 Test Data in Production Code
+### 2.4 Test Data Organization - ✅ Fixed
 
-**`server.js:198-217`** - Mock test data (`testMockTeams`, `testMockData`) is defined in the main server file rather than in a separate test fixtures file.
+Test mock data is now properly organized in `tests/fixtures/mock-data.js` and imported by server.js only in test mode.
 
 ---
 
@@ -154,11 +154,9 @@ While functional, immutable updates would be safer and easier to debug.
 | Session Regeneration | `routes/auth.js:138` | ✅ Prevents session fixation attacks |
 | Env Var Validation | `server.js:25-46` | ✅ Fails fast with clear messages |
 
-### 4.2 Remaining Security Considerations
+### 4.2 Security Considerations - ✅ All Addressed
 
-**Inline Event Handler**
-
-**`render.js:126`** - Uses inline `onsubmit` handler for form confirmation. This mixes JavaScript with HTML and can complicate Content Security Policy implementation.
+All security concerns have been addressed. The inline event handler was replaced with a `data-confirm` attribute and delegated submit handler for CSP compliance.
 
 ---
 
@@ -183,18 +181,15 @@ While functional, immutable updates would be safer and easier to debug.
 - ~~Split server.js~~ - Extracted to `lib/workspace.js`, `routes/auth.js`, `routes/workspace.js` (721 → 444 lines)
 - ~~Use event delegation~~ - Single delegated handler replaces 100+ listeners
 - ~~Use CSS variables consistently~~ - Added `--fg-vdim`, `--red`, `--red-hover`
+- ~~Remove inline event handlers~~ - Replaced `onsubmit` with `data-confirm` attribute and delegated handler
+- ~~Fix test.skip() calls~~ - Fixed unnecessary skip, documented legitimate skip
+- ~~Move test fixtures~~ - Extracted to `tests/fixtures/mock-data.js`
 
 ### Remaining Cleanup Tasks
 
-1. **Remove test.skip() calls** - Either fix the two skipped tests (lines 92, 178) or remove the incomplete features
+1. **Consider immutable state updates** - Replace `push()`/`splice()` with spread operator patterns
 
-2. **Move test fixtures** - Extract `testMockData` and `testMockTeams` to `tests/fixtures/`
-
-3. **Remove inline event handlers** - Move `onsubmit` handler from HTML to JavaScript
-
-4. **Consider immutable state updates** - Replace `push()`/`splice()` with spread operator patterns
-
-5. **Add JSDoc types** - Document complex data structures like the forest Map
+2. **Add JSDoc types** - Document complex data structures like the forest Map
 
 ---
 
@@ -202,16 +197,17 @@ While functional, immutable updates would be safer and easier to debug.
 
 | File | Lines | Issues Found | Severity |
 |------|-------|--------------|----------|
-| `server.js` | 444 | 1 | Low |
+| `server.js` | ~425 | 0 | ✅ Fixed |
 | `lib/workspace.js` | 83 | 0 | ✅ New |
 | `routes/auth.js` | 190 | 0 | ✅ New |
 | `routes/workspace.js` | 54 | 0 | ✅ New |
 | `lib/tree.js` | ~305 | 0 | ✅ Fixed |
-| `lib/render.js` | 522 | 1 | Low |
+| `lib/render.js` | 522 | 0 | ✅ Fixed |
 | `lib/parse-landing.js` | ~210 | 0 | ✅ Fixed |
-| `public/app.js` | ~590 | 1 | Low |
+| `public/app.js` | ~600 | 1 | Low |
 | `public/style.css` | 628 | 0 | ✅ Fixed |
-| `tests/e2e/*.spec.js` | ~750 | 2 | Low |
+| `tests/e2e/*.spec.js` | ~750 | 1 | Low |
+| `tests/fixtures/mock-data.js` | 25 | 0 | ✅ New |
 
 ---
 
