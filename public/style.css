@@ -21,9 +21,12 @@
   --bg: #ffffff;
   --fg: #1a1a1a;
   --fg-dim: #666666;
+  --fg-vdim: #eeeeee;  /* Very dim - box-drawing characters, structural elements */
   --green: #16a085;    /* Completed status */
   --yellow: #d4a600;   /* In-progress status */
   --blue: #2563eb;     /* Links and project headers */
+  --red: #cc0000;      /* Danger actions (remove) */
+  --red-hover: #990000;
 
   /* Font families: Separate structural (monospace) from content (readable) */
   --font-structural: 'SF Mono', 'Fira Code', 'Consolas', monospace;
@@ -156,7 +159,7 @@ h1 {
 }
 
 .option-prefix {
-  color: #eeeeee;
+  color: var(--fg-vdim);
   white-space: pre;
   flex-shrink: 0;
 }
@@ -203,11 +206,11 @@ h1 {
 
 .nav-option-danger {
   margin-left: auto;  /* Right-align remove button */
-  color: #c00;
+  color: var(--red);
 }
 
 .nav-option-danger:hover {
-  color: #900;
+  color: var(--red-hover);
 }
 
 /* =============================================================================
@@ -305,7 +308,7 @@ h1 {
 
 /* Box-drawing prefix (├─ └─ │) - preserves whitespace for alignment */
 .prefix {
-  color: #eeeeee;
+  color: var(--fg-vdim);
   white-space: pre;
   flex-shrink: 0;
 }
