@@ -169,23 +169,70 @@ app.use(session({
 // Allows tests to bypass OAuth and use predictable mock data.
 if (process.env.NODE_ENV === 'test') {
   // Endpoint to set a test session without going through OAuth flow
+  // Query parameters:
+  //   ?tokenExpired=true     - Set token expiry in the past
+  //   ?noRefreshToken=true   - Omit refresh token
+  //   ?multiWorkspace=true   - Set up 2 workspaces
+  //   ?maxWorkspaces=true    - Set up 10 workspaces (at limit)
   app.get('/test/set-session', (req, res) => {
-    // Use new workspace schema for test sessions
-    const testWorkspace = {
-      id: 'test-workspace-id',
-      name: 'Test Workspace',
-      urlKey: 'test-workspace',
+    const { tokenExpired, noRefreshToken, multiWorkspace, maxWorkspaces } = req.query
+
+    // Base workspace configuration - IDs must be valid UUIDs to pass validation
+    const createWorkspace = (id, name, urlKey) => ({
+      id,
+      name,
+      urlKey,
       accessToken: 'test-token',
-      refreshToken: 'test-refresh-token',
-      tokenExpiresAt: Date.now() + (24 * 60 * 60 * 1000), // 24 hours from now
+      refreshToken: noRefreshToken ? null : 'test-refresh-token',
+      tokenExpiresAt: tokenExpired
+        ? Date.now() - (60 * 60 * 1000)  // 1 hour in the past
+        : Date.now() + (24 * 60 * 60 * 1000),  // 24 hours from now
       addedAt: Date.now()
+    })
+
+    // Test UUIDs (valid format for workspace validation)
+    const TEST_UUID_1 = '11111111-1111-1111-1111-111111111111'
+    const TEST_UUID_2 = '22222222-2222-2222-2222-222222222222'
+
+    let workspaces
+    if (maxWorkspaces) {
+      // Create 10 workspaces (at the limit) with valid UUIDs
+      workspaces = Array.from({ length: 10 }, (_, i) =>
+        createWorkspace(
+          `${i}${i}${i}${i}${i}${i}${i}${i}-${i}${i}${i}${i}-${i}${i}${i}${i}-${i}${i}${i}${i}-${i}${i}${i}${i}${i}${i}${i}${i}${i}${i}${i}${i}`,
+          `Workspace ${i}`,
+          `workspace-${i}`
+        )
+      )
+    } else if (multiWorkspace) {
+      // Create 2 workspaces for switching tests
+      workspaces = [
+        createWorkspace(TEST_UUID_1, 'Test Workspace', 'test-workspace'),
+        createWorkspace(TEST_UUID_2, 'Second Workspace', 'second-workspace')
+      ]
+    } else {
+      // Default: single workspace
+      workspaces = [
+        createWorkspace(TEST_UUID_1, 'Test Workspace', 'test-workspace')
+      ]
     }
 
-    req.session.workspaces = [testWorkspace]
-    req.session.activeWorkspaceId = testWorkspace.id
+    req.session.workspaces = workspaces
+    req.session.activeWorkspaceId = workspaces[0].id
 
     // Explicitly save session before responding to ensure it's persisted
     req.session.save((err) => {
+      if (err) {
+        res.status(500).send('session error')
+      } else {
+        res.send('ok')
+      }
+    })
+  })
+
+  // Endpoint to clear session (for testing logout and unauthenticated states)
+  app.get('/test/clear-session', (req, res) => {
+    req.session.destroy((err) => {
       if (err) {
         res.status(500).send('session error')
       } else {

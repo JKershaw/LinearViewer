@@ -25,7 +25,7 @@ test.describe('Landing Page', () => {
   test('displays static project preview from landing.md', async ({ page }) => {
     await page.goto('/');
 
-    // Should show project headers from landing.md
+    // landing.md defines 5 projects: Login, What This Is, Self-Host, Use Cases, Source
     await expect(page.locator('.project-header')).toHaveCount(5);
     await expect(page.locator('.project-header:has-text("Login")')).toBeVisible();
     await expect(page.locator('.project-header:has-text("What This Is")')).toBeVisible();
@@ -37,10 +37,15 @@ test.describe('Landing Page', () => {
   test('displays state indicators correctly', async ({ page }) => {
     await page.goto('/');
 
-    // Should have different state indicators
-    await expect(page.locator('.state.done')).toHaveCount(4); // ✓ indicators
-    await expect(page.locator('.state.in-progress')).toHaveCount(1); // ◐ indicator
-    await expect(page.locator('.state.todo')).toHaveCount(11); // ○ indicators
+    // State counts from landing.md content:
+    // - 4 done (✓): Collapsible tree view, Always fresh, Auto-logout, Works everywhere
+    // - 1 in-progress (◐): Connect with Linear
+    // - 11 todo (○): You're looking at it, Run it yourself, AI-assisted setup, Customize it,
+    //                Daily standups, Project reviews, Status overviews,
+    //                What is Linear, View on GitHub, Bugs & feature requests, Built by John Kershaw
+    await expect(page.locator('.state.done')).toHaveCount(4);
+    await expect(page.locator('.state.in-progress')).toHaveCount(1);
+    await expect(page.locator('.state.todo')).toHaveCount(11);
   });
 
   test('does not show logout link on landing page', async ({ page }) => {
