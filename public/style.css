@@ -1,3 +1,6 @@
+/* Import Inter font from Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
 /**
  * Linear Projects Viewer - Stylesheet
  *
@@ -21,6 +24,10 @@
   --green: #16a085;    /* Completed status */
   --yellow: #d4a600;   /* In-progress status */
   --blue: #2563eb;     /* Links and project headers */
+
+  /* Font families: Separate structural (monospace) from content (readable) */
+  --font-structural: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  --font-content: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 /* =============================================================================
@@ -32,15 +39,15 @@ html {
   overflow-x: hidden;
 }
 
-/* Terminal-style monospace typography with comfortable line height */
+/* Terminal-style typography: structural base is monospace for alignment */
 body {
-  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-family: var(--font-structural);
   font-size: 16px;
   line-height: 1.6;
   background: var(--bg);
   color: var(--fg);
   padding: 2rem;
-  max-width: 120ch;  /* Optimal reading width for monospace */
+  max-width: 120ch;  /* Optimal reading width */
   overflow-x: hidden;
   width: 100%;
 }
@@ -58,6 +65,7 @@ header {
 h1 {
   color: var(--fg);
   font-weight: normal;
+  font-family: var(--font-content);
 }
 
 /* Navigation links (reset, logout) aligned to the right */
@@ -70,6 +78,7 @@ h1 {
   color: var(--fg-dim);
   text-decoration: none;
   font-size: 0.9em;
+  font-family: var(--font-content);
 }
 
 .header-actions a:hover {
@@ -91,6 +100,7 @@ h1 {
   font-weight: 600;
   cursor: pointer;
   padding: 0.5rem 0;
+  font-family: var(--font-content);
 }
 
 .in-progress-item {
@@ -115,11 +125,13 @@ h1 {
   color: var(--fg-dim);
   margin-left: 1ch;
   font-size: 0.9em;
+  font-family: var(--font-content);
 }
 
 .in-progress-assignee {
   color: var(--fg-dim);
   font-size: 0.9em;
+  font-family: var(--font-content);
 }
 
 .in-progress-items .details {
@@ -141,6 +153,7 @@ h1 {
   font-weight: 600;
   cursor: pointer;
   padding: 0.5rem 0;
+  font-family: var(--font-content);
 }
 
 .project-description {
@@ -150,6 +163,7 @@ h1 {
   word-wrap: break-word;
   overflow-wrap: break-word;
   cursor: pointer;
+  font-family: var(--font-content);
 }
 
 .project-description:hover {
@@ -213,6 +227,7 @@ h1 {
   min-width: 0;  /* Allow flex item to shrink below content size */
   word-wrap: break-word;
   overflow-wrap: break-word;
+  font-family: var(--font-content);
 }
 .title.done { color: var(--fg-dim); }
 
@@ -235,6 +250,7 @@ h1 {
   color: var(--blue);
   text-decoration: none;
   font-size: 0.9em;
+  font-family: var(--font-content);
 }
 
 .detail-link:hover {
@@ -245,6 +261,7 @@ h1 {
   color: var(--fg-dim);
   margin-left: 3ch;
   margin-bottom: 0.75rem;
+  font-family: var(--font-content);
 }
 
 /* "Show N completed" toggle link */
@@ -254,6 +271,7 @@ h1 {
   margin-left: 3ch;
   font-style: italic;
   padding: 0.5rem 0;
+  font-family: var(--font-content);
 }
 
 /* Utility class for hiding elements (used by JS for expand/collapse) */
@@ -262,6 +280,7 @@ h1 {
 .child-count {
   color: var(--fg-dim);
   font-size: 12px;
+  font-family: var(--font-content);
 }
 
 /* =============================================================================
@@ -298,6 +317,7 @@ h1 {
   min-width: 0;
   word-wrap: break-word;
   overflow-wrap: break-word;
+  font-family: var(--font-content);
 }
 
 .detail-meta {
@@ -307,6 +327,7 @@ h1 {
   min-width: 0;
   word-wrap: break-word;
   overflow-wrap: break-word;
+  font-family: var(--font-content);
 }
 
 /* =============================================================================
@@ -426,6 +447,7 @@ h1 {
 .login-container p {
   color: var(--fg-dim);
   margin-bottom: 1.5rem;
+  font-family: var(--font-content);
 }
 
 .login-button {
@@ -435,7 +457,7 @@ h1 {
   color: white;
   text-decoration: none;
   border-radius: 4px;
-  font-family: inherit;
+  font-family: var(--font-content);
 }
 
 .login-button:hover {
