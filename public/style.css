@@ -156,7 +156,7 @@ h1 {
 }
 
 .option-prefix {
-  color: var(--fg-dim);
+  color: #eeeeee;
   white-space: pre;
   flex-shrink: 0;
 }
