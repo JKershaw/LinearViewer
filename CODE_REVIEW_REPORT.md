@@ -184,12 +184,11 @@ All security concerns have been addressed. The inline event handler was replaced
 - ~~Remove inline event handlers~~ - Replaced `onsubmit` with `data-confirm` attribute and delegated handler
 - ~~Fix test.skip() calls~~ - Fixed unnecessary skip, documented legitimate skip
 - ~~Move test fixtures~~ - Extracted to `tests/fixtures/mock-data.js`
+- ~~Add JSDoc types~~ - Comprehensive type definitions in tree.js, workspace.js, render.js
 
 ### Remaining Cleanup Tasks
 
-1. **Consider immutable state updates** - Replace `push()`/`splice()` with spread operator patterns
-
-2. **Add JSDoc types** - Document complex data structures like the forest Map
+1. **Consider immutable state updates** - Replace `push()`/`splice()` with spread operator patterns in app.js
 
 ---
 
