@@ -18,7 +18,7 @@ import { fetchProjects, fetchTeams, fetchOrganization } from './lib/linear.js'
 import { buildForest, partitionCompleted } from './lib/tree.js'
 import { renderPage } from './lib/render.js'
 import { parseLandingPage } from './lib/parse-landing.js'
-import { refreshAccessToken, needsRefresh, calculateExpiresAt } from './lib/token-refresh.js'
+import { refreshAccessToken, calculateExpiresAt } from './lib/token-refresh.js'
 
 // =============================================================================
 // Constants
@@ -38,14 +38,14 @@ const MAX_WORKSPACES = 10; // Maximum workspaces per session
  * If activeWorkspaceId is out of sync, syncs to first workspace.
  */
 function getActiveWorkspace(session) {
-  if (!session.workspaces?.length) return null
-  const active = session.workspaces.find(w => w.id === session.activeWorkspaceId)
+  if (!session.workspaces?.length) return null;
+  const active = session.workspaces.find(w => w.id === session.activeWorkspaceId);
   if (!active) {
     // Sync activeWorkspaceId if it's out of sync
-    session.activeWorkspaceId = session.workspaces[0].id
-    return session.workspaces[0]
+    session.activeWorkspaceId = session.workspaces[0].id;
+    return session.workspaces[0];
   }
-  return active
+  return active;
 }
 
 /**
@@ -54,17 +54,17 @@ function getActiveWorkspace(session) {
  * Throws if MAX_WORKSPACES limit reached.
  */
 function upsertWorkspace(session, workspace) {
-  session.workspaces = session.workspaces || []
-  const index = session.workspaces.findIndex(w => w.id === workspace.id)
+  session.workspaces = session.workspaces || [];
+  const index = session.workspaces.findIndex(w => w.id === workspace.id);
   if (index >= 0) {
     // Update existing (re-auth for same workspace)
-    session.workspaces[index] = { ...session.workspaces[index], ...workspace }
+    session.workspaces[index] = { ...session.workspaces[index], ...workspace };
   } else {
     // Add new (check limit)
     if (session.workspaces.length >= MAX_WORKSPACES) {
-      throw new Error(`Maximum of ${MAX_WORKSPACES} workspaces allowed`)
+      throw new Error(`Maximum of ${MAX_WORKSPACES} workspaces allowed`);
     }
-    session.workspaces.push(workspace)
+    session.workspaces.push(workspace);
   }
 }
 
@@ -74,14 +74,14 @@ function upsertWorkspace(session, workspace) {
  * Returns number of remaining workspaces.
  */
 function removeWorkspace(session, workspaceId) {
-  session.workspaces = session.workspaces?.filter(w => w.id !== workspaceId) || []
+  session.workspaces = session.workspaces?.filter(w => w.id !== workspaceId) || [];
 
   // If removed workspace was active, switch to first remaining
   if (session.activeWorkspaceId === workspaceId) {
-    session.activeWorkspaceId = session.workspaces[0]?.id || null
+    session.activeWorkspaceId = session.workspaces[0]?.id || null;
   }
 
-  return session.workspaces.length
+  return session.workspaces.length;
 }
 
 /**
@@ -412,35 +412,36 @@ app.get('/logout', (req, res) => {
  * Switch active workspace (POST to avoid state change via GET)
  */
 app.post('/workspace/:id/switch', async (req, res) => {
-  const workspace = req.session.workspaces?.find(w => w.id === req.params.id)
-  if (!workspace) {
-    return res.status(404).send('Workspace not found')
+  if (!UUID_REGEX.test(req.params.id)) {
+    return res.status(400).send('Invalid workspace ID');
   }
 
-  req.session.activeWorkspaceId = workspace.id
-  await saveSession(req.session)
-  res.redirect('/')
+  const workspace = req.session.workspaces?.find(w => w.id === req.params.id);
+  if (!workspace) {
+    return res.status(404).send('Workspace not found');
+  }
+
+  req.session.activeWorkspaceId = workspace.id;
+  await saveSession(req.session);
+  res.redirect('/');
 })
 
 /**
  * Remove a workspace (POST for safety)
  */
 app.post('/workspace/:id/remove', async (req, res) => {
-  const workspaceId = req.params.id
+  if (!UUID_REGEX.test(req.params.id)) {
+    return res.status(400).send('Invalid workspace ID');
+  }
 
   // If only one workspace, just logout entirely
-  if (req.session.workspaces?.length === 1) {
-    return req.session.destroy(() => res.redirect('/'))
+  if (req.session.workspaces?.length <= 1) {
+    return req.session.destroy(() => res.redirect('/'));
   }
 
-  const remaining = removeWorkspace(req.session, workspaceId)
-
-  if (remaining === 0) {
-    return req.session.destroy(() => res.redirect('/'))
-  }
-
-  await saveSession(req.session)
-  res.redirect('/')
+  removeWorkspace(req.session, req.params.id);
+  await saveSession(req.session);
+  res.redirect('/');
 })
 
 // =============================================================================
