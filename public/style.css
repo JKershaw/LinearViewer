@@ -125,6 +125,117 @@ h1 {
 }
 
 /* =============================================================================
+   Workspace Switcher
+   =============================================================================
+   Dropdown to switch between connected Linear workspaces.
+*/
+.workspace-switcher {
+  position: relative;
+  display: inline-block;
+  margin-right: 1rem;
+}
+
+.current-workspace {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid #ddd;
+  background: var(--bg);
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 4px;
+  color: var(--fg);
+}
+
+.current-workspace:hover {
+  border-color: var(--blue);
+}
+
+.workspace-name {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dropdown-arrow {
+  font-size: 0.75em;
+  color: var(--fg-dim);
+}
+
+.workspace-dropdown {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: var(--bg);
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  min-width: 200px;
+  z-index: 100;
+  margin-top: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.workspace-dropdown.open {
+  display: block;
+}
+
+.workspace-dropdown hr {
+  margin: 0.25rem 0;
+  border: none;
+  border-top: 1px solid #eee;
+}
+
+.workspace-form {
+  margin: 0;
+}
+
+.workspace-item,
+.add-workspace,
+.remove-workspace {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  text-decoration: none;
+  color: var(--fg);
+  background: none;
+  border: none;
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  cursor: pointer;
+}
+
+.workspace-item:hover,
+.add-workspace:hover {
+  background: #f5f5f5;
+}
+
+.workspace-item.active {
+  font-weight: 500;
+}
+
+.workspace-indicator {
+  margin-right: 0.25rem;
+  color: var(--blue);
+}
+
+.add-workspace {
+  color: var(--fg-dim);
+}
+
+.remove-workspace {
+  color: #c00;
+}
+
+.remove-workspace:hover {
+  background: #fee;
+}
+
+/* =============================================================================
    "In Progress" Section
    =============================================================================
    Displays all in-progress issues across projects in a single collapsible list.

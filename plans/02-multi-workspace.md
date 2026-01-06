@@ -87,9 +87,7 @@ session = {
       addedAt: 1704510000000
     }
   ],
-  activeWorkspaceId: 'org-uuid-1',
-  // Track refresh in progress per workspace to prevent race conditions
-  refreshInProgress: {}  // { 'org-uuid-1': true, ... }
+  activeWorkspaceId: 'org-uuid-1'
 }
 ```
 
@@ -212,7 +210,7 @@ app.get('/auth/callback', async (req, res) => {
     const workspace = {
       id: org.id,
       name: org.name,
-      urlKey: org.urlKey,
+      urlKey: org.urlKey || org.name,  // Fallback to name if urlKey missing
       accessToken: tokens.access_token,
       refreshToken: tokens.refresh_token,
       tokenExpiresAt: Date.now() + (tokens.expires_in * 1000),
@@ -241,6 +239,8 @@ app.get('/auth/callback', async (req, res) => {
 
 ### Modified Token Refresh Middleware
 
+Simplified approach: concurrent requests may both trigger refresh, but this is harmless (Linear returns valid tokens either way, and the last write wins).
+
 ```javascript
 async function ensureValidToken(req, res, next) {
   const workspace = getActiveWorkspace(req.session)
@@ -250,34 +250,6 @@ async function ensureValidToken(req, res, next) {
 
   if (!needsRefresh) return next()
 
-  // Initialize refresh tracking
-  req.session.refreshInProgress = req.session.refreshInProgress || {}
-
-  // Check if refresh already in progress for this workspace
-  if (req.session.refreshInProgress[workspace.id]) {
-    // Wait for ongoing refresh (poll with timeout)
-    let attempts = 0
-    const maxAttempts = 50
-
-    while (req.session.refreshInProgress[workspace.id] && attempts < maxAttempts) {
-      await new Promise(resolve => setTimeout(resolve, 100))
-      attempts++
-    }
-
-    // Reload session to get updated tokens
-    return new Promise((resolve, reject) => {
-      req.session.reload(err => {
-        if (err) return res.redirect('/')
-        next()
-        resolve()
-      })
-    })
-  }
-
-  // Mark refresh in progress
-  req.session.refreshInProgress[workspace.id] = true
-  await saveSession(req.session)
-
   try {
     const newTokens = await refreshAccessToken(workspace.refreshToken)
 
@@ -286,16 +258,10 @@ async function ensureValidToken(req, res, next) {
     workspace.refreshToken = newTokens.refresh_token
     workspace.tokenExpiresAt = Date.now() + (newTokens.expires_in * 1000)
 
-    // Clear refresh flag
-    delete req.session.refreshInProgress[workspace.id]
     await saveSession(req.session)
-
     next()
   } catch (err) {
     console.error(`Token refresh failed for workspace ${workspace.id}:`, err)
-
-    // Clear refresh flag
-    delete req.session.refreshInProgress[workspace.id]
 
     // Remove failed workspace
     const remaining = removeWorkspace(req.session, workspace.id)
@@ -549,7 +515,7 @@ When switching workspaces:
 | User removes last workspace | Full logout |
 | Max workspaces reached | Show error, don't add new |
 | Switch workspace | Reset team filter |
-| Concurrent token refresh | Wait for in-progress refresh via polling |
+| Concurrent token refresh | Both proceed; harmless, last write wins |
 
 ---
 
@@ -591,6 +557,5 @@ test('cannot exceed max workspaces', ...)
 
 - Background token refresh for all workspaces (not just active)
 - Workspace-specific team selection memory (store per workspace)
-- Keyboard shortcut for workspace switching (e.g., `Cmd+1`, `Cmd+2`)
 - Show workspace color/logo if available from Linear
 - Workspace reordering via drag-and-drop

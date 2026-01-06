@@ -418,7 +418,37 @@ function initDescriptionToggles() {
   })
 }
 
+// Workspace switcher dropdown
+function initWorkspaceSwitcher() {
+  const switcher = document.getElementById('workspace-switcher')
+  if (!switcher) return
+
+  const button = switcher.querySelector('.current-workspace')
+  const dropdown = switcher.querySelector('.workspace-dropdown')
+
+  button.addEventListener('click', (e) => {
+    e.stopPropagation()
+    const expanded = button.getAttribute('aria-expanded') === 'true'
+    button.setAttribute('aria-expanded', !expanded)
+    dropdown.classList.toggle('open')
+  })
+
+  // Close on outside click
+  document.addEventListener('click', () => {
+    button.setAttribute('aria-expanded', 'false')
+    dropdown.classList.remove('open')
+  })
+
+  // Prevent dropdown clicks from closing (except form submissions)
+  dropdown.addEventListener('click', (e) => {
+    // Allow form submissions to proceed
+    if (e.target.closest('form')) return
+    e.stopPropagation()
+  })
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   init()
   initDescriptionToggles()
+  initWorkspaceSwitcher()
 })

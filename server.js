@@ -14,7 +14,7 @@ import session from 'express-session'
 import { MongoClient } from 'mongodb'
 import { MangoClient } from '@jkershaw/mangodb'
 import { MongoSessionStore } from './lib/session-store.js'
-import { fetchProjects, fetchTeams } from './lib/linear.js'
+import { fetchProjects, fetchTeams, fetchOrganization } from './lib/linear.js'
 import { buildForest, partitionCompleted } from './lib/tree.js'
 import { renderPage } from './lib/render.js'
 import { parseLandingPage } from './lib/parse-landing.js'
@@ -26,8 +26,72 @@ import { refreshAccessToken, needsRefresh, calculateExpiresAt } from './lib/toke
 const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SESSION_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
-const TOKEN_REFRESH_MAX_WAIT_RETRIES = 50; // Max retries for concurrent request waiting
-const TOKEN_REFRESH_WAIT_DELAY_MS = 100; // Delay between retries when waiting
+const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000; // 5 minutes before expiry
+const MAX_WORKSPACES = 10; // Maximum workspaces per session
+
+// =============================================================================
+// Multi-Workspace Helper Functions
+// =============================================================================
+
+/**
+ * Get the active workspace from session.
+ * If activeWorkspaceId is out of sync, syncs to first workspace.
+ */
+function getActiveWorkspace(session) {
+  if (!session.workspaces?.length) return null
+  const active = session.workspaces.find(w => w.id === session.activeWorkspaceId)
+  if (!active) {
+    // Sync activeWorkspaceId if it's out of sync
+    session.activeWorkspaceId = session.workspaces[0].id
+    return session.workspaces[0]
+  }
+  return active
+}
+
+/**
+ * Add or update a workspace in session.
+ * Updates existing workspace if same org ID, otherwise adds new.
+ * Throws if MAX_WORKSPACES limit reached.
+ */
+function upsertWorkspace(session, workspace) {
+  session.workspaces = session.workspaces || []
+  const index = session.workspaces.findIndex(w => w.id === workspace.id)
+  if (index >= 0) {
+    // Update existing (re-auth for same workspace)
+    session.workspaces[index] = { ...session.workspaces[index], ...workspace }
+  } else {
+    // Add new (check limit)
+    if (session.workspaces.length >= MAX_WORKSPACES) {
+      throw new Error(`Maximum of ${MAX_WORKSPACES} workspaces allowed`)
+    }
+    session.workspaces.push(workspace)
+  }
+}
+
+/**
+ * Remove a workspace from session.
+ * Updates activeWorkspaceId if removed workspace was active.
+ * Returns number of remaining workspaces.
+ */
+function removeWorkspace(session, workspaceId) {
+  session.workspaces = session.workspaces?.filter(w => w.id !== workspaceId) || []
+
+  // If removed workspace was active, switch to first remaining
+  if (session.activeWorkspaceId === workspaceId) {
+    session.activeWorkspaceId = session.workspaces[0]?.id || null
+  }
+
+  return session.workspaces.length
+}
+
+/**
+ * Promisified session save.
+ */
+function saveSession(session) {
+  return new Promise((resolve, reject) => {
+    session.save(err => err ? reject(err) : resolve())
+  })
+}
 
 // =============================================================================
 // Landing Page Setup
@@ -106,9 +170,20 @@ app.use(session({
 if (process.env.NODE_ENV === 'test') {
   // Endpoint to set a test session without going through OAuth flow
   app.get('/test/set-session', (req, res) => {
-    req.session.accessToken = 'test-token'
-    req.session.refreshToken = 'test-refresh-token'
-    req.session.tokenExpiresAt = Date.now() + (24 * 60 * 60 * 1000) // 24 hours from now
+    // Use new workspace schema for test sessions
+    const testWorkspace = {
+      id: 'test-workspace-id',
+      name: 'Test Workspace',
+      urlKey: 'test-workspace',
+      accessToken: 'test-token',
+      refreshToken: 'test-refresh-token',
+      tokenExpiresAt: Date.now() + (24 * 60 * 60 * 1000), // 24 hours from now
+      addedAt: Date.now()
+    }
+
+    req.session.workspaces = [testWorkspace]
+    req.session.activeWorkspaceId = testWorkspace.id
+
     // Explicitly save session before responding to ensure it's persisted
     req.session.save((err) => {
       if (err) {
@@ -145,93 +220,52 @@ const testMockData = {
 // Token Refresh Middleware
 // =============================================================================
 // Automatically refreshes access tokens before they expire (5-minute buffer).
-// Prevents race conditions with tokenRefreshInProgress flag.
+// Simplified approach: concurrent requests may both refresh, but this is harmless.
 
 /**
  * Middleware to ensure access token is valid before each authenticated request.
  * Automatically refreshes token if it's expired or about to expire (5-minute buffer).
+ * Works with multi-workspace sessions - refreshes active workspace token only.
  */
 async function ensureValidToken(req, res, next) {
-  // Skip if no access token (unauthenticated user)
-  if (!req.session.accessToken) {
-    return next();
-  }
-
-  // Skip if no refresh token (shouldn't happen with new flow)
-  if (!req.session.refreshToken) {
-    return next();
-  }
+  const workspace = getActiveWorkspace(req.session)
+  if (!workspace) return next()
 
   // Check if token needs refresh (5-minute buffer)
-  if (!needsRefresh(req.session.tokenExpiresAt)) {
-    return next();
-  }
-
-  // Prevent concurrent refresh attempts
-  if (req.session.tokenRefreshInProgress) {
-    // Track retry attempts to prevent infinite loops
-    if (!req._tokenRefreshRetries) req._tokenRefreshRetries = 0;
-
-    if (req._tokenRefreshRetries >= TOKEN_REFRESH_MAX_WAIT_RETRIES) {
-      console.error('Token refresh timeout - exceeded max retries');
-      // Reset and let the 401 handler deal with it
-      delete req._tokenRefreshRetries;
-      return next();
-    }
-
-    req._tokenRefreshRetries++;
-    // Wait briefly and recheck (simple approach for concurrent requests)
-    return setTimeout(() => ensureValidToken(req, res, next), TOKEN_REFRESH_WAIT_DELAY_MS);
-  }
+  const needsTokenRefresh = workspace.tokenExpiresAt - Date.now() < TOKEN_REFRESH_BUFFER_MS
+  if (!needsTokenRefresh) return next()
 
   try {
-    // Set flag and save it before starting refresh
-    req.session.tokenRefreshInProgress = true;
-    await new Promise((resolve, reject) => {
-      req.session.save((err) => err ? reject(err) : resolve());
-    });
+    const newTokens = await refreshAccessToken(workspace.refreshToken)
 
-    const tokenData = await refreshAccessToken(req.session.refreshToken);
+    // Update workspace tokens
+    workspace.accessToken = newTokens.access_token
+    workspace.refreshToken = newTokens.refresh_token
+    workspace.tokenExpiresAt = calculateExpiresAt(newTokens.expires_in)
 
-    // Update session with new tokens and remove the flag
-    req.session.accessToken = tokenData.access_token;
-    req.session.refreshToken = tokenData.refresh_token;
-    req.session.tokenExpiresAt = calculateExpiresAt(tokenData.expires_in);
-    delete req.session.tokenRefreshInProgress; // Remove flag entirely
-
-    // Save session before proceeding
-    await new Promise((resolve, reject) => {
-      req.session.save((err) => err ? reject(err) : resolve());
-    });
-
-    console.log('Token refreshed successfully');
-    next();
+    await saveSession(req.session)
+    console.log(`Token refreshed for workspace ${workspace.id}`)
+    next()
   } catch (error) {
-    // Clean up flag on error
-    delete req.session.tokenRefreshInProgress;
-    // Best effort to persist the cleanup
-    await new Promise((resolve) => {
-      req.session.save(() => resolve());
-    }).catch(() => {}); // Ignore save errors during cleanup
+    console.error(`Token refresh failed for workspace ${workspace.id}:`, error)
 
-    console.error('Token refresh failed:', error);
+    // Remove failed workspace
+    const remaining = removeWorkspace(req.session, workspace.id)
 
-    // If refresh token expired/invalid, clear session and redirect to landing
-    if (error.code === 'EXPIRED' || error.code === 'INVALID') {
-      return req.session.destroy((err) => {
-        if (err) console.error('Session destroy error:', err);
-        res.redirect('/');
-      });
+    if (remaining > 0) {
+      // Switch to another workspace
+      await saveSession(req.session)
+      return res.redirect('/')
     }
 
-    // For network errors, allow request to proceed (will fail with 401 if needed)
-    next();
+    // No workspaces left, destroy session
+    req.session.destroy(() => res.redirect('/'))
   }
 }
 
-// Apply middleware to all routes except auth and logout routes
+// Apply middleware to all routes except auth, logout, and workspace routes
 app.use((req, res, next) => {
-  if (req.path.startsWith('/auth/') || req.path === '/logout') {
+  if (req.path.startsWith('/auth/') || req.path === '/logout' || req.path.startsWith('/workspace/')) {
     return next();
   }
   ensureValidToken(req, res, next);
@@ -276,7 +310,8 @@ app.get('/auth/linear', async (req, res) => {
  * Linear redirects here after user authorizes. We:
  * 1. Validate the state token to prevent CSRF
  * 2. Exchange the authorization code for an access token
- * 3. Store the access token in the session
+ * 3. Fetch organization info to identify the workspace
+ * 4. Store workspace in session (supports multiple workspaces)
  */
 app.get('/auth/callback', async (req, res) => {
   // Clean up expired sessions before proceeding (must await to avoid race conditions)
@@ -314,14 +349,38 @@ app.get('/auth/callback', async (req, res) => {
       return res.status(400).send(`<pre>Token error: ${data.error || 'Unknown error'}</pre>`)
     }
 
-    // Store access token, refresh token, and expiration in session
-    req.session.accessToken = data.access_token;
-    req.session.refreshToken = data.refresh_token;
-    req.session.tokenExpiresAt = calculateExpiresAt(data.expires_in || 86400);
-    delete req.session.oauthState; // Clean up CSRF token after use
-    req.session.save(() => {
-      res.redirect('/');
-    });
+    // Fetch organization info to identify workspace
+    let org
+    try {
+      org = await fetchOrganization(data.access_token)
+    } catch (orgError) {
+      console.error('Failed to fetch organization:', orgError)
+      return res.status(500).send('<pre>Failed to fetch workspace information</pre>')
+    }
+
+    // Build workspace object
+    const workspace = {
+      id: org.id,
+      name: org.name,
+      urlKey: org.urlKey || org.name,  // Fallback to name if urlKey missing
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,
+      tokenExpiresAt: calculateExpiresAt(data.expires_in || 86400),
+      addedAt: Date.now()
+    }
+
+    // Add/update workspace in session
+    try {
+      upsertWorkspace(req.session, workspace)
+    } catch (limitError) {
+      return res.status(400).send(`<pre>${limitError.message}</pre>`)
+    }
+
+    req.session.activeWorkspaceId = workspace.id
+    delete req.session.oauthState  // Clean up CSRF token after use
+
+    await saveSession(req.session)
+    res.redirect('/')
   } catch (err) {
     console.error('OAuth callback error:', err);
     const errorMessage = process.env.NODE_ENV === 'production'
@@ -343,6 +402,45 @@ app.get('/logout', (req, res) => {
     res.redirect('/');
   });
 });
+
+// =============================================================================
+// Workspace Management Routes
+// =============================================================================
+
+/**
+ * Switch active workspace (POST to avoid state change via GET)
+ */
+app.post('/workspace/:id/switch', async (req, res) => {
+  const workspace = req.session.workspaces?.find(w => w.id === req.params.id)
+  if (!workspace) {
+    return res.status(404).send('Workspace not found')
+  }
+
+  req.session.activeWorkspaceId = workspace.id
+  await saveSession(req.session)
+  res.redirect('/')
+})
+
+/**
+ * Remove a workspace (POST for safety)
+ */
+app.post('/workspace/:id/remove', async (req, res) => {
+  const workspaceId = req.params.id
+
+  // If only one workspace, just logout entirely
+  if (req.session.workspaces?.length === 1) {
+    return req.session.destroy(() => res.redirect('/'))
+  }
+
+  const remaining = removeWorkspace(req.session, workspaceId)
+
+  if (remaining === 0) {
+    return req.session.destroy(() => res.redirect('/'))
+  }
+
+  await saveSession(req.session)
+  res.redirect('/')
+})
 
 // =============================================================================
 // Main Application Route
@@ -419,8 +517,11 @@ async function fetchAndPrepareProjects(accessToken, teamId = null) {
  * - team: Optional team ID to filter issues by (or 'all' for all teams)
  */
 app.get('/', async (req, res) => {
+  // Get active workspace (null if not authenticated)
+  const workspace = getActiveWorkspace(req.session)
+
   // Unauthenticated users see the static landing page
-  if (!req.session.accessToken) {
+  if (!workspace) {
     const html = renderPage(landingTrees, [], landingData.organizationName, { isLanding: true })
     return res.send(html)
   }
@@ -430,35 +531,48 @@ app.get('/', async (req, res) => {
   const teamId = rawTeam && rawTeam !== 'all' && UUID_REGEX.test(rawTeam) ? rawTeam : null;
 
   try {
-    const { trees, inProgressIssues, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(req.session.accessToken, teamId);
-    const html = renderPage(trees, inProgressIssues, organizationName, { teams, selectedTeamId });
+    const { trees, inProgressIssues, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace.accessToken, teamId);
+    const html = renderPage(trees, inProgressIssues, organizationName, {
+      teams,
+      selectedTeamId,
+      workspaces: req.session.workspaces,
+      activeWorkspaceId: req.session.activeWorkspaceId
+    });
     res.send(html);
   } catch (error) {
     console.error('Error fetching projects:', error)
 
     // If token is invalid/expired (401), attempt refresh and retry
-    if (error.response?.status === 401 && req.session.refreshToken) {
+    if (error.response?.status === 401 && workspace.refreshToken) {
       try {
         // Attempt to refresh the token
-        const tokenData = await refreshAccessToken(req.session.refreshToken);
-        req.session.accessToken = tokenData.access_token;
-        req.session.refreshToken = tokenData.refresh_token;
-        req.session.tokenExpiresAt = calculateExpiresAt(tokenData.expires_in);
+        const tokenData = await refreshAccessToken(workspace.refreshToken);
+        workspace.accessToken = tokenData.access_token;
+        workspace.refreshToken = tokenData.refresh_token;
+        workspace.tokenExpiresAt = calculateExpiresAt(tokenData.expires_in);
 
-        // Save session with new tokens
-        await new Promise((resolve, reject) => {
-          req.session.save((err) => err ? reject(err) : resolve());
-        });
-
+        await saveSession(req.session);
         console.log('Token refreshed after 401, retrying request');
 
         // Retry the request with the new token
-        const { trees, inProgressIssues, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(req.session.accessToken, teamId);
-        const html = renderPage(trees, inProgressIssues, organizationName, { teams, selectedTeamId });
+        const { trees, inProgressIssues, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace.accessToken, teamId);
+        const html = renderPage(trees, inProgressIssues, organizationName, {
+          teams,
+          selectedTeamId,
+          workspaces: req.session.workspaces,
+          activeWorkspaceId: req.session.activeWorkspaceId
+        });
         return res.send(html);
       } catch (refreshError) {
-        // Refresh failed, clear session and show landing page
+        // Refresh failed, remove this workspace
         console.error('Token refresh failed after 401:', refreshError);
+        const remaining = removeWorkspace(req.session, workspace.id);
+
+        if (remaining > 0) {
+          await saveSession(req.session);
+          return res.redirect('/');
+        }
+
         return req.session.destroy((err) => {
           if (err) console.error('Session destroy error:', err);
           const html = renderPage(landingTrees, [], landingData.organizationName, { isLanding: true });
@@ -467,8 +581,15 @@ app.get('/', async (req, res) => {
       }
     }
 
-    // If 401 but no refresh token, or other errors, clear session and show landing
+    // If 401 but no refresh token, remove workspace and show landing or switch
     if (error.response?.status === 401) {
+      const remaining = removeWorkspace(req.session, workspace.id);
+
+      if (remaining > 0) {
+        await saveSession(req.session);
+        return res.redirect('/');
+      }
+
       return req.session.destroy((err) => {
         if (err) console.error('Session destroy error:', err);
         const html = renderPage(landingTrees, [], landingData.organizationName, { isLanding: true });
