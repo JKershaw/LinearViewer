@@ -519,6 +519,14 @@ function initNavBar() {
     }
   })
 
+  // Handle forms with confirmation dialogs (replaces inline onsubmit)
+  document.addEventListener('submit', (e) => {
+    const form = e.target.closest('form[data-confirm]')
+    if (form && !confirm(form.dataset.confirm)) {
+      e.preventDefault()
+    }
+  })
+
   // Keyboard navigation
   function handleKeyboard(e, toggle, options) {
     if (!options || options.classList.contains('hidden')) return
