@@ -516,7 +516,7 @@ h1 {
   }
 
   .completed-toggle {
-    margin-left: 0;
+    margin-left: 3ch;
     padding: 0.5rem 0;
     display: block;
   }
