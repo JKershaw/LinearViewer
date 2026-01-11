@@ -99,3 +99,46 @@ The `/llms.txt` file provides guidance for AI agents navigating the site, includ
 - Status indicators and their meanings
 
 **Keep llms.txt updated** when modifying DOM structure or data attributes in `render.js`.
+
+## Linear CLI (for AI Agents)
+
+When `LINEAR_API_KEY` environment variable is set, AI agents can query Linear directly:
+
+```bash
+node lib/linear-cli.js <command> [args]
+```
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `viewer` / `me` | Get current user info |
+| `org` | Get organization info |
+| `teams` | List all teams |
+| `projects` | List active projects |
+| `issues [teamId]` | List all issues (optionally filter by team) |
+| `issue <id>` | Get issue details with full context |
+| `search "query"` | Search issues |
+
+### Setup
+
+1. Get your API key from: https://linear.app/settings/api
+2. Set the environment variable: `export LINEAR_API_KEY="lin_api_..."`
+
+### Examples
+
+```bash
+# Check authentication
+node lib/linear-cli.js viewer
+
+# List all active projects
+node lib/linear-cli.js projects
+
+# Get full context for an issue
+node lib/linear-cli.js issue abc123def
+
+# Search for issues
+node lib/linear-cli.js search "authentication bug"
+```
+
+**Note**: The CLI outputs JSON for easy parsing by AI agents.
