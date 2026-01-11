@@ -468,8 +468,7 @@ app.get('/api/audit', async (req, res) => {
         issues: testMockData.issues.map(i => ({
           ...i,
           labels: { nodes: [] }
-        })),
-        customFields: []
+        }))
       };
       const report = computeAuditFromData(mockAuditData);
       return res.json(report);

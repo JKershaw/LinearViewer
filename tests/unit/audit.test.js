@@ -112,9 +112,6 @@ describe('Audit Computation', () => {
         dueDate: null,
         labels: { nodes: [] }
       }
-    ],
-    customFields: [
-      { name: 'Sprint', type: 'select' }
     ]
   };
 
@@ -208,13 +205,6 @@ describe('Audit Computation', () => {
     assert.ok(report.fields.dueDatesUsage >= 30 && report.fields.dueDatesUsage <= 35);
   });
 
-  test('includes custom fields', () => {
-    const report = computeAuditFromData(baseMockData);
-
-    assert.strictEqual(report.fields.customFieldCount, 1);
-    assert.ok(report.fields.customFields.some(f => f.name === 'Sprint'));
-  });
-
   test('includes timestamp', () => {
     const report = computeAuditFromData(baseMockData);
 
@@ -230,8 +220,7 @@ describe('Empty Workspace Handling', () => {
       projects: [],
       workflowStates: [],
       labels: [],
-      issues: [],
-      customFields: []
+      issues: []
     };
 
     const report = computeAuditFromData(emptyData);
@@ -262,8 +251,7 @@ describe('Empty Workspace Handling', () => {
           dueDate: null,
           labels: { nodes: [] }
         }
-      ],
-      customFields: []
+      ]
     };
 
     const report = computeAuditFromData(noLabelsData);
@@ -297,8 +285,7 @@ describe('Multiple Labels Handling', () => {
           dueDate: null,
           labels: { nodes: [{ id: 'l1', name: 'breakdown' }, { id: 'l2', name: 'bug' }] }
         }
-      ],
-      customFields: []
+      ]
     };
 
     const report = computeAuditFromData(multiLabelData);

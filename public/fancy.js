@@ -344,13 +344,6 @@ function renderFieldsContent(fields) {
   return `
     ${renderUsageBar('Estimates', fields.estimatesUsage)}
     ${renderUsageBar('Due dates', fields.dueDatesUsage)}
-
-    <h4 style="margin-top: 1rem;">Custom Fields (${fields.customFieldCount})</h4>
-    ${fields.customFields.length > 0
-      ? `<ul class="data-list">${fields.customFields.map(f =>
-          `<li><span class="label">${escapeHtml(f.name)}</span><span class="value">${escapeHtml(f.type)}</span></li>`
-        ).join('')}</ul>`
-      : '<span style="color: var(--fg-dim)">No custom fields configured</span>'}
   `;
 }
 
