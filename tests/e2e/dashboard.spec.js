@@ -81,13 +81,18 @@ test.describe('Authenticated Dashboard', () => {
     await expect(h1).not.toContainText('Linear Projects Viewer');
   });
 
-  test('renders box-drawing characters for tree structure', async ({ page }) => {
-    // Should have prefix elements with box-drawing characters
-    const prefixes = page.locator('.prefix');
-    await expect(prefixes.first()).toBeVisible();
+  test('renders CSS-based tree structure', async ({ page }) => {
+    // Tree structure is now rendered with CSS pseudo-elements instead of box-drawing characters
+    // Verify the .tree container exists and contains nodes
+    const treeContainer = page.locator('.project .tree');
+    await expect(treeContainer.first()).toBeVisible();
 
-    // The prefix should contain box-drawing characters
-    const prefixText = await prefixes.first().textContent();
-    expect(prefixText).toMatch(/[├└│─]/);
+    // Verify nodes are inside tree container
+    const nodesInTree = page.locator('.project .tree > .node');
+    await expect(nodesInTree.first()).toBeVisible();
+
+    // Verify the node has padding-left for indentation (applied by CSS)
+    const nodeStyle = await nodesInTree.first().evaluate(el => getComputedStyle(el).paddingLeft);
+    expect(parseFloat(nodeStyle)).toBeGreaterThan(0);
   });
 });

@@ -289,10 +289,11 @@ h1 {
    Issue Tree Lines
    =============================================================================
    Each issue is rendered as a "line" with:
-   - prefix: Box-drawing characters (├─ └─ │) showing tree structure
    - state: Status indicator (✓ ◐ ○)
    - title: Issue title (clickable to expand details)
    - toggle: Collapse/expand arrow for parent issues
+
+   Tree structure is rendered with CSS pseudo-elements (::before/::after).
 */
 .line {
   display: flex;
@@ -304,13 +305,6 @@ h1 {
 /* Parent items (with children) get bolder weight for visual hierarchy */
 .line.has-children .title {
   font-weight: 500;
-}
-
-/* Box-drawing prefix (├─ └─ │) - preserves whitespace for alignment */
-.prefix {
-  color: var(--fg-vdim);
-  white-space: pre;
-  flex-shrink: 0;
 }
 
 /* Status indicators: ✓ (done), ◐ (in-progress), ○ (todo) */
@@ -378,25 +372,54 @@ h1 {
 .hidden { display: none !important; }
 
 /* =============================================================================
-   Node Container Structure
+   Node Container Structure & CSS Tree Lines
    =============================================================================
    Each issue is wrapped in a .node container that holds:
    - .line (the clickable row)
    - .details (expandable details panel)
    - .children (nested child nodes)
+
+   Tree lines are drawn with CSS pseudo-elements instead of box-drawing chars.
+   This provides cleaner HTML, easier theming, and better accessibility.
 */
-.node {
-  /* Structural container only */
+
+/* Tree containers provide the context for tree lines */
+.tree,
+.children {
+  position: relative;
+}
+
+/* All nodes inside tree containers get indentation and tree lines */
+:is(.tree, .children) > .node {
+  position: relative;
+  padding-left: 1.5em;
+}
+
+/* Branch connector: draws the ├── or └── shape */
+:is(.tree, .children) > .node::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 0.9em;  /* Align with middle of first line */
+  width: 0.8em;
+  border-left: 1px solid var(--fg-vdim);
+  border-bottom: 1px solid var(--fg-vdim);
+}
+
+/* Vertical line continuation for non-last nodes */
+:is(.tree, .children) > .node:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid var(--fg-vdim);
 }
 
 /* Hover highlighting for issue groups */
 .node:hover > .line {
   background-color: rgba(0, 0, 0, 0.02);
-}
-
-/* Children container for nested nodes */
-.children {
-  /* Structural container */
 }
 
 .child-count {
@@ -425,6 +448,7 @@ h1 {
 .details {
   line-height: 1.5;
   padding: 0.2rem 0;
+  padding-left: 1.5ch;  /* Align with title (after state indicator) */
   overflow: hidden;
 }
 

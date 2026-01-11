@@ -327,7 +327,9 @@ function init() {
       show(project.querySelector('.completed-toggle'))
 
       // Show top-level nodes (but keep them collapsed unless explicitly expanded)
-      project.querySelectorAll(':scope > .node').forEach(node => {
+      // Nodes are inside a .tree wrapper (not the completed one)
+      const incompleteTree = project.querySelector(':scope > .tree:not([data-completed-for])')
+      incompleteTree?.querySelectorAll(':scope > .node').forEach(node => {
         show(node)
         const nodeId = node.dataset.id
         // Show details and children only if this task is expanded
