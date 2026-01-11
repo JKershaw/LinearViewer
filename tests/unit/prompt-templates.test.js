@@ -160,12 +160,12 @@ describe('generatePrompt', () => {
   test('truncates long descriptions with notice', () => {
     const issueWithLongDesc = {
       ...mockIssue,
-      description: 'x'.repeat(600)
+      description: 'x'.repeat(1200)
     };
 
     const result = generatePrompt('needs-breakdown', issueWithLongDesc, mockContext);
-    // Should be truncated to 500 chars + "..."
-    assert.ok(result.prompt.includes('x'.repeat(500)));
+    // Should be truncated to 1000 chars + "..."
+    assert.ok(result.prompt.includes('x'.repeat(1000)));
     assert.ok(result.prompt.includes('...'));
     // Should include truncation notice
     assert.ok(result.prompt.includes('Description truncated'));

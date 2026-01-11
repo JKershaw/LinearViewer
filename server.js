@@ -530,21 +530,57 @@ app.get('/api/prompt/:issueId/:labelName', async (req, res) => {
         return res.status(404).json({ error: 'Issue not found' })
       }
 
+      // Extract identifier from URL (e.g., https://linear.app/test/issue/TEST-6 -> TEST-6)
+      const identifier = mockIssue.url.split('/').pop()
+
       // Find project for the mock issue
       const mockProject = testMockData.projects.find(p => p.id === mockIssue.project?.id)
 
       // Extract labels as array of strings
       const labels = (mockIssue.labels?.nodes || []).map(l => l.name)
 
+      // Find parent issue if exists
+      const mockParent = mockIssue.parent
+        ? testMockData.issues.find(i => i.id === mockIssue.parent.id)
+        : null
+
+      // Find siblings (other children of same parent)
+      const mockSiblings = mockParent
+        ? testMockData.issues
+            .filter(i => i.parent?.id === mockParent.id && i.id !== issueId)
+            .slice(0, 5)
+            .map(s => ({
+              id: s.id,
+              identifier: s.url.split('/').pop(),
+              title: s.title,
+              state: s.state
+            }))
+        : []
+
+      // Find children of this issue
+      const mockChildren = testMockData.issues
+        .filter(i => i.parent?.id === issueId)
+        .map(c => ({
+          id: c.id,
+          identifier: c.url.split('/').pop(),
+          title: c.title,
+          state: c.state
+        }))
+
       const result = generatePrompt(labelName, {
         ...mockIssue,
-        identifier: 'TEST-123',
+        identifier,
         labels
       }, {
-        parent: null,
-        siblings: [],
+        parent: mockParent ? {
+          id: mockParent.id,
+          identifier: mockParent.url.split('/').pop(),
+          title: mockParent.title,
+          state: mockParent.state
+        } : null,
+        siblings: mockSiblings,
         project: mockProject ? { name: mockProject.name, description: mockProject.content } : null,
-        children: []
+        children: mockChildren
       })
 
       return res.json({
