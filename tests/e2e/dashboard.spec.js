@@ -42,16 +42,16 @@ test.describe('Authenticated Dashboard', () => {
   });
 
   test('displays correct state indicators', async ({ page }) => {
-    // Mock data defines 14 issues with various states and labels
+    // Mock data defines 15 issues with various states and labels
     // In-progress issues: issue-1, issue-4, issue-11 (blocked)
     // Each in-progress appears 2x (In Progress section + project section)
     // In-progress count: issue-1 x2 + issue-4 x2 + issue-11 x2 = 6
     const inProgressStates = page.locator('.state.in-progress');
     await expect(inProgressStates).toHaveCount(6);
 
-    // Todo issues include: issue-2 (x2), issue-5, issue-6, issue-7, issue-8, issue-9, issue-10, issue-12, issue-13
-    // Count: issue-2 x2 + all others x1 = 10
-    await expect(page.locator('.state.todo')).toHaveCount(10);
+    // Todo issues include: issue-2 (x2), issue-5, issue-6, issue-7, issue-8, issue-9, issue-10, issue-12, issue-13, issue-14
+    // Count: issue-2 x2 + all others x1 = 11
+    await expect(page.locator('.state.todo')).toHaveCount(11);
   });
 
   test('shows logout link when authenticated', async ({ page }) => {

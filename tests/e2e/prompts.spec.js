@@ -9,6 +9,7 @@ const SPIKE_ISSUE_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const BLOCKED_ISSUE_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 const CONTEXT_ISSUE_ID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
 const BUG_ISSUE_ID = 'dddddddd-dddd-dddd-dddd-ddddddddddde';
+const PLAN_ISSUE_ID = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeef';
 
 test.describe('Promptable Labels', () => {
   test.beforeEach(async ({ page }) => {
@@ -286,6 +287,18 @@ test.describe('Prompt API', () => {
     expect(body.promptName).toBe('Bug Investigation');
     expect(body.prompt).toContain('Login fails with special characters');
     expect(body.prompt).toContain('Likely Causes');
+  });
+
+  test('returns plan prompt', async ({ page }) => {
+    const response = await page.request.get(`/api/prompt/${PLAN_ISSUE_ID}/plan`);
+    expect(response.status()).toBe(200);
+
+    const body = await response.json();
+    expect(body.label).toBe('plan');
+    expect(body.promptName).toBe('Implementation Plan');
+    expect(body.prompt).toContain('Add pagination to user list');
+    expect(body.prompt).toContain('Implementation Steps');
+    expect(body.prompt).toContain('Test Plan');
   });
 });
 
