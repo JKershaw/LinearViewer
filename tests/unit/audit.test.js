@@ -356,3 +356,120 @@ describe('Multiple Labels Handling', () => {
     assert.strictEqual(report.labels.unmappedCount, 1); // bug
   });
 });
+
+describe('Completed Tasks Exclusion', () => {
+  test('excludes completed tasks from health checks', () => {
+    const dataWithCompletedTasks = {
+      teams: [],
+      projects: [],
+      workflowStates: [],
+      labels: [],
+      issues: [
+        {
+          id: 'i1',
+          title: 'Completed orphan task',
+          description: '',
+          project: null,
+          state: { name: 'Done', type: 'completed' },
+          assignee: null,
+          estimate: null,
+          dueDate: null,
+          labels: { nodes: [] }
+        },
+        {
+          id: 'i2',
+          title: 'Active orphan task',
+          description: '',
+          project: null,
+          state: { name: 'Backlog', type: 'backlog' },
+          assignee: null,
+          estimate: null,
+          dueDate: null,
+          labels: { nodes: [] }
+        }
+      ]
+    };
+
+    const report = computeAuditFromData(dataWithCompletedTasks);
+
+    // Only active task should be flagged as orphan
+    assert.strictEqual(report.health.orphans.count, 1);
+    assert.ok(report.health.orphans.items.some(i => i.title === 'Active orphan task'));
+    assert.ok(!report.health.orphans.items.some(i => i.title === 'Completed orphan task'));
+
+    // Only active task should be flagged for other health issues
+    assert.strictEqual(report.health.unlabeled.count, 1);
+    assert.strictEqual(report.health.shortDescription.count, 1);
+    assert.strictEqual(report.health.noAssignee.count, 1);
+  });
+
+  test('excludes canceled tasks from health checks', () => {
+    const dataWithCanceledTask = {
+      teams: [],
+      projects: [],
+      workflowStates: [],
+      labels: [],
+      issues: [
+        {
+          id: 'i1',
+          title: 'Canceled task',
+          description: '',
+          project: null,
+          state: { name: 'Canceled', type: 'canceled' },
+          assignee: null,
+          estimate: null,
+          dueDate: null,
+          labels: { nodes: [] }
+        }
+      ]
+    };
+
+    const report = computeAuditFromData(dataWithCanceledTask);
+
+    // Canceled task should not be flagged
+    assert.strictEqual(report.health.orphans.count, 0);
+    assert.strictEqual(report.health.unlabeled.count, 0);
+    assert.strictEqual(report.health.shortDescription.count, 0);
+    assert.strictEqual(report.health.noAssignee.count, 0);
+  });
+
+  test('still counts completed tasks in state totals', () => {
+    const dataWithCompletedTasks = {
+      teams: [],
+      projects: [],
+      workflowStates: [],
+      labels: [],
+      issues: [
+        {
+          id: 'i1',
+          title: 'Completed task',
+          description: '',
+          project: null,
+          state: { name: 'Done', type: 'completed' },
+          assignee: null,
+          estimate: null,
+          dueDate: null,
+          labels: { nodes: [] }
+        },
+        {
+          id: 'i2',
+          title: 'Active task',
+          description: '',
+          project: null,
+          state: { name: 'Backlog', type: 'backlog' },
+          assignee: null,
+          estimate: null,
+          dueDate: null,
+          labels: { nodes: [] }
+        }
+      ]
+    };
+
+    const report = computeAuditFromData(dataWithCompletedTasks);
+
+    // State counts should include all tasks
+    assert.strictEqual(report.health.totalTasks, 2);
+    assert.strictEqual(report.health.byStateType.completed, 1);
+    assert.strictEqual(report.health.byStateType.backlog, 1);
+  });
+});
