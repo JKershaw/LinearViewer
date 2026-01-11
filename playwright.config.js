@@ -10,6 +10,9 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:3001',
     trace: 'on-first-retry',
+    launchOptions: {
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    },
   },
   webServer: {
     command: 'NODE_ENV=test PORT=3001 SESSION_SECRET=test-secret-for-playwright node server.js',
