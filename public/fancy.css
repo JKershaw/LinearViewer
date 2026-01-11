@@ -1,0 +1,520 @@
+/**
+ * Operator Dashboard Styles
+ *
+ * Extends the base style.css with dashboard-specific components.
+ * Maintains CLI aesthetic while adding data visualization.
+ */
+
+/* =============================================================================
+   Dashboard Header
+   ============================================================================= */
+.dashboard-subtitle {
+  color: var(--fg-dim);
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  margin-top: 0.5rem;
+}
+
+.nav-value-static {
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  color: var(--fg);
+}
+
+/* =============================================================================
+   Audit Controls
+   ============================================================================= */
+.audit-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.audit-button {
+  background: var(--blue);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.audit-button:hover {
+  background: #1d4ed8;
+}
+
+.audit-button:disabled {
+  background: var(--fg-dim);
+  cursor: not-allowed;
+}
+
+.audit-status {
+  color: var(--fg-dim);
+  font-family: var(--font-content);
+  font-size: 0.9em;
+}
+
+.audit-status.loading {
+  color: var(--yellow);
+}
+
+.audit-status.error {
+  color: var(--red);
+}
+
+/* =============================================================================
+   Audit Report
+   ============================================================================= */
+.audit-report {
+  margin-top: 1rem;
+}
+
+.audit-report.hidden {
+  display: none;
+}
+
+.audit-error {
+  color: var(--red);
+  font-family: var(--font-content);
+  padding: 1rem;
+  border: 1px solid var(--red);
+  border-radius: 4px;
+  margin-top: 1rem;
+}
+
+.audit-error.hidden {
+  display: none;
+}
+
+/* =============================================================================
+   Report Summary
+   ============================================================================= */
+.report-summary {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 4px;
+}
+
+.summary-stat {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-value {
+  font-family: var(--font-structural);
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.stat-value.good {
+  color: var(--green);
+}
+
+.stat-value.warning {
+  color: var(--yellow);
+}
+
+.stat-value.bad {
+  color: var(--red);
+}
+
+.stat-label {
+  font-family: var(--font-content);
+  font-size: 0.8em;
+  color: var(--fg-dim);
+  margin-top: 0.25rem;
+}
+
+/* =============================================================================
+   Report Sections
+   ============================================================================= */
+.report-section {
+  margin-bottom: 2rem;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  padding: 0.5rem 0;
+  font-family: var(--font-content);
+  font-weight: 500;
+  color: var(--fg);
+}
+
+.section-header:hover {
+  color: var(--blue);
+}
+
+.section-toggle {
+  color: var(--fg-dim);
+  font-size: 0.85em;
+}
+
+.section-content {
+  padding-left: 1.5rem;
+  margin-top: 0.5rem;
+}
+
+.section-content.hidden {
+  display: none;
+}
+
+/* =============================================================================
+   Data Tables and Lists
+   ============================================================================= */
+.data-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.data-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 0.25rem 0;
+  font-family: var(--font-content);
+  font-size: 0.9em;
+}
+
+.data-list .label {
+  color: var(--fg-dim);
+  min-width: 15ch;
+}
+
+.data-list .value {
+  color: var(--fg);
+}
+
+.data-list .count {
+  color: var(--fg-dim);
+  font-family: var(--font-structural);
+  font-size: 0.85em;
+}
+
+/* Queue Status List */
+.queue-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.queue-item {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 0.35rem 0;
+  font-family: var(--font-content);
+  font-size: 0.9em;
+}
+
+.queue-status {
+  flex-shrink: 0;
+  width: 1.5ch;
+}
+
+.queue-status.exists {
+  color: var(--green);
+}
+
+.queue-status.missing {
+  color: var(--red);
+}
+
+.queue-status.optional {
+  color: var(--fg-dim);
+}
+
+.queue-name {
+  min-width: 12ch;
+  font-weight: 500;
+}
+
+.queue-label {
+  color: var(--fg-dim);
+}
+
+.queue-count {
+  color: var(--fg-dim);
+  font-family: var(--font-structural);
+  font-size: 0.85em;
+}
+
+.queue-required {
+  color: var(--red);
+  font-size: 0.8em;
+  font-family: var(--font-structural);
+}
+
+/* Labels List */
+.labels-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.label-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5ch;
+  padding: 0.2rem 0.5rem;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 3px;
+  font-family: var(--font-content);
+  font-size: 0.85em;
+}
+
+.label-tag .tag-name {
+  color: var(--fg);
+}
+
+.label-tag .tag-count {
+  color: var(--fg-dim);
+  font-family: var(--font-structural);
+  font-size: 0.85em;
+}
+
+.label-tag.mapped {
+  background: rgba(22, 160, 133, 0.1);
+  border: 1px solid rgba(22, 160, 133, 0.3);
+}
+
+.label-tag.unmapped {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+/* Issues List (for health problems) */
+.issues-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0;
+}
+
+.issues-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.2rem 0;
+  font-family: var(--font-content);
+  font-size: 0.85em;
+}
+
+.issues-list .issue-prefix {
+  color: var(--fg-vdim);
+  flex-shrink: 0;
+}
+
+.issues-list .issue-title {
+  color: var(--fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 50ch;
+}
+
+.issues-list .issue-meta {
+  color: var(--fg-dim);
+  font-size: 0.9em;
+}
+
+/* More link */
+.more-link {
+  color: var(--fg-dim);
+  font-family: var(--font-content);
+  font-size: 0.85em;
+  margin-top: 0.25rem;
+  display: block;
+}
+
+/* Health Indicator */
+.health-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.2rem 0;
+}
+
+.health-count {
+  font-family: var(--font-structural);
+  font-weight: 600;
+}
+
+.health-count.good {
+  color: var(--green);
+}
+
+.health-count.warning {
+  color: var(--yellow);
+}
+
+.health-count.bad {
+  color: var(--red);
+}
+
+.health-label {
+  color: var(--fg-dim);
+  font-family: var(--font-content);
+  font-size: 0.9em;
+}
+
+/* Field Usage Bar */
+.usage-bar-container {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.25rem 0;
+}
+
+.usage-label {
+  min-width: 10ch;
+  color: var(--fg-dim);
+  font-family: var(--font-content);
+  font-size: 0.9em;
+}
+
+.usage-bar {
+  flex: 1;
+  max-width: 20ch;
+  height: 0.5rem;
+  background: var(--fg-vdim);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.usage-bar-fill {
+  height: 100%;
+  background: var(--green);
+  transition: width 0.3s ease;
+}
+
+.usage-bar-fill.low {
+  background: var(--yellow);
+}
+
+.usage-bar-fill.very-low {
+  background: var(--red);
+}
+
+.usage-percent {
+  font-family: var(--font-structural);
+  font-size: 0.85em;
+  color: var(--fg);
+  min-width: 4ch;
+  text-align: right;
+}
+
+/* Projects Table */
+.projects-table {
+  margin-top: 0.5rem;
+}
+
+.project-row {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 0.25rem 0;
+  font-family: var(--font-content);
+  font-size: 0.9em;
+}
+
+.project-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg);
+}
+
+.project-state {
+  color: var(--fg-dim);
+  font-size: 0.85em;
+  min-width: 8ch;
+}
+
+.project-count {
+  color: var(--fg);
+  font-family: var(--font-structural);
+  font-size: 0.85em;
+  min-width: 5ch;
+  text-align: right;
+}
+
+/* State breakdown */
+.state-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin-top: 0.5rem;
+}
+
+.state-item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.state-name {
+  color: var(--fg-dim);
+  font-family: var(--font-content);
+  font-size: 0.9em;
+}
+
+.state-count {
+  font-family: var(--font-structural);
+  font-weight: 500;
+  color: var(--fg);
+}
+
+/* Timestamp */
+.report-timestamp {
+  color: var(--fg-dim);
+  font-family: var(--font-content);
+  font-size: 0.8em;
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--fg-vdim);
+}
+
+/* =============================================================================
+   Responsive
+   ============================================================================= */
+@media (max-width: 640px) {
+  .report-summary {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .summary-stat {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0.5rem;
+  }
+
+  .stat-value {
+    font-size: 1.2rem;
+  }
+
+  .queue-item {
+    flex-wrap: wrap;
+  }
+
+  .usage-bar {
+    max-width: 15ch;
+  }
+
+  .project-row {
+    flex-wrap: wrap;
+  }
+}

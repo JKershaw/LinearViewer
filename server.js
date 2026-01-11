@@ -22,6 +22,8 @@ import { UUID_REGEX, getActiveWorkspace, removeWorkspace, saveSession } from './
 import { createAuthRoutes } from './routes/auth.js'
 import { createWorkspaceRoutes } from './routes/workspace.js'
 import { testMockTeams, testMockData } from './tests/fixtures/mock-data.js'
+import { runAudit, computeAuditFromData } from './lib/audit.js'
+import { renderFancyPage } from './lib/render-fancy.js'
 
 // =============================================================================
 // Environment Variable Validation
@@ -414,6 +416,77 @@ app.get('/', async (req, res) => {
     res.status(500).send(html);
   }
 })
+
+// =============================================================================
+// Operator Dashboard Routes
+// =============================================================================
+
+/**
+ * Operator Dashboard page - requires authentication.
+ * Displays workspace audit and health check functionality.
+ */
+app.get('/fancy', (req, res) => {
+  const workspace = getActiveWorkspace(req.session);
+
+  // Redirect to home if not authenticated
+  if (!workspace) {
+    return res.redirect('/');
+  }
+
+  const html = renderFancyPage(workspace.name || 'Workspace');
+  res.send(html);
+});
+
+/**
+ * Audit API endpoint - runs a workspace audit and returns JSON.
+ * Requires authentication.
+ */
+app.get('/api/audit', async (req, res) => {
+  const workspace = getActiveWorkspace(req.session);
+
+  // Return 401 if not authenticated
+  if (!workspace) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  try {
+    // Use mock audit data in test mode
+    if (process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token') {
+      const mockAuditData = {
+        teams: testMockTeams,
+        projects: testMockData.projects.map(p => ({ ...p, state: 'started' })),
+        workflowStates: [
+          { id: 'ws1', name: 'Backlog', type: 'backlog', team: { id: 'team1', name: 'Test Team' } },
+          { id: 'ws2', name: 'In Progress', type: 'started', team: { id: 'team1', name: 'Test Team' } },
+          { id: 'ws3', name: 'Done', type: 'completed', team: { id: 'team1', name: 'Test Team' } }
+        ],
+        labels: [
+          { id: 'l1', name: 'breakdown', color: '#000', issues: { nodes: [{ id: 'i1' }] } },
+          { id: 'l2', name: 'ready', color: '#000', issues: { nodes: [{ id: 'i2' }, { id: 'i3' }] } },
+          { id: 'l3', name: 'bug', color: '#f00', issues: { nodes: [] } }
+        ],
+        issues: testMockData.issues.map(i => ({
+          ...i,
+          labels: { nodes: [] }
+        }))
+      };
+      const report = computeAuditFromData(mockAuditData);
+      return res.json(report);
+    }
+
+    const report = await runAudit(workspace.accessToken);
+    res.json(report);
+  } catch (error) {
+    console.error('Audit error:', error);
+
+    // Handle 401 from Linear API
+    if (error.response?.status === 401) {
+      return res.status(401).json({ error: 'Token expired or invalid' });
+    }
+
+    res.status(500).json({ error: 'Audit failed', message: error.message });
+  }
+});
 
 // =============================================================================
 // Server Startup
