@@ -6,38 +6,35 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { computeAuditFromData } from '../../lib/audit.js';
-import { getQueueForLabel, matchesQueue, QUEUE_CONFIG } from '../../lib/queue-config.js';
+import { getQueueForLabel, matchesPattern, isInQueue, QUEUE_CONFIG, QUEUE_TYPES } from '../../lib/queue-config.js';
 
 // =============================================================================
 // Queue Config Tests
 // =============================================================================
 
 describe('Queue Config', () => {
-  test('matchesQueue returns true for exact match', () => {
-    assert.strictEqual(matchesQueue('breakdown', ['breakdown']), true);
-    assert.strictEqual(matchesQueue('ready', ['ready']), true);
+  test('matchesPattern returns true for exact match', () => {
+    assert.strictEqual(matchesPattern('needs-breakdown', ['needs-breakdown']), true);
+    assert.strictEqual(matchesPattern('needs-research', ['needs-research']), true);
   });
 
-  test('matchesQueue is case-insensitive', () => {
-    assert.strictEqual(matchesQueue('Breakdown', ['breakdown']), true);
-    assert.strictEqual(matchesQueue('BREAKDOWN', ['breakdown']), true);
-    assert.strictEqual(matchesQueue('breakdown', ['BREAKDOWN']), true);
+  test('matchesPattern is case-insensitive', () => {
+    assert.strictEqual(matchesPattern('Needs-Breakdown', ['needs-breakdown']), true);
+    assert.strictEqual(matchesPattern('NEEDS-BREAKDOWN', ['needs-breakdown']), true);
+    assert.strictEqual(matchesPattern('needs-breakdown', ['NEEDS-BREAKDOWN']), true);
   });
 
-  test('matchesQueue returns false for non-match', () => {
-    assert.strictEqual(matchesQueue('bug', ['breakdown']), false);
-    assert.strictEqual(matchesQueue('feature', ['ready', 'review']), false);
+  test('matchesPattern returns false for non-match', () => {
+    assert.strictEqual(matchesPattern('bug', ['needs-breakdown']), false);
+    assert.strictEqual(matchesPattern('feature', ['needs-research', 'needs-breakdown']), false);
   });
 
-  test('getQueueForLabel returns queue name for matching label', () => {
-    assert.strictEqual(getQueueForLabel('breakdown'), 'Breakdown');
-    assert.strictEqual(getQueueForLabel('status:breakdown'), 'Breakdown');
-    assert.strictEqual(getQueueForLabel('ready'), 'Ready');
-    assert.strictEqual(getQueueForLabel('review'), 'Review');
-    assert.strictEqual(getQueueForLabel('in-progress'), 'In-Progress');
+  test('getQueueForLabel returns queue name for label-based queues', () => {
+    assert.strictEqual(getQueueForLabel('needs-breakdown'), 'Breakdown');
+    assert.strictEqual(getQueueForLabel('needs-research'), 'Research');
   });
 
-  test('getQueueForLabel returns null for unmapped labels', () => {
+  test('getQueueForLabel returns null for non-label-based queues and unmapped labels', () => {
     assert.strictEqual(getQueueForLabel('bug'), null);
     assert.strictEqual(getQueueForLabel('feature'), null);
     assert.strictEqual(getQueueForLabel('priority:high'), null);
@@ -50,7 +47,63 @@ describe('Queue Config', () => {
     const requiredNames = requiredQueues.map(q => q.name);
     assert.ok(requiredNames.includes('Breakdown'), 'Breakdown should be required');
     assert.ok(requiredNames.includes('Ready'), 'Ready should be required');
-    assert.ok(requiredNames.includes('Review'), 'Review should be required');
+    assert.ok(requiredNames.includes('In-Progress'), 'In-Progress should be required');
+  });
+
+  test('isInQueue matches label-based queues correctly', () => {
+    const breakdownQueue = QUEUE_CONFIG.find(q => q.name === 'Breakdown');
+
+    const issueWithBreakdown = {
+      labels: { nodes: [{ name: 'needs-breakdown' }] },
+      state: { type: 'backlog' }
+    };
+    const issueWithoutBreakdown = {
+      labels: { nodes: [{ name: 'bug' }] },
+      state: { type: 'backlog' }
+    };
+
+    assert.strictEqual(isInQueue(issueWithBreakdown, breakdownQueue), true);
+    assert.strictEqual(isInQueue(issueWithoutBreakdown, breakdownQueue), false);
+  });
+
+  test('isInQueue matches state-based queues correctly', () => {
+    const inProgressQueue = QUEUE_CONFIG.find(q => q.name === 'In-Progress');
+
+    const startedIssue = {
+      labels: { nodes: [] },
+      state: { type: 'started' }
+    };
+    const backlogIssue = {
+      labels: { nodes: [] },
+      state: { type: 'backlog' }
+    };
+
+    assert.strictEqual(isInQueue(startedIssue, inProgressQueue), true);
+    assert.strictEqual(isInQueue(backlogIssue, inProgressQueue), false);
+  });
+
+  test('isInQueue matches implicit queues correctly', () => {
+    const readyQueue = QUEUE_CONFIG.find(q => q.name === 'Ready');
+
+    // Backlog with no pre-work labels = Ready
+    const readyIssue = {
+      labels: { nodes: [] },
+      state: { type: 'backlog' }
+    };
+    // Backlog with needs-breakdown = NOT Ready
+    const notReadyIssue = {
+      labels: { nodes: [{ name: 'needs-breakdown' }] },
+      state: { type: 'backlog' }
+    };
+    // Started state = NOT Ready
+    const startedIssue = {
+      labels: { nodes: [] },
+      state: { type: 'started' }
+    };
+
+    assert.strictEqual(isInQueue(readyIssue, readyQueue), true);
+    assert.strictEqual(isInQueue(notReadyIssue, readyQueue), false);
+    assert.strictEqual(isInQueue(startedIssue, readyQueue), false);
   });
 });
 
@@ -74,8 +127,8 @@ describe('Audit Computation', () => {
       { id: 'ws3', name: 'Done', type: 'completed', team: { id: 'team1', name: 'Engineering' } }
     ],
     labels: [
-      { id: 'l1', name: 'breakdown', color: '#000', issues: { nodes: [{ id: 'i1' }] } },
-      { id: 'l2', name: 'ready', color: '#000', issues: { nodes: [{ id: 'i2' }, { id: 'i3' }] } },
+      { id: 'l1', name: 'needs-breakdown', color: '#000', issues: { nodes: [{ id: 'i1' }] } },
+      { id: 'l2', name: 'needs-research', color: '#000', issues: { nodes: [{ id: 'i2' }] } },
       { id: 'l3', name: 'bug', color: '#f00', issues: { nodes: [{ id: 'i4' }] } }
     ],
     issues: [
@@ -88,7 +141,7 @@ describe('Audit Computation', () => {
         assignee: { id: 'u1', name: 'Alice' },
         estimate: 3,
         dueDate: '2025-01-15',
-        labels: { nodes: [{ id: 'l1', name: 'breakdown' }] }
+        labels: { nodes: [{ id: 'l1', name: 'needs-breakdown' }] }
       },
       {
         id: 'i2',
@@ -99,7 +152,7 @@ describe('Audit Computation', () => {
         assignee: null,
         estimate: null,
         dueDate: null,
-        labels: { nodes: [{ id: 'l2', name: 'ready' }] }
+        labels: { nodes: [{ id: 'l2', name: 'needs-research' }] }
       },
       {
         id: 'i3',
@@ -168,31 +221,36 @@ describe('Audit Computation', () => {
   test('maps labels to queues correctly', () => {
     const report = computeAuditFromData(baseMockData);
 
-    // breakdown and ready should be mapped
+    // needs-breakdown and needs-research should be mapped
     assert.strictEqual(report.labels.mappedCount, 2);
-    assert.ok(report.labels.mapped.some(l => l.name === 'breakdown' && l.queue === 'Breakdown'));
-    assert.ok(report.labels.mapped.some(l => l.name === 'ready' && l.queue === 'Ready'));
+    assert.ok(report.labels.mapped.some(l => l.name === 'needs-breakdown' && l.queue === 'Breakdown'));
+    assert.ok(report.labels.mapped.some(l => l.name === 'needs-research' && l.queue === 'Research'));
 
     // bug should be unmapped
     assert.strictEqual(report.labels.unmappedCount, 1);
     assert.ok(report.labels.unmapped.some(l => l.name === 'bug'));
   });
 
-  test('identifies missing queue labels', () => {
+  test('identifies queue readiness with hybrid approach', () => {
     const report = computeAuditFromData(baseMockData);
 
-    // breakdown and ready exist, but review and in-progress don't
-    assert.ok(!report.queues.isReady, 'Should not be ready (missing required queues)');
-    assert.ok(report.queues.missingRequired.some(q => q.name === 'Review'));
-    assert.ok(report.queues.missingRequired.some(q => q.name === 'In-Progress'));
+    // With backlog and started states, and needs-breakdown label:
+    // - Breakdown: exists (label-based, needs-breakdown exists)
+    // - Research: exists (label-based, needs-research exists)
+    // - Ready: exists (implicit, backlog state exists)
+    // - In-Progress: exists (state-based, started state exists)
+    // - Review: does not exist (state-based, review state not in workflowStates)
+
+    // All required queues exist (Breakdown, Ready, In-Progress)
+    assert.ok(report.queues.isReady, 'Should be ready (all required queues exist)');
+    assert.strictEqual(report.queues.missingRequired.length, 0);
   });
 
   test('calculates readiness score correctly', () => {
     const report = computeAuditFromData(baseMockData);
 
-    // 2 of 4 required queues exist = 50%
-    assert.ok(report.queues.readinessScore >= 0);
-    assert.ok(report.queues.readinessScore <= 100);
+    // All 3 required queues exist (Breakdown, Ready, In-Progress) = 100%
+    assert.strictEqual(report.queues.readinessScore, 100);
   });
 
   test('calculates field usage correctly', () => {
@@ -270,7 +328,7 @@ describe('Multiple Labels Handling', () => {
       projects: [],
       workflowStates: [],
       labels: [
-        { id: 'l1', name: 'breakdown', color: '#000', issues: { nodes: [{ id: 'i1' }] } },
+        { id: 'l1', name: 'needs-breakdown', color: '#000', issues: { nodes: [{ id: 'i1' }] } },
         { id: 'l2', name: 'bug', color: '#f00', issues: { nodes: [{ id: 'i1' }] } }
       ],
       issues: [
@@ -283,7 +341,7 @@ describe('Multiple Labels Handling', () => {
           assignee: null,
           estimate: null,
           dueDate: null,
-          labels: { nodes: [{ id: 'l1', name: 'breakdown' }, { id: 'l2', name: 'bug' }] }
+          labels: { nodes: [{ id: 'l1', name: 'needs-breakdown' }, { id: 'l2', name: 'bug' }] }
         }
       ]
     };
@@ -294,7 +352,7 @@ describe('Multiple Labels Handling', () => {
     assert.strictEqual(report.health.unlabeled.count, 0);
 
     // Both labels should be present
-    assert.strictEqual(report.labels.mappedCount, 1); // breakdown
+    assert.strictEqual(report.labels.mappedCount, 1); // needs-breakdown
     assert.strictEqual(report.labels.unmappedCount, 1); // bug
   });
 });
