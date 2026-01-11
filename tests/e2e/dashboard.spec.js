@@ -42,19 +42,20 @@ test.describe('Authenticated Dashboard', () => {
   });
 
   test('displays correct state indicators', async ({ page }) => {
-    // Mock data defines 5 issues:
+    // Mock data defines 6 issues:
     // - issue-1: in-progress (appears in In Progress + Project Alpha)
     // - issue-2: todo, child of issue-1 (appears in In Progress as child + Project Alpha)
     // - issue-3: completed (hidden by default, only in Project Alpha)
     // - issue-4: in-progress (appears in In Progress + Project Beta)
     // - issue-5: backlog/todo (only in Project Beta)
+    // - issue-6: backlog/todo (only in Project Alpha, has needs-breakdown label)
 
     // In-progress count: issue-1 x2 + issue-4 x2 = 4
     const inProgressStates = page.locator('.state.in-progress');
     await expect(inProgressStates).toHaveCount(4);
 
-    // Todo count: issue-2 x2 (In Progress + Alpha) + issue-5 x1 (Beta only) = 3
-    await expect(page.locator('.state.todo')).toHaveCount(3);
+    // Todo count: issue-2 x2 (In Progress + Alpha) + issue-5 x1 (Beta) + issue-6 x1 (Alpha) = 4
+    await expect(page.locator('.state.todo')).toHaveCount(4);
   });
 
   test('shows logout link when authenticated', async ({ page }) => {
