@@ -77,7 +77,19 @@ Both In Progress and Projects sections use the same nested structure:
 - `.in-progress-header` - collapsible section header
 
 ### Promptable Labels
-Some labels (like `needs-breakdown`) have associated AI prompts. These appear as clickable links in the task metadata.
+Some labels have associated AI prompts for Claude Code with Linear MCP. These appear as clickable links in the task metadata.
+
+**Supported Labels:**
+- `needs-breakdown` - Break task into subtasks (1-3 hour chunks)
+- `needs-research` - Investigate unknowns, evaluate options
+- `needs-scoping` - Define boundaries, success criteria, exclusions
+- `needs-design` - Create technical design with options analysis
+- `needs-spike` - Timeboxed technical exploration
+- `blocked` - Analyze blockers and find resolution paths
+- `needs-context` - Generate context summary for handoffs
+- `bug` - Investigate bug with reproduction steps and hypotheses
+
+**DOM Selectors:**
 - `.label-prompt[data-issue-id][data-label]` - clickable label that generates a prompt
 - `.prompt-container[data-prompt-for="{id}"]` - container for generated prompt
 - `.prompt-text` - the prompt text (inside container)

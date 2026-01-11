@@ -25,8 +25,8 @@ test.describe('Authenticated Dashboard', () => {
     await expect(inProgressHeader).toContainText('In Progress');
 
     // Should show in-progress issues as tree with their descendants
-    // issue-1 (in-progress) + issue-2 (child of issue-1, hidden) + issue-4 (in-progress) = 3 lines total
-    await expect(page.locator('.in-progress-items .line')).toHaveCount(3);
+    // issue-1 (in-progress) + issue-2 (child of issue-1, hidden) + issue-4 (in-progress) + issue-11 (blocked, in-progress) = 4 lines total
+    await expect(page.locator('.in-progress-items .line')).toHaveCount(4);
 
     // Top-level items are visible
     await expect(page.locator('.in-progress-items .line:has-text("Parent task in progress")')).toBeVisible();
@@ -42,20 +42,16 @@ test.describe('Authenticated Dashboard', () => {
   });
 
   test('displays correct state indicators', async ({ page }) => {
-    // Mock data defines 6 issues:
-    // - issue-1: in-progress (appears in In Progress + Project Alpha)
-    // - issue-2: todo, child of issue-1 (appears in In Progress as child + Project Alpha)
-    // - issue-3: completed (hidden by default, only in Project Alpha)
-    // - issue-4: in-progress (appears in In Progress + Project Beta)
-    // - issue-5: backlog/todo (only in Project Beta)
-    // - issue-6: backlog/todo (only in Project Alpha, has needs-breakdown label)
-
-    // In-progress count: issue-1 x2 + issue-4 x2 = 4
+    // Mock data defines 14 issues with various states and labels
+    // In-progress issues: issue-1, issue-4, issue-11 (blocked)
+    // Each in-progress appears 2x (In Progress section + project section)
+    // In-progress count: issue-1 x2 + issue-4 x2 + issue-11 x2 = 6
     const inProgressStates = page.locator('.state.in-progress');
-    await expect(inProgressStates).toHaveCount(4);
+    await expect(inProgressStates).toHaveCount(6);
 
-    // Todo count: issue-2 x2 (In Progress + Alpha) + issue-5 x1 (Beta) + issue-6 x1 (Alpha) = 4
-    await expect(page.locator('.state.todo')).toHaveCount(4);
+    // Todo issues include: issue-2 (x2), issue-5, issue-6, issue-7, issue-8, issue-9, issue-10, issue-12, issue-13
+    // Count: issue-2 x2 + all others x1 = 10
+    await expect(page.locator('.state.todo')).toHaveCount(10);
   });
 
   test('shows logout link when authenticated', async ({ page }) => {
