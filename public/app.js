@@ -596,7 +596,93 @@ function initNavBar() {
   }
 }
 
+// ==========================================================================
+// Prompt Generation for Labels
+// ==========================================================================
+
+/**
+ * Initialize prompt functionality for clickable labels
+ */
+function initPrompts() {
+  // Handle clicks on promptable labels
+  document.addEventListener('click', async (e) => {
+    const labelLink = e.target.closest('.label-prompt')
+    if (!labelLink) return
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    const issueId = labelLink.dataset.issueId
+    const labelName = labelLink.dataset.label
+
+    // Find the prompt container for this issue
+    const promptContainer = document.querySelector(`[data-prompt-for="${issueId}"]`)
+    if (!promptContainer) return
+
+    // If already visible with same label, toggle off
+    if (!promptContainer.classList.contains('hidden') &&
+        promptContainer.dataset.activeLabel === labelName) {
+      promptContainer.classList.add('hidden')
+      promptContainer.dataset.activeLabel = ''
+      return
+    }
+
+    // Show loading state
+    const promptText = promptContainer.querySelector('.prompt-text')
+    const promptName = promptContainer.querySelector('.prompt-name')
+    promptText.textContent = 'Loading...'
+    promptName.textContent = ''
+    promptContainer.classList.remove('hidden')
+    promptContainer.dataset.activeLabel = labelName
+
+    try {
+      const response = await fetch(`/api/prompt/${issueId}/${encodeURIComponent(labelName)}`)
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to load prompt')
+      }
+
+      const data = await response.json()
+      promptName.textContent = data.promptName
+      promptText.textContent = data.prompt
+    } catch (error) {
+      promptText.textContent = `Error: ${error.message}`
+      console.error('Failed to fetch prompt:', error)
+    }
+  })
+
+  // Handle copy button clicks
+  document.addEventListener('click', async (e) => {
+    const copyBtn = e.target.closest('.prompt-copy')
+    if (!copyBtn) return
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    const promptContainer = copyBtn.closest('.prompt-container')
+    const promptText = promptContainer?.querySelector('.prompt-text')
+    if (!promptText) return
+
+    try {
+      await navigator.clipboard.writeText(promptText.textContent)
+      const originalText = copyBtn.textContent
+      copyBtn.textContent = 'copied!'
+      setTimeout(() => {
+        copyBtn.textContent = originalText
+      }, 1500)
+    } catch (error) {
+      console.error('Failed to copy:', error)
+      copyBtn.textContent = 'failed'
+      setTimeout(() => {
+        copyBtn.textContent = 'copy'
+      }, 1500)
+    }
+  })
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   init()
   initNavBar()
+  initPrompts()
 })

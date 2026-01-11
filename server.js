@@ -13,7 +13,7 @@ import session from 'express-session'
 import { MongoClient } from 'mongodb'
 import { MangoClient } from '@jkershaw/mangodb'
 import { MongoSessionStore } from './lib/session-store.js'
-import { fetchProjects, fetchTeams } from './lib/linear.js'
+import { fetchProjects, fetchTeams, fetchIssueContext } from './lib/linear.js'
 import { buildForest, partitionCompleted, buildInProgressForest } from './lib/tree.js'
 import { renderPage, renderErrorPage } from './lib/render.js'
 import { parseLandingPage } from './lib/parse-landing.js'
@@ -24,6 +24,7 @@ import { createWorkspaceRoutes } from './routes/workspace.js'
 import { testMockTeams, testMockData } from './tests/fixtures/mock-data.js'
 import { runAudit, computeAuditFromData } from './lib/audit.js'
 import { renderFancyPage } from './lib/render-fancy.js'
+import { generatePrompt, hasPrompt } from './lib/prompt-templates.js'
 
 // =============================================================================
 // Environment Variable Validation
@@ -487,6 +488,94 @@ app.get('/api/audit', async (req, res) => {
     res.status(500).json({ error: 'Audit failed', message: error.message });
   }
 });
+
+// =============================================================================
+// Prompt Generation API
+// =============================================================================
+
+/**
+ * Generate a prompt for a specific issue and label.
+ * Returns a prompt that can be copied and used with Claude Code + Linear MCP.
+ *
+ * @route GET /api/prompt/:issueId/:labelName
+ * @param {string} issueId - The Linear issue ID
+ * @param {string} labelName - The label name (must have a prompt template)
+ * @returns {Object} { label, promptName, prompt } or error
+ */
+app.get('/api/prompt/:issueId/:labelName', async (req, res) => {
+  const workspace = getActiveWorkspace(req.session)
+
+  // Return 401 if not authenticated
+  if (!workspace) {
+    return res.status(401).json({ error: 'Not authenticated' })
+  }
+
+  const { issueId, labelName } = req.params
+
+  // Validate issue ID format (must be valid UUID)
+  if (!UUID_REGEX.test(issueId)) {
+    return res.status(400).json({ error: 'Invalid issue ID format' })
+  }
+
+  // Check if label has a prompt template
+  if (!hasPrompt(labelName)) {
+    return res.status(404).json({ error: `No prompt template for label: ${labelName}` })
+  }
+
+  try {
+    // Use mock data in test mode
+    if (process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token') {
+      const mockIssue = testMockData.issues.find(i => i.id === issueId)
+      if (!mockIssue) {
+        return res.status(404).json({ error: 'Issue not found' })
+      }
+
+      const result = generatePrompt(labelName, {
+        ...mockIssue,
+        identifier: 'TEST-123'
+      }, {
+        parent: null,
+        siblings: []
+      })
+
+      return res.json({
+        label: labelName,
+        promptName: result.name,
+        prompt: result.prompt
+      })
+    }
+
+    // Fetch issue context from Linear
+    const { issue, parent, siblings } = await fetchIssueContext(workspace.accessToken, issueId)
+
+    // Generate the prompt
+    const result = generatePrompt(labelName, issue, { parent, siblings })
+
+    if (!result) {
+      return res.status(500).json({ error: 'Failed to generate prompt' })
+    }
+
+    res.json({
+      label: labelName,
+      promptName: result.name,
+      prompt: result.prompt
+    })
+  } catch (error) {
+    console.error('Prompt generation error:', error)
+
+    // Handle 401 from Linear API
+    if (error.response?.status === 401) {
+      return res.status(401).json({ error: 'Token expired or invalid' })
+    }
+
+    // Handle issue not found
+    if (error.message?.includes('not found')) {
+      return res.status(404).json({ error: error.message })
+    }
+
+    res.status(500).json({ error: 'Failed to generate prompt', message: error.message })
+  }
+})
 
 // =============================================================================
 // Server Startup
