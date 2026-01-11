@@ -289,10 +289,11 @@ h1 {
    Issue Tree Lines
    =============================================================================
    Each issue is rendered as a "line" with:
-   - prefix: Box-drawing characters (├─ └─ │) showing tree structure
    - state: Status indicator (✓ ◐ ○)
    - title: Issue title (clickable to expand details)
    - toggle: Collapse/expand arrow for parent issues
+
+   Tree structure is rendered with CSS pseudo-elements (::before/::after).
 */
 .line {
   display: flex;
@@ -304,13 +305,6 @@ h1 {
 /* Parent items (with children) get bolder weight for visual hierarchy */
 .line.has-children .title {
   font-weight: 500;
-}
-
-/* Box-drawing prefix (├─ └─ │) - preserves whitespace for alignment */
-.prefix {
-  color: var(--fg-vdim);
-  white-space: pre;
-  flex-shrink: 0;
 }
 
 /* Status indicators: ✓ (done), ◐ (in-progress), ○ (todo) */
@@ -454,6 +448,7 @@ h1 {
 .details {
   line-height: 1.5;
   padding: 0.2rem 0;
+  padding-left: 1.5ch;  /* Align with title (after state indicator) */
   overflow: hidden;
 }
 
