@@ -19,6 +19,7 @@
 */
 :root {
   --bg: #ffffff;
+  --bg-muted: #f8f9fa;  /* Muted background for containers */
   --fg: #1a1a1a;
   --fg-dim: #666666;
   --fg-vdim: #eeeeee;  /* Very dim - box-drawing characters, structural elements */
@@ -675,7 +676,7 @@ h1 {
 .prompt-container {
   margin-top: 0.75rem;
   padding: 0.75rem;
-  background: #f8f9fa;
+  background: var(--bg-muted);
   border: 1px solid var(--fg-vdim);
   border-radius: 4px;
 }

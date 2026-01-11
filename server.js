@@ -530,12 +530,21 @@ app.get('/api/prompt/:issueId/:labelName', async (req, res) => {
         return res.status(404).json({ error: 'Issue not found' })
       }
 
+      // Find project for the mock issue
+      const mockProject = testMockData.projects.find(p => p.id === mockIssue.project?.id)
+
+      // Extract labels as array of strings
+      const labels = (mockIssue.labels?.nodes || []).map(l => l.name)
+
       const result = generatePrompt(labelName, {
         ...mockIssue,
-        identifier: 'TEST-123'
+        identifier: 'TEST-123',
+        labels
       }, {
         parent: null,
-        siblings: []
+        siblings: [],
+        project: mockProject ? { name: mockProject.name, description: mockProject.content } : null,
+        children: []
       })
 
       return res.json({
@@ -546,10 +555,10 @@ app.get('/api/prompt/:issueId/:labelName', async (req, res) => {
     }
 
     // Fetch issue context from Linear
-    const { issue, parent, siblings } = await fetchIssueContext(workspace.accessToken, issueId)
+    const { issue, parent, siblings, project, children } = await fetchIssueContext(workspace.accessToken, issueId)
 
     // Generate the prompt
-    const result = generatePrompt(labelName, issue, { parent, siblings })
+    const result = generatePrompt(labelName, issue, { parent, siblings, project, children })
 
     if (!result) {
       return res.status(500).json({ error: 'Failed to generate prompt' })

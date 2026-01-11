@@ -60,12 +60,15 @@ describe('generatePrompt', () => {
     title: 'Test task title',
     description: 'This is a test description for the task',
     url: 'https://linear.app/test/issue/TEST-123',
-    state: { name: 'Backlog', type: 'backlog' }
+    state: { name: 'Backlog', type: 'backlog' },
+    labels: ['needs-breakdown']
   };
 
   const mockContext = {
     parent: null,
-    siblings: []
+    siblings: [],
+    project: null,
+    children: []
   };
 
   test('returns null for unknown label', () => {
@@ -90,6 +93,11 @@ describe('generatePrompt', () => {
     assert.ok(result.prompt.includes('Test task title'));
   });
 
+  test('includes issue URL in prompt', () => {
+    const result = generatePrompt('needs-breakdown', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('https://linear.app/test/issue/TEST-123'));
+  });
+
   test('includes description in prompt', () => {
     const result = generatePrompt('needs-breakdown', mockIssue, mockContext);
     assert.ok(result.prompt.includes('This is a test description'));
@@ -102,13 +110,13 @@ describe('generatePrompt', () => {
 
   test('includes parent info when present', () => {
     const contextWithParent = {
+      ...mockContext,
       parent: {
         id: 'parent-123',
         identifier: 'TEST-100',
         title: 'Parent task title',
         state: { name: 'In Progress', type: 'started' }
-      },
-      siblings: []
+      }
     };
 
     const result = generatePrompt('needs-breakdown', mockIssue, contextWithParent);
@@ -118,6 +126,7 @@ describe('generatePrompt', () => {
 
   test('includes sibling info when present', () => {
     const contextWithSiblings = {
+      ...mockContext,
       parent: {
         id: 'parent-123',
         identifier: 'TEST-100',
@@ -148,7 +157,7 @@ describe('generatePrompt', () => {
     assert.ok(result.prompt.includes('mcp__linear__create_issue'));
   });
 
-  test('truncates long descriptions', () => {
+  test('truncates long descriptions with notice', () => {
     const issueWithLongDesc = {
       ...mockIssue,
       description: 'x'.repeat(600)
@@ -158,6 +167,9 @@ describe('generatePrompt', () => {
     // Should be truncated to 500 chars + "..."
     assert.ok(result.prompt.includes('x'.repeat(500)));
     assert.ok(result.prompt.includes('...'));
+    // Should include truncation notice
+    assert.ok(result.prompt.includes('Description truncated'));
+    assert.ok(result.prompt.includes('Use MCP to read full details'));
   });
 
   test('handles missing description gracefully', () => {
@@ -168,6 +180,66 @@ describe('generatePrompt', () => {
 
     const result = generatePrompt('needs-breakdown', issueNoDesc, mockContext);
     assert.ok(result.prompt.includes('No description provided'));
+  });
+
+  test('includes project context when present', () => {
+    const contextWithProject = {
+      ...mockContext,
+      project: {
+        name: 'My Project',
+        description: 'This is the project description'
+      }
+    };
+
+    const result = generatePrompt('needs-breakdown', mockIssue, contextWithProject);
+    assert.ok(result.prompt.includes('My Project'));
+    assert.ok(result.prompt.includes('This is the project description'));
+  });
+
+  test('shows Unknown for missing project', () => {
+    const result = generatePrompt('needs-breakdown', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('**Project:** Unknown'));
+  });
+
+  test('includes existing children when present', () => {
+    const contextWithChildren = {
+      ...mockContext,
+      children: [
+        { id: 'c1', identifier: 'TEST-201', title: 'Child task 1', state: { name: 'Todo', type: 'unstarted' } },
+        { id: 'c2', identifier: 'TEST-202', title: 'Child task 2', state: { name: 'In Progress', type: 'started' } }
+      ]
+    };
+
+    const result = generatePrompt('needs-breakdown', mockIssue, contextWithChildren);
+    assert.ok(result.prompt.includes('TEST-201'));
+    assert.ok(result.prompt.includes('Child task 1'));
+    assert.ok(result.prompt.includes('TEST-202'));
+    assert.ok(result.prompt.includes('Child task 2'));
+    // Should include instruction to avoid duplicating existing subtasks
+    assert.ok(result.prompt.includes('avoid duplicating'));
+  });
+
+  test('shows None for existing subtasks when empty', () => {
+    const result = generatePrompt('needs-breakdown', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('**Existing Subtasks:**\nNone'));
+  });
+
+  test('includes other labels excluding the trigger label', () => {
+    const issueWithLabels = {
+      ...mockIssue,
+      labels: ['needs-breakdown', 'backend', 'high-priority']
+    };
+
+    const result = generatePrompt('needs-breakdown', issueWithLabels, mockContext);
+    assert.ok(result.prompt.includes('backend'));
+    assert.ok(result.prompt.includes('high-priority'));
+    // Should not duplicate needs-breakdown in other labels
+    assert.ok(!result.prompt.includes('**Other Labels:** needs-breakdown'));
+  });
+
+  test('shows None for other labels when only trigger label exists', () => {
+    const result = generatePrompt('needs-breakdown', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('**Other Labels:** None'));
   });
 });
 
@@ -186,5 +258,57 @@ describe('PROMPT_TEMPLATES', () => {
   test('template name is human-readable', () => {
     const template = PROMPT_TEMPLATES['needs-breakdown'];
     assert.strictEqual(template.name, 'Task Breakdown');
+  });
+});
+
+// =============================================================================
+// Prompt Sections Tests
+// =============================================================================
+
+describe('Prompt Sections', () => {
+  const mockIssue = {
+    id: 'issue-123',
+    identifier: 'TEST-123',
+    title: 'Test task',
+    description: 'Test description',
+    url: 'https://linear.app/test/issue/TEST-123',
+    state: { name: 'Backlog', type: 'backlog' },
+    labels: ['needs-breakdown']
+  };
+
+  const fullContext = {
+    parent: { id: 'p1', identifier: 'TEST-100', title: 'Parent', state: { name: 'Started', type: 'started' } },
+    siblings: [{ id: 's1', identifier: 'TEST-101', title: 'Sibling', state: { name: 'Todo', type: 'unstarted' } }],
+    project: { name: 'Test Project', description: 'Project desc' },
+    children: [{ id: 'c1', identifier: 'TEST-201', title: 'Child', state: { name: 'Todo', type: 'unstarted' } }]
+  };
+
+  test('prompt includes all required context sections', () => {
+    const result = generatePrompt('needs-breakdown', mockIssue, fullContext);
+    assert.ok(result.prompt.includes('## Context'));
+    assert.ok(result.prompt.includes('**Project:**'));
+    assert.ok(result.prompt.includes('**Issue URL:**'));
+    assert.ok(result.prompt.includes('**Parent Task:**'));
+    assert.ok(result.prompt.includes('**Sibling Tasks:**'));
+    assert.ok(result.prompt.includes('**Existing Subtasks:**'));
+    assert.ok(result.prompt.includes('**Other Labels:**'));
+    assert.ok(result.prompt.includes('**Current Description:**'));
+  });
+
+  test('prompt includes all required instruction sections', () => {
+    const result = generatePrompt('needs-breakdown', mockIssue, fullContext);
+    assert.ok(result.prompt.includes('## Instructions'));
+    assert.ok(result.prompt.includes('## Output Format'));
+  });
+
+  test('prompt includes MCP tool references', () => {
+    const result = generatePrompt('needs-breakdown', mockIssue, fullContext);
+    assert.ok(result.prompt.includes('`mcp__linear__get_issue`'));
+    assert.ok(result.prompt.includes('`mcp__linear__create_issue`'));
+  });
+
+  test('prompt includes human approval step', () => {
+    const result = generatePrompt('needs-breakdown', mockIssue, fullContext);
+    assert.ok(result.prompt.includes('After I approve'));
   });
 });

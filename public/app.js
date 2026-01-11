@@ -600,6 +600,9 @@ function initNavBar() {
 // Prompt Generation for Labels
 // ==========================================================================
 
+// Track active fetch to prevent race conditions
+let activePromptFetch = null
+
 /**
  * Initialize prompt functionality for clickable labels
  */
@@ -627,6 +630,15 @@ function initPrompts() {
       return
     }
 
+    // Cancel any in-flight request
+    if (activePromptFetch) {
+      activePromptFetch.abort()
+    }
+
+    // Create new abort controller for this request
+    const abortController = new AbortController()
+    activePromptFetch = abortController
+
     // Show loading state
     const promptText = promptContainer.querySelector('.prompt-text')
     const promptName = promptContainer.querySelector('.prompt-name')
@@ -636,7 +648,10 @@ function initPrompts() {
     promptContainer.dataset.activeLabel = labelName
 
     try {
-      const response = await fetch(`/api/prompt/${issueId}/${encodeURIComponent(labelName)}`)
+      const response = await fetch(
+        `/api/prompt/${issueId}/${encodeURIComponent(labelName)}`,
+        { signal: abortController.signal }
+      )
 
       if (!response.ok) {
         const error = await response.json()
@@ -644,11 +659,23 @@ function initPrompts() {
       }
 
       const data = await response.json()
-      promptName.textContent = data.promptName
-      promptText.textContent = data.prompt
+
+      // Only update if this is still the active request
+      if (activePromptFetch === abortController) {
+        promptName.textContent = data.promptName
+        promptText.textContent = data.prompt
+      }
     } catch (error) {
+      // Ignore abort errors (user clicked away)
+      if (error.name === 'AbortError') return
+
       promptText.textContent = `Error: ${error.message}`
       console.error('Failed to fetch prompt:', error)
+    } finally {
+      // Clear active fetch if this was it
+      if (activePromptFetch === abortController) {
+        activePromptFetch = null
+      }
     }
   })
 
