@@ -76,6 +76,13 @@ Both In Progress and Projects sections use the same nested structure:
 - `.toggle` - expand/collapse arrow (▶/▼)
 - `.in-progress-header` - collapsible section header
 
+### Promptable Labels
+Some labels (like `needs-breakdown`) have associated AI prompts. These appear as clickable links in the task metadata.
+- `.label-prompt[data-issue-id][data-label]` - clickable label that generates a prompt
+- `.prompt-container[data-prompt-for="{id}"]` - container for generated prompt
+- `.prompt-text` - the prompt text (inside container)
+- `.prompt-copy` - copy button (inside container)
+
 ## Common Workflows
 
 1. **Find in-progress tasks**: Look in "In Progress" section at top (displays as tree with subtasks)
@@ -83,6 +90,7 @@ Both In Progress and Projects sections use the same nested structure:
 3. **Expand subtasks**: Click parent task or ▶ arrow to show child tasks (works in both sections)
 4. **Filter by team**: Use team selector in nav bar
 5. **Open in Linear**: Expand task details, click "View in Linear →"
+6. **Generate prompt for task**: Expand task with promptable label (e.g., `needs-breakdown`), click the label link, copy the generated prompt
 
 ## Limitations
 

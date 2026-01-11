@@ -19,6 +19,7 @@
 */
 :root {
   --bg: #ffffff;
+  --bg-muted: #f8f9fa;  /* Muted background for containers */
   --fg: #1a1a1a;
   --fg-dim: #666666;
   --fg-vdim: #eeeeee;  /* Very dim - box-drawing characters, structural elements */
@@ -651,4 +652,87 @@ h1 {
 
 .error-home-link:hover {
   color: var(--fg);
+}
+
+/* =============================================================================
+   Promptable Labels & Prompt Container
+   =============================================================================
+   Labels with AI prompts are rendered as clickable links.
+   Clicking opens a prompt container with copyable text.
+*/
+
+/* Promptable label links within metadata */
+.label-prompt {
+  color: var(--blue);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.label-prompt:hover {
+  text-decoration: underline;
+}
+
+/* Prompt container - appears below metadata when label is clicked */
+.prompt-container {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: var(--bg-muted);
+  border: 1px solid var(--fg-vdim);
+  border-radius: 4px;
+}
+
+.prompt-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.prompt-name {
+  font-family: var(--font-content);
+  font-weight: 500;
+  font-size: 0.9em;
+  color: var(--fg);
+}
+
+.prompt-copy {
+  background: none;
+  border: 1px solid var(--fg-vdim);
+  padding: 0.25rem 0.5rem;
+  font-family: var(--font-content);
+  font-size: 0.8em;
+  color: var(--fg-dim);
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.prompt-copy:hover {
+  border-color: var(--fg-dim);
+  color: var(--fg);
+}
+
+/* Prompt text - monospace, preserves formatting */
+.prompt-text {
+  font-family: var(--font-structural);
+  font-size: 0.85em;
+  line-height: 1.5;
+  color: var(--fg);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  margin: 0;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+/* Mobile adjustments for prompt container */
+@media (max-width: 640px) {
+  .prompt-container {
+    padding: 0.5rem;
+  }
+
+  .prompt-text {
+    font-size: 0.8em;
+    max-height: 300px;
+  }
 }
