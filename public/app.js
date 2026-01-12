@@ -610,7 +610,7 @@ function initPrompts() {
   // Handle clicks on promptable labels
   document.addEventListener('click', async (e) => {
     const labelLink = e.target.closest('.label-prompt')
-    if (!labelLink) return
+    if (!labelLink || labelLink.classList.contains('more-toggle')) return
 
     e.preventDefault()
     e.stopPropagation()
