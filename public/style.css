@@ -661,15 +661,38 @@ h1 {
    Clicking opens a prompt container with copyable text.
 */
 
-/* Promptable label links within metadata */
+/* Promptable label buttons within metadata */
 .label-prompt {
-  color: var(--blue);
-  text-decoration: none;
+  background: none;
+  border: 1px solid var(--fg-vdim);
+  padding: 0.2rem 0.5rem;
+  font-family: var(--font-content);
+  font-size: 0.8em;
+  color: var(--fg-dim);
   cursor: pointer;
+  border-radius: 3px;
+  text-decoration: none;
+  margin-right: 0.25rem;
 }
 
 .label-prompt:hover {
+  border-color: var(--fg-dim);
+  color: var(--fg);
+}
+
+/* "more" link keeps simple link styling */
+.label-prompt.more-toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-right: 0;
+  color: var(--fg-dim);
+  font-size: inherit;
+}
+
+.label-prompt.more-toggle:hover {
   text-decoration: underline;
+  border-color: transparent;
 }
 
 /* Prompt container - appears below metadata when label is clicked */
