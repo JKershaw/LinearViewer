@@ -16,6 +16,7 @@ A minimal, CLI-aesthetic web app that displays Linear projects and issues as a c
 server.js              Express server, OAuth routes, main entry point
 lib/
   linear.js            GraphQL client for Linear API
+  linear-cli.js        CLI tool for AI agents to query/modify Linear
   tree.js              Transforms flat issues → nested tree structure
   render.js            Generates HTML with box-drawing characters
   session-store.js     MongoDB/MangoDB session store
@@ -99,3 +100,60 @@ The `/llms.txt` file provides guidance for AI agents navigating the site, includ
 - Status indicators and their meanings
 
 **Keep llms.txt updated** when modifying DOM structure or data attributes in `render.js`.
+
+## Linear CLI (for AI Agents)
+
+When `LINEAR_API_KEY` environment variable is set, AI agents can query Linear directly:
+
+```bash
+node lib/linear-cli.js <command> [args]
+```
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `viewer` / `me` | Get current user info |
+| `org` | Get organization info |
+| `teams` | List all teams |
+| `projects` | List active projects |
+| `issues [teamId]` | List all issues (optionally filter by team) |
+| `issue <id>` | Get issue details with full context |
+| `search "query"` | Search issues |
+| `states <teamId>` | List workflow states for a team |
+| `create-issue <teamId> <title> [json]` | Create a new issue |
+| `update-issue <issueId> <json>` | Update an existing issue |
+| `comment <issueId> "body"` | Add a comment to an issue |
+
+### Setup
+
+1. Get your API key from: https://linear.app/settings/api
+2. Set the environment variable: `export LINEAR_API_KEY="lin_api_..."`
+
+### Examples
+
+```bash
+# Check authentication
+node lib/linear-cli.js viewer
+
+# List all active projects
+node lib/linear-cli.js projects
+
+# Get full context for an issue
+node lib/linear-cli.js issue abc123def
+
+# Search for issues
+node lib/linear-cli.js search "authentication bug"
+
+# Create a new issue
+node lib/linear-cli.js create-issue team_id "Fix login bug"
+node lib/linear-cli.js create-issue team_id "Add feature" '{"description":"Details","projectId":"proj_123"}'
+
+# Update an issue (change status, assignee, etc.)
+node lib/linear-cli.js update-issue issue_id '{"stateId":"state_done"}'
+
+# Add a comment
+node lib/linear-cli.js comment issue_id "Fixed in PR #42"
+```
+
+**Note**: The CLI outputs JSON for easy parsing by AI agents.
