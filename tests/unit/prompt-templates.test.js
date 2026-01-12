@@ -103,9 +103,9 @@ describe('generatePrompt', () => {
     assert.ok(result.prompt.includes('This is a test description'));
   });
 
-  test('shows "top-level task" when no parent', () => {
+  test('omits parent section when no parent', () => {
     const result = generatePrompt('needs-breakdown', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('top-level task'));
+    assert.ok(!result.prompt.includes('**Parent Task:**'));
   });
 
   test('includes parent info when present', () => {
@@ -146,15 +146,9 @@ describe('generatePrompt', () => {
     assert.ok(result.prompt.includes('Sibling 2'));
   });
 
-  test('shows "None" for siblings when empty', () => {
+  test('omits sibling section when empty', () => {
     const result = generatePrompt('needs-breakdown', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('**Sibling Tasks:**\nNone'));
-  });
-
-  test('includes Linear MCP tool references', () => {
-    const result = generatePrompt('needs-breakdown', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('mcp__linear__get_issue'));
-    assert.ok(result.prompt.includes('mcp__linear__create_issue'));
+    assert.ok(!result.prompt.includes('**Sibling Tasks:**'));
   });
 
   test('truncates long descriptions with notice', () => {
@@ -219,9 +213,9 @@ describe('generatePrompt', () => {
     assert.ok(result.prompt.includes('avoid duplicating'));
   });
 
-  test('shows None for existing subtasks when empty', () => {
+  test('omits existing subtasks section when empty', () => {
     const result = generatePrompt('needs-breakdown', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('**Existing Subtasks:**\nNone'));
+    assert.ok(!result.prompt.includes('**Existing Subtasks:**'));
   });
 
   test('includes other labels excluding the trigger label', () => {
@@ -237,9 +231,9 @@ describe('generatePrompt', () => {
     assert.ok(!result.prompt.includes('**Other Labels:** needs-breakdown'));
   });
 
-  test('shows None for other labels when only trigger label exists', () => {
+  test('omits other labels section when only trigger label exists', () => {
     const result = generatePrompt('needs-breakdown', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('**Other Labels:** None'));
+    assert.ok(!result.prompt.includes('**Other Labels:**'));
   });
 });
 
@@ -314,22 +308,16 @@ describe('needs-research template', () => {
     assert.strictEqual(result.name, 'Research Task');
   });
 
-  test('includes MCP tool references', () => {
+  test('includes goal section', () => {
     const result = generatePrompt('needs-research', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('mcp__linear__get_issue'));
-    assert.ok(result.prompt.includes('mcp__linear__update_issue'));
+    assert.ok(result.prompt.includes('## Goal'));
+    assert.ok(result.prompt.includes('research systematically'));
   });
 
-  test('includes instructions to update task after completion', () => {
+  test('includes project and URL', () => {
     const result = generatePrompt('needs-research', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Remove the `needs-research` label'));
-  });
-
-  test('includes output format sections', () => {
-    const result = generatePrompt('needs-research', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Key Questions'));
-    assert.ok(result.prompt.includes('Findings'));
-    assert.ok(result.prompt.includes('Recommendation'));
+    assert.ok(result.prompt.includes('Auth Project'));
+    assert.ok(result.prompt.includes('https://linear.app/test/issue/TEST-R1'));
   });
 });
 
@@ -360,17 +348,12 @@ describe('needs-scoping template', () => {
     assert.strictEqual(result.name, 'Scope Definition');
   });
 
-  test('includes scope-specific sections', () => {
+  test('includes goal with scope concepts', () => {
     const result = generatePrompt('needs-scoping', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('In Scope'));
-    assert.ok(result.prompt.includes('Out of Scope'));
-    assert.ok(result.prompt.includes('Success Criteria'));
-  });
-
-  test('includes MCP update instructions', () => {
-    const result = generatePrompt('needs-scoping', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Remove the `needs-scoping` label'));
-    assert.ok(result.prompt.includes('Update the description with the scope definition'));
+    assert.ok(result.prompt.includes('## Goal'));
+    assert.ok(result.prompt.includes('in scope'));
+    assert.ok(result.prompt.includes('out of scope'));
+    assert.ok(result.prompt.includes('success criteria'));
   });
 });
 
@@ -401,16 +384,11 @@ describe('needs-design template', () => {
     assert.strictEqual(result.name, 'Technical Design');
   });
 
-  test('includes design-specific sections', () => {
+  test('includes goal with design concepts', () => {
     const result = generatePrompt('needs-design', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Design Options'));
-    assert.ok(result.prompt.includes('Recommended Approach'));
-    assert.ok(result.prompt.includes('API/Interface Changes'));
-  });
-
-  test('includes follow-up label instruction', () => {
-    const result = generatePrompt('needs-design', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Add `needs-breakdown`'));
+    assert.ok(result.prompt.includes('## Goal'));
+    assert.ok(result.prompt.includes('design approaches'));
+    assert.ok(result.prompt.includes('tradeoffs'));
   });
 });
 
@@ -447,18 +425,17 @@ describe('needs-spike template', () => {
     assert.ok(result.prompt.includes('2 points'));
   });
 
-  test('includes spike-specific sections', () => {
+  test('includes goal with spike concepts', () => {
     const result = generatePrompt('needs-spike', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Questions to Answer'));
-    assert.ok(result.prompt.includes('Timebox'));
-    assert.ok(result.prompt.includes('If Successful'));
-    assert.ok(result.prompt.includes('If Unsuccessful'));
+    assert.ok(result.prompt.includes('## Goal'));
+    assert.ok(result.prompt.includes('questions'));
+    assert.ok(result.prompt.includes('success criteria'));
   });
 
-  test('suggests timebox when no estimate', () => {
+  test('omits timebox when no estimate', () => {
     const issueNoEstimate = { ...mockIssue, estimate: null };
     const result = generatePrompt('needs-spike', issueNoEstimate, mockContext);
-    assert.ok(result.prompt.includes('Suggest an appropriate timebox'));
+    assert.ok(!result.prompt.includes('Timebox'));
   });
 });
 
@@ -490,23 +467,17 @@ describe('blocked template', () => {
     assert.strictEqual(result.name, 'Blocker Analysis');
   });
 
-  test('includes assignee info', () => {
+  test('includes goal with blocker concepts', () => {
     const result = generatePrompt('blocked', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Alice'));
+    assert.ok(result.prompt.includes('## Goal'));
+    assert.ok(result.prompt.includes('blocker type'));
+    assert.ok(result.prompt.includes('root cause'));
   });
 
-  test('includes blocker-specific sections', () => {
+  test('includes parent info when present', () => {
     const result = generatePrompt('blocked', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Blocker Type'));
-    assert.ok(result.prompt.includes('Root Cause'));
-    assert.ok(result.prompt.includes('Options to Unblock'));
-    assert.ok(result.prompt.includes('Escalation'));
-  });
-
-  test('includes unassigned when no assignee', () => {
-    const issueNoAssignee = { ...mockIssue, assignee: null };
-    const result = generatePrompt('blocked', issueNoAssignee, mockContext);
-    assert.ok(result.prompt.includes('Unassigned'));
+    assert.ok(result.prompt.includes('TEST-P1'));
+    assert.ok(result.prompt.includes('Parent task'));
   });
 });
 
@@ -542,17 +513,16 @@ describe('needs-context template', () => {
     assert.strictEqual(result.name, 'Context Summary');
   });
 
-  test('includes current state info', () => {
+  test('includes status', () => {
     const result = generatePrompt('needs-context', mockIssue, mockContext);
     assert.ok(result.prompt.includes('**Status:** Backlog'));
-    assert.ok(result.prompt.includes('**Assignee:** Unassigned'));
   });
 
-  test('includes context-specific sections', () => {
+  test('includes goal with context concepts', () => {
     const result = generatePrompt('needs-context', mockIssue, mockContext);
-    assert.ok(result.prompt.includes("What's Done"));
-    assert.ok(result.prompt.includes("What Remains"));
-    assert.ok(result.prompt.includes('Key Decisions'));
+    assert.ok(result.prompt.includes('## Goal'));
+    assert.ok(result.prompt.includes("what's done"));
+    assert.ok(result.prompt.includes('next steps'));
   });
 
   test('includes siblings and children', () => {
@@ -590,25 +560,16 @@ describe('bug template', () => {
     assert.strictEqual(result.name, 'Bug Investigation');
   });
 
-  test('includes bug-specific sections', () => {
+  test('includes goal with bug concepts', () => {
     const result = generatePrompt('bug', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Expected Behavior'));
-    assert.ok(result.prompt.includes('Actual Behavior'));
-    assert.ok(result.prompt.includes('Reproduction Steps'));
-    assert.ok(result.prompt.includes('Likely Causes'));
-    assert.ok(result.prompt.includes('Investigation Plan'));
+    assert.ok(result.prompt.includes('## Goal'));
+    assert.ok(result.prompt.includes('reproduction steps'));
+    assert.ok(result.prompt.includes('likely causes'));
   });
 
-  test('includes assignee and status', () => {
+  test('includes status', () => {
     const result = generatePrompt('bug', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Bob'));
-    assert.ok(result.prompt.includes('Todo'));
-  });
-
-  test('includes MCP instructions for updating after fix', () => {
-    const result = generatePrompt('bug', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('link the PR'));
-    assert.ok(result.prompt.includes('update status'));
+    assert.ok(result.prompt.includes('**Status:** Todo'));
   });
 });
 
@@ -650,27 +611,9 @@ describe('plan template', () => {
     assert.strictEqual(template.category, PROMPT_CATEGORIES.READY);
   });
 
-  test('includes MCP tool references', () => {
-    const result = generatePrompt('plan', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('mcp__linear__get_issue'));
-    assert.ok(result.prompt.includes('mcp__linear__update_issue'));
-  });
-
-  test('includes status and assignee info', () => {
+  test('includes status', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
     assert.ok(result.prompt.includes('**Status:** Backlog'));
-    assert.ok(result.prompt.includes('**Assignee:** Alice'));
-  });
-
-  test('includes estimate when present', () => {
-    const result = generatePrompt('plan', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('5 points'));
-  });
-
-  test('shows Not estimated when no estimate', () => {
-    const issueNoEstimate = { ...mockIssue, estimate: null };
-    const result = generatePrompt('plan', issueNoEstimate, mockContext);
-    assert.ok(result.prompt.includes('Not estimated'));
   });
 
   test('includes parent info', () => {
@@ -679,10 +622,10 @@ describe('plan template', () => {
     assert.ok(result.prompt.includes('User Management Epic'));
   });
 
-  test('shows top-level task when no parent', () => {
+  test('omits parent section when no parent', () => {
     const contextNoParent = { ...mockContext, parent: null };
     const result = generatePrompt('plan', mockIssue, contextNoParent);
-    assert.ok(result.prompt.includes('top-level task'));
+    assert.ok(!result.prompt.includes('**Parent Task:**'));
   });
 
   test('includes sibling tasks', () => {
@@ -697,25 +640,10 @@ describe('plan template', () => {
     assert.ok(result.prompt.includes('Design profile UI'));
   });
 
-  test('includes output format sections', () => {
+  test('includes goal with implementation concepts', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Summary'));
-    assert.ok(result.prompt.includes('Research Findings'));
-    assert.ok(result.prompt.includes('Implementation Steps'));
-    assert.ok(result.prompt.includes('Test Plan'));
-    assert.ok(result.prompt.includes('Risks & Considerations'));
-    assert.ok(result.prompt.includes('Questions'));
-  });
-
-  test('includes instructions to remove label after completion', () => {
-    const result = generatePrompt('plan', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Remove the `plan` label'));
-  });
-
-  test('includes unassigned when no assignee', () => {
-    const issueNoAssignee = { ...mockIssue, assignee: null };
-    const result = generatePrompt('plan', issueNoAssignee, mockContext);
-    assert.ok(result.prompt.includes('Unassigned'));
+    assert.ok(result.prompt.includes('## Goal'));
+    assert.ok(result.prompt.includes('implementation plan'));
   });
 
   test('includes project info', () => {
@@ -758,57 +686,22 @@ describe('code-review template', () => {
     assert.strictEqual(template.category, PROMPT_CATEGORIES.READY);
   });
 
-  test('includes MCP tool references', () => {
+  test('includes goal with review concepts', () => {
     const result = generatePrompt('code-review', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('mcp__linear__get_issue'));
-    assert.ok(result.prompt.includes('mcp__linear__update_issue'));
-  });
-
-  test('includes review focus areas', () => {
-    const result = generatePrompt('code-review', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Correctness'));
-    assert.ok(result.prompt.includes('Tests'));
-    assert.ok(result.prompt.includes('Style'));
-    assert.ok(result.prompt.includes('Security'));
-    assert.ok(result.prompt.includes('Performance'));
-  });
-
-  test('includes checklist format', () => {
-    const result = generatePrompt('code-review', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Checklist'));
-    assert.ok(result.prompt.includes('[ ] Requirements fully implemented'));
-    assert.ok(result.prompt.includes('[ ] Tests added/updated'));
-    assert.ok(result.prompt.includes('[ ] No security vulnerabilities'));
-  });
-
-  test('includes verdict options', () => {
-    const result = generatePrompt('code-review', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Verdict'));
+    assert.ok(result.prompt.includes('## Goal'));
+    assert.ok(result.prompt.includes('correctness'));
+    assert.ok(result.prompt.includes('security'));
     assert.ok(result.prompt.includes('Approve'));
-    assert.ok(result.prompt.includes('Request Changes'));
   });
 
-  test('includes issue severity indicators', () => {
+  test('includes status', () => {
     const result = generatePrompt('code-review', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Critical'));
-    assert.ok(result.prompt.includes('Suggestions'));
-    assert.ok(result.prompt.includes('Nits'));
+    assert.ok(result.prompt.includes('**Status:** In Review'));
   });
 
-  test('includes assignee and status', () => {
+  test('includes project info', () => {
     const result = generatePrompt('code-review', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Alice'));
-    assert.ok(result.prompt.includes('In Review'));
-  });
-
-  test('includes estimate when present', () => {
-    const result = generatePrompt('code-review', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('3 points'));
-  });
-
-  test('includes instructions to remove label after completion', () => {
-    const result = generatePrompt('code-review', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Remove the `code-review` label'));
+    assert.ok(result.prompt.includes('Auth Refactor'));
   });
 });
 
@@ -892,7 +785,7 @@ describe('Prompt Sections', () => {
     description: 'Test description',
     url: 'https://linear.app/test/issue/TEST-123',
     state: { name: 'Backlog', type: 'backlog' },
-    labels: ['needs-breakdown']
+    labels: ['needs-breakdown', 'backend']
   };
 
   const fullContext = {
@@ -902,7 +795,7 @@ describe('Prompt Sections', () => {
     children: [{ id: 'c1', identifier: 'TEST-201', title: 'Child', state: { name: 'Todo', type: 'unstarted' } }]
   };
 
-  test('prompt includes all required context sections', () => {
+  test('prompt includes context sections when data present', () => {
     const result = generatePrompt('needs-breakdown', mockIssue, fullContext);
     assert.ok(result.prompt.includes('## Context'));
     assert.ok(result.prompt.includes('**Project:**'));
@@ -911,23 +804,25 @@ describe('Prompt Sections', () => {
     assert.ok(result.prompt.includes('**Sibling Tasks:**'));
     assert.ok(result.prompt.includes('**Existing Subtasks:**'));
     assert.ok(result.prompt.includes('**Other Labels:**'));
-    assert.ok(result.prompt.includes('**Current Description:**'));
   });
 
-  test('prompt includes all required instruction sections', () => {
+  test('prompt includes goal section', () => {
     const result = generatePrompt('needs-breakdown', mockIssue, fullContext);
-    assert.ok(result.prompt.includes('## Instructions'));
-    assert.ok(result.prompt.includes('## Output Format'));
+    assert.ok(result.prompt.includes('## Goal'));
   });
 
-  test('prompt includes MCP tool references', () => {
-    const result = generatePrompt('needs-breakdown', mockIssue, fullContext);
-    assert.ok(result.prompt.includes('`mcp__linear__get_issue`'));
-    assert.ok(result.prompt.includes('`mcp__linear__create_issue`'));
-  });
-
-  test('prompt includes human approval step', () => {
-    const result = generatePrompt('needs-breakdown', mockIssue, fullContext);
-    assert.ok(result.prompt.includes('After I approve'));
+  test('prompt omits empty sections', () => {
+    const emptyContext = {
+      parent: null,
+      siblings: [],
+      project: { name: 'Test Project' },
+      children: []
+    };
+    const issueNoExtraLabels = { ...mockIssue, labels: ['needs-breakdown'] };
+    const result = generatePrompt('needs-breakdown', issueNoExtraLabels, emptyContext);
+    assert.ok(!result.prompt.includes('**Parent Task:**'));
+    assert.ok(!result.prompt.includes('**Sibling Tasks:**'));
+    assert.ok(!result.prompt.includes('**Existing Subtasks:**'));
+    assert.ok(!result.prompt.includes('**Other Labels:**'));
   });
 });

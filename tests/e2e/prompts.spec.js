@@ -77,7 +77,7 @@ test.describe('Promptable Labels', () => {
     // Should show prompt text
     const promptText = promptContainer.locator('.prompt-text');
     await expect(promptText).toBeVisible();
-    await expect(promptText).toContainText('Linear MCP');
+    await expect(promptText).toContainText('## Goal');
   });
 
   test('prompt contains issue context', async ({ page }) => {
@@ -209,10 +209,10 @@ test.describe('Prompt API', () => {
     const body = await response.json();
     expect(body.label).toBe('needs-breakdown');
     expect(body.promptName).toBe('Task Breakdown');
-    expect(body.prompt).toContain('Linear MCP');
+    expect(body.prompt).toContain('## Goal');
   });
 
-  // Tests for all 7 new prompt templates
+  // Tests for all prompt templates
   test('returns research prompt', async ({ page }) => {
     const response = await page.request.get(`/api/prompt/${RESEARCH_ISSUE_ID}/needs-research`);
     expect(response.status()).toBe(200);
@@ -221,7 +221,7 @@ test.describe('Prompt API', () => {
     expect(body.label).toBe('needs-research');
     expect(body.promptName).toBe('Research Task');
     expect(body.prompt).toContain('Research authentication options');
-    expect(body.prompt).toContain('mcp__linear__get_issue');
+    expect(body.prompt).toContain('## Goal');
   });
 
   test('returns scoping prompt', async ({ page }) => {
@@ -232,7 +232,7 @@ test.describe('Prompt API', () => {
     expect(body.label).toBe('needs-scoping');
     expect(body.promptName).toBe('Scope Definition');
     expect(body.prompt).toContain('Define scope for user dashboard');
-    expect(body.prompt).toContain('In Scope');
+    expect(body.prompt).toContain('## Goal');
   });
 
   test('returns design prompt', async ({ page }) => {
@@ -243,7 +243,7 @@ test.describe('Prompt API', () => {
     expect(body.label).toBe('needs-design');
     expect(body.promptName).toBe('Technical Design');
     expect(body.prompt).toContain('Design caching layer architecture');
-    expect(body.prompt).toContain('Design Options');
+    expect(body.prompt).toContain('## Goal');
   });
 
   test('returns spike prompt', async ({ page }) => {
@@ -254,7 +254,7 @@ test.describe('Prompt API', () => {
     expect(body.label).toBe('needs-spike');
     expect(body.promptName).toBe('Technical Spike');
     expect(body.prompt).toContain('WebSocket vs SSE');
-    expect(body.prompt).toContain('Timebox');
+    expect(body.prompt).toContain('## Goal');
   });
 
   test('returns blocked prompt', async ({ page }) => {
@@ -265,7 +265,7 @@ test.describe('Prompt API', () => {
     expect(body.label).toBe('blocked');
     expect(body.promptName).toBe('Blocker Analysis');
     expect(body.prompt).toContain('Blocked on external API');
-    expect(body.prompt).toContain('Options to Unblock');
+    expect(body.prompt).toContain('## Goal');
   });
 
   test('returns context prompt', async ({ page }) => {
@@ -276,7 +276,7 @@ test.describe('Prompt API', () => {
     expect(body.label).toBe('needs-context');
     expect(body.promptName).toBe('Context Summary');
     expect(body.prompt).toContain('Context needed for legacy migration');
-    expect(body.prompt).toContain("What's Done");
+    expect(body.prompt).toContain('## Goal');
   });
 
   test('returns bug prompt', async ({ page }) => {
@@ -287,7 +287,7 @@ test.describe('Prompt API', () => {
     expect(body.label).toBe('bug');
     expect(body.promptName).toBe('Bug Investigation');
     expect(body.prompt).toContain('Login fails with special characters');
-    expect(body.prompt).toContain('Likely Causes');
+    expect(body.prompt).toContain('## Goal');
   });
 
   test('returns plan prompt', async ({ page }) => {
@@ -298,8 +298,7 @@ test.describe('Prompt API', () => {
     expect(body.label).toBe('plan');
     expect(body.promptName).toBe('Implementation Plan');
     expect(body.prompt).toContain('Add pagination to user list');
-    expect(body.prompt).toContain('Implementation Steps');
-    expect(body.prompt).toContain('Test Plan');
+    expect(body.prompt).toContain('## Goal');
   });
 
   test('returns code-review prompt', async ({ page }) => {
@@ -310,9 +309,7 @@ test.describe('Prompt API', () => {
     expect(body.label).toBe('code-review');
     expect(body.promptName).toBe('Code Review');
     expect(body.prompt).toContain('Refactor authentication module');
-    expect(body.prompt).toContain('Correctness');
-    expect(body.prompt).toContain('Security');
-    expect(body.prompt).toContain('Checklist');
+    expect(body.prompt).toContain('## Goal');
   });
 });
 
@@ -366,7 +363,7 @@ test.describe('Multiple Promptable Labels UI', () => {
     await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
 
     await expect(promptContainer.locator('.prompt-name')).toContainText('Research Task');
-    await expect(promptContainer.locator('.prompt-text')).toContainText('Key Questions');
+    await expect(promptContainer.locator('.prompt-text')).toContainText('## Goal');
   });
 
   test('renders code-review as clickable link in in-progress section', async ({ page }) => {
@@ -392,8 +389,6 @@ test.describe('Multiple Promptable Labels UI', () => {
     await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
 
     await expect(promptContainer.locator('.prompt-name')).toContainText('Code Review');
-    await expect(promptContainer.locator('.prompt-text')).toContainText('Correctness');
-    await expect(promptContainer.locator('.prompt-text')).toContainText('Security');
-    await expect(promptContainer.locator('.prompt-text')).toContainText('Checklist');
+    await expect(promptContainer.locator('.prompt-text')).toContainText('## Goal');
   });
 });
