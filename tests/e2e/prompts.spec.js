@@ -28,8 +28,8 @@ test.describe('Promptable Labels', () => {
     // Click to expand details
     await taskLine.click();
 
-    // Find the label link in the details
-    const labelLink = page.locator('.label-prompt[data-label="needs-breakdown"]');
+    // Find the label link in the specific issue's details panel
+    const labelLink = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .label-prompt[data-label="needs-breakdown"]`);
     await expect(labelLink).toBeVisible();
     await expect(labelLink).toHaveText('needs-breakdown');
   });
@@ -59,8 +59,8 @@ test.describe('Promptable Labels', () => {
     const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
     await taskLine.click();
 
-    // Click the promptable label
-    const labelLink = page.locator('.label-prompt[data-label="needs-breakdown"]');
+    // Click the promptable label in the specific issue's details
+    const labelLink = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .label-prompt[data-label="needs-breakdown"]`);
     await labelLink.click();
 
     // Wait for prompt container to appear
@@ -85,8 +85,8 @@ test.describe('Promptable Labels', () => {
     const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
     await taskLine.click();
 
-    // Click the promptable label
-    const labelLink = page.locator('.label-prompt[data-label="needs-breakdown"]');
+    // Click the promptable label in the specific issue's details
+    const labelLink = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .label-prompt[data-label="needs-breakdown"]`);
     await labelLink.click();
 
     // Wait for prompt to load
@@ -103,7 +103,7 @@ test.describe('Promptable Labels', () => {
     await taskLine.click();
 
     // Click the promptable label to show
-    const labelLink = page.locator('.label-prompt[data-label="needs-breakdown"]');
+    const labelLink = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .label-prompt[data-label="needs-breakdown"]`);
     await labelLink.click();
 
     // Wait for container to appear
@@ -123,8 +123,8 @@ test.describe('Promptable Labels', () => {
     const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
     await taskLine.click();
 
-    // Click the promptable label
-    const labelLink = page.locator('.label-prompt[data-label="needs-breakdown"]');
+    // Click the promptable label in the specific issue's details
+    const labelLink = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .label-prompt[data-label="needs-breakdown"]`);
     await labelLink.click();
 
     // Wait for prompt to load
@@ -148,8 +148,8 @@ test.describe('Promptable Labels', () => {
     const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
     await taskLine.click();
 
-    // Click the promptable label
-    const labelLink = page.locator('.label-prompt[data-label="needs-breakdown"]');
+    // Click the promptable label in the specific issue's details
+    const labelLink = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .label-prompt[data-label="needs-breakdown"]`);
     await labelLink.click();
 
     // Wait for container and prompt to load
@@ -326,7 +326,8 @@ test.describe('Multiple Promptable Labels UI', () => {
     await expect(taskLine).toBeVisible();
     await taskLine.click();
 
-    const labelLink = page.locator('.label-prompt[data-label="needs-research"]');
+    // Use specific selector scoped to the issue's details panel
+    const labelLink = page.locator(`.details[data-details-for="${RESEARCH_ISSUE_ID}"] .label-prompt[data-label="needs-research"]`);
     await expect(labelLink).toBeVisible();
   });
 
@@ -355,7 +356,8 @@ test.describe('Multiple Promptable Labels UI', () => {
     const taskLine = page.locator('.project .line:has-text("Research authentication options")');
     await taskLine.click();
 
-    const labelLink = page.locator('.label-prompt[data-label="needs-research"]');
+    // Use specific selector scoped to the issue's details panel
+    const labelLink = page.locator(`.details[data-details-for="${RESEARCH_ISSUE_ID}"] .label-prompt[data-label="needs-research"]`);
     await labelLink.click();
 
     const promptContainer = page.locator(`.prompt-container[data-prompt-for="${RESEARCH_ISSUE_ID}"]`);
@@ -390,5 +392,83 @@ test.describe('Multiple Promptable Labels UI', () => {
 
     await expect(promptContainer.locator('.prompt-name')).toContainText('Code Review');
     await expect(promptContainer.locator('.prompt-text')).toContainText('## Goal');
+  });
+});
+
+// Tests for "more" inline expansion feature
+test.describe('More Prompts Inline', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/test/set-session');
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+  });
+
+  test('renders "more" link for issues with additional prompts', async ({ page }) => {
+    // Expand an issue that has promptable labels
+    const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
+    await taskLine.click();
+
+    // Should show "more" link inline with other labels
+    const moreLink = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .more-toggle`);
+    await expect(moreLink).toBeVisible();
+    await expect(moreLink).toHaveText('more');
+  });
+
+  test('clicking "more" reveals hidden prompts inline', async ({ page }) => {
+    const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
+    await taskLine.click();
+
+    // Hidden prompts should not be visible initially
+    const hiddenPrompts = page.locator(`[data-more-for="${BREAKDOWN_ISSUE_ID}"]`);
+    await expect(hiddenPrompts).toBeHidden();
+
+    // Click "more"
+    const moreLink = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .more-toggle`);
+    await moreLink.click();
+
+    // Hidden prompts should now be visible
+    await expect(hiddenPrompts).toBeVisible();
+
+    // "more" link should be removed
+    await expect(moreLink).toHaveCount(0);
+
+    // Check some revealed prompts are visible (these are not on the issue's labels)
+    await expect(hiddenPrompts.locator('.label-prompt:has-text("Bug Investigation")')).toBeVisible();
+    await expect(hiddenPrompts.locator('.label-prompt:has-text("Implementation Plan")')).toBeVisible();
+  });
+
+  test('clicking revealed prompt loads it into container', async ({ page }) => {
+    const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
+    await taskLine.click();
+
+    // Click "more" to reveal prompts
+    const moreLink = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .more-toggle`);
+    await moreLink.click();
+
+    // Click a revealed prompt
+    const bugLink = page.locator(`[data-more-for="${BREAKDOWN_ISSUE_ID}"] .label-prompt[data-label="bug"]`);
+    await bugLink.click();
+
+    // Prompt container should show the prompt
+    const promptContainer = page.locator(`.prompt-container[data-prompt-for="${BREAKDOWN_ISSUE_ID}"]`);
+    await expect(promptContainer).toBeVisible();
+    await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
+    await expect(promptContainer.locator('.prompt-name')).toContainText('Bug Investigation');
+  });
+
+  test('works in In Progress section', async ({ page }) => {
+    // Blocked issue appears in In Progress section
+    const inProgressLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
+    await inProgressLine.click();
+
+    // Should have "more" link
+    const moreLink = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .more-toggle`);
+    await expect(moreLink).toBeVisible();
+
+    // Click to reveal
+    await moreLink.click();
+
+    const hiddenPrompts = page.locator(`.in-progress-items [data-more-for="${BLOCKED_ISSUE_ID}"]`);
+    await expect(hiddenPrompts).toBeVisible();
   });
 });

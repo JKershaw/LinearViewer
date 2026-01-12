@@ -95,6 +95,20 @@ Some labels have associated AI prompts for Claude Code with Linear MCP. These ap
 - `.prompt-text` - the prompt text (inside container)
 - `.prompt-copy` - copy button (inside container)
 
+### More Prompts Inline
+Access additional prompt templates from any issue, regardless of its labels.
+A "more" link appears after visible prompts; clicking reveals all remaining prompts inline.
+
+**DOM Selectors:**
+- `.more-toggle[data-issue-id]` - "more" link (appears after visible prompts)
+- `[data-more-for="{id}"]` - hidden span containing additional prompt links
+
+**Usage:**
+1. Expand any issue with promptable labels
+2. Click "more" link at end of labels row
+3. Additional prompts appear inline (same comma-separated format)
+4. Click any prompt to load it into the prompt container
+
 ## Common Workflows
 
 1. **Find in-progress tasks**: Look in "In Progress" section at top (displays as tree with subtasks)

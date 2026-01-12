@@ -711,8 +711,36 @@ function initPrompts() {
   })
 }
 
+// ==========================================================================
+// More Prompts Inline Toggle
+// ==========================================================================
+
+/**
+ * Initialize "more" toggle for revealing additional prompt options inline
+ */
+function initMorePrompts() {
+  document.addEventListener('click', (e) => {
+    const moreToggle = e.target.closest('.more-toggle')
+    if (!moreToggle) return
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    const issueId = moreToggle.dataset.issueId
+    const moreSpan = document.querySelector(`[data-more-for="${issueId}"]`)
+
+    if (moreSpan) {
+      // Reveal hidden prompts
+      moreSpan.classList.remove('hidden')
+      // Remove the "more" link and preceding comma
+      moreToggle.remove()
+    }
+  })
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   init()
   initNavBar()
   initPrompts()
+  initMorePrompts()
 })
