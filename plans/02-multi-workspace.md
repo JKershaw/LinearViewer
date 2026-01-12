@@ -1,5 +1,7 @@
 # Plan: Multi-Workspace Support
 
+**Status: ✅ COMPLETED**
+
 ## Overview
 
 Allow users to connect multiple Linear workspaces and switch between them without re-authenticating. A single Linear account can belong to multiple workspaces, and users may want to view projects across different organizations.

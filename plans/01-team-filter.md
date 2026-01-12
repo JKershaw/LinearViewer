@@ -1,5 +1,7 @@
 # Plan: Team Filter
 
+**Status: ✅ COMPLETED**
+
 ## Overview
 
 Add the ability to filter the project/issue tree by Linear team. This allows users in large workspaces to focus on issues relevant to their team.
