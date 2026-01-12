@@ -25,8 +25,8 @@ test.describe('Authenticated Dashboard', () => {
     await expect(inProgressHeader).toContainText('In Progress');
 
     // Should show in-progress issues as tree with their descendants
-    // issue-1 (in-progress) + issue-2 (child of issue-1, hidden) + issue-4 (in-progress) + issue-11 (blocked, in-progress) = 4 lines total
-    await expect(page.locator('.in-progress-items .line')).toHaveCount(4);
+    // issue-1 (in-progress) + issue-2 (child of issue-1, hidden) + issue-4 (in-progress) + issue-11 (blocked, in-progress) + issue-15 (code-review, in-review) = 5 lines total
+    await expect(page.locator('.in-progress-items .line')).toHaveCount(5);
 
     // Top-level items are visible
     await expect(page.locator('.in-progress-items .line:has-text("Parent task in progress")')).toBeVisible();
@@ -43,11 +43,11 @@ test.describe('Authenticated Dashboard', () => {
 
   test('displays correct state indicators', async ({ page }) => {
     // Mock data defines 15 issues with various states and labels
-    // In-progress issues: issue-1, issue-4, issue-11 (blocked)
+    // In-progress issues: issue-1, issue-4, issue-11 (blocked), issue-15 (code-review)
     // Each in-progress appears 2x (In Progress section + project section)
-    // In-progress count: issue-1 x2 + issue-4 x2 + issue-11 x2 = 6
+    // In-progress count: issue-1 x2 + issue-4 x2 + issue-11 x2 + issue-15 x2 = 8
     const inProgressStates = page.locator('.state.in-progress');
-    await expect(inProgressStates).toHaveCount(6);
+    await expect(inProgressStates).toHaveCount(8);
 
     // Todo issues include: issue-2 (x2), issue-5, issue-6, issue-7, issue-8, issue-9, issue-10, issue-12, issue-13, issue-14
     // Count: issue-2 x2 + all others x1 = 11
