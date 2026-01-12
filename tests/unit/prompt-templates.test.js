@@ -5,7 +5,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { hasPrompt, getPromptLabels, generatePrompt, PROMPT_TEMPLATES } from '../../lib/prompt-templates.js';
+import { hasPrompt, getPromptLabels, generatePrompt, getAvailablePrompts, PROMPT_TEMPLATES, PROMPT_CATEGORIES } from '../../lib/prompt-templates.js';
 
 // =============================================================================
 // hasPrompt Tests
@@ -269,7 +269,9 @@ describe('PROMPT_TEMPLATES', () => {
       'needs-spike',
       'blocked',
       'needs-context',
-      'bug'
+      'bug',
+      'plan',
+      'code-review'
     ];
     for (const labelName of expectedTemplates) {
       assert.ok(PROMPT_TEMPLATES[labelName], `Template for ${labelName} should exist`);
@@ -607,6 +609,162 @@ describe('bug template', () => {
     const result = generatePrompt('bug', mockIssue, mockContext);
     assert.ok(result.prompt.includes('link the PR'));
     assert.ok(result.prompt.includes('update status'));
+  });
+});
+
+// =============================================================================
+// code-review Template Tests
+// =============================================================================
+
+describe('code-review template', () => {
+  const mockIssue = {
+    id: 'issue-review',
+    identifier: 'TEST-CR1',
+    title: 'Refactor authentication module',
+    description: 'Extract auth logic into separate service for better testability',
+    url: 'https://linear.app/test/issue/TEST-CR1',
+    state: { name: 'In Review', type: 'started' },
+    labels: ['code-review'],
+    assignee: { name: 'Alice' },
+    estimate: 3
+  };
+
+  const mockContext = {
+    parent: null,
+    siblings: [],
+    project: { name: 'Auth Refactor', description: 'Authentication improvements' },
+    children: []
+  };
+
+  test('returns Code Review as name', () => {
+    const result = generatePrompt('code-review', mockIssue, mockContext);
+    assert.strictEqual(result.name, 'Code Review');
+  });
+
+  test('has READY category', () => {
+    const template = PROMPT_TEMPLATES['code-review'];
+    assert.strictEqual(template.category, PROMPT_CATEGORIES.READY);
+  });
+
+  test('includes MCP tool references', () => {
+    const result = generatePrompt('code-review', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('mcp__linear__get_issue'));
+    assert.ok(result.prompt.includes('mcp__linear__update_issue'));
+  });
+
+  test('includes review focus areas', () => {
+    const result = generatePrompt('code-review', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('Correctness'));
+    assert.ok(result.prompt.includes('Tests'));
+    assert.ok(result.prompt.includes('Style'));
+    assert.ok(result.prompt.includes('Security'));
+    assert.ok(result.prompt.includes('Performance'));
+  });
+
+  test('includes checklist format', () => {
+    const result = generatePrompt('code-review', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('Checklist'));
+    assert.ok(result.prompt.includes('[ ] Requirements fully implemented'));
+    assert.ok(result.prompt.includes('[ ] Tests added/updated'));
+    assert.ok(result.prompt.includes('[ ] No security vulnerabilities'));
+  });
+
+  test('includes verdict options', () => {
+    const result = generatePrompt('code-review', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('Verdict'));
+    assert.ok(result.prompt.includes('Approve'));
+    assert.ok(result.prompt.includes('Request Changes'));
+  });
+
+  test('includes issue severity indicators', () => {
+    const result = generatePrompt('code-review', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('Critical'));
+    assert.ok(result.prompt.includes('Suggestions'));
+    assert.ok(result.prompt.includes('Nits'));
+  });
+
+  test('includes assignee and status', () => {
+    const result = generatePrompt('code-review', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('Alice'));
+    assert.ok(result.prompt.includes('In Review'));
+  });
+
+  test('includes estimate when present', () => {
+    const result = generatePrompt('code-review', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('3 points'));
+  });
+
+  test('includes instructions to remove label after completion', () => {
+    const result = generatePrompt('code-review', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('Remove the `code-review` label'));
+  });
+});
+
+// =============================================================================
+// getAvailablePrompts Tests
+// =============================================================================
+
+describe('getAvailablePrompts', () => {
+  test('returns both plan and code-review for eligible backlog issue', () => {
+    const issue = {
+      state: { type: 'backlog' },
+      labels: { nodes: [] }
+    };
+    const available = getAvailablePrompts(issue);
+    assert.ok(available.includes('plan'), 'Should include plan');
+    assert.ok(available.includes('code-review'), 'Should include code-review');
+  });
+
+  test('returns both plan and code-review for eligible unstarted issue', () => {
+    const issue = {
+      state: { type: 'unstarted' },
+      labels: { nodes: [] }
+    };
+    const available = getAvailablePrompts(issue);
+    assert.ok(available.includes('plan'), 'Should include plan');
+    assert.ok(available.includes('code-review'), 'Should include code-review');
+  });
+
+  test('returns both plan and code-review for eligible started issue', () => {
+    const issue = {
+      state: { type: 'started' },
+      labels: { nodes: [] }
+    };
+    const available = getAvailablePrompts(issue);
+    assert.ok(available.includes('plan'), 'Should include plan');
+    assert.ok(available.includes('code-review'), 'Should include code-review');
+  });
+
+  test('does not return plan or code-review for completed issue', () => {
+    const issue = {
+      state: { type: 'completed' },
+      labels: { nodes: [] }
+    };
+    const available = getAvailablePrompts(issue);
+    assert.ok(!available.includes('plan'), 'Should not include plan');
+    assert.ok(!available.includes('code-review'), 'Should not include code-review');
+  });
+
+  test('does not return plan or code-review when pre-work label present', () => {
+    const issue = {
+      state: { type: 'backlog' },
+      labels: { nodes: [{ name: 'needs-breakdown' }] }
+    };
+    const available = getAvailablePrompts(issue);
+    assert.ok(!available.includes('plan'), 'Should not include plan when needs-breakdown present');
+    assert.ok(!available.includes('code-review'), 'Should not include code-review when needs-breakdown present');
+    assert.ok(available.includes('needs-breakdown'), 'Should include needs-breakdown label prompt');
+  });
+
+  test('returns label-based prompts alongside state-based prompts', () => {
+    const issue = {
+      state: { type: 'started' },
+      labels: { nodes: [{ name: 'bug' }] }
+    };
+    const available = getAvailablePrompts(issue);
+    assert.ok(available.includes('bug'), 'Should include bug label prompt');
+    assert.ok(available.includes('plan'), 'Should include plan');
+    assert.ok(available.includes('code-review'), 'Should include code-review');
   });
 });
 

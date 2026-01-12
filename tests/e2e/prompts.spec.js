@@ -10,6 +10,7 @@ const BLOCKED_ISSUE_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 const CONTEXT_ISSUE_ID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
 const BUG_ISSUE_ID = 'dddddddd-dddd-dddd-dddd-ddddddddddde';
 const PLAN_ISSUE_ID = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeef';
+const CODE_REVIEW_ISSUE_ID = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
 
 test.describe('Promptable Labels', () => {
   test.beforeEach(async ({ page }) => {
@@ -300,6 +301,19 @@ test.describe('Prompt API', () => {
     expect(body.prompt).toContain('Implementation Steps');
     expect(body.prompt).toContain('Test Plan');
   });
+
+  test('returns code-review prompt', async ({ page }) => {
+    const response = await page.request.get(`/api/prompt/${CODE_REVIEW_ISSUE_ID}/code-review`);
+    expect(response.status()).toBe(200);
+
+    const body = await response.json();
+    expect(body.label).toBe('code-review');
+    expect(body.promptName).toBe('Code Review');
+    expect(body.prompt).toContain('Refactor authentication module');
+    expect(body.prompt).toContain('Correctness');
+    expect(body.prompt).toContain('Security');
+    expect(body.prompt).toContain('Checklist');
+  });
 });
 
 // Tests for promptable label rendering across different labels
@@ -353,5 +367,33 @@ test.describe('Multiple Promptable Labels UI', () => {
 
     await expect(promptContainer.locator('.prompt-name')).toContainText('Research Task');
     await expect(promptContainer.locator('.prompt-text')).toContainText('Key Questions');
+  });
+
+  test('renders code-review as clickable link in in-progress section', async ({ page }) => {
+    // Code-review issue is in "In Review" state (started), so it appears in In Progress section
+    const taskLine = page.locator('.in-progress-items .line:has-text("Refactor authentication module")');
+    await expect(taskLine).toBeVisible();
+    await taskLine.click();
+
+    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="code-review"][data-issue-id="${CODE_REVIEW_ISSUE_ID}"]`);
+    await expect(labelLink).toBeVisible();
+  });
+
+  test('clicking code-review shows correct prompt', async ({ page }) => {
+    const taskLine = page.locator('.in-progress-items .line:has-text("Refactor authentication module")');
+    await taskLine.click();
+
+    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="code-review"][data-issue-id="${CODE_REVIEW_ISSUE_ID}"]`);
+    await labelLink.click();
+
+    // Use more specific locator since issue appears in both In Progress and Project sections
+    const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${CODE_REVIEW_ISSUE_ID}"]`);
+    await expect(promptContainer).toBeVisible();
+    await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
+
+    await expect(promptContainer.locator('.prompt-name')).toContainText('Code Review');
+    await expect(promptContainer.locator('.prompt-text')).toContainText('Correctness');
+    await expect(promptContainer.locator('.prompt-text')).toContainText('Security');
+    await expect(promptContainer.locator('.prompt-text')).toContainText('Checklist');
   });
 });
