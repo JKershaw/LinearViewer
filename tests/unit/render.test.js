@@ -23,7 +23,7 @@ describe('renderLabels', () => {
       assert.strictEqual(result, 'feature');
     });
 
-    test('renders multiple regular labels comma-separated', () => {
+    test('renders multiple regular labels space-separated', () => {
       const issue = {
         id: 'issue-1',
         labels: { nodes: [{ name: 'feature' }, { name: 'priority' }] },
@@ -32,7 +32,8 @@ describe('renderLabels', () => {
       const result = renderLabels(issue);
       assert.ok(result.includes('feature'));
       assert.ok(result.includes('priority'));
-      assert.ok(result.includes(', '));
+      // Labels are space-separated (buttons have margin for visual spacing)
+      assert.strictEqual(result, 'feature priority');
     });
 
     test('returns empty string for no labels on completed issue', () => {
@@ -171,16 +172,18 @@ describe('renderLabels', () => {
       assert.ok(!result.includes('data-label="plan"'));
     });
 
-    test('does not add plan link when pre-work label present', () => {
+    test('does not add plan as state-prompt when pre-work label present', () => {
       const issue = {
         id: 'issue-prework',
         labels: { nodes: [{ name: 'needs-breakdown' }] },
         state: { type: 'backlog' }
       };
       const result = renderLabels(issue);
-      // Should have needs-breakdown link but NOT plan
+      // Should have needs-breakdown link
       assert.ok(result.includes('data-label="needs-breakdown"'));
-      assert.ok(!result.includes('data-label="plan"'));
+      // Plan should NOT appear as a state-prompt (visible) link
+      assert.ok(!result.includes('class="label-prompt state-prompt" data-issue-id="issue-prework" data-label="plan"'));
+      // But plan may appear in hidden "more" prompts (which is expected behavior)
     });
 
     test('does not duplicate plan link if already a label', () => {
