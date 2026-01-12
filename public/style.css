@@ -41,6 +41,7 @@
 
 html {
   overflow-x: hidden;
+  scrollbar-gutter: stable;
 }
 
 /* Terminal-style typography: structural base is monospace for alignment */
@@ -312,6 +313,8 @@ h1 {
 .state {
   flex-shrink: 0;
   margin-right: 0.5ch;
+  font-size: 0.9em;
+  opacity: 0.85;
 }
 .state.done { color: var(--green); }
 .state.in-progress { color: var(--yellow); }
@@ -343,14 +346,16 @@ h1 {
 }
 
 .detail-link {
-  color: var(--blue);
+  color: var(--fg-dim);
   text-decoration: none;
-  font-size: 0.9em;
+  font-size: 0.8em;
   font-family: var(--font-content);
+  display: inline-block;
+  margin-top: 0.3rem;
 }
 
 .detail-link:hover {
-  text-decoration: underline;
+  color: var(--blue);
 }
 
 .project-meta {
@@ -447,15 +452,22 @@ h1 {
 
 /* Details panel shown when issue is expanded */
 .details {
-  line-height: 1.5;
+  line-height: 1.4;
   padding: 0.2rem 0;
-  padding-left: 1.5ch;  /* Align with title (after state indicator) */
+  padding-left: 1.5ch;
+  margin-left: 0.5ch;
+  border-left: 2px solid var(--fg-vdim);
   overflow: hidden;
 }
 
 .detail-line {
   display: flex;
   align-items: baseline;
+  margin-bottom: 0.2rem;
+}
+
+.detail-line:last-of-type {
+  margin-bottom: 0;
 }
 
 .detail-text {
@@ -550,7 +562,8 @@ h1 {
   }
 
   .details {
-    padding-left: 1rem;
+    padding-left: 0.75rem;
+    margin-left: 0.25rem;
   }
 
   /* Disable hover underline on touch devices (no hover state) */
@@ -663,21 +676,26 @@ h1 {
 
 /* Promptable label buttons within metadata */
 .label-prompt {
+  display: inline-block;
   background: none;
-  border: 1px solid var(--fg-vdim);
-  padding: 0.2rem 0.5rem;
+  border: 1px solid #ddd;
+  padding: 0.15rem 0.4rem;
   font-family: var(--font-content);
   font-size: 0.8em;
   color: var(--fg-dim);
   cursor: pointer;
   border-radius: 3px;
   text-decoration: none;
-  margin-right: 0.25rem;
+  margin-right: 0.3rem;
+  margin-bottom: 0.4rem;
+  white-space: nowrap;
+  transition: all 0.15s ease;
 }
 
 .label-prompt:hover {
   border-color: var(--fg-dim);
   color: var(--fg);
+  background: rgba(0, 0, 0, 0.03);
 }
 
 /* "more" link keeps simple link styling */
@@ -746,6 +764,7 @@ h1 {
   margin: 0;
   max-height: 400px;
   overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 /* Mobile adjustments for prompt container */
