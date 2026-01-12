@@ -618,8 +618,11 @@ function initPrompts() {
     const issueId = labelLink.dataset.issueId
     const labelName = labelLink.dataset.label
 
-    // Find the prompt container for this issue
-    const promptContainer = document.querySelector(`[data-prompt-for="${issueId}"]`)
+    // Find the prompt container within the same details context as the clicked label
+    // This is important because the same issue can appear in both the "In Progress"
+    // section and its project tree, each with its own prompt container
+    const detailsContainer = labelLink.closest('.details')
+    const promptContainer = detailsContainer?.querySelector(`[data-prompt-for="${issueId}"]`)
     if (!promptContainer) return
 
     // If already visible with same label, toggle off
