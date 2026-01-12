@@ -455,8 +455,6 @@ h1 {
   line-height: 1.4;
   padding: 0.2rem 0;
   padding-left: 1.5ch;
-  margin-left: 0.5ch;
-  border-left: 2px solid var(--fg-vdim);
   overflow: hidden;
 }
 
@@ -563,7 +561,6 @@ h1 {
 
   .details {
     padding-left: 0.75rem;
-    margin-left: 0.25rem;
   }
 
   /* Disable hover underline on touch devices (no hover state) */
