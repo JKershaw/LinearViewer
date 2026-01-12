@@ -613,6 +613,118 @@ describe('bug template', () => {
 });
 
 // =============================================================================
+// plan Template Tests
+// =============================================================================
+
+describe('plan template', () => {
+  const mockIssue = {
+    id: 'issue-plan',
+    identifier: 'TEST-P1',
+    title: 'Implement user profile page',
+    description: 'Create a new user profile page with avatar, bio, and settings',
+    url: 'https://linear.app/test/issue/TEST-P1',
+    state: { name: 'Backlog', type: 'backlog' },
+    labels: ['plan'],
+    assignee: { name: 'Alice' },
+    estimate: 5
+  };
+
+  const mockContext = {
+    parent: { id: 'p1', identifier: 'TEST-EPIC', title: 'User Management Epic', state: { name: 'In Progress', type: 'started' } },
+    siblings: [
+      { id: 's1', identifier: 'TEST-S1', title: 'User authentication', state: { name: 'Done', type: 'completed' } }
+    ],
+    project: { name: 'User Features', description: 'User-related features' },
+    children: [
+      { id: 'c1', identifier: 'TEST-C1', title: 'Design profile UI', state: { name: 'Todo', type: 'unstarted' } }
+    ]
+  };
+
+  test('returns Implementation Plan as name', () => {
+    const result = generatePrompt('plan', mockIssue, mockContext);
+    assert.strictEqual(result.name, 'Implementation Plan');
+  });
+
+  test('has READY category', () => {
+    const template = PROMPT_TEMPLATES['plan'];
+    assert.strictEqual(template.category, PROMPT_CATEGORIES.READY);
+  });
+
+  test('includes MCP tool references', () => {
+    const result = generatePrompt('plan', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('mcp__linear__get_issue'));
+    assert.ok(result.prompt.includes('mcp__linear__update_issue'));
+  });
+
+  test('includes status and assignee info', () => {
+    const result = generatePrompt('plan', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('**Status:** Backlog'));
+    assert.ok(result.prompt.includes('**Assignee:** Alice'));
+  });
+
+  test('includes estimate when present', () => {
+    const result = generatePrompt('plan', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('5 points'));
+  });
+
+  test('shows Not estimated when no estimate', () => {
+    const issueNoEstimate = { ...mockIssue, estimate: null };
+    const result = generatePrompt('plan', issueNoEstimate, mockContext);
+    assert.ok(result.prompt.includes('Not estimated'));
+  });
+
+  test('includes parent info', () => {
+    const result = generatePrompt('plan', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('TEST-EPIC'));
+    assert.ok(result.prompt.includes('User Management Epic'));
+  });
+
+  test('shows top-level task when no parent', () => {
+    const contextNoParent = { ...mockContext, parent: null };
+    const result = generatePrompt('plan', mockIssue, contextNoParent);
+    assert.ok(result.prompt.includes('top-level task'));
+  });
+
+  test('includes sibling tasks', () => {
+    const result = generatePrompt('plan', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('TEST-S1'));
+    assert.ok(result.prompt.includes('User authentication'));
+  });
+
+  test('includes subtasks', () => {
+    const result = generatePrompt('plan', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('TEST-C1'));
+    assert.ok(result.prompt.includes('Design profile UI'));
+  });
+
+  test('includes output format sections', () => {
+    const result = generatePrompt('plan', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('Summary'));
+    assert.ok(result.prompt.includes('Research Findings'));
+    assert.ok(result.prompt.includes('Implementation Steps'));
+    assert.ok(result.prompt.includes('Test Plan'));
+    assert.ok(result.prompt.includes('Risks & Considerations'));
+    assert.ok(result.prompt.includes('Questions'));
+  });
+
+  test('includes instructions to remove label after completion', () => {
+    const result = generatePrompt('plan', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('Remove the `plan` label'));
+  });
+
+  test('includes unassigned when no assignee', () => {
+    const issueNoAssignee = { ...mockIssue, assignee: null };
+    const result = generatePrompt('plan', issueNoAssignee, mockContext);
+    assert.ok(result.prompt.includes('Unassigned'));
+  });
+
+  test('includes project info', () => {
+    const result = generatePrompt('plan', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('User Features'));
+  });
+});
+
+// =============================================================================
 // code-review Template Tests
 // =============================================================================
 
