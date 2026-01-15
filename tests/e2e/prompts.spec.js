@@ -80,7 +80,7 @@ test.describe('Promptable Labels', () => {
     await expect(promptText).toContainText('## Goal');
   });
 
-  test('prompt contains issue context', async ({ page }) => {
+  test('prompt contains issue identifier', async ({ page }) => {
     // Find and expand the task
     const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
     await taskLine.click();
@@ -93,8 +93,8 @@ test.describe('Promptable Labels', () => {
     const promptText = page.locator(`.prompt-container[data-prompt-for="${BREAKDOWN_ISSUE_ID}"] .prompt-text`);
     await expect(promptText).not.toContainText('Loading', { timeout: 10000 });
 
-    // Prompt should contain the task title
-    await expect(promptText).toContainText('Task needing breakdown');
+    // Prompt should contain the task identifier (agent fetches title via MCP)
+    await expect(promptText).toContainText('TEST-');
   });
 
   test('clicking label again hides prompt container', async ({ page }) => {
@@ -220,7 +220,7 @@ test.describe('Prompt API', () => {
     const body = await response.json();
     expect(body.label).toBe('needs-research');
     expect(body.promptName).toBe('Research Task');
-    expect(body.prompt).toContain('Research authentication options');
+    expect(body.prompt).toContain('Help me research task TEST-');
     expect(body.prompt).toContain('## Goal');
   });
 
@@ -231,7 +231,7 @@ test.describe('Prompt API', () => {
     const body = await response.json();
     expect(body.label).toBe('needs-scoping');
     expect(body.promptName).toBe('Scope Definition');
-    expect(body.prompt).toContain('Define scope for user dashboard');
+    expect(body.prompt).toContain('Help me define the scope of TEST-');
     expect(body.prompt).toContain('## Goal');
   });
 
@@ -242,7 +242,7 @@ test.describe('Prompt API', () => {
     const body = await response.json();
     expect(body.label).toBe('needs-design');
     expect(body.promptName).toBe('Technical Design');
-    expect(body.prompt).toContain('Design caching layer architecture');
+    expect(body.prompt).toContain('Help me create a technical design for TEST-');
     expect(body.prompt).toContain('## Goal');
   });
 
@@ -253,7 +253,7 @@ test.describe('Prompt API', () => {
     const body = await response.json();
     expect(body.label).toBe('needs-spike');
     expect(body.promptName).toBe('Technical Spike');
-    expect(body.prompt).toContain('WebSocket vs SSE');
+    expect(body.prompt).toContain('Help me plan a technical spike for TEST-');
     expect(body.prompt).toContain('## Goal');
   });
 
@@ -264,7 +264,7 @@ test.describe('Prompt API', () => {
     const body = await response.json();
     expect(body.label).toBe('blocked');
     expect(body.promptName).toBe('Blocker Analysis');
-    expect(body.prompt).toContain('Blocked on external API');
+    expect(body.prompt).toContain('Help me analyze and resolve the blocker on TEST-');
     expect(body.prompt).toContain('## Goal');
   });
 
@@ -275,7 +275,7 @@ test.describe('Prompt API', () => {
     const body = await response.json();
     expect(body.label).toBe('needs-context');
     expect(body.promptName).toBe('Context Summary');
-    expect(body.prompt).toContain('Context needed for legacy migration');
+    expect(body.prompt).toContain('Provide a context summary for TEST-');
     expect(body.prompt).toContain('## Goal');
   });
 
@@ -286,7 +286,7 @@ test.describe('Prompt API', () => {
     const body = await response.json();
     expect(body.label).toBe('bug');
     expect(body.promptName).toBe('Bug Investigation');
-    expect(body.prompt).toContain('Login fails with special characters');
+    expect(body.prompt).toContain('Help me investigate bug TEST-');
     expect(body.prompt).toContain('## Goal');
   });
 
@@ -297,7 +297,7 @@ test.describe('Prompt API', () => {
     const body = await response.json();
     expect(body.label).toBe('plan');
     expect(body.promptName).toBe('Implementation Plan');
-    expect(body.prompt).toContain('Add pagination to user list');
+    expect(body.prompt).toContain('Help me create an implementation plan for TEST-');
     expect(body.prompt).toContain('## Goal');
   });
 
@@ -308,7 +308,7 @@ test.describe('Prompt API', () => {
     const body = await response.json();
     expect(body.label).toBe('code-review');
     expect(body.promptName).toBe('Code Review');
-    expect(body.prompt).toContain('Refactor authentication module');
+    expect(body.prompt).toContain('Help me review the code changes for TEST-');
     expect(body.prompt).toContain('## Goal');
   });
 });
