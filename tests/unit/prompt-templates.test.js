@@ -88,19 +88,16 @@ describe('generatePrompt', () => {
     assert.ok(result.prompt.includes('TEST-123'));
   });
 
-  test('includes issue title in prompt', () => {
+  test('does not include URL (agent uses MCP)', () => {
     const result = generatePrompt('needs-breakdown', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Test task title'));
+    assert.ok(!result.prompt.includes('https://linear.app'));
+    assert.ok(!result.prompt.includes('**Issue URL:**'));
   });
 
-  test('includes issue URL in prompt', () => {
+  test('does not include description (agent fetches via MCP)', () => {
     const result = generatePrompt('needs-breakdown', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('https://linear.app/test/issue/TEST-123'));
-  });
-
-  test('includes description in prompt', () => {
-    const result = generatePrompt('needs-breakdown', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('This is a test description'));
+    assert.ok(!result.prompt.includes('This is a test description'));
+    assert.ok(!result.prompt.includes('**Description:**'));
   });
 
   test('omits parent section when no parent', () => {
@@ -151,32 +148,7 @@ describe('generatePrompt', () => {
     assert.ok(!result.prompt.includes('**Sibling Tasks:**'));
   });
 
-  test('truncates long descriptions with notice', () => {
-    const issueWithLongDesc = {
-      ...mockIssue,
-      description: 'x'.repeat(1200)
-    };
-
-    const result = generatePrompt('needs-breakdown', issueWithLongDesc, mockContext);
-    // Should be truncated to 1000 chars + "..."
-    assert.ok(result.prompt.includes('x'.repeat(1000)));
-    assert.ok(result.prompt.includes('...'));
-    // Should include truncation notice
-    assert.ok(result.prompt.includes('Description truncated'));
-    assert.ok(result.prompt.includes('Use MCP to read full details'));
-  });
-
-  test('handles missing description gracefully', () => {
-    const issueNoDesc = {
-      ...mockIssue,
-      description: null
-    };
-
-    const result = generatePrompt('needs-breakdown', issueNoDesc, mockContext);
-    assert.ok(result.prompt.includes('No description provided'));
-  });
-
-  test('includes project context when present', () => {
+  test('includes project name when present', () => {
     const contextWithProject = {
       ...mockContext,
       project: {
@@ -187,12 +159,13 @@ describe('generatePrompt', () => {
 
     const result = generatePrompt('needs-breakdown', mockIssue, contextWithProject);
     assert.ok(result.prompt.includes('My Project'));
-    assert.ok(result.prompt.includes('This is the project description'));
+    // Project description is not included (agent can look it up)
+    assert.ok(!result.prompt.includes('This is the project description'));
   });
 
   test('shows Unknown for missing project', () => {
     const result = generatePrompt('needs-breakdown', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('**Project:** Unknown'));
+    assert.ok(result.prompt.includes('Unknown'));
   });
 
   test('includes existing children when present', () => {
@@ -227,13 +200,13 @@ describe('generatePrompt', () => {
     const result = generatePrompt('needs-breakdown', issueWithLabels, mockContext);
     assert.ok(result.prompt.includes('backend'));
     assert.ok(result.prompt.includes('high-priority'));
-    // Should not duplicate needs-breakdown in other labels
-    assert.ok(!result.prompt.includes('**Other Labels:** needs-breakdown'));
+    // Should not duplicate needs-breakdown in labels
+    assert.ok(!result.prompt.includes('**Labels:** needs-breakdown'));
   });
 
-  test('omits other labels section when only trigger label exists', () => {
+  test('omits labels section when only trigger label exists', () => {
     const result = generatePrompt('needs-breakdown', mockIssue, mockContext);
-    assert.ok(!result.prompt.includes('**Other Labels:**'));
+    assert.ok(!result.prompt.includes('**Labels:**'));
   });
 });
 
@@ -314,10 +287,9 @@ describe('needs-research template', () => {
     assert.ok(result.prompt.includes('research systematically'));
   });
 
-  test('includes project and URL', () => {
+  test('includes project name', () => {
     const result = generatePrompt('needs-research', mockIssue, mockContext);
     assert.ok(result.prompt.includes('Auth Project'));
-    assert.ok(result.prompt.includes('https://linear.app/test/issue/TEST-R1'));
   });
 });
 
@@ -513,11 +485,6 @@ describe('needs-context template', () => {
     assert.strictEqual(result.name, 'Context Summary');
   });
 
-  test('includes status', () => {
-    const result = generatePrompt('needs-context', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('**Status:** Backlog'));
-  });
-
   test('includes goal with context concepts', () => {
     const result = generatePrompt('needs-context', mockIssue, mockContext);
     assert.ok(result.prompt.includes('## Goal'));
@@ -566,11 +533,6 @@ describe('bug template', () => {
     assert.ok(result.prompt.includes('reproduction steps'));
     assert.ok(result.prompt.includes('likely causes'));
   });
-
-  test('includes status', () => {
-    const result = generatePrompt('bug', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('**Status:** Todo'));
-  });
 });
 
 // =============================================================================
@@ -609,11 +571,6 @@ describe('plan template', () => {
   test('has READY category', () => {
     const template = PROMPT_TEMPLATES['plan'];
     assert.strictEqual(template.category, PROMPT_CATEGORIES.READY);
-  });
-
-  test('includes status', () => {
-    const result = generatePrompt('plan', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('**Status:** Backlog'));
   });
 
   test('includes parent info', () => {
@@ -692,11 +649,6 @@ describe('code-review template', () => {
     assert.ok(result.prompt.includes('correctness'));
     assert.ok(result.prompt.includes('security'));
     assert.ok(result.prompt.includes('Approve'));
-  });
-
-  test('includes status', () => {
-    const result = generatePrompt('code-review', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('**Status:** In Review'));
   });
 
   test('includes project info', () => {
@@ -799,11 +751,13 @@ describe('Prompt Sections', () => {
     const result = generatePrompt('needs-breakdown', mockIssue, fullContext);
     assert.ok(result.prompt.includes('## Context'));
     assert.ok(result.prompt.includes('**Project:**'));
-    assert.ok(result.prompt.includes('**Issue URL:**'));
     assert.ok(result.prompt.includes('**Parent Task:**'));
     assert.ok(result.prompt.includes('**Sibling Tasks:**'));
     assert.ok(result.prompt.includes('**Existing Subtasks:**'));
-    assert.ok(result.prompt.includes('**Other Labels:**'));
+    assert.ok(result.prompt.includes('**Labels:**'));
+    // Should NOT include URL or description (agent fetches via MCP)
+    assert.ok(!result.prompt.includes('**Issue URL:**'));
+    assert.ok(!result.prompt.includes('**Description:**'));
   });
 
   test('prompt includes goal section', () => {
@@ -823,6 +777,6 @@ describe('Prompt Sections', () => {
     assert.ok(!result.prompt.includes('**Parent Task:**'));
     assert.ok(!result.prompt.includes('**Sibling Tasks:**'));
     assert.ok(!result.prompt.includes('**Existing Subtasks:**'));
-    assert.ok(!result.prompt.includes('**Other Labels:**'));
+    assert.ok(!result.prompt.includes('**Labels:**'));
   });
 });
