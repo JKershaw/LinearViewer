@@ -738,9 +738,116 @@ function initMorePrompts() {
   })
 }
 
+// ==========================================================================
+// AI Recommendation Feature
+// ==========================================================================
+
+// Track active recommendation fetch to prevent race conditions
+let activeRecommendFetch = null
+
+/**
+ * Initialize AI recommendation functionality
+ */
+function initRecommendations() {
+  // Handle clicks on suggest buttons
+  document.addEventListener('click', async (e) => {
+    const suggestBtn = e.target.closest('.suggest-btn')
+    if (!suggestBtn) return
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    const issueId = suggestBtn.dataset.issueId
+
+    // Find the recommendation container within the same details context
+    const detailsContainer = suggestBtn.closest('.details')
+    const recommendContainer = detailsContainer?.querySelector(`[data-recommend-for="${issueId}"]`)
+    if (!recommendContainer) return
+
+    // If already visible, toggle off
+    if (!recommendContainer.classList.contains('hidden')) {
+      recommendContainer.classList.add('hidden')
+      return
+    }
+
+    // Cancel any in-flight request
+    if (activeRecommendFetch) {
+      activeRecommendFetch.abort()
+    }
+
+    // Create new abort controller for this request
+    const abortController = new AbortController()
+    activeRecommendFetch = abortController
+
+    // Show loading state
+    const reasoning = recommendContainer.querySelector('.recommend-reasoning')
+    const promptDiv = recommendContainer.querySelector('.recommend-prompt')
+    const promptText = promptDiv?.querySelector('.prompt-text')
+
+    reasoning.textContent = 'Analyzing task context...'
+    if (promptText) promptText.textContent = ''
+    recommendContainer.classList.remove('hidden')
+
+    // Add loading class to button
+    suggestBtn.classList.add('loading')
+    suggestBtn.disabled = true
+
+    try {
+      const response = await fetch(
+        `/api/recommend/${issueId}`,
+        { signal: abortController.signal }
+      )
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to get recommendation')
+      }
+
+      const data = await response.json()
+
+      // Only update if this is still the active request
+      if (activeRecommendFetch === abortController) {
+        reasoning.textContent = data.reasoning
+        if (promptText && data.prompt) {
+          promptText.textContent = data.prompt
+        }
+      }
+    } catch (error) {
+      // Ignore abort errors (user clicked away)
+      if (error.name === 'AbortError') return
+
+      reasoning.textContent = `Error: ${error.message}`
+      console.error('Failed to get recommendation:', error)
+    } finally {
+      // Clear active fetch if this was it
+      if (activeRecommendFetch === abortController) {
+        activeRecommendFetch = null
+      }
+      // Remove loading state
+      suggestBtn.classList.remove('loading')
+      suggestBtn.disabled = false
+    }
+  })
+
+  // Handle dismiss button clicks
+  document.addEventListener('click', (e) => {
+    const dismissBtn = e.target.closest('.recommend-close')
+    if (!dismissBtn) return
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    const recommendContainer = dismissBtn.closest('.recommend-container')
+    if (recommendContainer) {
+      recommendContainer.classList.add('hidden')
+    }
+  })
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   init()
   initNavBar()
   initPrompts()
   initMorePrompts()
+  initRecommendations()
 })

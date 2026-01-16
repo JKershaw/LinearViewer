@@ -472,3 +472,178 @@ test.describe('More Prompts Inline', () => {
     await expect(hiddenPrompts).toBeVisible();
   });
 });
+
+// =============================================================================
+// AI Recommendation Tests
+// =============================================================================
+
+test.describe('AI Recommendations', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/test/set-session');
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+  });
+
+  test('renders suggest button for each issue', async ({ page }) => {
+    // Expand an issue
+    const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
+    await taskLine.click();
+
+    // Should have suggest button
+    const suggestBtn = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .suggest-btn`);
+    await expect(suggestBtn).toBeVisible();
+    await expect(suggestBtn).toHaveText('suggest');
+  });
+
+  test('clicking suggest button shows recommendation container', async ({ page }) => {
+    const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
+    await taskLine.click();
+
+    const suggestBtn = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .suggest-btn`);
+    await suggestBtn.click();
+
+    // Recommendation container should appear
+    const recommendContainer = page.locator(`.recommend-container[data-recommend-for="${BREAKDOWN_ISSUE_ID}"]`);
+    await expect(recommendContainer).toBeVisible();
+
+    // Wait for loading to complete
+    const reasoning = recommendContainer.locator('.recommend-reasoning');
+    await expect(reasoning).not.toContainText('Analyzing', { timeout: 10000 });
+
+    // Should show reasoning
+    await expect(reasoning).toContainText('breakdown');
+  });
+
+  test('recommendation shows generated prompt', async ({ page }) => {
+    const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
+    await taskLine.click();
+
+    const suggestBtn = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .suggest-btn`);
+    await suggestBtn.click();
+
+    const recommendContainer = page.locator(`.recommend-container[data-recommend-for="${BREAKDOWN_ISSUE_ID}"]`);
+    await expect(recommendContainer).toBeVisible();
+
+    // Wait for loading
+    const reasoning = recommendContainer.locator('.recommend-reasoning');
+    await expect(reasoning).not.toContainText('Analyzing', { timeout: 10000 });
+
+    // Should show generated prompt
+    const promptDiv = recommendContainer.locator('.recommend-prompt');
+    await expect(promptDiv).toBeVisible();
+
+    const promptText = promptDiv.locator('.prompt-text');
+    await expect(promptText).toBeVisible();
+    // Prompt should have content (not empty)
+    const text = await promptText.textContent();
+    expect(text.length).toBeGreaterThan(0);
+  });
+
+  test('generated prompt has copy button', async ({ page }) => {
+    const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
+    await taskLine.click();
+
+    const suggestBtn = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .suggest-btn`);
+    await suggestBtn.click();
+
+    const recommendContainer = page.locator(`.recommend-container[data-recommend-for="${BREAKDOWN_ISSUE_ID}"]`);
+    const reasoning = recommendContainer.locator('.recommend-reasoning');
+    await expect(reasoning).not.toContainText('Analyzing', { timeout: 10000 });
+
+    // Should have copy button
+    const copyBtn = recommendContainer.locator('.recommend-prompt .prompt-copy');
+    await expect(copyBtn).toBeVisible();
+    await expect(copyBtn).toContainText('copy');
+  });
+
+  test('dismiss button hides recommendation', async ({ page }) => {
+    const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
+    await taskLine.click();
+
+    const suggestBtn = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .suggest-btn`);
+    await suggestBtn.click();
+
+    const recommendContainer = page.locator(`.recommend-container[data-recommend-for="${BREAKDOWN_ISSUE_ID}"]`);
+    await expect(recommendContainer).toBeVisible();
+
+    // Click dismiss
+    const dismissBtn = recommendContainer.locator('.recommend-close');
+    await dismissBtn.click();
+
+    // Should be hidden
+    await expect(recommendContainer).toBeHidden();
+  });
+
+  test('clicking suggest again toggles recommendation off', async ({ page }) => {
+    const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
+    await taskLine.click();
+
+    const suggestBtn = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .suggest-btn`);
+    await suggestBtn.click();
+
+    const recommendContainer = page.locator(`.recommend-container[data-recommend-for="${BREAKDOWN_ISSUE_ID}"]`);
+    await expect(recommendContainer).toBeVisible();
+
+    // Click suggest again
+    await suggestBtn.click();
+
+    // Should be hidden
+    await expect(recommendContainer).toBeHidden();
+  });
+});
+
+// =============================================================================
+// Recommendation API Tests
+// =============================================================================
+
+test.describe('Recommendation API', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/test/set-session');
+  });
+
+  test('returns 401 for unauthenticated requests', async ({ page }) => {
+    await page.goto('/test/clear-session');
+    const response = await page.request.get(`/api/recommend/${BREAKDOWN_ISSUE_ID}`);
+    expect(response.status()).toBe(401);
+  });
+
+  test('returns 400 for invalid issue ID format', async ({ page }) => {
+    const response = await page.request.get('/api/recommend/invalid-id');
+    expect(response.status()).toBe(400);
+  });
+
+  test('returns 200 with generated prompt for valid request', async ({ page }) => {
+    const response = await page.request.get(`/api/recommend/${BREAKDOWN_ISSUE_ID}`);
+    expect(response.status()).toBe(200);
+
+    const body = await response.json();
+    expect(body.reasoning).toBeDefined();
+    expect(body.prompt).toBeDefined();
+    expect(typeof body.reasoning).toBe('string');
+    expect(typeof body.prompt).toBe('string');
+    expect(body.reasoning.length).toBeGreaterThan(0);
+    expect(body.prompt.length).toBeGreaterThan(0);
+  });
+
+  test('returns contextual prompt based on labels', async ({ page }) => {
+    // Issue with needs-breakdown label
+    const response = await page.request.get(`/api/recommend/${BREAKDOWN_ISSUE_ID}`);
+    const body = await response.json();
+
+    // Should mention breakdown in reasoning
+    expect(body.reasoning.toLowerCase()).toContain('breakdown');
+    // Prompt should include the issue identifier and goal section
+    expect(body.prompt).toContain('TEST-6');
+    expect(body.prompt).toContain('Goal');
+  });
+
+  test('returns status endpoint correctly', async ({ page }) => {
+    const response = await page.request.get('/api/recommend/status');
+    expect(response.status()).toBe(200);
+
+    const body = await response.json();
+    expect(typeof body.enabled).toBe('boolean');
+    // In test mode, should be enabled
+    expect(body.enabled).toBe(true);
+  });
+});
