@@ -5,7 +5,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { hasPrompt, getPromptLabels, generatePrompt, getAvailablePrompts, PROMPT_TEMPLATES, PROMPT_CATEGORIES } from '../../lib/prompt-templates.js';
+import { hasPrompt, getPromptLabels, generatePrompt, getAvailablePrompts, getPromptDescriptionsForAI, PROMPT_TEMPLATES, PROMPT_CATEGORIES } from '../../lib/prompt-templates.js';
 
 // =============================================================================
 // hasPrompt Tests
@@ -778,5 +778,52 @@ describe('Prompt Sections', () => {
     assert.ok(!result.prompt.includes('**Sibling Tasks:**'));
     assert.ok(!result.prompt.includes('**Existing Subtasks:**'));
     assert.ok(!result.prompt.includes('**Labels:**'));
+  });
+});
+
+// =============================================================================
+// getPromptDescriptionsForAI Tests
+// =============================================================================
+
+describe('getPromptDescriptionsForAI', () => {
+  test('returns array of prompt descriptions', () => {
+    const keys = ['needs-breakdown', 'plan'];
+    const descriptions = getPromptDescriptionsForAI(keys);
+    assert.ok(Array.isArray(descriptions));
+    assert.strictEqual(descriptions.length, 2);
+  });
+
+  test('each description has key, name, description, and category', () => {
+    const keys = ['needs-breakdown'];
+    const descriptions = getPromptDescriptionsForAI(keys);
+    const desc = descriptions[0];
+    assert.strictEqual(desc.key, 'needs-breakdown');
+    assert.strictEqual(desc.name, 'Task Breakdown');
+    assert.ok(typeof desc.description === 'string');
+    assert.ok(desc.description.length > 0);
+    assert.strictEqual(desc.category, PROMPT_CATEGORIES.PRE_WORK);
+  });
+
+  test('filters out unknown keys', () => {
+    const keys = ['needs-breakdown', 'unknown-label', 'plan'];
+    const descriptions = getPromptDescriptionsForAI(keys);
+    assert.strictEqual(descriptions.length, 2);
+    assert.ok(descriptions.every(d => d.key !== 'unknown-label'));
+  });
+
+  test('returns empty array for empty input', () => {
+    const descriptions = getPromptDescriptionsForAI([]);
+    assert.ok(Array.isArray(descriptions));
+    assert.strictEqual(descriptions.length, 0);
+  });
+
+  test('all templates have descriptions', () => {
+    const allKeys = Object.keys(PROMPT_TEMPLATES);
+    const descriptions = getPromptDescriptionsForAI(allKeys);
+    assert.strictEqual(descriptions.length, allKeys.length);
+    for (const desc of descriptions) {
+      assert.ok(typeof desc.description === 'string', `${desc.key} should have description`);
+      assert.ok(desc.description.length > 10, `${desc.key} description should be meaningful`);
+    }
   });
 });

@@ -738,9 +738,185 @@ function initMorePrompts() {
   })
 }
 
+// ==========================================================================
+// AI Recommendation Feature
+// ==========================================================================
+
+// Track active recommendation fetch to prevent race conditions
+let activeRecommendFetch = null
+
+/**
+ * Initialize AI recommendation functionality
+ */
+function initRecommendations() {
+  // Handle clicks on suggest buttons
+  document.addEventListener('click', async (e) => {
+    const suggestBtn = e.target.closest('.suggest-btn')
+    if (!suggestBtn) return
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    const issueId = suggestBtn.dataset.issueId
+
+    // Find the recommendation container within the same details context
+    const detailsContainer = suggestBtn.closest('.details')
+    const recommendContainer = detailsContainer?.querySelector(`[data-recommend-for="${issueId}"]`)
+    if (!recommendContainer) return
+
+    // If already visible, toggle off
+    if (!recommendContainer.classList.contains('hidden')) {
+      recommendContainer.classList.add('hidden')
+      return
+    }
+
+    // Cancel any in-flight request
+    if (activeRecommendFetch) {
+      activeRecommendFetch.abort()
+    }
+
+    // Create new abort controller for this request
+    const abortController = new AbortController()
+    activeRecommendFetch = abortController
+
+    // Show loading state
+    const reasoning = recommendContainer.querySelector('.recommend-reasoning')
+    const usePromptBtn = recommendContainer.querySelector('.recommend-use-prompt')
+    const customPromptDiv = recommendContainer.querySelector('.recommend-custom-prompt')
+
+    reasoning.textContent = 'Analyzing task context...'
+    usePromptBtn.classList.add('hidden')
+    usePromptBtn.textContent = ''
+    customPromptDiv.classList.add('hidden')
+    recommendContainer.classList.remove('hidden')
+
+    // Add loading class to button
+    suggestBtn.classList.add('loading')
+    suggestBtn.disabled = true
+
+    try {
+      const response = await fetch(
+        `/api/recommend/${issueId}`,
+        { signal: abortController.signal }
+      )
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to get recommendation')
+      }
+
+      const data = await response.json()
+
+      // Only update if this is still the active request
+      if (activeRecommendFetch === abortController) {
+        reasoning.textContent = data.reasoning
+
+        if (data.suggestedPrompt) {
+          // Show "Use [prompt name]" button
+          usePromptBtn.textContent = `Use "${data.promptName}"`
+          usePromptBtn.dataset.label = data.suggestedPrompt
+          usePromptBtn.classList.remove('hidden')
+          customPromptDiv.classList.add('hidden')
+        } else if (data.customPrompt) {
+          // Show custom prompt
+          const promptText = customPromptDiv.querySelector('.prompt-text')
+          promptText.textContent = data.customPrompt
+          customPromptDiv.classList.remove('hidden')
+          usePromptBtn.classList.add('hidden')
+        }
+      }
+    } catch (error) {
+      // Ignore abort errors (user clicked away)
+      if (error.name === 'AbortError') return
+
+      reasoning.textContent = `Error: ${error.message}`
+      console.error('Failed to get recommendation:', error)
+    } finally {
+      // Clear active fetch if this was it
+      if (activeRecommendFetch === abortController) {
+        activeRecommendFetch = null
+      }
+      // Remove loading state
+      suggestBtn.classList.remove('loading')
+      suggestBtn.disabled = false
+    }
+  })
+
+  // Handle "Use [prompt]" button clicks
+  document.addEventListener('click', async (e) => {
+    const usePromptBtn = e.target.closest('.recommend-use-prompt')
+    if (!usePromptBtn) return
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    const issueId = usePromptBtn.dataset.issueId
+    const labelName = usePromptBtn.dataset.label
+    if (!labelName) return
+
+    // Find the prompt label link and click it to trigger existing prompt flow
+    const detailsContainer = usePromptBtn.closest('.details')
+    const labelLink = detailsContainer?.querySelector(`.label-prompt[data-issue-id="${issueId}"][data-label="${labelName}"]`)
+
+    if (labelLink) {
+      // Click the existing prompt label
+      labelLink.click()
+    } else {
+      // Label might be hidden in "more" section - fetch directly
+      const promptContainer = detailsContainer?.querySelector(`[data-prompt-for="${issueId}"]`)
+      if (!promptContainer) return
+
+      // Show loading state
+      const promptText = promptContainer.querySelector('.prompt-text')
+      const promptName = promptContainer.querySelector('.prompt-name')
+      promptText.textContent = 'Loading...'
+      promptName.textContent = ''
+      promptContainer.classList.remove('hidden')
+      promptContainer.dataset.activeLabel = labelName
+
+      try {
+        const response = await fetch(`/api/prompt/${issueId}/${encodeURIComponent(labelName)}`)
+
+        if (!response.ok) {
+          const error = await response.json()
+          throw new Error(error.error || 'Failed to load prompt')
+        }
+
+        const data = await response.json()
+        promptName.textContent = data.promptName
+        promptText.textContent = data.prompt
+      } catch (error) {
+        promptText.textContent = `Error: ${error.message}`
+        console.error('Failed to fetch prompt:', error)
+      }
+    }
+
+    // Hide the recommendation container
+    const recommendContainer = detailsContainer?.querySelector(`[data-recommend-for="${issueId}"]`)
+    if (recommendContainer) {
+      recommendContainer.classList.add('hidden')
+    }
+  })
+
+  // Handle dismiss button clicks
+  document.addEventListener('click', (e) => {
+    const dismissBtn = e.target.closest('.recommend-close')
+    if (!dismissBtn) return
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    const recommendContainer = dismissBtn.closest('.recommend-container')
+    if (recommendContainer) {
+      recommendContainer.classList.add('hidden')
+    }
+  })
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   init()
   initNavBar()
   initPrompts()
   initMorePrompts()
+  initRecommendations()
 })

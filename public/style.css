@@ -783,3 +783,149 @@ h1 {
 .more-prompts.hidden {
   display: none;
 }
+
+/* =============================================================================
+   AI Recommendation Feature
+   =============================================================================
+   "suggest" button and recommendation container for AI-powered suggestions.
+*/
+
+/* Suggest button - styled similarly to label-prompt but with accent color */
+.suggest-btn {
+  display: inline-block;
+  background: none;
+  border: 1px solid var(--blue);
+  padding: 0.15rem 0.4rem;
+  font-family: var(--font-content);
+  font-size: 0.8em;
+  color: var(--blue);
+  cursor: pointer;
+  border-radius: 3px;
+  margin-left: 0.3rem;
+  margin-bottom: 0.4rem;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.suggest-btn:hover {
+  background: var(--blue);
+  color: white;
+}
+
+.suggest-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.suggest-btn.loading {
+  background: var(--blue);
+  color: white;
+  opacity: 0.7;
+}
+
+/* Recommendation container */
+.recommend-container {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: linear-gradient(135deg, #f0f7ff 0%, #f8f9fa 100%);
+  border: 1px solid var(--blue);
+  border-left: 3px solid var(--blue);
+  border-radius: 4px;
+}
+
+.recommend-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.recommend-title {
+  font-family: var(--font-content);
+  font-weight: 500;
+  font-size: 0.9em;
+  color: var(--blue);
+}
+
+.recommend-close {
+  background: none;
+  border: none;
+  padding: 0.25rem 0.5rem;
+  font-family: var(--font-content);
+  font-size: 0.8em;
+  color: var(--fg-dim);
+  cursor: pointer;
+}
+
+.recommend-close:hover {
+  color: var(--fg);
+}
+
+.recommend-reasoning {
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  line-height: 1.5;
+  color: var(--fg);
+  margin: 0 0 0.75rem 0;
+}
+
+.recommend-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* "Use [prompt]" button */
+.recommend-use-prompt {
+  display: inline-block;
+  background: var(--blue);
+  border: none;
+  padding: 0.5rem 1rem;
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  color: white;
+  cursor: pointer;
+  border-radius: 4px;
+  align-self: flex-start;
+  transition: background 0.15s ease;
+}
+
+.recommend-use-prompt:hover {
+  background: #1d4ed8;
+}
+
+/* Custom prompt display within recommendation */
+.recommend-custom-prompt {
+  margin-top: 0.5rem;
+}
+
+.recommend-custom-prompt .prompt-header {
+  margin-bottom: 0.25rem;
+}
+
+.recommend-custom-prompt .prompt-text {
+  background: white;
+  padding: 0.5rem;
+  border-radius: 3px;
+  max-height: 200px;
+}
+
+/* Mobile adjustments */
+@media (max-width: 640px) {
+  .suggest-btn {
+    padding: 0.4rem 0.6rem;
+  }
+
+  .recommend-container {
+    padding: 0.5rem;
+  }
+
+  .recommend-reasoning {
+    font-size: 0.85em;
+  }
+
+  .recommend-use-prompt {
+    width: 100%;
+    text-align: center;
+  }
+}

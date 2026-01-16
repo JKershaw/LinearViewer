@@ -24,7 +24,8 @@ import { createWorkspaceRoutes } from './routes/workspace.js'
 import { testMockTeams, testMockData } from './tests/fixtures/mock-data.js'
 import { runAudit, computeAuditFromData } from './lib/audit.js'
 import { renderFancyPage } from './lib/render-fancy.js'
-import { generatePrompt, hasPrompt } from './lib/prompt-templates.js'
+import { generatePrompt, hasPrompt, getAvailablePrompts, getPromptDescriptionsForAI, getPromptDisplayName } from './lib/prompt-templates.js'
+import { isRecommendationEnabled, getRecommendation } from './lib/openrouter.js'
 
 // =============================================================================
 // Environment Variable Validation
@@ -619,6 +620,135 @@ app.get('/api/prompt/:issueId/:labelName', async (req, res) => {
     }
 
     res.status(500).json({ error: 'Failed to generate prompt', message: error.message })
+  }
+})
+
+// =============================================================================
+// AI Recommendation API
+// =============================================================================
+
+/**
+ * Check if recommendation feature is available.
+ * Returns feature availability status.
+ *
+ * @route GET /api/recommend/status
+ * @returns {Object} { enabled: boolean }
+ */
+app.get('/api/recommend/status', (req, res) => {
+  const workspace = getActiveWorkspace(req.session)
+
+  if (!workspace) {
+    return res.status(401).json({ error: 'Not authenticated' })
+  }
+
+  // In test mode, always report as enabled for testing
+  const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token'
+  res.json({ enabled: isTestMode || isRecommendationEnabled() })
+})
+
+/**
+ * Get AI recommendation for which prompt to use next.
+ * Analyzes task context and suggests the best approach.
+ *
+ * @route GET /api/recommend/:issueId
+ * @param {string} issueId - The Linear issue ID
+ * @returns {Object} { suggestedPrompt, promptName, reasoning, customPrompt? } or error
+ */
+app.get('/api/recommend/:issueId', async (req, res) => {
+  const workspace = getActiveWorkspace(req.session)
+
+  // Return 401 if not authenticated
+  if (!workspace) {
+    return res.status(401).json({ error: 'Not authenticated' })
+  }
+
+  const { issueId } = req.params
+
+  // Validate issue ID format (must be valid UUID)
+  if (!UUID_REGEX.test(issueId)) {
+    return res.status(400).json({ error: 'Invalid issue ID format' })
+  }
+
+  // Check if feature is enabled (except in test mode)
+  const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token'
+  if (!isTestMode && !isRecommendationEnabled()) {
+    return res.status(503).json({ error: 'AI recommendation feature is not configured' })
+  }
+
+  try {
+    // Use mock data in test mode
+    if (isTestMode) {
+      const mockIssue = testMockData.issues.find(i => i.id === issueId)
+      if (!mockIssue) {
+        return res.status(404).json({ error: 'Issue not found' })
+      }
+
+      // Return a mock recommendation
+      const labels = (mockIssue.labels?.nodes || []).map(l => l.name)
+      let suggestedPrompt = 'look-into'
+      let reasoning = 'Start by getting an overview of what this task involves before deciding on the next steps.'
+
+      // Provide contextual mock recommendations based on labels
+      if (labels.includes('needs-breakdown')) {
+        suggestedPrompt = 'needs-breakdown'
+        reasoning = 'This task is marked as needing breakdown. Breaking it into smaller subtasks will make it easier to plan and execute.'
+      } else if (labels.includes('needs-research')) {
+        suggestedPrompt = 'needs-research'
+        reasoning = 'This task requires research. Investigating the options first will help make informed decisions.'
+      } else if (labels.includes('blocked')) {
+        suggestedPrompt = 'blocked'
+        reasoning = 'This task is blocked. Analyzing the blocker will help identify ways to unblock progress.'
+      } else if (labels.includes('bug')) {
+        suggestedPrompt = 'bug'
+        reasoning = 'This is a bug. Investigating the issue systematically will help find the root cause and fix.'
+      } else if (mockIssue.state?.type === 'backlog' || mockIssue.state?.type === 'unstarted') {
+        suggestedPrompt = 'plan'
+        reasoning = 'This task is ready to start. Creating an implementation plan will provide a clear path forward.'
+      }
+
+      return res.json({
+        suggestedPrompt,
+        promptName: getPromptDisplayName(suggestedPrompt),
+        reasoning,
+        customPrompt: null
+      })
+    }
+
+    // Fetch issue context from Linear
+    const { issue, parent, siblings, project, children } = await fetchIssueContext(workspace.accessToken, issueId)
+
+    // Get available prompts for this issue
+    const availablePromptKeys = getAvailablePrompts(issue)
+    const promptDescriptions = getPromptDescriptionsForAI(availablePromptKeys)
+
+    // Get AI recommendation
+    const recommendation = await getRecommendation(issue, { parent, siblings, project, children }, promptDescriptions)
+
+    res.json({
+      suggestedPrompt: recommendation.suggestedPrompt,
+      promptName: recommendation.suggestedPrompt ? getPromptDisplayName(recommendation.suggestedPrompt) : null,
+      reasoning: recommendation.reasoning,
+      customPrompt: recommendation.customPrompt
+    })
+  } catch (error) {
+    console.error('Recommendation error:', error)
+
+    // Handle 401 from Linear API
+    if (error.response?.status === 401) {
+      return res.status(401).json({ error: 'Token expired or invalid' })
+    }
+
+    // Handle issue not found
+    if (error.message?.includes('not found')) {
+      return res.status(404).json({ error: error.message })
+    }
+
+    // Handle OpenRouter errors
+    if (error.message?.includes('OpenRouter')) {
+      return res.status(503).json({ error: 'AI service temporarily unavailable', message: error.message })
+    }
+
+    res.status(500).json({ error: 'Failed to get recommendation', message: error.message })
   }
 })
 
