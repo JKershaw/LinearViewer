@@ -220,7 +220,7 @@ test.describe('Prompt API', () => {
     const body = await response.json();
     expect(body.label).toBe('needs-research');
     expect(body.promptName).toBe('Research Task');
-    expect(body.prompt).toContain('Help me research task TEST-');
+    expect(body.prompt).toContain('# Research TEST-');
     expect(body.prompt).toContain('## Goal');
   });
 
@@ -231,7 +231,7 @@ test.describe('Prompt API', () => {
     const body = await response.json();
     expect(body.label).toBe('needs-scoping');
     expect(body.promptName).toBe('Scope Definition');
-    expect(body.prompt).toContain('Help me define the scope of TEST-');
+    expect(body.prompt).toContain('# Define scope for TEST-');
     expect(body.prompt).toContain('## Goal');
   });
 
@@ -242,7 +242,7 @@ test.describe('Prompt API', () => {
     const body = await response.json();
     expect(body.label).toBe('needs-design');
     expect(body.promptName).toBe('Technical Design');
-    expect(body.prompt).toContain('Help me create a technical design for TEST-');
+    expect(body.prompt).toContain('# Design TEST-');
     expect(body.prompt).toContain('## Goal');
   });
 
@@ -253,7 +253,7 @@ test.describe('Prompt API', () => {
     const body = await response.json();
     expect(body.label).toBe('needs-spike');
     expect(body.promptName).toBe('Technical Spike');
-    expect(body.prompt).toContain('Help me plan a technical spike for TEST-');
+    expect(body.prompt).toContain('# Spike TEST-');
     expect(body.prompt).toContain('## Goal');
   });
 
@@ -264,7 +264,7 @@ test.describe('Prompt API', () => {
     const body = await response.json();
     expect(body.label).toBe('blocked');
     expect(body.promptName).toBe('Blocker Analysis');
-    expect(body.prompt).toContain('Help me analyze and resolve the blocker on TEST-');
+    expect(body.prompt).toContain('# Unblock TEST-');
     expect(body.prompt).toContain('## Goal');
   });
 
@@ -275,7 +275,7 @@ test.describe('Prompt API', () => {
     const body = await response.json();
     expect(body.label).toBe('needs-context');
     expect(body.promptName).toBe('Context Summary');
-    expect(body.prompt).toContain('Provide a context summary for TEST-');
+    expect(body.prompt).toContain('# Get context for TEST-');
     expect(body.prompt).toContain('## Goal');
   });
 
@@ -286,7 +286,7 @@ test.describe('Prompt API', () => {
     const body = await response.json();
     expect(body.label).toBe('bug');
     expect(body.promptName).toBe('Bug Investigation');
-    expect(body.prompt).toContain('Help me investigate bug TEST-');
+    expect(body.prompt).toContain('# Investigate bug TEST-');
     expect(body.prompt).toContain('## Goal');
   });
 
@@ -297,7 +297,7 @@ test.describe('Prompt API', () => {
     const body = await response.json();
     expect(body.label).toBe('plan');
     expect(body.promptName).toBe('Implementation Plan');
-    expect(body.prompt).toContain('Help me create an implementation plan for TEST-');
+    expect(body.prompt).toContain('# Implement TEST-');
     expect(body.prompt).toContain('## Goal');
   });
 
@@ -308,7 +308,7 @@ test.describe('Prompt API', () => {
     const body = await response.json();
     expect(body.label).toBe('code-review');
     expect(body.promptName).toBe('Code Review');
-    expect(body.prompt).toContain('Help me review the code changes for TEST-');
+    expect(body.prompt).toContain('# Review TEST-');
     expect(body.prompt).toContain('## Goal');
   });
 });
