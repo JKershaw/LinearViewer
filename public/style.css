@@ -875,39 +875,24 @@ h1 {
   gap: 0.5rem;
 }
 
-/* "Use [prompt]" button */
-.recommend-use-prompt {
-  display: inline-block;
-  background: var(--blue);
-  border: none;
-  padding: 0.5rem 1rem;
-  font-family: var(--font-content);
-  font-size: 0.9em;
-  color: white;
-  cursor: pointer;
-  border-radius: 4px;
-  align-self: flex-start;
-  transition: background 0.15s ease;
-}
-
-.recommend-use-prompt:hover {
-  background: #1d4ed8;
-}
-
-/* Custom prompt display within recommendation */
-.recommend-custom-prompt {
+/* Generated prompt display within recommendation */
+.recommend-prompt {
   margin-top: 0.5rem;
 }
 
-.recommend-custom-prompt .prompt-header {
+.recommend-prompt .prompt-header {
   margin-bottom: 0.25rem;
 }
 
-.recommend-custom-prompt .prompt-text {
+.recommend-prompt .prompt-text {
   background: white;
-  padding: 0.5rem;
+  padding: 0.75rem;
   border-radius: 3px;
-  max-height: 200px;
+  max-height: 300px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  font-size: 0.85em;
+  line-height: 1.5;
 }
 
 /* Mobile adjustments */
@@ -924,8 +909,7 @@ h1 {
     font-size: 0.85em;
   }
 
-  .recommend-use-prompt {
-    width: 100%;
-    text-align: center;
+  .recommend-prompt .prompt-text {
+    max-height: 200px;
   }
 }

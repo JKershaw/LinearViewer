@@ -781,13 +781,11 @@ function initRecommendations() {
 
     // Show loading state
     const reasoning = recommendContainer.querySelector('.recommend-reasoning')
-    const usePromptBtn = recommendContainer.querySelector('.recommend-use-prompt')
-    const customPromptDiv = recommendContainer.querySelector('.recommend-custom-prompt')
+    const promptDiv = recommendContainer.querySelector('.recommend-prompt')
+    const promptText = promptDiv?.querySelector('.prompt-text')
 
     reasoning.textContent = 'Analyzing task context...'
-    usePromptBtn.classList.add('hidden')
-    usePromptBtn.textContent = ''
-    customPromptDiv.classList.add('hidden')
+    if (promptText) promptText.textContent = ''
     recommendContainer.classList.remove('hidden')
 
     // Add loading class to button
@@ -810,19 +808,8 @@ function initRecommendations() {
       // Only update if this is still the active request
       if (activeRecommendFetch === abortController) {
         reasoning.textContent = data.reasoning
-
-        if (data.suggestedPrompt) {
-          // Show "Use [prompt name]" button
-          usePromptBtn.textContent = `Use "${data.promptName}"`
-          usePromptBtn.dataset.label = data.suggestedPrompt
-          usePromptBtn.classList.remove('hidden')
-          customPromptDiv.classList.add('hidden')
-        } else if (data.customPrompt) {
-          // Show custom prompt
-          const promptText = customPromptDiv.querySelector('.prompt-text')
-          promptText.textContent = data.customPrompt
-          customPromptDiv.classList.remove('hidden')
-          usePromptBtn.classList.add('hidden')
+        if (promptText && data.prompt) {
+          promptText.textContent = data.prompt
         }
       }
     } catch (error) {
@@ -839,62 +826,6 @@ function initRecommendations() {
       // Remove loading state
       suggestBtn.classList.remove('loading')
       suggestBtn.disabled = false
-    }
-  })
-
-  // Handle "Use [prompt]" button clicks
-  document.addEventListener('click', async (e) => {
-    const usePromptBtn = e.target.closest('.recommend-use-prompt')
-    if (!usePromptBtn) return
-
-    e.preventDefault()
-    e.stopPropagation()
-
-    const issueId = usePromptBtn.dataset.issueId
-    const labelName = usePromptBtn.dataset.label
-    if (!labelName) return
-
-    // Find the prompt label link and click it to trigger existing prompt flow
-    const detailsContainer = usePromptBtn.closest('.details')
-    const labelLink = detailsContainer?.querySelector(`.label-prompt[data-issue-id="${issueId}"][data-label="${labelName}"]`)
-
-    if (labelLink) {
-      // Click the existing prompt label
-      labelLink.click()
-    } else {
-      // Label might be hidden in "more" section - fetch directly
-      const promptContainer = detailsContainer?.querySelector(`[data-prompt-for="${issueId}"]`)
-      if (!promptContainer) return
-
-      // Show loading state
-      const promptText = promptContainer.querySelector('.prompt-text')
-      const promptName = promptContainer.querySelector('.prompt-name')
-      promptText.textContent = 'Loading...'
-      promptName.textContent = ''
-      promptContainer.classList.remove('hidden')
-      promptContainer.dataset.activeLabel = labelName
-
-      try {
-        const response = await fetch(`/api/prompt/${issueId}/${encodeURIComponent(labelName)}`)
-
-        if (!response.ok) {
-          const error = await response.json()
-          throw new Error(error.error || 'Failed to load prompt')
-        }
-
-        const data = await response.json()
-        promptName.textContent = data.promptName
-        promptText.textContent = data.prompt
-      } catch (error) {
-        promptText.textContent = `Error: ${error.message}`
-        console.error('Failed to fetch prompt:', error)
-      }
-    }
-
-    // Hide the recommendation container
-    const recommendContainer = detailsContainer?.querySelector(`[data-recommend-for="${issueId}"]`)
-    if (recommendContainer) {
-      recommendContainer.classList.add('hidden')
     }
   })
 

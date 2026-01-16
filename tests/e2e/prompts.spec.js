@@ -514,7 +514,7 @@ test.describe('AI Recommendations', () => {
     await expect(reasoning).toContainText('breakdown');
   });
 
-  test('recommendation shows "Use prompt" button', async ({ page }) => {
+  test('recommendation shows generated prompt', async ({ page }) => {
     const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
     await taskLine.click();
 
@@ -528,13 +528,18 @@ test.describe('AI Recommendations', () => {
     const reasoning = recommendContainer.locator('.recommend-reasoning');
     await expect(reasoning).not.toContainText('Analyzing', { timeout: 10000 });
 
-    // Should have "Use [prompt]" button
-    const usePromptBtn = recommendContainer.locator('.recommend-use-prompt');
-    await expect(usePromptBtn).toBeVisible();
-    await expect(usePromptBtn).toContainText('Use');
+    // Should show generated prompt
+    const promptDiv = recommendContainer.locator('.recommend-prompt');
+    await expect(promptDiv).toBeVisible();
+
+    const promptText = promptDiv.locator('.prompt-text');
+    await expect(promptText).toBeVisible();
+    // Prompt should have content (not empty)
+    const text = await promptText.textContent();
+    expect(text.length).toBeGreaterThan(0);
   });
 
-  test('clicking "Use prompt" button loads the prompt', async ({ page }) => {
+  test('generated prompt has copy button', async ({ page }) => {
     const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
     await taskLine.click();
 
@@ -545,17 +550,10 @@ test.describe('AI Recommendations', () => {
     const reasoning = recommendContainer.locator('.recommend-reasoning');
     await expect(reasoning).not.toContainText('Analyzing', { timeout: 10000 });
 
-    // Click "Use [prompt]" button
-    const usePromptBtn = recommendContainer.locator('.recommend-use-prompt');
-    await usePromptBtn.click();
-
-    // Recommendation should hide
-    await expect(recommendContainer).toBeHidden();
-
-    // Prompt container should show
-    const promptContainer = page.locator(`.prompt-container[data-prompt-for="${BREAKDOWN_ISSUE_ID}"]`);
-    await expect(promptContainer).toBeVisible();
-    await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
+    // Should have copy button
+    const copyBtn = recommendContainer.locator('.recommend-prompt .prompt-copy');
+    await expect(copyBtn).toBeVisible();
+    await expect(copyBtn).toContainText('copy');
   });
 
   test('dismiss button hides recommendation', async ({ page }) => {
@@ -614,24 +612,29 @@ test.describe('Recommendation API', () => {
     expect(response.status()).toBe(400);
   });
 
-  test('returns 200 with recommendation for valid request', async ({ page }) => {
+  test('returns 200 with generated prompt for valid request', async ({ page }) => {
     const response = await page.request.get(`/api/recommend/${BREAKDOWN_ISSUE_ID}`);
     expect(response.status()).toBe(200);
 
     const body = await response.json();
-    expect(body.suggestedPrompt).toBeDefined();
     expect(body.reasoning).toBeDefined();
+    expect(body.prompt).toBeDefined();
     expect(typeof body.reasoning).toBe('string');
+    expect(typeof body.prompt).toBe('string');
     expect(body.reasoning.length).toBeGreaterThan(0);
+    expect(body.prompt.length).toBeGreaterThan(0);
   });
 
-  test('returns contextual recommendation based on labels', async ({ page }) => {
+  test('returns contextual prompt based on labels', async ({ page }) => {
     // Issue with needs-breakdown label
     const response = await page.request.get(`/api/recommend/${BREAKDOWN_ISSUE_ID}`);
     const body = await response.json();
 
-    expect(body.suggestedPrompt).toBe('needs-breakdown');
-    expect(body.promptName).toBe('Task Breakdown');
+    // Should mention breakdown in reasoning
+    expect(body.reasoning.toLowerCase()).toContain('breakdown');
+    // Prompt should include the issue identifier and goal section
+    expect(body.prompt).toContain('TEST-6');
+    expect(body.prompt).toContain('Goal');
   });
 
   test('returns status endpoint correctly', async ({ page }) => {

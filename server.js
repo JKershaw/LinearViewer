@@ -24,7 +24,7 @@ import { createWorkspaceRoutes } from './routes/workspace.js'
 import { testMockTeams, testMockData } from './tests/fixtures/mock-data.js'
 import { runAudit, computeAuditFromData } from './lib/audit.js'
 import { renderFancyPage } from './lib/render-fancy.js'
-import { generatePrompt, hasPrompt, getAvailablePrompts, getPromptDescriptionsForAI, getPromptDisplayName } from './lib/prompt-templates.js'
+import { generatePrompt, hasPrompt, getAvailablePrompts } from './lib/prompt-templates.js'
 import { isRecommendationEnabled, getRecommendation } from './lib/openrouter.js'
 
 // =============================================================================
@@ -647,12 +647,12 @@ app.get('/api/recommend/status', (req, res) => {
 })
 
 /**
- * Get AI recommendation for which prompt to use next.
- * Analyzes task context and suggests the best approach.
+ * Get AI-generated prompt for a task.
+ * Analyzes task context and generates a tailored prompt.
  *
  * @route GET /api/recommend/:issueId
  * @param {string} issueId - The Linear issue ID
- * @returns {Object} { suggestedPrompt, promptName, reasoning, customPrompt? } or error
+ * @returns {Object} { reasoning, prompt } or error
  */
 app.get('/api/recommend/:issueId', async (req, res) => {
   const workspace = getActiveWorkspace(req.session)
@@ -683,52 +683,57 @@ app.get('/api/recommend/:issueId', async (req, res) => {
         return res.status(404).json({ error: 'Issue not found' })
       }
 
-      // Return a mock recommendation
+      // Generate a mock prompt based on the issue
       const labels = (mockIssue.labels?.nodes || []).map(l => l.name)
-      let suggestedPrompt = 'look-into'
       let reasoning = 'Start by getting an overview of what this task involves before deciding on the next steps.'
+      let goal = 'Summarize what this task involves and how it fits into the broader project context.'
 
-      // Provide contextual mock recommendations based on labels
+      // Provide contextual mock prompts based on labels
       if (labels.includes('needs-breakdown')) {
-        suggestedPrompt = 'needs-breakdown'
         reasoning = 'This task is marked as needing breakdown. Breaking it into smaller subtasks will make it easier to plan and execute.'
+        goal = 'Break this task into subtasks (1-3 hour chunks each), ordered by dependencies.'
       } else if (labels.includes('needs-research')) {
-        suggestedPrompt = 'needs-research'
         reasoning = 'This task requires research. Investigating the options first will help make informed decisions.'
+        goal = 'Identify key questions, research systematically, and provide actionable recommendations.'
       } else if (labels.includes('blocked')) {
-        suggestedPrompt = 'blocked'
         reasoning = 'This task is blocked. Analyzing the blocker will help identify ways to unblock progress.'
+        goal = 'Identify the blocker type and root cause, evaluate options to unblock, and recommend the best path.'
       } else if (labels.includes('bug')) {
-        suggestedPrompt = 'bug'
         reasoning = 'This is a bug. Investigating the issue systematically will help find the root cause and fix.'
+        goal = 'Identify reproduction steps, hypothesize likely causes, and suggest a debugging approach.'
       } else if (mockIssue.state?.type === 'backlog' || mockIssue.state?.type === 'unstarted') {
-        suggestedPrompt = 'plan'
         reasoning = 'This task is ready to start. Creating an implementation plan will provide a clear path forward.'
+        goal = 'Research the codebase, identify files to modify, and create a step-by-step implementation plan.'
       }
 
-      return res.json({
-        suggestedPrompt,
-        promptName: getPromptDisplayName(suggestedPrompt),
-        reasoning,
-        customPrompt: null
-      })
+      // Build the mock prompt
+      // Extract identifier from URL (e.g., "https://linear.app/test/issue/TEST-6" -> "TEST-6")
+      const identifier = mockIssue.url?.split('/').pop() || 'ISSUE'
+
+      const prompt = `Help me with task ${identifier}
+
+## Context
+
+**Project:** Test Project
+**Status:** ${mockIssue.state?.name || 'Unknown'}
+${labels.length > 0 ? `**Labels:** ${labels.join(', ')}` : ''}
+
+## Goal
+
+${goal}`
+
+      return res.json({ reasoning, prompt })
     }
 
     // Fetch issue context from Linear
     const { issue, parent, siblings, project, children } = await fetchIssueContext(workspace.accessToken, issueId)
 
-    // Get available prompts for this issue
-    const availablePromptKeys = getAvailablePrompts(issue)
-    const promptDescriptions = getPromptDescriptionsForAI(availablePromptKeys)
-
-    // Get AI recommendation
-    const recommendation = await getRecommendation(issue, { parent, siblings, project, children }, promptDescriptions)
+    // Get AI-generated prompt
+    const recommendation = await getRecommendation(issue, { parent, siblings, project, children })
 
     res.json({
-      suggestedPrompt: recommendation.suggestedPrompt,
-      promptName: recommendation.suggestedPrompt ? getPromptDisplayName(recommendation.suggestedPrompt) : null,
       reasoning: recommendation.reasoning,
-      customPrompt: recommendation.customPrompt
+      prompt: recommendation.prompt
     })
   } catch (error) {
     console.error('Recommendation error:', error)
