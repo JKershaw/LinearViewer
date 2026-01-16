@@ -83,9 +83,17 @@ describe('generatePrompt', () => {
     assert.ok(typeof result.prompt === 'string');
   });
 
-  test('includes issue identifier in prompt', () => {
+  test('includes issue identifier and title in header', () => {
     const result = generatePrompt('needs-breakdown', mockIssue, mockContext);
     assert.ok(result.prompt.includes('TEST-123'));
+    assert.ok(result.prompt.includes('Test task title'));
+    assert.ok(result.prompt.startsWith('# Break down TEST-123:'));
+  });
+
+  test('includes workflow section with Linear MCP instructions', () => {
+    const result = generatePrompt('needs-breakdown', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('## Workflow'));
+    assert.ok(result.prompt.includes('Linear MCP'));
   });
 
   test('does not include URL (agent uses MCP)', () => {
@@ -600,12 +608,36 @@ describe('plan template', () => {
   test('includes goal with implementation concepts', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
     assert.ok(result.prompt.includes('## Goal'));
-    assert.ok(result.prompt.includes('implementation plan'));
+    assert.ok(result.prompt.includes('implement'));
   });
 
   test('includes project info', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
     assert.ok(result.prompt.includes('User Features'));
+  });
+
+  test('includes workflow section with status updates', () => {
+    const result = generatePrompt('plan', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('## Workflow'));
+    assert.ok(result.prompt.includes('In Progress'));
+    assert.ok(result.prompt.includes('Done'));
+  });
+
+  test('includes success criteria section', () => {
+    const result = generatePrompt('plan', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('## Success Criteria'));
+    assert.ok(result.prompt.includes('Tests cover'));
+  });
+
+  test('includes if blocked section', () => {
+    const result = generatePrompt('plan', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('## If Blocked'));
+  });
+
+  test('success criteria includes parent alignment when parent exists', () => {
+    const result = generatePrompt('plan', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('TEST-EPIC'));
+    assert.ok(result.prompt.includes('align with parent'));
   });
 });
 
@@ -654,6 +686,19 @@ describe('code-review template', () => {
   test('includes project info', () => {
     const result = generatePrompt('code-review', mockIssue, mockContext);
     assert.ok(result.prompt.includes('Auth Refactor'));
+  });
+
+  test('includes workflow section', () => {
+    const result = generatePrompt('code-review', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('## Workflow'));
+    assert.ok(result.prompt.includes('Linear MCP'));
+  });
+
+  test('includes review checklist', () => {
+    const result = generatePrompt('code-review', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('Review checklist'));
+    assert.ok(result.prompt.includes('Tests cover'));
+    assert.ok(result.prompt.includes('security vulnerabilities'));
   });
 });
 
@@ -746,6 +791,17 @@ describe('Prompt Sections', () => {
     project: { name: 'Test Project', description: 'Project desc' },
     children: [{ id: 'c1', identifier: 'TEST-201', title: 'Child', state: { name: 'Todo', type: 'unstarted' } }]
   };
+
+  test('prompt includes header with identifier and title', () => {
+    const result = generatePrompt('needs-breakdown', mockIssue, fullContext);
+    assert.ok(result.prompt.startsWith('# Break down TEST-123: Test task'));
+  });
+
+  test('prompt includes workflow section', () => {
+    const result = generatePrompt('needs-breakdown', mockIssue, fullContext);
+    assert.ok(result.prompt.includes('## Workflow'));
+    assert.ok(result.prompt.includes('Linear MCP'));
+  });
 
   test('prompt includes context sections when data present', () => {
     const result = generatePrompt('needs-breakdown', mockIssue, fullContext);
