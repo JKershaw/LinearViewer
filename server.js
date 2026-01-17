@@ -752,7 +752,7 @@ ${labels.length > 0 ? `**Labels:** ${labels.join(', ')}` : ''}
 
 ${goal}`
 
-      return res.json({ reasoning, prompt })
+      return res.json({ reasoning, prompt, truncated: false, completionTokens: null })
     }
 
     // Fetch issue context from Linear
@@ -763,7 +763,9 @@ ${goal}`
 
     res.json({
       reasoning: recommendation.reasoning,
-      prompt: recommendation.prompt
+      prompt: recommendation.prompt,
+      truncated: recommendation.truncated,
+      completionTokens: recommendation.completionTokens
     })
   } catch (error) {
     console.error('Recommendation error:', error)

@@ -810,7 +810,12 @@ function initRecommendations() {
 
       // Only update if this is still the active request
       if (activeRecommendFetch === abortController) {
-        reasoning.textContent = data.reasoning
+        // Show truncation warning if response was cut off
+        if (data.truncated) {
+          reasoning.textContent = '[Warning: Response may be incomplete due to length limit]\n\n' + data.reasoning
+        } else {
+          reasoning.textContent = data.reasoning
+        }
         if (promptText && data.prompt) {
           promptText.textContent = data.prompt
         }

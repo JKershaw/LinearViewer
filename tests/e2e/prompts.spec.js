@@ -639,6 +639,9 @@ test.describe('Recommendation API', () => {
     expect(typeof body.prompt).toBe('string');
     expect(body.reasoning.length).toBeGreaterThan(0);
     expect(body.prompt.length).toBeGreaterThan(0);
+    // Check truncation metadata fields
+    expect(body.truncated).toBe(false);
+    expect(body.completionTokens).toBeNull(); // null for mock responses
   });
 
   test('returns contextual prompt based on labels', async ({ page }) => {
