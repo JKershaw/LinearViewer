@@ -2,80 +2,19 @@ const STORAGE_KEY = 'linear-projects-state'
 const TEAM_STORAGE_KEY = 'linear-projects-selected-team'
 
 // ==========================================================================
-// Simple Markdown Renderer for Prompts
+// Markdown Rendering (using marked.js library)
 // ==========================================================================
 
 /**
- * Render markdown to HTML for display
- * Supports: headers, bold, bullet lists, code blocks, inline code
+ * Render markdown to HTML for display using marked.js
  * @param {string} markdown - Raw markdown text
  * @returns {string} HTML string
  */
 function renderMarkdown(markdown) {
   if (!markdown) return ''
-
-  // Escape HTML first to prevent XSS
-  let html = markdown
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-
-  // Code blocks (```...```) - must be processed before other formatting
-  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
-    return `<pre class="md-code-block"><code>${code.trim()}</code></pre>`
-  })
-
-  // Inline code (`...`)
-  html = html.replace(/`([^`]+)`/g, '<code class="md-inline-code">$1</code>')
-
-  // Headers (## and ###)
-  html = html.replace(/^### (.+)$/gm, '<h4 class="md-h3">$1</h4>')
-  html = html.replace(/^## (.+)$/gm, '<h3 class="md-h2">$1</h3>')
-
-  // Bold (**...**)
-  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-
-  // Process lines for lists and paragraphs
-  const lines = html.split('\n')
-  const result = []
-  let inList = false
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
-
-    // Check if line is a list item
-    if (/^- (.+)$/.test(line)) {
-      if (!inList) {
-        result.push('<ul class="md-list">')
-        inList = true
-      }
-      result.push(line.replace(/^- (.+)$/, '<li>$1</li>'))
-    } else {
-      // Close list if we were in one
-      if (inList) {
-        result.push('</ul>')
-        inList = false
-      }
-
-      // Skip if it's already an HTML tag (headers, code blocks)
-      if (line.startsWith('<h') || line.startsWith('<pre') || line.startsWith('</pre')) {
-        result.push(line)
-      } else if (line.trim() === '') {
-        // Empty line - add spacing
-        result.push('<div class="md-spacer"></div>')
-      } else {
-        // Regular text line
-        result.push(`<p class="md-para">${line}</p>`)
-      }
-    }
-  }
-
-  // Close any open list
-  if (inList) {
-    result.push('</ul>')
-  }
-
-  return result.join('\n')
+  // Use marked library loaded via CDN
+  // marked.parse() sanitizes by default in recent versions
+  return marked.parse(markdown)
 }
 
 // Safe localStorage helpers for team selection
@@ -894,12 +833,11 @@ function initRecommendations() {
 
       // Only update if this is still the active request
       if (activeRecommendFetch === abortController) {
-        // Show truncation warning if response was cut off
-        if (data.truncated) {
-          reasoning.textContent = '[Warning: Response may be incomplete due to length limit]\n\n' + data.reasoning
-        } else {
-          reasoning.textContent = data.reasoning
-        }
+        // Render reasoning as markdown
+        const reasoningText = data.truncated
+          ? '[Warning: Response may be incomplete due to length limit]\n\n' + data.reasoning
+          : data.reasoning
+        reasoning.innerHTML = renderMarkdown(reasoningText)
         if (promptText && data.prompt) {
           // Store raw markdown for copy, render HTML for display
           promptText.dataset.rawPrompt = data.prompt

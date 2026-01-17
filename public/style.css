@@ -798,13 +798,25 @@ h1 {
 }
 
 /* =============================================================================
-   Markdown Rendering in Prompts
+   Markdown Rendering in Prompts and Reasoning
    =============================================================================
-   Styles for rendered markdown content within prompt containers.
+   Styles for rendered markdown content (via marked.js library).
+   Applied to both .prompt-text and .recommend-reasoning containers.
 */
 
-/* Headers in prompt markdown */
-.prompt-text .md-h2 {
+/* Shared markdown container styles */
+.prompt-text,
+.recommend-reasoning {
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  line-height: 1.5;
+}
+
+/* Headers - h1 rendered as h2 size, h2 as h3, etc. */
+.prompt-text h1,
+.prompt-text h2,
+.recommend-reasoning h1,
+.recommend-reasoning h2 {
   font-family: var(--font-content);
   font-size: 1em;
   font-weight: 600;
@@ -814,11 +826,17 @@ h1 {
   border-bottom: 1px solid var(--fg-vdim);
 }
 
-.prompt-text .md-h2:first-child {
+.prompt-text h1:first-child,
+.prompt-text h2:first-child,
+.recommend-reasoning h1:first-child,
+.recommend-reasoning h2:first-child {
   margin-top: 0;
 }
 
-.prompt-text .md-h3 {
+.prompt-text h3,
+.prompt-text h4,
+.recommend-reasoning h3,
+.recommend-reasoning h4 {
   font-family: var(--font-content);
   font-size: 0.95em;
   font-weight: 600;
@@ -827,34 +845,39 @@ h1 {
 }
 
 /* Paragraphs */
-.prompt-text .md-para {
-  font-family: var(--font-content);
-  font-size: 0.9em;
-  line-height: 1.5;
-  margin: 0;
+.prompt-text p,
+.recommend-reasoning p {
+  margin: 0.5em 0;
 }
 
-/* Spacing between elements */
-.prompt-text .md-spacer {
-  height: 0.5em;
+.prompt-text p:first-child,
+.recommend-reasoning p:first-child {
+  margin-top: 0;
 }
 
-/* Bullet lists */
-.prompt-text .md-list {
-  font-family: var(--font-content);
-  font-size: 0.9em;
-  margin: 0.25em 0;
+.prompt-text p:last-child,
+.recommend-reasoning p:last-child {
+  margin-bottom: 0;
+}
+
+/* Bullet and numbered lists */
+.prompt-text ul,
+.prompt-text ol,
+.recommend-reasoning ul,
+.recommend-reasoning ol {
+  margin: 0.5em 0;
   padding-left: 1.5em;
-  list-style-type: disc;
 }
 
-.prompt-text .md-list li {
+.prompt-text li,
+.recommend-reasoning li {
   margin: 0.2em 0;
   line-height: 1.4;
 }
 
 /* Code blocks */
-.prompt-text .md-code-block {
+.prompt-text pre,
+.recommend-reasoning pre {
   background: var(--bg);
   border: 1px solid var(--fg-vdim);
   border-radius: 3px;
@@ -863,14 +886,19 @@ h1 {
   overflow-x: auto;
 }
 
-.prompt-text .md-code-block code {
+.prompt-text pre code,
+.recommend-reasoning pre code {
   font-family: var(--font-structural);
   font-size: 0.9em;
   color: var(--fg);
+  background: none;
+  border: none;
+  padding: 0;
 }
 
 /* Inline code */
-.prompt-text .md-inline-code {
+.prompt-text code,
+.recommend-reasoning code {
   font-family: var(--font-structural);
   font-size: 0.85em;
   background: var(--bg);
@@ -880,8 +908,21 @@ h1 {
 }
 
 /* Bold text */
-.prompt-text strong {
+.prompt-text strong,
+.recommend-reasoning strong {
   font-weight: 600;
+}
+
+/* Links */
+.prompt-text a,
+.recommend-reasoning a {
+  color: var(--blue);
+  text-decoration: none;
+}
+
+.prompt-text a:hover,
+.recommend-reasoning a:hover {
+  text-decoration: underline;
 }
 
 /* =============================================================================
