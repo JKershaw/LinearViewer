@@ -623,11 +623,11 @@ describe('plan template', () => {
     assert.ok(result.prompt.includes('In Review'));
   });
 
-  test('workflow sets final status to In Review (not Done)', () => {
+  test('workflow sets final status to In Review with Done fallback', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
     assert.ok(result.prompt.includes('Submit for review'));
     assert.ok(result.prompt.includes('status to "In Review"'));
-    assert.ok(!result.prompt.includes('status to "Done"'));
+    assert.ok(result.prompt.includes('or "Done" if unavailable'));
   });
 
   test('includes explicit planning phase before coding', () => {
