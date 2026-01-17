@@ -616,10 +616,10 @@ app.get('/api/prompt/:issueId/:labelName', async (req, res) => {
     }
 
     // Fetch issue context from Linear
-    const { issue, parent, siblings, project, children } = await fetchIssueContext(workspace.accessToken, issueId)
+    const { issue, parent, siblings, project, children, comments } = await fetchIssueContext(workspace.accessToken, issueId)
 
     // Generate the prompt
-    const result = generatePrompt(labelName, issue, { parent, siblings, project, children })
+    const result = generatePrompt(labelName, issue, { parent, siblings, project, children, comments })
 
     if (!result) {
       return res.status(500).json({ error: 'Failed to generate prompt' })
@@ -756,10 +756,10 @@ ${goal}`
     }
 
     // Fetch issue context from Linear
-    const { issue, parent, siblings, project, children } = await fetchIssueContext(workspace.accessToken, issueId)
+    const { issue, parent, siblings, project, children, comments } = await fetchIssueContext(workspace.accessToken, issueId)
 
     // Get AI-generated prompt (pass session API key if available)
-    const recommendation = await getRecommendation(issue, { parent, siblings, project, children }, { apiKey: sessionApiKey })
+    const recommendation = await getRecommendation(issue, { parent, siblings, project, children, comments }, { apiKey: sessionApiKey })
 
     res.json({
       reasoning: recommendation.reasoning,
