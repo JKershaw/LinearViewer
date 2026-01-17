@@ -14,23 +14,32 @@ A minimal, CLI-aesthetic web app that displays Linear projects and issues as a c
 
 ```
 server.js              Express server, OAuth routes, main entry point
+routes/
+  auth.js              Linear OAuth routes
+  openrouter-auth.js   OpenRouter OAuth PKCE routes
+  workspace.js         Workspace management routes
 lib/
   linear.js            GraphQL client for Linear API
   linear-cli.js        CLI tool for AI agents to query/modify Linear
+  openrouter.js        OpenRouter API client for AI recommendations
   tree.js              Transforms flat issues → nested tree structure
   render.js            Generates HTML with box-drawing characters
+  render-fancy.js      Operator dashboard page renderer
   session-store.js     MongoDB/MangoDB session store
   parse-landing.js     Parses markdown content for landing page
 content/
   landing.md           Static projects preview for unauthenticated users
 public/
   style.css            Light theme, mobile-responsive
+  fancy.css            Operator dashboard styles
   app.js               Client-side collapse/expand, localStorage persistence
+  fancy.js             Operator dashboard client-side logic
   llms.txt             AI agent guidance (DOM selectors, navigation patterns)
 tests/e2e/
   landing.spec.js      Landing page tests
   dashboard.spec.js    Authenticated dashboard tests
   interactions.spec.js Collapse/expand interaction tests
+  openrouter-auth.spec.js  OpenRouter OAuth tests
 playwright.config.js   Playwright test configuration
 ```
 
@@ -51,7 +60,7 @@ playwright.config.js   Playwright test configuration
 
 ## Authentication
 
-OAuth 2.0 flow with Linear:
+### Linear OAuth 2.0
 
 ```
 GET /auth/linear     → Redirect to Linear OAuth (with state parameter)
@@ -60,18 +69,35 @@ GET /logout          → Destroy session, redirect to login
 ```
 
 - Sessions stored in MongoDB (production) or MangoDB file-based storage (development)
-- Tokens expire after 24 hours (no refresh token handling)
+- Tokens expire after 24 hours (with automatic refresh)
 - State parameter validated to prevent CSRF
+
+### OpenRouter OAuth (PKCE)
+
+Users can connect their OpenRouter account for AI recommendations:
+
+```
+GET /auth/openrouter           → Redirect to OpenRouter OAuth (with PKCE)
+GET /auth/openrouter/callback  → Exchange code for API key, store in session
+POST /auth/openrouter/disconnect → Remove stored API key
+```
+
+- Uses PKCE flow with S256 code challenge method
+- Returns a permanent API key (no expiry, no refresh needed)
+- API key stored in session alongside Linear workspace tokens
+- Falls back to `OPENROUTER_API_KEY` env var if no OAuth connection
 
 ## Environment Variables
 
 ```
-LINEAR_CLIENT_ID      OAuth client ID from Linear
-LINEAR_CLIENT_SECRET  OAuth client secret from Linear
-LINEAR_REDIRECT_URI   Callback URL (must match Linear OAuth app config)
-SESSION_SECRET        Secret for signing session cookies
-PORT                  Server port (default: 3000)
-MONGODB_URI           MongoDB connection string (optional, uses file storage if not set)
+LINEAR_CLIENT_ID        OAuth client ID from Linear
+LINEAR_CLIENT_SECRET    OAuth client secret from Linear
+LINEAR_REDIRECT_URI     Callback URL (must match Linear OAuth app config)
+SESSION_SECRET          Secret for signing session cookies
+PORT                    Server port (default: 3000)
+MONGODB_URI             MongoDB connection string (optional, uses file storage if not set)
+OPENROUTER_API_KEY      Server-side OpenRouter API key (optional, users can connect via OAuth)
+OPENROUTER_REDIRECT_URI Callback URL for OpenRouter OAuth (optional, defaults to /auth/openrouter/callback)
 ```
 
 ## Linear API
