@@ -74,10 +74,10 @@ test.describe('Promptable Labels', () => {
     const promptName = promptContainer.locator('.prompt-name');
     await expect(promptName).toContainText('Task Breakdown');
 
-    // Should show prompt text
+    // Should show prompt text (now rendered as HTML, so headers don't have ##)
     const promptText = promptContainer.locator('.prompt-text');
     await expect(promptText).toBeVisible();
-    await expect(promptText).toContainText('## Goal');
+    await expect(promptText).toContainText('Goal');
   });
 
   test('prompt contains issue identifier', async ({ page }) => {
@@ -365,7 +365,7 @@ test.describe('Multiple Promptable Labels UI', () => {
     await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
 
     await expect(promptContainer.locator('.prompt-name')).toContainText('Research Task');
-    await expect(promptContainer.locator('.prompt-text')).toContainText('## Goal');
+    await expect(promptContainer.locator('.prompt-text')).toContainText('Goal');
   });
 
   test('renders code-review as clickable link in in-progress section', async ({ page }) => {
@@ -391,7 +391,7 @@ test.describe('Multiple Promptable Labels UI', () => {
     await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
 
     await expect(promptContainer.locator('.prompt-name')).toContainText('Code Review');
-    await expect(promptContainer.locator('.prompt-text')).toContainText('## Goal');
+    await expect(promptContainer.locator('.prompt-text')).toContainText('Goal');
   });
 });
 
