@@ -786,6 +786,8 @@ function initRecommendations() {
 
     reasoning.textContent = 'Analyzing task context...'
     if (promptText) promptText.textContent = ''
+    // Keep prompt section hidden during loading - only show reasoning
+    if (promptDiv) promptDiv.classList.add('hidden')
     recommendContainer.classList.remove('hidden')
 
     // Add loading class to button
@@ -818,6 +820,8 @@ function initRecommendations() {
         }
         if (promptText && data.prompt) {
           promptText.textContent = data.prompt
+          // Show the prompt section now that the prompt is ready
+          if (promptDiv) promptDiv.classList.remove('hidden')
         }
       }
     } catch (error) {
