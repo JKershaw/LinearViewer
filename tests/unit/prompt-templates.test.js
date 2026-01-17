@@ -620,7 +620,51 @@ describe('plan template', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
     assert.ok(result.prompt.includes('## Workflow'));
     assert.ok(result.prompt.includes('In Progress'));
-    assert.ok(result.prompt.includes('Done'));
+    assert.ok(result.prompt.includes('In Review'));
+  });
+
+  test('workflow sets final status to In Review with Done fallback', () => {
+    const result = generatePrompt('plan', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('Submit for review'));
+    assert.ok(result.prompt.includes('status to "In Review"'));
+    assert.ok(result.prompt.includes('or "Done" if unavailable'));
+  });
+
+  test('includes explicit planning phase before coding', () => {
+    const result = generatePrompt('plan', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('Phase 1: Planning'));
+    assert.ok(result.prompt.includes('required before coding'));
+    assert.ok(result.prompt.includes('Files to modify or create'));
+  });
+
+  test('includes scope control guidance', () => {
+    const result = generatePrompt('plan', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('Scope Control'));
+    assert.ok(result.prompt.includes('Only implement what is explicitly requested'));
+    assert.ok(result.prompt.includes('Avoid over-engineering'));
+  });
+
+  test('includes baseline test verification', () => {
+    const result = generatePrompt('plan', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('Run existing tests to verify baseline'));
+  });
+
+  test('includes subtask guidance when subtasks present', () => {
+    const result = generatePrompt('plan', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('Subtask Guidance'));
+    assert.ok(result.prompt.includes('already completed'));
+    assert.ok(result.prompt.includes('Do not duplicate work'));
+  });
+
+  test('omits subtask guidance when no subtasks', () => {
+    const contextNoChildren = { ...mockContext, children: [] };
+    const result = generatePrompt('plan', mockIssue, contextNoChildren);
+    assert.ok(!result.prompt.includes('Subtask Guidance'));
+  });
+
+  test('includes commit message guidance with issue identifier', () => {
+    const result = generatePrompt('plan', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('commit message referencing TEST-P1'));
   });
 
   test('includes success criteria section', () => {
