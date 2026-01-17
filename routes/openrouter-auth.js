@@ -8,7 +8,7 @@
 import crypto from 'crypto'
 import { Router } from 'express'
 import { renderErrorPage } from '../lib/render.js'
-import { saveSession } from '../lib/workspace.js'
+import { saveSession, getActiveWorkspace } from '../lib/workspace.js'
 
 /**
  * Generate a cryptographically secure code verifier for PKCE
@@ -41,8 +41,15 @@ export function createOpenRouterAuthRoutes() {
    * Step 1: Initiate PKCE OAuth flow
    * Generates code verifier/challenge, stores verifier in session,
    * and redirects user to OpenRouter's auth page.
+   * Requires Linear authentication first.
    */
   router.get('/auth/openrouter', async (req, res) => {
+    // Require Linear authentication before connecting OpenRouter
+    const workspace = getActiveWorkspace(req.session)
+    if (!workspace) {
+      return res.redirect('/')
+    }
+
     // Generate PKCE code verifier and challenge
     const codeVerifier = generateCodeVerifier()
     const codeChallenge = await createCodeChallenge(codeVerifier)
@@ -68,8 +75,15 @@ export function createOpenRouterAuthRoutes() {
   /**
    * Step 2: Handle OAuth callback
    * Exchanges authorization code for API key using stored code verifier.
+   * Requires Linear authentication.
    */
   router.get('/auth/openrouter/callback', async (req, res) => {
+    // Require Linear authentication
+    const workspace = getActiveWorkspace(req.session)
+    if (!workspace) {
+      return res.redirect('/')
+    }
+
     const { code } = req.query
     const codeVerifier = req.session.openRouterCodeVerifier
 
@@ -144,8 +158,15 @@ export function createOpenRouterAuthRoutes() {
   /**
    * Step 3: Disconnect OpenRouter
    * Removes the stored API key from the session.
+   * Requires Linear authentication.
    */
   router.post('/auth/openrouter/disconnect', async (req, res) => {
+    // Require Linear authentication
+    const workspace = getActiveWorkspace(req.session)
+    if (!workspace) {
+      return res.redirect('/')
+    }
+
     delete req.session.openRouterApiKey
     await saveSession(req.session)
     res.redirect('/fancy')

@@ -6,6 +6,15 @@ test.describe('OpenRouter OAuth Flow', () => {
     await page.goto('/test/clear-session');
   });
 
+  test('unauthenticated users are redirected from /auth/openrouter', async ({ page }) => {
+    // Try to access OpenRouter auth without being logged into Linear
+    await page.goto('/auth/openrouter');
+
+    // Should be redirected to home (landing page)
+    await expect(page).toHaveURL('/');
+    await expect(page.locator('body')).toHaveClass(/is-landing/);
+  });
+
   test('auth/openrouter stores code verifier in session', async ({ page }) => {
     // Set up authenticated session first
     await page.goto('/test/set-session');
