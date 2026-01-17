@@ -690,7 +690,7 @@ function initPrompts() {
     e.preventDefault()
     e.stopPropagation()
 
-    const promptContainer = copyBtn.closest('.prompt-container')
+    const promptContainer = copyBtn.closest('.prompt-container, .recommend-prompt')
     const promptText = promptContainer?.querySelector('.prompt-text')
     if (!promptText) return
 
