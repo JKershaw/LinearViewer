@@ -790,7 +790,6 @@ function initRecommendations() {
 
     // Add loading class to button
     suggestBtn.classList.add('loading')
-    suggestBtn.disabled = true
 
     try {
       const response = await fetch(
@@ -825,7 +824,6 @@ function initRecommendations() {
       }
       // Remove loading state
       suggestBtn.classList.remove('loading')
-      suggestBtn.disabled = false
     }
   })
 

@@ -479,20 +479,36 @@ test.describe('More Prompts Inline', () => {
 
 test.describe('AI Recommendations', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/test/set-session');
+    // AI suggest button requires OpenRouter to be configured
+    await page.goto('/test/set-session?openRouterConnected=true');
     await page.goto('/');
     await page.waitForLoadState('networkidle');
   });
 
-  test('renders suggest button for each issue', async ({ page }) => {
+  test('renders AI suggest button for each issue when OpenRouter is configured', async ({ page }) => {
     // Expand an issue
     const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
     await taskLine.click();
 
-    // Should have suggest button
+    // Should have AI suggest button
     const suggestBtn = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .suggest-btn`);
     await expect(suggestBtn).toBeVisible();
-    await expect(suggestBtn).toHaveText('suggest');
+    await expect(suggestBtn).toHaveText('AI suggest');
+  });
+
+  test('AI suggest button is hidden when OpenRouter is not configured', async ({ page }) => {
+    // Set up session WITHOUT OpenRouter
+    await page.goto('/test/set-session');
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    // Expand an issue
+    const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
+    await taskLine.click();
+
+    // Should NOT have AI suggest button
+    const suggestBtn = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .suggest-btn`);
+    await expect(suggestBtn).toBeHidden();
   });
 
   test('clicking suggest button shows recommendation container', async ({ page }) => {
