@@ -655,7 +655,7 @@ describe('plan template', () => {
 
   test('workflow sets final status to In Review with Done fallback', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Submit for review'));
+    assert.ok(result.prompt.includes('Complete'));
     assert.ok(result.prompt.includes('status to "In Review"'));
     assert.ok(result.prompt.includes('or "Done" if unavailable'));
   });
