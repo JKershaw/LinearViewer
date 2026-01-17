@@ -21,6 +21,7 @@ import { refreshAccessToken, calculateExpiresAt } from './lib/token-refresh.js'
 import { UUID_REGEX, getActiveWorkspace, removeWorkspace, saveSession } from './lib/workspace.js'
 import { createAuthRoutes } from './routes/auth.js'
 import { createWorkspaceRoutes } from './routes/workspace.js'
+import { createOpenRouterAuthRoutes } from './routes/openrouter-auth.js'
 import { testMockTeams, testMockData } from './tests/fixtures/mock-data.js'
 import { runAudit, computeAuditFromData } from './lib/audit.js'
 import { renderFancyPage } from './lib/render-fancy.js'
@@ -136,12 +137,13 @@ app.use(session({
 if (process.env.NODE_ENV === 'test') {
   // Endpoint to set a test session without going through OAuth flow
   // Query parameters:
-  //   ?tokenExpired=true     - Set token expiry in the past
-  //   ?noRefreshToken=true   - Omit refresh token
-  //   ?multiWorkspace=true   - Set up 2 workspaces
-  //   ?maxWorkspaces=true    - Set up 10 workspaces (at limit)
+  //   ?tokenExpired=true        - Set token expiry in the past
+  //   ?noRefreshToken=true      - Omit refresh token
+  //   ?multiWorkspace=true      - Set up 2 workspaces
+  //   ?maxWorkspaces=true       - Set up 10 workspaces (at limit)
+  //   ?openRouterConnected=true - Set up OpenRouter API key in session
   app.get('/test/set-session', (req, res) => {
-    const { tokenExpired, noRefreshToken, multiWorkspace, maxWorkspaces } = req.query
+    const { tokenExpired, noRefreshToken, multiWorkspace, maxWorkspaces, openRouterConnected } = req.query
 
     // Base workspace configuration - IDs must be valid UUIDs to pass validation
     const createWorkspace = (id, name, urlKey) => ({
@@ -185,6 +187,11 @@ if (process.env.NODE_ENV === 'test') {
 
     req.session.workspaces = workspaces
     req.session.activeWorkspaceId = workspaces[0].id
+
+    // Set OpenRouter API key in session if requested
+    if (openRouterConnected) {
+      req.session.openRouterApiKey = 'test-openrouter-key'
+    }
 
     // Explicitly save session before responding to ensure it's persisted
     req.session.save((err) => {
@@ -269,6 +276,7 @@ app.use((req, res, next) => {
 // Mount extracted route modules
 app.use(createAuthRoutes({ sessionStore }))
 app.use(createWorkspaceRoutes())
+app.use(createOpenRouterAuthRoutes())
 
 // =============================================================================
 // Main Application Route
@@ -343,13 +351,18 @@ app.get('/', async (req, res) => {
   const rawTeam = req.query.team;
   const teamId = rawTeam && rawTeam !== 'all' && UUID_REGEX.test(rawTeam) ? rawTeam : null;
 
+  // Determine OpenRouter connection status for nav bar
+  const sessionApiKey = req.session.openRouterApiKey;
+  const openRouterSource = sessionApiKey ? 'oauth' : (process.env.OPENROUTER_API_KEY ? 'env' : null);
+
   try {
     const { trees, inProgressTrees, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace.accessToken, teamId);
     const html = renderPage(trees, inProgressTrees, organizationName, {
       teams,
       selectedTeamId,
       workspaces: req.session.workspaces,
-      activeWorkspaceId: req.session.activeWorkspaceId
+      activeWorkspaceId: req.session.activeWorkspaceId,
+      openRouterSource
     });
     res.send(html);
   } catch (error) {
@@ -373,7 +386,8 @@ app.get('/', async (req, res) => {
           teams,
           selectedTeamId,
           workspaces: req.session.workspaces,
-          activeWorkspaceId: req.session.activeWorkspaceId
+          activeWorkspaceId: req.session.activeWorkspaceId,
+          openRouterSource
         });
         return res.send(html);
       } catch (refreshError) {
@@ -435,7 +449,15 @@ app.get('/fancy', (req, res) => {
     return res.redirect('/');
   }
 
-  const html = renderFancyPage(workspace.name || 'Workspace');
+  // Determine OpenRouter connection status
+  const sessionApiKey = req.session.openRouterApiKey;
+  const envApiKey = process.env.OPENROUTER_API_KEY;
+  const openRouterSource = sessionApiKey ? 'oauth' : (envApiKey ? 'env' : null);
+
+  const html = renderFancyPage(workspace.name || 'Workspace', {
+    openRouterConnected: !!(sessionApiKey || envApiKey),
+    openRouterSource
+  });
   res.send(html);
 });
 
@@ -643,7 +665,12 @@ app.get('/api/recommend/status', (req, res) => {
 
   // In test mode, always report as enabled for testing
   const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token'
-  res.json({ enabled: isTestMode || isRecommendationEnabled() })
+  // Check if user has connected OpenRouter via OAuth (session) or if env key is set
+  const sessionApiKey = req.session.openRouterApiKey
+  res.json({
+    enabled: isTestMode || isRecommendationEnabled(sessionApiKey),
+    source: sessionApiKey ? 'oauth' : (process.env.OPENROUTER_API_KEY ? 'env' : null)
+  })
 })
 
 /**
@@ -671,8 +698,9 @@ app.get('/api/recommend/:issueId', async (req, res) => {
 
   // Check if feature is enabled (except in test mode)
   const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token'
-  if (!isTestMode && !isRecommendationEnabled()) {
-    return res.status(503).json({ error: 'AI recommendation feature is not configured' })
+  const sessionApiKey = req.session.openRouterApiKey
+  if (!isTestMode && !isRecommendationEnabled(sessionApiKey)) {
+    return res.status(503).json({ error: 'AI recommendation feature is not configured. Connect your OpenRouter account or set OPENROUTER_API_KEY.' })
   }
 
   try {
@@ -728,8 +756,8 @@ ${goal}`
     // Fetch issue context from Linear
     const { issue, parent, siblings, project, children } = await fetchIssueContext(workspace.accessToken, issueId)
 
-    // Get AI-generated prompt
-    const recommendation = await getRecommendation(issue, { parent, siblings, project, children })
+    // Get AI-generated prompt (pass session API key if available)
+    const recommendation = await getRecommendation(issue, { parent, siblings, project, children }, { apiKey: sessionApiKey })
 
     res.json({
       reasoning: recommendation.reasoning,

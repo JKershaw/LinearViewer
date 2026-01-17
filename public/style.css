@@ -123,6 +123,27 @@ h1 {
   color: var(--blue);
 }
 
+/* OpenRouter status indicator in nav */
+.nav-openrouter-status {
+  text-decoration: none;
+}
+
+.nav-openrouter-status.connected {
+  color: var(--green);
+}
+
+.nav-openrouter-status.env {
+  color: var(--fg-dim);
+}
+
+.nav-openrouter-status.disconnected {
+  color: var(--fg-dim);
+}
+
+.nav-openrouter-status:hover {
+  color: var(--blue);
+}
+
 .nav-actions {
   display: flex;
   align-items: baseline;
