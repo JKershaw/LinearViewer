@@ -114,6 +114,49 @@ test.describe('OpenRouter OAuth Flow', () => {
     expect(data.enabled).toBe(true);
     expect(data.source).toBe('oauth');
   });
+
+  test('main page nav shows ai status indicator when not connected', async ({ page }) => {
+    // Set up authenticated session without OpenRouter
+    await page.goto('/test/set-session');
+    await page.goto('/');
+
+    // Should show ai indicator in nav
+    const aiNav = page.locator('[data-selector="openrouter"]');
+    await expect(aiNav).toBeVisible();
+
+    // Should show disconnected state (○)
+    const statusLink = aiNav.locator('.nav-openrouter-status');
+    await expect(statusLink).toHaveClass(/disconnected/);
+    await expect(statusLink).toHaveText('○');
+  });
+
+  test('main page nav shows ai status indicator when connected', async ({ page }) => {
+    // Set up authenticated session with OpenRouter connected
+    await page.goto('/test/set-session?openRouterConnected=true');
+    await page.goto('/');
+
+    // Should show ai indicator in nav
+    const aiNav = page.locator('[data-selector="openrouter"]');
+    await expect(aiNav).toBeVisible();
+
+    // Should show connected state (●)
+    const statusLink = aiNav.locator('.nav-openrouter-status');
+    await expect(statusLink).toHaveClass(/connected/);
+    await expect(statusLink).toHaveText('●');
+  });
+
+  test('ai status links to fancy page', async ({ page }) => {
+    // Set up authenticated session
+    await page.goto('/test/set-session');
+    await page.goto('/');
+
+    // Click the ai status link
+    const statusLink = page.locator('.nav-openrouter-status');
+    await statusLink.click();
+
+    // Should navigate to fancy page
+    await expect(page).toHaveURL('/fancy');
+  });
 });
 
 test.describe('OpenRouter Auth Callback', () => {

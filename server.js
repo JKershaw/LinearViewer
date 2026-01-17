@@ -351,13 +351,18 @@ app.get('/', async (req, res) => {
   const rawTeam = req.query.team;
   const teamId = rawTeam && rawTeam !== 'all' && UUID_REGEX.test(rawTeam) ? rawTeam : null;
 
+  // Determine OpenRouter connection status for nav bar
+  const sessionApiKey = req.session.openRouterApiKey;
+  const openRouterSource = sessionApiKey ? 'oauth' : (process.env.OPENROUTER_API_KEY ? 'env' : null);
+
   try {
     const { trees, inProgressTrees, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace.accessToken, teamId);
     const html = renderPage(trees, inProgressTrees, organizationName, {
       teams,
       selectedTeamId,
       workspaces: req.session.workspaces,
-      activeWorkspaceId: req.session.activeWorkspaceId
+      activeWorkspaceId: req.session.activeWorkspaceId,
+      openRouterSource
     });
     res.send(html);
   } catch (error) {
@@ -381,7 +386,8 @@ app.get('/', async (req, res) => {
           teams,
           selectedTeamId,
           workspaces: req.session.workspaces,
-          activeWorkspaceId: req.session.activeWorkspaceId
+          activeWorkspaceId: req.session.activeWorkspaceId,
+          openRouterSource
         });
         return res.send(html);
       } catch (refreshError) {
