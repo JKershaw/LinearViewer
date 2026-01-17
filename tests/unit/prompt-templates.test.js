@@ -650,14 +650,14 @@ describe('plan template', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
     assert.ok(result.prompt.includes('## Workflow'));
     assert.ok(result.prompt.includes('In Progress'));
-    assert.ok(result.prompt.includes('In Review'));
+    assert.ok(result.prompt.includes('in-review'));
   });
 
-  test('workflow sets final status to In Review with Done fallback', () => {
+  test('workflow uses in-review label for completion', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
     assert.ok(result.prompt.includes('Complete'));
-    assert.ok(result.prompt.includes('status to "In Review"'));
-    assert.ok(result.prompt.includes('or "Done" if unavailable'));
+    assert.ok(result.prompt.includes('add "in-review" label'));
+    assert.ok(result.prompt.includes('indicate ready for review'));
   });
 
   test('includes explicit planning phase before coding', () => {
