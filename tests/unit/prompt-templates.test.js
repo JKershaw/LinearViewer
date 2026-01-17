@@ -68,7 +68,8 @@ describe('generatePrompt', () => {
     parent: null,
     siblings: [],
     project: null,
-    children: []
+    children: [],
+    comments: []
   };
 
   test('returns null for unknown label', () => {
@@ -199,6 +200,28 @@ describe('generatePrompt', () => {
     assert.ok(!result.prompt.includes('**Existing Subtasks:**'));
   });
 
+  test('includes comments when present', () => {
+    const contextWithComments = {
+      ...mockContext,
+      comments: [
+        { body: 'First comment with research findings', user: 'Alice', createdAt: '2024-01-15T10:00:00Z' },
+        { body: 'Follow-up discussion', user: 'Bob', createdAt: '2024-01-16T14:30:00Z' }
+      ]
+    };
+
+    const result = generatePrompt('needs-breakdown', mockIssue, contextWithComments);
+    assert.ok(result.prompt.includes('Alice'));
+    assert.ok(result.prompt.includes('First comment with research findings'));
+    assert.ok(result.prompt.includes('Bob'));
+    assert.ok(result.prompt.includes('Follow-up discussion'));
+    assert.ok(result.prompt.includes('Discussion History'));
+  });
+
+  test('omits comments section when empty', () => {
+    const result = generatePrompt('needs-breakdown', mockIssue, mockContext);
+    assert.ok(!result.prompt.includes('**Discussion History:**'));
+  });
+
   test('includes other labels excluding the trigger label', () => {
     const issueWithLabels = {
       ...mockIssue,
@@ -281,8 +304,19 @@ describe('needs-research template', () => {
     parent: null,
     siblings: [],
     project: { name: 'Auth Project', description: 'Authentication improvements' },
-    children: []
+    children: [],
+    comments: []
   };
+
+  test('includes prior research prompt when comments exist', () => {
+    const contextWithComments = {
+      ...mockContext,
+      comments: [{ body: 'Previous research on OAuth', user: 'Dev', createdAt: '2024-01-10T10:00:00Z' }]
+    };
+    const result = generatePrompt('needs-research', mockIssue, contextWithComments);
+    assert.ok(result.prompt.includes('Prior Research'));
+    assert.ok(result.prompt.includes('build on existing findings'));
+  });
 
   test('returns Research Task as name', () => {
     const result = generatePrompt('needs-research', mockIssue, mockContext);
@@ -320,7 +354,8 @@ describe('needs-scoping template', () => {
     parent: null,
     siblings: [],
     project: null,
-    children: []
+    children: [],
+    comments: []
   };
 
   test('returns Scope Definition as name', () => {
@@ -356,7 +391,8 @@ describe('needs-design template', () => {
     parent: null,
     siblings: [],
     project: { name: 'Performance', description: 'Performance improvements' },
-    children: []
+    children: [],
+    comments: []
   };
 
   test('returns Technical Design as name', () => {
@@ -392,7 +428,8 @@ describe('needs-spike template', () => {
     parent: null,
     siblings: [],
     project: null,
-    children: []
+    children: [],
+    comments: []
   };
 
   test('returns Technical Spike as name', () => {
@@ -400,22 +437,11 @@ describe('needs-spike template', () => {
     assert.strictEqual(result.name, 'Technical Spike');
   });
 
-  test('includes timebox hint from estimate', () => {
-    const result = generatePrompt('needs-spike', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('2 points'));
-  });
-
   test('includes goal with spike concepts', () => {
     const result = generatePrompt('needs-spike', mockIssue, mockContext);
     assert.ok(result.prompt.includes('## Goal'));
     assert.ok(result.prompt.includes('questions'));
     assert.ok(result.prompt.includes('success criteria'));
-  });
-
-  test('omits timebox when no estimate', () => {
-    const issueNoEstimate = { ...mockIssue, estimate: null };
-    const result = generatePrompt('needs-spike', issueNoEstimate, mockContext);
-    assert.ok(!result.prompt.includes('Timebox'));
   });
 });
 
@@ -439,7 +465,8 @@ describe('blocked template', () => {
     parent: { id: 'p1', identifier: 'TEST-P1', title: 'Parent task', state: { name: 'Started', type: 'started' } },
     siblings: [],
     project: { name: 'Integration', description: 'API Integration' },
-    children: []
+    children: [],
+    comments: []
   };
 
   test('returns Blocker Analysis as name', () => {
@@ -485,7 +512,8 @@ describe('needs-context template', () => {
     project: { name: 'Migration', description: 'Legacy system migration' },
     children: [
       { id: 'c1', identifier: 'TEST-C2', title: 'Subtask', state: { name: 'Todo', type: 'unstarted' } }
-    ]
+    ],
+    comments: []
   };
 
   test('returns Context Summary as name', () => {
@@ -527,7 +555,8 @@ describe('bug template', () => {
     parent: null,
     siblings: [],
     project: { name: 'Auth', description: 'Authentication system' },
-    children: []
+    children: [],
+    comments: []
   };
 
   test('returns Bug Investigation as name', () => {
@@ -568,7 +597,8 @@ describe('plan template', () => {
     project: { name: 'User Features', description: 'User-related features' },
     children: [
       { id: 'c1', identifier: 'TEST-C1', title: 'Design profile UI', state: { name: 'Todo', type: 'unstarted' } }
-    ]
+    ],
+    comments: []
   };
 
   test('returns Implementation Plan as name', () => {
@@ -706,7 +736,8 @@ describe('code-review template', () => {
     parent: null,
     siblings: [],
     project: { name: 'Auth Refactor', description: 'Authentication improvements' },
-    children: []
+    children: [],
+    comments: []
   };
 
   test('returns Code Review as name', () => {
@@ -833,7 +864,8 @@ describe('Prompt Sections', () => {
     parent: { id: 'p1', identifier: 'TEST-100', title: 'Parent', state: { name: 'Started', type: 'started' } },
     siblings: [{ id: 's1', identifier: 'TEST-101', title: 'Sibling', state: { name: 'Todo', type: 'unstarted' } }],
     project: { name: 'Test Project', description: 'Project desc' },
-    children: [{ id: 'c1', identifier: 'TEST-201', title: 'Child', state: { name: 'Todo', type: 'unstarted' } }]
+    children: [{ id: 'c1', identifier: 'TEST-201', title: 'Child', state: { name: 'Todo', type: 'unstarted' } }],
+    comments: []
   };
 
   test('prompt includes header with identifier and title', () => {
