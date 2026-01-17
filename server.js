@@ -14,7 +14,7 @@ import { MongoClient } from 'mongodb'
 import { MangoClient } from '@jkershaw/mangodb'
 import { MongoSessionStore } from './lib/session-store.js'
 import { fetchProjects, fetchTeams, fetchIssueContext } from './lib/linear.js'
-import { buildForest, partitionCompleted, buildInProgressForest } from './lib/tree.js'
+import { buildForest, partitionCompleted, buildInProgressForest, NO_PROJECT_ID } from './lib/tree.js'
 import { renderPage, renderErrorPage } from './lib/render.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken, calculateExpiresAt } from './lib/token-refresh.js'
@@ -313,6 +313,17 @@ async function fetchAndPrepareProjects(accessToken, teamId = null) {
 
   // Build issue tree structure (parent-child relationships)
   const forest = buildForest(issues);
+
+  // Add virtual "No Project" if there are issues without a project
+  if (forest.has(NO_PROJECT_ID)) {
+    projects.push({
+      id: NO_PROJECT_ID,
+      name: 'No Project',
+      content: null,
+      url: null,
+      sortOrder: Number.MAX_SAFE_INTEGER // Always sort last
+    });
+  }
 
   // Build in-progress tree with ancestor chains for context
   const inProgressTrees = buildInProgressForest(issues, projects);
