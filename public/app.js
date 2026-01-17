@@ -798,8 +798,12 @@ function initRecommendations() {
       )
 
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to get recommendation')
+        const errorData = await response.json()
+        // Include detailed message if available (e.g., OpenRouter API errors)
+        const errorMsg = errorData.message
+          ? `${errorData.error}: ${errorData.message}`
+          : errorData.error || 'Failed to get recommendation'
+        throw new Error(errorMsg)
       }
 
       const data = await response.json()
