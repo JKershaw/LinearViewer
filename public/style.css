@@ -808,38 +808,24 @@ h1 {
 /* =============================================================================
    AI Recommendation Feature
    =============================================================================
-   "suggest" button and recommendation container for AI-powered suggestions.
+   "AI suggest" button and recommendation container for AI-powered suggestions.
 */
 
-/* Suggest button - styled similarly to label-prompt but with accent color */
-.suggest-btn {
-  display: inline-block;
-  background: none;
-  border: 1px solid var(--blue);
-  padding: 0.15rem 0.4rem;
-  font-family: var(--font-content);
-  font-size: 0.8em;
+/* Suggest button - inherits layout from .label-prompt, only overrides colors */
+.label-prompt.suggest-btn {
+  border-color: var(--blue);
   color: var(--blue);
-  cursor: pointer;
-  border-radius: 3px;
-  margin-left: 0.3rem;
-  margin-bottom: 0.4rem;
-  white-space: nowrap;
-  transition: all 0.15s ease;
 }
 
-.suggest-btn:hover {
+.label-prompt.suggest-btn:hover {
   background: var(--blue);
+  border-color: var(--blue);
   color: white;
 }
 
-.suggest-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.suggest-btn.loading {
+.label-prompt.suggest-btn.loading {
   background: var(--blue);
+  border-color: var(--blue);
   color: white;
   opacity: 0.7;
 }
@@ -918,10 +904,6 @@ h1 {
 
 /* Mobile adjustments */
 @media (max-width: 640px) {
-  .suggest-btn {
-    padding: 0.4rem 0.6rem;
-  }
-
   .recommend-container {
     padding: 0.5rem;
   }

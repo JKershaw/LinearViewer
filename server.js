@@ -188,9 +188,11 @@ if (process.env.NODE_ENV === 'test') {
     req.session.workspaces = workspaces
     req.session.activeWorkspaceId = workspaces[0].id
 
-    // Set OpenRouter API key in session if requested
+    // Set or clear OpenRouter API key in session based on flag
     if (openRouterConnected) {
       req.session.openRouterApiKey = 'test-openrouter-key'
+    } else {
+      delete req.session.openRouterApiKey
     }
 
     // Explicitly save session before responding to ensure it's persisted
