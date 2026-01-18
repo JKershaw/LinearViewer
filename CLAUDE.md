@@ -182,4 +182,24 @@ node lib/linear-cli.js update-issue issue_id '{"stateId":"state_done"}'
 node lib/linear-cli.js comment issue_id "Fixed in PR #42"
 ```
 
+### Stdin Support
+
+For complex JSON with special characters (newlines, quotes, backticks), use `--stdin` to avoid shell escaping issues:
+
+```bash
+# Using pipe
+echo '{"description":"Text with \"quotes\" and\nnewlines"}' | node lib/linear-cli.js create-issue team_id "Title" --stdin
+
+# Using heredoc (recommended for complex content)
+node lib/linear-cli.js update-issue issue_id --stdin << 'EOF'
+{
+  "description": "Complex content with `backticks` and special chars",
+  "stateId": "state_123"
+}
+EOF
+
+# From file
+cat payload.json | node lib/linear-cli.js create-issue team_id "Title" --stdin
+```
+
 **Note**: The CLI outputs JSON for easy parsing by AI agents.
