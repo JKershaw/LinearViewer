@@ -9,8 +9,7 @@ import crypto from 'crypto'
 import { Router } from 'express'
 import { fetchOrganization } from '../lib/linear.js'
 import { renderErrorPage } from '../lib/render.js'
-import { calculateExpiresAt } from '../lib/token-refresh.js'
-import { upsertWorkspace, saveSession } from '../lib/workspace.js'
+import { upsertWorkspace, saveSession, updateWorkspaceTokens } from '../lib/workspace.js'
 
 /**
  * Create auth routes with required dependencies.
@@ -125,11 +124,10 @@ export function createAuthRoutes({ sessionStore }) {
         id: org.id,
         name: org.name,
         urlKey: org.urlKey || org.name,
-        accessToken: data.access_token,
-        refreshToken: data.refresh_token,
-        tokenExpiresAt: calculateExpiresAt(data.expires_in || 86400),
         addedAt: Date.now()
       }
+      // Add token fields using helper (with default expires_in for safety)
+      updateWorkspaceTokens(workspace, { ...data, expires_in: data.expires_in || 86400 })
 
       // Preserve existing workspaces before regenerating session
       const existingWorkspaces = req.session.workspaces || []

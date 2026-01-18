@@ -17,8 +17,8 @@ import { fetchProjects, fetchTeams, fetchIssueContext } from './lib/linear.js'
 import { buildForest, partitionCompleted, buildInProgressForest, NO_PROJECT_ID } from './lib/tree.js'
 import { renderPage, renderErrorPage } from './lib/render.js'
 import { parseLandingPage } from './lib/parse-landing.js'
-import { refreshAccessToken, calculateExpiresAt } from './lib/token-refresh.js'
-import { UUID_REGEX, getActiveWorkspace, removeWorkspace, saveSession } from './lib/workspace.js'
+import { refreshAccessToken } from './lib/token-refresh.js'
+import { UUID_REGEX, getActiveWorkspace, removeWorkspace, saveSession, updateWorkspaceTokens } from './lib/workspace.js'
 import { createAuthRoutes } from './routes/auth.js'
 import { createWorkspaceRoutes } from './routes/workspace.js'
 import { createOpenRouterAuthRoutes } from './routes/openrouter-auth.js'
@@ -240,9 +240,7 @@ async function ensureValidToken(req, res, next) {
     const newTokens = await refreshAccessToken(workspace.refreshToken)
 
     // Update workspace tokens
-    workspace.accessToken = newTokens.access_token
-    workspace.refreshToken = newTokens.refresh_token
-    workspace.tokenExpiresAt = calculateExpiresAt(newTokens.expires_in)
+    updateWorkspaceTokens(workspace, newTokens)
 
     await saveSession(req.session)
     console.log(`Token refreshed for workspace ${workspace.id}`)
@@ -386,9 +384,7 @@ app.get('/', async (req, res) => {
       try {
         // Attempt to refresh the token
         const tokenData = await refreshAccessToken(workspace.refreshToken);
-        workspace.accessToken = tokenData.access_token;
-        workspace.refreshToken = tokenData.refresh_token;
-        workspace.tokenExpiresAt = calculateExpiresAt(tokenData.expires_in);
+        updateWorkspaceTokens(workspace, tokenData);
 
         await saveSession(req.session);
         console.log('Token refreshed after 401, retrying request');
