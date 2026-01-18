@@ -835,12 +835,13 @@ ${goal}`
     const issueLabels = issue.labels || []
     const labelAlerts = []
 
+    // Helper to check if any label variant exists
+    const hasLabel = (labels, ...variants) =>
+      labels.some(l => variants.includes(l.toLowerCase()))
+
     // Check for research mismatch
     const aiRecommendsResearch = /Research:\s*✗\s*Needed/i.test(recommendation.reasoning)
-    const hasResearchLabel = issueLabels.some(label =>
-      label.toLowerCase() === 'needs-research' || label.toLowerCase() === 'needs research'
-    )
-    if (aiRecommendsResearch && !hasResearchLabel) {
+    if (aiRecommendsResearch && !hasLabel(issueLabels, 'needs-research', 'needs research')) {
       labelAlerts.push({
         type: 'needs-research',
         message: 'AI suggests this task needs research, but it doesn\'t have the "needs-research" label.'
@@ -849,10 +850,7 @@ ${goal}`
 
     // Check for breakdown mismatch
     const aiRecommendsBreakdown = /Size:\s*✗\s*Too large/i.test(recommendation.reasoning)
-    const hasBreakdownLabel = issueLabels.some(label =>
-      label.toLowerCase() === 'needs-breakdown' || label.toLowerCase() === 'needs breakdown'
-    )
-    if (aiRecommendsBreakdown && !hasBreakdownLabel) {
+    if (aiRecommendsBreakdown && !hasLabel(issueLabels, 'needs-breakdown', 'needs breakdown')) {
       labelAlerts.push({
         type: 'needs-breakdown',
         message: 'AI suggests this task is too large and needs breakdown, but it doesn\'t have the "needs-breakdown" label.'
