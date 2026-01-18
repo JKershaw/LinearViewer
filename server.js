@@ -831,6 +831,7 @@ ${goal}`
     const recommendation = await getRecommendation(issue, { parent, siblings, project, children, comments }, { apiKey: sessionApiKey })
 
     // Detect label mismatches between AI recommendations and issue labels
+    // Note: issue.labels is already an array of strings from fetchIssueContext (lib/linear.js:332)
     const issueLabels = issue.labels || []
     const labelAlerts = []
 

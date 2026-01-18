@@ -838,11 +838,24 @@ function initRecommendations() {
       if (activeRecommendFetch === abortController) {
         // Show label mismatch alerts if AI detected any
         if (alertDiv && data.labelAlerts && data.labelAlerts.length > 0) {
-          const issueUrl = data.issueUrl || '#'
-          const alertsHtml = data.labelAlerts.map(alert =>
-            `<div class="alert-item"><span class="alert-icon">⚠</span> ${alert.message}</div>`
-          ).join('')
-          alertDiv.innerHTML = `${alertsHtml}<a href="${issueUrl}" target="_blank" class="alert-link">Update in Linear →</a>`
+          // Use DOM APIs to avoid XSS from issueUrl
+          alertDiv.innerHTML = ''
+          data.labelAlerts.forEach(alert => {
+            const item = document.createElement('div')
+            item.className = 'alert-item'
+            const icon = document.createElement('span')
+            icon.className = 'alert-icon'
+            icon.textContent = '⚠'
+            item.appendChild(icon)
+            item.appendChild(document.createTextNode(' ' + alert.message))
+            alertDiv.appendChild(item)
+          })
+          const link = document.createElement('a')
+          link.href = data.issueUrl || '#'
+          link.target = '_blank'
+          link.className = 'alert-link'
+          link.textContent = 'Update in Linear →'
+          alertDiv.appendChild(link)
           alertDiv.classList.remove('hidden')
         } else if (alertDiv) {
           alertDiv.classList.add('hidden')
