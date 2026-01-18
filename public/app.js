@@ -839,7 +839,7 @@ function initRecommendations() {
         // Show label mismatch alerts if AI detected any
         if (alertDiv && data.labelAlerts && data.labelAlerts.length > 0) {
           // Use DOM APIs to avoid XSS from issueUrl (textContent auto-escapes)
-          alertDiv.innerHTML = ''
+          alertDiv.replaceChildren()
           data.labelAlerts.forEach(alert => {
             const item = document.createElement('div')
             item.className = 'alert-item'

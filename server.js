@@ -839,8 +839,10 @@ ${goal}`
     const hasLabel = (labels, ...variants) =>
       labels.some(l => variants.includes(l.toLowerCase()))
 
-    // AI assessment patterns from lib/prompts/meta-prompt-template.js (lines 154-157)
-    // These match the structured output format: "- Research: [✓ Complete | ✓ Not needed | ✗ Needed]"
+    // AI assessment patterns - these detect specific text in the AI reasoning output.
+    // Source: lib/prompts/meta-prompt-template.js (lines 154-157)
+    // Expected format: "- Research: [✓ Complete | ✓ Not needed | ✗ Needed]"
+    // NOTE: Update these patterns if the AI output format changes.
     const aiRecommendsResearch = /Research:\s*✗\s*Needed/i.test(recommendation.reasoning)
     if (aiRecommendsResearch && !hasLabel(issueLabels, 'needs-research', 'needs research')) {
       labelAlerts.push({
@@ -849,7 +851,7 @@ ${goal}`
       })
     }
 
-    // Pattern: "- Size: [✓ Focused | ✗ Too large]"
+    // Expected format: "- Size: [✓ Focused | ✗ Too large]"
     const aiRecommendsBreakdown = /Size:\s*✗\s*Too large/i.test(recommendation.reasoning)
     if (aiRecommendsBreakdown && !hasLabel(issueLabels, 'needs-breakdown', 'needs breakdown')) {
       labelAlerts.push({
