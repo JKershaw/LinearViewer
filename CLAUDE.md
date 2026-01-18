@@ -225,3 +225,76 @@ cat payload.json | node lib/linear-cli.js create-issue team_id "Title" --stdin
 ```
 
 **Note**: The CLI outputs JSON for easy parsing by AI agents.
+
+### Task Breakdown Workflow
+
+When breaking down a Linear issue into subtasks, follow this workflow:
+
+#### 1. Fetch Parent Issue Context
+
+```bash
+node lib/linear-cli.js issue LIN-XX
+node lib/linear-cli.js teams
+node lib/linear-cli.js states <teamId>
+node lib/linear-cli.js projects
+```
+
+#### 2. Create Subtasks with Proper Metadata
+
+Always set these fields when creating subtasks:
+
+```bash
+node lib/linear-cli.js create-issue <teamId> "Subtask title" --stdin << 'EOF'
+{
+  "description": "## Summary\n\nTask description...\n\n## Acceptance Criteria\n\n- [ ] Criterion 1\n- [ ] Criterion 2",
+  "parentId": "<parent-issue-uuid>",
+  "projectId": "<project-uuid>",
+  "stateId": "<todo-state-uuid>"
+}
+EOF
+```
+
+| Field | Purpose |
+|-------|---------|
+| `parentId` | Links subtask to parent issue |
+| `projectId` | Inherits project from parent |
+| `stateId` | Set to "Todo" state for new subtasks |
+
+#### 3. Create Dependency Relations
+
+After creating all subtasks, establish blocking relationships:
+
+```bash
+# LIN-40 depends on LIN-39 completing first
+node lib/linear-cli.js relation LIN-40 blocked-by LIN-39
+
+# LIN-41 depends on both LIN-39 and LIN-40
+node lib/linear-cli.js relation LIN-41 blocked-by LIN-39
+node lib/linear-cli.js relation LIN-41 blocked-by LIN-40
+```
+
+#### 4. Add Summary Comment to Parent
+
+Document the breakdown with phase grouping:
+
+```bash
+node lib/linear-cli.js comment <parentId> "## Task Breakdown Complete
+
+### Phase 1: Core Implementation
+- LIN-39: First task
+- LIN-40: Second task (depends on LIN-39)
+
+### Phase 2: Polish
+- LIN-41: Third task (depends on LIN-39, LIN-40)
+
+..."
+```
+
+#### Workflow Patterns
+
+| Pattern | Description |
+|---------|-------------|
+| **Phase grouping** | Organize subtasks into logical phases in comments |
+| **Dependency chains** | Use `blocked-by` relations to enforce execution order |
+| **Acceptance criteria** | Use checkbox format (`- [ ]`) in descriptions |
+| **Metadata inheritance** | Always inherit `projectId` from parent issue |
