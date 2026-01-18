@@ -1044,3 +1044,55 @@ h1 {
     max-height: 200px;
   }
 }
+
+/* =============================================================================
+   Page Footer
+   =============================================================================
+   Displays reset/audit actions and deploy information.
+   CLI aesthetic: monospace for technical info, dim colors.
+*/
+.page-footer {
+  margin-top: 3rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--fg-vdim);
+  text-align: center;
+  font-family: var(--font-content);
+  font-size: 0.85em;
+}
+
+.footer-actions {
+  margin-bottom: 0.5rem;
+}
+
+.footer-action {
+  color: var(--fg-dim);
+  text-decoration: none;
+}
+
+.footer-action:hover {
+  color: var(--fg);
+}
+
+.footer-deploy {
+  color: var(--fg-dim);
+  font-family: var(--font-structural);
+  font-size: 0.9em;
+}
+
+.footer-link {
+  color: var(--fg-dim);
+  text-decoration: none;
+}
+
+.footer-link:hover {
+  color: var(--blue);
+  text-decoration: underline;
+}
+
+/* Mobile adjustments for footer */
+@media (max-width: 640px) {
+  .page-footer {
+    margin-top: 2rem;
+    padding-top: 0.75rem;
+  }
+}

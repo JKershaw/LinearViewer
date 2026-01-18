@@ -70,7 +70,14 @@ Both In Progress and Projects sections use the same nested structure:
 - `#workspace-options` - workspace dropdown panel
 - `#team-options` - team dropdown panel
 - `[data-team="{id}"]` - team filter option (use "all" for all teams)
-- `.reset-view` - reset button
+
+### Footer Selectors
+- `.page-footer` - footer container
+- `.footer-actions` - container for action links (authenticated pages only)
+- `.footer-action` - action link (reset, audit)
+- `.reset-view` - reset button (in footer)
+- `.footer-deploy` - deploy information container
+- `.footer-link` - link within deploy info (commit hash or GitHub repo)
 
 ### Interactive Elements
 - `.toggle` - expand/collapse arrow (▶/▼)
