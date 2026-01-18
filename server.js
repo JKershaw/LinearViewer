@@ -843,7 +843,8 @@ ${goal}`
     // Source: lib/prompts/meta-prompt-template.js (lines 154-157)
     // Expected format: "- Research: [✓ Complete | ✓ Not needed | ✗ Needed]"
     // NOTE: Update these patterns if the AI output format changes.
-    const aiRecommendsResearch = /Research:\s*✗\s*Needed/i.test(recommendation.reasoning)
+    const reasoning = typeof recommendation.reasoning === 'string' ? recommendation.reasoning : ''
+    const aiRecommendsResearch = /Research:\s*✗\s*Needed/i.test(reasoning)
     if (aiRecommendsResearch && !hasLabel(issueLabels, 'needs-research', 'needs research')) {
       labelAlerts.push({
         type: 'needs-research',
@@ -852,7 +853,7 @@ ${goal}`
     }
 
     // Expected format: "- Size: [✓ Focused | ✗ Too large]"
-    const aiRecommendsBreakdown = /Size:\s*✗\s*Too large/i.test(recommendation.reasoning)
+    const aiRecommendsBreakdown = /Size:\s*✗\s*Too large/i.test(reasoning)
     if (aiRecommendsBreakdown && !hasLabel(issueLabels, 'needs-breakdown', 'needs breakdown')) {
       labelAlerts.push({
         type: 'needs-breakdown',

@@ -838,17 +838,19 @@ function initRecommendations() {
       if (activeRecommendFetch === abortController) {
         // Show label mismatch alerts if AI detected any
         if (alertDiv && data.labelAlerts && data.labelAlerts.length > 0) {
-          // Use DOM APIs to avoid XSS from issueUrl (textContent auto-escapes)
+          // Use DOM APIs to avoid XSS (textContent auto-escapes)
           alertDiv.replaceChildren()
           data.labelAlerts.forEach(alert => {
-            if (!alert || typeof alert.message !== 'string') return
+            if (typeof alert?.message !== 'string') return
             const item = document.createElement('div')
             item.className = 'alert-item'
             item.textContent = `⚠ ${alert.message}`
             alertDiv.appendChild(item)
           })
           const link = document.createElement('a')
-          link.href = (typeof data.issueUrl === 'string' && data.issueUrl) ? data.issueUrl : '#'
+          // Validate URL scheme to prevent javascript:/data: XSS injection
+          const url = (typeof data.issueUrl === 'string' && data.issueUrl) ? data.issueUrl : '#'
+          link.href = (url === '#' || url.startsWith('https://') || url.startsWith('http://')) ? url : '#'
           link.target = '_blank'
           link.rel = 'noopener noreferrer'
           link.className = 'alert-link'
