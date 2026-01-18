@@ -996,6 +996,36 @@ h1 {
   color: var(--fg);
 }
 
+/* Label mismatch alert banner */
+.recommend-alert {
+  background: #fef3cd;
+  border: 1px solid #ffc107;
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+  font-family: var(--font-content);
+  font-size: 0.85em;
+  color: #856404;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.recommend-alert .alert-icon {
+  flex-shrink: 0;
+}
+
+.recommend-alert .alert-link {
+  color: #533f03;
+  text-decoration: underline;
+  margin-left: auto;
+}
+
+.recommend-alert .alert-link:hover {
+  color: #1d1501;
+}
+
 .recommend-reasoning {
   font-family: var(--font-content);
   font-size: 0.9em;

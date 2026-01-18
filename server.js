@@ -813,7 +813,15 @@ ${labels.length > 0 ? `**Labels:** ${labels.join(', ')}` : ''}
 
 ${goal}`
 
-      return res.json({ reasoning, prompt, truncated: false, completionTokens: null })
+      // For test mode, also return the label alert fields (null since mock doesn't trigger it)
+      return res.json({
+        reasoning,
+        prompt,
+        truncated: false,
+        completionTokens: null,
+        labelAlert: null,
+        issueUrl: mockIssue.url
+      })
     }
 
     // Fetch issue context from Linear
@@ -822,11 +830,23 @@ ${goal}`
     // Get AI-generated prompt (pass session API key if available)
     const recommendation = await getRecommendation(issue, { parent, siblings, project, children, comments }, { apiKey: sessionApiKey })
 
+    // Detect if AI recommends research but issue lacks the label
+    const aiRecommendsResearch = /Research:\s*✗\s*Needed/i.test(recommendation.reasoning)
+    const issueLabels = issue.labels || []
+    const hasResearchLabel = issueLabels.some(label =>
+      label.toLowerCase() === 'needs-research' || label.toLowerCase() === 'needs research'
+    )
+    const labelAlert = aiRecommendsResearch && !hasResearchLabel
+      ? { type: 'needs-research', message: 'AI suggests this task needs research, but it doesn\'t have the "needs-research" label.' }
+      : null
+
     res.json({
       reasoning: recommendation.reasoning,
       prompt: recommendation.prompt,
       truncated: recommendation.truncated,
-      completionTokens: recommendation.completionTokens
+      completionTokens: recommendation.completionTokens,
+      labelAlert,
+      issueUrl: issue.url
     })
   } catch (error) {
     console.error('Recommendation error:', error)

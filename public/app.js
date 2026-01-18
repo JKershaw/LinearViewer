@@ -805,11 +805,13 @@ function initRecommendations() {
     const reasoning = recommendContainer.querySelector('.recommend-reasoning')
     const promptDiv = recommendContainer.querySelector('.recommend-prompt')
     const promptText = promptDiv?.querySelector('.prompt-text')
+    const alertDiv = recommendContainer.querySelector('.recommend-alert')
 
     reasoning.textContent = 'Analyzing task context...'
     if (promptText) promptText.textContent = ''
-    // Keep prompt section hidden during loading - only show reasoning
+    // Keep prompt section and alert hidden during loading - only show reasoning
     if (promptDiv) promptDiv.classList.add('hidden')
+    if (alertDiv) alertDiv.classList.add('hidden')
     recommendContainer.classList.remove('hidden')
 
     // Add loading class to button
@@ -834,6 +836,15 @@ function initRecommendations() {
 
       // Only update if this is still the active request
       if (activeRecommendFetch === abortController) {
+        // Show label mismatch alert if AI detected one
+        if (alertDiv && data.labelAlert) {
+          const issueUrl = data.issueUrl || '#'
+          alertDiv.innerHTML = `<span class="alert-icon">⚠</span> ${data.labelAlert.message} <a href="${issueUrl}" target="_blank" class="alert-link">Update in Linear →</a>`
+          alertDiv.classList.remove('hidden')
+        } else if (alertDiv) {
+          alertDiv.classList.add('hidden')
+        }
+
         // Render reasoning as markdown
         const reasoningText = data.truncated
           ? '[Warning: Response may be incomplete due to length limit]\n\n' + data.reasoning
