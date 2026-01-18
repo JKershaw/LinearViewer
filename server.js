@@ -835,9 +835,9 @@ ${goal}`
     const issueLabels = Array.isArray(issue?.labels) ? issue.labels : []
     const labelAlerts = []
 
-    // Helper to check if any label variant exists
+    // Helper to check if any label variant exists (handles whitespace/casing variations)
     const hasLabel = (labels, ...variants) =>
-      labels.some(l => variants.includes(l.toLowerCase()))
+      labels.some(l => variants.some(v => l.toLowerCase().trim() === v.toLowerCase().trim()))
 
     // AI assessment patterns - these detect specific text in the AI reasoning output.
     // Source: lib/prompts/meta-prompt-template.js (lines 154-157)

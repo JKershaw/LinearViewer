@@ -850,6 +850,7 @@ function initRecommendations() {
           const link = document.createElement('a')
           link.href = (typeof data.issueUrl === 'string' && data.issueUrl) ? data.issueUrl : '#'
           link.target = '_blank'
+          link.rel = 'noopener noreferrer'
           link.className = 'alert-link'
           link.textContent = 'Update in Linear →'
           alertDiv.appendChild(link)
