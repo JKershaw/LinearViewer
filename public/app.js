@@ -836,10 +836,13 @@ function initRecommendations() {
 
       // Only update if this is still the active request
       if (activeRecommendFetch === abortController) {
-        // Show label mismatch alert if AI detected one
-        if (alertDiv && data.labelAlert) {
+        // Show label mismatch alerts if AI detected any
+        if (alertDiv && data.labelAlerts && data.labelAlerts.length > 0) {
           const issueUrl = data.issueUrl || '#'
-          alertDiv.innerHTML = `<span class="alert-icon">⚠</span> ${data.labelAlert.message} <a href="${issueUrl}" target="_blank" class="alert-link">Update in Linear →</a>`
+          const alertsHtml = data.labelAlerts.map(alert =>
+            `<div class="alert-item"><span class="alert-icon">⚠</span> ${alert.message}</div>`
+          ).join('')
+          alertDiv.innerHTML = `${alertsHtml}<a href="${issueUrl}" target="_blank" class="alert-link">Update in Linear →</a>`
           alertDiv.classList.remove('hidden')
         } else if (alertDiv) {
           alertDiv.classList.add('hidden')

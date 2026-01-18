@@ -666,13 +666,13 @@ test.describe('Recommendation API', () => {
     expect(body.enabled).toBe(true);
   });
 
-  test('returns labelAlert and issueUrl fields', async ({ page }) => {
+  test('returns labelAlerts array and issueUrl fields', async ({ page }) => {
     const response = await page.request.get(`/api/recommend/${BREAKDOWN_ISSUE_ID}`);
     expect(response.status()).toBe(200);
 
     const body = await response.json();
-    // labelAlert should be present (null when no mismatch detected)
-    expect('labelAlert' in body).toBe(true);
+    // labelAlerts should be an array (empty when no mismatch detected)
+    expect(Array.isArray(body.labelAlerts)).toBe(true);
     // issueUrl should be present
     expect('issueUrl' in body).toBe(true);
     expect(typeof body.issueUrl).toBe('string');

@@ -813,13 +813,13 @@ ${labels.length > 0 ? `**Labels:** ${labels.join(', ')}` : ''}
 
 ${goal}`
 
-      // For test mode, also return the label alert fields (null since mock doesn't trigger it)
+      // For test mode, also return the label alert fields (empty array since mock doesn't trigger it)
       return res.json({
         reasoning,
         prompt,
         truncated: false,
         completionTokens: null,
-        labelAlert: null,
+        labelAlerts: [],
         issueUrl: mockIssue.url
       })
     }
@@ -830,22 +830,40 @@ ${goal}`
     // Get AI-generated prompt (pass session API key if available)
     const recommendation = await getRecommendation(issue, { parent, siblings, project, children, comments }, { apiKey: sessionApiKey })
 
-    // Detect if AI recommends research but issue lacks the label
-    const aiRecommendsResearch = /Research:\s*✗\s*Needed/i.test(recommendation.reasoning)
+    // Detect label mismatches between AI recommendations and issue labels
     const issueLabels = issue.labels || []
+    const labelAlerts = []
+
+    // Check for research mismatch
+    const aiRecommendsResearch = /Research:\s*✗\s*Needed/i.test(recommendation.reasoning)
     const hasResearchLabel = issueLabels.some(label =>
       label.toLowerCase() === 'needs-research' || label.toLowerCase() === 'needs research'
     )
-    const labelAlert = aiRecommendsResearch && !hasResearchLabel
-      ? { type: 'needs-research', message: 'AI suggests this task needs research, but it doesn\'t have the "needs-research" label.' }
-      : null
+    if (aiRecommendsResearch && !hasResearchLabel) {
+      labelAlerts.push({
+        type: 'needs-research',
+        message: 'AI suggests this task needs research, but it doesn\'t have the "needs-research" label.'
+      })
+    }
+
+    // Check for breakdown mismatch
+    const aiRecommendsBreakdown = /Size:\s*✗\s*Too large/i.test(recommendation.reasoning)
+    const hasBreakdownLabel = issueLabels.some(label =>
+      label.toLowerCase() === 'needs-breakdown' || label.toLowerCase() === 'needs breakdown'
+    )
+    if (aiRecommendsBreakdown && !hasBreakdownLabel) {
+      labelAlerts.push({
+        type: 'needs-breakdown',
+        message: 'AI suggests this task is too large and needs breakdown, but it doesn\'t have the "needs-breakdown" label.'
+      })
+    }
 
     res.json({
       reasoning: recommendation.reasoning,
       prompt: recommendation.prompt,
       truncated: recommendation.truncated,
       completionTokens: recommendation.completionTokens,
-      labelAlert,
+      labelAlerts,
       issueUrl: issue.url
     })
   } catch (error) {
