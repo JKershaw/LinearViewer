@@ -46,7 +46,7 @@ const sectionState = {};
     const ampm = hours >= 12 ? 'PM' : 'AM';
     hours = hours % 12;
     hours = hours || 12; // 0 should be 12
-    const minuteStr = minutes < 10 ? `0${minutes}` : minutes;
+    const minuteStr = String(minutes).padStart(2, '0');
 
     deployTimeEl.textContent = `deployed ${month} ${day}, ${hours}:${minuteStr} ${ampm}`;
   } catch (e) {
