@@ -339,6 +339,88 @@ async function fetchAndPrepareProjects(accessToken, teamId = null) {
 }
 
 /**
+ * Handles workspace removal after authentication failure.
+ * Removes the workspace from session, then either redirects to switch
+ * workspace or shows the landing page if no workspaces remain.
+ *
+ * @param {Object} session - Express session object
+ * @param {string} workspaceId - ID of workspace to remove
+ * @param {Object} res - Express response object
+ * @returns {Promise<void>}
+ */
+async function handleWorkspaceRemoval(session, workspaceId, res) {
+  const remaining = removeWorkspace(session, workspaceId);
+
+  if (remaining > 0) {
+    await saveSession(session);
+    return res.redirect('/');
+  }
+
+  return new Promise((resolve) => {
+    session.destroy((err) => {
+      if (err) console.error('Session destroy error:', err);
+      const html = renderPage(landingTrees, [], landingData.organizationName, { isLanding: true });
+      res.send(html);
+      resolve();
+    });
+  });
+}
+
+/**
+ * Attempts to refresh an expired token and retry the request.
+ * On success, renders the project page with fresh data.
+ *
+ * @param {Object} workspace - Workspace object with tokens
+ * @param {Object} session - Express session object
+ * @param {string|null} teamId - Optional team filter
+ * @param {string|null} openRouterSource - OpenRouter connection source
+ * @param {Object} res - Express response object
+ * @returns {Promise<void>}
+ * @throws {Error} If token refresh or retry fails
+ */
+async function handleTokenRefreshAndRetry(workspace, session, teamId, openRouterSource, res) {
+  const tokenData = await refreshAccessToken(workspace.refreshToken);
+  updateWorkspaceTokens(workspace, tokenData);
+  await saveSession(session);
+  console.log('Token refreshed after 401, retrying request');
+
+  const { trees, inProgressTrees, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace.accessToken, teamId);
+  const html = renderPage(trees, inProgressTrees, organizationName, {
+    teams,
+    selectedTeamId,
+    workspaces: session.workspaces,
+    activeWorkspaceId: session.activeWorkspaceId,
+    openRouterSource
+  });
+  return res.send(html);
+}
+
+/**
+ * Handles 401 Unauthorized errors from the Linear API.
+ * If a refresh token exists, attempts to refresh and retry.
+ * On failure or if no refresh token, removes the workspace.
+ *
+ * @param {Object} workspace - Workspace object with tokens
+ * @param {Object} session - Express session object
+ * @param {string|null} teamId - Optional team filter
+ * @param {string|null} openRouterSource - OpenRouter connection source
+ * @param {Object} res - Express response object
+ * @returns {Promise<void>}
+ */
+async function handleUnauthorizedError(workspace, session, teamId, openRouterSource, res) {
+  if (workspace.refreshToken) {
+    try {
+      return await handleTokenRefreshAndRetry(workspace, session, teamId, openRouterSource, res);
+    } catch (refreshError) {
+      console.error('Token refresh failed after 401:', refreshError);
+      return handleWorkspaceRemoval(session, workspace.id, res);
+    }
+  }
+
+  return handleWorkspaceRemoval(session, workspace.id, res);
+}
+
+/**
  * Home page - renders either landing page or authenticated project view.
  *
  * For unauthenticated users: Shows pre-rendered static landing page.
@@ -377,62 +459,14 @@ app.get('/', async (req, res) => {
     });
     res.send(html);
   } catch (error) {
-    console.error('Error fetching projects:', error)
+    console.error('Error fetching projects:', error);
 
-    // If token is invalid/expired (401), attempt refresh and retry
-    if (error.response?.status === 401 && workspace.refreshToken) {
-      try {
-        // Attempt to refresh the token
-        const tokenData = await refreshAccessToken(workspace.refreshToken);
-        updateWorkspaceTokens(workspace, tokenData);
-
-        await saveSession(req.session);
-        console.log('Token refreshed after 401, retrying request');
-
-        // Retry the request with the new token
-        const { trees, inProgressTrees, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace.accessToken, teamId);
-        const html = renderPage(trees, inProgressTrees, organizationName, {
-          teams,
-          selectedTeamId,
-          workspaces: req.session.workspaces,
-          activeWorkspaceId: req.session.activeWorkspaceId,
-          openRouterSource
-        });
-        return res.send(html);
-      } catch (refreshError) {
-        // Refresh failed, remove this workspace
-        console.error('Token refresh failed after 401:', refreshError);
-        const remaining = removeWorkspace(req.session, workspace.id);
-
-        if (remaining > 0) {
-          await saveSession(req.session);
-          return res.redirect('/');
-        }
-
-        return req.session.destroy((err) => {
-          if (err) console.error('Session destroy error:', err);
-          const html = renderPage(landingTrees, [], landingData.organizationName, { isLanding: true });
-          res.send(html);
-        });
-      }
-    }
-
-    // If 401 but no refresh token, remove workspace and show landing or switch
+    // Handle 401 Unauthorized - attempt refresh or remove workspace
     if (error.response?.status === 401) {
-      const remaining = removeWorkspace(req.session, workspace.id);
-
-      if (remaining > 0) {
-        await saveSession(req.session);
-        return res.redirect('/');
-      }
-
-      return req.session.destroy((err) => {
-        if (err) console.error('Session destroy error:', err);
-        const html = renderPage(landingTrees, [], landingData.organizationName, { isLanding: true });
-        res.send(html);
-      });
+      return handleUnauthorizedError(workspace, req.session, teamId, openRouterSource, res);
     }
 
+    // Generic error - show error page
     console.error('Main route error:', error);
     const html = renderErrorPage('Something Went Wrong', 'Could not load your projects. Please try again or re-authenticate.', {
       action: 'Try again',
