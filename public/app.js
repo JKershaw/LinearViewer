@@ -841,13 +841,14 @@ function initRecommendations() {
           // Use DOM APIs to avoid XSS from issueUrl (textContent auto-escapes)
           alertDiv.replaceChildren()
           data.labelAlerts.forEach(alert => {
+            if (!alert || typeof alert.message !== 'string') return
             const item = document.createElement('div')
             item.className = 'alert-item'
             item.textContent = `⚠ ${alert.message}`
             alertDiv.appendChild(item)
           })
           const link = document.createElement('a')
-          link.href = data.issueUrl || '#'
+          link.href = (typeof data.issueUrl === 'string' && data.issueUrl) ? data.issueUrl : '#'
           link.target = '_blank'
           link.className = 'alert-link'
           link.textContent = 'Update in Linear →'

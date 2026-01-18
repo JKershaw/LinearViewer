@@ -832,7 +832,7 @@ ${goal}`
 
     // Detect label mismatches between AI recommendations and issue labels
     // Note: issue.labels is already an array of strings from fetchIssueContext (lib/linear.js:332)
-    const issueLabels = Array.isArray(issue.labels) ? issue.labels : []
+    const issueLabels = Array.isArray(issue?.labels) ? issue.labels : []
     const labelAlerts = []
 
     // Helper to check if any label variant exists
