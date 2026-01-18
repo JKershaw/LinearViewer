@@ -71,8 +71,8 @@ test.describe('Operator Dashboard', () => {
       await expect(page.locator('.report-summary')).toBeVisible();
       await expect(page.locator('.stat-label')).toContainText(['Total Tasks']);
 
-      // Should show sections
-      await expect(page.locator('.report-section')).toHaveCount(6);
+      // Should show sections (7 total: workspace, queues, health, labels, fields, projects, prompts)
+      await expect(page.locator('.report-section')).toHaveCount(7);
 
       // Should show timestamp
       await expect(page.locator('.report-timestamp')).toBeVisible();
@@ -126,6 +126,99 @@ test.describe('Operator Dashboard', () => {
 
       // Status should say complete
       await expect(page.locator('#audit-status')).toContainText('complete');
+    });
+
+    test('displays prompts section collapsed by default', async ({ page }) => {
+      await page.goto('/fancy');
+
+      // Run audit
+      await page.locator('#run-audit').click();
+      await expect(page.locator('.audit-report')).toBeVisible({ timeout: 10000 });
+
+      // Find prompts section
+      const promptsSection = page.locator('.report-section[data-section="prompts"]');
+      await expect(promptsSection).toBeVisible();
+
+      // Content should be hidden by default (collapsed)
+      const content = promptsSection.locator('.section-content');
+      await expect(content).toHaveClass(/hidden/);
+    });
+
+    test('prompts section shows all templates', async ({ page }) => {
+      await page.goto('/fancy');
+
+      // Run audit
+      await page.locator('#run-audit').click();
+      await expect(page.locator('.audit-report')).toBeVisible({ timeout: 10000 });
+
+      // Expand prompts section
+      const promptsSection = page.locator('.report-section[data-section="prompts"]');
+      await promptsSection.locator('.section-header').click();
+
+      // Should show summary stats
+      await expect(promptsSection.locator('.prompts-summary')).toBeVisible();
+      await expect(promptsSection.locator('.prompts-stat').first()).toContainText('templates');
+
+      // Should show template cards (12 templates)
+      const promptCards = promptsSection.locator('.prompt-card:not(.meta-prompt)');
+      await expect(promptCards).toHaveCount(12);
+    });
+
+    test('prompts section shows meta-prompt', async ({ page }) => {
+      await page.goto('/fancy');
+
+      // Run audit
+      await page.locator('#run-audit').click();
+      await expect(page.locator('.audit-report')).toBeVisible({ timeout: 10000 });
+
+      // Expand prompts section
+      const promptsSection = page.locator('.report-section[data-section="prompts"]');
+      await promptsSection.locator('.section-header').click();
+
+      // Should show meta-prompt card
+      const metaPrompt = promptsSection.locator('.prompt-card.meta-prompt');
+      await expect(metaPrompt).toBeVisible();
+      await expect(metaPrompt.locator('.prompt-name')).toContainText('Meta-Prompt');
+    });
+
+    test('prompt cards show character counts', async ({ page }) => {
+      await page.goto('/fancy');
+
+      // Run audit
+      await page.locator('#run-audit').click();
+      await expect(page.locator('.audit-report')).toBeVisible({ timeout: 10000 });
+
+      // Expand prompts section
+      const promptsSection = page.locator('.report-section[data-section="prompts"]');
+      await promptsSection.locator('.section-header').click();
+
+      // First template card should show char count
+      const firstCard = promptsSection.locator('.prompt-card').first();
+      await expect(firstCard.locator('.prompt-char-count')).toContainText('chars');
+    });
+
+    test('prompt cards expand to show full prompt text', async ({ page }) => {
+      await page.goto('/fancy');
+
+      // Run audit
+      await page.locator('#run-audit').click();
+      await expect(page.locator('.audit-report')).toBeVisible({ timeout: 10000 });
+
+      // Expand prompts section
+      const promptsSection = page.locator('.report-section[data-section="prompts"]');
+      await promptsSection.locator('.section-header').click();
+
+      // First template card's prompt text should be hidden initially
+      const firstCard = promptsSection.locator('.prompt-card').first();
+      const promptText = firstCard.locator('.prompt-text');
+      await expect(promptText).not.toBeVisible();
+
+      // Click to expand
+      await firstCard.locator('.prompt-toggle').click();
+      await expect(promptText).toBeVisible();
+
+      // Should contain actual prompt content (not empty)
+      await expect(promptText).not.toBeEmpty();
     });
   });
 });
@@ -186,5 +279,29 @@ test.describe('Audit API', () => {
     expect(report.health).toHaveProperty('totalTasks');
     expect(report.health).toHaveProperty('orphans');
     expect(report.health).toHaveProperty('unlabeled');
+
+    // Verify prompts structure
+    expect(report).toHaveProperty('prompts');
+    expect(report.prompts).toHaveProperty('templates');
+    expect(report.prompts).toHaveProperty('templateCount');
+    expect(report.prompts).toHaveProperty('metaPrompt');
+    expect(report.prompts).toHaveProperty('metaPromptCharCount');
+    expect(report.prompts).toHaveProperty('totalCharCount');
+    expect(report.prompts.templateCount).toBe(12);
+    expect(report.prompts.templates).toHaveLength(12);
+
+    // Verify template structure
+    const firstTemplate = report.prompts.templates[0];
+    expect(firstTemplate).toHaveProperty('key');
+    expect(firstTemplate).toHaveProperty('name');
+    expect(firstTemplate).toHaveProperty('category');
+    expect(firstTemplate).toHaveProperty('description');
+    expect(firstTemplate).toHaveProperty('generatedPrompt');
+    expect(firstTemplate).toHaveProperty('charCount');
+    expect(firstTemplate.charCount).toBeGreaterThan(0);
+
+    // Verify meta-prompt exists and has content
+    expect(report.prompts.metaPrompt.length).toBeGreaterThan(1000);
+    expect(report.prompts.metaPromptCharCount).toBeGreaterThan(1000);
   });
 });
