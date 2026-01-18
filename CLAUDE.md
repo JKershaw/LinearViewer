@@ -206,7 +206,7 @@ node lib/linear-cli.js relation LIN-31 related LIN-29
 
 ### Stdin Support
 
-For complex JSON with special characters (newlines, quotes, backticks), use `--stdin` to avoid shell escaping issues:
+For complex content with special characters (newlines, quotes, backticks), use `--stdin` to avoid shell escaping issues:
 
 ```bash
 # Using pipe
@@ -222,6 +222,13 @@ EOF
 
 # From file
 cat payload.json | node lib/linear-cli.js create-issue team_id "Title" --stdin
+
+# Comments with special characters
+node lib/linear-cli.js comment issue_id --stdin << 'EOF'
+Analysis complete:
+- Found 3 issues with `authentication` module
+- Fixed in commit abc123
+EOF
 ```
 
 **Note**: The CLI outputs JSON for easy parsing by AI agents.
