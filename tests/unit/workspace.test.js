@@ -10,6 +10,7 @@ import {
   upsertWorkspace,
   removeWorkspace,
   updateWorkspaceTokens,
+  saveSession,
   MAX_WORKSPACES
 } from '../../lib/workspace.js';
 
@@ -244,5 +245,46 @@ describe('removeWorkspace', () => {
     const remaining = removeWorkspace(session, 'ws-1');
 
     assert.strictEqual(remaining, 0);
+  });
+});
+
+// =============================================================================
+// saveSession Tests
+// =============================================================================
+
+describe('saveSession', () => {
+  test('resolves when session.save succeeds', async () => {
+    const session = {
+      save: (callback) => callback()
+    };
+
+    await assert.doesNotReject(() => saveSession(session));
+  });
+
+  test('rejects when session.save fails', async () => {
+    const expectedError = new Error('Save failed');
+    const session = {
+      save: (callback) => callback(expectedError)
+    };
+
+    await assert.rejects(
+      () => saveSession(session),
+      expectedError
+    );
+  });
+
+  test('handles async callback timing', async () => {
+    let callbackCalled = false;
+    const session = {
+      save: (callback) => {
+        setTimeout(() => {
+          callbackCalled = true;
+          callback();
+        }, 10);
+      }
+    };
+
+    await saveSession(session);
+    assert.strictEqual(callbackCalled, true);
   });
 });

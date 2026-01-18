@@ -4,6 +4,7 @@
  */
 import { Router } from 'express'
 import { UUID_REGEX, removeWorkspace, saveSession } from '../lib/workspace.js'
+import { badRequest, notFound } from '../lib/errors.js'
 
 /**
  * Create workspace management routes.
@@ -18,12 +19,12 @@ export function createWorkspaceRoutes() {
    */
   router.post('/workspace/:id/switch', async (req, res) => {
     if (!UUID_REGEX.test(req.params.id)) {
-      return res.status(400).send('Invalid workspace ID')
+      return badRequest.html(res, 'Invalid workspace ID format')
     }
 
     const workspace = req.session.workspaces?.find(w => w.id === req.params.id)
     if (!workspace) {
-      return res.status(404).send('Workspace not found')
+      return notFound.html(res, 'Workspace not found')
     }
 
     req.session.activeWorkspaceId = workspace.id
@@ -37,7 +38,7 @@ export function createWorkspaceRoutes() {
    */
   router.post('/workspace/:id/remove', async (req, res) => {
     if (!UUID_REGEX.test(req.params.id)) {
-      return res.status(400).send('Invalid workspace ID')
+      return badRequest.html(res, 'Invalid workspace ID format')
     }
 
     // If only one workspace, just logout entirely
