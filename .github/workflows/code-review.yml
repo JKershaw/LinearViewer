@@ -22,5 +22,4 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           prompt_file: .github/claude-review-prompt.md
-          model: claude-sonnet-4-20250514
           timeout_minutes: 10
