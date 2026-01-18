@@ -60,13 +60,29 @@ test.describe('Authenticated Dashboard', () => {
     await expect(logoutLink).toContainText('logout');
   });
 
-  test('shows text-based navigation bar', async ({ page }) => {
+  test('shows text-based navigation bar with logout only', async ({ page }) => {
     // Should have nav bar
     await expect(page.locator('.nav-bar')).toBeVisible();
 
-    // Should have reset and logout actions
-    await expect(page.locator('.nav-action.reset-view')).toBeVisible();
+    // Should have logout in nav bar (reset/audit moved to footer)
     await expect(page.locator('.nav-action[href="/logout"]')).toBeVisible();
+
+    // Reset and audit should NOT be in nav bar
+    await expect(page.locator('.nav-bar .reset-view')).not.toBeVisible();
+    await expect(page.locator('.nav-bar .nav-action[href="/fancy"]')).not.toBeVisible();
+  });
+
+  test('shows footer with reset, audit, and deploy info', async ({ page }) => {
+    // Footer should be visible
+    await expect(page.locator('.page-footer')).toBeVisible();
+
+    // Should have reset and audit links in footer
+    await expect(page.locator('.footer-action.reset-view')).toBeVisible();
+    await expect(page.locator('.footer-action[href="/fancy"]')).toBeVisible();
+
+    // Should have deploy info section with GitHub link (fallback in test mode)
+    await expect(page.locator('.footer-deploy')).toBeVisible();
+    await expect(page.locator('.footer-link')).toBeVisible();
   });
 
   test('shows organization name from mock data', async ({ page }) => {

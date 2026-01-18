@@ -60,6 +60,19 @@ const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
 const SESSION_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000; // 5 minutes before expiry
 
+/**
+ * Get Heroku deploy information from environment variables.
+ * Requires `heroku labs:enable runtime-dyno-metadata` to be enabled.
+ * @returns {Object} Deploy info object with version, createdAt, commit
+ */
+function getDeployInfo() {
+  return {
+    version: process.env.HEROKU_RELEASE_VERSION || null,
+    createdAt: process.env.HEROKU_RELEASE_CREATED_AT || null,
+    commit: process.env.HEROKU_BUILD_COMMIT || null
+  }
+}
+
 // =============================================================================
 // Landing Page Setup
 // =============================================================================
@@ -350,6 +363,7 @@ async function fetchAndPrepareProjects(accessToken, teamId = null) {
  */
 async function handleWorkspaceRemoval(session, workspaceId, res) {
   const remaining = removeWorkspace(session, workspaceId);
+  const deployInfo = getDeployInfo()
 
   if (remaining > 0) {
     await saveSession(session);
@@ -359,7 +373,7 @@ async function handleWorkspaceRemoval(session, workspaceId, res) {
   return new Promise((resolve) => {
     session.destroy((err) => {
       if (err) console.error('Session destroy error:', err);
-      const html = renderPage(landingTrees, [], landingData.organizationName, { isLanding: true });
+      const html = renderPage(landingTrees, [], landingData.organizationName, { isLanding: true, deployInfo });
       res.send(html);
       resolve();
     });
@@ -384,13 +398,15 @@ async function handleTokenRefreshAndRetry(workspace, session, teamId, openRouter
   await saveSession(session);
   console.log('Token refreshed after 401, retrying request');
 
+  const deployInfo = getDeployInfo()
   const { trees, inProgressTrees, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace.accessToken, teamId);
   const html = renderPage(trees, inProgressTrees, organizationName, {
     teams,
     selectedTeamId,
     workspaces: session.workspaces,
     activeWorkspaceId: session.activeWorkspaceId,
-    openRouterSource
+    openRouterSource,
+    deployInfo
   });
   return res.send(html);
 }
@@ -433,10 +449,11 @@ async function handleUnauthorizedError(workspace, session, teamId, openRouterSou
 app.get('/', async (req, res) => {
   // Get active workspace (null if not authenticated)
   const workspace = getActiveWorkspace(req.session)
+  const deployInfo = getDeployInfo()
 
   // Unauthenticated users see the static landing page
   if (!workspace) {
-    const html = renderPage(landingTrees, [], landingData.organizationName, { isLanding: true })
+    const html = renderPage(landingTrees, [], landingData.organizationName, { isLanding: true, deployInfo })
     return res.send(html)
   }
 
@@ -455,7 +472,8 @@ app.get('/', async (req, res) => {
       selectedTeamId,
       workspaces: req.session.workspaces,
       activeWorkspaceId: req.session.activeWorkspaceId,
-      openRouterSource
+      openRouterSource,
+      deployInfo
     });
     res.send(html);
   } catch (error) {
@@ -496,10 +514,12 @@ app.get('/fancy', (req, res) => {
   const sessionApiKey = req.session.openRouterApiKey;
   const envApiKey = process.env.OPENROUTER_API_KEY;
   const openRouterSource = sessionApiKey ? 'oauth' : (envApiKey ? 'env' : null);
+  const deployInfo = getDeployInfo()
 
   const html = renderFancyPage(workspace.name || 'Workspace', {
     openRouterConnected: !!(sessionApiKey || envApiKey),
-    openRouterSource
+    openRouterSource,
+    deployInfo
   });
   res.send(html);
 });

@@ -287,6 +287,7 @@ function init() {
   applyState(state)
 
   // Reset view to defaults (including default collapsed projects)
+  // Button is in the footer (uses same .reset-view class)
   const resetBtn = document.querySelector('.reset-view')
   if (resetBtn) {
     resetBtn.addEventListener('click', (e) => {

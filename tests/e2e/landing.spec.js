@@ -22,6 +22,21 @@ test.describe('Landing Page', () => {
     await expect(page.locator('header .reset-view')).not.toBeVisible();
   });
 
+  test('shows footer with GitHub link on landing page', async ({ page }) => {
+    await page.goto('/');
+
+    // Footer should be visible
+    await expect(page.locator('.page-footer')).toBeVisible();
+
+    // Should NOT have reset/audit actions (landing page is unauthenticated)
+    await expect(page.locator('.footer-actions')).not.toBeVisible();
+
+    // Should show GitHub link (fallback when no Heroku deploy info in test mode)
+    const footerLink = page.locator('.footer-link');
+    await expect(footerLink).toBeVisible();
+    await expect(footerLink).toHaveAttribute('href', 'https://github.com/JKershaw/LinearViewer');
+  });
+
   test('displays static project preview from landing.md', async ({ page }) => {
     await page.goto('/');
 
