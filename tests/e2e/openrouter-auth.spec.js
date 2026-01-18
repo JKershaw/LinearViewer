@@ -81,15 +81,10 @@ test.describe('OpenRouter OAuth Flow', () => {
     // Verify connected state
     await expect(page.locator('.settings-value.connected')).toBeVisible();
 
-    // Click disconnect and wait for navigation to complete
-    // Since URL stays /fancy, we must explicitly wait for the form submission response
-    await Promise.all([
-      page.waitForResponse(resp => resp.url().includes('/auth/openrouter/disconnect')),
-      page.locator('.settings-action.disconnect').click(),
-    ]);
+    // Click disconnect - Playwright's auto-waiting will handle the page reload
+    await page.locator('.settings-action.disconnect').click();
 
-    // Wait for the redirect to complete and page to reload
-    await page.waitForLoadState('networkidle');
+    // Wait for disconnected state - Playwright auto-waits for element to appear
     await expect(page.locator('.settings-value.disconnected')).toBeVisible();
     await expect(page.locator('.settings-action.connect')).toBeVisible();
   });
