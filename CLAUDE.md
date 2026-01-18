@@ -147,9 +147,11 @@ node lib/linear-cli.js <command> [args]
 | `issue <id>` | Get issue details with full context |
 | `search "query"` | Search issues |
 | `states <teamId>` | List workflow states for a team |
+| `relations <issueId>` | Get issue relations (blocks, blocked-by, etc.) |
 | `create-issue <teamId> <title> [json]` | Create a new issue |
 | `update-issue <issueId> <json>` | Update an existing issue |
 | `comment <issueId> "body"` | Add a comment to an issue |
+| `relation <issueId> <type> <relatedId>` | Create a relation between issues |
 
 ### Setup
 
@@ -180,7 +182,27 @@ node lib/linear-cli.js update-issue issue_id '{"stateId":"state_done"}'
 
 # Add a comment
 node lib/linear-cli.js comment issue_id "Fixed in PR #42"
+
+# Query issue relations
+node lib/linear-cli.js relations LIN-37
+
+# Create relations between issues
+node lib/linear-cli.js relation LIN-40 blocked-by LIN-39
+node lib/linear-cli.js relation LIN-31 blocks LIN-32
+node lib/linear-cli.js relation LIN-31 duplicate LIN-28
+node lib/linear-cli.js relation LIN-31 related LIN-29
 ```
+
+### Relation Types
+
+| Type | Description |
+|------|-------------|
+| `blocks` | This issue blocks another issue |
+| `blocked-by` | This issue is blocked by another issue |
+| `duplicate` | This issue is a duplicate of another |
+| `related` | General relation between issues |
+
+**Note**: `blocked-by` is a convenience type - internally it creates a `blocks` relation with swapped issue IDs.
 
 ### Stdin Support
 
