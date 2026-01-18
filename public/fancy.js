@@ -97,6 +97,7 @@ function renderReport(report) {
     ${renderSection('labels', 'Labels', renderLabelsContent(report.labels))}
     ${renderSection('fields', 'Field Usage', renderFieldsContent(report.fields))}
     ${renderSection('projects', 'Projects', renderProjectsContent(report.projectTasks))}
+    ${renderSection('prompts', 'Prompts', renderPromptsContent(report.prompts), false)}
     <div class="report-timestamp">
       Report generated: ${new Date(report.timestamp).toLocaleString()}
     </div>
@@ -390,6 +391,128 @@ function renderProjectsContent(projects) {
     <div class="projects-table">
       ${rows}
       ${moreProjects}
+    </div>
+  `;
+}
+
+/**
+ * Renders prompts section content.
+ */
+function renderPromptsContent(prompts) {
+  // Group templates by category
+  const byCategory = {};
+  for (const template of prompts.templates) {
+    if (!byCategory[template.category]) {
+      byCategory[template.category] = {
+        display: template.categoryDisplay,
+        templates: []
+      };
+    }
+    byCategory[template.category].templates.push(template);
+  }
+
+  // Render categories in order
+  const categoryOrder = ['pre-work', 'work-issue', 'ready', 'universal'];
+  const categoriesHtml = categoryOrder
+    .filter(cat => byCategory[cat])
+    .map(cat => {
+      const category = byCategory[cat];
+      const templatesHtml = category.templates.map(t => renderPromptCard(t)).join('');
+      return `
+        <div class="prompt-category">
+          <h4 class="prompt-category-header">${escapeHtml(category.display)} (${category.templates.length})</h4>
+          ${templatesHtml}
+        </div>
+      `;
+    }).join('');
+
+  // Render meta-prompt
+  const metaPromptHtml = `
+    <div class="prompt-category">
+      <h4 class="prompt-category-header">AI Prompt Generator</h4>
+      <div class="prompt-card meta-prompt">
+        <div class="prompt-card-header">
+          <span class="prompt-name">Meta-Prompt Template</span>
+          <span class="prompt-char-count">${prompts.metaPromptCharCount.toLocaleString()} chars</span>
+        </div>
+        <div class="prompt-description">
+          Guides the AI to analyze a Linear task and recommend the appropriate next action (research, breakdown, or implementation).
+        </div>
+        <details class="prompt-details">
+          <summary class="prompt-toggle">Show full prompt</summary>
+          <pre class="prompt-text">${escapeHtml(prompts.metaPrompt)}</pre>
+        </details>
+      </div>
+    </div>
+  `;
+
+  return `
+    <div class="prompts-summary">
+      <span class="prompts-stat">${prompts.templateCount} templates</span>
+      <span class="prompts-stat">1 meta-prompt</span>
+      <span class="prompts-stat">${prompts.totalCharCount.toLocaleString()} total chars</span>
+    </div>
+    <h4 style="margin-top: 1rem;">Templates</h4>
+    ${categoriesHtml}
+    <h4 style="margin-top: 1.5rem;">AI Prompt Generator</h4>
+    ${metaPromptHtml}
+  `;
+}
+
+/**
+ * Renders a single prompt template card.
+ */
+function renderPromptCard(template) {
+  // AI hint section
+  let aiHintHtml = '';
+  if (template.aiHint) {
+    aiHintHtml = `
+      <div class="prompt-ai-hint">
+        <span class="ai-hint-label">Situation:</span> ${escapeHtml(template.aiHint.situation || 'N/A')}<br>
+        <span class="ai-hint-label">Goal:</span> ${escapeHtml(template.aiHint.goal || 'N/A')}<br>
+        <span class="ai-hint-label">Workflow:</span> ${escapeHtml(template.aiHint.workflow || 'N/A')}
+      </div>
+    `;
+  }
+
+  // Completion signals section
+  let signalsHtml = '';
+  if (template.completionSignals) {
+    const signalsList = template.completionSignals.signals
+      .map(s => `<li>${escapeHtml(s)}</li>`)
+      .join('');
+    signalsHtml = `
+      <div class="prompt-signals">
+        <div class="signal-row">
+          <span class="signal-label">Core Outcome:</span>
+          <span>${escapeHtml(template.completionSignals.coreOutcome)}</span>
+        </div>
+        <div class="signal-row">
+          <span class="signal-label">Signals:</span>
+          <ul class="signal-list">${signalsList}</ul>
+        </div>
+        <div class="signal-row">
+          <span class="signal-label">Readiness Check:</span>
+          <span>${escapeHtml(template.completionSignals.readinessCheck)}</span>
+        </div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="prompt-card" data-prompt-key="${escapeHtml(template.key)}">
+      <div class="prompt-card-header">
+        <span class="prompt-name">${escapeHtml(template.name)}</span>
+        <span class="prompt-key">${escapeHtml(template.key)}</span>
+        <span class="prompt-char-count">${template.charCount.toLocaleString()} chars</span>
+      </div>
+      <div class="prompt-description">${escapeHtml(template.description)}</div>
+      ${aiHintHtml}
+      ${signalsHtml}
+      <details class="prompt-details">
+        <summary class="prompt-toggle">Show full prompt</summary>
+        <pre class="prompt-text">${escapeHtml(template.generatedPrompt)}</pre>
+      </details>
     </div>
   `;
 }
