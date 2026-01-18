@@ -2,6 +2,12 @@
 
 Review this pull request for issues in the following areas. Focus on **changed code only** and provide specific, actionable feedback.
 
+## Severity Levels
+
+- **Blocker**: Security vulnerabilities, data loss risks, broken functionality - must fix before merge
+- **Warning**: Missing validation, error handling gaps, test coverage - should fix
+- **Suggestion**: Style inconsistencies, minor improvements - optional
+
 ## Code Style
 
 Verify adherence to project conventions:
@@ -11,13 +17,14 @@ Verify adherence to project conventions:
 - **Naming**: camelCase for functions/variables, UPPER_SNAKE_CASE for constants, PascalCase for classes
 - **Documentation**: Exported functions should have JSDoc comments with `@param`, `@returns`, `@throws`
 
-## Security (Critical)
+## Security (Blockers)
 
 Check for security vulnerabilities:
 
 - **Input Validation**: All route parameters and query strings must be validated
-  - UUIDs must pass validation: `/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i`
-  - Use `UUID_REGEX.test()` from `lib/workspace.js`
+  - UUIDs must pass `UUID_REGEX.test()` from `lib/workspace.js`
+  - Bad: `const id = req.params.id` then use directly
+  - Good: `if (!UUID_REGEX.test(id)) return badRequest.json(res, 'Invalid ID')`
 - **XSS Prevention**: User-generated content must be escaped with `escapeHtml()` before HTML rendering
 - **CSRF Protection**: State-changing operations use POST, OAuth flows validate state parameter
 - **No Sensitive Data Logging**: Never log tokens, API keys, or credentials
