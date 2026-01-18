@@ -838,16 +838,12 @@ function initRecommendations() {
       if (activeRecommendFetch === abortController) {
         // Show label mismatch alerts if AI detected any
         if (alertDiv && data.labelAlerts && data.labelAlerts.length > 0) {
-          // Use DOM APIs to avoid XSS from issueUrl
+          // Use DOM APIs to avoid XSS from issueUrl (textContent auto-escapes)
           alertDiv.innerHTML = ''
           data.labelAlerts.forEach(alert => {
             const item = document.createElement('div')
             item.className = 'alert-item'
-            const icon = document.createElement('span')
-            icon.className = 'alert-icon'
-            icon.textContent = '⚠'
-            item.appendChild(icon)
-            item.appendChild(document.createTextNode(' ' + alert.message))
+            item.textContent = `⚠ ${alert.message}`
             alertDiv.appendChild(item)
           })
           const link = document.createElement('a')

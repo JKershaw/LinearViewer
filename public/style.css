@@ -1012,13 +1012,7 @@ h1 {
 }
 
 .recommend-alert .alert-item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.recommend-alert .alert-icon {
-  flex-shrink: 0;
+  line-height: 1.4;
 }
 
 .recommend-alert .alert-link {

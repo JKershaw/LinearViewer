@@ -832,14 +832,15 @@ ${goal}`
 
     // Detect label mismatches between AI recommendations and issue labels
     // Note: issue.labels is already an array of strings from fetchIssueContext (lib/linear.js:332)
-    const issueLabels = issue.labels || []
+    const issueLabels = Array.isArray(issue.labels) ? issue.labels : []
     const labelAlerts = []
 
     // Helper to check if any label variant exists
     const hasLabel = (labels, ...variants) =>
       labels.some(l => variants.includes(l.toLowerCase()))
 
-    // Check for research mismatch
+    // AI assessment patterns from lib/prompts/meta-prompt-template.js (lines 154-157)
+    // These match the structured output format: "- Research: [✓ Complete | ✓ Not needed | ✗ Needed]"
     const aiRecommendsResearch = /Research:\s*✗\s*Needed/i.test(recommendation.reasoning)
     if (aiRecommendsResearch && !hasLabel(issueLabels, 'needs-research', 'needs research')) {
       labelAlerts.push({
@@ -848,7 +849,7 @@ ${goal}`
       })
     }
 
-    // Check for breakdown mismatch
+    // Pattern: "- Size: [✓ Focused | ✗ Too large]"
     const aiRecommendsBreakdown = /Size:\s*✗\s*Too large/i.test(recommendation.reasoning)
     if (aiRecommendsBreakdown && !hasLabel(issueLabels, 'needs-breakdown', 'needs breakdown')) {
       labelAlerts.push({
