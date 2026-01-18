@@ -813,7 +813,15 @@ ${labels.length > 0 ? `**Labels:** ${labels.join(', ')}` : ''}
 
 ${goal}`
 
-      return res.json({ reasoning, prompt, truncated: false, completionTokens: null })
+      // For test mode, also return the label alert fields (empty array since mock doesn't trigger it)
+      return res.json({
+        reasoning,
+        prompt,
+        truncated: false,
+        completionTokens: null,
+        labelAlerts: [],
+        issueUrl: mockIssue.url
+      })
     }
 
     // Fetch issue context from Linear
@@ -822,11 +830,44 @@ ${goal}`
     // Get AI-generated prompt (pass session API key if available)
     const recommendation = await getRecommendation(issue, { parent, siblings, project, children, comments }, { apiKey: sessionApiKey })
 
+    // Detect label mismatches between AI recommendations and issue labels
+    // Note: issue.labels is already an array of strings from fetchIssueContext (lib/linear.js:332)
+    const issueLabels = Array.isArray(issue?.labels) ? issue.labels : []
+    const labelAlerts = []
+
+    // Helper to check if any label variant exists (handles whitespace/casing variations)
+    const hasLabel = (labels, ...variants) =>
+      labels.some(l => variants.some(v => l.toLowerCase().trim() === v.toLowerCase().trim()))
+
+    // AI assessment patterns - these detect specific text in the AI reasoning output.
+    // Source: lib/prompts/meta-prompt-template.js (lines 154-157)
+    // Expected format: "- Research: [✓ Complete | ✓ Not needed | ✗ Needed]"
+    // NOTE: Update these patterns if the AI output format changes.
+    const reasoning = typeof recommendation.reasoning === 'string' ? recommendation.reasoning : ''
+    const aiRecommendsResearch = /Research:\s*✗\s*Needed/i.test(reasoning)
+    if (aiRecommendsResearch && !hasLabel(issueLabels, 'needs-research', 'needs research')) {
+      labelAlerts.push({
+        type: 'needs-research',
+        message: 'AI suggests this task needs research, but it doesn\'t have the "needs-research" label.'
+      })
+    }
+
+    // Expected format: "- Size: [✓ Focused | ✗ Too large]"
+    const aiRecommendsBreakdown = /Size:\s*✗\s*Too large/i.test(reasoning)
+    if (aiRecommendsBreakdown && !hasLabel(issueLabels, 'needs-breakdown', 'needs breakdown')) {
+      labelAlerts.push({
+        type: 'needs-breakdown',
+        message: 'AI suggests this task is too large and needs breakdown, but it doesn\'t have the "needs-breakdown" label.'
+      })
+    }
+
     res.json({
       reasoning: recommendation.reasoning,
       prompt: recommendation.prompt,
       truncated: recommendation.truncated,
-      completionTokens: recommendation.completionTokens
+      completionTokens: recommendation.completionTokens,
+      labelAlerts,
+      issueUrl: issue.url
     })
   } catch (error) {
     console.error('Recommendation error:', error)

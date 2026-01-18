@@ -805,11 +805,13 @@ function initRecommendations() {
     const reasoning = recommendContainer.querySelector('.recommend-reasoning')
     const promptDiv = recommendContainer.querySelector('.recommend-prompt')
     const promptText = promptDiv?.querySelector('.prompt-text')
+    const alertDiv = recommendContainer.querySelector('.recommend-alert')
 
     reasoning.textContent = 'Analyzing task context...'
     if (promptText) promptText.textContent = ''
-    // Keep prompt section hidden during loading - only show reasoning
+    // Keep prompt section and alert hidden during loading - only show reasoning
     if (promptDiv) promptDiv.classList.add('hidden')
+    if (alertDiv) alertDiv.classList.add('hidden')
     recommendContainer.classList.remove('hidden')
 
     // Add loading class to button
@@ -834,6 +836,31 @@ function initRecommendations() {
 
       // Only update if this is still the active request
       if (activeRecommendFetch === abortController) {
+        // Show label mismatch alerts if AI detected any
+        if (alertDiv && data.labelAlerts && data.labelAlerts.length > 0) {
+          // Use DOM APIs to avoid XSS (textContent auto-escapes)
+          alertDiv.replaceChildren()
+          data.labelAlerts.forEach(alert => {
+            if (typeof alert?.message !== 'string') return
+            const item = document.createElement('div')
+            item.className = 'alert-item'
+            item.textContent = `⚠ ${alert.message}`
+            alertDiv.appendChild(item)
+          })
+          const link = document.createElement('a')
+          // Validate URL scheme to prevent javascript:/data: XSS injection
+          const url = (typeof data.issueUrl === 'string' && data.issueUrl) ? data.issueUrl : '#'
+          link.href = (url === '#' || url.startsWith('https://') || url.startsWith('http://')) ? url : '#'
+          link.target = '_blank'
+          link.rel = 'noopener noreferrer'
+          link.className = 'alert-link'
+          link.textContent = 'Update in Linear →'
+          alertDiv.appendChild(link)
+          alertDiv.classList.remove('hidden')
+        } else if (alertDiv) {
+          alertDiv.classList.add('hidden')
+        }
+
         // Render reasoning as markdown
         const reasoningText = data.truncated
           ? '[Warning: Response may be incomplete due to length limit]\n\n' + data.reasoning

@@ -996,6 +996,36 @@ h1 {
   color: var(--fg);
 }
 
+/* Label mismatch alert banner */
+.recommend-alert {
+  background: #fef3cd;
+  border: 1px solid #ffc107;
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+  font-family: var(--font-content);
+  font-size: 0.85em;
+  color: #856404;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.recommend-alert .alert-item {
+  line-height: 1.4;
+}
+
+.recommend-alert .alert-link {
+  color: #533f03;
+  text-decoration: underline;
+  align-self: flex-end;
+  margin-top: 0.25rem;
+}
+
+.recommend-alert .alert-link:hover {
+  color: #1d1501;
+}
+
 .recommend-reasoning {
   font-family: var(--font-content);
   font-size: 0.9em;
@@ -1034,6 +1064,15 @@ h1 {
 @media (max-width: 640px) {
   .recommend-container {
     padding: 0.5rem;
+  }
+
+  .recommend-alert {
+    font-size: 0.8em;
+  }
+
+  .recommend-alert .alert-link {
+    align-self: flex-start;
+    margin-top: 0.5rem;
   }
 
   .recommend-reasoning {
