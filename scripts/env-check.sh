@@ -68,9 +68,13 @@ fi
 echo ""
 echo "Environment Variables:"
 
-# Check for .env file
+# Check for .env file and load it
 if [ -f ".env" ]; then
   echo "$check .env file exists"
+  # Load .env file for subsequent checks
+  set -a
+  source .env
+  set +a
 else
   echo "$cross .env file not found"
   if [ -f ".env.example" ]; then
@@ -87,30 +91,32 @@ else
   required_failed=1
 fi
 
-if [ -n "$LINEAR_API_KEY" ]; then
-  echo "$check LINEAR_API_KEY"
-else
-  echo "$cross LINEAR_API_KEY"
-  echo "  Get from: https://linear.app/settings/api"
-  required_failed=1
-fi
-
-# Check optional environment variables
 if [ -n "$LINEAR_CLIENT_ID" ]; then
   echo "$check LINEAR_CLIENT_ID"
 else
-  echo "$cross LINEAR_CLIENT_ID (optional - needed for OAuth)"
+  echo "$cross LINEAR_CLIENT_ID"
+  echo "  Get from: https://linear.app/settings/account#api"
+  required_failed=1
 fi
 
 if [ -n "$LINEAR_CLIENT_SECRET" ]; then
   echo "$check LINEAR_CLIENT_SECRET"
 else
-  echo "$cross LINEAR_CLIENT_SECRET (optional - needed for OAuth)"
+  echo "$cross LINEAR_CLIENT_SECRET"
+  echo "  Get from: https://linear.app/settings/account#api"
+  required_failed=1
 fi
 
-# Check Linear CLI (only if LINEAR_API_KEY is set)
+# Check optional environment variables
+if [ -n "$LINEAR_API_KEY" ]; then
+  echo "$check LINEAR_API_KEY"
+else
+  echo "$cross LINEAR_API_KEY (optional - for AI agents)"
+fi
+
+# Check Linear CLI (optional - only if LINEAR_API_KEY is set)
 echo ""
-echo "Linear CLI:"
+echo "Linear CLI (optional):"
 if [ -n "$LINEAR_API_KEY" ]; then
   if [ -f "lib/linear-cli.js" ]; then
     cli_output=$(node lib/linear-cli.js viewer 2>&1) || true
@@ -126,11 +132,9 @@ if [ -n "$LINEAR_API_KEY" ]; then
       else
         echo "  Check your LINEAR_API_KEY is valid"
       fi
-      required_failed=1
     fi
   else
     echo "$cross lib/linear-cli.js not found"
-    required_failed=1
   fi
 else
   echo "$cross Skipped (LINEAR_API_KEY not set)"
