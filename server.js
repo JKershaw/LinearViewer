@@ -25,6 +25,7 @@ import { createOpenRouterAuthRoutes } from './routes/openrouter-auth.js'
 import { testMockTeams, testMockData } from './tests/fixtures/mock-data.js'
 import { runAudit, computeAuditFromData } from './lib/audit.js'
 import { renderFancyPage } from './lib/render-fancy.js'
+import { renderSettingsPage } from './lib/render-settings.js'
 import { generatePrompt, hasPrompt, getAvailablePrompts } from './lib/prompt-templates.js'
 import { PHASE_LABELS, WORK_ISSUE_LABELS } from './lib/workflow-config.js'
 import { isRecommendationEnabled, getRecommendation, DEFAULT_MODEL, AVAILABLE_MODELS } from './lib/openrouter.js'
@@ -512,11 +513,31 @@ app.get('/fancy', (req, res) => {
     return res.redirect('/');
   }
 
+  const deployInfo = getDeployInfo();
+
+  const html = renderFancyPage(workspace.name || 'Workspace', {
+    deployInfo
+  });
+  res.send(html);
+});
+
+/**
+ * Settings page - requires authentication.
+ * Displays user preferences and AI configuration.
+ */
+app.get('/settings', (req, res) => {
+  const workspace = getActiveWorkspace(req.session);
+
+  // Redirect to home if not authenticated
+  if (!workspace) {
+    return res.redirect('/');
+  }
+
   // Determine OpenRouter connection status
   const sessionApiKey = req.session.openRouterApiKey;
   const envApiKey = process.env.OPENROUTER_API_KEY;
   const openRouterSource = sessionApiKey ? 'oauth' : (envApiKey ? 'env' : null);
-  const deployInfo = getDeployInfo()
+  const deployInfo = getDeployInfo();
 
   // Get current model selection (from session or default)
   const currentModel = req.session.modelId || DEFAULT_MODEL;
@@ -524,7 +545,7 @@ app.get('/fancy', (req, res) => {
   // Check for model validation error from redirect
   const modelError = req.query.error;
 
-  const html = renderFancyPage(workspace.name || 'Workspace', {
+  const html = renderSettingsPage(workspace.name || 'Workspace', {
     openRouterConnected: !!(sessionApiKey || envApiKey),
     openRouterSource,
     deployInfo,
@@ -558,20 +579,20 @@ app.post('/settings/model', async (req, res) => {
 
   // Validate and provide feedback on failure
   if (!selectedModel) {
-    return res.redirect('/fancy?error=empty');
+    return res.redirect('/settings?error=empty');
   }
 
   if (selectedModel.length > 100) {
-    return res.redirect('/fancy?error=too-long');
+    return res.redirect('/settings?error=too-long');
   }
 
   // Reject path traversal sequences
   if (selectedModel.includes('..')) {
-    return res.redirect('/fancy?error=invalid-format');
+    return res.redirect('/settings?error=invalid-format');
   }
 
   if (!modelIdRegex.test(selectedModel)) {
-    return res.redirect('/fancy?error=invalid-format');
+    return res.redirect('/settings?error=invalid-format');
   }
 
   // Validation passed - save the model
@@ -583,7 +604,7 @@ app.post('/settings/model', async (req, res) => {
     // Continue to redirect - model will still work for this session
   }
 
-  res.redirect('/fancy');
+  res.redirect('/settings');
 });
 
 /**

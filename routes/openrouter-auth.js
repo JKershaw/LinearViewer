@@ -169,7 +169,7 @@ export function createOpenRouterAuthRoutes() {
 
     delete req.session.openRouterApiKey
     await saveSession(req.session)
-    res.redirect('/fancy')
+    res.redirect('/settings')
   })
 
   return router

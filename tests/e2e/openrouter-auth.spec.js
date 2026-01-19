@@ -37,10 +37,10 @@ test.describe('OpenRouter OAuth Flow', () => {
     // The route successfully initiated the OAuth flow
   });
 
-  test('fancy page shows OpenRouter not connected by default', async ({ page }) => {
+  test('settings page shows OpenRouter not connected by default', async ({ page }) => {
     // Set up authenticated session without OpenRouter
     await page.goto('/test/set-session');
-    await page.goto('/fancy');
+    await page.goto('/settings');
 
     // Should see settings section
     await expect(page.locator('.settings-section')).toBeVisible();
@@ -55,10 +55,10 @@ test.describe('OpenRouter OAuth Flow', () => {
     await expect(connectLink).toHaveAttribute('href', '/auth/openrouter');
   });
 
-  test('fancy page shows OpenRouter connected when OAuth token is present', async ({ page }) => {
+  test('settings page shows OpenRouter connected when OAuth token is present', async ({ page }) => {
     // Set up authenticated session with OpenRouter connected
     await page.goto('/test/set-session?openRouterConnected=true');
-    await page.goto('/fancy');
+    await page.goto('/settings');
 
     // Should see settings section
     await expect(page.locator('.settings-section')).toBeVisible();
@@ -76,15 +76,18 @@ test.describe('OpenRouter OAuth Flow', () => {
   test('disconnect button removes OpenRouter connection', async ({ page }) => {
     // Set up authenticated session with OpenRouter connected
     await page.goto('/test/set-session?openRouterConnected=true');
-    await page.goto('/fancy');
+    await page.goto('/settings');
 
     // Verify connected state
     await expect(page.locator('.settings-value.connected')).toBeVisible();
 
-    // Click disconnect - Playwright's auto-waiting will handle the page reload
-    await page.locator('.settings-action.disconnect').click();
+    // Click disconnect and wait for navigation to complete
+    await Promise.all([
+      page.waitForURL('/settings'),
+      page.locator('.settings-action.disconnect').click()
+    ]);
 
-    // Wait for disconnected state - Playwright auto-waits for element to appear
+    // Verify disconnected state after redirect
     await expect(page.locator('.settings-value.disconnected')).toBeVisible();
     await expect(page.locator('.settings-action.connect')).toBeVisible();
   });
@@ -144,7 +147,7 @@ test.describe('OpenRouter OAuth Flow', () => {
     await expect(statusLink).toHaveText('●');
   });
 
-  test('ai status links to fancy page', async ({ page }) => {
+  test('ai status links to settings page', async ({ page }) => {
     // Set up authenticated session
     await page.goto('/test/set-session');
     await page.goto('/');
@@ -153,8 +156,8 @@ test.describe('OpenRouter OAuth Flow', () => {
     const statusLink = page.locator('.nav-openrouter-status');
     await statusLink.click();
 
-    // Should navigate to fancy page
-    await expect(page).toHaveURL('/fancy');
+    // Should navigate to settings page
+    await expect(page).toHaveURL('/settings');
   });
 });
 
