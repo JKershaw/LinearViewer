@@ -679,17 +679,59 @@ describe('plan template', () => {
     assert.ok(result.prompt.includes('Run existing tests to verify baseline'));
   });
 
-  test('includes subtask guidance when subtasks present', () => {
+  test('includes subtask summary when subtasks present', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Subtask Guidance'));
-    assert.ok(result.prompt.includes('already completed'));
-    assert.ok(result.prompt.includes('Do not duplicate work'));
+    assert.ok(result.prompt.includes('**Subtasks:**'));
+    assert.ok(result.prompt.includes('0/1 done'));
+    assert.ok(result.prompt.includes('Next: TEST-C1'));
   });
 
-  test('omits subtask guidance when no subtasks', () => {
+  test('omits subtask summary when no subtasks', () => {
     const contextNoChildren = { ...mockContext, children: [] };
     const result = generatePrompt('plan', mockIssue, contextNoChildren);
-    assert.ok(!result.prompt.includes('Subtask Guidance'));
+    assert.ok(!result.prompt.includes('**Subtasks:**'));
+  });
+
+  test('subtask summary shows in-progress with Continue', () => {
+    const contextWithInProgress = {
+      ...mockContext,
+      children: [
+        { id: 'c1', identifier: 'TEST-C1', title: 'Done task', state: { name: 'Done', type: 'completed' } },
+        { id: 'c2', identifier: 'TEST-C2', title: 'In progress', state: { name: 'In Progress', type: 'started' } },
+        { id: 'c3', identifier: 'TEST-C3', title: 'Todo', state: { name: 'Todo', type: 'unstarted' } }
+      ]
+    };
+    const result = generatePrompt('plan', mockIssue, contextWithInProgress);
+    assert.ok(result.prompt.includes('1/3 done'));
+    assert.ok(result.prompt.includes('1 in progress'));
+    assert.ok(result.prompt.includes('Continue: TEST-C2'));
+  });
+
+  test('subtask summary shows Next when none in progress', () => {
+    const contextAllTodo = {
+      ...mockContext,
+      children: [
+        { id: 'c1', identifier: 'TEST-C1', title: 'First', state: { name: 'Todo', type: 'unstarted' } },
+        { id: 'c2', identifier: 'TEST-C2', title: 'Second', state: { name: 'Todo', type: 'unstarted' } }
+      ]
+    };
+    const result = generatePrompt('plan', mockIssue, contextAllTodo);
+    assert.ok(result.prompt.includes('0/2 done'));
+    assert.ok(result.prompt.includes('Next: TEST-C1'));
+  });
+
+  test('subtask summary shows all done without next action', () => {
+    const contextAllDone = {
+      ...mockContext,
+      children: [
+        { id: 'c1', identifier: 'TEST-C1', title: 'Done 1', state: { name: 'Done', type: 'completed' } },
+        { id: 'c2', identifier: 'TEST-C2', title: 'Done 2', state: { name: 'Done', type: 'completed' } }
+      ]
+    };
+    const result = generatePrompt('plan', mockIssue, contextAllDone);
+    assert.ok(result.prompt.includes('2/2 done'));
+    assert.ok(!result.prompt.includes('Next:'));
+    assert.ok(!result.prompt.includes('Continue:'));
   });
 
   test('includes commit message guidance with issue identifier', () => {
