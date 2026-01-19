@@ -231,6 +231,68 @@ describe('Audit Computation', () => {
     assert.ok(report.labels.unmapped.some(l => l.name === 'bug'));
   });
 
+  test('includes workflow labels analysis', () => {
+    const report = computeAuditFromData(baseMockData);
+
+    // Workflow labels object should exist
+    assert.ok(report.labels.workflow, 'Should have workflow labels analysis');
+
+    // Should have 8 phase labels
+    assert.strictEqual(report.labels.workflow.phaseLabels.length, 8);
+
+    // Should have 2 work issue labels
+    assert.strictEqual(report.labels.workflow.workIssueLabels.length, 2);
+
+    // Total should be 10
+    assert.strictEqual(report.labels.workflow.totalCount, 10);
+
+    // in-breakdown and in-research exist in mock data
+    const breakdown = report.labels.workflow.phaseLabels.find(l => l.name === 'in-breakdown');
+    assert.ok(breakdown, 'Should have in-breakdown phase label');
+    assert.strictEqual(breakdown.exists, true);
+    assert.strictEqual(breakdown.issueCount, 1);
+
+    const research = report.labels.workflow.phaseLabels.find(l => l.name === 'in-research');
+    assert.ok(research, 'Should have in-research phase label');
+    assert.strictEqual(research.exists, true);
+    assert.strictEqual(research.issueCount, 1);
+
+    // bug exists in mock data as work issue label
+    const bug = report.labels.workflow.workIssueLabels.find(l => l.name === 'bug');
+    assert.ok(bug, 'Should have bug work issue label');
+    assert.strictEqual(bug.exists, true);
+
+    // blocked does not exist in mock data
+    const blocked = report.labels.workflow.workIssueLabels.find(l => l.name === 'blocked');
+    assert.ok(blocked, 'Should have blocked work issue label');
+    assert.strictEqual(blocked.exists, false);
+    assert.strictEqual(blocked.issueCount, 0);
+
+    // Present count should be 3 (in-breakdown, in-research, bug)
+    assert.strictEqual(report.labels.workflow.presentCount, 3);
+    assert.strictEqual(report.labels.workflow.missingCount, 7);
+  });
+
+  test('separates workflow labels from other labels', () => {
+    const dataWithCustomLabel = {
+      ...baseMockData,
+      labels: [
+        ...baseMockData.labels,
+        { id: 'l4', name: 'custom-label', color: '#abc', issues: { nodes: [{ id: 'i1' }] } }
+      ]
+    };
+
+    const report = computeAuditFromData(dataWithCustomLabel);
+
+    // Other labels should only include non-workflow labels
+    assert.strictEqual(report.labels.otherCount, 1);
+    assert.ok(report.labels.other.some(l => l.name === 'custom-label'));
+
+    // Workflow labels (bug) should NOT appear in other
+    assert.ok(!report.labels.other.some(l => l.name === 'bug'));
+    assert.ok(!report.labels.other.some(l => l.name === 'in-breakdown'));
+  });
+
   test('identifies queue readiness with hybrid approach', () => {
     const report = computeAuditFromData(baseMockData);
 

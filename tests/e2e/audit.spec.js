@@ -274,6 +274,19 @@ test.describe('Audit API', () => {
     expect(report.queues).toHaveProperty('readinessScore');
     expect(report.queues).toHaveProperty('isReady');
 
+    // Verify labels structure with workflow labels
+    expect(report.labels).toHaveProperty('workflow');
+    expect(report.labels.workflow).toHaveProperty('phaseLabels');
+    expect(report.labels.workflow).toHaveProperty('workIssueLabels');
+    expect(report.labels.workflow).toHaveProperty('presentCount');
+    expect(report.labels.workflow).toHaveProperty('missingCount');
+    expect(report.labels.workflow).toHaveProperty('totalCount');
+    expect(report.labels.workflow.phaseLabels).toHaveLength(8);
+    expect(report.labels.workflow.workIssueLabels).toHaveLength(2);
+    expect(report.labels.workflow.totalCount).toBe(10);
+    expect(report.labels).toHaveProperty('other');
+    expect(report.labels).toHaveProperty('otherCount');
+
     // Verify health structure
     expect(report.health).toHaveProperty('totalTasks');
     expect(report.health).toHaveProperty('orphans');
