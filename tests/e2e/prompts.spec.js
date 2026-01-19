@@ -522,11 +522,22 @@ test.describe('AI Recommendations', () => {
     const recommendContainer = page.locator(`.recommend-container[data-recommend-for="${BREAKDOWN_ISSUE_ID}"]`);
     await expect(recommendContainer).toBeVisible();
 
-    // Wait for loading to complete
+    // Reasoning shows "Analyzing..." during loading, then hides after loading
     const reasoning = recommendContainer.locator('.recommend-reasoning');
-    await expect(reasoning).not.toContainText('Analyzing', { timeout: 10000 });
+    const toggleBtn = recommendContainer.locator('.reasoning-toggle');
 
-    // Should show reasoning
+    // Wait for loading to complete (reasoning becomes hidden)
+    await expect(reasoning).toBeHidden({ timeout: 10000 });
+    await expect(toggleBtn).toHaveText('show reasoning');
+
+    // Click show reasoning toggle
+    await toggleBtn.click();
+
+    // Reasoning should now be visible
+    await expect(reasoning).toBeVisible();
+    await expect(toggleBtn).toHaveText('hide reasoning');
+
+    // Should contain reasoning content
     await expect(reasoning).toContainText('breakdown');
   });
 

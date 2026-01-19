@@ -996,6 +996,26 @@ h1 {
   color: var(--fg);
 }
 
+.recommend-header-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.reasoning-toggle {
+  background: none;
+  border: none;
+  padding: 0.25rem 0.5rem;
+  font-family: var(--font-content);
+  font-size: 0.8em;
+  color: var(--blue);
+  cursor: pointer;
+}
+
+.reasoning-toggle:hover {
+  text-decoration: underline;
+}
+
 .recommend-reasoning {
   font-family: var(--font-content);
   font-size: 0.9em;

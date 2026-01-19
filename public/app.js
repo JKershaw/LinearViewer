@@ -807,6 +807,7 @@ function initRecommendations() {
     const promptText = promptDiv?.querySelector('.prompt-text')
 
     reasoning.textContent = 'Analyzing task context...'
+    reasoning.classList.remove('hidden') // Show reasoning during loading
     if (promptText) promptText.textContent = ''
     // Keep prompt section hidden during loading - only show reasoning
     if (promptDiv) promptDiv.classList.add('hidden')
@@ -839,6 +840,10 @@ function initRecommendations() {
           ? '[Warning: Response may be incomplete due to length limit]\n\n' + data.reasoning
           : data.reasoning
         reasoning.innerHTML = renderMarkdown(reasoningText)
+        // Hide reasoning after loading (user can toggle to show)
+        reasoning.classList.add('hidden')
+        const toggleBtn = recommendContainer.querySelector('.reasoning-toggle')
+        if (toggleBtn) toggleBtn.textContent = 'show reasoning'
         if (promptText && data.prompt) {
           // Store raw markdown for copy, render HTML for display
           promptText.dataset.rawPrompt = data.prompt
@@ -852,6 +857,10 @@ function initRecommendations() {
       if (error.name === 'AbortError') return
 
       reasoning.textContent = `Error: ${error.message}`
+      reasoning.classList.remove('hidden') // Ensure visible for error
+      // Reasoning stays visible with error, so toggle should say "hide"
+      const toggleBtn = recommendContainer.querySelector('.reasoning-toggle')
+      if (toggleBtn) toggleBtn.textContent = 'hide reasoning'
       console.error('Failed to get recommendation:', error)
     } finally {
       // Clear active fetch if this was it
@@ -874,7 +883,29 @@ function initRecommendations() {
     const recommendContainer = dismissBtn.closest('.recommend-container')
     if (recommendContainer) {
       recommendContainer.classList.add('hidden')
+      // Reset reasoning toggle state when dismissed
+      const reasoning = recommendContainer.querySelector('.recommend-reasoning')
+      const toggleBtn = recommendContainer.querySelector('.reasoning-toggle')
+      if (reasoning) reasoning.classList.add('hidden')
+      if (toggleBtn) toggleBtn.textContent = 'show reasoning'
     }
+  })
+
+  // Handle reasoning toggle button clicks
+  document.addEventListener('click', (e) => {
+    const toggleBtn = e.target.closest('.reasoning-toggle')
+    if (!toggleBtn) return
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    const recommendContainer = toggleBtn.closest('.recommend-container')
+    const reasoning = recommendContainer?.querySelector('.recommend-reasoning')
+    if (!reasoning) return
+
+    // Toggle visibility
+    const isHidden = reasoning.classList.toggle('hidden')
+    toggleBtn.textContent = isHidden ? 'show reasoning' : 'hide reasoning'
   })
 }
 
