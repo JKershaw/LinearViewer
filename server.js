@@ -13,6 +13,7 @@ import session from 'express-session'
 import { MongoClient } from 'mongodb'
 import { MangoClient } from '@jkershaw/mangodb'
 import { MongoSessionStore } from './lib/session-store.js'
+import { UserPreferencesStore } from './lib/user-preferences.js'
 import { fetchProjects, fetchTeams, fetchIssueContext } from './lib/linear.js'
 import { buildForest, partitionCompleted, buildInProgressForest, NO_PROJECT_ID } from './lib/tree.js'
 import { renderPage, renderErrorPage } from './lib/render.js'
@@ -102,10 +103,15 @@ const dbClient = process.env.MONGODB_URI
 await dbClient.connect()
 const db = dbClient.db('linear-viewer')
 const sessionsCollection = db.collection('sessions')
+const userPreferencesCollection = db.collection('user-preferences')
 
 const sessionStore = new MongoSessionStore({
   collection: sessionsCollection,
   ttl: SESSION_TTL_SECONDS
+})
+
+const userPreferencesStore = new UserPreferencesStore({
+  collection: userPreferencesCollection
 })
 
 // =============================================================================
