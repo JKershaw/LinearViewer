@@ -671,37 +671,6 @@
 }
 
 /* =============================================================================
-   Prompts Link Section (prompts moved to dedicated page)
-   ============================================================================= */
-.prompts-link-section {
-  margin: 1.5rem 0;
-  padding: 1rem;
-  background: rgba(0, 0, 0, 0.02);
-  border-radius: 4px;
-  border-left: 3px solid var(--blue);
-}
-
-.prompts-link {
-  font-family: var(--font-content);
-  font-size: 0.95em;
-  color: var(--blue);
-  text-decoration: none;
-  font-weight: 500;
-}
-
-.prompts-link:hover {
-  text-decoration: underline;
-}
-
-.prompts-link-hint {
-  display: block;
-  font-family: var(--font-content);
-  font-size: 0.85em;
-  color: var(--fg-dim);
-  margin-top: 0.25rem;
-}
-
-/* =============================================================================
    Responsive
    ============================================================================= */
 @media (max-width: 640px) {
