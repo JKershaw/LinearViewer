@@ -296,7 +296,7 @@ app.use((req, res, next) => {
 // Route Mounting
 // =============================================================================
 // Mount extracted route modules
-app.use(createAuthRoutes({ sessionStore }))
+app.use(createAuthRoutes({ sessionStore, userPreferencesStore }))
 app.use(createWorkspaceRoutes())
 app.use(createOpenRouterAuthRoutes())
 
@@ -608,6 +608,21 @@ app.post('/settings/model', async (req, res) => {
   } catch (err) {
     console.error('Failed to save model preference:', err);
     // Continue to redirect - model will still work for this session
+  }
+
+  // Persist preference to user preferences store for cross-device sync
+  if (req.session.linearUserId) {
+    try {
+      // Get existing preferences and merge with new model selection
+      const existingPrefs = await userPreferencesStore.getUserPreferences(req.session.linearUserId);
+      await userPreferencesStore.saveUserPreferences(req.session.linearUserId, {
+        ...existingPrefs,
+        modelId: selectedModel
+      });
+    } catch (err) {
+      console.error('Failed to persist model preference:', err);
+      // Non-fatal: preference still works in session
+    }
   }
 
   res.redirect('/settings');
