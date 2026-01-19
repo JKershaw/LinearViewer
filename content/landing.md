@@ -25,6 +25,18 @@ title: Linear Projects Viewer
 - ✓ Works everywhere
   Clean interface on desktop, tablet, or phone
 
+# AI Integration
+> Get smart recommendations for your tasks
+
+- ○ Task-specific prompts
+  Click any task to see AI-generated prompts tailored to your workflow
+- ○ Connect OpenRouter
+  Link your OpenRouter account for personalized AI suggestions
+  @url: https://openrouter.ai
+  @linkText: Get an OpenRouter account →
+- ○ How it works
+  The AI analyzes your task context—parent issues, siblings, project goals—and recommends the best next action
+
 # Self-Host
 > Full privacy in under 5 minutes
 @collapsed: true
