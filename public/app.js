@@ -857,6 +857,9 @@ function initRecommendations() {
       if (error.name === 'AbortError') return
 
       reasoning.textContent = `Error: ${error.message}`
+      // Reasoning stays visible with error, so toggle should say "hide"
+      const toggleBtn = recommendContainer.querySelector('.reasoning-toggle')
+      if (toggleBtn) toggleBtn.textContent = 'hide reasoning'
       console.error('Failed to get recommendation:', error)
     } finally {
       // Clear active fetch if this was it
