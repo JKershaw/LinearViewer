@@ -453,16 +453,19 @@
   font-size: 0.85em;
 }
 
-.label-tag.mapped {
+.label-tag.mapped,
+.label-tag.workflow.present {
   background: rgba(22, 160, 133, 0.1);
   border: 1px solid rgba(22, 160, 133, 0.3);
 }
 
-.label-tag.unmapped {
+.label-tag.unmapped,
+.label-tag.other {
   background: rgba(0, 0, 0, 0.04);
 }
 
-.label-tag.missing {
+.label-tag.missing,
+.label-tag.workflow.missing {
   background: rgba(231, 76, 60, 0.1);
   border: 1px solid rgba(231, 76, 60, 0.3);
 }

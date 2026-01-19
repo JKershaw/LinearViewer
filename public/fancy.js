@@ -132,7 +132,7 @@ function renderReport(report) {
     ${renderSection('workspace', 'Workspace Structure', renderWorkspaceContent(report.workspace))}
     ${renderSection('queues', 'Queue Readiness', renderQueuesContent(report.queues))}
     ${renderSection('health', 'Task Health', renderHealthContent(report.health))}
-    ${renderSection('labels', 'Labels', renderLabelsContent(report.labels, report.queues))}
+    ${renderSection('labels', 'Labels', renderLabelsContent(report.labels))}
     ${renderSection('projects', 'Projects', renderProjectsContent(report.projectTasks))}
     ${renderSection('prompts', 'Prompts', renderPromptsContent(report.prompts), false)}
     <div class="report-timestamp">
@@ -348,52 +348,48 @@ function renderHealthIssue(label, issue) {
 /**
  * Renders labels content.
  */
-function renderLabelsContent(labels, queues) {
-  const mappedTags = labels.mapped.map(l =>
-    `<span class="label-tag mapped"><span class="tag-name">${escapeHtml(l.name)}</span><span class="tag-count">(${l.issueCount})</span></span>`
+function renderLabelsContent(labels) {
+  const { workflow, other } = labels;
+
+  // Render workflow label (present or missing)
+  const renderWorkflowLabel = (label) => {
+    if (label.exists) {
+      return `<span class="label-tag workflow present"><span class="tag-name">${escapeHtml(label.name)}</span><span class="tag-count">(${label.issueCount})</span></span>`;
+    } else {
+      return `<span class="label-tag workflow missing"><span class="tag-name">${escapeHtml(label.name)}</span><span class="tag-status">missing</span></span>`;
+    }
+  };
+
+  // Phase labels
+  const phaseLabelsTags = workflow.phaseLabels.map(renderWorkflowLabel).join('');
+
+  // Work issue labels
+  const workIssueLabelsTags = workflow.workIssueLabels.map(renderWorkflowLabel).join('');
+
+  // Other labels (non-workflow)
+  const otherTags = other.slice(0, 20).map(l =>
+    `<span class="label-tag other"><span class="tag-name">${escapeHtml(l.name)}</span><span class="tag-count">(${l.issueCount})</span></span>`
   ).join('');
 
-  // Find missing queue-mapped labels (label-based queues that don't exist)
-  const labelBasedQueues = queues.queues.filter(q => q.type === 'label');
-  const missingLabels = labelBasedQueues
-    .filter(q => !q.exists)
-    .flatMap(q => q.expectedLabels || []);
-
-  const missingTags = missingLabels.map(name =>
-    `<span class="label-tag missing"><span class="tag-name">${escapeHtml(name)}</span><span class="tag-status">missing</span></span>`
-  ).join('');
-
-  const unmappedTags = labels.unmapped.slice(0, 20).map(l =>
-    `<span class="label-tag unmapped"><span class="tag-name">${escapeHtml(l.name)}</span><span class="tag-count">(${l.issueCount})</span></span>`
-  ).join('');
-
-  const moreUnmapped = labels.unmapped.length > 20
-    ? `<span class="more-link">...and ${labels.unmapped.length - 20} more</span>`
+  const moreOther = other.length > 20
+    ? `<span class="more-link">...and ${other.length - 20} more</span>`
     : '';
 
-  // Build queue-mapped section content
-  let queueMappedContent = '';
-  if (mappedTags) {
-    queueMappedContent += `<div class="labels-list">${mappedTags}</div>`;
-  }
-  if (missingTags) {
-    if (mappedTags) {
-      queueMappedContent += `<h5 style="margin-top: 0.75rem; color: var(--fg-dim);">Missing:</h5>`;
-    }
-    queueMappedContent += `<div class="labels-list">${missingTags}</div>`;
-  }
-  if (!mappedTags && !missingTags) {
-    queueMappedContent = '<span style="color: var(--fg-dim)">No queue-mapped labels configured</span>';
-  }
-
   return `
-    <h4>Queue-Mapped Labels (${labels.mappedCount})</h4>
-    ${queueMappedContent}
-
-    <h4 style="margin-top: 1rem;">Other Labels (${labels.unmappedCount})</h4>
+    <h4>Workflow Labels (${workflow.presentCount}/${workflow.totalCount})</h4>
+    <h5 style="margin-top: 0.5rem; color: var(--fg-dim);">Phase Labels</h5>
     <div class="labels-list">
-      ${unmappedTags || '<span style="color: var(--fg-dim)">No other labels</span>'}
-      ${moreUnmapped}
+      ${phaseLabelsTags}
+    </div>
+    <h5 style="margin-top: 0.75rem; color: var(--fg-dim);">Work Issue Labels</h5>
+    <div class="labels-list">
+      ${workIssueLabelsTags}
+    </div>
+
+    <h4 style="margin-top: 1rem;">Other Labels (${labels.otherCount})</h4>
+    <div class="labels-list">
+      ${otherTags || '<span style="color: var(--fg-dim)">No other labels</span>'}
+      ${moreOther}
     </div>
   `;
 }
