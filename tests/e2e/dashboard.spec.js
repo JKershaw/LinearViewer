@@ -72,13 +72,20 @@ test.describe('Authenticated Dashboard', () => {
     await expect(page.locator('.nav-bar .nav-action[href="/fancy"]')).not.toBeVisible();
   });
 
-  test('shows footer with reset, audit, and deploy info', async ({ page }) => {
+  test('shows footer with reset, all navigation links, and deploy info', async ({ page }) => {
     // Footer should be visible
     await expect(page.locator('.page-footer')).toBeVisible();
 
-    // Should have reset and audit links in footer
+    // Should have reset link in footer
     await expect(page.locator('.footer-action.reset-view')).toBeVisible();
+
+    // Should have all navigation links (dashboard has no "current page" so all are links)
+    await expect(page.locator('.footer-action[href="/settings"]')).toBeVisible();
+    await expect(page.locator('.footer-action[href="/prompts"]')).toBeVisible();
     await expect(page.locator('.footer-action[href="/fancy"]')).toBeVisible();
+
+    // Should NOT have any bold current page indicator on dashboard
+    await expect(page.locator('.footer-current')).not.toBeVisible();
 
     // Should have deploy info section with GitHub link (fallback in test mode)
     await expect(page.locator('.footer-deploy')).toBeVisible();
