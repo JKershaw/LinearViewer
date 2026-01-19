@@ -9,6 +9,7 @@ required_failed=0
 # Colors and symbols
 check="✓"
 cross="✗"
+skip="○"
 
 echo "Environment Check"
 echo "─────────────────"
@@ -71,10 +72,21 @@ echo "Environment Variables:"
 # Check for .env file and load it
 if [ -f ".env" ]; then
   echo "$check .env file exists"
-  # Load .env file for subsequent checks
-  set -a
-  source .env
-  set +a
+  # Load .env file safely (only KEY=VALUE lines, no command execution)
+  while IFS='=' read -r key value; do
+    # Skip comments and empty lines
+    [[ "$key" =~ ^[[:space:]]*# ]] && continue
+    [[ -z "$key" ]] && continue
+    # Remove surrounding quotes from value
+    value="${value%\"}"
+    value="${value#\"}"
+    value="${value%\'}"
+    value="${value#\'}"
+    # Export if key is a valid variable name
+    if [[ "$key" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
+      export "$key=$value"
+    fi
+  done < .env
 else
   echo "$cross .env file not found"
   if [ -f ".env.example" ]; then
@@ -111,7 +123,7 @@ fi
 if [ -n "$LINEAR_API_KEY" ]; then
   echo "$check LINEAR_API_KEY"
 else
-  echo "$cross LINEAR_API_KEY (optional - for AI agents)"
+  echo "$skip LINEAR_API_KEY (optional - for AI agents)"
 fi
 
 # Check Linear CLI (optional - only if LINEAR_API_KEY is set)
@@ -137,7 +149,7 @@ if [ -n "$LINEAR_API_KEY" ]; then
     echo "$cross lib/linear-cli.js not found"
   fi
 else
-  echo "$cross Skipped (LINEAR_API_KEY not set)"
+  echo "$skip Skipped (LINEAR_API_KEY not set)"
 fi
 
 exit $required_failed
