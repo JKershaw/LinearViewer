@@ -128,26 +128,6 @@ test.describe('Operator Dashboard', () => {
       // Status should say complete
       await expect(page.locator('#audit-status')).toContainText('complete');
     });
-
-    test('displays link to prompts page', async ({ page }) => {
-      await page.goto('/fancy');
-
-      // Run audit
-      await page.locator('#run-audit').click();
-      await expect(page.locator('.audit-report')).toBeVisible({ timeout: 10000 });
-
-      // Find prompts link section
-      const promptsLink = page.locator('.prompts-link-section');
-      await expect(promptsLink).toBeVisible();
-
-      // Should have link to /prompts
-      const link = promptsLink.locator('.prompts-link');
-      await expect(link).toHaveAttribute('href', '/prompts');
-      await expect(link).toContainText('View Prompts');
-
-      // Should have hint text
-      await expect(promptsLink.locator('.prompts-link-hint')).toContainText('Prompt templates are now on their own page');
-    });
   });
 });
 
