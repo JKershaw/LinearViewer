@@ -7,7 +7,7 @@
  */
 import crypto from 'crypto'
 import { Router } from 'express'
-import { fetchOrganization } from '../lib/linear.js'
+import { fetchOrganization, fetchViewer } from '../lib/linear.js'
 import { renderErrorPage } from '../lib/render.js'
 import { upsertWorkspace, saveSession, updateWorkspaceTokens } from '../lib/workspace.js'
 
@@ -106,12 +106,15 @@ export function createAuthRoutes({ sessionStore }) {
         return res.status(400).send(html)
       }
 
-      // Fetch organization info to identify workspace
-      let org
+      // Fetch organization info and current user in parallel
+      let org, viewer
       try {
-        org = await fetchOrganization(data.access_token)
-      } catch (orgError) {
-        console.error('Failed to fetch organization:', orgError)
+        [org, viewer] = await Promise.all([
+          fetchOrganization(data.access_token),
+          fetchViewer(data.access_token)
+        ])
+      } catch (fetchError) {
+        console.error('Failed to fetch from Linear:', fetchError)
         const html = renderErrorPage('Connection Error', 'Could not fetch workspace information from Linear. Please try again.', {
           action: 'Try again',
           actionUrl: '/auth/linear'
@@ -145,6 +148,9 @@ export function createAuthRoutes({ sessionStore }) {
 
         // Restore preserved workspaces
         req.session.workspaces = existingWorkspaces
+
+        // Store Linear user ID for preference persistence
+        req.session.linearUserId = viewer.id
 
         // Add/update workspace in session
         try {
