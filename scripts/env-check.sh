@@ -3,8 +3,6 @@
 # Environment check script for LinearViewer
 # Verifies all dependencies, environment variables, and tools are properly configured
 
-set -e
-
 # Track if any required check fails
 required_failed=0
 
@@ -70,6 +68,16 @@ fi
 echo ""
 echo "Environment Variables:"
 
+# Check for .env file
+if [ -f ".env" ]; then
+  echo "$check .env file exists"
+else
+  echo "$cross .env file not found"
+  if [ -f ".env.example" ]; then
+    echo "  Run: cp .env.example .env"
+  fi
+fi
+
 # Check required environment variables
 if [ -n "$SESSION_SECRET" ]; then
   echo "$check SESSION_SECRET"
@@ -111,7 +119,13 @@ if [ -n "$LINEAR_API_KEY" ]; then
       echo "$check Working - authenticated as $user_name"
     else
       echo "$cross Linear CLI failed"
-      echo "  Check your LINEAR_API_KEY is valid"
+      # Show first line of error for debugging
+      error_line=$(echo "$cli_output" | head -1)
+      if [ -n "$error_line" ]; then
+        echo "  Error: $error_line"
+      else
+        echo "  Check your LINEAR_API_KEY is valid"
+      fi
       required_failed=1
     fi
   else
