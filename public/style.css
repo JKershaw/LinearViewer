@@ -1112,6 +1112,11 @@ h1 {
   color: var(--fg);
 }
 
+.footer-current {
+  color: var(--fg-dim);
+  font-weight: bold;
+}
+
 .footer-deploy {
   color: var(--fg-dim);
   font-family: var(--font-structural);
