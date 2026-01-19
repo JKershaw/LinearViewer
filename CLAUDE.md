@@ -149,10 +149,13 @@ node lib/linear-cli.js <command> [args]
 | `search "query"` | Search issues |
 | `states <teamId>` | List workflow states for a team |
 | `relations <issueId>` | Get issue relations (blocks, blocked-by, etc.) |
+| `labels [teamId]` | List all labels (optionally filter by team) |
 | `create-issue <teamId> <title> [json]` | Create a new issue |
 | `update-issue <issueId> <json>` | Update an existing issue |
 | `comment <issueId> "body"` | Add a comment to an issue |
 | `relation <issueId> <type> <relatedId>` | Create a relation between issues |
+| `add-label <issueId> <label>` | Add a label to an issue (by name or ID) |
+| `remove-label <issueId> <label>` | Remove a label from an issue (by name or ID) |
 
 ### Setup
 
@@ -192,6 +195,13 @@ node lib/linear-cli.js relation LIN-40 blocked-by LIN-39
 node lib/linear-cli.js relation LIN-31 blocks LIN-32
 node lib/linear-cli.js relation LIN-31 duplicate LIN-28
 node lib/linear-cli.js relation LIN-31 related LIN-29
+
+# List and manage labels
+node lib/linear-cli.js labels
+node lib/linear-cli.js labels team_id
+node lib/linear-cli.js add-label LIN-99 "bug"
+node lib/linear-cli.js add-label LIN-99 label_uuid_here
+node lib/linear-cli.js remove-label LIN-99 "bug"
 ```
 
 ### Relation Types
