@@ -159,9 +159,9 @@ test.describe('Operator Dashboard', () => {
       await expect(promptsSection.locator('.prompts-summary')).toBeVisible();
       await expect(promptsSection.locator('.prompts-stat').first()).toContainText('templates');
 
-      // Should show template cards (12 templates)
+      // Should show template cards (14 templates)
       const promptCards = promptsSection.locator('.prompt-card:not(.meta-prompt)');
-      await expect(promptCards).toHaveCount(12);
+      await expect(promptCards).toHaveCount(14);
     });
 
     test('prompts section shows meta-prompt', async ({ page }) => {
@@ -287,8 +287,8 @@ test.describe('Audit API', () => {
     expect(report.prompts).toHaveProperty('metaPrompt');
     expect(report.prompts).toHaveProperty('metaPromptCharCount');
     expect(report.prompts).toHaveProperty('totalCharCount');
-    expect(report.prompts.templateCount).toBe(12);
-    expect(report.prompts.templates).toHaveLength(12);
+    expect(report.prompts.templateCount).toBe(14);
+    expect(report.prompts.templates).toHaveLength(14);
 
     // Verify template structure
     const firstTemplate = report.prompts.templates[0];
