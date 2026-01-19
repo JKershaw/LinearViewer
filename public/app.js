@@ -857,6 +857,7 @@ function initRecommendations() {
       if (error.name === 'AbortError') return
 
       reasoning.textContent = `Error: ${error.message}`
+      reasoning.classList.remove('hidden') // Ensure visible for error
       // Reasoning stays visible with error, so toggle should say "hide"
       const toggleBtn = recommendContainer.querySelector('.reasoning-toggle')
       if (toggleBtn) toggleBtn.textContent = 'hide reasoning'
