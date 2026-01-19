@@ -27,7 +27,7 @@ import { runAudit, computeAuditFromData } from './lib/audit.js'
 import { renderFancyPage } from './lib/render-fancy.js'
 import { generatePrompt, hasPrompt, getAvailablePrompts } from './lib/prompt-templates.js'
 import { PHASE_LABELS, WORK_ISSUE_LABELS } from './lib/workflow-config.js'
-import { isRecommendationEnabled, getRecommendation } from './lib/openrouter.js'
+import { isRecommendationEnabled, getRecommendation, DEFAULT_MODEL, AVAILABLE_MODELS } from './lib/openrouter.js'
 
 // =============================================================================
 // Environment Variable Validation
@@ -127,6 +127,7 @@ app.use((req, res, next) => {
 })
 
 app.use(express.static('public'))
+app.use(express.urlencoded({ extended: false }))
 
 // Session middleware configuration:
 // - resave: false - don't save session if unmodified
@@ -517,12 +518,72 @@ app.get('/fancy', (req, res) => {
   const openRouterSource = sessionApiKey ? 'oauth' : (envApiKey ? 'env' : null);
   const deployInfo = getDeployInfo()
 
+  // Get current model selection (from session or default)
+  const currentModel = req.session.modelId || DEFAULT_MODEL;
+
+  // Check for model validation error from redirect
+  const modelError = req.query.error;
+
   const html = renderFancyPage(workspace.name || 'Workspace', {
     openRouterConnected: !!(sessionApiKey || envApiKey),
     openRouterSource,
-    deployInfo
+    deployInfo,
+    currentModel,
+    availableModels: AVAILABLE_MODELS,
+    modelError
   });
   res.send(html);
+});
+
+/**
+ * Save model selection to session.
+ * Accepts either a preset model ID or a custom model ID.
+ */
+app.post('/settings/model', async (req, res) => {
+  const workspace = getActiveWorkspace(req.session);
+
+  if (!workspace) {
+    return res.redirect('/');
+  }
+
+  const { modelId, customModelId } = req.body;
+
+  // Use custom model ID if provided, otherwise use selected preset
+  let selectedModel = customModelId?.trim() || modelId;
+
+  // Validate model ID format: provider/model (with optional :variant)
+  // Example: anthropic/claude-sonnet-4, meta-llama/llama-3.3-70b-instruct:free
+  // Dots allowed for version numbers (e.g., claude-3.5-sonnet) but not consecutive (..)
+  const modelIdRegex = /^[a-z0-9-]+\/[a-z0-9.-]+(?::[a-z0-9-]+)?$/i;
+
+  // Validate and provide feedback on failure
+  if (!selectedModel) {
+    return res.redirect('/fancy?error=empty');
+  }
+
+  if (selectedModel.length > 100) {
+    return res.redirect('/fancy?error=too-long');
+  }
+
+  // Reject path traversal sequences
+  if (selectedModel.includes('..')) {
+    return res.redirect('/fancy?error=invalid-format');
+  }
+
+  if (!modelIdRegex.test(selectedModel)) {
+    return res.redirect('/fancy?error=invalid-format');
+  }
+
+  // Validation passed - save the model
+  req.session.modelId = selectedModel;
+  try {
+    await saveSession(req.session);
+  } catch (err) {
+    console.error('Failed to save model preference:', err);
+    // Continue to redirect - model will still work for this session
+  }
+
+  res.redirect('/fancy');
 });
 
 /**
@@ -828,8 +889,9 @@ ${goal}`
     // Fetch issue context from Linear
     const { issue, parent, siblings, project, children, comments } = await fetchIssueContext(workspace.accessToken, issueId)
 
-    // Get AI-generated prompt (pass session API key if available)
-    const recommendation = await getRecommendation(issue, { parent, siblings, project, children, comments }, { apiKey: sessionApiKey })
+    // Get AI-generated prompt (pass session API key and model if available)
+    const selectedModel = req.session.modelId || DEFAULT_MODEL
+    const recommendation = await getRecommendation(issue, { parent, siblings, project, children, comments }, { apiKey: sessionApiKey, model: selectedModel })
 
     // Detect label mismatches between AI recommendations and issue labels
     // Note: issue.labels is already an array of strings from fetchIssueContext (lib/linear.js:332)
