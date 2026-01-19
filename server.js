@@ -552,6 +552,7 @@ app.post('/settings/model', async (req, res) => {
 
   // Validate model ID format: provider/model (with optional :variant)
   // Example: anthropic/claude-sonnet-4, meta-llama/llama-3.3-70b-instruct:free
+  // Dots allowed for version numbers (e.g., claude-3.5-sonnet) but not consecutive (..)
   const modelIdRegex = /^[a-z0-9-]+\/[a-z0-9.-]+(?::[a-z0-9-]+)?$/i;
 
   // Validate and provide feedback on failure
@@ -561,6 +562,11 @@ app.post('/settings/model', async (req, res) => {
 
   if (selectedModel.length > 100) {
     return res.redirect('/fancy?error=too-long');
+  }
+
+  // Reject path traversal sequences
+  if (selectedModel.includes('..')) {
+    return res.redirect('/fancy?error=invalid-format');
   }
 
   if (!modelIdRegex.test(selectedModel)) {
