@@ -874,7 +874,29 @@ function initRecommendations() {
     const recommendContainer = dismissBtn.closest('.recommend-container')
     if (recommendContainer) {
       recommendContainer.classList.add('hidden')
+      // Reset reasoning toggle state when dismissed
+      const reasoning = recommendContainer.querySelector('.recommend-reasoning')
+      const toggleBtn = recommendContainer.querySelector('.reasoning-toggle')
+      if (reasoning) reasoning.classList.add('hidden')
+      if (toggleBtn) toggleBtn.textContent = 'show reasoning'
     }
+  })
+
+  // Handle reasoning toggle button clicks
+  document.addEventListener('click', (e) => {
+    const toggleBtn = e.target.closest('.reasoning-toggle')
+    if (!toggleBtn) return
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    const recommendContainer = toggleBtn.closest('.recommend-container')
+    const reasoning = recommendContainer?.querySelector('.recommend-reasoning')
+    if (!reasoning) return
+
+    // Toggle visibility
+    const isHidden = reasoning.classList.toggle('hidden')
+    toggleBtn.textContent = isHidden ? 'show reasoning' : 'hide reasoning'
   })
 }
 
