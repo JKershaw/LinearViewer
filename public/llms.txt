@@ -83,18 +83,24 @@ Both In Progress and Projects sections use the same nested structure:
 - `.toggle` - expand/collapse arrow (▶/▼)
 - `.in-progress-header` - collapsible section header
 
-### Promptable Labels
-Some labels have associated AI prompts for Claude Code with Linear MCP. These appear as clickable links in the task metadata.
+### Phase Labels (Workflow)
+Tasks move to "In Progress" when any work begins. Labels indicate the current phase:
 
-**Supported Labels:**
-- `needs-breakdown` - Break task into subtasks (1-3 hour chunks)
-- `needs-research` - Investigate unknowns, evaluate options
-- `needs-scoping` - Define boundaries, success criteria, exclusions
-- `needs-design` - Create technical design with options analysis
-- `needs-spike` - Timeboxed technical exploration
+**Phase Labels (`in-X` pattern):**
+- `in-research` - Investigating unknowns, evaluating options
+- `in-breakdown` - Breaking task into subtasks (1-3 hour chunks)
+- `in-scoping` - Defining boundaries, success criteria, exclusions
+- `in-design` - Creating technical design with options analysis
+- `in-spike` - Timeboxed technical exploration
+- `in-context` - Generating context summary for handoffs
+- `in-implementation` - Active coding phase
+- `in-review` - Awaiting CI/CD and review
+
+**Work Issue Labels:**
 - `blocked` - Analyze blockers and find resolution paths
-- `needs-context` - Generate context summary for handoffs
 - `bug` - Investigate bug with reproduction steps and hypotheses
+
+All labels above have associated AI prompts that appear as clickable links in task metadata.
 
 **DOM Selectors:**
 - `.label-prompt[data-issue-id][data-label]` - clickable label that generates a prompt
