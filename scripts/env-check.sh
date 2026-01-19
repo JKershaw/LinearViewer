@@ -62,28 +62,13 @@ else
 echo ""
 echo "Environment Variables:"
 
-# Check for .env file and load it
+# Check for .env file
 if [ -f ".env" ]; then
   echo "$check .env file exists"
-  # Load .env file safely (only KEY=VALUE lines, no command execution)
-  while IFS='=' read -r key value; do
-    # Skip comments and empty lines
-    [[ "$key" =~ ^[[:space:]]*# ]] && continue
-    [[ -z "$key" ]] && continue
-    # Remove surrounding quotes from value
-    value="${value%\"}"
-    value="${value#\"}"
-    value="${value%\'}"
-    value="${value#\'}"
-    # Export if key is a valid variable name
-    if [[ "$key" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
-      export "$key=$value"
-    fi
-  done < .env
 else
   echo "$cross .env file not found"
   if [ -f ".env.example" ]; then
-    echo "  Run: cp .env.example .env"
+    echo "  Run: cp .env.example .env && source .env"
   fi
 fi
 
@@ -99,14 +84,14 @@ if [ -n "$LINEAR_CLIENT_ID" ]; then
   echo "$check LINEAR_CLIENT_ID"
 else
   echo "$cross LINEAR_CLIENT_ID"
-  echo "  Get from: https://linear.app/settings/account#api"
+  echo "  Get from: https://linear.app/settings/api/applications"
   fi
 
 if [ -n "$LINEAR_CLIENT_SECRET" ]; then
   echo "$check LINEAR_CLIENT_SECRET"
 else
   echo "$cross LINEAR_CLIENT_SECRET"
-  echo "  Get from: https://linear.app/settings/account#api"
+  echo "  Get from: https://linear.app/settings/api/applications"
   fi
 
 # Check optional environment variables

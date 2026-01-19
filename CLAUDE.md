@@ -21,6 +21,8 @@ npm run env:check
 
 This verifies Node.js, npm, dependencies, Playwright browsers, environment variables, and Linear CLI are properly configured. Fix any issues it reports before proceeding.
 
+**Note:** Requires bash (Unix/Linux/macOS). On Windows, use WSL or Git Bash.
+
 ## Architecture
 
 ```
