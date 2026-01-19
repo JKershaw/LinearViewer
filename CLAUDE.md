@@ -4,24 +4,12 @@ A minimal, CLI-aesthetic web app that displays Linear projects and issues as a c
 
 ## Commands
 
-- `npm run env:check` - Verify environment is ready (run this first)
+- `npm run env:check` - Verify environment is ready (runs automatically via Claude Code hook)
 - `npm install` - Install dependencies
 - `npx playwright install` - Install Playwright browsers (first-time setup)
 - `npm start` - Start the server (runs on PORT from .env, default 3000)
 - `npm test` - Run Playwright E2E tests
 - `npm test:ui` - Run tests with Playwright UI
-
-## Getting Started
-
-Before starting any work, run the environment check:
-
-```bash
-npm run env:check
-```
-
-This verifies Node.js, npm, dependencies, Playwright browsers, environment variables, and Linear CLI are properly configured. Fix any issues it reports before proceeding.
-
-**Note:** Requires bash (Unix/Linux/macOS). On Windows, use WSL or Git Bash.
 
 ## Architecture
 
