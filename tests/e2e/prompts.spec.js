@@ -522,13 +522,15 @@ test.describe('AI Recommendations', () => {
     const recommendContainer = page.locator(`.recommend-container[data-recommend-for="${BREAKDOWN_ISSUE_ID}"]`);
     await expect(recommendContainer).toBeVisible();
 
-    // Reasoning should be hidden by default
+    // Reasoning shows "Analyzing..." during loading, then hides after loading
     const reasoning = recommendContainer.locator('.recommend-reasoning');
-    await expect(reasoning).toBeHidden();
+    const toggleBtn = recommendContainer.locator('.reasoning-toggle');
+
+    // Wait for loading to complete (reasoning becomes hidden)
+    await expect(reasoning).toBeHidden({ timeout: 10000 });
+    await expect(toggleBtn).toHaveText('show reasoning');
 
     // Click show reasoning toggle
-    const toggleBtn = recommendContainer.locator('.reasoning-toggle');
-    await expect(toggleBtn).toHaveText('show reasoning');
     await toggleBtn.click();
 
     // Reasoning should now be visible

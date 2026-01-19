@@ -807,6 +807,7 @@ function initRecommendations() {
     const promptText = promptDiv?.querySelector('.prompt-text')
 
     reasoning.textContent = 'Analyzing task context...'
+    reasoning.classList.remove('hidden') // Show reasoning during loading
     if (promptText) promptText.textContent = ''
     // Keep prompt section hidden during loading - only show reasoning
     if (promptDiv) promptDiv.classList.add('hidden')
@@ -839,6 +840,10 @@ function initRecommendations() {
           ? '[Warning: Response may be incomplete due to length limit]\n\n' + data.reasoning
           : data.reasoning
         reasoning.innerHTML = renderMarkdown(reasoningText)
+        // Hide reasoning after loading (user can toggle to show)
+        reasoning.classList.add('hidden')
+        const toggleBtn = recommendContainer.querySelector('.reasoning-toggle')
+        if (toggleBtn) toggleBtn.textContent = 'show reasoning'
         if (promptText && data.prompt) {
           // Store raw markdown for copy, render HTML for display
           promptText.dataset.rawPrompt = data.prompt
