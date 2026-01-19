@@ -546,10 +546,18 @@ app.post('/settings/model', async (req, res) => {
   // Use custom model ID if provided, otherwise use selected preset
   let selectedModel = customModelId?.trim() || modelId;
 
-  // Validate model ID format (must contain a slash for provider/model)
-  if (selectedModel && selectedModel.includes('/')) {
+  // Validate model ID format: provider/model (with optional :variant)
+  // Example: anthropic/claude-sonnet-4, meta-llama/llama-3.3-70b-instruct:free
+  const modelIdRegex = /^[a-z0-9-]+\/[a-z0-9.-]+(?::[a-z0-9-]+)?$/i;
+
+  if (selectedModel && selectedModel.length <= 100 && modelIdRegex.test(selectedModel)) {
     req.session.modelId = selectedModel;
-    await saveSession(req.session);
+    try {
+      await saveSession(req.session);
+    } catch (err) {
+      console.error('Failed to save model preference:', err);
+      // Continue to redirect - model will still work for this session
+    }
   }
 
   res.redirect('/fancy');
