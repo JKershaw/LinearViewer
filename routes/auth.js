@@ -15,9 +15,10 @@ import { upsertWorkspace, saveSession, updateWorkspaceTokens } from '../lib/work
  * Create auth routes with required dependencies.
  * @param {Object} options
  * @param {Object} options.sessionStore - Session store with cleanup() method
+ * @param {Object} options.userPreferencesStore - User preferences store for loading saved preferences
  * @returns {Router} Express router
  */
-export function createAuthRoutes({ sessionStore }) {
+export function createAuthRoutes({ sessionStore, userPreferencesStore }) {
   const router = Router()
 
   /**
@@ -151,6 +152,15 @@ export function createAuthRoutes({ sessionStore }) {
 
         // Store Linear user ID for preference persistence
         req.session.linearUserId = viewer.id
+
+        // Load saved user preferences and apply to session
+        if (userPreferencesStore) {
+          const savedPrefs = await userPreferencesStore.getUserPreferences(viewer.id)
+          if (savedPrefs.modelId) {
+            req.session.modelId = savedPrefs.modelId
+          }
+          // Future preferences can be loaded here (theme, language, etc.)
+        }
 
         // Add/update workspace in session
         try {
