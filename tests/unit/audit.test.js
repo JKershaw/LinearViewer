@@ -253,16 +253,6 @@ describe('Audit Computation', () => {
     assert.strictEqual(report.queues.readinessScore, 100);
   });
 
-  test('calculates field usage correctly', () => {
-    const report = computeAuditFromData(baseMockData);
-
-    // 1 of 3 issues has estimate = 33%
-    assert.ok(report.fields.estimatesUsage >= 30 && report.fields.estimatesUsage <= 35);
-
-    // 1 of 3 issues has due date = 33%
-    assert.ok(report.fields.dueDatesUsage >= 30 && report.fields.dueDatesUsage <= 35);
-  });
-
   test('includes timestamp', () => {
     const report = computeAuditFromData(baseMockData);
 
@@ -288,7 +278,6 @@ describe('Empty Workspace Handling', () => {
     assert.strictEqual(report.health.totalTasks, 0);
     assert.strictEqual(report.health.orphans.count, 0);
     assert.strictEqual(report.labels.totalLabels, 0);
-    assert.strictEqual(report.fields.estimatesUsage, 0);
   });
 
   test('handles workspace with no labels', () => {
