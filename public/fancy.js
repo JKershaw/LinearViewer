@@ -134,10 +134,6 @@ function renderReport(report) {
     ${renderSection('health', 'Task Health', renderHealthContent(report.health))}
     ${renderSection('labels', 'Labels', renderLabelsContent(report.labels))}
     ${renderSection('projects', 'Projects', renderProjectsContent(report.projectTasks))}
-    <div class="prompts-link-section">
-      <a href="/prompts" class="prompts-link">View Prompts →</a>
-      <span class="prompts-link-hint">Prompt templates are now on their own page</span>
-    </div>
     <div class="report-timestamp">
       Report generated: ${new Date(report.timestamp).toLocaleString()}
     </div>
