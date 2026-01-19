@@ -71,8 +71,8 @@ test.describe('Operator Dashboard', () => {
       await expect(page.locator('.report-summary')).toBeVisible();
       await expect(page.locator('.stat-label')).toContainText(['Total Tasks']);
 
-      // Should show sections (7 total: workspace, queues, health, labels, fields, projects, prompts)
-      await expect(page.locator('.report-section')).toHaveCount(7);
+      // Should show sections (6 total: workspace, queues, health, labels, projects, prompts)
+      await expect(page.locator('.report-section')).toHaveCount(6);
 
       // Should show timestamp
       await expect(page.locator('.report-timestamp')).toBeVisible();
@@ -258,7 +258,6 @@ test.describe('Audit API', () => {
     expect(report).toHaveProperty('labels');
     expect(report).toHaveProperty('queues');
     expect(report).toHaveProperty('health');
-    expect(report).toHaveProperty('fields');
     expect(report).toHaveProperty('projectTasks');
 
     // Verify timestamp is valid ISO date

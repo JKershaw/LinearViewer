@@ -132,8 +132,7 @@ function renderReport(report) {
     ${renderSection('workspace', 'Workspace Structure', renderWorkspaceContent(report.workspace))}
     ${renderSection('queues', 'Queue Readiness', renderQueuesContent(report.queues))}
     ${renderSection('health', 'Task Health', renderHealthContent(report.health))}
-    ${renderSection('labels', 'Labels', renderLabelsContent(report.labels))}
-    ${renderSection('fields', 'Field Usage', renderFieldsContent(report.fields))}
+    ${renderSection('labels', 'Labels', renderLabelsContent(report.labels, report.queues))}
     ${renderSection('projects', 'Projects', renderProjectsContent(report.projectTasks))}
     ${renderSection('prompts', 'Prompts', renderPromptsContent(report.prompts), false)}
     <div class="report-timestamp">
@@ -349,9 +348,19 @@ function renderHealthIssue(label, issue) {
 /**
  * Renders labels content.
  */
-function renderLabelsContent(labels) {
+function renderLabelsContent(labels, queues) {
   const mappedTags = labels.mapped.map(l =>
     `<span class="label-tag mapped"><span class="tag-name">${escapeHtml(l.name)}</span><span class="tag-count">(${l.issueCount})</span></span>`
+  ).join('');
+
+  // Find missing queue-mapped labels (label-based queues that don't exist)
+  const labelBasedQueues = queues.queues.filter(q => q.type === 'label');
+  const missingLabels = labelBasedQueues
+    .filter(q => !q.exists)
+    .flatMap(q => q.expectedLabels || []);
+
+  const missingTags = missingLabels.map(name =>
+    `<span class="label-tag missing"><span class="tag-name">${escapeHtml(name)}</span><span class="tag-status">missing</span></span>`
   ).join('');
 
   const unmappedTags = labels.unmapped.slice(0, 20).map(l =>
@@ -362,45 +371,29 @@ function renderLabelsContent(labels) {
     ? `<span class="more-link">...and ${labels.unmapped.length - 20} more</span>`
     : '';
 
+  // Build queue-mapped section content
+  let queueMappedContent = '';
+  if (mappedTags) {
+    queueMappedContent += `<div class="labels-list">${mappedTags}</div>`;
+  }
+  if (missingTags) {
+    if (mappedTags) {
+      queueMappedContent += `<h5 style="margin-top: 0.75rem; color: var(--fg-dim);">Missing:</h5>`;
+    }
+    queueMappedContent += `<div class="labels-list">${missingTags}</div>`;
+  }
+  if (!mappedTags && !missingTags) {
+    queueMappedContent = '<span style="color: var(--fg-dim)">No queue-mapped labels configured</span>';
+  }
+
   return `
     <h4>Queue-Mapped Labels (${labels.mappedCount})</h4>
-    <div class="labels-list">
-      ${mappedTags || '<span style="color: var(--fg-dim)">No labels map to queues</span>'}
-    </div>
+    ${queueMappedContent}
 
     <h4 style="margin-top: 1rem;">Other Labels (${labels.unmappedCount})</h4>
     <div class="labels-list">
       ${unmappedTags || '<span style="color: var(--fg-dim)">No other labels</span>'}
       ${moreUnmapped}
-    </div>
-  `;
-}
-
-/**
- * Renders field usage content.
- */
-function renderFieldsContent(fields) {
-  return `
-    ${renderUsageBar('Estimates', fields.estimatesUsage)}
-    ${renderUsageBar('Due dates', fields.dueDatesUsage)}
-  `;
-}
-
-/**
- * Renders a usage bar.
- */
-function renderUsageBar(label, percent) {
-  let fillClass = '';
-  if (percent < 25) fillClass = 'very-low';
-  else if (percent < 50) fillClass = 'low';
-
-  return `
-    <div class="usage-bar-container">
-      <span class="usage-label">${escapeHtml(label)}</span>
-      <div class="usage-bar">
-        <div class="usage-bar-fill ${fillClass}" style="width: ${percent}%"></div>
-      </div>
-      <span class="usage-percent">${percent}%</span>
     </div>
   `;
 }

@@ -462,6 +462,18 @@
   background: rgba(0, 0, 0, 0.04);
 }
 
+.label-tag.missing {
+  background: rgba(231, 76, 60, 0.1);
+  border: 1px solid rgba(231, 76, 60, 0.3);
+}
+
+.label-tag .tag-status {
+  color: var(--red);
+  font-family: var(--font-structural);
+  font-size: 0.85em;
+  font-style: italic;
+}
+
 /* Issues List (for health problems) */
 .issues-list {
   list-style: none;
