@@ -102,6 +102,33 @@ Tasks move to "In Progress" when any work begins. Labels indicate the current ph
 
 All labels above have associated AI prompts that appear as clickable links in task metadata.
 
+### Label Lifecycle Model
+
+Labels indicate **current activity**, not future needs (e.g., `in-research` means "research is happening now").
+
+**Rules:**
+1. **One phase label at a time**: Remove current phase label before adding another
+2. **Status follows labels**: Adding any `in-X` label → set status to "In Progress"
+3. **Remove when done**: Phase labels are removed when their readiness check passes
+4. **Work issues coexist**: `blocked` and `bug` can exist alongside phase labels
+
+**Typical Flow:**
+1. Triage adds `in-breakdown` → task is being broken down
+2. Breakdown complete → remove `in-breakdown` (task returns to ready queue)
+3. Work begins → add `in-implementation`
+4. Code done → remove `in-implementation`, add `in-review`
+5. Merged → remove `in-review`, set status "Done"
+
+**Readiness Checks** (when to remove label):
+- `in-breakdown`: "Could someone pick up any subtask and start working?"
+- `in-research`: "Could an implementor start work based on verified findings?"
+- `in-scoping`: "Would two people independently agree on what is included?"
+- `in-design`: "Could an implementor start building based on this design?"
+- `in-spike`: "Do we know enough to make a confident decision?"
+- `in-context`: "Could someone new pick this up and continue effectively?"
+- `blocked`: "Can work resume based on this analysis?"
+- `bug`: "Could someone implement a fix based on this?"
+
 **DOM Selectors:**
 - `.label-prompt[data-issue-id][data-label]` - clickable label that generates a prompt
 - `.prompt-container[data-prompt-for="{id}"]` - container for generated prompt
