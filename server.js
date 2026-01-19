@@ -520,12 +520,16 @@ app.get('/fancy', (req, res) => {
   // Get current model selection (from session or default)
   const currentModel = req.session.modelId || DEFAULT_MODEL;
 
+  // Check for model validation error from redirect
+  const modelError = req.query.error;
+
   const html = renderFancyPage(workspace.name || 'Workspace', {
     openRouterConnected: !!(sessionApiKey || envApiKey),
     openRouterSource,
     deployInfo,
     currentModel,
-    availableModels: AVAILABLE_MODELS
+    availableModels: AVAILABLE_MODELS,
+    modelError
   });
   res.send(html);
 });
@@ -546,10 +550,36 @@ app.post('/settings/model', async (req, res) => {
   // Use custom model ID if provided, otherwise use selected preset
   let selectedModel = customModelId?.trim() || modelId;
 
-  // Validate model ID format (must contain a slash for provider/model)
-  if (selectedModel && selectedModel.includes('/')) {
-    req.session.modelId = selectedModel;
+  // Validate model ID format: provider/model (with optional :variant)
+  // Example: anthropic/claude-sonnet-4, meta-llama/llama-3.3-70b-instruct:free
+  // Dots allowed for version numbers (e.g., claude-3.5-sonnet) but not consecutive (..)
+  const modelIdRegex = /^[a-z0-9-]+\/[a-z0-9.-]+(?::[a-z0-9-]+)?$/i;
+
+  // Validate and provide feedback on failure
+  if (!selectedModel) {
+    return res.redirect('/fancy?error=empty');
+  }
+
+  if (selectedModel.length > 100) {
+    return res.redirect('/fancy?error=too-long');
+  }
+
+  // Reject path traversal sequences
+  if (selectedModel.includes('..')) {
+    return res.redirect('/fancy?error=invalid-format');
+  }
+
+  if (!modelIdRegex.test(selectedModel)) {
+    return res.redirect('/fancy?error=invalid-format');
+  }
+
+  // Validation passed - save the model
+  req.session.modelId = selectedModel;
+  try {
     await saveSession(req.session);
+  } catch (err) {
+    console.error('Failed to save model preference:', err);
+    // Continue to redirect - model will still work for this session
   }
 
   res.redirect('/fancy');
