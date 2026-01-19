@@ -21,8 +21,6 @@ npm run env:check
 
 This verifies Node.js, npm, dependencies, Playwright browsers, environment variables, and Linear CLI are properly configured. Fix any issues it reports before proceeding.
 
-Exit codes: 0 = ready, 1 = missing required dependencies or environment variables.
-
 ## Architecture
 
 ```

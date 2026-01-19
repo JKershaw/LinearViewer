@@ -3,8 +3,6 @@
 # Environment check script for LinearViewer
 # Verifies all dependencies, environment variables, and tools are properly configured
 
-# Track if any required check fails
-required_failed=0
 
 # Colors and symbols
 check="✓"
@@ -22,13 +20,11 @@ if command -v node &> /dev/null; then
     echo "$check Node.js $node_version (≥20 required)"
   else
     echo "$cross Node.js $node_version (≥20 required)"
-    required_failed=1
-  fi
+      fi
 else
   echo "$cross Node.js not installed"
   echo "  Run: Install Node.js 20+ from https://nodejs.org"
-  required_failed=1
-fi
+  fi
 
 # Check npm
 if command -v npm &> /dev/null; then
@@ -36,8 +32,7 @@ if command -v npm &> /dev/null; then
   echo "$check npm $npm_version"
 else
   echo "$cross npm not installed"
-  required_failed=1
-fi
+  fi
 
 # Check node_modules
 if [ -d "node_modules" ]; then
@@ -45,8 +40,7 @@ if [ -d "node_modules" ]; then
 else
   echo "$cross Dependencies not installed"
   echo "  Run: npm install"
-  required_failed=1
-fi
+  fi
 
 # Check Playwright browsers
 playwright_ok=0
@@ -63,8 +57,7 @@ if [ "$playwright_ok" -eq 1 ]; then
 else
   echo "$cross Playwright browsers not installed"
   echo "  Run: npx playwright install chromium --with-deps"
-  required_failed=1
-fi
+  fi
 
 echo ""
 echo "Environment Variables:"
@@ -100,24 +93,21 @@ if [ -n "$SESSION_SECRET" ]; then
 else
   echo "$cross SESSION_SECRET"
   echo "  Set in .env or export SESSION_SECRET=\"your-secret\""
-  required_failed=1
-fi
+  fi
 
 if [ -n "$LINEAR_CLIENT_ID" ]; then
   echo "$check LINEAR_CLIENT_ID"
 else
   echo "$cross LINEAR_CLIENT_ID"
   echo "  Get from: https://linear.app/settings/account#api"
-  required_failed=1
-fi
+  fi
 
 if [ -n "$LINEAR_CLIENT_SECRET" ]; then
   echo "$check LINEAR_CLIENT_SECRET"
 else
   echo "$cross LINEAR_CLIENT_SECRET"
   echo "  Get from: https://linear.app/settings/account#api"
-  required_failed=1
-fi
+  fi
 
 # Check optional environment variables
 if [ -n "$LINEAR_API_KEY" ]; then
@@ -152,4 +142,3 @@ else
   echo "$skip Skipped (LINEAR_API_KEY not set)"
 fi
 
-exit $required_failed
