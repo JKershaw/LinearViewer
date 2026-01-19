@@ -120,12 +120,17 @@ test.describe('Prompts Page', () => {
       // Should have footer
       await expect(page.locator('.page-footer')).toBeVisible();
 
-      // Should have settings link
+      // Current page (prompts) should be bold, not a link
+      const currentPage = page.locator('.footer-current');
+      await expect(currentPage).toBeVisible();
+      await expect(currentPage).toContainText('prompts');
+
+      // Should have settings link (not current page)
       const settingsLink = page.locator('.footer-action[href="/settings"]');
       await expect(settingsLink).toBeVisible();
       await expect(settingsLink).toContainText('settings');
 
-      // Should have audit link
+      // Should have audit link (not current page)
       const auditLink = page.locator('.footer-action[href="/fancy"]');
       await expect(auditLink).toBeVisible();
       await expect(auditLink).toContainText('audit');
