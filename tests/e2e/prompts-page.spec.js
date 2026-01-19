@@ -27,7 +27,7 @@ test.describe('Prompts Page', () => {
       await expect(page.locator('h1')).toContainText('Prompts');
 
       // Should show subtitle
-      await expect(page.locator('.prompts-subtitle')).toContainText('prompt templates');
+      await expect(page.locator('.prompts-subtitle')).toContainText('Prompt templates');
     });
 
     test('shows workspace name in navigation', async ({ page }) => {
@@ -111,7 +111,7 @@ test.describe('Prompts Page', () => {
 
       // Should show meta-prompt section
       await expect(page.locator('.meta-prompt-section')).toBeVisible();
-      await expect(page.locator('.section-header')).toContainText('Meta-Prompt');
+      await expect(page.locator('.meta-prompt-section .section-header')).toContainText('Meta-Prompt');
     });
 
     test('has footer with navigation links', async ({ page }) => {
