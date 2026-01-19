@@ -1,0 +1,192 @@
+/**
+ * Prompts Page Styles
+ *
+ * Minimal styles for the /prompts page.
+ * Maintains CLI aesthetic with monospace fonts and clean layout.
+ */
+
+/* Page subtitle */
+.prompts-subtitle {
+  color: #666;
+  margin-top: 0.25rem;
+}
+
+/* Summary section */
+.prompts-summary {
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background: #f8f8f8;
+  border: 1px solid #e0e0e0;
+}
+
+.summary-stats {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.stat-separator {
+  color: #999;
+}
+
+/* Section headers */
+.prompts-section {
+  margin-bottom: 2rem;
+}
+
+.section-header {
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.section-description {
+  color: #666;
+  margin-bottom: 1rem;
+}
+
+/* Category grouping */
+.prompt-category {
+  margin-bottom: 1.5rem;
+}
+
+.category-header {
+  font-size: 1rem;
+  margin-bottom: 0.75rem;
+  color: #444;
+}
+
+.category-count {
+  color: #888;
+  font-weight: normal;
+}
+
+/* Prompt cards */
+.prompt-card {
+  border: 1px solid #ddd;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  background: #fff;
+}
+
+.prompt-header {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.prompt-name {
+  font-weight: bold;
+}
+
+.prompt-label {
+  font-family: monospace;
+  font-size: 0.85rem;
+  background: #f0f0f0;
+  padding: 0.1rem 0.4rem;
+  border-radius: 2px;
+  color: #555;
+}
+
+.prompt-chars {
+  color: #888;
+  font-size: 0.85rem;
+  margin-left: auto;
+}
+
+.prompt-description {
+  color: #555;
+  margin-bottom: 0.75rem;
+}
+
+/* AI hints */
+.prompt-ai-hint {
+  background: #f5f5f5;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.ai-hint-row {
+  margin-bottom: 0.25rem;
+}
+
+.ai-hint-row:last-child {
+  margin-bottom: 0;
+}
+
+.ai-hint-label {
+  color: #666;
+  font-weight: 500;
+}
+
+/* Completion signals */
+.prompt-signals {
+  background: #f0f8f0;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.signals-label {
+  color: #666;
+  font-weight: 500;
+}
+
+.signals-list ul {
+  margin: 0.25rem 0 0 1.25rem;
+  padding: 0;
+}
+
+.signals-list li {
+  margin-bottom: 0.15rem;
+}
+
+/* Expandable prompt details */
+.prompt-details {
+  margin-top: 0.5rem;
+}
+
+.prompt-details summary {
+  cursor: pointer;
+  color: #0066cc;
+  font-size: 0.9rem;
+}
+
+.prompt-details summary:hover {
+  text-decoration: underline;
+}
+
+.prompt-text {
+  font-family: monospace;
+  font-size: 0.85rem;
+  background: #f8f8f8;
+  padding: 1rem;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  margin-top: 0.5rem;
+  border: 1px solid #e0e0e0;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+/* Meta-prompt section */
+.meta-prompt-section {
+  background: #fafafa;
+  padding: 1rem;
+  border: 1px solid #e0e0e0;
+}
+
+.meta-prompt-stats {
+  margin-bottom: 0.75rem;
+  color: #666;
+}
+
+.meta-prompt-text {
+  max-height: 600px;
+}
