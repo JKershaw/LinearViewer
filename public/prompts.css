@@ -1,0 +1,312 @@
+/**
+ * Prompts Page Styles
+ *
+ * Extends the base style.css with prompts-specific components.
+ * Maintains CLI aesthetic with CSS variables.
+ */
+
+/* =============================================================================
+   Page Header
+   ============================================================================= */
+.prompts-subtitle {
+  color: var(--fg-dim);
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  margin-top: 0.5rem;
+}
+
+.nav-value-static {
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  color: var(--fg);
+}
+
+/* =============================================================================
+   Summary Section
+   ============================================================================= */
+.prompts-summary {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 4px;
+}
+
+.summary-stats {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+  font-family: var(--font-content);
+  font-size: 0.9em;
+}
+
+.stat {
+  color: var(--fg-dim);
+}
+
+.stat strong {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.stat-separator {
+  color: var(--fg-vdim);
+}
+
+/* =============================================================================
+   Sections
+   ============================================================================= */
+.prompts-section {
+  margin-bottom: 2rem;
+}
+
+.section-header {
+  font-family: var(--font-content);
+  font-size: 1.1em;
+  font-weight: 500;
+  color: var(--fg);
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--fg-vdim);
+}
+
+.section-description {
+  color: var(--fg-dim);
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  margin-bottom: 1rem;
+  line-height: 1.5;
+}
+
+/* =============================================================================
+   Category Grouping
+   ============================================================================= */
+.prompt-category {
+  margin-bottom: 1.5rem;
+}
+
+.category-header {
+  font-family: var(--font-content);
+  font-size: 0.95em;
+  font-weight: 500;
+  color: var(--fg);
+  margin: 0 0 0.75rem 0;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--fg-vdim);
+}
+
+.category-count {
+  color: var(--fg-dim);
+  font-weight: normal;
+}
+
+.category-templates {
+  padding-left: 0.5rem;
+}
+
+/* =============================================================================
+   Prompt Cards
+   ============================================================================= */
+.prompt-card {
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 4px;
+  border-left: 3px solid var(--fg-vdim);
+}
+
+.prompt-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.prompt-name {
+  font-family: var(--font-content);
+  font-weight: 500;
+  color: var(--fg);
+}
+
+.prompt-label {
+  font-family: var(--font-structural);
+  font-size: 0.85em;
+  color: var(--fg-dim);
+  background: rgba(0, 0, 0, 0.05);
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+}
+
+.prompt-chars {
+  font-family: var(--font-structural);
+  font-size: 0.8em;
+  color: var(--fg-dim);
+  margin-left: auto;
+}
+
+.prompt-description {
+  font-family: var(--font-content);
+  font-size: 0.85em;
+  color: var(--fg-dim);
+  margin-bottom: 0.5rem;
+  line-height: 1.4;
+}
+
+/* =============================================================================
+   AI Hints
+   ============================================================================= */
+.prompt-ai-hint {
+  font-family: var(--font-content);
+  font-size: 0.8em;
+  color: var(--fg-dim);
+  margin-bottom: 0.5rem;
+  padding: 0.5rem;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 3px;
+  line-height: 1.5;
+}
+
+.ai-hint-row {
+  margin-bottom: 0.25rem;
+}
+
+.ai-hint-row:last-child {
+  margin-bottom: 0;
+}
+
+.ai-hint-label {
+  font-weight: 500;
+  color: var(--fg);
+}
+
+/* =============================================================================
+   Completion Signals
+   ============================================================================= */
+.prompt-signals {
+  font-family: var(--font-content);
+  font-size: 0.8em;
+  color: var(--fg-dim);
+  margin-bottom: 0.5rem;
+  padding: 0.5rem;
+  background: rgba(22, 160, 133, 0.05);
+  border-radius: 3px;
+}
+
+.signals-core {
+  margin-bottom: 0.25rem;
+}
+
+.signals-label {
+  font-weight: 500;
+  color: var(--fg);
+}
+
+.signals-list {
+  margin-top: 0.25rem;
+}
+
+.signals-list ul {
+  margin: 0.25rem 0 0 1.5rem;
+  padding: 0;
+  list-style-type: disc;
+}
+
+.signals-list li {
+  margin-bottom: 0.15rem;
+}
+
+/* =============================================================================
+   Expandable Prompt Details
+   ============================================================================= */
+.prompt-details {
+  margin-top: 0.5rem;
+}
+
+.prompt-details summary {
+  font-family: var(--font-content);
+  font-size: 0.85em;
+  color: var(--blue);
+  cursor: pointer;
+  padding: 0.25rem 0;
+}
+
+.prompt-details summary:hover {
+  text-decoration: underline;
+}
+
+.prompt-text {
+  font-family: var(--font-structural);
+  font-size: 0.8em;
+  line-height: 1.5;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--fg-vdim);
+  border-radius: 4px;
+  padding: 1rem;
+  margin-top: 0.5rem;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+/* =============================================================================
+   Meta-Prompt Section
+   ============================================================================= */
+.meta-prompt-section {
+  background: rgba(0, 0, 0, 0.02);
+  padding: 1rem;
+  border-radius: 4px;
+  border-left: 3px solid var(--blue);
+}
+
+.meta-prompt-section .section-header {
+  border-bottom: none;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0;
+}
+
+.meta-prompt-stats {
+  font-family: var(--font-content);
+  font-size: 0.85em;
+  color: var(--fg-dim);
+  margin-bottom: 0.75rem;
+}
+
+.meta-prompt-text {
+  max-height: 600px;
+}
+
+/* =============================================================================
+   Responsive
+   ============================================================================= */
+@media (max-width: 640px) {
+  .prompts-summary {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .prompt-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+
+  .prompt-chars {
+    margin-left: 0;
+  }
+
+  .prompt-text {
+    max-height: 300px;
+    font-size: 0.75em;
+  }
+
+  .category-templates {
+    padding-left: 0;
+  }
+}

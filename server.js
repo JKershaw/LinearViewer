@@ -26,6 +26,7 @@ import { testMockTeams, testMockData } from './tests/fixtures/mock-data.js'
 import { runAudit, computeAuditFromData } from './lib/audit.js'
 import { renderFancyPage } from './lib/render-fancy.js'
 import { renderSettingsPage } from './lib/render-settings.js'
+import { renderPromptsPage } from './lib/render-prompts.js'
 import { generatePrompt, hasPrompt, getAvailablePrompts } from './lib/prompt-templates.js'
 import { PHASE_LABELS, WORK_ISSUE_LABELS } from './lib/workflow-config.js'
 import { isRecommendationEnabled, getRecommendation, DEFAULT_MODEL, AVAILABLE_MODELS } from './lib/openrouter.js'
@@ -552,6 +553,26 @@ app.get('/settings', (req, res) => {
     currentModel,
     availableModels: AVAILABLE_MODELS,
     modelError
+  });
+  res.send(html);
+});
+
+/**
+ * Prompts page - requires authentication.
+ * Displays all prompt templates organized by category.
+ */
+app.get('/prompts', (req, res) => {
+  const workspace = getActiveWorkspace(req.session);
+
+  // Redirect to home if not authenticated
+  if (!workspace) {
+    return res.redirect('/');
+  }
+
+  const deployInfo = getDeployInfo();
+
+  const html = renderPromptsPage(workspace.name || 'Workspace', {
+    deployInfo
   });
   res.send(html);
 });
