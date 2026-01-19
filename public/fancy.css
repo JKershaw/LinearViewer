@@ -103,6 +103,82 @@
   background: rgba(239, 68, 68, 0.2);
 }
 
+.settings-action.save {
+  color: var(--green);
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.settings-action.save:hover {
+  background: rgba(34, 197, 94, 0.2);
+}
+
+.settings-link {
+  color: var(--blue);
+  font-family: var(--font-content);
+  font-size: 0.85em;
+  text-decoration: none;
+  margin-left: 0.5rem;
+}
+
+.settings-link:hover {
+  text-decoration: underline;
+}
+
+/* Model Selector */
+.model-form {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.model-select {
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--fg-vdim);
+  border-radius: 3px;
+  background: var(--bg);
+  color: var(--fg);
+  min-width: 18ch;
+}
+
+.model-select:focus {
+  outline: none;
+  border-color: var(--blue);
+}
+
+.model-input {
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--fg-vdim);
+  border-radius: 3px;
+  background: var(--bg);
+  color: var(--fg);
+  min-width: 22ch;
+}
+
+.model-input:focus {
+  outline: none;
+  border-color: var(--blue);
+}
+
+.model-input::placeholder {
+  color: var(--fg-dim);
+}
+
+.model-current {
+  margin-top: 0.25rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid var(--fg-vdim);
+}
+
+.model-id {
+  font-family: var(--font-structural);
+  font-size: 0.85em;
+  color: var(--fg-dim);
+}
+
 /* =============================================================================
    Audit Controls
    ============================================================================= */
