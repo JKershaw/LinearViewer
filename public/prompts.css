@@ -1,22 +1,37 @@
 /**
  * Prompts Page Styles
  *
- * Minimal styles for the /prompts page.
- * Maintains CLI aesthetic with monospace fonts and clean layout.
+ * Extends the base style.css with prompts-specific components.
+ * Maintains CLI aesthetic with CSS variables.
  */
 
-/* Page subtitle */
+/* =============================================================================
+   Page Header
+   ============================================================================= */
 .prompts-subtitle {
-  color: #666;
-  margin-top: 0.25rem;
+  color: var(--fg-dim);
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  margin-top: 0.5rem;
 }
 
-/* Summary section */
+.nav-value-static {
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  color: var(--fg);
+}
+
+/* =============================================================================
+   Summary Section
+   ============================================================================= */
 .prompts-summary {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
   margin-bottom: 2rem;
   padding: 1rem;
-  background: #f8f8f8;
-  border: 1px solid #e0e0e0;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 4px;
 }
 
 .summary-stats {
@@ -24,91 +39,135 @@
   gap: 0.5rem;
   align-items: center;
   flex-wrap: wrap;
+  font-family: var(--font-content);
+  font-size: 0.9em;
+}
+
+.stat {
+  color: var(--fg-dim);
+}
+
+.stat strong {
+  color: var(--fg);
+  font-weight: 600;
 }
 
 .stat-separator {
-  color: #999;
+  color: var(--fg-vdim);
 }
 
-/* Section headers */
+/* =============================================================================
+   Sections
+   ============================================================================= */
 .prompts-section {
   margin-bottom: 2rem;
 }
 
 .section-header {
-  font-size: 1.1rem;
+  font-family: var(--font-content);
+  font-size: 1.1em;
+  font-weight: 500;
+  color: var(--fg);
   margin-bottom: 1rem;
   padding-bottom: 0.5rem;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--fg-vdim);
 }
 
 .section-description {
-  color: #666;
+  color: var(--fg-dim);
+  font-family: var(--font-content);
+  font-size: 0.9em;
   margin-bottom: 1rem;
+  line-height: 1.5;
 }
 
-/* Category grouping */
+/* =============================================================================
+   Category Grouping
+   ============================================================================= */
 .prompt-category {
   margin-bottom: 1.5rem;
 }
 
 .category-header {
-  font-size: 1rem;
-  margin-bottom: 0.75rem;
-  color: #444;
+  font-family: var(--font-content);
+  font-size: 0.95em;
+  font-weight: 500;
+  color: var(--fg);
+  margin: 0 0 0.75rem 0;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--fg-vdim);
 }
 
 .category-count {
-  color: #888;
+  color: var(--fg-dim);
   font-weight: normal;
 }
 
-/* Prompt cards */
+.category-templates {
+  padding-left: 0.5rem;
+}
+
+/* =============================================================================
+   Prompt Cards
+   ============================================================================= */
 .prompt-card {
-  border: 1px solid #ddd;
-  padding: 1rem;
   margin-bottom: 1rem;
-  background: #fff;
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 4px;
+  border-left: 3px solid var(--fg-vdim);
 }
 
 .prompt-header {
   display: flex;
+  align-items: baseline;
   gap: 0.75rem;
-  align-items: center;
   flex-wrap: wrap;
   margin-bottom: 0.5rem;
 }
 
 .prompt-name {
-  font-weight: bold;
+  font-family: var(--font-content);
+  font-weight: 500;
+  color: var(--fg);
 }
 
 .prompt-label {
-  font-family: monospace;
-  font-size: 0.85rem;
-  background: #f0f0f0;
+  font-family: var(--font-structural);
+  font-size: 0.85em;
+  color: var(--fg-dim);
+  background: rgba(0, 0, 0, 0.05);
   padding: 0.1rem 0.4rem;
-  border-radius: 2px;
-  color: #555;
+  border-radius: 3px;
 }
 
 .prompt-chars {
-  color: #888;
-  font-size: 0.85rem;
+  font-family: var(--font-structural);
+  font-size: 0.8em;
+  color: var(--fg-dim);
   margin-left: auto;
 }
 
 .prompt-description {
-  color: #555;
-  margin-bottom: 0.75rem;
+  font-family: var(--font-content);
+  font-size: 0.85em;
+  color: var(--fg-dim);
+  margin-bottom: 0.5rem;
+  line-height: 1.4;
 }
 
-/* AI hints */
+/* =============================================================================
+   AI Hints
+   ============================================================================= */
 .prompt-ai-hint {
-  background: #f5f5f5;
-  padding: 0.75rem;
-  margin-bottom: 0.75rem;
-  font-size: 0.9rem;
+  font-family: var(--font-content);
+  font-size: 0.8em;
+  color: var(--fg-dim);
+  margin-bottom: 0.5rem;
+  padding: 0.5rem;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 3px;
+  line-height: 1.5;
 }
 
 .ai-hint-row {
@@ -120,41 +179,59 @@
 }
 
 .ai-hint-label {
-  color: #666;
   font-weight: 500;
+  color: var(--fg);
 }
 
-/* Completion signals */
+/* =============================================================================
+   Completion Signals
+   ============================================================================= */
 .prompt-signals {
-  background: #f0f8f0;
-  padding: 0.75rem;
-  margin-bottom: 0.75rem;
-  font-size: 0.9rem;
+  font-family: var(--font-content);
+  font-size: 0.8em;
+  color: var(--fg-dim);
+  margin-bottom: 0.5rem;
+  padding: 0.5rem;
+  background: rgba(22, 160, 133, 0.05);
+  border-radius: 3px;
+}
+
+.signals-core {
+  margin-bottom: 0.25rem;
 }
 
 .signals-label {
-  color: #666;
   font-weight: 500;
+  color: var(--fg);
+}
+
+.signals-list {
+  margin-top: 0.25rem;
 }
 
 .signals-list ul {
-  margin: 0.25rem 0 0 1.25rem;
+  margin: 0.25rem 0 0 1.5rem;
   padding: 0;
+  list-style-type: disc;
 }
 
 .signals-list li {
   margin-bottom: 0.15rem;
 }
 
-/* Expandable prompt details */
+/* =============================================================================
+   Expandable Prompt Details
+   ============================================================================= */
 .prompt-details {
   margin-top: 0.5rem;
 }
 
 .prompt-details summary {
+  font-family: var(--font-content);
+  font-size: 0.85em;
+  color: var(--blue);
   cursor: pointer;
-  color: #0066cc;
-  font-size: 0.9rem;
+  padding: 0.25rem 0;
 }
 
 .prompt-details summary:hover {
@@ -162,31 +239,74 @@
 }
 
 .prompt-text {
-  font-family: monospace;
-  font-size: 0.85rem;
-  background: #f8f8f8;
+  font-family: var(--font-structural);
+  font-size: 0.8em;
+  line-height: 1.5;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--fg-vdim);
+  border-radius: 4px;
   padding: 1rem;
+  margin-top: 0.5rem;
   overflow-x: auto;
   white-space: pre-wrap;
-  word-wrap: break-word;
-  margin-top: 0.5rem;
-  border: 1px solid #e0e0e0;
+  word-break: break-word;
   max-height: 400px;
   overflow-y: auto;
 }
 
-/* Meta-prompt section */
+/* =============================================================================
+   Meta-Prompt Section
+   ============================================================================= */
 .meta-prompt-section {
-  background: #fafafa;
+  background: rgba(0, 0, 0, 0.02);
   padding: 1rem;
-  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  border-left: 3px solid var(--blue);
+}
+
+.meta-prompt-section .section-header {
+  border-bottom: none;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0;
 }
 
 .meta-prompt-stats {
+  font-family: var(--font-content);
+  font-size: 0.85em;
+  color: var(--fg-dim);
   margin-bottom: 0.75rem;
-  color: #666;
 }
 
 .meta-prompt-text {
   max-height: 600px;
+}
+
+/* =============================================================================
+   Responsive
+   ============================================================================= */
+@media (max-width: 640px) {
+  .prompts-summary {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .prompt-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+
+  .prompt-chars {
+    margin-left: 0;
+  }
+
+  .prompt-text {
+    max-height: 300px;
+    font-size: 0.75em;
+  }
+
+  .category-templates {
+    padding-left: 0;
+  }
 }
