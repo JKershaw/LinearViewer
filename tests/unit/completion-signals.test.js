@@ -22,12 +22,12 @@ import {
 
 describe('COMPLETION_SIGNALS', () => {
   const expectedPromptTypes = [
-    'needs-research',
-    'needs-breakdown',
-    'needs-scoping',
-    'needs-design',
-    'needs-spike',
-    'needs-context',
+    'in-research',
+    'in-breakdown',
+    'in-scoping',
+    'in-design',
+    'in-spike',
+    'in-context',
     'blocked',
     'bug'
   ];
@@ -92,40 +92,40 @@ describe('COMPLETION_SIGNALS', () => {
 // =============================================================================
 
 describe('Signal Content', () => {
-  test('needs-research has appropriate signals', () => {
-    const signal = COMPLETION_SIGNALS['needs-research'];
+  test('in-research has appropriate signals', () => {
+    const signal = COMPLETION_SIGNALS['in-research'];
     assert.ok(signal.coreOutcome.includes('question'));
     assert.ok(signal.signals.some(s => s.includes('approach') || s.includes('Recommended')));
     assert.ok(signal.readinessCheck.includes('implementor'));
   });
 
-  test('needs-breakdown has appropriate signals', () => {
-    const signal = COMPLETION_SIGNALS['needs-breakdown'];
+  test('in-breakdown has appropriate signals', () => {
+    const signal = COMPLETION_SIGNALS['in-breakdown'];
     assert.ok(signal.coreOutcome.includes('split') || signal.coreOutcome.includes('actionable'));
     assert.ok(signal.signals.some(s => s.includes('Subtask') || s.includes('Dependencies')));
     assert.ok(signal.readinessCheck.includes('subtask') || signal.readinessCheck.includes('start'));
   });
 
-  test('needs-scoping has appropriate signals', () => {
-    const signal = COMPLETION_SIGNALS['needs-scoping'];
+  test('in-scoping has appropriate signals', () => {
+    const signal = COMPLETION_SIGNALS['in-scoping'];
     assert.ok(signal.coreOutcome.includes('Boundaries') || signal.coreOutcome.includes('clear'));
     assert.ok(signal.signals.some(s => s.includes('scope') || s.includes('Scope')));
   });
 
-  test('needs-design has appropriate signals', () => {
-    const signal = COMPLETION_SIGNALS['needs-design'];
+  test('in-design has appropriate signals', () => {
+    const signal = COMPLETION_SIGNALS['in-design'];
     assert.ok(signal.coreOutcome.includes('Approach') || signal.coreOutcome.includes('chosen'));
     assert.ok(signal.signals.some(s => s.includes('approaches') || s.includes('Tradeoffs')));
   });
 
-  test('needs-spike has appropriate signals', () => {
-    const signal = COMPLETION_SIGNALS['needs-spike'];
+  test('in-spike has appropriate signals', () => {
+    const signal = COMPLETION_SIGNALS['in-spike'];
     assert.ok(signal.coreOutcome.includes('Go/no-go') || signal.coreOutcome.includes('decision'));
     assert.ok(signal.signals.some(s => s.includes('Proof-of-concept') || s.includes('Feasibility')));
   });
 
-  test('needs-context has appropriate signals', () => {
-    const signal = COMPLETION_SIGNALS['needs-context'];
+  test('in-context has appropriate signals', () => {
+    const signal = COMPLETION_SIGNALS['in-context'];
     assert.ok(signal.coreOutcome.includes('state') || signal.coreOutcome.includes('understood'));
     assert.ok(signal.signals.some(s => s.includes('done') || s.includes('remains')));
   });
@@ -159,8 +159,8 @@ describe('getDefinedSignalTypes', () => {
   test('returns all expected types', () => {
     const defined = getDefinedSignalTypes();
     const expectedTypes = [
-      'needs-research', 'needs-breakdown', 'needs-scoping',
-      'needs-design', 'needs-spike', 'needs-context',
+      'in-research', 'in-breakdown', 'in-scoping',
+      'in-design', 'in-spike', 'in-context',
       'blocked', 'bug'
     ];
     for (const type of expectedTypes) {
@@ -176,8 +176,8 @@ describe('getDefinedSignalTypes', () => {
 describe('hasSignals', () => {
   test('returns true for all defined types', () => {
     const types = [
-      'needs-research', 'needs-breakdown', 'needs-scoping',
-      'needs-design', 'needs-spike', 'needs-context',
+      'in-research', 'in-breakdown', 'in-scoping',
+      'in-design', 'in-spike', 'in-context',
       'blocked', 'bug'
     ];
     for (const type of types) {
@@ -199,7 +199,7 @@ describe('hasSignals', () => {
 
 describe('getSignal', () => {
   test('returns signal for valid type', () => {
-    const signal = getSignal('needs-research');
+    const signal = getSignal('in-research');
     assert.ok(signal !== null);
     assert.ok(signal.coreOutcome);
     assert.ok(signal.signals);
@@ -224,7 +224,7 @@ describe('assessCompletion', () => {
   };
 
   test('returns assessment object with complete and reason', () => {
-    const result = assessCompletion('needs-research', mockContext);
+    const result = assessCompletion('in-research', mockContext);
     assert.ok('complete' in result);
     assert.ok('reason' in result);
     assert.strictEqual(typeof result.complete, 'boolean');
@@ -238,7 +238,7 @@ describe('assessCompletion', () => {
   });
 
   test('returns result for valid type', () => {
-    const result = assessCompletion('needs-research', mockContext);
+    const result = assessCompletion('in-research', mockContext);
     assert.strictEqual(typeof result.complete, 'boolean');
     assert.ok(result.reason.length > 0);
   });
@@ -252,13 +252,13 @@ describe('getBlockers', () => {
   const mockContext = {};
 
   test('returns array for valid type', () => {
-    const blockers = getBlockers('needs-research', mockContext);
+    const blockers = getBlockers('in-research', mockContext);
     assert.ok(Array.isArray(blockers));
     assert.ok(blockers.length > 0);
   });
 
   test('blockers reference signal items', () => {
-    const blockers = getBlockers('needs-research', mockContext);
+    const blockers = getBlockers('in-research', mockContext);
     assert.ok(blockers.every(b => b.startsWith('Missing:')));
   });
 
@@ -275,7 +275,7 @@ describe('getBlockers', () => {
 
 describe('formatSignalsForPrompt', () => {
   test('returns formatted string for valid type', () => {
-    const formatted = formatSignalsForPrompt('needs-research');
+    const formatted = formatSignalsForPrompt('in-research');
     assert.ok(typeof formatted === 'string');
     assert.ok(formatted.includes('Core Outcome:'));
     assert.ok(formatted.includes('Signals'));
@@ -283,8 +283,8 @@ describe('formatSignalsForPrompt', () => {
   });
 
   test('includes all signal items as bullets', () => {
-    const formatted = formatSignalsForPrompt('needs-research');
-    const signal = COMPLETION_SIGNALS['needs-research'];
+    const formatted = formatSignalsForPrompt('in-research');
+    const signal = COMPLETION_SIGNALS['in-research'];
     for (const s of signal.signals) {
       assert.ok(formatted.includes(s), `Should include signal: ${s}`);
     }
@@ -310,8 +310,8 @@ describe('formatAllSignalsForMetaPrompt', () => {
   test('includes all 8 signal types', () => {
     const formatted = formatAllSignalsForMetaPrompt();
     const types = [
-      'needs-research', 'needs-breakdown', 'needs-scoping',
-      'needs-design', 'needs-spike', 'needs-context',
+      'in-research', 'in-breakdown', 'in-scoping',
+      'in-design', 'in-spike', 'in-context',
       'blocked', 'bug'
     ];
     for (const type of types) {
@@ -327,7 +327,7 @@ describe('formatAllSignalsForMetaPrompt', () => {
 
   test('uses markdown headers for each type', () => {
     const formatted = formatAllSignalsForMetaPrompt();
-    assert.ok(formatted.includes('### needs-research'));
+    assert.ok(formatted.includes('### in-research'));
     assert.ok(formatted.includes('### blocked'));
   });
 });
@@ -341,8 +341,8 @@ describe('Integration', () => {
     const { PROMPT_TEMPLATES } = await import('../../lib/prompt-templates.js');
 
     const preWorkTypes = [
-      'needs-breakdown', 'needs-research', 'needs-scoping',
-      'needs-design', 'needs-spike', 'needs-context'
+      'in-breakdown', 'in-research', 'in-scoping',
+      'in-design', 'in-spike', 'in-context'
     ];
     const workIssueTypes = ['blocked', 'bug'];
 
@@ -361,8 +361,8 @@ describe('Integration', () => {
     const { PROMPT_TEMPLATES } = await import('../../lib/prompt-templates.js');
 
     const typesWithSignals = [
-      'needs-breakdown', 'needs-research', 'needs-scoping',
-      'needs-design', 'needs-spike', 'needs-context',
+      'in-breakdown', 'in-research', 'in-scoping',
+      'in-design', 'in-spike', 'in-context',
       'blocked', 'bug'
     ];
 
@@ -381,8 +381,8 @@ describe('Integration', () => {
     const { PROMPT_TEMPLATES } = await import('../../lib/prompt-templates.js');
 
     const typesWithSignals = [
-      'needs-breakdown', 'needs-research', 'needs-scoping',
-      'needs-design', 'needs-spike', 'needs-context',
+      'in-breakdown', 'in-research', 'in-scoping',
+      'in-design', 'in-spike', 'in-context',
       'blocked', 'bug'
     ];
 

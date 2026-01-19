@@ -58,29 +58,29 @@ describe('renderLabels', () => {
   });
 
   describe('promptable labels', () => {
-    test('renders needs-breakdown as clickable link', () => {
+    test('renders in-breakdown as clickable link', () => {
       const issue = {
         id: 'issue-123',
-        labels: { nodes: [{ name: 'needs-breakdown' }] },
+        labels: { nodes: [{ name: 'in-breakdown' }] },
         state: { type: 'backlog' }
       };
       const result = renderLabels(issue);
       assert.ok(result.includes('<a href="#"'));
       assert.ok(result.includes('class="label-prompt"'));
       assert.ok(result.includes('data-issue-id="issue-123"'));
-      assert.ok(result.includes('data-label="needs-breakdown"'));
-      assert.ok(result.includes('>needs-breakdown</a>'));
+      assert.ok(result.includes('data-label="in-breakdown"'));
+      assert.ok(result.includes('>in-breakdown</a>'));
     });
 
-    test('renders needs-research as clickable link', () => {
+    test('renders in-research as clickable link', () => {
       const issue = {
         id: 'issue-456',
-        labels: { nodes: [{ name: 'needs-research' }] },
+        labels: { nodes: [{ name: 'in-research' }] },
         state: { type: 'backlog' }
       };
       const result = renderLabels(issue);
       assert.ok(result.includes('class="label-prompt"'));
-      assert.ok(result.includes('data-label="needs-research"'));
+      assert.ok(result.includes('data-label="in-research"'));
     });
 
     test('renders blocked as clickable link', () => {
@@ -108,12 +108,12 @@ describe('renderLabels', () => {
     test('mixes promptable and regular labels correctly', () => {
       const issue = {
         id: 'issue-mix',
-        labels: { nodes: [{ name: 'needs-breakdown' }, { name: 'feature' }] },
+        labels: { nodes: [{ name: 'in-breakdown' }, { name: 'feature' }] },
         state: { type: 'started' } // started so plan/code-review added
       };
       const result = renderLabels(issue);
-      // needs-breakdown should be a link
-      assert.ok(result.includes('data-label="needs-breakdown"'));
+      // in-breakdown should be a link
+      assert.ok(result.includes('data-label="in-breakdown"'));
       // feature should be plain text (not a link)
       assert.ok(result.includes('feature'));
       assert.ok(!result.includes('data-label="feature"'));
@@ -175,12 +175,12 @@ describe('renderLabels', () => {
     test('does not add plan as state-prompt when pre-work label present', () => {
       const issue = {
         id: 'issue-prework',
-        labels: { nodes: [{ name: 'needs-breakdown' }] },
+        labels: { nodes: [{ name: 'in-breakdown' }] },
         state: { type: 'backlog' }
       };
       const result = renderLabels(issue);
-      // Should have needs-breakdown link
-      assert.ok(result.includes('data-label="needs-breakdown"'));
+      // Should have in-breakdown link
+      assert.ok(result.includes('data-label="in-breakdown"'));
       // Plan should NOT appear as a state-prompt (visible) link
       assert.ok(!result.includes('class="label-prompt state-prompt" data-issue-id="issue-prework" data-label="plan"'));
       // But plan may appear in hidden "more" prompts (which is expected behavior)
@@ -227,12 +227,12 @@ describe('renderLabels', () => {
       // in the data-label attribute (though this shouldn't happen in practice)
       const issue = {
         id: 'issue-test',
-        labels: { nodes: [{ name: 'needs-breakdown' }] },
+        labels: { nodes: [{ name: 'in-breakdown' }] },
         state: { type: 'backlog' }
       };
       const result = renderLabels(issue);
       // The escapeHtml function is called on label.name for data-label
-      assert.ok(result.includes('data-label="needs-breakdown"'));
+      assert.ok(result.includes('data-label="in-breakdown"'));
     });
   });
 

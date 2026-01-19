@@ -26,6 +26,7 @@ import { testMockTeams, testMockData } from './tests/fixtures/mock-data.js'
 import { runAudit, computeAuditFromData } from './lib/audit.js'
 import { renderFancyPage } from './lib/render-fancy.js'
 import { generatePrompt, hasPrompt, getAvailablePrompts } from './lib/prompt-templates.js'
+import { PHASE_LABELS, WORK_ISSUE_LABELS } from './lib/workflow-config.js'
 import { isRecommendationEnabled, getRecommendation, DEFAULT_MODEL, AVAILABLE_MODELS } from './lib/openrouter.js'
 
 // =============================================================================
@@ -841,16 +842,16 @@ app.get('/api/recommend/:issueId', async (req, res) => {
       let goal = 'Summarize what this task involves and how it fits into the broader project context.'
 
       // Provide contextual mock prompts based on labels
-      if (labels.includes('needs-breakdown')) {
-        reasoning = 'This task is marked as needing breakdown. Breaking it into smaller subtasks will make it easier to plan and execute.'
+      if (labels.includes(PHASE_LABELS.BREAKDOWN)) {
+        reasoning = 'This task is in the breakdown phase. Breaking it into smaller subtasks will make it easier to plan and execute.'
         goal = 'Break this task into subtasks (1-3 hour chunks each), ordered by dependencies.'
-      } else if (labels.includes('needs-research')) {
-        reasoning = 'This task requires research. Investigating the options first will help make informed decisions.'
+      } else if (labels.includes(PHASE_LABELS.RESEARCH)) {
+        reasoning = 'This task is in the research phase. Investigating the options first will help make informed decisions.'
         goal = 'Identify key questions, research systematically, and provide actionable recommendations.'
-      } else if (labels.includes('blocked')) {
+      } else if (labels.includes(WORK_ISSUE_LABELS.BLOCKED)) {
         reasoning = 'This task is blocked. Analyzing the blocker will help identify ways to unblock progress.'
         goal = 'Identify the blocker type and root cause, evaluate options to unblock, and recommend the best path.'
-      } else if (labels.includes('bug')) {
+      } else if (labels.includes(WORK_ISSUE_LABELS.BUG)) {
         reasoning = 'This is a bug. Investigating the issue systematically will help find the root cause and fix.'
         goal = 'Identify reproduction steps, hypothesize likely causes, and suggest a debugging approach.'
       } else if (mockIssue.state?.type === 'backlog' || mockIssue.state?.type === 'unstarted') {
@@ -907,19 +908,19 @@ ${goal}`
     // NOTE: Update these patterns if the AI output format changes.
     const reasoning = typeof recommendation.reasoning === 'string' ? recommendation.reasoning : ''
     const aiRecommendsResearch = /Research:\s*✗\s*Needed/i.test(reasoning)
-    if (aiRecommendsResearch && !hasLabel(issueLabels, 'needs-research', 'needs research')) {
+    if (aiRecommendsResearch && !hasLabel(issueLabels, PHASE_LABELS.RESEARCH, 'in research')) {
       labelAlerts.push({
-        type: 'needs-research',
-        message: 'AI suggests this task needs research, but it doesn\'t have the "needs-research" label.'
+        type: PHASE_LABELS.RESEARCH,
+        message: `AI suggests this task needs research, but it doesn't have the "${PHASE_LABELS.RESEARCH}" label.`
       })
     }
 
     // Expected format: "- Size: [✓ Focused | ✗ Too large]"
     const aiRecommendsBreakdown = /Size:\s*✗\s*Too large/i.test(reasoning)
-    if (aiRecommendsBreakdown && !hasLabel(issueLabels, 'needs-breakdown', 'needs breakdown')) {
+    if (aiRecommendsBreakdown && !hasLabel(issueLabels, PHASE_LABELS.BREAKDOWN, 'in breakdown')) {
       labelAlerts.push({
-        type: 'needs-breakdown',
-        message: 'AI suggests this task is too large and needs breakdown, but it doesn\'t have the "needs-breakdown" label.'
+        type: PHASE_LABELS.BREAKDOWN,
+        message: `AI suggests this task is too large and needs breakdown, but it doesn't have the "${PHASE_LABELS.BREAKDOWN}" label.`
       })
     }
 

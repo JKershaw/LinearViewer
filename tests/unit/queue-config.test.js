@@ -50,12 +50,12 @@ describe('Ready queue excludeLabels', () => {
 
   test('excludeLabels contains expected pre-work labels', () => {
     const labels = readyQueue.excludeLabels;
-    assert.ok(labels.includes('needs-breakdown'));
-    assert.ok(labels.includes('needs-research'));
-    assert.ok(labels.includes('needs-scoping'));
-    assert.ok(labels.includes('needs-design'));
-    assert.ok(labels.includes('needs-spike'));
-    assert.ok(labels.includes('needs-context'));
+    assert.ok(labels.includes('in-breakdown'));
+    assert.ok(labels.includes('in-research'));
+    assert.ok(labels.includes('in-scoping'));
+    assert.ok(labels.includes('in-design'));
+    assert.ok(labels.includes('in-spike'));
+    assert.ok(labels.includes('in-context'));
   });
 
   test('excludeLabels matches getPreWorkLabels()', () => {
@@ -89,7 +89,7 @@ describe('QUEUE_CONFIG', () => {
     const breakdown = QUEUE_CONFIG.find(q => q.name === 'Breakdown');
     assert.ok(breakdown);
     assert.strictEqual(breakdown.type, QUEUE_TYPES.LABEL);
-    assert.ok(breakdown.labelPatterns.includes('needs-breakdown'));
+    assert.ok(breakdown.labelPatterns.includes('in-breakdown'));
     assert.strictEqual(breakdown.required, true);
   });
 
@@ -97,7 +97,7 @@ describe('QUEUE_CONFIG', () => {
     const research = QUEUE_CONFIG.find(q => q.name === 'Research');
     assert.ok(research);
     assert.strictEqual(research.type, QUEUE_TYPES.LABEL);
-    assert.ok(research.labelPatterns.includes('needs-research'));
+    assert.ok(research.labelPatterns.includes('in-research'));
     assert.strictEqual(research.required, false);
   });
 
@@ -143,29 +143,29 @@ describe('QUEUE_CONFIG', () => {
 
 describe('matchesPattern', () => {
   test('returns true for exact match', () => {
-    assert.strictEqual(matchesPattern('needs-breakdown', ['needs-breakdown']), true);
+    assert.strictEqual(matchesPattern('in-breakdown', ['in-breakdown']), true);
   });
 
   test('is case-insensitive', () => {
-    assert.strictEqual(matchesPattern('Needs-Breakdown', ['needs-breakdown']), true);
-    assert.strictEqual(matchesPattern('NEEDS-BREAKDOWN', ['needs-breakdown']), true);
-    assert.strictEqual(matchesPattern('needs-breakdown', ['NEEDS-BREAKDOWN']), true);
+    assert.strictEqual(matchesPattern('In-Breakdown', ['in-breakdown']), true);
+    assert.strictEqual(matchesPattern('IN-BREAKDOWN', ['in-breakdown']), true);
+    assert.strictEqual(matchesPattern('in-breakdown', ['IN-BREAKDOWN']), true);
   });
 
   test('trims whitespace', () => {
-    assert.strictEqual(matchesPattern(' needs-breakdown ', ['needs-breakdown']), true);
+    assert.strictEqual(matchesPattern(' in-breakdown ', ['in-breakdown']), true);
   });
 
   test('returns false for non-match', () => {
-    assert.strictEqual(matchesPattern('bug', ['needs-breakdown']), false);
+    assert.strictEqual(matchesPattern('bug', ['in-breakdown']), false);
   });
 
   test('matches any pattern in array', () => {
-    assert.strictEqual(matchesPattern('needs-research', ['needs-breakdown', 'needs-research']), true);
+    assert.strictEqual(matchesPattern('in-research', ['in-breakdown', 'in-research']), true);
   });
 
   test('returns false for empty patterns array', () => {
-    assert.strictEqual(matchesPattern('needs-breakdown', []), false);
+    assert.strictEqual(matchesPattern('in-breakdown', []), false);
   });
 });
 
@@ -179,7 +179,7 @@ describe('isInQueue', () => {
 
     test('returns true when issue has matching label', () => {
       const issue = {
-        labels: { nodes: [{ name: 'needs-breakdown' }] },
+        labels: { nodes: [{ name: 'in-breakdown' }] },
         state: { type: 'backlog' }
       };
       assert.strictEqual(isInQueue(issue, breakdownQueue), true);
@@ -195,7 +195,7 @@ describe('isInQueue', () => {
 
     test('is case-insensitive for labels', () => {
       const issue = {
-        labels: { nodes: [{ name: 'NEEDS-BREAKDOWN' }] },
+        labels: { nodes: [{ name: 'IN-BREAKDOWN' }] },
         state: { type: 'backlog' }
       };
       assert.strictEqual(isInQueue(issue, breakdownQueue), true);
@@ -267,7 +267,7 @@ describe('isInQueue', () => {
 
     test('returns false when has excluded label', () => {
       const issue = {
-        labels: { nodes: [{ name: 'needs-breakdown' }] },
+        labels: { nodes: [{ name: 'in-breakdown' }] },
         state: { type: 'backlog' }
       };
       assert.strictEqual(isInQueue(issue, readyQueue), false);
@@ -275,7 +275,7 @@ describe('isInQueue', () => {
 
     test('returns false when has any pre-work label', () => {
       // Only PRE_WORK category labels exclude from Ready queue
-      const preWorkLabels = ['needs-research', 'needs-scoping', 'needs-design', 'needs-spike', 'needs-context'];
+      const preWorkLabels = ['in-research', 'in-scoping', 'in-design', 'in-spike', 'in-context'];
       for (const label of preWorkLabels) {
         const issue = {
           labels: { nodes: [{ name: label }] },
@@ -329,9 +329,9 @@ describe('isInQueue', () => {
 // =============================================================================
 
 describe('getQueuesForIssue', () => {
-  test('returns Breakdown queue for issue with needs-breakdown label', () => {
+  test('returns Breakdown queue for issue with in-breakdown label', () => {
     const issue = {
-      labels: { nodes: [{ name: 'needs-breakdown' }] },
+      labels: { nodes: [{ name: 'in-breakdown' }] },
       state: { type: 'backlog' }
     };
     const queues = getQueuesForIssue(issue);
@@ -359,7 +359,7 @@ describe('getQueuesForIssue', () => {
 
   test('returns multiple queues when applicable', () => {
     const issue = {
-      labels: { nodes: [{ name: 'needs-breakdown' }] },
+      labels: { nodes: [{ name: 'in-breakdown' }] },
       state: { type: 'started' }
     };
     const queues = getQueuesForIssue(issue);
@@ -382,12 +382,12 @@ describe('getQueuesForIssue', () => {
 // =============================================================================
 
 describe('getQueueForLabel', () => {
-  test('returns Breakdown for needs-breakdown', () => {
-    assert.strictEqual(getQueueForLabel('needs-breakdown'), 'Breakdown');
+  test('returns Breakdown for in-breakdown', () => {
+    assert.strictEqual(getQueueForLabel('in-breakdown'), 'Breakdown');
   });
 
-  test('returns Research for needs-research', () => {
-    assert.strictEqual(getQueueForLabel('needs-research'), 'Research');
+  test('returns Research for in-research', () => {
+    assert.strictEqual(getQueueForLabel('in-research'), 'Research');
   });
 
   test('returns null for non-label-based queue labels', () => {
@@ -396,8 +396,8 @@ describe('getQueueForLabel', () => {
   });
 
   test('is case-insensitive', () => {
-    assert.strictEqual(getQueueForLabel('NEEDS-BREAKDOWN'), 'Breakdown');
-    assert.strictEqual(getQueueForLabel('Needs-Research'), 'Research');
+    assert.strictEqual(getQueueForLabel('IN-BREAKDOWN'), 'Breakdown');
+    assert.strictEqual(getQueueForLabel('In-Research'), 'Research');
   });
 });
 

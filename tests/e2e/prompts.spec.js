@@ -20,8 +20,8 @@ test.describe('Promptable Labels', () => {
     await page.waitForLoadState('networkidle');
   });
 
-  test('renders needs-breakdown label as clickable link', async ({ page }) => {
-    // Find the task with needs-breakdown label and expand it (in project section, not in-progress)
+  test('renders in-breakdown label as clickable link', async ({ page }) => {
+    // Find the task with in-breakdown label and expand it (in project section, not in-progress)
     const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
     await expect(taskLine).toBeVisible();
 
@@ -29,9 +29,9 @@ test.describe('Promptable Labels', () => {
     await taskLine.click();
 
     // Find the label link in the specific issue's details panel
-    const labelLink = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .label-prompt[data-label="needs-breakdown"]`);
+    const labelLink = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .label-prompt[data-label="in-breakdown"]`);
     await expect(labelLink).toBeVisible();
-    await expect(labelLink).toHaveText('needs-breakdown');
+    await expect(labelLink).toHaveText('in-breakdown');
   });
 
   test('regular labels are not clickable', async ({ page }) => {
@@ -55,12 +55,12 @@ test.describe('Promptable Labels', () => {
   });
 
   test('clicking promptable label shows prompt container', async ({ page }) => {
-    // Find and expand the task with needs-breakdown label
+    // Find and expand the task with in-breakdown label
     const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
     await taskLine.click();
 
     // Click the promptable label in the specific issue's details
-    const labelLink = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .label-prompt[data-label="needs-breakdown"]`);
+    const labelLink = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .label-prompt[data-label="in-breakdown"]`);
     await labelLink.click();
 
     // Wait for prompt container to appear
@@ -86,7 +86,7 @@ test.describe('Promptable Labels', () => {
     await taskLine.click();
 
     // Click the promptable label in the specific issue's details
-    const labelLink = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .label-prompt[data-label="needs-breakdown"]`);
+    const labelLink = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .label-prompt[data-label="in-breakdown"]`);
     await labelLink.click();
 
     // Wait for prompt to load
@@ -103,7 +103,7 @@ test.describe('Promptable Labels', () => {
     await taskLine.click();
 
     // Click the promptable label to show
-    const labelLink = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .label-prompt[data-label="needs-breakdown"]`);
+    const labelLink = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .label-prompt[data-label="in-breakdown"]`);
     await labelLink.click();
 
     // Wait for container to appear
@@ -124,7 +124,7 @@ test.describe('Promptable Labels', () => {
     await taskLine.click();
 
     // Click the promptable label in the specific issue's details
-    const labelLink = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .label-prompt[data-label="needs-breakdown"]`);
+    const labelLink = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .label-prompt[data-label="in-breakdown"]`);
     await labelLink.click();
 
     // Wait for prompt to load
@@ -149,7 +149,7 @@ test.describe('Promptable Labels', () => {
     await taskLine.click();
 
     // Click the promptable label in the specific issue's details
-    const labelLink = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .label-prompt[data-label="needs-breakdown"]`);
+    const labelLink = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .label-prompt[data-label="in-breakdown"]`);
     await labelLink.click();
 
     // Wait for container and prompt to load
@@ -178,7 +178,7 @@ test.describe('Prompt API', () => {
     await page.goto('/test/clear-session');
 
     // Try to fetch prompt (use valid UUID format)
-    const response = await page.request.get(`/api/prompt/${BREAKDOWN_ISSUE_ID}/needs-breakdown`);
+    const response = await page.request.get(`/api/prompt/${BREAKDOWN_ISSUE_ID}/in-breakdown`);
     expect(response.status()).toBe(401);
 
     const body = await response.json();
@@ -195,7 +195,7 @@ test.describe('Prompt API', () => {
   });
 
   test('returns 400 for invalid issue ID format', async ({ page }) => {
-    const response = await page.request.get('/api/prompt/invalid-id/needs-breakdown');
+    const response = await page.request.get('/api/prompt/invalid-id/in-breakdown');
     expect(response.status()).toBe(400);
 
     const body = await response.json();
@@ -203,55 +203,55 @@ test.describe('Prompt API', () => {
   });
 
   test('returns prompt for valid request', async ({ page }) => {
-    const response = await page.request.get(`/api/prompt/${BREAKDOWN_ISSUE_ID}/needs-breakdown`);
+    const response = await page.request.get(`/api/prompt/${BREAKDOWN_ISSUE_ID}/in-breakdown`);
     expect(response.status()).toBe(200);
 
     const body = await response.json();
-    expect(body.label).toBe('needs-breakdown');
+    expect(body.label).toBe('in-breakdown');
     expect(body.promptName).toBe('Task Breakdown');
     expect(body.prompt).toContain('## Goal');
   });
 
   // Tests for all prompt templates
   test('returns research prompt', async ({ page }) => {
-    const response = await page.request.get(`/api/prompt/${RESEARCH_ISSUE_ID}/needs-research`);
+    const response = await page.request.get(`/api/prompt/${RESEARCH_ISSUE_ID}/in-research`);
     expect(response.status()).toBe(200);
 
     const body = await response.json();
-    expect(body.label).toBe('needs-research');
+    expect(body.label).toBe('in-research');
     expect(body.promptName).toBe('Research Task');
     expect(body.prompt).toContain('# Research TEST-');
     expect(body.prompt).toContain('## Goal');
   });
 
   test('returns scoping prompt', async ({ page }) => {
-    const response = await page.request.get(`/api/prompt/${SCOPING_ISSUE_ID}/needs-scoping`);
+    const response = await page.request.get(`/api/prompt/${SCOPING_ISSUE_ID}/in-scoping`);
     expect(response.status()).toBe(200);
 
     const body = await response.json();
-    expect(body.label).toBe('needs-scoping');
+    expect(body.label).toBe('in-scoping');
     expect(body.promptName).toBe('Scope Definition');
     expect(body.prompt).toContain('# Define scope for TEST-');
     expect(body.prompt).toContain('## Goal');
   });
 
   test('returns design prompt', async ({ page }) => {
-    const response = await page.request.get(`/api/prompt/${DESIGN_ISSUE_ID}/needs-design`);
+    const response = await page.request.get(`/api/prompt/${DESIGN_ISSUE_ID}/in-design`);
     expect(response.status()).toBe(200);
 
     const body = await response.json();
-    expect(body.label).toBe('needs-design');
+    expect(body.label).toBe('in-design');
     expect(body.promptName).toBe('Technical Design');
     expect(body.prompt).toContain('# Design TEST-');
     expect(body.prompt).toContain('## Goal');
   });
 
   test('returns spike prompt', async ({ page }) => {
-    const response = await page.request.get(`/api/prompt/${SPIKE_ISSUE_ID}/needs-spike`);
+    const response = await page.request.get(`/api/prompt/${SPIKE_ISSUE_ID}/in-spike`);
     expect(response.status()).toBe(200);
 
     const body = await response.json();
-    expect(body.label).toBe('needs-spike');
+    expect(body.label).toBe('in-spike');
     expect(body.promptName).toBe('Technical Spike');
     expect(body.prompt).toContain('# Spike TEST-');
     expect(body.prompt).toContain('## Goal');
@@ -269,11 +269,11 @@ test.describe('Prompt API', () => {
   });
 
   test('returns context prompt', async ({ page }) => {
-    const response = await page.request.get(`/api/prompt/${CONTEXT_ISSUE_ID}/needs-context`);
+    const response = await page.request.get(`/api/prompt/${CONTEXT_ISSUE_ID}/in-context`);
     expect(response.status()).toBe(200);
 
     const body = await response.json();
-    expect(body.label).toBe('needs-context');
+    expect(body.label).toBe('in-context');
     expect(body.promptName).toBe('Context Summary');
     expect(body.prompt).toContain('# Get context for TEST-');
     expect(body.prompt).toContain('## Goal');
@@ -321,13 +321,13 @@ test.describe('Multiple Promptable Labels UI', () => {
     await page.waitForLoadState('networkidle');
   });
 
-  test('renders needs-research as clickable link', async ({ page }) => {
+  test('renders in-research as clickable link', async ({ page }) => {
     const taskLine = page.locator('.project .line:has-text("Research authentication options")');
     await expect(taskLine).toBeVisible();
     await taskLine.click();
 
     // Use specific selector scoped to the issue's details panel
-    const labelLink = page.locator(`.details[data-details-for="${RESEARCH_ISSUE_ID}"] .label-prompt[data-label="needs-research"]`);
+    const labelLink = page.locator(`.details[data-details-for="${RESEARCH_ISSUE_ID}"] .label-prompt[data-label="in-research"]`);
     await expect(labelLink).toBeVisible();
   });
 
@@ -352,12 +352,12 @@ test.describe('Multiple Promptable Labels UI', () => {
     await expect(labelLink).toBeVisible();
   });
 
-  test('clicking needs-research shows correct prompt', async ({ page }) => {
+  test('clicking in-research shows correct prompt', async ({ page }) => {
     const taskLine = page.locator('.project .line:has-text("Research authentication options")');
     await taskLine.click();
 
     // Use specific selector scoped to the issue's details panel
-    const labelLink = page.locator(`.details[data-details-for="${RESEARCH_ISSUE_ID}"] .label-prompt[data-label="needs-research"]`);
+    const labelLink = page.locator(`.details[data-details-for="${RESEARCH_ISSUE_ID}"] .label-prompt[data-label="in-research"]`);
     await labelLink.click();
 
     const promptContainer = page.locator(`.prompt-container[data-prompt-for="${RESEARCH_ISSUE_ID}"]`);
@@ -645,7 +645,7 @@ test.describe('Recommendation API', () => {
   });
 
   test('returns contextual prompt based on labels', async ({ page }) => {
-    // Issue with needs-breakdown label
+    // Issue with in-breakdown label
     const response = await page.request.get(`/api/recommend/${BREAKDOWN_ISSUE_ID}`);
     const body = await response.json();
 
