@@ -52,8 +52,8 @@ test.describe('OpenRouter OAuth Flow', () => {
     await setupSession(page);
     await page.goto(SETTINGS_URL);
 
-    // Should see settings section
-    await expect(page.locator('.settings-section')).toBeVisible();
+    // Should see settings section (AI Configuration)
+    await expect(page.locator('.settings-section').first()).toBeVisible();
 
     // Should show OpenRouter as not connected
     const disconnectedStatus = page.locator('.settings-value.disconnected');
@@ -71,8 +71,8 @@ test.describe('OpenRouter OAuth Flow', () => {
     await setupSession(page, { openRouterConnected: true });
     await page.goto(SETTINGS_URL);
 
-    // Should see settings section
-    await expect(page.locator('.settings-section')).toBeVisible();
+    // Should see settings section (AI Configuration)
+    await expect(page.locator('.settings-section').first()).toBeVisible();
 
     // Should show OpenRouter as connected
     const connectedStatus = page.locator('.settings-value.connected');

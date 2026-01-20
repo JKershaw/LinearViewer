@@ -1031,6 +1031,210 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;')
 }
 
+// =============================================================================
+// Token Management (Settings Page)
+// =============================================================================
+
+/**
+ * Initialize token management functionality for settings page
+ */
+function initTokenManagement() {
+  const createForm = document.getElementById('create-token-form')
+  if (!createForm) return // Not on settings page
+
+  const urlKey = createForm.dataset.urlKey
+
+  // Load existing tokens
+  loadTokenList(urlKey)
+
+  // Handle create form submission
+  createForm.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    const label = createForm.label.value.trim() || 'default'
+    await createToken(urlKey, label)
+    createForm.reset()
+  })
+
+  // Handle revoke clicks (delegated)
+  document.addEventListener('click', async (e) => {
+    const revokeBtn = e.target.closest('.token-revoke')
+    if (!revokeBtn) return
+
+    e.preventDefault()
+    const tokenId = revokeBtn.dataset.tokenId
+    if (confirm('Revoke this token? It will immediately stop working.')) {
+      await revokeToken(urlKey, tokenId)
+    }
+  })
+}
+
+/**
+ * Load and display token list
+ */
+async function loadTokenList(urlKey) {
+  const listEl = document.querySelector('.token-list')
+  if (!listEl) return
+
+  try {
+    const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/tokens`)
+    if (!response.ok) throw new Error('Failed to load tokens')
+
+    const { tokens } = await response.json()
+    renderTokenList(listEl, tokens, urlKey)
+  } catch (e) {
+    console.error('Failed to load tokens:', e)
+    listEl.innerHTML = '<div class="token-list-empty">Failed to load tokens</div>'
+  }
+}
+
+/**
+ * Render token list in container
+ */
+function renderTokenList(container, tokens, urlKey) {
+  if (tokens.length === 0) {
+    container.innerHTML = '<div class="token-list-empty">No tokens yet</div>'
+    return
+  }
+
+  container.innerHTML = tokens.map(t => {
+    const created = new Date(t.createdAt).toLocaleDateString()
+    const lastUsed = t.lastUsedAt
+      ? `last used ${new Date(t.lastUsedAt).toLocaleDateString()}`
+      : 'never used'
+
+    return `
+      <div class="token-item" data-token-id="${escapeHtml(t.tokenId)}">
+        <div class="token-info">
+          <span class="token-label-text">${escapeHtml(t.label)}</span>
+          <div class="token-meta">created ${created} · ${lastUsed}</div>
+        </div>
+        <button class="settings-action token-revoke" data-token-id="${escapeHtml(t.tokenId)}">revoke</button>
+      </div>
+    `
+  }).join('')
+}
+
+/**
+ * Create a new dispatch token
+ */
+async function createToken(urlKey, label) {
+  const submitBtn = document.querySelector('#create-token-form button[type="submit"]')
+  const originalText = submitBtn?.textContent
+
+  try {
+    if (submitBtn) submitBtn.textContent = 'creating...'
+
+    const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/tokens`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label })
+    })
+
+    if (!response.ok) throw new Error('Failed to create token')
+
+    const { token } = await response.json()
+
+    // Show token in modal (one-time display)
+    showTokenModal(token)
+
+    // Refresh list
+    await loadTokenList(urlKey)
+  } catch (e) {
+    console.error('Failed to create token:', e)
+    alert('Failed to create token: ' + e.message)
+  } finally {
+    if (submitBtn) submitBtn.textContent = originalText
+  }
+}
+
+/**
+ * Revoke a dispatch token
+ */
+async function revokeToken(urlKey, tokenId) {
+  try {
+    const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/tokens/${tokenId}`, {
+      method: 'DELETE'
+    })
+
+    if (!response.ok) throw new Error('Failed to revoke token')
+
+    // Remove from DOM
+    document.querySelector(`.token-item[data-token-id="${tokenId}"]`)?.remove()
+
+    // Check if list is now empty
+    const listEl = document.querySelector('.token-list')
+    if (listEl && listEl.querySelectorAll('.token-item').length === 0) {
+      listEl.innerHTML = '<div class="token-list-empty">No tokens yet</div>'
+    }
+  } catch (e) {
+    console.error('Failed to revoke token:', e)
+    alert('Failed to revoke token: ' + e.message)
+  }
+}
+
+/**
+ * Show modal with newly created token (one-time display)
+ */
+function showTokenModal(token) {
+  // Create overlay
+  const overlay = document.createElement('div')
+  overlay.className = 'token-modal-overlay'
+
+  // Create modal
+  const modal = document.createElement('div')
+  modal.className = 'token-modal'
+  modal.innerHTML = `
+    <div class="token-modal-header">
+      <strong>Token Created</strong>
+      <button class="token-modal-close" aria-label="Close">×</button>
+    </div>
+    <p>Copy this token now - it won't be shown again:</p>
+    <div class="token-display">
+      <span class="token-value">${escapeHtml(token)}</span>
+      <button class="token-copy-btn">copy</button>
+    </div>
+    <div class="token-usage-hint">
+      Use in Authorization header:<br>
+      <code>Authorization: Bearer &lt;token&gt;</code>
+    </div>
+  `
+
+  document.body.appendChild(overlay)
+  document.body.appendChild(modal)
+
+  // Close handlers
+  const close = () => {
+    overlay.remove()
+    modal.remove()
+  }
+
+  overlay.addEventListener('click', close)
+  modal.querySelector('.token-modal-close').addEventListener('click', close)
+
+  // Close on escape
+  const escHandler = (e) => {
+    if (e.key === 'Escape') {
+      close()
+      document.removeEventListener('keydown', escHandler)
+    }
+  }
+  document.addEventListener('keydown', escHandler)
+
+  // Copy handler
+  modal.querySelector('.token-copy-btn').addEventListener('click', async () => {
+    const copyBtn = modal.querySelector('.token-copy-btn')
+    try {
+      await navigator.clipboard.writeText(token)
+      copyBtn.textContent = 'copied!'
+      setTimeout(() => { copyBtn.textContent = 'copy' }, 1500)
+    } catch (e) {
+      console.error('Failed to copy:', e)
+      copyBtn.textContent = 'failed'
+      setTimeout(() => { copyBtn.textContent = 'copy' }, 1500)
+    }
+  })
+}
+
 // ==========================================================================
 // More Prompts Inline Toggle
 // ==========================================================================
@@ -1262,4 +1466,5 @@ document.addEventListener('DOMContentLoaded', () => {
   initRecommendations()
   initDeployTime()
   initQueuePanel()
+  initTokenManagement()
 })
