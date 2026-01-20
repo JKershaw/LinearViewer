@@ -749,7 +749,12 @@ function initMorePrompts() {
     e.stopPropagation()
 
     const issueId = moreToggle.dataset.issueId
-    const moreSpan = document.querySelector(`[data-more-for="${issueId}"]`)
+
+    // Find the more-prompts span within the same details context as the clicked toggle
+    // This is important because the same issue can appear in both the "In Progress"
+    // section and its project tree, each with its own set of prompt links
+    const detailsContainer = moreToggle.closest('.details')
+    const moreSpan = detailsContainer?.querySelector(`[data-more-for="${issueId}"]`)
 
     if (moreSpan) {
       // Reveal hidden prompts
