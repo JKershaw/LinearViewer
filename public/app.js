@@ -412,7 +412,6 @@ function init() {
       return
     }
 
-    // 2. Detail section toggles (Details ▶ / Prompts ▶)
     const detailToggle = e.target.closest('.detail-toggle')
     if (detailToggle) {
       e.stopPropagation()
@@ -420,7 +419,7 @@ function init() {
       const detailsContainer = detailToggle.closest('.details')
       const content = detailsContainer?.querySelector(`[data-content="${toggleType}"]`)
 
-      if (content) {
+      if (content && detailsContainer) {
         const isHidden = content.classList.toggle('hidden')
         // Update arrow: ▶ when collapsed, ▼ when expanded
         detailToggle.textContent = detailToggle.textContent.replace(
@@ -429,6 +428,7 @@ function init() {
         )
       }
       return
+    }
     }
 
     // 3. Toggle arrow click (expand/collapse children)
