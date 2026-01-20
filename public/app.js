@@ -1,5 +1,6 @@
 const STORAGE_KEY = 'linear-projects-state'
 const TEAM_STORAGE_KEY = 'linear-projects-selected-team'
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 // ==========================================================================
 // Markdown Rendering (using marked.js library)
@@ -1013,14 +1014,20 @@ function hideQueuePanel() {
  * Remove an item from the queue
  */
 async function removeQueueItem(urlKey, itemId) {
+  // Validate itemId format to prevent CSS selector injection
+  if (!itemId || !UUID_REGEX.test(itemId)) {
+    console.error('Invalid itemId format')
+    return
+  }
+
   try {
-    const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/${itemId}`, {
+    const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/${encodeURIComponent(itemId)}`, {
       method: 'DELETE'
     })
 
     if (!response.ok) throw new Error('Failed to remove item')
 
-    // Remove item from DOM
+    // Remove item from DOM (itemId validated as UUID above, safe for selector)
     document.querySelector(`.queue-item[data-item-id="${itemId}"]`)?.remove()
 
     // Update badge

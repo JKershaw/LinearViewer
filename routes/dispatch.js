@@ -24,6 +24,9 @@ const MAX_NAME_LENGTH = 200;           // Short names/labels/titles
 const MAX_URL_LENGTH = 2000;           // URLs
 const MAX_IDENTIFIER_LENGTH = 50;      // Issue identifiers like "LIN-123"
 
+// Pattern to detect null bytes and dangerous control characters (except common whitespace)
+const DANGEROUS_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
+
 /**
  * Creates dispatch routes with injected dependencies.
  *
@@ -68,7 +71,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       req.dispatchUrlKey = urlKey;
       next();
     } catch (err) {
-      console.error('Token validation error:', err);
+      console.error('Token validation error:', err.message);
       return res.status(500).json({ error: 'Authentication error' });
     }
   }
@@ -109,6 +112,17 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         return res.status(400).json({ error: `issueUrl exceeds maximum length of ${MAX_URL_LENGTH}` });
       }
 
+      // Reject null bytes and dangerous control characters
+      if (DANGEROUS_CHARS_REGEX.test(prompt)) {
+        return res.status(400).json({ error: 'prompt contains invalid characters' });
+      }
+      if (promptName && DANGEROUS_CHARS_REGEX.test(promptName)) {
+        return res.status(400).json({ error: 'promptName contains invalid characters' });
+      }
+      if (issueTitle && DANGEROUS_CHARS_REGEX.test(issueTitle)) {
+        return res.status(400).json({ error: 'issueTitle contains invalid characters' });
+      }
+
       // Validate issueId format if provided
       if (issueId && !UUID_REGEX.test(issueId)) {
         return res.status(400).json({ error: 'Invalid issueId format' });
@@ -135,7 +149,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         }
       });
     } catch (err) {
-      console.error('Dispatch error:', err);
+      console.error('Dispatch error:', err.message);
       res.status(500).json({ error: 'Failed to dispatch prompt' });
     }
   });
@@ -151,7 +165,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       const items = await dispatchQueueStore.listItems(workspace.urlKey);
       res.json({ items });
     } catch (err) {
-      console.error('List dispatch items error:', err);
+      console.error('List dispatch items error:', err.message);
       res.status(500).json({ error: 'Failed to list dispatch items' });
     }
   });
@@ -167,7 +181,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       const count = await dispatchQueueStore.countItems(workspace.urlKey);
       res.json({ count });
     } catch (err) {
-      console.error('Count dispatch items error:', err);
+      console.error('Count dispatch items error:', err.message);
       res.status(500).json({ error: 'Failed to count dispatch items' });
     }
   });
@@ -194,7 +208,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
 
       res.json({ success: true });
     } catch (err) {
-      console.error('Remove dispatch item error:', err);
+      console.error('Remove dispatch item error:', err.message);
       res.status(500).json({ error: 'Failed to remove item' });
     }
   });
@@ -227,7 +241,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         message: 'Token created. Save this token now - it cannot be retrieved later.'
       });
     } catch (err) {
-      console.error('Create token error:', err);
+      console.error('Create token error:', err.message);
       res.status(500).json({ error: 'Failed to create token' });
     }
   });
@@ -243,7 +257,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       const tokens = await dispatchTokenStore.listTokens(workspace.urlKey);
       res.json({ tokens });
     } catch (err) {
-      console.error('List tokens error:', err);
+      console.error('List tokens error:', err.message);
       res.status(500).json({ error: 'Failed to list tokens' });
     }
   });
@@ -270,7 +284,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
 
       res.json({ success: true });
     } catch (err) {
-      console.error('Revoke token error:', err);
+      console.error('Revoke token error:', err.message);
       res.status(500).json({ error: 'Failed to revoke token' });
     }
   });
@@ -289,7 +303,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       const items = await dispatchQueueStore.pollAvailable(req.dispatchUrlKey);
       res.json({ items });
     } catch (err) {
-      console.error('Poll error:', err);
+      console.error('Poll error:', err.message);
       res.status(500).json({ error: 'Failed to poll dispatch queue' });
     }
   });
@@ -317,7 +331,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
 
       res.json({ item });
     } catch (err) {
-      console.error('Take error:', err);
+      console.error('Take error:', err.message);
       res.status(500).json({ error: 'Failed to take item' });
     }
   });
