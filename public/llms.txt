@@ -35,9 +35,26 @@ Issues are wrapped in nested `.node` containers:
 .node[data-id="{id}"]           - node container
   .line[data-id="{id}"]         - task row (clickable)
   .details[data-details-for]    - details panel (hidden by default)
+    .detail-toggle[data-toggle="details"] - "Details ▶" toggle
+    .detail-content[data-content="details"] - description + metadata (hidden)
+    .detail-toggle[data-toggle="prompts"]  - "Prompts ▶" toggle (auth only)
+    .detail-content[data-content="prompts"] - prompt buttons (hidden)
+    .detail-link                - "View in Linear →" link
   .children                     - container for nested child nodes
     .node[data-id="{child-id}"] - child node (same structure)
 ```
+
+### Detail Section Toggles
+When a task is expanded, its details contain toggleable sections:
+- **Details ▶**: Description and metadata (assignee, dates, labels)
+- **Prompts ▶**: Prompt buttons and AI features (authenticated users only)
+- **View in Linear →**: Navigation link (always visible)
+
+Toggle behavior:
+- Both sections start collapsed (▶ arrow)
+- Click toggle to expand (▼ arrow) and show content
+- Toggle state is per-issue and does not persist across page loads
+- Same task in different sections (In Progress vs Project) has independent toggles
 
 ### Task Selectors
 Both In Progress and Projects sections use the same nested structure:
@@ -80,7 +97,12 @@ Both In Progress and Projects sections use the same nested structure:
 - `.footer-link` - link within deploy info (commit hash or GitHub repo)
 
 ### Interactive Elements
-- `.toggle` - expand/collapse arrow (▶/▼)
+- `.toggle` - expand/collapse arrow for child tasks (▶/▼)
+- `.detail-toggle` - expand/collapse toggle for detail sections (Details ▶ / Prompts ▶)
+- `.detail-toggle[data-toggle="details"]` - Details section toggle
+- `.detail-toggle[data-toggle="prompts"]` - Prompts section toggle
+- `.detail-content[data-content="details"]` - Details section content (hidden by default)
+- `.detail-content[data-content="prompts"]` - Prompts section content (hidden by default)
 - `.in-progress-header` - collapsible section header
 
 ## Workflow Labels (Simplified 3-Label System)
@@ -171,8 +193,9 @@ A "more" link appears after visible prompts; clicking reveals all remaining prom
 2. **Drill into project**: Click project header to expand, click task to see details
 3. **Expand subtasks**: Click parent task or ▶ arrow to show child tasks (works in both sections)
 4. **Filter by team**: Use team selector in nav bar
-5. **Open in Linear**: Expand task details, click "View in Linear →"
-6. **Generate prompt for task**: Expand task with promptable label (e.g., `blocked`, `bug`), click the label link, copy the generated prompt
+5. **Open in Linear**: Expand task, click "View in Linear →" link
+6. **View task details**: Expand task, click "Details ▶" to show description and metadata
+7. **Generate prompt for task**: Expand task, click "Prompts ▶" to reveal prompt buttons, click a prompt button, copy the generated prompt
 
 ## Limitations
 
