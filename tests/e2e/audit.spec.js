@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 // Workspace URL key used in test session
 const TEST_WORKSPACE_URL_KEY = 'test-workspace';
 const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;
-const FANCY_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/fancy`;
+const AUDIT_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/audit`;
 const API_PREFIX = `/workspace/${TEST_WORKSPACE_URL_KEY}`;
 
 test.describe('Operator Dashboard', () => {
@@ -12,8 +12,8 @@ test.describe('Operator Dashboard', () => {
       // Clear any existing session
       await page.goto('/test/clear-session');
 
-      // Try to access /fancy (legacy route redirects to home for unauthenticated)
-      await page.goto('/fancy');
+      // Try to access /audit (legacy route redirects to home for unauthenticated)
+      await page.goto('/audit');
 
       // Should redirect to home
       await expect(page).toHaveURL('/');
@@ -27,7 +27,7 @@ test.describe('Operator Dashboard', () => {
     });
 
     test('renders dashboard page', async ({ page }) => {
-      await page.goto(FANCY_URL);
+      await page.goto(AUDIT_URL);
 
       // Should show dashboard header
       await expect(page.locator('h1')).toContainText('Operator Dashboard');
@@ -41,14 +41,14 @@ test.describe('Operator Dashboard', () => {
     });
 
     test('shows workspace name in navigation', async ({ page }) => {
-      await page.goto(FANCY_URL);
+      await page.goto(AUDIT_URL);
 
       // Should show workspace name in nav
       await expect(page.locator('.nav-value-static')).toBeVisible();
     });
 
     test('has back link to projects', async ({ page }) => {
-      await page.goto(FANCY_URL);
+      await page.goto(AUDIT_URL);
 
       // Should have link back to workspace projects page
       const projectsLink = page.locator(`.nav-action[href="${WORKSPACE_URL}"]`);
@@ -57,7 +57,7 @@ test.describe('Operator Dashboard', () => {
     });
 
     test('has logout link', async ({ page }) => {
-      await page.goto(FANCY_URL);
+      await page.goto(AUDIT_URL);
 
       const logoutLink = page.locator('.nav-action[href="/logout"]');
       await expect(logoutLink).toBeVisible();
@@ -65,7 +65,7 @@ test.describe('Operator Dashboard', () => {
     });
 
     test('runs audit and displays report', async ({ page }) => {
-      await page.goto(FANCY_URL);
+      await page.goto(AUDIT_URL);
 
       // Click Run Audit button
       await page.locator('#run-audit').click();
@@ -86,7 +86,7 @@ test.describe('Operator Dashboard', () => {
     });
 
     test('displays queue readiness section', async ({ page }) => {
-      await page.goto(FANCY_URL);
+      await page.goto(AUDIT_URL);
 
       // Run audit
       await page.locator('#run-audit').click();
@@ -101,7 +101,7 @@ test.describe('Operator Dashboard', () => {
     });
 
     test('sections are collapsible', async ({ page }) => {
-      await page.goto(FANCY_URL);
+      await page.goto(AUDIT_URL);
 
       // Run audit
       await page.locator('#run-audit').click();
@@ -125,7 +125,7 @@ test.describe('Operator Dashboard', () => {
     });
 
     test('shows completion status after audit', async ({ page }) => {
-      await page.goto(FANCY_URL);
+      await page.goto(AUDIT_URL);
 
       // Run audit
       await page.locator('#run-audit').click();

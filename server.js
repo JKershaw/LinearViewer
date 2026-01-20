@@ -25,7 +25,7 @@ import { createWorkspaceRoutes } from './routes/workspace.js'
 import { createOpenRouterAuthRoutes } from './routes/openrouter-auth.js'
 import { testMockTeams, testMockData } from './tests/fixtures/mock-data.js'
 import { runAudit, computeAuditFromData } from './lib/audit.js'
-import { renderFancyPage } from './lib/render-fancy.js'
+import { renderAuditPage } from './lib/render-audit.js'
 import { renderSettingsPage } from './lib/render-settings.js'
 import { renderPromptsPage } from './lib/render-prompts.js'
 import { generatePrompt, hasPrompt, getAvailablePrompts } from './lib/prompt-templates.js'
@@ -570,11 +570,11 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
  * Operator Dashboard page - requires authentication.
  * Displays workspace audit and health check functionality.
  */
-app.get('/workspace/:urlKey/fancy', workspaceFromUrl, (req, res) => {
+app.get('/workspace/:urlKey/audit', workspaceFromUrl, (req, res) => {
   const workspace = req.workspace;
   const deployInfo = getDeployInfo();
 
-  const html = renderFancyPage(workspace.name || 'Workspace', {
+  const html = renderAuditPage(workspace.name || 'Workspace', {
     deployInfo,
     urlKey: workspace.urlKey
   });
@@ -1019,7 +1019,7 @@ function redirectToWorkspace(page) {
 }
 
 // Legacy page routes - redirect to workspace-prefixed versions
-app.get('/fancy', redirectToWorkspace('fancy'))
+app.get('/audit', redirectToWorkspace('audit'))
 app.get('/settings', redirectToWorkspace('settings'))
 app.get('/prompts', redirectToWorkspace('prompts'))
 

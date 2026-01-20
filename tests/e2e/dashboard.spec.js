@@ -74,7 +74,7 @@ test.describe('Authenticated Dashboard', () => {
 
     // Reset and audit should NOT be in nav bar
     await expect(page.locator('.nav-bar .reset-view')).not.toBeVisible();
-    await expect(page.locator('.nav-bar .nav-action[href="/fancy"]')).not.toBeVisible();
+    await expect(page.locator('.nav-bar .nav-action[href="/audit"]')).not.toBeVisible();
   });
 
   test('shows footer with reset, all navigation links, and deploy info', async ({ page }) => {
@@ -87,7 +87,7 @@ test.describe('Authenticated Dashboard', () => {
     // Should have all navigation links with workspace prefix (dashboard has no "current page" so all are links)
     await expect(page.locator(`.footer-action[href="/workspace/${TEST_WORKSPACE_URL_KEY}/settings"]`)).toBeVisible();
     await expect(page.locator(`.footer-action[href="/workspace/${TEST_WORKSPACE_URL_KEY}/prompts"]`)).toBeVisible();
-    await expect(page.locator(`.footer-action[href="/workspace/${TEST_WORKSPACE_URL_KEY}/fancy"]`)).toBeVisible();
+    await expect(page.locator(`.footer-action[href="/workspace/${TEST_WORKSPACE_URL_KEY}/audit"]`)).toBeVisible();
 
     // Should NOT have any bold current page indicator on dashboard
     await expect(page.locator('.footer-current')).not.toBeVisible();

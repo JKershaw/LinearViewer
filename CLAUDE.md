@@ -25,16 +25,16 @@ lib/
   openrouter.js        OpenRouter API client for AI recommendations
   tree.js              Transforms flat issues → nested tree structure
   render.js            Generates HTML with box-drawing characters
-  render-fancy.js      Operator dashboard page renderer
+  render-audit.js      Operator dashboard page renderer
   session-store.js     MongoDB/MangoDB session store
   parse-landing.js     Parses markdown content for landing page
 content/
   landing.md           Static projects preview for unauthenticated users
 public/
   style.css            Light theme, mobile-responsive
-  fancy.css            Operator dashboard styles
+  audit.css            Operator dashboard styles
   app.js               Client-side collapse/expand, localStorage persistence
-  fancy.js             Operator dashboard client-side logic
+  audit.js             Operator dashboard client-side logic
   llms.txt             AI agent guidance (DOM selectors, navigation patterns)
 tests/e2e/
   landing.spec.js      Landing page tests

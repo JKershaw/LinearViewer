@@ -136,7 +136,7 @@ test.describe('Prompts Page', () => {
       await expect(settingsLink).toContainText('settings');
 
       // Should have audit link with workspace prefix (not current page)
-      const auditLink = page.locator(`.footer-action[href="/workspace/${TEST_WORKSPACE_URL_KEY}/fancy"]`);
+      const auditLink = page.locator(`.footer-action[href="/workspace/${TEST_WORKSPACE_URL_KEY}/audit"]`);
       await expect(auditLink).toBeVisible();
       await expect(auditLink).toContainText('audit');
     });
