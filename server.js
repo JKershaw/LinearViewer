@@ -413,9 +413,9 @@ async function handleTokenRefreshAndRetry(workspace, session, teamId, openRouter
     teams,
     selectedTeamId,
     workspaces: session.workspaces,
-    activeWorkspaceId: session.activeWorkspaceId,
     openRouterSource,
-    deployInfo
+    deployInfo,
+    urlKey: workspace.urlKey
   });
   return res.send(html);
 }
@@ -539,7 +539,6 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
       teams,
       selectedTeamId,
       workspaces: req.session.workspaces,
-      activeWorkspaceId: req.session.activeWorkspaceId,
       openRouterSource,
       deployInfo,
       urlKey: workspace.urlKey
