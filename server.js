@@ -14,6 +14,8 @@ import { MongoClient } from 'mongodb'
 import { MangoClient } from '@jkershaw/mangodb'
 import { MongoSessionStore } from './lib/session-store.js'
 import { UserPreferencesStore } from './lib/user-preferences.js'
+import { DispatchQueueStore } from './lib/dispatch-store.js'
+import { DispatchTokenStore } from './lib/dispatch-tokens.js'
 import { fetchProjects, fetchTeams, fetchIssueContext } from './lib/linear.js'
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID } from './lib/tree.js'
 import { renderPage, renderErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
@@ -23,6 +25,7 @@ import { UUID_REGEX, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspace
 import { createAuthRoutes } from './routes/auth.js'
 import { createWorkspaceRoutes } from './routes/workspace.js'
 import { createOpenRouterAuthRoutes } from './routes/openrouter-auth.js'
+import { createDispatchRoutes } from './routes/dispatch.js'
 import { testMockTeams, testMockData } from './tests/fixtures/mock-data.js'
 import { runAudit, computeAuditFromData } from './lib/audit.js'
 import { renderAuditPage } from './lib/render-audit.js'
@@ -113,6 +116,19 @@ const userPreferencesStore = new UserPreferencesStore({
   collection: userPreferencesCollection
 })
 
+// Dispatch queue collections
+const dispatchQueueCollection = db.collection('dispatch-queue')
+const dispatchTokensCollection = db.collection('dispatch-tokens')
+
+const dispatchQueueStore = new DispatchQueueStore({
+  collection: dispatchQueueCollection,
+  ttl: 24 * 60 * 60 // 24 hours
+})
+
+const dispatchTokenStore = new DispatchTokenStore({
+  collection: dispatchTokensCollection
+})
+
 // =============================================================================
 // Express App Configuration
 // =============================================================================
@@ -134,6 +150,7 @@ app.use((req, res, next) => {
 
 app.use(express.static('public'))
 app.use(express.urlencoded({ extended: false }))
+app.use(express.json())
 
 // Session middleware configuration:
 // - resave: false - don't save session if unmodified
@@ -236,6 +253,39 @@ if (process.env.NODE_ENV === 'test') {
       }
     })
   })
+
+  // Endpoint to create a dispatch token for testing
+  app.get('/test/create-dispatch-token', async (req, res) => {
+    try {
+      const { tokenId, token } = await dispatchTokenStore.createToken(
+        'test-workspace',
+        'test-token'
+      )
+      res.json({ tokenId, token })
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
+
+  // Endpoint to clear dispatch queue for testing
+  app.get('/test/clear-dispatch-queue', async (req, res) => {
+    try {
+      await dispatchQueueStore.clear('test-workspace')
+      res.send('ok')
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
+
+  // Endpoint to clear dispatch tokens for testing
+  app.get('/test/clear-dispatch-tokens', async (req, res) => {
+    try {
+      await dispatchTokenStore.clear('test-workspace')
+      res.send('ok')
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
 }
 
 // =============================================================================
@@ -299,6 +349,7 @@ app.use((req, res, next) => {
 app.use(createAuthRoutes({ sessionStore, userPreferencesStore }))
 app.use(createWorkspaceRoutes())
 app.use(createOpenRouterAuthRoutes())
+// Note: Dispatch routes mounted after workspaceFromUrl middleware is defined
 
 // =============================================================================
 // Main Application Route
@@ -517,6 +568,9 @@ function workspaceFromUrl(req, res, next) {
     return res.status(500).send(renderErrorPage('Error', 'An unexpected error occurred'))
   }
 }
+
+// Mount dispatch routes (requires workspaceFromUrl middleware)
+app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl }))
 
 /**
  * Workspace project view - renders the interactive tree view.
@@ -1075,4 +1129,17 @@ app.get('/api/recommend/:issueId', (req, res) => {
 const PORT = process.env.PORT || 3000
 app.listen(PORT, () => {
   console.log(`Linear Projects Viewer running at http://localhost:${PORT}`)
+
+  // Start periodic cleanup of expired dispatch queue items (every hour)
+  const CLEANUP_INTERVAL_MS = 60 * 60 * 1000 // 1 hour
+  setInterval(async () => {
+    try {
+      const removedCount = await dispatchQueueStore.cleanup()
+      if (removedCount > 0) {
+        console.log(`Dispatch queue cleanup: removed ${removedCount} expired items`)
+      }
+    } catch (err) {
+      console.error('Dispatch queue cleanup error:', err)
+    }
+  }, CLEANUP_INTERVAL_MS)
 })

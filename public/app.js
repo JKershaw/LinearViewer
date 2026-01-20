@@ -1,5 +1,6 @@
 const STORAGE_KEY = 'linear-projects-state'
 const TEAM_STORAGE_KEY = 'linear-projects-selected-team'
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 // ==========================================================================
 // Markdown Rendering (using marked.js library)
@@ -784,6 +785,479 @@ function initPrompts() {
       }, 1500)
     }
   })
+
+  // Handle dispatch button clicks
+  document.addEventListener('click', async (e) => {
+    const dispatchBtn = e.target.closest('.prompt-dispatch')
+    if (!dispatchBtn) return
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    const promptContainer = dispatchBtn.closest('.prompt-container, .recommend-prompt')
+    const promptText = promptContainer?.querySelector('.prompt-text')
+    const promptNameEl = promptContainer?.querySelector('.prompt-name')
+    if (!promptText) return
+
+    // Get the prompt content
+    const prompt = promptText.dataset.rawPrompt || promptText.textContent
+    const promptName = promptNameEl?.textContent || 'Prompt'
+
+    // Get issue ID and workspace URL key
+    const issueId = promptContainer.dataset.promptFor ||
+      promptContainer.closest('[data-recommend-for]')?.dataset.recommendFor
+    const urlKey = promptContainer.dataset.urlKey ||
+      promptContainer.closest('[data-url-key]')?.dataset.urlKey
+
+    if (!urlKey) {
+      console.error('No workspace URL key found for dispatch')
+      dispatchBtn.textContent = 'failed'
+      setTimeout(() => { dispatchBtn.textContent = 'dispatch' }, 1500)
+      return
+    }
+
+    // Get issue title from the DOM if available
+    const issueEl = issueId ? document.querySelector(`[data-id="${issueId}"]`) : null
+    const issueTitle = issueEl?.querySelector('.title, .title-dim')?.textContent || null
+
+    try {
+      dispatchBtn.textContent = 'sending...'
+
+      const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
+          promptName,
+          issueId: issueId || null,
+          issueTitle
+        })
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Dispatch failed')
+      }
+
+      dispatchBtn.textContent = 'dispatched!'
+      dispatchBtn.classList.add('dispatched')
+
+      // Update queue badge if exists
+      updateQueueBadge(urlKey)
+
+      setTimeout(() => {
+        dispatchBtn.textContent = 'dispatch'
+        dispatchBtn.classList.remove('dispatched')
+      }, 1500)
+    } catch (error) {
+      console.error('Failed to dispatch:', error)
+      dispatchBtn.textContent = 'failed'
+      setTimeout(() => {
+        dispatchBtn.textContent = 'dispatch'
+      }, 1500)
+    }
+  })
+}
+
+// =============================================================================
+// Queue Badge Management
+// =============================================================================
+
+/**
+ * Update the queue badge count for a workspace
+ */
+async function updateQueueBadge(urlKey) {
+  try {
+    const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/count`)
+    if (!response.ok) return
+
+    const { count } = await response.json()
+    const badge = document.querySelector(`[data-queue-badge][data-url-key="${urlKey}"]`)
+    if (badge) {
+      const countEl = badge.querySelector('.queue-count')
+      if (countEl) countEl.textContent = count
+      badge.classList.toggle('hidden', count === 0)
+    }
+  } catch (e) {
+    console.error('Failed to update queue badge:', e)
+  }
+}
+
+/**
+ * Initialize queue panel functionality
+ */
+function initQueuePanel() {
+  // Initialize badge count on page load
+  const badge = document.querySelector('[data-queue-badge]')
+  if (badge) {
+    updateQueueBadge(badge.dataset.urlKey)
+  }
+
+  // Handle badge click to show queue panel
+  document.addEventListener('click', async (e) => {
+    const badgeBtn = e.target.closest('[data-queue-badge]')
+    if (!badgeBtn) return
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    const urlKey = badgeBtn.dataset.urlKey
+    await showQueuePanel(urlKey)
+  })
+
+  // Handle close button and overlay clicks
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('.queue-panel-close') || e.target.closest('.queue-panel-overlay')) {
+      hideQueuePanel()
+    }
+  })
+
+  // Handle remove button clicks
+  document.addEventListener('click', async (e) => {
+    const removeBtn = e.target.closest('.queue-item-remove')
+    if (!removeBtn) return
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    const itemId = removeBtn.dataset.itemId
+    const urlKey = removeBtn.dataset.urlKey
+    await removeQueueItem(urlKey, itemId)
+  })
+
+  // Close on escape key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      hideQueuePanel()
+    }
+  })
+}
+
+/**
+ * Show the queue panel with items
+ */
+async function showQueuePanel(urlKey) {
+  // Remove any existing panel
+  hideQueuePanel()
+
+  // Create overlay
+  const overlay = document.createElement('div')
+  overlay.className = 'queue-panel-overlay'
+  document.body.appendChild(overlay)
+
+  // Create panel
+  const panel = document.createElement('div')
+  panel.className = 'queue-panel'
+  panel.dataset.urlKey = urlKey
+  panel.innerHTML = `
+    <div class="queue-panel-header">
+      <span>Dispatch Queue</span>
+      <button class="queue-panel-close" aria-label="Close">×</button>
+    </div>
+    <div class="queue-panel-items">
+      <div class="queue-panel-empty">Loading...</div>
+    </div>
+  `
+  document.body.appendChild(panel)
+
+  // Load items
+  try {
+    const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch`)
+    if (!response.ok) throw new Error('Failed to load queue')
+
+    const { items } = await response.json()
+    renderQueueItems(panel, items, urlKey)
+  } catch (e) {
+    console.error('Failed to load queue items:', e)
+    panel.querySelector('.queue-panel-items').innerHTML =
+      '<div class="queue-panel-empty">Failed to load queue</div>'
+  }
+}
+
+/**
+ * Render queue items in the panel
+ */
+function renderQueueItems(panel, items, urlKey) {
+  const container = panel.querySelector('.queue-panel-items')
+
+  if (items.length === 0) {
+    container.innerHTML = '<div class="queue-panel-empty">Queue is empty</div>'
+    return
+  }
+
+  container.innerHTML = items.map(item => {
+    const time = new Date(item.dispatchedAt).toLocaleString()
+    const title = item.issueTitle || item.promptName || 'Prompt'
+    const meta = item.issueIdentifier ? `${item.issueIdentifier} · ${time}` : time
+
+    return `
+      <div class="queue-item" data-item-id="${escapeHtml(item.id)}">
+        <div class="queue-item-header">
+          <span class="queue-item-title">${escapeHtml(title)}</span>
+          <button class="queue-item-remove" data-item-id="${escapeHtml(item.id)}" data-url-key="${escapeHtml(urlKey)}">remove</button>
+        </div>
+        <div class="queue-item-meta">${escapeHtml(meta)}</div>
+      </div>
+    `
+  }).join('')
+}
+
+/**
+ * Hide the queue panel
+ */
+function hideQueuePanel() {
+  document.querySelector('.queue-panel')?.remove()
+  document.querySelector('.queue-panel-overlay')?.remove()
+}
+
+/**
+ * Remove an item from the queue
+ */
+async function removeQueueItem(urlKey, itemId) {
+  // Validate itemId format to prevent CSS selector injection
+  if (!itemId || !UUID_REGEX.test(itemId)) {
+    console.error('Invalid itemId format')
+    return
+  }
+
+  try {
+    const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/${encodeURIComponent(itemId)}`, {
+      method: 'DELETE'
+    })
+
+    if (!response.ok) throw new Error('Failed to remove item')
+
+    // Remove item from DOM (itemId validated as UUID above, safe for selector)
+    document.querySelector(`.queue-item[data-item-id="${itemId}"]`)?.remove()
+
+    // Update badge
+    await updateQueueBadge(urlKey)
+
+    // Check if queue is now empty
+    const panel = document.querySelector('.queue-panel')
+    if (panel && panel.querySelectorAll('.queue-item').length === 0) {
+      panel.querySelector('.queue-panel-items').innerHTML =
+        '<div class="queue-panel-empty">Queue is empty</div>'
+    }
+  } catch (e) {
+    console.error('Failed to remove queue item:', e)
+  }
+}
+
+/**
+ * Simple HTML escaping for queue panel content
+ */
+function escapeHtml(str) {
+  if (!str) return ''
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+// =============================================================================
+// Token Management (Settings Page)
+// =============================================================================
+
+/**
+ * Initialize token management functionality for settings page
+ */
+function initTokenManagement() {
+  const createForm = document.getElementById('create-token-form')
+  if (!createForm) return // Not on settings page
+
+  const urlKey = createForm.dataset.urlKey
+
+  // Load existing tokens
+  loadTokenList(urlKey)
+
+  // Handle create form submission
+  createForm.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    const label = createForm.label.value.trim() || 'default'
+    await createToken(urlKey, label)
+    createForm.reset()
+  })
+
+  // Handle revoke clicks (delegated)
+  document.addEventListener('click', async (e) => {
+    const revokeBtn = e.target.closest('.token-revoke')
+    if (!revokeBtn) return
+
+    e.preventDefault()
+    const tokenId = revokeBtn.dataset.tokenId
+    if (confirm('Revoke this token? It will immediately stop working.')) {
+      await revokeToken(urlKey, tokenId)
+    }
+  })
+}
+
+/**
+ * Load and display token list
+ */
+async function loadTokenList(urlKey) {
+  const listEl = document.querySelector('.token-list')
+  if (!listEl) return
+
+  try {
+    const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/tokens`)
+    if (!response.ok) throw new Error('Failed to load tokens')
+
+    const { tokens } = await response.json()
+    renderTokenList(listEl, tokens, urlKey)
+  } catch (e) {
+    console.error('Failed to load tokens:', e)
+    listEl.innerHTML = '<div class="token-list-empty">Failed to load tokens</div>'
+  }
+}
+
+/**
+ * Render token list in container
+ */
+function renderTokenList(container, tokens, urlKey) {
+  if (tokens.length === 0) {
+    container.innerHTML = '<div class="token-list-empty">No tokens yet</div>'
+    return
+  }
+
+  container.innerHTML = tokens.map(t => {
+    const created = new Date(t.createdAt).toLocaleDateString()
+    const lastUsed = t.lastUsedAt
+      ? `last used ${new Date(t.lastUsedAt).toLocaleDateString()}`
+      : 'never used'
+
+    return `
+      <div class="token-item" data-token-id="${escapeHtml(t.tokenId)}">
+        <div class="token-info">
+          <span class="token-label-text">${escapeHtml(t.label)}</span>
+          <div class="token-meta">created ${created} · ${lastUsed}</div>
+        </div>
+        <button class="settings-action token-revoke" data-token-id="${escapeHtml(t.tokenId)}">revoke</button>
+      </div>
+    `
+  }).join('')
+}
+
+/**
+ * Create a new dispatch token
+ */
+async function createToken(urlKey, label) {
+  const submitBtn = document.querySelector('#create-token-form button[type="submit"]')
+  const originalText = submitBtn?.textContent
+
+  try {
+    if (submitBtn) submitBtn.textContent = 'creating...'
+
+    const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/tokens`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label })
+    })
+
+    if (!response.ok) throw new Error('Failed to create token')
+
+    const { token } = await response.json()
+
+    // Show token in modal (one-time display)
+    showTokenModal(token)
+
+    // Refresh list
+    await loadTokenList(urlKey)
+  } catch (e) {
+    console.error('Failed to create token:', e)
+    alert('Failed to create token: ' + e.message)
+  } finally {
+    if (submitBtn) submitBtn.textContent = originalText
+  }
+}
+
+/**
+ * Revoke a dispatch token
+ */
+async function revokeToken(urlKey, tokenId) {
+  try {
+    const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/tokens/${tokenId}`, {
+      method: 'DELETE'
+    })
+
+    if (!response.ok) throw new Error('Failed to revoke token')
+
+    // Remove from DOM
+    document.querySelector(`.token-item[data-token-id="${tokenId}"]`)?.remove()
+
+    // Check if list is now empty
+    const listEl = document.querySelector('.token-list')
+    if (listEl && listEl.querySelectorAll('.token-item').length === 0) {
+      listEl.innerHTML = '<div class="token-list-empty">No tokens yet</div>'
+    }
+  } catch (e) {
+    console.error('Failed to revoke token:', e)
+    alert('Failed to revoke token: ' + e.message)
+  }
+}
+
+/**
+ * Show modal with newly created token (one-time display)
+ */
+function showTokenModal(token) {
+  // Create overlay
+  const overlay = document.createElement('div')
+  overlay.className = 'token-modal-overlay'
+
+  // Create modal
+  const modal = document.createElement('div')
+  modal.className = 'token-modal'
+  modal.innerHTML = `
+    <div class="token-modal-header">
+      <strong>Token Created</strong>
+      <button class="token-modal-close" aria-label="Close">×</button>
+    </div>
+    <p>Copy this token now - it won't be shown again:</p>
+    <div class="token-display">
+      <span class="token-value">${escapeHtml(token)}</span>
+      <button class="token-copy-btn">copy</button>
+    </div>
+    <div class="token-usage-hint">
+      Use in Authorization header:<br>
+      <code>Authorization: Bearer &lt;token&gt;</code>
+    </div>
+  `
+
+  document.body.appendChild(overlay)
+  document.body.appendChild(modal)
+
+  // Close handlers
+  const close = () => {
+    overlay.remove()
+    modal.remove()
+  }
+
+  overlay.addEventListener('click', close)
+  modal.querySelector('.token-modal-close').addEventListener('click', close)
+
+  // Close on escape
+  const escHandler = (e) => {
+    if (e.key === 'Escape') {
+      close()
+      document.removeEventListener('keydown', escHandler)
+    }
+  }
+  document.addEventListener('keydown', escHandler)
+
+  // Copy handler
+  modal.querySelector('.token-copy-btn').addEventListener('click', async () => {
+    const copyBtn = modal.querySelector('.token-copy-btn')
+    try {
+      await navigator.clipboard.writeText(token)
+      copyBtn.textContent = 'copied!'
+      setTimeout(() => { copyBtn.textContent = 'copy' }, 1500)
+    } catch (e) {
+      console.error('Failed to copy:', e)
+      copyBtn.textContent = 'failed'
+      setTimeout(() => { copyBtn.textContent = 'copy' }, 1500)
+    }
+  })
 }
 
 // ==========================================================================
@@ -1016,4 +1490,6 @@ document.addEventListener('DOMContentLoaded', () => {
   initMorePrompts()
   initRecommendations()
   initDeployTime()
+  initQueuePanel()
+  initTokenManagement()
 })
