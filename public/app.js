@@ -429,7 +429,6 @@ function init() {
       }
       return
     }
-    }
 
     // 3. Toggle arrow click (expand/collapse children)
     const toggle = e.target.closest('.toggle')
