@@ -47,7 +47,7 @@ if [ -d "node_modules" ]; then
   ready+=("Dependencies installed")
   deps_installed=1
 else
-  blockers+=("Install dependencies")
+  blockers+=("Install dependencies (required for Linear CLI and web app)")
   blocker_commands+=("npm install")
 fi
 
