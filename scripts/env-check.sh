@@ -2,45 +2,93 @@
 
 # Environment check script for LinearViewer
 # Verifies all dependencies, environment variables, and tools are properly configured
-
+# Output is structured for AI agents: blocking issues first, then passing checks
 
 # Colors and symbols
 check="✓"
-cross="✗"
-skip="○"
+warn="⚠️"
 
-echo "Environment Check"
-echo "─────────────────"
+# Arrays to collect results
+blockers=()
+blocker_commands=()
+optional=()
+optional_commands=()
+ready=()
+
+# --- Collect check results ---
 
 # Check Node.js
 if command -v node &> /dev/null; then
   node_version=$(node --version | sed 's/v//')
   node_major=$(echo "$node_version" | cut -d. -f1)
   if [ "$node_major" -ge 20 ]; then
-    echo "$check Node.js $node_version (≥20 required)"
+    ready+=("Node.js $node_version (≥20 required)")
   else
-    echo "$cross Node.js $node_version (≥20 required)"
-      fi
-else
-  echo "$cross Node.js not installed"
-  echo "  Run: Install Node.js 20+ from https://nodejs.org"
+    blockers+=("Upgrade Node.js (current: $node_version, need ≥20)")
+    blocker_commands+=("Install Node.js 20+ from https://nodejs.org")
   fi
+else
+  blockers+=("Install Node.js")
+  blocker_commands+=("Install Node.js 20+ from https://nodejs.org")
+fi
 
 # Check npm
 if command -v npm &> /dev/null; then
   npm_version=$(npm --version)
-  echo "$check npm $npm_version"
+  ready+=("npm $npm_version")
 else
-  echo "$cross npm not installed"
-  fi
+  blockers+=("Install npm")
+  blocker_commands+=("Comes with Node.js installation")
+fi
 
 # Check node_modules
+deps_installed=0
 if [ -d "node_modules" ]; then
-  echo "$check Dependencies installed"
+  ready+=("Dependencies installed")
+  deps_installed=1
 else
-  echo "$cross Dependencies not installed"
-  echo "  Run: npm install"
+  blockers+=("Install dependencies")
+  blocker_commands+=("npm install")
+fi
+
+# Check .env file (optional - only needed for web app OAuth)
+env_exists=0
+if [ -f ".env" ]; then
+  ready+=(".env file exists")
+  env_exists=1
+else
+  if [ -f ".env.example" ]; then
+    optional+=("Create .env file")
+    optional_commands+=("cp .env.example .env")
   fi
+fi
+
+# Check environment variables for OAuth (optional - only needed for web app)
+if [ -n "$SESSION_SECRET" ]; then
+  ready+=("SESSION_SECRET")
+else
+  optional+=("Set SESSION_SECRET")
+  optional_commands+=("Add to .env: SESSION_SECRET=\"your-secret-here\"")
+fi
+
+if [ -n "$LINEAR_CLIENT_ID" ]; then
+  ready+=("LINEAR_CLIENT_ID")
+else
+  optional+=("Set LINEAR_CLIENT_ID")
+  optional_commands+=("Get from https://linear.app/settings/api/applications")
+fi
+
+if [ -n "$LINEAR_CLIENT_SECRET" ]; then
+  ready+=("LINEAR_CLIENT_SECRET")
+else
+  optional+=("Set LINEAR_CLIENT_SECRET")
+  optional_commands+=("Get from https://linear.app/settings/api/applications")
+fi
+
+# Check optional environment variables
+if [ -n "$LINEAR_API_KEY" ]; then
+  ready+=("LINEAR_API_KEY")
+fi
 
 # Check Playwright browsers
 playwright_ok=0
@@ -53,77 +101,63 @@ elif [ -d "/ms-playwright" ]; then
 fi
 
 if [ "$playwright_ok" -eq 1 ]; then
-  echo "$check Playwright browsers installed"
+  ready+=("Playwright browsers installed")
 else
-  echo "$cross Playwright browsers not installed"
-  echo "  Run: npx playwright install chromium --with-deps"
-  fi
-
-echo ""
-echo "Environment Variables:"
-
-# Check for .env file
-if [ -f ".env" ]; then
-  echo "$check .env file exists"
-else
-  echo "$cross .env file not found"
-  if [ -f ".env.example" ]; then
-    echo "  Run: cp .env.example .env && source .env"
-  fi
+  blockers+=("Install Playwright browsers")
+  blocker_commands+=("npx playwright install chromium --with-deps")
 fi
 
-# Check required environment variables
-if [ -n "$SESSION_SECRET" ]; then
-  echo "$check SESSION_SECRET"
-else
-  echo "$cross SESSION_SECRET"
-  echo "  Set in .env or export SESSION_SECRET=\"your-secret\""
-  fi
-
-if [ -n "$LINEAR_CLIENT_ID" ]; then
-  echo "$check LINEAR_CLIENT_ID"
-else
-  echo "$cross LINEAR_CLIENT_ID"
-  echo "  Get from: https://linear.app/settings/api/applications"
-  fi
-
-if [ -n "$LINEAR_CLIENT_SECRET" ]; then
-  echo "$check LINEAR_CLIENT_SECRET"
-else
-  echo "$cross LINEAR_CLIENT_SECRET"
-  echo "  Get from: https://linear.app/settings/api/applications"
-  fi
-
-# Check optional environment variables
-if [ -n "$LINEAR_API_KEY" ]; then
-  echo "$check LINEAR_API_KEY"
-else
-  echo "$skip LINEAR_API_KEY (optional - for AI agents)"
-fi
-
-# Check Linear CLI (optional - only if LINEAR_API_KEY is set)
-echo ""
-echo "Linear CLI (optional):"
-if [ -n "$LINEAR_API_KEY" ]; then
+# Check Linear CLI (only if dependencies are installed and API key is set)
+if [ -n "$LINEAR_API_KEY" ] && [ "$deps_installed" -eq 1 ]; then
   if [ -f "lib/linear-cli.js" ]; then
     cli_output=$(node lib/linear-cli.js viewer 2>&1) || true
     if echo "$cli_output" | grep -q '"name"'; then
       user_name=$(echo "$cli_output" | grep -o '"name": *"[^"]*"' | head -1 | sed 's/"name": *"//' | sed 's/"$//')
-      echo "$check Working - authenticated as $user_name"
-    else
-      echo "$cross Linear CLI failed"
-      # Show first line of error for debugging
-      error_line=$(echo "$cli_output" | head -1)
-      if [ -n "$error_line" ]; then
-        echo "  Error: $error_line"
-      else
-        echo "  Check your LINEAR_API_KEY is valid"
-      fi
+      ready+=("Linear CLI (authenticated as $user_name)")
     fi
-  else
-    echo "$cross lib/linear-cli.js not found"
   fi
-else
-  echo "$skip Skipped (LINEAR_API_KEY not set)"
 fi
 
+# --- Output results ---
+
+echo "Environment Check"
+echo "─────────────────"
+
+# Print blockers first (if any)
+if [ ${#blockers[@]} -gt 0 ]; then
+  echo ""
+  echo "$warn ACTION REQUIRED (complete these first):"
+  echo ""
+  for i in "${!blockers[@]}"; do
+    num=$((i + 1))
+    echo "$num. ${blockers[$i]}"
+    echo "   → ${blocker_commands[$i]}"
+  done
+fi
+
+# Print optional items (for web app only)
+if [ ${#optional[@]} -gt 0 ]; then
+  echo ""
+  echo "Optional (only needed for web app OAuth):"
+  for i in "${!optional[@]}"; do
+    echo "- ${optional[$i]}"
+    echo "  → ${optional_commands[$i]}"
+  done
+fi
+
+# Print ready items
+if [ ${#ready[@]} -gt 0 ]; then
+  echo ""
+  echo "Ready:"
+  for item in "${ready[@]}"; do
+    echo "$check $item"
+  done
+fi
+
+# Final summary for AI agents
+echo ""
+if [ ${#blockers[@]} -gt 0 ]; then
+  echo "Status: ${#blockers[@]} issue(s) to fix before proceeding"
+else
+  echo "Status: All checks passed"
+fi
