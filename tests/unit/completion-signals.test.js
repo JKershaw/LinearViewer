@@ -2,6 +2,11 @@
  * Unit tests for completion-signals.js
  *
  * Run with: node --test tests/unit/completion-signals.test.js
+ *
+ * Tests the simplified 3-label system completion signals:
+ * - preparing: Pre-implementation work
+ * - blocked: Work stuck on external dependency
+ * - bug: Investigating unexpected behavior
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
@@ -15,6 +20,7 @@ import {
   formatSignalsForPrompt,
   formatAllSignalsForMetaPrompt
 } from '../../lib/completion-signals.js';
+import { PREPARING_LABEL, WORK_ISSUE_LABELS } from '../../lib/workflow-config.js';
 
 // =============================================================================
 // COMPLETION_SIGNALS Structure Tests
@@ -22,19 +28,14 @@ import {
 
 describe('COMPLETION_SIGNALS', () => {
   const expectedPromptTypes = [
-    'in-research',
-    'in-breakdown',
-    'in-scoping',
-    'in-design',
-    'in-spike',
-    'in-context',
-    'blocked',
-    'bug'
+    PREPARING_LABEL,
+    WORK_ISSUE_LABELS.BLOCKED,
+    WORK_ISSUE_LABELS.BUG
   ];
 
-  test('has all 8 expected prompt types', () => {
+  test('has all 3 expected prompt types', () => {
     const keys = Object.keys(COMPLETION_SIGNALS);
-    assert.strictEqual(keys.length, 8, 'Should have exactly 8 prompt types');
+    assert.strictEqual(keys.length, 3, 'Should have exactly 3 prompt types');
     for (const type of expectedPromptTypes) {
       assert.ok(type in COMPLETION_SIGNALS, `Should have ${type} signal`);
     }
@@ -92,53 +93,22 @@ describe('COMPLETION_SIGNALS', () => {
 // =============================================================================
 
 describe('Signal Content', () => {
-  test('in-research has appropriate signals', () => {
-    const signal = COMPLETION_SIGNALS['in-research'];
-    assert.ok(signal.coreOutcome.includes('question'));
-    assert.ok(signal.signals.some(s => s.includes('approach') || s.includes('Recommended')));
+  test('preparing has appropriate signals', () => {
+    const signal = COMPLETION_SIGNALS[PREPARING_LABEL];
+    assert.ok(signal.coreOutcome.includes('ready'));
+    assert.ok(signal.signals.some(s => s.includes('question') || s.includes('Requirements')));
     assert.ok(signal.readinessCheck.includes('implementor'));
   });
 
-  test('in-breakdown has appropriate signals', () => {
-    const signal = COMPLETION_SIGNALS['in-breakdown'];
-    assert.ok(signal.coreOutcome.includes('split') || signal.coreOutcome.includes('actionable'));
-    assert.ok(signal.signals.some(s => s.includes('Subtask') || s.includes('Dependencies')));
-    assert.ok(signal.readinessCheck.includes('subtask') || signal.readinessCheck.includes('start'));
-  });
-
-  test('in-scoping has appropriate signals', () => {
-    const signal = COMPLETION_SIGNALS['in-scoping'];
-    assert.ok(signal.coreOutcome.includes('Boundaries') || signal.coreOutcome.includes('clear'));
-    assert.ok(signal.signals.some(s => s.includes('scope') || s.includes('Scope')));
-  });
-
-  test('in-design has appropriate signals', () => {
-    const signal = COMPLETION_SIGNALS['in-design'];
-    assert.ok(signal.coreOutcome.includes('Approach') || signal.coreOutcome.includes('chosen'));
-    assert.ok(signal.signals.some(s => s.includes('approaches') || s.includes('Tradeoffs')));
-  });
-
-  test('in-spike has appropriate signals', () => {
-    const signal = COMPLETION_SIGNALS['in-spike'];
-    assert.ok(signal.coreOutcome.includes('Go/no-go') || signal.coreOutcome.includes('decision'));
-    assert.ok(signal.signals.some(s => s.includes('Proof-of-concept') || s.includes('Feasibility')));
-  });
-
-  test('in-context has appropriate signals', () => {
-    const signal = COMPLETION_SIGNALS['in-context'];
-    assert.ok(signal.coreOutcome.includes('state') || signal.coreOutcome.includes('understood'));
-    assert.ok(signal.signals.some(s => s.includes('done') || s.includes('remains')));
-  });
-
   test('blocked has appropriate signals', () => {
-    const signal = COMPLETION_SIGNALS['blocked'];
+    const signal = COMPLETION_SIGNALS[WORK_ISSUE_LABELS.BLOCKED];
     assert.ok(signal.coreOutcome.includes('forward') || signal.coreOutcome.includes('Path'));
     assert.ok(signal.signals.some(s => s.includes('Blocker') || s.includes('Root cause')));
     assert.ok(signal.readinessCheck.includes('resume'));
   });
 
   test('bug has appropriate signals', () => {
-    const signal = COMPLETION_SIGNALS['bug'];
+    const signal = COMPLETION_SIGNALS[WORK_ISSUE_LABELS.BUG];
     assert.ok(signal.coreOutcome.includes('fix') || signal.coreOutcome.includes('understood'));
     assert.ok(signal.signals.some(s => s.includes('Reproduction') || s.includes('Root cause')));
     assert.ok(signal.readinessCheck.includes('fix'));
@@ -150,19 +120,15 @@ describe('Signal Content', () => {
 // =============================================================================
 
 describe('getDefinedSignalTypes', () => {
-  test('returns all 8 signal types', () => {
+  test('returns all 3 signal types', () => {
     const defined = getDefinedSignalTypes();
     assert.ok(Array.isArray(defined));
-    assert.strictEqual(defined.length, 8);
+    assert.strictEqual(defined.length, 3);
   });
 
   test('returns all expected types', () => {
     const defined = getDefinedSignalTypes();
-    const expectedTypes = [
-      'in-research', 'in-breakdown', 'in-scoping',
-      'in-design', 'in-spike', 'in-context',
-      'blocked', 'bug'
-    ];
+    const expectedTypes = [PREPARING_LABEL, 'blocked', 'bug'];
     for (const type of expectedTypes) {
       assert.ok(defined.includes(type), `Should include ${type}`);
     }
@@ -175,11 +141,7 @@ describe('getDefinedSignalTypes', () => {
 
 describe('hasSignals', () => {
   test('returns true for all defined types', () => {
-    const types = [
-      'in-research', 'in-breakdown', 'in-scoping',
-      'in-design', 'in-spike', 'in-context',
-      'blocked', 'bug'
-    ];
+    const types = [PREPARING_LABEL, 'blocked', 'bug'];
     for (const type of types) {
       assert.strictEqual(hasSignals(type), true, `${type} should have signals`);
     }
@@ -191,6 +153,12 @@ describe('hasSignals', () => {
     assert.strictEqual(hasSignals('code-review'), false);
     assert.strictEqual(hasSignals(''), false);
   });
+
+  test('returns false for old phase labels', () => {
+    assert.strictEqual(hasSignals('in-research'), false);
+    assert.strictEqual(hasSignals('in-breakdown'), false);
+    assert.strictEqual(hasSignals('in-scoping'), false);
+  });
 });
 
 // =============================================================================
@@ -199,7 +167,7 @@ describe('hasSignals', () => {
 
 describe('getSignal', () => {
   test('returns signal for valid type', () => {
-    const signal = getSignal('in-research');
+    const signal = getSignal(PREPARING_LABEL);
     assert.ok(signal !== null);
     assert.ok(signal.coreOutcome);
     assert.ok(signal.signals);
@@ -224,7 +192,7 @@ describe('assessCompletion', () => {
   };
 
   test('returns assessment object with complete and reason', () => {
-    const result = assessCompletion('in-research', mockContext);
+    const result = assessCompletion(PREPARING_LABEL, mockContext);
     assert.ok('complete' in result);
     assert.ok('reason' in result);
     assert.strictEqual(typeof result.complete, 'boolean');
@@ -238,7 +206,7 @@ describe('assessCompletion', () => {
   });
 
   test('returns result for valid type', () => {
-    const result = assessCompletion('in-research', mockContext);
+    const result = assessCompletion(PREPARING_LABEL, mockContext);
     assert.strictEqual(typeof result.complete, 'boolean');
     assert.ok(result.reason.length > 0);
   });
@@ -252,13 +220,13 @@ describe('getBlockers', () => {
   const mockContext = {};
 
   test('returns array for valid type', () => {
-    const blockers = getBlockers('in-research', mockContext);
+    const blockers = getBlockers(PREPARING_LABEL, mockContext);
     assert.ok(Array.isArray(blockers));
     assert.ok(blockers.length > 0);
   });
 
   test('blockers reference signal items', () => {
-    const blockers = getBlockers('in-research', mockContext);
+    const blockers = getBlockers(PREPARING_LABEL, mockContext);
     assert.ok(blockers.every(b => b.startsWith('Missing:')));
   });
 
@@ -275,7 +243,7 @@ describe('getBlockers', () => {
 
 describe('formatSignalsForPrompt', () => {
   test('returns formatted string for valid type', () => {
-    const formatted = formatSignalsForPrompt('in-research');
+    const formatted = formatSignalsForPrompt(PREPARING_LABEL);
     assert.ok(typeof formatted === 'string');
     assert.ok(formatted.includes('Core Outcome:'));
     assert.ok(formatted.includes('Signals'));
@@ -283,8 +251,8 @@ describe('formatSignalsForPrompt', () => {
   });
 
   test('includes all signal items as bullets', () => {
-    const formatted = formatSignalsForPrompt('in-research');
-    const signal = COMPLETION_SIGNALS['in-research'];
+    const formatted = formatSignalsForPrompt(PREPARING_LABEL);
+    const signal = COMPLETION_SIGNALS[PREPARING_LABEL];
     for (const s of signal.signals) {
       assert.ok(formatted.includes(s), `Should include signal: ${s}`);
     }
@@ -307,13 +275,9 @@ describe('formatAllSignalsForMetaPrompt', () => {
     assert.ok(formatted.length > 0);
   });
 
-  test('includes all 8 signal types', () => {
+  test('includes all 3 signal types', () => {
     const formatted = formatAllSignalsForMetaPrompt();
-    const types = [
-      'in-research', 'in-breakdown', 'in-scoping',
-      'in-design', 'in-spike', 'in-context',
-      'blocked', 'bug'
-    ];
+    const types = [PREPARING_LABEL, 'blocked', 'bug'];
     for (const type of types) {
       assert.ok(formatted.includes(type), `Should include ${type}`);
     }
@@ -327,7 +291,7 @@ describe('formatAllSignalsForMetaPrompt', () => {
 
   test('uses markdown headers for each type', () => {
     const formatted = formatAllSignalsForMetaPrompt();
-    assert.ok(formatted.includes('### in-research'));
+    assert.ok(formatted.includes(`### ${PREPARING_LABEL}`));
     assert.ok(formatted.includes('### blocked'));
   });
 });
@@ -337,16 +301,11 @@ describe('formatAllSignalsForMetaPrompt', () => {
 // =============================================================================
 
 describe('Integration', () => {
-  test('all prompt-templates types have corresponding signals', async () => {
+  test('work-issue labels have corresponding signals', async () => {
     const { PROMPT_TEMPLATES } = await import('../../lib/prompt-templates.js');
-
-    const preWorkTypes = [
-      'in-breakdown', 'in-research', 'in-scoping',
-      'in-design', 'in-spike', 'in-context'
-    ];
     const workIssueTypes = ['blocked', 'bug'];
 
-    for (const type of [...preWorkTypes, ...workIssueTypes]) {
+    for (const type of workIssueTypes) {
       assert.ok(hasSignals(type), `${type} should have signals defined`);
       const template = PROMPT_TEMPLATES[type];
       assert.ok(template, `${type} should have template defined`);
@@ -357,14 +316,9 @@ describe('Integration', () => {
     }
   });
 
-  test('template completionSignals match COMPLETION_SIGNALS', async () => {
+  test('template completionSignals match COMPLETION_SIGNALS for work issues', async () => {
     const { PROMPT_TEMPLATES } = await import('../../lib/prompt-templates.js');
-
-    const typesWithSignals = [
-      'in-breakdown', 'in-research', 'in-scoping',
-      'in-design', 'in-spike', 'in-context',
-      'blocked', 'bug'
-    ];
+    const typesWithSignals = ['blocked', 'bug'];
 
     for (const type of typesWithSignals) {
       const template = PROMPT_TEMPLATES[type];
@@ -377,14 +331,9 @@ describe('Integration', () => {
     }
   });
 
-  test('aiHint.readinessCheck matches signal readinessCheck', async () => {
+  test('aiHint.readinessCheck matches signal readinessCheck for work issues', async () => {
     const { PROMPT_TEMPLATES } = await import('../../lib/prompt-templates.js');
-
-    const typesWithSignals = [
-      'in-breakdown', 'in-research', 'in-scoping',
-      'in-design', 'in-spike', 'in-context',
-      'blocked', 'bug'
-    ];
+    const typesWithSignals = ['blocked', 'bug'];
 
     for (const type of typesWithSignals) {
       const template = PROMPT_TEMPLATES[type];

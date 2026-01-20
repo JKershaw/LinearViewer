@@ -83,49 +83,43 @@ Both In Progress and Projects sections use the same nested structure:
 - `.toggle` - expand/collapse arrow (▶/▼)
 - `.in-progress-header` - collapsible section header
 
-### Phase Labels (Workflow)
-Tasks move to "In Progress" when any work begins. Labels indicate the current phase:
+## Workflow Labels (Simplified 3-Label System)
 
-**Phase Labels (`in-X` pattern):**
-- `in-research` - Investigating unknowns, evaluating options
-- `in-breakdown` - Breaking task into subtasks (1-3 hour chunks)
-- `in-scoping` - Defining boundaries, success criteria, exclusions
-- `in-design` - Creating technical design with options analysis
-- `in-spike` - Timeboxed technical exploration
-- `in-context` - Generating context summary for handoffs
-- `in-implementation` - Active coding phase
-- `in-review` - Awaiting CI/CD and review
+Tasks use a simplified label system with just 3 labels:
 
-**Work Issue Labels:**
-- `blocked` - Analyze blockers and find resolution paths
-- `bug` - Investigate bug with reproduction steps and hypotheses
+**`preparing`** - Pre-implementation work in progress
+- Use when task needs research, breakdown, design, or other prep work
+- Tasks with this label are excluded from the "Ready" queue
+- Remove when preparation is complete and task is ready to implement
 
-All labels above have associated AI prompts that appear as clickable links in task metadata.
+**`blocked`** - Work stuck on external dependency
+- Use when work cannot continue due to dependency, decision, or missing info
+- Analyze blockers and find resolution paths
+- Remove when blocker is resolved
 
-### Label Lifecycle Model
+**`bug`** - Investigating unexpected behavior
+- Use when investigating unexpected behavior
+- Document reproduction steps and hypotheses
+- Remove when bug is fixed
 
-Labels indicate **current activity**, not future needs (e.g., `in-research` means "research is happening now").
+### Label Rules
 
-**Rules:**
-1. **One phase label at a time**: Remove current phase label before adding another
-2. **Status follows labels**: Adding any `in-X` label → set status to "In Progress"
-3. **Remove when done**: Phase labels are removed when their readiness check passes
-4. **Work issues coexist**: `blocked` and `bug` can exist alongside phase labels
+1. **`preparing` excludes from Ready**: Tasks with `preparing` label need more work before implementation
+2. **Work issues can coexist**: `blocked` and `bug` can exist alongside `preparing`
+3. **Remove when done**: Remove labels when their purpose is complete
 
-**Typical Flow:**
-1. Triage adds `in-breakdown` → task is being broken down
-2. Breakdown complete → remove `in-breakdown` (task returns to ready queue)
-3. Work begins → add `in-implementation`
-4. Code done → remove `in-implementation`, add `in-review`
-5. Merged → remove `in-review`, set status "Done"
+### Typical Flow
 
-**Readiness Checks** (when to remove label):
-- `in-breakdown`: "Could someone pick up any subtask and start working?"
-- `in-research`: "Could an implementor start work based on verified findings?"
-- `in-scoping`: "Would two people independently agree on what is included?"
-- `in-design`: "Could an implementor start building based on this design?"
-- `in-spike`: "Do we know enough to make a confident decision?"
-- `in-context`: "Could someone new pick this up and continue effectively?"
+1. New task arrives → add `preparing` if it needs research/breakdown
+2. Preparation complete → remove `preparing` (task enters Ready queue)
+3. Work begins → set status to "In Progress"
+4. If blocked → add `blocked` label
+5. If bug found → add `bug` label
+6. Work complete → set status to "Done"
+
+### Readiness Checks
+
+- `preparing`: "Could an implementor start work based on what is known?"
 - `blocked`: "Can work resume based on this analysis?"
 - `bug`: "Could someone implement a fix based on this?"
 
@@ -156,7 +150,7 @@ A "more" link appears after visible prompts; clicking reveals all remaining prom
 3. **Expand subtasks**: Click parent task or ▶ arrow to show child tasks (works in both sections)
 4. **Filter by team**: Use team selector in nav bar
 5. **Open in Linear**: Expand task details, click "View in Linear →"
-6. **Generate prompt for task**: Expand task with promptable label (e.g., `needs-breakdown`), click the label link, copy the generated prompt
+6. **Generate prompt for task**: Expand task with promptable label (e.g., `blocked`, `bug`), click the label link, copy the generated prompt
 
 ## Limitations
 
