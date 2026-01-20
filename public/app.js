@@ -218,12 +218,17 @@ function applyState(state) {
     hide(items)
   }
 
-  // Apply recent activity section collapsed state
-  if (state.recentActivityCollapsed) {
-    const header = document.querySelector('.recent-activity-header')
-    const items = document.querySelector('.recent-activity-items')
-    setArrow(header, false)
-    hide(items)
+  // Apply recent activity section collapsed state (always set explicitly since HTML starts collapsed)
+  const recentActivityHeader = document.querySelector('.recent-activity-header')
+  const recentActivityItems = document.querySelector('.recent-activity-items')
+  if (recentActivityHeader && recentActivityItems) {
+    if (state.recentActivityCollapsed) {
+      setArrow(recentActivityHeader, false)
+      hide(recentActivityItems)
+    } else {
+      setArrow(recentActivityHeader, true)
+      show(recentActivityItems)
+    }
   }
 
   // Expand nodes (shows both children AND details)
