@@ -262,6 +262,32 @@ h1 {
   font-family: var(--font-content);
 }
 
+/* Completion time shown in Recently Completed section */
+.completed-time {
+  color: var(--fg-dim);
+  margin-left: 1ch;
+  font-size: 0.9em;
+  font-family: var(--font-content);
+}
+
+/* =============================================================================
+   "Recently Completed" Section
+   =============================================================================
+   Displays recently completed issues across projects in a single collapsible list.
+   Green accent color matches Linear's "completed" state.
+*/
+.recent-activity-section {
+  margin-bottom: 2.5rem;
+}
+
+.recent-activity-header {
+  color: var(--green);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.5rem 0;
+  font-family: var(--font-content);
+}
+
 /* =============================================================================
    Project Sections
    =============================================================================
@@ -559,6 +585,10 @@ h1 {
     margin-bottom: 2rem;
   }
 
+  .recent-activity-section {
+    margin-bottom: 2rem;
+  }
+
   .project-header {
     padding: 0.4rem 0;
   }
@@ -610,6 +640,10 @@ h1 {
   }
 
   .in-progress-section {
+    margin-bottom: 1.5rem;
+  }
+
+  .recent-activity-section {
     margin-bottom: 1.5rem;
   }
 }

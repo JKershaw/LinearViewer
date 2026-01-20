@@ -15,7 +15,7 @@ import { MangoClient } from '@jkershaw/mangodb'
 import { MongoSessionStore } from './lib/session-store.js'
 import { UserPreferencesStore } from './lib/user-preferences.js'
 import { fetchProjects, fetchTeams, fetchIssueContext } from './lib/linear.js'
-import { buildForest, partitionCompleted, buildInProgressForest, NO_PROJECT_ID } from './lib/tree.js'
+import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID } from './lib/tree.js'
 import { renderPage, renderErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken } from './lib/token-refresh.js'
@@ -348,6 +348,9 @@ async function fetchAndPrepareProjects(accessToken, teamId = null) {
   // Build in-progress tree with ancestor chains for context
   const inProgressTrees = buildInProgressForest(issues, projects);
 
+  // Build recent activity tree (completed in last 7 days)
+  const recentActivityTrees = buildRecentActivityForest(issues, projects, 1);
+
   // Build tree structure for each project, separating complete from incomplete
   const trees = projects
     .sort((a, b) => a.sortOrder - b.sortOrder)
@@ -357,7 +360,7 @@ async function fetchAndPrepareProjects(accessToken, teamId = null) {
       return { project, incomplete, completed, completedCount };
     });
 
-  return { trees, inProgressTrees, organizationName, teams, selectedTeamId: teamId };
+  return { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId: teamId };
 }
 
 /**
@@ -382,7 +385,7 @@ async function handleWorkspaceRemoval(session, workspaceId, res) {
   return new Promise((resolve) => {
     session.destroy((err) => {
       if (err) console.error('Session destroy error:', err);
-      const html = renderPage(landingTrees, [], landingData.organizationName, { isLanding: true, deployInfo });
+      const html = renderPage(landingTrees, [], [], landingData.organizationName, { isLanding: true, deployInfo });
       res.send(html);
       resolve();
     });
@@ -408,8 +411,8 @@ async function handleTokenRefreshAndRetry(workspace, session, teamId, openRouter
   console.log('Token refreshed after 401, retrying request');
 
   const deployInfo = getDeployInfo()
-  const { trees, inProgressTrees, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace.accessToken, teamId);
-  const html = renderPage(trees, inProgressTrees, organizationName, {
+  const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace.accessToken, teamId);
+  const html = renderPage(trees, inProgressTrees, recentActivityTrees, organizationName, {
     teams,
     selectedTeamId,
     workspaces: session.workspaces,
@@ -461,7 +464,7 @@ app.get('/', (req, res) => {
   }
 
   // Unauthenticated users see the static landing page
-  const html = renderPage(landingTrees, [], landingData.organizationName, { isLanding: true, deployInfo })
+  const html = renderPage(landingTrees, [], [], landingData.organizationName, { isLanding: true, deployInfo })
   res.send(html)
 })
 
@@ -534,8 +537,8 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
   const openRouterSource = sessionApiKey ? 'oauth' : (process.env.OPENROUTER_API_KEY ? 'env' : null);
 
   try {
-    const { trees, inProgressTrees, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace.accessToken, teamId);
-    const html = renderPage(trees, inProgressTrees, organizationName, {
+    const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace.accessToken, teamId);
+    const html = renderPage(trees, inProgressTrees, recentActivityTrees, organizationName, {
       teams,
       selectedTeamId,
       workspaces: req.session.workspaces,

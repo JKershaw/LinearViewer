@@ -58,7 +58,8 @@ function getDefaultState() {
     expandedProjectMeta: [],
     hideCompleted: [],
     collapsedProjects: [],
-    inProgressCollapsed: false
+    inProgressCollapsed: false,
+    recentActivityCollapsed: true  // Start collapsed by default
   }
 }
 
@@ -201,6 +202,7 @@ function applyState(state) {
   state.expandedProjectMeta = state.expandedProjectMeta || []
   state.hideCompleted = state.hideCompleted || []
   state.inProgressCollapsed = state.inProgressCollapsed || false
+  state.recentActivityCollapsed = state.recentActivityCollapsed || false
 
   // Show expanded project meta
   state.expandedProjectMeta.forEach(projectId => {
@@ -212,6 +214,14 @@ function applyState(state) {
   if (state.inProgressCollapsed) {
     const header = document.querySelector('.in-progress-header')
     const items = document.querySelector('.in-progress-items')
+    setArrow(header, false)
+    hide(items)
+  }
+
+  // Apply recent activity section collapsed state
+  if (state.recentActivityCollapsed) {
+    const header = document.querySelector('.recent-activity-header')
+    const items = document.querySelector('.recent-activity-items')
     setArrow(header, false)
     hide(items)
   }
@@ -454,6 +464,17 @@ function init() {
       const items = document.querySelector('.in-progress-items')
       setHidden(items, state.inProgressCollapsed)
       setArrow(inProgressHeader, !state.inProgressCollapsed)
+      return
+    }
+
+    // 8. Recent activity header click
+    const recentActivityHeader = e.target.closest('.recent-activity-header')
+    if (recentActivityHeader) {
+      state.recentActivityCollapsed = !state.recentActivityCollapsed
+      persistState(state)
+      const items = document.querySelector('.recent-activity-items')
+      setHidden(items, state.recentActivityCollapsed)
+      setArrow(recentActivityHeader, !state.recentActivityCollapsed)
       return
     }
   })
