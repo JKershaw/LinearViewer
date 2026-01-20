@@ -198,15 +198,15 @@ test.describe('Audit API', () => {
     expect(report.health).toHaveProperty('orphans');
     expect(report.health).toHaveProperty('unlabeled');
 
-    // Verify prompts structure (simplified 6 templates)
+    // Verify prompts structure (14 templates: 6 original + 8 restored universal prompts)
     expect(report).toHaveProperty('prompts');
     expect(report.prompts).toHaveProperty('templates');
     expect(report.prompts).toHaveProperty('templateCount');
     expect(report.prompts).toHaveProperty('metaPrompt');
     expect(report.prompts).toHaveProperty('metaPromptCharCount');
     expect(report.prompts).toHaveProperty('totalCharCount');
-    expect(report.prompts.templateCount).toBe(6);
-    expect(report.prompts.templates).toHaveLength(6);
+    expect(report.prompts.templateCount).toBe(14);
+    expect(report.prompts.templates).toHaveLength(14);
 
     // Verify template structure
     const firstTemplate = report.prompts.templates[0];

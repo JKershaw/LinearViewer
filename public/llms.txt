@@ -129,6 +129,28 @@ Tasks use a simplified label system with just 3 labels:
 - `.prompt-text` - the prompt text (inside container)
 - `.prompt-copy` - copy button (inside container)
 
+### Available Prompt Templates (14 total)
+
+**Label-Based Prompts** (require specific label on issue):
+- `blocked` - Blocker Analysis: Analyze and resolve blockers
+- `bug` - Bug Investigation: Find root cause and potential fixes
+
+**State-Based Prompts** (available for Ready queue tasks):
+- `plan` - Implementation Plan: Step-by-step implementation with test coverage
+- `code-review` - Code Review: Review code for correctness, tests, and quality
+
+**Universal Prompts** (available for all issues):
+- `look-into` - Look Into: Quick overview and context for any task
+- `triage` - Task Triage: Review and update metadata (labels, priority)
+- `breakdown` - Task Breakdown: Break large tasks into actionable subtasks
+- `research` - Research Task: Investigate unknowns and gather information
+- `scoping` - Scope Definition: Define boundaries and success criteria
+- `design` - Technical Design: Evaluate approaches and recommend architecture
+- `spike` - Technical Spike: Time-boxed exploration for proof-of-concept
+- `context` - Context Summary: Synthesize current state when joining mid-task
+- `implementation` - Implementation Guide: Active coding phase guidance
+- `review` - Review Checklist: Verify implementation before merge
+
 ### More Prompts Inline
 Access additional prompt templates from any issue, regardless of its labels.
 A "more" link appears after visible prompts; clicking reveals all remaining prompts inline.

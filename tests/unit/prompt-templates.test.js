@@ -33,6 +33,14 @@ describe('hasPrompt', () => {
     assert.strictEqual(hasPrompt('code-review'), true);
     assert.strictEqual(hasPrompt('look-into'), true);
     assert.strictEqual(hasPrompt('triage'), true);
+    assert.strictEqual(hasPrompt('breakdown'), true);
+    assert.strictEqual(hasPrompt('research'), true);
+    assert.strictEqual(hasPrompt('scoping'), true);
+    assert.strictEqual(hasPrompt('design'), true);
+    assert.strictEqual(hasPrompt('spike'), true);
+    assert.strictEqual(hasPrompt('context'), true);
+    assert.strictEqual(hasPrompt('implementation'), true);
+    assert.strictEqual(hasPrompt('review'), true);
   });
 
   test('returns false for unknown labels', () => {
@@ -41,10 +49,15 @@ describe('hasPrompt', () => {
     assert.strictEqual(hasPrompt('documentation'), false);
   });
 
-  test('returns false for old phase labels (removed)', () => {
+  test('returns false for old in-X phase labels (removed format)', () => {
     assert.strictEqual(hasPrompt('in-breakdown'), false);
     assert.strictEqual(hasPrompt('in-research'), false);
     assert.strictEqual(hasPrompt('in-scoping'), false);
+    assert.strictEqual(hasPrompt('in-design'), false);
+    assert.strictEqual(hasPrompt('in-spike'), false);
+    assert.strictEqual(hasPrompt('in-context'), false);
+    assert.strictEqual(hasPrompt('in-implementation'), false);
+    assert.strictEqual(hasPrompt('in-review'), false);
   });
 
   test('returns false for empty string', () => {
@@ -75,11 +88,19 @@ describe('getPromptLabels', () => {
     assert.ok(labels.includes('code-review'));
     assert.ok(labels.includes('look-into'));
     assert.ok(labels.includes('triage'));
+    assert.ok(labels.includes('breakdown'));
+    assert.ok(labels.includes('research'));
+    assert.ok(labels.includes('scoping'));
+    assert.ok(labels.includes('design'));
+    assert.ok(labels.includes('spike'));
+    assert.ok(labels.includes('context'));
+    assert.ok(labels.includes('implementation'));
+    assert.ok(labels.includes('review'));
   });
 
-  test('has exactly 6 templates', () => {
+  test('has exactly 14 templates', () => {
     const labels = getPromptLabels();
-    assert.strictEqual(labels.length, 6);
+    assert.strictEqual(labels.length, 14);
   });
 });
 
@@ -244,7 +265,15 @@ describe('PROMPT_TEMPLATES', () => {
       'plan',
       'code-review',
       'look-into',
-      'triage'
+      'triage',
+      'breakdown',
+      'research',
+      'scoping',
+      'design',
+      'spike',
+      'context',
+      'implementation',
+      'review'
     ];
     for (const labelName of expectedTemplates) {
       assert.ok(PROMPT_TEMPLATES[labelName], `Template for ${labelName} should exist`);
@@ -259,8 +288,8 @@ describe('PROMPT_TEMPLATES', () => {
     assert.strictEqual(names.length, uniqueNames.size, 'All template names should be unique');
   });
 
-  test('old phase label templates are removed', () => {
-    const removedTemplates = [
+  test('old in-X label format templates do not exist (replaced by universal prompts)', () => {
+    const oldLabelFormat = [
       'in-breakdown',
       'in-research',
       'in-scoping',
@@ -270,8 +299,8 @@ describe('PROMPT_TEMPLATES', () => {
       'in-implementation',
       'in-review'
     ];
-    for (const labelName of removedTemplates) {
-      assert.ok(!PROMPT_TEMPLATES[labelName], `Template for ${labelName} should NOT exist`);
+    for (const labelName of oldLabelFormat) {
+      assert.ok(!PROMPT_TEMPLATES[labelName], `Old template for ${labelName} should NOT exist`);
     }
   });
 });
