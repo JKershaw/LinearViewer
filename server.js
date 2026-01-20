@@ -36,15 +36,13 @@ import { isRecommendationEnabled, getRecommendation, DEFAULT_MODEL, AVAILABLE_MO
 // Environment Variable Validation
 // =============================================================================
 // Validate required environment variables at startup to fail fast with clear errors
-const requiredEnvVars = ['SESSION_SECRET'];
 const oauthEnvVars = ['LINEAR_CLIENT_ID', 'LINEAR_CLIENT_SECRET', 'LINEAR_REDIRECT_URI'];
 
-// SESSION_SECRET is always required (even in test mode, sessions need a secret)
-for (const envVar of requiredEnvVars) {
-  if (!process.env[envVar]) {
-    console.error(`Error: Missing required environment variable: ${envVar}`);
-    process.exit(1);
-  }
+// SESSION_SECRET defaults for easy local development (override in production)
+const DEFAULT_SESSION_SECRET = 'dev-secret-change-in-production';
+if (!process.env.SESSION_SECRET) {
+  console.warn('Warning: SESSION_SECRET not set, using default (not secure for production)');
+  process.env.SESSION_SECRET = DEFAULT_SESSION_SECRET;
 }
 
 // OAuth vars only required in non-test mode (tests use mock auth)
