@@ -145,7 +145,7 @@ node lib/linear-cli.js <command> [args]
 | `teams` | List all teams |
 | `projects` | List active projects |
 | `issues [teamId]` | List all issues (optionally filter by team) |
-| `issue <id>` | Get issue details with full context |
+| `issue <id>` | Get issue details with full context (including comments) |
 | `search "query"` | Search issues |
 | `states <teamId>` | List workflow states for a team |
 | `relations <issueId>` | Get issue relations (blocks, blocked-by, etc.) |
