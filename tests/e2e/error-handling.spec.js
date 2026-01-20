@@ -1,32 +1,38 @@
 import { test, expect } from '@playwright/test';
 
+// Workspace URL key used in test session
+const TEST_WORKSPACE_URL_KEY = 'test-workspace';
+const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;
+
 test.describe('Input Validation', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/test/set-session');
   });
 
-  test('invalid workspace ID on switch returns 400', async ({ page }) => {
-    const response = await page.request.post('/workspace/invalid-id/switch');
+  test('invalid workspace urlKey on switch returns 400', async ({ page }) => {
+    // Special characters are not allowed in urlKey
+    const response = await page.request.post('/workspace/invalid@workspace!/switch');
     expect(response.status()).toBe(400);
     expect(await response.text()).toContain('Invalid workspace ID');
   });
 
-  test('invalid workspace ID on remove returns 400', async ({ page }) => {
-    const response = await page.request.post('/workspace/not-a-uuid/remove');
+  test('invalid workspace urlKey on remove returns 400', async ({ page }) => {
+    // urlKey too long (over 50 chars) is invalid
+    const response = await page.request.post('/workspace/' + 'a'.repeat(51) + '/remove');
     expect(response.status()).toBe(400);
     expect(await response.text()).toContain('Invalid workspace ID');
   });
 
-  test('non-existent workspace ID on switch returns 404', async ({ page }) => {
-    // Valid UUID format but not in session
-    const response = await page.request.post('/workspace/12345678-1234-1234-1234-123456789abc/switch');
+  test('non-existent workspace urlKey on switch returns 404', async ({ page }) => {
+    // Valid urlKey format but not in session
+    const response = await page.request.post('/workspace/nonexistent-workspace/switch');
     expect(response.status()).toBe(404);
     expect(await response.text()).toContain('Workspace not found');
   });
 
   test('invalid team filter is ignored', async ({ page }) => {
     // Invalid team ID should be ignored (not cause error)
-    await page.goto('/?team=invalid-team-id');
+    await page.goto(`${WORKSPACE_URL}?team=invalid-team-id`);
 
     // Page should still load normally
     await expect(page.locator('.nav-bar')).toBeVisible();
@@ -38,7 +44,7 @@ test.describe('Session State', () => {
   test('cleared session shows landing page', async ({ page }) => {
     // First authenticate
     await page.goto('/test/set-session');
-    await page.goto('/');
+    await page.goto(WORKSPACE_URL);
     await expect(page.locator('.nav-bar')).toBeVisible();
 
     // Clear session
@@ -51,7 +57,7 @@ test.describe('Session State', () => {
 
   test('session persists across page reloads', async ({ page }) => {
     await page.goto('/test/set-session');
-    await page.goto('/');
+    await page.goto(WORKSPACE_URL);
     await expect(page.locator('.nav-bar')).toBeVisible();
 
     // Reload the page
@@ -69,7 +75,7 @@ test.describe('Team Filtering', () => {
   });
 
   test('team selector shows all teams', async ({ page }) => {
-    await page.goto('/');
+    await page.goto(WORKSPACE_URL);
 
     const teamToggle = page.locator('#team-toggle');
     await expect(teamToggle).toBeVisible();
@@ -88,7 +94,7 @@ test.describe('Team Filtering', () => {
 
   test('selecting "all" removes team filter', async ({ page }) => {
     // Start with Engineering team filter (UUID format)
-    await page.goto('/?team=eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee');
+    await page.goto(`${WORKSPACE_URL}?team=eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee`);
 
     await page.locator('#team-toggle').click();
     await page.locator('#team-options .nav-option[data-team="all"]').click();
@@ -100,7 +106,7 @@ test.describe('Team Filtering', () => {
 
   test('team filter shows only issues from selected team', async ({ page }) => {
     // Filter to Engineering team - should show Project Alpha issues only
-    await page.goto('/?team=eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee');
+    await page.goto(`${WORKSPACE_URL}?team=eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee`);
 
     // Team toggle should show Engineering
     await expect(page.locator('#team-toggle')).toHaveText('Engineering');

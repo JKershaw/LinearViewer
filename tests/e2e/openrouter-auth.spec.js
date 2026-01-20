@@ -1,5 +1,10 @@
 import { test, expect } from '@playwright/test';
 
+// Workspace URL key used in test session
+const TEST_WORKSPACE_URL_KEY = 'test-workspace';
+const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;
+const SETTINGS_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/settings`;
+
 /**
  * Helper to set up a test session with proper waiting.
  * Ensures session is fully established before continuing.
@@ -45,7 +50,7 @@ test.describe('OpenRouter OAuth Flow', () => {
   test('settings page shows OpenRouter not connected by default', async ({ page }) => {
     // Set up authenticated session without OpenRouter
     await setupSession(page);
-    await page.goto('/settings');
+    await page.goto(SETTINGS_URL);
 
     // Should see settings section
     await expect(page.locator('.settings-section')).toBeVisible();
@@ -64,7 +69,7 @@ test.describe('OpenRouter OAuth Flow', () => {
   test('settings page shows OpenRouter connected when OAuth token is present', async ({ page }) => {
     // Set up authenticated session with OpenRouter connected
     await setupSession(page, { openRouterConnected: true });
-    await page.goto('/settings');
+    await page.goto(SETTINGS_URL);
 
     // Should see settings section
     await expect(page.locator('.settings-section')).toBeVisible();
@@ -83,7 +88,7 @@ test.describe('OpenRouter OAuth Flow', () => {
   test('disconnect button removes OpenRouter connection', async ({ page }) => {
     // Set up authenticated session with OpenRouter connected
     await setupSession(page, { openRouterConnected: true });
-    await page.goto('/settings');
+    await page.goto(SETTINGS_URL);
 
     // Verify connected state
     await expect(page.locator('.settings-value.connected')).toBeVisible();
@@ -94,7 +99,7 @@ test.describe('OpenRouter OAuth Flow', () => {
     await disconnectBtn.click();
 
     // Wait for page to reload and verify disconnected state
-    await expect(page).toHaveURL('/settings');
+    await expect(page).toHaveURL(SETTINGS_URL);
     await expect(page.locator('.settings-value.disconnected')).toBeVisible();
     await expect(page.locator('.settings-action.connect')).toBeVisible();
   });
@@ -104,7 +109,7 @@ test.describe('OpenRouter OAuth Flow', () => {
     await setupSession(page);
 
     // Check recommendation status - should be enabled (test mode always enabled)
-    const response = await page.request.get('/api/recommend/status');
+    const response = await page.request.get(`/workspace/${TEST_WORKSPACE_URL_KEY}/api/recommend/status`);
     expect(response.ok()).toBeTruthy();
     const data = await response.json();
 
@@ -117,7 +122,7 @@ test.describe('OpenRouter OAuth Flow', () => {
     await setupSession(page, { openRouterConnected: true });
 
     // Check recommendation status
-    const response = await page.request.get('/api/recommend/status');
+    const response = await page.request.get(`/workspace/${TEST_WORKSPACE_URL_KEY}/api/recommend/status`);
     expect(response.ok()).toBeTruthy();
     const data = await response.json();
 
@@ -128,7 +133,7 @@ test.describe('OpenRouter OAuth Flow', () => {
   test('main page nav shows ai status indicator when not connected', async ({ page }) => {
     // Set up authenticated session without OpenRouter
     await setupSession(page);
-    await page.goto('/');
+    await page.goto(WORKSPACE_URL);
 
     // Should show ai indicator in nav
     const aiNav = page.locator('[data-selector="openrouter"]');
@@ -144,7 +149,7 @@ test.describe('OpenRouter OAuth Flow', () => {
   test('main page nav shows ai status indicator when connected', async ({ page }) => {
     // Set up authenticated session with OpenRouter connected
     await setupSession(page, { openRouterConnected: true });
-    await page.goto('/');
+    await page.goto(WORKSPACE_URL);
 
     // Should show ai indicator in nav
     const aiNav = page.locator('[data-selector="openrouter"]');
@@ -160,7 +165,7 @@ test.describe('OpenRouter OAuth Flow', () => {
   test('ai status links to settings page', async ({ page }) => {
     // Set up authenticated session
     await setupSession(page);
-    await page.goto('/');
+    await page.goto(WORKSPACE_URL);
 
     // Click the ai status link
     const statusLink = page.locator('.nav-openrouter-status');
@@ -168,7 +173,7 @@ test.describe('OpenRouter OAuth Flow', () => {
     await statusLink.click();
 
     // Should navigate to settings page
-    await expect(page).toHaveURL('/settings');
+    await expect(page).toHaveURL(SETTINGS_URL);
   });
 });
 

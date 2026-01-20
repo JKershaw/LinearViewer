@@ -84,7 +84,9 @@ async function runAudit() {
   auditError.classList.add('hidden');
 
   try {
-    const response = await fetch('/api/audit');
+    // Get the API URL from the page's data attribute (workspace-prefixed)
+    const auditUrl = document.body.dataset.apiAuditUrl || '/api/audit';
+    const response = await fetch(auditUrl);
 
     if (!response.ok) {
       if (response.status === 401) {

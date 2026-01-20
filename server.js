@@ -16,10 +16,10 @@ import { MongoSessionStore } from './lib/session-store.js'
 import { UserPreferencesStore } from './lib/user-preferences.js'
 import { fetchProjects, fetchTeams, fetchIssueContext } from './lib/linear.js'
 import { buildForest, partitionCompleted, buildInProgressForest, NO_PROJECT_ID } from './lib/tree.js'
-import { renderPage, renderErrorPage } from './lib/render.js'
+import { renderPage, renderErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken } from './lib/token-refresh.js'
-import { UUID_REGEX, getActiveWorkspace, removeWorkspace, saveSession, updateWorkspaceTokens } from './lib/workspace.js'
+import { UUID_REGEX, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, updateWorkspaceTokens } from './lib/workspace.js'
 import { createAuthRoutes } from './routes/auth.js'
 import { createWorkspaceRoutes } from './routes/workspace.js'
 import { createOpenRouterAuthRoutes } from './routes/openrouter-auth.js'
@@ -283,9 +283,10 @@ async function ensureValidToken(req, res, next) {
   }
 }
 
-// Apply middleware to all routes except auth, logout, and workspace routes
+// Apply middleware to all routes except auth and logout
+// Note: workspace routes need token refresh too (they access Linear API)
 app.use((req, res, next) => {
-  if (req.path.startsWith('/auth/') || req.path === '/logout' || req.path.startsWith('/workspace/')) {
+  if (req.path.startsWith('/auth/') || req.path === '/logout') {
     return next();
   }
   ensureValidToken(req, res, next);
@@ -445,25 +446,84 @@ async function handleUnauthorizedError(workspace, session, teamId, openRouterSou
 }
 
 /**
- * Home page - renders either landing page or authenticated project view.
+ * Home page - renders landing page or redirects to workspace.
  *
  * For unauthenticated users: Shows pre-rendered static landing page.
- * For authenticated users: Fetches projects/issues from Linear API and renders
- * the interactive tree view with "In Progress" section.
+ * For authenticated users: Redirects to active workspace URL.
+ */
+app.get('/', (req, res) => {
+  const workspace = getActiveWorkspace(req.session)
+  const deployInfo = getDeployInfo()
+
+  // Authenticated users redirect to their workspace
+  if (workspace) {
+    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/`)
+  }
+
+  // Unauthenticated users see the static landing page
+  const html = renderPage(landingTrees, [], landingData.organizationName, { isLanding: true, deployInfo })
+  res.send(html)
+})
+
+// =============================================================================
+// Workspace-Prefixed Routes
+// =============================================================================
+
+/**
+ * Middleware to extract and validate workspace from URL.
+ * Sets req.workspace for use by route handlers.
+ */
+function workspaceFromUrl(req, res, next) {
+  try {
+    const { urlKey } = req.params
+
+    // Validate urlKey format FIRST (before any other checks)
+    // This prevents information disclosure about auth state for invalid URLs
+    if (!validateWorkspaceUrlKey(urlKey)) {
+      // For API routes, return JSON error
+      if (req.path.includes('/api/')) {
+        return res.status(400).json({ error: 'Invalid workspace URL' })
+      }
+      // For page routes, show error page (urlKey is sanitized by validation failure)
+      return res.status(404).send(renderWorkspaceNotFoundPage('invalid', []))
+    }
+
+    // Check if user is authenticated (has any workspaces)
+    if (!req.session.workspaces || req.session.workspaces.length === 0) {
+      // For API routes, return JSON error
+      if (req.path.includes('/api/')) {
+        return res.status(401).json({ error: 'Not authenticated' })
+      }
+      // For page routes, redirect to login
+      return res.redirect('/')
+    }
+
+    // Find workspace in session
+    const workspace = getWorkspaceByUrlKey(req.session, urlKey)
+    if (!workspace) {
+      return res.status(404).send(renderWorkspaceNotFoundPage(urlKey, req.session.workspaces || []))
+    }
+
+    req.workspace = workspace
+    next()
+  } catch (error) {
+    console.error('Error in workspaceFromUrl middleware:', error)
+    if (req.path.includes('/api/')) {
+      return res.status(500).json({ error: 'Internal server error' })
+    }
+    return res.status(500).send(renderErrorPage('Error', 'An unexpected error occurred'))
+  }
+}
+
+/**
+ * Workspace project view - renders the interactive tree view.
  *
  * Query parameters:
  * - team: Optional team ID to filter issues by (or 'all' for all teams)
  */
-app.get('/', async (req, res) => {
-  // Get active workspace (null if not authenticated)
-  const workspace = getActiveWorkspace(req.session)
+app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
+  const workspace = req.workspace
   const deployInfo = getDeployInfo()
-
-  // Unauthenticated users see the static landing page
-  if (!workspace) {
-    const html = renderPage(landingTrees, [], landingData.organizationName, { isLanding: true, deployInfo })
-    return res.send(html)
-  }
 
   // Parse and validate team filter from query string (must be valid UUID)
   const rawTeam = req.query.team;
@@ -481,7 +541,8 @@ app.get('/', async (req, res) => {
       workspaces: req.session.workspaces,
       activeWorkspaceId: req.session.activeWorkspaceId,
       openRouterSource,
-      deployInfo
+      deployInfo,
+      urlKey: workspace.urlKey
     });
     res.send(html);
   } catch (error) {
@@ -496,32 +557,27 @@ app.get('/', async (req, res) => {
     console.error('Main route error:', error);
     const html = renderErrorPage('Something Went Wrong', 'Could not load your projects. Please try again or re-authenticate.', {
       action: 'Try again',
-      actionUrl: '/'
+      actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/`
     });
     res.status(500).send(html);
   }
 })
 
 // =============================================================================
-// Operator Dashboard Routes
+// Workspace-Prefixed Dashboard Routes
 // =============================================================================
 
 /**
  * Operator Dashboard page - requires authentication.
  * Displays workspace audit and health check functionality.
  */
-app.get('/fancy', (req, res) => {
-  const workspace = getActiveWorkspace(req.session);
-
-  // Redirect to home if not authenticated
-  if (!workspace) {
-    return res.redirect('/');
-  }
-
+app.get('/workspace/:urlKey/fancy', workspaceFromUrl, (req, res) => {
+  const workspace = req.workspace;
   const deployInfo = getDeployInfo();
 
   const html = renderFancyPage(workspace.name || 'Workspace', {
-    deployInfo
+    deployInfo,
+    urlKey: workspace.urlKey
   });
   res.send(html);
 });
@@ -530,13 +586,8 @@ app.get('/fancy', (req, res) => {
  * Settings page - requires authentication.
  * Displays user preferences and AI configuration.
  */
-app.get('/settings', (req, res) => {
-  const workspace = getActiveWorkspace(req.session);
-
-  // Redirect to home if not authenticated
-  if (!workspace) {
-    return res.redirect('/');
-  }
+app.get('/workspace/:urlKey/settings', workspaceFromUrl, (req, res) => {
+  const workspace = req.workspace;
 
   // Determine OpenRouter connection status
   const sessionApiKey = req.session.openRouterApiKey;
@@ -556,7 +607,8 @@ app.get('/settings', (req, res) => {
     deployInfo,
     currentModel,
     availableModels: AVAILABLE_MODELS,
-    modelError
+    modelError,
+    urlKey: workspace.urlKey
   });
   res.send(html);
 });
@@ -565,18 +617,13 @@ app.get('/settings', (req, res) => {
  * Prompts page - requires authentication.
  * Displays all prompt templates organized by category.
  */
-app.get('/prompts', (req, res) => {
-  const workspace = getActiveWorkspace(req.session);
-
-  // Redirect to home if not authenticated
-  if (!workspace) {
-    return res.redirect('/');
-  }
-
+app.get('/workspace/:urlKey/prompts', workspaceFromUrl, (req, res) => {
+  const workspace = req.workspace;
   const deployInfo = getDeployInfo();
 
   const html = renderPromptsPage(workspace.name || 'Workspace', {
-    deployInfo
+    deployInfo,
+    urlKey: workspace.urlKey
   });
   res.send(html);
 });
@@ -585,12 +632,8 @@ app.get('/prompts', (req, res) => {
  * Save model selection to session.
  * Accepts either a preset model ID or a custom model ID.
  */
-app.post('/settings/model', async (req, res) => {
-  const workspace = getActiveWorkspace(req.session);
-
-  if (!workspace) {
-    return res.redirect('/');
-  }
+app.post('/workspace/:urlKey/settings/model', workspaceFromUrl, async (req, res) => {
+  const workspace = req.workspace;
 
   const { modelId, customModelId } = req.body;
 
@@ -604,20 +647,20 @@ app.post('/settings/model', async (req, res) => {
 
   // Validate and provide feedback on failure
   if (!selectedModel) {
-    return res.redirect('/settings?error=empty');
+    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings?error=empty`);
   }
 
   if (selectedModel.length > 100) {
-    return res.redirect('/settings?error=too-long');
+    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings?error=too-long`);
   }
 
   // Reject path traversal sequences
   if (selectedModel.includes('..')) {
-    return res.redirect('/settings?error=invalid-format');
+    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings?error=invalid-format`);
   }
 
   if (!modelIdRegex.test(selectedModel)) {
-    return res.redirect('/settings?error=invalid-format');
+    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings?error=invalid-format`);
   }
 
   // Validation passed - save the model
@@ -644,20 +687,15 @@ app.post('/settings/model', async (req, res) => {
     }
   }
 
-  res.redirect('/settings');
+  res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
 });
 
 /**
  * Audit API endpoint - runs a workspace audit and returns JSON.
  * Requires authentication.
  */
-app.get('/api/audit', async (req, res) => {
-  const workspace = getActiveWorkspace(req.session);
-
-  // Return 401 if not authenticated
-  if (!workspace) {
-    return res.status(401).json({ error: 'Not authenticated' });
-  }
+app.get('/workspace/:urlKey/api/audit', workspaceFromUrl, async (req, res) => {
+  const workspace = req.workspace;
 
   try {
     // Use mock audit data in test mode
@@ -699,25 +737,20 @@ app.get('/api/audit', async (req, res) => {
 });
 
 // =============================================================================
-// Prompt Generation API
+// Workspace-Prefixed Prompt Generation API
 // =============================================================================
 
 /**
  * Generate a prompt for a specific issue and label.
  * Returns a prompt that can be copied and used with Claude Code + Linear MCP.
  *
- * @route GET /api/prompt/:issueId/:labelName
+ * @route GET /workspace/:urlKey/api/prompt/:issueId/:labelName
  * @param {string} issueId - The Linear issue ID
  * @param {string} labelName - The label name (must have a prompt template)
  * @returns {Object} { label, promptName, prompt } or error
  */
-app.get('/api/prompt/:issueId/:labelName', async (req, res) => {
-  const workspace = getActiveWorkspace(req.session)
-
-  // Return 401 if not authenticated
-  if (!workspace) {
-    return res.status(401).json({ error: 'Not authenticated' })
-  }
+app.get('/workspace/:urlKey/api/prompt/:issueId/:labelName', workspaceFromUrl, async (req, res) => {
+  const workspace = req.workspace
 
   const { issueId, labelName } = req.params
 
@@ -832,22 +865,18 @@ app.get('/api/prompt/:issueId/:labelName', async (req, res) => {
 })
 
 // =============================================================================
-// AI Recommendation API
+// Workspace-Prefixed AI Recommendation API
 // =============================================================================
 
 /**
  * Check if recommendation feature is available.
  * Returns feature availability status.
  *
- * @route GET /api/recommend/status
+ * @route GET /workspace/:urlKey/api/recommend/status
  * @returns {Object} { enabled: boolean }
  */
-app.get('/api/recommend/status', (req, res) => {
-  const workspace = getActiveWorkspace(req.session)
-
-  if (!workspace) {
-    return res.status(401).json({ error: 'Not authenticated' })
-  }
+app.get('/workspace/:urlKey/api/recommend/status', workspaceFromUrl, (req, res) => {
+  const workspace = req.workspace
 
   // In test mode, always report as enabled for testing
   const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token'
@@ -863,17 +892,12 @@ app.get('/api/recommend/status', (req, res) => {
  * Get AI-generated prompt for a task.
  * Analyzes task context and generates a tailored prompt.
  *
- * @route GET /api/recommend/:issueId
+ * @route GET /workspace/:urlKey/api/recommend/:issueId
  * @param {string} issueId - The Linear issue ID
  * @returns {Object} { reasoning, prompt } or error
  */
-app.get('/api/recommend/:issueId', async (req, res) => {
-  const workspace = getActiveWorkspace(req.session)
-
-  // Return 401 if not authenticated
-  if (!workspace) {
-    return res.status(401).json({ error: 'Not authenticated' })
-  }
+app.get('/workspace/:urlKey/api/recommend/:issueId', workspaceFromUrl, async (req, res) => {
+  const workspace = req.workspace
 
   const { issueId } = req.params
 
@@ -976,6 +1000,71 @@ ${goal}`
 
     res.status(500).json({ error: 'Failed to get recommendation', message: error.message })
   }
+})
+
+// =============================================================================
+// Legacy Route Redirects (backward compatibility)
+// =============================================================================
+
+/**
+ * Helper to create redirect functions for legacy routes.
+ */
+function redirectToWorkspace(page) {
+  return (req, res) => {
+    const workspace = getActiveWorkspace(req.session)
+    if (workspace) {
+      return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/${page}`)
+    }
+    res.redirect('/')
+  }
+}
+
+// Legacy page routes - redirect to workspace-prefixed versions
+app.get('/fancy', redirectToWorkspace('fancy'))
+app.get('/settings', redirectToWorkspace('settings'))
+app.get('/prompts', redirectToWorkspace('prompts'))
+
+// Legacy POST route for settings model
+app.post('/settings/model', (req, res) => {
+  const workspace = getActiveWorkspace(req.session)
+  if (workspace) {
+    // Re-submit to the workspace-prefixed route (redirect loses POST data, so we'll handle directly)
+    return res.redirect(307, `/workspace/${encodeURIComponent(workspace.urlKey)}/settings/model`)
+  }
+  res.redirect('/')
+})
+
+// Legacy API routes - redirect to workspace-prefixed versions
+app.get('/api/audit', (req, res) => {
+  const workspace = getActiveWorkspace(req.session)
+  if (workspace) {
+    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/api/audit`)
+  }
+  res.status(401).json({ error: 'Not authenticated' })
+})
+
+app.get('/api/prompt/:issueId/:labelName', (req, res) => {
+  const workspace = getActiveWorkspace(req.session)
+  if (workspace) {
+    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/api/prompt/${req.params.issueId}/${encodeURIComponent(req.params.labelName)}`)
+  }
+  res.status(401).json({ error: 'Not authenticated' })
+})
+
+app.get('/api/recommend/status', (req, res) => {
+  const workspace = getActiveWorkspace(req.session)
+  if (workspace) {
+    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/api/recommend/status`)
+  }
+  res.status(401).json({ error: 'Not authenticated' })
+})
+
+app.get('/api/recommend/:issueId', (req, res) => {
+  const workspace = getActiveWorkspace(req.session)
+  if (workspace) {
+    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/api/recommend/${req.params.issueId}`)
+  }
+  res.status(401).json({ error: 'Not authenticated' })
 })
 
 // =============================================================================

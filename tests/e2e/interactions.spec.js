@@ -1,5 +1,9 @@
 import { test, expect } from '@playwright/test';
 
+// Workspace URL key used in test session
+const TEST_WORKSPACE_URL_KEY = 'test-workspace';
+const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;
+
 test.describe('Interactive Features', () => {
   test.beforeEach(async ({ page }) => {
     // Set up test session first
@@ -8,8 +12,8 @@ test.describe('Interactive Features', () => {
     // Clear localStorage once (after navigation so we have a page context)
     await page.evaluate(() => localStorage.clear());
 
-    // Navigate to main page
-    await page.goto('/');
+    // Navigate to workspace page
+    await page.goto(WORKSPACE_URL);
   });
 
   test('expands issue details on click', async ({ page }) => {

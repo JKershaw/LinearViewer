@@ -1,12 +1,18 @@
 import { test, expect } from '@playwright/test';
 
+// Workspace URL key used in test session
+const TEST_WORKSPACE_URL_KEY = 'test-workspace';
+const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;
+const FANCY_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/fancy`;
+const API_PREFIX = `/workspace/${TEST_WORKSPACE_URL_KEY}`;
+
 test.describe('Operator Dashboard', () => {
   test.describe('Unauthenticated', () => {
     test('redirects to home when not authenticated', async ({ page }) => {
       // Clear any existing session
       await page.goto('/test/clear-session');
 
-      // Try to access /fancy
+      // Try to access /fancy (legacy route redirects to home for unauthenticated)
       await page.goto('/fancy');
 
       // Should redirect to home
@@ -21,7 +27,7 @@ test.describe('Operator Dashboard', () => {
     });
 
     test('renders dashboard page', async ({ page }) => {
-      await page.goto('/fancy');
+      await page.goto(FANCY_URL);
 
       // Should show dashboard header
       await expect(page.locator('h1')).toContainText('Operator Dashboard');
@@ -35,23 +41,23 @@ test.describe('Operator Dashboard', () => {
     });
 
     test('shows workspace name in navigation', async ({ page }) => {
-      await page.goto('/fancy');
+      await page.goto(FANCY_URL);
 
       // Should show workspace name in nav
       await expect(page.locator('.nav-value-static')).toBeVisible();
     });
 
     test('has back link to projects', async ({ page }) => {
-      await page.goto('/fancy');
+      await page.goto(FANCY_URL);
 
-      // Should have link back to projects
-      const projectsLink = page.locator('.nav-action[href="/"]');
+      // Should have link back to workspace projects page
+      const projectsLink = page.locator(`.nav-action[href="${WORKSPACE_URL}"]`);
       await expect(projectsLink).toBeVisible();
       await expect(projectsLink).toContainText('projects');
     });
 
     test('has logout link', async ({ page }) => {
-      await page.goto('/fancy');
+      await page.goto(FANCY_URL);
 
       const logoutLink = page.locator('.nav-action[href="/logout"]');
       await expect(logoutLink).toBeVisible();
@@ -59,7 +65,7 @@ test.describe('Operator Dashboard', () => {
     });
 
     test('runs audit and displays report', async ({ page }) => {
-      await page.goto('/fancy');
+      await page.goto(FANCY_URL);
 
       // Click Run Audit button
       await page.locator('#run-audit').click();
@@ -80,7 +86,7 @@ test.describe('Operator Dashboard', () => {
     });
 
     test('displays queue readiness section', async ({ page }) => {
-      await page.goto('/fancy');
+      await page.goto(FANCY_URL);
 
       // Run audit
       await page.locator('#run-audit').click();
@@ -95,7 +101,7 @@ test.describe('Operator Dashboard', () => {
     });
 
     test('sections are collapsible', async ({ page }) => {
-      await page.goto('/fancy');
+      await page.goto(FANCY_URL);
 
       // Run audit
       await page.locator('#run-audit').click();
@@ -119,7 +125,7 @@ test.describe('Operator Dashboard', () => {
     });
 
     test('shows completion status after audit', async ({ page }) => {
-      await page.goto('/fancy');
+      await page.goto(FANCY_URL);
 
       // Run audit
       await page.locator('#run-audit').click();
@@ -134,7 +140,7 @@ test.describe('Operator Dashboard', () => {
 test.describe('Audit API', () => {
   test('returns 401 when not authenticated', async ({ request }) => {
     // Try to call API without session
-    const response = await request.get('/api/audit');
+    const response = await request.get(`${API_PREFIX}/api/audit`);
     expect(response.status()).toBe(401);
 
     const data = await response.json();
@@ -150,7 +156,7 @@ test.describe('Audit API', () => {
     const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
 
     // Call API with session cookie
-    const response = await request.get('/api/audit', {
+    const response = await request.get(`${API_PREFIX}/api/audit`, {
       headers: {
         Cookie: cookieHeader
       }

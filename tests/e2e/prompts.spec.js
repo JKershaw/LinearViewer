@@ -7,11 +7,16 @@ const BUG_ISSUE_ID = 'dddddddd-dddd-dddd-dddd-ddddddddddde';
 const PLAN_ISSUE_ID = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeef';
 const CODE_REVIEW_ISSUE_ID = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
 
+// Workspace URL key used in test session
+const TEST_WORKSPACE_URL_KEY = 'test-workspace';
+const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;
+const API_PREFIX = `/workspace/${TEST_WORKSPACE_URL_KEY}`;
+
 test.describe('Promptable Labels', () => {
   test.beforeEach(async ({ page }) => {
     // Set up test session
     await page.goto('/test/set-session');
-    await page.goto('/');
+    await page.goto(WORKSPACE_URL);
     await page.waitForLoadState('networkidle');
   });
 
@@ -173,7 +178,7 @@ test.describe('Prompt API', () => {
     await page.goto('/test/clear-session');
 
     // Try to fetch prompt (use valid UUID format)
-    const response = await page.request.get(`/api/prompt/${BLOCKED_ISSUE_ID}/blocked`);
+    const response = await page.request.get(`${API_PREFIX}/api/prompt/${BLOCKED_ISSUE_ID}/blocked`);
     expect(response.status()).toBe(401);
 
     const body = await response.json();
@@ -182,7 +187,7 @@ test.describe('Prompt API', () => {
 
   test('returns 404 for unknown label', async ({ page }) => {
     // Use valid UUID format so we get to the label check
-    const response = await page.request.get(`/api/prompt/${BLOCKED_ISSUE_ID}/unknown-label`);
+    const response = await page.request.get(`${API_PREFIX}/api/prompt/${BLOCKED_ISSUE_ID}/unknown-label`);
     expect(response.status()).toBe(404);
 
     const body = await response.json();
@@ -190,7 +195,7 @@ test.describe('Prompt API', () => {
   });
 
   test('returns 400 for invalid issue ID format', async ({ page }) => {
-    const response = await page.request.get('/api/prompt/invalid-id/blocked');
+    const response = await page.request.get(`${API_PREFIX}/api/prompt/invalid-id/blocked`);
     expect(response.status()).toBe(400);
 
     const body = await response.json();
@@ -199,12 +204,12 @@ test.describe('Prompt API', () => {
 
   test('returns 404 for removed phase labels', async ({ page }) => {
     // Old phase labels should no longer have templates
-    const response = await page.request.get(`/api/prompt/${BLOCKED_ISSUE_ID}/in-breakdown`);
+    const response = await page.request.get(`${API_PREFIX}/api/prompt/${BLOCKED_ISSUE_ID}/in-breakdown`);
     expect(response.status()).toBe(404);
   });
 
   test('returns blocked prompt', async ({ page }) => {
-    const response = await page.request.get(`/api/prompt/${BLOCKED_ISSUE_ID}/blocked`);
+    const response = await page.request.get(`${API_PREFIX}/api/prompt/${BLOCKED_ISSUE_ID}/blocked`);
     expect(response.status()).toBe(200);
 
     const body = await response.json();
@@ -215,7 +220,7 @@ test.describe('Prompt API', () => {
   });
 
   test('returns bug prompt', async ({ page }) => {
-    const response = await page.request.get(`/api/prompt/${BUG_ISSUE_ID}/bug`);
+    const response = await page.request.get(`${API_PREFIX}/api/prompt/${BUG_ISSUE_ID}/bug`);
     expect(response.status()).toBe(200);
 
     const body = await response.json();
@@ -226,7 +231,7 @@ test.describe('Prompt API', () => {
   });
 
   test('returns plan prompt', async ({ page }) => {
-    const response = await page.request.get(`/api/prompt/${PLAN_ISSUE_ID}/plan`);
+    const response = await page.request.get(`${API_PREFIX}/api/prompt/${PLAN_ISSUE_ID}/plan`);
     expect(response.status()).toBe(200);
 
     const body = await response.json();
@@ -237,7 +242,7 @@ test.describe('Prompt API', () => {
   });
 
   test('returns code-review prompt', async ({ page }) => {
-    const response = await page.request.get(`/api/prompt/${CODE_REVIEW_ISSUE_ID}/code-review`);
+    const response = await page.request.get(`${API_PREFIX}/api/prompt/${CODE_REVIEW_ISSUE_ID}/code-review`);
     expect(response.status()).toBe(200);
 
     const body = await response.json();
@@ -248,7 +253,7 @@ test.describe('Prompt API', () => {
   });
 
   test('returns look-into prompt', async ({ page }) => {
-    const response = await page.request.get(`/api/prompt/${BLOCKED_ISSUE_ID}/look-into`);
+    const response = await page.request.get(`${API_PREFIX}/api/prompt/${BLOCKED_ISSUE_ID}/look-into`);
     expect(response.status()).toBe(200);
 
     const body = await response.json();
@@ -258,7 +263,7 @@ test.describe('Prompt API', () => {
   });
 
   test('returns triage prompt', async ({ page }) => {
-    const response = await page.request.get(`/api/prompt/${BLOCKED_ISSUE_ID}/triage`);
+    const response = await page.request.get(`${API_PREFIX}/api/prompt/${BLOCKED_ISSUE_ID}/triage`);
     expect(response.status()).toBe(200);
 
     const body = await response.json();
@@ -272,7 +277,7 @@ test.describe('Prompt API', () => {
 test.describe('Multiple Promptable Labels UI', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/test/set-session');
-    await page.goto('/');
+    await page.goto(WORKSPACE_URL);
     await page.waitForLoadState('networkidle');
   });
 
@@ -343,7 +348,7 @@ test.describe('Multiple Promptable Labels UI', () => {
 test.describe('More Prompts Inline', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/test/set-session');
-    await page.goto('/');
+    await page.goto(WORKSPACE_URL);
     await page.waitForLoadState('networkidle');
   });
 
@@ -425,7 +430,7 @@ test.describe('AI Recommendations', () => {
   test.beforeEach(async ({ page }) => {
     // AI suggest button requires OpenRouter to be configured
     await page.goto('/test/set-session?openRouterConnected=true');
-    await page.goto('/');
+    await page.goto(WORKSPACE_URL);
     await page.waitForLoadState('networkidle');
   });
 
@@ -443,7 +448,7 @@ test.describe('AI Recommendations', () => {
   test('AI suggest button is hidden when OpenRouter is not configured', async ({ page }) => {
     // Set up session WITHOUT OpenRouter
     await page.goto('/test/set-session');
-    await page.goto('/');
+    await page.goto(WORKSPACE_URL);
     await page.waitForLoadState('networkidle');
 
     // Expand an issue
@@ -572,17 +577,17 @@ test.describe('Recommendation API', () => {
 
   test('returns 401 for unauthenticated requests', async ({ page }) => {
     await page.goto('/test/clear-session');
-    const response = await page.request.get(`/api/recommend/${BLOCKED_ISSUE_ID}`);
+    const response = await page.request.get(`${API_PREFIX}/api/recommend/${BLOCKED_ISSUE_ID}`);
     expect(response.status()).toBe(401);
   });
 
   test('returns 400 for invalid issue ID format', async ({ page }) => {
-    const response = await page.request.get('/api/recommend/invalid-id');
+    const response = await page.request.get(`${API_PREFIX}/api/recommend/invalid-id`);
     expect(response.status()).toBe(400);
   });
 
   test('returns 200 with generated prompt for valid request', async ({ page }) => {
-    const response = await page.request.get(`/api/recommend/${BLOCKED_ISSUE_ID}`);
+    const response = await page.request.get(`${API_PREFIX}/api/recommend/${BLOCKED_ISSUE_ID}`);
     expect(response.status()).toBe(200);
 
     const body = await response.json();
@@ -599,7 +604,7 @@ test.describe('Recommendation API', () => {
 
   test('returns contextual prompt based on labels', async ({ page }) => {
     // Issue with blocked label
-    const response = await page.request.get(`/api/recommend/${BLOCKED_ISSUE_ID}`);
+    const response = await page.request.get(`${API_PREFIX}/api/recommend/${BLOCKED_ISSUE_ID}`);
     const body = await response.json();
 
     // Should mention blocked in reasoning
@@ -610,7 +615,7 @@ test.describe('Recommendation API', () => {
   });
 
   test('returns status endpoint correctly', async ({ page }) => {
-    const response = await page.request.get('/api/recommend/status');
+    const response = await page.request.get(`${API_PREFIX}/api/recommend/status`);
     expect(response.status()).toBe(200);
 
     const body = await response.json();
@@ -620,7 +625,7 @@ test.describe('Recommendation API', () => {
   });
 
   test('returns issueUrl field', async ({ page }) => {
-    const response = await page.request.get(`/api/recommend/${BLOCKED_ISSUE_ID}`);
+    const response = await page.request.get(`${API_PREFIX}/api/recommend/${BLOCKED_ISSUE_ID}`);
     expect(response.status()).toBe(200);
 
     const body = await response.json();

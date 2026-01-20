@@ -1,12 +1,17 @@
 import { test, expect } from '@playwright/test';
 
+// Workspace URL key used in test session
+const TEST_WORKSPACE_URL_KEY = 'test-workspace';
+const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;
+const PROMPTS_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/prompts`;
+
 test.describe('Prompts Page', () => {
   test.describe('Unauthenticated', () => {
     test('redirects to home when not authenticated', async ({ page }) => {
       // Clear any existing session
       await page.goto('/test/clear-session');
 
-      // Try to access /prompts
+      // Try to access /prompts (legacy route redirects to home for unauthenticated)
       await page.goto('/prompts');
 
       // Should redirect to home
@@ -21,7 +26,7 @@ test.describe('Prompts Page', () => {
     });
 
     test('renders prompts page', async ({ page }) => {
-      await page.goto('/prompts');
+      await page.goto(PROMPTS_URL);
 
       // Should show prompts header
       await expect(page.locator('h1')).toContainText('Prompts');
@@ -31,23 +36,23 @@ test.describe('Prompts Page', () => {
     });
 
     test('shows workspace name in navigation', async ({ page }) => {
-      await page.goto('/prompts');
+      await page.goto(PROMPTS_URL);
 
       // Should show workspace name in nav
       await expect(page.locator('.nav-value-static')).toBeVisible();
     });
 
     test('has back link to projects', async ({ page }) => {
-      await page.goto('/prompts');
+      await page.goto(PROMPTS_URL);
 
-      // Should have link back to projects
-      const projectsLink = page.locator('.nav-action[href="/"]');
+      // Should have link back to workspace projects page
+      const projectsLink = page.locator(`.nav-action[href="${WORKSPACE_URL}"]`);
       await expect(projectsLink).toBeVisible();
       await expect(projectsLink).toContainText('projects');
     });
 
     test('has logout link', async ({ page }) => {
-      await page.goto('/prompts');
+      await page.goto(PROMPTS_URL);
 
       const logoutLink = page.locator('.nav-action[href="/logout"]');
       await expect(logoutLink).toBeVisible();
@@ -55,7 +60,7 @@ test.describe('Prompts Page', () => {
     });
 
     test('shows summary stats', async ({ page }) => {
-      await page.goto('/prompts');
+      await page.goto(PROMPTS_URL);
 
       // Should show summary with template count and total chars
       const summaryStats = page.locator('.prompts-summary .stat');
@@ -69,7 +74,7 @@ test.describe('Prompts Page', () => {
     });
 
     test('shows template categories', async ({ page }) => {
-      await page.goto('/prompts');
+      await page.goto(PROMPTS_URL);
 
       // Should show category headers
       await expect(page.locator('.prompt-category')).not.toHaveCount(0);
@@ -77,7 +82,7 @@ test.describe('Prompts Page', () => {
     });
 
     test('shows template cards', async ({ page }) => {
-      await page.goto('/prompts');
+      await page.goto(PROMPTS_URL);
 
       // Should show prompt cards
       const promptCards = page.locator('.prompt-card');
@@ -91,7 +96,7 @@ test.describe('Prompts Page', () => {
     });
 
     test('can expand prompt details', async ({ page }) => {
-      await page.goto('/prompts');
+      await page.goto(PROMPTS_URL);
 
       // Find a prompt card with details
       const promptDetails = page.locator('.prompt-details').first();
@@ -107,7 +112,7 @@ test.describe('Prompts Page', () => {
     });
 
     test('shows meta-prompt section', async ({ page }) => {
-      await page.goto('/prompts');
+      await page.goto(PROMPTS_URL);
 
       // Should show meta-prompt section
       await expect(page.locator('.meta-prompt-section')).toBeVisible();
@@ -115,7 +120,7 @@ test.describe('Prompts Page', () => {
     });
 
     test('has footer with navigation links', async ({ page }) => {
-      await page.goto('/prompts');
+      await page.goto(PROMPTS_URL);
 
       // Should have footer
       await expect(page.locator('.page-footer')).toBeVisible();
@@ -125,13 +130,13 @@ test.describe('Prompts Page', () => {
       await expect(currentPage).toBeVisible();
       await expect(currentPage).toContainText('prompts');
 
-      // Should have settings link (not current page)
-      const settingsLink = page.locator('.footer-action[href="/settings"]');
+      // Should have settings link with workspace prefix (not current page)
+      const settingsLink = page.locator(`.footer-action[href="/workspace/${TEST_WORKSPACE_URL_KEY}/settings"]`);
       await expect(settingsLink).toBeVisible();
       await expect(settingsLink).toContainText('settings');
 
-      // Should have audit link (not current page)
-      const auditLink = page.locator('.footer-action[href="/fancy"]');
+      // Should have audit link with workspace prefix (not current page)
+      const auditLink = page.locator(`.footer-action[href="/workspace/${TEST_WORKSPACE_URL_KEY}/fancy"]`);
       await expect(auditLink).toBeVisible();
       await expect(auditLink).toContainText('audit');
     });
