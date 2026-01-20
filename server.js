@@ -459,7 +459,7 @@ app.get('/', (req, res) => {
 
   // Authenticated users redirect to their workspace
   if (workspace) {
-    return res.redirect(`/workspace/${workspace.urlKey}/`)
+    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/`)
   }
 
   // Unauthenticated users see the static landing page
@@ -476,31 +476,45 @@ app.get('/', (req, res) => {
  * Sets req.workspace for use by route handlers.
  */
 function workspaceFromUrl(req, res, next) {
-  const { urlKey } = req.params
+  try {
+    const { urlKey } = req.params
 
-  // Check if user is authenticated (has any workspaces)
-  if (!req.session.workspaces || req.session.workspaces.length === 0) {
-    // For API routes, return JSON error
-    if (req.path.includes('/api/')) {
-      return res.status(401).json({ error: 'Not authenticated' })
+    // Validate urlKey format FIRST (before any other checks)
+    // This prevents information disclosure about auth state for invalid URLs
+    if (!validateWorkspaceUrlKey(urlKey)) {
+      // For API routes, return JSON error
+      if (req.path.includes('/api/')) {
+        return res.status(400).json({ error: 'Invalid workspace URL' })
+      }
+      // For page routes, show error page (urlKey is sanitized by validation failure)
+      return res.status(404).send(renderWorkspaceNotFoundPage('invalid', []))
     }
-    // For page routes, redirect to login
-    return res.redirect('/')
-  }
 
-  // Validate urlKey format
-  if (!validateWorkspaceUrlKey(urlKey)) {
-    return res.status(404).send(renderWorkspaceNotFoundPage(urlKey, req.session.workspaces || []))
-  }
+    // Check if user is authenticated (has any workspaces)
+    if (!req.session.workspaces || req.session.workspaces.length === 0) {
+      // For API routes, return JSON error
+      if (req.path.includes('/api/')) {
+        return res.status(401).json({ error: 'Not authenticated' })
+      }
+      // For page routes, redirect to login
+      return res.redirect('/')
+    }
 
-  // Find workspace in session
-  const workspace = getWorkspaceByUrlKey(req.session, urlKey)
-  if (!workspace) {
-    return res.status(404).send(renderWorkspaceNotFoundPage(urlKey, req.session.workspaces || []))
-  }
+    // Find workspace in session
+    const workspace = getWorkspaceByUrlKey(req.session, urlKey)
+    if (!workspace) {
+      return res.status(404).send(renderWorkspaceNotFoundPage(urlKey, req.session.workspaces || []))
+    }
 
-  req.workspace = workspace
-  next()
+    req.workspace = workspace
+    next()
+  } catch (error) {
+    console.error('Error in workspaceFromUrl middleware:', error)
+    if (req.path.includes('/api/')) {
+      return res.status(500).json({ error: 'Internal server error' })
+    }
+    return res.status(500).send(renderErrorPage('Error', 'An unexpected error occurred'))
+  }
 }
 
 /**
@@ -545,7 +559,7 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
     console.error('Main route error:', error);
     const html = renderErrorPage('Something Went Wrong', 'Could not load your projects. Please try again or re-authenticate.', {
       action: 'Try again',
-      actionUrl: `/workspace/${workspace.urlKey}/`
+      actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/`
     });
     res.status(500).send(html);
   }
@@ -635,20 +649,20 @@ app.post('/workspace/:urlKey/settings/model', workspaceFromUrl, async (req, res)
 
   // Validate and provide feedback on failure
   if (!selectedModel) {
-    return res.redirect(`/workspace/${workspace.urlKey}/settings?error=empty`);
+    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings?error=empty`);
   }
 
   if (selectedModel.length > 100) {
-    return res.redirect(`/workspace/${workspace.urlKey}/settings?error=too-long`);
+    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings?error=too-long`);
   }
 
   // Reject path traversal sequences
   if (selectedModel.includes('..')) {
-    return res.redirect(`/workspace/${workspace.urlKey}/settings?error=invalid-format`);
+    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings?error=invalid-format`);
   }
 
   if (!modelIdRegex.test(selectedModel)) {
-    return res.redirect(`/workspace/${workspace.urlKey}/settings?error=invalid-format`);
+    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings?error=invalid-format`);
   }
 
   // Validation passed - save the model
@@ -675,7 +689,7 @@ app.post('/workspace/:urlKey/settings/model', workspaceFromUrl, async (req, res)
     }
   }
 
-  res.redirect(`/workspace/${workspace.urlKey}/settings`);
+  res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
 });
 
 /**
@@ -1001,7 +1015,7 @@ function redirectToWorkspace(page) {
   return (req, res) => {
     const workspace = getActiveWorkspace(req.session)
     if (workspace) {
-      return res.redirect(`/workspace/${workspace.urlKey}/${page}`)
+      return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/${page}`)
     }
     res.redirect('/')
   }
@@ -1017,7 +1031,7 @@ app.post('/settings/model', (req, res) => {
   const workspace = getActiveWorkspace(req.session)
   if (workspace) {
     // Re-submit to the workspace-prefixed route (redirect loses POST data, so we'll handle directly)
-    return res.redirect(307, `/workspace/${workspace.urlKey}/settings/model`)
+    return res.redirect(307, `/workspace/${encodeURIComponent(workspace.urlKey)}/settings/model`)
   }
   res.redirect('/')
 })
@@ -1026,7 +1040,7 @@ app.post('/settings/model', (req, res) => {
 app.get('/api/audit', (req, res) => {
   const workspace = getActiveWorkspace(req.session)
   if (workspace) {
-    return res.redirect(`/workspace/${workspace.urlKey}/api/audit`)
+    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/api/audit`)
   }
   res.status(401).json({ error: 'Not authenticated' })
 })
@@ -1034,7 +1048,7 @@ app.get('/api/audit', (req, res) => {
 app.get('/api/prompt/:issueId/:labelName', (req, res) => {
   const workspace = getActiveWorkspace(req.session)
   if (workspace) {
-    return res.redirect(`/workspace/${workspace.urlKey}/api/prompt/${req.params.issueId}/${encodeURIComponent(req.params.labelName)}`)
+    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/api/prompt/${req.params.issueId}/${encodeURIComponent(req.params.labelName)}`)
   }
   res.status(401).json({ error: 'Not authenticated' })
 })
@@ -1042,7 +1056,7 @@ app.get('/api/prompt/:issueId/:labelName', (req, res) => {
 app.get('/api/recommend/status', (req, res) => {
   const workspace = getActiveWorkspace(req.session)
   if (workspace) {
-    return res.redirect(`/workspace/${workspace.urlKey}/api/recommend/status`)
+    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/api/recommend/status`)
   }
   res.status(401).json({ error: 'Not authenticated' })
 })
@@ -1050,7 +1064,7 @@ app.get('/api/recommend/status', (req, res) => {
 app.get('/api/recommend/:issueId', (req, res) => {
   const workspace = getActiveWorkspace(req.session)
   if (workspace) {
-    return res.redirect(`/workspace/${workspace.urlKey}/api/recommend/${req.params.issueId}`)
+    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/api/recommend/${req.params.issueId}`)
   }
   res.status(401).json({ error: 'Not authenticated' })
 })

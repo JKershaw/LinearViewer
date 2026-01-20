@@ -522,7 +522,7 @@ function initNavBar() {
       setTeamSelection(teamId)
       // Get workspace URL key from data attribute (workspace-prefixed URLs)
       const urlKey = teamOptions.dataset.urlKey
-      const workspacePrefix = urlKey ? `/workspace/${urlKey}` : ''
+      const workspacePrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : ''
       const url = teamId === 'all' ? `${workspacePrefix}/` : `${workspacePrefix}/?team=${teamId}`
       window.location.href = url
     })
@@ -604,7 +604,7 @@ function initNavBar() {
     if (!urlTeam && savedTeam && savedTeam !== 'all' && savedTeamExists) {
       // Get workspace URL key from data attribute (workspace-prefixed URLs)
       const urlKey = teamOptions?.dataset.urlKey
-      const workspacePrefix = urlKey ? `/workspace/${urlKey}` : ''
+      const workspacePrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : ''
       window.location.href = `${workspacePrefix}/?team=${savedTeam}`
       return
     }
@@ -676,7 +676,7 @@ function initPrompts() {
     try {
       // Get workspace URL key from data attribute (workspace-prefixed URLs)
       const urlKey = promptContainer.dataset.urlKey
-      const apiPrefix = urlKey ? `/workspace/${urlKey}` : ''
+      const apiPrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : ''
       const response = await fetch(
         `${apiPrefix}/api/prompt/${issueId}/${encodeURIComponent(labelName)}`,
         { signal: abortController.signal }
@@ -828,7 +828,7 @@ function initRecommendations() {
     try {
       // Get workspace URL key from data attribute (workspace-prefixed URLs)
       const urlKey = recommendContainer.dataset.urlKey
-      const apiPrefix = urlKey ? `/workspace/${urlKey}` : ''
+      const apiPrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : ''
       const response = await fetch(
         `${apiPrefix}/api/recommend/${issueId}`,
         { signal: abortController.signal }

@@ -30,7 +30,7 @@ export function createWorkspaceRoutes() {
     req.session.activeWorkspaceId = workspace.id
     await saveSession(req.session)
     // Redirect to the new workspace's URL
-    res.redirect(`/workspace/${workspace.urlKey}/`)
+    res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/`)
   })
 
   /**
@@ -58,7 +58,7 @@ export function createWorkspaceRoutes() {
     // Redirect to the remaining active workspace's URL
     const activeWorkspace = getActiveWorkspace(req.session)
     if (activeWorkspace) {
-      res.redirect(`/workspace/${activeWorkspace.urlKey}/`)
+      res.redirect(`/workspace/${encodeURIComponent(activeWorkspace.urlKey)}/`)
     } else {
       res.redirect('/')
     }
