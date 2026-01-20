@@ -1129,4 +1129,17 @@ app.get('/api/recommend/:issueId', (req, res) => {
 const PORT = process.env.PORT || 3000
 app.listen(PORT, () => {
   console.log(`Linear Projects Viewer running at http://localhost:${PORT}`)
+
+  // Start periodic cleanup of expired dispatch queue items (every hour)
+  const CLEANUP_INTERVAL_MS = 60 * 60 * 1000 // 1 hour
+  setInterval(async () => {
+    try {
+      const removedCount = await dispatchQueueStore.cleanup()
+      if (removedCount > 0) {
+        console.log(`Dispatch queue cleanup: removed ${removedCount} expired items`)
+      }
+    } catch (err) {
+      console.error('Dispatch queue cleanup error:', err)
+    }
+  }, CLEANUP_INTERVAL_MS)
 })

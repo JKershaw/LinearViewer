@@ -18,6 +18,12 @@ import { Router } from 'express';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// Input length limits to prevent database bloat
+const MAX_PROMPT_LENGTH = 100000;      // 100KB max for prompt content
+const MAX_NAME_LENGTH = 200;           // Short names/labels/titles
+const MAX_URL_LENGTH = 2000;           // URLs
+const MAX_IDENTIFIER_LENGTH = 50;      // Issue identifiers like "LIN-123"
+
 /**
  * Creates dispatch routes with injected dependencies.
  *
@@ -84,6 +90,23 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       // Validate required fields
       if (!prompt || typeof prompt !== 'string') {
         return res.status(400).json({ error: 'prompt is required and must be a string' });
+      }
+
+      // Validate input lengths to prevent database bloat
+      if (prompt.length > MAX_PROMPT_LENGTH) {
+        return res.status(400).json({ error: `prompt exceeds maximum length of ${MAX_PROMPT_LENGTH}` });
+      }
+      if (promptName && promptName.length > MAX_NAME_LENGTH) {
+        return res.status(400).json({ error: `promptName exceeds maximum length of ${MAX_NAME_LENGTH}` });
+      }
+      if (issueIdentifier && issueIdentifier.length > MAX_IDENTIFIER_LENGTH) {
+        return res.status(400).json({ error: `issueIdentifier exceeds maximum length of ${MAX_IDENTIFIER_LENGTH}` });
+      }
+      if (issueTitle && issueTitle.length > MAX_NAME_LENGTH) {
+        return res.status(400).json({ error: `issueTitle exceeds maximum length of ${MAX_NAME_LENGTH}` });
+      }
+      if (issueUrl && issueUrl.length > MAX_URL_LENGTH) {
+        return res.status(400).json({ error: `issueUrl exceeds maximum length of ${MAX_URL_LENGTH}` });
       }
 
       // Validate issueId format if provided
@@ -189,6 +212,12 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
 
     try {
       const { label } = req.body || {};
+
+      // Validate label length
+      if (label && label.length > MAX_NAME_LENGTH) {
+        return res.status(400).json({ error: `label exceeds maximum length of ${MAX_NAME_LENGTH}` });
+      }
+
       const result = await dispatchTokenStore.createToken(workspace.urlKey, label || 'default');
 
       res.status(201).json({
