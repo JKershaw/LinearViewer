@@ -12,6 +12,26 @@ const TEST_WORKSPACE_URL_KEY = 'test-workspace';
 const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;
 const API_PREFIX = `/workspace/${TEST_WORKSPACE_URL_KEY}`;
 
+/**
+ * Helper to expand Prompts section for an issue
+ * Use after clicking the task line to expand details
+ */
+async function expandPromptsSection(page, containerSelector, issueId) {
+  const details = page.locator(`${containerSelector} .details[data-details-for="${issueId}"]`);
+  const promptsToggle = details.locator('.detail-toggle[data-toggle="prompts"]');
+  await promptsToggle.click();
+}
+
+/**
+ * Helper to expand Details section for an issue
+ * Use after clicking the task line to expand details
+ */
+async function expandDetailsSection(page, containerSelector, issueId) {
+  const details = page.locator(`${containerSelector} .details[data-details-for="${issueId}"]`);
+  const detailsToggle = details.locator('.detail-toggle[data-toggle="details"]');
+  await detailsToggle.click();
+}
+
 test.describe('Promptable Labels', () => {
   test.beforeEach(async ({ page }) => {
     // Set up test session
@@ -28,6 +48,9 @@ test.describe('Promptable Labels', () => {
     // Click to expand details
     await taskLine.click();
 
+    // Expand Prompts section to reveal prompt buttons
+    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
     // Find the label link in the specific issue's details panel
     const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
     await expect(labelLink).toBeVisible();
@@ -42,22 +65,29 @@ test.describe('Promptable Labels', () => {
     // Click to expand details
     await taskLine.click();
 
+    // Expand Details section to reveal metadata
+    await expandDetailsSection(page, '.project', 'issue-1');
+
     // The feature label should be text, not a link
     const details = page.locator('.project .details[data-details-for="issue-1"]');
     await expect(details).toBeVisible();
 
-    // Feature should appear as plain text, not as a .label-prompt link
-    const labelLink = details.locator('.label-prompt[data-label="feature"]');
+    // Feature should appear as plain text, not as a .label-prompt link in Details section
+    const detailsContent = details.locator('.detail-content[data-content="details"]');
+    const labelLink = detailsContent.locator('.label-prompt[data-label="feature"]');
     await expect(labelLink).toHaveCount(0);
 
-    // But feature text should appear in metadata
-    await expect(details.locator('.detail-meta')).toContainText('feature');
+    // But feature text should appear in metadata within Details section
+    await expect(detailsContent.locator('.detail-meta')).toContainText('feature');
   });
 
   test('clicking promptable label shows prompt container', async ({ page }) => {
     // Find and expand the task with blocked label
     const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
+
+    // Expand Prompts section
+    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
     // Click the promptable label
     const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
@@ -85,6 +115,9 @@ test.describe('Promptable Labels', () => {
     const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
 
+    // Expand Prompts section
+    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
     // Click the promptable label
     const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
     await labelLink.click();
@@ -101,6 +134,9 @@ test.describe('Promptable Labels', () => {
     // Find and expand the task
     const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
+
+    // Expand Prompts section
+    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
     // Click the promptable label to show
     const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
@@ -122,6 +158,9 @@ test.describe('Promptable Labels', () => {
     // Find and expand the task
     const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
+
+    // Expand Prompts section
+    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
     // Click the promptable label
     const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
@@ -147,6 +186,9 @@ test.describe('Promptable Labels', () => {
     // Find and expand the task
     const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
+
+    // Expand Prompts section
+    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
     // Click the promptable label
     const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
@@ -287,6 +329,9 @@ test.describe('Multiple Promptable Labels UI', () => {
     await expect(taskLine).toBeVisible();
     await taskLine.click();
 
+    // Expand Prompts section
+    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
     // Use specific issue ID to avoid ambiguity (task appears in both In Progress and Project sections)
     const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
     await expect(labelLink).toBeVisible();
@@ -297,6 +342,9 @@ test.describe('Multiple Promptable Labels UI', () => {
     await expect(taskLine).toBeVisible();
     await taskLine.click();
 
+    // Expand Prompts section
+    await expandPromptsSection(page, '.project', BUG_ISSUE_ID);
+
     // Use specific issue ID to avoid ambiguity (bug label also exists on completed issue-3)
     const labelLink = page.locator(`.label-prompt[data-label="bug"][data-issue-id="${BUG_ISSUE_ID}"]`);
     await expect(labelLink).toBeVisible();
@@ -305,6 +353,9 @@ test.describe('Multiple Promptable Labels UI', () => {
   test('clicking blocked shows correct prompt', async ({ page }) => {
     const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
+
+    // Expand Prompts section
+    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
     const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
     await labelLink.click();
@@ -323,6 +374,9 @@ test.describe('Multiple Promptable Labels UI', () => {
     await expect(taskLine).toBeVisible();
     await taskLine.click();
 
+    // Expand Prompts section
+    await expandPromptsSection(page, '.in-progress-items', CODE_REVIEW_ISSUE_ID);
+
     const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="code-review"][data-issue-id="${CODE_REVIEW_ISSUE_ID}"]`);
     await expect(labelLink).toBeVisible();
   });
@@ -330,6 +384,9 @@ test.describe('Multiple Promptable Labels UI', () => {
   test('clicking code-review shows correct prompt', async ({ page }) => {
     const taskLine = page.locator('.in-progress-items .line:has-text("Refactor authentication module")');
     await taskLine.click();
+
+    // Expand Prompts section
+    await expandPromptsSection(page, '.in-progress-items', CODE_REVIEW_ISSUE_ID);
 
     const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="code-review"][data-issue-id="${CODE_REVIEW_ISSUE_ID}"]`);
     await labelLink.click();
@@ -357,6 +414,9 @@ test.describe('More Prompts Inline', () => {
     const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
 
+    // Expand Prompts section
+    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
     // Should show "more" link inline with other labels
     const moreLink = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .more-toggle`);
     await expect(moreLink).toBeVisible();
@@ -366,6 +426,9 @@ test.describe('More Prompts Inline', () => {
   test('clicking "more" reveals hidden prompts inline', async ({ page }) => {
     const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
+
+    // Expand Prompts section
+    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
     // Hidden prompts should not be visible initially
     const hiddenPrompts = page.locator(`.in-progress-items [data-more-for="${BLOCKED_ISSUE_ID}"]`);
@@ -390,6 +453,9 @@ test.describe('More Prompts Inline', () => {
     const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
 
+    // Expand Prompts section
+    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
     // Click "more" to reveal prompts
     const moreLink = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .more-toggle`);
     await moreLink.click();
@@ -409,6 +475,9 @@ test.describe('More Prompts Inline', () => {
     // Bug issue appears in project section
     const projectLine = page.locator('.project .line:has-text("Login fails with special characters")');
     await projectLine.click();
+
+    // Expand Prompts section
+    await expandPromptsSection(page, '.project', BUG_ISSUE_ID);
 
     // Should have "more" link
     const moreLink = page.locator(`.project .details[data-details-for="${BUG_ISSUE_ID}"] .more-toggle`);
@@ -439,6 +508,9 @@ test.describe('AI Recommendations', () => {
     const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
 
+    // Expand Prompts section
+    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
     // Should have AI suggest button
     const suggestBtn = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .suggest-btn`);
     await expect(suggestBtn).toBeVisible();
@@ -455,14 +527,20 @@ test.describe('AI Recommendations', () => {
     const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
 
-    // Should NOT have AI suggest button
+    // Expand Prompts section
+    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
+    // Should NOT have AI suggest button (it's not rendered, not just hidden)
     const suggestBtn = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .suggest-btn`);
-    await expect(suggestBtn).toBeHidden();
+    await expect(suggestBtn).toHaveCount(0);
   });
 
   test('clicking suggest button shows recommendation container', async ({ page }) => {
     const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
+
+    // Expand Prompts section
+    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
     const suggestBtn = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .suggest-btn`);
     await suggestBtn.click();
@@ -494,6 +572,9 @@ test.describe('AI Recommendations', () => {
     const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
 
+    // Expand Prompts section
+    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
     const suggestBtn = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .suggest-btn`);
     await suggestBtn.click();
 
@@ -515,6 +596,9 @@ test.describe('AI Recommendations', () => {
     const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
 
+    // Expand Prompts section
+    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
     const suggestBtn = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .suggest-btn`);
     await suggestBtn.click();
 
@@ -534,6 +618,9 @@ test.describe('AI Recommendations', () => {
     const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
 
+    // Expand Prompts section
+    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
     const suggestBtn = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .suggest-btn`);
     await suggestBtn.click();
 
@@ -551,6 +638,9 @@ test.describe('AI Recommendations', () => {
   test('clicking suggest again toggles recommendation off', async ({ page }) => {
     const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
+
+    // Expand Prompts section
+    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
     const suggestBtn = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .suggest-btn`);
     await suggestBtn.click();

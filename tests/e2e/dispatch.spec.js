@@ -8,6 +8,16 @@ const API_PREFIX = `/workspace/${TEST_WORKSPACE_URL_KEY}`;
 // Test issue ID (from mock-data.js - blocked issue has prompts)
 const BLOCKED_ISSUE_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 
+/**
+ * Helper to expand Prompts section for an issue
+ * Use after clicking the task line to expand details
+ */
+async function expandPromptsSection(page, containerSelector, issueId) {
+  const details = page.locator(`${containerSelector} .details[data-details-for="${issueId}"]`);
+  const promptsToggle = details.locator('.detail-toggle[data-toggle="prompts"]');
+  await promptsToggle.click();
+}
+
 test.describe('Dispatch Queue', () => {
   test.beforeEach(async ({ page }) => {
     // Clear dispatch queue and tokens before each test
@@ -24,6 +34,9 @@ test.describe('Dispatch Queue', () => {
     // Find and expand a task with prompts
     const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
+
+    // Expand Prompts section to reveal prompt buttons
+    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
     // Click the promptable label to show prompt
     const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
@@ -46,6 +59,9 @@ test.describe('Dispatch Queue', () => {
     // Find and expand a task with prompts
     const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
+
+    // Expand Prompts section to reveal prompt buttons
+    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
     // Click the promptable label to show prompt
     const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
@@ -75,6 +91,9 @@ test.describe('Dispatch Queue', () => {
     const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
 
+    // Expand Prompts section to reveal prompt buttons
+    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
     // Click the promptable label and dispatch
     const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
     await labelLink.click();
@@ -88,8 +107,8 @@ test.describe('Dispatch Queue', () => {
     // Wait for dispatch to complete
     await expect(dispatchBtn).toHaveText('dispatched!');
 
-    // Badge should now be visible
-    await expect(badge).not.toHaveClass(/hidden/);
+    // Badge should now be visible (wait for async badge update)
+    await expect(badge).not.toHaveClass(/hidden/, { timeout: 10000 });
     await expect(badge.locator('.queue-count')).toHaveText('1');
   });
 
@@ -97,6 +116,9 @@ test.describe('Dispatch Queue', () => {
     // First dispatch something to have items in queue
     const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
+
+    // Expand Prompts section to reveal prompt buttons
+    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
     const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
     await labelLink.click();
@@ -108,9 +130,9 @@ test.describe('Dispatch Queue', () => {
     await dispatchBtn.click();
     await expect(dispatchBtn).toHaveText('dispatched!');
 
-    // Click the queue badge
+    // Click the queue badge (wait for async badge update)
     const badge = page.locator('[data-queue-badge]');
-    await expect(badge).not.toHaveClass(/hidden/);
+    await expect(badge).not.toHaveClass(/hidden/, { timeout: 10000 });
     await badge.click();
 
     // Queue panel should appear
@@ -127,6 +149,9 @@ test.describe('Dispatch Queue', () => {
     const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
 
+    // Expand Prompts section to reveal prompt buttons
+    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
     const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
     await labelLink.click();
 
@@ -137,8 +162,9 @@ test.describe('Dispatch Queue', () => {
     await dispatchBtn.click();
     await expect(dispatchBtn).toHaveText('dispatched!');
 
-    // Open queue panel
+    // Open queue panel (wait for async badge update)
     const badge = page.locator('[data-queue-badge]');
+    await expect(badge).not.toHaveClass(/hidden/, { timeout: 10000 });
     await badge.click();
 
     const panel = page.locator('.queue-panel');
@@ -163,6 +189,9 @@ test.describe('Dispatch Queue', () => {
     const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
 
+    // Expand Prompts section to reveal prompt buttons
+    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
     const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
     await labelLink.click();
 
@@ -171,9 +200,9 @@ test.describe('Dispatch Queue', () => {
 
     await promptContainer.locator('.prompt-dispatch').click();
 
-    // Open panel
+    // Open panel (wait for async badge update)
     const badge = page.locator('[data-queue-badge]');
-    await expect(badge).not.toHaveClass(/hidden/);
+    await expect(badge).not.toHaveClass(/hidden/, { timeout: 10000 });
     await badge.click();
 
     const panel = page.locator('.queue-panel');
