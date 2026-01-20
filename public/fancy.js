@@ -359,11 +359,8 @@ function renderLabelsContent(labels) {
     }
   };
 
-  // Phase labels
-  const phaseLabelsTags = workflow.phaseLabels.map(renderWorkflowLabel).join('');
-
-  // Work issue labels
-  const workIssueLabelsTags = workflow.workIssueLabels.map(renderWorkflowLabel).join('');
+  // Workflow labels (simplified 3-label system: preparing, blocked, bug)
+  const workflowLabelsTags = workflow.labels.map(renderWorkflowLabel).join('');
 
   // Other labels (non-workflow)
   const otherTags = other.slice(0, 20).map(l =>
@@ -376,13 +373,8 @@ function renderLabelsContent(labels) {
 
   return `
     <h4>Workflow Labels (${workflow.presentCount}/${workflow.totalCount})</h4>
-    <h5 style="margin-top: 0.5rem; color: var(--fg-dim);">Phase Labels</h5>
     <div class="labels-list">
-      ${phaseLabelsTags}
-    </div>
-    <h5 style="margin-top: 0.75rem; color: var(--fg-dim);">Work Issue Labels</h5>
-    <div class="labels-list">
-      ${workIssueLabelsTags}
+      ${workflowLabelsTags}
     </div>
 
     <h4 style="margin-top: 1rem;">Other Labels (${labels.otherCount})</h4>

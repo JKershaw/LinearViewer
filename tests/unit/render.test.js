@@ -2,6 +2,11 @@
  * Unit tests for render.js
  *
  * Run with: node --test tests/unit/render.test.js
+ *
+ * Tests the simplified 3-label system:
+ * - preparing: Pre-implementation work
+ * - blocked: Work stuck on external dependency
+ * - bug: Investigating unexpected behavior
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
@@ -58,31 +63,6 @@ describe('renderLabels', () => {
   });
 
   describe('promptable labels', () => {
-    test('renders in-breakdown as clickable link', () => {
-      const issue = {
-        id: 'issue-123',
-        labels: { nodes: [{ name: 'in-breakdown' }] },
-        state: { type: 'backlog' }
-      };
-      const result = renderLabels(issue);
-      assert.ok(result.includes('<a href="#"'));
-      assert.ok(result.includes('class="label-prompt"'));
-      assert.ok(result.includes('data-issue-id="issue-123"'));
-      assert.ok(result.includes('data-label="in-breakdown"'));
-      assert.ok(result.includes('>in-breakdown</a>'));
-    });
-
-    test('renders in-research as clickable link', () => {
-      const issue = {
-        id: 'issue-456',
-        labels: { nodes: [{ name: 'in-research' }] },
-        state: { type: 'backlog' }
-      };
-      const result = renderLabels(issue);
-      assert.ok(result.includes('class="label-prompt"'));
-      assert.ok(result.includes('data-label="in-research"'));
-    });
-
     test('renders blocked as clickable link', () => {
       const issue = {
         id: 'issue-789',
@@ -90,8 +70,11 @@ describe('renderLabels', () => {
         state: { type: 'started' }
       };
       const result = renderLabels(issue);
+      assert.ok(result.includes('<a href="#"'));
       assert.ok(result.includes('class="label-prompt"'));
+      assert.ok(result.includes('data-issue-id="issue-789"'));
       assert.ok(result.includes('data-label="blocked"'));
+      assert.ok(result.includes('>blocked</a>'));
     });
 
     test('renders bug as clickable link', () => {
@@ -108,12 +91,12 @@ describe('renderLabels', () => {
     test('mixes promptable and regular labels correctly', () => {
       const issue = {
         id: 'issue-mix',
-        labels: { nodes: [{ name: 'in-breakdown' }, { name: 'feature' }] },
+        labels: { nodes: [{ name: 'blocked' }, { name: 'feature' }] },
         state: { type: 'started' } // started so plan/code-review added
       };
       const result = renderLabels(issue);
-      // in-breakdown should be a link
-      assert.ok(result.includes('data-label="in-breakdown"'));
+      // blocked should be a link
+      assert.ok(result.includes('data-label="blocked"'));
       // feature should be plain text (not a link)
       assert.ok(result.includes('feature'));
       assert.ok(!result.includes('data-label="feature"'));
@@ -172,18 +155,18 @@ describe('renderLabels', () => {
       assert.ok(!result.includes('data-label="plan"'));
     });
 
-    test('does not add plan as state-prompt when pre-work label present', () => {
+    test('does not add plan as state-prompt when preparing label present', () => {
       const issue = {
         id: 'issue-prework',
-        labels: { nodes: [{ name: 'in-breakdown' }] },
+        labels: { nodes: [{ name: 'preparing' }] },
         state: { type: 'backlog' }
       };
       const result = renderLabels(issue);
-      // Should have in-breakdown link
-      assert.ok(result.includes('data-label="in-breakdown"'));
-      // Plan should NOT appear as a state-prompt (visible) link
+      // preparing is not a promptable label (no template for it)
+      // so it renders as plain text
+      assert.ok(result.includes('preparing'));
+      // Plan should NOT appear as a state-prompt (visible) link when preparing label is present
       assert.ok(!result.includes('class="label-prompt state-prompt" data-issue-id="issue-prework" data-label="plan"'));
-      // But plan may appear in hidden "more" prompts (which is expected behavior)
     });
 
     test('does not duplicate plan link if already a label', () => {
@@ -227,12 +210,12 @@ describe('renderLabels', () => {
       // in the data-label attribute (though this shouldn't happen in practice)
       const issue = {
         id: 'issue-test',
-        labels: { nodes: [{ name: 'in-breakdown' }] },
+        labels: { nodes: [{ name: 'blocked' }] },
         state: { type: 'backlog' }
       };
       const result = renderLabels(issue);
       // The escapeHtml function is called on label.name for data-label
-      assert.ok(result.includes('data-label="in-breakdown"'));
+      assert.ok(result.includes('data-label="blocked"'));
     });
   });
 

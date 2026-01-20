@@ -42,16 +42,17 @@ test.describe('Authenticated Dashboard', () => {
   });
 
   test('displays correct state indicators', async ({ page }) => {
-    // Mock data defines 15 issues with various states and labels
-    // In-progress issues: issue-1, issue-4, issue-11 (blocked), issue-15 (code-review)
+    // Mock data defines 10 issues with various states and labels
+    // In-progress issues (type: 'started'): issue-1, issue-4, blocked issue, code-review issue
     // Each in-progress appears 2x (In Progress section + project section)
-    // In-progress count: issue-1 x2 + issue-4 x2 + issue-11 x2 + issue-15 x2 = 8
+    // In-progress count: 4 issues x 2 = 8
     const inProgressStates = page.locator('.state.in-progress');
     await expect(inProgressStates).toHaveCount(8);
 
-    // Todo issues include: issue-2 (x2), issue-5, issue-6, issue-7, issue-8, issue-9, issue-10, issue-12, issue-13, issue-14
-    // Count: issue-2 x2 + all others x1 = 11
-    await expect(page.locator('.state.todo')).toHaveCount(11);
+    // Todo issues (type: 'unstarted' or 'backlog'): issue-2, issue-5, preparing issue, bug issue, plan issue
+    // issue-2 appears 2x (child of in-progress parent), others appear 1x
+    // Todo count: 2 + 1 + 1 + 1 + 1 = 6
+    await expect(page.locator('.state.todo')).toHaveCount(6);
   });
 
   test('shows logout link when authenticated', async ({ page }) => {

@@ -1,13 +1,8 @@
 import { test, expect } from '@playwright/test';
 
-// UUIDs for test issues with promptable labels
-const BREAKDOWN_ISSUE_ID = '66666666-6666-6666-6666-666666666666';
-const RESEARCH_ISSUE_ID = '77777777-7777-7777-7777-777777777777';
-const SCOPING_ISSUE_ID = '88888888-8888-8888-8888-888888888888';
-const DESIGN_ISSUE_ID = '99999999-9999-9999-9999-999999999999';
-const SPIKE_ISSUE_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+// UUIDs for test issues (from mock-data.js)
+const PREPARING_ISSUE_ID = '66666666-6666-6666-6666-666666666666';
 const BLOCKED_ISSUE_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
-const CONTEXT_ISSUE_ID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
 const BUG_ISSUE_ID = 'dddddddd-dddd-dddd-dddd-ddddddddddde';
 const PLAN_ISSUE_ID = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeef';
 const CODE_REVIEW_ISSUE_ID = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
@@ -20,18 +15,18 @@ test.describe('Promptable Labels', () => {
     await page.waitForLoadState('networkidle');
   });
 
-  test('renders in-breakdown label as clickable link', async ({ page }) => {
-    // Find the task with in-breakdown label and expand it (in project section, not in-progress)
-    const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
+  test('renders blocked label as clickable link', async ({ page }) => {
+    // Blocked task is in-progress, so it appears in the In Progress section
+    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await expect(taskLine).toBeVisible();
 
     // Click to expand details
     await taskLine.click();
 
     // Find the label link in the specific issue's details panel
-    const labelLink = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .label-prompt[data-label="in-breakdown"]`);
+    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
     await expect(labelLink).toBeVisible();
-    await expect(labelLink).toHaveText('in-breakdown');
+    await expect(labelLink).toHaveText('blocked');
   });
 
   test('regular labels are not clickable', async ({ page }) => {
@@ -55,16 +50,16 @@ test.describe('Promptable Labels', () => {
   });
 
   test('clicking promptable label shows prompt container', async ({ page }) => {
-    // Find and expand the task with in-breakdown label
-    const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
+    // Find and expand the task with blocked label
+    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
 
-    // Click the promptable label in the specific issue's details
-    const labelLink = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .label-prompt[data-label="in-breakdown"]`);
+    // Click the promptable label
+    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
     await labelLink.click();
 
     // Wait for prompt container to appear
-    const promptContainer = page.locator(`.prompt-container[data-prompt-for="${BREAKDOWN_ISSUE_ID}"]`);
+    const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
     await expect(promptContainer).toBeVisible();
 
     // Wait for prompt to load (not showing "Loading...")
@@ -72,7 +67,7 @@ test.describe('Promptable Labels', () => {
 
     // Should show prompt name
     const promptName = promptContainer.locator('.prompt-name');
-    await expect(promptName).toContainText('Task Breakdown');
+    await expect(promptName).toContainText('Blocker Analysis');
 
     // Should show prompt text (now rendered as HTML, so headers don't have ##)
     const promptText = promptContainer.locator('.prompt-text');
@@ -82,32 +77,32 @@ test.describe('Promptable Labels', () => {
 
   test('prompt contains issue identifier', async ({ page }) => {
     // Find and expand the task
-    const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
+    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
 
-    // Click the promptable label in the specific issue's details
-    const labelLink = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .label-prompt[data-label="in-breakdown"]`);
+    // Click the promptable label
+    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
     await labelLink.click();
 
     // Wait for prompt to load
-    const promptText = page.locator(`.prompt-container[data-prompt-for="${BREAKDOWN_ISSUE_ID}"] .prompt-text`);
+    const promptText = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"] .prompt-text`);
     await expect(promptText).not.toContainText('Loading', { timeout: 10000 });
 
-    // Prompt should contain the task identifier (agent fetches title via MCP)
+    // Prompt should contain the task identifier
     await expect(promptText).toContainText('TEST-');
   });
 
   test('clicking label again hides prompt container', async ({ page }) => {
     // Find and expand the task
-    const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
+    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
 
     // Click the promptable label to show
-    const labelLink = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .label-prompt[data-label="in-breakdown"]`);
+    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
     await labelLink.click();
 
     // Wait for container to appear
-    const promptContainer = page.locator(`.prompt-container[data-prompt-for="${BREAKDOWN_ISSUE_ID}"]`);
+    const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
     await expect(promptContainer).toBeVisible();
 
     // Click again to hide
@@ -120,15 +115,15 @@ test.describe('Promptable Labels', () => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
 
     // Find and expand the task
-    const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
+    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
 
-    // Click the promptable label in the specific issue's details
-    const labelLink = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .label-prompt[data-label="in-breakdown"]`);
+    // Click the promptable label
+    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
     await labelLink.click();
 
     // Wait for prompt to load
-    const promptContainer = page.locator(`.prompt-container[data-prompt-for="${BREAKDOWN_ISSUE_ID}"]`);
+    const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
     await expect(promptContainer).toBeVisible();
     await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
 
@@ -145,15 +140,15 @@ test.describe('Promptable Labels', () => {
 
   test('prompt container has correct structure', async ({ page }) => {
     // Find and expand the task
-    const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
+    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
 
-    // Click the promptable label in the specific issue's details
-    const labelLink = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .label-prompt[data-label="in-breakdown"]`);
+    // Click the promptable label
+    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
     await labelLink.click();
 
     // Wait for container and prompt to load
-    const promptContainer = page.locator(`.prompt-container[data-prompt-for="${BREAKDOWN_ISSUE_ID}"]`);
+    const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
     await expect(promptContainer).toBeVisible();
     await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
 
@@ -178,7 +173,7 @@ test.describe('Prompt API', () => {
     await page.goto('/test/clear-session');
 
     // Try to fetch prompt (use valid UUID format)
-    const response = await page.request.get(`/api/prompt/${BREAKDOWN_ISSUE_ID}/in-breakdown`);
+    const response = await page.request.get(`/api/prompt/${BLOCKED_ISSUE_ID}/blocked`);
     expect(response.status()).toBe(401);
 
     const body = await response.json();
@@ -187,7 +182,7 @@ test.describe('Prompt API', () => {
 
   test('returns 404 for unknown label', async ({ page }) => {
     // Use valid UUID format so we get to the label check
-    const response = await page.request.get(`/api/prompt/${BREAKDOWN_ISSUE_ID}/unknown-label`);
+    const response = await page.request.get(`/api/prompt/${BLOCKED_ISSUE_ID}/unknown-label`);
     expect(response.status()).toBe(404);
 
     const body = await response.json();
@@ -195,66 +190,17 @@ test.describe('Prompt API', () => {
   });
 
   test('returns 400 for invalid issue ID format', async ({ page }) => {
-    const response = await page.request.get('/api/prompt/invalid-id/in-breakdown');
+    const response = await page.request.get('/api/prompt/invalid-id/blocked');
     expect(response.status()).toBe(400);
 
     const body = await response.json();
     expect(body.error).toContain('Invalid issue ID format');
   });
 
-  test('returns prompt for valid request', async ({ page }) => {
-    const response = await page.request.get(`/api/prompt/${BREAKDOWN_ISSUE_ID}/in-breakdown`);
-    expect(response.status()).toBe(200);
-
-    const body = await response.json();
-    expect(body.label).toBe('in-breakdown');
-    expect(body.promptName).toBe('Task Breakdown');
-    expect(body.prompt).toContain('## Goal');
-  });
-
-  // Tests for all prompt templates
-  test('returns research prompt', async ({ page }) => {
-    const response = await page.request.get(`/api/prompt/${RESEARCH_ISSUE_ID}/in-research`);
-    expect(response.status()).toBe(200);
-
-    const body = await response.json();
-    expect(body.label).toBe('in-research');
-    expect(body.promptName).toBe('Research Task');
-    expect(body.prompt).toContain('# Research TEST-');
-    expect(body.prompt).toContain('## Goal');
-  });
-
-  test('returns scoping prompt', async ({ page }) => {
-    const response = await page.request.get(`/api/prompt/${SCOPING_ISSUE_ID}/in-scoping`);
-    expect(response.status()).toBe(200);
-
-    const body = await response.json();
-    expect(body.label).toBe('in-scoping');
-    expect(body.promptName).toBe('Scope Definition');
-    expect(body.prompt).toContain('# Define scope for TEST-');
-    expect(body.prompt).toContain('## Goal');
-  });
-
-  test('returns design prompt', async ({ page }) => {
-    const response = await page.request.get(`/api/prompt/${DESIGN_ISSUE_ID}/in-design`);
-    expect(response.status()).toBe(200);
-
-    const body = await response.json();
-    expect(body.label).toBe('in-design');
-    expect(body.promptName).toBe('Technical Design');
-    expect(body.prompt).toContain('# Design TEST-');
-    expect(body.prompt).toContain('## Goal');
-  });
-
-  test('returns spike prompt', async ({ page }) => {
-    const response = await page.request.get(`/api/prompt/${SPIKE_ISSUE_ID}/in-spike`);
-    expect(response.status()).toBe(200);
-
-    const body = await response.json();
-    expect(body.label).toBe('in-spike');
-    expect(body.promptName).toBe('Technical Spike');
-    expect(body.prompt).toContain('# Spike TEST-');
-    expect(body.prompt).toContain('## Goal');
+  test('returns 404 for removed phase labels', async ({ page }) => {
+    // Old phase labels should no longer have templates
+    const response = await page.request.get(`/api/prompt/${BLOCKED_ISSUE_ID}/in-breakdown`);
+    expect(response.status()).toBe(404);
   });
 
   test('returns blocked prompt', async ({ page }) => {
@@ -265,17 +211,6 @@ test.describe('Prompt API', () => {
     expect(body.label).toBe('blocked');
     expect(body.promptName).toBe('Blocker Analysis');
     expect(body.prompt).toContain('# Unblock TEST-');
-    expect(body.prompt).toContain('## Goal');
-  });
-
-  test('returns context prompt', async ({ page }) => {
-    const response = await page.request.get(`/api/prompt/${CONTEXT_ISSUE_ID}/in-context`);
-    expect(response.status()).toBe(200);
-
-    const body = await response.json();
-    expect(body.label).toBe('in-context');
-    expect(body.promptName).toBe('Context Summary');
-    expect(body.prompt).toContain('# Get context for TEST-');
     expect(body.prompt).toContain('## Goal');
   });
 
@@ -311,6 +246,26 @@ test.describe('Prompt API', () => {
     expect(body.prompt).toContain('# Review TEST-');
     expect(body.prompt).toContain('## Goal');
   });
+
+  test('returns look-into prompt', async ({ page }) => {
+    const response = await page.request.get(`/api/prompt/${BLOCKED_ISSUE_ID}/look-into`);
+    expect(response.status()).toBe(200);
+
+    const body = await response.json();
+    expect(body.label).toBe('look-into');
+    expect(body.promptName).toBe('Look Into');
+    expect(body.prompt).toContain('## Goal');
+  });
+
+  test('returns triage prompt', async ({ page }) => {
+    const response = await page.request.get(`/api/prompt/${BLOCKED_ISSUE_ID}/triage`);
+    expect(response.status()).toBe(200);
+
+    const body = await response.json();
+    expect(body.label).toBe('triage');
+    expect(body.promptName).toBe('Task Triage');
+    expect(body.prompt).toContain('## Goal');
+  });
 });
 
 // Tests for promptable label rendering across different labels
@@ -319,16 +274,6 @@ test.describe('Multiple Promptable Labels UI', () => {
     await page.goto('/test/set-session');
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-  });
-
-  test('renders in-research as clickable link', async ({ page }) => {
-    const taskLine = page.locator('.project .line:has-text("Research authentication options")');
-    await expect(taskLine).toBeVisible();
-    await taskLine.click();
-
-    // Use specific selector scoped to the issue's details panel
-    const labelLink = page.locator(`.details[data-details-for="${RESEARCH_ISSUE_ID}"] .label-prompt[data-label="in-research"]`);
-    await expect(labelLink).toBeVisible();
   });
 
   test('renders blocked as clickable link in in-progress section', async ({ page }) => {
@@ -352,19 +297,18 @@ test.describe('Multiple Promptable Labels UI', () => {
     await expect(labelLink).toBeVisible();
   });
 
-  test('clicking in-research shows correct prompt', async ({ page }) => {
-    const taskLine = page.locator('.project .line:has-text("Research authentication options")');
+  test('clicking blocked shows correct prompt', async ({ page }) => {
+    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
 
-    // Use specific selector scoped to the issue's details panel
-    const labelLink = page.locator(`.details[data-details-for="${RESEARCH_ISSUE_ID}"] .label-prompt[data-label="in-research"]`);
+    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
     await labelLink.click();
 
-    const promptContainer = page.locator(`.prompt-container[data-prompt-for="${RESEARCH_ISSUE_ID}"]`);
+    const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
     await expect(promptContainer).toBeVisible();
     await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
 
-    await expect(promptContainer.locator('.prompt-name')).toContainText('Research Task');
+    await expect(promptContainer.locator('.prompt-name')).toContainText('Blocker Analysis');
     await expect(promptContainer.locator('.prompt-text')).toContainText('Goal');
   });
 
@@ -405,25 +349,25 @@ test.describe('More Prompts Inline', () => {
 
   test('renders "more" link for issues with additional prompts', async ({ page }) => {
     // Expand an issue that has promptable labels
-    const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
+    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
 
     // Should show "more" link inline with other labels
-    const moreLink = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .more-toggle`);
+    const moreLink = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .more-toggle`);
     await expect(moreLink).toBeVisible();
     await expect(moreLink).toHaveText('more');
   });
 
   test('clicking "more" reveals hidden prompts inline', async ({ page }) => {
-    const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
+    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
 
     // Hidden prompts should not be visible initially
-    const hiddenPrompts = page.locator(`[data-more-for="${BREAKDOWN_ISSUE_ID}"]`);
+    const hiddenPrompts = page.locator(`.in-progress-items [data-more-for="${BLOCKED_ISSUE_ID}"]`);
     await expect(hiddenPrompts).toBeHidden();
 
     // Click "more"
-    const moreLink = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .more-toggle`);
+    const moreLink = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .more-toggle`);
     await moreLink.click();
 
     // Hidden prompts should now be visible
@@ -432,43 +376,43 @@ test.describe('More Prompts Inline', () => {
     // "more" link should be removed
     await expect(moreLink).toHaveCount(0);
 
-    // Check some revealed prompts are visible (these are not on the issue's labels)
+    // Check the revealed prompt is visible (only "Bug Investigation" is hidden for a blocked issue)
+    // Other prompts (plan, code-review, look-into, triage) are already visible as state/universal prompts
     await expect(hiddenPrompts.locator('.label-prompt:has-text("Bug Investigation")')).toBeVisible();
-    await expect(hiddenPrompts.locator('.label-prompt:has-text("Implementation Plan")')).toBeVisible();
   });
 
   test('clicking revealed prompt loads it into container', async ({ page }) => {
-    const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
+    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
 
     // Click "more" to reveal prompts
-    const moreLink = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .more-toggle`);
+    const moreLink = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .more-toggle`);
     await moreLink.click();
 
     // Click a revealed prompt
-    const bugLink = page.locator(`[data-more-for="${BREAKDOWN_ISSUE_ID}"] .label-prompt[data-label="bug"]`);
+    const bugLink = page.locator(`.in-progress-items [data-more-for="${BLOCKED_ISSUE_ID}"] .label-prompt[data-label="bug"]`);
     await bugLink.click();
 
     // Prompt container should show the prompt
-    const promptContainer = page.locator(`.prompt-container[data-prompt-for="${BREAKDOWN_ISSUE_ID}"]`);
+    const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
     await expect(promptContainer).toBeVisible();
     await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
     await expect(promptContainer.locator('.prompt-name')).toContainText('Bug Investigation');
   });
 
-  test('works in In Progress section', async ({ page }) => {
-    // Blocked issue appears in In Progress section
-    const inProgressLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
-    await inProgressLine.click();
+  test('works in project section', async ({ page }) => {
+    // Bug issue appears in project section
+    const projectLine = page.locator('.project .line:has-text("Login fails with special characters")');
+    await projectLine.click();
 
     // Should have "more" link
-    const moreLink = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .more-toggle`);
+    const moreLink = page.locator(`.project .details[data-details-for="${BUG_ISSUE_ID}"] .more-toggle`);
     await expect(moreLink).toBeVisible();
 
     // Click to reveal
     await moreLink.click();
 
-    const hiddenPrompts = page.locator(`.in-progress-items [data-more-for="${BLOCKED_ISSUE_ID}"]`);
+    const hiddenPrompts = page.locator(`.project [data-more-for="${BUG_ISSUE_ID}"]`);
     await expect(hiddenPrompts).toBeVisible();
   });
 });
@@ -487,11 +431,11 @@ test.describe('AI Recommendations', () => {
 
   test('renders AI suggest button for each issue when OpenRouter is configured', async ({ page }) => {
     // Expand an issue
-    const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
+    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
 
     // Should have AI suggest button
-    const suggestBtn = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .suggest-btn`);
+    const suggestBtn = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .suggest-btn`);
     await expect(suggestBtn).toBeVisible();
     await expect(suggestBtn).toHaveText('AI suggest');
   });
@@ -503,23 +447,23 @@ test.describe('AI Recommendations', () => {
     await page.waitForLoadState('networkidle');
 
     // Expand an issue
-    const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
+    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
 
     // Should NOT have AI suggest button
-    const suggestBtn = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .suggest-btn`);
+    const suggestBtn = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .suggest-btn`);
     await expect(suggestBtn).toBeHidden();
   });
 
   test('clicking suggest button shows recommendation container', async ({ page }) => {
-    const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
+    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
 
-    const suggestBtn = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .suggest-btn`);
+    const suggestBtn = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .suggest-btn`);
     await suggestBtn.click();
 
     // Recommendation container should appear
-    const recommendContainer = page.locator(`.recommend-container[data-recommend-for="${BREAKDOWN_ISSUE_ID}"]`);
+    const recommendContainer = page.locator(`.in-progress-items .recommend-container[data-recommend-for="${BLOCKED_ISSUE_ID}"]`);
     await expect(recommendContainer).toBeVisible();
 
     // Reasoning shows "Analyzing..." during loading, then hides after loading
@@ -538,26 +482,22 @@ test.describe('AI Recommendations', () => {
     await expect(toggleBtn).toHaveText('hide reasoning');
 
     // Should contain reasoning content
-    await expect(reasoning).toContainText('breakdown');
+    await expect(reasoning).toContainText('blocked');
   });
 
   test('recommendation shows generated prompt', async ({ page }) => {
-    const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
+    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
 
-    const suggestBtn = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .suggest-btn`);
+    const suggestBtn = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .suggest-btn`);
     await suggestBtn.click();
 
-    const recommendContainer = page.locator(`.recommend-container[data-recommend-for="${BREAKDOWN_ISSUE_ID}"]`);
+    const recommendContainer = page.locator(`.in-progress-items .recommend-container[data-recommend-for="${BLOCKED_ISSUE_ID}"]`);
     await expect(recommendContainer).toBeVisible();
 
-    // Wait for loading
-    const reasoning = recommendContainer.locator('.recommend-reasoning');
-    await expect(reasoning).not.toContainText('Analyzing', { timeout: 10000 });
-
-    // Should show generated prompt
+    // Wait for prompt to be generated (prompt text should have content)
     const promptDiv = recommendContainer.locator('.recommend-prompt');
-    await expect(promptDiv).toBeVisible();
+    await expect(promptDiv).toBeVisible({ timeout: 10000 });
 
     const promptText = promptDiv.locator('.prompt-text');
     await expect(promptText).toBeVisible();
@@ -567,30 +507,32 @@ test.describe('AI Recommendations', () => {
   });
 
   test('generated prompt has copy button', async ({ page }) => {
-    const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
+    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
 
-    const suggestBtn = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .suggest-btn`);
+    const suggestBtn = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .suggest-btn`);
     await suggestBtn.click();
 
-    const recommendContainer = page.locator(`.recommend-container[data-recommend-for="${BREAKDOWN_ISSUE_ID}"]`);
-    const reasoning = recommendContainer.locator('.recommend-reasoning');
-    await expect(reasoning).not.toContainText('Analyzing', { timeout: 10000 });
+    const recommendContainer = page.locator(`.in-progress-items .recommend-container[data-recommend-for="${BLOCKED_ISSUE_ID}"]`);
+
+    // Wait for prompt to be generated
+    const promptDiv = recommendContainer.locator('.recommend-prompt');
+    await expect(promptDiv).toBeVisible({ timeout: 10000 });
 
     // Should have copy button
-    const copyBtn = recommendContainer.locator('.recommend-prompt .prompt-copy');
+    const copyBtn = promptDiv.locator('.prompt-copy');
     await expect(copyBtn).toBeVisible();
     await expect(copyBtn).toContainText('copy');
   });
 
   test('dismiss button hides recommendation', async ({ page }) => {
-    const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
+    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
 
-    const suggestBtn = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .suggest-btn`);
+    const suggestBtn = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .suggest-btn`);
     await suggestBtn.click();
 
-    const recommendContainer = page.locator(`.recommend-container[data-recommend-for="${BREAKDOWN_ISSUE_ID}"]`);
+    const recommendContainer = page.locator(`.in-progress-items .recommend-container[data-recommend-for="${BLOCKED_ISSUE_ID}"]`);
     await expect(recommendContainer).toBeVisible();
 
     // Click dismiss
@@ -602,13 +544,13 @@ test.describe('AI Recommendations', () => {
   });
 
   test('clicking suggest again toggles recommendation off', async ({ page }) => {
-    const taskLine = page.locator('.project .line:has-text("Task needing breakdown")');
+    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
 
-    const suggestBtn = page.locator(`.details[data-details-for="${BREAKDOWN_ISSUE_ID}"] .suggest-btn`);
+    const suggestBtn = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .suggest-btn`);
     await suggestBtn.click();
 
-    const recommendContainer = page.locator(`.recommend-container[data-recommend-for="${BREAKDOWN_ISSUE_ID}"]`);
+    const recommendContainer = page.locator(`.in-progress-items .recommend-container[data-recommend-for="${BLOCKED_ISSUE_ID}"]`);
     await expect(recommendContainer).toBeVisible();
 
     // Click suggest again
@@ -630,7 +572,7 @@ test.describe('Recommendation API', () => {
 
   test('returns 401 for unauthenticated requests', async ({ page }) => {
     await page.goto('/test/clear-session');
-    const response = await page.request.get(`/api/recommend/${BREAKDOWN_ISSUE_ID}`);
+    const response = await page.request.get(`/api/recommend/${BLOCKED_ISSUE_ID}`);
     expect(response.status()).toBe(401);
   });
 
@@ -640,7 +582,7 @@ test.describe('Recommendation API', () => {
   });
 
   test('returns 200 with generated prompt for valid request', async ({ page }) => {
-    const response = await page.request.get(`/api/recommend/${BREAKDOWN_ISSUE_ID}`);
+    const response = await page.request.get(`/api/recommend/${BLOCKED_ISSUE_ID}`);
     expect(response.status()).toBe(200);
 
     const body = await response.json();
@@ -656,14 +598,14 @@ test.describe('Recommendation API', () => {
   });
 
   test('returns contextual prompt based on labels', async ({ page }) => {
-    // Issue with in-breakdown label
-    const response = await page.request.get(`/api/recommend/${BREAKDOWN_ISSUE_ID}`);
+    // Issue with blocked label
+    const response = await page.request.get(`/api/recommend/${BLOCKED_ISSUE_ID}`);
     const body = await response.json();
 
-    // Should mention breakdown in reasoning
-    expect(body.reasoning.toLowerCase()).toContain('breakdown');
+    // Should mention blocked in reasoning
+    expect(body.reasoning.toLowerCase()).toContain('blocked');
     // Prompt should include the issue identifier and goal section
-    expect(body.prompt).toContain('TEST-6');
+    expect(body.prompt).toContain('TEST-11');
     expect(body.prompt).toContain('Goal');
   });
 
@@ -678,7 +620,7 @@ test.describe('Recommendation API', () => {
   });
 
   test('returns issueUrl field', async ({ page }) => {
-    const response = await page.request.get(`/api/recommend/${BREAKDOWN_ISSUE_ID}`);
+    const response = await page.request.get(`/api/recommend/${BLOCKED_ISSUE_ID}`);
     expect(response.status()).toBe(200);
 
     const body = await response.json();

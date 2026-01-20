@@ -29,7 +29,7 @@ import { renderFancyPage } from './lib/render-fancy.js'
 import { renderSettingsPage } from './lib/render-settings.js'
 import { renderPromptsPage } from './lib/render-prompts.js'
 import { generatePrompt, hasPrompt, getAvailablePrompts } from './lib/prompt-templates.js'
-import { PHASE_LABELS, WORK_ISSUE_LABELS } from './lib/workflow-config.js'
+import { PREPARING_LABEL, WORK_ISSUE_LABELS } from './lib/workflow-config.js'
 import { isRecommendationEnabled, getRecommendation, DEFAULT_MODEL, AVAILABLE_MODELS } from './lib/openrouter.js'
 
 // =============================================================================
@@ -902,13 +902,10 @@ app.get('/api/recommend/:issueId', async (req, res) => {
       let reasoning = 'Start by getting an overview of what this task involves before deciding on the next steps.'
       let goal = 'Summarize what this task involves and how it fits into the broader project context.'
 
-      // Provide contextual mock prompts based on labels
-      if (labels.includes(PHASE_LABELS.BREAKDOWN)) {
-        reasoning = 'This task is in the breakdown phase. Breaking it into smaller subtasks will make it easier to plan and execute.'
-        goal = 'Break this task into subtasks (1-3 hour chunks each), ordered by dependencies.'
-      } else if (labels.includes(PHASE_LABELS.RESEARCH)) {
-        reasoning = 'This task is in the research phase. Investigating the options first will help make informed decisions.'
-        goal = 'Identify key questions, research systematically, and provide actionable recommendations.'
+      // Provide contextual mock prompts based on labels (simplified 3-label system)
+      if (labels.includes(PREPARING_LABEL)) {
+        reasoning = 'This task needs preparation before implementation. Research, breakdown, or design work is needed.'
+        goal = 'Complete the necessary preparation work so this task is ready for implementation.'
       } else if (labels.includes(WORK_ISSUE_LABELS.BLOCKED)) {
         reasoning = 'This task is blocked. Analyzing the blocker will help identify ways to unblock progress.'
         goal = 'Identify the blocker type and root cause, evaluate options to unblock, and recommend the best path.'

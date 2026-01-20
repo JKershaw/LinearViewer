@@ -2,18 +2,45 @@
  * Unit tests for prompt-templates.js
  *
  * Run with: node --test tests/unit/prompt-templates.test.js
+ *
+ * Tests the simplified 3-label system:
+ * - preparing: Pre-implementation work
+ * - blocked: Work stuck on external dependency
+ * - bug: Investigating unexpected behavior
+ *
+ * Plus virtual prompts: plan, code-review, look-into, triage
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { hasPrompt, getPromptLabels, generatePrompt, getAvailablePrompts, getPromptDescriptionsForAI, PROMPT_TEMPLATES, PROMPT_CATEGORIES } from '../../lib/prompt-templates.js';
+import { hasPrompt, getPromptLabels, generatePrompt, getAvailablePrompts, getPromptDescriptionsForAI, PROMPT_TEMPLATES, PROMPT_CATEGORIES, getPreWorkLabels, isPreWorkLabel } from '../../lib/prompt-templates.js';
+import { PREPARING_LABEL, WORK_ISSUE_LABELS } from '../../lib/workflow-config.js';
 
 // =============================================================================
 // hasPrompt Tests
 // =============================================================================
 
 describe('hasPrompt', () => {
-  test('returns true for in-breakdown label', () => {
-    assert.strictEqual(hasPrompt('in-breakdown'), true);
+  test('returns true for blocked label', () => {
+    assert.strictEqual(hasPrompt('blocked'), true);
+  });
+
+  test('returns true for bug label', () => {
+    assert.strictEqual(hasPrompt('bug'), true);
+  });
+
+  test('returns true for virtual prompts', () => {
+    assert.strictEqual(hasPrompt('plan'), true);
+    assert.strictEqual(hasPrompt('code-review'), true);
+    assert.strictEqual(hasPrompt('look-into'), true);
+    assert.strictEqual(hasPrompt('triage'), true);
+    assert.strictEqual(hasPrompt('breakdown'), true);
+    assert.strictEqual(hasPrompt('research'), true);
+    assert.strictEqual(hasPrompt('scoping'), true);
+    assert.strictEqual(hasPrompt('design'), true);
+    assert.strictEqual(hasPrompt('spike'), true);
+    assert.strictEqual(hasPrompt('context'), true);
+    assert.strictEqual(hasPrompt('implementation'), true);
+    assert.strictEqual(hasPrompt('review'), true);
   });
 
   test('returns false for unknown labels', () => {
@@ -22,13 +49,19 @@ describe('hasPrompt', () => {
     assert.strictEqual(hasPrompt('documentation'), false);
   });
 
-  test('returns false for empty string', () => {
-    assert.strictEqual(hasPrompt(''), false);
+  test('returns false for old in-X phase labels (removed format)', () => {
+    assert.strictEqual(hasPrompt('in-breakdown'), false);
+    assert.strictEqual(hasPrompt('in-research'), false);
+    assert.strictEqual(hasPrompt('in-scoping'), false);
+    assert.strictEqual(hasPrompt('in-design'), false);
+    assert.strictEqual(hasPrompt('in-spike'), false);
+    assert.strictEqual(hasPrompt('in-context'), false);
+    assert.strictEqual(hasPrompt('in-implementation'), false);
+    assert.strictEqual(hasPrompt('in-review'), false);
   });
 
-  test('is case-sensitive', () => {
-    assert.strictEqual(hasPrompt('NEEDS-BREAKDOWN'), false);
-    assert.strictEqual(hasPrompt('Needs-Breakdown'), false);
+  test('returns false for empty string', () => {
+    assert.strictEqual(hasPrompt(''), false);
   });
 });
 
@@ -43,9 +76,62 @@ describe('getPromptLabels', () => {
     assert.ok(labels.length > 0);
   });
 
-  test('includes in-breakdown', () => {
+  test('includes work-issue labels', () => {
     const labels = getPromptLabels();
-    assert.ok(labels.includes('in-breakdown'));
+    assert.ok(labels.includes('blocked'));
+    assert.ok(labels.includes('bug'));
+  });
+
+  test('includes virtual prompts', () => {
+    const labels = getPromptLabels();
+    assert.ok(labels.includes('plan'));
+    assert.ok(labels.includes('code-review'));
+    assert.ok(labels.includes('look-into'));
+    assert.ok(labels.includes('triage'));
+    assert.ok(labels.includes('breakdown'));
+    assert.ok(labels.includes('research'));
+    assert.ok(labels.includes('scoping'));
+    assert.ok(labels.includes('design'));
+    assert.ok(labels.includes('spike'));
+    assert.ok(labels.includes('context'));
+    assert.ok(labels.includes('implementation'));
+    assert.ok(labels.includes('review'));
+  });
+
+  test('has exactly 14 templates', () => {
+    const labels = getPromptLabels();
+    assert.strictEqual(labels.length, 14);
+  });
+});
+
+// =============================================================================
+// getPreWorkLabels Tests
+// =============================================================================
+
+describe('getPreWorkLabels', () => {
+  test('returns array with preparing label', () => {
+    const labels = getPreWorkLabels();
+    assert.ok(Array.isArray(labels));
+    assert.strictEqual(labels.length, 1);
+    assert.ok(labels.includes(PREPARING_LABEL));
+  });
+});
+
+// =============================================================================
+// isPreWorkLabel Tests
+// =============================================================================
+
+describe('isPreWorkLabel', () => {
+  test('returns true for preparing label', () => {
+    assert.strictEqual(isPreWorkLabel('preparing'), true);
+    assert.strictEqual(isPreWorkLabel('Preparing'), true);
+    assert.strictEqual(isPreWorkLabel('PREPARING'), true);
+  });
+
+  test('returns false for other labels', () => {
+    assert.strictEqual(isPreWorkLabel('blocked'), false);
+    assert.strictEqual(isPreWorkLabel('bug'), false);
+    assert.strictEqual(isPreWorkLabel('in-breakdown'), false);
   });
 });
 
@@ -61,7 +147,7 @@ describe('generatePrompt', () => {
     description: 'This is a test description for the task',
     url: 'https://linear.app/test/issue/TEST-123',
     state: { name: 'Backlog', type: 'backlog' },
-    labels: ['in-breakdown']
+    labels: ['blocked']
   };
 
   const mockContext = {
@@ -78,40 +164,22 @@ describe('generatePrompt', () => {
   });
 
   test('returns object with name and prompt for valid label', () => {
-    const result = generatePrompt('in-breakdown', mockIssue, mockContext);
+    const result = generatePrompt('blocked', mockIssue, mockContext);
     assert.ok(result !== null);
     assert.ok(typeof result.name === 'string');
     assert.ok(typeof result.prompt === 'string');
   });
 
   test('includes issue identifier and title in header', () => {
-    const result = generatePrompt('in-breakdown', mockIssue, mockContext);
+    const result = generatePrompt('blocked', mockIssue, mockContext);
     assert.ok(result.prompt.includes('TEST-123'));
     assert.ok(result.prompt.includes('Test task title'));
-    assert.ok(result.prompt.startsWith('# Break down TEST-123:'));
   });
 
   test('includes workflow section with Linear MCP instructions', () => {
-    const result = generatePrompt('in-breakdown', mockIssue, mockContext);
+    const result = generatePrompt('blocked', mockIssue, mockContext);
     assert.ok(result.prompt.includes('## Workflow'));
     assert.ok(result.prompt.includes('Linear MCP'));
-  });
-
-  test('does not include URL (agent uses MCP)', () => {
-    const result = generatePrompt('in-breakdown', mockIssue, mockContext);
-    assert.ok(!result.prompt.includes('https://linear.app'));
-    assert.ok(!result.prompt.includes('**Issue URL:**'));
-  });
-
-  test('does not include description (agent fetches via MCP)', () => {
-    const result = generatePrompt('in-breakdown', mockIssue, mockContext);
-    assert.ok(!result.prompt.includes('This is a test description'));
-    assert.ok(!result.prompt.includes('**Description:**'));
-  });
-
-  test('omits parent section when no parent', () => {
-    const result = generatePrompt('in-breakdown', mockIssue, mockContext);
-    assert.ok(!result.prompt.includes('**Parent Task:**'));
   });
 
   test('includes parent info when present', () => {
@@ -125,7 +193,7 @@ describe('generatePrompt', () => {
       }
     };
 
-    const result = generatePrompt('in-breakdown', mockIssue, contextWithParent);
+    const result = generatePrompt('blocked', mockIssue, contextWithParent);
     assert.ok(result.prompt.includes('TEST-100'));
     assert.ok(result.prompt.includes('Parent task title'));
   });
@@ -145,16 +213,9 @@ describe('generatePrompt', () => {
       ]
     };
 
-    const result = generatePrompt('in-breakdown', mockIssue, contextWithSiblings);
+    const result = generatePrompt('blocked', mockIssue, contextWithSiblings);
     assert.ok(result.prompt.includes('TEST-101'));
     assert.ok(result.prompt.includes('Sibling 1'));
-    assert.ok(result.prompt.includes('TEST-102'));
-    assert.ok(result.prompt.includes('Sibling 2'));
-  });
-
-  test('omits sibling section when empty', () => {
-    const result = generatePrompt('in-breakdown', mockIssue, mockContext);
-    assert.ok(!result.prompt.includes('**Sibling Tasks:**'));
   });
 
   test('includes project name when present', () => {
@@ -166,38 +227,8 @@ describe('generatePrompt', () => {
       }
     };
 
-    const result = generatePrompt('in-breakdown', mockIssue, contextWithProject);
+    const result = generatePrompt('blocked', mockIssue, contextWithProject);
     assert.ok(result.prompt.includes('My Project'));
-    // Project description is not included (agent can look it up)
-    assert.ok(!result.prompt.includes('This is the project description'));
-  });
-
-  test('shows Unknown for missing project', () => {
-    const result = generatePrompt('in-breakdown', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Unknown'));
-  });
-
-  test('includes existing children when present', () => {
-    const contextWithChildren = {
-      ...mockContext,
-      children: [
-        { id: 'c1', identifier: 'TEST-201', title: 'Child task 1', state: { name: 'Todo', type: 'unstarted' } },
-        { id: 'c2', identifier: 'TEST-202', title: 'Child task 2', state: { name: 'In Progress', type: 'started' } }
-      ]
-    };
-
-    const result = generatePrompt('in-breakdown', mockIssue, contextWithChildren);
-    assert.ok(result.prompt.includes('TEST-201'));
-    assert.ok(result.prompt.includes('Child task 1'));
-    assert.ok(result.prompt.includes('TEST-202'));
-    assert.ok(result.prompt.includes('Child task 2'));
-    // Should include instruction to avoid duplicating existing subtasks
-    assert.ok(result.prompt.includes('avoid duplicating'));
-  });
-
-  test('omits existing subtasks section when empty', () => {
-    const result = generatePrompt('in-breakdown', mockIssue, mockContext);
-    assert.ok(!result.prompt.includes('**Existing Subtasks:**'));
   });
 
   test('includes comments when present', () => {
@@ -209,35 +240,9 @@ describe('generatePrompt', () => {
       ]
     };
 
-    const result = generatePrompt('in-breakdown', mockIssue, contextWithComments);
+    const result = generatePrompt('blocked', mockIssue, contextWithComments);
     assert.ok(result.prompt.includes('Alice'));
     assert.ok(result.prompt.includes('First comment with research findings'));
-    assert.ok(result.prompt.includes('Bob'));
-    assert.ok(result.prompt.includes('Follow-up discussion'));
-    assert.ok(result.prompt.includes('Discussion History'));
-  });
-
-  test('omits comments section when empty', () => {
-    const result = generatePrompt('in-breakdown', mockIssue, mockContext);
-    assert.ok(!result.prompt.includes('**Discussion History:**'));
-  });
-
-  test('includes other labels excluding the trigger label', () => {
-    const issueWithLabels = {
-      ...mockIssue,
-      labels: ['in-breakdown', 'backend', 'high-priority']
-    };
-
-    const result = generatePrompt('in-breakdown', issueWithLabels, mockContext);
-    assert.ok(result.prompt.includes('backend'));
-    assert.ok(result.prompt.includes('high-priority'));
-    // Should not duplicate in-breakdown in labels
-    assert.ok(!result.prompt.includes('**Labels:** in-breakdown'));
-  });
-
-  test('omits labels section when only trigger label exists', () => {
-    const result = generatePrompt('in-breakdown', mockIssue, mockContext);
-    assert.ok(!result.prompt.includes('**Labels:**'));
   });
 });
 
@@ -246,30 +251,29 @@ describe('generatePrompt', () => {
 // =============================================================================
 
 describe('PROMPT_TEMPLATES', () => {
-  test('in-breakdown template has required properties', () => {
-    const template = PROMPT_TEMPLATES['in-breakdown'];
+  test('blocked template has required properties', () => {
+    const template = PROMPT_TEMPLATES['blocked'];
     assert.ok(template !== undefined);
     assert.ok(typeof template.name === 'string');
     assert.ok(typeof template.generate === 'function');
   });
 
-  test('template name is human-readable', () => {
-    const template = PROMPT_TEMPLATES['in-breakdown'];
-    assert.strictEqual(template.name, 'Task Breakdown');
-  });
-
   test('all expected templates exist', () => {
     const expectedTemplates = [
-      'in-breakdown',
-      'in-research',
-      'in-scoping',
-      'in-design',
-      'in-spike',
       'blocked',
-      'in-context',
       'bug',
       'plan',
-      'code-review'
+      'code-review',
+      'look-into',
+      'triage',
+      'breakdown',
+      'research',
+      'scoping',
+      'design',
+      'spike',
+      'context',
+      'implementation',
+      'review'
     ];
     for (const labelName of expectedTemplates) {
       assert.ok(PROMPT_TEMPLATES[labelName], `Template for ${labelName} should exist`);
@@ -283,165 +287,21 @@ describe('PROMPT_TEMPLATES', () => {
     const uniqueNames = new Set(names);
     assert.strictEqual(names.length, uniqueNames.size, 'All template names should be unique');
   });
-});
 
-// =============================================================================
-// in-research Template Tests
-// =============================================================================
-
-describe('in-research template', () => {
-  const mockIssue = {
-    id: 'issue-research',
-    identifier: 'TEST-R1',
-    title: 'Research authentication options',
-    description: 'Investigate OAuth vs JWT vs session-based auth',
-    url: 'https://linear.app/test/issue/TEST-R1',
-    state: { name: 'Backlog', type: 'backlog' },
-    labels: ['in-research']
-  };
-
-  const mockContext = {
-    parent: null,
-    siblings: [],
-    project: { name: 'Auth Project', description: 'Authentication improvements' },
-    children: [],
-    comments: []
-  };
-
-  test('includes prior research prompt when comments exist', () => {
-    const contextWithComments = {
-      ...mockContext,
-      comments: [{ body: 'Previous research on OAuth', user: 'Dev', createdAt: '2024-01-10T10:00:00Z' }]
-    };
-    const result = generatePrompt('in-research', mockIssue, contextWithComments);
-    assert.ok(result.prompt.includes('Prior Research'));
-    assert.ok(result.prompt.includes('build on existing findings'));
-  });
-
-  test('returns Research Task as name', () => {
-    const result = generatePrompt('in-research', mockIssue, mockContext);
-    assert.strictEqual(result.name, 'Research Task');
-  });
-
-  test('includes goal section', () => {
-    const result = generatePrompt('in-research', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('## Goal'));
-    assert.ok(result.prompt.includes('research systematically'));
-  });
-
-  test('includes project name', () => {
-    const result = generatePrompt('in-research', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Auth Project'));
-  });
-});
-
-// =============================================================================
-// in-scoping Template Tests
-// =============================================================================
-
-describe('in-scoping template', () => {
-  const mockIssue = {
-    id: 'issue-scoping',
-    identifier: 'TEST-S1',
-    title: 'Define scope for user dashboard',
-    description: 'Need to clarify dashboard features',
-    url: 'https://linear.app/test/issue/TEST-S1',
-    state: { name: 'Backlog', type: 'backlog' },
-    labels: ['in-scoping']
-  };
-
-  const mockContext = {
-    parent: null,
-    siblings: [],
-    project: null,
-    children: [],
-    comments: []
-  };
-
-  test('returns Scope Definition as name', () => {
-    const result = generatePrompt('in-scoping', mockIssue, mockContext);
-    assert.strictEqual(result.name, 'Scope Definition');
-  });
-
-  test('includes goal with scope concepts', () => {
-    const result = generatePrompt('in-scoping', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('## Goal'));
-    assert.ok(result.prompt.includes('in scope'));
-    assert.ok(result.prompt.includes('out of scope'));
-    assert.ok(result.prompt.includes('success criteria'));
-  });
-});
-
-// =============================================================================
-// in-design Template Tests
-// =============================================================================
-
-describe('in-design template', () => {
-  const mockIssue = {
-    id: 'issue-design',
-    identifier: 'TEST-D1',
-    title: 'Design caching layer',
-    description: 'Create technical design for caching',
-    url: 'https://linear.app/test/issue/TEST-D1',
-    state: { name: 'Backlog', type: 'backlog' },
-    labels: ['in-design']
-  };
-
-  const mockContext = {
-    parent: null,
-    siblings: [],
-    project: { name: 'Performance', description: 'Performance improvements' },
-    children: [],
-    comments: []
-  };
-
-  test('returns Technical Design as name', () => {
-    const result = generatePrompt('in-design', mockIssue, mockContext);
-    assert.strictEqual(result.name, 'Technical Design');
-  });
-
-  test('includes goal with design concepts', () => {
-    const result = generatePrompt('in-design', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('## Goal'));
-    assert.ok(result.prompt.includes('design approaches'));
-    assert.ok(result.prompt.includes('tradeoffs'));
-  });
-});
-
-// =============================================================================
-// in-spike Template Tests
-// =============================================================================
-
-describe('in-spike template', () => {
-  const mockIssue = {
-    id: 'issue-spike',
-    identifier: 'TEST-SP1',
-    title: 'Spike: WebSocket vs SSE',
-    description: 'Evaluate real-time update options',
-    url: 'https://linear.app/test/issue/TEST-SP1',
-    state: { name: 'Backlog', type: 'backlog' },
-    labels: ['in-spike'],
-    estimate: 2
-  };
-
-  const mockContext = {
-    parent: null,
-    siblings: [],
-    project: null,
-    children: [],
-    comments: []
-  };
-
-  test('returns Technical Spike as name', () => {
-    const result = generatePrompt('in-spike', mockIssue, mockContext);
-    assert.strictEqual(result.name, 'Technical Spike');
-  });
-
-  test('includes goal with spike concepts', () => {
-    const result = generatePrompt('in-spike', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('## Goal'));
-    assert.ok(result.prompt.includes('questions'));
-    assert.ok(result.prompt.includes('success criteria'));
+  test('old in-X label format templates do not exist (replaced by universal prompts)', () => {
+    const oldLabelFormat = [
+      'in-breakdown',
+      'in-research',
+      'in-scoping',
+      'in-design',
+      'in-spike',
+      'in-context',
+      'in-implementation',
+      'in-review'
+    ];
+    for (const labelName of oldLabelFormat) {
+      assert.ok(!PROMPT_TEMPLATES[labelName], `Old template for ${labelName} should NOT exist`);
+    }
   });
 });
 
@@ -462,7 +322,7 @@ describe('blocked template', () => {
   };
 
   const mockContext = {
-    parent: { id: 'p1', identifier: 'TEST-P1', title: 'Parent task', state: { name: 'Started', type: 'started' } },
+    parent: null,
     siblings: [],
     project: { name: 'Integration', description: 'API Integration' },
     children: [],
@@ -481,57 +341,9 @@ describe('blocked template', () => {
     assert.ok(result.prompt.includes('root cause'));
   });
 
-  test('includes parent info when present', () => {
-    const result = generatePrompt('blocked', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('TEST-P1'));
-    assert.ok(result.prompt.includes('Parent task'));
-  });
-});
-
-// =============================================================================
-// in-context Template Tests
-// =============================================================================
-
-describe('in-context template', () => {
-  const mockIssue = {
-    id: 'issue-context',
-    identifier: 'TEST-C1',
-    title: 'Context needed for migration',
-    description: 'Need context on legacy system',
-    url: 'https://linear.app/test/issue/TEST-C1',
-    state: { name: 'Backlog', type: 'backlog' },
-    labels: ['in-context'],
-    assignee: null
-  };
-
-  const mockContext = {
-    parent: null,
-    siblings: [
-      { id: 's1', identifier: 'TEST-S1', title: 'Related task', state: { name: 'Done', type: 'completed' } }
-    ],
-    project: { name: 'Migration', description: 'Legacy system migration' },
-    children: [
-      { id: 'c1', identifier: 'TEST-C2', title: 'Subtask', state: { name: 'Todo', type: 'unstarted' } }
-    ],
-    comments: []
-  };
-
-  test('returns Context Summary as name', () => {
-    const result = generatePrompt('in-context', mockIssue, mockContext);
-    assert.strictEqual(result.name, 'Context Summary');
-  });
-
-  test('includes goal with context concepts', () => {
-    const result = generatePrompt('in-context', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('## Goal'));
-    assert.ok(result.prompt.includes("what's done"));
-    assert.ok(result.prompt.includes('next steps'));
-  });
-
-  test('includes siblings and children', () => {
-    const result = generatePrompt('in-context', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('TEST-S1'));
-    assert.ok(result.prompt.includes('TEST-C2'));
+  test('has WORK_ISSUE category', () => {
+    const template = PROMPT_TEMPLATES['blocked'];
+    assert.strictEqual(template.category, PROMPT_CATEGORIES.WORK_ISSUE);
   });
 });
 
@@ -570,6 +382,11 @@ describe('bug template', () => {
     assert.ok(result.prompt.includes('reproduction steps'));
     assert.ok(result.prompt.includes('likely causes'));
   });
+
+  test('has WORK_ISSUE category', () => {
+    const template = PROMPT_TEMPLATES['bug'];
+    assert.strictEqual(template.category, PROMPT_CATEGORIES.WORK_ISSUE);
+  });
 });
 
 // =============================================================================
@@ -584,7 +401,7 @@ describe('plan template', () => {
     description: 'Create a new user profile page with avatar, bio, and settings',
     url: 'https://linear.app/test/issue/TEST-P1',
     state: { name: 'Backlog', type: 'backlog' },
-    labels: ['plan'],
+    labels: [],
     assignee: { name: 'Alice' },
     estimate: 5
   };
@@ -617,12 +434,6 @@ describe('plan template', () => {
     assert.ok(result.prompt.includes('User Management Epic'));
   });
 
-  test('omits parent section when no parent', () => {
-    const contextNoParent = { ...mockContext, parent: null };
-    const result = generatePrompt('plan', mockIssue, contextNoParent);
-    assert.ok(!result.prompt.includes('**Parent Task:**'));
-  });
-
   test('includes sibling tasks', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
     assert.ok(result.prompt.includes('TEST-S1'));
@@ -633,31 +444,6 @@ describe('plan template', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
     assert.ok(result.prompt.includes('TEST-C1'));
     assert.ok(result.prompt.includes('Design profile UI'));
-  });
-
-  test('includes goal with implementation concepts', () => {
-    const result = generatePrompt('plan', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('## Goal'));
-    assert.ok(result.prompt.includes('implement'));
-  });
-
-  test('includes project info', () => {
-    const result = generatePrompt('plan', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('User Features'));
-  });
-
-  test('includes workflow section with status updates', () => {
-    const result = generatePrompt('plan', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('## Workflow'));
-    assert.ok(result.prompt.includes('In Progress'));
-    assert.ok(result.prompt.includes('in-review'));
-  });
-
-  test('workflow uses in-review label for completion', () => {
-    const result = generatePrompt('plan', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Complete'));
-    assert.ok(result.prompt.includes('add "in-review" label'));
-    assert.ok(result.prompt.includes('indicate ready for review'));
   });
 
   test('includes explicit planning phase before coding', () => {
@@ -674,69 +460,11 @@ describe('plan template', () => {
     assert.ok(result.prompt.includes('Avoid over-engineering'));
   });
 
-  test('includes baseline test verification', () => {
-    const result = generatePrompt('plan', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Run existing tests to verify baseline'));
-  });
-
   test('includes subtask summary when subtasks present', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
     assert.ok(result.prompt.includes('**Subtasks:**'));
     assert.ok(result.prompt.includes('0/1 done'));
     assert.ok(result.prompt.includes('Next: TEST-C1'));
-  });
-
-  test('omits subtask summary when no subtasks', () => {
-    const contextNoChildren = { ...mockContext, children: [] };
-    const result = generatePrompt('plan', mockIssue, contextNoChildren);
-    assert.ok(!result.prompt.includes('**Subtasks:**'));
-  });
-
-  test('subtask summary shows in-progress with Continue', () => {
-    const contextWithInProgress = {
-      ...mockContext,
-      children: [
-        { id: 'c1', identifier: 'TEST-C1', title: 'Done task', state: { name: 'Done', type: 'completed' } },
-        { id: 'c2', identifier: 'TEST-C2', title: 'In progress', state: { name: 'In Progress', type: 'started' } },
-        { id: 'c3', identifier: 'TEST-C3', title: 'Todo', state: { name: 'Todo', type: 'unstarted' } }
-      ]
-    };
-    const result = generatePrompt('plan', mockIssue, contextWithInProgress);
-    assert.ok(result.prompt.includes('1/3 done'));
-    assert.ok(result.prompt.includes('1 in progress'));
-    assert.ok(result.prompt.includes('Continue: TEST-C2'));
-  });
-
-  test('subtask summary shows Next when none in progress', () => {
-    const contextAllTodo = {
-      ...mockContext,
-      children: [
-        { id: 'c1', identifier: 'TEST-C1', title: 'First', state: { name: 'Todo', type: 'unstarted' } },
-        { id: 'c2', identifier: 'TEST-C2', title: 'Second', state: { name: 'Todo', type: 'unstarted' } }
-      ]
-    };
-    const result = generatePrompt('plan', mockIssue, contextAllTodo);
-    assert.ok(result.prompt.includes('0/2 done'));
-    assert.ok(result.prompt.includes('Next: TEST-C1'));
-  });
-
-  test('subtask summary shows all done without next action', () => {
-    const contextAllDone = {
-      ...mockContext,
-      children: [
-        { id: 'c1', identifier: 'TEST-C1', title: 'Done 1', state: { name: 'Done', type: 'completed' } },
-        { id: 'c2', identifier: 'TEST-C2', title: 'Done 2', state: { name: 'Done', type: 'completed' } }
-      ]
-    };
-    const result = generatePrompt('plan', mockIssue, contextAllDone);
-    assert.ok(result.prompt.includes('2/2 done'));
-    assert.ok(!result.prompt.includes('Next:'));
-    assert.ok(!result.prompt.includes('Continue:'));
-  });
-
-  test('includes commit message guidance with issue identifier', () => {
-    const result = generatePrompt('plan', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('commit message referencing TEST-P1'));
   });
 
   test('includes success criteria section', () => {
@@ -750,10 +478,20 @@ describe('plan template', () => {
     assert.ok(result.prompt.includes('## If Blocked'));
   });
 
-  test('success criteria includes parent alignment when parent exists', () => {
+  test('includes preparing label removal instruction when issue has preparing label', () => {
+    const issueWithPreparing = {
+      ...mockIssue,
+      labels: ['preparing']
+    };
+    const result = generatePrompt('plan', issueWithPreparing, mockContext);
+    assert.ok(result.prompt.includes('Label Update'));
+    assert.ok(result.prompt.includes('preparing'));
+    assert.ok(result.prompt.includes('Remove it'));
+  });
+
+  test('does not include preparing label removal when not present', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('TEST-EPIC'));
-    assert.ok(result.prompt.includes('align with parent'));
+    assert.ok(!result.prompt.includes('Label Update'));
   });
 });
 
@@ -800,22 +538,97 @@ describe('code-review template', () => {
     assert.ok(result.prompt.includes('Approve'));
   });
 
-  test('includes project info', () => {
-    const result = generatePrompt('code-review', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Auth Refactor'));
-  });
-
-  test('includes workflow section', () => {
-    const result = generatePrompt('code-review', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('## Workflow'));
-    assert.ok(result.prompt.includes('Linear MCP'));
-  });
-
   test('includes review checklist', () => {
     const result = generatePrompt('code-review', mockIssue, mockContext);
     assert.ok(result.prompt.includes('Review checklist'));
     assert.ok(result.prompt.includes('Tests cover'));
     assert.ok(result.prompt.includes('security vulnerabilities'));
+  });
+});
+
+// =============================================================================
+// look-into Template Tests
+// =============================================================================
+
+describe('look-into template', () => {
+  const mockIssue = {
+    id: 'issue-lookin',
+    identifier: 'TEST-L1',
+    title: 'Investigate performance issue',
+    description: 'Users reporting slow page loads',
+    url: 'https://linear.app/test/issue/TEST-L1',
+    state: { name: 'Backlog', type: 'backlog' },
+    labels: [],
+    assignee: null
+  };
+
+  const mockContext = {
+    parent: null,
+    siblings: [],
+    project: { name: 'Performance', description: 'Performance work' },
+    children: [],
+    comments: []
+  };
+
+  test('returns Look Into as name', () => {
+    const result = generatePrompt('look-into', mockIssue, mockContext);
+    assert.strictEqual(result.name, 'Look Into');
+  });
+
+  test('has UNIVERSAL category', () => {
+    const template = PROMPT_TEMPLATES['look-into'];
+    assert.strictEqual(template.category, PROMPT_CATEGORIES.UNIVERSAL);
+  });
+
+  test('includes goal with overview concepts', () => {
+    const result = generatePrompt('look-into', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('## Goal'));
+    assert.ok(result.prompt.includes('overview'));
+    assert.ok(result.prompt.includes('Recommended next action'));
+  });
+});
+
+// =============================================================================
+// triage Template Tests
+// =============================================================================
+
+describe('triage template', () => {
+  const mockIssue = {
+    id: 'issue-triage',
+    identifier: 'TEST-T1',
+    title: 'New feature request',
+    description: 'User wants dark mode',
+    url: 'https://linear.app/test/issue/TEST-T1',
+    state: { name: 'Triage', type: 'triage' },
+    labels: [],
+    assignee: null,
+    priority: 2
+  };
+
+  const mockContext = {
+    parent: null,
+    siblings: [],
+    project: null,
+    children: [],
+    comments: []
+  };
+
+  test('returns Task Triage as name', () => {
+    const result = generatePrompt('triage', mockIssue, mockContext);
+    assert.strictEqual(result.name, 'Task Triage');
+  });
+
+  test('has UNIVERSAL category', () => {
+    const template = PROMPT_TEMPLATES['triage'];
+    assert.strictEqual(template.category, PROMPT_CATEGORIES.UNIVERSAL);
+  });
+
+  test('includes label selection guide with 3 labels', () => {
+    const result = generatePrompt('triage', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('Label Selection Guide'));
+    assert.ok(result.prompt.includes('preparing'));
+    assert.ok(result.prompt.includes('blocked'));
+    assert.ok(result.prompt.includes('bug'));
   });
 });
 
@@ -834,24 +647,14 @@ describe('getAvailablePrompts', () => {
     assert.ok(available.includes('code-review'), 'Should include code-review');
   });
 
-  test('returns both plan and code-review for eligible unstarted issue', () => {
+  test('returns universal prompts for all issues', () => {
     const issue = {
-      state: { type: 'unstarted' },
+      state: { type: 'backlog' },
       labels: { nodes: [] }
     };
     const available = getAvailablePrompts(issue);
-    assert.ok(available.includes('plan'), 'Should include plan');
-    assert.ok(available.includes('code-review'), 'Should include code-review');
-  });
-
-  test('returns both plan and code-review for eligible started issue', () => {
-    const issue = {
-      state: { type: 'started' },
-      labels: { nodes: [] }
-    };
-    const available = getAvailablePrompts(issue);
-    assert.ok(available.includes('plan'), 'Should include plan');
-    assert.ok(available.includes('code-review'), 'Should include code-review');
+    assert.ok(available.includes('look-into'), 'Should include look-into');
+    assert.ok(available.includes('triage'), 'Should include triage');
   });
 
   test('does not return plan or code-review for completed issue', () => {
@@ -864,15 +667,14 @@ describe('getAvailablePrompts', () => {
     assert.ok(!available.includes('code-review'), 'Should not include code-review');
   });
 
-  test('does not return plan or code-review when pre-work label present', () => {
+  test('does not return plan or code-review when preparing label present', () => {
     const issue = {
       state: { type: 'backlog' },
-      labels: { nodes: [{ name: 'in-breakdown' }] }
+      labels: { nodes: [{ name: 'preparing' }] }
     };
     const available = getAvailablePrompts(issue);
-    assert.ok(!available.includes('plan'), 'Should not include plan when in-breakdown present');
-    assert.ok(!available.includes('code-review'), 'Should not include code-review when in-breakdown present');
-    assert.ok(available.includes('in-breakdown'), 'Should include in-breakdown label prompt');
+    assert.ok(!available.includes('plan'), 'Should not include plan when preparing present');
+    assert.ok(!available.includes('code-review'), 'Should not include code-review when preparing present');
   });
 
   test('returns label-based prompts alongside state-based prompts', () => {
@@ -888,98 +690,30 @@ describe('getAvailablePrompts', () => {
 });
 
 // =============================================================================
-// Prompt Sections Tests
-// =============================================================================
-
-describe('Prompt Sections', () => {
-  const mockIssue = {
-    id: 'issue-123',
-    identifier: 'TEST-123',
-    title: 'Test task',
-    description: 'Test description',
-    url: 'https://linear.app/test/issue/TEST-123',
-    state: { name: 'Backlog', type: 'backlog' },
-    labels: ['in-breakdown', 'backend']
-  };
-
-  const fullContext = {
-    parent: { id: 'p1', identifier: 'TEST-100', title: 'Parent', state: { name: 'Started', type: 'started' } },
-    siblings: [{ id: 's1', identifier: 'TEST-101', title: 'Sibling', state: { name: 'Todo', type: 'unstarted' } }],
-    project: { name: 'Test Project', description: 'Project desc' },
-    children: [{ id: 'c1', identifier: 'TEST-201', title: 'Child', state: { name: 'Todo', type: 'unstarted' } }],
-    comments: []
-  };
-
-  test('prompt includes header with identifier and title', () => {
-    const result = generatePrompt('in-breakdown', mockIssue, fullContext);
-    assert.ok(result.prompt.startsWith('# Break down TEST-123: Test task'));
-  });
-
-  test('prompt includes workflow section', () => {
-    const result = generatePrompt('in-breakdown', mockIssue, fullContext);
-    assert.ok(result.prompt.includes('## Workflow'));
-    assert.ok(result.prompt.includes('Linear MCP'));
-  });
-
-  test('prompt includes context sections when data present', () => {
-    const result = generatePrompt('in-breakdown', mockIssue, fullContext);
-    assert.ok(result.prompt.includes('## Context'));
-    assert.ok(result.prompt.includes('**Project:**'));
-    assert.ok(result.prompt.includes('**Parent Task:**'));
-    assert.ok(result.prompt.includes('**Sibling Tasks:**'));
-    assert.ok(result.prompt.includes('**Existing Subtasks:**'));
-    assert.ok(result.prompt.includes('**Labels:**'));
-    // Should NOT include URL or description (agent fetches via MCP)
-    assert.ok(!result.prompt.includes('**Issue URL:**'));
-    assert.ok(!result.prompt.includes('**Description:**'));
-  });
-
-  test('prompt includes goal section', () => {
-    const result = generatePrompt('in-breakdown', mockIssue, fullContext);
-    assert.ok(result.prompt.includes('## Goal'));
-  });
-
-  test('prompt omits empty sections', () => {
-    const emptyContext = {
-      parent: null,
-      siblings: [],
-      project: { name: 'Test Project' },
-      children: []
-    };
-    const issueNoExtraLabels = { ...mockIssue, labels: ['in-breakdown'] };
-    const result = generatePrompt('in-breakdown', issueNoExtraLabels, emptyContext);
-    assert.ok(!result.prompt.includes('**Parent Task:**'));
-    assert.ok(!result.prompt.includes('**Sibling Tasks:**'));
-    assert.ok(!result.prompt.includes('**Existing Subtasks:**'));
-    assert.ok(!result.prompt.includes('**Labels:**'));
-  });
-});
-
-// =============================================================================
 // getPromptDescriptionsForAI Tests
 // =============================================================================
 
 describe('getPromptDescriptionsForAI', () => {
   test('returns array of prompt descriptions', () => {
-    const keys = ['in-breakdown', 'plan'];
+    const keys = ['blocked', 'plan'];
     const descriptions = getPromptDescriptionsForAI(keys);
     assert.ok(Array.isArray(descriptions));
     assert.strictEqual(descriptions.length, 2);
   });
 
   test('each description has key, name, description, and category', () => {
-    const keys = ['in-breakdown'];
+    const keys = ['blocked'];
     const descriptions = getPromptDescriptionsForAI(keys);
     const desc = descriptions[0];
-    assert.strictEqual(desc.key, 'in-breakdown');
-    assert.strictEqual(desc.name, 'Task Breakdown');
+    assert.strictEqual(desc.key, 'blocked');
+    assert.strictEqual(desc.name, 'Blocker Analysis');
     assert.ok(typeof desc.description === 'string');
     assert.ok(desc.description.length > 0);
-    assert.strictEqual(desc.category, PROMPT_CATEGORIES.PRE_WORK);
+    assert.strictEqual(desc.category, PROMPT_CATEGORIES.WORK_ISSUE);
   });
 
   test('filters out unknown keys', () => {
-    const keys = ['in-breakdown', 'unknown-label', 'plan'];
+    const keys = ['blocked', 'unknown-label', 'plan'];
     const descriptions = getPromptDescriptionsForAI(keys);
     assert.strictEqual(descriptions.length, 2);
     assert.ok(descriptions.every(d => d.key !== 'unknown-label'));

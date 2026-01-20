@@ -90,8 +90,8 @@ test.describe('Operator Dashboard', () => {
       const queueSection = page.locator('.report-section:has(.section-header:has-text("Queue Readiness"))');
       await expect(queueSection).toBeVisible();
 
-      // Should show queue items
-      await expect(queueSection.locator('.queue-item')).toHaveCount(5);
+      // Should show queue items (4 queues: Preparing, Ready, In-Progress, Review)
+      await expect(queueSection.locator('.queue-item')).toHaveCount(4);
     });
 
     test('sections are collapsible', async ({ page }) => {
@@ -182,16 +182,14 @@ test.describe('Audit API', () => {
     expect(report.queues).toHaveProperty('readinessScore');
     expect(report.queues).toHaveProperty('isReady');
 
-    // Verify labels structure with workflow labels
+    // Verify labels structure with workflow labels (simplified 3-label system)
     expect(report.labels).toHaveProperty('workflow');
-    expect(report.labels.workflow).toHaveProperty('phaseLabels');
-    expect(report.labels.workflow).toHaveProperty('workIssueLabels');
+    expect(report.labels.workflow).toHaveProperty('labels');
     expect(report.labels.workflow).toHaveProperty('presentCount');
     expect(report.labels.workflow).toHaveProperty('missingCount');
     expect(report.labels.workflow).toHaveProperty('totalCount');
-    expect(report.labels.workflow.phaseLabels).toHaveLength(8);
-    expect(report.labels.workflow.workIssueLabels).toHaveLength(2);
-    expect(report.labels.workflow.totalCount).toBe(10);
+    expect(report.labels.workflow.labels).toHaveLength(3);
+    expect(report.labels.workflow.totalCount).toBe(3);
     expect(report.labels).toHaveProperty('other');
     expect(report.labels).toHaveProperty('otherCount');
 
@@ -200,7 +198,7 @@ test.describe('Audit API', () => {
     expect(report.health).toHaveProperty('orphans');
     expect(report.health).toHaveProperty('unlabeled');
 
-    // Verify prompts structure
+    // Verify prompts structure (14 templates: 6 original + 8 restored universal prompts)
     expect(report).toHaveProperty('prompts');
     expect(report.prompts).toHaveProperty('templates');
     expect(report.prompts).toHaveProperty('templateCount');

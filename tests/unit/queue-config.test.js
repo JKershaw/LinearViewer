@@ -2,6 +2,8 @@
  * Unit tests for queue-config.js
  *
  * Run with: node --test tests/unit/queue-config.test.js
+ *
+ * Tests the simplified queue system with preparing label.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
@@ -18,6 +20,7 @@ import {
   getStateBasedQueues
 } from '../../lib/queue-config.js';
 import { getPreWorkLabels } from '../../lib/prompt-templates.js';
+import { PREPARING_LABEL } from '../../lib/workflow-config.js';
 
 // =============================================================================
 // QUEUE_TYPES Tests
@@ -48,18 +51,17 @@ describe('Ready queue excludeLabels', () => {
     assert.ok(Array.isArray(readyQueue.excludeLabels));
   });
 
-  test('excludeLabels contains expected pre-work labels', () => {
+  test('excludeLabels contains preparing label', () => {
     const labels = readyQueue.excludeLabels;
-    assert.ok(labels.includes('in-breakdown'));
-    assert.ok(labels.includes('in-research'));
-    assert.ok(labels.includes('in-scoping'));
-    assert.ok(labels.includes('in-design'));
-    assert.ok(labels.includes('in-spike'));
-    assert.ok(labels.includes('in-context'));
+    assert.ok(labels.includes(PREPARING_LABEL));
   });
 
   test('excludeLabels matches getPreWorkLabels()', () => {
     assert.deepStrictEqual(readyQueue.excludeLabels, getPreWorkLabels());
+  });
+
+  test('excludeLabels has exactly 1 label (preparing)', () => {
+    assert.strictEqual(readyQueue.excludeLabels.length, 1);
   });
 
   test('excludeLabels does not contain work-issue labels', () => {
@@ -67,12 +69,6 @@ describe('Ready queue excludeLabels', () => {
     // blocked and bug are WORK_ISSUE category, not PRE_WORK
     assert.ok(!labels.includes('blocked'));
     assert.ok(!labels.includes('bug'));
-  });
-
-  test('excludeLabels does not contain ready-state labels', () => {
-    const labels = readyQueue.excludeLabels;
-    assert.ok(!labels.includes('plan'));
-    assert.ok(!labels.includes('code-review'));
   });
 });
 
@@ -85,20 +81,12 @@ describe('QUEUE_CONFIG', () => {
     assert.ok(Array.isArray(QUEUE_CONFIG));
   });
 
-  test('has Breakdown queue', () => {
-    const breakdown = QUEUE_CONFIG.find(q => q.name === 'Breakdown');
-    assert.ok(breakdown);
-    assert.strictEqual(breakdown.type, QUEUE_TYPES.LABEL);
-    assert.ok(breakdown.labelPatterns.includes('in-breakdown'));
-    assert.strictEqual(breakdown.required, true);
-  });
-
-  test('has Research queue', () => {
-    const research = QUEUE_CONFIG.find(q => q.name === 'Research');
-    assert.ok(research);
-    assert.strictEqual(research.type, QUEUE_TYPES.LABEL);
-    assert.ok(research.labelPatterns.includes('in-research'));
-    assert.strictEqual(research.required, false);
+  test('has Preparing queue', () => {
+    const preparing = QUEUE_CONFIG.find(q => q.name === 'Preparing');
+    assert.ok(preparing);
+    assert.strictEqual(preparing.type, QUEUE_TYPES.LABEL);
+    assert.ok(preparing.labelPatterns.includes(PREPARING_LABEL));
+    assert.strictEqual(preparing.required, true);
   });
 
   test('has Ready queue', () => {
@@ -135,6 +123,10 @@ describe('QUEUE_CONFIG', () => {
       assert.ok(queue.description, `Queue ${queue.name} should have description`);
     }
   });
+
+  test('has exactly 4 queues', () => {
+    assert.strictEqual(QUEUE_CONFIG.length, 4);
+  });
 });
 
 // =============================================================================
@@ -143,29 +135,29 @@ describe('QUEUE_CONFIG', () => {
 
 describe('matchesPattern', () => {
   test('returns true for exact match', () => {
-    assert.strictEqual(matchesPattern('in-breakdown', ['in-breakdown']), true);
+    assert.strictEqual(matchesPattern('preparing', ['preparing']), true);
   });
 
   test('is case-insensitive', () => {
-    assert.strictEqual(matchesPattern('In-Breakdown', ['in-breakdown']), true);
-    assert.strictEqual(matchesPattern('IN-BREAKDOWN', ['in-breakdown']), true);
-    assert.strictEqual(matchesPattern('in-breakdown', ['IN-BREAKDOWN']), true);
+    assert.strictEqual(matchesPattern('Preparing', ['preparing']), true);
+    assert.strictEqual(matchesPattern('PREPARING', ['preparing']), true);
+    assert.strictEqual(matchesPattern('preparing', ['PREPARING']), true);
   });
 
   test('trims whitespace', () => {
-    assert.strictEqual(matchesPattern(' in-breakdown ', ['in-breakdown']), true);
+    assert.strictEqual(matchesPattern(' preparing ', ['preparing']), true);
   });
 
   test('returns false for non-match', () => {
-    assert.strictEqual(matchesPattern('bug', ['in-breakdown']), false);
+    assert.strictEqual(matchesPattern('bug', ['preparing']), false);
   });
 
   test('matches any pattern in array', () => {
-    assert.strictEqual(matchesPattern('in-research', ['in-breakdown', 'in-research']), true);
+    assert.strictEqual(matchesPattern('bug', ['preparing', 'bug']), true);
   });
 
   test('returns false for empty patterns array', () => {
-    assert.strictEqual(matchesPattern('in-breakdown', []), false);
+    assert.strictEqual(matchesPattern('preparing', []), false);
   });
 });
 
@@ -175,14 +167,14 @@ describe('matchesPattern', () => {
 
 describe('isInQueue', () => {
   describe('label-based queues', () => {
-    const breakdownQueue = QUEUE_CONFIG.find(q => q.name === 'Breakdown');
+    const preparingQueue = QUEUE_CONFIG.find(q => q.name === 'Preparing');
 
     test('returns true when issue has matching label', () => {
       const issue = {
-        labels: { nodes: [{ name: 'in-breakdown' }] },
+        labels: { nodes: [{ name: 'preparing' }] },
         state: { type: 'backlog' }
       };
-      assert.strictEqual(isInQueue(issue, breakdownQueue), true);
+      assert.strictEqual(isInQueue(issue, preparingQueue), true);
     });
 
     test('returns false when issue lacks matching label', () => {
@@ -190,15 +182,15 @@ describe('isInQueue', () => {
         labels: { nodes: [{ name: 'bug' }] },
         state: { type: 'backlog' }
       };
-      assert.strictEqual(isInQueue(issue, breakdownQueue), false);
+      assert.strictEqual(isInQueue(issue, preparingQueue), false);
     });
 
     test('is case-insensitive for labels', () => {
       const issue = {
-        labels: { nodes: [{ name: 'IN-BREAKDOWN' }] },
+        labels: { nodes: [{ name: 'PREPARING' }] },
         state: { type: 'backlog' }
       };
-      assert.strictEqual(isInQueue(issue, breakdownQueue), true);
+      assert.strictEqual(isInQueue(issue, preparingQueue), true);
     });
 
     test('handles missing labels gracefully', () => {
@@ -206,7 +198,7 @@ describe('isInQueue', () => {
         labels: null,
         state: { type: 'backlog' }
       };
-      assert.strictEqual(isInQueue(issue, breakdownQueue), false);
+      assert.strictEqual(isInQueue(issue, preparingQueue), false);
     });
   });
 
@@ -265,24 +257,12 @@ describe('isInQueue', () => {
       assert.strictEqual(isInQueue(issue, readyQueue), true);
     });
 
-    test('returns false when has excluded label', () => {
+    test('returns false when has preparing label', () => {
       const issue = {
-        labels: { nodes: [{ name: 'in-breakdown' }] },
+        labels: { nodes: [{ name: 'preparing' }] },
         state: { type: 'backlog' }
       };
       assert.strictEqual(isInQueue(issue, readyQueue), false);
-    });
-
-    test('returns false when has any pre-work label', () => {
-      // Only PRE_WORK category labels exclude from Ready queue
-      const preWorkLabels = ['in-research', 'in-scoping', 'in-design', 'in-spike', 'in-context'];
-      for (const label of preWorkLabels) {
-        const issue = {
-          labels: { nodes: [{ name: label }] },
-          state: { type: 'backlog' }
-        };
-        assert.strictEqual(isInQueue(issue, readyQueue), false, `Should exclude ${label}`);
-      }
     });
 
     test('does not exclude work-issue labels from Ready queue', () => {
@@ -329,17 +309,17 @@ describe('isInQueue', () => {
 // =============================================================================
 
 describe('getQueuesForIssue', () => {
-  test('returns Breakdown queue for issue with in-breakdown label', () => {
+  test('returns Preparing queue for issue with preparing label', () => {
     const issue = {
-      labels: { nodes: [{ name: 'in-breakdown' }] },
+      labels: { nodes: [{ name: 'preparing' }] },
       state: { type: 'backlog' }
     };
     const queues = getQueuesForIssue(issue);
-    assert.ok(queues.includes('Breakdown'));
+    assert.ok(queues.includes('Preparing'));
     assert.ok(!queues.includes('Ready'));
   });
 
-  test('returns Ready queue for backlog issue without pre-work labels', () => {
+  test('returns Ready queue for backlog issue without preparing label', () => {
     const issue = {
       labels: { nodes: [] },
       state: { type: 'backlog' }
@@ -359,11 +339,11 @@ describe('getQueuesForIssue', () => {
 
   test('returns multiple queues when applicable', () => {
     const issue = {
-      labels: { nodes: [{ name: 'in-breakdown' }] },
+      labels: { nodes: [{ name: 'preparing' }] },
       state: { type: 'started' }
     };
     const queues = getQueuesForIssue(issue);
-    assert.ok(queues.includes('Breakdown'));
+    assert.ok(queues.includes('Preparing'));
     assert.ok(queues.includes('In-Progress'));
   });
 
@@ -382,22 +362,19 @@ describe('getQueuesForIssue', () => {
 // =============================================================================
 
 describe('getQueueForLabel', () => {
-  test('returns Breakdown for in-breakdown', () => {
-    assert.strictEqual(getQueueForLabel('in-breakdown'), 'Breakdown');
-  });
-
-  test('returns Research for in-research', () => {
-    assert.strictEqual(getQueueForLabel('in-research'), 'Research');
+  test('returns Preparing for preparing label', () => {
+    assert.strictEqual(getQueueForLabel('preparing'), 'Preparing');
   });
 
   test('returns null for non-label-based queue labels', () => {
     assert.strictEqual(getQueueForLabel('bug'), null);
+    assert.strictEqual(getQueueForLabel('blocked'), null);
     assert.strictEqual(getQueueForLabel('feature'), null);
   });
 
   test('is case-insensitive', () => {
-    assert.strictEqual(getQueueForLabel('IN-BREAKDOWN'), 'Breakdown');
-    assert.strictEqual(getQueueForLabel('In-Research'), 'Research');
+    assert.strictEqual(getQueueForLabel('PREPARING'), 'Preparing');
+    assert.strictEqual(getQueueForLabel('Preparing'), 'Preparing');
   });
 });
 
@@ -413,8 +390,7 @@ describe('getQueueNames', () => {
 
   test('includes all expected queue names', () => {
     const names = getQueueNames();
-    assert.ok(names.includes('Breakdown'));
-    assert.ok(names.includes('Research'));
+    assert.ok(names.includes('Preparing'));
     assert.ok(names.includes('Ready'));
     assert.ok(names.includes('In-Progress'));
     assert.ok(names.includes('Review'));
@@ -436,16 +412,15 @@ describe('getRequiredQueues', () => {
     assert.ok(Array.isArray(required));
   });
 
-  test('includes Breakdown, Ready, and In-Progress', () => {
+  test('includes Preparing, Ready, and In-Progress', () => {
     const required = getRequiredQueues();
-    assert.ok(required.includes('Breakdown'));
+    assert.ok(required.includes('Preparing'));
     assert.ok(required.includes('Ready'));
     assert.ok(required.includes('In-Progress'));
   });
 
   test('does not include optional queues', () => {
     const required = getRequiredQueues();
-    assert.ok(!required.includes('Research'));
     assert.ok(!required.includes('Review'));
   });
 });
@@ -467,11 +442,10 @@ describe('getLabelBasedQueues', () => {
     }
   });
 
-  test('includes Breakdown and Research queues', () => {
+  test('includes Preparing queue', () => {
     const queues = getLabelBasedQueues();
     const names = queues.map(q => q.name);
-    assert.ok(names.includes('Breakdown'));
-    assert.ok(names.includes('Research'));
+    assert.ok(names.includes('Preparing'));
   });
 
   test('does not include state-based or implicit queues', () => {
@@ -514,7 +488,6 @@ describe('getStateBasedQueues', () => {
   test('does not include label-based queues', () => {
     const queues = getStateBasedQueues();
     const names = queues.map(q => q.name);
-    assert.ok(!names.includes('Breakdown'));
-    assert.ok(!names.includes('Research'));
+    assert.ok(!names.includes('Preparing'));
   });
 });
