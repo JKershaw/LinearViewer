@@ -412,7 +412,26 @@ function init() {
       return
     }
 
-    // 2. Toggle arrow click (expand/collapse children)
+    // 2. Detail section toggles (Details ▶ / Prompts ▶)
+    const detailToggle = e.target.closest('.detail-toggle')
+    if (detailToggle) {
+      e.stopPropagation()
+      const toggleType = detailToggle.dataset.toggle // 'details' or 'prompts'
+      const detailsContainer = detailToggle.closest('.details')
+      const content = detailsContainer?.querySelector(`[data-content="${toggleType}"]`)
+
+      if (content) {
+        const isHidden = content.classList.toggle('hidden')
+        // Update arrow: ▶ when collapsed, ▼ when expanded
+        detailToggle.textContent = detailToggle.textContent.replace(
+          isHidden ? '▼' : '▶',
+          isHidden ? '▶' : '▼'
+        )
+      }
+      return
+    }
+
+    // 3. Toggle arrow click (expand/collapse children)
     const toggle = e.target.closest('.toggle')
     if (toggle) {
       e.stopPropagation()
@@ -420,7 +439,7 @@ function init() {
       return
     }
 
-    // 3. Project description click (show/hide meta)
+    // 4. Project description click (show/hide meta)
     const desc = e.target.closest('.project-description')
     if (desc) {
       const project = desc.closest('.project')
@@ -432,14 +451,14 @@ function init() {
       return
     }
 
-    // 4. Line click (expand issue details) - skip if clicking a link
+    // 5. Line click (expand issue details) - skip if clicking a link
     const line = e.target.closest('.line.expandable')
     if (line && !e.target.closest('a')) {
       toggleItem(line)
       return
     }
 
-    // 5. Completed toggle click
+    // 6. Completed toggle click
     const completedToggle = e.target.closest('.completed-toggle')
     if (completedToggle) {
       const projectId = completedToggle.dataset.projectId
@@ -454,14 +473,14 @@ function init() {
       return
     }
 
-    // 6. Project header click (collapse project)
+    // 7. Project header click (collapse project)
     const header = e.target.closest('.project-header')
     if (header) {
       handleProjectHeaderClick(header)
       return
     }
 
-    // 7. In-progress header click
+    // 8. In-progress header click
     const inProgressHeader = e.target.closest('.in-progress-header')
     if (inProgressHeader) {
       state.inProgressCollapsed = !state.inProgressCollapsed
@@ -472,7 +491,7 @@ function init() {
       return
     }
 
-    // 8. Recent activity header click
+    // 9. Recent activity header click
     const recentActivityHeader = e.target.closest('.recent-activity-header')
     if (recentActivityHeader) {
       state.recentActivityCollapsed = !state.recentActivityCollapsed

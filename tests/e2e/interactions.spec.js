@@ -154,6 +154,142 @@ test.describe('Interactive Features', () => {
   });
 });
 
+test.describe('Detail Section Toggles', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/test/set-session');
+    await page.evaluate(() => localStorage.clear());
+    await page.goto(WORKSPACE_URL);
+  });
+
+  test('Details toggle shows/hides description and metadata', async ({ page }) => {
+    // Find and expand an issue in project section
+    const project = page.locator('.project').first();
+    const issueLine = project.locator('.line.expandable').first();
+    await issueLine.click();
+
+    const issueId = await issueLine.getAttribute('data-id');
+    const details = project.locator(`.details[data-details-for="${issueId}"]`);
+    const detailsToggle = details.locator('.detail-toggle[data-toggle="details"]');
+    const detailsContent = details.locator('.detail-content[data-content="details"]');
+
+    // Details content should be hidden initially
+    await expect(detailsToggle).toBeVisible();
+    await expect(detailsToggle).toContainText('Details ▶');
+    await expect(detailsContent).toHaveClass(/hidden/);
+
+    // Click to expand
+    await detailsToggle.click();
+    await expect(detailsContent).not.toHaveClass(/hidden/);
+    await expect(detailsToggle).toContainText('Details ▼');
+
+    // Click to collapse
+    await detailsToggle.click();
+    await expect(detailsContent).toHaveClass(/hidden/);
+    await expect(detailsToggle).toContainText('Details ▶');
+  });
+
+  test('Prompts toggle shows/hides prompt buttons', async ({ page }) => {
+    // Find and expand an issue
+    const project = page.locator('.project').first();
+    const issueLine = project.locator('.line.expandable').first();
+    await issueLine.click();
+
+    const issueId = await issueLine.getAttribute('data-id');
+    const details = project.locator(`.details[data-details-for="${issueId}"]`);
+    const promptsToggle = details.locator('.detail-toggle[data-toggle="prompts"]');
+    const promptsContent = details.locator('.detail-content[data-content="prompts"]');
+
+    // Prompts content should be hidden initially
+    await expect(promptsToggle).toBeVisible();
+    await expect(promptsToggle).toContainText('Prompts ▶');
+    await expect(promptsContent).toHaveClass(/hidden/);
+
+    // Click to expand
+    await promptsToggle.click();
+    await expect(promptsContent).not.toHaveClass(/hidden/);
+    await expect(promptsToggle).toContainText('Prompts ▼');
+
+    // Prompt buttons should be visible inside
+    await expect(promptsContent.locator('.label-prompt').first()).toBeVisible();
+  });
+
+  test('Details and Prompts toggles work independently', async ({ page }) => {
+    // Find and expand an issue
+    const project = page.locator('.project').first();
+    const issueLine = project.locator('.line.expandable').first();
+    await issueLine.click();
+
+    const issueId = await issueLine.getAttribute('data-id');
+    const details = project.locator(`.details[data-details-for="${issueId}"]`);
+    const detailsToggle = details.locator('.detail-toggle[data-toggle="details"]');
+    const detailsContent = details.locator('.detail-content[data-content="details"]');
+    const promptsToggle = details.locator('.detail-toggle[data-toggle="prompts"]');
+    const promptsContent = details.locator('.detail-content[data-content="prompts"]');
+
+    // Expand Details only
+    await detailsToggle.click();
+    await expect(detailsContent).not.toHaveClass(/hidden/);
+    await expect(promptsContent).toHaveClass(/hidden/);
+
+    // Expand Prompts too
+    await promptsToggle.click();
+    await expect(detailsContent).not.toHaveClass(/hidden/);
+    await expect(promptsContent).not.toHaveClass(/hidden/);
+
+    // Collapse Details, Prompts stays open
+    await detailsToggle.click();
+    await expect(detailsContent).toHaveClass(/hidden/);
+    await expect(promptsContent).not.toHaveClass(/hidden/);
+  });
+
+  test('same issue in different sections has independent toggles', async ({ page }) => {
+    // Find an in-progress issue (appears in both In Progress and Project sections)
+    const inProgressItems = page.locator('.in-progress-items');
+    const inProgressLine = inProgressItems.locator('.line.expandable').first();
+
+    // Skip if no in-progress issues
+    if (await inProgressLine.count() === 0) {
+      test.skip();
+      return;
+    }
+
+    const issueId = await inProgressLine.getAttribute('data-id');
+
+    // Expand in In Progress section
+    await inProgressLine.click();
+    const inProgressDetails = inProgressItems.locator(`.details[data-details-for="${issueId}"]`);
+    const inProgressDetailsToggle = inProgressDetails.locator('.detail-toggle[data-toggle="details"]');
+
+    // Expand Details in In Progress section
+    await inProgressDetailsToggle.click();
+    const inProgressDetailsContent = inProgressDetails.locator('.detail-content[data-content="details"]');
+    await expect(inProgressDetailsContent).not.toHaveClass(/hidden/);
+
+    // Find same issue in project section (if it exists there)
+    const projectDetails = page.locator(`.project .details[data-details-for="${issueId}"]`);
+    if (await projectDetails.count() > 0) {
+      // Project section's Details should still be collapsed (independent state)
+      const projectDetailsContent = projectDetails.locator('.detail-content[data-content="details"]');
+      await expect(projectDetailsContent).toHaveClass(/hidden/);
+    }
+  });
+
+  test('View in Linear link remains visible outside toggles', async ({ page }) => {
+    // Find and expand an issue with a URL
+    const project = page.locator('.project').first();
+    const issueLine = project.locator('.line.expandable').first();
+    await issueLine.click();
+
+    const issueId = await issueLine.getAttribute('data-id');
+    const details = project.locator(`.details[data-details-for="${issueId}"]`);
+    const viewInLinearLink = details.locator('.detail-link');
+
+    // Link should be visible immediately (not inside a toggle)
+    await expect(viewInLinearLink).toBeVisible();
+    await expect(viewInLinearLink).toContainText('View in Linear');
+  });
+});
+
 test.describe('Landing Page Interactions', () => {
   test.beforeEach(async ({ page }) => {
     // Navigate first to have a page context, then clear localStorage
@@ -201,5 +337,32 @@ test.describe('Landing Page Interactions', () => {
     // Click to expand
     await projectHeader.click();
     await expect(linesInProject.first()).toBeVisible();
+  });
+
+  test('landing page has Details toggle but no Prompts toggle', async ({ page }) => {
+    await page.reload();
+
+    // Find an expandable issue on landing page
+    const issueLine = page.locator('.line.expandable').first();
+
+    // Skip if no expandable issues on landing page
+    if (await issueLine.count() === 0) {
+      test.skip();
+      return;
+    }
+
+    // Expand the issue
+    await issueLine.click();
+
+    const issueId = await issueLine.getAttribute('data-id');
+    const details = page.locator(`.details[data-details-for="${issueId}"]`);
+
+    // Details toggle should exist
+    const detailsToggle = details.locator('.detail-toggle[data-toggle="details"]');
+    await expect(detailsToggle).toBeVisible();
+
+    // Prompts toggle should NOT exist (landing page has no prompts)
+    const promptsToggle = details.locator('.detail-toggle[data-toggle="prompts"]');
+    await expect(promptsToggle).toHaveCount(0);
   });
 });

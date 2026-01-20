@@ -405,6 +405,45 @@ h1 {
   color: var(--blue);
 }
 
+/* =============================================================================
+   Detail Section Toggles (Details ▶ / Prompts ▶)
+   =============================================================================
+   Styled like .detail-link but with cursor pointer and toggle behavior.
+   Content sections start collapsed (hidden) by default.
+*/
+.detail-toggle {
+  color: var(--fg-dim);
+  cursor: pointer;
+  font-size: 0.8em;
+  font-family: var(--font-content);
+  padding: 0.25rem 0;
+  display: block;
+}
+
+.detail-toggle:hover {
+  color: var(--blue);
+}
+
+/* Content wrapper for toggleable sections */
+.detail-content {
+  padding-left: 1.5ch;
+  margin-bottom: 0.25rem;
+}
+
+/* Prompt buttons row within Prompts section */
+.detail-prompts {
+  color: var(--fg-dim);
+  font-size: 0.9em;
+  font-family: var(--font-content);
+}
+
+/* Mobile: larger tap targets for toggles */
+@media (max-width: 640px) {
+  .detail-toggle {
+    padding: 0.5rem 0;
+  }
+}
+
 .project-meta {
   color: var(--fg-dim);
   margin-left: 3ch;
