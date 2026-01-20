@@ -520,7 +520,10 @@ function initNavBar() {
       e.stopPropagation()
       const teamId = option.dataset.team
       setTeamSelection(teamId)
-      const url = teamId === 'all' ? '/' : `/?team=${teamId}`
+      // Get workspace URL key from data attribute (workspace-prefixed URLs)
+      const urlKey = teamOptions.dataset.urlKey
+      const workspacePrefix = urlKey ? `/workspace/${urlKey}` : ''
+      const url = teamId === 'all' ? `${workspacePrefix}/` : `${workspacePrefix}/?team=${teamId}`
       window.location.href = url
     })
   }
@@ -599,7 +602,10 @@ function initNavBar() {
 
     // If URL has no team but localStorage does (and team still exists), redirect
     if (!urlTeam && savedTeam && savedTeam !== 'all' && savedTeamExists) {
-      window.location.href = `/?team=${savedTeam}`
+      // Get workspace URL key from data attribute (workspace-prefixed URLs)
+      const urlKey = teamOptions?.dataset.urlKey
+      const workspacePrefix = urlKey ? `/workspace/${urlKey}` : ''
+      window.location.href = `${workspacePrefix}/?team=${savedTeam}`
       return
     }
 
@@ -668,8 +674,11 @@ function initPrompts() {
     promptContainer.dataset.activeLabel = labelName
 
     try {
+      // Get workspace URL key from data attribute (workspace-prefixed URLs)
+      const urlKey = promptContainer.dataset.urlKey
+      const apiPrefix = urlKey ? `/workspace/${urlKey}` : ''
       const response = await fetch(
-        `/api/prompt/${issueId}/${encodeURIComponent(labelName)}`,
+        `${apiPrefix}/api/prompt/${issueId}/${encodeURIComponent(labelName)}`,
         { signal: abortController.signal }
       )
 
@@ -817,8 +826,11 @@ function initRecommendations() {
     suggestBtn.classList.add('loading')
 
     try {
+      // Get workspace URL key from data attribute (workspace-prefixed URLs)
+      const urlKey = recommendContainer.dataset.urlKey
+      const apiPrefix = urlKey ? `/workspace/${urlKey}` : ''
       const response = await fetch(
-        `/api/recommend/${issueId}`,
+        `${apiPrefix}/api/recommend/${issueId}`,
         { signal: abortController.signal }
       )
 

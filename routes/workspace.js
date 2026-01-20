@@ -3,7 +3,7 @@
  * Handles switching between and removing workspaces.
  */
 import { Router } from 'express'
-import { UUID_REGEX, removeWorkspace, saveSession } from '../lib/workspace.js'
+import { removeWorkspace, saveSession, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey } from '../lib/workspace.js'
 import { badRequest, notFound } from '../lib/errors.js'
 
 /**
@@ -17,28 +17,29 @@ export function createWorkspaceRoutes() {
    * Switch active workspace.
    * POST to avoid state change via GET.
    */
-  router.post('/workspace/:id/switch', async (req, res) => {
-    if (!UUID_REGEX.test(req.params.id)) {
-      return badRequest.html(res, 'Invalid workspace ID format')
+  router.post('/workspace/:urlKey/switch', async (req, res) => {
+    if (!validateWorkspaceUrlKey(req.params.urlKey)) {
+      return badRequest.html(res, 'Invalid workspace ID')
     }
 
-    const workspace = req.session.workspaces?.find(w => w.id === req.params.id)
+    const workspace = getWorkspaceByUrlKey(req.session, req.params.urlKey)
     if (!workspace) {
       return notFound.html(res, 'Workspace not found')
     }
 
     req.session.activeWorkspaceId = workspace.id
     await saveSession(req.session)
-    res.redirect('/')
+    // Redirect to the new workspace's URL
+    res.redirect(`/workspace/${workspace.urlKey}/`)
   })
 
   /**
    * Remove a workspace.
    * POST for safety. If only one workspace, logs out entirely.
    */
-  router.post('/workspace/:id/remove', async (req, res) => {
-    if (!UUID_REGEX.test(req.params.id)) {
-      return badRequest.html(res, 'Invalid workspace ID format')
+  router.post('/workspace/:urlKey/remove', async (req, res) => {
+    if (!validateWorkspaceUrlKey(req.params.urlKey)) {
+      return badRequest.html(res, 'Invalid workspace ID')
     }
 
     // If only one workspace, just logout entirely
@@ -46,9 +47,21 @@ export function createWorkspaceRoutes() {
       return req.session.destroy(() => res.redirect('/'))
     }
 
-    removeWorkspace(req.session, req.params.id)
+    const workspace = getWorkspaceByUrlKey(req.session, req.params.urlKey)
+    if (!workspace) {
+      return notFound.html(res, 'Workspace not found')
+    }
+
+    removeWorkspace(req.session, workspace.id)
     await saveSession(req.session)
-    res.redirect('/')
+
+    // Redirect to the remaining active workspace's URL
+    const activeWorkspace = getActiveWorkspace(req.session)
+    if (activeWorkspace) {
+      res.redirect(`/workspace/${activeWorkspace.urlKey}/`)
+    } else {
+      res.redirect('/')
+    }
   })
 
   return router

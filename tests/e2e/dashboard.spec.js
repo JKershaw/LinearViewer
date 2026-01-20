@@ -1,12 +1,16 @@
 import { test, expect } from '@playwright/test';
 
+// Workspace URL key used in test session
+const TEST_WORKSPACE_URL_KEY = 'test-workspace';
+const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;
+
 test.describe('Authenticated Dashboard', () => {
   test.beforeEach(async ({ page }) => {
     // Set up test session (server will use mock data in test mode)
     await page.goto('/test/set-session');
 
-    // Navigate to main page
-    await page.goto('/');
+    // Navigate to workspace page (authenticated users are redirected here)
+    await page.goto(WORKSPACE_URL);
   });
 
   test('renders project tree with issues', async ({ page }) => {
@@ -80,10 +84,10 @@ test.describe('Authenticated Dashboard', () => {
     // Should have reset link in footer
     await expect(page.locator('.footer-action.reset-view')).toBeVisible();
 
-    // Should have all navigation links (dashboard has no "current page" so all are links)
-    await expect(page.locator('.footer-action[href="/settings"]')).toBeVisible();
-    await expect(page.locator('.footer-action[href="/prompts"]')).toBeVisible();
-    await expect(page.locator('.footer-action[href="/fancy"]')).toBeVisible();
+    // Should have all navigation links with workspace prefix (dashboard has no "current page" so all are links)
+    await expect(page.locator(`.footer-action[href="/workspace/${TEST_WORKSPACE_URL_KEY}/settings"]`)).toBeVisible();
+    await expect(page.locator(`.footer-action[href="/workspace/${TEST_WORKSPACE_URL_KEY}/prompts"]`)).toBeVisible();
+    await expect(page.locator(`.footer-action[href="/workspace/${TEST_WORKSPACE_URL_KEY}/fancy"]`)).toBeVisible();
 
     // Should NOT have any bold current page indicator on dashboard
     await expect(page.locator('.footer-current')).not.toBeVisible();

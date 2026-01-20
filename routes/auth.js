@@ -175,7 +175,7 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore }) {
 
         req.session.activeWorkspaceId = workspace.id
         await saveSession(req.session)
-        res.redirect('/')
+        res.redirect(`/workspace/${workspace.urlKey}/`)
       })
     } catch (err) {
       console.error('OAuth callback error:', err)

@@ -144,7 +144,7 @@ export function createOpenRouterAuthRoutes() {
       await saveSession(req.session)
 
       // Redirect back to the fancy page (where OpenRouter features are used)
-      res.redirect('/fancy')
+      res.redirect(`/workspace/${workspace.urlKey}/fancy`)
     } catch (err) {
       console.error('OpenRouter OAuth callback error:', err)
       const html = renderErrorPage('Something Went Wrong', 'An unexpected error occurred during authentication. Please try again.', {
@@ -169,7 +169,7 @@ export function createOpenRouterAuthRoutes() {
 
     delete req.session.openRouterApiKey
     await saveSession(req.session)
-    res.redirect('/settings')
+    res.redirect(`/workspace/${workspace.urlKey}/settings`)
   })
 
   return router
