@@ -10,7 +10,7 @@
     "env:check": "bash scripts/env-check.sh"
   },
   "dependencies": {
-    "@jkershaw/mangodb": "^0.1.0",
+    "@jkershaw/mangodb": "^0.1.2",
     "dotenv": "^17.2.3",
     "express": "^4.18.2",
     "express-rate-limit": "^8.2.1",
