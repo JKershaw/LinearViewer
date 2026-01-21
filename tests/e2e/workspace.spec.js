@@ -12,7 +12,7 @@ test.describe('Workspace Selector', () => {
 
     const workspaceToggle = page.locator('#workspace-toggle');
     await expect(workspaceToggle).toBeVisible();
-    await expect(workspaceToggle).toHaveText('test-workspace');
+    await expect(workspaceToggle).toHaveText('Test Workspace');
 
     // Click to open options
     await workspaceToggle.click();
@@ -40,7 +40,7 @@ test.describe('Workspace Selector', () => {
     await expect(options).toHaveCount(3); // 2 workspaces + 1 add
 
     // First workspace should be selected (has ● marker)
-    await expect(workspaceOptions.locator('.nav-option.selected')).toContainText('test-workspace');
+    await expect(workspaceOptions.locator('.nav-option.selected')).toContainText('Test Workspace');
   });
 
   test('clicking outside closes workspace selector', async ({ page }) => {
@@ -66,7 +66,7 @@ test.describe('Workspace Switching', () => {
     await page.goto(WORKSPACE_URL);
 
     // Initially showing first workspace
-    await expect(page.locator('#workspace-toggle')).toHaveText('test-workspace');
+    await expect(page.locator('#workspace-toggle')).toHaveText('Test Workspace');
 
     // Open workspace selector
     await page.locator('#workspace-toggle').click();
@@ -75,14 +75,14 @@ test.describe('Workspace Switching', () => {
     // Click the second workspace and wait for navigation to the new workspace URL
     await Promise.all([
       page.waitForURL(`/workspace/${SECOND_WORKSPACE_URL_KEY}/`),
-      page.getByRole('option', { name: /second-workspace/ }).click()
+      page.getByRole('option', { name: /Second Workspace/ }).click()
     ]);
 
     // Force a reload to bypass any caching issues
     await page.reload();
 
     // Should now show second workspace
-    await expect(page.locator('#workspace-toggle')).toHaveText('second-workspace');
+    await expect(page.locator('#workspace-toggle')).toHaveText('Second Workspace');
   });
 });
 

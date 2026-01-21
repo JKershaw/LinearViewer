@@ -65,7 +65,7 @@ test.describe('Session State', () => {
 
     // Session should still be valid
     await expect(page.locator('.nav-bar')).toBeVisible();
-    await expect(page.locator('#workspace-toggle')).toHaveText('test-workspace');
+    await expect(page.locator('#workspace-toggle')).toHaveText('Test Workspace');
   });
 });
 
