@@ -14,7 +14,11 @@ if [ ! -d "node_modules" ]; then
 fi
 
 # Install Playwright browsers (idempotent - skips if correct version installed)
-npx playwright install chromium --with-deps 2>/dev/null || npx playwright install chromium
+# Try with system deps first; fall back to browser-only if that fails (e.g., no sudo)
+if ! npx playwright install chromium --with-deps; then
+  echo "Note: Could not install system dependencies, installing browser only..."
+  npx playwright install chromium
+fi
 
 # Run the environment check to show status
 npm run env:check
