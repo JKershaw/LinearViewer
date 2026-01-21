@@ -553,8 +553,15 @@ test.describe('AI Recommendations', () => {
     const reasoning = recommendContainer.locator('.recommend-reasoning');
     const toggleBtn = recommendContainer.locator('.reasoning-toggle');
 
+    // Toggle button should be hidden during loading (LIN-111 fix)
+    await expect(toggleBtn).toBeHidden();
+    // Reasoning should show loading text
+    await expect(reasoning).toContainText('Analyzing');
+
     // Wait for loading to complete (reasoning becomes hidden)
     await expect(reasoning).toBeHidden({ timeout: 10000 });
+    // Toggle button should become visible after loading
+    await expect(toggleBtn).toBeVisible();
     await expect(toggleBtn).toHaveText('show reasoning');
 
     // Click show reasoning toggle
