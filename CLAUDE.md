@@ -19,6 +19,7 @@ routes/
   auth.js              Linear OAuth routes
   openrouter-auth.js   OpenRouter OAuth PKCE routes
   workspace.js         Workspace management routes
+  dispatch.js          Dispatch queue API (user + consumer endpoints)
 lib/
   linear.js            GraphQL client for Linear API
   linear-cli.js        CLI tool for AI agents to query/modify Linear
@@ -28,6 +29,8 @@ lib/
   render-audit.js      Operator dashboard page renderer
   session-store.js     MongoDB/MangoDB session store
   parse-landing.js     Parses markdown content for landing page
+  dispatch-store.js    Dispatch queue storage
+  dispatch-tokens.js   Consumer API token management
 content/
   landing.md           Static projects preview for unauthenticated users
 public/
@@ -41,6 +44,9 @@ tests/e2e/
   dashboard.spec.js    Authenticated dashboard tests
   interactions.spec.js Collapse/expand interaction tests
   openrouter-auth.spec.js  OpenRouter OAuth tests
+  dispatch.spec.js     Dispatch queue and consumer API tests
+docs/
+  dispatch-integration.md  Consumer integration guide
 playwright.config.js   Playwright test configuration
 ```
 
@@ -127,6 +133,24 @@ The `/llms.txt` file provides guidance for AI agents navigating the site, includ
 - Status indicators and their meanings
 
 **Keep llms.txt updated** when modifying DOM structure or data attributes in `render.js`.
+
+## Dispatch API
+
+The Dispatch feature allows users to queue prompts for external consumers (AI agents, automation tools).
+
+**User-facing endpoints** (session auth, workspace-prefixed):
+- `POST /workspace/:urlKey/api/dispatch` - Queue a prompt
+- `GET /workspace/:urlKey/api/dispatch` - List queued items
+- `DELETE /workspace/:urlKey/api/dispatch/:itemId` - Remove item
+- Token management at `/workspace/:urlKey/api/dispatch/tokens`
+
+**Consumer endpoints** (Bearer token auth):
+- `GET /api/dispatch/poll` - Poll for available items
+- `POST /api/dispatch/take/:itemId` - Atomically claim an item
+
+Items expire after 24 hours. Tokens are workspace-scoped and never expire (but can be revoked).
+
+**See [docs/dispatch-integration.md](docs/dispatch-integration.md)** for the full consumer integration guide.
 
 ## Linear CLI (for AI Agents)
 
