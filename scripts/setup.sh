@@ -12,17 +12,10 @@ if [ ! -d "node_modules" ]; then
   echo ""
 fi
 
-# Check and install Playwright browsers
-playwright_ok=0
-if [ -d "node_modules/playwright-core/.local-browsers" ]; then
-  playwright_ok=1
-elif [ -d "$HOME/.cache/ms-playwright" ]; then
-  playwright_ok=1
-elif [ -d "/ms-playwright" ]; then
-  playwright_ok=1
-fi
-
-if [ "$playwright_ok" -eq 0 ]; then
+# Install Playwright browsers if needed
+# Extract expected chromium path from dry-run and check if it exists
+chromium_path=$(npx playwright install chromium --dry-run 2>&1 | grep -m1 "Install location:" | awk '{print $3}')
+if [ -n "$chromium_path" ] && [ ! -d "$chromium_path" ]; then
   echo "Installing Playwright browsers..."
   npx playwright install chromium --with-deps
   echo ""
