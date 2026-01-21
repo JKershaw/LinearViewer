@@ -156,6 +156,7 @@ app.use(express.json())
 // - resave: false - don't save session if unmodified
 // - saveUninitialized: false - don't create session until something is stored
 // - secure cookies only in production (requires HTTPS)
+// - sameSite: 'lax' - CSRF protection (prevents cookies on cross-origin POST)
 app.use(session({
   store: sessionStore,
   secret: process.env.SESSION_SECRET,
@@ -163,7 +164,8 @@ app.use(session({
   saveUninitialized: false,
   cookie: {
     maxAge: SESSION_COOKIE_MAX_AGE_MS,
-    secure: process.env.NODE_ENV === 'production'
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax'
   }
 }))
 

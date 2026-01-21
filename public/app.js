@@ -9,13 +9,16 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 /**
  * Render markdown to HTML for display using marked.js
  * @param {string} markdown - Raw markdown text
- * @returns {string} HTML string
+ * @returns {string} HTML string (sanitized with DOMPurify for defense-in-depth)
  */
 function renderMarkdown(markdown) {
   if (!markdown) return ''
-  // Use marked library loaded via CDN
-  // marked.parse() sanitizes by default in recent versions
-  return marked.parse(markdown)
+  // Use marked library for markdown parsing, then DOMPurify for XSS protection.
+  // While marked v17+ sanitizes by default and prompts are server-generated,
+  // DOMPurify provides defense-in-depth against any future changes.
+  const html = marked.parse(markdown)
+  // DOMPurify may not be loaded on all pages, check before using
+  return typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(html) : html
 }
 
 // Safe localStorage helpers for team selection
