@@ -1337,9 +1337,11 @@ function initRecommendations() {
     const reasoning = recommendContainer.querySelector('.recommend-reasoning')
     const promptDiv = recommendContainer.querySelector('.recommend-prompt')
     const promptText = promptDiv?.querySelector('.prompt-text')
+    const toggleBtn = recommendContainer.querySelector('.reasoning-toggle')
 
     reasoning.textContent = 'Analyzing task context...'
     reasoning.classList.remove('hidden') // Show reasoning during loading
+    if (toggleBtn) toggleBtn.classList.add('hidden') // Hide toggle during loading
     if (promptText) promptText.textContent = ''
     // Keep prompt section hidden during loading - only show reasoning
     if (promptDiv) promptDiv.classList.add('hidden')
@@ -1378,7 +1380,10 @@ function initRecommendations() {
         // Hide reasoning after loading (user can toggle to show)
         reasoning.classList.add('hidden')
         const toggleBtn = recommendContainer.querySelector('.reasoning-toggle')
-        if (toggleBtn) toggleBtn.textContent = 'show reasoning'
+        if (toggleBtn) {
+          toggleBtn.classList.remove('hidden') // Show toggle after loading
+          toggleBtn.textContent = 'show reasoning'
+        }
         if (promptText && data.prompt) {
           // Store raw markdown for copy, render HTML for display
           promptText.dataset.rawPrompt = data.prompt
@@ -1395,7 +1400,10 @@ function initRecommendations() {
       reasoning.classList.remove('hidden') // Ensure visible for error
       // Reasoning stays visible with error, so toggle should say "hide"
       const toggleBtn = recommendContainer.querySelector('.reasoning-toggle')
-      if (toggleBtn) toggleBtn.textContent = 'hide reasoning'
+      if (toggleBtn) {
+        toggleBtn.classList.remove('hidden') // Show toggle after loading
+        toggleBtn.textContent = 'hide reasoning'
+      }
       console.error('Failed to get recommendation:', error)
     } finally {
       // Clear active fetch if this was it
