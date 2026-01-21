@@ -68,7 +68,7 @@ test.describe('Authentication Flow', () => {
     // Should see workspace selector
     const workspaceToggle = page.locator('#workspace-toggle');
     await expect(workspaceToggle).toBeVisible();
-    await expect(workspaceToggle).toHaveText('test-workspace');
+    await expect(workspaceToggle).toHaveText('Test Workspace');
   });
 });
 
