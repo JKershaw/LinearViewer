@@ -143,8 +143,8 @@ export function createOpenRouterAuthRoutes() {
 
       await saveSession(req.session)
 
-      // Redirect back to the audit page (where OpenRouter features are used)
-      res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/audit`)
+      // Redirect back to settings page where OpenRouter connection status is shown
+      res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`)
     } catch (err) {
       console.error('OpenRouter OAuth callback error:', err)
       const html = renderErrorPage('Something Went Wrong', 'An unexpected error occurred during authentication. Please try again.', {
