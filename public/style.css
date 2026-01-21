@@ -377,6 +377,11 @@ h1 {
   color: var(--red-hover);
 }
 
+/* Mobile dropdown backdrop - hidden on desktop */
+.nav-dropdown-overlay {
+  display: none;
+}
+
 /* =============================================================================
    "In Progress" Section
    =============================================================================
@@ -728,20 +733,86 @@ h1 {
     font-size: 14px;
   }
 
-  /* Nav bar stacks on mobile */
+  /* Mobile nav: compact horizontal layout */
   .nav-bar {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem 1ch;
   }
 
   .nav-filters {
-    flex-direction: column;
-    gap: 0.5rem;
+    flex-direction: row;
+    gap: 1.5ch;
+  }
+
+  .nav-actions {
+    gap: 1ch;
+  }
+
+  .nav-item {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+
+  .nav-value {
+    max-width: 12ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .nav-option {
     padding: 0.5rem 0;  /* Larger tap targets */
+  }
+
+  /* Mobile dropdown panels: bottom-sheet style overlay */
+  .nav-options-panel {
+    position: fixed;
+    left: 1rem;
+    right: 1rem;
+    bottom: 1rem;
+    top: auto;
+    max-height: 50vh;
+    overflow-y: auto;
+    background: var(--bg);
+    border: 1px solid var(--fg-vdim);
+    border-radius: 8px;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+    z-index: 1000;
+    margin-left: 0;
+    max-width: none;
+    padding: 0.75rem;
+  }
+
+  .nav-options-row {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+
+  .nav-option {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 0.25rem;
+  }
+
+  /* Backdrop overlay for mobile dropdowns */
+  .nav-dropdown-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.3);
+    z-index: 999;
+  }
+
+  .nav-dropdown-overlay.hidden {
+    display: none;
   }
 
   header {
@@ -825,6 +896,15 @@ h1 {
 
   .recent-activity-section {
     margin-bottom: 1.5rem;
+  }
+
+  /* Tighter nav spacing on very small phones */
+  .nav-filters {
+    gap: 1ch;
+  }
+
+  .nav-value {
+    max-width: 10ch;
   }
 }
 
