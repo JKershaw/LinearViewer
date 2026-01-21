@@ -517,6 +517,14 @@ function initNavBar() {
   const workspaceOptions = document.getElementById('workspace-options')
   const teamOptions = document.getElementById('team-options')
 
+  // Create overlay element for mobile dropdown backdrop
+  let dropdownOverlay = document.querySelector('.nav-dropdown-overlay')
+  if (!dropdownOverlay) {
+    dropdownOverlay = document.createElement('div')
+    dropdownOverlay.className = 'nav-dropdown-overlay hidden'
+    document.body.appendChild(dropdownOverlay)
+  }
+
   // Track currently open selector
   let openSelector = null
 
@@ -527,6 +535,7 @@ function initNavBar() {
     ;[workspaceOptions, teamOptions].forEach(panel => {
       if (panel) panel.classList.add('hidden')
     })
+    if (dropdownOverlay) dropdownOverlay.classList.add('hidden')
     openSelector = null
   }
 
@@ -539,6 +548,7 @@ function initNavBar() {
       closeAllSelectors()
       toggle.setAttribute('aria-expanded', 'true')
       options.classList.remove('hidden')
+      if (dropdownOverlay) dropdownOverlay.classList.remove('hidden')
       openSelector = selectorName
     }
   }
@@ -588,6 +598,11 @@ function initNavBar() {
       panel.addEventListener('click', (e) => e.stopPropagation())
     }
   })
+
+  // Close on overlay click (mobile backdrop)
+  if (dropdownOverlay) {
+    dropdownOverlay.addEventListener('click', closeAllSelectors)
+  }
 
   // Handle forms with confirmation dialogs (replaces inline onsubmit)
   document.addEventListener('submit', (e) => {
