@@ -15,6 +15,30 @@
  */
 
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
+
+// Rate limiters for dispatch endpoints to prevent abuse
+// Dispatch queue: 30 requests per minute per IP (reasonable for adding prompts)
+const dispatchQueueLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many dispatch requests, please try again later' },
+  // Skip rate limiting in test mode
+  skip: () => process.env.NODE_ENV === 'test'
+});
+
+// Token creation: 5 requests per 15 minutes per IP (tokens rarely created)
+const tokenCreationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many token creation requests, please try again later' },
+  // Skip rate limiting in test mode
+  skip: () => process.env.NODE_ENV === 'test'
+});
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -83,8 +107,9 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
   /**
    * POST /workspace/:urlKey/api/dispatch
    * Add a prompt to the dispatch queue.
+   * Rate limited to 30 requests per minute per IP.
    */
-  router.post('/workspace/:urlKey/api/dispatch', workspaceFromUrl, async (req, res) => {
+  router.post('/workspace/:urlKey/api/dispatch', dispatchQueueLimiter, workspaceFromUrl, async (req, res) => {
     const { workspace } = req;
 
     try {
@@ -220,8 +245,9 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
   /**
    * POST /workspace/:urlKey/api/dispatch/tokens
    * Create a new dispatch token for this workspace.
+   * Rate limited to 5 requests per 15 minutes per IP.
    */
-  router.post('/workspace/:urlKey/api/dispatch/tokens', workspaceFromUrl, async (req, res) => {
+  router.post('/workspace/:urlKey/api/dispatch/tokens', tokenCreationLimiter, workspaceFromUrl, async (req, res) => {
     const { workspace } = req;
 
     try {
