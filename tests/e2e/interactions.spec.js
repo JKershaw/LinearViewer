@@ -288,6 +288,28 @@ test.describe('Detail Section Toggles', () => {
     await expect(viewInLinearLink).toBeVisible();
     await expect(viewInLinearLink).toContainText('View in Linear');
   });
+
+  test('Create task link is visible for authenticated users', async ({ page }) => {
+    const project = page.locator('.project').first();
+    const projectId = await project.getAttribute('data-id');
+
+    // Reveal project-meta if hidden (has description)
+    const description = project.locator('.project-description');
+    if (await description.isVisible()) {
+      await description.click();
+    }
+
+    const createTaskLink = project.locator('[data-action="create-task"]');
+    await expect(createTaskLink).toBeVisible();
+    await expect(createTaskLink).toContainText('+ Create task');
+
+    const href = await createTaskLink.getAttribute('href');
+    expect(href).toContain('linear.app/');
+    expect(href).toContain('/new?project=');
+    expect(href).toContain(projectId);
+    await expect(createTaskLink).toHaveAttribute('target', '_blank');
+  });
+
 });
 
 test.describe('Landing Page Interactions', () => {
@@ -295,6 +317,12 @@ test.describe('Landing Page Interactions', () => {
     // Navigate first to have a page context, then clear localStorage
     await page.goto('/');
     await page.evaluate(() => localStorage.clear());
+  });
+
+  test('Create task link is NOT visible on landing page', async ({ page }) => {
+    await page.reload();
+    const createTaskLinks = page.locator('[data-action="create-task"]');
+    await expect(createTaskLinks).toHaveCount(0);
   });
 
   test('collapse and expand work on landing page', async ({ page }) => {
