@@ -80,7 +80,7 @@ Both In Progress and Projects sections use the same nested structure:
 - `.project[data-id="{project-id}"]` - project container
 - `.project-header` - clickable project header
 - `[data-completed-for="{project-id}"]` - completed tasks section
-- `[data-action="create-task"]` - "+ Create task" link (project level, authenticated only)
+- `[data-action="create-task"]` - "Create task +" link (project level, authenticated only)
 
 ### Navigation Selectors
 - `#workspace-toggle` - workspace dropdown button
