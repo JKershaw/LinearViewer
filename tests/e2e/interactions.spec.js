@@ -301,7 +301,7 @@ test.describe('Detail Section Toggles', () => {
 
     const createTaskLink = project.locator('[data-action="create-task"]');
     await expect(createTaskLink).toBeVisible();
-    await expect(createTaskLink).toContainText('Create task +');
+    await expect(createTaskLink).toContainText('Add +');
 
     const href = await createTaskLink.getAttribute('href');
     expect(href).toContain('linear.app/');
