@@ -42,11 +42,11 @@ const tokenCreationLimiter = rateLimit({
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Input length limits to prevent database bloat
-const MAX_PROMPT_LENGTH = 100000;      // 100KB max for prompt content
-const MAX_NAME_LENGTH = 200;           // Short names/labels/titles
-const MAX_URL_LENGTH = 2000;           // URLs
-const MAX_IDENTIFIER_LENGTH = 50;      // Issue identifiers like "LIN-123"
+// Input length limits to prevent MongoDB errors (16MB document limit)
+const MAX_PROMPT_LENGTH = 10000000;    // 10MB max for prompt content
+const MAX_NAME_LENGTH = 1000;          // Names/labels/titles
+const MAX_URL_LENGTH = 8000;           // URLs (covers long query strings)
+const MAX_IDENTIFIER_LENGTH = 100;     // Issue identifiers
 
 // Pattern to detect null bytes and dangerous control characters (except common whitespace)
 const DANGEROUS_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
