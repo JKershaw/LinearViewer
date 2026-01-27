@@ -27,15 +27,22 @@ import { PREPARING_LABEL, WORK_ISSUE_LABELS } from '../../lib/workflow-config.js
 // =============================================================================
 
 describe('COMPLETION_SIGNALS', () => {
-  const expectedPromptTypes = [
+  const expectedLabelTypes = [
     PREPARING_LABEL,
     WORK_ISSUE_LABELS.BLOCKED,
     WORK_ISSUE_LABELS.BUG
   ];
 
-  test('has all 3 expected prompt types', () => {
+  const expectedPromptTypes = [
+    ...expectedLabelTypes,
+    'plan', 'code-review',
+    'look-into', 'triage', 'breakdown', 'research', 'scoping',
+    'design', 'spike', 'context', 'implementation', 'review'
+  ];
+
+  test('has all 15 expected prompt types', () => {
     const keys = Object.keys(COMPLETION_SIGNALS);
-    assert.strictEqual(keys.length, 3, 'Should have exactly 3 prompt types');
+    assert.strictEqual(keys.length, 15, 'Should have exactly 15 prompt types');
     for (const type of expectedPromptTypes) {
       assert.ok(type in COMPLETION_SIGNALS, `Should have ${type} signal`);
     }
@@ -120,15 +127,19 @@ describe('Signal Content', () => {
 // =============================================================================
 
 describe('getDefinedSignalTypes', () => {
-  test('returns all 3 signal types', () => {
+  test('returns all 15 signal types', () => {
     const defined = getDefinedSignalTypes();
     assert.ok(Array.isArray(defined));
-    assert.strictEqual(defined.length, 3);
+    assert.strictEqual(defined.length, 15);
   });
 
   test('returns all expected types', () => {
     const defined = getDefinedSignalTypes();
-    const expectedTypes = [PREPARING_LABEL, 'blocked', 'bug'];
+    const expectedTypes = [
+      PREPARING_LABEL, 'blocked', 'bug',
+      'plan', 'code-review', 'look-into', 'triage', 'breakdown',
+      'research', 'scoping', 'design', 'spike', 'context', 'implementation', 'review'
+    ];
     for (const type of expectedTypes) {
       assert.ok(defined.includes(type), `Should include ${type}`);
     }
@@ -149,9 +160,20 @@ describe('hasSignals', () => {
 
   test('returns false for unknown types', () => {
     assert.strictEqual(hasSignals('unknown'), false);
-    assert.strictEqual(hasSignals('plan'), false);
-    assert.strictEqual(hasSignals('code-review'), false);
+    assert.strictEqual(hasSignals('nonexistent'), false);
+    assert.strictEqual(hasSignals('invalid-type'), false);
     assert.strictEqual(hasSignals(''), false);
+  });
+
+  test('returns true for all 15 defined types', () => {
+    const allTypes = [
+      PREPARING_LABEL, 'blocked', 'bug',
+      'plan', 'code-review', 'look-into', 'triage', 'breakdown',
+      'research', 'scoping', 'design', 'spike', 'context', 'implementation', 'review'
+    ];
+    for (const type of allTypes) {
+      assert.strictEqual(hasSignals(type), true, `${type} should have signals`);
+    }
   });
 
   test('returns false for old phase labels', () => {
@@ -176,7 +198,21 @@ describe('getSignal', () => {
 
   test('returns null for unknown type', () => {
     assert.strictEqual(getSignal('unknown'), null);
-    assert.strictEqual(getSignal('plan'), null);
+    assert.strictEqual(getSignal('nonexistent'), null);
+  });
+
+  test('returns signal for all 15 defined types', () => {
+    const allTypes = [
+      PREPARING_LABEL, 'blocked', 'bug',
+      'plan', 'code-review', 'look-into', 'triage', 'breakdown',
+      'research', 'scoping', 'design', 'spike', 'context', 'implementation', 'review'
+    ];
+    for (const type of allTypes) {
+      const signal = getSignal(type);
+      assert.ok(signal !== null, `${type} should return a signal`);
+      assert.ok(signal.coreOutcome, `${type} should have coreOutcome`);
+      assert.ok(signal.readinessCheck, `${type} should have readinessCheck`);
+    }
   });
 });
 
@@ -260,7 +296,21 @@ describe('formatSignalsForPrompt', () => {
 
   test('returns null for unknown type', () => {
     assert.strictEqual(formatSignalsForPrompt('unknown'), null);
-    assert.strictEqual(formatSignalsForPrompt('plan'), null);
+    assert.strictEqual(formatSignalsForPrompt('nonexistent'), null);
+  });
+
+  test('returns formatted string for all 15 types', () => {
+    const allTypes = [
+      PREPARING_LABEL, 'blocked', 'bug',
+      'plan', 'code-review', 'look-into', 'triage', 'breakdown',
+      'research', 'scoping', 'design', 'spike', 'context', 'implementation', 'review'
+    ];
+    for (const type of allTypes) {
+      const formatted = formatSignalsForPrompt(type);
+      assert.ok(typeof formatted === 'string', `${type} should return a string`);
+      assert.ok(formatted.includes('Core Outcome:'), `${type} should include Core Outcome`);
+      assert.ok(formatted.includes('Readiness Check:'), `${type} should include Readiness Check`);
+    }
   });
 });
 
@@ -331,17 +381,37 @@ describe('Integration', () => {
     }
   });
 
-  test('aiHint.readinessCheck matches signal readinessCheck for work issues', async () => {
+  test('all templates have completionSignals defined', async () => {
     const { PROMPT_TEMPLATES } = await import('../../lib/prompt-templates.js');
-    const typesWithSignals = ['blocked', 'bug'];
+    const allTypes = Object.keys(PROMPT_TEMPLATES);
 
-    for (const type of typesWithSignals) {
+    for (const type of allTypes) {
       const template = PROMPT_TEMPLATES[type];
-      const signal = COMPLETION_SIGNALS[type];
+      assert.ok(
+        template.completionSignals,
+        `${type} template should have completionSignals property`
+      );
+      assert.ok(
+        template.completionSignals.coreOutcome,
+        `${type} should have coreOutcome`
+      );
+      assert.ok(
+        template.completionSignals.readinessCheck,
+        `${type} should have readinessCheck`
+      );
+    }
+  });
+
+  test('aiHint does not have redundant readinessCheck', async () => {
+    const { PROMPT_TEMPLATES } = await import('../../lib/prompt-templates.js');
+    const allTypes = Object.keys(PROMPT_TEMPLATES);
+
+    for (const type of allTypes) {
+      const template = PROMPT_TEMPLATES[type];
       assert.strictEqual(
-        template.aiHint.readinessCheck,
-        signal.readinessCheck,
-        `${type} aiHint.readinessCheck should match signal`
+        template.aiHint?.readinessCheck,
+        undefined,
+        `${type} aiHint should not have readinessCheck (use completionSignals instead)`
       );
     }
   });
