@@ -214,6 +214,50 @@ test.describe('Dispatch Queue', () => {
     // Panel should be hidden
     await expect(panel).not.toBeVisible();
   });
+
+  test('badge updates via polling when consumer claims item', async ({ page, request }) => {
+    // Create a consumer token
+    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const { token } = await tokenResponse.json();
+
+    // Find and expand a task with prompts
+    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
+    await taskLine.click();
+
+    // Expand Prompts section to reveal prompt buttons
+    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
+    // Click the promptable label to show prompt
+    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
+    await labelLink.click();
+
+    // Wait for prompt to load and dispatch
+    const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
+    await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
+
+    const dispatchBtn = promptContainer.locator('.prompt-dispatch');
+    await dispatchBtn.click();
+    await expect(dispatchBtn).toHaveText('dispatched!');
+
+    // Badge should show 1 queued
+    const badge = page.locator('[data-queue-badge]');
+    await expect(badge).not.toHaveClass(/hidden/, { timeout: 10000 });
+    await expect(badge.locator('.queue-count')).toHaveText('1');
+
+    // Consumer claims the item via API
+    const pollResponse = await request.get('/api/dispatch/poll', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const { items } = await pollResponse.json();
+    expect(items.length).toBe(1);
+
+    await request.post(`/api/dispatch/take/${items[0].id}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    // Badge should update via polling (within 2 seconds given 1s interval)
+    await expect(badge).toHaveClass(/hidden/, { timeout: 3000 });
+  });
 });
 
 test.describe('Dispatch API', () => {
