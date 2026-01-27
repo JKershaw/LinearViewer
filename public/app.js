@@ -2,6 +2,10 @@ const STORAGE_KEY = 'linear-projects-state'
 const TEAM_STORAGE_KEY = 'linear-projects-selected-team'
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+// Queue badge polling state
+let queuePollIntervalId = null
+const QUEUE_POLL_INTERVAL_MS = 1000
+
 // ==========================================================================
 // Markdown Rendering (using marked.js library)
 // ==========================================================================
@@ -902,13 +906,45 @@ async function updateQueueBadge(urlKey) {
 }
 
 /**
+ * Start polling for queue badge updates
+ */
+function startQueuePolling(urlKey) {
+  if (queuePollIntervalId) return
+
+  queuePollIntervalId = setInterval(() => {
+    if (!document.hidden) {
+      updateQueueBadge(urlKey)
+    }
+  }, QUEUE_POLL_INTERVAL_MS)
+}
+
+/**
+ * Stop polling for queue badge updates
+ */
+function stopQueuePolling() {
+  if (queuePollIntervalId) {
+    clearInterval(queuePollIntervalId)
+    queuePollIntervalId = null
+  }
+}
+
+/**
  * Initialize queue panel functionality
  */
 function initQueuePanel() {
-  // Initialize badge count on page load
+  // Initialize badge count on page load and start polling
   const badge = document.querySelector('[data-queue-badge]')
   if (badge) {
-    updateQueueBadge(badge.dataset.urlKey)
+    const urlKey = badge.dataset.urlKey
+    updateQueueBadge(urlKey)
+    startQueuePolling(urlKey)
+
+    // Fetch immediately when tab becomes visible (data may be stale)
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        updateQueueBadge(urlKey)
+      }
+    })
   }
 
   // Handle badge click to show queue panel
@@ -1508,6 +1544,9 @@ function initDeployTime() {
     console.warn('Failed to format deploy time:', e)
   }
 }
+
+// Cleanup polling on page unload
+window.addEventListener('beforeunload', stopQueuePolling)
 
 document.addEventListener('DOMContentLoaded', () => {
   init()
