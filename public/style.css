@@ -606,6 +606,23 @@ h1 {
   font-family: var(--font-content);
 }
 
+/* "+ Add task" link at end of task list */
+.add-task-link {
+  color: var(--fg-dim);
+  padding: 0.25rem 0;
+  padding-left: 1.5em;
+  font-family: var(--font-content);
+}
+
+.add-task-link a {
+  color: var(--fg-dim);
+  text-decoration: none;
+}
+
+.add-task-link a:hover {
+  color: var(--blue);
+}
+
 /* Utility class for hiding elements (used by JS for expand/collapse) */
 .hidden { display: none !important; }
 
@@ -764,54 +781,14 @@ h1 {
     white-space: nowrap;
   }
 
-  .nav-option {
-    padding: 0.5rem 0;  /* Larger tap targets */
-  }
-
-  /* Mobile dropdown panels: bottom-sheet style overlay */
+  /* Mobile dropdown panels: inline dropdown below nav item */
   .nav-options-panel {
-    position: fixed;
-    left: 1rem;
-    right: 1rem;
-    bottom: 1rem;
-    top: auto;
-    max-height: 50vh;
-    overflow-y: auto;
-    background: var(--bg);
-    border: 1px solid var(--fg-vdim);
-    border-radius: 8px;
-    box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
-    z-index: 1000;
-    margin-left: 0;
     max-width: none;
-    padding: 0.75rem;
+    margin-left: 1ch;
   }
 
-  .nav-options-row {
-    min-height: 44px;
-    display: flex;
-    align-items: center;
-  }
-
-  .nav-option {
-    min-height: 44px;
-    display: flex;
-    align-items: center;
-    padding: 0.5rem 0.25rem;
-  }
-
-  /* Backdrop overlay for mobile dropdowns */
+  /* Hide backdrop overlay on mobile - not needed for inline dropdown */
   .nav-dropdown-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0,0,0,0.3);
-    z-index: 999;
-  }
-
-  .nav-dropdown-overlay.hidden {
     display: none;
   }
 

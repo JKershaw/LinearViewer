@@ -293,15 +293,10 @@ test.describe('Detail Section Toggles', () => {
     const project = page.locator('.project').first();
     const projectId = await project.getAttribute('data-id');
 
-    // Reveal project-meta if hidden (has description)
-    const description = project.locator('.project-description');
-    if (await description.isVisible()) {
-      await description.click();
-    }
-
+    // Link is now at end of task list, not hidden in project-meta
     const createTaskLink = project.locator('[data-action="create-task"]');
     await expect(createTaskLink).toBeVisible();
-    await expect(createTaskLink).toContainText('Add +');
+    await expect(createTaskLink).toContainText('+ Add task');
 
     const href = await createTaskLink.getAttribute('href');
     expect(href).toContain('linear.app/');
