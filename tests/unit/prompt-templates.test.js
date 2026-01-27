@@ -586,6 +586,17 @@ describe('look-into template', () => {
     assert.ok(result.prompt.includes('overview'));
     assert.ok(result.prompt.includes('Recommended next action'));
   });
+
+  test('does NOT include status change instruction (read-only template)', () => {
+    const result = generatePrompt('look-into', mockIssue, mockContext);
+    assert.ok(!result.prompt.includes('status to "In Progress"'), 'look-into should not change status');
+  });
+
+  test('includes read-only workflow instructions', () => {
+    const result = generatePrompt('look-into', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('Fetch details'), 'should include fetch step');
+    assert.ok(result.prompt.includes('Add findings as a comment'), 'should include comment step');
+  });
 });
 
 // =============================================================================
@@ -629,6 +640,98 @@ describe('triage template', () => {
     assert.ok(result.prompt.includes('preparing'));
     assert.ok(result.prompt.includes('blocked'));
     assert.ok(result.prompt.includes('bug'));
+  });
+});
+
+// =============================================================================
+// context Template Tests
+// =============================================================================
+
+describe('context template', () => {
+  const mockIssue = {
+    id: 'issue-context',
+    identifier: 'TEST-CTX1',
+    title: 'Feature implementation in progress',
+    description: 'User profile feature work',
+    url: 'https://linear.app/test/issue/TEST-CTX1',
+    state: { name: 'In Progress', type: 'started' },
+    labels: [],
+    assignee: { name: 'Alice' }
+  };
+
+  const mockContext = {
+    parent: null,
+    siblings: [],
+    project: { name: 'User Features', description: 'User-related features' },
+    children: [],
+    comments: []
+  };
+
+  test('returns Context Summary as name', () => {
+    const result = generatePrompt('context', mockIssue, mockContext);
+    assert.strictEqual(result.name, 'Context Summary');
+  });
+
+  test('has UNIVERSAL category', () => {
+    const template = PROMPT_TEMPLATES['context'];
+    assert.strictEqual(template.category, PROMPT_CATEGORIES.UNIVERSAL);
+  });
+
+  test('does NOT include status change instruction (read-only template)', () => {
+    const result = generatePrompt('context', mockIssue, mockContext);
+    assert.ok(!result.prompt.includes('status to "In Progress"'), 'context should not change status');
+  });
+
+  test('includes read-only workflow instructions', () => {
+    const result = generatePrompt('context', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('Fetch details'), 'should include fetch step');
+    assert.ok(result.prompt.includes('Add findings as a comment'), 'should include comment step');
+  });
+});
+
+// =============================================================================
+// review Template Tests
+// =============================================================================
+
+describe('review template', () => {
+  const mockIssue = {
+    id: 'issue-review',
+    identifier: 'TEST-REV1',
+    title: 'Completed feature for review',
+    description: 'Feature ready for final review',
+    url: 'https://linear.app/test/issue/TEST-REV1',
+    state: { name: 'In Progress', type: 'started' },
+    labels: [],
+    assignee: { name: 'Bob' }
+  };
+
+  const mockContext = {
+    parent: null,
+    siblings: [],
+    project: { name: 'Product', description: 'Product features' },
+    children: [],
+    comments: []
+  };
+
+  test('returns Review Checklist as name', () => {
+    const result = generatePrompt('review', mockIssue, mockContext);
+    assert.strictEqual(result.name, 'Review Checklist');
+  });
+
+  test('has UNIVERSAL category', () => {
+    const template = PROMPT_TEMPLATES['review'];
+    assert.strictEqual(template.category, PROMPT_CATEGORIES.UNIVERSAL);
+  });
+
+  test('does NOT include status change instruction (read-only template)', () => {
+    const result = generatePrompt('review', mockIssue, mockContext);
+    assert.ok(!result.prompt.includes('status to "In Progress"'), 'review should not change status');
+  });
+
+  test('includes read-only workflow instructions', () => {
+    const result = generatePrompt('review', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('Fetch details'), 'should include fetch step');
+    assert.ok(result.prompt.includes('Add findings as a comment'), 'should include comment step');
   });
 });
 
