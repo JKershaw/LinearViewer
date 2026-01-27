@@ -11,6 +11,8 @@
 
 /**
  * Escapes HTML special characters to prevent XSS.
+ * Matches server-side implementation in lib/utils/html.js.
+ * @global
  * @param {string} str - String to escape
  * @returns {string} Escaped string safe for HTML insertion
  */
@@ -20,7 +22,8 @@ window.escapeHtml = function(str) {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 };
 
 // =============================================================================
