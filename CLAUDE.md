@@ -169,11 +169,12 @@ node lib/linear-cli.js <command> [args]
 | `teams` | List all teams |
 | `projects` | List active projects |
 | `issues [teamId]` | List all issues (optionally filter by team) |
-| `issue <id>` | Get issue details with full context (including comments) |
+| `issue <id>` | Get issue details with full context (use `--with-images` for base64) |
 | `search "query"` | Search issues |
 | `states <teamId>` | List workflow states for a team |
 | `relations <issueId>` | Get issue relations (blocks, blocked-by, etc.) |
 | `labels [teamId]` | List all labels (optionally filter by team) |
+| `fetch-image <url>` | Fetch image with auth (`--base64` or `--file <path>`) |
 | `create-issue <teamId> <title> [json]` | Create a new issue |
 | `update-issue <issueId> <json>` | Update an existing issue |
 | `comment <issueId> "body"` | Add a comment to an issue |
@@ -267,6 +268,45 @@ EOF
 ```
 
 **Note**: The CLI outputs JSON for easy parsing by AI agents.
+
+### Image Support
+
+The CLI can fetch images from Linear issues for AI agent visual analysis.
+
+**Issue images are automatically included:**
+```bash
+# Get issue with image URLs extracted from description, comments, and attachments
+node lib/linear-cli.js issue LIN-99
+
+# Output includes:
+# {
+#   "images": {
+#     "fromDescription": [{"alt": "screenshot", "url": "..."}],
+#     "fromComments": [{"alt": "", "url": "...", "commentId": "..."}],
+#     "fromAttachments": [{"id": "...", "url": "...", "title": "..."}]
+#   }
+# }
+```
+
+**Embed images as base64 for multimodal AI:**
+```bash
+node lib/linear-cli.js issue LIN-99 --with-images
+# Adds "embeddedImages" array with base64 data URIs
+```
+
+**Fetch individual images:**
+```bash
+# Get image metadata only
+node lib/linear-cli.js fetch-image "https://linear.app/uploads/..."
+
+# Get as base64 data URI (for AI vision models)
+node lib/linear-cli.js fetch-image "https://linear.app/uploads/..." --base64
+
+# Save to file
+node lib/linear-cli.js fetch-image "https://linear.app/uploads/..." --file ./image.png
+```
+
+**Note**: Linear-hosted images require authentication. The CLI uses your `LINEAR_API_KEY` automatically.
 
 ## GitHub Actions CI (for AI Agents)
 
