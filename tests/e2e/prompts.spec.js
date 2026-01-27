@@ -536,6 +536,16 @@ test.describe('AI Recommendations', () => {
   });
 
   test('clicking suggest button shows recommendation container', async ({ page }) => {
+    // Intercept the recommend API to add delay so we can test loading state
+    let resolveDelay;
+    const delayPromise = new Promise(resolve => { resolveDelay = resolve; });
+
+    await page.route(`**/api/recommend/${BLOCKED_ISSUE_ID}`, async (route) => {
+      // Wait for our signal before continuing with the request
+      await delayPromise;
+      await route.continue();
+    });
+
     const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
 
@@ -557,6 +567,9 @@ test.describe('AI Recommendations', () => {
     await expect(toggleBtn).toBeHidden();
     // Reasoning should show loading text
     await expect(reasoning).toContainText('Analyzing');
+
+    // Now release the API request to complete
+    resolveDelay();
 
     // Wait for loading to complete (reasoning becomes hidden)
     await expect(reasoning).toBeHidden({ timeout: 10000 });
