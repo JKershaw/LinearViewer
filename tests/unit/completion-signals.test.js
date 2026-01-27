@@ -404,8 +404,7 @@ describe('Integration', () => {
 
   test('aiHint does not have redundant readinessCheck', async () => {
     const { PROMPT_TEMPLATES } = await import('../../lib/prompt-templates.js');
-    }
-  });
+    const allTypes = Object.keys(PROMPT_TEMPLATES);
 
     for (const type of allTypes) {
       const template = PROMPT_TEMPLATES[type];
