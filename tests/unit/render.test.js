@@ -10,7 +10,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { renderLabels } from '../../lib/render.js';
+import { renderLabels, renderPage } from '../../lib/render.js';
 
 // =============================================================================
 // renderLabels Tests
@@ -28,7 +28,7 @@ describe('renderLabels', () => {
       assert.strictEqual(result, 'feature');
     });
 
-    test('renders multiple regular labels space-separated', () => {
+    test('renders multiple regular labels comma-separated', () => {
       const issue = {
         id: 'issue-1',
         labels: { nodes: [{ name: 'feature' }, { name: 'priority' }] },
@@ -37,8 +37,8 @@ describe('renderLabels', () => {
       const result = renderLabels(issue);
       assert.ok(result.includes('feature'));
       assert.ok(result.includes('priority'));
-      // Labels are space-separated (buttons have margin for visual spacing)
-      assert.strictEqual(result, 'feature priority');
+      // Labels are comma-separated in renderDisplayLabels
+      assert.strictEqual(result, 'feature, priority');
     });
 
     test('returns empty string for no labels on completed issue', () => {
@@ -241,6 +241,82 @@ describe('renderLabels', () => {
       assert.ok(result.includes('feature'));
       assert.ok(result.includes('data-label="plan"'));
       assert.ok(result.includes('data-label="code-review"'));
+    });
+  });
+});
+
+// =============================================================================
+// renderPage Description Tests (LIN-151)
+// =============================================================================
+
+describe('renderPage description rendering', () => {
+  // Helper to create minimal project tree structure
+  function createProjectTree(issue) {
+    return {
+      project: {
+        id: 'project-1',
+        name: 'Test Project',
+        content: null,
+        url: null
+      },
+      incomplete: [{
+        issue,
+        children: [],
+        depth: 0
+      }],
+      completed: [],
+      completedCount: 0
+    };
+  }
+
+  describe('--- delimited blocks in descriptions (LIN-151)', () => {
+    const issueWithDashBlock = {
+      id: 'issue-dash',
+      title: 'Issue with dashes',
+      description: 'Some intro\n---\nContent between dashes\n---\nMore text',
+      state: { type: 'started' },
+      labels: { nodes: [] },
+      url: 'https://linear.app/test'
+    };
+
+    test('renders --- blocks as prompt container on landing page', () => {
+      const projectTree = createProjectTree(issueWithDashBlock);
+      const result = renderPage([projectTree], [], [], 'Test', { isLanding: true });
+
+      // Should have prompt-container with "Setup Prompt" for landing page
+      assert.ok(result.includes('prompt-container'), 'Landing page should render prompt container');
+      assert.ok(result.includes('Setup Prompt'), 'Landing page should show "Setup Prompt" name');
+    });
+
+    test('does NOT render --- blocks as prompt container for authenticated users', () => {
+      const projectTree = createProjectTree(issueWithDashBlock);
+      const result = renderPage([projectTree], [], [], 'Test', { isLanding: false });
+
+      // Should NOT have the "Setup Prompt" container that comes from --- blocks
+      // (There may be other prompt-containers for the interactive prompt UI)
+      assert.ok(!result.includes('Setup Prompt'), 'Authenticated view should NOT render "Setup Prompt"');
+
+      // The description text should be rendered as plain text
+      assert.ok(result.includes('Some intro'), 'Description intro should be visible');
+    });
+
+    test('renders description with --- as plain text for authenticated users', () => {
+      const issueWithHorizontalRule = {
+        id: 'issue-hr',
+        title: 'Issue with markdown HR',
+        description: 'Above the line\n---\nBelow the line\n---\nEnd',
+        state: { type: 'started' },
+        labels: { nodes: [] },
+        url: 'https://linear.app/test'
+      };
+
+      const projectTree = createProjectTree(issueWithHorizontalRule);
+      const result = renderPage([projectTree], [], [], 'Test', { isLanding: false });
+
+      // Should render as plain text, not as a prompt
+      assert.ok(!result.includes('class="prompt-container"') ||
+                !result.includes('Setup Prompt'),
+                'Should not render --- content as Setup Prompt');
     });
   });
 });
