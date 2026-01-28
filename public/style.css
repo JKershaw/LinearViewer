@@ -502,7 +502,7 @@ h1 {
   font-weight: 500;
 }
 
-/* Status indicators: ✓ (done), ◐ (in-progress), ○ (todo) */
+/* Status indicators: ✓ (done), ◐ (in-progress), ○ (todo), ◌ (backlog) */
 .state {
   flex-shrink: 0;
   margin-right: 0.5ch;
@@ -512,6 +512,7 @@ h1 {
 .state.done { color: var(--green); }
 .state.in-progress { color: var(--yellow); }
 .state.todo { color: var(--fg-dim); }
+.state.backlog { color: var(--fg-dim); opacity: 0.5; }
 
 /* Issue title - fills remaining space, wraps on overflow */
 .title {

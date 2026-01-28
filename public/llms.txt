@@ -18,7 +18,8 @@
 
 ## Status Indicators
 
-- ○ (todo) - `data-status="todo"` - Not started
+- ○ (todo) - `data-status="todo"` - Ready to start (planned for soon)
+- ◌ (backlog) - `data-status="backlog"` - In the queue (not coming soon)
 - ◐ (in-progress) - `data-status="in-progress"` - In progress
 - ✓ (done) - `data-status="done"` - Completed
 

@@ -53,10 +53,15 @@ test.describe('Authenticated Dashboard', () => {
     const inProgressStates = page.locator('.state.in-progress');
     await expect(inProgressStates).toHaveCount(8);
 
-    // Todo issues (type: 'unstarted' or 'backlog'): issue-2, issue-5, preparing issue, bug issue, plan issue
+    // Todo issues (type: 'unstarted'): issue-2, bug issue, plan issue
     // issue-2 appears 2x (child of in-progress parent), others appear 1x
-    // Todo count: 2 + 1 + 1 + 1 + 1 = 6
-    await expect(page.locator('.state.todo')).toHaveCount(6);
+    // Todo count: 2 + 1 + 1 = 4
+    await expect(page.locator('.state.todo')).toHaveCount(4);
+
+    // Backlog issues (type: 'backlog'): issue-5, preparing issue
+    // Each appears 1x in project section only
+    // Backlog count: 1 + 1 = 2
+    await expect(page.locator('.state.backlog')).toHaveCount(2);
   });
 
   test('shows logout link when authenticated', async ({ page }) => {
