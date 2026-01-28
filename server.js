@@ -16,7 +16,7 @@ import { MongoSessionStore } from './lib/session-store.js'
 import { UserPreferencesStore } from './lib/user-preferences.js'
 import { DispatchQueueStore } from './lib/dispatch-store.js'
 import { DispatchTokenStore } from './lib/dispatch-tokens.js'
-import { fetchProjects, fetchTeams, fetchIssueContext } from './lib/linear.js'
+import { fetchProjects, fetchTeams, fetchIssueContext, fetchRecommendationContext } from './lib/linear.js'
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID } from './lib/tree.js'
 import { renderPage, renderErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
 import { parseLandingPage } from './lib/parse-landing.js'
@@ -1024,12 +1024,13 @@ ${goal}`
       })
     }
 
-    // Fetch issue context from Linear
-    const { issue, parent, siblings, project, children, comments } = await fetchIssueContext(workspace.accessToken, issueId)
+    // Fetch issue context from Linear (uses two-tier context for parent tasks)
+    const context = await fetchRecommendationContext(workspace.accessToken, issueId)
+    const { issue, parent, siblings, project, children, comments, focusedChild } = context
 
     // Get AI-generated prompt (pass session API key and model if available)
     const selectedModel = req.session.modelId || DEFAULT_MODEL
-    const recommendation = await getRecommendation(issue, { parent, siblings, project, children, comments }, { apiKey: sessionApiKey, model: selectedModel })
+    const recommendation = await getRecommendation(issue, { parent, siblings, project, children, comments, focusedChild }, { apiKey: sessionApiKey, model: selectedModel })
 
     res.json({
       reasoning: recommendation.reasoning,
