@@ -508,10 +508,10 @@ async function handleUnauthorizedError(workspace, session, teamId, openRouterSou
  * For authenticated users: Redirects to active workspace URL.
  */
 app.get('/', (req, res) => {
-  const workspace = getActiveWorkspace(req.session)
+  const workspace = req.session.workspaces?.[0]
   const deployInfo = getDeployInfo()
 
-  // Authenticated users redirect to their workspace
+  // Authenticated users redirect to their first workspace
   if (workspace) {
     return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/`)
   }

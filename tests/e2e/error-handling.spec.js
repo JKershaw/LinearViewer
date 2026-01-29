@@ -9,25 +9,11 @@ test.describe('Input Validation', () => {
     await page.goto('/test/set-session');
   });
 
-  test('invalid workspace urlKey on switch returns 400', async ({ page }) => {
-    // Special characters are not allowed in urlKey
-    const response = await page.request.post('/workspace/invalid@workspace!/switch');
-    expect(response.status()).toBe(400);
-    expect(await response.text()).toContain('Invalid workspace ID');
-  });
-
   test('invalid workspace urlKey on remove returns 400', async ({ page }) => {
     // urlKey too long (over 50 chars) is invalid
     const response = await page.request.post('/workspace/' + 'a'.repeat(51) + '/remove');
     expect(response.status()).toBe(400);
     expect(await response.text()).toContain('Invalid workspace ID');
-  });
-
-  test('non-existent workspace urlKey on switch returns 404', async ({ page }) => {
-    // Valid urlKey format but not in session
-    const response = await page.request.post('/workspace/nonexistent-workspace/switch');
-    expect(response.status()).toBe(404);
-    expect(await response.text()).toContain('Workspace not found');
   });
 
   test('invalid team filter is ignored', async ({ page }) => {

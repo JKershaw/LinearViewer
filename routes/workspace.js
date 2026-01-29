@@ -1,6 +1,6 @@
 /**
  * Workspace management routes.
- * Handles switching between and removing workspaces.
+ * Handles removing workspaces.
  */
 import { Router } from 'express'
 import { removeWorkspace, saveSession, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey } from '../lib/workspace.js'
@@ -12,26 +12,6 @@ import { badRequest, notFound } from '../lib/errors.js'
  */
 export function createWorkspaceRoutes() {
   const router = Router()
-
-  /**
-   * Switch active workspace.
-   * POST to avoid state change via GET.
-   */
-  router.post('/workspace/:urlKey/switch', async (req, res) => {
-    if (!validateWorkspaceUrlKey(req.params.urlKey)) {
-      return badRequest.html(res, 'Invalid workspace ID')
-    }
-
-    const workspace = getWorkspaceByUrlKey(req.session, req.params.urlKey)
-    if (!workspace) {
-      return notFound.html(res, 'Workspace not found')
-    }
-
-    req.session.activeWorkspaceId = workspace.id
-    await saveSession(req.session)
-    // Redirect to the new workspace's URL
-    res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/`)
-  })
 
   /**
    * Remove a workspace.
