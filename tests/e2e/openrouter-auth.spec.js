@@ -133,36 +133,32 @@ test.describe('OpenRouter OAuth Flow', () => {
     expect(data.source).toBe('oauth');
   });
 
-  test('main page nav shows ai status indicator when not connected', async ({ page }) => {
+  test('main page footer shows ai status indicator when not connected', async ({ page }) => {
     // Set up authenticated session without OpenRouter
     await setupSession(page);
     await page.goto(WORKSPACE_URL);
 
-    // Should show ai indicator in nav
-    const aiNav = page.locator('[data-selector="openrouter"]');
-    await expect(aiNav).toBeVisible();
+    // Should show ai indicator in footer
+    const statusLink = page.locator('.footer-ai-status');
+    await expect(statusLink).toBeVisible();
 
     // Should show disconnected state (○)
-    const statusLink = aiNav.locator('.nav-openrouter-status');
-    await expect(statusLink).toBeVisible();
     await expect(statusLink).toHaveClass(/disconnected/);
-    await expect(statusLink).toHaveText('○');
+    await expect(statusLink).toHaveText('ai: ○');
   });
 
-  test('main page nav shows ai status indicator when connected', async ({ page }) => {
+  test('main page footer shows ai status indicator when connected', async ({ page }) => {
     // Set up authenticated session with OpenRouter connected
     await setupSession(page, { openRouterConnected: true });
     await page.goto(WORKSPACE_URL);
 
-    // Should show ai indicator in nav
-    const aiNav = page.locator('[data-selector="openrouter"]');
-    await expect(aiNav).toBeVisible();
+    // Should show ai indicator in footer
+    const statusLink = page.locator('.footer-ai-status');
+    await expect(statusLink).toBeVisible();
 
     // Should show connected state (●)
-    const statusLink = aiNav.locator('.nav-openrouter-status');
-    await expect(statusLink).toBeVisible();
     await expect(statusLink).toHaveClass(/connected/);
-    await expect(statusLink).toHaveText('●');
+    await expect(statusLink).toHaveText('ai: ●');
   });
 
   test('ai status links to settings page', async ({ page }) => {
@@ -170,8 +166,8 @@ test.describe('OpenRouter OAuth Flow', () => {
     await setupSession(page);
     await page.goto(WORKSPACE_URL);
 
-    // Click the ai status link
-    const statusLink = page.locator('.nav-openrouter-status');
+    // Click the ai status link in footer
+    const statusLink = page.locator('.footer-ai-status');
     await expect(statusLink).toBeVisible();
     await statusLink.click();
 

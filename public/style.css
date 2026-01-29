@@ -123,27 +123,6 @@ h1 {
   color: var(--blue);
 }
 
-/* OpenRouter status indicator in nav */
-.nav-openrouter-status {
-  text-decoration: none;
-}
-
-.nav-openrouter-status.connected {
-  color: var(--green);
-}
-
-.nav-openrouter-status.env {
-  color: var(--fg-dim);
-}
-
-.nav-openrouter-status.disconnected {
-  color: var(--fg-dim);
-}
-
-.nav-openrouter-status:hover {
-  color: var(--blue);
-}
-
 .nav-actions {
   display: flex;
   align-items: baseline;
@@ -1603,6 +1582,26 @@ h1 {
 .footer-link:hover {
   color: var(--blue);
   text-decoration: underline;
+}
+
+.footer-ai-status {
+  text-decoration: none;
+}
+
+.footer-ai-status.connected {
+  color: var(--green);
+}
+
+.footer-ai-status.env {
+  color: var(--fg-dim);
+}
+
+.footer-ai-status.disconnected {
+  color: var(--fg-dim);
+}
+
+.footer-ai-status:hover {
+  color: var(--blue);
 }
 
 /* Mobile adjustments for footer */

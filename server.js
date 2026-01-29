@@ -632,10 +632,14 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
 app.get('/workspace/:urlKey/audit', workspaceFromUrl, (req, res) => {
   const workspace = req.workspace;
   const deployInfo = getDeployInfo();
+  const sessionApiKey = req.session.openRouterApiKey;
+  const envApiKey = process.env.OPENROUTER_API_KEY;
+  const openRouterSource = sessionApiKey ? 'oauth' : (envApiKey ? 'env' : null);
 
   const html = renderAuditPage(workspace.name || 'Workspace', {
     deployInfo,
-    urlKey: workspace.urlKey
+    urlKey: workspace.urlKey,
+    openRouterSource
   });
   res.send(html);
 });
@@ -678,10 +682,14 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, (req, res) => {
 app.get('/workspace/:urlKey/prompts', workspaceFromUrl, (req, res) => {
   const workspace = req.workspace;
   const deployInfo = getDeployInfo();
+  const sessionApiKey = req.session.openRouterApiKey;
+  const envApiKey = process.env.OPENROUTER_API_KEY;
+  const openRouterSource = sessionApiKey ? 'oauth' : (envApiKey ? 'env' : null);
 
   const html = renderPromptsPage(workspace.name || 'Workspace', {
     deployInfo,
-    urlKey: workspace.urlKey
+    urlKey: workspace.urlKey,
+    openRouterSource
   });
   res.send(html);
 });
