@@ -16,7 +16,7 @@ import { MongoSessionStore } from './lib/session-store.js'
 import { UserPreferencesStore } from './lib/user-preferences.js'
 import { DispatchQueueStore } from './lib/dispatch-store.js'
 import { DispatchTokenStore } from './lib/dispatch-tokens.js'
-import { fetchProjects, fetchTeams, fetchIssueContext, fetchRecommendationContext } from './lib/linear.js'
+import { fetchProjects, fetchTeams, fetchIssueContext, fetchRecommendationContext, fetchIssueComments } from './lib/linear.js'
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID } from './lib/tree.js'
 import { renderPage, renderErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
 import { parseLandingPage } from './lib/parse-landing.js'
@@ -1058,6 +1058,139 @@ ${goal}`
     }
 
     res.status(500).json({ error: 'Failed to get recommendation', message: error.message })
+  }
+})
+
+/**
+ * Fetch comments for a specific issue.
+ * LIN-156: Lightweight endpoint for fetching issue comments.
+ *
+ * @route GET /workspace/:urlKey/api/comments/:issueId
+ * @param {string} issueId - The Linear issue ID
+ * @returns {Object} { comments: Array<{id, body, createdAt, user}> }
+ */
+app.get('/workspace/:urlKey/api/comments/:issueId', workspaceFromUrl, async (req, res) => {
+  const workspace = req.workspace
+  const { issueId } = req.params
+
+  // Validate issue ID format (must be valid UUID)
+  if (!issueId || !UUID_REGEX.test(issueId)) {
+    return res.status(400).json({ error: 'Invalid issue ID format' })
+  }
+
+  try {
+    // Use mock data in test mode
+    const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token'
+    if (isTestMode) {
+      const mockIssue = testMockData.issues.find(i => i.id === issueId)
+      if (!mockIssue) {
+        return res.status(404).json({ error: 'Issue not found' })
+      }
+      // Return mock comments for test mode
+      return res.json({
+        comments: [
+          { id: 'comment-1', body: 'This is a test comment with **markdown**.', createdAt: '2024-01-15T10:00:00Z', user: 'Alice' },
+          { id: 'comment-2', body: 'Second comment with `code`.', createdAt: '2024-01-16T14:30:00Z', user: 'Bob' }
+        ]
+      })
+    }
+
+    const comments = await fetchIssueComments(workspace.accessToken, issueId)
+    res.json({ comments })
+  } catch (error) {
+    console.error('Comments fetch error:', error)
+
+    if (error.response?.status === 401) {
+      return res.status(401).json({ error: 'Token expired or invalid' })
+    }
+
+    if (error.message?.includes('not found')) {
+      return res.status(404).json({ error: error.message })
+    }
+
+    res.status(500).json({ error: 'Failed to fetch comments', message: error.message })
+  }
+})
+
+/**
+ * Proxy image requests to Linear with authentication.
+ * LIN-156: Linear-hosted images require auth headers that browsers can't add to img src.
+ *
+ * @route GET /workspace/:urlKey/api/image
+ * @query {string} url - The Linear image URL to fetch
+ * @returns {Stream} Image data with appropriate content-type
+ */
+app.get('/workspace/:urlKey/api/image', workspaceFromUrl, async (req, res) => {
+  const workspace = req.workspace
+  const imageUrl = req.query.url
+
+  // Validate URL
+  if (!imageUrl) {
+    return res.status(400).json({ error: 'Missing url parameter' })
+  }
+
+  // Only allow HTTPS URLs (security)
+  if (!imageUrl.startsWith('https://')) {
+    return res.status(400).json({ error: 'Invalid image URL: must be HTTPS' })
+  }
+
+  // Only allow Linear-hosted images (security - prevent SSRF)
+  // Use exact hostname matching to prevent bypass via evillinear.app
+  const allowedHosts = new Set(['uploads.linear.app', 'cdn.linear.app', 'linear.app'])
+  let urlObj
+  try {
+    urlObj = new URL(imageUrl)
+    if (!allowedHosts.has(urlObj.hostname)) {
+      return res.status(400).json({ error: 'Invalid image URL: must be from Linear' })
+    }
+  } catch {
+    return res.status(400).json({ error: 'Invalid image URL format' })
+  }
+
+  // Max image size: 10MB to prevent memory exhaustion
+  const MAX_IMAGE_SIZE = 10 * 1024 * 1024
+
+  try {
+    const response = await fetch(imageUrl, {
+      headers: {
+        Authorization: `Bearer ${workspace.accessToken}`
+      },
+      // Prevent redirects that could bypass SSRF protection
+      redirect: 'error'
+    })
+
+    if (!response.ok) {
+      return res.status(response.status).json({ error: 'Failed to fetch image' })
+    }
+
+    // Validate content-type is an image (prevent serving HTML/JS through proxy)
+    const contentType = response.headers.get('content-type') || ''
+    if (!contentType.startsWith('image/')) {
+      return res.status(400).json({ error: 'Invalid response: not an image' })
+    }
+
+    // Check content-length if available
+    const contentLength = parseInt(response.headers.get('content-length') || '0', 10)
+    if (contentLength > MAX_IMAGE_SIZE) {
+      return res.status(413).json({ error: 'Image too large' })
+    }
+
+    // Read response with size limit
+    const arrayBuffer = await response.arrayBuffer()
+    if (arrayBuffer.byteLength > MAX_IMAGE_SIZE) {
+      return res.status(413).json({ error: 'Image too large' })
+    }
+
+    res.set('Content-Type', contentType)
+    res.set('Cache-Control', 'private, max-age=3600')
+    res.send(Buffer.from(arrayBuffer))
+  } catch (error) {
+    // Handle redirect errors specifically
+    if (error.cause?.code === 'ERR_FR_TOO_MANY_REDIRECTS' || error.message?.includes('redirect')) {
+      return res.status(400).json({ error: 'Redirects not allowed' })
+    }
+    console.error('Image proxy error:', error)
+    res.status(500).json({ error: 'Failed to fetch image' })
   }
 })
 

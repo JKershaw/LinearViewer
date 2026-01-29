@@ -25,6 +25,98 @@ function renderMarkdown(markdown) {
   return typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(html) : html
 }
 
+/**
+ * Format a date as relative time (e.g., "2h ago", "yesterday")
+ * LIN-156: Used for comment timestamps
+ * @param {string} dateStr - ISO date string
+ * @returns {string} Human-readable relative time
+ */
+function formatRelativeTime(dateStr) {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  const now = new Date()
+  const diffMs = now - date
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+
+  if (diffMins < 1) return 'just now'
+  if (diffMins < 60) return `${diffMins}m ago`
+  if (diffHours < 24) return `${diffHours}h ago`
+  if (diffDays === 1) return 'yesterday'
+  if (diffDays < 7) return `${diffDays}d ago`
+
+  // Fallback to short date format
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  return `${months[date.getMonth()]} ${date.getDate()}`
+}
+
+/**
+ * Load and render comments for an issue
+ * LIN-156: Fetches comments from API on first expand
+ * @param {HTMLElement} toggle - The toggle element containing issue ID and urlKey
+ * @param {HTMLElement} content - The content container to render into
+ */
+async function loadComments(toggle, content) {
+  const issueId = toggle.dataset.issueId
+  const urlKey = toggle.dataset.urlKey
+
+  if (!issueId || !urlKey) {
+    console.error('Missing issueId or urlKey for comments')
+    return
+  }
+
+  const loadingEl = content.querySelector('.comments-loading')
+  const errorEl = content.querySelector('.comments-error')
+  const listEl = content.querySelector('.comments-list')
+
+  // Show loading state
+  loadingEl?.classList.remove('hidden')
+  errorEl?.classList.add('hidden')
+
+  try {
+    const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/comments/${issueId}`)
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch comments: ${response.status}`)
+    }
+
+    const data = await response.json()
+    const comments = data.comments || []
+
+    // Mark as loaded (don't re-fetch on toggle)
+    content.dataset.loaded = 'true'
+
+    // Update toggle to show count
+    const currentText = toggle.textContent
+    if (!currentText.includes('(')) {
+      toggle.textContent = currentText.replace('Comments', `Comments (${comments.length})`)
+    }
+
+    // Render comments
+    if (comments.length === 0) {
+      listEl.innerHTML = '<div class="comments-empty">No comments yet</div>'
+    } else {
+      listEl.innerHTML = comments.map(comment => {
+        const bodyHtml = renderMarkdown(comment.body)
+        const timeStr = formatRelativeTime(comment.createdAt)
+        return `<div class="comment">
+          <div class="comment-meta">${escapeHtml(comment.user)} · ${timeStr}</div>
+          <div class="comment-body">${bodyHtml}</div>
+        </div>`
+      }).join('')
+    }
+  } catch (error) {
+    console.error('Failed to load comments:', error)
+    if (errorEl) {
+      errorEl.textContent = 'Failed to load comments'
+      errorEl.classList.remove('hidden')
+    }
+  } finally {
+    loadingEl?.classList.add('hidden')
+  }
+}
+
 // Safe localStorage helpers for team selection
 function getTeamSelection() {
   try {
@@ -420,10 +512,89 @@ function init() {
       return
     }
 
+    // 1b. Issue description toggle (show more/less with markdown) - LIN-156
+    if (e.target.closest('.issue-desc-toggle')) {
+      e.stopPropagation()
+      const container = e.target.closest('.issue-description')
+      if (!container) return
+
+      const truncated = container.querySelector('.desc-truncated')
+      const full = container.querySelector('.desc-full')
+      const fullContent = container.querySelector('.desc-full-content')
+
+      // Render markdown on first expansion
+      if (fullContent && !fullContent.dataset.rendered) {
+        const rawDescBase64 = container.dataset.rawDesc
+        if (rawDescBase64) {
+          try {
+            // Decode base64 with validation
+            let rawDesc
+            try {
+              rawDesc = atob(rawDescBase64)
+            } catch (decodeErr) {
+              console.error('Failed to decode description:', decodeErr)
+              fullContent.textContent = '[Error decoding description]'
+              fullContent.dataset.rendered = 'true'
+              truncated.classList.toggle('hidden')
+              full.classList.toggle('hidden')
+              return
+            }
+
+            const urlKey = container.dataset.urlKey
+            let html = renderMarkdown(rawDesc)
+
+            // Rewrite Linear image URLs to use proxy (LIN-156)
+            // Only rewrite for valid urlKey and proper image URLs
+            if (urlKey && /^[a-zA-Z0-9_-]+$/.test(urlKey)) {
+              const tempDiv = document.createElement('div')
+              tempDiv.innerHTML = html
+
+              // Find all images and rewrite Linear URLs
+              tempDiv.querySelectorAll('img').forEach(img => {
+                const src = img.getAttribute('src') || ''
+                if (src.match(/^https:\/\/(uploads\.linear\.app|cdn\.linear\.app)\//)) {
+                  const proxyUrl = `/workspace/${encodeURIComponent(urlKey)}/api/image?url=${encodeURIComponent(src)}`
+                  img.setAttribute('src', proxyUrl)
+                  img.setAttribute('loading', 'lazy')
+                  // Add error handler safely via event listener (not inline)
+                  img.dataset.originalSrc = src
+                }
+              })
+
+              html = tempDiv.innerHTML
+            }
+
+            fullContent.innerHTML = html
+
+            // Add error handlers to images after inserting into DOM
+            fullContent.querySelectorAll('img[data-original-src]').forEach(img => {
+              img.addEventListener('error', function() {
+                this.style.display = 'none'
+                const errorSpan = document.createElement('span')
+                errorSpan.className = 'img-error'
+                errorSpan.textContent = '[Image failed to load]'
+                this.parentNode.insertBefore(errorSpan, this.nextSibling)
+              })
+            })
+
+            fullContent.dataset.rendered = 'true'
+          } catch (err) {
+            console.error('Failed to render description:', err)
+            fullContent.textContent = '[Error rendering description]'
+            fullContent.dataset.rendered = 'true'
+          }
+        }
+      }
+
+      truncated.classList.toggle('hidden')
+      full.classList.toggle('hidden')
+      return
+    }
+
     const detailToggle = e.target.closest('.detail-toggle')
     if (detailToggle) {
       e.stopPropagation()
-      const toggleType = detailToggle.dataset.toggle // 'details' or 'prompts'
+      const toggleType = detailToggle.dataset.toggle // 'details', 'prompts', or 'comments'
       const detailsContainer = detailToggle.closest('.details')
       const content = detailsContainer?.querySelector(`[data-content="${toggleType}"]`)
 
@@ -434,6 +605,11 @@ function init() {
           isHidden ? '▼' : '▶',
           isHidden ? '▶' : '▼'
         )
+
+        // LIN-156: Load comments on first expand
+        if (toggleType === 'comments' && !isHidden && !content.dataset.loaded) {
+          loadComments(detailToggle, content)
+        }
       }
       return
     }
