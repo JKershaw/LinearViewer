@@ -1143,6 +1143,10 @@ app.get('/workspace/:urlKey/api/image', workspaceFromUrl, async (req, res) => {
     if (!allowedHosts.has(urlObj.hostname)) {
       return res.status(400).json({ error: 'Invalid image URL: must be from Linear' })
     }
+    // Prevent path traversal attacks
+    if (urlObj.pathname.includes('..')) {
+      return res.status(400).json({ error: 'Invalid image URL: path traversal not allowed' })
+    }
   } catch {
     return res.status(400).json({ error: 'Invalid image URL format' })
   }
