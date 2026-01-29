@@ -75,7 +75,7 @@ async function loadComments(toggle, content) {
   errorEl?.classList.add('hidden')
 
   try {
-    const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/comments/${issueId}`)
+    const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/comments/${encodeURIComponent(issueId)}`)
 
     if (!response.ok) {
       throw new Error(`Failed to fetch comments: ${response.status}`)
@@ -573,7 +573,9 @@ function init() {
                 const errorSpan = document.createElement('span')
                 errorSpan.className = 'img-error'
                 errorSpan.textContent = '[Image failed to load]'
-                this.parentNode.insertBefore(errorSpan, this.nextSibling)
+                if (this.parentNode) {
+                  this.parentNode.insertBefore(errorSpan, this.nextSibling)
+                }
               })
             })
 
