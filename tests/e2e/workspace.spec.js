@@ -84,6 +84,29 @@ test.describe('Workspace Switching', () => {
     // Should now show second workspace
     await expect(page.locator('#workspace-toggle')).toHaveText('Second Workspace');
   });
+
+  test('switching workspace from settings stays on settings', async ({ page }) => {
+    // Set up multiWorkspace session
+    await page.goto('/test/set-session?multiWorkspace=true');
+    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/settings`);
+
+    // Verify we're on settings page
+    await expect(page.locator('h1')).toHaveText('Settings');
+
+    // Open workspace selector
+    await page.locator('#workspace-toggle').click();
+    await expect(page.locator('#workspace-options')).toBeVisible();
+
+    // Click the second workspace and wait for navigation to settings in new workspace
+    await Promise.all([
+      page.waitForURL(`/workspace/${SECOND_WORKSPACE_URL_KEY}/settings`),
+      page.getByRole('option', { name: /Second Workspace/ }).click()
+    ]);
+
+    // Should still be on settings page
+    await expect(page.locator('h1')).toHaveText('Settings');
+    await expect(page.locator('#workspace-toggle')).toHaveText('Second Workspace');
+  });
 });
 
 test.describe('Workspace Removal', () => {
