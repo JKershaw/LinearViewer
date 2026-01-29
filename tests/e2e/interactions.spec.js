@@ -413,7 +413,12 @@ test.describe('Description Expansion (LIN-156)', () => {
       // Use .project to get the details in project section specifically
       const details = page.locator(`.project .details[data-details-for="${issueId}"]`).first();
 
-      // Comments toggle should be visible
+      // LIN-158: Comments is now nested inside Details, so expand Details first
+      const detailsToggle = details.locator('.detail-toggle[data-toggle="details"]');
+      await expect(detailsToggle).toBeVisible();
+      await detailsToggle.click();
+
+      // Comments toggle should be visible inside Details content
       const commentsToggle = details.locator('.detail-toggle[data-toggle="comments"]');
       await expect(commentsToggle).toBeVisible();
       await expect(commentsToggle).toContainText('Comments');
@@ -429,6 +434,11 @@ test.describe('Description Expansion (LIN-156)', () => {
 
       const issueId = await issueLine.getAttribute('data-id');
       const details = page.locator(`.project .details[data-details-for="${issueId}"]`).first();
+
+      // LIN-158: Comments is now nested inside Details, so expand Details first
+      const detailsToggle = details.locator('.detail-toggle[data-toggle="details"]');
+      await detailsToggle.click();
+
       const commentsToggle = details.locator('.detail-toggle[data-toggle="comments"]');
       const commentsContent = details.locator('[data-content="comments"]');
 
@@ -466,6 +476,11 @@ test.describe('Description Expansion (LIN-156)', () => {
 
       const issueId = await issueLine.getAttribute('data-id');
       const details = page.locator(`.project .details[data-details-for="${issueId}"]`).first();
+
+      // LIN-158: Comments is now nested inside Details, so expand Details first
+      const detailsToggle = details.locator('.detail-toggle[data-toggle="details"]');
+      await detailsToggle.click();
+
       const commentsToggle = details.locator('.detail-toggle[data-toggle="comments"]');
 
       // Initial state: collapsed (▶)
@@ -487,6 +502,11 @@ test.describe('Description Expansion (LIN-156)', () => {
 
       const issueId = await issueLine.getAttribute('data-id');
       const details = page.locator(`.project .details[data-details-for="${issueId}"]`).first();
+
+      // LIN-158: Comments is now nested inside Details, so expand Details first
+      const detailsToggle = details.locator('.detail-toggle[data-toggle="details"]');
+      await detailsToggle.click();
+
       const commentsToggle = details.locator('.detail-toggle[data-toggle="comments"]');
 
       // Before click: just "Comments ▶"
