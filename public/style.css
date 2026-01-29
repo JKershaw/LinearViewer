@@ -571,10 +571,23 @@ h1 {
   color: var(--blue);
 }
 
+/* LIN-158: Nested toggle (e.g., Comments inside Details) */
+.detail-toggle.nested-toggle {
+  margin-top: 0.5rem;
+  padding-left: 1rem;
+  border-left: 1px solid var(--border);
+}
+
 /* Content wrapper for toggleable sections */
 .detail-content {
   padding-left: 1.5ch;
   margin-bottom: 0.25rem;
+}
+
+/* LIN-158: Nested content (comments inside details) inherits border styling */
+.detail-content .detail-content {
+  margin-left: 1rem;
+  border-left: 1px solid var(--border);
 }
 
 /* Prompt buttons row within Prompts section */
