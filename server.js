@@ -639,7 +639,8 @@ app.get('/workspace/:urlKey/audit', workspaceFromUrl, (req, res) => {
   const html = renderAuditPage(workspace.name || 'Workspace', {
     deployInfo,
     urlKey: workspace.urlKey,
-    openRouterSource
+    openRouterSource,
+    workspaces: req.session.workspaces
   });
   res.send(html);
 });
@@ -670,7 +671,8 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, (req, res) => {
     currentModel,
     availableModels: AVAILABLE_MODELS,
     modelError,
-    urlKey: workspace.urlKey
+    urlKey: workspace.urlKey,
+    workspaces: req.session.workspaces
   });
   res.send(html);
 });
@@ -689,7 +691,8 @@ app.get('/workspace/:urlKey/prompts', workspaceFromUrl, (req, res) => {
   const html = renderPromptsPage(workspace.name || 'Workspace', {
     deployInfo,
     urlKey: workspace.urlKey,
-    openRouterSource
+    openRouterSource,
+    workspaces: req.session.workspaces
   });
   res.send(html);
 });

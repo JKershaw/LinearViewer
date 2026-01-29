@@ -20,8 +20,10 @@ test.describe('Settings Page', () => {
     await expect(page.locator('a:has-text("logout")')).toBeVisible()
   })
 
-  test('shows workspace name in nav', async ({ page }) => {
-    await expect(page.locator('.nav-value-static')).toContainText('Test Workspace')
+  test('shows workspace dropdown in nav', async ({ page }) => {
+    const workspaceToggle = page.locator('#workspace-toggle')
+    await expect(workspaceToggle).toBeVisible()
+    await expect(workspaceToggle).toContainText('Test Workspace')
   })
 })
 

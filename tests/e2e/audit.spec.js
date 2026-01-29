@@ -40,11 +40,13 @@ test.describe('Operator Dashboard', () => {
       await expect(page.locator('#run-audit')).toContainText('Run Audit');
     });
 
-    test('shows workspace name in navigation', async ({ page }) => {
+    test('shows workspace dropdown in navigation', async ({ page }) => {
       await page.goto(AUDIT_URL);
 
-      // Should show workspace name in nav
-      await expect(page.locator('.nav-value-static')).toBeVisible();
+      // Should show workspace dropdown with workspace name
+      const workspaceToggle = page.locator('#workspace-toggle');
+      await expect(workspaceToggle).toBeVisible();
+      await expect(workspaceToggle).toContainText('Test Workspace');
     });
 
     test('has back link to projects', async ({ page }) => {
