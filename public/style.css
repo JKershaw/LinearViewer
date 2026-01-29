@@ -738,6 +738,184 @@ h1 {
 }
 
 /* =============================================================================
+   Issue Description Expansion (LIN-156)
+   =============================================================================
+   Expandable descriptions with markdown rendering and image support.
+*/
+.issue-description {
+  color: var(--fg-dim);
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  margin-bottom: 0.5rem;
+}
+
+.issue-description .desc-truncated {
+  display: block;
+}
+
+.issue-description .desc-full {
+  display: block;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+}
+
+.issue-description .desc-full-content {
+  display: block;
+}
+
+/* Markdown content styling within expanded descriptions */
+.issue-description .desc-full-content p {
+  margin: 0.5em 0;
+}
+
+.issue-description .desc-full-content p:first-child {
+  margin-top: 0;
+}
+
+.issue-description .desc-full-content ul,
+.issue-description .desc-full-content ol {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+}
+
+.issue-description .desc-full-content li {
+  margin: 0.25em 0;
+}
+
+.issue-description .desc-full-content code {
+  background: var(--bg-muted);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+  font-family: var(--font-structural);
+  font-size: 0.9em;
+}
+
+.issue-description .desc-full-content pre {
+  background: var(--bg-muted);
+  padding: 0.75em;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: 0.5em 0;
+}
+
+.issue-description .desc-full-content pre code {
+  background: none;
+  padding: 0;
+}
+
+.issue-description .desc-full-content blockquote {
+  border-left: 3px solid var(--fg-vdim);
+  margin: 0.5em 0;
+  padding-left: 1em;
+  color: var(--fg-dim);
+}
+
+.issue-description .desc-full-content a {
+  color: var(--blue);
+}
+
+/* Images in expanded descriptions */
+.issue-description img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  margin: 0.5rem 0;
+  display: block;
+}
+
+.issue-description .img-error {
+  color: var(--fg-dim);
+  font-style: italic;
+  font-size: 0.85em;
+}
+
+/* Toggle button for description expand/collapse */
+.issue-desc-toggle {
+  color: var(--blue);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: inherit;
+  font-family: inherit;
+  padding: 0;
+  text-decoration: none;
+}
+
+.issue-desc-toggle:hover {
+  text-decoration: underline;
+}
+
+/* =============================================================================
+   Comments Section (LIN-156)
+   =============================================================================
+   Collapsible comments list fetched on-demand.
+*/
+.comments-loading,
+.comments-error,
+.comments-empty {
+  color: var(--fg-dim);
+  font-style: italic;
+  font-size: 0.9em;
+  padding: 0.25rem 0;
+}
+
+.comments-error {
+  color: var(--red);
+}
+
+.comments-list {
+  margin-top: 0.25rem;
+}
+
+.comment {
+  margin: 0.5rem 0;
+  padding: 0.5rem 0 0.5rem 0.75rem;
+  border-left: 2px solid var(--fg-vdim);
+}
+
+.comment:first-child {
+  margin-top: 0;
+}
+
+.comment-meta {
+  color: var(--fg-dim);
+  font-size: 0.85em;
+  margin-bottom: 0.25rem;
+  font-family: var(--font-content);
+}
+
+.comment-body {
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  color: var(--fg);
+}
+
+.comment-body p {
+  margin: 0.25em 0;
+}
+
+.comment-body p:first-child {
+  margin-top: 0;
+}
+
+.comment-body p:last-child {
+  margin-bottom: 0;
+}
+
+.comment-body code {
+  background: var(--bg-muted);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+  font-family: var(--font-structural);
+  font-size: 0.9em;
+}
+
+.comment-body a {
+  color: var(--blue);
+}
+
+/* =============================================================================
    Responsive Breakpoints
    =============================================================================
    640px: Tablets and large phones - reduce padding, increase tap targets

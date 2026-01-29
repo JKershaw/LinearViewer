@@ -389,3 +389,139 @@ test.describe('Landing Page Interactions', () => {
     await expect(promptsToggle).toHaveCount(0);
   });
 });
+
+// =============================================================================
+// LIN-156: Description Expansion and Comments
+// =============================================================================
+test.describe('Description Expansion (LIN-156)', () => {
+  test.describe('Authenticated', () => {
+    test.beforeEach(async ({ page }) => {
+      // Set up test session (server will use mock data in test mode)
+      await page.goto('/test/set-session');
+      await page.goto('/workspace/test-workspace/');
+    });
+
+    test('Comments toggle appears for authenticated users', async ({ page }) => {
+      // Find an expandable issue (use project section, first() to avoid duplicates)
+      const issueLine = page.locator('.project .line.expandable').first();
+      await expect(issueLine).toBeVisible();
+
+      // Expand the issue to show details
+      await issueLine.click();
+
+      const issueId = await issueLine.getAttribute('data-id');
+      // Use .project to get the details in project section specifically
+      const details = page.locator(`.project .details[data-details-for="${issueId}"]`).first();
+
+      // Comments toggle should be visible
+      const commentsToggle = details.locator('.detail-toggle[data-toggle="comments"]');
+      await expect(commentsToggle).toBeVisible();
+      await expect(commentsToggle).toContainText('Comments');
+    });
+
+    test('Clicking Comments toggle expands section and loads comments', async ({ page }) => {
+      // Find an expandable issue
+      const issueLine = page.locator('.project .line.expandable').first();
+      await expect(issueLine).toBeVisible();
+
+      // Expand issue details
+      await issueLine.click();
+
+      const issueId = await issueLine.getAttribute('data-id');
+      const details = page.locator(`.project .details[data-details-for="${issueId}"]`).first();
+      const commentsToggle = details.locator('.detail-toggle[data-toggle="comments"]');
+      const commentsContent = details.locator('[data-content="comments"]');
+
+      // Comments content should start hidden
+      await expect(commentsContent).toHaveClass(/hidden/);
+
+      // Click comments toggle
+      await commentsToggle.click();
+
+      // Comments content should now be visible
+      await expect(commentsContent).not.toHaveClass(/hidden/);
+
+      // Arrow should change from ▶ to ▼
+      await expect(commentsToggle).toContainText('▼');
+
+      // Should load and display mock comments
+      const commentsList = commentsContent.locator('.comments-list');
+      await expect(commentsList).toBeVisible();
+
+      // Wait for comments to load (mock data has 2 comments)
+      const comments = commentsList.locator('.comment');
+      await expect(comments).toHaveCount(2);
+
+      // Check first comment has expected content
+      const firstComment = comments.first();
+      await expect(firstComment.locator('.comment-meta')).toContainText('Alice');
+      await expect(firstComment.locator('.comment-body')).toContainText('test comment');
+    });
+
+    test('Comments toggle arrow changes on expand/collapse', async ({ page }) => {
+      const issueLine = page.locator('.project .line.expandable').first();
+      await expect(issueLine).toBeVisible();
+
+      await issueLine.click();
+
+      const issueId = await issueLine.getAttribute('data-id');
+      const details = page.locator(`.project .details[data-details-for="${issueId}"]`).first();
+      const commentsToggle = details.locator('.detail-toggle[data-toggle="comments"]');
+
+      // Initial state: collapsed (▶)
+      await expect(commentsToggle).toContainText('▶');
+
+      // Click to expand
+      await commentsToggle.click();
+      await expect(commentsToggle).toContainText('▼');
+
+      // Click to collapse
+      await commentsToggle.click();
+      await expect(commentsToggle).toContainText('▶');
+    });
+
+    test('Comments show count after loading', async ({ page }) => {
+      const issueLine = page.locator('.project .line.expandable').first();
+      await expect(issueLine).toBeVisible();
+      await issueLine.click();
+
+      const issueId = await issueLine.getAttribute('data-id');
+      const details = page.locator(`.project .details[data-details-for="${issueId}"]`).first();
+      const commentsToggle = details.locator('.detail-toggle[data-toggle="comments"]');
+
+      // Before click: just "Comments ▶"
+      await expect(commentsToggle).toContainText('Comments ▶');
+
+      // Click to expand and load comments
+      await commentsToggle.click();
+
+      // After loading: should show count "Comments (2) ▼"
+      await expect(commentsToggle).toContainText('Comments (2)');
+    });
+  });
+
+  test.describe('Landing Page', () => {
+    test('Comments toggle does NOT appear on landing page', async ({ page }) => {
+      // Go to landing page (not authenticated - fresh context, no session)
+      await page.goto('/');
+
+      // Find an expandable issue on landing page
+      const issueLine = page.locator('.line.expandable').first();
+
+      if (await issueLine.count() === 0) {
+        test.skip();
+        return;
+      }
+
+      // Expand the issue
+      await issueLine.click();
+
+      const issueId = await issueLine.getAttribute('data-id');
+      const details = page.locator(`.details[data-details-for="${issueId}"]`);
+
+      // Comments toggle should NOT exist on landing page
+      const commentsToggle = details.locator('.detail-toggle[data-toggle="comments"]');
+      await expect(commentsToggle).toHaveCount(0);
+    });
+  });
+});
