@@ -1135,38 +1135,60 @@ app.get('/workspace/:urlKey/api/image', workspaceFromUrl, async (req, res) => {
   }
 
   // Only allow Linear-hosted images (security - prevent SSRF)
-  const allowedHosts = ['uploads.linear.app', 'cdn.linear.app', 'linear.app']
+  // Use exact hostname matching to prevent bypass via evillinear.app
+  const allowedHosts = new Set(['uploads.linear.app', 'cdn.linear.app', 'linear.app'])
+  let urlObj
   try {
-    const urlObj = new URL(imageUrl)
-    if (!allowedHosts.some(host => urlObj.hostname === host || urlObj.hostname.endsWith('.' + host))) {
+    urlObj = new URL(imageUrl)
+    if (!allowedHosts.has(urlObj.hostname)) {
       return res.status(400).json({ error: 'Invalid image URL: must be from Linear' })
     }
   } catch {
     return res.status(400).json({ error: 'Invalid image URL format' })
   }
 
+  // Max image size: 10MB to prevent memory exhaustion
+  const MAX_IMAGE_SIZE = 10 * 1024 * 1024
+
   try {
     const response = await fetch(imageUrl, {
       headers: {
         Authorization: `Bearer ${workspace.accessToken}`
-      }
+      },
+      // Prevent redirects that could bypass SSRF protection
+      redirect: 'error'
     })
 
     if (!response.ok) {
       return res.status(response.status).json({ error: 'Failed to fetch image' })
     }
 
-    // Forward content type and cache headers
-    const contentType = response.headers.get('content-type')
-    if (contentType) {
-      res.set('Content-Type', contentType)
+    // Validate content-type is an image (prevent serving HTML/JS through proxy)
+    const contentType = response.headers.get('content-type') || ''
+    if (!contentType.startsWith('image/')) {
+      return res.status(400).json({ error: 'Invalid response: not an image' })
     }
-    res.set('Cache-Control', 'private, max-age=3600')
 
-    // Stream the response body to the client
+    // Check content-length if available
+    const contentLength = parseInt(response.headers.get('content-length') || '0', 10)
+    if (contentLength > MAX_IMAGE_SIZE) {
+      return res.status(413).json({ error: 'Image too large' })
+    }
+
+    // Read response with size limit
     const arrayBuffer = await response.arrayBuffer()
+    if (arrayBuffer.byteLength > MAX_IMAGE_SIZE) {
+      return res.status(413).json({ error: 'Image too large' })
+    }
+
+    res.set('Content-Type', contentType)
+    res.set('Cache-Control', 'private, max-age=3600')
     res.send(Buffer.from(arrayBuffer))
   } catch (error) {
+    // Handle redirect errors specifically
+    if (error.cause?.code === 'ERR_FR_TOO_MANY_REDIRECTS' || error.message?.includes('redirect')) {
+      return res.status(400).json({ error: 'Redirects not allowed' })
+    }
     console.error('Image proxy error:', error)
     res.status(500).json({ error: 'Failed to fetch image' })
   }

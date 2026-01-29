@@ -527,26 +527,61 @@ function init() {
         const rawDescBase64 = container.dataset.rawDesc
         if (rawDescBase64) {
           try {
-            const rawDesc = atob(rawDescBase64)
+            // Decode base64 with validation
+            let rawDesc
+            try {
+              rawDesc = atob(rawDescBase64)
+            } catch (decodeErr) {
+              console.error('Failed to decode description:', decodeErr)
+              fullContent.textContent = '[Error decoding description]'
+              fullContent.dataset.rendered = 'true'
+              truncated.classList.toggle('hidden')
+              full.classList.toggle('hidden')
+              return
+            }
+
             const urlKey = container.dataset.urlKey
             let html = renderMarkdown(rawDesc)
 
             // Rewrite Linear image URLs to use proxy (LIN-156)
-            if (urlKey) {
-              html = html.replace(
-                /<img\s+([^>]*?)src="(https:\/\/(?:uploads\.linear\.app|cdn\.linear\.app)[^"]+)"/gi,
-                (match, prefix, url) => {
-                  const proxyUrl = `/workspace/${encodeURIComponent(urlKey)}/api/image?url=${encodeURIComponent(url)}`
-                  return `<img ${prefix}src="${proxyUrl}" loading="lazy" onerror="this.style.display='none'; this.insertAdjacentHTML('afterend', '<span class=\\'img-error\\'>[Image failed to load]</span>')"`
+            // Only rewrite for valid urlKey and proper image URLs
+            if (urlKey && /^[a-zA-Z0-9_-]+$/.test(urlKey)) {
+              const tempDiv = document.createElement('div')
+              tempDiv.innerHTML = html
+
+              // Find all images and rewrite Linear URLs
+              tempDiv.querySelectorAll('img').forEach(img => {
+                const src = img.getAttribute('src') || ''
+                if (src.match(/^https:\/\/(uploads\.linear\.app|cdn\.linear\.app)\//)) {
+                  const proxyUrl = `/workspace/${encodeURIComponent(urlKey)}/api/image?url=${encodeURIComponent(src)}`
+                  img.setAttribute('src', proxyUrl)
+                  img.setAttribute('loading', 'lazy')
+                  // Add error handler safely via event listener (not inline)
+                  img.dataset.originalSrc = src
                 }
-              )
+              })
+
+              html = tempDiv.innerHTML
             }
 
             fullContent.innerHTML = html
+
+            // Add error handlers to images after inserting into DOM
+            fullContent.querySelectorAll('img[data-original-src]').forEach(img => {
+              img.addEventListener('error', function() {
+                this.style.display = 'none'
+                const errorSpan = document.createElement('span')
+                errorSpan.className = 'img-error'
+                errorSpan.textContent = '[Image failed to load]'
+                this.parentNode.insertBefore(errorSpan, this.nextSibling)
+              })
+            })
+
             fullContent.dataset.rendered = 'true'
           } catch (err) {
             console.error('Failed to render description:', err)
             fullContent.textContent = '[Error rendering description]'
+            fullContent.dataset.rendered = 'true'
           }
         }
       }
