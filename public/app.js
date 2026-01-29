@@ -694,6 +694,26 @@ function initNavBar() {
 let activePromptFetch = null
 
 /**
+ * Hide all prompt containers for an issue (ensures only one visible at a time)
+ * @param {Element} detailsContainer - The .details element containing prompt UI
+ * @param {string} issueId - The issue ID
+ */
+function hideIssuePromptUI(detailsContainer, issueId) {
+  // Hide manual prompt container and reset its state
+  const promptContainer = detailsContainer?.querySelector(`[data-prompt-for="${issueId}"]`)
+  if (promptContainer) {
+    promptContainer.classList.add('hidden')
+    promptContainer.dataset.activeLabel = ''
+  }
+
+  // Hide AI recommendation container
+  const recommendContainer = detailsContainer?.querySelector(`[data-recommend-for="${issueId}"]`)
+  if (recommendContainer) {
+    recommendContainer.classList.add('hidden')
+  }
+}
+
+/**
  * Initialize prompt functionality for clickable labels
  */
 function initPrompts() {
@@ -731,6 +751,9 @@ function initPrompts() {
     // Create new abort controller for this request
     const abortController = new AbortController()
     activePromptFetch = abortController
+
+    // Hide any other prompt UI for this issue (AI suggestion)
+    hideIssuePromptUI(detailsContainer, issueId)
 
     // Show loading state
     const promptText = promptContainer.querySelector('.prompt-text')
@@ -1374,6 +1397,9 @@ function initRecommendations() {
     // Create new abort controller for this request
     const abortController = new AbortController()
     activeRecommendFetch = abortController
+
+    // Hide any other prompt UI for this issue (manual prompts)
+    hideIssuePromptUI(detailsContainer, issueId)
 
     // Show loading state
     const reasoning = recommendContainer.querySelector('.recommend-reasoning')
