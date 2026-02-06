@@ -1726,11 +1726,15 @@ function initSearch() {
   function clearSearchState() {
     if (!searchActive) return
     searchActive = false
-    // Remove search-driven hidden classes from projects and sections
-    // (resetDOM/applyState don't touch these since they're normally never hidden)
+    // Remove all search-driven hidden classes before applyState restores normal view.
+    // applyState/resetDOM handle .node visibility by depth but don't touch projects/sections
+    // (which are normally never hidden), so we must clean those up explicitly.
     document.querySelectorAll('.project.hidden').forEach(p => p.classList.remove('hidden'))
     document.querySelectorAll('.in-progress-section.hidden').forEach(s => s.classList.remove('hidden'))
     document.querySelectorAll('.recent-activity-section.hidden').forEach(s => s.classList.remove('hidden'))
+    // Also ensure all .node elements are visible before resetDOM re-applies depth-based visibility,
+    // in case search left nodes hidden that resetDOM wouldn't otherwise reach (e.g. in completed sections)
+    document.querySelectorAll('.node.hidden').forEach(n => n.classList.remove('hidden'))
     applyState(loadState())
   }
 
