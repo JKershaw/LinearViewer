@@ -1698,12 +1698,166 @@ function initRecommendations() {
   })
 }
 
+// ==========================================================================
+// Search Feature
+// ==========================================================================
+
+/**
+ * Initialize search functionality for filtering issues by keyword.
+ * LIN-145: Client-side filtering using data-search-text attributes.
+ */
+function initSearch() {
+  const searchToggle = document.querySelector('.search-toggle')
+  const searchPanel = document.getElementById('search-panel')
+  const searchInput = document.getElementById('search-input')
+  const searchClear = document.getElementById('search-clear')
+  const noResults = document.getElementById('search-no-results')
+
+  if (!searchToggle || !searchPanel || !searchInput) return
+
+  let searchActive = false
+
+  function openSearch() {
+    searchPanel.classList.remove('hidden')
+    searchToggle.setAttribute('aria-expanded', 'true')
+    searchInput.focus()
+  }
+
+  function clearSearchState() {
+    if (!searchActive) return
+    searchActive = false
+    // Remove all search-driven hidden classes before applyState restores normal view.
+    // applyState/resetDOM handle .node visibility by depth but don't touch projects/sections
+    // (which are normally never hidden), so we must clean those up explicitly.
+    document.querySelectorAll('.project.hidden').forEach(p => p.classList.remove('hidden'))
+    document.querySelectorAll('.in-progress-section.hidden').forEach(s => s.classList.remove('hidden'))
+    document.querySelectorAll('.recent-activity-section.hidden').forEach(s => s.classList.remove('hidden'))
+    // Also ensure all .node elements are visible before resetDOM re-applies depth-based visibility,
+    // in case search left nodes hidden that resetDOM wouldn't otherwise reach (e.g. in completed sections)
+    document.querySelectorAll('.node.hidden').forEach(n => n.classList.remove('hidden'))
+    applyState(loadState())
+  }
+
+  function closeSearch() {
+    searchPanel.classList.add('hidden')
+    searchToggle.setAttribute('aria-expanded', 'false')
+    searchInput.value = ''
+    if (noResults) noResults.classList.add('hidden')
+    clearSearchState()
+  }
+
+  function performSearch(term) {
+    const lowerTerm = term.toLowerCase().trim()
+
+    if (!lowerTerm) {
+      clearSearchState()
+      if (noResults) noResults.classList.add('hidden')
+      return
+    }
+
+    searchActive = true
+
+    // Hide all nodes first
+    document.querySelectorAll('.node').forEach(n => n.classList.add('hidden'))
+
+    // Hide all details during search
+    document.querySelectorAll('.details').forEach(d => d.classList.add('hidden'))
+
+    // Find matching lines and show their nodes + ancestors
+    let matchCount = 0
+    document.querySelectorAll('.line[data-search-text]').forEach(line => {
+      if (!line.dataset.searchText.includes(lowerTerm)) return
+      matchCount++
+
+      // Show this node and all ancestor nodes
+      let node = line.closest('.node')
+      while (node) {
+        node.classList.remove('hidden')
+        // Walk up: .node → .children → .node
+        node = node.parentElement?.closest('.node')
+      }
+    })
+
+    // Show/hide projects based on whether they contain matches
+    document.querySelectorAll('.project').forEach(project => {
+      const hasMatch = project.querySelector('.node:not(.hidden)')
+      project.classList.toggle('hidden', !hasMatch)
+    })
+
+    // Show/hide in-progress section
+    const ipSection = document.querySelector('.in-progress-section')
+    if (ipSection) {
+      const ipItems = ipSection.querySelector('.in-progress-items')
+      const hasMatch = ipItems?.querySelector('.node:not(.hidden)')
+      ipSection.classList.toggle('hidden', !hasMatch)
+      // Ensure the items container is visible if section has matches
+      if (hasMatch && ipItems) ipItems.classList.remove('hidden')
+    }
+
+    // Show/hide recent activity section
+    const raSection = document.querySelector('.recent-activity-section')
+    if (raSection) {
+      const raItems = raSection.querySelector('.recent-activity-items')
+      const hasMatch = raItems?.querySelector('.node:not(.hidden)')
+      raSection.classList.toggle('hidden', !hasMatch)
+      if (hasMatch && raItems) raItems.classList.remove('hidden')
+    }
+
+    // Also check completed sections for matches
+    document.querySelectorAll('[data-completed-for]').forEach(completedSection => {
+      const hasMatch = completedSection.querySelector('.node:not(.hidden)')
+      completedSection.classList.toggle('hidden', !hasMatch)
+    })
+
+    // Show/hide "no results" message
+    if (noResults) noResults.classList.toggle('hidden', matchCount > 0)
+  }
+
+  // Toggle search panel
+  searchToggle.addEventListener('click', (e) => {
+    e.stopPropagation()
+    const isOpen = searchToggle.getAttribute('aria-expanded') === 'true'
+    if (isOpen) {
+      closeSearch()
+    } else {
+      openSearch()
+    }
+  })
+
+  // Filter on input
+  searchInput.addEventListener('input', () => {
+    performSearch(searchInput.value)
+  })
+
+  // Clear button
+  searchClear.addEventListener('click', (e) => {
+    e.stopPropagation()
+    closeSearch()
+  })
+
+  // Escape key closes search
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeSearch()
+    }
+  })
+
+  // "/" keyboard shortcut to open search (when no input is focused)
+  document.addEventListener('keydown', (e) => {
+    if (e.key === '/' && !e.target.closest('input, textarea, select, [contenteditable]')) {
+      e.preventDefault()
+      openSearch()
+    }
+  })
+}
+
 // Cleanup polling on page unload
 window.addEventListener('beforeunload', stopQueuePolling)
 
 document.addEventListener('DOMContentLoaded', () => {
   init()
   initNavBar()
+  initSearch()
   initPrompts()
   initMorePrompts()
   initRecommendations()

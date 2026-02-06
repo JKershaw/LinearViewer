@@ -83,6 +83,14 @@ Both In Progress and Projects sections use the same nested structure:
 - `[data-completed-for="{project-id}"]` - completed tasks section
 - `[data-action="create-task"]` - "Add +" link (project level, authenticated only)
 
+### Search Selectors
+- `.search-toggle` - opens/closes search panel (in nav bar)
+- `#search-panel` - search input panel (below nav bar)
+- `#search-input` - text input for keyword search
+- `.search-clear` / `#search-clear` - clears search and restores full view
+- `#search-no-results` - "no matching issues" message (shown when search has zero results)
+- `[data-search-text]` - lowercased searchable content on each `.line` (title, description, assignee, ID, labels)
+
 ### Navigation Selectors
 - `#workspace-toggle` - workspace dropdown button
 - `#team-toggle` - team dropdown button
@@ -195,9 +203,10 @@ A "more" link appears after visible prompts; clicking reveals all remaining prom
 2. **Drill into project**: Click project header to expand, click task to see details
 3. **Expand subtasks**: Click parent task or ▶ arrow to show child tasks (works in both sections)
 4. **Filter by team**: Use team selector in nav bar
-5. **Open in Linear**: Expand task, click "View in Linear →" link
-6. **View task details**: Expand task, click "Details ▶" to show description and metadata
-7. **Generate prompt for task**: Expand task, click "Prompts ▶" to reveal prompt buttons, click a prompt button, copy the generated prompt
+5. **Search for issues**: Click "search" in nav bar (or press "/"), type keywords to filter issues across all sections
+6. **Open in Linear**: Expand task, click "View in Linear →" link
+7. **View task details**: Expand task, click "Details ▶" to show description and metadata
+8. **Generate prompt for task**: Expand task, click "Prompts ▶" to reveal prompt buttons, click a prompt button, copy the generated prompt
 
 ## Limitations
 
