@@ -362,6 +362,65 @@ h1 {
 }
 
 /* =============================================================================
+   Search Panel
+   =============================================================================
+   Search input below nav bar for filtering issues by keyword.
+*/
+.search-panel {
+  padding: 0.5rem 0;
+  margin-bottom: 0.5rem;
+}
+
+.search-panel.hidden {
+  display: none;
+}
+
+.search-input-row {
+  display: flex;
+  align-items: center;
+  gap: 1ch;
+}
+
+.search-input {
+  font-family: var(--font-structural);
+  font-size: 0.9em;
+  border: 1px solid var(--fg-vdim);
+  padding: 0.25rem 0.5rem;
+  color: var(--fg);
+  background: var(--bg);
+  flex: 1;
+  max-width: 40ch;
+}
+
+.search-input:focus {
+  outline: 1px solid var(--blue);
+  border-color: var(--blue);
+}
+
+.search-clear {
+  font-family: var(--font-structural);
+  font-size: 0.9em;
+  color: var(--fg-dim);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.search-clear:hover {
+  color: var(--fg);
+}
+
+.search-no-results {
+  color: var(--fg-dim);
+  font-size: 0.9em;
+  padding: 0.5rem 0;
+}
+
+.search-no-results.hidden {
+  display: none;
+}
+
+/* =============================================================================
    "In Progress" Section
    =============================================================================
    Displays all in-progress issues across projects in a single collapsible list.
@@ -950,6 +1009,11 @@ h1 {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* Search input: full width on mobile */
+  .search-input {
+    max-width: none;
   }
 
   /* Mobile dropdown panels: inline dropdown below nav item */
