@@ -1806,7 +1806,7 @@ function initSearch() {
     // Also check completed sections for matches
     document.querySelectorAll('[data-completed-for]').forEach(completedSection => {
       const hasMatch = completedSection.querySelector('.node:not(.hidden)')
-      if (hasMatch) completedSection.classList.remove('hidden')
+      completedSection.classList.toggle('hidden', !hasMatch)
     })
 
     // Show/hide "no results" message
