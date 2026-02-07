@@ -1543,6 +1543,39 @@ function initMorePrompts() {
 let activeRecommendFetch = null
 
 /**
+ * Show free tier usage info below a recommendation container
+ * @param {Element} recommendContainer - The recommendation container element
+ * @param {Object} freeTier - Free tier usage data
+ */
+function showFreeTierInfo(recommendContainer, freeTier) {
+  // Remove existing info if present
+  const existing = recommendContainer.querySelector('.free-tier-info')
+  if (existing) existing.remove()
+
+  const info = document.createElement('div')
+  info.className = 'free-tier-info'
+  info.setAttribute('data-testid', 'free-tier-info')
+  info.textContent = `free tier \u00b7 ${freeTier.remaining} of ${freeTier.limit} daily prompts remaining \u00b7 resets midnight UTC`
+  recommendContainer.appendChild(info)
+}
+
+/**
+ * Update the footer AI status with free tier remaining count
+ * @param {Object} freeTier - Free tier usage data
+ */
+function updateFooterFreeTier(freeTier) {
+  const footerStatus = document.querySelector('.footer-ai-status[data-ai-source="free"]')
+  if (!footerStatus) return
+
+  footerStatus.textContent = `ai: \u25cf free (${freeTier.remaining}/${freeTier.limit})`
+  if (freeTier.remaining === 0) {
+    footerStatus.classList.remove('free')
+    footerStatus.classList.add('disconnected')
+    footerStatus.title = 'Free tier: daily limit reached'
+  }
+}
+
+/**
  * Initialize AI recommendation functionality
  */
 function initRecommendations() {
@@ -1607,6 +1640,10 @@ function initRecommendations() {
 
       if (!response.ok) {
         const errorData = await response.json()
+        // Handle rate limit (429) with free tier info
+        if (response.status === 429 && errorData.freeTier) {
+          throw Object.assign(new Error(errorData.error), { freeTier: errorData.freeTier })
+        }
         // Include detailed message if available (e.g., OpenRouter API errors)
         const errorMsg = errorData.message
           ? `${errorData.error}: ${errorData.message}`
@@ -1637,13 +1674,29 @@ function initRecommendations() {
           // Show the prompt section now that the prompt is ready
           if (promptDiv) promptDiv.classList.remove('hidden')
         }
+
+        // Show free tier usage info if applicable
+        if (data.freeTier) {
+          showFreeTierInfo(recommendContainer, data.freeTier)
+          updateFooterFreeTier(data.freeTier)
+        }
       }
     } catch (error) {
       // Ignore abort errors (user clicked away)
       if (error.name === 'AbortError') return
 
-      reasoning.textContent = `Error: ${error.message}`
-      reasoning.classList.remove('hidden') // Ensure visible for error
+      // Show free tier limit exceeded with helpful message
+      if (error.freeTier) {
+        const urlKey = recommendContainer.dataset.urlKey
+        const settingsUrl = urlKey ? `/workspace/${encodeURIComponent(urlKey)}/settings` : '/settings'
+        reasoning.innerHTML = `<span class="free-tier-limit-reached">${escapeHtml(error.message)}</span><br>` +
+          `<a href="${escapeHtml(settingsUrl)}">Connect your OpenRouter account</a> for unlimited prompts.`
+        reasoning.classList.remove('hidden')
+        updateFooterFreeTier(error.freeTier)
+      } else {
+        reasoning.textContent = `Error: ${error.message}`
+        reasoning.classList.remove('hidden') // Ensure visible for error
+      }
       // Reasoning stays visible with error, so toggle should say "hide"
       const toggleBtn = recommendContainer.querySelector('.reasoning-toggle')
       if (toggleBtn) {
@@ -1855,6 +1908,54 @@ function initSearch() {
 // Cleanup polling on page unload
 window.addEventListener('beforeunload', stopQueuePolling)
 
+/**
+ * Get the workspace urlKey from the footer settings link.
+ * @returns {string|null} The workspace urlKey or null
+ */
+function getUrlKeyFromFooter() {
+  const footerStatus = document.querySelector('.footer-ai-status[data-ai-source="free"]')
+  if (!footerStatus) return null
+  const href = footerStatus.getAttribute('href') || ''
+  const match = href.match(/\/workspace\/([^/]+)\/settings/)
+  return match ? match[1] : null
+}
+
+/**
+ * Initialize free tier footer status on page load.
+ * Fetches current usage from the recommend/status endpoint and updates the footer.
+ * Also populates the settings page free tier usage display.
+ */
+async function initFreeTierStatus() {
+  // Check both footer and settings page for free tier elements
+  const footerStatus = document.querySelector('.footer-ai-status[data-ai-source="free"]')
+  const settingsUsage = document.querySelector('[data-free-tier-usage]')
+  if (!footerStatus && !settingsUsage) return
+
+  // Get urlKey from footer link or settings page URL
+  let urlKey = getUrlKeyFromFooter()
+  if (!urlKey) {
+    const pathMatch = window.location.pathname.match(/\/workspace\/([^/]+)/)
+    urlKey = pathMatch ? pathMatch[1] : null
+  }
+  if (!urlKey) return
+
+  try {
+    const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/recommend/status`)
+    if (!response.ok) return
+
+    const data = await response.json()
+    if (data.freeTier) {
+      if (footerStatus) updateFooterFreeTier(data.freeTier)
+      if (settingsUsage) {
+        settingsUsage.textContent = `${data.freeTier.remaining} of ${data.freeTier.limit} daily prompts remaining`
+      }
+    }
+  } catch (e) {
+    // Silently fail - elements will show defaults
+    if (settingsUsage) settingsUsage.textContent = 'Unable to load usage'
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   init()
   initNavBar()
@@ -1864,4 +1965,5 @@ document.addEventListener('DOMContentLoaded', () => {
   initRecommendations()
   initQueuePanel()
   initTokenManagement()
+  initFreeTierStatus()
 })

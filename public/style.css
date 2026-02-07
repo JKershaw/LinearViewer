@@ -1584,6 +1584,21 @@ h1 {
   line-height: 1.5;
 }
 
+.free-tier-info {
+  margin-top: 0.5rem;
+  padding: 0.25rem 0;
+  font-size: 0.8em;
+  color: var(--fg-dim);
+}
+
+.free-tier-info .free-tier-limit-reached {
+  color: var(--red);
+}
+
+.free-tier-info a {
+  color: var(--blue);
+}
+
 /* Mobile adjustments */
 @media (max-width: 640px) {
   .recommend-container {
@@ -1658,6 +1673,10 @@ h1 {
 
 .footer-ai-status.env {
   color: var(--fg-dim);
+}
+
+.footer-ai-status.free {
+  color: var(--yellow);
 }
 
 .footer-ai-status.disconnected {
