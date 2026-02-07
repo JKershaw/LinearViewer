@@ -165,7 +165,7 @@ completionSignals: {
 
 ### Work Issues Category
 
-#### blocked - Blocker Analysis (Score: 3.4/5)
+#### blocked (Score: 3.4/5)
 
 | Issue | Severity | Improvement |
 |-------|----------|-------------|
@@ -174,7 +174,7 @@ completionSignals: {
 | No escalation path | Medium | Add guidance for when blocker cannot be resolved internally |
 | Sample discussion doesn't show actual blocker | Low | Update mock data to demonstrate blocking scenario |
 
-#### bug - Bug Investigation (Score: 3.3/5)
+#### bug (Score: 3.3/5)
 
 | Issue | Severity | Improvement |
 |-------|----------|-------------|
@@ -187,7 +187,7 @@ completionSignals: {
 
 ### Ready Category
 
-#### plan - Implementation Plan (Score: 3.9/5)
+#### plan (Score: 3.9/5)
 
 | Issue | Severity | Improvement |
 |-------|----------|-------------|
@@ -196,7 +196,7 @@ completionSignals: {
 | Orphaned subtask summary line | Low | Move to Context section |
 | Scope Control redundancy | Low | Consolidate duplicate "minimal and focused" text |
 
-#### code-review - Code Review (Score: 3.4/5)
+#### code-review (Score: 3.4/5)
 
 | Issue | Severity | Improvement |
 |-------|----------|-------------|
@@ -209,7 +209,7 @@ completionSignals: {
 
 ### Universal Category
 
-#### look-into - Look Into (Score: 3.6/5)
+#### look-into (Score: 3.6/5)
 
 | Issue | Severity | Improvement |
 |-------|----------|-------------|
@@ -217,14 +217,14 @@ completionSignals: {
 | Status change inappropriate | Medium | Remove "Set to In Progress" step |
 | Missing depth guidance | Low | Specify this is quick overview, not deep dive |
 
-#### triage - Task Triage (Score: 4.3/5)
+#### triage (Score: 4.3/5)
 
 | Issue | Severity | Improvement |
 |-------|----------|-------------|
 | Missing assignee handling | Medium | Add assignee review to Metadata Checklist |
 | No "no changes needed" guidance | Low | Add confirmation path when triage finds nothing to change |
 
-#### breakdown - Task Breakdown (Score: 3.6/5)
+#### breakdown (Score: 3.6/5)
 
 | Issue | Severity | Improvement |
 |-------|----------|-------------|
@@ -232,7 +232,7 @@ completionSignals: {
 | No granularity guidance | Medium | Add guidance: 3-7 subtasks, each ~1-4 hours of work |
 | Missing subtask template | Medium | Add example format for good subtask title/description |
 
-#### research - Research Task (Score: 3.3/5)
+#### research (Score: 3.3/5)
 
 | Issue | Severity | Improvement |
 |-------|----------|-------------|
@@ -240,7 +240,7 @@ completionSignals: {
 | No research methodology | Medium | Add structured process: identify questions, consult sources, document |
 | Missing completion criteria | Medium | Define when research is "done" |
 
-#### scoping - Scope Definition (Score: 3.1/5)
+#### scoping (Score: 3.1/5)
 
 | Issue | Severity | Improvement |
 |-------|----------|-------------|
@@ -248,7 +248,7 @@ completionSignals: {
 | No conflict resolution guidance | Medium | Add handling for contradictory requirements |
 | Success criteria format undefined | Low | Specify checkbox format for criteria |
 
-#### design - Technical Design (Score: 3.4/5)
+#### design (Score: 3.4/5)
 
 | Issue | Severity | Improvement |
 |-------|----------|-------------|
@@ -256,7 +256,7 @@ completionSignals: {
 | No decision framework | Medium | Add tiebreaker criteria when approaches are equal |
 | Missing constraints section | Medium | Add consideration of codebase patterns, performance, timeline |
 
-#### spike - Technical Spike (Score: 3.0/5)
+#### spike (Score: 3.0/5)
 
 | Issue | Severity | Improvement |
 |-------|----------|-------------|
@@ -264,7 +264,7 @@ completionSignals: {
 | No timebox guidance | High | Add explicit timebox section with enforcement guidance |
 | Goal statement contradiction | Medium | Restructure into Frame/Explore/Conclude phases |
 
-#### context - Context Summary (Score: 3.9/5)
+#### context (Score: 3.9/5)
 
 | Issue | Severity | Improvement |
 |-------|----------|-------------|
@@ -272,7 +272,7 @@ completionSignals: {
 | Missing git command specifics | Low | Add specific git log commands |
 | No conflict resolution guidance | Low | Add handling for contradictory discussion history |
 
-#### implementation - Implementation Guide (Score: 3.3/5)
+#### implement (Score: 3.3/5)
 
 | Issue | Severity | Improvement |
 |-------|----------|-------------|
@@ -281,7 +281,7 @@ completionSignals: {
 | No commit guidance | Medium | Add commit message format with issue reference |
 | Missing verification section | Medium | Add explicit test-run instructions |
 
-#### review - Review Checklist (Score: 3.4/5)
+#### review (Score: 3.4/5)
 
 | Issue | Severity | Improvement |
 |-------|----------|-------------|

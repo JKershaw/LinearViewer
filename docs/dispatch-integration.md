@@ -80,7 +80,7 @@ Authorization: Bearer <token>
     {
       "id": "uuid",
       "prompt": "The prompt text...",
-      "promptName": "Blocker Analysis",
+      "promptName": "blocked",
       "issueId": "linear-issue-uuid",
       "issueIdentifier": "LIN-42",
       "issueTitle": "Fix authentication bug",
@@ -111,7 +111,7 @@ Authorization: Bearer <token>
   "item": {
     "id": "uuid",
     "prompt": "The prompt text...",
-    "promptName": "Blocker Analysis",
+    "promptName": "blocked",
     "issueId": "linear-issue-uuid",
     "issueIdentifier": "LIN-42",
     "issueTitle": "Fix authentication bug",
@@ -139,7 +139,7 @@ Authorization: Bearer <token>
 |-------|------|-------------|
 | `id` | string | Unique item ID (UUID) |
 | `prompt` | string | The prompt text (up to 100KB) |
-| `promptName` | string | Display name (e.g., "Blocker Analysis") |
+| `promptName` | string | Display name (e.g., "blocked") |
 | `issueId` | string | Linear issue UUID (nullable) |
 | `issueIdentifier` | string | Human-readable issue ID, e.g., "LIN-42" (nullable) |
 | `issueTitle` | string | Issue title (nullable) |

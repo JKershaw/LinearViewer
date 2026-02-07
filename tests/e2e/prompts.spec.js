@@ -117,7 +117,7 @@ test.describe('Promptable Labels', () => {
 
     // Should show prompt name
     const promptName = promptContainer.locator('.prompt-name');
-    await expect(promptName).toContainText('Blocker Analysis');
+    await expect(promptName).toContainText('blocked');
 
     // Should show prompt text (now rendered as HTML, so headers don't have ##)
     const promptText = promptContainer.locator('.prompt-text');
@@ -283,7 +283,7 @@ test.describe('Prompt API', () => {
 
     const body = await response.json();
     expect(body.label).toBe('blocked');
-    expect(body.promptName).toBe('Blocker Analysis');
+    expect(body.promptName).toBe('blocked');
     expect(body.prompt).toContain('# Unblock TEST-');
     expect(body.prompt).toContain('## Goal');
   });
@@ -294,7 +294,7 @@ test.describe('Prompt API', () => {
 
     const body = await response.json();
     expect(body.label).toBe('bug');
-    expect(body.promptName).toBe('Bug Investigation');
+    expect(body.promptName).toBe('bug');
     expect(body.prompt).toContain('# Investigate bug TEST-');
     expect(body.prompt).toContain('## Goal');
   });
@@ -305,7 +305,7 @@ test.describe('Prompt API', () => {
 
     const body = await response.json();
     expect(body.label).toBe('plan');
-    expect(body.promptName).toBe('Implementation Plan');
+    expect(body.promptName).toBe('plan');
     expect(body.prompt).toContain('# Implement TEST-');
     expect(body.prompt).toContain('## Goal');
   });
@@ -316,7 +316,7 @@ test.describe('Prompt API', () => {
 
     const body = await response.json();
     expect(body.label).toBe('code-review');
-    expect(body.promptName).toBe('Code Review');
+    expect(body.promptName).toBe('code review');
     expect(body.prompt).toContain('# Review TEST-');
     expect(body.prompt).toContain('## Goal');
   });
@@ -327,7 +327,7 @@ test.describe('Prompt API', () => {
 
     const body = await response.json();
     expect(body.label).toBe('look-into');
-    expect(body.promptName).toBe('Look Into');
+    expect(body.promptName).toBe('look into');
     expect(body.prompt).toContain('## Goal');
   });
 
@@ -337,7 +337,7 @@ test.describe('Prompt API', () => {
 
     const body = await response.json();
     expect(body.label).toBe('triage');
-    expect(body.promptName).toBe('Task Triage');
+    expect(body.promptName).toBe('triage');
     expect(body.prompt).toContain('## Goal');
   });
 });
@@ -400,7 +400,7 @@ test.describe('Multiple Promptable Labels UI', () => {
     await expect(promptContainer).toBeVisible();
     await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
 
-    await expect(promptContainer.locator('.prompt-name')).toContainText('Blocker Analysis');
+    await expect(promptContainer.locator('.prompt-name')).toContainText('blocked');
     await expect(promptContainer.locator('.prompt-text')).toContainText('Goal');
   });
 
@@ -438,7 +438,7 @@ test.describe('Multiple Promptable Labels UI', () => {
     await expect(promptContainer).toBeVisible();
     await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
 
-    await expect(promptContainer.locator('.prompt-name')).toContainText('Code Review');
+    await expect(promptContainer.locator('.prompt-name')).toContainText('code review');
     await expect(promptContainer.locator('.prompt-text')).toContainText('Goal');
   });
 });
@@ -486,8 +486,8 @@ test.describe('More Prompts Inline', () => {
     // "more" link should be removed
     await expect(moreLink).toHaveCount(0);
 
-    // Check a revealed prompt is visible (most prompts are behind "more", only look-into, research, implementation are default-visible)
-    await expect(hiddenPrompts.locator('.label-prompt:has-text("Bug Investigation")')).toBeVisible();
+    // Check a revealed prompt is visible (most prompts are behind "more")
+    await expect(hiddenPrompts.locator('.label-prompt:has-text("bug")')).toBeVisible();
   });
 
   test('clicking revealed prompt loads it into container', async ({ page }) => {
@@ -509,7 +509,7 @@ test.describe('More Prompts Inline', () => {
     const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
     await expect(promptContainer).toBeVisible();
     await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
-    await expect(promptContainer.locator('.prompt-name')).toContainText('Bug Investigation');
+    await expect(promptContainer.locator('.prompt-name')).toContainText('bug');
   });
 
   test('works in project section', async ({ page }) => {
