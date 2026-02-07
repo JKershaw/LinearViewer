@@ -486,8 +486,8 @@ test.describe('More Prompts Inline', () => {
     // "more" link should be removed
     await expect(moreLink).toHaveCount(0);
 
-    // Check a revealed prompt is visible (most prompts are behind "more", only look-into, research, implementation are default-visible)
-    await expect(hiddenPrompts.locator('.label-prompt:has-text("Bug Investigation")')).toBeVisible();
+    // Check a revealed prompt is visible (most prompts are behind "more")
+    await expect(hiddenPrompts.locator('.label-prompt:has-text("bug")')).toBeVisible();
   });
 
   test('clicking revealed prompt loads it into container', async ({ page }) => {

@@ -92,10 +92,10 @@ describe('renderLabels', () => {
       const issue = {
         id: 'issue-mix',
         labels: { nodes: [{ name: 'blocked' }, { name: 'feature' }] },
-        state: { type: 'started' } // started so plan/code-review added
+        state: { type: 'started' }
       };
       const result = renderLabels(issue);
-      // blocked should be a link
+      // blocked should be a link (behind "more")
       assert.ok(result.includes('data-label="blocked"'));
       // feature should be plain text (not a link)
       assert.ok(result.includes('feature'));
@@ -103,49 +103,32 @@ describe('renderLabels', () => {
     });
   });
 
-  describe('plan and code-review links', () => {
-    test('adds plan link for backlog issue without pre-work labels', () => {
+  describe('default prompt buttons', () => {
+    test('shows default prompts for actionable issues', () => {
       const issue = {
         id: 'issue-ready',
         labels: { nodes: [] },
         state: { type: 'backlog' }
       };
       const result = renderLabels(issue);
+      assert.ok(result.includes('data-label="look-into"'));
+      assert.ok(result.includes('data-label="research"'));
       assert.ok(result.includes('data-label="plan"'));
-      assert.ok(result.includes('class="label-prompt state-prompt"'));
+      assert.ok(result.includes('data-label="implementation"'));
     });
 
-    test('adds code-review link for backlog issue without pre-work labels', () => {
+    test('shows same prompts regardless of issue state (started)', () => {
       const issue = {
-        id: 'issue-ready',
-        labels: { nodes: [] },
-        state: { type: 'backlog' }
-      };
-      const result = renderLabels(issue);
-      assert.ok(result.includes('data-label="code-review"'));
-    });
-
-    test('adds plan link for unstarted issue without pre-work labels', () => {
-      const issue = {
-        id: 'issue-ready',
-        labels: { nodes: [] },
-        state: { type: 'unstarted' }
-      };
-      const result = renderLabels(issue);
-      assert.ok(result.includes('data-label="plan"'));
-    });
-
-    test('adds plan link for started issue without pre-work labels', () => {
-      const issue = {
-        id: 'issue-ready',
+        id: 'issue-started',
         labels: { nodes: [] },
         state: { type: 'started' }
       };
       const result = renderLabels(issue);
       assert.ok(result.includes('data-label="plan"'));
+      assert.ok(result.includes('data-label="research"'));
     });
 
-    test('does not add plan link for completed issue', () => {
+    test('does not add prompts for completed issue', () => {
       const issue = {
         id: 'issue-done',
         labels: { nodes: [] },
@@ -153,43 +136,42 @@ describe('renderLabels', () => {
       };
       const result = renderLabels(issue);
       assert.ok(!result.includes('data-label="plan"'));
+      assert.ok(!result.includes('data-label="look-into"'));
     });
 
-    test('does not add plan as state-prompt when preparing label present', () => {
+    test('shows same prompts even with preparing label', () => {
       const issue = {
         id: 'issue-prework',
         labels: { nodes: [{ name: 'preparing' }] },
         state: { type: 'backlog' }
       };
       const result = renderLabels(issue);
-      // preparing is not a promptable label (no template for it)
-      // so it renders as plain text
       assert.ok(result.includes('preparing'));
-      // Plan should NOT appear as a state-prompt (visible) link when preparing label is present
-      assert.ok(!result.includes('class="label-prompt state-prompt" data-issue-id="issue-prework" data-label="plan"'));
+      assert.ok(result.includes('data-label="plan"'));
     });
 
-    test('does not duplicate plan link if already a label', () => {
+    test('plan appears once even if plan label exists', () => {
       const issue = {
         id: 'issue-plan',
         labels: { nodes: [{ name: 'plan' }] },
         state: { type: 'backlog' }
       };
       const result = renderLabels(issue);
-      // Should have plan as label link (not state-prompt)
       const planMatches = result.match(/data-label="plan"/g);
       assert.strictEqual(planMatches?.length, 1, 'Should only have one plan link');
     });
 
-    test('does not duplicate code-review link if already a label', () => {
+    test('uses short button labels for defaults', () => {
       const issue = {
-        id: 'issue-review',
-        labels: { nodes: [{ name: 'code-review' }] },
+        id: 'issue-labels',
+        labels: { nodes: [] },
         state: { type: 'backlog' }
       };
       const result = renderLabels(issue);
-      const reviewMatches = result.match(/data-label="code-review"/g);
-      assert.strictEqual(reviewMatches?.length, 1, 'Should only have one code-review link');
+      assert.ok(result.includes('>look into</a>'));
+      assert.ok(result.includes('>research</a>'));
+      assert.ok(result.includes('>plan</a>'));
+      assert.ok(result.includes('>implement</a>'));
     });
   });
 
@@ -237,10 +219,10 @@ describe('renderLabels', () => {
         state: { type: 'backlog' }
       };
       const result = renderLabels(issue);
-      // Should have feature as text, plus plan and code-review links
+      // Should have feature as text, plus default prompt buttons
       assert.ok(result.includes('feature'));
       assert.ok(result.includes('data-label="plan"'));
-      assert.ok(result.includes('data-label="code-review"'));
+      assert.ok(result.includes('data-label="look-into"'));
     });
   });
 });
