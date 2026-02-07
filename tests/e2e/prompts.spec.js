@@ -32,6 +32,15 @@ async function expandDetailsSection(page, containerSelector, issueId) {
   await detailsToggle.click();
 }
 
+/**
+ * Helper to reveal hidden prompts behind "more" toggle
+ * Use after expanding the Prompts section
+ */
+async function clickMoreToggle(page, containerSelector, issueId) {
+  const moreToggle = page.locator(`${containerSelector} .more-toggle[data-issue-id="${issueId}"]`);
+  await moreToggle.click();
+}
+
 test.describe('Promptable Labels', () => {
   test.beforeEach(async ({ page }) => {
     // Set up test session
@@ -50,6 +59,9 @@ test.describe('Promptable Labels', () => {
 
     // Expand Prompts section to reveal prompt buttons
     await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
+    // Reveal hidden prompts (blocked is behind "more")
+    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
     // Find the label link in the specific issue's details panel
     const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
@@ -89,6 +101,9 @@ test.describe('Promptable Labels', () => {
     // Expand Prompts section
     await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
+    // Reveal hidden prompts (blocked is behind "more")
+    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
     // Click the promptable label
     const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
     await labelLink.click();
@@ -118,6 +133,9 @@ test.describe('Promptable Labels', () => {
     // Expand Prompts section
     await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
+    // Reveal hidden prompts (blocked is behind "more")
+    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
     // Click the promptable label
     const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
     await labelLink.click();
@@ -137,6 +155,9 @@ test.describe('Promptable Labels', () => {
 
     // Expand Prompts section
     await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
+    // Reveal hidden prompts (blocked is behind "more")
+    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
     // Click the promptable label to show
     const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
@@ -161,6 +182,9 @@ test.describe('Promptable Labels', () => {
 
     // Expand Prompts section
     await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
+    // Reveal hidden prompts (blocked is behind "more")
+    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
     // Click the promptable label
     const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
@@ -189,6 +213,9 @@ test.describe('Promptable Labels', () => {
 
     // Expand Prompts section
     await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
+    // Reveal hidden prompts (blocked is behind "more")
+    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
     // Click the promptable label
     const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
@@ -332,6 +359,9 @@ test.describe('Multiple Promptable Labels UI', () => {
     // Expand Prompts section
     await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
+    // Reveal hidden prompts (blocked is behind "more")
+    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
     // Use specific issue ID to avoid ambiguity (task appears in both In Progress and Project sections)
     const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
     await expect(labelLink).toBeVisible();
@@ -345,6 +375,9 @@ test.describe('Multiple Promptable Labels UI', () => {
     // Expand Prompts section
     await expandPromptsSection(page, '.project', BUG_ISSUE_ID);
 
+    // Reveal hidden prompts (bug is behind "more")
+    await clickMoreToggle(page, '.project', BUG_ISSUE_ID);
+
     // Use specific issue ID to avoid ambiguity (bug label also exists on completed issue-3)
     const labelLink = page.locator(`.label-prompt[data-label="bug"][data-issue-id="${BUG_ISSUE_ID}"]`);
     await expect(labelLink).toBeVisible();
@@ -356,6 +389,9 @@ test.describe('Multiple Promptable Labels UI', () => {
 
     // Expand Prompts section
     await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
+    // Reveal hidden prompts (blocked is behind "more")
+    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
     const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
     await labelLink.click();
@@ -377,6 +413,9 @@ test.describe('Multiple Promptable Labels UI', () => {
     // Expand Prompts section
     await expandPromptsSection(page, '.in-progress-items', CODE_REVIEW_ISSUE_ID);
 
+    // Reveal hidden prompts (code-review is behind "more")
+    await clickMoreToggle(page, '.in-progress-items', CODE_REVIEW_ISSUE_ID);
+
     const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="code-review"][data-issue-id="${CODE_REVIEW_ISSUE_ID}"]`);
     await expect(labelLink).toBeVisible();
   });
@@ -387,6 +426,9 @@ test.describe('Multiple Promptable Labels UI', () => {
 
     // Expand Prompts section
     await expandPromptsSection(page, '.in-progress-items', CODE_REVIEW_ISSUE_ID);
+
+    // Reveal hidden prompts (code-review is behind "more")
+    await clickMoreToggle(page, '.in-progress-items', CODE_REVIEW_ISSUE_ID);
 
     const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="code-review"][data-issue-id="${CODE_REVIEW_ISSUE_ID}"]`);
     await labelLink.click();
@@ -444,8 +486,7 @@ test.describe('More Prompts Inline', () => {
     // "more" link should be removed
     await expect(moreLink).toHaveCount(0);
 
-    // Check the revealed prompt is visible (only "Bug Investigation" is hidden for a blocked issue)
-    // Other prompts (plan, code-review, look-into, triage) are already visible as state/universal prompts
+    // Check a revealed prompt is visible (most prompts are behind "more", only look-into, research, implementation are default-visible)
     await expect(hiddenPrompts.locator('.label-prompt:has-text("Bug Investigation")')).toBeVisible();
   });
 

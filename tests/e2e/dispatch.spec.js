@@ -18,6 +18,15 @@ async function expandPromptsSection(page, containerSelector, issueId) {
   await promptsToggle.click();
 }
 
+/**
+ * Helper to reveal hidden prompts behind "more" toggle
+ * Use after expanding the Prompts section
+ */
+async function clickMoreToggle(page, containerSelector, issueId) {
+  const moreToggle = page.locator(`${containerSelector} .more-toggle[data-issue-id="${issueId}"]`);
+  await moreToggle.click();
+}
+
 test.describe('Dispatch Queue', () => {
   test.beforeEach(async ({ page }) => {
     // Clear dispatch queue and tokens before each test
@@ -37,6 +46,9 @@ test.describe('Dispatch Queue', () => {
 
     // Expand Prompts section to reveal prompt buttons
     await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
+    // Reveal hidden prompts (blocked is behind "more")
+    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
     // Click the promptable label to show prompt
     const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
@@ -62,6 +74,9 @@ test.describe('Dispatch Queue', () => {
 
     // Expand Prompts section to reveal prompt buttons
     await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
+    // Reveal hidden prompts (blocked is behind "more")
+    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
     // Click the promptable label to show prompt
     const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
@@ -94,6 +109,9 @@ test.describe('Dispatch Queue', () => {
     // Expand Prompts section to reveal prompt buttons
     await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
+    // Reveal hidden prompts (blocked is behind "more")
+    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
     // Click the promptable label and dispatch
     const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
     await labelLink.click();
@@ -119,6 +137,9 @@ test.describe('Dispatch Queue', () => {
 
     // Expand Prompts section to reveal prompt buttons
     await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
+    // Reveal hidden prompts (blocked is behind "more")
+    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
     const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
     await labelLink.click();
@@ -151,6 +172,9 @@ test.describe('Dispatch Queue', () => {
 
     // Expand Prompts section to reveal prompt buttons
     await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
+    // Reveal hidden prompts (blocked is behind "more")
+    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
     const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
     await labelLink.click();
@@ -192,6 +216,9 @@ test.describe('Dispatch Queue', () => {
     // Expand Prompts section to reveal prompt buttons
     await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
+    // Reveal hidden prompts (blocked is behind "more")
+    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
     const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
     await labelLink.click();
 
@@ -226,6 +253,9 @@ test.describe('Dispatch Queue', () => {
 
     // Expand Prompts section to reveal prompt buttons
     await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
+    // Reveal hidden prompts (blocked is behind "more")
+    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
     // Click the promptable label to show prompt
     const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
