@@ -64,18 +64,12 @@ test.describe('Authenticated Dashboard', () => {
     await expect(page.locator('.state.backlog')).toHaveCount(2);
   });
 
-  test('shows logout link when authenticated', async ({ page }) => {
-    const logoutLink = page.locator('.nav-action[href="/logout"]');
-    await expect(logoutLink).toBeVisible();
-    await expect(logoutLink).toContainText('logout');
-  });
-
-  test('shows text-based navigation bar with logout only', async ({ page }) => {
+  test('shows text-based navigation bar', async ({ page }) => {
     // Should have nav bar
     await expect(page.locator('.nav-bar')).toBeVisible();
 
-    // Should have logout in nav bar (reset/audit moved to footer)
-    await expect(page.locator('.nav-action[href="/logout"]')).toBeVisible();
+    // Logout should NOT be in nav bar (moved to settings page)
+    await expect(page.locator('.nav-action[href="/logout"]')).not.toBeVisible();
 
     // Reset and audit should NOT be in nav bar
     await expect(page.locator('.nav-bar .reset-view')).not.toBeVisible();

@@ -23,12 +23,11 @@ test.describe('Authentication Flow', () => {
     await expect(page.locator('.title:has-text("Connect with Linear")')).toBeVisible();
   });
 
-  test('unauthenticated users do not see logout or reset links', async ({ page }) => {
+  test('unauthenticated users do not see navigation actions', async ({ page }) => {
     await page.goto('/');
 
     // Navigation actions should not be present on landing page
     await expect(page.locator('.nav-action')).toHaveCount(0);
-    await expect(page.locator('a[href="/logout"]')).toHaveCount(0);
   });
 
   test('login link exists and points to auth endpoint', async ({ page }) => {
@@ -58,7 +57,6 @@ test.describe('Authentication Flow', () => {
     // Should see navigation bar with actions
     await expect(page.locator('.nav-bar')).toBeVisible();
     await expect(page.locator('.reset-view')).toBeVisible();
-    await expect(page.locator('a[href="/logout"]')).toBeVisible();
   });
 
   test('authenticated users see workspace selector', async ({ page }) => {
@@ -79,12 +77,12 @@ test.describe('Logout Flow', () => {
   });
 
   test('logout link destroys session and shows landing page', async ({ page }) => {
-    await page.goto(WORKSPACE_URL);
+    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/settings`);
 
     // Verify we're authenticated
     await expect(page.locator('.nav-bar')).toBeVisible();
 
-    // Click logout and wait for navigation
+    // Click logout on settings page and wait for navigation
     await Promise.all([
       page.waitForURL('/'),
       page.click('a[href="/logout"]')
@@ -95,9 +93,9 @@ test.describe('Logout Flow', () => {
   });
 
   test('after logout, navigating to home shows landing page', async ({ page }) => {
-    await page.goto(WORKSPACE_URL);
+    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/settings`);
 
-    // Click logout and wait for redirect
+    // Click logout on settings page and wait for redirect
     await Promise.all([
       page.waitForURL('/'),
       page.click('a[href="/logout"]')

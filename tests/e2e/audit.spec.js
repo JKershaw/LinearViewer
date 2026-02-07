@@ -58,12 +58,11 @@ test.describe('Operator Dashboard', () => {
       await expect(projectsLink).toContainText('projects');
     });
 
-    test('has logout link', async ({ page }) => {
+    test('does not have logout link in navbar', async ({ page }) => {
       await page.goto(AUDIT_URL);
 
-      const logoutLink = page.locator('.nav-action[href="/logout"]');
-      await expect(logoutLink).toBeVisible();
-      await expect(logoutLink).toContainText('logout');
+      // Logout moved to settings page
+      await expect(page.locator('.nav-action[href="/logout"]')).not.toBeVisible();
     });
 
     test('runs audit and displays report', async ({ page }) => {
