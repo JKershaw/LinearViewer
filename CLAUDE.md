@@ -24,6 +24,7 @@ lib/
   linear.js            GraphQL client for Linear API
   linear-cli.js        CLI tool for AI agents to query/modify Linear
   openrouter.js        OpenRouter API client for AI recommendations
+  free-tier-store.js   Free tier usage tracking and rate limiting
   tree.js              Transforms flat issues → nested tree structure
   render.js            Generates HTML with box-drawing characters
   render-audit.js      Operator dashboard page renderer
@@ -45,6 +46,7 @@ tests/e2e/
   interactions.spec.js Collapse/expand interaction tests
   openrouter-auth.spec.js  OpenRouter OAuth tests
   dispatch.spec.js     Dispatch queue and consumer API tests
+  free-tier.spec.js    Free tier rate limiting tests
 docs/
   dispatch-integration.md  Consumer integration guide
 playwright.config.js   Playwright test configuration
@@ -94,6 +96,17 @@ POST /auth/openrouter/disconnect → Remove stored API key
 - API key stored in session alongside Linear workspace tokens
 - Falls back to `OPENROUTER_API_KEY` env var if no OAuth connection
 
+### Free Tier (Rate-Limited)
+
+When `OPENROUTER_FREE_TIER_KEY` is set, users without an OpenRouter connection get limited free prompts:
+
+- API key source priority: user OAuth > env key > free tier key > none
+- Per-workspace daily limit: 5 prompts (resets at midnight UTC)
+- Global hourly limit: 50 prompts across all workspaces
+- Uses atomic check-and-increment (`tryUse()`) to prevent race conditions
+- Footer shows `ai: ● free (N/5)` status; settings page shows usage info
+- Returns 429 with usage metadata when limits exceeded
+
 ## Environment Variables
 
 ```
@@ -105,6 +118,7 @@ PORT                    Server port (default: 3000)
 MONGODB_URI             MongoDB connection string (optional, uses file storage if not set)
 OPENROUTER_API_KEY      Server-side OpenRouter API key (optional, users can connect via OAuth)
 OPENROUTER_REDIRECT_URI Callback URL for OpenRouter OAuth (optional, defaults to /auth/openrouter/callback)
+OPENROUTER_FREE_TIER_KEY Server-side API key for free tier users (optional, enables rate-limited free prompts)
 ```
 
 ## Linear API
@@ -124,6 +138,7 @@ OPENROUTER_REDIRECT_URI Callback URL for OpenRouter OAuth (optional, defaults to
 - Click "reset" → restore default collapse state
 - Collapse state persisted in localStorage
 - 401 errors clear session and redirect to landing page
+- Free tier users see daily prompt quota in footer and settings; 429 on limit exceeded
 
 ## AI Agent Support
 

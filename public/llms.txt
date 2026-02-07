@@ -105,6 +105,9 @@ Both In Progress and Projects sections use the same nested structure:
 - `.reset-view` - reset button (in footer)
 - `.footer-deploy` - deploy information container
 - `.footer-link` - link within deploy info (commit hash or GitHub repo)
+- `.footer-ai-status` - AI connection status indicator
+- `.footer-ai-status.free` - free tier status (yellow, shows "ai: ● free (N/5)")
+- `[data-ai-source]` - AI source attribute on footer status (`oauth`, `env`, `free`)
 
 ### Interactive Elements
 - `.toggle` - expand/collapse arrow for child tasks (▶/▼)
@@ -197,6 +200,16 @@ A "more" link appears after visible prompts; clicking reveals all remaining prom
 3. Additional prompts appear inline (same comma-separated format)
 4. Click any prompt to load it into the prompt container
 
+### AI Recommendation Selectors
+- `.suggest-btn` - AI suggest button (in Prompts section, requires OpenRouter)
+- `.recommend-container[data-recommend-for="{id}"]` - recommendation result container
+- `.recommend-reasoning` - AI reasoning text
+- `.recommend-prompt` - generated prompt text
+- `.free-tier-info` / `[data-testid="free-tier-info"]` - free tier usage info below recommendation
+- `.free-tier-limit-reached` - error message when daily limit exceeded
+- `[data-free-tier-status]` - free tier status on settings page
+- `[data-free-tier-usage]` - free tier usage display on settings page
+
 ## Common Workflows
 
 1. **Find in-progress tasks**: Look in "In Progress" section at top (displays as tree with subtasks)
@@ -207,6 +220,7 @@ A "more" link appears after visible prompts; clicking reveals all remaining prom
 6. **Open in Linear**: Expand task, click "View in Linear →" link
 7. **View task details**: Expand task, click "Details ▶" to show description and metadata
 8. **Generate prompt for task**: Expand task, click "Prompts ▶" to reveal prompt buttons, click a prompt button, copy the generated prompt
+9. **Get AI recommendation**: Expand task, click "Prompts ▶", click "AI suggest" button (free tier: 5/day per workspace)
 
 ## Limitations
 
