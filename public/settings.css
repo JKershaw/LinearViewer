@@ -53,6 +53,10 @@
   color: var(--fg-dim);
 }
 
+.settings-value.free-tier {
+  color: var(--yellow);
+}
+
 .settings-value.error {
   color: var(--red);
 }

@@ -16,6 +16,7 @@ import { MongoSessionStore } from './lib/session-store.js'
 import { UserPreferencesStore } from './lib/user-preferences.js'
 import { DispatchQueueStore } from './lib/dispatch-store.js'
 import { DispatchTokenStore } from './lib/dispatch-tokens.js'
+import { FreeTierStore } from './lib/free-tier-store.js'
 import { fetchProjects, fetchTeams, fetchIssueContext, fetchRecommendationContext, fetchIssueComments } from './lib/linear.js'
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID } from './lib/tree.js'
 import { renderPage, renderErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
@@ -129,6 +130,14 @@ const dispatchTokenStore = new DispatchTokenStore({
   collection: dispatchTokensCollection
 })
 
+// Free tier usage tracking
+const freeTierCollection = db.collection('free-tier-usage')
+const freeTierStore = new FreeTierStore({
+  collection: freeTierCollection,
+  dailyLimit: parseInt(process.env.FREE_TIER_DAILY_LIMIT, 10) || 5,
+  hourlyLimit: parseInt(process.env.FREE_TIER_HOURLY_LIMIT, 10) || 50
+})
+
 // =============================================================================
 // Express App Configuration
 // =============================================================================
@@ -182,8 +191,9 @@ if (process.env.NODE_ENV === 'test') {
   //   ?multiWorkspace=true      - Set up 2 workspaces
   //   ?maxWorkspaces=true       - Set up 10 workspaces (at limit)
   //   ?openRouterConnected=true - Set up OpenRouter API key in session
+  //   ?freeTierEnabled=true     - Simulate free tier mode (no OAuth, no env key)
   app.get('/test/set-session', (req, res) => {
-    const { tokenExpired, noRefreshToken, multiWorkspace, maxWorkspaces, openRouterConnected } = req.query
+    const { tokenExpired, noRefreshToken, multiWorkspace, maxWorkspaces, openRouterConnected, freeTierEnabled } = req.query
 
     // Base workspace configuration - IDs must be valid UUIDs to pass validation
     const createWorkspace = (id, name, urlKey) => ({
@@ -235,6 +245,13 @@ if (process.env.NODE_ENV === 'test') {
       delete req.session.openRouterApiKey
     }
 
+    // Set free tier mode flag in session for testing
+    if (freeTierEnabled) {
+      req.session.freeTierEnabled = true
+    } else {
+      delete req.session.freeTierEnabled
+    }
+
     // Explicitly save session before responding to ensure it's persisted
     req.session.save((err) => {
       if (err) {
@@ -283,6 +300,29 @@ if (process.env.NODE_ENV === 'test') {
   app.get('/test/clear-dispatch-tokens', async (req, res) => {
     try {
       await dispatchTokenStore.clear('test-workspace')
+      res.send('ok')
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
+
+  // Endpoint to clear free tier usage for testing
+  app.get('/test/clear-free-tier', async (req, res) => {
+    try {
+      await freeTierStore.clear('test-workspace')
+      res.send('ok')
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
+
+  // Endpoint to add free tier usage for testing
+  app.get('/test/add-free-tier-usage', async (req, res) => {
+    try {
+      const count = parseInt(req.query.count, 10) || 1
+      for (let i = 0; i < count; i++) {
+        await freeTierStore.recordUsage('test-workspace')
+      }
       res.send('ok')
     } catch (err) {
       res.status(500).json({ error: err.message })
@@ -590,7 +630,7 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
 
   // Determine OpenRouter connection status for nav bar
   const sessionApiKey = req.session.openRouterApiKey;
-  const openRouterSource = sessionApiKey ? 'oauth' : (process.env.OPENROUTER_API_KEY ? 'env' : null);
+  const openRouterSource = sessionApiKey ? 'oauth' : (process.env.OPENROUTER_API_KEY ? 'env' : ((process.env.OPENROUTER_FREE_TIER_KEY || req.session.freeTierEnabled) ? 'free' : null));
 
   try {
     const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace.accessToken, teamId);
@@ -634,7 +674,7 @@ app.get('/workspace/:urlKey/audit', workspaceFromUrl, (req, res) => {
   const deployInfo = getDeployInfo();
   const sessionApiKey = req.session.openRouterApiKey;
   const envApiKey = process.env.OPENROUTER_API_KEY;
-  const openRouterSource = sessionApiKey ? 'oauth' : (envApiKey ? 'env' : null);
+  const openRouterSource = sessionApiKey ? 'oauth' : (envApiKey ? 'env' : ((process.env.OPENROUTER_FREE_TIER_KEY || req.session.freeTierEnabled) ? 'free' : null));
 
   const html = renderAuditPage(workspace.name || 'Workspace', {
     deployInfo,
@@ -655,7 +695,7 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, (req, res) => {
   // Determine OpenRouter connection status
   const sessionApiKey = req.session.openRouterApiKey;
   const envApiKey = process.env.OPENROUTER_API_KEY;
-  const openRouterSource = sessionApiKey ? 'oauth' : (envApiKey ? 'env' : null);
+  const openRouterSource = sessionApiKey ? 'oauth' : (envApiKey ? 'env' : ((process.env.OPENROUTER_FREE_TIER_KEY || req.session.freeTierEnabled) ? 'free' : null));
   const deployInfo = getDeployInfo();
 
   // Get current model selection (from session or default)
@@ -686,7 +726,7 @@ app.get('/workspace/:urlKey/prompts', workspaceFromUrl, (req, res) => {
   const deployInfo = getDeployInfo();
   const sessionApiKey = req.session.openRouterApiKey;
   const envApiKey = process.env.OPENROUTER_API_KEY;
-  const openRouterSource = sessionApiKey ? 'oauth' : (envApiKey ? 'env' : null);
+  const openRouterSource = sessionApiKey ? 'oauth' : (envApiKey ? 'env' : ((process.env.OPENROUTER_FREE_TIER_KEY || req.session.freeTierEnabled) ? 'free' : null));
 
   const html = renderPromptsPage(workspace.name || 'Workspace', {
     deployInfo,
@@ -944,17 +984,35 @@ app.get('/workspace/:urlKey/api/prompt/:issueId/:labelName', workspaceFromUrl, a
  * @route GET /workspace/:urlKey/api/recommend/status
  * @returns {Object} { enabled: boolean }
  */
-app.get('/workspace/:urlKey/api/recommend/status', workspaceFromUrl, (req, res) => {
+app.get('/workspace/:urlKey/api/recommend/status', workspaceFromUrl, async (req, res) => {
   const workspace = req.workspace
 
   // In test mode, always report as enabled for testing
   const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token'
   // Check if user has connected OpenRouter via OAuth (session) or if env key is set
   const sessionApiKey = req.session.openRouterApiKey
-  res.json({
-    enabled: isTestMode || isRecommendationEnabled(sessionApiKey),
-    source: sessionApiKey ? 'oauth' : (process.env.OPENROUTER_API_KEY ? 'env' : null)
-  })
+
+  // Determine source: oauth > env > free > null
+  let source = null
+  if (sessionApiKey) {
+    source = 'oauth'
+  } else if (process.env.OPENROUTER_API_KEY) {
+    source = 'env'
+  } else if (process.env.OPENROUTER_FREE_TIER_KEY || req.session.freeTierEnabled) {
+    source = 'free'
+  }
+
+  const enabled = isTestMode || isRecommendationEnabled(sessionApiKey) || !!process.env.OPENROUTER_FREE_TIER_KEY || !!req.session.freeTierEnabled
+
+  const result = { enabled, source }
+
+  // Include free tier usage info when applicable
+  if (source === 'free') {
+    const usage = await freeTierStore.getUsage(workspace.urlKey)
+    result.freeTier = usage
+  }
+
+  res.json(result)
 })
 
 /**
@@ -978,8 +1036,26 @@ app.get('/workspace/:urlKey/api/recommend/:issueId', workspaceFromUrl, async (re
   // Check if feature is enabled (except in test mode)
   const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token'
   const sessionApiKey = req.session.openRouterApiKey
-  if (!isTestMode && !isRecommendationEnabled(sessionApiKey)) {
+  const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY
+  const isFreeTier = !sessionApiKey && !process.env.OPENROUTER_API_KEY && !!freeTierKey
+  if (!isTestMode && !isRecommendationEnabled(sessionApiKey) && !freeTierKey) {
     return res.status(503).json({ error: 'AI recommendation feature is not configured. Connect your OpenRouter account or set OPENROUTER_API_KEY.' })
+  }
+
+  // Check free tier rate limits before proceeding
+  if (!isTestMode && isFreeTier) {
+    const check = await freeTierStore.canUse(workspace.urlKey)
+    if (!check.allowed) {
+      return res.status(429).json({
+        error: check.reason,
+        freeTier: {
+          used: true,
+          remaining: check.remaining,
+          limit: check.limit,
+          resetsAt: check.resetsAt
+        }
+      })
+    }
   }
 
   try {
@@ -988,6 +1064,23 @@ app.get('/workspace/:urlKey/api/recommend/:issueId', workspaceFromUrl, async (re
       const mockIssue = testMockData.issues.find(i => i.id === issueId)
       if (!mockIssue) {
         return res.status(404).json({ error: 'Issue not found' })
+      }
+
+      // Check free tier limits in test mode when session has freeTierEnabled flag
+      const testIsFreeTier = req.session.freeTierEnabled && !req.session.openRouterApiKey && !process.env.OPENROUTER_API_KEY
+      if (testIsFreeTier) {
+        const check = await freeTierStore.canUse(workspace.urlKey)
+        if (!check.allowed) {
+          return res.status(429).json({
+            error: check.reason,
+            freeTier: {
+              used: true,
+              remaining: check.remaining,
+              limit: check.limit,
+              resetsAt: check.resetsAt
+            }
+          })
+        }
       }
 
       // Generate a mock prompt based on the issue
@@ -1026,30 +1119,67 @@ ${labels.length > 0 ? `**Labels:** ${labels.join(', ')}` : ''}
 
 ${goal}`
 
-      return res.json({
+      // Record free tier usage in test mode
+      if (testIsFreeTier) {
+        await freeTierStore.recordUsage(workspace.urlKey)
+      }
+
+      const result = {
         reasoning,
         prompt,
         truncated: false,
         completionTokens: null,
         issueUrl: mockIssue.url
-      })
+      }
+
+      // Include free tier metadata in test mode
+      if (testIsFreeTier) {
+        const usage = await freeTierStore.getUsage(workspace.urlKey)
+        result.freeTier = {
+          used: true,
+          remaining: usage.remaining,
+          limit: usage.limit,
+          resetsAt: usage.resetsAt
+        }
+      }
+
+      return res.json(result)
     }
 
     // Fetch issue context from Linear (uses two-tier context for parent tasks)
     const context = await fetchRecommendationContext(workspace.accessToken, issueId)
     const { issue, parent, siblings, project, children, comments, focusedChild } = context
 
-    // Get AI-generated prompt (pass session API key and model if available)
+    // Get AI-generated prompt (pass session API key, free tier key, and model if available)
     const selectedModel = req.session.modelId || DEFAULT_MODEL
-    const recommendation = await getRecommendation(issue, { parent, siblings, project, children, comments, focusedChild }, { apiKey: sessionApiKey, model: selectedModel })
+    const apiKeyToUse = sessionApiKey || (isFreeTier ? freeTierKey : undefined)
+    const recommendation = await getRecommendation(issue, { parent, siblings, project, children, comments, focusedChild }, { apiKey: apiKeyToUse, model: selectedModel })
 
-    res.json({
+    // Record free tier usage after successful API call
+    if (isFreeTier) {
+      await freeTierStore.recordUsage(workspace.urlKey)
+    }
+
+    const result = {
       reasoning: recommendation.reasoning,
       prompt: recommendation.prompt,
       truncated: recommendation.truncated,
       completionTokens: recommendation.completionTokens,
       issueUrl: issue.url
-    })
+    }
+
+    // Include free tier metadata
+    if (isFreeTier) {
+      const usage = await freeTierStore.getUsage(workspace.urlKey)
+      result.freeTier = {
+        used: true,
+        remaining: usage.remaining,
+        limit: usage.limit,
+        resetsAt: usage.resetsAt
+      }
+    }
+
+    res.json(result)
   } catch (error) {
     console.error('Recommendation error:', error)
 
@@ -1281,7 +1411,7 @@ const PORT = process.env.PORT || 3000
 app.listen(PORT, () => {
   console.log(`Linear Projects Viewer running at http://localhost:${PORT}`)
 
-  // Start periodic cleanup of expired dispatch queue items (every hour)
+  // Start periodic cleanup of expired items (every hour)
   const CLEANUP_INTERVAL_MS = 60 * 60 * 1000 // 1 hour
   setInterval(async () => {
     try {
@@ -1291,6 +1421,14 @@ app.listen(PORT, () => {
       }
     } catch (err) {
       console.error('Dispatch queue cleanup error:', err)
+    }
+    try {
+      const removedCount = await freeTierStore.cleanup()
+      if (removedCount > 0) {
+        console.log(`Free tier cleanup: removed ${removedCount} expired records`)
+      }
+    } catch (err) {
+      console.error('Free tier cleanup error:', err)
     }
   }, CLEANUP_INTERVAL_MS)
 })
