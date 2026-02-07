@@ -329,9 +329,9 @@ describe('blocked template', () => {
     comments: []
   };
 
-  test('returns Blocker Analysis as name', () => {
+  test('returns blocked as name', () => {
     const result = generatePrompt('blocked', mockIssue, mockContext);
-    assert.strictEqual(result.name, 'Blocker Analysis');
+    assert.strictEqual(result.name, 'blocked');
   });
 
   test('includes goal with blocker concepts', () => {
@@ -371,9 +371,9 @@ describe('bug template', () => {
     comments: []
   };
 
-  test('returns Bug Investigation as name', () => {
+  test('returns bug as name', () => {
     const result = generatePrompt('bug', mockIssue, mockContext);
-    assert.strictEqual(result.name, 'Bug Investigation');
+    assert.strictEqual(result.name, 'bug');
   });
 
   test('includes goal with bug concepts', () => {
@@ -418,9 +418,9 @@ describe('plan template', () => {
     comments: []
   };
 
-  test('returns Implementation Plan as name', () => {
+  test('returns plan as name', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
-    assert.strictEqual(result.name, 'Implementation Plan');
+    assert.strictEqual(result.name, 'plan');
   });
 
   test('has READY category', () => {
@@ -520,9 +520,9 @@ describe('code-review template', () => {
     comments: []
   };
 
-  test('returns Code Review as name', () => {
+  test('returns code review as name', () => {
     const result = generatePrompt('code-review', mockIssue, mockContext);
-    assert.strictEqual(result.name, 'Code Review');
+    assert.strictEqual(result.name, 'code review');
   });
 
   test('has READY category', () => {
@@ -570,9 +570,9 @@ describe('look-into template', () => {
     comments: []
   };
 
-  test('returns Look Into as name', () => {
+  test('returns look into as name', () => {
     const result = generatePrompt('look-into', mockIssue, mockContext);
-    assert.strictEqual(result.name, 'Look Into');
+    assert.strictEqual(result.name, 'look into');
   });
 
   test('has UNIVERSAL category', () => {
@@ -624,9 +624,9 @@ describe('triage template', () => {
     comments: []
   };
 
-  test('returns Task Triage as name', () => {
+  test('returns triage as name', () => {
     const result = generatePrompt('triage', mockIssue, mockContext);
-    assert.strictEqual(result.name, 'Task Triage');
+    assert.strictEqual(result.name, 'triage');
   });
 
   test('has UNIVERSAL category', () => {
@@ -667,9 +667,9 @@ describe('context template', () => {
     comments: []
   };
 
-  test('returns Context Summary as name', () => {
+  test('returns context as name', () => {
     const result = generatePrompt('context', mockIssue, mockContext);
-    assert.strictEqual(result.name, 'Context Summary');
+    assert.strictEqual(result.name, 'context');
   });
 
   test('has UNIVERSAL category', () => {
@@ -713,9 +713,9 @@ describe('review template', () => {
     comments: []
   };
 
-  test('returns Review Checklist as name', () => {
+  test('returns review as name', () => {
     const result = generatePrompt('review', mockIssue, mockContext);
-    assert.strictEqual(result.name, 'Review Checklist');
+    assert.strictEqual(result.name, 'review');
   });
 
   test('has UNIVERSAL category', () => {
@@ -809,7 +809,7 @@ describe('getPromptDescriptionsForAI', () => {
     const descriptions = getPromptDescriptionsForAI(keys);
     const desc = descriptions[0];
     assert.strictEqual(desc.key, 'blocked');
-    assert.strictEqual(desc.name, 'Blocker Analysis');
+    assert.strictEqual(desc.name, 'blocked');
     assert.ok(typeof desc.description === 'string');
     assert.ok(desc.description.length > 0);
     assert.strictEqual(desc.category, PROMPT_CATEGORIES.WORK_ISSUE);

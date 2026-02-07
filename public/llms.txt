@@ -163,25 +163,23 @@ Tasks use a simplified label system with just 3 labels:
 
 ### Available Prompt Templates (14 total)
 
-**Label-Based Prompts** (require specific label on issue):
-- `blocked` - Blocker Analysis: Analyze and resolve blockers
-- `bug` - Bug Investigation: Find root cause and potential fixes
+**Default Prompts** (shown for every actionable issue):
+- `look-into` - look into: Quick overview and context for any task
+- `research` - research: Investigate unknowns and gather information
+- `plan` - plan: Step-by-step implementation with test coverage
+- `implementation` - implement: Active coding phase guidance
 
-**State-Based Prompts** (available for Ready queue tasks):
-- `plan` - Implementation Plan: Step-by-step implementation with test coverage
-- `code-review` - Code Review: Review code for correctness, tests, and quality
-
-**Universal Prompts** (available for all issues):
-- `look-into` - Look Into: Quick overview and context for any task
-- `triage` - Task Triage: Review and update metadata (labels, priority)
-- `breakdown` - Task Breakdown: Break large tasks into actionable subtasks
-- `research` - Research Task: Investigate unknowns and gather information
-- `scoping` - Scope Definition: Define boundaries and success criteria
-- `design` - Technical Design: Evaluate approaches and recommend architecture
-- `spike` - Technical Spike: Time-boxed exploration for proof-of-concept
-- `context` - Context Summary: Synthesize current state when joining mid-task
-- `implementation` - Implementation Guide: Active coding phase guidance
-- `review` - Review Checklist: Verify implementation before merge
+**More Prompts** (behind "more" toggle):
+- `blocked` - blocked: Analyze and resolve blockers
+- `bug` - bug: Find root cause and potential fixes
+- `code-review` - code review: Review code for correctness, tests, and quality
+- `triage` - triage: Review and update metadata (labels, priority)
+- `breakdown` - breakdown: Break large tasks into actionable subtasks
+- `scoping` - scoping: Define boundaries and success criteria
+- `design` - design: Evaluate approaches and recommend architecture
+- `spike` - spike: Time-boxed exploration for proof-of-concept
+- `context` - context: Synthesize current state when joining mid-task
+- `review` - review: Verify implementation before merge
 
 ### More Prompts Inline
 Access additional prompt templates from any issue, regardless of its labels.

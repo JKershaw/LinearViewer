@@ -35,20 +35,20 @@ node scripts/audit-prompts.js <template-key>
 
 | Key | Name | Category |
 |-----|------|----------|
-| blocked | Blocker Analysis | Work Issues |
-| bug | Bug Investigation | Work Issues |
-| plan | Implementation Plan | Ready |
-| code-review | Code Review | Ready |
-| look-into | Look Into | Universal |
-| triage | Task Triage | Universal |
-| breakdown | Task Breakdown | Universal |
-| research | Research Task | Universal |
-| scoping | Scope Definition | Universal |
-| design | Technical Design | Universal |
-| spike | Technical Spike | Universal |
-| context | Context Summary | Universal |
-| implementation | Implementation Guide | Universal |
-| review | Review Checklist | Universal |
+| blocked | blocked | Work Issues |
+| bug | bug | Work Issues |
+| plan | plan | Ready |
+| code-review | code review | Ready |
+| look-into | look into | Universal |
+| triage | triage | Universal |
+| breakdown | breakdown | Universal |
+| research | research | Universal |
+| scoping | scoping | Universal |
+| design | design | Universal |
+| spike | spike | Universal |
+| context | context | Universal |
+| implementation | implement | Universal |
+| review | review | Universal |
 
 ## Step 2: Evaluate Each Template
 
