@@ -1815,6 +1815,7 @@ function initSearch() {
 
   // Toggle search panel
   searchToggle.addEventListener('click', (e) => {
+    e.preventDefault()
     e.stopPropagation()
     const isOpen = searchToggle.getAttribute('aria-expanded') === 'true'
     if (isOpen) {

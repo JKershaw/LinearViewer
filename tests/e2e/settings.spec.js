@@ -17,7 +17,13 @@ test.describe('Settings Page', () => {
 
   test('has navigation links', async ({ page }) => {
     await expect(page.locator('a:has-text("projects")')).toBeVisible()
-    await expect(page.locator('a:has-text("logout")')).toBeVisible()
+  })
+
+  test('has Account section with logout', async ({ page }) => {
+    await expect(page.locator('.settings-header:has-text("Account")')).toBeVisible()
+    const logoutLink = page.locator('a[href="/logout"]')
+    await expect(logoutLink).toBeVisible()
+    await expect(logoutLink).toContainText('logout')
   })
 
   test('shows workspace dropdown in nav', async ({ page }) => {

@@ -88,12 +88,14 @@
   background: rgba(59, 130, 246, 0.2);
 }
 
-.settings-action.disconnect {
+.settings-action.disconnect,
+.settings-action.logout {
   color: var(--red);
   background: rgba(239, 68, 68, 0.1);
 }
 
-.settings-action.disconnect:hover {
+.settings-action.disconnect:hover,
+.settings-action.logout:hover {
   background: rgba(239, 68, 68, 0.2);
 }
 
