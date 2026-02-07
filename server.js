@@ -1043,9 +1043,9 @@ app.get('/workspace/:urlKey/api/recommend/:issueId', workspaceFromUrl, async (re
     return res.status(503).json({ error: 'AI recommendation feature is not configured. Connect your OpenRouter account or set OPENROUTER_API_KEY.' })
   }
 
-  // Check free tier rate limits before proceeding
+  // Atomically check rate limits and record usage before proceeding
   if (!isTestMode && isFreeTier) {
-    const check = await freeTierStore.canUse(workspace.urlKey)
+    const check = await freeTierStore.tryUse(workspace.urlKey)
     if (!check.allowed) {
       return res.status(429).json({
         error: check.reason,
@@ -1067,10 +1067,10 @@ app.get('/workspace/:urlKey/api/recommend/:issueId', workspaceFromUrl, async (re
         return res.status(404).json({ error: 'Issue not found' })
       }
 
-      // Check free tier limits in test mode when session has freeTierEnabled flag
+      // Atomically check free tier limits and record usage in test mode
       const testIsFreeTier = req.session.freeTierEnabled && !req.session.openRouterApiKey && !process.env.OPENROUTER_API_KEY
       if (testIsFreeTier) {
-        const check = await freeTierStore.canUse(workspace.urlKey)
+        const check = await freeTierStore.tryUse(workspace.urlKey)
         if (!check.allowed) {
           return res.status(429).json({
             error: check.reason,
@@ -1120,11 +1120,6 @@ ${labels.length > 0 ? `**Labels:** ${labels.join(', ')}` : ''}
 
 ${goal}`
 
-      // Record free tier usage in test mode
-      if (testIsFreeTier) {
-        await freeTierStore.recordUsage(workspace.urlKey)
-      }
-
       const result = {
         reasoning,
         prompt,
@@ -1155,11 +1150,6 @@ ${goal}`
     const selectedModel = req.session.modelId || DEFAULT_MODEL
     const apiKeyToUse = sessionApiKey || (isFreeTier ? freeTierKey : undefined)
     const recommendation = await getRecommendation(issue, { parent, siblings, project, children, comments, focusedChild }, { apiKey: apiKeyToUse, model: selectedModel })
-
-    // Record free tier usage after successful API call
-    if (isFreeTier) {
-      await freeTierStore.recordUsage(workspace.urlKey)
-    }
 
     const result = {
       reasoning: recommendation.reasoning,

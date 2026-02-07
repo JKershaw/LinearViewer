@@ -115,6 +115,28 @@ test.describe('Free Tier API', () => {
     expect(body.source).toBe('oauth');
     expect(body.freeTier).toBeUndefined();
   });
+
+  test('concurrent requests respect rate limits', async ({ page }) => {
+    // Pre-fill usage to 3 of 5 (leaving 2 remaining)
+    await page.goto('/test/add-free-tier-usage?count=3');
+
+    // Fire 4 concurrent requests — only 2 should succeed
+    const results = await Promise.all(
+      Array.from({ length: 4 }, () =>
+        page.request.get(`${API_PREFIX}/api/recommend/${BLOCKED_ISSUE_ID}`)
+      )
+    );
+
+    const successes = results.filter(r => r.status() === 200).length;
+    const rateLimited = results.filter(r => r.status() === 429).length;
+
+    // At most 2 should succeed (the remaining quota)
+    expect(successes).toBeLessThanOrEqual(2);
+    // At least 2 should be rate limited
+    expect(rateLimited).toBeGreaterThanOrEqual(2);
+    // Total should be 4
+    expect(successes + rateLimited).toBe(4);
+  });
 });
 
 // =============================================================================

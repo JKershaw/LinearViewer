@@ -1690,7 +1690,7 @@ function initRecommendations() {
         const urlKey = recommendContainer.dataset.urlKey
         const settingsUrl = urlKey ? `/workspace/${encodeURIComponent(urlKey)}/settings` : '/settings'
         reasoning.innerHTML = `<span class="free-tier-limit-reached">${escapeHtml(error.message)}</span><br>` +
-          `<a href="${settingsUrl}">Connect your OpenRouter account</a> for unlimited prompts.`
+          `<a href="${escapeHtml(settingsUrl)}">Connect your OpenRouter account</a> for unlimited prompts.`
         reasoning.classList.remove('hidden')
         updateFooterFreeTier(error.freeTier)
       } else {
