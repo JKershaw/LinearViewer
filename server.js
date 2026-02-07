@@ -331,6 +331,24 @@ if (process.env.NODE_ENV === 'test') {
 }
 
 // =============================================================================
+// OpenRouter Source Helper
+// =============================================================================
+
+/**
+ * Determines the source of the OpenRouter API key for the current request.
+ * Priority: user OAuth key > server env key > free tier key > null
+ *
+ * @param {Object} req - Express request object
+ * @returns {'oauth'|'env'|'free'|null} The source of the API key
+ */
+function getOpenRouterSource(req) {
+  if (req.session.openRouterApiKey) return 'oauth';
+  if (process.env.OPENROUTER_API_KEY) return 'env';
+  if (process.env.OPENROUTER_FREE_TIER_KEY || req.session.freeTierEnabled) return 'free';
+  return null;
+}
+
+// =============================================================================
 // Token Refresh Middleware
 // =============================================================================
 // Automatically refreshes access tokens before they expire (5-minute buffer).
@@ -629,8 +647,7 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
   const teamId = rawTeam && rawTeam !== 'all' && UUID_REGEX.test(rawTeam) ? rawTeam : null;
 
   // Determine OpenRouter connection status for nav bar
-  const sessionApiKey = req.session.openRouterApiKey;
-  const openRouterSource = sessionApiKey ? 'oauth' : (process.env.OPENROUTER_API_KEY ? 'env' : ((process.env.OPENROUTER_FREE_TIER_KEY || req.session.freeTierEnabled) ? 'free' : null));
+  const openRouterSource = getOpenRouterSource(req);
 
   try {
     const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace.accessToken, teamId);
@@ -672,9 +689,7 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
 app.get('/workspace/:urlKey/audit', workspaceFromUrl, (req, res) => {
   const workspace = req.workspace;
   const deployInfo = getDeployInfo();
-  const sessionApiKey = req.session.openRouterApiKey;
-  const envApiKey = process.env.OPENROUTER_API_KEY;
-  const openRouterSource = sessionApiKey ? 'oauth' : (envApiKey ? 'env' : ((process.env.OPENROUTER_FREE_TIER_KEY || req.session.freeTierEnabled) ? 'free' : null));
+  const openRouterSource = getOpenRouterSource(req);
 
   const html = renderAuditPage(workspace.name || 'Workspace', {
     deployInfo,
@@ -693,9 +708,7 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, (req, res) => {
   const workspace = req.workspace;
 
   // Determine OpenRouter connection status
-  const sessionApiKey = req.session.openRouterApiKey;
-  const envApiKey = process.env.OPENROUTER_API_KEY;
-  const openRouterSource = sessionApiKey ? 'oauth' : (envApiKey ? 'env' : ((process.env.OPENROUTER_FREE_TIER_KEY || req.session.freeTierEnabled) ? 'free' : null));
+  const openRouterSource = getOpenRouterSource(req);
   const deployInfo = getDeployInfo();
 
   // Get current model selection (from session or default)
@@ -705,7 +718,7 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, (req, res) => {
   const modelError = req.query.error;
 
   const html = renderSettingsPage(workspace.name || 'Workspace', {
-    openRouterConnected: !!(sessionApiKey || envApiKey),
+    openRouterConnected: !!(openRouterSource === 'oauth' || openRouterSource === 'env'),
     openRouterSource,
     deployInfo,
     currentModel,
@@ -724,9 +737,7 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, (req, res) => {
 app.get('/workspace/:urlKey/prompts', workspaceFromUrl, (req, res) => {
   const workspace = req.workspace;
   const deployInfo = getDeployInfo();
-  const sessionApiKey = req.session.openRouterApiKey;
-  const envApiKey = process.env.OPENROUTER_API_KEY;
-  const openRouterSource = sessionApiKey ? 'oauth' : (envApiKey ? 'env' : ((process.env.OPENROUTER_FREE_TIER_KEY || req.session.freeTierEnabled) ? 'free' : null));
+  const openRouterSource = getOpenRouterSource(req);
 
   const html = renderPromptsPage(workspace.name || 'Workspace', {
     deployInfo,
@@ -989,20 +1000,10 @@ app.get('/workspace/:urlKey/api/recommend/status', workspaceFromUrl, async (req,
 
   // In test mode, always report as enabled for testing
   const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token'
-  // Check if user has connected OpenRouter via OAuth (session) or if env key is set
   const sessionApiKey = req.session.openRouterApiKey
+  const source = getOpenRouterSource(req)
 
-  // Determine source: oauth > env > free > null
-  let source = null
-  if (sessionApiKey) {
-    source = 'oauth'
-  } else if (process.env.OPENROUTER_API_KEY) {
-    source = 'env'
-  } else if (process.env.OPENROUTER_FREE_TIER_KEY || req.session.freeTierEnabled) {
-    source = 'free'
-  }
-
-  const enabled = isTestMode || isRecommendationEnabled(sessionApiKey) || !!process.env.OPENROUTER_FREE_TIER_KEY || !!req.session.freeTierEnabled
+  const enabled = isTestMode || isRecommendationEnabled(sessionApiKey) || source === 'free'
 
   const result = { enabled, source }
 
