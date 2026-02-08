@@ -1388,6 +1388,17 @@ function initFeatureToggles() {
         feedback.classList.add('visible')
         setTimeout(() => feedback.classList.remove('visible'), 1500)
       }
+
+      // Show/hide sub-toggles when a parent feature with children is toggled
+      const nodeDiv = featureLine.closest('.node')
+      if (nodeDiv) {
+        const childrenDiv = nodeDiv.querySelector('.children.code-review-options')
+        if (childrenDiv) {
+        if (childrenDiv && nodeDiv.dataset.feature === 'codeReview') {
+          childrenDiv.hidden = hiddenEnabled.value === 'true'
+        }
+        }
+      }
     } catch (err) {
       // Network error — fall back to standard form submission
       console.warn('Feature toggle AJAX failed, falling back to form POST:', err)

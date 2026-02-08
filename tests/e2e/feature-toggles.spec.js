@@ -20,9 +20,10 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('.settings-header:has-text("AI")')).toBeVisible();
     await expect(page.locator('.settings-header:has-text("Workflow")')).toBeVisible();
 
-    // All 5 feature toggle labels should be present (split across sections)
+    // All feature toggle labels should be present (split across sections)
     await expect(page.locator('.feature-toggle-label:has-text("Linear MCP in prompts")')).toBeVisible();
     await expect(page.locator('.feature-toggle-label:has-text("Feature branch workflow")')).toBeVisible();
+    await expect(page.locator('.feature-toggle-label:has-text("Code review before completing")')).toBeVisible();
     await expect(page.locator('.feature-toggle-label:has-text("Dispatch queue")')).toBeVisible();
     await expect(page.locator('.feature-toggle-label:has-text("AI recommendations")')).toBeVisible();
     await expect(page.locator('.feature-toggle-label:has-text("Prompt buttons")')).toBeVisible();
@@ -32,9 +33,10 @@ test.describe('Feature Toggle Settings', () => {
     await page.goto(SETTINGS_URL);
     await page.waitForLoadState('networkidle');
 
-    // Defaults: linearMcp ON, featureBranches OFF, dispatch OFF, aiRecommendations ON, promptButtons ON
+    // Defaults: linearMcp ON, featureBranches OFF, codeReview OFF, dispatch OFF, aiRecommendations ON, promptButtons ON
     await expect(page.locator('[data-feature="linearMcp"] .toggle-state')).toHaveText('● on');
     await expect(page.locator('[data-feature="featureBranches"] .toggle-state')).toHaveText('○ off');
+    await expect(page.locator('[data-feature="codeReview"] .toggle-state')).toHaveText('○ off');
     await expect(page.locator('[data-feature="dispatch"] .toggle-state')).toHaveText('○ off');
     await expect(page.locator('[data-feature="aiRecommendations"] .toggle-state')).toHaveText('● on');
     await expect(page.locator('[data-feature="promptButtons"] .toggle-state')).toHaveText('● on');
@@ -255,6 +257,111 @@ test.describe('Feature Toggle Settings', () => {
     // AI suggest button should exist (when openRouterSource is configured in test)
     // Recommendation container should exist
     await expect(page.locator('.recommend-container')).not.toHaveCount(0);
+  });
+
+  // =========================================================================
+  // LIN-173: Code review toggle affects prompt content and sub-toggle visibility
+  // =========================================================================
+
+  test('code review sub-toggles hidden by default (codeReview off)', async ({ page }) => {
+    await page.goto(SETTINGS_URL);
+    await page.waitForLoadState('networkidle');
+
+    // Parent toggle should be off
+    await expect(page.locator('[data-feature="codeReview"] .toggle-state')).toHaveText('○ off');
+
+    // Sub-toggles should be hidden
+    await expect(page.locator('.code-review-options')).toBeHidden();
+  });
+
+  test('code review sub-toggles visible when codeReview is on', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ codeReview: true }))}`);
+
+    await page.goto(SETTINGS_URL);
+    await page.waitForLoadState('networkidle');
+
+    // Parent toggle should be on
+    await expect(page.locator('[data-feature="codeReview"] .toggle-state')).toHaveText('● on');
+
+    // Sub-toggles should be visible with correct defaults
+    await expect(page.locator('.code-review-options')).toBeVisible();
+    await expect(page.locator('[data-feature="codeReviewSelf"] .toggle-state')).toHaveText('● on');
+    await expect(page.locator('[data-feature="codeReviewCicd"] .toggle-state')).toHaveText('○ off');
+    await expect(page.locator('[data-feature="codeReviewPr"] .toggle-state')).toHaveText('○ off');
+  });
+
+  test('prompts exclude code review sections by default', async ({ page }) => {
+    // Default: codeReview is OFF
+    const response = await page.request.get(
+      `/workspace/${TEST_WORKSPACE_URL_KEY}/api/prompt/${TEST_ISSUE_ID}/plan`
+    );
+    expect(response.ok()).toBeTruthy();
+    const data = await response.json();
+    expect(data.prompt).not.toContain('Self-Review');
+    expect(data.prompt).not.toContain('CI/CD Check');
+    expect(data.prompt).not.toContain('PR Review');
+  });
+
+  test('plan prompt includes self-review when codeReview is on', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ codeReview: true }))}`);
+
+    const response = await page.request.get(
+      `/workspace/${TEST_WORKSPACE_URL_KEY}/api/prompt/${TEST_ISSUE_ID}/plan`
+    );
+    expect(response.ok()).toBeTruthy();
+    const data = await response.json();
+    // Self-review defaults to on
+    expect(data.prompt).toContain('Self-Review');
+    expect(data.prompt).toContain('Verify correctness against task requirements');
+  });
+
+  test('plan prompt includes CI/CD check when codeReviewCicd is on', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ codeReview: true, codeReviewCicd: true }))}`);
+
+    const response = await page.request.get(
+      `/workspace/${TEST_WORKSPACE_URL_KEY}/api/prompt/${TEST_ISSUE_ID}/plan`
+    );
+    expect(response.ok()).toBeTruthy();
+    const data = await response.json();
+    expect(data.prompt).toContain('CI/CD Check');
+    expect(data.prompt).toContain('Check CI/CD pipeline status');
+  });
+
+  test('plan prompt includes PR review when codeReviewPr is on', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ codeReview: true, codeReviewPr: true }))}`);
+
+    const response = await page.request.get(
+      `/workspace/${TEST_WORKSPACE_URL_KEY}/api/prompt/${TEST_ISSUE_ID}/plan`
+    );
+    expect(response.ok()).toBeTruthy();
+    const data = await response.json();
+    expect(data.prompt).toContain('PR Review');
+    expect(data.prompt).toContain('Check for review comments');
+  });
+
+  test('implementation prompt also gets code review sections', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ codeReview: true, codeReviewCicd: true }))}`);
+
+    const response = await page.request.get(
+      `/workspace/${TEST_WORKSPACE_URL_KEY}/api/prompt/${TEST_ISSUE_ID}/implementation`
+    );
+    expect(response.ok()).toBeTruthy();
+    const data = await response.json();
+    expect(data.prompt).toContain('Self-Review');
+    expect(data.prompt).toContain('CI/CD Check');
+  });
+
+  test('code-review prompt does NOT get code review sections', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ codeReview: true, codeReviewCicd: true }))}`);
+
+    const response = await page.request.get(
+      `/workspace/${TEST_WORKSPACE_URL_KEY}/api/prompt/${TEST_ISSUE_ID}/code-review`
+    );
+    expect(response.ok()).toBeTruthy();
+    const data = await response.json();
+    // code-review template IS a review, should not get review instructions appended
+    expect(data.prompt).not.toContain('Self-Review');
+    expect(data.prompt).not.toContain('CI/CD Check');
   });
 
   // =========================================================================
