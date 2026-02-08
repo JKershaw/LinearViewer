@@ -14,29 +14,46 @@ A minimal, CLI-aesthetic web app that displays Linear projects and issues as a c
 ## Architecture
 
 ```
-server.js              Express server, OAuth routes, main entry point
+server.js              Express server, main entry point, dashboard routes
 routes/
   auth.js              Linear OAuth routes
   openrouter-auth.js   OpenRouter OAuth PKCE routes
   workspace.js         Workspace management routes
   dispatch.js          Dispatch queue API (user + consumer endpoints)
+  workspace-api.js     Workspace API routes (prompts, recommendations, audit, comments, images)
+  test.js              Test-only routes for E2E tests (mock sessions, fixtures)
+  legacy-redirects.js  Backward-compatible redirects for old URLs
 lib/
   linear.js            GraphQL client for Linear API
   linear-cli.js        CLI tool for AI agents to query/modify Linear
   openrouter.js        OpenRouter API client for AI recommendations
   free-tier-store.js   Free tier usage tracking and rate limiting
   tree.js              Transforms flat issues → nested tree structure
-  render.js            Generates HTML with box-drawing characters
+  render.js            Dashboard page renderer (tree view, sections)
+  render-pages.js      Standalone page renderers (login, error, workspace-not-found)
   render-audit.js      Operator dashboard page renderer
+  render-settings.js   Settings page renderer
+  render-prompts.js    Prompts catalog page renderer
+  feature-defaults.js  Feature toggle keys, defaults, and helpers
+  user-preferences.js  Cross-device preference storage (MongoDB)
   session-store.js     MongoDB/MangoDB session store
   parse-landing.js     Parses markdown content for landing page
+  prompt-templates.js  Prompt template query functions and main entry point
+  prompt-formatters.js Shared formatting helpers for prompt templates
+  prompt-template-defs.js  Prompt template definitions (14 templates)
+  prompts/
+    meta-prompt-template.js  Meta-prompt for AI recommendation generation
   dispatch-store.js    Dispatch queue storage
   dispatch-tokens.js   Consumer API token management
+  components/
+    navbar.js          Nav bar with workspace/team selectors, queue badge
+    footer.js          Footer with deploy info, AI status
 content/
   landing.md           Static projects preview for unauthenticated users
 public/
   style.css            Light theme, mobile-responsive
   audit.css            Operator dashboard styles
+  settings.css         Settings page styles
   app.js               Client-side collapse/expand, localStorage persistence
   audit.js             Operator dashboard client-side logic
   llms.txt             AI agent guidance (DOM selectors, navigation patterns)
@@ -47,10 +64,18 @@ tests/e2e/
   openrouter-auth.spec.js  OpenRouter OAuth tests
   dispatch.spec.js     Dispatch queue and consumer API tests
   free-tier.spec.js    Free tier rate limiting tests
+  feature-toggles.spec.js  Feature toggle settings tests
 docs/
   dispatch-integration.md  Consumer integration guide
 playwright.config.js   Playwright test configuration
 ```
+
+### Prompt System (two independent paths)
+
+Changes to prompt behavior (feature flags, workflow instructions, context formatting) must update BOTH:
+
+- **Handwritten prompts**: `lib/prompt-templates.js` → `generatePrompt()` — deterministic, template-based
+- **AI-generated prompts**: `lib/openrouter.js` → `lib/prompts/meta-prompt-template.js` — LLM generates via meta-prompt
 
 ## Code Style
 

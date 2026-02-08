@@ -386,6 +386,50 @@
 }
 
 /* =============================================================================
+   Feature Toggles
+   ============================================================================= */
+.feature-toggle {
+  gap: 0.5rem;
+}
+
+.feature-toggle-label {
+  min-width: 14ch;
+}
+
+.feature-form {
+  display: inline-flex;
+}
+
+.toggle-btn {
+  font-family: var(--font-structural);
+  font-size: 0.85rem;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--fg-dim);
+  border-radius: 2px;
+  cursor: pointer;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.toggle-btn:hover {
+  background: var(--fg-vdim);
+}
+
+.toggle-btn.toggle-on .toggle-state {
+  color: var(--green);
+}
+
+.toggle-btn.toggle-off .toggle-state {
+  color: var(--fg-dim);
+}
+
+.feature-note {
+  font-size: 0.8rem;
+  color: var(--yellow);
+  margin-left: 0.5rem;
+}
+
+/* =============================================================================
    Responsive
    ============================================================================= */
 @media (max-width: 640px) {
