@@ -630,21 +630,24 @@ app.post('/workspace/:urlKey/settings/model', workspaceFromUrl, async (req, res)
     await saveSession(req.session);
   } catch (err) {
     console.error('Failed to save model preference:', err);
-    // Continue to redirect - model will still work for this session
+    return res.status(500).send(renderErrorPage('Settings Error', 'Failed to save model preference. Please try again.', {
+      action: 'Back to settings',
+      actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/settings`
+    }));
   }
 
-  // Persist preference to user preferences store for cross-device sync
+  // Best-effort persist to user preferences store for cross-device sync.
+  // Non-fatal: session is the authoritative source; preferences are for convenience
+  // across devices. If this fails, the model still works for the current session.
   if (req.session.linearUserId) {
     try {
-      // Get existing preferences and merge with new model selection
       const existingPrefs = await userPreferencesStore.getUserPreferences(req.session.linearUserId);
       await userPreferencesStore.saveUserPreferences(req.session.linearUserId, {
         ...existingPrefs,
         modelId: selectedModel
       });
     } catch (err) {
-      console.error('Failed to persist model preference:', err);
-      // Non-fatal: preference still works in session
+      console.error('Failed to persist model preference to preferences store:', err);
     }
   }
 
@@ -677,9 +680,15 @@ app.post('/workspace/:urlKey/settings/features', workspaceFromUrl, async (req, r
     await saveSession(req.session);
   } catch (err) {
     console.error('Failed to save feature toggle:', err);
+    return res.status(500).send(renderErrorPage('Settings Error', 'Failed to save feature toggle. Please try again.', {
+      action: 'Back to settings',
+      actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/settings`
+    }));
   }
 
-  // Persist to user preferences store for cross-device sync
+  // Best-effort persist to user preferences store for cross-device sync.
+  // Non-fatal: session is the authoritative source; preferences are for convenience
+  // across devices. If this fails, the toggle still works for the current session.
   if (req.session.linearUserId) {
     try {
       const existingPrefs = await userPreferencesStore.getUserPreferences(req.session.linearUserId);
@@ -692,7 +701,7 @@ app.post('/workspace/:urlKey/settings/features', workspaceFromUrl, async (req, r
         }
       });
     } catch (err) {
-      console.error('Failed to persist feature toggle:', err);
+      console.error('Failed to persist feature toggle to preferences store:', err);
     }
   }
 

@@ -5,6 +5,7 @@
  * Only mounted when NODE_ENV === 'test'.
  */
 import { Router } from 'express';
+import { isValidFeatureKey } from '../lib/feature-defaults.js';
 
 /**
  * Create test routes with required dependencies.
@@ -86,9 +87,17 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     }
 
     // Set feature flags in session for testing (JSON string of overrides)
+    // Validate each key against the whitelist to prevent arbitrary session injection
     if (features) {
       try {
-        req.session.features = JSON.parse(features)
+        const parsed = JSON.parse(features)
+        const validated = {}
+        for (const [key, value] of Object.entries(parsed)) {
+          if (isValidFeatureKey(key)) {
+            validated[key] = value
+          }
+        }
+        req.session.features = validated
       } catch {
         // Ignore invalid JSON
       }
