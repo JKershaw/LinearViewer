@@ -1663,6 +1663,15 @@ h1 {
   text-decoration: underline;
 }
 
+.footer-legal {
+  color: var(--fg-dim);
+  text-decoration: none;
+}
+
+.footer-legal:hover {
+  color: var(--fg);
+}
+
 .footer-ai-status {
   text-decoration: none;
 }
@@ -1693,4 +1702,32 @@ h1 {
     margin-top: 2rem;
     padding-top: 0.75rem;
   }
+}
+
+/*
+   Legal Pages
+   Minimal styling for privacy policy and terms of service.
+*/
+.legal-content {
+  max-width: 640px;
+  line-height: 1.6;
+}
+
+.legal-content h2 {
+  margin-bottom: 1.5rem;
+}
+
+.legal-content h3 {
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  color: var(--fg);
+}
+
+.legal-content p {
+  color: var(--fg-dim);
+  margin-bottom: 0.75rem;
+}
+
+.legal-content a {
+  color: var(--blue);
 }
