@@ -1323,10 +1323,20 @@ function initFeatureToggles() {
     try {
       const res = await fetch(form.action, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
         body: new URLSearchParams(new FormData(form))
       })
 
+      // Auth errors — redirect to re-authenticate
+      if (res.status === 401 || res.status === 403) {
+        window.location.href = '/logout'
+        return
+      }
+
+      // Validation or server error — fall back to form POST for error display
       if (!res.ok && !res.redirected) {
         form.submit()
         return
