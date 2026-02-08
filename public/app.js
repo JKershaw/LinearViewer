@@ -1391,9 +1391,11 @@ function initFeatureToggles() {
 
       // Show/hide sub-toggles when a parent feature with children is toggled
       const nodeDiv = featureLine.closest('.node')
-      const childrenDiv = nodeDiv?.querySelector('.children.code-review-options')
-      if (childrenDiv) {
-        childrenDiv.hidden = hiddenEnabled.value === 'true' // value already flipped above
+      if (nodeDiv) {
+        const childrenDiv = nodeDiv.querySelector('.children.code-review-options')
+        if (childrenDiv) {
+          childrenDiv.hidden = hiddenEnabled.value === 'true' // value already flipped above
+        }
       }
     } catch (err) {
       // Network error — fall back to standard form submission
