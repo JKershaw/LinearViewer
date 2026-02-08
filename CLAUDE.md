@@ -28,15 +28,26 @@ lib/
   tree.js              Transforms flat issues → nested tree structure
   render.js            Generates HTML with box-drawing characters
   render-audit.js      Operator dashboard page renderer
+  render-settings.js   Settings page renderer
+  render-prompts.js    Prompts catalog page renderer
+  feature-defaults.js  Feature toggle keys, defaults, and helpers
+  user-preferences.js  Cross-device preference storage (MongoDB)
   session-store.js     MongoDB/MangoDB session store
   parse-landing.js     Parses markdown content for landing page
+  prompt-templates.js  Handwritten prompt templates (deterministic)
+  prompts/
+    meta-prompt-template.js  Meta-prompt for AI recommendation generation
   dispatch-store.js    Dispatch queue storage
   dispatch-tokens.js   Consumer API token management
+  components/
+    navbar.js          Nav bar with workspace/team selectors, queue badge
+    footer.js          Footer with deploy info, AI status
 content/
   landing.md           Static projects preview for unauthenticated users
 public/
   style.css            Light theme, mobile-responsive
   audit.css            Operator dashboard styles
+  settings.css         Settings page styles
   app.js               Client-side collapse/expand, localStorage persistence
   audit.js             Operator dashboard client-side logic
   llms.txt             AI agent guidance (DOM selectors, navigation patterns)
@@ -47,10 +58,18 @@ tests/e2e/
   openrouter-auth.spec.js  OpenRouter OAuth tests
   dispatch.spec.js     Dispatch queue and consumer API tests
   free-tier.spec.js    Free tier rate limiting tests
+  feature-toggles.spec.js  Feature toggle settings tests
 docs/
   dispatch-integration.md  Consumer integration guide
 playwright.config.js   Playwright test configuration
 ```
+
+### Prompt System (two independent paths)
+
+Changes to prompt behavior (feature flags, workflow instructions, context formatting) must update BOTH:
+
+- **Handwritten prompts**: `lib/prompt-templates.js` → `generatePrompt()` — deterministic, template-based
+- **AI-generated prompts**: `lib/openrouter.js` → `lib/prompts/meta-prompt-template.js` — LLM generates via meta-prompt
 
 ## Code Style
 

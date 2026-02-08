@@ -1212,7 +1212,7 @@ ${goal}`
     // Get AI-generated prompt (pass session API key, free tier key, and model if available)
     const selectedModel = req.session.modelId || DEFAULT_MODEL
     const apiKeyToUse = sessionApiKey || (isFreeTier ? freeTierKey : undefined)
-    const recommendation = await getRecommendation(issue, { parent, siblings, project, children, comments, focusedChild }, { apiKey: apiKeyToUse, model: selectedModel })
+    const recommendation = await getRecommendation(issue, { parent, siblings, project, children, comments, focusedChild }, { apiKey: apiKeyToUse, model: selectedModel, featureFlags: getFeatureFlags(req.session) })
 
     const result = {
       reasoning: recommendation.reasoning,
