@@ -1394,7 +1394,9 @@ function initFeatureToggles() {
       if (nodeDiv) {
         const childrenDiv = nodeDiv.querySelector('.children.code-review-options')
         if (childrenDiv) {
-          childrenDiv.hidden = hiddenEnabled.value === 'true' // value already flipped above
+        if (childrenDiv && nodeDiv.dataset.feature === 'codeReview') {
+          childrenDiv.hidden = hiddenEnabled.value === 'true'
+        }
         }
       }
     } catch (err) {
