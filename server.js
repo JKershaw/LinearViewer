@@ -419,11 +419,11 @@ app.get('/', (req, res) => {
 // =============================================================================
 
 app.get('/privacy', (req, res) => {
-  res.send(renderPrivacyPolicy())
+  res.send(renderPrivacyPolicy({ deployInfo: getDeployInfo() }))
 })
 
 app.get('/terms', (req, res) => {
-  res.send(renderTermsOfService())
+  res.send(renderTermsOfService({ deployInfo: getDeployInfo() }))
 })
 
 // =============================================================================
