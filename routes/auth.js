@@ -159,7 +159,9 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore }) {
           if (savedPrefs.modelId) {
             req.session.modelId = savedPrefs.modelId
           }
-          // Future preferences can be loaded here (theme, language, etc.)
+          if (savedPrefs.features) {
+            req.session.features = savedPrefs.features
+          }
         }
 
         // Add/update workspace in session

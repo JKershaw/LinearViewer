@@ -35,6 +35,7 @@ import { renderPromptsPage } from './lib/render-prompts.js'
 import { generatePrompt, hasPrompt, getAvailablePrompts } from './lib/prompt-templates.js'
 import { PREPARING_LABEL, WORK_ISSUE_LABELS } from './lib/workflow-config.js'
 import { isRecommendationEnabled, getRecommendation, DEFAULT_MODEL, AVAILABLE_MODELS } from './lib/openrouter.js'
+import { getFeatureFlags, isValidFeatureKey, FEATURE_DEFAULTS } from './lib/feature-defaults.js'
 
 // =============================================================================
 // Environment Variable Validation
@@ -725,7 +726,8 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, (req, res) => {
     availableModels: AVAILABLE_MODELS,
     modelError,
     urlKey: workspace.urlKey,
-    workspaces: req.session.workspaces
+    workspaces: req.session.workspaces,
+    featureFlags: getFeatureFlags(req.session)
   });
   res.send(html);
 });
@@ -804,6 +806,54 @@ app.post('/workspace/:urlKey/settings/model', workspaceFromUrl, async (req, res)
     } catch (err) {
       console.error('Failed to persist model preference:', err);
       // Non-fatal: preference still works in session
+    }
+  }
+
+  res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
+});
+
+/**
+ * Toggle a feature flag on or off.
+ * Accepts { feature, enabled } in body.
+ * Saves to session and persists to UserPreferencesStore.
+ */
+app.post('/workspace/:urlKey/settings/features', workspaceFromUrl, async (req, res) => {
+  const workspace = req.workspace;
+  const { feature, enabled } = req.body;
+
+  // Validate feature key
+  if (!feature || !isValidFeatureKey(feature)) {
+    return res.status(400).json({ error: 'Invalid feature key' });
+  }
+
+  const isEnabled = enabled === 'true' || enabled === true;
+
+  // Save to session
+  if (!req.session.features) {
+    req.session.features = {};
+  }
+  req.session.features[feature] = isEnabled;
+
+  try {
+    await saveSession(req.session);
+  } catch (err) {
+    console.error('Failed to save feature toggle:', err);
+  }
+
+  // Persist to user preferences store for cross-device sync
+  if (req.session.linearUserId) {
+    try {
+      const existingPrefs = await userPreferencesStore.getUserPreferences(req.session.linearUserId);
+      const existingFeatures = existingPrefs.features || {};
+      await userPreferencesStore.saveUserPreferences(req.session.linearUserId, {
+        ...existingPrefs,
+        features: {
+          ...existingFeatures,
+          [feature]: isEnabled
+        }
+      });
+    } catch (err) {
+      console.error('Failed to persist feature toggle:', err);
     }
   }
 
