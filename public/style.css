@@ -71,6 +71,15 @@ h1 {
   font-family: var(--font-content);
 }
 
+.header-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.header-link:hover {
+  color: var(--blue);
+}
+
 /* =============================================================================
    Navigation Bar
    =============================================================================
@@ -1706,26 +1715,37 @@ h1 {
 
 /*
    Legal Pages
-   Minimal styling for privacy policy and terms of service.
+   Styled to match the landing and projects page aesthetic.
 */
 .legal-content {
-  max-width: 640px;
   line-height: 1.6;
 }
 
 .legal-content h2 {
-  margin-bottom: 1.5rem;
+  color: var(--fg);
+  font-family: var(--font-content);
+  font-weight: normal;
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.legal-section {
+  margin-bottom: 2.5rem;
 }
 
 .legal-content h3 {
-  margin-top: 1.5rem;
+  color: var(--blue);
+  font-weight: 600;
+  font-family: var(--font-content);
+  padding: 0.5rem 0;
   margin-bottom: 0.5rem;
-  color: var(--fg);
 }
 
 .legal-content p {
   color: var(--fg-dim);
   margin-bottom: 0.75rem;
+  margin-left: 3ch;
+  font-family: var(--font-content);
 }
 
 .legal-content a {
