@@ -32,6 +32,7 @@ import { createWorkspaceApiRoutes } from './routes/workspace-api.js'
 import { createLegacyRedirects } from './routes/legacy-redirects.js'
 import { testMockTeams, testMockData } from './tests/fixtures/mock-data.js'
 import { renderAuditPage } from './lib/render-audit.js'
+import { renderPrivacyPolicy, renderTermsOfService } from './lib/render-legal.js'
 import { renderSettingsPage } from './lib/render-settings.js'
 import { renderPromptsPage } from './lib/render-prompts.js'
 import { DEFAULT_MODEL, AVAILABLE_MODELS } from './lib/openrouter.js'
@@ -252,7 +253,7 @@ async function ensureValidToken(req, res, next) {
 // Apply middleware to all routes except auth and logout
 // Note: workspace routes need token refresh too (they access Linear API)
 app.use((req, res, next) => {
-  if (req.path.startsWith('/auth/') || req.path === '/logout') {
+  if (req.path.startsWith('/auth/') || req.path === '/logout' || req.path === '/privacy' || req.path === '/terms') {
     return next();
   }
   ensureValidToken(req, res, next);
@@ -411,6 +412,18 @@ app.get('/', (req, res) => {
   // Unauthenticated users see the static landing page
   const html = renderPage(landingTrees, [], [], landingData.organizationName, { isLanding: true, deployInfo })
   res.send(html)
+})
+
+// =============================================================================
+// Legal Pages (public, no auth required)
+// =============================================================================
+
+app.get('/privacy', (req, res) => {
+  res.send(renderPrivacyPolicy({ deployInfo: getDeployInfo() }))
+})
+
+app.get('/terms', (req, res) => {
+  res.send(renderTermsOfService({ deployInfo: getDeployInfo() }))
 })
 
 // =============================================================================

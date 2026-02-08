@@ -101,4 +101,4 @@ And add `https://yourdomain.com/auth/callback` to your Linear OAuth app's redire
 
 ## License
 
-MIT
+All rights reserved.
