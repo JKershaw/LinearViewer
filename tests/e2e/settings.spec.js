@@ -36,7 +36,7 @@ test.describe('Settings Page', () => {
 test.describe('Token Management', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/test/clear-dispatch-tokens')
-    await page.goto('/test/set-session')
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`)
     await page.goto(SETTINGS_URL)
     await page.waitForLoadState('networkidle')
   })
@@ -162,7 +162,7 @@ test.describe('Token Management', () => {
 test.describe('Token API Integration', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/test/clear-dispatch-tokens')
-    await page.goto('/test/set-session')
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`)
   })
 
   test('created token works with consumer API', async ({ page, request }) => {

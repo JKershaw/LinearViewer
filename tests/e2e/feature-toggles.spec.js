@@ -3,6 +3,8 @@ import { test, expect } from '@playwright/test';
 // Workspace URL key used in test session
 const TEST_WORKSPACE_URL_KEY = 'test-workspace';
 const SETTINGS_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/settings`;
+// UUID-format issue ID from mock data (issue-4 = "Beta task in progress", In Progress state)
+const TEST_ISSUE_ID = '66666666-6666-6666-6666-666666666666';
 
 test.describe('Feature Toggle Settings', () => {
   test.beforeEach(async ({ page }) => {
@@ -99,6 +101,136 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('[data-feature="aiRecommendations"] .toggle-state')).toHaveText('on');
     await expect(page.locator('[data-feature="promptButtons"] .toggle-state')).toHaveText('on');
   });
+
+  // =========================================================================
+  // LIN-168: Linear MCP toggle affects prompt content
+  // =========================================================================
+
+  test('prompts include MCP instructions by default', async ({ page }) => {
+    // Default: linearMcp is ON
+    const response = await page.request.get(
+      `/workspace/${TEST_WORKSPACE_URL_KEY}/api/prompt/${TEST_ISSUE_ID}/look-into`
+    );
+    expect(response.ok()).toBeTruthy();
+    const data = await response.json();
+    expect(data.prompt).toContain('Linear MCP');
+  });
+
+  test('prompts exclude MCP instructions when linearMcp is off', async ({ page }) => {
+    // Set session with linearMcp OFF
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ linearMcp: false }))}`);
+
+    const response = await page.request.get(
+      `/workspace/${TEST_WORKSPACE_URL_KEY}/api/prompt/${TEST_ISSUE_ID}/look-into`
+    );
+    expect(response.ok()).toBeTruthy();
+    const data = await response.json();
+    expect(data.prompt).not.toContain('Linear MCP');
+  });
+
+  // =========================================================================
+  // LIN-169: Feature branch toggle affects prompt content
+  // =========================================================================
+
+  test('prompts exclude git workflow by default', async ({ page }) => {
+    // Default: featureBranches is OFF
+    const response = await page.request.get(
+      `/workspace/${TEST_WORKSPACE_URL_KEY}/api/prompt/${TEST_ISSUE_ID}/plan`
+    );
+    expect(response.ok()).toBeTruthy();
+    const data = await response.json();
+    expect(data.prompt).not.toContain('Git Workflow');
+  });
+
+  test('prompts include git workflow when featureBranches is on', async ({ page }) => {
+    // Set session with featureBranches ON
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ featureBranches: true }))}`);
+
+    const response = await page.request.get(
+      `/workspace/${TEST_WORKSPACE_URL_KEY}/api/prompt/${TEST_ISSUE_ID}/plan`
+    );
+    expect(response.ok()).toBeTruthy();
+    const data = await response.json();
+    expect(data.prompt).toContain('Git Workflow');
+  });
+
+  // =========================================================================
+  // LIN-170: Dispatch toggle affects UI visibility
+  // =========================================================================
+
+  test('dispatch UI is hidden by default (dispatch off)', async ({ page }) => {
+    // Default: dispatch is OFF
+    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/`);
+    await page.waitForLoadState('networkidle');
+
+    // Queue badge should not be in the DOM
+    await expect(page.locator('[data-queue-badge]')).toHaveCount(0);
+
+    // Dispatch buttons on prompts should not exist
+    await expect(page.locator('.dispatch-btn')).toHaveCount(0);
+  });
+
+  test('dispatch UI is visible when dispatch is on', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+
+    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/`);
+    await page.waitForLoadState('networkidle');
+
+    // Queue badge should exist (hidden class applied by JS when count is 0, but element exists)
+    await expect(page.locator('[data-queue-badge]')).toHaveCount(1);
+  });
+
+  test('dispatch tokens section hidden in settings when dispatch off', async ({ page }) => {
+    await page.goto(SETTINGS_URL);
+    await page.waitForLoadState('networkidle');
+
+    // Dispatch Tokens section should not be visible
+    await expect(page.locator('.settings-header:has-text("Dispatch Tokens")')).toHaveCount(0);
+  });
+
+  test('dispatch tokens section visible in settings when dispatch on', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+
+    await page.goto(SETTINGS_URL);
+    await page.waitForLoadState('networkidle');
+
+    // Dispatch Tokens section should be visible
+    await expect(page.locator('.settings-header:has-text("Dispatch Tokens")')).toBeVisible();
+  });
+
+  // =========================================================================
+  // LIN-172: Prompt buttons toggle affects UI visibility
+  // =========================================================================
+
+  test('prompts section is hidden when promptButtons is off', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ promptButtons: false }))}`);
+
+    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/`);
+    await page.waitForLoadState('networkidle');
+
+    // Expand an issue to see its details
+    await page.locator('.line[data-id]').first().click();
+    await page.waitForTimeout(200);
+
+    // Prompts toggle should not exist in any detail section
+    await expect(page.locator('[data-toggle="prompts"]')).toHaveCount(0);
+  });
+
+  test('prompts section is visible by default (promptButtons on)', async ({ page }) => {
+    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/`);
+    await page.waitForLoadState('networkidle');
+
+    // Expand an issue to see its details
+    await page.locator('.line[data-id]').first().click();
+    await page.waitForTimeout(200);
+
+    // Prompts toggle should exist in expanded detail section
+    await expect(page.locator('[data-toggle="prompts"]')).not.toHaveCount(0);
+  });
+
+  // =========================================================================
+  // Validation
+  // =========================================================================
 
   test('feature toggles API rejects invalid feature key', async ({ page }) => {
     const response = await page.request.post(

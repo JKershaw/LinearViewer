@@ -194,7 +194,7 @@ if (process.env.NODE_ENV === 'test') {
   //   ?openRouterConnected=true - Set up OpenRouter API key in session
   //   ?freeTierEnabled=true     - Simulate free tier mode (no OAuth, no env key)
   app.get('/test/set-session', (req, res) => {
-    const { tokenExpired, noRefreshToken, multiWorkspace, maxWorkspaces, openRouterConnected, freeTierEnabled } = req.query
+    const { tokenExpired, noRefreshToken, multiWorkspace, maxWorkspaces, openRouterConnected, freeTierEnabled, features } = req.query
 
     // Base workspace configuration - IDs must be valid UUIDs to pass validation
     const createWorkspace = (id, name, urlKey) => ({
@@ -251,6 +251,15 @@ if (process.env.NODE_ENV === 'test') {
       req.session.freeTierEnabled = true
     } else {
       delete req.session.freeTierEnabled
+    }
+
+    // Set feature flags in session for testing (JSON string of overrides)
+    if (features) {
+      try {
+        req.session.features = JSON.parse(features)
+      } catch {
+        // Ignore invalid JSON
+      }
     }
 
     // Explicitly save session before responding to ensure it's persisted
@@ -530,7 +539,8 @@ async function handleTokenRefreshAndRetry(workspace, session, teamId, openRouter
     workspaces: session.workspaces,
     openRouterSource,
     deployInfo,
-    urlKey: workspace.urlKey
+    urlKey: workspace.urlKey,
+    featureFlags: getFeatureFlags(session)
   });
   return res.send(html);
 }
@@ -658,7 +668,8 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
       workspaces: req.session.workspaces,
       openRouterSource,
       deployInfo,
-      urlKey: workspace.urlKey
+      urlKey: workspace.urlKey,
+      featureFlags: getFeatureFlags(req.session)
     });
     res.send(html);
   } catch (error) {
@@ -993,7 +1004,7 @@ app.get('/workspace/:urlKey/api/prompt/:issueId/:labelName', workspaceFromUrl, a
         siblings: mockSiblings,
         project: mockProject ? { name: mockProject.name, description: mockProject.content } : null,
         children: mockChildren
-      })
+      }, getFeatureFlags(req.session))
 
       return res.json({
         label: labelName,
@@ -1006,7 +1017,7 @@ app.get('/workspace/:urlKey/api/prompt/:issueId/:labelName', workspaceFromUrl, a
     const { issue, parent, siblings, project, children, comments } = await fetchIssueContext(workspace.accessToken, issueId)
 
     // Generate the prompt
-    const result = generatePrompt(labelName, issue, { parent, siblings, project, children, comments })
+    const result = generatePrompt(labelName, issue, { parent, siblings, project, children, comments }, getFeatureFlags(req.session))
 
     if (!result) {
       return res.status(500).json({ error: 'Failed to generate prompt' })

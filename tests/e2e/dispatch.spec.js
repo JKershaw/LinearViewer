@@ -33,8 +33,8 @@ test.describe('Dispatch Queue', () => {
     await page.goto('/test/clear-dispatch-queue');
     await page.goto('/test/clear-dispatch-tokens');
 
-    // Set up test session
-    await page.goto('/test/set-session');
+    // Set up test session with dispatch feature enabled
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
     await page.goto(WORKSPACE_URL);
     await page.waitForLoadState('networkidle');
   });
