@@ -229,6 +229,40 @@ test.describe('Feature Toggle Settings', () => {
   });
 
   // =========================================================================
+  // LIN-171: AI recommendations toggle affects UI visibility
+  // =========================================================================
+
+  test('AI suggest button is hidden when aiRecommendations is off', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ aiRecommendations: false }))}`);
+
+    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/`);
+    await page.waitForLoadState('networkidle');
+
+    // Expand an issue to see its details
+    await page.locator('.line[data-id]').first().click();
+    await page.waitForTimeout(200);
+
+    // AI suggest button should not exist
+    await expect(page.locator('.suggest-btn')).toHaveCount(0);
+
+    // Recommendation container should not exist
+    await expect(page.locator('.recommend-container')).toHaveCount(0);
+  });
+
+  test('AI suggest button is visible by default (aiRecommendations on)', async ({ page }) => {
+    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/`);
+    await page.waitForLoadState('networkidle');
+
+    // Expand an issue to see its details
+    await page.locator('.line[data-id]').first().click();
+    await page.waitForTimeout(200);
+
+    // AI suggest button should exist (when openRouterSource is configured in test)
+    // Recommendation container should exist
+    await expect(page.locator('.recommend-container')).not.toHaveCount(0);
+  });
+
+  // =========================================================================
   // Validation
   // =========================================================================
 

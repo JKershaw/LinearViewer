@@ -35,7 +35,7 @@ import { renderPromptsPage } from './lib/render-prompts.js'
 import { generatePrompt, hasPrompt, getAvailablePrompts } from './lib/prompt-templates.js'
 import { PREPARING_LABEL, WORK_ISSUE_LABELS } from './lib/workflow-config.js'
 import { isRecommendationEnabled, getRecommendation, DEFAULT_MODEL, AVAILABLE_MODELS } from './lib/openrouter.js'
-import { getFeatureFlags, isValidFeatureKey, FEATURE_DEFAULTS } from './lib/feature-defaults.js'
+import { getFeatureFlags, isValidFeatureKey } from './lib/feature-defaults.js'
 
 // =============================================================================
 // Environment Variable Validation
@@ -707,7 +707,8 @@ app.get('/workspace/:urlKey/audit', workspaceFromUrl, (req, res) => {
     deployInfo,
     urlKey: workspace.urlKey,
     openRouterSource,
-    workspaces: req.session.workspaces
+    workspaces: req.session.workspaces,
+    featureFlags: getFeatureFlags(req.session)
   });
   res.send(html);
 });
@@ -756,7 +757,8 @@ app.get('/workspace/:urlKey/prompts', workspaceFromUrl, (req, res) => {
     deployInfo,
     urlKey: workspace.urlKey,
     openRouterSource,
-    workspaces: req.session.workspaces
+    workspaces: req.session.workspaces,
+    featureFlags: getFeatureFlags(req.session)
   });
   res.send(html);
 });
