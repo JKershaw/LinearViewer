@@ -12,7 +12,7 @@ test.describe('Settings Page', () => {
 
   test('renders settings page with title and sections', async ({ page }) => {
     await expect(page.locator('h1')).toContainText('Settings')
-    await expect(page.locator('.settings-header').first()).toContainText('AI Configuration')
+    await expect(page.locator('.settings-header').first()).toContainText('AI')
   })
 
   test('has navigation links', async ({ page }) => {

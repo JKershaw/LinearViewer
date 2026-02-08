@@ -1300,6 +1300,105 @@ async function removeQueueItem(urlKey, itemId) {
 }
 
 // =============================================================================
+// Feature Toggle AJAX (Settings Page)
+// =============================================================================
+
+/**
+ * Initialize AJAX-based feature toggle saves on the settings page.
+ * Intercepts form submissions, POSTs via fetch, and updates UI inline
+ * without a full page reload. Falls back to standard form POST on error.
+ */
+function initFeatureToggles() {
+  const toggleBtns = document.querySelectorAll('.settings-section .toggle-btn')
+  if (!toggleBtns.length) return // Not on settings page
+
+  document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.settings-section .toggle-btn')
+    if (!btn) return
+
+    e.preventDefault()
+    const form = btn.closest('form')
+    if (!form) return
+
+    // Prevent rapid double-clicks from causing race conditions
+    if (btn.disabled) return
+    btn.disabled = true
+
+    try {
+      const res = await fetch(form.action, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: new URLSearchParams(new FormData(form))
+      })
+
+      // Auth errors — redirect to re-authenticate
+      if (res.status === 401 || res.status === 403) {
+        window.location.href = '/logout'
+        return
+      }
+
+      // Validation or server error — fall back to form POST for error display
+      if (!res.ok) {
+        form.submit()
+        return
+      }
+
+      // Server returns JSON for AJAX requests: { ok, feature, enabled }
+      const data = await res.json()
+      if (!data.ok) {
+        form.submit()
+        return
+      }
+
+      // Toggle visual state inline
+      const stateSpan = btn.querySelector('.toggle-state')
+      const featureLine = btn.closest('.feature-toggle')
+      const hiddenEnabled = form.querySelector('input[name="enabled"]')
+
+      if (hiddenEnabled.value === 'true') {
+        // Was off, now on
+        btn.classList.remove('toggle-off')
+        btn.classList.add('toggle-on')
+        if (stateSpan) stateSpan.textContent = '● on'
+        hiddenEnabled.value = 'false' // Next click will turn off
+      } else {
+        // Was on, now off
+        btn.classList.remove('toggle-on')
+        btn.classList.add('toggle-off')
+        if (stateSpan) stateSpan.textContent = '○ off'
+        hiddenEnabled.value = 'true' // Next click will turn on
+      }
+
+      // Show inline ✓ feedback
+      if (featureLine) {
+        let feedback = featureLine.querySelector('.save-feedback')
+        if (!feedback) {
+          feedback = document.createElement('span')
+          feedback.className = 'save-feedback'
+          featureLine.appendChild(feedback)
+          feedback.textContent = '✓'
+        }
+        // Force a DOM reflow between removing and re-adding the class so
+        // the CSS opacity transition restarts even on rapid successive saves
+        feedback.classList.remove('visible')
+        void feedback.offsetWidth
+        feedback.classList.add('visible')
+        setTimeout(() => feedback.classList.remove('visible'), 1500)
+      }
+    } catch (err) {
+      // Network error — fall back to standard form submission
+      console.warn('Feature toggle AJAX failed, falling back to form POST:', err)
+      form.submit()
+    } finally {
+      btn.disabled = false
+    }
+  })
+}
+
+// =============================================================================
 // Token Management (Settings Page)
 // =============================================================================
 
@@ -1964,6 +2063,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initMorePrompts()
   initRecommendations()
   initQueuePanel()
+  initFeatureToggles()
   initTokenManagement()
   initFreeTierStatus()
 })
