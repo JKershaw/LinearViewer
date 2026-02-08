@@ -1337,7 +1337,14 @@ function initFeatureToggles() {
       }
 
       // Validation or server error — fall back to form POST for error display
-      if (!res.ok && !res.redirected) {
+      if (!res.ok) {
+        form.submit()
+        return
+      }
+
+      // Server returns JSON for AJAX requests: { ok, feature, enabled }
+      const data = await res.json()
+      if (!data.ok) {
         form.submit()
         return
       }
@@ -1370,7 +1377,8 @@ function initFeatureToggles() {
           feedback.textContent = '✓'
           featureLine.appendChild(feedback)
         }
-        // Trigger reflow then show
+        // Force a DOM reflow between removing and re-adding the class so
+        // the CSS opacity transition restarts even on rapid successive saves
         feedback.classList.remove('visible')
         void feedback.offsetWidth
         feedback.classList.add('visible')

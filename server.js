@@ -705,7 +705,12 @@ app.post('/workspace/:urlKey/settings/features', workspaceFromUrl, async (req, r
     }
   }
 
-  res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
+  // AJAX requests get JSON; regular form submissions get redirect
+  if (req.headers['x-requested-with'] === 'XMLHttpRequest') {
+    res.json({ ok: true, feature, enabled: isEnabled });
+  } else {
+    res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
+  }
 });
 
 // =============================================================================
