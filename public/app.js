@@ -1320,6 +1320,10 @@ function initFeatureToggles() {
     const form = btn.closest('form')
     if (!form) return
 
+    // Prevent rapid double-clicks from causing race conditions
+    if (btn.disabled) return
+    btn.disabled = true
+
     try {
       const res = await fetch(form.action, {
         method: 'POST',
@@ -1374,8 +1378,8 @@ function initFeatureToggles() {
         if (!feedback) {
           feedback = document.createElement('span')
           feedback.className = 'save-feedback'
-          feedback.textContent = '✓'
           featureLine.appendChild(feedback)
+          feedback.textContent = '✓'
         }
         // Force a DOM reflow between removing and re-adding the class so
         // the CSS opacity transition restarts even on rapid successive saves
@@ -1384,9 +1388,12 @@ function initFeatureToggles() {
         feedback.classList.add('visible')
         setTimeout(() => feedback.classList.remove('visible'), 1500)
       }
-    } catch {
+    } catch (err) {
       // Network error — fall back to standard form submission
+      console.warn('Feature toggle AJAX failed, falling back to form POST:', err)
       form.submit()
+    } finally {
+      btn.disabled = false
     }
   })
 }
