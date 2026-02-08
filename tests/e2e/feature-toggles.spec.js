@@ -12,15 +12,15 @@ test.describe('Feature Toggle Settings', () => {
     await page.goto('/test/set-session');
   });
 
-  test('settings page shows Features section with all toggles', async ({ page }) => {
+  test('settings page shows AI and Workflow sections with all toggles', async ({ page }) => {
     await page.goto(SETTINGS_URL);
     await page.waitForLoadState('networkidle');
 
-    // Features section header should be visible
-    const featuresHeader = page.locator('.settings-header:has-text("Features")');
-    await expect(featuresHeader).toBeVisible();
+    // AI and Workflow section headers should be visible
+    await expect(page.locator('.settings-header:has-text("AI")')).toBeVisible();
+    await expect(page.locator('.settings-header:has-text("Workflow")')).toBeVisible();
 
-    // All 5 feature toggle labels should be present
+    // All 5 feature toggle labels should be present (split across sections)
     await expect(page.locator('.feature-toggle-label:has-text("Linear MCP in prompts")')).toBeVisible();
     await expect(page.locator('.feature-toggle-label:has-text("Feature branch workflow")')).toBeVisible();
     await expect(page.locator('.feature-toggle-label:has-text("Dispatch queue")')).toBeVisible();
@@ -33,11 +33,11 @@ test.describe('Feature Toggle Settings', () => {
     await page.waitForLoadState('networkidle');
 
     // Defaults: linearMcp ON, featureBranches OFF, dispatch OFF, aiRecommendations ON, promptButtons ON
-    await expect(page.locator('[data-feature="linearMcp"] .toggle-state')).toHaveText('on');
-    await expect(page.locator('[data-feature="featureBranches"] .toggle-state')).toHaveText('off');
-    await expect(page.locator('[data-feature="dispatch"] .toggle-state')).toHaveText('off');
-    await expect(page.locator('[data-feature="aiRecommendations"] .toggle-state')).toHaveText('on');
-    await expect(page.locator('[data-feature="promptButtons"] .toggle-state')).toHaveText('on');
+    await expect(page.locator('[data-feature="linearMcp"] .toggle-state')).toHaveText('● on');
+    await expect(page.locator('[data-feature="featureBranches"] .toggle-state')).toHaveText('○ off');
+    await expect(page.locator('[data-feature="dispatch"] .toggle-state')).toHaveText('○ off');
+    await expect(page.locator('[data-feature="aiRecommendations"] .toggle-state')).toHaveText('● on');
+    await expect(page.locator('[data-feature="promptButtons"] .toggle-state')).toHaveText('● on');
   });
 
   test('shows recommendation note on Linear MCP toggle', async ({ page }) => {
@@ -54,21 +54,18 @@ test.describe('Feature Toggle Settings', () => {
     await page.waitForLoadState('networkidle');
 
     // linearMcp should start ON
-    await expect(page.locator('[data-feature="linearMcp"] .toggle-state')).toHaveText('on');
+    await expect(page.locator('[data-feature="linearMcp"] .toggle-state')).toHaveText('● on');
 
-    // Click the toggle button to turn it off
+    // Click the toggle button to turn it off (AJAX — no page reload)
     await page.locator('[data-feature="linearMcp"] .toggle-btn').click();
 
-    // Should redirect back to settings — wait for page load
-    await page.waitForLoadState('networkidle');
-
-    // Should now be OFF
-    await expect(page.locator('[data-feature="linearMcp"] .toggle-state')).toHaveText('off');
+    // Should update inline via AJAX
+    await expect(page.locator('[data-feature="linearMcp"] .toggle-state')).toHaveText('○ off');
 
     // Reload page — state should persist (stored in session)
     await page.reload();
     await page.waitForLoadState('networkidle');
-    await expect(page.locator('[data-feature="linearMcp"] .toggle-state')).toHaveText('off');
+    await expect(page.locator('[data-feature="linearMcp"] .toggle-state')).toHaveText('○ off');
   });
 
   test('can toggle a feature on', async ({ page }) => {
@@ -76,30 +73,28 @@ test.describe('Feature Toggle Settings', () => {
     await page.waitForLoadState('networkidle');
 
     // dispatch should start OFF
-    await expect(page.locator('[data-feature="dispatch"] .toggle-state')).toHaveText('off');
+    await expect(page.locator('[data-feature="dispatch"] .toggle-state')).toHaveText('○ off');
 
-    // Click to turn it on
+    // Click to turn it on (AJAX — no page reload)
     await page.locator('[data-feature="dispatch"] .toggle-btn').click();
-    await page.waitForLoadState('networkidle');
 
-    // Should now be ON
-    await expect(page.locator('[data-feature="dispatch"] .toggle-state')).toHaveText('on');
+    // Should update inline via AJAX
+    await expect(page.locator('[data-feature="dispatch"] .toggle-state')).toHaveText('● on');
   });
 
   test('toggling one feature does not affect others', async ({ page }) => {
     await page.goto(SETTINGS_URL);
     await page.waitForLoadState('networkidle');
 
-    // Turn off linearMcp
+    // Turn off linearMcp (AJAX — no page reload)
     await page.locator('[data-feature="linearMcp"] .toggle-btn').click();
-    await page.waitForLoadState('networkidle');
 
     // linearMcp should be off, but others unchanged
-    await expect(page.locator('[data-feature="linearMcp"] .toggle-state')).toHaveText('off');
-    await expect(page.locator('[data-feature="featureBranches"] .toggle-state')).toHaveText('off');
-    await expect(page.locator('[data-feature="dispatch"] .toggle-state')).toHaveText('off');
-    await expect(page.locator('[data-feature="aiRecommendations"] .toggle-state')).toHaveText('on');
-    await expect(page.locator('[data-feature="promptButtons"] .toggle-state')).toHaveText('on');
+    await expect(page.locator('[data-feature="linearMcp"] .toggle-state')).toHaveText('○ off');
+    await expect(page.locator('[data-feature="featureBranches"] .toggle-state')).toHaveText('○ off');
+    await expect(page.locator('[data-feature="dispatch"] .toggle-state')).toHaveText('○ off');
+    await expect(page.locator('[data-feature="aiRecommendations"] .toggle-state')).toHaveText('● on');
+    await expect(page.locator('[data-feature="promptButtons"] .toggle-state')).toHaveText('● on');
   });
 
   // =========================================================================

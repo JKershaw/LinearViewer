@@ -1300,6 +1300,80 @@ async function removeQueueItem(urlKey, itemId) {
 }
 
 // =============================================================================
+// Feature Toggle AJAX (Settings Page)
+// =============================================================================
+
+/**
+ * Initialize AJAX-based feature toggle saves on the settings page.
+ * Intercepts form submissions, POSTs via fetch, and updates UI inline
+ * without a full page reload. Falls back to standard form POST on error.
+ */
+function initFeatureToggles() {
+  const toggleBtns = document.querySelectorAll('.settings-section .toggle-btn')
+  if (!toggleBtns.length) return // Not on settings page
+
+  document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.settings-section .toggle-btn')
+    if (!btn) return
+
+    e.preventDefault()
+    const form = btn.closest('form')
+    if (!form) return
+
+    try {
+      const res = await fetch(form.action, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams(new FormData(form))
+      })
+
+      if (!res.ok && !res.redirected) {
+        form.submit()
+        return
+      }
+
+      // Toggle visual state inline
+      const stateSpan = btn.querySelector('.toggle-state')
+      const featureLine = btn.closest('.feature-toggle')
+      const hiddenEnabled = form.querySelector('input[name="enabled"]')
+
+      if (hiddenEnabled.value === 'true') {
+        // Was off, now on
+        btn.classList.remove('toggle-off')
+        btn.classList.add('toggle-on')
+        if (stateSpan) stateSpan.textContent = '● on'
+        hiddenEnabled.value = 'false' // Next click will turn off
+      } else {
+        // Was on, now off
+        btn.classList.remove('toggle-on')
+        btn.classList.add('toggle-off')
+        if (stateSpan) stateSpan.textContent = '○ off'
+        hiddenEnabled.value = 'true' // Next click will turn on
+      }
+
+      // Show inline ✓ feedback
+      if (featureLine) {
+        let feedback = featureLine.querySelector('.save-feedback')
+        if (!feedback) {
+          feedback = document.createElement('span')
+          feedback.className = 'save-feedback'
+          feedback.textContent = '✓'
+          featureLine.appendChild(feedback)
+        }
+        // Trigger reflow then show
+        feedback.classList.remove('visible')
+        void feedback.offsetWidth
+        feedback.classList.add('visible')
+        setTimeout(() => feedback.classList.remove('visible'), 1500)
+      }
+    } catch {
+      // Network error — fall back to standard form submission
+      form.submit()
+    }
+  })
+}
+
+// =============================================================================
 // Token Management (Settings Page)
 // =============================================================================
 
@@ -1964,6 +2038,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initMorePrompts()
   initRecommendations()
   initQueuePanel()
+  initFeatureToggles()
   initTokenManagement()
   initFreeTierStatus()
 })

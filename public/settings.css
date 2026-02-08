@@ -2,7 +2,8 @@
  * Settings Page Styles
  *
  * Styles for the standalone /settings page.
- * Maintains CLI aesthetic consistent with the rest of the app.
+ * Uses the same tree/node visual language as the dashboard (from style.css).
+ * Settings-specific overrides for labels, toggles, and forms below.
  */
 
 /* =============================================================================
@@ -23,11 +24,16 @@
   margin: 0 0 0.75rem 0;
 }
 
-.settings-item {
+/* =============================================================================
+   Settings Nodes (tree items)
+   ============================================================================= */
+
+/* Override .line within settings tree for appropriate spacing */
+.settings-section .line {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.35rem 0;
+  padding: 0.4rem 0;
   font-family: var(--font-content);
   font-size: 0.9em;
 }
@@ -35,6 +41,7 @@
 .settings-label {
   color: var(--fg-dim);
   min-width: 10ch;
+  flex-shrink: 0;
 }
 
 .settings-value {
@@ -59,12 +66,6 @@
 
 .settings-value.error {
   color: var(--red);
-}
-
-.model-error {
-  margin-top: 0.25rem;
-  padding-top: 0.25rem;
-  border-top: 1px solid var(--red);
 }
 
 .settings-form {
@@ -149,6 +150,11 @@
   border-color: var(--blue);
 }
 
+.model-or {
+  color: var(--fg-dim);
+  font-size: 0.85em;
+}
+
 .model-input {
   font-family: var(--font-content);
   font-size: 0.9em;
@@ -157,7 +163,7 @@
   border-radius: 3px;
   background: var(--bg);
   color: var(--fg);
-  min-width: 22ch;
+  min-width: 16ch;
 }
 
 .model-input:focus {
@@ -167,12 +173,6 @@
 
 .model-input::placeholder {
   color: var(--fg-dim);
-}
-
-.model-current {
-  margin-top: 0.25rem;
-  padding-top: 0.25rem;
-  border-top: 1px solid var(--fg-vdim);
 }
 
 .model-id {
@@ -200,12 +200,6 @@
 /* =============================================================================
    Token Management
    ============================================================================= */
-.settings-description {
-  color: var(--fg-dim);
-  font-size: 0.85em;
-  margin-bottom: 0.75rem;
-}
-
 .token-label-input {
   font-family: var(--font-content);
   font-size: 0.9em;
@@ -403,16 +397,22 @@
 .toggle-btn {
   font-family: var(--font-structural);
   font-size: 0.85rem;
-  padding: 0.15rem 0.5rem;
-  border: 1px solid var(--fg-dim);
-  border-radius: 2px;
+  min-width: 5ch;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--fg-vdim);
+  border-radius: 3px;
   cursor: pointer;
   background: var(--bg);
   color: var(--fg);
+  text-align: center;
 }
 
 .toggle-btn:hover {
-  background: var(--fg-vdim);
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.toggle-btn.toggle-on {
+  border-color: var(--green);
 }
 
 .toggle-btn.toggle-on .toggle-state {
@@ -426,14 +426,32 @@
 .feature-note {
   font-size: 0.8rem;
   color: var(--yellow);
-  margin-left: 0.5rem;
+  margin-left: 0.25rem;
+}
+
+.feature-desc {
+  color: var(--fg-dim);
+  font-size: 0.85em;
+  font-family: var(--font-content);
+}
+
+/* Inline save feedback */
+.save-feedback {
+  font-size: 0.85em;
+  color: var(--green);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.save-feedback.visible {
+  opacity: 1;
 }
 
 /* =============================================================================
    Responsive
    ============================================================================= */
 @media (max-width: 640px) {
-  .settings-item {
+  .settings-section .line {
     flex-wrap: wrap;
   }
 
@@ -446,6 +464,10 @@
   .model-input,
   .token-label-input {
     min-width: 100%;
+  }
+
+  .feature-desc {
+    width: 100%;
   }
 
   .token-item {
