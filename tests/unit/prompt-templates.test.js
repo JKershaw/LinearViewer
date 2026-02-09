@@ -446,18 +446,19 @@ describe('plan template', () => {
     assert.ok(result.prompt.includes('Design profile UI'));
   });
 
-  test('includes explicit planning phase before coding', () => {
+  test('includes planning content without implementation phase', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Phase 1: Planning'));
-    assert.ok(result.prompt.includes('required before coding'));
     assert.ok(result.prompt.includes('Files to modify or create'));
+    assert.ok(result.prompt.includes('Testing approach'));
+    assert.ok(!result.prompt.includes('Phase 2: Implementation'), 'Should not include implementation phase');
+    assert.ok(!result.prompt.includes('Implement changes incrementally'), 'Should not include implementation instructions');
   });
 
-  test('includes scope control guidance', () => {
+  test('includes scope assessment section', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Scope Control'));
-    assert.ok(result.prompt.includes('Only implement what is explicitly requested'));
-    assert.ok(result.prompt.includes('Avoid over-engineering'));
+    assert.ok(result.prompt.includes('Scope Assessment'));
+    assert.ok(result.prompt.includes('Appropriately sized'));
+    assert.ok(result.prompt.includes('Needs breakdown'));
   });
 
   test('includes subtask summary when subtasks present', () => {
@@ -467,10 +468,10 @@ describe('plan template', () => {
     assert.ok(result.prompt.includes('Next: TEST-C1'));
   });
 
-  test('includes success criteria section', () => {
+  test('uses planning role, not implementation role', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('## Success Criteria'));
-    assert.ok(result.prompt.includes('Tests cover'));
+    assert.ok(result.prompt.includes('technical planner'));
+    assert.ok(!result.prompt.includes('implementation engineer'));
   });
 
   test('includes if blocked section', () => {

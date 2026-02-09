@@ -306,7 +306,7 @@ test.describe('Prompt API', () => {
     const body = await response.json();
     expect(body.label).toBe('plan');
     expect(body.promptName).toBe('plan');
-    expect(body.prompt).toContain('# Implement TEST-');
+    expect(body.prompt).toContain('# Plan TEST-');
     expect(body.prompt).toContain('## Goal');
   });
 

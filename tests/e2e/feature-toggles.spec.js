@@ -302,41 +302,18 @@ test.describe('Feature Toggle Settings', () => {
     expect(data.prompt).not.toContain('PR Review');
   });
 
-  test('plan prompt includes self-review when codeReview is on', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ codeReview: true }))}`);
+  test('plan prompt does NOT get code review sections (plan is not implementation)', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ codeReview: true, codeReviewCicd: true, codeReviewPr: true }))}`);
 
     const response = await page.request.get(
       `/workspace/${TEST_WORKSPACE_URL_KEY}/api/prompt/${TEST_ISSUE_ID}/plan`
     );
     expect(response.ok()).toBeTruthy();
     const data = await response.json();
-    // Self-review defaults to on
-    expect(data.prompt).toContain('Self-Review');
-    expect(data.prompt).toContain('Verify correctness against task requirements');
-  });
-
-  test('plan prompt includes CI/CD check when codeReviewCicd is on', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ codeReview: true, codeReviewCicd: true }))}`);
-
-    const response = await page.request.get(
-      `/workspace/${TEST_WORKSPACE_URL_KEY}/api/prompt/${TEST_ISSUE_ID}/plan`
-    );
-    expect(response.ok()).toBeTruthy();
-    const data = await response.json();
-    expect(data.prompt).toContain('CI/CD Check');
-    expect(data.prompt).toContain('Check CI/CD pipeline status');
-  });
-
-  test('plan prompt includes PR review when codeReviewPr is on', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ codeReview: true, codeReviewPr: true }))}`);
-
-    const response = await page.request.get(
-      `/workspace/${TEST_WORKSPACE_URL_KEY}/api/prompt/${TEST_ISSUE_ID}/plan`
-    );
-    expect(response.ok()).toBeTruthy();
-    const data = await response.json();
-    expect(data.prompt).toContain('PR Review');
-    expect(data.prompt).toContain('Check for review comments');
+    // Plan is a pure planning step — code review sections only apply to implementation
+    expect(data.prompt).not.toContain('Self-Review');
+    expect(data.prompt).not.toContain('CI/CD Check');
+    expect(data.prompt).not.toContain('PR Review');
   });
 
   test('implementation prompt also gets code review sections', async ({ page }) => {
