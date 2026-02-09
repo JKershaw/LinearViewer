@@ -1026,6 +1026,10 @@ function initPrompts() {
     const prompt = promptText.dataset.rawPrompt || promptText.textContent
     const promptName = promptNameEl?.textContent || 'Prompt'
 
+    // Read target from button's data-target attribute (defaults to 'cli')
+    const target = dispatchBtn.dataset.target || 'cli'
+    const originalLabel = dispatchBtn.textContent
+
     // Get issue ID and workspace URL key
     const issueId = promptContainer.dataset.promptFor ||
       promptContainer.closest('[data-recommend-for]')?.dataset.recommendFor
@@ -1035,7 +1039,7 @@ function initPrompts() {
     if (!urlKey) {
       console.error('No workspace URL key found for dispatch')
       dispatchBtn.textContent = 'failed'
-      setTimeout(() => { dispatchBtn.textContent = 'dispatch' }, 1500)
+      setTimeout(() => { dispatchBtn.textContent = originalLabel }, 1500)
       return
     }
 
@@ -1053,7 +1057,8 @@ function initPrompts() {
           prompt,
           promptName,
           issueId: issueId || null,
-          issueTitle
+          issueTitle,
+          target
         })
       })
 
@@ -1069,14 +1074,14 @@ function initPrompts() {
       updateQueueBadge(urlKey)
 
       setTimeout(() => {
-        dispatchBtn.textContent = 'dispatch'
+        dispatchBtn.textContent = originalLabel
         dispatchBtn.classList.remove('dispatched')
       }, 1500)
     } catch (error) {
       console.error('Failed to dispatch:', error)
       dispatchBtn.textContent = 'failed'
       setTimeout(() => {
-        dispatchBtn.textContent = 'dispatch'
+        dispatchBtn.textContent = originalLabel
       }, 1500)
     }
   })
@@ -1243,7 +1248,9 @@ function renderQueueItems(panel, items, urlKey) {
   container.innerHTML = items.map(item => {
     const time = new Date(item.dispatchedAt).toLocaleString()
     const title = item.issueTitle || item.promptName || 'Prompt'
-    const meta = item.issueIdentifier ? `${item.issueIdentifier} · ${time}` : time
+    const target = item.target || 'cli'
+    const metaParts = [item.issueIdentifier, target, time].filter(Boolean)
+    const meta = metaParts.join(' \u00b7 ')
 
     return `
       <div class="queue-item" data-item-id="${escapeHtml(item.id)}">

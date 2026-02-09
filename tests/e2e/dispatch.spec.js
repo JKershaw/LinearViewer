@@ -39,7 +39,7 @@ test.describe('Dispatch Queue', () => {
     await page.waitForLoadState('networkidle');
   });
 
-  test('dispatch button appears in prompt container', async ({ page }) => {
+  test('two dispatch buttons appear in prompt container with correct targets', async ({ page }) => {
     // Find and expand a task with prompts
     const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
@@ -61,10 +61,17 @@ test.describe('Dispatch Queue', () => {
     // Wait for prompt to load
     await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
 
-    // Verify dispatch button exists
-    const dispatchBtn = promptContainer.locator('.prompt-dispatch');
-    await expect(dispatchBtn).toBeVisible();
-    await expect(dispatchBtn).toHaveText('dispatch');
+    // Verify two dispatch buttons exist with correct data-target attributes
+    const dispatchBtns = promptContainer.locator('.prompt-dispatch');
+    await expect(dispatchBtns).toHaveCount(2);
+
+    const cliBtn = promptContainer.locator('.prompt-dispatch[data-target="cli"]');
+    await expect(cliBtn).toBeVisible();
+    await expect(cliBtn).toHaveText('dispatch');
+
+    const webBtn = promptContainer.locator('.prompt-dispatch[data-target="web"]');
+    await expect(webBtn).toBeVisible();
+    await expect(webBtn).toContainText('web');
   });
 
   test('clicking dispatch adds item to queue and shows feedback', async ({ page }) => {
@@ -87,7 +94,7 @@ test.describe('Dispatch Queue', () => {
     await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
 
     // Click dispatch button
-    const dispatchBtn = promptContainer.locator('.prompt-dispatch');
+    const dispatchBtn = promptContainer.locator('.prompt-dispatch[data-target="cli"]');
     await dispatchBtn.click();
 
     // Should show "dispatched!" feedback
@@ -119,7 +126,7 @@ test.describe('Dispatch Queue', () => {
     const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
     await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
 
-    const dispatchBtn = promptContainer.locator('.prompt-dispatch');
+    const dispatchBtn = promptContainer.locator('.prompt-dispatch[data-target="cli"]');
     await dispatchBtn.click();
 
     // Wait for dispatch to complete
@@ -147,7 +154,7 @@ test.describe('Dispatch Queue', () => {
     const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
     await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
 
-    const dispatchBtn = promptContainer.locator('.prompt-dispatch');
+    const dispatchBtn = promptContainer.locator('.prompt-dispatch[data-target="cli"]');
     await dispatchBtn.click();
     await expect(dispatchBtn).toHaveText('dispatched!');
 
@@ -182,7 +189,7 @@ test.describe('Dispatch Queue', () => {
     const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
     await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
 
-    const dispatchBtn = promptContainer.locator('.prompt-dispatch');
+    const dispatchBtn = promptContainer.locator('.prompt-dispatch[data-target="cli"]');
     await dispatchBtn.click();
     await expect(dispatchBtn).toHaveText('dispatched!');
 
@@ -225,7 +232,7 @@ test.describe('Dispatch Queue', () => {
     const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
     await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
 
-    await promptContainer.locator('.prompt-dispatch').click();
+    await promptContainer.locator('.prompt-dispatch[data-target="cli"]').click();
 
     // Open panel (wait for async badge update)
     const badge = page.locator('[data-queue-badge]');
@@ -265,7 +272,7 @@ test.describe('Dispatch Queue', () => {
     const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
     await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
 
-    const dispatchBtn = promptContainer.locator('.prompt-dispatch');
+    const dispatchBtn = promptContainer.locator('.prompt-dispatch[data-target="cli"]');
     await dispatchBtn.click();
     await expect(dispatchBtn).toHaveText('dispatched!');
 
@@ -359,6 +366,67 @@ test.describe('Dispatch API', () => {
     expect(listData.items.length).toBe(0);
   });
 
+  test('POST /api/dispatch with target=web stores target correctly', async ({ request }) => {
+    await request.get('/test/set-session');
+
+    const response = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: {
+        prompt: 'Web prompt content',
+        promptName: 'Web Prompt',
+        target: 'web'
+      }
+    });
+
+    expect(response.status()).toBe(201);
+
+    const data = await response.json();
+    expect(data.success).toBe(true);
+    expect(data.item.target).toBe('web');
+
+    // Verify via list endpoint
+    const listResponse = await request.get(`${API_PREFIX}/api/dispatch`);
+    const listData = await listResponse.json();
+    expect(listData.items[0].target).toBe('web');
+  });
+
+  test('POST /api/dispatch without target defaults to cli', async ({ request }) => {
+    await request.get('/test/set-session');
+
+    const response = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: {
+        prompt: 'Default target prompt',
+        promptName: 'Default'
+      }
+    });
+
+    expect(response.status()).toBe(201);
+
+    const data = await response.json();
+    expect(data.item.target).toBe('cli');
+
+    // Verify via list endpoint
+    const listResponse = await request.get(`${API_PREFIX}/api/dispatch`);
+    const listData = await listResponse.json();
+    expect(listData.items[0].target).toBe('cli');
+  });
+
+  test('POST /api/dispatch with invalid target returns 400', async ({ request }) => {
+    await request.get('/test/set-session');
+
+    const response = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: {
+        prompt: 'Invalid target prompt',
+        promptName: 'Bad',
+        target: 'invalid'
+      }
+    });
+
+    expect(response.status()).toBe(400);
+
+    const data = await response.json();
+    expect(data.error).toContain('target must be one of');
+  });
+
   test('GET /api/dispatch/count returns count', async ({ request }) => {
     await request.get('/test/set-session');
 
@@ -440,6 +508,33 @@ test.describe('Consumer API', () => {
     });
     const pollData = await pollResponse.json();
     expect(pollData.items.length).toBe(0);
+  });
+
+  test('poll returns target field for items', async ({ request }) => {
+    // Create a token
+    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const { token } = await tokenResponse.json();
+
+    // Add items with different targets
+    await request.get('/test/set-session');
+    await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: { prompt: 'CLI prompt', promptName: 'CLI', target: 'cli' }
+    });
+    await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: { prompt: 'Web prompt', promptName: 'Web', target: 'web' }
+    });
+
+    // Poll with token - should see both items with targets
+    const pollResponse = await request.get('/api/dispatch/poll', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    expect(pollResponse.status()).toBe(200);
+
+    const data = await pollResponse.json();
+    expect(data.items.length).toBe(2);
+
+    const targets = data.items.map(item => item.target).sort();
+    expect(targets).toEqual(['cli', 'web']);
   });
 
   test('take returns 404 for non-existent item', async ({ request }) => {

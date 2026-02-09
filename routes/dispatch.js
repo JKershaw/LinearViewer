@@ -113,11 +113,17 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const { workspace } = req;
 
     try {
-      const { prompt, promptName, issueId, issueIdentifier, issueTitle, issueUrl } = req.body;
+      const { prompt, promptName, issueId, issueIdentifier, issueTitle, issueUrl, target } = req.body;
 
       // Validate required fields
       if (!prompt || typeof prompt !== 'string') {
         return res.status(400).json({ error: 'prompt is required and must be a string' });
+      }
+
+      // Validate target if provided (must be 'cli' or 'web')
+      const VALID_TARGETS = ['cli', 'web'];
+      if (target !== undefined && !VALID_TARGETS.includes(target)) {
+        return res.status(400).json({ error: `target must be one of: ${VALID_TARGETS.join(', ')}` });
       }
 
       // Validate input lengths to prevent database bloat
@@ -161,7 +167,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         issueIdentifier: issueIdentifier || null,
         issueTitle: issueTitle || null,
         issueUrl: issueUrl || null,
-        dispatchedBy: req.session.linearUserId || null
+        dispatchedBy: req.session.linearUserId || null,
+        target: target || 'cli'
       });
 
       res.status(201).json({
@@ -170,6 +177,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
           id: item._id,
           promptName: item.promptName,
           issueIdentifier: item.issueIdentifier,
+          target: item.target,
           dispatchedAt: item.dispatchedAt
         }
       });
