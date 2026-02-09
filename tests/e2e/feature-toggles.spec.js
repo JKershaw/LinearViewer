@@ -320,6 +320,22 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('.code-review-options')).toBeHidden();
   });
 
+  test('codeReview sub-toggles round-trip: on then off in single session', async ({ page }) => {
+    await page.goto(SETTINGS_URL);
+    await page.waitForLoadState('networkidle');
+
+    // Start off
+    await expect(page.locator('.code-review-options')).toBeHidden();
+
+    // Toggle on
+    await page.locator('[data-feature="codeReview"] .toggle-btn').click();
+    await expect(page.locator('.code-review-options')).toBeVisible();
+
+    // Toggle off again without reload
+    await page.locator('[data-feature="codeReview"] .toggle-btn').click();
+    await expect(page.locator('.code-review-options')).toBeHidden();
+  });
+
   test('prompts exclude code review sections by default', async ({ page }) => {
     // Default: codeReview is OFF
     const response = await page.request.get(
