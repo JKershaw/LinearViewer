@@ -290,6 +290,52 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('[data-feature="codeReviewPr"] .toggle-state')).toHaveText('○ off');
   });
 
+  test('clicking codeReview toggle dynamically shows sub-toggles via AJAX', async ({ page }) => {
+    await page.goto(SETTINGS_URL);
+    await page.waitForLoadState('networkidle');
+
+    // Sub-toggles should start hidden (codeReview defaults to off)
+    await expect(page.locator('.code-review-options')).toBeHidden();
+
+    // Click the codeReview toggle to turn it on
+    await page.locator('[data-feature="codeReview"] .toggle-btn').click();
+
+    // Sub-toggles should appear without page reload
+    await expect(page.locator('.code-review-options')).toBeVisible();
+  });
+
+  test('clicking codeReview toggle dynamically hides sub-toggles via AJAX', async ({ page }) => {
+    // Start with codeReview ON
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ codeReview: true }))}`);
+    await page.goto(SETTINGS_URL);
+    await page.waitForLoadState('networkidle');
+
+    // Sub-toggles should start visible
+    await expect(page.locator('.code-review-options')).toBeVisible();
+
+    // Click the codeReview toggle to turn it off
+    await page.locator('[data-feature="codeReview"] .toggle-btn').click();
+
+    // Sub-toggles should hide without page reload
+    await expect(page.locator('.code-review-options')).toBeHidden();
+  });
+
+  test('codeReview sub-toggles round-trip: on then off in single session', async ({ page }) => {
+    await page.goto(SETTINGS_URL);
+    await page.waitForLoadState('networkidle');
+
+    // Start off
+    await expect(page.locator('.code-review-options')).toBeHidden();
+
+    // Toggle on
+    await page.locator('[data-feature="codeReview"] .toggle-btn').click();
+    await expect(page.locator('.code-review-options')).toBeVisible();
+
+    // Toggle off again without reload
+    await page.locator('[data-feature="codeReview"] .toggle-btn').click();
+    await expect(page.locator('.code-review-options')).toBeHidden();
+  });
+
   test('prompts exclude code review sections by default', async ({ page }) => {
     // Default: codeReview is OFF
     const response = await page.request.get(
