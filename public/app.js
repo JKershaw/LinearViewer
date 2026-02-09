@@ -1393,10 +1393,8 @@ function initFeatureToggles() {
       const nodeDiv = featureLine.closest('.node')
       if (nodeDiv) {
         const childrenDiv = nodeDiv.querySelector('.children.code-review-options')
-        if (childrenDiv) {
-        if (childrenDiv && nodeDiv.dataset.feature === 'codeReview') {
+        if (childrenDiv && featureLine.dataset.feature === 'codeReview') {
           childrenDiv.hidden = hiddenEnabled.value === 'true'
-        }
         }
       }
     } catch (err) {
