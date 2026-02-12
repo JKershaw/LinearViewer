@@ -593,10 +593,11 @@ describe('look-into template', () => {
     assert.ok(!result.prompt.includes('status to "In Progress"'), 'look-into should not change status');
   });
 
-  test('includes read-only workflow instructions', () => {
+  test('includes inform-only workflow instructions (no Linear updates)', () => {
     const result = generatePrompt('look-into', mockIssue, mockContext);
     assert.ok(result.prompt.includes('Fetch details'), 'should include fetch step');
-    assert.ok(result.prompt.includes('Add findings as a comment'), 'should include comment step');
+    assert.ok(result.prompt.includes('Present your findings to the user'), 'should present findings to user');
+    assert.ok(!result.prompt.includes('Add findings as a comment'), 'should NOT write back to Linear');
   });
 });
 
