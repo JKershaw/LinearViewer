@@ -220,69 +220,6 @@ h1 {
   color: var(--fg);
 }
 
-.queue-panel-input {
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--fg-vdim);
-}
-
-.queue-custom-prompt {
-  width: 100%;
-  box-sizing: border-box;
-  font-family: var(--font-structural);
-  font-size: 0.85em;
-  padding: 0.5rem;
-  border: 1px solid var(--fg-vdim);
-  border-radius: 3px;
-  background: var(--bg);
-  color: var(--fg);
-  resize: vertical;
-  min-height: 3em;
-}
-
-.queue-custom-prompt:focus {
-  outline: none;
-  border-color: var(--blue, #4EA7FC);
-}
-
-.queue-custom-actions {
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-}
-
-.queue-recents-label {
-  font-size: 0.8em;
-  color: var(--fg-dim);
-  margin-top: 0.5rem;
-}
-
-.queue-recents-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-  margin-top: 0.25rem;
-}
-
-.queue-recent-item {
-  background: none;
-  border: 1px solid var(--fg-vdim);
-  border-radius: 3px;
-  padding: 0.15rem 0.4rem;
-  font-family: var(--font-content);
-  font-size: 0.75em;
-  color: var(--fg-dim);
-  cursor: pointer;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.queue-recent-item:hover {
-  border-color: var(--blue, #4EA7FC);
-  color: var(--blue, #4EA7FC);
-}
-
 .queue-panel-items {
   max-height: calc(70vh - 170px);
   overflow-y: auto;
@@ -1355,8 +1292,7 @@ h1 {
 }
 
 /* Dispatch button - similar to copy but with accent color */
-.prompt-dispatch,
-.queue-custom-dispatch {
+.prompt-dispatch {
   background: none;
   border: 1px solid var(--blue, #4EA7FC);
   padding: 0.25rem 0.5rem;
@@ -1367,14 +1303,12 @@ h1 {
   border-radius: 3px;
 }
 
-.prompt-dispatch:hover,
-.queue-custom-dispatch:hover {
+.prompt-dispatch:hover {
   background: var(--blue, #4EA7FC);
   color: white;
 }
 
-.prompt-dispatch.dispatched,
-.queue-custom-dispatch.dispatched {
+.prompt-dispatch.dispatched {
   border-color: var(--green, #4cb782);
   color: var(--green, #4cb782);
 }
