@@ -1302,8 +1302,16 @@ async function renderRecentPrompts(container, urlKey) {
 
 /**
  * Dispatch a custom prompt and update UI feedback
+ * @param {Object} opts
+ * @param {string} opts.urlKey - Workspace URL key
+ * @param {string} opts.prompt - Prompt text
+ * @param {string} opts.target - Dispatch target ('cli' or 'web')
+ * @param {HTMLElement} opts.btn - The button that triggered dispatch
+ * @param {HTMLTextAreaElement} [opts.textarea] - Textarea to clear on success
+ * @param {HTMLElement} [opts.feedbackEl] - Element for feedback messages
+ * @param {HTMLElement} [opts.recentsContainer] - Container for recent prompts
  */
-async function dispatchCustomPrompt(urlKey, prompt, target, btn, textarea, feedbackEl, recentsContainer) {
+async function dispatchCustomPrompt({ urlKey, prompt, target, btn, textarea, feedbackEl, recentsContainer }) {
   const originalText = btn.textContent
   btn.textContent = 'sending...'
   btn.disabled = true
@@ -1371,50 +1379,57 @@ async function dispatchCustomPrompt(urlKey, prompt, target, btn, textarea, feedb
 }
 
 /**
- * Initialize dispatch prompt on settings page
+ * Initialize dispatch prompt on settings page.
+ * Uses a single delegated click handler on the dispatch section container
+ * to avoid leaking document-level listeners on repeated calls.
  */
 function initDispatchPrompt() {
   const textarea = document.querySelector('.dispatch-prompt-input')
   if (!textarea) return // Not on settings page or dispatch not enabled
 
+  // Guard against duplicate initialization
+  if (textarea.dataset.initialized) return
+  textarea.dataset.initialized = 'true'
+
   const urlKey = textarea.dataset.urlKey
-  const recentsContainer = document.querySelector('.dispatch-recents-container')
-  const feedbackEl = document.querySelector('.dispatch-prompt-feedback')
+  const section = textarea.closest('.settings-section')
+  const recentsContainer = section.querySelector('.dispatch-recents-container')
+  const feedbackEl = section.querySelector('.dispatch-prompt-feedback')
 
   // Load recent prompts
   renderRecentPrompts(recentsContainer, urlKey)
 
-  // Handle dispatch button clicks
-  document.addEventListener('click', async (e) => {
+  // Single delegated handler on the dispatch section
+  section.addEventListener('click', async (e) => {
+    // Handle dispatch button clicks
     const btn = e.target.closest('.dispatch-prompt-send')
-    if (!btn) return
+    if (btn) {
+      e.preventDefault()
+      const prompt = textarea.value.trim()
 
-    e.preventDefault()
-    const prompt = textarea.value.trim()
-
-    if (!prompt) {
-      if (feedbackEl) {
-        feedbackEl.textContent = 'prompt is empty'
-        feedbackEl.className = 'dispatch-prompt-feedback error'
-        setTimeout(() => { feedbackEl.textContent = '' }, 1500)
+      if (!prompt) {
+        if (feedbackEl) {
+          feedbackEl.textContent = 'prompt is empty'
+          feedbackEl.className = 'dispatch-prompt-feedback error'
+          setTimeout(() => { feedbackEl.textContent = '' }, 1500)
+        }
+        return
       }
+
+      const target = btn.dataset.target || 'cli'
+      await dispatchCustomPrompt({ urlKey, prompt, target, btn, textarea, feedbackEl, recentsContainer })
       return
     }
 
-    const target = btn.dataset.target || 'cli'
-    await dispatchCustomPrompt(urlKey, prompt, target, btn, textarea, feedbackEl, recentsContainer)
-  })
-
-  // Handle recent prompt clicks
-  document.addEventListener('click', (e) => {
+    // Handle recent prompt clicks
     const item = e.target.closest('.dispatch-recents-container .queue-recent-item')
-    if (!item) return
-
-    e.preventDefault()
-    const prompt = item.dataset.prompt
-    if (prompt && textarea) {
-      textarea.value = prompt
-      textarea.focus()
+    if (item) {
+      e.preventDefault()
+      const prompt = item.dataset.prompt
+      if (prompt) {
+        textarea.value = prompt
+        textarea.focus()
+      }
     }
   })
 }
