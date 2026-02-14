@@ -1326,6 +1326,10 @@ async function renderRecentPrompts(panel, urlKey) {
 
   try {
     const res = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/recent-prompts`)
+    if (res.status === 401) {
+      window.location.href = '/logout'
+      return
+    }
     if (!res.ok) return
 
     const { prompts } = await res.json()
@@ -1367,6 +1371,10 @@ async function dispatchCustomPrompt(urlKey, prompt, target, btn) {
       })
     })
 
+    if (response.status === 401) {
+      window.location.href = '/logout'
+      return
+    }
     if (!response.ok) throw new Error('Failed to dispatch')
 
     btn.textContent = 'dispatched!'
@@ -1405,10 +1413,12 @@ async function dispatchCustomPrompt(urlKey, prompt, target, btn) {
     btn.textContent = 'failed'
   }
 
-  // Reset button text after delay
+  // Reset button text after delay (check if still in DOM in case panel was closed)
   setTimeout(() => {
-    btn.textContent = originalText
-    btn.disabled = false
+    if (btn.isConnected) {
+      btn.textContent = originalText
+      btn.disabled = false
+    }
   }, 1500)
 }
 

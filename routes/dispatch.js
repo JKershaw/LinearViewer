@@ -233,7 +233,10 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
    */
   router.get('/workspace/:urlKey/api/dispatch/recent-prompts', workspaceFromUrl, async (req, res) => {
     const linearUserId = req.session.linearUserId;
-    if (!linearUserId || !userPreferencesStore) {
+    if (!linearUserId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    if (!userPreferencesStore) {
       return res.json({ prompts: [] });
     }
 
@@ -254,11 +257,15 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
    */
   router.post('/workspace/:urlKey/api/dispatch/recent-prompts', workspaceFromUrl, async (req, res) => {
     const linearUserId = req.session.linearUserId;
-    if (!linearUserId || !userPreferencesStore) {
-      return res.json({ success: false });
+    if (!linearUserId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    if (!userPreferencesStore) {
+      return res.status(503).json({ error: 'Service unavailable' });
     }
 
-    const { prompt } = req.body;
+    const { prompt: rawPrompt } = req.body;
+    const prompt = typeof rawPrompt === 'string' ? rawPrompt.trim() : rawPrompt;
     if (!prompt || typeof prompt !== 'string') {
       return res.status(400).json({ error: 'prompt is required and must be a string' });
     }
