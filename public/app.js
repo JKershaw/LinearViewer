@@ -1185,50 +1185,6 @@ function initQueuePanel() {
     await removeQueueItem(urlKey, itemId)
   })
 
-  // Handle custom dispatch button clicks
-  document.addEventListener('click', async (e) => {
-    const btn = e.target.closest('.queue-custom-dispatch')
-    if (!btn) return
-
-    e.preventDefault()
-    e.stopPropagation()
-
-    const panel = document.querySelector('.queue-panel')
-    if (!panel) return
-
-    const urlKey = panel.dataset.urlKey
-    const textarea = panel.querySelector('.queue-custom-prompt')
-    const prompt = textarea?.value?.trim()
-
-    if (!prompt) {
-      const originalText = btn.textContent
-      btn.textContent = 'empty'
-      setTimeout(() => { btn.textContent = originalText }, 1500)
-      return
-    }
-
-    const target = btn.dataset.target || 'cli'
-    await dispatchCustomPrompt(urlKey, prompt, target, btn)
-  })
-
-  // Handle recent prompt item clicks
-  document.addEventListener('click', (e) => {
-    const item = e.target.closest('.queue-recent-item')
-    if (!item) return
-
-    e.preventDefault()
-    e.stopPropagation()
-
-    const prompt = item.dataset.prompt
-    if (!prompt) return
-
-    const textarea = document.querySelector('.queue-custom-prompt')
-    if (textarea) {
-      textarea.value = prompt
-      textarea.focus()
-    }
-  })
-
   // Close on escape key
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
@@ -1258,33 +1214,26 @@ async function showQueuePanel(urlKey) {
       <span>Dispatch Queue</span>
       <button class="queue-panel-close" aria-label="Close">×</button>
     </div>
-    <div class="queue-panel-input">
-      <textarea class="queue-custom-prompt" placeholder="Type a custom prompt or /command..." rows="3"></textarea>
-      <div class="queue-custom-actions">
-        <button class="queue-custom-dispatch" data-target="cli">dispatch</button>
-        <button class="queue-custom-dispatch" data-target="web">dispatch &rarr; web</button>
-      </div>
-      <div class="queue-custom-recents"></div>
-    </div>
     <div class="queue-panel-items">
       <div class="queue-panel-empty">Loading...</div>
     </div>
   `
   document.body.appendChild(panel)
 
-  // Load items and recent prompts in parallel
-  const itemsPromise = fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch`)
-    .then(r => r.ok ? r.json() : Promise.reject(new Error('Failed to load queue')))
-    .then(({ items }) => renderQueueItems(panel, items, urlKey))
-    .catch(e => {
-      console.error('Failed to load queue items:', e)
-      panel.querySelector('.queue-panel-items').innerHTML =
-        '<div class="queue-panel-empty">Failed to load queue</div>'
-    })
-
-  const recentsPromise = renderRecentPrompts(panel, urlKey)
-
-  await Promise.all([itemsPromise, recentsPromise])
+  // Load items
+  try {
+    const r = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch`)
+    if (r.ok) {
+      const { items } = await r.json()
+      renderQueueItems(panel, items, urlKey)
+    } else {
+      throw new Error('Failed to load queue')
+    }
+  } catch (e) {
+    console.error('Failed to load queue items:', e)
+    panel.querySelector('.queue-panel-items').innerHTML =
+      '<div class="queue-panel-empty">Failed to load queue</div>'
+  }
 }
 
 /**
@@ -1318,10 +1267,9 @@ function renderQueueItems(panel, items, urlKey) {
 }
 
 /**
- * Render recent custom prompts in the queue panel
+ * Render recent custom prompts into a container element
  */
-async function renderRecentPrompts(panel, urlKey) {
-  const container = panel.querySelector('.queue-custom-recents')
+async function renderRecentPrompts(container, urlKey) {
   if (!container) return
 
   try {
@@ -1353,9 +1301,9 @@ async function renderRecentPrompts(panel, urlKey) {
 }
 
 /**
- * Dispatch a custom prompt from the queue panel
+ * Dispatch a custom prompt and update UI feedback
  */
-async function dispatchCustomPrompt(urlKey, prompt, target, btn) {
+async function dispatchCustomPrompt(urlKey, prompt, target, btn, textarea, feedbackEl, recentsContainer) {
   const originalText = btn.textContent
   btn.textContent = 'sending...'
   btn.disabled = true
@@ -1378,32 +1326,28 @@ async function dispatchCustomPrompt(urlKey, prompt, target, btn) {
     if (!response.ok) throw new Error('Failed to dispatch')
 
     btn.textContent = 'dispatched!'
+    if (feedbackEl) {
+      feedbackEl.textContent = ''
+      feedbackEl.className = 'dispatch-prompt-feedback'
+    }
 
-    // Save to recent prompts (best-effort, don't block on it)
-    fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/recent-prompts`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt })
-    }).catch(() => {})
+    // Save to recent prompts, then refresh recents list
+    try {
+      await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/recent-prompts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt })
+      })
+    } catch (e) {
+      // Best-effort: don't fail the dispatch on save error
+    }
 
     // Clear textarea
-    const panel = document.querySelector('.queue-panel')
-    if (panel) {
-      const textarea = panel.querySelector('.queue-custom-prompt')
-      if (textarea) textarea.value = ''
+    if (textarea) textarea.value = ''
 
-      // Refresh queue items and recents
-      try {
-        const listRes = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch`)
-        if (listRes.ok) {
-          const { items } = await listRes.json()
-          renderQueueItems(panel, items, urlKey)
-        }
-      } catch (e) {
-        // Non-fatal
-      }
-
-      renderRecentPrompts(panel, urlKey)
+    // Refresh recents
+    if (recentsContainer) {
+      renderRecentPrompts(recentsContainer, urlKey)
     }
 
     // Update badge
@@ -1411,6 +1355,10 @@ async function dispatchCustomPrompt(urlKey, prompt, target, btn) {
   } catch (e) {
     console.error('Failed to dispatch custom prompt:', e)
     btn.textContent = 'failed'
+    if (feedbackEl) {
+      feedbackEl.textContent = 'dispatch failed'
+      feedbackEl.className = 'dispatch-prompt-feedback error'
+    }
   }
 
   // Reset button text after delay (check if still in DOM in case panel was closed)
@@ -1420,6 +1368,55 @@ async function dispatchCustomPrompt(urlKey, prompt, target, btn) {
       btn.disabled = false
     }
   }, 1500)
+}
+
+/**
+ * Initialize dispatch prompt on settings page
+ */
+function initDispatchPrompt() {
+  const textarea = document.querySelector('.dispatch-prompt-input')
+  if (!textarea) return // Not on settings page or dispatch not enabled
+
+  const urlKey = textarea.dataset.urlKey
+  const recentsContainer = document.querySelector('.dispatch-recents-container')
+  const feedbackEl = document.querySelector('.dispatch-prompt-feedback')
+
+  // Load recent prompts
+  renderRecentPrompts(recentsContainer, urlKey)
+
+  // Handle dispatch button clicks
+  document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.dispatch-prompt-send')
+    if (!btn) return
+
+    e.preventDefault()
+    const prompt = textarea.value.trim()
+
+    if (!prompt) {
+      if (feedbackEl) {
+        feedbackEl.textContent = 'prompt is empty'
+        feedbackEl.className = 'dispatch-prompt-feedback error'
+        setTimeout(() => { feedbackEl.textContent = '' }, 1500)
+      }
+      return
+    }
+
+    const target = btn.dataset.target || 'cli'
+    await dispatchCustomPrompt(urlKey, prompt, target, btn, textarea, feedbackEl, recentsContainer)
+  })
+
+  // Handle recent prompt clicks
+  document.addEventListener('click', (e) => {
+    const item = e.target.closest('.dispatch-recents-container .queue-recent-item')
+    if (!item) return
+
+    e.preventDefault()
+    const prompt = item.dataset.prompt
+    if (prompt && textarea) {
+      textarea.value = prompt
+      textarea.focus()
+    }
+  })
 }
 
 /**
@@ -2349,6 +2346,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initQueuePanel()
   initFeatureToggles()
   initTokenManagement()
+  initDispatchPrompt()
   initDispatchHistory()
   initFreeTierStatus()
 })

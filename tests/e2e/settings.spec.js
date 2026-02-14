@@ -41,8 +41,8 @@ test.describe('Token Management', () => {
     await page.waitForLoadState('networkidle')
   })
 
-  test('shows Dispatch Tokens section', async ({ page }) => {
-    await expect(page.locator('.settings-header:has-text("Dispatch Tokens")')).toBeVisible()
+  test('shows Dispatch section', async ({ page }) => {
+    await expect(page.locator('.settings-header:text-is("Dispatch")')).toBeVisible()
   })
 
   test('shows token create form', async ({ page }) => {

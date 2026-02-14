@@ -610,6 +610,8 @@ test.describe('Token Management API', () => {
 });
 
 test.describe('Custom Prompt Dispatch', () => {
+  const SETTINGS_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/settings`;
+
   test.beforeEach(async ({ page }) => {
     // Clear state before each test
     await page.goto('/test/clear-dispatch-queue');
@@ -621,72 +623,42 @@ test.describe('Custom Prompt Dispatch', () => {
   });
 
   /**
-   * Helper: seed a dispatch item via page's API context so the queue badge
-   * becomes visible, then navigate to workspace and open the queue panel.
-   * Uses page.request to share session cookies with the browser context.
+   * Helper: navigate to the settings page where custom prompt input lives.
    */
-  async function openQueuePanel(page) {
-    // Navigate first so the session is established
-    await page.goto(WORKSPACE_URL);
+  async function openSettingsPage(page) {
+    await page.goto(SETTINGS_URL);
     await page.waitForLoadState('networkidle');
-
-    // Seed an item via page's request context (shares session cookies)
-    await page.request.post(`${API_PREFIX}/api/dispatch`, {
-      data: { prompt: 'Seed item', promptName: 'Seed' }
-    });
-
-    // Trigger badge update
-    await page.evaluate(async () => {
-      const badge = document.querySelector('[data-queue-badge]');
-      if (badge) {
-        const urlKey = badge.dataset.urlKey;
-        const res = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/count`);
-        const { count } = await res.json();
-        const countEl = badge.querySelector('.queue-count');
-        if (countEl) countEl.textContent = count;
-        badge.classList.toggle('hidden', count === 0);
-      }
-    });
-
-    // Wait for badge to appear and click it
-    const badge = page.locator('[data-queue-badge]');
-    await expect(badge).not.toHaveClass(/hidden/, { timeout: 10000 });
-    await badge.click();
-
-    const panel = page.locator('.queue-panel');
-    await expect(panel).toBeVisible();
-    return panel;
   }
 
-  test('custom prompt input visible in queue panel', async ({ page }) => {
-    const panel = await openQueuePanel(page);
+  test('custom prompt input visible on settings page', async ({ page }) => {
+    await openSettingsPage(page);
 
     // Verify textarea exists
-    const textarea = panel.locator('.queue-custom-prompt');
+    const textarea = page.locator('.dispatch-prompt-input');
     await expect(textarea).toBeVisible();
     await expect(textarea).toHaveAttribute('placeholder', 'Type a custom prompt or /command...');
 
     // Verify two dispatch buttons with correct targets
-    const buttons = panel.locator('.queue-custom-dispatch');
+    const buttons = page.locator('.dispatch-prompt-send');
     await expect(buttons).toHaveCount(2);
 
-    const cliBtn = panel.locator('.queue-custom-dispatch[data-target="cli"]');
+    const cliBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
     await expect(cliBtn).toBeVisible();
     await expect(cliBtn).toHaveText('dispatch');
 
-    const webBtn = panel.locator('.queue-custom-dispatch[data-target="web"]');
+    const webBtn = page.locator('.dispatch-prompt-send[data-target="web"]');
     await expect(webBtn).toBeVisible();
   });
 
   test('can dispatch custom freeform text', async ({ page }) => {
-    const panel = await openQueuePanel(page);
+    await openSettingsPage(page);
 
     // Type custom prompt
-    const textarea = panel.locator('.queue-custom-prompt');
+    const textarea = page.locator('.dispatch-prompt-input');
     await textarea.fill('Review the auth module for security issues');
 
     // Click dispatch (cli target)
-    const dispatchBtn = panel.locator('.queue-custom-dispatch[data-target="cli"]');
+    const dispatchBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
     await dispatchBtn.click();
 
     // Should show "dispatched!" feedback
@@ -705,13 +677,13 @@ test.describe('Custom Prompt Dispatch', () => {
   });
 
   test('can dispatch custom prompt with web target', async ({ page }) => {
-    const panel = await openQueuePanel(page);
+    await openSettingsPage(page);
 
     // Type and dispatch with web target
-    const textarea = panel.locator('.queue-custom-prompt');
+    const textarea = page.locator('.dispatch-prompt-input');
     await textarea.fill('Check deployment status');
 
-    const webBtn = panel.locator('.queue-custom-dispatch[data-target="web"]');
+    const webBtn = page.locator('.dispatch-prompt-send[data-target="web"]');
     await webBtn.click();
 
     // Should show feedback
@@ -726,32 +698,33 @@ test.describe('Custom Prompt Dispatch', () => {
   });
 
   test('empty input shows validation feedback', async ({ page }) => {
-    const panel = await openQueuePanel(page);
+    await openSettingsPage(page);
 
     // Click dispatch with empty textarea
-    const dispatchBtn = panel.locator('.queue-custom-dispatch[data-target="cli"]');
+    const dispatchBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
     await dispatchBtn.click();
 
-    // Should show "empty" feedback
-    await expect(dispatchBtn).toHaveText('empty');
+    // Should show "prompt is empty" feedback
+    const feedback = page.locator('.dispatch-prompt-feedback');
+    await expect(feedback).toHaveText('prompt is empty');
 
-    // Should revert to "dispatch"
-    await expect(dispatchBtn).toHaveText('dispatch', { timeout: 3000 });
+    // Feedback should clear after delay
+    await expect(feedback).toHaveText('', { timeout: 3000 });
 
-    // No new item should be in queue (only the seed item)
+    // No item should be in queue
     const listResponse = await page.request.get(`${API_PREFIX}/api/dispatch`);
     const { items } = await listResponse.json();
     expect(items.filter(i => i.promptName === 'Custom').length).toBe(0);
   });
 
   test('slash command dispatched as literal text', async ({ page }) => {
-    const panel = await openQueuePanel(page);
+    await openSettingsPage(page);
 
     // Type a slash command
-    const textarea = panel.locator('.queue-custom-prompt');
+    const textarea = page.locator('.dispatch-prompt-input');
     await textarea.fill('/plan');
 
-    const dispatchBtn = panel.locator('.queue-custom-dispatch[data-target="cli"]');
+    const dispatchBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
     await dispatchBtn.click();
 
     await expect(dispatchBtn).toHaveText('dispatched!');
@@ -765,42 +738,42 @@ test.describe('Custom Prompt Dispatch', () => {
   });
 
   test('recent custom prompts appear after dispatch', async ({ page }) => {
-    const panel = await openQueuePanel(page);
+    await openSettingsPage(page);
 
     // Dispatch a custom prompt
-    const textarea = panel.locator('.queue-custom-prompt');
+    const textarea = page.locator('.dispatch-prompt-input');
     await textarea.fill('First custom prompt');
-    const dispatchBtn = panel.locator('.queue-custom-dispatch[data-target="cli"]');
+    const dispatchBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
     await dispatchBtn.click();
     await expect(dispatchBtn).toHaveText('dispatched!');
 
     // Wait for recents to render (async update after dispatch)
-    const recentItem = panel.locator('.queue-recent-item');
+    const recentItem = page.locator('.dispatch-recents-container .queue-recent-item');
     await expect(recentItem.first()).toBeVisible({ timeout: 5000 });
     await expect(recentItem.first()).toContainText('First custom prompt');
   });
 
   test('clicking recent prompt fills textarea', async ({ page }) => {
-    // Navigate and set up session first
-    await page.goto(WORKSPACE_URL);
-    await page.waitForLoadState('networkidle');
+    // Navigate to settings page first to establish session
+    await openSettingsPage(page);
 
     // Populate recents via page's API context (shares session)
     await page.request.post(`${API_PREFIX}/api/dispatch/recent-prompts`, {
       data: { prompt: 'Reusable prompt text' }
     });
 
-    const panel = await openQueuePanel(page);
+    // Reload settings page to load recents
+    await openSettingsPage(page);
 
     // Wait for recent items to load
-    const recentItem = panel.locator('.queue-recent-item');
+    const recentItem = page.locator('.dispatch-recents-container .queue-recent-item');
     await expect(recentItem.first()).toBeVisible({ timeout: 5000 });
 
     // Click the recent prompt
     await recentItem.first().click();
 
     // Textarea should be filled
-    const textarea = panel.locator('.queue-custom-prompt');
+    const textarea = page.locator('.dispatch-prompt-input');
     await expect(textarea).toHaveValue('Reusable prompt text');
   });
 });

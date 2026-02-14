@@ -177,22 +177,22 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('[data-queue-badge]')).toHaveCount(1);
   });
 
-  test('dispatch tokens section hidden in settings when dispatch off', async ({ page }) => {
+  test('dispatch section hidden in settings when dispatch off', async ({ page }) => {
     await page.goto(SETTINGS_URL);
     await page.waitForLoadState('networkidle');
 
-    // Dispatch Tokens section should not be visible
-    await expect(page.locator('.settings-header:has-text("Dispatch Tokens")')).toHaveCount(0);
+    // Dispatch section should not be visible
+    await expect(page.locator('.settings-header:text-is("Dispatch")')).toHaveCount(0);
   });
 
-  test('dispatch tokens section visible in settings when dispatch on', async ({ page }) => {
+  test('dispatch section visible in settings when dispatch on', async ({ page }) => {
     await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
 
     await page.goto(SETTINGS_URL);
     await page.waitForLoadState('networkidle');
 
-    // Dispatch Tokens section should be visible
-    await expect(page.locator('.settings-header:has-text("Dispatch Tokens")')).toBeVisible();
+    // Dispatch section should be visible
+    await expect(page.locator('.settings-header:text-is("Dispatch")')).toBeVisible();
   });
 
   // =========================================================================
