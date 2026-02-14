@@ -610,7 +610,7 @@ test.describe('Token Management API', () => {
 });
 
 test.describe('Custom Prompt Dispatch', () => {
-  const SETTINGS_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/settings`;
+  const DISPATCH_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/dispatch`;
 
   test.beforeEach(async ({ page }) => {
     // Clear state before each test
@@ -623,15 +623,15 @@ test.describe('Custom Prompt Dispatch', () => {
   });
 
   /**
-   * Helper: navigate to the settings page where custom prompt input lives.
+   * Helper: navigate to the dispatch page where custom prompt input lives.
    */
-  async function openSettingsPage(page) {
-    await page.goto(SETTINGS_URL);
+  async function openDispatchPage(page) {
+    await page.goto(DISPATCH_URL);
     await page.waitForLoadState('networkidle');
   }
 
-  test('custom prompt input visible on settings page', async ({ page }) => {
-    await openSettingsPage(page);
+  test('custom prompt input visible on dispatch page', async ({ page }) => {
+    await openDispatchPage(page);
 
     // Verify textarea exists
     const textarea = page.locator('.dispatch-prompt-input');
@@ -651,7 +651,7 @@ test.describe('Custom Prompt Dispatch', () => {
   });
 
   test('can dispatch custom freeform text', async ({ page }) => {
-    await openSettingsPage(page);
+    await openDispatchPage(page);
 
     // Type custom prompt
     const textarea = page.locator('.dispatch-prompt-input');
@@ -677,7 +677,7 @@ test.describe('Custom Prompt Dispatch', () => {
   });
 
   test('can dispatch custom prompt with web target', async ({ page }) => {
-    await openSettingsPage(page);
+    await openDispatchPage(page);
 
     // Type and dispatch with web target
     const textarea = page.locator('.dispatch-prompt-input');
@@ -698,7 +698,7 @@ test.describe('Custom Prompt Dispatch', () => {
   });
 
   test('empty input shows validation feedback', async ({ page }) => {
-    await openSettingsPage(page);
+    await openDispatchPage(page);
 
     // Click dispatch with empty textarea
     const dispatchBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
@@ -718,7 +718,7 @@ test.describe('Custom Prompt Dispatch', () => {
   });
 
   test('slash command dispatched as literal text', async ({ page }) => {
-    await openSettingsPage(page);
+    await openDispatchPage(page);
 
     // Type a slash command
     const textarea = page.locator('.dispatch-prompt-input');
@@ -738,7 +738,7 @@ test.describe('Custom Prompt Dispatch', () => {
   });
 
   test('recent custom prompts appear after dispatch', async ({ page }) => {
-    await openSettingsPage(page);
+    await openDispatchPage(page);
 
     // Dispatch a custom prompt
     const textarea = page.locator('.dispatch-prompt-input');
@@ -754,16 +754,16 @@ test.describe('Custom Prompt Dispatch', () => {
   });
 
   test('clicking recent prompt fills textarea', async ({ page }) => {
-    // Navigate to settings page first to establish session
-    await openSettingsPage(page);
+    // Navigate to dispatch page first to establish session
+    await openDispatchPage(page);
 
     // Populate recents via page's API context (shares session)
     await page.request.post(`${API_PREFIX}/api/dispatch/recent-prompts`, {
       data: { prompt: 'Reusable prompt text' }
     });
 
-    // Reload settings page to load recents
-    await openSettingsPage(page);
+    // Reload dispatch page to load recents
+    await openDispatchPage(page);
 
     // Wait for recent items to load
     const recentItem = page.locator('.dispatch-recents-container .queue-recent-item');
@@ -989,8 +989,8 @@ test.describe('Dispatch History UI', () => {
     await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
   });
 
-  test('history section shows on settings page with dispatch enabled', async ({ page }) => {
-    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/settings`);
+  test('history section shows on dispatch page with dispatch enabled', async ({ page }) => {
+    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/dispatch`);
     await page.waitForLoadState('networkidle');
 
     const historyList = page.locator('.history-list');
@@ -1001,13 +1001,13 @@ test.describe('Dispatch History UI', () => {
     await expect(empty).toContainText('No dispatch history yet');
   });
 
-  test('history section hidden when dispatch disabled', async ({ page }) => {
+  test('dispatch page redirects to settings when dispatch disabled', async ({ page }) => {
     await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: false }))}`);
-    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/settings`);
+    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/dispatch`);
     await page.waitForLoadState('networkidle');
 
-    const historyList = page.locator('.history-list');
-    await expect(historyList).toHaveCount(0);
+    // Should redirect to settings page
+    expect(page.url()).toContain('/settings');
   });
 
   test('taken item shows with correct status indicator', async ({ page, request }) => {
@@ -1026,8 +1026,8 @@ test.describe('Dispatch History UI', () => {
       headers: { 'Authorization': `Bearer ${token}` }
     });
 
-    // Navigate to settings
-    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/settings`);
+    // Navigate to dispatch page
+    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/dispatch`);
     await page.waitForLoadState('networkidle');
 
     // History item should be visible
@@ -1047,7 +1047,7 @@ test.describe('Dispatch History UI', () => {
 
     await request.delete(`${API_PREFIX}/api/dispatch/${item.id}`);
 
-    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/settings`);
+    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/dispatch`);
     await page.waitForLoadState('networkidle');
 
     const historyItem = page.locator('.history-item[data-status="cancelled"]');
@@ -1068,7 +1068,7 @@ test.describe('Dispatch History UI', () => {
       await request.delete(`${API_PREFIX}/api/dispatch/${item.id}`);
     }
 
-    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/settings`);
+    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/dispatch`);
     await page.waitForLoadState('networkidle');
 
     // Should show 20 items initially

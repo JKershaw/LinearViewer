@@ -185,14 +185,14 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('.settings-header:text-is("Dispatch")')).toHaveCount(0);
   });
 
-  test('dispatch section visible in settings when dispatch on', async ({ page }) => {
+  test('dispatch link visible in footer when dispatch on', async ({ page }) => {
     await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
 
     await page.goto(SETTINGS_URL);
     await page.waitForLoadState('networkidle');
 
-    // Dispatch section should be visible
-    await expect(page.locator('.settings-header:text-is("Dispatch")')).toBeVisible();
+    // Dispatch link should appear in footer
+    await expect(page.locator('footer a[href*="/dispatch"]')).toBeVisible();
   });
 
   // =========================================================================

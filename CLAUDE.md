@@ -34,6 +34,7 @@ lib/
   render-audit.js      Operator dashboard page renderer
   render-settings.js   Settings page renderer
   render-prompts.js    Prompts catalog page renderer
+  render-dispatch.js   Dispatch page renderer (prompt, queue, tokens, history)
   feature-defaults.js  Feature toggle keys, defaults, and helpers
   user-preferences.js  Cross-device preference storage (MongoDB)
   session-store.js     MongoDB/MangoDB session store
@@ -54,7 +55,9 @@ public/
   style.css            Light theme, mobile-responsive
   audit.css            Operator dashboard styles
   settings.css         Settings page styles
+  dispatch.css         Dispatch page styles
   app.js               Client-side collapse/expand, localStorage persistence
+  dispatch.js          Dispatch page client-side logic (prompt, queue, tokens, history)
   audit.js             Operator dashboard client-side logic
   llms.txt             AI agent guidance (DOM selectors, navigation patterns)
 tests/e2e/
@@ -63,6 +66,7 @@ tests/e2e/
   interactions.spec.js Collapse/expand interaction tests
   openrouter-auth.spec.js  OpenRouter OAuth tests
   dispatch.spec.js     Dispatch queue and consumer API tests
+  dispatch-page.spec.js  Dispatch page UI tests
   free-tier.spec.js    Free tier rate limiting tests
   feature-toggles.spec.js  Feature toggle settings tests
 docs/

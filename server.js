@@ -35,6 +35,7 @@ import { renderAuditPage } from './lib/render-audit.js'
 import { renderPrivacyPolicy, renderTermsOfService } from './lib/render-legal.js'
 import { renderSettingsPage } from './lib/render-settings.js'
 import { renderPromptsPage } from './lib/render-prompts.js'
+import { renderDispatchPage } from './lib/render-dispatch.js'
 import { DEFAULT_MODEL, AVAILABLE_MODELS } from './lib/openrouter.js'
 import { getFeatureFlags, isValidFeatureKey } from './lib/feature-defaults.js'
 
@@ -600,6 +601,31 @@ app.get('/workspace/:urlKey/prompts', workspaceFromUrl, (req, res) => {
     openRouterSource,
     workspaces: req.session.workspaces,
     featureFlags: getFeatureFlags(req.session)
+  });
+  res.send(html);
+});
+
+/**
+ * Dispatch page - requires authentication and dispatch feature flag.
+ * Displays dispatch prompt, queue, tokens, and history.
+ */
+app.get('/workspace/:urlKey/dispatch', workspaceFromUrl, (req, res) => {
+  const workspace = req.workspace;
+  const deployInfo = getDeployInfo();
+  const openRouterSource = getOpenRouterSource(req);
+  const featureFlags = getFeatureFlags(req.session);
+
+  // Guard: dispatch feature must be enabled
+  if (featureFlags.dispatch !== true) {
+    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
+  }
+
+  const html = renderDispatchPage(workspace.name || 'Workspace', {
+    deployInfo,
+    urlKey: workspace.urlKey,
+    openRouterSource,
+    workspaces: req.session.workspaces,
+    featureFlags
   });
   res.send(html);
 });
