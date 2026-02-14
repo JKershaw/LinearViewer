@@ -13,9 +13,10 @@ import { isValidFeatureKey } from '../lib/feature-defaults.js';
  * @param {Object} options.dispatchQueueStore - Dispatch queue store
  * @param {Object} options.dispatchTokenStore - Dispatch token store
  * @param {Object} options.freeTierStore - Free tier usage store
+ * @param {Object} options.userPreferencesStore - User preferences store
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore }) {
   const router = Router();
 
   // Endpoint to set a test session without going through OAuth flow
@@ -71,6 +72,7 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
 
     req.session.workspaces = workspaces
     req.session.activeWorkspaceId = workspaces[0].id
+    req.session.linearUserId = 'test-linear-user-id'
 
     // Set or clear OpenRouter API key in session based on flag
     if (openRouterConnected) {
@@ -166,6 +168,20 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       res.status(500).json({ error: err.message })
     }
   })
+
+  // Endpoint to clear recent custom prompts for testing
+  router.get('/test/clear-recent-prompts', async (req, res) => {
+    try {
+      const prefs = await userPreferencesStore.getUserPreferences('test-linear-user-id');
+      await userPreferencesStore.saveUserPreferences('test-linear-user-id', {
+        ...prefs,
+        recentCustomPrompts: {}
+      });
+      res.send('ok');
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
 
   // Endpoint to add free tier usage for testing
   router.get('/test/add-free-tier-usage', async (req, res) => {

@@ -58,9 +58,10 @@ const DANGEROUS_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
  * @param {Object} options.dispatchQueueStore - Queue storage instance
  * @param {Object} options.dispatchTokenStore - Token storage instance
  * @param {Function} options.workspaceFromUrl - Middleware to validate workspace
+ * @param {Object} options.userPreferencesStore - User preferences store for recent prompts
  * @returns {Router} Express router with dispatch routes
  */
-export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl }) {
+export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore }) {
   const router = Router();
 
   // =========================================================================
@@ -216,6 +217,88 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     } catch (err) {
       console.error('Count dispatch items error:', err.message);
       res.status(500).json({ error: 'Failed to count dispatch items' });
+    }
+  });
+
+  // =========================================================================
+  // Recent Custom Prompts API (Session Auth)
+  // =========================================================================
+
+  const MAX_RECENT_PROMPTS = 10;
+  const MAX_CUSTOM_PROMPT_LENGTH = 10000;
+
+  /**
+   * GET /workspace/:urlKey/api/dispatch/recent-prompts
+   * Fetch recent custom prompts for the current user and workspace.
+   */
+  router.get('/workspace/:urlKey/api/dispatch/recent-prompts', workspaceFromUrl, async (req, res) => {
+    const linearUserId = req.session.linearUserId;
+    if (!linearUserId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    if (!userPreferencesStore) {
+      return res.json({ prompts: [] });
+    }
+
+    try {
+      const prefs = await userPreferencesStore.getUserPreferences(linearUserId);
+      const recentByWorkspace = prefs.recentCustomPrompts || {};
+      const prompts = recentByWorkspace[req.workspace.urlKey] || [];
+      res.json({ prompts });
+    } catch (err) {
+      console.error('Failed to fetch recent prompts:', err.message);
+      res.json({ prompts: [] });
+    }
+  });
+
+  /**
+   * POST /workspace/:urlKey/api/dispatch/recent-prompts
+   * Save a custom prompt to the recent list for the current user and workspace.
+   */
+  router.post('/workspace/:urlKey/api/dispatch/recent-prompts', workspaceFromUrl, async (req, res) => {
+    const linearUserId = req.session.linearUserId;
+    if (!linearUserId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    if (!userPreferencesStore) {
+      return res.status(503).json({ error: 'Service unavailable' });
+    }
+
+    const { prompt: rawPrompt } = req.body;
+    const prompt = typeof rawPrompt === 'string' ? rawPrompt.trim() : rawPrompt;
+    if (!prompt || typeof prompt !== 'string') {
+      return res.status(400).json({ error: 'prompt is required and must be a string' });
+    }
+    if (prompt.length > MAX_CUSTOM_PROMPT_LENGTH) {
+      return res.status(400).json({ error: `prompt exceeds maximum length of ${MAX_CUSTOM_PROMPT_LENGTH}` });
+    }
+    if (DANGEROUS_CHARS_REGEX.test(prompt)) {
+      return res.status(400).json({ error: 'prompt contains invalid characters' });
+    }
+
+    try {
+      const prefs = await userPreferencesStore.getUserPreferences(linearUserId);
+      const recentByWorkspace = prefs.recentCustomPrompts || {};
+      const urlKey = req.workspace.urlKey;
+      let list = recentByWorkspace[urlKey] || [];
+
+      // Deduplicate: remove existing match, prepend new
+      list = list.filter(p => p !== prompt);
+      list.unshift(prompt);
+      list = list.slice(0, MAX_RECENT_PROMPTS);
+
+      await userPreferencesStore.saveUserPreferences(linearUserId, {
+        ...prefs,
+        recentCustomPrompts: {
+          ...recentByWorkspace,
+          [urlKey]: list
+        }
+      });
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error('Failed to save recent prompt:', err.message);
+      res.status(500).json({ error: 'Failed to save recent prompt' });
     }
   });
 

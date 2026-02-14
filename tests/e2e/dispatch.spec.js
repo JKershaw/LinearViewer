@@ -608,3 +608,281 @@ test.describe('Token Management API', () => {
     expect(pollResponse.status()).toBe(401);
   });
 });
+
+test.describe('Custom Prompt Dispatch', () => {
+  test.beforeEach(async ({ page }) => {
+    // Clear state before each test
+    await page.goto('/test/clear-dispatch-queue');
+    await page.goto('/test/clear-dispatch-tokens');
+    await page.goto('/test/clear-recent-prompts');
+
+    // Set up test session with dispatch feature enabled
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+  });
+
+  /**
+   * Helper: seed a dispatch item via page's API context so the queue badge
+   * becomes visible, then navigate to workspace and open the queue panel.
+   * Uses page.request to share session cookies with the browser context.
+   */
+  async function openQueuePanel(page) {
+    // Navigate first so the session is established
+    await page.goto(WORKSPACE_URL);
+    await page.waitForLoadState('networkidle');
+
+    // Seed an item via page's request context (shares session cookies)
+    await page.request.post(`${API_PREFIX}/api/dispatch`, {
+      data: { prompt: 'Seed item', promptName: 'Seed' }
+    });
+
+    // Trigger badge update
+    await page.evaluate(async () => {
+      const badge = document.querySelector('[data-queue-badge]');
+      if (badge) {
+        const urlKey = badge.dataset.urlKey;
+        const res = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/count`);
+        const { count } = await res.json();
+        const countEl = badge.querySelector('.queue-count');
+        if (countEl) countEl.textContent = count;
+        badge.classList.toggle('hidden', count === 0);
+      }
+    });
+
+    // Wait for badge to appear and click it
+    const badge = page.locator('[data-queue-badge]');
+    await expect(badge).not.toHaveClass(/hidden/, { timeout: 10000 });
+    await badge.click();
+
+    const panel = page.locator('.queue-panel');
+    await expect(panel).toBeVisible();
+    return panel;
+  }
+
+  test('custom prompt input visible in queue panel', async ({ page }) => {
+    const panel = await openQueuePanel(page);
+
+    // Verify textarea exists
+    const textarea = panel.locator('.queue-custom-prompt');
+    await expect(textarea).toBeVisible();
+    await expect(textarea).toHaveAttribute('placeholder', 'Type a custom prompt or /command...');
+
+    // Verify two dispatch buttons with correct targets
+    const buttons = panel.locator('.queue-custom-dispatch');
+    await expect(buttons).toHaveCount(2);
+
+    const cliBtn = panel.locator('.queue-custom-dispatch[data-target="cli"]');
+    await expect(cliBtn).toBeVisible();
+    await expect(cliBtn).toHaveText('dispatch');
+
+    const webBtn = panel.locator('.queue-custom-dispatch[data-target="web"]');
+    await expect(webBtn).toBeVisible();
+  });
+
+  test('can dispatch custom freeform text', async ({ page }) => {
+    const panel = await openQueuePanel(page);
+
+    // Type custom prompt
+    const textarea = panel.locator('.queue-custom-prompt');
+    await textarea.fill('Review the auth module for security issues');
+
+    // Click dispatch (cli target)
+    const dispatchBtn = panel.locator('.queue-custom-dispatch[data-target="cli"]');
+    await dispatchBtn.click();
+
+    // Should show "dispatched!" feedback
+    await expect(dispatchBtn).toHaveText('dispatched!');
+
+    // Textarea should be cleared
+    await expect(textarea).toHaveValue('');
+
+    // Verify item appears in queue via API
+    const listResponse = await page.request.get(`${API_PREFIX}/api/dispatch`);
+    const { items } = await listResponse.json();
+    const customItem = items.find(i => i.promptName === 'Custom');
+    expect(customItem).toBeDefined();
+    expect(customItem.prompt).toBe('Review the auth module for security issues');
+    expect(customItem.target).toBe('cli');
+  });
+
+  test('can dispatch custom prompt with web target', async ({ page }) => {
+    const panel = await openQueuePanel(page);
+
+    // Type and dispatch with web target
+    const textarea = panel.locator('.queue-custom-prompt');
+    await textarea.fill('Check deployment status');
+
+    const webBtn = panel.locator('.queue-custom-dispatch[data-target="web"]');
+    await webBtn.click();
+
+    // Should show feedback
+    await expect(webBtn).toContainText('dispatched!');
+
+    // Verify target is "web" via API
+    const listResponse = await page.request.get(`${API_PREFIX}/api/dispatch`);
+    const { items } = await listResponse.json();
+    const customItem = items.find(i => i.prompt === 'Check deployment status');
+    expect(customItem).toBeDefined();
+    expect(customItem.target).toBe('web');
+  });
+
+  test('empty input shows validation feedback', async ({ page }) => {
+    const panel = await openQueuePanel(page);
+
+    // Click dispatch with empty textarea
+    const dispatchBtn = panel.locator('.queue-custom-dispatch[data-target="cli"]');
+    await dispatchBtn.click();
+
+    // Should show "empty" feedback
+    await expect(dispatchBtn).toHaveText('empty');
+
+    // Should revert to "dispatch"
+    await expect(dispatchBtn).toHaveText('dispatch', { timeout: 3000 });
+
+    // No new item should be in queue (only the seed item)
+    const listResponse = await page.request.get(`${API_PREFIX}/api/dispatch`);
+    const { items } = await listResponse.json();
+    expect(items.filter(i => i.promptName === 'Custom').length).toBe(0);
+  });
+
+  test('slash command dispatched as literal text', async ({ page }) => {
+    const panel = await openQueuePanel(page);
+
+    // Type a slash command
+    const textarea = panel.locator('.queue-custom-prompt');
+    await textarea.fill('/plan');
+
+    const dispatchBtn = panel.locator('.queue-custom-dispatch[data-target="cli"]');
+    await dispatchBtn.click();
+
+    await expect(dispatchBtn).toHaveText('dispatched!');
+
+    // Verify prompt is literally "/plan"
+    const listResponse = await page.request.get(`${API_PREFIX}/api/dispatch`);
+    const { items } = await listResponse.json();
+    const customItem = items.find(i => i.promptName === 'Custom');
+    expect(customItem).toBeDefined();
+    expect(customItem.prompt).toBe('/plan');
+  });
+
+  test('recent custom prompts appear after dispatch', async ({ page }) => {
+    const panel = await openQueuePanel(page);
+
+    // Dispatch a custom prompt
+    const textarea = panel.locator('.queue-custom-prompt');
+    await textarea.fill('First custom prompt');
+    const dispatchBtn = panel.locator('.queue-custom-dispatch[data-target="cli"]');
+    await dispatchBtn.click();
+    await expect(dispatchBtn).toHaveText('dispatched!');
+
+    // Wait for recents to render (async update after dispatch)
+    const recentItem = panel.locator('.queue-recent-item');
+    await expect(recentItem.first()).toBeVisible({ timeout: 5000 });
+    await expect(recentItem.first()).toContainText('First custom prompt');
+  });
+
+  test('clicking recent prompt fills textarea', async ({ page }) => {
+    // Navigate and set up session first
+    await page.goto(WORKSPACE_URL);
+    await page.waitForLoadState('networkidle');
+
+    // Populate recents via page's API context (shares session)
+    await page.request.post(`${API_PREFIX}/api/dispatch/recent-prompts`, {
+      data: { prompt: 'Reusable prompt text' }
+    });
+
+    const panel = await openQueuePanel(page);
+
+    // Wait for recent items to load
+    const recentItem = panel.locator('.queue-recent-item');
+    await expect(recentItem.first()).toBeVisible({ timeout: 5000 });
+
+    // Click the recent prompt
+    await recentItem.first().click();
+
+    // Textarea should be filled
+    const textarea = panel.locator('.queue-custom-prompt');
+    await expect(textarea).toHaveValue('Reusable prompt text');
+  });
+});
+
+test.describe('Recent Prompts API', () => {
+  test.beforeEach(async ({ request }) => {
+    await request.get('/test/clear-recent-prompts');
+    await request.get('/test/set-session');
+  });
+
+  test('GET recent-prompts returns empty array initially', async ({ request }) => {
+    await request.get('/test/set-session');
+    const response = await request.get(`${API_PREFIX}/api/dispatch/recent-prompts`);
+    expect(response.status()).toBe(200);
+    const data = await response.json();
+    expect(data.prompts).toEqual([]);
+  });
+
+  test('POST recent-prompts saves and GET retrieves', async ({ request }) => {
+    await request.get('/test/set-session');
+
+    const postResponse = await request.post(`${API_PREFIX}/api/dispatch/recent-prompts`, {
+      data: { prompt: 'Test recent prompt' }
+    });
+    expect(postResponse.status()).toBe(200);
+    const postData = await postResponse.json();
+    expect(postData.success).toBe(true);
+
+    const getResponse = await request.get(`${API_PREFIX}/api/dispatch/recent-prompts`);
+    const getData = await getResponse.json();
+    expect(getData.prompts).toEqual(['Test recent prompt']);
+  });
+
+  test('recent prompts are deduplicated and most-recent-first', async ({ request }) => {
+    await request.get('/test/set-session');
+
+    await request.post(`${API_PREFIX}/api/dispatch/recent-prompts`, {
+      data: { prompt: 'First' }
+    });
+    await request.post(`${API_PREFIX}/api/dispatch/recent-prompts`, {
+      data: { prompt: 'Second' }
+    });
+    await request.post(`${API_PREFIX}/api/dispatch/recent-prompts`, {
+      data: { prompt: 'First' } // Duplicate - should move to top
+    });
+
+    const response = await request.get(`${API_PREFIX}/api/dispatch/recent-prompts`);
+    const data = await response.json();
+    expect(data.prompts).toEqual(['First', 'Second']);
+  });
+
+  test('recent prompts limited to 10', async ({ request }) => {
+    await request.get('/test/set-session');
+
+    // Add 12 prompts
+    for (let i = 1; i <= 12; i++) {
+      await request.post(`${API_PREFIX}/api/dispatch/recent-prompts`, {
+        data: { prompt: `Prompt ${i}` }
+      });
+    }
+
+    const response = await request.get(`${API_PREFIX}/api/dispatch/recent-prompts`);
+    const data = await response.json();
+    expect(data.prompts.length).toBe(10);
+    // Most recent should be first
+    expect(data.prompts[0]).toBe('Prompt 12');
+    expect(data.prompts[9]).toBe('Prompt 3');
+  });
+
+  test('POST recent-prompts validates input', async ({ request }) => {
+    await request.get('/test/set-session');
+
+    // Empty prompt
+    const emptyResponse = await request.post(`${API_PREFIX}/api/dispatch/recent-prompts`, {
+      data: { prompt: '' }
+    });
+    expect(emptyResponse.status()).toBe(400);
+
+    // Missing prompt
+    const missingResponse = await request.post(`${API_PREFIX}/api/dispatch/recent-prompts`, {
+      data: {}
+    });
+    expect(missingResponse.status()).toBe(400);
+  });
+});
