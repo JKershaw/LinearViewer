@@ -34,15 +34,17 @@ test.describe('Settings Page', () => {
 })
 
 test.describe('Token Management', () => {
+  const DISPATCH_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/dispatch`
+
   test.beforeEach(async ({ page }) => {
     await page.goto('/test/clear-dispatch-tokens')
     await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`)
-    await page.goto(SETTINGS_URL)
+    await page.goto(DISPATCH_URL)
     await page.waitForLoadState('networkidle')
   })
 
-  test('shows Dispatch section', async ({ page }) => {
-    await expect(page.locator('.settings-header:text-is("Dispatch")')).toBeVisible()
+  test('shows Tokens section on dispatch page', async ({ page }) => {
+    await expect(page.locator('.dispatch-section-header:text-is("Tokens")')).toBeVisible()
   })
 
   test('shows token create form', async ({ page }) => {
@@ -155,18 +157,22 @@ test.describe('Token Management', () => {
     await page.click('#create-token-form button[type="submit"]')
     await page.click('.token-modal-close')
 
+    // Wait for token list to re-render after modal close
+    await expect(page.locator('.token-item')).toBeVisible()
     await expect(page.locator('.token-meta')).toContainText('never used')
   })
 })
 
 test.describe('Token API Integration', () => {
+  const DISPATCH_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/dispatch`
+
   test.beforeEach(async ({ page }) => {
     await page.goto('/test/clear-dispatch-tokens')
     await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`)
   })
 
   test('created token works with consumer API', async ({ page, request }) => {
-    await page.goto(SETTINGS_URL)
+    await page.goto(DISPATCH_URL)
     await page.waitForLoadState('networkidle')
 
     // Create token via UI
@@ -185,13 +191,16 @@ test.describe('Token API Integration', () => {
   })
 
   test('revoked token stops working', async ({ page, request }) => {
-    await page.goto(SETTINGS_URL)
+    await page.goto(DISPATCH_URL)
     await page.waitForLoadState('networkidle')
 
     // Create and capture token
     await page.click('#create-token-form button[type="submit"]')
     const tokenValue = await page.locator('.token-value').textContent()
     await page.click('.token-modal-close')
+
+    // Wait for token list to re-render after modal close
+    await expect(page.locator('.token-item')).toBeVisible()
 
     // Verify it works
     let response = await request.get('/api/dispatch/poll', {
