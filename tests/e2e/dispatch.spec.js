@@ -886,3 +886,234 @@ test.describe('Recent Prompts API', () => {
     expect(missingResponse.status()).toBe(400);
   });
 });
+
+test.describe('Dispatch History API', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/test/clear-dispatch-queue');
+    await page.goto('/test/clear-dispatch-tokens');
+    await page.goto('/test/clear-dispatch-history');
+    await page.goto('/test/set-session');
+  });
+
+  test('taken items appear in history', async ({ request }) => {
+    // Create token and session
+    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const { token } = await tokenResponse.json();
+    await request.get('/test/set-session');
+
+    // Dispatch an item
+    const createResponse = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: {
+        prompt: 'Test prompt',
+        promptName: 'Test',
+        issueIdentifier: 'LIN-42',
+        issueTitle: 'Test Issue'
+      }
+    });
+    const { item } = await createResponse.json();
+
+    // Take it via consumer API
+    await request.post(`/api/dispatch/take/${item.id}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    // Check history
+    const historyResponse = await request.get(`${API_PREFIX}/api/dispatch/history`);
+    expect(historyResponse.status()).toBe(200);
+
+    const historyData = await historyResponse.json();
+    expect(historyData.items.length).toBe(1);
+    expect(historyData.total).toBe(1);
+    expect(historyData.items[0].status).toBe('taken');
+    expect(historyData.items[0].promptName).toBe('Test');
+    expect(historyData.items[0].issueIdentifier).toBe('LIN-42');
+    expect(historyData.items[0].takenByTokenLabel).toBe('test-token');
+  });
+
+  test('cancelled items appear in history', async ({ request }) => {
+    await request.get('/test/set-session');
+
+    // Dispatch and then cancel
+    const createResponse = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: { prompt: 'To cancel', promptName: 'Cancel Me' }
+    });
+    const { item } = await createResponse.json();
+
+    await request.delete(`${API_PREFIX}/api/dispatch/${item.id}`);
+
+    // Check history
+    const historyResponse = await request.get(`${API_PREFIX}/api/dispatch/history`);
+    const historyData = await historyResponse.json();
+    expect(historyData.items.length).toBe(1);
+    expect(historyData.items[0].status).toBe('cancelled');
+    expect(historyData.items[0].promptName).toBe('Cancel Me');
+  });
+
+  test('history returns newest-first', async ({ request }) => {
+    await request.get('/test/set-session');
+
+    // Dispatch and cancel two items sequentially
+    const resp1 = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: { prompt: 'First', promptName: 'First' }
+    });
+    const item1 = (await resp1.json()).item;
+    await request.delete(`${API_PREFIX}/api/dispatch/${item1.id}`);
+
+    const resp2 = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: { prompt: 'Second', promptName: 'Second' }
+    });
+    const item2 = (await resp2.json()).item;
+    await request.delete(`${API_PREFIX}/api/dispatch/${item2.id}`);
+
+    // Check history order
+    const historyResponse = await request.get(`${API_PREFIX}/api/dispatch/history`);
+    const { items } = await historyResponse.json();
+    expect(items.length).toBe(2);
+    expect(items[0].promptName).toBe('Second');
+    expect(items[1].promptName).toBe('First');
+  });
+
+  test('history pagination works', async ({ request }) => {
+    await request.get('/test/set-session');
+
+    // Create 3 items and cancel them
+    for (let i = 1; i <= 3; i++) {
+      const resp = await request.post(`${API_PREFIX}/api/dispatch`, {
+        data: { prompt: `Prompt ${i}`, promptName: `Item ${i}` }
+      });
+      const { item } = await resp.json();
+      await request.delete(`${API_PREFIX}/api/dispatch/${item.id}`);
+    }
+
+    // Fetch with limit=2, offset=0
+    const page1 = await request.get(`${API_PREFIX}/api/dispatch/history?limit=2&offset=0`);
+    const data1 = await page1.json();
+    expect(data1.items.length).toBe(2);
+    expect(data1.total).toBe(3);
+
+    // Fetch with limit=2, offset=2
+    const page2 = await request.get(`${API_PREFIX}/api/dispatch/history?limit=2&offset=2`);
+    const data2 = await page2.json();
+    expect(data2.items.length).toBe(1);
+    expect(data2.total).toBe(3);
+  });
+
+  test('history endpoint returns empty when no history', async ({ request }) => {
+    await request.get('/test/set-session');
+
+    const response = await request.get(`${API_PREFIX}/api/dispatch/history`);
+    const data = await response.json();
+    expect(data.items).toEqual([]);
+    expect(data.total).toBe(0);
+  });
+});
+
+test.describe('Dispatch History UI', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/test/clear-dispatch-queue');
+    await page.goto('/test/clear-dispatch-tokens');
+    await page.goto('/test/clear-dispatch-history');
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+  });
+
+  test('history section shows on settings page with dispatch enabled', async ({ page }) => {
+    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/settings`);
+    await page.waitForLoadState('networkidle');
+
+    const historyList = page.locator('.history-list');
+    await expect(historyList).toBeVisible();
+
+    // Should show empty state
+    const empty = page.locator('.history-list-empty');
+    await expect(empty).toContainText('No dispatch history yet');
+  });
+
+  test('history section hidden when dispatch disabled', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: false }))}`);
+    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/settings`);
+    await page.waitForLoadState('networkidle');
+
+    const historyList = page.locator('.history-list');
+    await expect(historyList).toHaveCount(0);
+  });
+
+  test('taken item shows with correct status indicator', async ({ page, request }) => {
+    // Create token and dispatch+take an item
+    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const { token } = await tokenResponse.json();
+
+    await request.get(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+
+    const createResponse = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: { prompt: 'Taken prompt', promptName: 'Taken Test', issueIdentifier: 'LIN-99' }
+    });
+    const { item } = await createResponse.json();
+
+    await request.post(`/api/dispatch/take/${item.id}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    // Navigate to settings
+    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/settings`);
+    await page.waitForLoadState('networkidle');
+
+    // History item should be visible
+    const historyItem = page.locator('.history-item[data-status="taken"]');
+    await expect(historyItem).toBeVisible();
+    await expect(historyItem.locator('.history-status')).toHaveClass(/status-taken/);
+    await expect(historyItem.locator('.history-name')).toContainText('Taken Test');
+  });
+
+  test('cancelled item shows with correct status indicator', async ({ page, request }) => {
+    await request.get(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+
+    const createResponse = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: { prompt: 'Cancelled prompt', promptName: 'Cancel Test' }
+    });
+    const { item } = await createResponse.json();
+
+    await request.delete(`${API_PREFIX}/api/dispatch/${item.id}`);
+
+    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/settings`);
+    await page.waitForLoadState('networkidle');
+
+    const historyItem = page.locator('.history-item[data-status="cancelled"]');
+    await expect(historyItem).toBeVisible();
+    await expect(historyItem.locator('.history-status')).toHaveClass(/status-cancelled/);
+    await expect(historyItem.locator('.history-name')).toContainText('Cancel Test');
+  });
+
+  test('show more button loads additional items', async ({ page, request }) => {
+    await request.get(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+
+    // Create 25 history items (more than one page of 20)
+    for (let i = 1; i <= 25; i++) {
+      const resp = await request.post(`${API_PREFIX}/api/dispatch`, {
+        data: { prompt: `Prompt ${i}`, promptName: `Item ${i}` }
+      });
+      const { item } = await resp.json();
+      await request.delete(`${API_PREFIX}/api/dispatch/${item.id}`);
+    }
+
+    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/settings`);
+    await page.waitForLoadState('networkidle');
+
+    // Should show 20 items initially
+    const items = page.locator('.history-item');
+    await expect(items).toHaveCount(20);
+
+    // Show more button should be visible
+    const showMore = page.locator('.history-show-more');
+    await expect(showMore).toBeVisible();
+    await expect(showMore).toContainText('20/25');
+
+    // Click show more
+    await showMore.click();
+
+    // Should now show all 25 items
+    await expect(items).toHaveCount(25);
+
+    // Show more button should be gone
+    await expect(page.locator('.history-show-more')).toHaveCount(0);
+  });
+});

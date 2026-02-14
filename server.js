@@ -122,9 +122,11 @@ const userPreferencesStore = new UserPreferencesStore({
 // Dispatch queue collections
 const dispatchQueueCollection = db.collection('dispatch-queue')
 const dispatchTokensCollection = db.collection('dispatch-tokens')
+const dispatchHistoryCollection = db.collection('dispatch-history')
 
 const dispatchQueueStore = new DispatchQueueStore({
   collection: dispatchQueueCollection,
+  historyCollection: dispatchHistoryCollection,
   ttl: 24 * 60 * 60 // 24 hours
 })
 

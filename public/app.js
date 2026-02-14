@@ -1776,6 +1776,116 @@ function showTokenModal(token) {
   })
 }
 
+// =============================================================================
+// Dispatch History (Settings Page)
+// =============================================================================
+
+/**
+ * Initialize dispatch history functionality for settings page
+ */
+function initDispatchHistory() {
+  const historyEl = document.querySelector('.history-list')
+  if (!historyEl) return // Not on settings page or dispatch disabled
+
+  const urlKey = historyEl.dataset.urlKey
+  loadHistory(urlKey, 0)
+}
+
+/**
+ * Load and display dispatch history
+ */
+async function loadHistory(urlKey, offset) {
+  const historyEl = document.querySelector('.history-list')
+  if (!historyEl) return
+
+  try {
+    const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/history?limit=20&offset=${offset}`)
+    if (!response.ok) throw new Error('Failed to load history')
+
+    const { items, total } = await response.json()
+    renderHistoryList(historyEl, items, total, offset, urlKey)
+  } catch (e) {
+    console.error('Failed to load history:', e)
+    historyEl.innerHTML = '<div class="history-list-empty">Failed to load history</div>'
+  }
+}
+
+/**
+ * Format a relative time string (e.g., "2h ago", "3d ago")
+ */
+function formatRelativeTime(dateStr) {
+  const now = Date.now()
+  const then = new Date(dateStr).getTime()
+  const diffMs = now - then
+  const diffSec = Math.floor(diffMs / 1000)
+
+  if (diffSec < 60) return 'just now'
+  const diffMin = Math.floor(diffSec / 60)
+  if (diffMin < 60) return `${diffMin}m ago`
+  const diffHr = Math.floor(diffMin / 60)
+  if (diffHr < 24) return `${diffHr}h ago`
+  const diffDay = Math.floor(diffHr / 24)
+  if (diffDay < 30) return `${diffDay}d ago`
+  return new Date(dateStr).toLocaleDateString()
+}
+
+/**
+ * Render dispatch history list
+ */
+function renderHistoryList(container, items, total, offset, urlKey) {
+  if (items.length === 0 && offset === 0) {
+    container.innerHTML = '<div class="history-list-empty">No dispatch history yet</div>'
+    return
+  }
+
+  const STATUS_INDICATORS = {
+    taken: { symbol: '\u2713', css: 'status-taken' },
+    expired: { symbol: '\u2298', css: 'status-expired' },
+    cancelled: { symbol: '\u2715', css: 'status-cancelled' }
+  }
+
+  const itemsHtml = items.map(item => {
+    const st = STATUS_INDICATORS[item.status] || STATUS_INDICATORS.expired
+    const issueHtml = item.issueIdentifier
+      ? (item.issueUrl
+        ? ` <a class="history-issue" href="${escapeHtml(item.issueUrl)}" target="_blank">${escapeHtml(item.issueIdentifier)}</a>`
+        : ` <span class="history-issue">${escapeHtml(item.issueIdentifier)}</span>`)
+      : ''
+
+    const dispatched = formatRelativeTime(item.dispatchedAt)
+    const resolved = formatRelativeTime(item.resolvedAt)
+    const tokenInfo = item.takenByTokenLabel ? ` \u00b7 by ${escapeHtml(item.takenByTokenLabel)}` : ''
+
+    return `
+      <div class="history-item" data-status="${escapeHtml(item.status)}">
+        <span class="history-status ${st.css}">${st.symbol}</span>
+        <div class="history-info">
+          <span class="history-name">${escapeHtml(item.promptName || 'Prompt')}</span>${issueHtml}
+          <div class="history-meta">dispatched ${dispatched} \u00b7 ${escapeHtml(item.status)} ${resolved}${tokenInfo}</div>
+        </div>
+      </div>`
+  }).join('')
+
+  // If appending (offset > 0), insert before the show-more button
+  if (offset > 0) {
+    const btn = container.querySelector('.history-show-more')
+    if (btn) btn.remove()
+    container.insertAdjacentHTML('beforeend', itemsHtml)
+  } else {
+    container.innerHTML = itemsHtml
+  }
+
+  // Show "show more" button if there are more items
+  const loaded = offset + items.length
+  if (loaded < total) {
+    const showMoreBtn = document.createElement('button')
+    showMoreBtn.className = 'history-show-more'
+    showMoreBtn.textContent = `show more (${loaded}/${total})`
+    showMoreBtn.addEventListener('click', () => loadHistory(urlKey, loaded))
+    container.appendChild(showMoreBtn)
+  }
+}
+
 // ==========================================================================
 // More Prompts Inline Toggle
 // ==========================================================================
@@ -2239,5 +2349,6 @@ document.addEventListener('DOMContentLoaded', () => {
   initQueuePanel()
   initFeatureToggles()
   initTokenManagement()
+  initDispatchHistory()
   initFreeTierStatus()
 })

@@ -183,6 +183,16 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     }
   });
 
+  // Endpoint to clear dispatch history for testing
+  router.get('/test/clear-dispatch-history', async (req, res) => {
+    try {
+      await dispatchQueueStore.clearHistory('test-workspace')
+      res.send('ok')
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
+
   // Endpoint to add free tier usage for testing
   router.get('/test/add-free-tier-usage', async (req, res) => {
     try {

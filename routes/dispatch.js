@@ -87,13 +87,14 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     }
 
     try {
-      const urlKey = await dispatchTokenStore.validateToken(token);
+      const result = await dispatchTokenStore.validateToken(token);
 
-      if (!urlKey) {
+      if (!result) {
         return res.status(401).json({ error: 'Invalid or expired token' });
       }
 
-      req.dispatchUrlKey = urlKey;
+      req.dispatchUrlKey = result.urlKey;
+      req.dispatchTokenLabel = result.label;
       next();
     } catch (err) {
       console.error('Token validation error:', err.message);
@@ -217,6 +218,25 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     } catch (err) {
       console.error('Count dispatch items error:', err.message);
       res.status(500).json({ error: 'Failed to count dispatch items' });
+    }
+  });
+
+  /**
+   * GET /workspace/:urlKey/api/dispatch/history
+   * List dispatch history for this workspace.
+   */
+  router.get('/workspace/:urlKey/api/dispatch/history', workspaceFromUrl, async (req, res) => {
+    const { workspace } = req;
+
+    try {
+      const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
+      const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+
+      const result = await dispatchQueueStore.listHistory(workspace.urlKey, { limit, offset });
+      res.json(result);
+    } catch (err) {
+      console.error('List dispatch history error:', err.message);
+      res.status(500).json({ error: 'Failed to list dispatch history' });
     }
   });
 
@@ -440,7 +460,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
 
     try {
       // Take with urlKey verification (consumer can only take from their workspace)
-      const item = await dispatchQueueStore.takeItem(itemId, req.dispatchUrlKey);
+      const item = await dispatchQueueStore.takeItem(itemId, req.dispatchUrlKey, req.dispatchTokenLabel);
 
       if (!item) {
         return res.status(404).json({ error: 'Item not found or already taken' });

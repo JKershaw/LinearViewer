@@ -380,6 +380,95 @@
 }
 
 /* =============================================================================
+   Dispatch History
+   ============================================================================= */
+.history-list {
+  margin-top: 0.75rem;
+}
+
+.history-list-loading,
+.history-list-empty {
+  color: var(--fg-dim);
+  font-size: 0.9em;
+  padding: 0.25rem 0;
+}
+
+.history-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--fg-vdim);
+  font-size: 0.9em;
+}
+
+.history-item:last-of-type {
+  border-bottom: none;
+}
+
+.history-status {
+  flex-shrink: 0;
+  font-family: var(--font-structural);
+  min-width: 2ch;
+}
+
+.history-status.status-taken {
+  color: var(--green);
+}
+
+.history-status.status-expired {
+  color: var(--fg-dim);
+}
+
+.history-status.status-cancelled {
+  color: var(--red);
+}
+
+.history-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.history-name {
+  font-family: var(--font-content);
+  color: var(--fg);
+}
+
+.history-issue {
+  color: var(--blue);
+  text-decoration: none;
+  margin-left: 0.5rem;
+}
+
+.history-issue:hover {
+  text-decoration: underline;
+}
+
+.history-meta {
+  font-size: 0.8em;
+  color: var(--fg-dim);
+  margin-top: 0.15rem;
+}
+
+.history-show-more {
+  display: block;
+  margin-top: 0.75rem;
+  background: none;
+  border: 1px solid var(--fg-vdim);
+  border-radius: 3px;
+  padding: 0.3rem 0.75rem;
+  font-family: var(--font-content);
+  font-size: 0.85em;
+  color: var(--fg-dim);
+  cursor: pointer;
+}
+
+.history-show-more:hover {
+  border-color: var(--fg-dim);
+  color: var(--fg);
+}
+
+/* =============================================================================
    Feature Toggles
    ============================================================================= */
 .feature-toggle {
