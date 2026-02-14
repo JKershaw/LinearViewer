@@ -2,64 +2,81 @@
 
 ## Summary
 
-Add the ability for users to type and dispatch a custom freeform prompt from the queue panel. If the text starts with a `/` (slash command), resolve it to the corresponding prompt template before dispatching.
+Add a custom prompt textarea + dispatch buttons to the queue panel modal, allowing users to type freeform text (or slash commands) and dispatch directly. Include a recent custom prompts list persisted server-side via `UserPreferencesStore` (MongoDB/MangoDB) so prompts are available on any device.
 
-## Current State
+## Architecture Decision: Server-Side Storage for Recent Prompts
 
-- Users can only dispatch **pre-built prompts** (14 handwritten templates like `look-into`, `plan`, `implementation`) or **AI-generated recommendations**
-- Dispatching requires: click issue → expand Prompts → click label → wait for prompt to load → click dispatch
-- The queue panel (modal) shows queued items but has no input capability
-- The dispatch API (`POST /workspace/:urlKey/api/dispatch`) already accepts freeform prompt text — no backend changes needed
+Recent custom prompts are stored in the existing `user-preferences` MongoDB collection (via `UserPreferencesStore`), keyed by Linear user ID. This mirrors how `modelId` and `features` are already persisted cross-device.
 
-## Design
-
-### Where: Queue Panel
-
-Add a custom prompt input area **at the top of the queue panel** (above the items list). This is the natural location because:
-- The queue panel is already the dispatch management hub
-- It avoids cluttering the per-issue Prompts section
-- General-purpose prompts don't always need issue context
-
-### Slash Command Handling
-
-When the user types text starting with `/`, treat the remainder as a prompt template key:
-- `/plan` → resolves to the "plan" template
-- `/look-into` → resolves to the "look into" template
-- `/implementation` → resolves to the "implement" template
-
-Since slash commands require issue context to generate the full prompt, and the queue panel is not issue-scoped, slash commands dispatched from the queue panel will be sent **as-is** (the literal text `/plan`, `/look-into`, etc.) and interpreted by the consumer. This keeps the implementation simple and avoids requiring an issue picker.
-
-> **Note**: If issue-scoped slash command resolution is desired later, it can be added as a follow-up by placing a custom input in the per-issue Prompts section.
-
-### Data Flow
-
-```
-User opens queue panel → types custom text → clicks "dispatch" or "dispatch → web"
-  → POST /workspace/:urlKey/api/dispatch
-    {
-      prompt: "<user text>",
-      promptName: "Custom",
-      issueId: null,
-      issueTitle: null,
-      target: "cli" | "web"
+**Schema** (within the existing preferences document):
+```json
+{
+  "_id": "<linearUserId>",
+  "preferences": {
+    "modelId": "...",
+    "features": { ... },
+    "recentCustomPrompts": {
+      "<workspaceUrlKey>": ["prompt text 1", "prompt text 2", ...]
     }
-  → Item appears in queue → consumer polls and claims
+  }
+}
 ```
 
-## Files to Modify
+Scoped per workspace since prompts may reference workspace-specific issues/context. Max 10 per workspace.
 
-### 1. `public/app.js` — Client-side dispatch logic
+**New API endpoints** (in `routes/dispatch.js`):
+- `GET /workspace/:urlKey/api/dispatch/recent-prompts` — fetch recent prompts list
+- `POST /workspace/:urlKey/api/dispatch/recent-prompts` — save a prompt to the list (called after successful dispatch)
 
-**Location**: `showQueuePanel()` function (line ~1199)
+## Steps
 
-**Changes**:
-- Add custom prompt input form to the panel HTML (textarea + dispatch buttons)
-- Add event handler for the custom dispatch buttons
-- On submit: POST to `/workspace/:urlKey/api/dispatch` with the textarea content
-- Show feedback (dispatched!/failed) and refresh the items list
-- Clear textarea on success
+### Step 1: Add recent prompts API endpoints (`routes/dispatch.js`)
 
-**New HTML in panel** (inserted between header and items):
+The `createDispatchRoutes` function needs the `userPreferencesStore` dependency. Update the function signature and add two endpoints.
+
+**Update function signature** (line 63):
+```js
+export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore }) {
+```
+
+**Add GET endpoint** — after the count endpoint (~line 220):
+```
+GET /workspace/:urlKey/api/dispatch/recent-prompts
+```
+1. Read `req.session.linearUserId`; return `[]` if not set
+2. Call `userPreferencesStore.getUserPreferences(linearUserId)`
+3. Extract `preferences.recentCustomPrompts[urlKey]` (default `[]`)
+4. Return `{ prompts: [...] }`
+
+**Add POST endpoint**:
+```
+POST /workspace/:urlKey/api/dispatch/recent-prompts
+```
+Body: `{ prompt: "text" }`
+1. Validate `prompt` is non-empty string, max 10000 chars
+2. Read existing preferences
+3. Get `recentCustomPrompts[urlKey]` array (or `[]`)
+4. Remove duplicate if exists (dedup by exact match)
+5. Prepend new prompt
+6. Trim to max 10 items
+7. Save back to preferences
+8. Return `{ success: true }`
+
+### Step 2: Wire `userPreferencesStore` into dispatch routes (`server.js`)
+
+**Edit** line 480: Pass `userPreferencesStore` to `createDispatchRoutes`:
+```js
+app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore }))
+```
+
+### Step 3: Add test cleanup route (`routes/test.js`)
+
+Add a `/test/clear-recent-prompts` endpoint that clears the `recentCustomPrompts` key for the test user, so E2E tests start from a clean slate.
+
+### Step 4: Add custom prompt input HTML to queue panel (`public/app.js`)
+
+**Edit `showQueuePanel()`** (line 1212): Insert a `queue-panel-input` div between the header and items divs in the panel's `innerHTML` template.
+
 ```html
 <div class="queue-panel-input">
   <textarea class="queue-custom-prompt"
@@ -67,21 +84,91 @@ User opens queue panel → types custom text → clicks "dispatch" or "dispatch 
             rows="3"></textarea>
   <div class="queue-custom-actions">
     <button class="queue-custom-dispatch" data-target="cli">dispatch</button>
-    <button class="queue-custom-dispatch" data-target="web">dispatch → web</button>
+    <button class="queue-custom-dispatch" data-target="web">dispatch &rarr; web</button>
   </div>
+  <div class="queue-custom-recents"></div>
 </div>
 ```
 
-**Event handler** (in `initQueuePanel()`):
-- Listen for clicks on `.queue-custom-dispatch`
-- Read textarea value, validate non-empty
-- POST to dispatch API
-- Show button feedback (sending → dispatched! → reset)
-- Refresh queue items and badge
+After the panel is appended, fetch and render recent prompts:
+```js
+renderRecentPrompts(panel, urlKey)
+```
 
-### 2. `public/style.css` — Styling
+### Step 5: Add `renderRecentPrompts()` function (`public/app.js`)
 
-**New styles** (after `.queue-panel-header` block, ~line 208):
+```js
+async function renderRecentPrompts(panel, urlKey) {
+  const container = panel.querySelector('.queue-custom-recents')
+  try {
+    const res = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/recent-prompts`)
+    if (!res.ok) return
+    const { prompts } = await res.json()
+    if (!prompts || prompts.length === 0) {
+      container.innerHTML = ''
+      return
+    }
+    container.innerHTML = `
+      <div class="queue-recents-label">Recent:</div>
+      <div class="queue-recents-list">
+        ${prompts.map(p => {
+          const display = p.length > 60 ? p.slice(0, 60) + '…' : p
+          return `<button class="queue-recent-item" data-prompt="${escapeHtml(p)}" title="${escapeHtml(p)}">${escapeHtml(display)}</button>`
+        }).join('')}
+      </div>
+    `
+  } catch (e) {
+    // Non-fatal: just don't show recents
+  }
+}
+```
+
+### Step 6: Add click handler for recent prompts (`public/app.js`)
+
+**Edit `initQueuePanel()`**: Add a delegated click handler for `.queue-recent-item` buttons.
+
+On click:
+1. Read `data-prompt` attribute (full prompt text)
+2. Set `.queue-custom-prompt` textarea value
+3. Focus the textarea
+
+### Step 7: Add click handler for custom dispatch buttons (`public/app.js`)
+
+**Edit `initQueuePanel()`** (after the existing remove-button handler): Add a delegated click handler for `.queue-custom-dispatch` buttons.
+
+Logic:
+1. Find the clicked `.queue-custom-dispatch` button
+2. Get the panel's `data-url-key` attribute
+3. Read textarea value from `.queue-custom-prompt`, trim whitespace
+4. If empty, briefly show "empty" on button, return early
+5. Read `data-target` from the button (`"cli"` or `"web"`)
+6. Show "sending..." feedback on the button
+7. `POST /workspace/${urlKey}/api/dispatch` with body:
+   ```json
+   { "prompt": "<text>", "promptName": "Custom", "target": "cli"|"web" }
+   ```
+8. On success:
+   - Show "dispatched!" feedback on button
+   - Save prompt to server: `POST /workspace/${urlKey}/api/dispatch/recent-prompts` with `{ prompt }`
+   - Clear textarea
+   - Re-fetch and re-render queue items in panel
+   - Re-render recent prompts list (call `renderRecentPrompts()` again)
+   - Update queue badge count
+9. On error: show "failed" feedback
+10. After 1500ms timeout, reset button text to original label
+
+### Step 8: Adjust `.queue-panel-items` max-height (`public/style.css`)
+
+**Edit** line 224: Update to account for the new input area:
+```css
+.queue-panel-items {
+  max-height: calc(70vh - 170px);
+}
+```
+
+### Step 9: Add custom prompt input and recent prompt styles (`public/style.css`)
+
+**Insert after `.queue-panel-close:hover`** (after line 221):
 
 ```css
 .queue-panel-input {
@@ -92,7 +179,7 @@ User opens queue panel → types custom text → clicks "dispatch" or "dispatch 
 .queue-custom-prompt {
   width: 100%;
   box-sizing: border-box;
-  font-family: var(--font-mono);
+  font-family: var(--font-structural);
   font-size: 0.85em;
   padding: 0.5rem;
   border: 1px solid var(--fg-vdim);
@@ -114,42 +201,132 @@ User opens queue panel → types custom text → clicks "dispatch" or "dispatch 
   margin-top: 0.5rem;
 }
 
-/* Reuse .dispatch-btn styling from prompt containers */
+.queue-recents-label {
+  font-size: 0.8em;
+  color: var(--fg-dim);
+  margin-top: 0.5rem;
+}
+
+.queue-recents-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+}
+
+.queue-recent-item {
+  background: none;
+  border: 1px solid var(--fg-vdim);
+  border-radius: 3px;
+  padding: 0.15rem 0.4rem;
+  font-family: var(--font-content);
+  font-size: 0.75em;
+  color: var(--fg-dim);
+  cursor: pointer;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queue-recent-item:hover {
+  border-color: var(--blue, #4EA7FC);
+  color: var(--blue, #4EA7FC);
+}
 ```
 
-### 3. `tests/e2e/dispatch.spec.js` — E2E tests
+### Step 10: Extend dispatch button styles (`public/style.css`)
 
-**New test cases**:
+**Edit** the `.prompt-dispatch` selectors (~line 1295) to also apply to `.queue-custom-dispatch`:
+```css
+.prompt-dispatch, .queue-custom-dispatch { ... }
+.prompt-dispatch:hover, .queue-custom-dispatch:hover { ... }
+.prompt-dispatch.dispatched, .queue-custom-dispatch.dispatched { ... }
+```
 
-1. **Custom prompt input visible in queue panel** — Open panel, verify textarea and dispatch buttons exist
-2. **Can dispatch custom freeform text** — Type text, click dispatch, verify "dispatched!" feedback, verify item appears in queue
-3. **Can dispatch custom prompt with web target** — Same as above but click "dispatch → web", verify target is "web"
-4. **Empty input shows validation feedback** — Click dispatch with empty textarea, verify "failed" or no-op
-5. **Slash command dispatched as literal text** — Type `/plan`, dispatch, verify prompt text is literally "/plan"
+### Step 11: Add E2E tests (`tests/e2e/dispatch.spec.js`)
 
-## Scope Assessment
+Add a new `test.describe('Custom Prompt Dispatch')` block. `beforeEach`: clear dispatch queue, clear dispatch tokens, clear recent prompts, set session with dispatch feature, navigate.
 
-**Single coherent change**: Yes. All modifications are tightly coupled:
-- The panel HTML, its event handlers, and its styling ship together
-- No independent sub-features that could ship separately
-- No backend changes needed
-- No context-switching between unrelated systems
+**Test 1: "custom prompt input visible in queue panel"**
+- Dispatch an item via API (to make badge visible)
+- Click queue badge to open panel
+- Assert `.queue-custom-prompt` textarea is visible
+- Assert two `.queue-custom-dispatch` buttons with `data-target` "cli" and "web"
 
-**Estimated test additions**: 5 new test cases in `dispatch.spec.js`
+**Test 2: "can dispatch custom freeform text"**
+- Dispatch item via API to make badge visible
+- Open queue panel
+- Fill textarea with "Review the auth module for security issues"
+- Click `data-target="cli"` dispatch button
+- Assert button shows "dispatched!" feedback
+- Assert textarea is cleared
+- Verify item in queue via API — prompt text matches, promptName is "Custom"
 
-**No changes needed to**:
-- `routes/dispatch.js` (API already accepts freeform text)
-- `lib/dispatch-store.js` (storage already handles any prompt string)
-- `lib/render.js` (server-rendered HTML doesn't change; input is client-side in panel)
-- `lib/prompt-templates.js` (no template changes)
+**Test 3: "can dispatch custom prompt with web target"**
+- Open queue panel (with seed item for badge)
+- Type "Check deployment status"
+- Click `data-target="web"` dispatch button
+- Verify dispatched item has `target: "web"` via API
+
+**Test 4: "empty input shows validation feedback"**
+- Open queue panel
+- Click dispatch with empty textarea
+- Assert button briefly shows "empty"
+- Assert no new item in queue
+
+**Test 5: "slash command dispatched as literal text"**
+- Open queue panel, type "/plan", dispatch
+- Verify item prompt is literally "/plan" via API
+
+**Test 6: "recent custom prompts appear after dispatch"**
+- Open queue panel
+- Type "First custom prompt" and dispatch
+- Close and reopen queue panel
+- Assert `.queue-recent-item` is visible with text "First custom prompt"
+
+**Test 7: "clicking recent prompt fills textarea"**
+- Dispatch a custom prompt ("Reusable prompt text")
+- Close and reopen queue panel
+- Click the recent prompt item
+- Assert textarea value is "Reusable prompt text"
+
+### Step 12: Run tests and verify
+
+- Run `npm test` to ensure all existing + 7 new tests pass
+
+## Files Modified
+
+| File | Change |
+|------|--------|
+| `routes/dispatch.js` | Add `userPreferencesStore` param; add GET/POST `/recent-prompts` endpoints |
+| `server.js` | Pass `userPreferencesStore` to `createDispatchRoutes()` |
+| `routes/test.js` | Add `/test/clear-recent-prompts` cleanup endpoint |
+| `public/app.js` | Add input HTML in `showQueuePanel()`, `renderRecentPrompts()`, click handlers in `initQueuePanel()` |
+| `public/style.css` | Add `.queue-panel-input` / `.queue-custom-prompt` / `.queue-custom-actions` / `.queue-recents-*` styles; extend dispatch-btn selectors; adjust items max-height |
+| `tests/e2e/dispatch.spec.js` | Add 7 new test cases in `Custom Prompt Dispatch` describe block |
+
+## Files NOT Modified
+
+- `lib/user-preferences.js` — existing `getUserPreferences` / `saveUserPreferences` API is sufficient
+- `lib/dispatch-store.js` — storage already handles any prompt string
+- `lib/render.js` — server-rendered HTML unchanged; input is client-side only
+- `lib/prompt-templates.js` — no template changes needed
 
 ## Acceptance Criteria
 
-1. Queue panel shows a textarea input with "dispatch" and "dispatch → web" buttons
-2. User can type freeform text and dispatch it to the queue
-3. Dispatched custom prompt appears in queue items list
-4. Button feedback works (sending → dispatched! → reset)
-5. Empty input is rejected (no dispatch with blank text)
-6. Queue badge updates after custom dispatch
-7. Consumer can poll and claim custom-dispatched items
-8. All existing dispatch tests continue to pass
+1. Queue panel shows textarea with placeholder "Type a custom prompt or /command..."
+2. Two dispatch buttons below textarea: "dispatch" (cli) and "dispatch → web"
+3. Typing text and clicking dispatch sends it to the queue
+4. Dispatched item appears in queue items list (panel refreshes)
+5. Queue badge updates after custom dispatch
+6. Button feedback: sending → dispatched! → reset (1500ms)
+7. Empty textarea rejected with "empty" feedback, no API call
+8. Textarea cleared on successful dispatch
+9. Recent custom prompts persisted server-side in user preferences (per workspace, max 10)
+10. Recent prompts available on any device the user logs in from
+11. Recent prompts displayed as clickable chips below the textarea
+12. Clicking a recent prompt fills the textarea with its text
+13. Recent list updates immediately after dispatching a new custom prompt
+14. Consumer can poll and claim custom-dispatched items (existing API, no changes)
+15. All existing dispatch tests continue to pass

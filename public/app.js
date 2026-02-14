@@ -1185,6 +1185,50 @@ function initQueuePanel() {
     await removeQueueItem(urlKey, itemId)
   })
 
+  // Handle custom dispatch button clicks
+  document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.queue-custom-dispatch')
+    if (!btn) return
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    const panel = document.querySelector('.queue-panel')
+    if (!panel) return
+
+    const urlKey = panel.dataset.urlKey
+    const textarea = panel.querySelector('.queue-custom-prompt')
+    const prompt = textarea?.value?.trim()
+
+    if (!prompt) {
+      const originalText = btn.textContent
+      btn.textContent = 'empty'
+      setTimeout(() => { btn.textContent = originalText }, 1500)
+      return
+    }
+
+    const target = btn.dataset.target || 'cli'
+    await dispatchCustomPrompt(urlKey, prompt, target, btn)
+  })
+
+  // Handle recent prompt item clicks
+  document.addEventListener('click', (e) => {
+    const item = e.target.closest('.queue-recent-item')
+    if (!item) return
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    const prompt = item.dataset.prompt
+    if (!prompt) return
+
+    const textarea = document.querySelector('.queue-custom-prompt')
+    if (textarea) {
+      textarea.value = prompt
+      textarea.focus()
+    }
+  })
+
   // Close on escape key
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
@@ -1214,24 +1258,33 @@ async function showQueuePanel(urlKey) {
       <span>Dispatch Queue</span>
       <button class="queue-panel-close" aria-label="Close">×</button>
     </div>
+    <div class="queue-panel-input">
+      <textarea class="queue-custom-prompt" placeholder="Type a custom prompt or /command..." rows="3"></textarea>
+      <div class="queue-custom-actions">
+        <button class="queue-custom-dispatch" data-target="cli">dispatch</button>
+        <button class="queue-custom-dispatch" data-target="web">dispatch &rarr; web</button>
+      </div>
+      <div class="queue-custom-recents"></div>
+    </div>
     <div class="queue-panel-items">
       <div class="queue-panel-empty">Loading...</div>
     </div>
   `
   document.body.appendChild(panel)
 
-  // Load items
-  try {
-    const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch`)
-    if (!response.ok) throw new Error('Failed to load queue')
+  // Load items and recent prompts in parallel
+  const itemsPromise = fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch`)
+    .then(r => r.ok ? r.json() : Promise.reject(new Error('Failed to load queue')))
+    .then(({ items }) => renderQueueItems(panel, items, urlKey))
+    .catch(e => {
+      console.error('Failed to load queue items:', e)
+      panel.querySelector('.queue-panel-items').innerHTML =
+        '<div class="queue-panel-empty">Failed to load queue</div>'
+    })
 
-    const { items } = await response.json()
-    renderQueueItems(panel, items, urlKey)
-  } catch (e) {
-    console.error('Failed to load queue items:', e)
-    panel.querySelector('.queue-panel-items').innerHTML =
-      '<div class="queue-panel-empty">Failed to load queue</div>'
-  }
+  const recentsPromise = renderRecentPrompts(panel, urlKey)
+
+  await Promise.all([itemsPromise, recentsPromise])
 }
 
 /**
@@ -1262,6 +1315,101 @@ function renderQueueItems(panel, items, urlKey) {
       </div>
     `
   }).join('')
+}
+
+/**
+ * Render recent custom prompts in the queue panel
+ */
+async function renderRecentPrompts(panel, urlKey) {
+  const container = panel.querySelector('.queue-custom-recents')
+  if (!container) return
+
+  try {
+    const res = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/recent-prompts`)
+    if (!res.ok) return
+
+    const { prompts } = await res.json()
+    if (!prompts || prompts.length === 0) {
+      container.innerHTML = ''
+      return
+    }
+
+    container.innerHTML = `
+      <div class="queue-recents-label">Recent:</div>
+      <div class="queue-recents-list">
+        ${prompts.map(p => {
+          const display = p.length > 60 ? p.slice(0, 60) + '\u2026' : p
+          return `<button class="queue-recent-item" data-prompt="${escapeHtml(p)}" title="${escapeHtml(p)}">${escapeHtml(display)}</button>`
+        }).join('')}
+      </div>
+    `
+  } catch (e) {
+    // Non-fatal: just don't show recents
+  }
+}
+
+/**
+ * Dispatch a custom prompt from the queue panel
+ */
+async function dispatchCustomPrompt(urlKey, prompt, target, btn) {
+  const originalText = btn.textContent
+  btn.textContent = 'sending...'
+  btn.disabled = true
+
+  try {
+    const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt,
+        promptName: 'Custom',
+        target
+      })
+    })
+
+    if (!response.ok) throw new Error('Failed to dispatch')
+
+    btn.textContent = 'dispatched!'
+
+    // Save to recent prompts (best-effort, don't block on it)
+    fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/recent-prompts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
+    }).catch(() => {})
+
+    // Clear textarea
+    const panel = document.querySelector('.queue-panel')
+    if (panel) {
+      const textarea = panel.querySelector('.queue-custom-prompt')
+      if (textarea) textarea.value = ''
+
+      // Refresh queue items and recents
+      try {
+        const listRes = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch`)
+        if (listRes.ok) {
+          const { items } = await listRes.json()
+          renderQueueItems(panel, items, urlKey)
+        }
+      } catch (e) {
+        // Non-fatal
+      }
+
+      renderRecentPrompts(panel, urlKey)
+    }
+
+    // Update badge
+    await updateQueueBadge(urlKey)
+  } catch (e) {
+    console.error('Failed to dispatch custom prompt:', e)
+    btn.textContent = 'failed'
+  }
+
+  // Reset button text after delay
+  setTimeout(() => {
+    btn.textContent = originalText
+    btn.disabled = false
+  }, 1500)
 }
 
 /**
