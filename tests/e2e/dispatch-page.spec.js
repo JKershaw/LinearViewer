@@ -109,6 +109,55 @@ test.describe('Dispatch Page', () => {
       await expect(recentItem.first()).toContainText('First custom prompt');
     });
 
+    test('repo selector shows projects with repo= in description', async ({ page }) => {
+      const select = page.locator('.dispatch-repo-select');
+      await expect(select).toBeVisible();
+
+      // Should have "none" default plus Project Alpha (which has repo=test-repo)
+      const options = select.locator('option');
+      await expect(options).toHaveCount(2);
+      await expect(options.first()).toHaveText('none');
+      await expect(options.nth(1)).toContainText('test-repo');
+    });
+
+    test('repo selector defaults to none', async ({ page }) => {
+      const select = page.locator('.dispatch-repo-select');
+      await expect(select).toHaveValue('');
+    });
+
+    test('custom prompt dispatch includes selected repo', async ({ page }) => {
+      const textarea = page.locator('.dispatch-prompt-input');
+      await textarea.fill('Prompt with repo');
+
+      // Select a repo
+      const select = page.locator('.dispatch-repo-select');
+      await select.selectOption('test-repo');
+
+      const dispatchBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
+      await dispatchBtn.click();
+      await expect(dispatchBtn).toHaveText('dispatched!');
+
+      // Verify item has repo field via API
+      const listResponse = await page.request.get(`${API_PREFIX}/api/dispatch`);
+      const { items } = await listResponse.json();
+      expect(items[0].repo).toBe('test-repo');
+    });
+
+    test('custom prompt dispatch without repo sends null', async ({ page }) => {
+      const textarea = page.locator('.dispatch-prompt-input');
+      await textarea.fill('Prompt without repo');
+
+      // Leave repo as "none" (default)
+      const dispatchBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
+      await dispatchBtn.click();
+      await expect(dispatchBtn).toHaveText('dispatched!');
+
+      // Verify item has null repo
+      const listResponse = await page.request.get(`${API_PREFIX}/api/dispatch`);
+      const { items } = await listResponse.json();
+      expect(items[0].repo).toBeNull();
+    });
+
     test('clicking recent prompt fills textarea', async ({ page }) => {
       // Populate recents via API
       await page.request.post(`${API_PREFIX}/api/dispatch/recent-prompts`, {
