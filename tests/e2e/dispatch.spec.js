@@ -466,6 +466,57 @@ test.describe('Dispatch API', () => {
     expect(data.error).toContain('target must be one of');
   });
 
+  test('POST /api/dispatch rejects repo exceeding max length', async ({ request }) => {
+    await request.get('/test/set-session');
+
+    const longRepo = 'a'.repeat(1001);
+    const response = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: {
+        prompt: 'Test prompt',
+        promptName: 'Test',
+        repo: longRepo
+      }
+    });
+
+    expect(response.status()).toBe(400);
+    const data = await response.json();
+    expect(data.error).toContain('repo exceeds maximum length');
+  });
+
+  test('POST /api/dispatch rejects repo with null bytes', async ({ request }) => {
+    await request.get('/test/set-session');
+
+    const response = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: {
+        prompt: 'Test prompt',
+        promptName: 'Test',
+        repo: 'my-repo\x00injected'
+      }
+    });
+
+    expect(response.status()).toBe(400);
+    const data = await response.json();
+    expect(data.error).toContain('repo contains invalid characters');
+  });
+
+  test('POST /api/dispatch without repo stores null repo', async ({ request }) => {
+    await request.get('/test/set-session');
+
+    const response = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: {
+        prompt: 'Test prompt',
+        promptName: 'Test'
+      }
+    });
+
+    expect(response.status()).toBe(201);
+
+    // Verify via list endpoint that repo is null
+    const listResponse = await request.get(`${API_PREFIX}/api/dispatch`);
+    const listData = await listResponse.json();
+    expect(listData.items[0].repo).toBeNull();
+  });
+
   test('GET /api/dispatch/count returns count', async ({ request }) => {
     await request.get('/test/set-session');
 
