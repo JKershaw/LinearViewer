@@ -102,6 +102,21 @@
   border-color: var(--blue);
 }
 
+.dispatch-repo-select {
+  font-family: var(--font-content);
+  font-size: 0.85em;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--fg-vdim);
+  border-radius: 3px;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.dispatch-repo-select:focus {
+  outline: none;
+  border-color: var(--blue);
+}
+
 .dispatch-prompt-actions {
   gap: 0.5rem;
 }

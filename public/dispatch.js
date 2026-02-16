@@ -58,20 +58,19 @@ async function renderDispatchRecentPrompts(container, urlKey) {
 /**
  * Dispatch a custom prompt and update UI feedback
  */
-async function dispatchPageCustomPrompt({ urlKey, prompt, target, btn, textarea, feedbackEl, recentsContainer }) {
+async function dispatchPageCustomPrompt({ urlKey, prompt, target, repo, btn, textarea, feedbackEl, recentsContainer }) {
   const originalText = btn.textContent
   btn.textContent = 'sending...'
   btn.disabled = true
 
   try {
+    const payload = { prompt, promptName: 'Custom', target }
+    if (repo) payload.repo = repo
+
     const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        prompt,
-        promptName: 'Custom',
-        target
-      })
+      body: JSON.stringify(payload)
     })
 
     if (response.status === 401) {
@@ -139,6 +138,7 @@ function initDispatchPagePrompt() {
   const section = textarea.closest('.dispatch-section')
   const recentsContainer = section.querySelector('.dispatch-recents-container')
   const feedbackEl = section.querySelector('.dispatch-prompt-feedback')
+  const repoSelect = section.querySelector('.dispatch-repo-select')
 
   // Load recent prompts
   renderDispatchRecentPrompts(recentsContainer, urlKey)
@@ -161,7 +161,8 @@ function initDispatchPagePrompt() {
       }
 
       const target = btn.dataset.target || 'cli'
-      await dispatchPageCustomPrompt({ urlKey, prompt, target, btn, textarea, feedbackEl, recentsContainer })
+      const repo = repoSelect ? repoSelect.value : ''
+      await dispatchPageCustomPrompt({ urlKey, prompt, target, repo, btn, textarea, feedbackEl, recentsContainer })
       return
     }
 

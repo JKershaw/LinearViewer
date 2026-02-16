@@ -17,8 +17,9 @@ import { UserPreferencesStore } from './lib/user-preferences.js'
 import { DispatchQueueStore } from './lib/dispatch-store.js'
 import { DispatchTokenStore } from './lib/dispatch-tokens.js'
 import { FreeTierStore } from './lib/free-tier-store.js'
-import { fetchProjects, fetchTeams } from './lib/linear.js'
+import { fetchProjects, fetchProjectsList, fetchTeams } from './lib/linear.js'
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID } from './lib/tree.js'
+import { parseRepoFromDescription } from './lib/prompt-formatters.js'
 import { renderPage, renderErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken } from './lib/token-refresh.js'
@@ -609,7 +610,7 @@ app.get('/workspace/:urlKey/prompts', workspaceFromUrl, (req, res) => {
  * Dispatch page - requires authentication and dispatch feature flag.
  * Displays dispatch prompt, queue, tokens, and history.
  */
-app.get('/workspace/:urlKey/dispatch', workspaceFromUrl, (req, res) => {
+app.get('/workspace/:urlKey/dispatch', workspaceFromUrl, async (req, res) => {
   const workspace = req.workspace;
   const deployInfo = getDeployInfo();
   const openRouterSource = getOpenRouterSource(req);
@@ -620,12 +621,25 @@ app.get('/workspace/:urlKey/dispatch', workspaceFromUrl, (req, res) => {
     return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
   }
 
+  // Fetch project repos for the repo selector
+  let projectRepos = [];
+  try {
+    const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
+    const projects = isTestMode ? testMockData.projects : await fetchProjectsList(workspace.accessToken);
+    projectRepos = projects
+      .map(p => ({ name: p.name, repo: parseRepoFromDescription(p.content) }))
+      .filter(p => p.repo);
+  } catch (e) {
+    // Non-fatal: dispatch page works without repo selector
+  }
+
   const html = renderDispatchPage(workspace.name || 'Workspace', {
     deployInfo,
     urlKey: workspace.urlKey,
     openRouterSource,
     workspaces: req.session.workspaces,
-    featureFlags
+    featureFlags,
+    projectRepos
   });
   res.send(html);
 });
