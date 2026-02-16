@@ -963,6 +963,12 @@ function initPrompts() {
         // Store raw markdown for copy, render HTML for display
         promptText.dataset.rawPrompt = data.prompt
         promptText.innerHTML = renderMarkdown(data.prompt)
+        // Store repo from project description for dispatch
+        if (data.repo) {
+          promptContainer.dataset.repo = data.repo
+        } else {
+          delete promptContainer.dataset.repo
+        }
       }
     } catch (error) {
       // Ignore abort errors (user clicked away)
@@ -1047,19 +1053,25 @@ function initPrompts() {
     const issueEl = issueId ? document.querySelector(`[data-id="${issueId}"]`) : null
     const issueTitle = issueEl?.querySelector('.title, .title-dim')?.textContent || null
 
+    // Get repo from prompt/recommend container (set by prompt API response)
+    const repo = promptContainer.dataset.repo || null
+
     try {
       dispatchBtn.textContent = 'sending...'
+
+      const payload = {
+        prompt,
+        promptName,
+        issueId: issueId || null,
+        issueTitle,
+        target
+      }
+      if (repo) payload.repo = repo
 
       const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt,
-          promptName,
-          issueId: issueId || null,
-          issueTitle,
-          target
-        })
+        body: JSON.stringify(payload)
       })
 
       if (!response.ok) {
@@ -1587,6 +1599,12 @@ function initRecommendations() {
           // Store raw markdown for copy, render HTML for display
           promptText.dataset.rawPrompt = data.prompt
           promptText.innerHTML = renderMarkdown(data.prompt)
+          // Store repo from project description for dispatch
+          if (data.repo && promptDiv) {
+            promptDiv.dataset.repo = data.repo
+          } else if (promptDiv) {
+            delete promptDiv.dataset.repo
+          }
           // Show the prompt section now that the prompt is ready
           if (promptDiv) promptDiv.classList.remove('hidden')
         }

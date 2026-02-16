@@ -104,6 +104,45 @@ test.describe('Dispatch Queue', () => {
     await expect(dispatchBtn).toHaveText('dispatch', { timeout: 3000 });
   });
 
+  test('dispatching a prompt includes repo from project description', async ({ page, request }) => {
+    // Create a consumer token
+    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const { token } = await tokenResponse.json();
+
+    // Find and expand a task with prompts (blocked issue is in proj-alpha which has repo=test-repo)
+    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
+    await taskLine.click();
+
+    // Expand Prompts section to reveal prompt buttons
+    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
+    // Reveal hidden prompts (blocked is behind "more")
+    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
+    // Click the promptable label to show prompt
+    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
+    await labelLink.click();
+
+    // Wait for prompt to load
+    const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
+    await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
+
+    // Click dispatch button
+    const dispatchBtn = promptContainer.locator('.prompt-dispatch[data-target="cli"]');
+    await dispatchBtn.click();
+
+    // Wait for dispatch to complete
+    await expect(dispatchBtn).toHaveText('dispatched!');
+
+    // Verify the dispatched item has the repo field via consumer API
+    const pollResponse = await request.get('/api/dispatch/poll', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await pollResponse.json();
+    expect(data.items.length).toBe(1);
+    expect(data.items[0].repo).toBe('test-repo');
+  });
+
   test('queue badge appears after dispatch', async ({ page }) => {
     // Initially badge should be hidden (queue is empty)
     const badge = page.locator('[data-queue-badge]');
@@ -535,6 +574,59 @@ test.describe('Consumer API', () => {
 
     const targets = data.items.map(item => item.target).sort();
     expect(targets).toEqual(['cli', 'web']);
+  });
+
+  test('poll returns repo field when included in dispatch', async ({ request }) => {
+    // Create a token
+    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const { token } = await tokenResponse.json();
+
+    // Add item with repo field
+    await request.get('/test/set-session');
+    await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: { prompt: 'Repo prompt', promptName: 'Test', repo: 'my-repo' }
+    });
+
+    // Add item without repo field
+    await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: { prompt: 'No repo prompt', promptName: 'Test' }
+    });
+
+    // Poll with token - should see repo on first item, null on second
+    const pollResponse = await request.get('/api/dispatch/poll', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    expect(pollResponse.status()).toBe(200);
+
+    const data = await pollResponse.json();
+    expect(data.items.length).toBe(2);
+
+    const withRepo = data.items.find(i => i.prompt === 'Repo prompt');
+    const withoutRepo = data.items.find(i => i.prompt === 'No repo prompt');
+    expect(withRepo.repo).toBe('my-repo');
+    expect(withoutRepo.repo).toBeNull();
+  });
+
+  test('take returns repo field in claimed item', async ({ request }) => {
+    // Create a token
+    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const { token } = await tokenResponse.json();
+
+    // Add item with repo
+    await request.get('/test/set-session');
+    const createResponse = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: { prompt: 'Test prompt', promptName: 'Test', repo: 'dash-build' }
+    });
+    const { item } = await createResponse.json();
+
+    // Take the item
+    const takeResponse = await request.post(`/api/dispatch/take/${item.id}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    expect(takeResponse.status()).toBe(200);
+
+    const takeData = await takeResponse.json();
+    expect(takeData.item.repo).toBe('dash-build');
   });
 
   test('take returns 404 for non-existent item', async ({ request }) => {

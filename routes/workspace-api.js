@@ -12,6 +12,7 @@ import { Router } from 'express';
 import { fetchIssueContext, fetchRecommendationContext, fetchIssueComments } from '../lib/linear.js';
 import { generatePrompt, hasPrompt, getAvailablePrompts } from '../lib/prompt-templates.js';
 import { PREPARING_LABEL, WORK_ISSUE_LABELS } from '../lib/workflow-config.js';
+import { parseRepoFromDescription } from '../lib/prompt-formatters.js';
 import { isRecommendationEnabled, getRecommendation, DEFAULT_MODEL } from '../lib/openrouter.js';
 import { runAudit, computeAuditFromData } from '../lib/audit.js';
 import { UUID_REGEX } from '../lib/workspace.js';
@@ -168,10 +169,12 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
           children: mockChildren
         }, getFeatureFlags(req.session))
 
+        const mockProjectDescription = mockProject?.content || null
         return res.json({
           label: labelName,
           promptName: result.name,
-          prompt: result.prompt
+          prompt: result.prompt,
+          repo: parseRepoFromDescription(mockProjectDescription)
         })
       }
 
@@ -188,7 +191,8 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       res.json({
         label: labelName,
         promptName: result.name,
-        prompt: result.prompt
+        prompt: result.prompt,
+        repo: parseRepoFromDescription(project?.description)
       })
     } catch (error) {
       console.error('Prompt generation error:', error)
@@ -343,12 +347,14 @@ ${labels.length > 0 ? `**Labels:** ${labels.join(', ')}` : ''}
 
 ${goal}`
 
+        const mockRecommendProject = testMockData.projects.find(p => p.id === mockIssue.project?.id)
         const result = {
           reasoning,
           prompt,
           truncated: false,
           completionTokens: null,
-          issueUrl: mockIssue.url
+          issueUrl: mockIssue.url,
+          repo: parseRepoFromDescription(mockRecommendProject?.content)
         }
 
         // Include free tier metadata in test mode
@@ -379,7 +385,8 @@ ${goal}`
         prompt: recommendation.prompt,
         truncated: recommendation.truncated,
         completionTokens: recommendation.completionTokens,
-        issueUrl: issue.url
+        issueUrl: issue.url,
+        repo: parseRepoFromDescription(project?.description)
       }
 
       // Include free tier metadata

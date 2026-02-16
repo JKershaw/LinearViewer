@@ -16,7 +16,7 @@ export const testMockTeams = [
 export const testMockData = {
   organizationName: 'Test Workspace',
   projects: [
-    { id: 'proj-alpha', name: 'Project Alpha', content: 'First test project', url: 'https://linear.app/test/project/proj-alpha', sortOrder: 1 },
+    { id: 'proj-alpha', name: 'Project Alpha', content: 'First test project\n\nrepo=test-repo', url: 'https://linear.app/test/project/proj-alpha', sortOrder: 1 },
     { id: 'proj-beta', name: 'Project Beta', content: 'Second test project', url: 'https://linear.app/test/project/proj-beta', sortOrder: 2 }
   ],
   issues: [

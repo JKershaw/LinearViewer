@@ -115,7 +115,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const { workspace } = req;
 
     try {
-      const { prompt, promptName, issueId, issueIdentifier, issueTitle, issueUrl, target } = req.body;
+      const { prompt, promptName, issueId, issueIdentifier, issueTitle, issueUrl, target, repo } = req.body;
 
       // Validate required fields
       if (!prompt || typeof prompt !== 'string') {
@@ -144,6 +144,9 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       if (issueUrl && issueUrl.length > MAX_URL_LENGTH) {
         return res.status(400).json({ error: `issueUrl exceeds maximum length of ${MAX_URL_LENGTH}` });
       }
+      if (repo && repo.length > MAX_NAME_LENGTH) {
+        return res.status(400).json({ error: `repo exceeds maximum length of ${MAX_NAME_LENGTH}` });
+      }
 
       // Reject null bytes and dangerous control characters
       if (DANGEROUS_CHARS_REGEX.test(prompt)) {
@@ -154,6 +157,9 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       }
       if (issueTitle && DANGEROUS_CHARS_REGEX.test(issueTitle)) {
         return res.status(400).json({ error: 'issueTitle contains invalid characters' });
+      }
+      if (repo && DANGEROUS_CHARS_REGEX.test(repo)) {
+        return res.status(400).json({ error: 'repo contains invalid characters' });
       }
 
       // Validate issueId format if provided
@@ -170,7 +176,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         issueTitle: issueTitle || null,
         issueUrl: issueUrl || null,
         dispatchedBy: req.session.linearUserId || null,
-        target: target || 'cli'
+        target: target || 'cli',
+        repo: repo || null
       });
 
       res.status(201).json({
