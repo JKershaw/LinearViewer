@@ -16,8 +16,8 @@ export const testMockTeams = [
 export const testMockData = {
   organizationName: 'Test Workspace',
   projects: [
-    { id: 'proj-alpha', name: 'Project Alpha', content: 'First test project', url: 'https://linear.app/test/project/proj-alpha', sortOrder: 1 },
-    { id: 'proj-beta', name: 'Project Beta', content: 'Second test project', url: 'https://linear.app/test/project/proj-beta', sortOrder: 2 }
+    { id: 'proj-alpha', name: 'Project Alpha', content: 'First test project\n\nrepo=test-repo', url: 'https://linear.app/test/project/proj-alpha', sortOrder: 1 },
+    { id: 'proj-beta', name: 'Project Beta', content: 'Second test project', url: 'https://linear.app/test/project/proj-beta', sortOrder: 2 } // no repo= line — tests null repo case
   ],
   issues: [
     { id: 'issue-1', title: 'Parent task in progress', description: 'This is a parent task', estimate: 5, priority: 2, sortOrder: 1, createdAt: '2024-01-01T00:00:00Z', dueDate: '2024-02-01', completedAt: null, url: 'https://linear.app/test/issue/TEST-1', parent: null, project: { id: 'proj-alpha' }, state: { name: 'In Progress', type: 'started' }, assignee: { name: 'Alice' }, labels: { nodes: [{ name: 'feature' }] }, team: { id: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee' } },
