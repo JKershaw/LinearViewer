@@ -615,6 +615,22 @@ ${goal}`;
       const selectedModel = req.session.modelId || DEFAULT_MODEL;
       const apiKeyToUse = sessionApiKey || (isFreeTier ? freeTierKey : undefined);
 
+      // Build metadata to merge into the done event
+      const metadata = {
+        issueUrl: issue.url,
+        repo: parseRepoFromDescription(project?.description)
+      };
+
+      if (isFreeTier) {
+        const usage = await freeTierStore.getUsage(workspace.urlKey);
+        metadata.freeTier = {
+          used: true,
+          remaining: usage.remaining,
+          limit: usage.limit,
+          resetsAt: usage.resetsAt
+        };
+      }
+
       await getRecommendationStream(
         issue,
         { parent, siblings, project, children, comments, focusedChild },
@@ -626,31 +642,14 @@ ${goal}`;
         },
         (type, data) => {
           if (closed) return;
-          sendSSE(res, type, data);
+          // Merge metadata into the done event so all data arrives in one event
+          if (type === 'done') {
+            sendSSE(res, 'done', { ...data, ...metadata });
+          } else {
+            sendSSE(res, type, data);
+          }
         }
       );
-
-      if (closed) return;
-
-      // Amend done event with additional metadata
-      const doneData = {
-        issueUrl: issue.url,
-        repo: parseRepoFromDescription(project?.description)
-      };
-
-      if (isFreeTier) {
-        const usage = await freeTierStore.getUsage(workspace.urlKey);
-        doneData.freeTier = {
-          used: true,
-          remaining: usage.remaining,
-          limit: usage.limit,
-          resetsAt: usage.resetsAt
-        };
-      }
-
-      // The getRecommendationStream already emits a 'done' event with truncated/completionTokens.
-      // Send an additional metadata event with issueUrl, repo, freeTier.
-      sendSSE(res, 'metadata', doneData);
     } catch (error) {
       if (closed) return;
       console.error('Streaming recommendation error:', error);

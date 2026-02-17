@@ -1540,6 +1540,7 @@ async function readSSEStream(response, onEvent) {
       let data = ''
 
       for (const line of part.split('\n')) {
+        if (line.startsWith(':')) continue // Skip SSE comments
         if (line.startsWith('event: ')) type = line.slice(7)
         else if (line.startsWith('data: ')) data = line.slice(6)
       }
