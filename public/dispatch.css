@@ -45,6 +45,15 @@
   font-size: 0.9em;
 }
 
+.dispatch-prompt-line {
+  align-items: flex-start;
+}
+
+.dispatch-prompt-wrapper {
+  flex: 1;
+  min-width: 0;
+}
+
 .dispatch-label {
   color: var(--fg-dim);
   min-width: 10ch;
@@ -138,7 +147,7 @@
 
 .dispatch-recents-container .queue-recents-list {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 0.25rem;
   margin-top: 0.25rem;
 }
@@ -147,20 +156,26 @@
   background: none;
   border: 1px solid var(--fg-vdim);
   border-radius: 3px;
-  padding: 0.15rem 0.4rem;
+  padding: 0.3rem 0.5rem;
   font-family: var(--font-content);
   font-size: 0.75em;
   color: var(--fg-dim);
   cursor: pointer;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .dispatch-recents-container .queue-recent-item:hover {
   border-color: var(--blue);
   color: var(--blue);
+}
+
+/* Slash command highlighting */
+.slash-command {
+  font-family: var(--font-structural);
+  color: var(--blue);
+  font-weight: 500;
 }
 
 /* =============================================================================
@@ -414,6 +429,38 @@
 .history-name {
   font-family: var(--font-content);
   color: var(--fg);
+}
+
+.history-item.expandable {
+  cursor: pointer;
+}
+
+.history-item.expandable .history-name::before {
+  content: '\25b6 ';
+  font-size: 0.7em;
+  color: var(--fg-dim);
+}
+
+.history-item.expandable.expanded .history-name::before {
+  content: '\25bc ';
+}
+
+.history-prompt {
+  display: none;
+  margin-top: 0.35rem;
+  padding: 0.4rem 0.5rem;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid var(--fg-vdim);
+  border-radius: 3px;
+  font-family: var(--font-structural);
+  font-size: 0.85em;
+  color: var(--fg);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.history-item.expanded .history-prompt {
+  display: block;
 }
 
 .history-issue {

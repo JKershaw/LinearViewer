@@ -22,6 +22,18 @@ const QUEUE_LIST_POLL_MS = 3000
 // =============================================================================
 
 /**
+ * Format prompt text with slash command highlighting.
+ * Detects /command at the start and wraps it in a styled span.
+ */
+function formatPromptHtml(text) {
+  const match = text.match(/^(\/\S+)(.*)$/s)
+  if (match) {
+    return `<span class="slash-command">${escapeHtml(match[1])}</span>${escapeHtml(match[2])}`
+  }
+  return escapeHtml(text)
+}
+
+/**
  * Render recent custom prompts into a container element
  */
 async function renderDispatchRecentPrompts(container, urlKey) {
@@ -45,8 +57,7 @@ async function renderDispatchRecentPrompts(container, urlKey) {
       <div class="queue-recents-label">Recent:</div>
       <div class="queue-recents-list">
         ${prompts.map(p => {
-          const display = p.length > 60 ? p.slice(0, 60) + '\u2026' : p
-          return `<button class="queue-recent-item" data-prompt="${escapeHtml(p)}" title="${escapeHtml(p)}">${escapeHtml(display)}</button>`
+          return `<button class="queue-recent-item" data-prompt="${escapeHtml(p)}">${formatPromptHtml(p)}</button>`
         }).join('')}
       </div>
     `
@@ -563,13 +574,18 @@ function renderDispatchHistoryList(container, items, total, offset, urlKey) {
     const dispatched = formatDispatchTime(item.dispatchedAt)
     const resolved = formatDispatchTime(item.resolvedAt)
     const tokenInfo = item.takenByTokenLabel ? ` \u00b7 by ${escapeHtml(item.takenByTokenLabel)}` : ''
+    const hasPrompt = item.prompt && item.prompt.trim()
+    const expandableClass = hasPrompt ? ' expandable' : ''
+    const promptHtml = hasPrompt
+      ? `<div class="history-prompt">${formatPromptHtml(item.prompt)}</div>`
+      : ''
 
     return `
-      <div class="history-item" data-status="${escapeHtml(item.status)}">
+      <div class="history-item${expandableClass}" data-status="${escapeHtml(item.status)}">
         <span class="history-status ${st.css}">${st.symbol}</span>
         <div class="history-info">
           <span class="history-name">${escapeHtml(item.promptName || 'Prompt')}</span>${issueHtml}
-          <div class="history-meta">dispatched ${dispatched} \u00b7 ${escapeHtml(item.status)} ${resolved}${tokenInfo}</div>
+          <div class="history-meta">dispatched ${dispatched} \u00b7 ${escapeHtml(item.status)} ${resolved}${tokenInfo}</div>${promptHtml}
         </div>
       </div>`
   }).join('')
@@ -603,6 +619,17 @@ function initDispatchHistory() {
 
   const urlKey = historyEl.dataset.urlKey
   loadDispatchHistory(urlKey, 0)
+
+  // Delegated click handler for expanding history items
+  historyEl.addEventListener('click', (e) => {
+    // Don't toggle when clicking links
+    if (e.target.closest('a')) return
+
+    const item = e.target.closest('.history-item.expandable')
+    if (item) {
+      item.classList.toggle('expanded')
+    }
+  })
 }
 
 // =============================================================================
