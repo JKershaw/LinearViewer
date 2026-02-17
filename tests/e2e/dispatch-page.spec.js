@@ -158,6 +158,57 @@ test.describe('Dispatch Page', () => {
       expect(items[0].repo).toBeNull();
     });
 
+    test('recent prompts show full text without truncation', async ({ page }) => {
+      const longPrompt = 'This is a very long custom prompt that exceeds sixty characters and should not be truncated in the recent prompts list';
+      await page.request.post(`${API_PREFIX}/api/dispatch/recent-prompts`, {
+        data: { prompt: longPrompt }
+      });
+
+      await page.goto(DISPATCH_URL);
+      await page.waitForLoadState('networkidle');
+
+      const recentItem = page.locator('.dispatch-recents-container .queue-recent-item');
+      await expect(recentItem.first()).toBeVisible({ timeout: 5000 });
+      await expect(recentItem.first()).toContainText(longPrompt);
+    });
+
+    test('slash commands are highlighted in recent prompts', async ({ page }) => {
+      await page.request.post(`${API_PREFIX}/api/dispatch/recent-prompts`, {
+        data: { prompt: '/blocked fix the auth module' }
+      });
+
+      await page.goto(DISPATCH_URL);
+      await page.waitForLoadState('networkidle');
+
+      const recentItem = page.locator('.dispatch-recents-container .queue-recent-item');
+      await expect(recentItem.first()).toBeVisible({ timeout: 5000 });
+
+      const slashCmd = recentItem.first().locator('.slash-command');
+      await expect(slashCmd).toBeVisible();
+      await expect(slashCmd).toHaveText('/blocked');
+    });
+
+    test('recent prompts display vertically with most recent first', async ({ page }) => {
+      await page.request.post(`${API_PREFIX}/api/dispatch/recent-prompts`, {
+        data: { prompt: 'Older prompt' }
+      });
+      await page.request.post(`${API_PREFIX}/api/dispatch/recent-prompts`, {
+        data: { prompt: 'Newer prompt' }
+      });
+
+      await page.goto(DISPATCH_URL);
+      await page.waitForLoadState('networkidle');
+
+      const recentItems = page.locator('.dispatch-recents-container .queue-recent-item');
+      await expect(recentItems).toHaveCount(2, { timeout: 5000 });
+      await expect(recentItems.first()).toContainText('Newer prompt');
+      await expect(recentItems.nth(1)).toContainText('Older prompt');
+
+      // Verify vertical layout (column direction)
+      const list = page.locator('.dispatch-recents-container .queue-recents-list');
+      await expect(list).toHaveCSS('flex-direction', 'column');
+    });
+
     test('clicking recent prompt fills textarea', async ({ page }) => {
       // Populate recents via API
       await page.request.post(`${API_PREFIX}/api/dispatch/recent-prompts`, {
@@ -412,6 +463,59 @@ test.describe('Dispatch Page', () => {
       await showMore.click();
       await expect(items).toHaveCount(25);
       await expect(page.locator('.history-show-more')).toHaveCount(0);
+    });
+
+    test('history item is expandable and shows full prompt', async ({ page, request }) => {
+      await request.get(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+
+      const createResponse = await request.post(`${API_PREFIX}/api/dispatch`, {
+        data: { prompt: 'Full prompt text for expansion test', promptName: 'Expand Test' }
+      });
+      const { item } = await createResponse.json();
+      await request.delete(`${API_PREFIX}/api/dispatch/${item.id}`);
+
+      await page.goto(DISPATCH_URL);
+      await page.waitForLoadState('networkidle');
+
+      const historyItem = page.locator('.history-item.expandable');
+      await expect(historyItem).toBeVisible();
+
+      // Prompt should be hidden initially
+      const promptDiv = historyItem.locator('.history-prompt');
+      await expect(promptDiv).not.toBeVisible();
+
+      // Click to expand
+      await historyItem.click();
+      await expect(historyItem).toHaveClass(/expanded/);
+      await expect(promptDiv).toBeVisible();
+      await expect(promptDiv).toContainText('Full prompt text for expansion test');
+
+      // Click again to collapse
+      await historyItem.click();
+      await expect(historyItem).not.toHaveClass(/expanded/);
+      await expect(promptDiv).not.toBeVisible();
+    });
+
+    test('history item shows slash command highlighting in expanded prompt', async ({ page, request }) => {
+      await request.get(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+
+      const createResponse = await request.post(`${API_PREFIX}/api/dispatch`, {
+        data: { prompt: '/plan implement the new feature', promptName: 'Slash Test' }
+      });
+      const { item } = await createResponse.json();
+      await request.delete(`${API_PREFIX}/api/dispatch/${item.id}`);
+
+      await page.goto(DISPATCH_URL);
+      await page.waitForLoadState('networkidle');
+
+      const historyItem = page.locator('.history-item.expandable');
+      await expect(historyItem).toBeVisible();
+
+      // Expand the item
+      await historyItem.click();
+      const slashCmd = historyItem.locator('.history-prompt .slash-command');
+      await expect(slashCmd).toBeVisible();
+      await expect(slashCmd).toHaveText('/plan');
     });
   });
 
