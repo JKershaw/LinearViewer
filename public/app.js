@@ -1665,10 +1665,6 @@ function initRecommendations() {
             if (phaseIndicator) {
               phaseIndicator.textContent = PHASE_LABELS[data.phase] || data.phase
             }
-            // Show reasoning section when reasoning phase starts
-            if (data.phase === 'reasoning') {
-              reasoning.classList.remove('hidden')
-            }
             // Show prompt section when prompt phase starts
             if (data.phase === 'prompt') {
               if (promptDiv) promptDiv.classList.remove('hidden')
@@ -1679,6 +1675,11 @@ function initRecommendations() {
             if (data.section === 'reasoning') {
               reasoningRaw += data.content
               scheduleRender(reasoning, reasoningRaw)
+              // Show toggle as soon as reasoning content arrives
+              if (toggleBtn && toggleBtn.classList.contains('hidden')) {
+                toggleBtn.classList.remove('hidden')
+                toggleBtn.textContent = 'show reasoning'
+              }
             } else if (data.section === 'prompt') {
               promptRaw += data.content
               if (promptText) scheduleRender(promptText, promptRaw)
@@ -1694,11 +1695,9 @@ function initRecommendations() {
               reasoning.innerHTML = renderMarkdown(reasoningText)
             }
 
-            // Hide reasoning, show toggle
-            reasoning.classList.add('hidden')
-            if (toggleBtn) {
+            // Show toggle if there's reasoning (keeps user's expand/collapse choice)
+            if (toggleBtn && reasoningRaw) {
               toggleBtn.classList.remove('hidden')
-              toggleBtn.textContent = 'show reasoning'
             }
 
             if (promptText && promptRaw) {
