@@ -1511,6 +1511,25 @@ h1 {
   border-radius: 4px;
 }
 
+/* Streaming phase indicator (LIN-185) */
+.streaming-phase {
+  font-family: var(--font-content);
+  font-size: 0.8em;
+  color: var(--blue);
+  padding: 0.25rem 0;
+  margin-bottom: 0.25rem;
+}
+
+.streaming-phase::before {
+  content: '● ';
+  animation: phase-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes phase-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
 .recommend-header {
   display: flex;
   justify-content: space-between;

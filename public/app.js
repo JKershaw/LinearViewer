@@ -1504,7 +1504,60 @@ function updateFooterFreeTier(freeTier) {
 }
 
 /**
+ * Phase labels for streaming UI
+ */
+const PHASE_LABELS = {
+  fetching_context: 'Fetching task context...',
+  reasoning: 'Analyzing...',
+  prompt: 'Building prompt...'
+}
+
+/**
+ * Read an SSE stream from a fetch response, calling onEvent for each parsed event.
+ * @param {Response} response - Fetch response with SSE body
+ * @param {Function} onEvent - Callback: (type, data) => void
+ * @returns {Promise<void>}
+ */
+async function readSSEStream(response, onEvent) {
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+
+    buffer += decoder.decode(value, { stream: true })
+
+    // Split on double newlines (SSE event boundaries)
+    const parts = buffer.split('\n\n')
+    buffer = parts.pop() // Keep incomplete last part
+
+    for (const part of parts) {
+      if (!part.trim()) continue
+
+      let type = 'message'
+      let data = ''
+
+      for (const line of part.split('\n')) {
+        if (line.startsWith('event: ')) type = line.slice(7)
+        else if (line.startsWith('data: ')) data = line.slice(6)
+      }
+
+      if (data) {
+        try {
+          onEvent(type, JSON.parse(data))
+        } catch {
+          onEvent(type, data)
+        }
+      }
+    }
+  }
+}
+
+/**
  * Initialize AI recommendation functionality
+ * LIN-185: Uses SSE streaming for dynamic suggestion UX
  */
 function initRecommendations() {
   // Handle clicks on suggest buttons
@@ -1540,81 +1593,143 @@ function initRecommendations() {
     // Hide any other prompt UI for this issue (manual prompts)
     hideIssuePromptUI(detailsContainer, issueId)
 
-    // Show loading state
+    // Get DOM elements
     const reasoning = recommendContainer.querySelector('.recommend-reasoning')
     const promptDiv = recommendContainer.querySelector('.recommend-prompt')
     const promptText = promptDiv?.querySelector('.prompt-text')
     const toggleBtn = recommendContainer.querySelector('.reasoning-toggle')
+    const phaseIndicator = recommendContainer.querySelector('.streaming-phase')
 
-    reasoning.textContent = 'Analyzing task context...'
-    reasoning.classList.remove('hidden') // Show reasoning during loading
-    if (toggleBtn) toggleBtn.classList.add('hidden') // Hide toggle during loading
-    if (promptText) promptText.textContent = ''
-    // Keep prompt section hidden during loading - only show reasoning
+    // Reset state
+    reasoning.textContent = ''
+    reasoning.classList.add('hidden')
+    if (toggleBtn) toggleBtn.classList.add('hidden')
+    if (promptText) {
+      promptText.textContent = ''
+      delete promptText.dataset.rawPrompt
+    }
     if (promptDiv) promptDiv.classList.add('hidden')
     recommendContainer.classList.remove('hidden')
+
+    // Show phase indicator
+    if (phaseIndicator) {
+      phaseIndicator.textContent = PHASE_LABELS.fetching_context
+      phaseIndicator.classList.remove('hidden')
+    }
 
     // Add loading class to button
     suggestBtn.classList.add('loading')
 
+    // Accumulators for streamed content
+    let reasoningRaw = ''
+    let promptRaw = ''
+    let renderPending = false
+
+    // Throttled markdown render using requestAnimationFrame
+    function scheduleRender(element, text) {
+      if (renderPending) return
+      renderPending = true
+      requestAnimationFrame(() => {
+        element.innerHTML = renderMarkdown(text)
+        renderPending = false
+      })
+    }
+
     try {
-      // Get workspace URL key from data attribute (workspace-prefixed URLs)
       const urlKey = recommendContainer.dataset.urlKey
       const apiPrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : ''
       const response = await fetch(
-        `${apiPrefix}/api/recommend/${issueId}`,
+        `${apiPrefix}/api/recommend/${issueId}/stream`,
         { signal: abortController.signal }
       )
 
       if (!response.ok) {
         const errorData = await response.json()
-        // Handle rate limit (429) with free tier info
         if (response.status === 429 && errorData.freeTier) {
           throw Object.assign(new Error(errorData.error), { freeTier: errorData.freeTier })
         }
-        // Include detailed message if available (e.g., OpenRouter API errors)
         const errorMsg = errorData.message
           ? `${errorData.error}: ${errorData.message}`
           : errorData.error || 'Failed to get recommendation'
         throw new Error(errorMsg)
       }
 
-      const data = await response.json()
+      // Read SSE stream
+      await readSSEStream(response, (type, data) => {
+        if (activeRecommendFetch !== abortController) return
 
-      // Only update if this is still the active request
-      if (activeRecommendFetch === abortController) {
-        // Render reasoning as markdown
-        const reasoningText = data.truncated
-          ? '[Warning: Response may be incomplete due to length limit]\n\n' + data.reasoning
-          : data.reasoning
-        reasoning.innerHTML = renderMarkdown(reasoningText)
-        // Hide reasoning after loading (user can toggle to show)
-        reasoning.classList.add('hidden')
-        const toggleBtn = recommendContainer.querySelector('.reasoning-toggle')
-        if (toggleBtn) {
-          toggleBtn.classList.remove('hidden') // Show toggle after loading
-          toggleBtn.textContent = 'show reasoning'
-        }
-        if (promptText && data.prompt) {
-          // Store raw markdown for copy, render HTML for display
-          promptText.dataset.rawPrompt = data.prompt
-          promptText.innerHTML = renderMarkdown(data.prompt)
-          // Store repo from project description for dispatch
-          if (data.repo && promptDiv) {
-            promptDiv.dataset.repo = data.repo
-          } else if (promptDiv) {
-            delete promptDiv.dataset.repo
-          }
-          // Show the prompt section now that the prompt is ready
-          if (promptDiv) promptDiv.classList.remove('hidden')
-        }
+        switch (type) {
+          case 'phase':
+            // Update phase indicator
+            if (phaseIndicator) {
+              phaseIndicator.textContent = PHASE_LABELS[data.phase] || data.phase
+            }
+            // Show reasoning section when reasoning phase starts
+            if (data.phase === 'reasoning') {
+              reasoning.classList.remove('hidden')
+            }
+            // Show prompt section when prompt phase starts
+            if (data.phase === 'prompt') {
+              if (promptDiv) promptDiv.classList.remove('hidden')
+            }
+            break
 
-        // Show free tier usage info if applicable
-        if (data.freeTier) {
-          showFreeTierInfo(recommendContainer, data.freeTier)
-          updateFooterFreeTier(data.freeTier)
+          case 'delta':
+            if (data.section === 'reasoning') {
+              reasoningRaw += data.content
+              scheduleRender(reasoning, reasoningRaw)
+            } else if (data.section === 'prompt') {
+              promptRaw += data.content
+              if (promptText) scheduleRender(promptText, promptRaw)
+            }
+            break
+
+          case 'done':
+            // Finalize: do a final render to ensure completeness
+            if (reasoningRaw) {
+              const reasoningText = data.truncated
+                ? '[Warning: Response may be incomplete due to length limit]\n\n' + reasoningRaw
+                : reasoningRaw
+              reasoning.innerHTML = renderMarkdown(reasoningText)
+            }
+
+            // Hide reasoning, show toggle
+            reasoning.classList.add('hidden')
+            if (toggleBtn) {
+              toggleBtn.classList.remove('hidden')
+              toggleBtn.textContent = 'show reasoning'
+            }
+
+            if (promptText && promptRaw) {
+              promptText.dataset.rawPrompt = promptRaw
+              promptText.innerHTML = renderMarkdown(promptRaw)
+              if (promptDiv) promptDiv.classList.remove('hidden')
+            }
+
+            // Store repo for dispatch
+            if (data.repo && promptDiv) {
+              promptDiv.dataset.repo = data.repo
+            } else if (promptDiv) {
+              delete promptDiv.dataset.repo
+            }
+
+            // Free tier info
+            if (data.freeTier) {
+              showFreeTierInfo(recommendContainer, data.freeTier)
+              updateFooterFreeTier(data.freeTier)
+            }
+
+            // Hide phase indicator
+            if (phaseIndicator) phaseIndicator.classList.add('hidden')
+            break
+
+          case 'error':
+            reasoning.textContent = `Error: ${data.error}`
+            reasoning.classList.remove('hidden')
+            if (phaseIndicator) phaseIndicator.classList.add('hidden')
+            break
         }
-      }
+      })
     } catch (error) {
       // Ignore abort errors (user clicked away)
       if (error.name === 'AbortError') return
@@ -1629,21 +1744,19 @@ function initRecommendations() {
         updateFooterFreeTier(error.freeTier)
       } else {
         reasoning.textContent = `Error: ${error.message}`
-        reasoning.classList.remove('hidden') // Ensure visible for error
+        reasoning.classList.remove('hidden')
       }
       // Reasoning stays visible with error, so toggle should say "hide"
-      const toggleBtn = recommendContainer.querySelector('.reasoning-toggle')
       if (toggleBtn) {
-        toggleBtn.classList.remove('hidden') // Show toggle after loading
+        toggleBtn.classList.remove('hidden')
         toggleBtn.textContent = 'hide reasoning'
       }
+      if (phaseIndicator) phaseIndicator.classList.add('hidden')
       console.error('Failed to get recommendation:', error)
     } finally {
-      // Clear active fetch if this was it
       if (activeRecommendFetch === abortController) {
         activeRecommendFetch = null
       }
-      // Remove loading state
       suggestBtn.classList.remove('loading')
     }
   })

@@ -13,7 +13,7 @@ import { fetchIssueContext, fetchRecommendationContext, fetchIssueComments } fro
 import { generatePrompt, hasPrompt, getAvailablePrompts } from '../lib/prompt-templates.js';
 import { PREPARING_LABEL, WORK_ISSUE_LABELS } from '../lib/workflow-config.js';
 import { parseRepoFromDescription } from '../lib/prompt-formatters.js';
-import { isRecommendationEnabled, getRecommendation, DEFAULT_MODEL } from '../lib/openrouter.js';
+import { isRecommendationEnabled, getRecommendation, getRecommendationStream, DEFAULT_MODEL } from '../lib/openrouter.js';
 import { runAudit, computeAuditFromData } from '../lib/audit.js';
 import { UUID_REGEX } from '../lib/workspace.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
@@ -422,6 +422,243 @@ ${goal}`
       res.status(500).json({ error: 'Failed to get recommendation', message: error.message })
     }
   })
+
+  // ===========================================================================
+  // AI Recommendation Streaming API (SSE)
+  // ===========================================================================
+
+  /**
+   * Helper: write an SSE event to the response.
+   * @param {Object} res - Express response
+   * @param {string} type - Event type
+   * @param {Object} data - Event data (will be JSON-stringified)
+   */
+  function sendSSE(res, type, data) {
+    res.write(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`);
+  }
+
+  /**
+   * Generate mock recommendation content for test mode.
+   * Shared logic between streaming and non-streaming endpoints.
+   */
+  function generateMockRecommendation(mockIssue) {
+    const labels = (mockIssue.labels?.nodes || []).map(l => l.name);
+    let reasoning = 'Start by getting an overview of what this task involves before deciding on the next steps.';
+    let goal = 'Summarize what this task involves and how it fits into the broader project context.';
+
+    if (labels.includes(PREPARING_LABEL)) {
+      reasoning = 'This task needs preparation before implementation. Research, breakdown, or design work is needed.';
+      goal = 'Complete the necessary preparation work so this task is ready for implementation.';
+    } else if (labels.includes(WORK_ISSUE_LABELS.BLOCKED)) {
+      reasoning = 'This task is blocked. Analyzing the blocker will help identify ways to unblock progress.';
+      goal = 'Identify the blocker type and root cause, evaluate options to unblock, and recommend the best path.';
+    } else if (labels.includes(WORK_ISSUE_LABELS.BUG)) {
+      reasoning = 'This is a bug. Investigating the issue systematically will help find the root cause and fix.';
+      goal = 'Identify reproduction steps, hypothesize likely causes, and suggest a debugging approach.';
+    } else if (mockIssue.state?.type === 'backlog' || mockIssue.state?.type === 'unstarted') {
+      reasoning = 'This task is ready to start. Creating an implementation plan will provide a clear path forward.';
+      goal = 'Research the codebase, identify files to modify, and create a step-by-step implementation plan.';
+    }
+
+    const identifier = mockIssue.url?.split('/').pop() || 'ISSUE';
+
+    const prompt = `Help me with task ${identifier}
+
+## Context
+
+**Project:** Test Project
+**Status:** ${mockIssue.state?.name || 'Unknown'}
+${labels.length > 0 ? `**Labels:** ${labels.join(', ')}` : ''}
+
+## Goal
+
+${goal}`;
+
+    return { reasoning, prompt, identifier };
+  }
+
+  /**
+   * Stream AI-generated prompt for a task via Server-Sent Events.
+   * Delivers content incrementally with phase indicators.
+   *
+   * LIN-185: Streaming endpoint for dynamic AI suggestion UX.
+   *
+   * @route GET /workspace/:urlKey/api/recommend/:issueId/stream
+   * @param {string} issueId - The Linear issue ID
+   * @returns SSE stream with phase, delta, done, and error events
+   */
+  router.get('/workspace/:urlKey/api/recommend/:issueId/stream', workspaceFromUrl, async (req, res) => {
+    const workspace = req.workspace;
+    const { issueId } = req.params;
+
+    // --- Pre-flight validation (regular HTTP errors) ---
+
+    if (!UUID_REGEX.test(issueId)) {
+      return res.status(400).json({ error: 'Invalid issue ID format' });
+    }
+
+    const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
+    const sessionApiKey = req.session.openRouterApiKey;
+    const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
+    const isFreeTier = !sessionApiKey && !process.env.OPENROUTER_API_KEY && !!freeTierKey;
+
+    if (!isTestMode && !isRecommendationEnabled(sessionApiKey) && !freeTierKey) {
+      return res.status(503).json({ error: 'AI recommendation feature is not configured.' });
+    }
+
+    // Rate limiting (before streaming starts)
+    if (!isTestMode && isFreeTier) {
+      const check = await freeTierStore.tryUse(workspace.urlKey);
+      if (!check.allowed) {
+        return res.status(429).json({
+          error: check.reason,
+          freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt }
+        });
+      }
+    }
+
+    // --- Test mode: mock streaming ---
+
+    if (isTestMode) {
+      const mockIssue = testMockData.issues.find(i => i.id === issueId);
+      if (!mockIssue) {
+        return res.status(404).json({ error: 'Issue not found' });
+      }
+
+      // Free tier check in test mode
+      const testIsFreeTier = req.session.freeTierEnabled && !req.session.openRouterApiKey && !process.env.OPENROUTER_API_KEY;
+      if (testIsFreeTier) {
+        const check = await freeTierStore.tryUse(workspace.urlKey);
+        if (!check.allowed) {
+          return res.status(429).json({
+            error: check.reason,
+            freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt }
+          });
+        }
+      }
+
+      const { reasoning, prompt } = generateMockRecommendation(mockIssue);
+      const mockProject = testMockData.projects.find(p => p.id === mockIssue.project?.id);
+
+      // Start SSE
+      res.set({
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      });
+      res.flushHeaders();
+
+      // Emit phases and deltas
+      sendSSE(res, 'phase', { phase: 'fetching_context' });
+
+      // Split into multiple chunks to test assembly
+      sendSSE(res, 'phase', { phase: 'reasoning' });
+      const reasoningMid = Math.floor(reasoning.length / 2);
+      sendSSE(res, 'delta', { section: 'reasoning', content: reasoning.slice(0, reasoningMid) });
+      sendSSE(res, 'delta', { section: 'reasoning', content: reasoning.slice(reasoningMid) });
+
+      sendSSE(res, 'phase', { phase: 'prompt' });
+      const promptMid = Math.floor(prompt.length / 2);
+      sendSSE(res, 'delta', { section: 'prompt', content: prompt.slice(0, promptMid) });
+      sendSSE(res, 'delta', { section: 'prompt', content: prompt.slice(promptMid) });
+
+      // Done event with metadata
+      const doneData = {
+        truncated: false,
+        completionTokens: null,
+        issueUrl: mockIssue.url,
+        repo: parseRepoFromDescription(mockProject?.content)
+      };
+
+      if (testIsFreeTier) {
+        const usage = await freeTierStore.getUsage(workspace.urlKey);
+        doneData.freeTier = {
+          used: true,
+          remaining: usage.remaining,
+          limit: usage.limit,
+          resetsAt: usage.resetsAt
+        };
+      }
+
+      sendSSE(res, 'done', doneData);
+      res.end();
+      return;
+    }
+
+    // --- Production mode: real streaming ---
+
+    // Start SSE
+    res.set({
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    });
+    res.flushHeaders();
+
+    // Track client disconnection
+    const abortController = new AbortController();
+    let closed = false;
+    req.on('close', () => {
+      closed = true;
+      abortController.abort();
+    });
+
+    try {
+      // Phase 1: Fetch context from Linear
+      sendSSE(res, 'phase', { phase: 'fetching_context' });
+      const context = await fetchRecommendationContext(workspace.accessToken, issueId);
+      const { issue, parent, siblings, project, children, comments, focusedChild } = context;
+
+      if (closed) return;
+
+      // Phase 2: Stream AI recommendation
+      const selectedModel = req.session.modelId || DEFAULT_MODEL;
+      const apiKeyToUse = sessionApiKey || (isFreeTier ? freeTierKey : undefined);
+
+      await getRecommendationStream(
+        issue,
+        { parent, siblings, project, children, comments, focusedChild },
+        {
+          apiKey: apiKeyToUse,
+          model: selectedModel,
+          featureFlags: getFeatureFlags(req.session),
+          signal: abortController.signal
+        },
+        (type, data) => {
+          if (closed) return;
+          sendSSE(res, type, data);
+        }
+      );
+
+      if (closed) return;
+
+      // Amend done event with additional metadata
+      const doneData = {
+        issueUrl: issue.url,
+        repo: parseRepoFromDescription(project?.description)
+      };
+
+      if (isFreeTier) {
+        const usage = await freeTierStore.getUsage(workspace.urlKey);
+        doneData.freeTier = {
+          used: true,
+          remaining: usage.remaining,
+          limit: usage.limit,
+          resetsAt: usage.resetsAt
+        };
+      }
+
+      // The getRecommendationStream already emits a 'done' event with truncated/completionTokens.
+      // Send an additional metadata event with issueUrl, repo, freeTier.
+      sendSSE(res, 'metadata', doneData);
+    } catch (error) {
+      if (closed) return;
+      console.error('Streaming recommendation error:', error);
+      sendSSE(res, 'error', { error: error.message });
+    } finally {
+      if (!closed) res.end();
+    }
+  });
 
   // ===========================================================================
   // Comments API
