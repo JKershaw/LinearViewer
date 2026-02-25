@@ -551,6 +551,26 @@ async function loadDispatchHistory(urlKey, offset) {
 /**
  * Render dispatch history list
  */
+/**
+ * Render feedback entries for a history item
+ */
+function renderFeedbackEntries(feedback) {
+  if (!feedback || feedback.length === 0) return ''
+
+  const entries = feedback.map((f, i) => {
+    const isLast = i === feedback.length - 1
+    const prefix = isLast ? '\u2514\u2500' : '\u251c\u2500'
+    const time = formatDispatchTime(f.timestamp)
+    const urlHtml = f.url
+      ? ` <a class="feedback-link" href="${escapeHtml(f.url)}" target="_blank">${escapeHtml(f.urlLabel || 'link')}</a>`
+      : ''
+
+    return `<div class="feedback-entry"><span class="feedback-prefix">${prefix}</span> ${escapeHtml(f.message)}${urlHtml} <span class="feedback-time">\u00b7 ${time}</span></div>`
+  }).join('')
+
+  return `<div class="feedback-list">${entries}</div>`
+}
+
 function renderDispatchHistoryList(container, items, total, offset, urlKey) {
   if (items.length === 0 && offset === 0) {
     container.innerHTML = '<div class="history-list-empty">No dispatch history yet</div>'
@@ -577,17 +597,19 @@ function renderDispatchHistoryList(container, items, total, offset, urlKey) {
     const repoInfo = item.repo ? ` \u00b7 ${escapeHtml(item.repo)}` : ''
     const targetInfo = item.target && item.target !== 'cli' ? ` \u00b7 ${escapeHtml(item.target)}` : ''
     const hasPrompt = item.prompt && item.prompt.trim()
+    const hasFeedback = item.feedback && item.feedback.length > 0
     const expandableClass = hasPrompt ? ' expandable' : ''
     const promptHtml = hasPrompt
       ? `<div class="history-prompt">${formatPromptHtml(item.prompt)}</div>`
       : ''
+    const feedbackHtml = hasFeedback ? renderFeedbackEntries(item.feedback) : ''
 
     return `
       <div class="history-item${expandableClass}" data-status="${escapeHtml(item.status)}">
         <span class="history-status ${st.css}">${st.symbol}</span>
         <div class="history-info">
           <span class="history-name">${escapeHtml(item.promptName || 'Prompt')}</span>${issueHtml}
-          <div class="history-meta">dispatched ${dispatched} \u00b7 ${escapeHtml(item.status)} ${resolved}${tokenInfo}${repoInfo}${targetInfo}</div>${promptHtml}
+          <div class="history-meta">dispatched ${dispatched} \u00b7 ${escapeHtml(item.status)} ${resolved}${tokenInfo}${repoInfo}${targetInfo}</div>${promptHtml}${feedbackHtml}
         </div>
       </div>`
   }).join('')
@@ -621,6 +643,19 @@ function initDispatchHistory() {
 
   const urlKey = historyEl.dataset.urlKey
   loadDispatchHistory(urlKey, 0)
+
+  // Set up refresh button
+  const refreshBtn = document.querySelector('.history-refresh')
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', () => {
+      refreshBtn.textContent = 'refreshing...'
+      refreshBtn.disabled = true
+      loadDispatchHistory(urlKey, 0).then(() => {
+        refreshBtn.textContent = 'refresh'
+        refreshBtn.disabled = false
+      })
+    })
+  }
 
   // Delegated click handler for expanding history items
   historyEl.addEventListener('click', (e) => {

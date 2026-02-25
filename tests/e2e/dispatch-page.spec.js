@@ -519,6 +519,124 @@ test.describe('Dispatch Page', () => {
     });
   });
 
+  test.describe('Feedback in History', () => {
+    test.beforeEach(async ({ page }) => {
+      await page.goto('/test/clear-dispatch-queue');
+      await page.goto('/test/clear-dispatch-tokens');
+      await page.goto('/test/clear-dispatch-history');
+      await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+    });
+
+    test('history item with feedback shows feedback entries', async ({ page, request }) => {
+      // Set up: create token, dispatch, take, add feedback
+      const tokenResponse = await request.get('/test/create-dispatch-token');
+      const { token } = await tokenResponse.json();
+
+      await request.get(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+
+      const createResponse = await request.post(`${API_PREFIX}/api/dispatch`, {
+        data: { prompt: 'Test prompt', promptName: 'Feedback Test', issueIdentifier: 'LIN-42' }
+      });
+      const { item } = await createResponse.json();
+
+      await request.post(`/api/dispatch/take/${item.id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      await request.post(`/api/dispatch/feedback/${item.id}`, {
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        data: { message: 'Analyzing issue...' }
+      });
+
+      await request.post(`/api/dispatch/feedback/${item.id}`, {
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        data: { message: 'Created PR', url: 'https://example.com/pr/1', urlLabel: 'PR #1' }
+      });
+
+      await page.goto(DISPATCH_URL);
+      await page.waitForLoadState('networkidle');
+
+      // History item should show feedback entries
+      const historyItem = page.locator('.history-item[data-status="taken"]');
+      await expect(historyItem).toBeVisible();
+
+      const feedbackList = historyItem.locator('.feedback-list');
+      await expect(feedbackList).toBeVisible();
+
+      const feedbackEntries = historyItem.locator('.feedback-entry');
+      await expect(feedbackEntries).toHaveCount(2);
+
+      // First entry: message only
+      await expect(feedbackEntries.first()).toContainText('Analyzing issue...');
+
+      // Second entry: message with link
+      await expect(feedbackEntries.nth(1)).toContainText('Created PR');
+      const link = feedbackEntries.nth(1).locator('.feedback-link');
+      await expect(link).toBeVisible();
+      await expect(link).toHaveText('PR #1');
+      await expect(link).toHaveAttribute('href', 'https://example.com/pr/1');
+    });
+
+    test('history item without feedback shows no feedback section', async ({ page, request }) => {
+      await request.get(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+
+      const createResponse = await request.post(`${API_PREFIX}/api/dispatch`, {
+        data: { prompt: 'No feedback item', promptName: 'Plain Test' }
+      });
+      const { item } = await createResponse.json();
+      await request.delete(`${API_PREFIX}/api/dispatch/${item.id}`);
+
+      await page.goto(DISPATCH_URL);
+      await page.waitForLoadState('networkidle');
+
+      const historyItem = page.locator('.history-item');
+      await expect(historyItem).toBeVisible();
+
+      const feedbackList = historyItem.locator('.feedback-list');
+      await expect(feedbackList).toHaveCount(0);
+    });
+
+    test('refresh button reloads history', async ({ page, request }) => {
+      const tokenResponse = await request.get('/test/create-dispatch-token');
+      const { token } = await tokenResponse.json();
+
+      await request.get(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+
+      const createResponse = await request.post(`${API_PREFIX}/api/dispatch`, {
+        data: { prompt: 'Refresh test', promptName: 'Refresh Test' }
+      });
+      const { item } = await createResponse.json();
+
+      await request.post(`/api/dispatch/take/${item.id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      await page.goto(DISPATCH_URL);
+      await page.waitForLoadState('networkidle');
+
+      // Verify history shows item without feedback
+      const historyItem = page.locator('.history-item[data-status="taken"]');
+      await expect(historyItem).toBeVisible();
+      await expect(historyItem.locator('.feedback-list')).toHaveCount(0);
+
+      // Add feedback via API while page is open
+      await request.post(`/api/dispatch/feedback/${item.id}`, {
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        data: { message: 'Added after page load' }
+      });
+
+      // Click refresh button
+      const refreshBtn = page.locator('.history-refresh');
+      await expect(refreshBtn).toBeVisible();
+      await refreshBtn.click();
+
+      // Wait for feedback to appear
+      const feedbackList = page.locator('.history-item .feedback-list');
+      await expect(feedbackList).toBeVisible({ timeout: 5000 });
+      await expect(page.locator('.feedback-entry')).toContainText('Added after page load');
+    });
+  });
+
   test.describe('Navigation', () => {
     test('footer shows dispatch link when feature enabled', async ({ page }) => {
       await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);

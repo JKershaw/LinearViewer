@@ -18,6 +18,17 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 
 // Rate limiters for dispatch endpoints to prevent abuse
+// Consumer feedback: 100 requests per minute per IP
+const feedbackLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many feedback requests, please try again later' },
+  // Skip rate limiting in test mode
+  skip: () => process.env.NODE_ENV === 'test'
+});
+
 // Dispatch queue: 30 requests per minute per IP (reasonable for adding prompts)
 const dispatchQueueLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
@@ -47,6 +58,7 @@ const MAX_PROMPT_LENGTH = 10000000;    // 10MB max for prompt content
 const MAX_NAME_LENGTH = 1000;          // Names/labels/titles
 const MAX_URL_LENGTH = 8000;           // URLs (covers long query strings)
 const MAX_IDENTIFIER_LENGTH = 100;     // Issue identifiers
+const MAX_FEEDBACK_MESSAGE_LENGTH = 2000; // Feedback message
 
 // Pattern to detect null bytes and dangerous control characters (except common whitespace)
 const DANGEROUS_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
@@ -477,6 +489,65 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     } catch (err) {
       console.error('Take error:', err.message);
       res.status(500).json({ error: 'Failed to take item' });
+    }
+  });
+
+  /**
+   * POST /api/dispatch/feedback/:itemId
+   * Post feedback on a taken item.
+   * Requires token authentication. Only the token that took the item can post feedback.
+   * Rate limited to 100 requests per minute per IP.
+   */
+  router.post('/api/dispatch/feedback/:itemId', feedbackLimiter, authenticateDispatchToken, async (req, res) => {
+    const { itemId } = req.params;
+
+    // Validate itemId format
+    if (!UUID_REGEX.test(itemId)) {
+      return res.status(400).json({ error: 'Invalid item ID format' });
+    }
+
+    const { message, url, urlLabel } = req.body;
+
+    // Validate required fields
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({ error: 'message is required and must be a string' });
+    }
+
+    // Validate lengths
+    if (message.length > MAX_FEEDBACK_MESSAGE_LENGTH) {
+      return res.status(400).json({ error: `message exceeds maximum length of ${MAX_FEEDBACK_MESSAGE_LENGTH}` });
+    }
+    if (url && url.length > MAX_URL_LENGTH) {
+      return res.status(400).json({ error: `url exceeds maximum length of ${MAX_URL_LENGTH}` });
+    }
+    if (urlLabel && urlLabel.length > MAX_NAME_LENGTH) {
+      return res.status(400).json({ error: `urlLabel exceeds maximum length of ${MAX_NAME_LENGTH}` });
+    }
+
+    // Reject dangerous characters
+    if (DANGEROUS_CHARS_REGEX.test(message)) {
+      return res.status(400).json({ error: 'message contains invalid characters' });
+    }
+    if (urlLabel && DANGEROUS_CHARS_REGEX.test(urlLabel)) {
+      return res.status(400).json({ error: 'urlLabel contains invalid characters' });
+    }
+
+    try {
+      const result = await dispatchQueueStore.addFeedback(
+        itemId,
+        req.dispatchUrlKey,
+        { message, url: url || null, urlLabel: urlLabel || null },
+        req.dispatchTokenLabel
+      );
+
+      if (!result) {
+        return res.status(404).json({ error: 'Item not found or feedback not allowed' });
+      }
+
+      res.json(result);
+    } catch (err) {
+      console.error('Feedback error:', err.message);
+      res.status(500).json({ error: 'Failed to post feedback' });
     }
   });
 
