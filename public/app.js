@@ -1275,7 +1275,7 @@ function renderQueueItems(panel, items, urlKey) {
     const time = new Date(item.dispatchedAt).toLocaleString()
     const title = item.issueTitle || item.promptName || 'Prompt'
     const target = item.target || 'cli'
-    const metaParts = [item.issueIdentifier, target, time].filter(Boolean)
+    const metaParts = [item.issueIdentifier, item.repo, target, time].filter(Boolean)
     const meta = metaParts.join(' \u00b7 ')
 
     return `
