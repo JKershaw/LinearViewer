@@ -549,9 +549,6 @@ async function loadDispatchHistory(urlKey, offset) {
 }
 
 /**
- * Render dispatch history list
- */
-/**
  * Render feedback entries for a history item
  */
 function renderFeedbackEntries(feedback) {
@@ -650,7 +647,7 @@ function initDispatchHistory() {
     refreshBtn.addEventListener('click', () => {
       refreshBtn.textContent = 'refreshing...'
       refreshBtn.disabled = true
-      loadDispatchHistory(urlKey, 0).then(() => {
+      loadDispatchHistory(urlKey, 0).finally(() => {
         refreshBtn.textContent = 'refresh'
         refreshBtn.disabled = false
       })
