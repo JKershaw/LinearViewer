@@ -226,7 +226,7 @@ function renderDispatchQueueList(container, items, urlKey) {
     const time = new Date(item.dispatchedAt).toLocaleString()
     const title = item.issueTitle || item.promptName || 'Prompt'
     const target = item.target || 'cli'
-    const metaParts = [item.issueIdentifier, target, time].filter(Boolean)
+    const metaParts = [item.issueIdentifier, item.repo, target, time].filter(Boolean)
     const meta = metaParts.join(' \u00b7 ')
 
     return `
@@ -574,6 +574,8 @@ function renderDispatchHistoryList(container, items, total, offset, urlKey) {
     const dispatched = formatDispatchTime(item.dispatchedAt)
     const resolved = formatDispatchTime(item.resolvedAt)
     const tokenInfo = item.takenByTokenLabel ? ` \u00b7 by ${escapeHtml(item.takenByTokenLabel)}` : ''
+    const repoInfo = item.repo ? ` \u00b7 ${escapeHtml(item.repo)}` : ''
+    const targetInfo = item.target && item.target !== 'cli' ? ` \u00b7 ${escapeHtml(item.target)}` : ''
     const hasPrompt = item.prompt && item.prompt.trim()
     const expandableClass = hasPrompt ? ' expandable' : ''
     const promptHtml = hasPrompt
@@ -585,7 +587,7 @@ function renderDispatchHistoryList(container, items, total, offset, urlKey) {
         <span class="history-status ${st.css}">${st.symbol}</span>
         <div class="history-info">
           <span class="history-name">${escapeHtml(item.promptName || 'Prompt')}</span>${issueHtml}
-          <div class="history-meta">dispatched ${dispatched} \u00b7 ${escapeHtml(item.status)} ${resolved}${tokenInfo}</div>${promptHtml}
+          <div class="history-meta">dispatched ${dispatched} \u00b7 ${escapeHtml(item.status)} ${resolved}${tokenInfo}${repoInfo}${targetInfo}</div>${promptHtml}
         </div>
       </div>`
   }).join('')
