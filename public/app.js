@@ -6,6 +6,17 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 let queuePollIntervalId = null
 const QUEUE_POLL_INTERVAL_MS = 1000
 
+/**
+ * Strip markdown code block fences from prompt text.
+ * AI models sometimes wrap generated prompts in backtick fences.
+ * @param {string} text - Text that may be wrapped in code block markers
+ * @returns {string} Text with outer code block markers removed
+ */
+function stripCodeBlockFences(text) {
+  if (!text) return text
+  return text.replace(/^```[^\n]*\n?/, '').replace(/\n?```\s*$/, '').trim()
+}
+
 // ==========================================================================
 // Markdown Rendering (using marked.js library)
 // ==========================================================================
@@ -997,7 +1008,8 @@ function initPrompts() {
     if (!promptText) return
 
     // Use raw markdown from data attribute, fall back to textContent
-    const textToCopy = promptText.dataset.rawPrompt || promptText.textContent
+    // Strip any backtick code fences the AI may have wrapped the prompt in
+    const textToCopy = stripCodeBlockFences(promptText.dataset.rawPrompt || promptText.textContent)
 
     try {
       await navigator.clipboard.writeText(textToCopy)
@@ -1028,8 +1040,8 @@ function initPrompts() {
     const promptNameEl = promptContainer?.querySelector('.prompt-name')
     if (!promptText) return
 
-    // Get the prompt content
-    const prompt = promptText.dataset.rawPrompt || promptText.textContent
+    // Get the prompt content, stripping any backtick code fences
+    const prompt = stripCodeBlockFences(promptText.dataset.rawPrompt || promptText.textContent)
     const promptName = promptNameEl?.textContent || 'Prompt'
 
     // Read target from button's data-target attribute (defaults to 'cli')
