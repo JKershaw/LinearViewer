@@ -479,6 +479,49 @@
   margin-top: 0.15rem;
 }
 
+/* Feedback entries within history items */
+.feedback-list {
+  margin-top: 0.35rem;
+  padding-left: 0.25rem;
+}
+
+.feedback-entry {
+  font-size: 0.85em;
+  color: var(--fg);
+  padding: 0.1rem 0;
+  word-break: break-word;
+}
+
+.feedback-prefix {
+  font-family: var(--font-structural);
+  color: var(--fg-dim);
+}
+
+.feedback-link {
+  color: var(--blue);
+  text-decoration: none;
+}
+
+.feedback-link:hover {
+  text-decoration: underline;
+}
+
+.feedback-time {
+  color: var(--fg-dim);
+  font-size: 0.9em;
+}
+
+/* History refresh button */
+.history-refresh {
+  color: var(--fg-dim);
+  font-size: 0.85em;
+  vertical-align: middle;
+}
+
+.history-refresh:hover {
+  color: var(--fg);
+}
+
 .history-show-more {
   display: block;
   margin-top: 0.75rem;

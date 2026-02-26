@@ -1124,6 +1124,210 @@ test.describe('Dispatch History API', () => {
   });
 });
 
+test.describe('Consumer Feedback API', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/test/clear-dispatch-queue');
+    await page.goto('/test/clear-dispatch-tokens');
+    await page.goto('/test/clear-dispatch-history');
+  });
+
+  /**
+   * Helper: create a token, dispatch an item, take it, and return all references
+   */
+  async function setupTakenItem(request) {
+    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const { token } = await tokenResponse.json();
+
+    await request.get('/test/set-session');
+
+    const createResponse = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: { prompt: 'Test prompt', promptName: 'Feedback Test', issueIdentifier: 'LIN-42' }
+    });
+    const { item } = await createResponse.json();
+
+    await request.post(`/api/dispatch/take/${item.id}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    return { token, itemId: item.id };
+  }
+
+  test('can post feedback on a taken item', async ({ request }) => {
+    const { token, itemId } = await setupTakenItem(request);
+
+    const response = await request.post(`/api/dispatch/feedback/${itemId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      data: { message: 'Working on it...' }
+    });
+
+    expect(response.status()).toBe(200);
+    const data = await response.json();
+    expect(data.success).toBe(true);
+    expect(data.feedbackCount).toBe(1);
+  });
+
+  test('feedback appears in history API', async ({ request }) => {
+    const { token, itemId } = await setupTakenItem(request);
+
+    await request.post(`/api/dispatch/feedback/${itemId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      data: { message: 'Analyzing issue...', url: 'https://example.com/pr/1', urlLabel: 'PR #1' }
+    });
+
+    await request.get('/test/set-session');
+    const historyResponse = await request.get(`${API_PREFIX}/api/dispatch/history`);
+    const { items } = await historyResponse.json();
+
+    expect(items.length).toBe(1);
+    expect(items[0].feedback).toBeDefined();
+    expect(items[0].feedback.length).toBe(1);
+    expect(items[0].feedback[0].message).toBe('Analyzing issue...');
+    expect(items[0].feedback[0].url).toBe('https://example.com/pr/1');
+    expect(items[0].feedback[0].urlLabel).toBe('PR #1');
+    expect(items[0].feedback[0].timestamp).toBeDefined();
+  });
+
+  test('multiple feedback entries accumulate', async ({ request }) => {
+    const { token, itemId } = await setupTakenItem(request);
+
+    await request.post(`/api/dispatch/feedback/${itemId}`, {
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      data: { message: 'Starting work...' }
+    });
+
+    await request.post(`/api/dispatch/feedback/${itemId}`, {
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      data: { message: 'Done!', url: 'https://example.com/result' }
+    });
+
+    await request.get('/test/set-session');
+    const historyResponse = await request.get(`${API_PREFIX}/api/dispatch/history`);
+    const { items } = await historyResponse.json();
+
+    expect(items[0].feedback.length).toBe(2);
+    expect(items[0].feedback[0].message).toBe('Starting work...');
+    expect(items[0].feedback[1].message).toBe('Done!');
+  });
+
+  test('feedback returns 401 without token', async ({ request }) => {
+    const response = await request.post('/api/dispatch/feedback/00000000-0000-0000-0000-000000000000', {
+      data: { message: 'test' }
+    });
+    expect(response.status()).toBe(401);
+  });
+
+  test('feedback returns 400 without message', async ({ request }) => {
+    const { token, itemId } = await setupTakenItem(request);
+
+    const response = await request.post(`/api/dispatch/feedback/${itemId}`, {
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      data: {}
+    });
+    expect(response.status()).toBe(400);
+  });
+
+  test('feedback returns 400 for javascript: url (XSS prevention)', async ({ request }) => {
+    const { token, itemId } = await setupTakenItem(request);
+
+    const response = await request.post(`/api/dispatch/feedback/${itemId}`, {
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      data: { message: 'xss attempt', url: 'javascript:alert(document.cookie)' }
+    });
+    expect(response.status()).toBe(400);
+    const body = await response.json();
+    expect(body.error).toContain('http');
+  });
+
+  test('feedback returns 400 for data: url', async ({ request }) => {
+    const { token, itemId } = await setupTakenItem(request);
+
+    const response = await request.post(`/api/dispatch/feedback/${itemId}`, {
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      data: { message: 'data uri attempt', url: 'data:text/html,<script>alert(1)</script>' }
+    });
+    expect(response.status()).toBe(400);
+  });
+
+  test('feedback returns 400 for invalid item ID', async ({ request }) => {
+    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const { token } = await tokenResponse.json();
+
+    const response = await request.post('/api/dispatch/feedback/not-a-uuid', {
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      data: { message: 'test' }
+    });
+    expect(response.status()).toBe(400);
+  });
+
+  test('feedback returns 404 for non-existent item', async ({ request }) => {
+    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const { token } = await tokenResponse.json();
+
+    const response = await request.post('/api/dispatch/feedback/00000000-0000-0000-0000-000000000000', {
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      data: { message: 'test' }
+    });
+    expect(response.status()).toBe(404);
+  });
+
+  test('feedback returns 404 for cancelled item', async ({ request }) => {
+    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const { token } = await tokenResponse.json();
+
+    await request.get('/test/set-session');
+
+    const createResponse = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: { prompt: 'Test', promptName: 'Test' }
+    });
+    const { item } = await createResponse.json();
+
+    // Cancel instead of take
+    await request.delete(`${API_PREFIX}/api/dispatch/${item.id}`);
+
+    const response = await request.post(`/api/dispatch/feedback/${item.id}`, {
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      data: { message: 'test' }
+    });
+    expect(response.status()).toBe(404);
+  });
+
+  test('feedback enforces strict ownership (different token rejected)', async ({ request }) => {
+    const { itemId } = await setupTakenItem(request);
+
+    // Create a second token with a different label
+    const token2Response = await request.get('/test/create-dispatch-token?label=other-agent');
+    const { token: token2 } = await token2Response.json();
+
+    const response = await request.post(`/api/dispatch/feedback/${itemId}`, {
+      headers: { 'Authorization': `Bearer ${token2}`, 'Content-Type': 'application/json' },
+      data: { message: 'From different token' }
+    });
+    expect(response.status()).toBe(404);
+  });
+
+  test('feedback without url does not include url in history', async ({ request }) => {
+    const { token, itemId } = await setupTakenItem(request);
+
+    await request.post(`/api/dispatch/feedback/${itemId}`, {
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      data: { message: 'No link here' }
+    });
+
+    await request.get('/test/set-session');
+    const historyResponse = await request.get(`${API_PREFIX}/api/dispatch/history`);
+    const { items } = await historyResponse.json();
+
+    expect(items[0].feedback[0].url).toBeNull();
+    expect(items[0].feedback[0].urlLabel).toBeNull();
+  });
+});
+
 test.describe('Dispatch History UI', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/test/clear-dispatch-queue');

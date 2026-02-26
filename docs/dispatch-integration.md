@@ -23,6 +23,12 @@ curl -H "Authorization: Bearer YOUR_TOKEN" \
 # 2. Take an item atomically
 curl -X POST -H "Authorization: Bearer YOUR_TOKEN" \
   https://your-instance.com/api/dispatch/take/ITEM_ID
+
+# 3. Post feedback after processing
+curl -X POST -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Done!", "url": "https://github.com/repo/pull/1"}' \
+  https://your-instance.com/api/dispatch/feedback/ITEM_ID
 ```
 
 ## Authentication
@@ -134,6 +140,51 @@ Authorization: Bearer <token>
 }
 ```
 
+### Post Feedback
+
+After taking an item, consumers can post feedback to report progress, results, or links back to the user.
+
+```
+POST /api/dispatch/feedback/:itemId
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "message": "Analyzing issue LIN-42...",
+  "url": "https://github.com/repo/pull/42",
+  "urlLabel": "Pull Request #42"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `message` | string | Yes | Feedback message (max 2000 chars) |
+| `url` | string | No | Link URL (e.g., PR, deployment) |
+| `urlLabel` | string | No | Display text for the link |
+
+**Constraints:**
+- Only the token that took the item can post feedback (strict ownership)
+- Only items with `status: 'taken'` accept feedback
+- Maximum 20 feedback entries per item
+- Rate limited to ~100 requests per minute per token
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "feedbackCount": 1
+}
+```
+
+**Error Response (404):**
+```json
+{
+  "error": "Item not found or feedback not allowed"
+}
+```
+
+Feedback entries are displayed in the dispatch history UI and inherit the 30-day history TTL.
+
 ## Queue Item Schema
 
 | Field | Type | Description |
@@ -182,6 +233,8 @@ Items without a `target` field default to `"cli"` for backward compatibility.
 | 401 | `Invalid or expired token` | Token doesn't exist or was revoked |
 | 400 | `Invalid item ID format` | Item ID is not a valid UUID |
 | 404 | `Item not found or already taken` | Item doesn't exist, expired, or was claimed |
+| 404 | `Item not found or feedback not allowed` | Item doesn't exist, not taken, or wrong token |
+| 429 | `Too many feedback requests` | Rate limit exceeded (~100/min) |
 | 500 | `Failed to poll dispatch queue` | Server error |
 
 ## Building a Consumer
@@ -237,7 +290,33 @@ async function pollAndProcess() {
 async function processPrompt(item) {
   console.log(`Processing: ${item.promptName} (${item.issueIdentifier || 'no issue'})`);
   console.log(`Prompt: ${item.prompt}`);
+
+  // Post feedback to report progress
+  await fetch(`${API_BASE}/api/dispatch/feedback/${item.id}`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${TOKEN}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ message: 'Working on it...' })
+  });
+
   // Your processing logic here
+  const result = await doWork(item);
+
+  // Post completion feedback with a link
+  await fetch(`${API_BASE}/api/dispatch/feedback/${item.id}`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${TOKEN}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      message: 'Created pull request',
+      url: result.prUrl,
+      urlLabel: `PR #${result.prNumber}`
+    })
+  });
 }
 
 // Start polling loop

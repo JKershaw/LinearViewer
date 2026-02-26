@@ -127,11 +127,13 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   })
 
   // Endpoint to create a dispatch token for testing
+  // Optional query parameter: ?label=custom-label (default: 'test-token')
   router.get('/test/create-dispatch-token', async (req, res) => {
     try {
+      const label = req.query.label || 'test-token'
       const { tokenId, token } = await dispatchTokenStore.createToken(
         'test-workspace',
-        'test-token'
+        label
       )
       res.json({ tokenId, token })
     } catch (err) {
