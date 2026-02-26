@@ -194,7 +194,7 @@ The Dispatch feature allows users to queue prompts for external consumers (AI ag
 - `POST /api/dispatch/feedback/:itemId` - Post feedback on a taken item
 
 Items expire after 24 hours. Tokens are workspace-scoped and never expire (but can be revoked).
-Feedback is append-only (max 20 entries per item), inherits 30-day history TTL, and requires strict token ownership.
+Feedback is append-only, inherits 30-day history TTL, and requires strict token ownership.
 
 **See [docs/dispatch-integration.md](docs/dispatch-integration.md)** for the full consumer integration guide.
 

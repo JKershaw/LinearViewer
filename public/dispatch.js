@@ -537,7 +537,7 @@ async function loadDispatchHistory(urlKey, offset) {
   if (!historyEl) return
 
   try {
-    const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/history?limit=20&offset=${offset}`)
+    const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/history?offset=${offset}`)
     if (!response.ok) throw new Error('Failed to load history')
 
     const { items, total } = await response.json()

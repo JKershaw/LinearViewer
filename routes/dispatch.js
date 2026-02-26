@@ -248,7 +248,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const { workspace } = req;
 
     try {
-      const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
+      const limit = req.query.limit ? Math.min(Math.max(parseInt(req.query.limit, 10), 1), 100) : undefined;
       const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
 
       const result = await dispatchQueueStore.listHistory(workspace.urlKey, { limit, offset });

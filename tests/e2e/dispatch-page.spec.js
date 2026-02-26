@@ -437,7 +437,7 @@ test.describe('Dispatch Page', () => {
       await expect(historyItem.locator('.history-status')).toHaveClass(/status-cancelled/);
     });
 
-    test('show more button loads additional items', async ({ page, request }) => {
+    test('all history items load without pagination', async ({ page, request }) => {
       await request.get(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
 
       // Create 25 history items
@@ -452,16 +452,11 @@ test.describe('Dispatch Page', () => {
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
 
-      // Should show 20 items initially
+      // Should show all 25 items at once (no pagination limit)
       const items = page.locator('.history-item');
-      await expect(items).toHaveCount(20);
-
-      const showMore = page.locator('.history-show-more');
-      await expect(showMore).toBeVisible();
-      await expect(showMore).toContainText('20/25');
-
-      await showMore.click();
       await expect(items).toHaveCount(25);
+
+      // No show more button needed
       await expect(page.locator('.history-show-more')).toHaveCount(0);
     });
 

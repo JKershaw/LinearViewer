@@ -1403,10 +1403,10 @@ test.describe('Dispatch History UI', () => {
     await expect(historyItem.locator('.history-name')).toContainText('Cancel Test');
   });
 
-  test('show more button loads additional items', async ({ page, request }) => {
+  test('all history items load without pagination', async ({ page, request }) => {
     await request.get(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
 
-    // Create 25 history items (more than one page of 20)
+    // Create 25 history items
     for (let i = 1; i <= 25; i++) {
       const resp = await request.post(`${API_PREFIX}/api/dispatch`, {
         data: { prompt: `Prompt ${i}`, promptName: `Item ${i}` }
@@ -1418,22 +1418,11 @@ test.describe('Dispatch History UI', () => {
     await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/dispatch`);
     await page.waitForLoadState('networkidle');
 
-    // Should show 20 items initially
+    // Should show all 25 items at once (no pagination limit)
     const items = page.locator('.history-item');
-    await expect(items).toHaveCount(20);
-
-    // Show more button should be visible
-    const showMore = page.locator('.history-show-more');
-    await expect(showMore).toBeVisible();
-    await expect(showMore).toContainText('20/25');
-
-    // Click show more
-    await showMore.click();
-
-    // Should now show all 25 items
     await expect(items).toHaveCount(25);
 
-    // Show more button should be gone
+    // No show more button needed
     await expect(page.locator('.history-show-more')).toHaveCount(0);
   });
 });

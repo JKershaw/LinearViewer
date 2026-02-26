@@ -165,7 +165,6 @@ Content-Type: application/json
 **Constraints:**
 - Only the token that took the item can post feedback (strict ownership)
 - Only items with `status: 'taken'` accept feedback
-- Maximum 20 feedback entries per item
 - Rate limited to ~100 requests per minute per token
 
 **Success Response (200):**
