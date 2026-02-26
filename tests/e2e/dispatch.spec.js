@@ -1232,6 +1232,28 @@ test.describe('Consumer Feedback API', () => {
     expect(response.status()).toBe(400);
   });
 
+  test('feedback returns 400 for javascript: url (XSS prevention)', async ({ request }) => {
+    const { token, itemId } = await setupTakenItem(request);
+
+    const response = await request.post(`/api/dispatch/feedback/${itemId}`, {
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      data: { message: 'xss attempt', url: 'javascript:alert(document.cookie)' }
+    });
+    expect(response.status()).toBe(400);
+    const body = await response.json();
+    expect(body.error).toContain('http');
+  });
+
+  test('feedback returns 400 for data: url', async ({ request }) => {
+    const { token, itemId } = await setupTakenItem(request);
+
+    const response = await request.post(`/api/dispatch/feedback/${itemId}`, {
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      data: { message: 'data uri attempt', url: 'data:text/html,<script>alert(1)</script>' }
+    });
+    expect(response.status()).toBe(400);
+  });
+
   test('feedback returns 400 for invalid item ID', async ({ request }) => {
     const tokenResponse = await request.get('/test/create-dispatch-token');
     const { token } = await tokenResponse.json();

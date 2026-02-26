@@ -532,6 +532,18 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       return res.status(400).json({ error: 'urlLabel contains invalid characters' });
     }
 
+    // Block javascript: and other dangerous URL schemes
+    if (url) {
+      try {
+        const parsed = new URL(url);
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+          return res.status(400).json({ error: 'url must use http or https protocol' });
+        }
+      } catch {
+        return res.status(400).json({ error: 'url must be a valid URL' });
+      }
+    }
+
     try {
       const result = await dispatchQueueStore.addFeedback(
         itemId,

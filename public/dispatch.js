@@ -558,7 +558,8 @@ function renderFeedbackEntries(feedback) {
     const isLast = i === feedback.length - 1
     const prefix = isLast ? '\u2514\u2500' : '\u251c\u2500'
     const time = formatDispatchTime(f.timestamp)
-    const urlHtml = f.url
+    const isSafeUrl = f.url && /^https?:\/\//i.test(f.url)
+    const urlHtml = isSafeUrl
       ? ` <a class="feedback-link" href="${escapeHtml(f.url)}" target="_blank">${escapeHtml(f.urlLabel || 'link')}</a>`
       : ''
 
