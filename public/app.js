@@ -903,6 +903,18 @@ function hideIssuePromptUI(detailsContainer, issueId) {
 }
 
 /**
+ * Toggle disabled state on prompt action buttons (dispatch + copy) within a container.
+ * LIN-191: Prevents interaction while prompts are loading or streaming.
+ * @param {Element} container - Parent element containing .prompt-actions buttons
+ * @param {boolean} disabled - Whether buttons should be disabled
+ */
+function setPromptActionsDisabled(container, disabled) {
+  if (!container) return
+  const buttons = container.querySelectorAll('.prompt-actions button')
+  buttons.forEach(btn => { btn.disabled = disabled })
+}
+
+/**
  * Initialize prompt functionality for clickable labels
  */
 function initPrompts() {
@@ -952,6 +964,9 @@ function initPrompts() {
     promptContainer.classList.remove('hidden')
     promptContainer.dataset.activeLabel = labelName
 
+    // LIN-191: Disable dispatch/copy buttons while loading
+    setPromptActionsDisabled(promptContainer, true)
+
     try {
       // Get workspace URL key from data attribute (workspace-prefixed URLs)
       const urlKey = promptContainer.dataset.urlKey
@@ -980,6 +995,8 @@ function initPrompts() {
         } else {
           delete promptContainer.dataset.repo
         }
+        // LIN-191: Enable dispatch/copy buttons now content is loaded
+        setPromptActionsDisabled(promptContainer, false)
       }
     } catch (error) {
       // Ignore abort errors (user clicked away)
@@ -1002,6 +1019,9 @@ function initPrompts() {
 
     e.preventDefault()
     e.stopPropagation()
+
+    // LIN-191: Ignore clicks on disabled buttons
+    if (copyBtn.disabled) return
 
     const promptContainer = copyBtn.closest('.prompt-container, .recommend-prompt')
     const promptText = promptContainer?.querySelector('.prompt-text')
@@ -1034,6 +1054,9 @@ function initPrompts() {
 
     e.preventDefault()
     e.stopPropagation()
+
+    // LIN-191: Ignore clicks on disabled buttons
+    if (dispatchBtn.disabled) return
 
     const promptContainer = dispatchBtn.closest('.prompt-container, .recommend-prompt')
     const promptText = promptContainer?.querySelector('.prompt-text')
@@ -1621,7 +1644,11 @@ function initRecommendations() {
       promptText.textContent = ''
       delete promptText.dataset.rawPrompt
     }
-    if (promptDiv) promptDiv.classList.add('hidden')
+    if (promptDiv) {
+      promptDiv.classList.add('hidden')
+      // LIN-191: Disable dispatch/copy buttons while streaming
+      setPromptActionsDisabled(promptDiv, true)
+    }
     recommendContainer.classList.remove('hidden')
 
     // Show phase indicator
@@ -1734,6 +1761,9 @@ function initRecommendations() {
 
             // Hide phase indicator
             if (phaseIndicator) phaseIndicator.classList.add('hidden')
+
+            // LIN-191: Enable dispatch/copy buttons now streaming is complete
+            setPromptActionsDisabled(promptDiv, false)
             break
 
           case 'error':

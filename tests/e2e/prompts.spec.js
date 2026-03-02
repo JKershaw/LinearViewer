@@ -206,6 +206,31 @@ test.describe('Promptable Labels', () => {
     await expect(copyButton).toHaveText('copy', { timeout: 3000 });
   });
 
+  test('LIN-191: copy button enabled only after prompt loads', async ({ page }) => {
+    // Find and expand the task with blocked label
+    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
+    await taskLine.click();
+
+    // Expand Prompts section
+    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
+    // Reveal hidden prompts (blocked is behind "more")
+    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
+    // Click the promptable label
+    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
+    await labelLink.click();
+
+    // Wait for prompt to load
+    const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
+    await expect(promptContainer).toBeVisible();
+    await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
+
+    // Copy button should now be enabled
+    const copyButton = promptContainer.locator('.prompt-copy');
+    await expect(copyButton).toBeEnabled();
+  });
+
   test('prompt container has correct structure', async ({ page }) => {
     // Find and expand the task
     const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
