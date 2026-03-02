@@ -39,7 +39,7 @@ test.describe('Dispatch Queue', () => {
     await page.waitForLoadState('networkidle');
   });
 
-  test('two dispatch buttons appear in prompt container with correct targets', async ({ page }) => {
+  test('three dispatch buttons appear in prompt container with correct targets', async ({ page }) => {
     // Find and expand a task with prompts
     const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
@@ -61,17 +61,21 @@ test.describe('Dispatch Queue', () => {
     // Wait for prompt to load
     await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
 
-    // Verify two dispatch buttons exist with correct data-target attributes
+    // Verify three dispatch buttons exist with correct data-target attributes
     const dispatchBtns = promptContainer.locator('.prompt-dispatch');
-    await expect(dispatchBtns).toHaveCount(2);
+    await expect(dispatchBtns).toHaveCount(3);
 
     const cliBtn = promptContainer.locator('.prompt-dispatch[data-target="cli"]');
     await expect(cliBtn).toBeVisible();
-    await expect(cliBtn).toHaveText('dispatch');
+    await expect(cliBtn).toHaveText('cli');
 
     const webBtn = promptContainer.locator('.prompt-dispatch[data-target="web"]');
     await expect(webBtn).toBeVisible();
-    await expect(webBtn).toContainText('web');
+    await expect(webBtn).toHaveText('web');
+
+    const dashBtn = promptContainer.locator('.prompt-dispatch[data-target="dash"]');
+    await expect(dashBtn).toBeVisible();
+    await expect(dashBtn).toHaveText('dash');
   });
 
   test('clicking dispatch adds item to queue and shows feedback', async ({ page }) => {
@@ -100,8 +104,8 @@ test.describe('Dispatch Queue', () => {
     // Should show "dispatched!" feedback
     await expect(dispatchBtn).toHaveText('dispatched!');
 
-    // Should revert to "dispatch" after timeout
-    await expect(dispatchBtn).toHaveText('dispatch', { timeout: 3000 });
+    // Should revert to "cli" after timeout
+    await expect(dispatchBtn).toHaveText('cli', { timeout: 3000 });
   });
 
   test('dispatching a prompt includes repo from project description', async ({ page, request }) => {
@@ -426,6 +430,29 @@ test.describe('Dispatch API', () => {
     const listResponse = await request.get(`${API_PREFIX}/api/dispatch`);
     const listData = await listResponse.json();
     expect(listData.items[0].target).toBe('web');
+  });
+
+  test('POST /api/dispatch with target=dash stores target correctly', async ({ request }) => {
+    await request.get('/test/set-session');
+
+    const response = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: {
+        prompt: 'Dash prompt content',
+        promptName: 'Dash Prompt',
+        target: 'dash'
+      }
+    });
+
+    expect(response.status()).toBe(201);
+
+    const data = await response.json();
+    expect(data.success).toBe(true);
+    expect(data.item.target).toBe('dash');
+
+    // Verify via list endpoint
+    const listResponse = await request.get(`${API_PREFIX}/api/dispatch`);
+    const listData = await listResponse.json();
+    expect(listData.items[0].target).toBe('dash');
   });
 
   test('POST /api/dispatch without target defaults to cli', async ({ request }) => {
@@ -781,16 +808,21 @@ test.describe('Custom Prompt Dispatch', () => {
     await expect(textarea).toBeVisible();
     await expect(textarea).toHaveAttribute('placeholder', 'Type a custom prompt or /command...');
 
-    // Verify two dispatch buttons with correct targets
+    // Verify three dispatch buttons with correct targets
     const buttons = page.locator('.dispatch-prompt-send');
-    await expect(buttons).toHaveCount(2);
+    await expect(buttons).toHaveCount(3);
 
     const cliBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
     await expect(cliBtn).toBeVisible();
-    await expect(cliBtn).toHaveText('dispatch');
+    await expect(cliBtn).toHaveText('cli');
 
     const webBtn = page.locator('.dispatch-prompt-send[data-target="web"]');
     await expect(webBtn).toBeVisible();
+    await expect(webBtn).toHaveText('web');
+
+    const dashBtn = page.locator('.dispatch-prompt-send[data-target="dash"]');
+    await expect(dashBtn).toBeVisible();
+    await expect(dashBtn).toHaveText('dash');
   });
 
   test('can dispatch custom freeform text', async ({ page }) => {
@@ -838,6 +870,27 @@ test.describe('Custom Prompt Dispatch', () => {
     const customItem = items.find(i => i.prompt === 'Check deployment status');
     expect(customItem).toBeDefined();
     expect(customItem.target).toBe('web');
+  });
+
+  test('can dispatch custom prompt with dash target', async ({ page }) => {
+    await openDispatchPage(page);
+
+    // Type and dispatch with dash target
+    const textarea = page.locator('.dispatch-prompt-input');
+    await textarea.fill('Run quick lint check');
+
+    const dashBtn = page.locator('.dispatch-prompt-send[data-target="dash"]');
+    await dashBtn.click();
+
+    // Should show feedback
+    await expect(dashBtn).toContainText('dispatched!');
+
+    // Verify target is "dash" via API
+    const listResponse = await page.request.get(`${API_PREFIX}/api/dispatch`);
+    const { items } = await listResponse.json();
+    const customItem = items.find(i => i.prompt === 'Run quick lint check');
+    expect(customItem).toBeDefined();
+    expect(customItem.target).toBe('dash');
   });
 
   test('empty input shows validation feedback', async ({ page }) => {

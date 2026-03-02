@@ -134,8 +134,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         return res.status(400).json({ error: 'prompt is required and must be a string' });
       }
 
-      // Validate target if provided (must be 'cli' or 'web')
-      const VALID_TARGETS = ['cli', 'web'];
+      // Validate target if provided (must be 'cli', 'web', or 'dash')
+      const VALID_TARGETS = ['cli', 'web', 'dash'];
       if (target !== undefined && !VALID_TARGETS.includes(target)) {
         return res.status(400).json({ error: `target must be one of: ${VALID_TARGETS.join(', ')}` });
       }

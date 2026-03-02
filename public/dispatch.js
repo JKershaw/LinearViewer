@@ -593,7 +593,7 @@ function renderDispatchHistoryList(container, items, total, offset, urlKey) {
     const resolved = formatDispatchTime(item.resolvedAt)
     const tokenInfo = item.takenByTokenLabel ? ` \u00b7 by ${escapeHtml(item.takenByTokenLabel)}` : ''
     const repoInfo = item.repo ? ` \u00b7 ${escapeHtml(item.repo)}` : ''
-    const targetInfo = item.target && item.target !== 'cli' ? ` \u00b7 ${escapeHtml(item.target)}` : ''
+    const targetInfo = item.target ? ` \u00b7 ${escapeHtml(item.target)}` : ''
     const hasPrompt = item.prompt && item.prompt.trim()
     const hasFeedback = item.feedback && item.feedback.length > 0
     const expandableClass = hasPrompt ? ' expandable' : ''

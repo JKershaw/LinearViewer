@@ -1288,7 +1288,16 @@ h1 {
 /* Prompt action buttons container */
 .prompt-actions {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.prompt-actions-label {
+  font-family: var(--font-content);
+  font-size: 0.8em;
+  color: var(--fg-dim);
+  margin-right: 0.15rem;
+  user-select: none;
 }
 
 /* Dispatch button - similar to copy but with accent color */

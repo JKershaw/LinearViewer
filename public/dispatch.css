@@ -89,6 +89,14 @@
   background: rgba(34, 197, 94, 0.2);
 }
 
+.dispatch-actions-label {
+  font-family: var(--font-content);
+  font-size: 0.85em;
+  color: var(--fg-dim);
+  margin-right: 0.15rem;
+  user-select: none;
+}
+
 /* =============================================================================
    Dispatch Prompt
    ============================================================================= */
