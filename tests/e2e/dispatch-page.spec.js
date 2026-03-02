@@ -52,7 +52,7 @@ test.describe('Dispatch Page', () => {
       await expect(textarea).toHaveAttribute('placeholder', 'Type a custom prompt or /command...');
 
       const buttons = page.locator('.dispatch-prompt-send');
-      await expect(buttons).toHaveCount(2);
+      await expect(buttons).toHaveCount(3);
     });
 
     test('can dispatch custom freeform text', async ({ page }) => {
@@ -87,6 +87,22 @@ test.describe('Dispatch Page', () => {
       const customItem = items.find(i => i.prompt === 'Check deployment status');
       expect(customItem).toBeDefined();
       expect(customItem.target).toBe('web');
+    });
+
+    test('can dispatch with dash target', async ({ page }) => {
+      const textarea = page.locator('.dispatch-prompt-input');
+      await textarea.fill('Run quick lint check');
+
+      const dashBtn = page.locator('.dispatch-prompt-send[data-target="dash"]');
+      await dashBtn.click();
+
+      await expect(dashBtn).toContainText('dispatched!');
+
+      const listResponse = await page.request.get(`${API_PREFIX}/api/dispatch`);
+      const { items } = await listResponse.json();
+      const customItem = items.find(i => i.prompt === 'Run quick lint check');
+      expect(customItem).toBeDefined();
+      expect(customItem.target).toBe('dash');
     });
 
     test('empty input shows validation feedback', async ({ page }) => {

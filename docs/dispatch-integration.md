@@ -11,7 +11,7 @@ The Dispatch API allows external consumers (AI agents, automation tools, custom 
 - Atomic take/claim operations (prevents duplicate processing)
 - 24-hour TTL with automatic cleanup
 - Workspace isolation (tokens are scoped to a single workspace)
-- Target-based routing (`cli` or `web`) so consumers only process items meant for them
+- Target-based routing (`cli`, `web`, or `dash`) so consumers only process items meant for them
 
 ## Quick Start
 
@@ -195,7 +195,7 @@ Feedback entries are displayed in the dispatch history UI and inherit the 30-day
 | `issueIdentifier` | string | Human-readable issue ID, e.g., "LIN-42" (nullable) |
 | `issueTitle` | string | Issue title (nullable) |
 | `issueUrl` | string | Full URL to the Linear issue (nullable) |
-| `target` | string | Dispatch target: `"cli"` (default) or `"web"` |
+| `target` | string | Dispatch target: `"cli"` (default), `"web"`, or `"dash"` |
 | `workspace.urlKey` | string | Workspace identifier |
 | `dispatchedAt` | string | ISO 8601 timestamp when item was queued |
 | `dispatchedBy` | string | Linear user ID who dispatched (nullable) |
@@ -209,16 +209,19 @@ Each dispatch item has a `target` field indicating which type of consumer should
 |--------|-------------|
 | `cli` | Default. Intended for CLI-based consumers (e.g., Claude Code) |
 | `web` | Intended for web-based consumers (e.g., Claude on the Web) |
+| `dash` | Intended for dashboard-based consumers (e.g., Dash agent) |
 
-The UI provides two dispatch buttons:
-- **"dispatch"** — sends with `target: "cli"`
-- **"dispatch → web"** — sends with `target: "web"`
+The UI provides a grouped button bar: **Dispatch: [cli] [web] [dash] [copy]**
+- **"cli"** — sends with `target: "cli"`
+- **"web"** — sends with `target: "web"`
+- **"dash"** — sends with `target: "dash"`
+- **"copy"** — copies prompt to clipboard (no dispatch)
 
 Consumers should filter poll results by target to only process items intended for them:
 
 ```javascript
 const { items } = await pollRes.json();
-const myItems = items.filter(item => item.target === 'cli'); // or 'web'
+const myItems = items.filter(item => item.target === 'cli'); // or 'web', 'dash'
 ```
 
 Items without a `target` field default to `"cli"` for backward compatibility.
