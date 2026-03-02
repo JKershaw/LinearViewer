@@ -1317,7 +1317,6 @@ h1 {
 .prompt-actions button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
-  pointer-events: none;
 }
 
 /* Prompt text - monospace, preserves formatting */

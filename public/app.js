@@ -1002,6 +1002,8 @@ function initPrompts() {
       // Ignore abort errors (user clicked away)
       if (error.name === 'AbortError') return
 
+      // LIN-191: Re-enable buttons so user can retry without reloading
+      setPromptActionsDisabled(promptContainer, false)
       promptText.textContent = `Error: ${error.message}`
       console.error('Failed to fetch prompt:', error)
     } finally {
@@ -1770,6 +1772,8 @@ function initRecommendations() {
             reasoning.textContent = `Error: ${data.error}`
             reasoning.classList.remove('hidden')
             if (phaseIndicator) phaseIndicator.classList.add('hidden')
+            // LIN-191: Re-enable buttons so user can retry
+            setPromptActionsDisabled(promptDiv, false)
             break
         }
       })
