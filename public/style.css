@@ -1313,6 +1313,12 @@ h1 {
   color: var(--green, #4cb782);
 }
 
+/* LIN-191: Disabled state for prompt action buttons during loading/streaming */
+.prompt-actions button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* Prompt text - monospace, preserves formatting */
 .prompt-text {
   font-family: var(--font-structural);

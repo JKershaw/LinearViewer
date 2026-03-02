@@ -334,6 +334,43 @@ test.describe('Streaming AI Recommendations - UI', () => {
     expect(rawPrompt).toContain('Help me with task');
   });
 
+  test('LIN-191: dispatch and copy buttons disabled during streaming, enabled after', async ({ page }) => {
+    // Re-setup with dispatch enabled
+    await page.goto(`/test/set-session?openRouterConnected=true&features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+    await page.goto(WORKSPACE_URL);
+    await page.waitForLoadState('networkidle');
+
+    // Expand the blocked issue
+    const taskLine = page.locator(
+      '.in-progress-items .line:has-text("Blocked on external API")'
+    );
+    await taskLine.click();
+
+    // Expand Prompts section
+    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
+    // Click suggest button
+    const suggestBtn = page.locator(
+      `.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .suggest-btn`
+    );
+    await suggestBtn.click();
+
+    // Wait for streaming to complete
+    const recommendContainer = page.locator(
+      `.in-progress-items .recommend-container[data-recommend-for="${BLOCKED_ISSUE_ID}"]`
+    );
+    const promptSection = recommendContainer.locator('.recommend-prompt');
+    const promptText = recommendContainer.locator('.prompt-text');
+    await expect(promptText).toContainText('Help me with task', { timeout: 10000 });
+
+    // After streaming completes, buttons should be enabled
+    const copyBtn = promptSection.locator('.prompt-copy');
+    await expect(copyBtn).toBeEnabled();
+
+    const dispatchBtn = promptSection.locator('.prompt-dispatch').first();
+    await expect(dispatchBtn).toBeEnabled();
+  });
+
   test('dismiss button works during streaming', async ({ page }) => {
     // Expand the blocked issue
     const taskLine = page.locator(
