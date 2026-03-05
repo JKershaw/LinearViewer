@@ -738,6 +738,56 @@ describe('review template', () => {
 });
 
 // =============================================================================
+// research Template Tests
+// =============================================================================
+
+describe('research template', () => {
+  const mockIssue = {
+    id: 'issue-research',
+    identifier: 'TEST-R1',
+    title: 'Research new API',
+    description: 'Investigate the new Stripe API for subscriptions',
+    url: 'https://linear.app/test/issue/TEST-R1',
+    state: { name: 'In Progress', type: 'started' },
+    labels: ['research'],
+    assignee: { name: 'Alice' }
+  };
+
+  const mockContext = {
+    parent: null,
+    siblings: [],
+    project: { name: 'Payments', description: 'Payment system' },
+    children: [],
+    comments: []
+  };
+
+  test('includes refactoring and cleanup instructions', () => {
+    const result = generatePrompt('research', mockIssue, mockContext);
+    
+    // Assert Workflow includes refactor identification step
+    assert.match(
+      result.prompt, 
+      /\*\*Refactor Identification\*\*|refactor-ready/i,
+      'Research prompt workflow should mention refactoring or health assessment'
+    );
+
+    // Assert Documentation includes refactoring recommendations
+    assert.match(
+      result.prompt,
+      /Refactoring and cleanup recommendations/i,
+      'Research prompt should include a section for refactoring recommendations'
+    );
+    
+    // Verify it explains WHY (to improve the outcome of the task)
+    assert.match(
+      result.prompt,
+      /improve the outcome|simplify implementation/i,
+      'Research prompt should explain that refactoring targets improved outcomes'
+    );
+  });
+});
+
+// =============================================================================
 // getAvailablePrompts Tests
 // =============================================================================
 
