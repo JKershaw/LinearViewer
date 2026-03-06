@@ -14,9 +14,11 @@ import { isValidFeatureKey } from '../lib/feature-defaults.js';
  * @param {Object} options.dispatchTokenStore - Dispatch token store
  * @param {Object} options.freeTierStore - Free tier usage store
  * @param {Object} options.userPreferencesStore - User preferences store
+ * @param {Object} options.proxyTokenStore - Proxy token store
+ * @param {Object} options.proxyEventStore - Proxy event store
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, proxyTokenStore, proxyEventStore }) {
   const router = Router();
 
   // Endpoint to set a test session without going through OAuth flow
@@ -189,6 +191,42 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   router.get('/test/clear-dispatch-history', async (req, res) => {
     try {
       await dispatchQueueStore.clearHistory('test-workspace')
+      res.send('ok')
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
+
+  // Endpoint to create a proxy token for testing
+  router.get('/test/create-proxy-token', async (req, res) => {
+    try {
+      const label = req.query.label || 'test-proxy-token'
+      const scope = req.query.scope || 'read'
+      const result = await proxyTokenStore.createToken('test-workspace', {
+        label,
+        scope,
+        singleUse: req.query.singleUse === 'true'
+      })
+      res.json({ tokenId: result.tokenId, token: result.token, scope: result.scope })
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
+
+  // Endpoint to clear proxy tokens for testing
+  router.get('/test/clear-proxy-tokens', async (req, res) => {
+    try {
+      await proxyTokenStore.clear('test-workspace')
+      res.send('ok')
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
+
+  // Endpoint to clear proxy events for testing
+  router.get('/test/clear-proxy-events', async (req, res) => {
+    try {
+      await proxyEventStore.clear('test-workspace')
       res.send('ok')
     } catch (err) {
       res.status(500).json({ error: err.message })

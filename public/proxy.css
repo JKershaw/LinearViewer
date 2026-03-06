@@ -1,0 +1,261 @@
+/**
+ * Proxy Page Styles
+ *
+ * Styles for the standalone /proxy page.
+ * Reuses dispatch/token visual language for consistency.
+ */
+
+/* =============================================================================
+   Proxy Section
+   ============================================================================= */
+.proxy-section {
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 4px;
+}
+
+.proxy-section-header {
+  font-family: var(--font-content);
+  font-size: 1em;
+  font-weight: 500;
+  color: var(--fg);
+  margin: 0 0 0.75rem 0;
+}
+
+.proxy-subtitle {
+  color: var(--fg-dim);
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  margin-top: 0.5rem;
+}
+
+.proxy-hint {
+  color: var(--fg-dim);
+  font-family: var(--font-content);
+  font-size: 0.85em;
+  margin: 0 0 0.75rem 0;
+}
+
+.proxy-label {
+  color: var(--fg-dim);
+  min-width: 10ch;
+  flex-shrink: 0;
+}
+
+/* =============================================================================
+   Agent Prompt Section
+   ============================================================================= */
+.proxy-prompt-box {
+  border: 1px solid var(--fg-vdim);
+  border-radius: 4px;
+  padding: 0.75rem;
+  background: var(--bg);
+}
+
+.proxy-prompt-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.proxy-scope-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-content);
+  font-size: 0.9em;
+}
+
+.proxy-scope-select {
+  font-family: var(--font-content);
+  font-size: 0.85em;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--fg-vdim);
+  border-radius: 3px;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.proxy-scope-select:focus {
+  outline: none;
+  border-color: var(--blue);
+}
+
+.proxy-prompt-feedback {
+  font-size: 0.85em;
+  color: var(--green);
+}
+
+.proxy-prompt-feedback.error {
+  color: var(--red);
+}
+
+.proxy-prompt-output {
+  font-family: var(--font-structural);
+  font-size: 0.8em;
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid var(--fg-vdim);
+  border-radius: 3px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--fg-dim);
+  margin: 0;
+  max-height: 12em;
+  overflow-y: auto;
+  cursor: pointer;
+}
+
+.proxy-prompt-output.has-prompt {
+  color: var(--fg);
+}
+
+/* =============================================================================
+   Token List (reuses dispatch token styles)
+   ============================================================================= */
+.proxy-token-list {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--fg-vdim);
+}
+
+.proxy-section .line {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.4rem 0;
+  font-family: var(--font-content);
+  font-size: 0.9em;
+}
+
+/* =============================================================================
+   Curl Examples
+   ============================================================================= */
+.proxy-examples {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.proxy-example {
+  font-family: var(--font-content);
+  font-size: 0.85em;
+}
+
+.proxy-example-label {
+  color: var(--fg-dim);
+  margin-bottom: 0.25rem;
+}
+
+.proxy-example-code {
+  display: block;
+  font-family: var(--font-structural);
+  font-size: 0.9em;
+  padding: 0.4rem 0.6rem;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid var(--fg-vdim);
+  border-radius: 3px;
+  color: var(--fg);
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+
+/* =============================================================================
+   Event Log
+   ============================================================================= */
+.proxy-events-list {
+  margin-top: 0.5rem;
+}
+
+.proxy-events-loading,
+.proxy-events-empty {
+  color: var(--fg-dim);
+  font-size: 0.9em;
+  padding: 0.25rem 0;
+}
+
+.proxy-event-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--fg-vdim);
+  font-size: 0.85em;
+  font-family: var(--font-content);
+}
+
+.proxy-event-item:last-child {
+  border-bottom: none;
+}
+
+.proxy-event-method {
+  font-family: var(--font-structural);
+  font-weight: 500;
+  min-width: 5ch;
+  color: var(--fg);
+}
+
+.proxy-event-endpoint {
+  flex: 1;
+  color: var(--fg);
+  font-family: var(--font-structural);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.proxy-event-status {
+  font-family: var(--font-structural);
+  min-width: 3ch;
+}
+
+.proxy-event-status.status-ok {
+  color: var(--green);
+}
+
+.proxy-event-status.status-error {
+  color: var(--red);
+}
+
+.proxy-event-status.status-warn {
+  color: var(--yellow);
+}
+
+.proxy-event-meta {
+  color: var(--fg-dim);
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+
+/* Refresh button */
+.proxy-events-refresh {
+  color: var(--fg-dim);
+  font-size: 0.85em;
+  vertical-align: middle;
+}
+
+.proxy-events-refresh:hover {
+  color: var(--fg);
+}
+
+/* =============================================================================
+   Responsive
+   ============================================================================= */
+@media (max-width: 640px) {
+  .proxy-prompt-controls {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .proxy-section .line {
+    flex-wrap: wrap;
+  }
+
+  .proxy-event-item {
+    flex-wrap: wrap;
+  }
+}
