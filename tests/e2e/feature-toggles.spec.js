@@ -25,6 +25,7 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('.feature-toggle-label:has-text("Feature branch workflow")')).toBeVisible();
     await expect(page.locator('.feature-toggle-label:has-text("Code review before completing")')).toBeVisible();
     await expect(page.locator('.feature-toggle-label:has-text("Dispatch queue")')).toBeVisible();
+    await expect(page.locator('.feature-toggle-label:has-text("Linear API proxy")')).toBeVisible();
     await expect(page.locator('.feature-toggle-label:has-text("AI recommendations")')).toBeVisible();
     await expect(page.locator('.feature-toggle-label:has-text("Prompt buttons")')).toBeVisible();
   });
@@ -33,11 +34,12 @@ test.describe('Feature Toggle Settings', () => {
     await page.goto(SETTINGS_URL);
     await page.waitForLoadState('networkidle');
 
-    // Defaults: linearMcp ON, featureBranches OFF, codeReview OFF, dispatch OFF, aiRecommendations ON, promptButtons ON
+    // Defaults: linearMcp ON, featureBranches OFF, codeReview OFF, dispatch OFF, proxy OFF, aiRecommendations ON, promptButtons ON
     await expect(page.locator('[data-feature="linearMcp"] .toggle-state')).toHaveText('● on');
     await expect(page.locator('[data-feature="featureBranches"] .toggle-state')).toHaveText('○ off');
     await expect(page.locator('[data-feature="codeReview"] .toggle-state')).toHaveText('○ off');
     await expect(page.locator('[data-feature="dispatch"] .toggle-state')).toHaveText('○ off');
+    await expect(page.locator('[data-feature="proxy"] .toggle-state')).toHaveText('○ off');
     await expect(page.locator('[data-feature="aiRecommendations"] .toggle-state')).toHaveText('● on');
     await expect(page.locator('[data-feature="promptButtons"] .toggle-state')).toHaveText('● on');
   });
@@ -385,6 +387,74 @@ test.describe('Feature Toggle Settings', () => {
     // code-review template IS a review, should not get review instructions appended
     expect(data.prompt).not.toContain('Self-Review');
     expect(data.prompt).not.toContain('CI/CD Check');
+  });
+
+  // =========================================================================
+  // LIN-193: Proxy toggle affects UI visibility
+  // =========================================================================
+
+  test('proxy toggle is visible in Workflow section on settings page', async ({ page }) => {
+    await page.goto(SETTINGS_URL);
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('.feature-toggle-label:has-text("Linear API proxy")')).toBeVisible();
+  });
+
+  test('proxy toggle defaults to off', async ({ page }) => {
+    await page.goto(SETTINGS_URL);
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('[data-feature="proxy"] .toggle-state')).toHaveText('○ off');
+  });
+
+  test('proxy nav link hidden by default (proxy off)', async ({ page }) => {
+    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/`);
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('a[href*="/proxy"]')).toHaveCount(0);
+  });
+
+  test('proxy nav link visible when proxy is on', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
+
+    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/`);
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('a.nav-action:has-text("proxy")')).toBeVisible();
+  });
+
+  test('proxy page redirects to settings when proxy is off', async ({ page }) => {
+    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/proxy`);
+
+    // Should redirect to settings
+    await expect(page).toHaveURL(new RegExp(`/workspace/${TEST_WORKSPACE_URL_KEY}/settings`));
+  });
+
+  test('proxy page loads when proxy is on', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
+
+    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/proxy`);
+    await page.waitForLoadState('networkidle');
+
+    // Should stay on proxy page, not redirect
+    await expect(page).toHaveURL(new RegExp(`/workspace/${TEST_WORKSPACE_URL_KEY}/proxy`));
+  });
+
+  test('can toggle proxy on via settings and state persists', async ({ page }) => {
+    await page.goto(SETTINGS_URL);
+    await page.waitForLoadState('networkidle');
+
+    // Should start OFF
+    await expect(page.locator('[data-feature="proxy"] .toggle-state')).toHaveText('○ off');
+
+    // Click to turn on
+    await page.locator('[data-feature="proxy"] .toggle-btn').click();
+    await expect(page.locator('[data-feature="proxy"] .toggle-state')).toHaveText('● on');
+
+    // Reload — state should persist
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('[data-feature="proxy"] .toggle-state')).toHaveText('● on');
   });
 
   // =========================================================================
