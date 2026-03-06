@@ -16,6 +16,8 @@ import { MongoSessionStore } from './lib/session-store.js'
 import { UserPreferencesStore } from './lib/user-preferences.js'
 import { DispatchQueueStore } from './lib/dispatch-store.js'
 import { DispatchTokenStore } from './lib/dispatch-tokens.js'
+import { ProxyTokenStore } from './lib/proxy-tokens.js'
+import { ProxyEventStore } from './lib/proxy-events.js'
 import { FreeTierStore } from './lib/free-tier-store.js'
 import { fetchProjects, fetchProjectsList, fetchTeams } from './lib/linear.js'
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID } from './lib/tree.js'
@@ -28,6 +30,7 @@ import { createAuthRoutes } from './routes/auth.js'
 import { createWorkspaceRoutes } from './routes/workspace.js'
 import { createOpenRouterAuthRoutes } from './routes/openrouter-auth.js'
 import { createDispatchRoutes } from './routes/dispatch.js'
+import { createProxyRoutes } from './routes/proxy.js'
 import { createTestRoutes } from './routes/test.js'
 import { createWorkspaceApiRoutes } from './routes/workspace-api.js'
 import { createLegacyRedirects } from './routes/legacy-redirects.js'
@@ -37,6 +40,7 @@ import { renderPrivacyPolicy, renderTermsOfService } from './lib/render-legal.js
 import { renderSettingsPage } from './lib/render-settings.js'
 import { renderPromptsPage } from './lib/render-prompts.js'
 import { renderDispatchPage } from './lib/render-dispatch.js'
+import { renderProxyPage } from './lib/render-proxy.js'
 import { DEFAULT_MODEL, AVAILABLE_MODELS } from './lib/openrouter.js'
 import { getFeatureFlags, isValidFeatureKey } from './lib/feature-defaults.js'
 
@@ -136,6 +140,18 @@ const dispatchTokenStore = new DispatchTokenStore({
   collection: dispatchTokensCollection
 })
 
+// Proxy collections
+const proxyTokensCollection = db.collection('proxy-tokens')
+const proxyEventsCollection = db.collection('proxy-events')
+
+const proxyTokenStore = new ProxyTokenStore({
+  collection: proxyTokensCollection
+})
+
+const proxyEventStore = new ProxyEventStore({
+  collection: proxyEventsCollection
+})
+
 // Free tier usage tracking
 const freeTierCollection = db.collection('free-tier-usage')
 const freeTierStore = new FreeTierStore({
@@ -188,7 +204,7 @@ app.use(session({
 // Test Mode Setup
 // =============================================================================
 if (process.env.NODE_ENV === 'test') {
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, proxyTokenStore, proxyEventStore }))
 }
 
 // =============================================================================
@@ -483,6 +499,58 @@ function workspaceFromUrl(req, res, next) {
 // Mount dispatch routes (requires workspaceFromUrl middleware)
 app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore }))
 
+// Mount proxy routes
+// getWorkspaceAccessToken: looks up a workspace access token from active sessions.
+// In test mode, returns 'test-token'. In production, finds the freshest non-expired token.
+// Uses a short-lived cache (30s) to avoid scanning sessions on every proxy request.
+const _tokenCache = new Map(); // urlKey -> { token, expiresAt, cachedAt }
+const TOKEN_CACHE_TTL_MS = 30 * 1000; // 30 seconds
+
+async function getWorkspaceAccessToken(urlKey) {
+  if (process.env.NODE_ENV === 'test' && urlKey === 'test-workspace') {
+    return 'test-token';
+  }
+
+  // Check cache first
+  const cached = _tokenCache.get(urlKey);
+  if (cached && Date.now() - cached.cachedAt < TOKEN_CACHE_TTL_MS) {
+    // Only return if the token hasn't expired
+    if (cached.expiresAt > Date.now() + TOKEN_REFRESH_BUFFER_MS) {
+      return cached.token;
+    }
+  }
+
+  // Look up the access token from the sessions collection
+  // Find the workspace with the latest-expiring token
+  try {
+    const sessions = await sessionsCollection.find({}).toArray();
+    let bestToken = null;
+    let bestExpiry = 0;
+
+    for (const s of sessions) {
+      const data = typeof s.data === 'string' ? JSON.parse(s.data) : s.data;
+      const ws = data?.workspaces?.find(w => w.urlKey === urlKey);
+      if (ws?.accessToken && ws.tokenExpiresAt > Date.now() + TOKEN_REFRESH_BUFFER_MS) {
+        if (ws.tokenExpiresAt > bestExpiry) {
+          bestToken = ws.accessToken;
+          bestExpiry = ws.tokenExpiresAt;
+        }
+      }
+    }
+
+    if (bestToken) {
+      _tokenCache.set(urlKey, { token: bestToken, expiresAt: bestExpiry, cachedAt: Date.now() });
+    }
+
+    return bestToken;
+  } catch (err) {
+    console.error('Error looking up workspace access token:', err);
+  }
+  return null;
+}
+
+app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, workspaceFromUrl, getWorkspaceAccessToken }))
+
 // Mount workspace API routes (audit, prompts, recommendations, comments, images)
 app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource }))
 
@@ -645,6 +713,32 @@ app.get('/workspace/:urlKey/dispatch', workspaceFromUrl, async (req, res) => {
 });
 
 /**
+ * Proxy page - requires authentication and proxy feature flag.
+ * Displays proxy token management, agent prompt, and event log.
+ */
+app.get('/workspace/:urlKey/proxy', workspaceFromUrl, (req, res) => {
+  const workspace = req.workspace;
+  const deployInfo = getDeployInfo();
+  const openRouterSource = getOpenRouterSource(req);
+  const featureFlags = getFeatureFlags(req.session);
+
+  // Guard: proxy feature must be enabled
+  if (featureFlags.proxy !== true) {
+    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
+  }
+
+  const html = renderProxyPage(workspace.name || 'Workspace', {
+    deployInfo,
+    urlKey: workspace.urlKey,
+    openRouterSource,
+    workspaces: req.session.workspaces,
+    featureFlags,
+    baseUrl: `${req.protocol}://${req.get('host')}`
+  });
+  res.send(html);
+});
+
+/**
  * Save model selection to session.
  * Accepts either a preset model ID or a custom model ID.
  */
@@ -798,6 +892,22 @@ app.listen(PORT, () => {
       }
     } catch (err) {
       console.error('Free tier cleanup error:', err)
+    }
+    try {
+      const removedCount = await proxyTokenStore.cleanup()
+      if (removedCount > 0) {
+        console.log(`Proxy token cleanup: removed ${removedCount} expired/consumed tokens`)
+      }
+    } catch (err) {
+      console.error('Proxy token cleanup error:', err)
+    }
+    try {
+      const removedCount = await proxyEventStore.cleanup()
+      if (removedCount > 0) {
+        console.log(`Proxy event cleanup: removed ${removedCount} expired events`)
+      }
+    } catch (err) {
+      console.error('Proxy event cleanup error:', err)
     }
   }, CLEANUP_INTERVAL_MS)
 })
