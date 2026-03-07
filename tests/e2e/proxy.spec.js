@@ -352,3 +352,28 @@ test.describe('Proxy API - Event Logging', () => {
     expect(eventsData.items[0].tokenLabel).toBe('events-test');
   });
 });
+
+test.describe('Proxy API - Session Token Lookup', () => {
+  test('getWorkspaceAccessToken finds token from session store', async ({ page }) => {
+    // Set up a multi-workspace session so "second-workspace" exists
+    // This bypasses the test-mode shortcut (which only handles "test-workspace")
+    // and exercises the real session-scanning code path in getWorkspaceAccessToken
+    await page.goto('/test/set-session?multiWorkspace=true');
+
+    // Look up the token for second-workspace via the real session scan
+    const resp = await page.goto('/test/workspace-token/second-workspace');
+    const data = await resp.json();
+
+    // Should find the access token stored by set-session
+    expect(data.found).toBe(true);
+  });
+
+  test('getWorkspaceAccessToken returns null for unknown workspace', async ({ page }) => {
+    await page.goto('/test/set-session');
+
+    const resp = await page.goto('/test/workspace-token/nonexistent-workspace');
+    const data = await resp.json();
+
+    expect(data.found).toBe(false);
+  });
+});

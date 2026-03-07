@@ -204,7 +204,7 @@ app.use(session({
 // Test Mode Setup
 // =============================================================================
 if (process.env.NODE_ENV === 'test') {
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, proxyTokenStore, proxyEventStore }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, proxyTokenStore, proxyEventStore, getWorkspaceAccessToken }))
 }
 
 // =============================================================================
@@ -528,7 +528,7 @@ async function getWorkspaceAccessToken(urlKey) {
     let bestExpiry = 0;
 
     for (const s of sessions) {
-      const data = typeof s.data === 'string' ? JSON.parse(s.data) : s.data;
+      const data = typeof s.session === 'string' ? JSON.parse(s.session) : s.session;
       const ws = data?.workspaces?.find(w => w.urlKey === urlKey);
       if (ws?.accessToken && ws.tokenExpiresAt > Date.now() + TOKEN_REFRESH_BUFFER_MS) {
         if (ws.tokenExpiresAt > bestExpiry) {

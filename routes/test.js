@@ -16,9 +16,10 @@ import { isValidFeatureKey } from '../lib/feature-defaults.js';
  * @param {Object} options.userPreferencesStore - User preferences store
  * @param {Object} options.proxyTokenStore - Proxy token store
  * @param {Object} options.proxyEventStore - Proxy event store
+ * @param {Function} options.getWorkspaceAccessToken - Function to look up workspace access token
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, proxyTokenStore, proxyEventStore }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, proxyTokenStore, proxyEventStore, getWorkspaceAccessToken }) {
   const router = Router();
 
   // Endpoint to set a test session without going through OAuth flow
@@ -243,6 +244,18 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       res.send('ok')
     } catch (err) {
       res.status(500).json({ error: err.message })
+    }
+  })
+
+  // Endpoint to test workspace access token lookup from sessions
+  // Uses a non-test-workspace urlKey to bypass the test-mode shortcut
+  // and exercise the real session-scanning code path.
+  router.get('/test/workspace-token/:urlKey', async (req, res) => {
+    try {
+      const token = await getWorkspaceAccessToken(req.params.urlKey);
+      res.json({ found: !!token });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
     }
   })
 
