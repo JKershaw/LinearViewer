@@ -1,0 +1,562 @@
+/* ==========================================================================
+   Swipe Page - Mobile-First Task Cards
+   ========================================================================== */
+
+.swipe-page {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 0.5rem 1rem 2rem;
+}
+
+/* Filter Bar */
+.swipe-filter-bar {
+  margin-bottom: 1rem;
+}
+
+.swipe-filter-select {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 14px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: var(--bg, #fff);
+  color: var(--fg, #1a1a1a);
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+}
+
+/* Card Area */
+.swipe-card-area {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Arrow Buttons */
+.swipe-arrow {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: var(--bg, #fff);
+  color: var(--fg-dim, #666);
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+
+.swipe-arrow:hover:not(:disabled) {
+  background: var(--bg-muted, #f8f9fa);
+  color: var(--fg, #1a1a1a);
+}
+
+.swipe-arrow:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* Card Container */
+.swipe-card-container {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  min-height: 200px;
+}
+
+/* Card */
+.swipe-card {
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 1.25rem;
+  background: var(--bg, #fff);
+  will-change: transform, opacity;
+  transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              opacity 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  cursor: grab;
+}
+
+.swipe-card.swiping {
+  transition: none;
+  cursor: grabbing;
+}
+
+.swipe-card.exiting {
+  transition: transform 0.25s ease-out, opacity 0.25s ease-out;
+}
+
+.swipe-card.entering {
+  transition: transform 0.25s ease-out, opacity 0.25s ease-out;
+}
+
+.swipe-card-empty {
+  text-align: center;
+  color: var(--fg-dim, #666);
+  padding: 2rem 0;
+  font-style: italic;
+}
+
+/* Card Header: status + identifier + position */
+.swipe-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 13px;
+}
+
+.swipe-card-status {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.swipe-card-status .state {
+  font-size: 14px;
+}
+
+.swipe-card-status .state.done { color: #16a085; }
+.swipe-card-status .state.in-progress { color: #d4a600; }
+.swipe-card-status .state.todo { color: #999; }
+.swipe-card-status .state.backlog { color: #ccc; }
+
+.swipe-card-identifier {
+  color: var(--fg-dim, #666);
+}
+
+.swipe-card-position {
+  color: var(--fg-dim, #666);
+  font-size: 12px;
+}
+
+/* Card Title */
+.swipe-card-title {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.3;
+  margin-bottom: 1rem;
+  color: var(--fg, #1a1a1a);
+  word-break: break-word;
+}
+
+.swipe-card-title.done {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+/* Card Meta */
+.swipe-card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-size: 13px;
+  color: var(--fg-dim, #666);
+}
+
+.swipe-card-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.swipe-card-meta-label {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  color: var(--fg-dim, #666);
+  min-width: 60px;
+}
+
+.swipe-card-meta-value {
+  color: var(--fg, #1a1a1a);
+}
+
+/* Priority Dots */
+.priority-dots {
+  letter-spacing: 1px;
+}
+
+.priority-dots .filled { color: var(--fg, #1a1a1a); }
+.priority-dots .empty { color: #ddd; }
+
+/* Label Tags */
+.swipe-card-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.swipe-label-tag {
+  display: inline-block;
+  padding: 0.1rem 0.4rem;
+  font-size: 11px;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  color: var(--fg-dim, #666);
+  background: var(--bg-muted, #f8f9fa);
+}
+
+/* Expandable Accordion Sections */
+.swipe-card-accordion {
+  margin-top: 1rem;
+  border-top: 1px solid #eee;
+}
+
+.swipe-accordion-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 0;
+  cursor: pointer;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 13px;
+  color: var(--fg-dim, #666);
+  border-bottom: 1px solid #eee;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.swipe-accordion-header:hover {
+  color: var(--fg, #1a1a1a);
+}
+
+.swipe-accordion-toggle {
+  font-size: 10px;
+  transition: transform 0.2s;
+}
+
+.swipe-accordion-header.open .swipe-accordion-toggle {
+  transform: rotate(90deg);
+}
+
+.swipe-accordion-body {
+  display: none;
+  padding: 0.75rem 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--fg, #1a1a1a);
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.swipe-accordion-body.open {
+  display: block;
+}
+
+/* Markdown content in accordion */
+.swipe-accordion-body p { margin: 0 0 0.5rem; }
+.swipe-accordion-body ul,
+.swipe-accordion-body ol { margin: 0 0 0.5rem; padding-left: 1.5rem; }
+.swipe-accordion-body code {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 13px;
+  background: var(--bg-muted, #f8f9fa);
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+}
+.swipe-accordion-body pre {
+  background: var(--bg-muted, #f8f9fa);
+  padding: 0.75rem;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: 0 0 0.5rem;
+}
+.swipe-accordion-body pre code {
+  background: none;
+  padding: 0;
+}
+.swipe-accordion-body img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Comments */
+.swipe-comments-loading {
+  color: var(--fg-dim, #666);
+  font-style: italic;
+  padding: 0.5rem 0;
+}
+
+.swipe-comment {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.swipe-comment:last-child {
+  border-bottom: none;
+}
+
+.swipe-comment-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--fg-dim, #666);
+  margin-bottom: 0.3rem;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+}
+
+.swipe-comment-body {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Counter */
+.swipe-counter {
+  text-align: center;
+  padding: 0.75rem 0;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 13px;
+  color: var(--fg-dim, #666);
+}
+
+/* Linear Link */
+.swipe-card-link {
+  display: inline-block;
+  margin-top: 0.75rem;
+  font-size: 13px;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+}
+
+.swipe-card-link a {
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.swipe-card-link a:hover {
+  text-decoration: underline;
+}
+
+/* ==========================================================================
+   Prompt Section
+   ========================================================================== */
+
+.swipe-prompts {
+  margin-top: 0.5rem;
+}
+
+/* Prompt Buttons - 2 column grid */
+.swipe-prompt-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.swipe-prompt-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 0.5rem;
+  min-height: 48px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: var(--bg, #fff);
+  color: var(--fg, #1a1a1a);
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.15s, border-color 0.15s;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.swipe-prompt-btn:hover {
+  background: var(--bg-muted, #f8f9fa);
+  border-color: #ccc;
+}
+
+.swipe-prompt-btn:active {
+  background: #f0f0f0;
+}
+
+.swipe-prompt-btn.active {
+  border-color: #2563eb;
+  background: #f0f5ff;
+}
+
+.swipe-prompt-btn.loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.swipe-prompt-btn.ai-btn {
+  grid-column: 1 / -1;
+  border-color: #d4a600;
+  color: #8a6d00;
+}
+
+.swipe-prompt-btn.ai-btn:hover {
+  background: #fffbeb;
+}
+
+.swipe-prompt-btn-more {
+  font-size: 12px;
+  color: var(--fg-dim, #666);
+  border-style: dashed;
+}
+
+/* More prompts (hidden by default) */
+.swipe-more-prompts {
+  display: none;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.swipe-more-prompts.visible {
+  display: grid;
+}
+
+/* Prompt Result */
+.swipe-prompt-result {
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.swipe-prompt-result.hidden {
+  display: none;
+}
+
+.swipe-prompt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-muted, #f8f9fa);
+  border-bottom: 1px solid #eee;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 12px;
+}
+
+.swipe-prompt-name {
+  color: var(--fg-dim, #666);
+  font-weight: 600;
+}
+
+.swipe-prompt-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.swipe-prompt-actions button {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  background: var(--bg, #fff);
+  color: var(--fg-dim, #666);
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.swipe-prompt-actions button:hover {
+  background: var(--bg-muted, #f8f9fa);
+}
+
+.swipe-prompt-actions button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.swipe-prompt-text {
+  padding: 0.75rem;
+  font-size: 13px;
+  line-height: 1.6;
+  max-height: 400px;
+  overflow-y: auto;
+  color: var(--fg, #1a1a1a);
+}
+
+.swipe-prompt-text p { margin: 0 0 0.5rem; }
+.swipe-prompt-text ul,
+.swipe-prompt-text ol { margin: 0 0 0.5rem; padding-left: 1.5rem; }
+.swipe-prompt-text code {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 12px;
+  background: var(--bg-muted, #f8f9fa);
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+}
+.swipe-prompt-text pre {
+  background: var(--bg-muted, #f8f9fa);
+  padding: 0.75rem;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+.swipe-prompt-text pre code {
+  background: none;
+  padding: 0;
+}
+
+/* Copy feedback */
+.swipe-prompt-copy.copied {
+  color: #16a085;
+  border-color: #16a085;
+}
+
+/* ==========================================================================
+   Responsive - Desktop
+   ========================================================================== */
+
+@media (min-width: 641px) {
+  .swipe-page {
+    padding: 1rem 2rem 3rem;
+  }
+
+  .swipe-card {
+    padding: 1.5rem;
+  }
+
+  .swipe-card-title {
+    font-size: 20px;
+  }
+
+  .swipe-arrow {
+    width: 48px;
+    height: 48px;
+    font-size: 22px;
+  }
+}
+
+/* ==========================================================================
+   Responsive - Small Phones
+   ========================================================================== */
+
+@media (max-width: 400px) {
+  .swipe-page {
+    padding: 0.25rem 0.5rem 1.5rem;
+  }
+
+  .swipe-arrow {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+
+  .swipe-card {
+    padding: 1rem;
+  }
+
+  .swipe-card-title {
+    font-size: 16px;
+  }
+
+  .swipe-prompt-btn {
+    padding: 0.6rem 0.4rem;
+    font-size: 12px;
+    min-height: 44px;
+  }
+}
