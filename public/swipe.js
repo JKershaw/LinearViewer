@@ -8,43 +8,43 @@
 // State
 // ==========================================================================
 
-const data = window.__SWIPE_DATA__ || {}
-const allIssues = data.issues || []
-const filters = data.filters || []
-const promptMeta = data.promptMeta || {}
-const defaultPromptKeys = data.defaultPromptKeys || []
-const morePromptKeys = data.morePromptKeys || []
-const urlKey = data.urlKey || ''
-const hasAI = data.hasAI || false
-const dispatchEnabled = data.dispatchEnabled || false
+const data = window.__SWIPE_DATA__ || {};
+const allIssues = data.issues || [];
+const filters = data.filters || [];
+const promptMeta = data.promptMeta || {};
+const defaultPromptKeys = data.defaultPromptKeys || [];
+const morePromptKeys = data.morePromptKeys || [];
+const urlKey = data.urlKey || '';
+const hasAI = data.hasAI || false;
+const dispatchEnabled = data.dispatchEnabled || false;
 
-let currentFilter = filters.length > 0 ? filters[0].key : ''
-let filteredIssues = []
-let currentIndex = 0
-let promptCache = {} // 'issueId:label' -> {label, name, raw, html}
-let lastPromptLabel = {} // issueId -> last active label
-let activePromptLabel = null
-let activePromptFetch = null
-let moreVisible = false
+let currentFilter = filters.length > 0 ? filters[0].key : '';
+let filteredIssues = [];
+let currentIndex = 0;
+let promptCache = {}; // 'issueId:label' -> {label, name, raw, html}
+let lastPromptLabel = {}; // issueId -> last active label
+let activePromptLabel = null;
+let activePromptFetch = null;
+let moreVisible = false;
 
 // Swipe state
-let touchStartX = 0
-let touchStartY = 0
-let touchCurrentX = 0
-let isSwiping = false
-let swipeDirection = null // 'horizontal' or 'vertical' or null
+let touchStartX = 0;
+let touchStartY = 0;
+let touchCurrentX = 0;
+let isSwiping = false;
+let swipeDirection = null; // 'horizontal' or 'vertical' or null
 
 // DOM elements
-const card = document.getElementById('swipe-card')
-const counter = document.getElementById('swipe-counter')
-const promptButtons = document.getElementById('swipe-prompt-buttons')
-const promptResult = document.getElementById('swipe-prompt-result')
-const promptName = document.getElementById('swipe-prompt-name')
-const promptText = document.getElementById('swipe-prompt-text')
-const promptActions = document.getElementById('swipe-prompt-actions')
-const filterSelect = document.querySelector('.swipe-filter-select')
-const arrowLeft = document.querySelector('.swipe-arrow-left')
-const arrowRight = document.querySelector('.swipe-arrow-right')
+const card = document.getElementById('swipe-card');
+const counter = document.getElementById('swipe-counter');
+const promptButtons = document.getElementById('swipe-prompt-buttons');
+const promptResult = document.getElementById('swipe-prompt-result');
+const promptName = document.getElementById('swipe-prompt-name');
+const promptText = document.getElementById('swipe-prompt-text');
+const promptActions = document.getElementById('swipe-prompt-actions');
+const filterSelect = document.querySelector('.swipe-filter-select');
+const arrowLeft = document.querySelector('.swipe-arrow-left');
+const arrowRight = document.querySelector('.swipe-arrow-right');
 
 // ==========================================================================
 // Markdown Rendering
@@ -56,9 +56,9 @@ const arrowRight = document.querySelector('.swipe-arrow-right')
  * @returns {string} Safe HTML
  */
 function renderMarkdown(text) {
-  if (!text) return ''
-  const html = typeof marked !== 'undefined' ? marked.parse(text) : window.escapeHtml(text)
-  return typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(html) : html
+  if (!text) return '';
+  const html = typeof marked !== 'undefined' ? marked.parse(text) : window.escapeHtml(text);
+  return typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(html) : html;
 }
 
 /**
@@ -66,7 +66,7 @@ function renderMarkdown(text) {
  * Named _esc to avoid overwriting the global function.
  */
 function _esc(str) {
-  return window.escapeHtml(str)
+  return window.escapeHtml(str);
 }
 
 // ==========================================================================
@@ -74,22 +74,22 @@ function _esc(str) {
 // ==========================================================================
 
 function formatRelativeTime(dateStr) {
-  if (!dateStr) return ''
-  const date = new Date(dateStr)
-  const now = new Date()
-  const diffMs = now - date
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMs / 3600000)
-  const diffDays = Math.floor(diffMs / 86400000)
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now - date;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
 
-  if (diffMins < 1) return 'just now'
-  if (diffMins < 60) return `${diffMins}m ago`
-  if (diffHours < 24) return `${diffHours}h ago`
-  if (diffDays === 1) return 'yesterday'
-  if (diffDays < 7) return `${diffDays}d ago`
+  if (diffMins < 1) return 'just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays === 1) return 'yesterday';
+  if (diffDays < 7) return `${diffDays}d ago`;
 
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-  return `${months[date.getMonth()]} ${date.getDate()}`
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${months[date.getMonth()]} ${date.getDate()}`;
 }
 
 // ==========================================================================
@@ -97,25 +97,25 @@ function formatRelativeTime(dateStr) {
 // ==========================================================================
 
 function applyFilter(filterKey) {
-  currentFilter = filterKey
+  currentFilter = filterKey;
 
   if (filterKey === 'in-progress') {
-    filteredIssues = allIssues.filter(i => i.stateType === 'started')
+    filteredIssues = allIssues.filter(i => i.stateType === 'started');
   } else if (filterKey === 'recent-activity') {
-    filteredIssues = allIssues.filter(i => i.section === 'recent-activity')
+    filteredIssues = allIssues.filter(i => i.section === 'recent-activity');
   } else if (filterKey.startsWith('project:')) {
-    const projectName = filterKey.slice(8)
-    filteredIssues = allIssues.filter(i => i.projectName === projectName && i.section === 'project')
+    const projectName = filterKey.slice(8);
+    filteredIssues = allIssues.filter(i => i.projectName === projectName && i.section === 'project');
   } else {
-    filteredIssues = allIssues
+    filteredIssues = allIssues;
   }
 
-  currentIndex = 0
-  activePromptLabel = null
-  renderCard()
-  renderPromptButtons()
-  updateArrows()
-  updateCounter()
+  currentIndex = 0;
+  activePromptLabel = null;
+  renderCard();
+  renderPromptButtons();
+  updateArrows();
+  updateCounter();
 }
 
 // ==========================================================================
@@ -126,82 +126,82 @@ function getStateInfo(stateType) {
   switch (stateType) {
     case 'completed':
     case 'canceled':
-      return { char: '\u2713', cls: 'done' }
+      return { char: '\u2713', cls: 'done' };
     case 'started':
-      return { char: '\u25D0', cls: 'in-progress' }
+      return { char: '\u25D0', cls: 'in-progress' };
     case 'backlog':
-      return { char: '\u25CC', cls: 'backlog' }
+      return { char: '\u25CC', cls: 'backlog' };
     default:
-      return { char: '\u25CB', cls: 'todo' }
+      return { char: '\u25CB', cls: 'todo' };
   }
 }
 
 function renderPriorityDots(priority) {
-  if (!priority || priority === 0) return ''
+  if (!priority || priority === 0) return '';
   // Priority: 1=Urgent, 2=High, 3=Medium, 4=Low
-  const filled = Math.max(0, 5 - priority)
-  const empty = 4 - filled
+  const filled = Math.max(0, 5 - priority);
+  const empty = 4 - filled;
   return '<span class="priority-dots">' +
     '<span class="filled">' + '\u25CF'.repeat(filled) + '</span>' +
     '<span class="empty">' + '\u25CB'.repeat(empty) + '</span>' +
-    '</span>'
+    '</span>';
 }
 
 function renderCard(direction) {
-  const issue = filteredIssues[currentIndex]
+  const issue = filteredIssues[currentIndex];
 
   if (!issue) {
-    card.innerHTML = '<div class="swipe-card-empty">No tasks in this view</div>'
-    promptResult.classList.add('hidden')
-    return
+    card.innerHTML = '<div class="swipe-card-empty">No tasks in this view</div>';
+    promptResult.classList.add('hidden');
+    return;
   }
 
-  const state = getStateInfo(issue.stateType)
-  const titleClass = state.cls === 'done' ? 'swipe-card-title done' : 'swipe-card-title'
-  const total = filteredIssues.length
+  const state = getStateInfo(issue.stateType);
+  const titleClass = state.cls === 'done' ? 'swipe-card-title done' : 'swipe-card-title';
+  const total = filteredIssues.length;
 
   // Build meta rows
-  let metaHtml = ''
+  let metaHtml = '';
 
   if (issue.projectName) {
     metaHtml += `<div class="swipe-card-meta-row">
       <span class="swipe-card-meta-label">Project</span>
       <span class="swipe-card-meta-value">${_esc(issue.projectName)}</span>
-    </div>`
+    </div>`;
   }
 
   if (issue.priority && issue.priority > 0) {
-    const priorityNames = { 1: 'Urgent', 2: 'High', 3: 'Medium', 4: 'Low' }
+    const priorityNames = { 1: 'Urgent', 2: 'High', 3: 'Medium', 4: 'Low' };
     metaHtml += `<div class="swipe-card-meta-row">
       <span class="swipe-card-meta-label">Priority</span>
       <span class="swipe-card-meta-value">${renderPriorityDots(issue.priority)} ${priorityNames[issue.priority] || ''}</span>
-    </div>`
+    </div>`;
   }
 
   if (issue.labels && issue.labels.length > 0) {
-    const labelsHtml = issue.labels.map(l => `<span class="swipe-label-tag">${_esc(l)}</span>`).join('')
+    const labelsHtml = issue.labels.map(l => `<span class="swipe-label-tag">${_esc(l)}</span>`).join('');
     metaHtml += `<div class="swipe-card-meta-row">
       <span class="swipe-card-meta-label">Labels</span>
       <span class="swipe-card-labels">${labelsHtml}</span>
-    </div>`
+    </div>`;
   }
 
   if (issue.dueDate) {
     metaHtml += `<div class="swipe-card-meta-row">
       <span class="swipe-card-meta-label">Due</span>
       <span class="swipe-card-meta-value">${formatRelativeTime(issue.dueDate)}</span>
-    </div>`
+    </div>`;
   }
 
   if (issue.completedAt) {
     metaHtml += `<div class="swipe-card-meta-row">
       <span class="swipe-card-meta-label">Done</span>
       <span class="swipe-card-meta-value">${formatRelativeTime(issue.completedAt)}</span>
-    </div>`
+    </div>`;
   }
 
   // Accordion sections
-  let accordionHtml = ''
+  let accordionHtml = '';
 
   if (issue.description) {
     accordionHtml += `
@@ -212,7 +212,7 @@ function renderCard(direction) {
       <div class="swipe-accordion-body" data-accordion-body="description">
         ${renderMarkdown(issue.description)}
       </div>
-    </div>`
+    </div>`;
   }
 
   // Comments accordion (lazy loaded)
@@ -224,12 +224,12 @@ function renderCard(direction) {
     <div class="swipe-accordion-body" data-accordion-body="comments">
       <div class="swipe-comments-loading">Loading comments...</div>
     </div>
-  </div>`
+  </div>`;
 
   // Linear link
   const linkHtml = issue.url
     ? `<div class="swipe-card-link"><a href="${_esc(issue.url)}" target="_blank">View in Linear \u2192</a></div>`
-    : ''
+    : '';
 
   const html = `
     <div class="swipe-card-header">
@@ -243,28 +243,28 @@ function renderCard(direction) {
     <div class="swipe-card-meta">${metaHtml}</div>
     ${accordionHtml}
     ${linkHtml}
-  `
+  `;
 
   // Animate transition
   if (direction) {
-    animateCardTransition(html, direction)
+    animateCardTransition(html, direction);
   } else {
-    card.innerHTML = html
+    card.innerHTML = html;
   }
 
   // Restore cached prompt if this card had one before
-  const lastLabel = lastPromptLabel[issue.id]
-  const cached = lastLabel ? promptCache[`${issue.id}:${lastLabel}`] : null
+  const lastLabel = lastPromptLabel[issue.id];
+  const cached = lastLabel ? promptCache[`${issue.id}:${lastLabel}`] : null;
   if (cached) {
-    promptName.textContent = cached.name
-    promptText.innerHTML = cached.html
-    promptText.dataset.rawPrompt = cached.raw
-    promptResult.classList.remove('hidden')
-    activePromptLabel = cached.label
-    setPromptActionsEnabled(true)
+    promptName.textContent = cached.name;
+    promptText.innerHTML = cached.html;
+    promptText.dataset.rawPrompt = cached.raw;
+    promptResult.classList.remove('hidden');
+    activePromptLabel = cached.label;
+    setPromptActionsEnabled(true);
   } else {
-    promptResult.classList.add('hidden')
-    activePromptLabel = null
+    promptResult.classList.add('hidden');
+    activePromptLabel = null;
   }
 }
 
@@ -273,38 +273,38 @@ function renderCard(direction) {
 // ==========================================================================
 
 function animateCardTransition(newHtml, direction) {
-  const exitX = direction === 'left' ? '-110%' : '110%'
-  const enterX = direction === 'left' ? '110%' : '-110%'
+  const exitX = direction === 'left' ? '-110%' : '110%';
+  const enterX = direction === 'left' ? '110%' : '-110%';
 
   // Exit current card
-  card.classList.add('exiting')
-  card.style.transform = `translate3d(${exitX}, 0, 0)`
-  card.style.opacity = '0'
+  card.classList.add('exiting');
+  card.style.transform = `translate3d(${exitX}, 0, 0)`;
+  card.style.opacity = '0';
 
   setTimeout(() => {
     // Set new content and position for entry
-    card.innerHTML = newHtml
-    card.classList.remove('exiting')
-    card.classList.add('entering')
-    card.style.transition = 'none'
-    card.style.transform = `translate3d(${enterX}, 0, 0)`
-    card.style.opacity = '0'
+    card.innerHTML = newHtml;
+    card.classList.remove('exiting');
+    card.classList.add('entering');
+    card.style.transition = 'none';
+    card.style.transform = `translate3d(${enterX}, 0, 0)`;
+    card.style.opacity = '0';
 
     // Force reflow
-    card.offsetHeight
+    card.offsetHeight;
 
     // Animate in
-    card.style.transition = ''
-    card.classList.remove('entering')
-    card.style.transform = 'translate3d(0, 0, 0)'
-    card.style.opacity = '1'
+    card.style.transition = '';
+    card.classList.remove('entering');
+    card.style.transform = 'translate3d(0, 0, 0)';
+    card.style.opacity = '1';
 
     // Clean up
     setTimeout(() => {
-      card.style.transform = ''
-      card.style.opacity = ''
-    }, 250)
-  }, 250)
+      card.style.transform = '';
+      card.style.opacity = '';
+    }, 250);
+  }, 250);
 }
 
 // ==========================================================================
@@ -314,137 +314,137 @@ function animateCardTransition(newHtml, direction) {
 function goNext() {
   if (currentIndex >= filteredIssues.length - 1) {
     // Bounce effect at end
-    card.style.transform = 'translate3d(-20px, 0, 0)'
+    card.style.transform = 'translate3d(-20px, 0, 0)';
     setTimeout(() => {
-      card.style.transform = ''
-    }, 150)
-    return
+      card.style.transform = '';
+    }, 150);
+    return;
   }
-  currentIndex++
-  renderCard('left')
-  renderPromptButtons()
-  updateArrows()
-  updateCounter()
+  currentIndex++;
+  renderCard('left');
+  renderPromptButtons();
+  updateArrows();
+  updateCounter();
 }
 
 function goPrev() {
   if (currentIndex <= 0) {
     // Bounce effect at start
-    card.style.transform = 'translate3d(20px, 0, 0)'
+    card.style.transform = 'translate3d(20px, 0, 0)';
     setTimeout(() => {
-      card.style.transform = ''
-    }, 150)
-    return
+      card.style.transform = '';
+    }, 150);
+    return;
   }
-  currentIndex--
-  renderCard('right')
-  renderPromptButtons()
-  updateArrows()
-  updateCounter()
+  currentIndex--;
+  renderCard('right');
+  renderPromptButtons();
+  updateArrows();
+  updateCounter();
 }
 
 function updateArrows() {
-  arrowLeft.disabled = currentIndex <= 0
-  arrowRight.disabled = currentIndex >= filteredIssues.length - 1
+  arrowLeft.disabled = currentIndex <= 0;
+  arrowRight.disabled = currentIndex >= filteredIssues.length - 1;
 }
 
 function updateCounter() {
   if (filteredIssues.length === 0) {
-    counter.textContent = 'No tasks'
-    return
+    counter.textContent = 'No tasks';
+    return;
   }
-  counter.textContent = `${currentIndex + 1} of ${filteredIssues.length}`
+  counter.textContent = `${currentIndex + 1} of ${filteredIssues.length}`;
 }
 
 // ==========================================================================
 // Touch / Swipe Handling
 // ==========================================================================
 
-const SWIPE_THRESHOLD = 0.3 // 30% of card width
-const DIRECTION_LOCK_THRESHOLD = 10 // px before locking direction
+const SWIPE_THRESHOLD = 0.3; // 30% of card width
+const DIRECTION_LOCK_THRESHOLD = 10; // px before locking direction
 
 function handleTouchStart(e) {
-  if (filteredIssues.length <= 1) return
+  if (filteredIssues.length <= 1) return;
   // Don't interfere with accordion taps or links
-  if (e.target.closest('.swipe-accordion-header, .swipe-accordion-body, a, button, select')) return
+  if (e.target.closest('.swipe-accordion-header, .swipe-accordion-body, a, button, select')) return;
 
-  touchStartX = e.touches[0].clientX
-  touchStartY = e.touches[0].clientY
-  touchCurrentX = touchStartX
-  isSwiping = true
-  swipeDirection = null
-  card.classList.add('swiping')
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
+  touchCurrentX = touchStartX;
+  isSwiping = true;
+  swipeDirection = null;
+  card.classList.add('swiping');
 }
 
 function handleTouchMove(e) {
-  if (!isSwiping) return
+  if (!isSwiping) return;
 
-  touchCurrentX = e.touches[0].clientX
-  const deltaX = touchCurrentX - touchStartX
-  const deltaY = e.touches[0].clientY - touchStartY
+  touchCurrentX = e.touches[0].clientX;
+  const deltaX = touchCurrentX - touchStartX;
+  const deltaY = e.touches[0].clientY - touchStartY;
 
   // Lock direction after threshold
   if (!swipeDirection) {
     if (Math.abs(deltaX) > DIRECTION_LOCK_THRESHOLD || Math.abs(deltaY) > DIRECTION_LOCK_THRESHOLD) {
-      swipeDirection = Math.abs(deltaX) > Math.abs(deltaY) ? 'horizontal' : 'vertical'
+      swipeDirection = Math.abs(deltaX) > Math.abs(deltaY) ? 'horizontal' : 'vertical';
     }
   }
 
   if (swipeDirection !== 'horizontal') {
-    isSwiping = false
-    card.classList.remove('swiping')
-    card.style.transform = ''
-    card.style.opacity = ''
-    return
+    isSwiping = false;
+    card.classList.remove('swiping');
+    card.style.transform = '';
+    card.style.opacity = '';
+    return;
   }
 
-  e.preventDefault()
+  e.preventDefault();
 
   // Apply resistance at edges
-  let translationX = deltaX
+  let translationX = deltaX;
   if ((currentIndex === 0 && deltaX > 0) || (currentIndex >= filteredIssues.length - 1 && deltaX < 0)) {
-    translationX = deltaX * 0.3 // Rubber band effect
+    translationX = deltaX * 0.3; // Rubber band effect
   }
 
-  const progress = Math.abs(deltaX) / card.offsetWidth
-  const opacity = Math.max(0.4, 1 - progress * 0.6)
+  const progress = Math.abs(deltaX) / card.offsetWidth;
+  const opacity = Math.max(0.4, 1 - progress * 0.6);
 
-  card.style.transform = `translate3d(${translationX}px, 0, 0)`
-  card.style.opacity = opacity
+  card.style.transform = `translate3d(${translationX}px, 0, 0)`;
+  card.style.opacity = opacity;
 }
 
 function handleTouchEnd() {
   if (!isSwiping || swipeDirection !== 'horizontal') {
-    isSwiping = false
-    return
+    isSwiping = false;
+    return;
   }
 
-  card.classList.remove('swiping')
-  isSwiping = false
+  card.classList.remove('swiping');
+  isSwiping = false;
 
-  const deltaX = touchCurrentX - touchStartX
-  const cardWidth = card.offsetWidth
-  const progress = Math.abs(deltaX) / cardWidth
+  const deltaX = touchCurrentX - touchStartX;
+  const cardWidth = card.offsetWidth;
+  const progress = Math.abs(deltaX) / cardWidth;
 
   if (progress > SWIPE_THRESHOLD) {
     if (deltaX < 0 && currentIndex < filteredIssues.length - 1) {
       // Swipe left → next
-      goNext()
-      return
+      goNext();
+      return;
     } else if (deltaX > 0 && currentIndex > 0) {
       // Swipe right → prev
-      goPrev()
-      return
+      goPrev();
+      return;
     }
   }
 
   // Snap back
-  card.style.transform = 'translate3d(0, 0, 0)'
-  card.style.opacity = '1'
+  card.style.transform = 'translate3d(0, 0, 0)';
+  card.style.opacity = '1';
   setTimeout(() => {
-    card.style.transform = ''
-    card.style.opacity = ''
-  }, 300)
+    card.style.transform = '';
+    card.style.opacity = '';
+  }, 300);
 }
 
 // ==========================================================================
@@ -452,55 +452,56 @@ function handleTouchEnd() {
 // ==========================================================================
 
 function handleAccordionClick(e) {
-  const header = e.target.closest('.swipe-accordion-header')
-  if (!header) return
+  const header = e.target.closest('.swipe-accordion-header');
+  if (!header) return;
 
-  e.preventDefault()
-  e.stopPropagation()
+  e.preventDefault();
+  e.stopPropagation();
 
-  const type = header.dataset.accordion
-  const body = header.nextElementSibling
+  const type = header.dataset.accordion;
+  const body = header.nextElementSibling;
 
-  if (!body) return
+  if (!body) return;
 
-  const isOpen = header.classList.contains('open')
-  header.classList.toggle('open')
-  body.classList.toggle('open')
+  const isOpen = header.classList.contains('open');
+  header.classList.toggle('open');
+  body.classList.toggle('open');
 
   // Lazy load comments on first open
   if (type === 'comments' && !isOpen && body.querySelector('.swipe-comments-loading')) {
-    loadComments(body)
+    loadComments(body);
   }
 }
 
 async function loadComments(container) {
-  const issue = filteredIssues[currentIndex]
-  if (!issue) return
+  const issue = filteredIssues[currentIndex];
+  if (!issue) return;
 
-  const apiPrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : ''
+  const apiPrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : '';
 
   try {
-    const response = await fetch(`${apiPrefix}/api/issues/${issue.id}/comments`)
-    if (!response.ok) throw new Error('Failed to load comments')
+    const response = await fetch(`${apiPrefix}/api/comments/${encodeURIComponent(issue.id)}`);
+    if (!response.ok) throw new Error('Failed to load comments');
 
-    const comments = await response.json()
+    const result = await response.json();
+    const comments = result.comments || [];
 
     if (comments.length === 0) {
-      container.innerHTML = '<div class="swipe-comments-loading">No comments</div>'
-      return
+      container.innerHTML = '<div class="swipe-comments-loading">No comments</div>';
+      return;
     }
 
     container.innerHTML = comments.map(c => `
       <div class="swipe-comment">
         <div class="swipe-comment-header">
-          <span>${_esc(c.user?.name || 'Unknown')}</span>
+          <span>${_esc(c.user || 'Unknown')}</span>
           <span>${formatRelativeTime(c.createdAt)}</span>
         </div>
         <div class="swipe-comment-body">${renderMarkdown(c.body)}</div>
       </div>
-    `).join('')
+    `).join('');
   } catch (err) {
-    container.innerHTML = '<div class="swipe-comments-loading">Could not load comments</div>'
+    container.innerHTML = '<div class="swipe-comments-loading">Could not load comments</div>';
   }
 }
 
@@ -509,142 +510,142 @@ async function loadComments(container) {
 // ==========================================================================
 
 function renderPromptButtons() {
-  const issue = filteredIssues[currentIndex]
+  const issue = filteredIssues[currentIndex];
   if (!issue) {
-    promptButtons.innerHTML = ''
-    return
+    promptButtons.innerHTML = '';
+    return;
   }
 
-  const isCompleted = ['completed', 'canceled'].includes(issue.stateType)
-  let html = ''
+  const isCompleted = ['completed', 'canceled'].includes(issue.stateType);
+  let html = '';
 
   // AI suggest button
   if (hasAI) {
-    html += `<button class="swipe-prompt-btn ai-btn${activePromptLabel === '__ai__' ? ' active' : ''}" data-prompt="__ai__">\u2726 AI Recommend</button>`
+    html += `<button class="swipe-prompt-btn ai-btn${activePromptLabel === '__ai__' ? ' active' : ''}" data-prompt="__ai__">\u2726 AI Recommend</button>`;
   }
 
   if (!isCompleted) {
     // Default prompt buttons
     for (const key of defaultPromptKeys) {
-      const name = promptMeta[key] || key
-      html += `<button class="swipe-prompt-btn${activePromptLabel === key ? ' active' : ''}" data-prompt="${_esc(key)}">${_esc(name)}</button>`
+      const name = promptMeta[key] || key;
+      html += `<button class="swipe-prompt-btn${activePromptLabel === key ? ' active' : ''}" data-prompt="${_esc(key)}">${_esc(name)}</button>`;
     }
 
     // More button
     if (morePromptKeys.length > 0) {
-      html += `<button class="swipe-prompt-btn swipe-prompt-btn-more" data-prompt="__more__">${moreVisible ? 'less \u25B4' : 'more \u25BE'}</button>`
+      html += `<button class="swipe-prompt-btn swipe-prompt-btn-more" data-prompt="__more__">${moreVisible ? 'less \u25B4' : 'more \u25BE'}</button>`;
 
       // More prompts (hidden grid)
-      html += `<div class="swipe-more-prompts${moreVisible ? ' visible' : ''}" style="grid-column: 1 / -1; display: ${moreVisible ? 'grid' : 'none'};">`
+      html += `<div class="swipe-more-prompts${moreVisible ? ' visible' : ''}" style="grid-column: 1 / -1; display: ${moreVisible ? 'grid' : 'none'};">`;
       for (const key of morePromptKeys) {
-        const name = promptMeta[key] || key
-        html += `<button class="swipe-prompt-btn${activePromptLabel === key ? ' active' : ''}" data-prompt="${_esc(key)}">${_esc(name)}</button>`
+        const name = promptMeta[key] || key;
+        html += `<button class="swipe-prompt-btn${activePromptLabel === key ? ' active' : ''}" data-prompt="${_esc(key)}">${_esc(name)}</button>`;
       }
-      html += '</div>'
+      html += '</div>';
     }
   }
 
-  promptButtons.innerHTML = html
+  promptButtons.innerHTML = html;
 }
 
 async function handlePromptClick(e) {
-  const btn = e.target.closest('.swipe-prompt-btn')
-  if (!btn) return
+  const btn = e.target.closest('.swipe-prompt-btn');
+  if (!btn) return;
 
-  const label = btn.dataset.prompt
-  if (!label) return
+  const label = btn.dataset.prompt;
+  if (!label) return;
 
   // Handle "more" toggle
   if (label === '__more__') {
-    moreVisible = !moreVisible
-    renderPromptButtons()
-    return
+    moreVisible = !moreVisible;
+    renderPromptButtons();
+    return;
   }
 
-  const issue = filteredIssues[currentIndex]
-  if (!issue) return
+  const issue = filteredIssues[currentIndex];
+  if (!issue) return;
 
   // Toggle off if same prompt
   if (activePromptLabel === label && !promptResult.classList.contains('hidden')) {
-    promptResult.classList.add('hidden')
-    activePromptLabel = null
-    renderPromptButtons()
-    return
+    promptResult.classList.add('hidden');
+    activePromptLabel = null;
+    renderPromptButtons();
+    return;
   }
 
   // Check cache
-  const cacheKey = `${issue.id}:${label}`
+  const cacheKey = `${issue.id}:${label}`;
   if (promptCache[cacheKey]) {
-    const cached = promptCache[cacheKey]
-    promptName.textContent = cached.name
-    promptText.innerHTML = cached.html
-    promptText.dataset.rawPrompt = cached.raw
-    promptResult.classList.remove('hidden')
-    activePromptLabel = label
-    lastPromptLabel[issue.id] = label
-    setPromptActionsEnabled(true)
-    renderPromptButtons()
-    return
+    const cached = promptCache[cacheKey];
+    promptName.textContent = cached.name;
+    promptText.innerHTML = cached.html;
+    promptText.dataset.rawPrompt = cached.raw;
+    promptResult.classList.remove('hidden');
+    activePromptLabel = label;
+    lastPromptLabel[issue.id] = label;
+    setPromptActionsEnabled(true);
+    renderPromptButtons();
+    return;
   }
 
   // Cancel in-flight
-  if (activePromptFetch) activePromptFetch.abort()
-  const abortController = new AbortController()
-  activePromptFetch = abortController
+  if (activePromptFetch) activePromptFetch.abort();
+  const abortController = new AbortController();
+  activePromptFetch = abortController;
 
   // Show loading
-  activePromptLabel = label
-  promptName.textContent = ''
-  promptText.textContent = 'Loading...'
-  promptText.dataset.rawPrompt = ''
-  promptResult.classList.remove('hidden')
-  setPromptActionsEnabled(false)
-  btn.classList.add('loading')
-  renderPromptButtons()
+  activePromptLabel = label;
+  promptName.textContent = '';
+  promptText.textContent = 'Loading...';
+  promptText.dataset.rawPrompt = '';
+  promptResult.classList.remove('hidden');
+  setPromptActionsEnabled(false);
+  btn.classList.add('loading');
+  renderPromptButtons();
 
-  const apiPrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : ''
+  const apiPrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : '';
 
   try {
-    let response
+    let response;
     if (label === '__ai__') {
       // AI recommendation - use streaming endpoint
-      response = await fetch(`${apiPrefix}/api/recommend/${issue.id}`, { signal: abortController.signal })
+      response = await fetch(`${apiPrefix}/api/recommend/${issue.id}`, { signal: abortController.signal });
     } else {
-      response = await fetch(`${apiPrefix}/api/prompt/${issue.id}/${encodeURIComponent(label)}`, { signal: abortController.signal })
+      response = await fetch(`${apiPrefix}/api/prompt/${issue.id}/${encodeURIComponent(label)}`, { signal: abortController.signal });
     }
 
     if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || 'Failed to load prompt')
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to load prompt');
     }
 
     if (label === '__ai__') {
       // Handle streaming response for AI recommendations
-      await handleStreamingResponse(response, issue.id, label, abortController)
+      await handleStreamingResponse(response, issue.id, label, abortController);
     } else {
-      const result = await response.json()
+      const result = await response.json();
 
       if (activePromptFetch === abortController) {
-        const html = renderMarkdown(result.prompt)
-        promptName.textContent = result.promptName || ''
-        promptText.innerHTML = html
-        promptText.dataset.rawPrompt = result.prompt
-        promptResult.classList.remove('hidden')
-        setPromptActionsEnabled(true)
+        const html = renderMarkdown(result.prompt);
+        promptName.textContent = result.promptName || '';
+        promptText.innerHTML = html;
+        promptText.dataset.rawPrompt = result.prompt;
+        promptResult.classList.remove('hidden');
+        setPromptActionsEnabled(true);
 
         // Cache and track last active label for this issue
         promptCache[`${issue.id}:${label}`] = {
           label, name: result.promptName || '', raw: result.prompt, html
-        }
-        lastPromptLabel[issue.id] = label
+        };
+        lastPromptLabel[issue.id] = label;
       }
     }
   } catch (err) {
-    if (err.name === 'AbortError') return
-    promptText.textContent = `Error: ${err.message}`
-    setPromptActionsEnabled(false)
+    if (err.name === 'AbortError') return;
+    promptText.textContent = `Error: ${err.message}`;
+    setPromptActionsEnabled(false);
   } finally {
-    btn.classList.remove('loading')
+    btn.classList.remove('loading');
   }
 }
 
@@ -652,69 +653,69 @@ async function handlePromptClick(e) {
  * Handle streaming AI recommendation response
  */
 async function handleStreamingResponse(response, issueId, label, abortController) {
-  const reader = response.body.getReader()
-  const decoder = new TextDecoder()
-  let promptRaw = ''
-  let reasoningRaw = ''
-  let currentField = null
-  let renderPending = false
-  let sseBuffer = '' // Buffer for partial SSE lines across chunks
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let promptRaw = '';
+  let reasoningRaw = '';
+  let currentField = null;
+  let renderPending = false;
+  let sseBuffer = ''; // Buffer for partial SSE lines across chunks
 
   function scheduleRender() {
-    if (renderPending) return
-    renderPending = true
+    if (renderPending) return;
+    renderPending = true;
     requestAnimationFrame(() => {
       if (currentField === 'reasoning') {
-        promptName.textContent = 'AI thinking...'
+        promptName.textContent = 'AI thinking...';
       } else {
-        promptName.textContent = 'AI Recommendation'
+        promptName.textContent = 'AI Recommendation';
       }
-      const displayText = promptRaw || reasoningRaw
-      promptText.innerHTML = renderMarkdown(displayText)
-      renderPending = false
-    })
+      const displayText = promptRaw || reasoningRaw;
+      promptText.innerHTML = renderMarkdown(displayText);
+      renderPending = false;
+    });
   }
 
   try {
     while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      if (activePromptFetch !== abortController) break
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (activePromptFetch !== abortController) break;
 
-      sseBuffer += decoder.decode(value, { stream: true })
-      const lines = sseBuffer.split('\n')
+      sseBuffer += decoder.decode(value, { stream: true });
+      const lines = sseBuffer.split('\n');
       // Keep the last (possibly incomplete) line in the buffer
-      sseBuffer = lines.pop() || ''
+      sseBuffer = lines.pop() || '';
 
       for (const line of lines) {
-        if (!line.startsWith('data: ')) continue
-        const data = line.slice(6)
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6);
 
-        if (data === '[DONE]') continue
+        if (data === '[DONE]') continue;
 
         try {
-          const parsed = JSON.parse(data)
+          const parsed = JSON.parse(data);
 
           if (parsed.phase) {
-            currentField = parsed.phase
-            continue
+            currentField = parsed.phase;
+            continue;
           }
 
           if (parsed.reasoning) {
-            reasoningRaw += parsed.reasoning
-            currentField = 'reasoning'
-            scheduleRender()
+            reasoningRaw += parsed.reasoning;
+            currentField = 'reasoning';
+            scheduleRender();
           }
 
           if (parsed.content) {
-            promptRaw += parsed.content
-            currentField = 'prompt'
-            scheduleRender()
+            promptRaw += parsed.content;
+            currentField = 'prompt';
+            scheduleRender();
           }
 
           if (parsed.error) {
-            promptText.textContent = `Error: ${parsed.error}`
-            return
+            promptText.textContent = `Error: ${parsed.error}`;
+            return;
           }
         } catch (parseErr) {
           // Skip unparseable lines
@@ -724,22 +725,22 @@ async function handleStreamingResponse(response, issueId, label, abortController
 
     // Final render
     if (activePromptFetch === abortController) {
-      const displayText = promptRaw || reasoningRaw
-      const html = renderMarkdown(displayText)
-      promptName.textContent = 'AI Recommendation'
-      promptText.innerHTML = html
-      promptText.dataset.rawPrompt = displayText
-      promptResult.classList.remove('hidden')
-      setPromptActionsEnabled(true)
+      const displayText = promptRaw || reasoningRaw;
+      const html = renderMarkdown(displayText);
+      promptName.textContent = 'AI Recommendation';
+      promptText.innerHTML = html;
+      promptText.dataset.rawPrompt = displayText;
+      promptResult.classList.remove('hidden');
+      setPromptActionsEnabled(true);
 
       promptCache[`${issueId}:${label}`] = {
         label, name: 'AI Recommendation', raw: displayText, html
-      }
-      lastPromptLabel[issueId] = label
+      };
+      lastPromptLabel[issueId] = label;
     }
   } catch (err) {
-    if (err.name === 'AbortError') return
-    promptText.textContent = `Error: ${err.message}`
+    if (err.name === 'AbortError') return;
+    promptText.textContent = `Error: ${err.message}`;
   }
 }
 
@@ -748,73 +749,73 @@ async function handleStreamingResponse(response, issueId, label, abortController
 // ==========================================================================
 
 function setPromptActionsEnabled(enabled) {
-  const buttons = promptActions.querySelectorAll('button')
-  buttons.forEach(btn => { btn.disabled = !enabled })
+  const buttons = promptActions.querySelectorAll('button');
+  buttons.forEach(btn => { btn.disabled = !enabled; });
 }
 
 function buildPromptActions() {
-  let html = '<button class="swipe-prompt-copy">copy</button>'
+  let html = '<button class="swipe-prompt-copy">copy</button>';
   if (dispatchEnabled) {
-    html += '<button class="swipe-prompt-dispatch" data-target="cli">cli</button>'
-    html += '<button class="swipe-prompt-dispatch" data-target="web">web</button>'
-    html += '<button class="swipe-prompt-dispatch" data-target="dash">dash</button>'
+    html += '<button class="swipe-prompt-dispatch" data-target="cli">cli</button>';
+    html += '<button class="swipe-prompt-dispatch" data-target="web">web</button>';
+    html += '<button class="swipe-prompt-dispatch" data-target="dash">dash</button>';
   }
-  promptActions.innerHTML = html
+  promptActions.innerHTML = html;
 }
 
 function handleCopyClick(e) {
-  const btn = e.target.closest('.swipe-prompt-copy')
-  if (!btn) return
+  const btn = e.target.closest('.swipe-prompt-copy');
+  if (!btn) return;
 
-  const raw = promptText.dataset.rawPrompt
-  if (!raw) return
+  const raw = promptText.dataset.rawPrompt;
+  if (!raw) return;
 
   navigator.clipboard.writeText(raw).then(() => {
-    btn.textContent = 'copied!'
-    btn.classList.add('copied')
+    btn.textContent = 'copied!';
+    btn.classList.add('copied');
     setTimeout(() => {
-      btn.textContent = 'copy'
-      btn.classList.remove('copied')
-    }, 2000)
+      btn.textContent = 'copy';
+      btn.classList.remove('copied');
+    }, 2000);
   }).catch(() => {
-    btn.textContent = 'failed'
-    setTimeout(() => { btn.textContent = 'copy' }, 2000)
-  })
+    btn.textContent = 'failed';
+    setTimeout(() => { btn.textContent = 'copy'; }, 2000);
+  });
 }
 
 async function handleDispatchClick(e) {
-  const btn = e.target.closest('.swipe-prompt-dispatch')
-  if (!btn || btn.disabled) return
+  const btn = e.target.closest('.swipe-prompt-dispatch');
+  if (!btn || btn.disabled) return;
 
-  const target = btn.dataset.target
-  const raw = promptText.dataset.rawPrompt
-  if (!raw) return
+  const target = btn.dataset.target;
+  const raw = promptText.dataset.rawPrompt;
+  if (!raw) return;
 
-  const apiPrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : ''
+  const apiPrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : '';
 
-  btn.disabled = true
-  const originalText = btn.textContent
+  btn.disabled = true;
+  const originalText = btn.textContent;
 
   try {
     const response = await fetch(`${apiPrefix}/api/dispatch`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt: raw, target })
-    })
+    });
 
-    if (!response.ok) throw new Error('Dispatch failed')
+    if (!response.ok) throw new Error('Dispatch failed');
 
-    btn.textContent = '\u2713'
+    btn.textContent = '\u2713';
     setTimeout(() => {
-      btn.textContent = originalText
-      btn.disabled = false
-    }, 2000)
+      btn.textContent = originalText;
+      btn.disabled = false;
+    }, 2000);
   } catch (err) {
-    btn.textContent = 'err'
+    btn.textContent = 'err';
     setTimeout(() => {
-      btn.textContent = originalText
-      btn.disabled = false
-    }, 2000)
+      btn.textContent = originalText;
+      btn.disabled = false;
+    }, 2000);
   }
 }
 
@@ -824,14 +825,14 @@ async function handleDispatchClick(e) {
 
 function handleKeydown(e) {
   // Don't capture when focused on inputs
-  if (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
+  if (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
   if (e.key === 'ArrowLeft') {
-    e.preventDefault()
-    goPrev()
+    e.preventDefault();
+    goPrev();
   } else if (e.key === 'ArrowRight') {
-    e.preventDefault()
-    goNext()
+    e.preventDefault();
+    goNext();
   }
 }
 
@@ -841,38 +842,38 @@ function handleKeydown(e) {
 
 // Filter
 filterSelect.addEventListener('change', (e) => {
-  moreVisible = false
-  applyFilter(e.target.value)
-})
+  moreVisible = false;
+  applyFilter(e.target.value);
+});
 
 // Arrows
-arrowLeft.addEventListener('click', goPrev)
-arrowRight.addEventListener('click', goNext)
+arrowLeft.addEventListener('click', goPrev);
+arrowRight.addEventListener('click', goNext);
 
 // Touch events on card container
-const cardContainer = document.querySelector('.swipe-card-container')
-cardContainer.addEventListener('touchstart', handleTouchStart, { passive: true })
-cardContainer.addEventListener('touchmove', handleTouchMove, { passive: false })
-cardContainer.addEventListener('touchend', handleTouchEnd)
+const cardContainer = document.querySelector('.swipe-card-container');
+cardContainer.addEventListener('touchstart', handleTouchStart, { passive: true });
+cardContainer.addEventListener('touchmove', handleTouchMove, { passive: false });
+cardContainer.addEventListener('touchend', handleTouchEnd);
 
 // Accordion clicks (delegated)
-card.addEventListener('click', handleAccordionClick)
+card.addEventListener('click', handleAccordionClick);
 
 // Prompt button clicks (delegated)
-promptButtons.addEventListener('click', handlePromptClick)
+promptButtons.addEventListener('click', handlePromptClick);
 
 // Prompt action clicks (delegated)
 promptActions.addEventListener('click', (e) => {
-  handleCopyClick(e)
-  handleDispatchClick(e)
-})
+  handleCopyClick(e);
+  handleDispatchClick(e);
+});
 
 // Keyboard
-document.addEventListener('keydown', handleKeydown)
+document.addEventListener('keydown', handleKeydown);
 
 // ==========================================================================
 // Initialize
 // ==========================================================================
 
-buildPromptActions()
-applyFilter(currentFilter)
+buildPromptActions();
+applyFilter(currentFilter);
