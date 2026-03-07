@@ -40,6 +40,7 @@ import { renderPrivacyPolicy, renderTermsOfService } from './lib/render-legal.js
 import { renderSettingsPage } from './lib/render-settings.js'
 import { renderPromptsPage } from './lib/render-prompts.js'
 import { renderDispatchPage } from './lib/render-dispatch.js'
+import { renderSwipePage } from './lib/render-swipe.js'
 import { renderProxyPage } from './lib/render-proxy.js'
 import { DEFAULT_MODEL, AVAILABLE_MODELS } from './lib/openrouter.js'
 import { getFeatureFlags, isValidFeatureKey } from './lib/feature-defaults.js'
@@ -604,6 +605,47 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
 // =============================================================================
 // Workspace-Prefixed Dashboard Routes
 // =============================================================================
+
+/**
+ * Swipe page - mobile-first task card swiping with prompts.
+ * Displays tasks as swipeable cards with integrated prompt generation.
+ */
+app.get('/workspace/:urlKey/swipe', workspaceFromUrl, async (req, res) => {
+  const workspace = req.workspace;
+  const deployInfo = getDeployInfo();
+  const openRouterSource = getOpenRouterSource(req);
+
+  // Parse team filter (same as main dashboard)
+  const rawTeam = req.query.team;
+  const teamId = rawTeam && rawTeam !== 'all' && UUID_REGEX.test(rawTeam) ? rawTeam : null;
+
+  try {
+    const { trees, inProgressTrees, recentActivityTrees, organizationName } = await fetchAndPrepareProjects(workspace.accessToken, teamId);
+    const html = renderSwipePage(
+      { projectTrees: trees, inProgressTrees, recentActivityTrees, organizationName },
+      {
+        deployInfo,
+        urlKey: workspace.urlKey,
+        openRouterSource,
+        workspaces: req.session.workspaces,
+        featureFlags: getFeatureFlags(req.session)
+      }
+    );
+    res.send(html);
+  } catch (error) {
+    console.error('Swipe page error:', error);
+
+    if (error.response?.status === 401) {
+      return handleUnauthorizedError(workspace, req.session, teamId, openRouterSource, res);
+    }
+
+    const html = renderErrorPage('Something Went Wrong', 'Could not load your tasks. Please try again.', {
+      action: 'Try again',
+      actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/swipe`
+    });
+    res.status(500).send(html);
+  }
+});
 
 /**
  * Operator Dashboard page - requires authentication.
