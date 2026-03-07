@@ -38,7 +38,7 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore }) {
       client_id: process.env.LINEAR_CLIENT_ID,
       redirect_uri: process.env.LINEAR_REDIRECT_URI,
       response_type: 'code',
-      scope: 'read',
+      scope: 'read,write',
       state,
       prompt: 'consent'
     })
