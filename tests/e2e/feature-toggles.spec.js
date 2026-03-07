@@ -414,13 +414,13 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('a[href*="/proxy"]')).toHaveCount(0);
   });
 
-  test('proxy nav link visible when proxy is on', async ({ page }) => {
+  test('proxy footer link visible when proxy is on', async ({ page }) => {
     await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
 
     await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/`);
     await page.waitForLoadState('networkidle');
 
-    await expect(page.locator('a.nav-action:has-text("proxy")')).toBeVisible();
+    await expect(page.locator('.footer-actions a:has-text("proxy")')).toBeVisible();
   });
 
   test('proxy page redirects to settings when proxy is off', async ({ page }) => {
