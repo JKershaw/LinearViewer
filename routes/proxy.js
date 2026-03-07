@@ -80,7 +80,6 @@ const PROJECTS_QUERY = gql`
         name
         content
         url
-        state { type }
       }
     }
   }
