@@ -19,6 +19,10 @@ import rateLimit from 'express-rate-limit';
 const LINEAR_API_ENDPOINT = 'https://api.linear.app/graphql';
 
 // Rate limiters
+// Note: proxyLimiter is applied before authenticateProxyToken on consumer
+// endpoints intentionally. This ensures unauthenticated/malicious requests
+// are counted against the per-IP limit, mitigating DoS attacks that would
+// otherwise bypass rate limiting by failing at auth.
 const proxyLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 60,
@@ -392,12 +396,36 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, workspaceF
   }
 
   /**
-   * Extract a human-readable error message from a GraphQL error.
+   * Extract a safe, human-readable error message from a GraphQL error.
    * graphql-request stores the server errors in err.response.errors.
+   *
+   * Sanitizes the message to avoid leaking internal schema structures
+   * or validation details to external consumers.
    */
   function graphqlErrorDetail(err) {
     const gqlMessage = err.response?.errors?.[0]?.message;
-    return gqlMessage || err.message;
+    const raw = gqlMessage || err.message || 'Unknown error';
+
+    // Strip messages that could reveal internal schema or field details.
+    // Keep common user-facing messages (not found, permission, validation).
+    const safePatterns = [
+      /not found/i,
+      /does not exist/i,
+      /permission/i,
+      /unauthorized/i,
+      /forbidden/i,
+      /rate limit/i,
+      /invalid.*id/i,
+      /already exists/i,
+    ];
+
+    if (safePatterns.some(p => p.test(raw))) {
+      return raw;
+    }
+
+    // For anything else, return a generic message and log the real one
+    console.error('GraphQL error detail (suppressed from response):', raw);
+    return 'Linear API request failed';
   }
 
   // =========================================================================
@@ -1093,6 +1121,12 @@ ${readEndpoints}${writeEndpoints}
   /**
    * POST /api/proxy/issue/:issueId/labels
    * Add a label to an issue.
+   *
+   * Note: This performs a Read-Modify-Write cycle (fetch current labels, then
+   * update with the new set) because Linear's GraphQL API requires sending the
+   * full label ID array. Concurrent label modifications (e.g. from the Linear
+   * UI and this proxy simultaneously) could overwrite each other. This is an
+   * inherent limitation of Linear's label API — there is no atomic add/remove.
    */
   router.post('/api/proxy/issue/:issueId/labels', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
@@ -1142,6 +1176,9 @@ ${readEndpoints}${writeEndpoints}
   /**
    * DELETE /api/proxy/issue/:issueId/labels/:labelId
    * Remove a label from an issue.
+   *
+   * Note: Same Read-Modify-Write race condition caveat as the add-label
+   * endpoint above. See POST /labels comment for details.
    */
   router.delete('/api/proxy/issue/:issueId/labels/:labelId', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {

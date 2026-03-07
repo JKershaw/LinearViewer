@@ -1,0 +1,268 @@
+/**
+ * Unit tests for proxy-tokens.js
+ *
+ * Run with: node --test tests/unit/proxy-tokens.test.js
+ */
+import { test, describe, beforeEach } from 'node:test';
+import assert from 'node:assert';
+import crypto from 'crypto';
+import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
+
+// =============================================================================
+// In-memory collection mock (MangoDB-compatible interface)
+// =============================================================================
+
+function createMockCollection() {
+  let docs = [];
+
+  return {
+    async insertOne(doc) {
+      docs.push({ ...doc });
+      return { insertedId: doc._id };
+    },
+    async findOne(query) {
+      return docs.find(d => {
+        return Object.keys(query).every(k => {
+          if (typeof query[k] === 'object' && query[k] !== null) return true; // skip operators
+          return d[k] === query[k];
+        });
+      }) || null;
+    },
+    async updateOne(query, update) {
+      const idx = docs.findIndex(d => {
+        return Object.keys(query).every(k => {
+          if (typeof query[k] === 'object' && query[k] !== null) return true;
+          return d[k] === query[k];
+        });
+      });
+      if (idx === -1) return { matchedCount: 0, modifiedCount: 0 };
+      if (update.$set) {
+        Object.assign(docs[idx], update.$set);
+      }
+      return { matchedCount: 1, modifiedCount: 1 };
+    },
+    async deleteOne(query) {
+      const idx = docs.findIndex(d => {
+        return Object.keys(query).every(k => d[k] === query[k]);
+      });
+      if (idx === -1) return { deletedCount: 0 };
+      docs.splice(idx, 1);
+      return { deletedCount: 1 };
+    },
+    async deleteMany(query) {
+      const before = docs.length;
+      docs = docs.filter(d => {
+        return !Object.keys(query).every(k => {
+          const val = query[k];
+          if (val && typeof val === 'object') {
+            // Handle $lt, $ne, $gt operators
+            if ('$lt' in val && '$ne' in val) {
+              return d[k] !== val.$ne && d[k] !== null && new Date(d[k]) < new Date(val.$lt);
+            }
+            if ('$lt' in val) {
+              return d[k] !== null && new Date(d[k]) < new Date(val.$lt);
+            }
+            return true;
+          }
+          return d[k] === val;
+        });
+      });
+      return { deletedCount: before - docs.length };
+    },
+    find(query) {
+      const results = docs.filter(d => {
+        return Object.keys(query).every(k => {
+          const val = query[k];
+          if (val && typeof val === 'object') return true; // skip operators
+          return d[k] === val;
+        });
+      });
+      return { toArray: async () => results };
+    },
+    _docs: () => docs,
+    _clear: () => { docs = []; }
+  };
+}
+
+// =============================================================================
+// Tests
+// =============================================================================
+
+describe('ProxyTokenStore', () => {
+  let store;
+  let collection;
+
+  beforeEach(() => {
+    collection = createMockCollection();
+    store = new ProxyTokenStore({ collection });
+  });
+
+  describe('hash verification', () => {
+    test('validates a token using its SHA-256 hash', async () => {
+      const result = await store.createToken('workspace-1', { label: 'test' });
+      const validated = await store.validateToken(result.token);
+      assert.ok(validated, 'Token should validate successfully');
+      assert.strictEqual(validated.urlKey, 'workspace-1');
+      assert.strictEqual(validated.label, 'test');
+    });
+
+    test('rejects a modified token (wrong hash)', async () => {
+      const result = await store.createToken('workspace-1', { label: 'test' });
+      // Flip a character in the token
+      const modified = result.token.slice(0, -1) + (result.token.at(-1) === 'a' ? 'b' : 'a');
+      const validated = await store.validateToken(modified);
+      assert.strictEqual(validated, null, 'Modified token should not validate');
+    });
+
+    test('rejects a completely random token', async () => {
+      await store.createToken('workspace-1', { label: 'test' });
+      const randomToken = crypto.randomBytes(32).toString('base64url');
+      const validated = await store.validateToken(randomToken);
+      assert.strictEqual(validated, null, 'Random token should not validate');
+    });
+
+    test('rejects empty token', async () => {
+      const validated = await store.validateToken('');
+      assert.strictEqual(validated, null);
+    });
+
+    test('rejects null token', async () => {
+      const validated = await store.validateToken(null);
+      assert.strictEqual(validated, null);
+    });
+
+    test('stored hash matches SHA-256 of the token', async () => {
+      const result = await store.createToken('workspace-1');
+      const docs = collection._docs();
+      const storedHash = docs[0].tokenHash;
+      const expectedHash = crypto.createHash('sha256').update(result.token).digest('hex');
+      assert.strictEqual(storedHash, expectedHash, 'Stored hash should match SHA-256 of token');
+    });
+
+    test('plain token is never stored in the database', async () => {
+      const result = await store.createToken('workspace-1');
+      const docs = collection._docs();
+      const doc = docs[0];
+      // The plain token should not appear anywhere in the stored document
+      const docString = JSON.stringify(doc);
+      assert.ok(!docString.includes(result.token), 'Plain token must not be stored in database');
+    });
+  });
+
+  describe('single-use tokens', () => {
+    test('single-use token is consumed after first validation', async () => {
+      const result = await store.createToken('workspace-1', { singleUse: true });
+
+      const first = await store.validateToken(result.token);
+      assert.ok(first, 'First validation should succeed');
+
+      const second = await store.validateToken(result.token);
+      assert.strictEqual(second, null, 'Second validation should fail (consumed)');
+    });
+
+    test('non-single-use token can be validated multiple times', async () => {
+      const result = await store.createToken('workspace-1', { singleUse: false });
+
+      const first = await store.validateToken(result.token);
+      assert.ok(first, 'First validation should succeed');
+
+      const second = await store.validateToken(result.token);
+      assert.ok(second, 'Second validation should also succeed');
+    });
+  });
+
+  describe('token expiry', () => {
+    test('expired token is rejected', async () => {
+      // Create a token with a 1-second TTL, then manually set it to past
+      const result = await store.createToken('workspace-1', { ttl: 1 });
+      const docs = collection._docs();
+      // Set expiry to 1 hour ago
+      docs[0].expiresAt = new Date(Date.now() - 60 * 60 * 1000);
+
+      const validated = await store.validateToken(result.token);
+      assert.strictEqual(validated, null, 'Expired token should not validate');
+    });
+
+    test('token without TTL does not expire', async () => {
+      const result = await store.createToken('workspace-1');
+      const docs = collection._docs();
+      assert.strictEqual(docs[0].expiresAt, null, 'No-TTL token should have null expiresAt');
+
+      const validated = await store.validateToken(result.token);
+      assert.ok(validated, 'Non-expiring token should validate');
+    });
+  });
+
+  describe('scope', () => {
+    test('read scope is stored correctly', async () => {
+      const result = await store.createToken('workspace-1', { scope: 'read' });
+      const validated = await store.validateToken(result.token);
+      assert.strictEqual(validated.scope, 'read');
+    });
+
+    test('readWrite scope is stored correctly', async () => {
+      const result = await store.createToken('workspace-1', { scope: 'readWrite' });
+      const validated = await store.validateToken(result.token);
+      assert.strictEqual(validated.scope, 'readWrite');
+    });
+
+    test('invalid scope throws error', async () => {
+      await assert.rejects(
+        () => store.createToken('workspace-1', { scope: 'admin' }),
+        /scope must be/
+      );
+    });
+  });
+
+  describe('cleanup', () => {
+    test('removes expired tokens', async () => {
+      await store.createToken('workspace-1', { ttl: 1 });
+      const docs = collection._docs();
+      // Set expiry to past
+      docs[0].expiresAt = new Date(Date.now() - 60 * 1000);
+
+      const removed = await store.cleanup();
+      assert.strictEqual(removed, 1);
+      assert.strictEqual(collection._docs().length, 0);
+    });
+
+    test('removes consumed single-use tokens older than 24h', async () => {
+      const result = await store.createToken('workspace-1', { singleUse: true });
+      // Consume it
+      await store.validateToken(result.token);
+      // Set lastUsedAt to 25 hours ago
+      const docs = collection._docs();
+      docs[0].lastUsedAt = new Date(Date.now() - 25 * 60 * 60 * 1000);
+
+      const removed = await store.cleanup();
+      assert.strictEqual(removed, 1);
+    });
+
+    test('does not remove active tokens', async () => {
+      await store.createToken('workspace-1');
+      const removed = await store.cleanup();
+      assert.strictEqual(removed, 0);
+      assert.strictEqual(collection._docs().length, 1);
+    });
+  });
+
+  describe('revocation', () => {
+    test('revoked token cannot be validated', async () => {
+      const result = await store.createToken('workspace-1');
+      await store.revokeToken('workspace-1', result.tokenId);
+
+      const validated = await store.validateToken(result.token);
+      assert.strictEqual(validated, null, 'Revoked token should not validate');
+    });
+
+    test('revoking requires matching workspace', async () => {
+      const result = await store.createToken('workspace-1');
+      const revoked = await store.revokeToken('wrong-workspace', result.tokenId);
+      assert.strictEqual(revoked, false, 'Should not revoke with wrong workspace');
+
+      // Token should still work
+      const validated = await store.validateToken(result.token);
+      assert.ok(validated, 'Token should still be valid');
+    });
+  });
+});
