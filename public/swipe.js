@@ -21,7 +21,8 @@ const dispatchEnabled = data.dispatchEnabled || false
 let currentFilter = filters.length > 0 ? filters[0].key : ''
 let filteredIssues = []
 let currentIndex = 0
-let promptCache = {} // issueId -> {label, name, raw, html}
+let promptCache = {} // 'issueId:label' -> {label, name, raw, html}
+let lastPromptLabel = {} // issueId -> last active label
 let activePromptLabel = null
 let activePromptFetch = null
 let moreVisible = false
@@ -251,8 +252,9 @@ function renderCard(direction) {
     card.innerHTML = html
   }
 
-  // Restore cached prompt if exists
-  const cached = promptCache[issue.id]
+  // Restore cached prompt if this card had one before
+  const lastLabel = lastPromptLabel[issue.id]
+  const cached = lastLabel ? promptCache[`${issue.id}:${lastLabel}`] : null
   if (cached) {
     promptName.textContent = cached.name
     promptText.innerHTML = cached.html
@@ -579,6 +581,7 @@ async function handlePromptClick(e) {
     promptText.dataset.rawPrompt = cached.raw
     promptResult.classList.remove('hidden')
     activePromptLabel = label
+    lastPromptLabel[issue.id] = label
     setPromptActionsEnabled(true)
     renderPromptButtons()
     return
@@ -629,10 +632,11 @@ async function handlePromptClick(e) {
         promptResult.classList.remove('hidden')
         setPromptActionsEnabled(true)
 
-        // Cache
+        // Cache and track last active label for this issue
         promptCache[`${issue.id}:${label}`] = {
           label, name: result.promptName || '', raw: result.prompt, html
         }
+        lastPromptLabel[issue.id] = label
       }
     }
   } catch (err) {
@@ -654,6 +658,7 @@ async function handleStreamingResponse(response, issueId, label, abortController
   let reasoningRaw = ''
   let currentField = null
   let renderPending = false
+  let sseBuffer = '' // Buffer for partial SSE lines across chunks
 
   function scheduleRender() {
     if (renderPending) return
@@ -676,8 +681,10 @@ async function handleStreamingResponse(response, issueId, label, abortController
       if (done) break
       if (activePromptFetch !== abortController) break
 
-      const chunk = decoder.decode(value, { stream: true })
-      const lines = chunk.split('\n')
+      sseBuffer += decoder.decode(value, { stream: true })
+      const lines = sseBuffer.split('\n')
+      // Keep the last (possibly incomplete) line in the buffer
+      sseBuffer = lines.pop() || ''
 
       for (const line of lines) {
         if (!line.startsWith('data: ')) continue
@@ -728,6 +735,7 @@ async function handleStreamingResponse(response, issueId, label, abortController
       promptCache[`${issueId}:${label}`] = {
         label, name: 'AI Recommendation', raw: displayText, html
       }
+      lastPromptLabel[issueId] = label
     }
   } catch (err) {
     if (err.name === 'AbortError') return
