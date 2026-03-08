@@ -17,9 +17,8 @@ test.describe('Swipe Page', () => {
     // Should have a card with content
     await expect(page.locator('.swipe-card')).toBeVisible();
 
-    // Should show card position counter
+    // Should show card position counter (dots or text)
     await expect(page.locator('.swipe-counter')).toBeVisible();
-    await expect(page.locator('.swipe-counter')).not.toHaveText('No tasks');
   });
 
   test('displays task card with correct elements', async ({ page }) => {
@@ -34,26 +33,26 @@ test.describe('Swipe Page', () => {
   });
 
   test('arrow buttons navigate between cards', async ({ page }) => {
-    // Get initial counter text
-    const counterText = await page.locator('.swipe-counter').textContent();
+    // Get initial card position text
+    const positionText = await page.locator('.swipe-card-position').textContent();
 
     // If there are multiple tasks, right arrow should advance
-    if (!counterText.includes('1 of 1')) {
+    if (!positionText.includes('1 / 1')) {
       const rightArrow = page.locator('.swipe-arrow-right');
       await expect(rightArrow).not.toBeDisabled();
 
       // Click right arrow
       await rightArrow.click();
 
-      // Counter should update
-      await expect(page.locator('.swipe-counter')).toContainText('2 of');
+      // Card position should update to show card 2
+      await expect(page.locator('.swipe-card-position')).toContainText('2 /');
 
       // Left arrow should now be enabled
       await expect(page.locator('.swipe-arrow-left')).not.toBeDisabled();
 
       // Click left arrow to go back
       await page.locator('.swipe-arrow-left').click();
-      await expect(page.locator('.swipe-counter')).toContainText('1 of');
+      await expect(page.locator('.swipe-card-position')).toContainText('1 /');
     }
   });
 
@@ -80,9 +79,9 @@ test.describe('Swipe Page', () => {
       const secondOption = await select.locator('option').nth(1).getAttribute('value');
       await select.selectOption(secondOption);
 
-      // Counter should reset
-      const counter = await page.locator('.swipe-counter').textContent();
-      expect(counter).toMatch(/^(1 of \d+|No tasks)$/);
+      // Card position should reset to 1
+      const position = await page.locator('.swipe-card-position').textContent();
+      expect(position).toMatch(/^1 \//);
     }
   });
 
@@ -114,16 +113,16 @@ test.describe('Swipe Page', () => {
   });
 
   test('keyboard navigation works', async ({ page }) => {
-    const counterText = await page.locator('.swipe-counter').textContent();
+    const positionText = await page.locator('.swipe-card-position').textContent();
 
-    if (!counterText.includes('1 of 1')) {
+    if (!positionText.includes('1 / 1')) {
       // Press right arrow key
       await page.keyboard.press('ArrowRight');
-      await expect(page.locator('.swipe-counter')).toContainText('2 of');
+      await expect(page.locator('.swipe-card-position')).toContainText('2 /');
 
       // Press left arrow key
       await page.keyboard.press('ArrowLeft');
-      await expect(page.locator('.swipe-counter')).toContainText('1 of');
+      await expect(page.locator('.swipe-card-position')).toContainText('1 /');
     }
   });
 
