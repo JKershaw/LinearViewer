@@ -28,6 +28,9 @@ let activePromptLabel = null;
 let activePromptFetch = null;
 let moreVisible = false;
 
+// Animation state
+let animationTimers = [];
+
 // Swipe state
 let touchStartX = 0;
 let touchStartY = 0;
@@ -100,7 +103,9 @@ function formatRelativeTime(dateStr) {
 function applyFilter(filterKey) {
   currentFilter = filterKey;
 
-  if (filterKey === 'in-progress') {
+  if (filterKey === 'all') {
+    filteredIssues = allIssues;
+  } else if (filterKey === 'in-progress') {
     filteredIssues = allIssues.filter(i => i.stateType === 'started');
   } else if (filterKey === 'recent-activity') {
     filteredIssues = allIssues.filter(i => i.section === 'recent-activity');
@@ -276,39 +281,45 @@ function renderCard(direction) {
 // Card Animation
 // ==========================================================================
 
+/**
+ * Cancel any in-flight animation timers and reset inline styles.
+ */
+function clearAnimations() {
+  for (const id of animationTimers) clearTimeout(id);
+  animationTimers = [];
+  card.classList.remove('exiting', 'entering', 'swiping');
+  card.style.transition = '';
+  card.style.transform = '';
+  card.style.opacity = '';
+}
+
 function animateCardTransition(newHtml, direction) {
-  const exitX = direction === 'left' ? '-110%' : '110%';
+  clearAnimations();
+
   const enterX = direction === 'left' ? '110%' : '-110%';
 
-  // Exit current card
-  card.classList.add('exiting');
-  card.style.transform = `translate3d(${exitX}, 0, 0)`;
+  // Set new content immediately and position off-screen for entry
+  card.innerHTML = newHtml;
+  card.classList.add('entering');
+  card.style.transition = 'none';
+  card.style.transform = `translate3d(${enterX}, 0, 0)`;
   card.style.opacity = '0';
 
-  setTimeout(() => {
-    // Set new content and position for entry
-    card.innerHTML = newHtml;
-    card.classList.remove('exiting');
-    card.classList.add('entering');
-    card.style.transition = 'none';
-    card.style.transform = `translate3d(${enterX}, 0, 0)`;
-    card.style.opacity = '0';
+  // Force reflow
+  card.offsetHeight;
 
-    // Force reflow
-    card.offsetHeight;
+  // Animate in
+  card.style.transition = '';
+  card.classList.remove('entering');
+  card.style.transform = 'translate3d(0, 0, 0)';
+  card.style.opacity = '1';
 
-    // Animate in
-    card.style.transition = '';
-    card.classList.remove('entering');
-    card.style.transform = 'translate3d(0, 0, 0)';
-    card.style.opacity = '1';
-
-    // Clean up
-    setTimeout(() => {
-      card.style.transform = '';
-      card.style.opacity = '';
-    }, 250);
+  // Clean up inline styles after transition completes
+  const cleanup = setTimeout(() => {
+    card.style.transform = '';
+    card.style.opacity = '';
   }, 250);
+  animationTimers.push(cleanup);
 }
 
 // ==========================================================================
@@ -318,33 +329,33 @@ function animateCardTransition(newHtml, direction) {
 function goNext() {
   if (currentIndex >= filteredIssues.length - 1) {
     // Bounce effect at end
+    clearAnimations();
     card.style.transform = 'translate3d(-20px, 0, 0)';
-    setTimeout(() => {
-      card.style.transform = '';
-    }, 150);
+    const id = setTimeout(() => { card.style.transform = ''; }, 150);
+    animationTimers.push(id);
     return;
   }
   currentIndex++;
-  renderCard('left');
-  renderPromptButtons();
   updateArrows();
   updateCounter();
+  renderPromptButtons();
+  renderCard('left');
 }
 
 function goPrev() {
   if (currentIndex <= 0) {
     // Bounce effect at start
+    clearAnimations();
     card.style.transform = 'translate3d(20px, 0, 0)';
-    setTimeout(() => {
-      card.style.transform = '';
-    }, 150);
+    const id = setTimeout(() => { card.style.transform = ''; }, 150);
+    animationTimers.push(id);
     return;
   }
   currentIndex--;
-  renderCard('right');
-  renderPromptButtons();
   updateArrows();
   updateCounter();
+  renderPromptButtons();
+  renderCard('right');
 }
 
 function updateArrows() {
@@ -383,6 +394,7 @@ function handleTouchStart(e) {
   // Don't interfere with accordion taps or links
   if (e.target.closest('.swipe-accordion-header, .swipe-accordion-body, a, button, select')) return;
 
+  clearAnimations();
   touchStartX = e.touches[0].clientX;
   touchStartY = e.touches[0].clientY;
   touchCurrentX = touchStartX;
@@ -456,10 +468,11 @@ function handleTouchEnd() {
   // Snap back
   card.style.transform = 'translate3d(0, 0, 0)';
   card.style.opacity = '1';
-  setTimeout(() => {
+  const snapBack = setTimeout(() => {
     card.style.transform = '';
     card.style.opacity = '';
   }, 300);
+  animationTimers.push(snapBack);
 }
 
 // ==========================================================================
