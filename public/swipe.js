@@ -700,9 +700,17 @@ async function handleStreamingResponse(response, issueId, label, abortController
       }
       const displayText = promptRaw || reasoningRaw;
       promptText.innerHTML = renderMarkdown(displayText);
+      // Auto-scroll only if user hasn't scrolled up to read
+      const nearBottom = promptText.scrollHeight - promptText.scrollTop - promptText.clientHeight < 60;
+      if (nearBottom) {
+        promptText.scrollTop = promptText.scrollHeight;
+      }
       renderPending = false;
     });
   }
+
+  // Add streaming class for fade-in and gradient mask
+  promptResult.classList.add('streaming');
 
   try {
     while (true) {
@@ -749,7 +757,8 @@ async function handleStreamingResponse(response, issueId, label, abortController
       }
     }
 
-    // Final render
+    // Final render — remove streaming effects
+    promptResult.classList.remove('streaming');
     if (activePromptFetch === abortController) {
       const displayText = promptRaw || reasoningRaw;
       const html = renderMarkdown(displayText);
@@ -766,6 +775,7 @@ async function handleStreamingResponse(response, issueId, label, abortController
     }
   } catch (err) {
     if (err.name === 'AbortError') return;
+    promptResult.classList.remove('streaming');
     promptText.textContent = `Error: ${err.message}`;
   }
 }

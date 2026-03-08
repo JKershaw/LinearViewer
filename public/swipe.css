@@ -555,6 +555,22 @@
   color: var(--fg, #1a1a1a);
 }
 
+/* Streaming fade-in */
+@keyframes promptFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.swipe-prompt-result.streaming {
+  animation: promptFadeIn 0.3s ease-out both;
+}
+
+/* Bottom gradient mask during streaming — text appears to materialise */
+.swipe-prompt-result.streaming .swipe-prompt-text {
+  mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+}
+
 .swipe-prompt-text p { margin: 0 0 0.5rem; }
 .swipe-prompt-text ul,
 .swipe-prompt-text ol { margin: 0 0 0.5rem; padding-left: 1.5rem; }
