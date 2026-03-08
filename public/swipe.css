@@ -508,6 +508,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.3rem;
   padding: 0.4rem 0.75rem;
   background: var(--bg-muted, #f8f9fa);
   border-bottom: 1px solid #eee;
@@ -522,6 +524,7 @@
 
 .swipe-prompt-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.3rem;
 }
 
