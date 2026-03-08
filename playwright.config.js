@@ -23,7 +23,7 @@ export default defineConfig({
   webServer: {
     command: 'NODE_ENV=test PORT=3001 SESSION_SECRET=test-secret-for-playwright node server.js',
     url: 'http://localhost:3001',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 120000,
     stdout: 'pipe',
     stderr: 'pipe',
