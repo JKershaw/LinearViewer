@@ -232,17 +232,20 @@ function renderCard(direction) {
     : '';
 
   const html = `
-    <div class="swipe-card-header">
-      <div class="swipe-card-status">
-        <span class="state ${state.cls}">${state.char}</span>
-        <span class="swipe-card-identifier">${_esc(issue.identifier)}</span>
+    <div class="swipe-card-accent ${state.cls}"></div>
+    <div class="swipe-card-inner">
+      <div class="swipe-card-header">
+        <div class="swipe-card-status">
+          <span class="state ${state.cls}">${state.char}</span>
+          <span class="swipe-card-identifier">${_esc(issue.identifier)}</span>
+        </div>
+        <span class="swipe-card-position">${currentIndex + 1} / ${total}</span>
       </div>
-      <span class="swipe-card-position">${currentIndex + 1} of ${total}</span>
+      <div class="${titleClass}">${_esc(issue.title)}</div>
+      <div class="swipe-card-meta">${metaHtml}</div>
+      ${accordionHtml}
+      ${linkHtml}
     </div>
-    <div class="${titleClass}">${_esc(issue.title)}</div>
-    <div class="swipe-card-meta">${metaHtml}</div>
-    ${accordionHtml}
-    ${linkHtml}
   `;
 
   // Animate transition
@@ -349,11 +352,22 @@ function updateArrows() {
 }
 
 function updateCounter() {
-  if (filteredIssues.length === 0) {
-    counter.textContent = 'No tasks';
+  const total = filteredIssues.length;
+  if (total === 0) {
+    counter.innerHTML = '<span>No tasks</span>';
     return;
   }
-  counter.textContent = `${currentIndex + 1} of ${filteredIssues.length}`;
+
+  // Show dots for small sets, text for large
+  const MAX_DOTS = 12;
+  if (total <= MAX_DOTS) {
+    const dots = Array.from({ length: total }, (_, i) =>
+      `<span class="swipe-counter-dot${i === currentIndex ? ' active' : ''}"></span>`
+    ).join('');
+    counter.innerHTML = `<span class="swipe-counter-dots">${dots}</span>`;
+  } else {
+    counter.innerHTML = `<span>${currentIndex + 1} / ${total}</span>`;
+  }
 }
 
 // ==========================================================================
@@ -535,8 +549,8 @@ function renderPromptButtons() {
     if (morePromptKeys.length > 0) {
       html += `<button class="swipe-prompt-btn swipe-prompt-btn-more" data-prompt="__more__">${moreVisible ? 'less \u25B4' : 'more \u25BE'}</button>`;
 
-      // More prompts (hidden grid)
-      html += `<div class="swipe-more-prompts${moreVisible ? ' visible' : ''}" style="grid-column: 1 / -1; display: ${moreVisible ? 'grid' : 'none'};">`;
+      // More prompts (hidden row)
+      html += `<div class="swipe-more-prompts${moreVisible ? ' visible' : ''}" style="display: ${moreVisible ? 'flex' : 'none'};">`;
       for (const key of morePromptKeys) {
         const name = promptMeta[key] || key;
         html += `<button class="swipe-prompt-btn${activePromptLabel === key ? ' active' : ''}" data-prompt="${_esc(key)}">${_esc(name)}</button>`;
