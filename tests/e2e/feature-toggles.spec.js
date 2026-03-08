@@ -21,7 +21,7 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('.settings-header:has-text("Workflow")')).toBeVisible();
 
     // All feature toggle labels should be present (split across sections)
-    await expect(page.locator('.feature-toggle-label:has-text("Linear MCP in prompts")')).toBeVisible();
+    await expect(page.locator('.feature-toggle-label:has-text("Linear references in prompts")')).toBeVisible();
     await expect(page.locator('.feature-toggle-label:has-text("Feature branch workflow")')).toBeVisible();
     await expect(page.locator('.feature-toggle-label:has-text("Code review before completing")')).toBeVisible();
     await expect(page.locator('.feature-toggle-label:has-text("Dispatch queue")')).toBeVisible();
@@ -44,7 +44,7 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('[data-feature="promptButtons"] .toggle-state')).toHaveText('● on');
   });
 
-  test('shows recommendation note on Linear MCP toggle', async ({ page }) => {
+  test('shows recommendation note on Linear references toggle', async ({ page }) => {
     await page.goto(SETTINGS_URL);
     await page.waitForLoadState('networkidle');
 
@@ -102,20 +102,20 @@ test.describe('Feature Toggle Settings', () => {
   });
 
   // =========================================================================
-  // LIN-168: Linear MCP toggle affects prompt content
+  // Linear references toggle affects prompt content
   // =========================================================================
 
-  test('prompts include MCP instructions by default', async ({ page }) => {
+  test('prompts include Linear references by default', async ({ page }) => {
     // Default: linearMcp is ON
     const response = await page.request.get(
       `/workspace/${TEST_WORKSPACE_URL_KEY}/api/prompt/${TEST_ISSUE_ID}/look-into`
     );
     expect(response.ok()).toBeTruthy();
     const data = await response.json();
-    expect(data.prompt).toContain('Linear MCP');
+    expect(data.prompt).toContain('in Linear');
   });
 
-  test('prompts exclude MCP instructions when linearMcp is off', async ({ page }) => {
+  test('prompts exclude Linear references when linearMcp is off', async ({ page }) => {
     // Set session with linearMcp OFF
     await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ linearMcp: false }))}`);
 
@@ -124,7 +124,7 @@ test.describe('Feature Toggle Settings', () => {
     );
     expect(response.ok()).toBeTruthy();
     const data = await response.json();
-    expect(data.prompt).not.toContain('Linear MCP');
+    expect(data.prompt).not.toContain('in Linear');
   });
 
   // =========================================================================
@@ -455,6 +455,47 @@ test.describe('Feature Toggle Settings', () => {
     await page.reload();
     await page.waitForLoadState('networkidle');
     await expect(page.locator('[data-feature="proxy"] .toggle-state')).toHaveText('● on');
+  });
+
+  // =========================================================================
+  // Proxy toggle button in prompt UI
+  // =========================================================================
+
+  test('proxy toggle button hidden when proxy feature is off', async ({ page }) => {
+    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/`);
+    await page.waitForLoadState('networkidle');
+
+    // Proxy toggle buttons should not exist
+    await expect(page.locator('.prompt-proxy-toggle')).toHaveCount(0);
+  });
+
+  test('proxy toggle button rendered in prompt containers when proxy feature is on', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
+
+    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/`);
+    await page.waitForLoadState('networkidle');
+
+    // Proxy toggle buttons should be present in the DOM (inside hidden prompt containers)
+    const toggleCount = await page.locator('.prompt-proxy-toggle').count();
+    expect(toggleCount).toBeGreaterThan(0);
+  });
+
+  test('proxy toggle button appears on dispatch page when proxy is on', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true, dispatch: true }))}`);
+
+    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/dispatch`);
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('.prompt-proxy-toggle')).toBeVisible();
+  });
+
+  test('proxy toggle button absent on dispatch page when proxy is off', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+
+    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/dispatch`);
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('.prompt-proxy-toggle')).toHaveCount(0);
   });
 
   // =========================================================================

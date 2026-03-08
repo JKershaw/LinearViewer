@@ -176,10 +176,10 @@ describe('generatePrompt', () => {
     assert.ok(result.prompt.includes('Test task title'));
   });
 
-  test('includes workflow section with Linear MCP instructions', () => {
+  test('includes workflow section with Linear references', () => {
     const result = generatePrompt('blocked', mockIssue, mockContext);
     assert.ok(result.prompt.includes('## Workflow'));
-    assert.ok(result.prompt.includes('Linear MCP'));
+    assert.ok(result.prompt.includes('in Linear'));
   });
 
   test('includes parent info when present', () => {

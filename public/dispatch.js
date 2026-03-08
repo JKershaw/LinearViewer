@@ -74,8 +74,13 @@ async function dispatchPageCustomPrompt({ urlKey, prompt, target, repo, btn, tex
   btn.textContent = 'sending...'
   btn.disabled = true
 
+  // Append proxy block if toggle is active (maybeAppendProxyBlock provided by app.js)
+  const finalPrompt = typeof maybeAppendProxyBlock === 'function'
+    ? await maybeAppendProxyBlock(prompt, urlKey)
+    : prompt
+
   try {
-    const payload = { prompt, promptName: 'Custom', target }
+    const payload = { prompt: finalPrompt, promptName: 'Custom', target }
     if (repo) payload.repo = repo
 
     const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch`, {
@@ -156,6 +161,10 @@ function initDispatchPagePrompt() {
 
   // Single delegated handler on the dispatch section
   section.addEventListener('click', async (e) => {
+    // Handle proxy toggle clicks (initProxyToggle in app.js handles these via document delegation,
+    // but we also need to stop propagation to avoid triggering other handlers)
+    if (e.target.closest('.prompt-proxy-toggle')) return
+
     // Handle dispatch button clicks
     const btn = e.target.closest('.dispatch-prompt-send')
     if (btn) {

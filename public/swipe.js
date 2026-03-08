@@ -17,6 +17,7 @@ const morePromptKeys = data.morePromptKeys || [];
 const urlKey = data.urlKey || '';
 const hasAI = data.hasAI || false;
 const dispatchEnabled = data.dispatchEnabled || false;
+const proxyEnabled = data.proxyEnabled || false;
 
 let currentFilter = filters.length > 0 ? filters[0].key : '';
 let filteredIssues = [];
@@ -774,17 +775,71 @@ function buildPromptActions() {
     html += '<button class="swipe-prompt-dispatch" data-target="web">web</button>';
     html += '<button class="swipe-prompt-dispatch" data-target="dash">dash</button>';
   }
+  if (proxyEnabled) {
+    const active = localStorage.getItem('proxy-toggle-active') === 'true' ? ' active' : '';
+    html += `<button class="prompt-proxy-toggle${active}" title="Append proxy API instructions to prompt">+proxy</button>`;
+  }
   promptActions.innerHTML = html;
 }
 
-function handleCopyClick(e) {
+// ==========================================================================
+// Proxy Toggle Helpers
+// ==========================================================================
+
+const PROXY_TOGGLE_KEY = 'proxy-toggle-active';
+let cachedProxyToken = null;
+
+function isProxyActive() {
+  return localStorage.getItem(PROXY_TOGGLE_KEY) === 'true';
+}
+
+async function getOrCreateProxyToken() {
+  if (cachedProxyToken) return cachedProxyToken;
+  if (!urlKey) return null;
+  try {
+    const resp = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/proxy/tokens`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: 'prompt-proxy', scope: 'readWrite', singleUse: false })
+    });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    cachedProxyToken = data.token;
+    return cachedProxyToken;
+  } catch { return null; }
+}
+
+function buildProxyBlock(token) {
+  const baseUrl = window.location.origin;
+  return `\n\n## Linear API Proxy\n\nYou have access to a Linear API proxy. Use it to read and modify Linear issues, projects, and more.\n\nTo get started, fetch the full API documentation:\n\n  curl -H "Authorization: Bearer ${token}" ${baseUrl}/api/proxy/instructions\n\nThis will return all available endpoints with examples. Your token scope is: readWrite.`;
+}
+
+async function maybeAppendProxy(text) {
+  if (!isProxyActive()) return text;
+  const token = await getOrCreateProxyToken();
+  if (!token) return text;
+  return text + buildProxyBlock(token);
+}
+
+function handleProxyToggleClick(e) {
+  const btn = e.target.closest('.prompt-proxy-toggle');
+  if (!btn) return;
+  const nowActive = !isProxyActive();
+  localStorage.setItem(PROXY_TOGGLE_KEY, nowActive ? 'true' : 'false');
+  document.querySelectorAll('.prompt-proxy-toggle').forEach(b => {
+    b.classList.toggle('active', nowActive);
+  });
+}
+
+async function handleCopyClick(e) {
   const btn = e.target.closest('.swipe-prompt-copy');
   if (!btn) return;
 
   const raw = promptText.dataset.rawPrompt;
   if (!raw) return;
 
-  navigator.clipboard.writeText(raw).then(() => {
+  const text = await maybeAppendProxy(raw);
+  navigator.clipboard.writeText(text).then(() => {
     btn.textContent = 'copied!';
     btn.classList.add('copied');
     setTimeout(() => {
@@ -805,6 +860,7 @@ async function handleDispatchClick(e) {
   const raw = promptText.dataset.rawPrompt;
   if (!raw) return;
 
+  const prompt = await maybeAppendProxy(raw);
   const apiPrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : '';
 
   btn.disabled = true;
@@ -814,7 +870,7 @@ async function handleDispatchClick(e) {
     const response = await fetch(`${apiPrefix}/api/dispatch`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: raw, target })
+      body: JSON.stringify({ prompt, target })
     });
 
     if (!response.ok) throw new Error('Dispatch failed');
@@ -880,6 +936,7 @@ promptButtons.addEventListener('click', handlePromptClick);
 promptActions.addEventListener('click', (e) => {
   handleCopyClick(e);
   handleDispatchClick(e);
+  handleProxyToggleClick(e);
 });
 
 // Keyboard
