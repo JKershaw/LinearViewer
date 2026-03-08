@@ -103,7 +103,9 @@ function formatRelativeTime(dateStr) {
 function applyFilter(filterKey) {
   currentFilter = filterKey;
 
-  if (filterKey === 'in-progress') {
+  if (filterKey === 'all') {
+    filteredIssues = allIssues;
+  } else if (filterKey === 'in-progress') {
     filteredIssues = allIssues.filter(i => i.stateType === 'started');
   } else if (filterKey === 'recent-activity') {
     filteredIssues = allIssues.filter(i => i.section === 'recent-activity');
