@@ -6,6 +6,64 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 let queuePollIntervalId = null
 const QUEUE_POLL_INTERVAL_MS = 1000
 
+// ==========================================================================
+// Proxy Toggle (append proxy API instructions to prompts)
+// ==========================================================================
+
+const PROXY_TOGGLE_KEY = 'proxy-toggle-active'
+let cachedProxyToken = null
+
+function isProxyToggleActive() {
+  return localStorage.getItem(PROXY_TOGGLE_KEY) === 'true'
+}
+
+/**
+ * Get or create a proxy token for the current workspace.
+ * Caches the token for the session to avoid creating duplicates.
+ * @param {string} urlKey - Workspace URL key
+ * @returns {Promise<string|null>} Token string or null on failure
+ */
+async function getOrCreateProxyToken(urlKey) {
+  if (cachedProxyToken) return cachedProxyToken
+
+  try {
+    const resp = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/proxy/tokens`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: 'prompt-proxy', scope: 'readWrite', singleUse: false })
+    })
+    if (!resp.ok) return null
+    const data = await resp.json()
+    cachedProxyToken = data.token
+    return cachedProxyToken
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Build the proxy instructions block to append to a prompt.
+ * @param {string} token - Proxy API token
+ * @returns {string} Markdown proxy instructions
+ */
+function buildProxyBlock(token) {
+  const baseUrl = window.location.origin
+  return `\n\n## Linear API Proxy\n\nYou have access to a Linear API proxy. Use it to read and modify Linear issues, projects, and more.\n\nTo get started, fetch the full API documentation:\n\n  curl -H "Authorization: Bearer ${token}" ${baseUrl}/api/proxy/instructions\n\nThis will return all available endpoints with examples. Your token scope is: readWrite.`
+}
+
+/**
+ * If proxy toggle is active, append proxy instructions to prompt text.
+ * @param {string} prompt - Original prompt text
+ * @param {string} urlKey - Workspace URL key
+ * @returns {Promise<string>} Prompt with proxy block appended (or unchanged)
+ */
+async function maybeAppendProxyBlock(prompt, urlKey) {
+  if (!isProxyToggleActive() || !urlKey) return prompt
+  const token = await getOrCreateProxyToken(urlKey)
+  if (!token) return prompt
+  return prompt + buildProxyBlock(token)
+}
+
 /**
  * Strip markdown code block fences from prompt text.
  * AI models sometimes wrap generated prompts in backtick fences.
@@ -1031,7 +1089,11 @@ function initPrompts() {
 
     // Use raw markdown from data attribute, fall back to textContent
     // Strip any backtick code fences the AI may have wrapped the prompt in
-    const textToCopy = stripCodeBlockFences(promptText.dataset.rawPrompt || promptText.textContent)
+    let textToCopy = stripCodeBlockFences(promptText.dataset.rawPrompt || promptText.textContent)
+
+    // Append proxy block if toggle is active
+    const urlKey = promptContainer.dataset.urlKey || promptContainer.closest('[data-url-key]')?.dataset.urlKey
+    textToCopy = await maybeAppendProxyBlock(textToCopy, urlKey)
 
     try {
       await navigator.clipboard.writeText(textToCopy)
@@ -1066,7 +1128,7 @@ function initPrompts() {
     if (!promptText) return
 
     // Get the prompt content, stripping any backtick code fences
-    const prompt = stripCodeBlockFences(promptText.dataset.rawPrompt || promptText.textContent)
+    let prompt = stripCodeBlockFences(promptText.dataset.rawPrompt || promptText.textContent)
     const promptName = promptNameEl?.textContent || 'Prompt'
 
     // Read target from button's data-target attribute (defaults to 'cli')
@@ -1085,6 +1147,9 @@ function initPrompts() {
       setTimeout(() => { dispatchBtn.textContent = originalLabel }, 1500)
       return
     }
+
+    // Append proxy block if toggle is active
+    prompt = await maybeAppendProxyBlock(prompt, urlKey)
 
     // Get issue title from the DOM if available
     const issueEl = issueId ? document.querySelector(`[data-id="${issueId}"]`) : null
@@ -2050,6 +2115,36 @@ async function initFreeTierStatus() {
   }
 }
 
+/**
+ * Initialize proxy toggle buttons.
+ * Restores active state from localStorage and handles click events.
+ */
+function initProxyToggle() {
+  // Restore active state on existing buttons
+  if (isProxyToggleActive()) {
+    document.querySelectorAll('.prompt-proxy-toggle').forEach(btn => {
+      btn.classList.add('active')
+    })
+  }
+
+  // Handle clicks on proxy toggle buttons (delegated)
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.prompt-proxy-toggle')
+    if (!btn) return
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    const nowActive = !isProxyToggleActive()
+    localStorage.setItem(PROXY_TOGGLE_KEY, nowActive ? 'true' : 'false')
+
+    // Update ALL proxy toggle buttons on the page
+    document.querySelectorAll('.prompt-proxy-toggle').forEach(b => {
+      b.classList.toggle('active', nowActive)
+    })
+  })
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   init()
   initNavBar()
@@ -2060,4 +2155,5 @@ document.addEventListener('DOMContentLoaded', () => {
   initQueuePanel()
   initFeatureToggles()
   initFreeTierStatus()
+  initProxyToggle()
 })

@@ -1322,6 +1322,29 @@ h1 {
   color: var(--green, #4cb782);
 }
 
+/* Proxy toggle button - toggles proxy API instructions in prompts */
+.prompt-proxy-toggle {
+  background: none;
+  border: 1px solid var(--fg-vdim);
+  padding: 0.25rem 0.5rem;
+  font-family: var(--font-content);
+  font-size: 0.8em;
+  color: var(--fg-vdim);
+  cursor: pointer;
+  border-radius: 3px;
+  margin-left: 0.25rem;
+}
+
+.prompt-proxy-toggle:hover {
+  border-color: var(--fg-dim);
+  color: var(--fg-dim);
+}
+
+.prompt-proxy-toggle.active {
+  border-color: var(--green, #4cb782);
+  color: var(--green, #4cb782);
+}
+
 /* LIN-191: Disabled state for prompt action buttons during loading/streaming */
 .prompt-actions button:disabled {
   opacity: 0.4;
