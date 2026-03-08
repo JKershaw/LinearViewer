@@ -55,13 +55,25 @@ const arrowRight = document.querySelector('.swipe-arrow-right');
 // ==========================================================================
 
 /**
+ * Strip wrapping code-block fences that some AI models add around prompts.
+ * Handles ```markdown ... ``` , ``` ... ``` , and similar.
+ * Only strips when the entire text is wrapped in a single fence.
+ */
+function stripCodeBlockWrapper(text) {
+  if (!text) return text;
+  const m = text.match(/^\s*```[a-z]*\s*\n([\s\S]*?)\n\s*```\s*$/);
+  return m ? m[1] : text;
+}
+
+/**
  * Render markdown to HTML using marked.js + DOMPurify
  * @param {string} text - Raw markdown
  * @returns {string} Safe HTML
  */
 function renderMarkdown(text) {
   if (!text) return '';
-  const html = typeof marked !== 'undefined' ? marked.parse(text) : window.escapeHtml(text);
+  const cleaned = stripCodeBlockWrapper(text);
+  const html = typeof marked !== 'undefined' ? marked.parse(cleaned) : window.escapeHtml(cleaned);
   return typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(html) : html;
 }
 
@@ -612,6 +624,7 @@ async function handlePromptClick(e) {
     activePromptLabel = label;
     lastPromptLabel[issue.id] = label;
     setPromptActionsEnabled(true);
+    showReasoningToggle(cached.reasoning || '');
     renderPromptButtons();
     return;
   }
@@ -688,9 +701,14 @@ async function handleStreamingResponse(response, issueId, label, abortController
   let currentField = null;
   let renderPending = false;
   let sseBuffer = ''; // Buffer for partial SSE lines across chunks
+  let prevChildCount = 0; // Track rendered children for fade-in
+  let reasoningHeld = false; // True during hold phase (reasoning shown, prompt buffered)
+  let transitionDone = false; // True after crossfade completes
 
   function scheduleRender() {
     if (renderPending) return;
+    // During hold phase, skip rendering — prompt is buffering silently
+    if (reasoningHeld) return;
     renderPending = true;
     requestAnimationFrame(() => {
       if (currentField === 'reasoning') {
@@ -698,8 +716,20 @@ async function handleStreamingResponse(response, issueId, label, abortController
       } else {
         promptName.textContent = 'AI Recommendation';
       }
-      const displayText = promptRaw || reasoningRaw;
+      const displayText = (transitionDone || !reasoningRaw) ? (promptRaw || reasoningRaw) : reasoningRaw;
       promptText.innerHTML = renderMarkdown(displayText);
+
+      // Apply fade-in to newly added child elements
+      const children = promptText.children;
+      for (let i = prevChildCount; i < children.length; i++) {
+        children[i].classList.add('stream-in');
+      }
+      // Mark the last child as the active streaming target
+      for (let i = 0; i < children.length; i++) {
+        children[i].classList.toggle('stream-cursor', i === children.length - 1);
+      }
+      prevChildCount = children.length;
+
       // Auto-scroll only if user hasn't scrolled up to read
       const nearBottom = promptText.scrollHeight - promptText.scrollTop - promptText.clientHeight < 60;
       if (nearBottom) {
@@ -709,8 +739,32 @@ async function handleStreamingResponse(response, issueId, label, abortController
     });
   }
 
+  // Crossfade from reasoning to prompt content
+  function crossfadeToPrompt() {
+    reasoningHeld = false;
+    promptText.classList.add('fade-out');
+    promptText.addEventListener('animationend', function onFadeOut() {
+      promptText.removeEventListener('animationend', onFadeOut);
+      promptText.classList.remove('fade-out');
+      // Switch content to prompt
+      promptName.textContent = 'AI Recommendation';
+      prevChildCount = 0;
+      const displayText = promptRaw || reasoningRaw;
+      promptText.innerHTML = renderMarkdown(displayText);
+      promptText.classList.add('fade-in');
+      promptText.addEventListener('animationend', function onFadeIn() {
+        promptText.removeEventListener('animationend', onFadeIn);
+        promptText.classList.remove('fade-in');
+        transitionDone = true;
+        // Resume live rendering of buffered prompt
+        scheduleRender();
+      }, { once: true });
+    }, { once: true });
+  }
+
   // Add streaming class for fade-in and gradient mask
   promptResult.classList.add('streaming');
+  hideReasoningToggle();
 
   try {
     while (true) {
@@ -733,6 +787,14 @@ async function handleStreamingResponse(response, issueId, label, abortController
           const parsed = JSON.parse(data);
 
           if (parsed.phase) {
+            // Transition from reasoning to prompt phase
+            if (parsed.phase === 'prompt' && currentField === 'reasoning' && reasoningRaw) {
+              reasoningHeld = true;
+              const holdMs = reasoningRaw.length < 100 ? 500 : 2000;
+              setTimeout(() => {
+                if (reasoningHeld) crossfadeToPrompt();
+              }, holdMs);
+            }
             currentField = parsed.phase;
             continue;
           }
@@ -743,8 +805,12 @@ async function handleStreamingResponse(response, issueId, label, abortController
             scheduleRender();
           } else if (parsed.section === 'prompt' && parsed.content) {
             promptRaw += parsed.content;
-            currentField = 'prompt';
-            scheduleRender();
+            if (!reasoningRaw) currentField = 'prompt';
+            // Only render live if no reasoning hold is active
+            if (!reasoningHeld && (transitionDone || !reasoningRaw)) {
+              currentField = 'prompt';
+              scheduleRender();
+            }
           }
 
           if (parsed.error) {
@@ -757,10 +823,16 @@ async function handleStreamingResponse(response, issueId, label, abortController
       }
     }
 
+    // If still in hold phase when stream ends, force the transition
+    if (reasoningHeld) {
+      reasoningHeld = false;
+      transitionDone = true;
+    }
+
     // Final render — remove streaming effects
     promptResult.classList.remove('streaming');
     if (activePromptFetch === abortController) {
-      const displayText = promptRaw || reasoningRaw;
+      const displayText = stripCodeBlockWrapper(promptRaw || reasoningRaw);
       const html = renderMarkdown(displayText);
       promptName.textContent = 'AI Recommendation';
       promptText.innerHTML = html;
@@ -769,15 +841,52 @@ async function handleStreamingResponse(response, issueId, label, abortController
       setPromptActionsEnabled(true);
 
       promptCache[`${issueId}:${label}`] = {
-        label, name: 'AI Recommendation', raw: displayText, html
+        label, name: 'AI Recommendation', raw: displayText, html,
+        reasoning: reasoningRaw
       };
       lastPromptLabel[issueId] = label;
+      showReasoningToggle(reasoningRaw);
     }
   } catch (err) {
     if (err.name === 'AbortError') return;
     promptResult.classList.remove('streaming');
     promptText.textContent = `Error: ${err.message}`;
   }
+}
+
+/**
+ * Show/hide the reasoning toggle below the prompt result.
+ */
+function showReasoningToggle(reasoning) {
+  const toggle = document.getElementById('swipe-reasoning-toggle');
+  const content = document.getElementById('swipe-reasoning-content');
+  if (!toggle || !content) return;
+
+  if (!reasoning) {
+    toggle.classList.add('hidden');
+    content.classList.add('hidden');
+    return;
+  }
+
+  toggle.textContent = '\u25b8 reasoning';
+  toggle.classList.remove('hidden');
+  content.classList.add('hidden');
+  content.innerHTML = renderMarkdown(reasoning);
+
+  // Replace handler each time to avoid stale closures
+  const newToggle = toggle.cloneNode(true);
+  toggle.parentNode.replaceChild(newToggle, toggle);
+  newToggle.addEventListener('click', () => {
+    const isHidden = content.classList.toggle('hidden');
+    newToggle.textContent = isHidden ? '\u25b8 reasoning' : '\u25be reasoning';
+  });
+}
+
+function hideReasoningToggle() {
+  const toggle = document.getElementById('swipe-reasoning-toggle');
+  const content = document.getElementById('swipe-reasoning-content');
+  if (toggle) toggle.classList.add('hidden');
+  if (content) content.classList.add('hidden');
 }
 
 // ==========================================================================

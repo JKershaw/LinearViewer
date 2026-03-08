@@ -558,7 +558,7 @@
   color: var(--fg, #1a1a1a);
 }
 
-/* Streaming fade-in */
+/* Streaming fade-in for the container */
 @keyframes promptFadeIn {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -568,10 +568,27 @@
   animation: promptFadeIn 0.3s ease-out both;
 }
 
+/* Per-element fade-in during streaming — new blocks materialise smoothly */
+@keyframes streamIn {
+  from { opacity: 0; filter: blur(2px); transform: translateY(4px); }
+  to   { opacity: 1; filter: blur(0);   transform: translateY(0); }
+}
+
+.swipe-prompt-text .stream-in {
+  animation: streamIn 0.35s ease-out both;
+}
+
+/* Subtle indicator on the element currently being written to */
+.swipe-prompt-result.streaming .swipe-prompt-text .stream-cursor {
+  border-left: 2px solid rgba(0,0,0,0.12);
+  padding-left: 0.5rem;
+  transition: border-color 0.3s;
+}
+
 /* Bottom gradient mask during streaming — text appears to materialise */
 .swipe-prompt-result.streaming .swipe-prompt-text {
-  mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 75%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 75%, transparent 100%);
 }
 
 .swipe-prompt-text p { margin: 0 0 0.5rem; }
@@ -599,6 +616,58 @@
 .swipe-prompt-copy.copied {
   color: #16a085;
   border-color: #16a085;
+}
+
+/* Crossfade transition between reasoning and prompt */
+@keyframes fadeOutUp {
+  to { opacity: 0; transform: translateY(-8px); }
+}
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.swipe-prompt-text.fade-out {
+  animation: fadeOutUp 0.3s ease-in forwards;
+}
+.swipe-prompt-text.fade-in {
+  animation: fadeInUp 0.3s ease-out forwards;
+}
+
+/* Reasoning toggle */
+.swipe-reasoning-toggle {
+  padding: 0.4rem 0.75rem;
+  font-size: 11px;
+  color: var(--fg-dim, #666);
+  cursor: pointer;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  border-top: 1px solid #eee;
+  user-select: none;
+}
+.swipe-reasoning-toggle:hover {
+  color: var(--fg, #1a1a1a);
+}
+
+/* Reasoning content (collapsible) */
+.swipe-reasoning-content {
+  padding: 0.5rem 0.75rem;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--fg-dim, #888);
+  border-top: 1px solid #eee;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.swipe-reasoning-content.hidden { display: none; }
+.swipe-reasoning-toggle.hidden { display: none; }
+.swipe-reasoning-content p { margin: 0 0 0.4rem; }
+.swipe-reasoning-content ul,
+.swipe-reasoning-content ol { margin: 0 0 0.4rem; padding-left: 1.5rem; }
+.swipe-reasoning-content code {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 11px;
+  background: var(--bg-muted, #f8f9fa);
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
 }
 
 /* ==========================================================================
