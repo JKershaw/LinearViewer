@@ -558,7 +558,7 @@
   color: var(--fg, #1a1a1a);
 }
 
-/* Streaming fade-in */
+/* Streaming fade-in for the container */
 @keyframes promptFadeIn {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -568,10 +568,27 @@
   animation: promptFadeIn 0.3s ease-out both;
 }
 
+/* Per-element fade-in during streaming — new blocks materialise smoothly */
+@keyframes streamIn {
+  from { opacity: 0; filter: blur(2px); transform: translateY(4px); }
+  to   { opacity: 1; filter: blur(0);   transform: translateY(0); }
+}
+
+.swipe-prompt-text .stream-in {
+  animation: streamIn 0.35s ease-out both;
+}
+
+/* Subtle indicator on the element currently being written to */
+.swipe-prompt-result.streaming .swipe-prompt-text .stream-cursor {
+  border-left: 2px solid rgba(0,0,0,0.12);
+  padding-left: 0.5rem;
+  transition: border-color 0.3s;
+}
+
 /* Bottom gradient mask during streaming — text appears to materialise */
 .swipe-prompt-result.streaming .swipe-prompt-text {
-  mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 75%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 75%, transparent 100%);
 }
 
 .swipe-prompt-text p { margin: 0 0 0.5rem; }

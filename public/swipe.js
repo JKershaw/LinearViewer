@@ -55,13 +55,25 @@ const arrowRight = document.querySelector('.swipe-arrow-right');
 // ==========================================================================
 
 /**
+ * Strip wrapping code-block fences that some AI models add around prompts.
+ * Handles ```markdown ... ``` , ``` ... ``` , and similar.
+ * Only strips when the entire text is wrapped in a single fence.
+ */
+function stripCodeBlockWrapper(text) {
+  if (!text) return text;
+  const m = text.match(/^\s*```[a-z]*\s*\n([\s\S]*?)\n\s*```\s*$/);
+  return m ? m[1] : text;
+}
+
+/**
  * Render markdown to HTML using marked.js + DOMPurify
  * @param {string} text - Raw markdown
  * @returns {string} Safe HTML
  */
 function renderMarkdown(text) {
   if (!text) return '';
-  const html = typeof marked !== 'undefined' ? marked.parse(text) : window.escapeHtml(text);
+  const cleaned = stripCodeBlockWrapper(text);
+  const html = typeof marked !== 'undefined' ? marked.parse(cleaned) : window.escapeHtml(cleaned);
   return typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(html) : html;
 }
 
@@ -688,6 +700,7 @@ async function handleStreamingResponse(response, issueId, label, abortController
   let currentField = null;
   let renderPending = false;
   let sseBuffer = ''; // Buffer for partial SSE lines across chunks
+  let prevChildCount = 0; // Track rendered children for fade-in
 
   function scheduleRender() {
     if (renderPending) return;
@@ -700,6 +713,18 @@ async function handleStreamingResponse(response, issueId, label, abortController
       }
       const displayText = promptRaw || reasoningRaw;
       promptText.innerHTML = renderMarkdown(displayText);
+
+      // Apply fade-in to newly added child elements
+      const children = promptText.children;
+      for (let i = prevChildCount; i < children.length; i++) {
+        children[i].classList.add('stream-in');
+      }
+      // Mark the last child as the active streaming target
+      for (let i = 0; i < children.length; i++) {
+        children[i].classList.toggle('stream-cursor', i === children.length - 1);
+      }
+      prevChildCount = children.length;
+
       // Auto-scroll only if user hasn't scrolled up to read
       const nearBottom = promptText.scrollHeight - promptText.scrollTop - promptText.clientHeight < 60;
       if (nearBottom) {
@@ -760,7 +785,7 @@ async function handleStreamingResponse(response, issueId, label, abortController
     // Final render — remove streaming effects
     promptResult.classList.remove('streaming');
     if (activePromptFetch === abortController) {
-      const displayText = promptRaw || reasoningRaw;
+      const displayText = stripCodeBlockWrapper(promptRaw || reasoningRaw);
       const html = renderMarkdown(displayText);
       promptName.textContent = 'AI Recommendation';
       promptText.innerHTML = html;
