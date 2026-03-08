@@ -716,13 +716,11 @@ async function handleStreamingResponse(response, issueId, label, abortController
             continue;
           }
 
-          if (parsed.reasoning) {
-            reasoningRaw += parsed.reasoning;
+          if (parsed.section === 'reasoning' && parsed.content) {
+            reasoningRaw += parsed.content;
             currentField = 'reasoning';
             scheduleRender();
-          }
-
-          if (parsed.content) {
+          } else if (parsed.section === 'prompt' && parsed.content) {
             promptRaw += parsed.content;
             currentField = 'prompt';
             scheduleRender();
