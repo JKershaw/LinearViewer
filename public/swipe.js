@@ -391,8 +391,8 @@ const DIRECTION_LOCK_THRESHOLD = 10; // px before locking direction
 
 function handleTouchStart(e) {
   if (filteredIssues.length <= 1) return;
-  // Don't interfere with accordion taps or links
-  if (e.target.closest('.swipe-accordion-header, .swipe-accordion-body, a, button, select')) return;
+  // Don't interfere with accordion taps, links, or interactive elements
+  if (e.target.closest('.swipe-accordion-header, a, button, select')) return;
 
   clearAnimations();
   touchStartX = e.touches[0].clientX;
