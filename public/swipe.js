@@ -624,7 +624,7 @@ async function handlePromptClick(e) {
     let response;
     if (label === '__ai__') {
       // AI recommendation - use streaming endpoint
-      response = await fetch(`${apiPrefix}/api/recommend/${issue.id}`, { signal: abortController.signal });
+      response = await fetch(`${apiPrefix}/api/recommend/${issue.id}/stream`, { signal: abortController.signal });
     } else {
       response = await fetch(`${apiPrefix}/api/prompt/${issue.id}/${encodeURIComponent(label)}`, { signal: abortController.signal });
     }
@@ -716,13 +716,11 @@ async function handleStreamingResponse(response, issueId, label, abortController
             continue;
           }
 
-          if (parsed.reasoning) {
-            reasoningRaw += parsed.reasoning;
+          if (parsed.section === 'reasoning' && parsed.content) {
+            reasoningRaw += parsed.content;
             currentField = 'reasoning';
             scheduleRender();
-          }
-
-          if (parsed.content) {
+          } else if (parsed.section === 'prompt' && parsed.content) {
             promptRaw += parsed.content;
             currentField = 'prompt';
             scheduleRender();
