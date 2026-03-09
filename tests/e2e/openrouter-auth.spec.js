@@ -61,7 +61,7 @@ test.describe('OpenRouter OAuth Flow', () => {
     await expect(disconnectedStatus).toHaveText('○ not connected');
 
     // Should have a connect link
-    const connectLink = page.locator('.settings-action.connect');
+    const connectLink = page.locator('.action-btn.connect');
     await expect(connectLink).toBeVisible();
     await expect(connectLink).toHaveAttribute('href', '/auth/openrouter');
   });
@@ -80,7 +80,7 @@ test.describe('OpenRouter OAuth Flow', () => {
     await expect(connectedStatus).toHaveText('● connected');
 
     // Should have a disconnect button
-    const disconnectBtn = page.locator('.settings-action.disconnect');
+    const disconnectBtn = page.locator('.action-btn.disconnect');
     await expect(disconnectBtn).toBeVisible();
     await expect(disconnectBtn).toHaveText('disconnect');
   });

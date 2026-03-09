@@ -247,7 +247,7 @@ test.describe('Free Tier Settings', () => {
     await expect(freeTierStatus).toContainText('free tier');
 
     // Should show connect for unlimited link
-    await expect(page.locator('.settings-action.connect')).toContainText('connect for unlimited');
+    await expect(page.locator('.action-btn.connect')).toContainText('connect for unlimited');
   });
 
   test('settings page shows usage info', async ({ page }) => {
