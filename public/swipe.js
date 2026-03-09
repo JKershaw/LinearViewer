@@ -37,6 +37,7 @@ let touchStartY = 0;
 let touchCurrentX = 0;
 let isSwiping = false;
 let swipeDirection = null; // 'horizontal' or 'vertical' or null
+let isMouseDragging = false; // tracks mouse-initiated swipes
 
 // DOM elements
 const card = document.getElementById('swipe-card');
@@ -401,26 +402,33 @@ function updateCounter() {
 const SWIPE_THRESHOLD = 0.3; // 30% of card width
 const DIRECTION_LOCK_THRESHOLD = 10; // px before locking direction
 
-function handleTouchStart(e) {
+function getPointerCoords(e) {
+  if (e.touches) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  return { x: e.clientX, y: e.clientY };
+}
+
+function handleSwipeStart(e) {
   if (filteredIssues.length <= 1) return;
   // Don't interfere with accordion taps, links, or interactive elements
   if (e.target.closest('.swipe-accordion-header, a, button, select')) return;
 
   clearAnimations();
-  touchStartX = e.touches[0].clientX;
-  touchStartY = e.touches[0].clientY;
+  const coords = getPointerCoords(e);
+  touchStartX = coords.x;
+  touchStartY = coords.y;
   touchCurrentX = touchStartX;
   isSwiping = true;
   swipeDirection = null;
   card.classList.add('swiping');
 }
 
-function handleTouchMove(e) {
+function handleSwipeMove(e) {
   if (!isSwiping) return;
 
-  touchCurrentX = e.touches[0].clientX;
+  const coords = getPointerCoords(e);
+  touchCurrentX = coords.x;
   const deltaX = touchCurrentX - touchStartX;
-  const deltaY = e.touches[0].clientY - touchStartY;
+  const deltaY = coords.y - touchStartY;
 
   // Lock direction after threshold
   if (!swipeDirection) {
@@ -452,14 +460,16 @@ function handleTouchMove(e) {
   card.style.opacity = opacity;
 }
 
-function handleTouchEnd() {
+function handleSwipeEnd() {
   if (!isSwiping || swipeDirection !== 'horizontal') {
     isSwiping = false;
+    isMouseDragging = false;
     return;
   }
 
   card.classList.remove('swiping');
   isSwiping = false;
+  isMouseDragging = false;
 
   const deltaX = touchCurrentX - touchStartX;
   const cardWidth = card.offsetWidth;
@@ -485,6 +495,23 @@ function handleTouchEnd() {
     card.style.opacity = '';
   }, 300);
   animationTimers.push(snapBack);
+}
+
+// Mouse event wrappers for desktop swipe support
+function handleMouseDown(e) {
+  if (e.button !== 0) return; // left click only
+  isMouseDragging = true;
+  handleSwipeStart(e);
+}
+
+function handleMouseMove(e) {
+  if (!isMouseDragging) return;
+  handleSwipeMove(e);
+}
+
+function handleMouseUp() {
+  if (!isMouseDragging) return;
+  handleSwipeEnd();
 }
 
 // ==========================================================================
@@ -1052,9 +1079,14 @@ arrowRight.addEventListener('click', goNext);
 
 // Touch events on card container
 const cardContainer = document.querySelector('.swipe-card-container');
-cardContainer.addEventListener('touchstart', handleTouchStart, { passive: true });
-cardContainer.addEventListener('touchmove', handleTouchMove, { passive: false });
-cardContainer.addEventListener('touchend', handleTouchEnd);
+cardContainer.addEventListener('touchstart', handleSwipeStart, { passive: true });
+cardContainer.addEventListener('touchmove', handleSwipeMove, { passive: false });
+cardContainer.addEventListener('touchend', handleSwipeEnd);
+
+// Mouse events for desktop swipe support
+cardContainer.addEventListener('mousedown', handleMouseDown);
+document.addEventListener('mousemove', handleMouseMove);
+document.addEventListener('mouseup', handleMouseUp);
 
 // Accordion clicks (delegated)
 card.addEventListener('click', handleAccordionClick);
