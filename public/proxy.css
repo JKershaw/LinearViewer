@@ -113,14 +113,7 @@
   color: var(--fg);
 }
 
-/* =============================================================================
-   Token List (reuses dispatch token styles)
-   ============================================================================= */
-.proxy-token-list {
-  margin-top: 0.75rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--fg-vdim);
-}
+/* Token list: see common-actions.css (.proxy-token-list) */
 
 .proxy-section .line {
   display: flex;

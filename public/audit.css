@@ -84,43 +84,7 @@
   margin: 0;
 }
 
-.settings-action {
-  background: none;
-  border: none;
-  padding: 0.2rem 0.5rem;
-  font-family: var(--font-content);
-  font-size: 0.85em;
-  cursor: pointer;
-  border-radius: 3px;
-  text-decoration: none;
-}
-
-.settings-action.connect {
-  color: var(--blue);
-  background: rgba(59, 130, 246, 0.1);
-}
-
-.settings-action.connect:hover {
-  background: rgba(59, 130, 246, 0.2);
-}
-
-.settings-action.disconnect {
-  color: var(--red);
-  background: rgba(239, 68, 68, 0.1);
-}
-
-.settings-action.disconnect:hover {
-  background: rgba(239, 68, 68, 0.2);
-}
-
-.settings-action.save {
-  color: var(--green);
-  background: rgba(34, 197, 94, 0.1);
-}
-
-.settings-action.save:hover {
-  background: rgba(34, 197, 94, 0.2);
-}
+/* Action buttons: see common-actions.css (.action-btn) */
 
 .settings-link {
   color: var(--blue);

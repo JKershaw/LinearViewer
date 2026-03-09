@@ -165,7 +165,7 @@ This will return all available endpoints with examples. Your token scope is: ${s
           <div class="token-label-text">${escapeHtml(t.label)}${scopeBadge}${consumedBadge}</div>
           <div class="token-meta">${escapeHtml(meta)}</div>
         </div>
-        <button class="dispatch-action token-revoke" data-token-id="${escapeHtml(t.tokenId)}">revoke</button>
+        <button class="action-btn token-revoke" data-token-id="${escapeHtml(t.tokenId)}">revoke</button>
       </div>`;
     }).join('');
 
@@ -207,7 +207,7 @@ This will return all available endpoints with examples. Your token scope is: ${s
       </div>
       <div class="token-usage-hint">
         <div>Label: ${escapeHtml(label)} · Scope: ${escapeHtml(scope)}</div>
-        <div style="margin-top: 0.5rem">
+        <div class="token-usage-hint-code">
           <code>curl -H "Authorization: Bearer ${escapeHtml(token)}" ${escapeHtml(baseUrl)}/api/proxy/me</code>
         </div>
       </div>`;

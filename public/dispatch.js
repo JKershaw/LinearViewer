@@ -357,7 +357,7 @@ function renderDispatchTokenList(container, tokens, urlKey) {
           <span class="token-label-text">${escapeHtml(t.label)}</span>
           <div class="token-meta">created ${created} · ${lastUsed}</div>
         </div>
-        <button class="dispatch-action token-revoke" data-token-id="${escapeHtml(t.tokenId)}">revoke</button>
+        <button class="action-btn token-revoke" data-token-id="${escapeHtml(t.tokenId)}">revoke</button>
       </div>
     `
   }).join('')
