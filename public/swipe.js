@@ -503,6 +503,10 @@ function handleSwipeEnd() {
 // Mouse event wrappers for desktop swipe support
 function handleMouseDown(e) {
   if (e.button !== 0) return; // left click only
+  // On touch-enabled desktops (Surface, Chromebook) browsers fire both
+  // touchstart and mousedown for the same gesture. Guard against re-entry
+  // so we don't reset swipe state mid-gesture.
+  if (isSwiping) return;
   isMouseDragging = true;
   handleSwipeStart(e);
 }
@@ -1090,6 +1094,9 @@ cardContainer.addEventListener('touchend', handleSwipeEnd);
 cardContainer.addEventListener('mousedown', handleMouseDown);
 document.addEventListener('mousemove', handleMouseMove);
 document.addEventListener('mouseup', handleMouseUp);
+// Safety net: reset mouse drag if cursor leaves the browser window
+// (mouseup won't fire on document if button is released outside)
+document.addEventListener('mouseleave', handleMouseUp);
 
 // Accordion clicks (delegated)
 card.addEventListener('click', handleAccordionClick);
