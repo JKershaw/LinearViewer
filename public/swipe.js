@@ -437,13 +437,16 @@ function handleSwipeMove(e) {
     }
   }
 
-  if (swipeDirection !== 'horizontal') {
+  if (swipeDirection === 'vertical') {
     isSwiping = false;
     card.classList.remove('swiping');
     card.style.transform = '';
     card.style.opacity = '';
     return;
   }
+
+  // Direction not yet determined — wait for more movement
+  if (!swipeDirection) return;
 
   e.preventDefault();
 
