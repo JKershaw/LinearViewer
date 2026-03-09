@@ -71,7 +71,7 @@
 
 /* Action buttons: see common-actions.css (.action-btn) */
 
-.dispatch-actions-label {
+.action-btns-label {
   font-family: var(--font-content);
   font-size: 0.85em;
   color: var(--fg-dim);
