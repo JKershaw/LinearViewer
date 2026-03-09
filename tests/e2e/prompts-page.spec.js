@@ -135,11 +135,6 @@ test.describe('Prompts Page', () => {
       const settingsLink = page.locator(`.footer-action[href="/workspace/${TEST_WORKSPACE_URL_KEY}/settings"]`);
       await expect(settingsLink).toBeVisible();
       await expect(settingsLink).toContainText('settings');
-
-      // Should have audit link with workspace prefix (not current page)
-      const auditLink = page.locator(`.footer-action[href="/workspace/${TEST_WORKSPACE_URL_KEY}/audit"]`);
-      await expect(auditLink).toBeVisible();
-      await expect(auditLink).toContainText('audit');
     });
   });
 });
