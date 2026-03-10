@@ -5,7 +5,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { sortIssuesForSwipe, applyBlockingOrder } from '../../lib/render-swipe.js';
+import { sortIssuesForSwipe, applyBlockingOrder, buildFilterGroups } from '../../lib/render-swipe.js';
 
 // =============================================================================
 // Test Helpers
@@ -181,5 +181,87 @@ describe('applyBlockingOrder', () => {
     const b = createCard({ id: 'b' });
     const result = applyBlockingOrder([a, b]);
     assert.strictEqual(result.length, 2);
+  });
+});
+
+// =============================================================================
+// buildFilterGroups
+// =============================================================================
+
+describe('buildFilterGroups', () => {
+  test('project count includes in-progress issues for that project', () => {
+    const cards = [
+      createCard({ id: 'ip1', stateType: 'started', projectName: 'Alpha', section: 'in-progress' }),
+      createCard({ id: 'ip2', stateType: 'started', projectName: 'Alpha', section: 'in-progress' }),
+      createCard({ id: 'p1', stateType: 'unstarted', projectName: 'Alpha', section: 'project' }),
+      createCard({ id: 'p2', stateType: 'unstarted', projectName: 'Alpha', section: 'project' }),
+    ];
+    const groups = buildFilterGroups(cards);
+    const alphaGroup = groups.find(g => g.key === 'project:Alpha');
+    assert.ok(alphaGroup, 'project filter should appear');
+    assert.strictEqual(alphaGroup.count, 4);
+  });
+
+  test('project filter appears when all project issues are in-progress', () => {
+    const cards = [
+      createCard({ id: 'ip1', stateType: 'started', projectName: 'Solo', section: 'in-progress' }),
+    ];
+    const groups = buildFilterGroups(cards);
+    const soloGroup = groups.find(g => g.key === 'project:Solo');
+    assert.ok(soloGroup, 'project filter should appear');
+    assert.strictEqual(soloGroup.count, 1);
+  });
+});
+
+// =============================================================================
+// Project filter starting index
+// =============================================================================
+
+describe('project filter starting index', () => {
+  test('skips in-progress issues at the front', () => {
+    const cards = [
+      createCard({ id: 'ip1', stateType: 'started', projectName: 'Alpha' }),
+      createCard({ id: 'ip2', stateType: 'started', projectName: 'Alpha' }),
+      createCard({ id: 'p1', stateType: 'unstarted', projectName: 'Alpha' }),
+      createCard({ id: 'p2', stateType: 'backlog', projectName: 'Alpha' }),
+    ];
+    const firstNonStarted = cards.findIndex(i => i.stateType !== 'started');
+    assert.strictEqual(firstNonStarted, 2);
+  });
+
+  test('falls back to 0 when all issues are in-progress', () => {
+    const cards = [
+      createCard({ id: 'ip1', stateType: 'started', projectName: 'Alpha' }),
+      createCard({ id: 'ip2', stateType: 'started', projectName: 'Alpha' }),
+    ];
+    const firstNonStarted = cards.findIndex(i => i.stateType !== 'started');
+    const startIndex = firstNonStarted !== -1 ? firstNonStarted : 0;
+    assert.strictEqual(startIndex, 0);
+  });
+
+  test('starts at 0 when no in-progress issues', () => {
+    const cards = [
+      createCard({ id: 'p1', stateType: 'unstarted', projectName: 'Alpha' }),
+      createCard({ id: 'p2', stateType: 'backlog', projectName: 'Alpha' }),
+    ];
+    const firstNonStarted = cards.findIndex(i => i.stateType !== 'started');
+    assert.strictEqual(firstNonStarted, 0);
+  });
+
+  test('partitioning puts started before bugs for correct skip', () => {
+    // The global sort puts bugs before started, but the project filter
+    // partitions started to the front so the user can swipe back to them
+    const sorted = [
+      createCard({ id: 'bug', stateType: 'unstarted', labels: ['bug'] }),
+      createCard({ id: 'ip1', stateType: 'started' }),
+      createCard({ id: 'ip2', stateType: 'started' }),
+      createCard({ id: 'todo', stateType: 'unstarted' }),
+    ];
+    const started = sorted.filter(i => i.stateType === 'started');
+    const rest = sorted.filter(i => i.stateType !== 'started');
+    const partitioned = [...started, ...rest];
+    assert.deepStrictEqual(partitioned.map(i => i.id), ['ip1', 'ip2', 'bug', 'todo']);
+    const firstNonStarted = partitioned.findIndex(i => i.stateType !== 'started');
+    assert.strictEqual(firstNonStarted, 2);
   });
 });

@@ -165,12 +165,23 @@ function applyFilter(filterKey) {
     filteredIssues = allIssues.filter(i => i.section === 'recent-activity');
   } else if (filterKey.startsWith('project:')) {
     const projectName = filterKey.slice(8);
-    filteredIssues = allIssues.filter(i => i.projectName === projectName && i.section === 'project');
+    const projectIssues = allIssues.filter(i => i.projectName === projectName);
+    // Put in-progress issues first so the user can swipe back to see them
+    const started = projectIssues.filter(i => i.stateType === 'started');
+    const rest = projectIssues.filter(i => i.stateType !== 'started');
+    filteredIssues = [...started, ...rest];
   } else {
     filteredIssues = allIssues;
   }
 
-  currentIndex = 0;
+  // For project filters, start on the first non-in-progress issue
+  // so the user lands on actionable work (they can swipe back for in-progress)
+  if (filterKey.startsWith('project:')) {
+    const firstNonStarted = filteredIssues.findIndex(i => i.stateType !== 'started');
+    currentIndex = firstNonStarted !== -1 ? firstNonStarted : 0;
+  } else {
+    currentIndex = 0;
+  }
   activePromptLabel = null;
   renderCard();
   renderPromptButtons();

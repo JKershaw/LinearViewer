@@ -202,6 +202,34 @@ test.describe('Swipe Page', () => {
     await expect(subtaskLink).toHaveClass(/swipe-relation-todo/);
   });
 
+  test('project filter includes in-progress issues and starts on first todo', async ({ page }) => {
+    const select = page.locator('.swipe-filter-select');
+
+    // Select "Project Alpha" filter
+    const options = await select.locator('option').allTextContents();
+    const alphaOption = options.find(o => o.includes('Project Alpha'));
+    expect(alphaOption).toBeTruthy();
+
+    // Count should include in-progress issues (3 started + 4 incomplete = 7)
+    const match = alphaOption.match(/\((\d+)\)/);
+    expect(match).toBeTruthy();
+    expect(parseInt(match[1], 10)).toBe(7);
+
+    await select.selectOption({ label: alphaOption });
+
+    // Should NOT start on an in-progress card
+    const stateClass = await page.locator('.swipe-card-status .state').getAttribute('class');
+    expect(stateClass).not.toContain('in-progress');
+
+    // Left arrow should be enabled (in-progress cards are before this one)
+    await expect(page.locator('.swipe-arrow-left')).not.toBeDisabled();
+
+    // Navigate backward to reach an in-progress card
+    await page.locator('.swipe-arrow-left').click();
+    const prevStateClass = await page.locator('.swipe-card-status .state').getAttribute('class');
+    expect(prevStateClass).toContain('in-progress');
+  });
+
   test('clicking subtask link navigates to that card', async ({ page }) => {
     // Load TEST-1 which has TEST-2 as a subtask
     await page.goto(`${SWIPE_URL}/TEST-1`);
