@@ -358,7 +358,7 @@ test.describe('Custom Prompts on Dashboard', () => {
     await page.goto('/test/clear-custom-prompts');
   });
 
-  test('custom prompt buttons appear in more section on dashboard', async ({ page }) => {
+  test('custom prompt buttons appear as default buttons on dashboard', async ({ page }) => {
     // Create a custom prompt via API
     await page.request.post(API_BASE, {
       data: { name: 'My Dashboard Prompt', template: 'Analyze {{title}}' }
@@ -379,11 +379,7 @@ test.describe('Custom Prompts on Dashboard', () => {
     const promptsToggle = details.locator('.detail-toggle[data-toggle="prompts"]');
     await promptsToggle.click();
 
-    // Click "more" to reveal hidden prompts
-    const moreToggle = page.locator(`.in-progress-items .more-toggle[data-issue-id="${issueId}"]`);
-    await moreToggle.click();
-
-    // Custom prompt button should be visible with dashed border class
+    // Custom prompt button should be visible without needing to click "more"
     const customBtn = page.locator(`.in-progress-items .custom-prompt-btn[data-issue-id="${issueId}"]`);
     await expect(customBtn).toBeVisible();
     await expect(customBtn).toHaveText('My Dashboard Prompt');
@@ -411,11 +407,7 @@ test.describe('Custom Prompts on Dashboard', () => {
     const promptsToggle = details.locator('.detail-toggle[data-toggle="prompts"]');
     await promptsToggle.click();
 
-    // Click "more" to reveal hidden prompts
-    const moreToggle = page.locator(`.in-progress-items .more-toggle[data-issue-id="${issueId}"]`);
-    await moreToggle.click();
-
-    // Click the custom prompt button (scoped to this issue's details)
+    // Click the custom prompt button (visible by default, no need to click "more")
     const customBtn = details.locator(`.label-prompt[data-label="custom:${prompt.id}"]`);
     await customBtn.click();
 
@@ -446,11 +438,7 @@ test.describe('Custom Prompts on Dashboard', () => {
     const promptsToggle = details.locator('.detail-toggle[data-toggle="prompts"]');
     await promptsToggle.click();
 
-    // Click "more" to reveal hidden prompts
-    const moreToggle = page.locator(`.in-progress-items .more-toggle[data-issue-id="${issueId}"]`);
-    await moreToggle.click();
-
-    // No custom prompt buttons should exist
+    // No custom prompt buttons should exist (they render as default buttons now)
     const customBtns = page.locator(`.in-progress-items .custom-prompt-btn[data-issue-id="${issueId}"]`);
     await expect(customBtns).toHaveCount(0);
   });
