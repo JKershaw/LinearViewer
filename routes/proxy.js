@@ -15,8 +15,13 @@
 import { Router } from 'express';
 import { GraphQLClient, gql } from 'graphql-request';
 import rateLimit from 'express-rate-limit';
+import { createProxyFetch } from '../lib/proxy-fetch.js';
 
 const LINEAR_API_ENDPOINT = 'https://api.linear.app/graphql';
+
+// Proxy-aware fetch for environments behind an HTTP proxy (e.g. corporate networks).
+// graphql-request's default fetch doesn't respect HTTP_PROXY/HTTPS_PROXY env vars.
+const proxyFetch = await createProxyFetch();
 
 // Rate limiters
 // Note: proxyLimiter is applied before authenticateProxyToken on consumer
@@ -376,9 +381,9 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, workspaceF
     if (!accessToken) {
       return null;
     }
-    return new GraphQLClient(LINEAR_API_ENDPOINT, {
-      headers: { Authorization: accessToken }
-    });
+    const clientOptions = { headers: { Authorization: accessToken } };
+    if (proxyFetch) clientOptions.fetch = proxyFetch;
+    return new GraphQLClient(LINEAR_API_ENDPOINT, clientOptions);
   }
 
   /**
@@ -393,6 +398,26 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, workspaceF
       endpoint,
       status
     }).catch(err => console.error('Failed to log proxy event:', err));
+  }
+
+  /**
+   * Extract the upstream HTTP status from a graphql-request error.
+   * graphql-request stores Linear's response status in err.response.status
+   * and in err.response.errors[].extensions.statusCode.
+   *
+   * Maps upstream status to appropriate proxy response status:
+   *  - 401/403 from Linear → 401 (workspace token invalid/expired)
+   *  - 404 from Linear     → 404 (resource not found)
+   *  - 429 from Linear     → 429 (rate limited)
+   *  - anything else       → 500
+   */
+  function graphqlErrorStatus(err) {
+    const status = err.response?.status
+      || err.response?.errors?.[0]?.extensions?.statusCode;
+    if (status === 401 || status === 403) return 401;
+    if (status === 404) return 404;
+    if (status === 429) return 429;
+    return 500;
   }
 
   /**
@@ -656,9 +681,10 @@ ${readEndpoints}${writeEndpoints}
       logEvent(req, '/api/proxy/me', 200);
       res.json(data.viewer);
     } catch (err) {
-      logEvent(req, '/api/proxy/me', 500);
+      const status = graphqlErrorStatus(err);
+      logEvent(req, '/api/proxy/me', status);
       console.error('Proxy /me error:', err.message);
-      res.status(500).json({ error: 'Failed to fetch user info', detail: graphqlErrorDetail(err) });
+      res.status(status).json({ error: 'Failed to fetch user info', detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -677,9 +703,10 @@ ${readEndpoints}${writeEndpoints}
       logEvent(req, '/api/proxy/teams', 200);
       res.json({ teams: data.teams?.nodes || [] });
     } catch (err) {
-      logEvent(req, '/api/proxy/teams', 500);
+      const status = graphqlErrorStatus(err);
+      logEvent(req, '/api/proxy/teams', status);
       console.error('Proxy /teams error:', err.message);
-      res.status(500).json({ error: 'Failed to fetch teams', detail: graphqlErrorDetail(err) });
+      res.status(status).json({ error: 'Failed to fetch teams', detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -698,9 +725,10 @@ ${readEndpoints}${writeEndpoints}
       logEvent(req, '/api/proxy/projects', 200);
       res.json({ projects: data.projects?.nodes || [] });
     } catch (err) {
-      logEvent(req, '/api/proxy/projects', 500);
+      const status = graphqlErrorStatus(err);
+      logEvent(req, '/api/proxy/projects', status);
       console.error('Proxy /projects error:', err.message);
-      res.status(500).json({ error: 'Failed to fetch projects', detail: graphqlErrorDetail(err) });
+      res.status(status).json({ error: 'Failed to fetch projects', detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -739,9 +767,10 @@ ${readEndpoints}${writeEndpoints}
         }
       });
     } catch (err) {
-      logEvent(req, '/api/proxy/issues', 500);
+      const status = graphqlErrorStatus(err);
+      logEvent(req, '/api/proxy/issues', status);
       console.error('Proxy /issues error:', err.message);
-      res.status(500).json({ error: 'Failed to fetch issues', detail: graphqlErrorDetail(err) });
+      res.status(status).json({ error: 'Failed to fetch issues', detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -773,9 +802,10 @@ ${readEndpoints}${writeEndpoints}
       logEvent(req, '/api/proxy/issue', 200);
       res.json(data.issue);
     } catch (err) {
-      logEvent(req, '/api/proxy/issue', 500);
+      const status = graphqlErrorStatus(err);
+      logEvent(req, '/api/proxy/issue', status);
       console.error('Proxy /issue error:', err.message);
-      res.status(500).json({ error: 'Failed to fetch issue', detail: graphqlErrorDetail(err) });
+      res.status(status).json({ error: 'Failed to fetch issue', detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -805,9 +835,10 @@ ${readEndpoints}${writeEndpoints}
       logEvent(req, '/api/proxy/search', 200);
       res.json({ issues: data.searchIssues?.nodes || [] });
     } catch (err) {
-      logEvent(req, '/api/proxy/search', 500);
+      const status = graphqlErrorStatus(err);
+      logEvent(req, '/api/proxy/search', status);
       console.error('Proxy /search error:', err.message);
-      res.status(500).json({ error: 'Failed to search issues', detail: graphqlErrorDetail(err) });
+      res.status(status).json({ error: 'Failed to search issues', detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -833,9 +864,10 @@ ${readEndpoints}${writeEndpoints}
       logEvent(req, '/api/proxy/states', 200);
       res.json({ states });
     } catch (err) {
-      logEvent(req, '/api/proxy/states', 500);
+      const status = graphqlErrorStatus(err);
+      logEvent(req, '/api/proxy/states', status);
       console.error('Proxy /states error:', err.message);
-      res.status(500).json({ error: 'Failed to fetch states', detail: graphqlErrorDetail(err) });
+      res.status(status).json({ error: 'Failed to fetch states', detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -862,9 +894,10 @@ ${readEndpoints}${writeEndpoints}
       logEvent(req, '/api/proxy/labels', 200);
       res.json({ labels: data.issueLabels?.nodes || [] });
     } catch (err) {
-      logEvent(req, '/api/proxy/labels', 500);
+      const status = graphqlErrorStatus(err);
+      logEvent(req, '/api/proxy/labels', status);
       console.error('Proxy /labels error:', err.message);
-      res.status(500).json({ error: 'Failed to fetch labels', detail: graphqlErrorDetail(err) });
+      res.status(status).json({ error: 'Failed to fetch labels', detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -897,9 +930,10 @@ ${readEndpoints}${writeEndpoints}
         inverseRelations: data.issue.inverseRelations?.nodes || []
       });
     } catch (err) {
-      logEvent(req, '/api/proxy/relations', 500);
+      const status = graphqlErrorStatus(err);
+      logEvent(req, '/api/proxy/relations', status);
       console.error('Proxy /relations error:', err.message);
-      res.status(500).json({ error: 'Failed to fetch relations', detail: graphqlErrorDetail(err) });
+      res.status(status).json({ error: 'Failed to fetch relations', detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -961,9 +995,10 @@ ${readEndpoints}${writeEndpoints}
       logEvent(req, '/api/proxy/issues', 201);
       res.status(201).json(data.issueCreate);
     } catch (err) {
-      logEvent(req, '/api/proxy/issues', 500);
+      const status = graphqlErrorStatus(err);
+      logEvent(req, '/api/proxy/issues', status);
       console.error('Proxy create issue error:', err.message);
-      res.status(500).json({ error: 'Failed to create issue', detail: graphqlErrorDetail(err) });
+      res.status(status).json({ error: 'Failed to create issue', detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -1023,9 +1058,10 @@ ${readEndpoints}${writeEndpoints}
       logEvent(req, '/api/proxy/issue', 200);
       res.json(data.issueUpdate);
     } catch (err) {
-      logEvent(req, '/api/proxy/issue', 500);
+      const status = graphqlErrorStatus(err);
+      logEvent(req, '/api/proxy/issue', status);
       console.error('Proxy update issue error:', err.message);
-      res.status(500).json({ error: 'Failed to update issue', detail: graphqlErrorDetail(err) });
+      res.status(status).json({ error: 'Failed to update issue', detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -1066,9 +1102,10 @@ ${readEndpoints}${writeEndpoints}
       logEvent(req, '/api/proxy/issue/comments', 201);
       res.status(201).json(data.commentCreate);
     } catch (err) {
-      logEvent(req, '/api/proxy/issue/comments', 500);
+      const status = graphqlErrorStatus(err);
+      logEvent(req, '/api/proxy/issue/comments', status);
       console.error('Proxy create comment error:', err.message);
-      res.status(500).json({ error: 'Failed to create comment', detail: graphqlErrorDetail(err) });
+      res.status(status).json({ error: 'Failed to create comment', detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -1112,9 +1149,10 @@ ${readEndpoints}${writeEndpoints}
       logEvent(req, '/api/proxy/issue/relations', 201);
       res.status(201).json(data.issueRelationCreate);
     } catch (err) {
-      logEvent(req, '/api/proxy/issue/relations', 500);
+      const status = graphqlErrorStatus(err);
+      logEvent(req, '/api/proxy/issue/relations', status);
       console.error('Proxy create relation error:', err.message);
-      res.status(500).json({ error: 'Failed to create relation', detail: graphqlErrorDetail(err) });
+      res.status(status).json({ error: 'Failed to create relation', detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -1167,9 +1205,10 @@ ${readEndpoints}${writeEndpoints}
       logEvent(req, '/api/proxy/issue/labels', 200);
       res.json(data.issueUpdate);
     } catch (err) {
-      logEvent(req, '/api/proxy/issue/labels', 500);
+      const status = graphqlErrorStatus(err);
+      logEvent(req, '/api/proxy/issue/labels', status);
       console.error('Proxy add label error:', err.message);
-      res.status(500).json({ error: 'Failed to add label', detail: graphqlErrorDetail(err) });
+      res.status(status).json({ error: 'Failed to add label', detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -1218,9 +1257,10 @@ ${readEndpoints}${writeEndpoints}
       logEvent(req, '/api/proxy/issue/labels', 200);
       res.json(data.issueUpdate);
     } catch (err) {
-      logEvent(req, '/api/proxy/issue/labels', 500);
+      const status = graphqlErrorStatus(err);
+      logEvent(req, '/api/proxy/issue/labels', status);
       console.error('Proxy remove label error:', err.message);
-      res.status(500).json({ error: 'Failed to remove label', detail: graphqlErrorDetail(err) });
+      res.status(status).json({ error: 'Failed to remove label', detail: graphqlErrorDetail(err) });
     }
   });
 
