@@ -271,7 +271,7 @@ function renderCard(direction) {
     const names = blocksTargets.map(i => {
       const display = _esc(i.identifier || i.title);
       if (i.identifier) {
-        return `<a href="/workspace/${encodeURIComponent(urlKey)}/swipe/${encodeURIComponent(i.identifier)}" class="swipe-blocking-issue" data-navigate-identifier="${_esc(i.identifier)}">${display}</a>`;
+        return `<a href="/workspace/${encodeURIComponent(urlKey)}/swipe/${encodeURIComponent(i.identifier)}" class="swipe-blocking-issue" data-navigate-identifier="${_esc(i.identifier)}" title="${_esc(i.title)}">${display}</a>`;
       }
       return `<span class="swipe-blocking-issue">${display}</span>`;
     }).join(', ');
@@ -285,7 +285,7 @@ function renderCard(direction) {
     const names = blockedBySources.map(i => {
       const display = _esc(i.identifier || i.title);
       if (i.identifier) {
-        return `<a href="/workspace/${encodeURIComponent(urlKey)}/swipe/${encodeURIComponent(i.identifier)}" class="swipe-blocking-issue" data-navigate-identifier="${_esc(i.identifier)}">${display}</a>`;
+        return `<a href="/workspace/${encodeURIComponent(urlKey)}/swipe/${encodeURIComponent(i.identifier)}" class="swipe-blocking-issue" data-navigate-identifier="${_esc(i.identifier)}" title="${_esc(i.title)}">${display}</a>`;
       }
       return `<span class="swipe-blocking-issue">${display}</span>`;
     }).join(', ');
