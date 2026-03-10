@@ -345,3 +345,189 @@ test.describe('Custom Prompts Page', () => {
     await expect(link).toBeVisible();
   });
 });
+
+// ==========================================================================
+// Custom Prompts on Dashboard
+// ==========================================================================
+
+test.describe('Custom Prompts on Dashboard', () => {
+  const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;
+
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/test/set-session');
+    await page.goto('/test/clear-custom-prompts');
+  });
+
+  test('custom prompt buttons appear in more section on dashboard', async ({ page }) => {
+    // Create a custom prompt via API
+    await page.request.post(API_BASE, {
+      data: { name: 'My Dashboard Prompt', template: 'Analyze {{title}}' }
+    });
+
+    // Navigate to dashboard
+    await page.goto(WORKSPACE_URL);
+    await page.waitForLoadState('networkidle');
+
+    // Click an issue to expand it
+    const issueLine = page.locator('.in-progress-items .line.expandable').first();
+    await issueLine.click();
+
+    const issueId = await issueLine.getAttribute('data-id');
+    const details = page.locator(`.in-progress-items .details[data-details-for="${issueId}"]`);
+
+    // Expand Prompts section
+    const promptsToggle = details.locator('.detail-toggle[data-toggle="prompts"]');
+    await promptsToggle.click();
+
+    // Click "more" to reveal hidden prompts
+    const moreToggle = page.locator(`.in-progress-items .more-toggle[data-issue-id="${issueId}"]`);
+    await moreToggle.click();
+
+    // Custom prompt button should be visible with dashed border class
+    const customBtn = page.locator(`.in-progress-items .custom-prompt-btn[data-issue-id="${issueId}"]`);
+    await expect(customBtn).toBeVisible();
+    await expect(customBtn).toHaveText('My Dashboard Prompt');
+  });
+
+  test('clicking custom prompt button generates prompt on dashboard', async ({ page }) => {
+    // Create a custom prompt with a variable
+    const createRes = await page.request.post(API_BASE, {
+      data: { name: 'Title Prompt', template: 'Work on: {{title}}' }
+    });
+    const { prompt } = await createRes.json();
+
+    // Navigate to dashboard
+    await page.goto(WORKSPACE_URL);
+    await page.waitForLoadState('networkidle');
+
+    // Click an issue to expand it
+    const issueLine = page.locator('.in-progress-items .line.expandable').first();
+    await issueLine.click();
+
+    const issueId = await issueLine.getAttribute('data-id');
+    const details = page.locator(`.in-progress-items .details[data-details-for="${issueId}"]`);
+
+    // Expand Prompts section
+    const promptsToggle = details.locator('.detail-toggle[data-toggle="prompts"]');
+    await promptsToggle.click();
+
+    // Click "more" to reveal hidden prompts
+    const moreToggle = page.locator(`.in-progress-items .more-toggle[data-issue-id="${issueId}"]`);
+    await moreToggle.click();
+
+    // Click the custom prompt button (scoped to this issue's details)
+    const customBtn = details.locator(`.label-prompt[data-label="custom:${prompt.id}"]`);
+    await customBtn.click();
+
+    // Wait for prompt to load in container
+    const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${issueId}"]`);
+    await expect(promptContainer).toBeVisible();
+    await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
+
+    // Verify the prompt name shows
+    await expect(promptContainer.locator('.prompt-name')).toHaveText('Title Prompt');
+
+    // Verify variable substitution happened (contains "Work on:")
+    await expect(promptContainer.locator('.prompt-text')).toContainText('Work on:');
+  });
+
+  test('no custom prompt buttons when none exist', async ({ page }) => {
+    await page.goto(WORKSPACE_URL);
+    await page.waitForLoadState('networkidle');
+
+    // Expand an issue
+    const issueLine = page.locator('.in-progress-items .line.expandable').first();
+    await issueLine.click();
+
+    const issueId = await issueLine.getAttribute('data-id');
+    const details = page.locator(`.in-progress-items .details[data-details-for="${issueId}"]`);
+
+    // Expand Prompts section
+    const promptsToggle = details.locator('.detail-toggle[data-toggle="prompts"]');
+    await promptsToggle.click();
+
+    // Click "more" to reveal hidden prompts
+    const moreToggle = page.locator(`.in-progress-items .more-toggle[data-issue-id="${issueId}"]`);
+    await moreToggle.click();
+
+    // No custom prompt buttons should exist
+    const customBtns = page.locator(`.in-progress-items .custom-prompt-btn[data-issue-id="${issueId}"]`);
+    await expect(customBtns).toHaveCount(0);
+  });
+});
+
+// ==========================================================================
+// Custom Prompts on Swipe Page
+// ==========================================================================
+
+test.describe('Custom Prompts on Swipe Page', () => {
+  const SWIPE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/swipe`;
+
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/test/set-session');
+    await page.goto('/test/clear-custom-prompts');
+  });
+
+  test('custom prompt buttons appear in more section on swipe page', async ({ page }) => {
+    // Create a custom prompt via API
+    await page.request.post(API_BASE, {
+      data: { name: 'My Swipe Prompt', template: 'Review {{title}}' }
+    });
+
+    // Navigate to swipe page
+    await page.goto(SWIPE_URL);
+    await page.waitForLoadState('networkidle');
+
+    // Click "more" to reveal hidden prompts
+    const moreBtn = page.locator('.swipe-prompt-btn-more');
+    await moreBtn.click();
+
+    // Custom prompt button should be visible
+    const customBtn = page.locator('.swipe-prompt-btn.custom-prompt-btn');
+    await expect(customBtn).toBeVisible();
+    await expect(customBtn).toHaveText('My Swipe Prompt');
+  });
+
+  test('clicking custom prompt button generates prompt on swipe page', async ({ page }) => {
+    // Create a custom prompt with a variable
+    const createRes = await page.request.post(API_BASE, {
+      data: { name: 'Swipe Title', template: 'Analyze: {{title}}' }
+    });
+    const { prompt } = await createRes.json();
+
+    // Navigate to swipe page
+    await page.goto(SWIPE_URL);
+    await page.waitForLoadState('networkidle');
+
+    // Click "more" to reveal hidden prompts
+    const moreBtn = page.locator('.swipe-prompt-btn-more');
+    await moreBtn.click();
+
+    // Click the custom prompt button
+    const customBtn = page.locator(`.swipe-prompt-btn[data-prompt="custom:${prompt.id}"]`);
+    await customBtn.click();
+
+    // Wait for prompt result to load
+    const promptResult = page.locator('#swipe-prompt-result');
+    await expect(promptResult).not.toHaveClass(/hidden/, { timeout: 10000 });
+
+    // Verify prompt name
+    await expect(page.locator('#swipe-prompt-name')).toHaveText('Swipe Title');
+
+    // Verify variable substitution
+    await expect(page.locator('#swipe-prompt-text')).toContainText('Analyze:');
+  });
+
+  test('no custom prompt buttons when none exist on swipe page', async ({ page }) => {
+    await page.goto(SWIPE_URL);
+    await page.waitForLoadState('networkidle');
+
+    // Click "more" to reveal hidden prompts
+    const moreBtn = page.locator('.swipe-prompt-btn-more');
+    await moreBtn.click();
+
+    // No custom prompt buttons should exist
+    const customBtns = page.locator('.swipe-prompt-btn.custom-prompt-btn');
+    await expect(customBtns).toHaveCount(0);
+  });
+});

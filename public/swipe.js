@@ -14,6 +14,7 @@ const filters = data.filters || [];
 const promptMeta = data.promptMeta || {};
 const defaultPromptKeys = data.defaultPromptKeys || [];
 const morePromptKeys = data.morePromptKeys || [];
+const customPrompts = data.customPrompts || [];
 const urlKey = data.urlKey || '';
 const hasAI = data.hasAI || false;
 const dispatchEnabled = data.dispatchEnabled || false;
@@ -605,8 +606,8 @@ function renderPromptButtons() {
       html += `<button class="swipe-prompt-btn${activePromptLabel === key ? ' active' : ''}" data-prompt="${_esc(key)}">${_esc(name)}</button>`;
     }
 
-    // More button
-    if (morePromptKeys.length > 0) {
+    // More button (show if built-in extras or custom prompts exist)
+    if (morePromptKeys.length > 0 || customPrompts.length > 0) {
       html += `<button class="swipe-prompt-btn swipe-prompt-btn-more" data-prompt="__more__">${moreVisible ? 'less \u25B4' : 'more \u25BE'}</button>`;
 
       // More prompts (hidden row)
@@ -614,6 +615,11 @@ function renderPromptButtons() {
       for (const key of morePromptKeys) {
         const name = promptMeta[key] || key;
         html += `<button class="swipe-prompt-btn${activePromptLabel === key ? ' active' : ''}" data-prompt="${_esc(key)}">${_esc(name)}</button>`;
+      }
+      // Custom prompts after built-in ones
+      for (const cp of customPrompts) {
+        const label = `custom:${cp.id}`;
+        html += `<button class="swipe-prompt-btn custom-prompt-btn${activePromptLabel === label ? ' active' : ''}" data-prompt="${_esc(label)}">${_esc(cp.name)}</button>`;
       }
       html += '</div>';
     }
