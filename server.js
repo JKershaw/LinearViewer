@@ -15,6 +15,7 @@ import { MangoClient } from '@jkershaw/mangodb'
 import { MongoSessionStore } from './lib/session-store.js'
 import { UserPreferencesStore } from './lib/user-preferences.js'
 import { DispatchQueueStore } from './lib/dispatch-store.js'
+import { CustomPromptsStore } from './lib/custom-prompts-store.js'
 import { DispatchTokenStore } from './lib/dispatch-tokens.js'
 import { ProxyTokenStore } from './lib/proxy-tokens.js'
 import { ProxyEventStore } from './lib/proxy-events.js'
@@ -127,6 +128,12 @@ const userPreferencesStore = new UserPreferencesStore({
   collection: userPreferencesCollection
 })
 
+// Custom prompts (workspace-scoped)
+const customPromptsCollection = db.collection('custom-prompts')
+const customPromptsStore = new CustomPromptsStore({
+  collection: customPromptsCollection
+})
+
 // Dispatch queue collections
 const dispatchQueueCollection = db.collection('dispatch-queue')
 const dispatchTokensCollection = db.collection('dispatch-tokens')
@@ -206,7 +213,7 @@ app.use(session({
 // Test Mode Setup
 // =============================================================================
 if (process.env.NODE_ENV === 'test') {
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, proxyTokenStore, proxyEventStore, getWorkspaceAccessToken }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, getWorkspaceAccessToken }))
 }
 
 // =============================================================================
@@ -389,8 +396,7 @@ async function handleTokenRefreshAndRetry(workspace, session, teamId, openRouter
   // Load custom prompts (non-blocking, fallback to empty)
   let customPrompts = [];
   try {
-    const prefs = await userPreferencesStore.getUserPreferences(session.linearUserId);
-    customPrompts = (prefs.customPrompts || []).map(p => ({ id: p.id, name: p.name }));
+    customPrompts = (await customPromptsStore.list(workspace.urlKey)).map(p => ({ id: p.id, name: p.name }));
   } catch (e) { /* non-fatal */ }
 
   const deployInfo = getDeployInfo()
@@ -562,7 +568,7 @@ async function getWorkspaceAccessToken(urlKey) {
 app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, workspaceFromUrl, getWorkspaceAccessToken }))
 
 // Mount workspace API routes (audit, prompts, recommendations, comments, images)
-app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore }))
+app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, customPromptsStore }))
 
 /**
  * Workspace project view - renders the interactive tree view.
@@ -585,8 +591,7 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
     // Load custom prompts (non-blocking, fallback to empty)
     let customPrompts = [];
     try {
-      const prefs = await userPreferencesStore.getUserPreferences(req.session.linearUserId);
-      customPrompts = (prefs.customPrompts || []).map(p => ({ id: p.id, name: p.name }));
+      customPrompts = (await customPromptsStore.list(workspace.urlKey)).map(p => ({ id: p.id, name: p.name }));
     } catch (e) { /* non-fatal */ }
 
     const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace.accessToken, teamId);
@@ -640,8 +645,7 @@ app.get('/workspace/:urlKey/swipe', workspaceFromUrl, async (req, res) => {
     // Load custom prompts (non-blocking, fallback to empty)
     let customPrompts = [];
     try {
-      const prefs = await userPreferencesStore.getUserPreferences(req.session.linearUserId);
-      customPrompts = (prefs.customPrompts || []).map(p => ({ id: p.id, name: p.name }));
+      customPrompts = (await customPromptsStore.list(workspace.urlKey)).map(p => ({ id: p.id, name: p.name }));
     } catch (e) { /* non-fatal */ }
 
     const { trees, inProgressTrees, recentActivityTrees, organizationName } = await fetchAndPrepareProjects(workspace.accessToken, teamId);
@@ -753,8 +757,7 @@ app.get('/workspace/:urlKey/prompts/custom', workspaceFromUrl, async (req, res) 
   // Load user's custom prompts
   let customPrompts = [];
   try {
-    const prefs = await userPreferencesStore.getUserPreferences(req.session.linearUserId);
-    customPrompts = prefs.customPrompts || [];
+    customPrompts = await customPromptsStore.list(workspace.urlKey);
   } catch (e) {
     // Non-fatal: page works without existing prompts
   }
