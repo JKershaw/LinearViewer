@@ -20,6 +20,18 @@ const hasAI = data.hasAI || false;
 const dispatchEnabled = data.dispatchEnabled || false;
 const proxyEnabled = data.proxyEnabled || false;
 
+// Build reverse lookup: issueId → array of issues that block it (incomplete only)
+const blockedByMap = new Map();
+for (const issue of allIssues) {
+  const isFinished = issue.stateType === 'completed' || issue.stateType === 'canceled';
+  if (isFinished) continue;
+  for (const blockedId of issue.blocksIds || []) {
+    if (!blockedByMap.has(blockedId)) blockedByMap.set(blockedId, []);
+    blockedByMap.get(blockedId).push(issue);
+  }
+}
+const issueById = new Map(allIssues.map(i => [i.id, i]));
+
 let currentFilter = filters.length > 0 ? filters[0].key : '';
 let filteredIssues = [];
 let currentIndex = 0;
@@ -217,6 +229,28 @@ function renderCard(direction) {
     metaHtml += `<div class="swipe-card-meta-row">
       <span class="swipe-card-meta-label">Done</span>
       <span class="swipe-card-meta-value">${formatRelativeTime(issue.completedAt)}</span>
+    </div>`;
+  }
+
+  // Blocking relationship rows
+  const blocksTargets = (issue.blocksIds || [])
+    .map(id => issueById.get(id))
+    .filter(i => i && i.stateType !== 'completed' && i.stateType !== 'canceled');
+  const blockedBySources = blockedByMap.get(issue.id) || [];
+
+  if (blocksTargets.length > 0) {
+    const names = blocksTargets.map(i => `<span class="swipe-blocking-issue">${_esc(i.identifier || i.title)}</span>`).join(', ');
+    metaHtml += `<div class="swipe-card-meta-row swipe-meta-blocks">
+      <span class="swipe-card-meta-label">Blocks</span>
+      <span class="swipe-card-meta-value">${names}</span>
+    </div>`;
+  }
+
+  if (blockedBySources.length > 0) {
+    const names = blockedBySources.map(i => `<span class="swipe-blocking-issue">${_esc(i.identifier || i.title)}</span>`).join(', ');
+    metaHtml += `<div class="swipe-card-meta-row swipe-meta-blocked">
+      <span class="swipe-card-meta-label">Blocked by</span>
+      <span class="swipe-card-meta-value">${names}</span>
     </div>`;
   }
 

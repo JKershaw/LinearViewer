@@ -241,6 +241,30 @@
   background: var(--bg-muted, #f8f9fa);
 }
 
+/* Blocking Relationship Rows */
+.swipe-meta-blocks {
+  border: 1px solid #e74c3c;
+  border-radius: 6px;
+  padding: 0.3rem 0.5rem;
+  margin-top: 0.15rem;
+}
+.swipe-meta-blocks .swipe-card-meta-label { color: #c0392b; }
+.swipe-meta-blocks .swipe-card-meta-value { color: #c0392b; }
+
+.swipe-meta-blocked {
+  background: var(--bg-muted, #f5f5f5);
+  border: 1px solid #e8e8e8;
+  border-radius: 6px;
+  padding: 0.3rem 0.5rem;
+  margin-top: 0.15rem;
+}
+.swipe-meta-blocked .swipe-card-meta-label { color: var(--fg-dim, #999); }
+
+.swipe-blocking-issue {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 12px;
+}
+
 /* Expandable Accordion Sections */
 .swipe-card-accordion {
   margin-top: 0.25rem;

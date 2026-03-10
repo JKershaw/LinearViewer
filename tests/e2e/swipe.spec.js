@@ -139,4 +139,39 @@ test.describe('Swipe Page', () => {
     // Footer should have swipe link
     await expect(page.locator('.footer-action[href*="/swipe"]')).toBeVisible();
   });
+
+  test('shows blocking relationship rows on cards', async ({ page }) => {
+    // Navigate through cards to find one with blocking info
+    // TEST-15 (Refactor auth) blocks TEST-14 (Add pagination)
+    let foundBlocks = false;
+    let foundBlocked = false;
+    const maxCards = 15;
+
+    for (let i = 0; i < maxCards; i++) {
+      const blocksRow = page.locator('.swipe-meta-blocks');
+      const blockedRow = page.locator('.swipe-meta-blocked');
+
+      if (await blocksRow.isVisible()) {
+        foundBlocks = true;
+        await expect(blocksRow.locator('.swipe-card-meta-label')).toHaveText('Blocks');
+        await expect(blocksRow.locator('.swipe-blocking-issue')).toBeVisible();
+      }
+
+      if (await blockedRow.isVisible()) {
+        foundBlocked = true;
+        await expect(blockedRow.locator('.swipe-card-meta-label')).toHaveText('Blocked by');
+        await expect(blockedRow.locator('.swipe-blocking-issue')).toBeVisible();
+      }
+
+      if (foundBlocks && foundBlocked) break;
+
+      const rightArrow = page.locator('.swipe-arrow-right');
+      if (await rightArrow.isDisabled()) break;
+      await rightArrow.click();
+    }
+
+    // Mock data has TEST-15 blocks TEST-14, so both should appear
+    expect(foundBlocks).toBe(true);
+    expect(foundBlocked).toBe(true);
+  });
 });
