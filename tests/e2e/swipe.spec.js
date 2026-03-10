@@ -175,6 +175,46 @@ test.describe('Swipe Page', () => {
     expect(foundBlocked).toBe(true);
   });
 
+  test('shows parent/subtask relationship rows on cards', async ({ page }) => {
+    // TEST-2 is a child of TEST-1 (parent/child relationship)
+    // Navigate to TEST-2 which should show a "Parent" row
+    await page.goto(`${SWIPE_URL}/TEST-2`);
+    await page.waitForLoadState('networkidle');
+
+    const parentRow = page.locator('.swipe-meta-parent');
+    await expect(parentRow).toBeVisible();
+    await expect(parentRow.locator('.swipe-card-meta-label')).toHaveText('Parent');
+    const parentLink = parentRow.locator('a.swipe-relation-issue');
+    await expect(parentLink).toHaveText('TEST-1');
+    // Parent is in-progress, so link should have the in-progress colour class
+    await expect(parentLink).toHaveClass(/swipe-relation-in-progress/);
+
+    // Navigate to TEST-1 which should show a "Subtasks" row
+    await parentLink.click();
+    await expect(page.locator('.swipe-card-identifier')).toHaveText('TEST-1');
+
+    const subtasksRow = page.locator('.swipe-meta-subtasks');
+    await expect(subtasksRow).toBeVisible();
+    await expect(subtasksRow.locator('.swipe-card-meta-label')).toHaveText('Subtasks');
+    const subtaskLink = subtasksRow.locator('a.swipe-relation-issue');
+    await expect(subtaskLink).toHaveText('TEST-2');
+    // Subtask is todo, so link should have the todo colour class
+    await expect(subtaskLink).toHaveClass(/swipe-relation-todo/);
+  });
+
+  test('clicking subtask link navigates to that card', async ({ page }) => {
+    // Load TEST-1 which has TEST-2 as a subtask
+    await page.goto(`${SWIPE_URL}/TEST-1`);
+    await page.waitForLoadState('networkidle');
+
+    const subtaskLink = page.locator('.swipe-meta-subtasks a.swipe-relation-issue');
+    await expect(subtaskLink).toHaveText('TEST-2');
+    await subtaskLink.click();
+
+    await expect(page.locator('.swipe-card-identifier')).toHaveText('TEST-2');
+    expect(page.url()).toContain('/swipe/TEST-2');
+  });
+
   test('URL updates with task identifier when navigating', async ({ page }) => {
     // Start on a card with a known identifier
     await page.goto(`${SWIPE_URL}/TEST-15`);

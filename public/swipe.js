@@ -295,6 +295,38 @@ function renderCard(direction) {
     </div>`;
   }
 
+  // Parent/subtask relationship rows
+  if (issue.parentInfo) {
+    const p = issue.parentInfo;
+    const stateCls = getStateInfo(p.stateType).cls;
+    const display = _esc(p.identifier || p.title);
+    let nameHtml;
+    if (p.identifier) {
+      nameHtml = `<a href="/workspace/${encodeURIComponent(urlKey)}/swipe/${encodeURIComponent(p.identifier)}" class="swipe-relation-issue swipe-relation-${stateCls}" data-navigate-identifier="${_esc(p.identifier)}" title="${_esc(p.title)}">${display}</a>`;
+    } else {
+      nameHtml = `<span class="swipe-relation-issue swipe-relation-${stateCls}">${display}</span>`;
+    }
+    metaHtml += `<div class="swipe-card-meta-row swipe-meta-parent">
+      <span class="swipe-card-meta-label">Parent</span>
+      <span class="swipe-card-meta-value">${nameHtml}</span>
+    </div>`;
+  }
+
+  if (issue.subtasks && issue.subtasks.length > 0) {
+    const subtasksHtml = issue.subtasks.map(s => {
+      const stateCls = getStateInfo(s.stateType).cls;
+      const display = _esc(s.identifier || s.title);
+      if (s.identifier) {
+        return `<a href="/workspace/${encodeURIComponent(urlKey)}/swipe/${encodeURIComponent(s.identifier)}" class="swipe-relation-issue swipe-relation-${stateCls}" data-navigate-identifier="${_esc(s.identifier)}" title="${_esc(s.title)}">${display}</a>`;
+      }
+      return `<span class="swipe-relation-issue swipe-relation-${stateCls}">${display}</span>`;
+    }).join(' ');
+    metaHtml += `<div class="swipe-card-meta-row swipe-meta-subtasks">
+      <span class="swipe-card-meta-label">Subtasks</span>
+      <span class="swipe-card-meta-value">${subtasksHtml}</span>
+    </div>`;
+  }
+
   // Accordion sections
   let accordionHtml = '';
 
@@ -1183,8 +1215,8 @@ document.addEventListener('mouseleave', handleMouseUp);
 
 // Accordion clicks and blocking issue link clicks (delegated)
 card.addEventListener('click', (e) => {
-  // Blocking issue link navigation
-  const link = e.target.closest('a.swipe-blocking-issue');
+  // Blocking/parent/subtask issue link navigation
+  const link = e.target.closest('a.swipe-blocking-issue, a.swipe-relation-issue');
   if (link) {
     e.preventDefault();
     e.stopPropagation();
