@@ -13,10 +13,64 @@
  */
 
 import { Router } from 'express';
+import https from 'https';
 import { GraphQLClient, gql } from 'graphql-request';
 import rateLimit from 'express-rate-limit';
 
 const LINEAR_API_ENDPOINT = 'https://api.linear.app/graphql';
+
+// Proxy-aware fetch for environments behind an HTTP proxy (e.g. corporate networks).
+// graphql-request's default fetch doesn't respect HTTP_PROXY/HTTPS_PROXY env vars.
+const _proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY
+  || process.env.https_proxy || process.env.http_proxy;
+let proxyFetch;
+
+if (_proxyUrl) {
+  const { HttpsProxyAgent } = await import('https-proxy-agent');
+  const proxyAgent = new HttpsProxyAgent(_proxyUrl);
+
+  proxyFetch = (url, options = {}) => {
+    return new Promise((resolve, reject) => {
+      const urlObj = new URL(url);
+      const postData = options.body || '';
+
+      const req = https.request({
+        hostname: urlObj.hostname,
+        path: urlObj.pathname + urlObj.search,
+        method: options.method || 'GET',
+        agent: proxyAgent,
+        headers: {
+          ...options.headers,
+          'Content-Length': Buffer.byteLength(postData)
+        }
+      }, (res) => {
+        const chunks = [];
+        res.on('data', chunk => chunks.push(chunk));
+        res.on('end', () => {
+          const buffer = Buffer.concat(chunks);
+          const headers = new Map(Object.entries(res.headers));
+          headers.forEach = (callback) => {
+            for (const [key, value] of headers) callback(value, key);
+          };
+          headers.get = (name) => res.headers[name.toLowerCase()];
+          resolve({
+            ok: res.statusCode >= 200 && res.statusCode < 300,
+            status: res.statusCode,
+            headers,
+            json: () => Promise.resolve(JSON.parse(buffer.toString('utf8'))),
+            text: () => Promise.resolve(buffer.toString('utf8')),
+            arrayBuffer: () => Promise.resolve(buffer.buffer.slice(
+              buffer.byteOffset, buffer.byteOffset + buffer.byteLength))
+          });
+        });
+      });
+
+      req.on('error', reject);
+      if (postData) req.write(postData);
+      req.end();
+    });
+  };
+}
 
 // Rate limiters
 // Note: proxyLimiter is applied before authenticateProxyToken on consumer
@@ -376,9 +430,9 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, workspaceF
     if (!accessToken) {
       return null;
     }
-    return new GraphQLClient(LINEAR_API_ENDPOINT, {
-      headers: { Authorization: accessToken }
-    });
+    const clientOptions = { headers: { Authorization: accessToken } };
+    if (proxyFetch) clientOptions.fetch = proxyFetch;
+    return new GraphQLClient(LINEAR_API_ENDPOINT, clientOptions);
   }
 
   /**
