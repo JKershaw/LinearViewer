@@ -27,7 +27,7 @@ import { testMockTeams, testMockData } from '../tests/fixtures/mock-data.js';
  * @param {Function} options.getOpenRouterSource - Helper to determine OpenRouter source
  * @returns {Router} Express router
  */
-export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore }) {
+export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, customPromptsStore }) {
   const router = Router();
 
   // ===========================================================================
@@ -173,8 +173,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
 
         if (isCustomPrompt) {
           const customPromptId = labelName.slice('custom:'.length);
-          const prefs = await userPreferencesStore.getUserPreferences(req.session.linearUserId);
-          const customPromptDef = (prefs.customPrompts || []).find(p => p.id === customPromptId);
+          const customPromptDef = await customPromptsStore.get(req.workspace.urlKey, customPromptId);
           if (!customPromptDef) {
             return res.status(404).json({ error: 'Custom prompt not found' });
           }
@@ -199,8 +198,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       let result;
       if (isCustomPrompt) {
         const customPromptId = labelName.slice('custom:'.length);
-        const prefs = await userPreferencesStore.getUserPreferences(req.session.linearUserId);
-        const customPromptDef = (prefs.customPrompts || []).find(p => p.id === customPromptId);
+        const customPromptDef = await customPromptsStore.get(req.workspace.urlKey, customPromptId);
         if (!customPromptDef) {
           return res.status(404).json({ error: 'Custom prompt not found' });
         }
@@ -833,17 +831,14 @@ ${goal}`;
   // Custom Prompts API
   // ===========================================================================
 
-  const MAX_CUSTOM_PROMPTS = 20;
-  const MAX_PROMPT_NAME_LENGTH = 50;
-
   /**
-   * List all custom prompts for the current user.
+   * List all custom prompts for the workspace.
    * @route GET /workspace/:urlKey/api/prompts/custom
    */
   router.get('/workspace/:urlKey/api/prompts/custom', workspaceFromUrl, async (req, res) => {
     try {
-      const prefs = await userPreferencesStore.getUserPreferences(req.session.linearUserId);
-      res.json({ prompts: prefs.customPrompts || [] });
+      const prompts = await customPromptsStore.list(req.workspace.urlKey);
+      res.json({ prompts });
     } catch (error) {
       console.error('Custom prompts list error:', error);
       res.status(500).json({ error: 'Failed to list custom prompts' });
@@ -857,42 +852,13 @@ ${goal}`;
   router.post('/workspace/:urlKey/api/prompts/custom', workspaceFromUrl, async (req, res) => {
     const { name, template } = req.body;
 
-    if (!name || typeof name !== 'string' || !name.trim()) {
-      return res.status(400).json({ error: 'Name is required' });
-    }
-    if (!template || typeof template !== 'string' || !template.trim()) {
-      return res.status(400).json({ error: 'Template is required' });
-    }
-    if (name.length > MAX_PROMPT_NAME_LENGTH) {
-      return res.status(400).json({ error: `Name must be ${MAX_PROMPT_NAME_LENGTH} characters or less` });
-    }
-
     try {
-      const prefs = await userPreferencesStore.getUserPreferences(req.session.linearUserId);
-      const customPrompts = prefs.customPrompts || [];
-
-      if (customPrompts.length >= MAX_CUSTOM_PROMPTS) {
-        return res.status(400).json({ error: `You have reached the maximum of ${MAX_CUSTOM_PROMPTS} custom prompts` });
-      }
-
-      const newPrompt = {
-        id: crypto.randomUUID(),
-        name: name.trim(),
-        template: template.trim(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-
-      customPrompts.push(newPrompt);
-      await userPreferencesStore.saveUserPreferences(req.session.linearUserId, {
-        ...prefs,
-        customPrompts
-      });
-
-      res.json({ prompt: newPrompt });
+      const prompt = await customPromptsStore.create(req.workspace.urlKey, { name, template });
+      res.json({ prompt });
     } catch (error) {
       console.error('Custom prompt create error:', error);
-      res.status(500).json({ error: 'Failed to create custom prompt' });
+      const status = error.message.includes('required') || error.message.includes('maximum') || error.message.includes('characters') ? 400 : 500;
+      res.status(status).json({ error: error.message || 'Failed to create custom prompt' });
     }
   });
 
@@ -907,35 +873,20 @@ ${goal}`;
     if (name !== undefined && (typeof name !== 'string' || !name.trim())) {
       return res.status(400).json({ error: 'Name cannot be empty' });
     }
-    if (name && name.length > MAX_PROMPT_NAME_LENGTH) {
-      return res.status(400).json({ error: `Name must be ${MAX_PROMPT_NAME_LENGTH} characters or less` });
-    }
     if (template !== undefined && (typeof template !== 'string' || !template.trim())) {
       return res.status(400).json({ error: 'Template cannot be empty' });
     }
 
     try {
-      const prefs = await userPreferencesStore.getUserPreferences(req.session.linearUserId);
-      const customPrompts = prefs.customPrompts || [];
-      const index = customPrompts.findIndex(p => p.id === id);
-
-      if (index === -1) {
+      const updated = await customPromptsStore.update(req.workspace.urlKey, id, { name, template });
+      if (!updated) {
         return res.status(404).json({ error: 'Custom prompt not found' });
       }
-
-      if (name) customPrompts[index].name = name.trim();
-      if (template) customPrompts[index].template = template.trim();
-      customPrompts[index].updatedAt = new Date().toISOString();
-
-      await userPreferencesStore.saveUserPreferences(req.session.linearUserId, {
-        ...prefs,
-        customPrompts
-      });
-
-      res.json({ prompt: customPrompts[index] });
+      res.json({ prompt: updated });
     } catch (error) {
       console.error('Custom prompt update error:', error);
-      res.status(500).json({ error: 'Failed to update custom prompt' });
+      const status = error.message.includes('characters') ? 400 : 500;
+      res.status(status).json({ error: error.message || 'Failed to update custom prompt' });
     }
   });
 
@@ -947,20 +898,10 @@ ${goal}`;
     const { id } = req.params;
 
     try {
-      const prefs = await userPreferencesStore.getUserPreferences(req.session.linearUserId);
-      const customPrompts = prefs.customPrompts || [];
-      const index = customPrompts.findIndex(p => p.id === id);
-
-      if (index === -1) {
+      const deleted = await customPromptsStore.delete(req.workspace.urlKey, id);
+      if (!deleted) {
         return res.status(404).json({ error: 'Custom prompt not found' });
       }
-
-      customPrompts.splice(index, 1);
-      await userPreferencesStore.saveUserPreferences(req.session.linearUserId, {
-        ...prefs,
-        customPrompts
-      });
-
       res.json({ ok: true });
     } catch (error) {
       console.error('Custom prompt delete error:', error);

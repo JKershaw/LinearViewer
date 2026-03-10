@@ -19,7 +19,7 @@ import { isValidFeatureKey } from '../lib/feature-defaults.js';
  * @param {Function} options.getWorkspaceAccessToken - Function to look up workspace access token
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, proxyTokenStore, proxyEventStore, getWorkspaceAccessToken }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, getWorkspaceAccessToken }) {
   const router = Router();
 
   // Endpoint to set a test session without going through OAuth flow
@@ -191,11 +191,7 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   // Endpoint to clear custom prompts for testing
   router.get('/test/clear-custom-prompts', async (req, res) => {
     try {
-      const prefs = await userPreferencesStore.getUserPreferences('test-linear-user-id');
-      await userPreferencesStore.saveUserPreferences('test-linear-user-id', {
-        ...prefs,
-        customPrompts: []
-      });
+      await customPromptsStore.deleteAll('test-workspace');
       res.send('ok');
     } catch (err) {
       res.status(500).json({ error: err.message });
