@@ -480,6 +480,10 @@
   border-style: dashed;
 }
 
+.swipe-prompt-btn.custom-prompt-btn {
+  border-style: dashed;
+}
+
 /* More prompts (hidden by default) */
 .swipe-more-prompts {
   display: none;

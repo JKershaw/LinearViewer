@@ -1243,6 +1243,11 @@ h1 {
   border-color: transparent;
 }
 
+/* Custom prompt buttons - dashed border to distinguish from built-in */
+.label-prompt.custom-prompt-btn {
+  border-style: dashed;
+}
+
 /* Prompt container - appears below metadata when label is clicked */
 .prompt-container {
   margin-top: 0.75rem;

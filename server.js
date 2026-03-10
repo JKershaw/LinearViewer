@@ -386,6 +386,13 @@ async function handleTokenRefreshAndRetry(workspace, session, teamId, openRouter
   await saveSession(session);
   console.log('Token refreshed after 401, retrying request');
 
+  // Load custom prompts (non-blocking, fallback to empty)
+  let customPrompts = [];
+  try {
+    const prefs = await userPreferencesStore.getUserPreferences(session.linearUserId);
+    customPrompts = (prefs.customPrompts || []).map(p => ({ id: p.id, name: p.name }));
+  } catch (e) { /* non-fatal */ }
+
   const deployInfo = getDeployInfo()
   const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace.accessToken, teamId);
   const html = renderPage(trees, inProgressTrees, recentActivityTrees, organizationName, {
@@ -395,7 +402,8 @@ async function handleTokenRefreshAndRetry(workspace, session, teamId, openRouter
     openRouterSource,
     deployInfo,
     urlKey: workspace.urlKey,
-    featureFlags: getFeatureFlags(session)
+    featureFlags: getFeatureFlags(session),
+    customPrompts
   });
   return res.send(html);
 }
@@ -574,6 +582,13 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
   const openRouterSource = getOpenRouterSource(req);
 
   try {
+    // Load custom prompts (non-blocking, fallback to empty)
+    let customPrompts = [];
+    try {
+      const prefs = await userPreferencesStore.getUserPreferences(req.session.linearUserId);
+      customPrompts = (prefs.customPrompts || []).map(p => ({ id: p.id, name: p.name }));
+    } catch (e) { /* non-fatal */ }
+
     const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace.accessToken, teamId);
     const html = renderPage(trees, inProgressTrees, recentActivityTrees, organizationName, {
       teams,
@@ -582,7 +597,8 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
       openRouterSource,
       deployInfo,
       urlKey: workspace.urlKey,
-      featureFlags: getFeatureFlags(req.session)
+      featureFlags: getFeatureFlags(req.session),
+      customPrompts
     });
     res.send(html);
   } catch (error) {
@@ -621,6 +637,13 @@ app.get('/workspace/:urlKey/swipe', workspaceFromUrl, async (req, res) => {
   const teamId = rawTeam && rawTeam !== 'all' && UUID_REGEX.test(rawTeam) ? rawTeam : null;
 
   try {
+    // Load custom prompts (non-blocking, fallback to empty)
+    let customPrompts = [];
+    try {
+      const prefs = await userPreferencesStore.getUserPreferences(req.session.linearUserId);
+      customPrompts = (prefs.customPrompts || []).map(p => ({ id: p.id, name: p.name }));
+    } catch (e) { /* non-fatal */ }
+
     const { trees, inProgressTrees, recentActivityTrees, organizationName } = await fetchAndPrepareProjects(workspace.accessToken, teamId);
     const html = renderSwipePage(
       { projectTrees: trees, inProgressTrees, recentActivityTrees, organizationName },
@@ -629,7 +652,8 @@ app.get('/workspace/:urlKey/swipe', workspaceFromUrl, async (req, res) => {
         urlKey: workspace.urlKey,
         openRouterSource,
         workspaces: req.session.workspaces,
-        featureFlags: getFeatureFlags(req.session)
+        featureFlags: getFeatureFlags(req.session),
+        customPrompts
       }
     );
     res.send(html);
