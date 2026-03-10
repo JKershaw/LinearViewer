@@ -39,6 +39,7 @@ import { renderAuditPage } from './lib/render-audit.js'
 import { renderPrivacyPolicy, renderTermsOfService } from './lib/render-legal.js'
 import { renderSettingsPage } from './lib/render-settings.js'
 import { renderPromptsPage } from './lib/render-prompts.js'
+import { renderCustomPromptsPage } from './lib/render-custom-prompts.js'
 import { renderDispatchPage } from './lib/render-dispatch.js'
 import { renderSwipePage } from './lib/render-swipe.js'
 import { renderProxyPage } from './lib/render-proxy.js'
@@ -553,7 +554,7 @@ async function getWorkspaceAccessToken(urlKey) {
 app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, workspaceFromUrl, getWorkspaceAccessToken }))
 
 // Mount workspace API routes (audit, prompts, recommendations, comments, images)
-app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource }))
+app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore }))
 
 /**
  * Workspace project view - renders the interactive tree view.
@@ -707,6 +708,35 @@ app.get('/workspace/:urlKey/prompts', workspaceFromUrl, (req, res) => {
   const openRouterSource = getOpenRouterSource(req);
 
   const html = renderPromptsPage(workspace.name || 'Workspace', {
+    deployInfo,
+    urlKey: workspace.urlKey,
+    openRouterSource,
+    workspaces: req.session.workspaces,
+    featureFlags: getFeatureFlags(req.session)
+  });
+  res.send(html);
+});
+
+/**
+ * Custom Prompts page - requires authentication.
+ * Allows users to create, edit, and delete custom prompt templates.
+ */
+app.get('/workspace/:urlKey/prompts/custom', workspaceFromUrl, async (req, res) => {
+  const workspace = req.workspace;
+  const deployInfo = getDeployInfo();
+  const openRouterSource = getOpenRouterSource(req);
+
+  // Load user's custom prompts
+  let customPrompts = [];
+  try {
+    const prefs = await userPreferencesStore.getUserPreferences(req.session.linearUserId);
+    customPrompts = prefs.customPrompts || [];
+  } catch (e) {
+    // Non-fatal: page works without existing prompts
+  }
+
+  const html = renderCustomPromptsPage(workspace.name || 'Workspace', {
+    customPrompts,
     deployInfo,
     urlKey: workspace.urlKey,
     openRouterSource,

@@ -10,7 +10,7 @@
  */
 import { Router } from 'express';
 import { fetchIssueContext, fetchRecommendationContext, fetchIssueComments } from '../lib/linear.js';
-import { generatePrompt, hasPrompt, getAvailablePrompts } from '../lib/prompt-templates.js';
+import { generatePrompt, generateCustomPrompt, hasPrompt, getAvailablePrompts } from '../lib/prompt-templates.js';
 import { PREPARING_LABEL, WORK_ISSUE_LABELS } from '../lib/workflow-config.js';
 import { parseRepoFromDescription } from '../lib/prompt-formatters.js';
 import { isRecommendationEnabled, getRecommendation, getRecommendationStream, DEFAULT_MODEL } from '../lib/openrouter.js';
@@ -27,7 +27,7 @@ import { testMockTeams, testMockData } from '../tests/fixtures/mock-data.js';
  * @param {Function} options.getOpenRouterSource - Helper to determine OpenRouter source
  * @returns {Router} Express router
  */
-export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource }) {
+export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore }) {
   const router = Router();
 
   // ===========================================================================
@@ -103,8 +103,11 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       return res.status(400).json({ error: 'Invalid issue ID format' })
     }
 
-    // Check if label has a prompt template
-    if (!hasPrompt(labelName)) {
+    // Check if this is a custom prompt request (format: custom:promptId)
+    const isCustomPrompt = labelName.startsWith('custom:');
+
+    // Check if label has a prompt template (unless it's a custom prompt)
+    if (!isCustomPrompt && !hasPrompt(labelName)) {
       return res.status(404).json({ error: `No prompt template for label: ${labelName}` })
     }
 
@@ -153,11 +156,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
             state: c.state
           }))
 
-        const result = generatePrompt(labelName, {
-          ...mockIssue,
-          identifier,
-          labels
-        }, {
+        const mockContext = {
           parent: mockParent ? {
             id: mockParent.id,
             identifier: mockParent.url.split('/').pop(),
@@ -167,7 +166,22 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
           siblings: mockSiblings,
           project: mockProject ? { name: mockProject.name, description: mockProject.content } : null,
           children: mockChildren
-        }, getFeatureFlags(req.session))
+        };
+
+        const issueObj = { ...mockIssue, identifier, labels };
+        let result;
+
+        if (isCustomPrompt) {
+          const customPromptId = labelName.slice('custom:'.length);
+          const prefs = await userPreferencesStore.getUserPreferences(req.session.linearUserId);
+          const customPromptDef = (prefs.customPrompts || []).find(p => p.id === customPromptId);
+          if (!customPromptDef) {
+            return res.status(404).json({ error: 'Custom prompt not found' });
+          }
+          result = generateCustomPrompt(customPromptDef, issueObj, mockContext, getFeatureFlags(req.session));
+        } else {
+          result = generatePrompt(labelName, issueObj, mockContext, getFeatureFlags(req.session));
+        }
 
         const mockProjectDescription = mockProject?.content || null
         return res.json({
@@ -182,7 +196,18 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       const { issue, parent, siblings, project, children, comments } = await fetchIssueContext(workspace.accessToken, issueId)
 
       // Generate the prompt
-      const result = generatePrompt(labelName, issue, { parent, siblings, project, children, comments }, getFeatureFlags(req.session))
+      let result;
+      if (isCustomPrompt) {
+        const customPromptId = labelName.slice('custom:'.length);
+        const prefs = await userPreferencesStore.getUserPreferences(req.session.linearUserId);
+        const customPromptDef = (prefs.customPrompts || []).find(p => p.id === customPromptId);
+        if (!customPromptDef) {
+          return res.status(404).json({ error: 'Custom prompt not found' });
+        }
+        result = generateCustomPrompt(customPromptDef, issue, { parent, siblings, project, children, comments }, getFeatureFlags(req.session));
+      } else {
+        result = generatePrompt(labelName, issue, { parent, siblings, project, children, comments }, getFeatureFlags(req.session));
+      }
 
       if (!result) {
         return res.status(500).json({ error: 'Failed to generate prompt' })
@@ -803,6 +828,145 @@ ${goal}`;
       res.status(500).json({ error: 'Failed to fetch image' })
     }
   })
+
+  // ===========================================================================
+  // Custom Prompts API
+  // ===========================================================================
+
+  const MAX_CUSTOM_PROMPTS = 20;
+  const MAX_PROMPT_NAME_LENGTH = 50;
+
+  /**
+   * List all custom prompts for the current user.
+   * @route GET /workspace/:urlKey/api/prompts/custom
+   */
+  router.get('/workspace/:urlKey/api/prompts/custom', workspaceFromUrl, async (req, res) => {
+    try {
+      const prefs = await userPreferencesStore.getUserPreferences(req.session.linearUserId);
+      res.json({ prompts: prefs.customPrompts || [] });
+    } catch (error) {
+      console.error('Custom prompts list error:', error);
+      res.status(500).json({ error: 'Failed to list custom prompts' });
+    }
+  });
+
+  /**
+   * Create a new custom prompt.
+   * @route POST /workspace/:urlKey/api/prompts/custom
+   */
+  router.post('/workspace/:urlKey/api/prompts/custom', workspaceFromUrl, async (req, res) => {
+    const { name, template } = req.body;
+
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ error: 'Name is required' });
+    }
+    if (!template || typeof template !== 'string' || !template.trim()) {
+      return res.status(400).json({ error: 'Template is required' });
+    }
+    if (name.length > MAX_PROMPT_NAME_LENGTH) {
+      return res.status(400).json({ error: `Name must be ${MAX_PROMPT_NAME_LENGTH} characters or less` });
+    }
+
+    try {
+      const prefs = await userPreferencesStore.getUserPreferences(req.session.linearUserId);
+      const customPrompts = prefs.customPrompts || [];
+
+      if (customPrompts.length >= MAX_CUSTOM_PROMPTS) {
+        return res.status(400).json({ error: `You have reached the maximum of ${MAX_CUSTOM_PROMPTS} custom prompts` });
+      }
+
+      const newPrompt = {
+        id: crypto.randomUUID(),
+        name: name.trim(),
+        template: template.trim(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      customPrompts.push(newPrompt);
+      await userPreferencesStore.saveUserPreferences(req.session.linearUserId, {
+        ...prefs,
+        customPrompts
+      });
+
+      res.json({ prompt: newPrompt });
+    } catch (error) {
+      console.error('Custom prompt create error:', error);
+      res.status(500).json({ error: 'Failed to create custom prompt' });
+    }
+  });
+
+  /**
+   * Update an existing custom prompt.
+   * @route PUT /workspace/:urlKey/api/prompts/custom/:id
+   */
+  router.put('/workspace/:urlKey/api/prompts/custom/:id', workspaceFromUrl, async (req, res) => {
+    const { id } = req.params;
+    const { name, template } = req.body;
+
+    if (name !== undefined && (typeof name !== 'string' || !name.trim())) {
+      return res.status(400).json({ error: 'Name cannot be empty' });
+    }
+    if (name && name.length > MAX_PROMPT_NAME_LENGTH) {
+      return res.status(400).json({ error: `Name must be ${MAX_PROMPT_NAME_LENGTH} characters or less` });
+    }
+    if (template !== undefined && (typeof template !== 'string' || !template.trim())) {
+      return res.status(400).json({ error: 'Template cannot be empty' });
+    }
+
+    try {
+      const prefs = await userPreferencesStore.getUserPreferences(req.session.linearUserId);
+      const customPrompts = prefs.customPrompts || [];
+      const index = customPrompts.findIndex(p => p.id === id);
+
+      if (index === -1) {
+        return res.status(404).json({ error: 'Custom prompt not found' });
+      }
+
+      if (name) customPrompts[index].name = name.trim();
+      if (template) customPrompts[index].template = template.trim();
+      customPrompts[index].updatedAt = new Date().toISOString();
+
+      await userPreferencesStore.saveUserPreferences(req.session.linearUserId, {
+        ...prefs,
+        customPrompts
+      });
+
+      res.json({ prompt: customPrompts[index] });
+    } catch (error) {
+      console.error('Custom prompt update error:', error);
+      res.status(500).json({ error: 'Failed to update custom prompt' });
+    }
+  });
+
+  /**
+   * Delete a custom prompt.
+   * @route DELETE /workspace/:urlKey/api/prompts/custom/:id
+   */
+  router.delete('/workspace/:urlKey/api/prompts/custom/:id', workspaceFromUrl, async (req, res) => {
+    const { id } = req.params;
+
+    try {
+      const prefs = await userPreferencesStore.getUserPreferences(req.session.linearUserId);
+      const customPrompts = prefs.customPrompts || [];
+      const index = customPrompts.findIndex(p => p.id === id);
+
+      if (index === -1) {
+        return res.status(404).json({ error: 'Custom prompt not found' });
+      }
+
+      customPrompts.splice(index, 1);
+      await userPreferencesStore.saveUserPreferences(req.session.linearUserId, {
+        ...prefs,
+        customPrompts
+      });
+
+      res.json({ ok: true });
+    } catch (error) {
+      console.error('Custom prompt delete error:', error);
+      res.status(500).json({ error: 'Failed to delete custom prompt' });
+    }
+  });
 
   return router;
 }

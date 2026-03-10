@@ -188,6 +188,20 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     }
   });
 
+  // Endpoint to clear custom prompts for testing
+  router.get('/test/clear-custom-prompts', async (req, res) => {
+    try {
+      const prefs = await userPreferencesStore.getUserPreferences('test-linear-user-id');
+      await userPreferencesStore.saveUserPreferences('test-linear-user-id', {
+        ...prefs,
+        customPrompts: []
+      });
+      res.send('ok');
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Endpoint to clear dispatch history for testing
   router.get('/test/clear-dispatch-history', async (req, res) => {
     try {
