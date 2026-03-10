@@ -851,22 +851,18 @@ async function handleStreamingResponse(response, issueId, label, abortController
   let renderPending = false;
   let sseBuffer = ''; // Buffer for partial SSE lines across chunks
   let prevChildCount = 0; // Track rendered children for fade-in
-  let reasoningHeld = false; // True during hold phase (reasoning shown, prompt buffered)
-  let transitionDone = false; // True after crossfade completes
 
   function scheduleRender() {
     if (renderPending) return;
-    // During hold phase, skip rendering — prompt is buffering silently
-    if (reasoningHeld) return;
     renderPending = true;
     requestAnimationFrame(() => {
       if (currentField === 'reasoning') {
         promptName.textContent = 'AI thinking...';
+        promptText.innerHTML = renderMarkdown(reasoningRaw);
       } else {
         promptName.textContent = 'AI Recommendation';
+        promptText.innerHTML = renderMarkdown(promptRaw || reasoningRaw);
       }
-      const displayText = (transitionDone || !reasoningRaw) ? (promptRaw || reasoningRaw) : reasoningRaw;
-      promptText.innerHTML = renderMarkdown(displayText);
 
       // Apply fade-in to newly added child elements
       const children = promptText.children;
@@ -886,29 +882,6 @@ async function handleStreamingResponse(response, issueId, label, abortController
       }
       renderPending = false;
     });
-  }
-
-  // Crossfade from reasoning to prompt content
-  function crossfadeToPrompt() {
-    reasoningHeld = false;
-    promptText.classList.add('fade-out');
-    promptText.addEventListener('animationend', function onFadeOut() {
-      promptText.removeEventListener('animationend', onFadeOut);
-      promptText.classList.remove('fade-out');
-      // Switch content to prompt
-      promptName.textContent = 'AI Recommendation';
-      prevChildCount = 0;
-      const displayText = promptRaw || reasoningRaw;
-      promptText.innerHTML = renderMarkdown(displayText);
-      promptText.classList.add('fade-in');
-      promptText.addEventListener('animationend', function onFadeIn() {
-        promptText.removeEventListener('animationend', onFadeIn);
-        promptText.classList.remove('fade-in');
-        transitionDone = true;
-        // Resume live rendering of buffered prompt
-        scheduleRender();
-      }, { once: true });
-    }, { once: true });
   }
 
   // Add streaming class for fade-in and gradient mask
@@ -938,11 +911,8 @@ async function handleStreamingResponse(response, issueId, label, abortController
           if (parsed.phase) {
             // Transition from reasoning to prompt phase
             if (parsed.phase === 'prompt' && currentField === 'reasoning' && reasoningRaw) {
-              reasoningHeld = true;
-              const holdMs = reasoningRaw.length < 100 ? 500 : 2000;
-              setTimeout(() => {
-                if (reasoningHeld) crossfadeToPrompt();
-              }, holdMs);
+              showReasoningToggle(reasoningRaw);
+              prevChildCount = 0;
             }
             currentField = parsed.phase;
             continue;
@@ -954,12 +924,8 @@ async function handleStreamingResponse(response, issueId, label, abortController
             scheduleRender();
           } else if (parsed.section === 'prompt' && parsed.content) {
             promptRaw += parsed.content;
-            if (!reasoningRaw) currentField = 'prompt';
-            // Only render live if no reasoning hold is active
-            if (!reasoningHeld && (transitionDone || !reasoningRaw)) {
-              currentField = 'prompt';
-              scheduleRender();
-            }
+            currentField = 'prompt';
+            scheduleRender();
           }
 
           if (parsed.error) {
@@ -970,12 +936,6 @@ async function handleStreamingResponse(response, issueId, label, abortController
           // Skip unparseable lines
         }
       }
-    }
-
-    // If still in hold phase when stream ends, force the transition
-    if (reasoningHeld) {
-      reasoningHeld = false;
-      transitionDone = true;
     }
 
     // Final render — remove streaming effects
@@ -994,7 +954,8 @@ async function handleStreamingResponse(response, issueId, label, abortController
         reasoning: reasoningRaw
       };
       lastPromptLabel[issueId] = label;
-      showReasoningToggle(reasoningRaw);
+      // Show reasoning toggle if not already shown during streaming
+      if (reasoningRaw) showReasoningToggle(reasoningRaw);
     }
   } catch (err) {
     if (err.name === 'AbortError') return;
@@ -1004,7 +965,7 @@ async function handleStreamingResponse(response, issueId, label, abortController
 }
 
 /**
- * Show/hide the reasoning toggle below the prompt result.
+ * Show/hide the reasoning toggle above the prompt text.
  */
 function showReasoningToggle(reasoning) {
   const toggle = document.getElementById('swipe-reasoning-toggle');
