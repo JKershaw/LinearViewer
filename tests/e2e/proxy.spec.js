@@ -164,14 +164,19 @@ test.describe('Proxy API - Consumer Endpoints', () => {
 
   test('GET /api/proxy/me returns user info', async ({ request }) => {
     // In test mode with mock data, the Linear API won't actually be called,
-    // but we verify the auth flow works. The endpoint will likely 500 since
-    // there's no real Linear API in test mode, but auth should pass.
+    // but we verify the auth flow works. The endpoint will likely fail since
+    // there's no real Linear API in test mode, but proxy token auth should pass.
     const resp = await request.get('/api/proxy/me', {
       headers: { Authorization: `Bearer ${readToken}` }
     });
-    // In test mode, the workspace token is 'test-token' which won't auth with Linear,
-    // but the proxy token auth itself should succeed (not 401)
-    expect(resp.status()).not.toBe(401);
+    // Proxy token auth itself should succeed — we should not get our own
+    // 401 response (which has 'Invalid or missing proxy token' error).
+    // A 401 from upstream Linear (with 'Failed to fetch' error) is expected
+    // since test-token isn't a real Linear token.
+    if (resp.status() === 401) {
+      const data = await resp.json();
+      expect(data.error).not.toContain('Invalid or missing proxy token');
+    }
   });
 
   test('read-only token gets 403 on write endpoints', async ({ request }) => {
@@ -195,10 +200,14 @@ test.describe('Proxy API - Consumer Endpoints', () => {
       },
       data: { teamId: '11111111-1111-1111-1111-111111111111', title: 'Test issue' }
     });
-    // Should not be 401 or 403 (auth passes, scope passes)
-    // Will likely 500 since test-token isn't a real Linear token, but auth works
-    expect(resp.status()).not.toBe(401);
+    // Proxy token auth and scope check should pass — we should not get
+    // our own 403 (scope error). A 401 from upstream Linear is expected
+    // since test-token isn't a real Linear token.
     expect(resp.status()).not.toBe(403);
+    if (resp.status() === 401) {
+      const data = await resp.json();
+      expect(data.error).not.toContain('Invalid or missing proxy token');
+    }
   });
 
   test('write endpoint validates required fields', async ({ request }) => {
