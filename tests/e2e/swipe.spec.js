@@ -174,4 +174,53 @@ test.describe('Swipe Page', () => {
     expect(foundBlocks).toBe(true);
     expect(foundBlocked).toBe(true);
   });
+
+  test('URL updates with task identifier when navigating', async ({ page }) => {
+    // Start on a card with a known identifier
+    await page.goto(`${SWIPE_URL}/TEST-15`);
+    await page.waitForLoadState('networkidle');
+
+    // URL should contain the identifier
+    expect(page.url()).toContain('/swipe/TEST-15');
+
+    // Navigate away and back — URL should update each time
+    const rightArrow = page.locator('.swipe-arrow-right');
+    if (!await rightArrow.isDisabled()) {
+      await rightArrow.click();
+      // URL should no longer point to TEST-15
+      expect(page.url()).not.toContain('/swipe/TEST-15');
+    }
+
+    await page.locator('.swipe-arrow-left').click();
+    expect(page.url()).toContain('/swipe/TEST-15');
+  });
+
+  test('deep-link URL loads specific card', async ({ page }) => {
+    // Navigate directly to TEST-15 (session already set by beforeEach)
+    await page.goto(`${SWIPE_URL}/TEST-15`);
+    await page.waitForLoadState('networkidle');
+
+    // Should display the TEST-15 card
+    await expect(page.locator('.swipe-card-identifier')).toHaveText('TEST-15');
+  });
+
+  test('clicking blocking issue link navigates to that card', async ({ page }) => {
+    // Load TEST-15 which blocks TEST-14 (session already set by beforeEach)
+    await page.goto(`${SWIPE_URL}/TEST-15`);
+    await page.waitForLoadState('networkidle');
+
+    // Should see "Blocks" row with a clickable link
+    const blocksRow = page.locator('.swipe-meta-blocks');
+    await expect(blocksRow).toBeVisible();
+    const link = blocksRow.locator('a.swipe-blocking-issue');
+    await expect(link).toBeVisible();
+    await expect(link).toHaveText('TEST-14');
+
+    // Click the link
+    await link.click();
+
+    // Should navigate to TEST-14 in-place
+    await expect(page.locator('.swipe-card-identifier')).toHaveText('TEST-14');
+    expect(page.url()).toContain('/swipe/TEST-14');
+  });
 });

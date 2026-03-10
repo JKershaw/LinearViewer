@@ -263,6 +263,18 @@
 .swipe-blocking-issue {
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
   font-size: 12px;
+  color: inherit;
+  text-decoration: none;
+}
+
+a.swipe-blocking-issue {
+  border-bottom: 1px dotted currentColor;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+a.swipe-blocking-issue:hover {
+  opacity: 0.7;
 }
 
 /* Expandable Accordion Sections */

@@ -632,7 +632,7 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
  * Swipe page - mobile-first task card swiping with prompts.
  * Displays tasks as swipeable cards with integrated prompt generation.
  */
-app.get('/workspace/:urlKey/swipe', workspaceFromUrl, async (req, res) => {
+app.get('/workspace/:urlKey/swipe/:identifier?', workspaceFromUrl, async (req, res) => {
   const workspace = req.workspace;
   const deployInfo = getDeployInfo();
   const openRouterSource = getOpenRouterSource(req);
@@ -657,7 +657,8 @@ app.get('/workspace/:urlKey/swipe', workspaceFromUrl, async (req, res) => {
         openRouterSource,
         workspaces: req.session.workspaces,
         featureFlags: getFeatureFlags(req.session),
-        customPrompts
+        customPrompts,
+        initialIdentifier: req.params.identifier || null
       }
     );
     res.send(html);

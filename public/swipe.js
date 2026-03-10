@@ -19,6 +19,7 @@ const urlKey = data.urlKey || '';
 const hasAI = data.hasAI || false;
 const dispatchEnabled = data.dispatchEnabled || false;
 const proxyEnabled = data.proxyEnabled || false;
+const initialIdentifier = data.initialIdentifier || null;
 
 // Build reverse lookup: issueId → array of issues that block it (incomplete only)
 const blockedByMap = new Map();
@@ -123,6 +124,33 @@ function formatRelativeTime(dateStr) {
 }
 
 // ==========================================================================
+// URL Deep-Linking
+// ==========================================================================
+
+function updateUrl() {
+  const issue = filteredIssues[currentIndex];
+  const base = `/workspace/${encodeURIComponent(urlKey)}/swipe`;
+  const path = issue && issue.identifier ? `${base}/${encodeURIComponent(issue.identifier)}` : base;
+  history.replaceState(null, '', path + window.location.search);
+}
+
+/**
+ * Navigate to a specific issue by identifier within the current filtered set.
+ * Returns true if the issue was found and navigated to, false otherwise.
+ */
+function navigateToIdentifier(identifier) {
+  const idx = filteredIssues.findIndex(i => i.identifier === identifier);
+  if (idx === -1) return false;
+  currentIndex = idx;
+  updateArrows();
+  updateCounter();
+  renderPromptButtons();
+  renderCard();
+  updateUrl();
+  return true;
+}
+
+// ==========================================================================
 // Filtering
 // ==========================================================================
 
@@ -148,6 +176,7 @@ function applyFilter(filterKey) {
   renderPromptButtons();
   updateArrows();
   updateCounter();
+  updateUrl();
 }
 
 // ==========================================================================
@@ -239,7 +268,13 @@ function renderCard(direction) {
   const blockedBySources = blockedByMap.get(issue.id) || [];
 
   if (blocksTargets.length > 0) {
-    const names = blocksTargets.map(i => `<span class="swipe-blocking-issue">${_esc(i.identifier || i.title)}</span>`).join(', ');
+    const names = blocksTargets.map(i => {
+      const display = _esc(i.identifier || i.title);
+      if (i.identifier) {
+        return `<a href="/workspace/${encodeURIComponent(urlKey)}/swipe/${encodeURIComponent(i.identifier)}" class="swipe-blocking-issue" data-navigate-identifier="${_esc(i.identifier)}">${display}</a>`;
+      }
+      return `<span class="swipe-blocking-issue">${display}</span>`;
+    }).join(', ');
     metaHtml += `<div class="swipe-card-meta-row swipe-meta-blocks">
       <span class="swipe-card-meta-label">Blocks</span>
       <span class="swipe-card-meta-value">${names}</span>
@@ -247,7 +282,13 @@ function renderCard(direction) {
   }
 
   if (blockedBySources.length > 0) {
-    const names = blockedBySources.map(i => `<span class="swipe-blocking-issue">${_esc(i.identifier || i.title)}</span>`).join(', ');
+    const names = blockedBySources.map(i => {
+      const display = _esc(i.identifier || i.title);
+      if (i.identifier) {
+        return `<a href="/workspace/${encodeURIComponent(urlKey)}/swipe/${encodeURIComponent(i.identifier)}" class="swipe-blocking-issue" data-navigate-identifier="${_esc(i.identifier)}">${display}</a>`;
+      }
+      return `<span class="swipe-blocking-issue">${display}</span>`;
+    }).join(', ');
     metaHtml += `<div class="swipe-card-meta-row swipe-meta-blocked">
       <span class="swipe-card-meta-label">Blocked by</span>
       <span class="swipe-card-meta-value">${names}</span>
@@ -388,6 +429,7 @@ function goNext() {
   updateCounter();
   renderPromptButtons();
   renderCard('left');
+  updateUrl();
 }
 
 function goPrev() {
@@ -404,6 +446,7 @@ function goPrev() {
   updateCounter();
   renderPromptButtons();
   renderCard('right');
+  updateUrl();
 }
 
 function updateArrows() {
@@ -1138,8 +1181,22 @@ document.addEventListener('mouseup', handleMouseUp);
 // (mouseup won't fire on document if button is released outside)
 document.addEventListener('mouseleave', handleMouseUp);
 
-// Accordion clicks (delegated)
-card.addEventListener('click', handleAccordionClick);
+// Accordion clicks and blocking issue link clicks (delegated)
+card.addEventListener('click', (e) => {
+  // Blocking issue link navigation
+  const link = e.target.closest('a.swipe-blocking-issue');
+  if (link) {
+    e.preventDefault();
+    e.stopPropagation();
+    const identifier = link.dataset.navigateIdentifier;
+    if (identifier && !navigateToIdentifier(identifier)) {
+      // Issue not in current filter — do a full navigation
+      window.location.href = link.href;
+    }
+    return;
+  }
+  handleAccordionClick(e);
+});
 
 // Prompt button clicks (delegated)
 promptButtons.addEventListener('click', handlePromptClick);
@@ -1160,3 +1217,10 @@ document.addEventListener('keydown', handleKeydown);
 
 buildPromptActions();
 applyFilter(currentFilter);
+
+// Navigate to initial identifier from URL (after filter is applied)
+if (initialIdentifier) {
+  navigateToIdentifier(initialIdentifier);
+} else {
+  updateUrl();
+}
