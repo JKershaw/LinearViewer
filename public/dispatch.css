@@ -187,6 +187,50 @@
 /* Token management: see common-actions.css */
 
 /* =============================================================================
+   Integration Guide
+   ============================================================================= */
+.guide-summary {
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  color: var(--fg-dim);
+  margin: 0 0 0.75rem 0;
+}
+
+.guide-step {
+  color: var(--fg-dim);
+  min-width: 2ch;
+}
+
+.guide-code {
+  font-family: var(--font-structural);
+  font-size: 0.85em;
+  background: rgba(0, 0, 0, 0.04);
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  border: 1px solid var(--fg-vdim);
+}
+
+.guide-desc {
+  color: var(--fg-dim);
+  font-size: 0.9em;
+}
+
+.guide-link-line {
+  margin: 0.75rem 0 0 0;
+}
+
+.guide-link {
+  color: var(--blue);
+  text-decoration: none;
+  font-family: var(--font-content);
+  font-size: 0.9em;
+}
+
+.guide-link:hover {
+  text-decoration: underline;
+}
+
+/* =============================================================================
    Dispatch History
    ============================================================================= */
 .history-list {
