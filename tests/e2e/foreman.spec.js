@@ -284,6 +284,76 @@ test.describe('Foreman API - Status Endpoints', () => {
     expect(data.error).toContain('read-write');
   });
 
+  test('POST /api/proxy/foreman/status rejects oversized summary', async ({ request }) => {
+    const resp = await request.post('/api/proxy/foreman/status', {
+      headers: {
+        Authorization: `Bearer ${writeToken}`,
+        'Content-Type': 'application/json'
+      },
+      data: {
+        taskIdentifier: 'LIN-1',
+        action: 'research',
+        status: 'completed',
+        summary: 'x'.repeat(10001)
+      }
+    });
+    expect(resp.status()).toBe(400);
+    const data = await resp.json();
+    expect(data.error).toContain('max length');
+  });
+
+  test('POST /api/proxy/foreman/status rejects dangerous characters', async ({ request }) => {
+    const resp = await request.post('/api/proxy/foreman/status', {
+      headers: {
+        Authorization: `Bearer ${writeToken}`,
+        'Content-Type': 'application/json'
+      },
+      data: {
+        taskIdentifier: 'LIN-1\x00',
+        action: 'research',
+        status: 'completed',
+        summary: 'test'
+      }
+    });
+    expect(resp.status()).toBe(400);
+    const data = await resp.json();
+    expect(data.error).toContain('invalid characters');
+  });
+
+  test('GET /api/proxy/foreman/status supports pagination', async ({ request }) => {
+    // Post 3 entries
+    for (let i = 1; i <= 3; i++) {
+      await request.post('/api/proxy/foreman/status', {
+        headers: {
+          Authorization: `Bearer ${writeToken}`,
+          'Content-Type': 'application/json'
+        },
+        data: {
+          taskIdentifier: `LIN-${i}`,
+          action: 'research',
+          status: 'completed',
+          summary: `Entry ${i}`
+        }
+      });
+    }
+
+    // Get with limit=2
+    const resp1 = await request.get('/api/proxy/foreman/status?limit=2', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    const data1 = await resp1.json();
+    expect(data1.items).toHaveLength(2);
+    expect(data1.total).toBe(3);
+
+    // Get with offset=2
+    const resp2 = await request.get('/api/proxy/foreman/status?limit=10&offset=2', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    const data2 = await resp2.json();
+    expect(data2.items).toHaveLength(1);
+    expect(data2.total).toBe(3);
+  });
+
   test('GET /api/proxy/foreman/status requires authentication', async ({ request }) => {
     const resp = await request.get('/api/proxy/foreman/status');
     expect(resp.status()).toBe(401);
@@ -320,6 +390,35 @@ test.describe('Foreman API - Playbook Endpoint', () => {
   test('GET /api/proxy/foreman/playbook requires authentication', async ({ request }) => {
     const resp = await request.get('/api/proxy/foreman/playbook');
     expect(resp.status()).toBe(401);
+  });
+});
+
+test.describe('Foreman API - Event Logging', () => {
+  test('foreman endpoint calls create proxy events', async ({ page, request }) => {
+    await page.goto('/test/clear-proxy-tokens');
+    await page.goto('/test/clear-proxy-events');
+
+    const tokenResp = await page.goto('/test/create-proxy-token?scope=read&label=foreman-events-test');
+    const { token } = await tokenResp.json();
+
+    // Make a foreman call to generate an event
+    await request.get('/api/proxy/stack?limit=1', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    // Check events via session-authed API
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
+    const cookies = await page.context().cookies();
+    const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+
+    const eventsResp = await request.get('/workspace/test-workspace/api/proxy/events', {
+      headers: { Cookie: cookieHeader }
+    });
+    expect(eventsResp.status()).toBe(200);
+    const eventsData = await eventsResp.json();
+    const stackEvents = eventsData.items.filter(e => e.endpoint === '/api/proxy/stack');
+    expect(stackEvents.length).toBeGreaterThan(0);
+    expect(stackEvents[0].tokenLabel).toBe('foreman-events-test');
   });
 });
 

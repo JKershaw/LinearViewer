@@ -1311,7 +1311,7 @@ ${readEndpoints}${writeEndpoints}
       // Fetch projects and issues (use mock data in test mode)
       const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
       const { projects, issues } = isTestMode
-        ? { projects: [...testMockData.projects], issues: testMockData.issues }
+        ? { projects: [...testMockData.projects], issues: [...testMockData.issues] }
         : await fetchProjects(accessToken);
 
       // Build tree structure
@@ -1495,6 +1495,14 @@ ${readEndpoints}${writeEndpoints}
     if (!summary || typeof summary !== 'string') {
       logEvent(req, '/api/proxy/foreman/status', 400);
       return res.status(400).json({ error: 'summary is required' });
+    }
+    if (summary.length > 10000) {
+      logEvent(req, '/api/proxy/foreman/status', 400);
+      return res.status(400).json({ error: 'summary exceeds max length (10000)' });
+    }
+    if (taskIdentifier.length > 200 || action.length > 200 || status.length > 200) {
+      logEvent(req, '/api/proxy/foreman/status', 400);
+      return res.status(400).json({ error: 'Field exceeds max length (200)' });
     }
 
     if (DANGEROUS_CHARS_REGEX.test(taskIdentifier) || DANGEROUS_CHARS_REGEX.test(action) ||
