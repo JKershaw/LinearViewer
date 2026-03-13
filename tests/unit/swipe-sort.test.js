@@ -242,6 +242,16 @@ describe('clusterByParent', () => {
     assert.deepStrictEqual(clusterByParent([]), []);
   });
 
+  test('handles circular parent references without infinite loop', () => {
+    const a = createCard({ id: 'a', parentId: 'b', priority: 1 });
+    const b = createCard({ id: 'b', parentId: 'a', priority: 2 });
+    const result = clusterByParent([a, b]);
+    assert.strictEqual(result.length, 2);
+    const ids = new Set(result.map(i => i.id));
+    assert.ok(ids.has('a'));
+    assert.ok(ids.has('b'));
+  });
+
   test('handles multiple independent families', () => {
     const parentA = createCard({ id: 'pA', priority: 1 });
     const childA = createCard({ id: 'cA', parentId: 'pA', priority: 3 });
