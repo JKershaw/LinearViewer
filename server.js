@@ -19,6 +19,7 @@ import { CustomPromptsStore } from './lib/custom-prompts-store.js'
 import { DispatchTokenStore } from './lib/dispatch-tokens.js'
 import { ProxyTokenStore } from './lib/proxy-tokens.js'
 import { ProxyEventStore } from './lib/proxy-events.js'
+import { ForemanStore } from './lib/foreman-store.js'
 import { FreeTierStore } from './lib/free-tier-store.js'
 import { fetchProjects, fetchProjectsList, fetchTeams } from './lib/linear.js'
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID } from './lib/tree.js'
@@ -161,6 +162,12 @@ const proxyEventStore = new ProxyEventStore({
   collection: proxyEventsCollection
 })
 
+// Foreman status tracking
+const foremanStatusCollection = db.collection('foreman-status')
+const foremanStore = new ForemanStore({
+  collection: foremanStatusCollection
+})
+
 // Free tier usage tracking
 const freeTierCollection = db.collection('free-tier-usage')
 const freeTierStore = new FreeTierStore({
@@ -213,7 +220,7 @@ app.use(session({
 // Test Mode Setup
 // =============================================================================
 if (process.env.NODE_ENV === 'test') {
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, getWorkspaceAccessToken }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, foremanStore, getWorkspaceAccessToken }))
 }
 
 // =============================================================================
@@ -565,7 +572,7 @@ async function getWorkspaceAccessToken(urlKey) {
   return null;
 }
 
-app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, workspaceFromUrl, getWorkspaceAccessToken }))
+app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanStore, workspaceFromUrl, getWorkspaceAccessToken }))
 
 // Mount workspace API routes (audit, prompts, recommendations, comments, images)
 app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, customPromptsStore }))
@@ -1008,6 +1015,14 @@ app.listen(PORT, () => {
       }
     } catch (err) {
       console.error('Proxy event cleanup error:', err)
+    }
+    try {
+      const removedCount = await foremanStore.cleanup()
+      if (removedCount > 0) {
+        console.log(`Foreman status cleanup: removed ${removedCount} expired entries`)
+      }
+    } catch (err) {
+      console.error('Foreman status cleanup error:', err)
     }
   }, CLEANUP_INTERVAL_MS)
 })
