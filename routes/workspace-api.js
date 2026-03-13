@@ -949,6 +949,11 @@ ${goal}`;
       return res.status(400).json({ error: 'Body must be a JSON array' });
     }
 
+    // Validate: reasonable size limit
+    if (order.length > 500) {
+      return res.status(400).json({ error: 'Too many items (max 500)' });
+    }
+
     // Validate: every element must be a non-empty string
     for (const item of order) {
       if (typeof item !== 'string' || item.length === 0) {

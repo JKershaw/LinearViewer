@@ -218,4 +218,40 @@ test.describe('Drag-and-drop project reordering', () => {
 
     await expect(firstProject).not.toHaveClass(/dragging/);
   });
+
+  test('dragging a project onto itself has no effect', async ({ page }) => {
+    const projects = page.locator('section[aria-label="Projects"] > .project');
+    const firstId = await projects.nth(0).getAttribute('data-id');
+    const secondId = await projects.nth(1).getAttribute('data-id');
+
+    await page.evaluate(({ id }) => {
+      const container = document.querySelector('section[role="region"][aria-label="Projects"]');
+      const project = container.querySelector(`.project[data-id="${id}"]`);
+      const rect = project.getBoundingClientRect();
+      const dt = new DataTransfer();
+      dt.setData('text/plain', id);
+
+      project.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: dt }));
+      project.dispatchEvent(new DragEvent('drop', {
+        bubbles: true, cancelable: true, dataTransfer: dt,
+        clientY: rect.top + rect.height * 0.75
+      }));
+      project.dispatchEvent(new DragEvent('dragend', { bubbles: true }));
+    }, { id: firstId });
+
+    // Order should remain unchanged
+    expect(await projects.nth(0).getAttribute('data-id')).toBe(firstId);
+    expect(await projects.nth(1).getAttribute('data-id')).toBe(secondId);
+  });
+
+  test('PUT /api/tile-order returns 400 for oversized array', async ({ page }) => {
+    const bigArray = Array.from({ length: 501 }, (_, i) => `item-${i}`);
+    const response = await page.request.put(
+      `/workspace/${TEST_WORKSPACE_URL_KEY}/api/tile-order`,
+      { data: bigArray }
+    );
+    expect(response.status()).toBe(400);
+    const body = await response.json();
+    expect(body.error).toContain('max 500');
+  });
 });

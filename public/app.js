@@ -2223,7 +2223,7 @@ function initDragReorder() {
       const sourceId = e.dataTransfer.getData('text/plain')
       if (!sourceId || sourceId === project.dataset.id) return
 
-      const sourceEl = container.querySelector(`.project[data-id="${sourceId}"]`)
+      const sourceEl = container.querySelector(`.project[data-id="${CSS.escape(sourceId)}"]`)
       if (!sourceEl) return
 
       // Determine insertion position
