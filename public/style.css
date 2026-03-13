@@ -1810,3 +1810,19 @@ h1 {
 .legal-content a {
   color: var(--blue);
 }
+
+/* ==========================================================================
+   Drag-and-drop project reordering
+   ========================================================================== */
+
+.project.dragging {
+  opacity: 0.4;
+}
+
+.project.drag-over-before {
+  border-top: 3px solid var(--blue);
+}
+
+.project.drag-over-after {
+  border-bottom: 3px solid var(--blue);
+}

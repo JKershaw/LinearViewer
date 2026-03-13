@@ -2145,6 +2145,159 @@ function initProxyToggle() {
   })
 }
 
+// ==========================================================================
+// Drag-and-drop project reordering
+// ==========================================================================
+
+/**
+ * Get the workspace URL key from the current page URL.
+ * @returns {string|null} The workspace URL key or null
+ */
+function getUrlKeyFromPath() {
+  const match = window.location.pathname.match(/\/workspace\/([^/]+)/)
+  return match ? match[1] : null
+}
+
+/**
+ * Initialize drag-and-drop reordering for .project elements.
+ * Desktop only — uses HTML5 Drag and Drop API.
+ * Uses event delegation on the container to avoid per-element listeners.
+ */
+function initDragReorder() {
+  const isLanding = document.body.classList.contains('is-landing')
+  if (isLanding) return
+
+  const container = document.querySelector('section[role="region"][aria-label="Projects"]')
+  if (!container) return
+
+  const projects = container.querySelectorAll('.project')
+  if (projects.length < 2) return
+
+  let draggedId = null
+  let dragEnabled = false
+
+  function clearIndicators() {
+    container.querySelectorAll('.drag-over-before, .drag-over-after').forEach(el => {
+      el.classList.remove('drag-over-before', 'drag-over-after')
+    })
+  }
+
+  // Event delegation: single set of listeners on the container
+  container.addEventListener('dragstart', (e) => {
+    if (!dragEnabled) return
+    const project = e.target.closest('.project')
+    if (!project || project.parentElement !== container) return
+
+    draggedId = project.dataset.id
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', draggedId)
+    requestAnimationFrame(() => project.classList.add('dragging'))
+  })
+
+  container.addEventListener('dragend', (e) => {
+    const project = e.target.closest('.project')
+    if (project) project.classList.remove('dragging')
+    draggedId = null
+    clearIndicators()
+  })
+
+  container.addEventListener('dragover', (e) => {
+    if (!draggedId) return
+    const project = e.target.closest('.project')
+    if (!project || project.parentElement !== container) return
+    if (project.dataset.id === draggedId) return
+
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+
+    clearIndicators()
+    const rect = project.getBoundingClientRect()
+    const midY = rect.top + rect.height / 2
+    if (e.clientY < midY) {
+      project.classList.add('drag-over-before')
+    } else {
+      project.classList.add('drag-over-after')
+    }
+  })
+
+  container.addEventListener('dragleave', (e) => {
+    const project = e.target.closest('.project')
+    if (project) project.classList.remove('drag-over-before', 'drag-over-after')
+  })
+
+  container.addEventListener('drop', (e) => {
+    const project = e.target.closest('.project')
+    if (!project || project.parentElement !== container) return
+
+    e.preventDefault()
+    const sourceId = e.dataTransfer.getData('text/plain')
+    if (!sourceId || sourceId === project.dataset.id) return
+
+    const sourceEl = container.querySelector(`.project[data-id="${CSS.escape(sourceId)}"]`)
+    if (!sourceEl) return
+
+    const rect = project.getBoundingClientRect()
+    const midY = rect.top + rect.height / 2
+    const insertBefore = e.clientY < midY
+
+    if (insertBefore) {
+      container.insertBefore(sourceEl, project)
+    } else {
+      const next = project.nextElementSibling
+      if (next) {
+        container.insertBefore(sourceEl, next)
+      } else {
+        container.appendChild(sourceEl)
+      }
+    }
+
+    clearIndicators()
+
+    // Persist the new order
+    const newOrder = Array.from(container.querySelectorAll('.project')).map(p => p.dataset.id)
+    const urlKey = getUrlKeyFromPath()
+    if (urlKey) {
+      fetch(`/workspace/${encodeURIComponent(urlKey)}/api/tile-order`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newOrder)
+      }).then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      }).catch(err => {
+        console.error('Failed to save tile order:', err)
+        sourceEl.style.outline = '2px solid var(--red, #e53e3e)'
+        setTimeout(() => { sourceEl.style.outline = '' }, 1500)
+      })
+    }
+  })
+
+  // Load saved tile order, apply it, THEN enable drag
+  const urlKey = getUrlKeyFromPath()
+  if (urlKey) {
+    fetch(`/workspace/${encodeURIComponent(urlKey)}/api/preferences`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.tileOrder?.length) {
+          const orderMap = new Map(data.tileOrder.map((id, i) => [id, i]))
+          const projectEls = Array.from(container.querySelectorAll('.project'))
+
+          projectEls.sort((a, b) => {
+            const ai = orderMap.has(a.dataset.id) ? orderMap.get(a.dataset.id) : Infinity
+            const bi = orderMap.has(b.dataset.id) ? orderMap.get(b.dataset.id) : Infinity
+            if (ai === bi) return 0
+            return ai - bi
+          })
+
+          projectEls.forEach(el => container.appendChild(el))
+        }
+      })
+      .catch(err => console.error('Failed to load tile order:', err))
+      .finally(() => { dragEnabled = true })
+  } else {
+    dragEnabled = true
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   init()
   initNavBar()
@@ -2156,4 +2309,5 @@ document.addEventListener('DOMContentLoaded', () => {
   initFeatureToggles()
   initFreeTierStatus()
   initProxyToggle()
+  initDragReorder()
 })
