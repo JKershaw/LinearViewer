@@ -5,7 +5,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { sortIssuesForSwipe, applyBlockingOrder, buildFilterGroups } from '../../lib/render-swipe.js';
+import { sortIssuesForSwipe, applyBlockingOrder, clusterByParent, buildFilterGroups } from '../../lib/render-swipe.js';
 
 // =============================================================================
 // Test Helpers
@@ -181,6 +181,75 @@ describe('applyBlockingOrder', () => {
     const b = createCard({ id: 'b' });
     const result = applyBlockingOrder([a, b]);
     assert.strictEqual(result.length, 2);
+  });
+});
+
+// =============================================================================
+// clusterByParent
+// =============================================================================
+
+describe('clusterByParent', () => {
+  test('clusters subtasks before their parent', () => {
+    const parent = createCard({ id: 'parent', priority: 1 });
+    const child1 = createCard({ id: 'child1', parentId: 'parent', priority: 3 });
+    const child2 = createCard({ id: 'child2', parentId: 'parent', priority: 4 });
+    const unrelated = createCard({ id: 'unrelated', priority: 2 });
+    // Input order: parent, unrelated, child1, child2
+    const result = clusterByParent([parent, unrelated, child1, child2]);
+    // Parent cluster should appear at parent's position (first), subtasks before parent
+    assert.strictEqual(result[0].id, 'child1');
+    assert.strictEqual(result[1].id, 'child2');
+    assert.strictEqual(result[2].id, 'parent');
+    assert.strictEqual(result[3].id, 'unrelated');
+  });
+
+  test('clusters at position of earliest family member', () => {
+    const parent = createCard({ id: 'parent', priority: 4 });
+    const child = createCard({ id: 'child', parentId: 'parent', priority: 1 });
+    const unrelated = createCard({ id: 'unrelated', priority: 2 });
+    // child sorts first by priority, so cluster anchors there
+    const result = clusterByParent([child, unrelated, parent]);
+    assert.strictEqual(result[0].id, 'child');
+    assert.strictEqual(result[1].id, 'parent');
+    assert.strictEqual(result[2].id, 'unrelated');
+  });
+
+  test('returns unchanged array when no parent-child relationships', () => {
+    const a = createCard({ id: 'a' });
+    const b = createCard({ id: 'b' });
+    const result = clusterByParent([a, b]);
+    assert.deepStrictEqual(result.map(i => i.id), ['a', 'b']);
+  });
+
+  test('handles nested subtasks (grandchildren)', () => {
+    const grandparent = createCard({ id: 'gp', priority: 1 });
+    const parent = createCard({ id: 'p', parentId: 'gp', priority: 2 });
+    const child = createCard({ id: 'c', parentId: 'p', priority: 3 });
+    const result = clusterByParent([grandparent, parent, child]);
+    // Deepest first: child, then parent, then grandparent
+    assert.deepStrictEqual(result.map(i => i.id), ['c', 'p', 'gp']);
+  });
+
+  test('handles parent not in the set (subtask only)', () => {
+    const child = createCard({ id: 'child', parentId: 'missing-parent', priority: 1 });
+    const other = createCard({ id: 'other', priority: 2 });
+    const result = clusterByParent([child, other]);
+    // parentId references missing issue — child treated as standalone
+    assert.deepStrictEqual(result.map(i => i.id), ['child', 'other']);
+  });
+
+  test('handles empty array', () => {
+    assert.deepStrictEqual(clusterByParent([]), []);
+  });
+
+  test('handles multiple independent families', () => {
+    const parentA = createCard({ id: 'pA', priority: 1 });
+    const childA = createCard({ id: 'cA', parentId: 'pA', priority: 3 });
+    const parentB = createCard({ id: 'pB', priority: 2 });
+    const childB = createCard({ id: 'cB', parentId: 'pB', priority: 4 });
+    const result = clusterByParent([parentA, parentB, childA, childB]);
+    // Family A clusters at position 0 (parentA), Family B at position 1 (parentB)
+    assert.deepStrictEqual(result.map(i => i.id), ['cA', 'pA', 'cB', 'pB']);
   });
 });
 
