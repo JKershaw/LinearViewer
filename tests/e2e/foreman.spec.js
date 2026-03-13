@@ -133,6 +133,73 @@ test.describe('Foreman API - Prompt Endpoint', () => {
   });
 });
 
+test.describe('Foreman API - Recommend Endpoint', () => {
+  let readToken;
+
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/test/clear-proxy-tokens');
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
+
+    const resp = await page.goto('/test/create-proxy-token?scope=read&label=foreman-read');
+    const data = await resp.json();
+    readToken = data.token;
+  });
+
+  test('GET /api/proxy/recommend returns AI recommendation for issue', async ({ request }) => {
+    // Use mock issue UUID that exists in test data
+    const resp = await request.get('/api/proxy/recommend/66666666-6666-6666-6666-666666666666', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(resp.status()).toBe(200);
+    const data = await resp.json();
+    expect(data.reasoning).toBeTruthy();
+    expect(data.prompt).toBeTruthy();
+    expect(data.identifier).toBeTruthy();
+    expect(typeof data.truncated).toBe('boolean');
+  });
+
+  test('GET /api/proxy/recommend returns bug-specific recommendation', async ({ request }) => {
+    // dddddddd-dddd-dddd-dddd-ddddddddddde has 'bug' label
+    const resp = await request.get('/api/proxy/recommend/dddddddd-dddd-dddd-dddd-ddddddddddde', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(resp.status()).toBe(200);
+    const data = await resp.json();
+    expect(data.reasoning).toContain('bug');
+  });
+
+  test('GET /api/proxy/recommend accepts identifier format', async ({ request }) => {
+    // TEST-14 exists in mock data
+    const resp = await request.get('/api/proxy/recommend/TEST-14', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(resp.status()).toBe(200);
+    const data = await resp.json();
+    expect(data.prompt).toBeTruthy();
+  });
+
+  test('GET /api/proxy/recommend with invalid identifier gets 400', async ({ request }) => {
+    const resp = await request.get('/api/proxy/recommend/INVALID!!!', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(resp.status()).toBe(400);
+    const data = await resp.json();
+    expect(data.error).toContain('Invalid identifier');
+  });
+
+  test('GET /api/proxy/recommend with nonexistent issue gets 404', async ({ request }) => {
+    const resp = await request.get('/api/proxy/recommend/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(resp.status()).toBe(404);
+  });
+
+  test('GET /api/proxy/recommend requires authentication', async ({ request }) => {
+    const resp = await request.get('/api/proxy/recommend/LIN-1');
+    expect(resp.status()).toBe(401);
+  });
+});
+
 test.describe('Foreman API - Status Endpoints', () => {
   let readToken;
   let writeToken;

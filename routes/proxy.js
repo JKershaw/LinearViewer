@@ -16,7 +16,8 @@ import { Router } from 'express';
 import { GraphQLClient, gql } from 'graphql-request';
 import rateLimit from 'express-rate-limit';
 import { createProxyFetch } from '../lib/proxy-fetch.js';
-import { fetchProjects, fetchIssueContext } from '../lib/linear.js';
+import { fetchProjects, fetchIssueContext, fetchRecommendationContext } from '../lib/linear.js';
+import { isRecommendationEnabled, getRecommendation } from '../lib/openrouter.js';
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID } from '../lib/tree.js';
 import { flattenTrees, sortIssuesForSwipe, applyBlockingOrder, clusterByParent } from '../lib/render-swipe.js';
 import { generatePrompt, hasPrompt, getAvailablePrompts } from '../lib/prompt-templates.js';
@@ -613,6 +614,9 @@ GET ${baseUrl}/api/proxy/stack?limit={n}
 
 GET ${baseUrl}/api/proxy/prompt/{identifier}/{templateKey}
   → Generate a prompt for an issue (e.g., /prompt/LIN-42/research)
+
+GET ${baseUrl}/api/proxy/recommend/{identifier}
+  → AI-generated prompt recommendation for an issue (requires OPENROUTER_API_KEY on server)
 
 GET ${baseUrl}/api/proxy/foreman/status
   → List recent foreman status entries
@@ -1474,6 +1478,108 @@ ${readEndpoints}${writeEndpoints}
   });
 
   /**
+   * GET /api/proxy/recommend/:identifier
+   * Returns an AI-generated prompt recommendation for an issue.
+   * Uses the server-side OPENROUTER_API_KEY (no session needed).
+   */
+  router.get('/api/proxy/recommend/:identifier', proxyLimiter, authenticateProxyToken, async (req, res) => {
+    try {
+      const accessToken = await getWorkspaceAccessToken(req.proxyUrlKey);
+      if (!accessToken) {
+        logEvent(req, '/api/proxy/recommend', 503);
+        return res.status(503).json({ error: 'Workspace not available' });
+      }
+
+      const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
+
+      // Check if AI recommendations are available (skip in test mode)
+      if (!isTestMode && !isRecommendationEnabled()) {
+        logEvent(req, '/api/proxy/recommend', 503);
+        return res.status(503).json({ error: 'AI recommendations not configured. Set OPENROUTER_API_KEY on the server.' });
+      }
+
+      const { identifier } = req.params;
+
+      // Validate identifier format (UUID or LIN-123 pattern)
+      if (!UUID_REGEX.test(identifier) && !/^[A-Z]+-\d+$/i.test(identifier)) {
+        logEvent(req, '/api/proxy/recommend', 400);
+        return res.status(400).json({ error: 'Invalid identifier format' });
+      }
+      if (isTestMode) {
+        // Find mock issue by UUID or identifier
+        const mockIssue = testMockData.issues.find(i =>
+          i.id === identifier || i.identifier === identifier
+        );
+        if (!mockIssue) {
+          logEvent(req, '/api/proxy/recommend', 404);
+          return res.status(404).json({ error: 'Issue not found' });
+        }
+
+        const labels = (mockIssue.labels?.nodes || []).map(l => l.name);
+        const issueIdentifier = mockIssue.identifier || mockIssue.url?.split('/').pop() || 'ISSUE';
+
+        let reasoning = 'Analyzing the task to determine the best approach.';
+        let goal = 'Understand what this task involves and plan the next steps.';
+
+        if (labels.includes('bug')) {
+          reasoning = 'This is a bug. Investigating systematically will help find the root cause.';
+          goal = 'Identify reproduction steps, hypothesize causes, and suggest a fix.';
+        } else if (labels.includes('blocked')) {
+          reasoning = 'This task is blocked. Analyzing the blocker to find a way forward.';
+          goal = 'Identify the blocker and recommend how to unblock.';
+        } else if (mockIssue.state?.type === 'started') {
+          reasoning = 'Task is in progress. Checking what work remains.';
+          goal = 'Continue implementation and update progress.';
+        }
+
+        const mockProject = testMockData.projects.find(p => p.id === mockIssue.project?.id);
+
+        logEvent(req, '/api/proxy/recommend', 200);
+        return res.json({
+          identifier: issueIdentifier,
+          reasoning,
+          prompt: `Help me with task ${issueIdentifier}\n\n## Context\n\n**Status:** ${mockIssue.state?.name || 'Unknown'}\n${labels.length > 0 ? `**Labels:** ${labels.join(', ')}` : ''}\n\n## Goal\n\n${goal}`,
+          truncated: false,
+          repo: parseRepoFromDescription(mockProject?.content)
+        });
+      }
+
+      // Fetch issue context with two-tier support for parent tasks
+      const context = await fetchRecommendationContext(accessToken, identifier);
+      const { issue, parent, siblings, project, children, comments, focusedChild } = context;
+
+      // Get AI-generated recommendation (uses server-side OPENROUTER_API_KEY)
+      const recommendation = await getRecommendation(
+        issue,
+        { parent, siblings, project, children, comments, focusedChild },
+        { featureFlags: {} }
+      );
+
+      logEvent(req, '/api/proxy/recommend', 200);
+      res.json({
+        identifier: issue.identifier,
+        reasoning: recommendation.reasoning,
+        prompt: recommendation.prompt,
+        truncated: recommendation.truncated,
+        repo: parseRepoFromDescription(project?.description)
+      });
+    } catch (err) {
+      if (err.message?.includes('not found')) {
+        logEvent(req, '/api/proxy/recommend', 404);
+        return res.status(404).json({ error: 'Issue not found' });
+      }
+      if (err.message?.includes('OpenRouter')) {
+        logEvent(req, '/api/proxy/recommend', 503);
+        return res.status(503).json({ error: 'AI service temporarily unavailable', detail: err.message });
+      }
+      const status = graphqlErrorStatus(err);
+      logEvent(req, '/api/proxy/recommend', status);
+      console.error('Proxy /recommend error:', err.message);
+      res.status(status).json({ error: 'Failed to get recommendation', detail: graphqlErrorDetail(err) });
+    }
+  });
+
+  /**
    * POST /api/proxy/foreman/status
    * Record a foreman status update.
    */
@@ -1587,25 +1693,33 @@ Returns the top tasks sorted by priority, blocking dependencies, and parent-chil
 - The stack is pre-sorted: bugs first, then by state (started → unstarted → backlog), then by priority
 - Blocking issues appear before the issues they block
 
-### 3. Choose a prompt template
+### 3. Get the prompt
+
+**Option A — AI recommendation** (recommended, adapts to task context):
+
+\`\`\`bash
+curl -s -H "Authorization: Bearer YOUR_TOKEN" ${baseUrl}/api/proxy/recommend/{identifier}
+\`\`\`
+
+Returns \`{ reasoning, prompt, repo }\`. The AI analyzes the task and generates the right prompt automatically.
+Read the \`reasoning\` to understand why it chose that approach, then use the \`prompt\`.
+
+**Option B — Template prompt** (deterministic, you choose the template):
 
 Each task in the stack includes \`availablePrompts\` — an array of valid template keys.
-
-Select based on task state and what work has been done:
-- New/unstarted task with no context → \`research\` or \`look-into\`
-- Task needing breakdown → \`breakdown\`
-- Task ready for planning → \`plan\`
-- Task with a plan → \`implementation\`
-- Implementation done → \`review\` (includes test coverage check)
+Select based on task state:
+- New/unstarted → \`research\` or \`look-into\`
+- Needs breakdown → \`breakdown\`
+- Ready for planning → \`plan\`
+- Has a plan → \`implementation\`
+- Implementation done → \`review\`
 - Bug-labeled → \`bug\`
-
-### 4. Get the prompt
 
 \`\`\`bash
 curl -s -H "Authorization: Bearer YOUR_TOKEN" ${baseUrl}/api/proxy/prompt/{identifier}/{templateKey}
 \`\`\`
 
-Returns \`{ prompt, promptName, repo }\`. The \`prompt\` field contains the full instructions.
+Returns \`{ prompt, promptName, repo }\`.
 
 ### 5. Execute the prompt
 
