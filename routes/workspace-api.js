@@ -909,5 +909,61 @@ ${goal}`;
     }
   });
 
+  // ===========================================================================
+  // Tile Order API
+  // ===========================================================================
+
+  /**
+   * Get user preferences including tile order.
+   * @route GET /workspace/:urlKey/api/preferences
+   */
+  router.get('/workspace/:urlKey/api/preferences', workspaceFromUrl, async (req, res) => {
+    try {
+      const linearUserId = req.session.linearUserId;
+      if (!linearUserId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+      const tileOrder = await userPreferencesStore.getTileOrder(linearUserId);
+      res.json({ tileOrder });
+    } catch (error) {
+      console.error('Get preferences error:', error);
+      res.status(500).json({ error: 'Failed to get preferences' });
+    }
+  });
+
+  /**
+   * Save tile order for the authenticated user.
+   * Body must be a JSON array of non-empty strings.
+   * @route PUT /workspace/:urlKey/api/tile-order
+   */
+  router.put('/workspace/:urlKey/api/tile-order', workspaceFromUrl, async (req, res) => {
+    const linearUserId = req.session.linearUserId;
+    if (!linearUserId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const order = req.body;
+
+    // Validate: must be an array
+    if (!Array.isArray(order)) {
+      return res.status(400).json({ error: 'Body must be a JSON array' });
+    }
+
+    // Validate: every element must be a non-empty string
+    for (const item of order) {
+      if (typeof item !== 'string' || item.length === 0) {
+        return res.status(400).json({ error: 'Every element must be a non-empty string' });
+      }
+    }
+
+    try {
+      await userPreferencesStore.setTileOrder(linearUserId, order);
+      res.json({ ok: true });
+    } catch (error) {
+      console.error('Set tile order error:', error);
+      res.status(500).json({ error: 'Failed to save tile order' });
+    }
+  });
+
   return router;
 }
