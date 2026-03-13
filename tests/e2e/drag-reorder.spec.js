@@ -9,6 +9,14 @@ test.describe('Drag-and-drop project reordering', () => {
     await page.goto('/test/clear-tile-order');
     await page.evaluate(() => localStorage.clear());
     await page.goto(WORKSPACE_URL);
+    // Wait for drag to be enabled (preferences fetch must complete first)
+    await page.waitForFunction(() => {
+      const container = document.querySelector('section[role="region"][aria-label="Projects"]');
+      // dragEnabled is set after preferences fetch; verify by checking projects exist
+      return container && container.querySelectorAll('.project').length >= 2;
+    });
+    // Small buffer for the async .finally() to set dragEnabled
+    await page.waitForTimeout(100);
   });
 
   test('projects are draggable', async ({ page }) => {
