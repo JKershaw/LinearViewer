@@ -520,3 +520,107 @@ test.describe('Foreman API - Instructions Integration', () => {
     expect(text).toContain('taskIdentifier');
   });
 });
+
+test.describe('Foreman Page UI', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/test/clear-proxy-tokens');
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
+  });
+
+  test('foreman page loads with proxy feature enabled', async ({ page }) => {
+    await page.goto('/workspace/test-workspace/foreman');
+    await expect(page.locator('h1')).toContainText('Foreman');
+    await expect(page.locator('.foreman-experimental')).toBeVisible();
+  });
+
+  test('foreman page redirects to settings when proxy disabled', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: false }))}`);
+    await page.goto('/workspace/test-workspace/foreman');
+    await page.waitForURL('**/settings');
+    expect(page.url()).toContain('/settings');
+  });
+
+  test('foreman page shows all three sections', async ({ page }) => {
+    await page.goto('/workspace/test-workspace/foreman');
+    const headers = page.locator('.foreman-section-header');
+    await expect(headers.nth(0)).toContainText('Playbook');
+    await expect(headers.nth(1)).toContainText('Status Log');
+    await expect(headers.nth(2)).toContainText('Stack Preview');
+  });
+
+  test('foreman page has copy button and +proxy toggle', async ({ page }) => {
+    await page.goto('/workspace/test-workspace/foreman');
+    await expect(page.locator('#foreman-copy-btn')).toBeVisible();
+    await expect(page.locator('.prompt-proxy-toggle')).toBeVisible();
+  });
+
+  test('foreman page has token selector', async ({ page }) => {
+    await page.goto('/workspace/test-workspace/foreman');
+    await expect(page.locator('#foreman-token-select')).toBeVisible();
+  });
+
+  test('proxy page links to foreman page', async ({ page }) => {
+    await page.goto('/workspace/test-workspace/proxy');
+    const foremanLink = page.locator('a[href*="/foreman"]');
+    await expect(foremanLink).toBeVisible();
+    await expect(foremanLink).toContainText('Foreman');
+    await expect(page.locator('.foreman-experimental')).toBeVisible();
+  });
+
+  test('foreman page loads playbook when token exists', async ({ page }) => {
+    // Create a readWrite token first
+    await page.goto('/test/create-proxy-token?scope=readWrite&label=foreman-test');
+
+    await page.goto('/workspace/test-workspace/foreman');
+    const output = page.locator('#foreman-playbook-output');
+
+    // Wait for playbook to load (it creates a token and fetches)
+    await expect(output).toContainText('Foreman', { timeout: 10000 });
+    await expect(output).toHaveClass(/has-content/);
+  });
+
+  test('foreman page shows status entries', async ({ page, request }) => {
+    // Create a write token and post a status entry
+    const tokenResp = await page.goto('/test/create-proxy-token?scope=readWrite&label=foreman-status-test');
+    const { token } = await tokenResp.json();
+
+    await request.post('/api/proxy/foreman/status', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      data: {
+        taskIdentifier: 'TEST-99',
+        action: 'research',
+        status: 'completed',
+        summary: 'Found the answer'
+      }
+    });
+
+    await page.goto('/workspace/test-workspace/foreman');
+
+    // Wait for status to load
+    const statusList = page.locator('#foreman-status-list');
+    await expect(statusList.locator('.foreman-status-item')).toBeVisible({ timeout: 10000 });
+    await expect(statusList).toContainText('TEST-99');
+    await expect(statusList).toContainText('research');
+    await expect(statusList).toContainText('completed');
+  });
+
+  test('foreman page shows stack preview', async ({ page }) => {
+    // Create a readWrite token so the page can fetch the stack
+    await page.goto('/test/create-proxy-token?scope=readWrite&label=foreman-stack-test');
+
+    await page.goto('/workspace/test-workspace/foreman');
+
+    // Wait for stack to load
+    const stackList = page.locator('#foreman-stack-list');
+    await expect(stackList.locator('.foreman-stack-item').first()).toBeVisible({ timeout: 10000 });
+
+    // Should show task identifiers
+    const items = stackList.locator('.foreman-stack-item');
+    const count = await items.count();
+    expect(count).toBeGreaterThan(0);
+    expect(count).toBeLessThanOrEqual(5);
+  });
+});

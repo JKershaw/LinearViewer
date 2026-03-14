@@ -1,0 +1,306 @@
+/**
+ * Foreman Page Styles
+ *
+ * Styles for the /foreman page.
+ * Reuses proxy/dispatch visual language for consistency.
+ */
+
+/* =============================================================================
+   Foreman Section
+   ============================================================================= */
+.foreman-section {
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 4px;
+}
+
+.foreman-section-header {
+  font-family: var(--font-content);
+  font-size: 1em;
+  font-weight: 500;
+  color: var(--fg);
+  margin: 0 0 0.75rem 0;
+}
+
+.foreman-subtitle {
+  color: var(--fg-dim);
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  margin-top: 0.5rem;
+}
+
+.foreman-hint {
+  color: var(--fg-dim);
+  font-family: var(--font-content);
+  font-size: 0.85em;
+  margin: 0 0 0.75rem 0;
+}
+
+/* =============================================================================
+   Experimental Badge
+   ============================================================================= */
+.foreman-experimental {
+  display: inline-block;
+  font-size: 0.7em;
+  font-weight: 400;
+  color: var(--yellow, #b8860b);
+  border: 1px solid var(--yellow, #b8860b);
+  border-radius: 3px;
+  padding: 0.1rem 0.4rem;
+  vertical-align: middle;
+  margin-left: 0.5rem;
+  font-family: var(--font-content);
+  letter-spacing: 0.03em;
+}
+
+/* =============================================================================
+   Playbook Prompt
+   ============================================================================= */
+.foreman-playbook-box {
+  border: 1px solid var(--fg-vdim);
+  border-radius: 4px;
+  padding: 0.75rem;
+  background: var(--bg);
+}
+
+.foreman-playbook-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.foreman-playbook-feedback {
+  font-size: 0.85em;
+  color: var(--green);
+}
+
+.foreman-playbook-feedback.error {
+  color: var(--red);
+}
+
+.foreman-playbook-output {
+  font-family: var(--font-structural);
+  font-size: 0.8em;
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid var(--fg-vdim);
+  border-radius: 3px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--fg-dim);
+  margin: 0;
+  max-height: 24em;
+  overflow-y: auto;
+}
+
+.foreman-playbook-output.has-content {
+  color: var(--fg);
+}
+
+/* =============================================================================
+   Token Selector
+   ============================================================================= */
+.foreman-token-select {
+  font-family: var(--font-content);
+  font-size: 0.85em;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--fg-vdim);
+  border-radius: 3px;
+  background: var(--bg);
+  color: var(--fg);
+  max-width: 20ch;
+}
+
+.foreman-token-select:focus {
+  outline: none;
+  border-color: var(--blue);
+}
+
+.foreman-no-token {
+  color: var(--fg-dim);
+  font-size: 0.85em;
+  font-family: var(--font-content);
+}
+
+.foreman-no-token a {
+  color: var(--blue);
+  text-decoration: none;
+}
+
+.foreman-no-token a:hover {
+  text-decoration: underline;
+}
+
+/* =============================================================================
+   Status Log
+   ============================================================================= */
+.foreman-status-list {
+  margin-top: 0.5rem;
+}
+
+.foreman-status-loading,
+.foreman-status-empty {
+  color: var(--fg-dim);
+  font-size: 0.9em;
+  padding: 0.25rem 0;
+}
+
+.foreman-status-item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--fg-vdim);
+  font-size: 0.85em;
+  font-family: var(--font-content);
+}
+
+.foreman-status-item:last-child {
+  border-bottom: none;
+}
+
+.foreman-status-task {
+  font-family: var(--font-structural);
+  font-weight: 500;
+  min-width: 8ch;
+  color: var(--fg);
+}
+
+.foreman-status-action {
+  color: var(--fg-dim);
+  min-width: 12ch;
+}
+
+.foreman-status-badge {
+  font-family: var(--font-structural);
+  font-size: 0.9em;
+  min-width: 10ch;
+}
+
+.foreman-status-badge.status-completed {
+  color: var(--green);
+}
+
+.foreman-status-badge.status-in-progress {
+  color: var(--yellow, #b8860b);
+}
+
+.foreman-status-badge.status-failed,
+.foreman-status-badge.status-blocked {
+  color: var(--red);
+}
+
+.foreman-status-summary {
+  flex: 1;
+  color: var(--fg);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.foreman-status-time {
+  color: var(--fg-dim);
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+
+/* =============================================================================
+   Stack Preview
+   ============================================================================= */
+.foreman-stack-list {
+  margin-top: 0.5rem;
+}
+
+.foreman-stack-loading,
+.foreman-stack-empty {
+  color: var(--fg-dim);
+  font-size: 0.9em;
+  padding: 0.25rem 0;
+}
+
+.foreman-stack-item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--fg-vdim);
+  font-size: 0.85em;
+  font-family: var(--font-content);
+}
+
+.foreman-stack-item:last-child {
+  border-bottom: none;
+}
+
+.foreman-stack-identifier {
+  font-family: var(--font-structural);
+  font-weight: 500;
+  min-width: 8ch;
+  color: var(--fg);
+}
+
+.foreman-stack-title {
+  flex: 1;
+  color: var(--fg);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.foreman-stack-state {
+  font-family: var(--font-structural);
+  font-size: 0.9em;
+  min-width: 8ch;
+}
+
+.foreman-stack-state.state-started {
+  color: var(--yellow, #b8860b);
+}
+
+.foreman-stack-state.state-unstarted {
+  color: var(--fg-dim);
+}
+
+.foreman-stack-state.state-backlog {
+  color: var(--fg-vdim);
+}
+
+.foreman-stack-labels {
+  color: var(--fg-dim);
+  font-size: 0.9em;
+  white-space: nowrap;
+}
+
+/* Refresh buttons */
+.foreman-refresh {
+  color: var(--fg-dim);
+  font-size: 0.85em;
+  vertical-align: middle;
+}
+
+.foreman-refresh:hover {
+  color: var(--fg);
+}
+
+/* =============================================================================
+   Responsive
+   ============================================================================= */
+@media (max-width: 640px) {
+  .foreman-playbook-controls {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .foreman-status-item {
+    flex-wrap: wrap;
+  }
+
+  .foreman-stack-item {
+    flex-wrap: wrap;
+  }
+}

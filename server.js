@@ -45,6 +45,7 @@ import { renderCustomPromptsPage } from './lib/render-custom-prompts.js'
 import { renderDispatchPage } from './lib/render-dispatch.js'
 import { renderSwipePage } from './lib/render-swipe.js'
 import { renderProxyPage } from './lib/render-proxy.js'
+import { renderForemanPage } from './lib/render-foreman.js'
 import { DEFAULT_MODEL, AVAILABLE_MODELS } from './lib/openrouter.js'
 import { getFeatureFlags, isValidFeatureKey } from './lib/feature-defaults.js'
 
@@ -841,6 +842,31 @@ app.get('/workspace/:urlKey/proxy', workspaceFromUrl, (req, res) => {
     workspaces: req.session.workspaces,
     featureFlags,
     baseUrl: `${req.protocol}://${req.get('host')}`
+  });
+  res.send(html);
+});
+
+/**
+ * Foreman page - requires authentication and proxy feature flag.
+ * Displays foreman playbook, status log, and stack preview.
+ */
+app.get('/workspace/:urlKey/foreman', workspaceFromUrl, (req, res) => {
+  const workspace = req.workspace;
+  const deployInfo = getDeployInfo();
+  const openRouterSource = getOpenRouterSource(req);
+  const featureFlags = getFeatureFlags(req.session);
+
+  // Guard: proxy feature must be enabled (foreman uses proxy tokens)
+  if (featureFlags.proxy !== true) {
+    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
+  }
+
+  const html = renderForemanPage(workspace.name || 'Workspace', {
+    deployInfo,
+    urlKey: workspace.urlKey,
+    openRouterSource,
+    workspaces: req.session.workspaces,
+    featureFlags
   });
   res.send(html);
 });
