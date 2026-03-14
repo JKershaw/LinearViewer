@@ -16,10 +16,11 @@ import { isValidFeatureKey } from '../lib/feature-defaults.js';
  * @param {Object} options.userPreferencesStore - User preferences store
  * @param {Object} options.proxyTokenStore - Proxy token store
  * @param {Object} options.proxyEventStore - Proxy event store
+ * @param {Object} options.foremanStore - Foreman status store
  * @param {Function} options.getWorkspaceAccessToken - Function to look up workspace access token
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, getWorkspaceAccessToken }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, foremanStore, getWorkspaceAccessToken }) {
   const router = Router();
 
   // Endpoint to set a test session without going through OAuth flow
@@ -252,6 +253,16 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   router.get('/test/clear-proxy-events', async (req, res) => {
     try {
       await proxyEventStore.clear('test-workspace')
+      res.send('ok')
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
+
+  // Endpoint to clear foreman status for testing
+  router.get('/test/clear-foreman-status', async (req, res) => {
+    try {
+      await foremanStore.clear('test-workspace')
       res.send('ok')
     } catch (err) {
       res.status(500).json({ error: err.message })

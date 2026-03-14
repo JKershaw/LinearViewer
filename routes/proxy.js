@@ -16,6 +16,22 @@ import { Router } from 'express';
 import { GraphQLClient, gql } from 'graphql-request';
 import rateLimit from 'express-rate-limit';
 import { createProxyFetch } from '../lib/proxy-fetch.js';
+import { fetchProjects, fetchIssueContext, fetchRecommendationContext } from '../lib/linear.js';
+import { isRecommendationEnabled, getRecommendation } from '../lib/openrouter.js';
+import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID } from '../lib/tree.js';
+import { flattenTrees, sortIssuesForSwipe, applyBlockingOrder, clusterByParent } from '../lib/render-swipe.js';
+import { generatePrompt, hasPrompt, getAvailablePrompts } from '../lib/prompt-templates.js';
+import { parseRepoFromDescription } from '../lib/prompt-formatters.js';
+
+// Lazy-load test fixtures only in test mode to avoid production dependency on test files
+let testMockData = null;
+async function getTestMockData() {
+  if (!testMockData) {
+    const mod = await import('../tests/fixtures/mock-data.js');
+    testMockData = mod.testMockData;
+  }
+  return testMockData;
+}
 
 const LINEAR_API_ENDPOINT = 'https://api.linear.app/graphql';
 
@@ -323,11 +339,12 @@ const UPDATE_ISSUE_LABELS_MUTATION = gql`
  * @param {Object} options - Dependencies
  * @param {Object} options.proxyTokenStore - Proxy token storage instance
  * @param {Object} options.proxyEventStore - Proxy event storage instance
+ * @param {Object} options.foremanStore - Foreman status storage instance
  * @param {Function} options.workspaceFromUrl - Middleware to validate workspace
  * @param {Function} options.getWorkspaceAccessToken - Function to get workspace access token by urlKey
  * @returns {Router} Express router with proxy routes
  */
-export function createProxyRoutes({ proxyTokenStore, proxyEventStore, workspaceFromUrl, getWorkspaceAccessToken }) {
+export function createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanStore, workspaceFromUrl, getWorkspaceAccessToken }) {
   const router = Router();
 
   // =========================================================================
@@ -597,7 +614,24 @@ GET ${baseUrl}/api/proxy/labels?teamId={teamId}
   → List labels (optionally filter by team)
 
 GET ${baseUrl}/api/proxy/relations/{issueId}
-  → Get issue relations (blocks, blocked-by, related, duplicate)`;
+  → Get issue relations (blocks, blocked-by, related, duplicate)
+
+## Foreman Endpoints
+
+GET ${baseUrl}/api/proxy/stack?limit={n}
+  → Sorted task stack (default 5, max 50) with available prompts per task
+
+GET ${baseUrl}/api/proxy/prompt/{identifier}/{templateKey}
+  → Generate a prompt for an issue (e.g., /prompt/LIN-42/research)
+
+GET ${baseUrl}/api/proxy/recommend/{identifier}
+  → AI-generated prompt recommendation for an issue (requires OPENROUTER_API_KEY on server)
+
+GET ${baseUrl}/api/proxy/foreman/status
+  → List recent foreman status entries
+
+GET ${baseUrl}/api/proxy/foreman/playbook
+  → Get the foreman playbook prompt (plain text)`;
 
     const writeEndpoints = scope === 'readWrite' ? `
 
@@ -624,7 +658,11 @@ POST ${baseUrl}/api/proxy/issue/{issueId}/labels
   → Add a label to an issue
 
 DELETE ${baseUrl}/api/proxy/issue/{issueId}/labels/{labelId}
-  → Remove a label from an issue` : '';
+  → Remove a label from an issue
+
+POST ${baseUrl}/api/proxy/foreman/status
+  Body: { "taskIdentifier": "LIN-42", "action": "research", "status": "completed", "summary": "..." }
+  → Record a foreman status update` : '';
 
     const text = `# Linear API Proxy
 
@@ -1262,6 +1300,536 @@ ${readEndpoints}${writeEndpoints}
       console.error('Proxy remove label error:', err.message);
       res.status(status).json({ error: 'Failed to remove label', detail: graphqlErrorDetail(err) });
     }
+  });
+
+  // =========================================================================
+  // Consumer API - Foreman Endpoints
+  // =========================================================================
+
+  /**
+   * GET /api/proxy/stack
+   * Returns the sorted task stack for foreman use.
+   * Uses the same sort pipeline as the swipe view.
+   */
+  router.get('/api/proxy/stack', proxyLimiter, authenticateProxyToken, async (req, res) => {
+    try {
+      const accessToken = await getWorkspaceAccessToken(req.proxyUrlKey);
+      if (!accessToken) {
+        logEvent(req, '/api/proxy/stack', 503);
+        return res.status(503).json({ error: 'Workspace not available' });
+      }
+
+      const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 5, 1), 50);
+
+      // Fetch projects and issues (use mock data in test mode)
+      const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
+      let projects, issues;
+      if (isTestMode) {
+        const mockData = await getTestMockData();
+        projects = [...mockData.projects];
+        issues = [...mockData.issues];
+      } else {
+        ({ projects, issues } = await fetchProjects(accessToken));
+      }
+
+      // Build tree structure
+      const forest = buildForest(issues);
+      if (forest.has(NO_PROJECT_ID)) {
+        projects.push({
+          id: NO_PROJECT_ID,
+          name: 'No Project',
+          content: null,
+          url: null,
+          sortOrder: Number.MAX_SAFE_INTEGER
+        });
+      }
+
+      const inProgressTrees = buildInProgressForest(issues, projects);
+      const recentActivityTrees = buildRecentActivityForest(issues, projects, 1);
+      const trees = projects
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map(project => {
+          const { roots } = forest.get(project.id) || { roots: [] };
+          const { incomplete } = partitionCompleted(roots);
+          return { project, incomplete };
+        });
+
+      // Flatten and deduplicate (same as swipe view)
+      const projectIssues = flattenTrees(trees, 'project');
+      const inProgressIssues = flattenTrees(inProgressTrees, 'in-progress');
+      const recentIssues = flattenTrees(recentActivityTrees, 'recent-activity');
+
+      const seenIds = new Set();
+      const allIssues = [];
+      for (const issue of inProgressIssues) {
+        if (!seenIds.has(issue.id)) { seenIds.add(issue.id); allIssues.push(issue); }
+      }
+      for (const issue of projectIssues) {
+        if (!seenIds.has(issue.id)) { seenIds.add(issue.id); allIssues.push(issue); }
+      }
+      for (const issue of recentIssues) {
+        if (!seenIds.has(issue.id)) { seenIds.add(issue.id); allIssues.push(issue); }
+      }
+
+      // Build parent/subtask relationships
+      const cardById = new Map(allIssues.map(i => [i.id, i]));
+      const subtaskMap = new Map();
+      for (const issue of allIssues) {
+        if (issue.parentId && cardById.has(issue.parentId)) {
+          const parent = cardById.get(issue.parentId);
+          issue.parentIdentifier = parent.identifier;
+          issue.parentTitle = parent.title;
+          if (!subtaskMap.has(issue.parentId)) subtaskMap.set(issue.parentId, []);
+          subtaskMap.get(issue.parentId).push({
+            id: issue.id,
+            identifier: issue.identifier,
+            title: issue.title,
+            stateType: issue.stateType
+          });
+        }
+      }
+      for (const [parentId, children] of subtaskMap) {
+        const parent = cardById.get(parentId);
+        if (parent) parent.subtasks = children;
+      }
+
+      // Sort and cluster
+      sortIssuesForSwipe(allIssues);
+      const sortedIssues = clusterByParent(applyBlockingOrder(allIssues));
+
+      // Add available prompts and trim to limit
+      const tasks = sortedIssues.slice(0, limit).map(issue => {
+        // Build a minimal issue object for getAvailablePrompts
+        const issueForPrompts = {
+          labels: { nodes: (issue.labels || []).map(name => ({ name })) },
+          state: { type: issue.stateType }
+        };
+        return {
+          id: issue.id,
+          identifier: issue.identifier,
+          title: issue.title,
+          description: issue.description,
+          priority: issue.priority,
+          url: issue.url,
+          stateType: issue.stateType,
+          stateName: issue.stateName,
+          labels: issue.labels,
+          projectName: issue.projectName,
+          parentId: issue.parentId || null,
+          parentIdentifier: issue.parentIdentifier || null,
+          parentTitle: issue.parentTitle || null,
+          subtasks: issue.subtasks || [],
+          blocksIds: issue.blocksIds || [],
+          availablePrompts: getAvailablePrompts(issueForPrompts)
+        };
+      });
+
+      logEvent(req, '/api/proxy/stack', 200);
+      res.json({ tasks, total: sortedIssues.length });
+    } catch (err) {
+      const status = graphqlErrorStatus(err);
+      logEvent(req, '/api/proxy/stack', status);
+      console.error('Proxy /stack error:', err.message);
+      res.status(status).json({ error: 'Failed to fetch task stack', detail: graphqlErrorDetail(err) });
+    }
+  });
+
+  /**
+   * GET /api/proxy/prompt/:identifier/:templateKey
+   * Returns the generated prompt for a specific issue and template.
+   */
+  router.get('/api/proxy/prompt/:identifier/:templateKey', proxyLimiter, authenticateProxyToken, async (req, res) => {
+    try {
+      const accessToken = await getWorkspaceAccessToken(req.proxyUrlKey);
+      if (!accessToken) {
+        logEvent(req, '/api/proxy/prompt', 503);
+        return res.status(503).json({ error: 'Workspace not available' });
+      }
+
+      const { identifier, templateKey } = req.params;
+
+      // Validate identifier format (UUID or LIN-123 pattern)
+      if (!UUID_REGEX.test(identifier) && !/^[A-Z]+-\d+$/i.test(identifier)) {
+        logEvent(req, '/api/proxy/prompt', 400);
+        return res.status(400).json({ error: 'Invalid identifier format' });
+      }
+
+      // Validate template key
+      if (!hasPrompt(templateKey)) {
+        logEvent(req, '/api/proxy/prompt', 404);
+        return res.status(404).json({ error: `No prompt template for key: ${templateKey}` });
+      }
+
+      // Fetch issue context (use mock data in test mode)
+      const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
+      let issue, parent, siblings, project, children, comments;
+      if (isTestMode) {
+        const mockData = await getTestMockData();
+        const mockIssue = mockData.issues.find(i =>
+          i.id === identifier || i.identifier === identifier
+        );
+        if (!mockIssue) {
+          logEvent(req, '/api/proxy/prompt', 404);
+          return res.status(404).json({ error: 'Issue not found' });
+        }
+        const mockProject = mockData.projects.find(p => p.id === mockIssue.project?.id);
+        issue = {
+          id: mockIssue.id,
+          identifier: mockIssue.identifier || 'TEST-1',
+          title: mockIssue.title,
+          description: mockIssue.description || '',
+          state: mockIssue.state || { name: 'Todo', type: 'unstarted' },
+          labels: (mockIssue.labels?.nodes || []).map(l => l.name),
+          url: mockIssue.url || ''
+        };
+        parent = null;
+        siblings = [];
+        project = mockProject ? { name: mockProject.name, description: mockProject.content } : null;
+        children = mockData.issues.filter(i => i.parent?.id === mockIssue.id).map(i => ({
+          id: i.id, identifier: i.identifier, title: i.title, state: i.state
+        }));
+        comments = [];
+      } else {
+        ({ issue, parent, siblings, project, children, comments } = await fetchIssueContext(accessToken, identifier));
+      }
+
+      // Generate the prompt
+      const result = generatePrompt(templateKey, issue, { parent, siblings, project, children, comments }, {});
+
+      if (!result) {
+        logEvent(req, '/api/proxy/prompt', 500);
+        return res.status(500).json({ error: 'Failed to generate prompt' });
+      }
+
+      logEvent(req, '/api/proxy/prompt', 200);
+      res.json({
+        identifier: issue.identifier,
+        templateKey,
+        promptName: result.name,
+        prompt: result.prompt,
+        repo: parseRepoFromDescription(project?.description)
+      });
+    } catch (err) {
+      if (err.message?.includes('not found')) {
+        logEvent(req, '/api/proxy/prompt', 404);
+        return res.status(404).json({ error: 'Issue not found' });
+      }
+      const status = graphqlErrorStatus(err);
+      logEvent(req, '/api/proxy/prompt', status);
+      console.error('Proxy /prompt error:', err.message);
+      res.status(status).json({ error: 'Failed to generate prompt', detail: graphqlErrorDetail(err) });
+    }
+  });
+
+  /**
+   * GET /api/proxy/recommend/:identifier
+   * Returns an AI-generated prompt recommendation for an issue.
+   * Uses the server-side OPENROUTER_API_KEY (no session needed).
+   */
+  router.get('/api/proxy/recommend/:identifier', proxyLimiter, authenticateProxyToken, async (req, res) => {
+    try {
+      const accessToken = await getWorkspaceAccessToken(req.proxyUrlKey);
+      if (!accessToken) {
+        logEvent(req, '/api/proxy/recommend', 503);
+        return res.status(503).json({ error: 'Workspace not available' });
+      }
+
+      const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
+
+      // Check if AI recommendations are available (skip in test mode)
+      if (!isTestMode && !isRecommendationEnabled()) {
+        logEvent(req, '/api/proxy/recommend', 503);
+        return res.status(503).json({ error: 'AI recommendations not configured. Set OPENROUTER_API_KEY on the server.' });
+      }
+
+      const { identifier } = req.params;
+
+      // Validate identifier format (UUID or LIN-123 pattern)
+      if (!UUID_REGEX.test(identifier) && !/^[A-Z]+-\d+$/i.test(identifier)) {
+        logEvent(req, '/api/proxy/recommend', 400);
+        return res.status(400).json({ error: 'Invalid identifier format' });
+      }
+      if (isTestMode) {
+        const mockData = await getTestMockData();
+        // Find mock issue by UUID or identifier
+        const mockIssue = mockData.issues.find(i =>
+          i.id === identifier || i.identifier === identifier
+        );
+        if (!mockIssue) {
+          logEvent(req, '/api/proxy/recommend', 404);
+          return res.status(404).json({ error: 'Issue not found' });
+        }
+
+        const labels = (mockIssue.labels?.nodes || []).map(l => l.name);
+        const issueIdentifier = mockIssue.identifier || mockIssue.url?.split('/').pop() || 'ISSUE';
+
+        let reasoning = 'Analyzing the task to determine the best approach.';
+        let goal = 'Understand what this task involves and plan the next steps.';
+
+        if (labels.includes('bug')) {
+          reasoning = 'This is a bug. Investigating systematically will help find the root cause.';
+          goal = 'Identify reproduction steps, hypothesize causes, and suggest a fix.';
+        } else if (labels.includes('blocked')) {
+          reasoning = 'This task is blocked. Analyzing the blocker to find a way forward.';
+          goal = 'Identify the blocker and recommend how to unblock.';
+        } else if (mockIssue.state?.type === 'started') {
+          reasoning = 'Task is in progress. Checking what work remains.';
+          goal = 'Continue implementation and update progress.';
+        }
+
+        const mockProject = mockData.projects.find(p => p.id === mockIssue.project?.id);
+
+        logEvent(req, '/api/proxy/recommend', 200);
+        return res.json({
+          identifier: issueIdentifier,
+          reasoning,
+          prompt: `Help me with task ${issueIdentifier}\n\n## Context\n\n**Status:** ${mockIssue.state?.name || 'Unknown'}\n${labels.length > 0 ? `**Labels:** ${labels.join(', ')}` : ''}\n\n## Goal\n\n${goal}`,
+          truncated: false,
+          repo: parseRepoFromDescription(mockProject?.content)
+        });
+      }
+
+      // Fetch issue context with two-tier support for parent tasks
+      const context = await fetchRecommendationContext(accessToken, identifier);
+      const { issue, parent, siblings, project, children, comments, focusedChild } = context;
+
+      // Get AI-generated recommendation (uses server-side OPENROUTER_API_KEY)
+      const recommendation = await getRecommendation(
+        issue,
+        { parent, siblings, project, children, comments, focusedChild },
+        { featureFlags: {} }
+      );
+
+      logEvent(req, '/api/proxy/recommend', 200);
+      res.json({
+        identifier: issue.identifier,
+        reasoning: recommendation.reasoning,
+        prompt: recommendation.prompt,
+        truncated: recommendation.truncated,
+        repo: parseRepoFromDescription(project?.description)
+      });
+    } catch (err) {
+      if (err.message?.includes('not found')) {
+        logEvent(req, '/api/proxy/recommend', 404);
+        return res.status(404).json({ error: 'Issue not found' });
+      }
+      if (err.message?.includes('OpenRouter')) {
+        logEvent(req, '/api/proxy/recommend', 503);
+        return res.status(503).json({ error: 'AI service temporarily unavailable', detail: err.message });
+      }
+      const status = graphqlErrorStatus(err);
+      logEvent(req, '/api/proxy/recommend', status);
+      console.error('Proxy /recommend error:', err.message);
+      res.status(status).json({ error: 'Failed to get recommendation', detail: graphqlErrorDetail(err) });
+    }
+  });
+
+  /**
+   * POST /api/proxy/foreman/status
+   * Record a foreman status update.
+   */
+  router.post('/api/proxy/foreman/status', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
+    const { taskIdentifier, action, status, summary } = req.body;
+
+    if (!taskIdentifier || typeof taskIdentifier !== 'string') {
+      logEvent(req, '/api/proxy/foreman/status', 400);
+      return res.status(400).json({ error: 'taskIdentifier is required' });
+    }
+    if (!action || typeof action !== 'string') {
+      logEvent(req, '/api/proxy/foreman/status', 400);
+      return res.status(400).json({ error: 'action is required' });
+    }
+    if (!status || typeof status !== 'string') {
+      logEvent(req, '/api/proxy/foreman/status', 400);
+      return res.status(400).json({ error: 'status is required' });
+    }
+    if (!summary || typeof summary !== 'string') {
+      logEvent(req, '/api/proxy/foreman/status', 400);
+      return res.status(400).json({ error: 'summary is required' });
+    }
+    if (summary.length > 10000) {
+      logEvent(req, '/api/proxy/foreman/status', 400);
+      return res.status(400).json({ error: 'summary exceeds max length (10000)' });
+    }
+    if (taskIdentifier.length > 200 || action.length > 200 || status.length > 200) {
+      logEvent(req, '/api/proxy/foreman/status', 400);
+      return res.status(400).json({ error: 'Field exceeds max length (200)' });
+    }
+
+    if (DANGEROUS_CHARS_REGEX.test(taskIdentifier) || DANGEROUS_CHARS_REGEX.test(action) ||
+        DANGEROUS_CHARS_REGEX.test(status) || DANGEROUS_CHARS_REGEX.test(summary)) {
+      logEvent(req, '/api/proxy/foreman/status', 400);
+      return res.status(400).json({ error: 'Input contains invalid characters' });
+    }
+
+    try {
+      await foremanStore.recordStatus({
+        urlKey: req.proxyUrlKey,
+        taskIdentifier,
+        action,
+        status,
+        summary
+      });
+
+      logEvent(req, '/api/proxy/foreman/status', 201);
+      res.status(201).json({ success: true });
+    } catch (err) {
+      logEvent(req, '/api/proxy/foreman/status', 500);
+      console.error('Foreman status post error:', err.message);
+      res.status(500).json({ error: 'Failed to record status' });
+    }
+  });
+
+  /**
+   * GET /api/proxy/foreman/status
+   * List recent foreman status entries.
+   */
+  router.get('/api/proxy/foreman/status', proxyLimiter, authenticateProxyToken, async (req, res) => {
+    try {
+      const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
+      const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+
+      const result = await foremanStore.listStatus(req.proxyUrlKey, { limit, offset });
+
+      logEvent(req, '/api/proxy/foreman/status', 200);
+      res.json(result);
+    } catch (err) {
+      logEvent(req, '/api/proxy/foreman/status', 500);
+      console.error('Foreman status list error:', err.message);
+      res.status(500).json({ error: 'Failed to list status' });
+    }
+  });
+
+  /**
+   * GET /api/proxy/foreman/playbook
+   * Returns the foreman playbook prompt as plain text.
+   */
+  router.get('/api/proxy/foreman/playbook', proxyLimiter, authenticateProxyToken, async (req, res) => {
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+
+    logEvent(req, '/api/proxy/foreman/playbook', 200);
+
+    const playbook = `# Foreman — Autonomous Task Runner
+
+You are a foreman managing a Linear task stack. You work through tasks iteratively using curl to interact with the Linear proxy API.
+
+## Setup
+
+- Base URL: ${baseUrl}
+- Auth header: Authorization: Bearer YOUR_TOKEN
+
+All curl commands below need the auth header:
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+## Loop
+
+### 1. Fetch the stack
+
+\`\`\`bash
+curl -s -H "Authorization: Bearer YOUR_TOKEN" ${baseUrl}/api/proxy/stack?limit=5
+\`\`\`
+
+Returns the top tasks sorted by priority, blocking dependencies, and parent-child clustering.
+
+### 2. Pick the next task
+
+- If the top task has incomplete subtasks, work on the first incomplete subtask instead
+- Skip completed/canceled tasks
+- The stack is pre-sorted: bugs first, then by state (started → unstarted → backlog), then by priority
+- Blocking issues appear before the issues they block
+
+### 3. Get the prompt
+
+**Option A — AI recommendation** (recommended, adapts to task context):
+
+\`\`\`bash
+curl -s -H "Authorization: Bearer YOUR_TOKEN" ${baseUrl}/api/proxy/recommend/{identifier}
+\`\`\`
+
+Returns \`{ reasoning, prompt, repo }\`. The AI analyzes the task and generates the right prompt automatically.
+Read the \`reasoning\` to understand why it chose that approach, then use the \`prompt\`.
+
+**Option B — Template prompt** (deterministic, you choose the template):
+
+Each task in the stack includes \`availablePrompts\` — an array of valid template keys.
+Select based on task state:
+- New/unstarted → \`research\` or \`look-into\`
+- Needs breakdown → \`breakdown\`
+- Ready for planning → \`plan\`
+- Has a plan → \`implementation\`
+- Implementation done → \`review\`
+- Bug-labeled → \`bug\`
+
+\`\`\`bash
+curl -s -H "Authorization: Bearer YOUR_TOKEN" ${baseUrl}/api/proxy/prompt/{identifier}/{templateKey}
+\`\`\`
+
+Returns \`{ prompt, promptName, repo }\`.
+
+### 4. Execute the prompt
+
+Use the Agent tool to spawn a sub-agent with the prompt content.
+The sub-agent does the actual work (research, coding, review).
+
+### 5. Update Linear
+
+Based on the result:
+
+**Research/Plan:**
+\`\`\`bash
+# Add findings as a comment
+curl -X POST -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" \\
+  -d '{"body":"## Research Findings\\n\\n..."}' \\
+  ${baseUrl}/api/proxy/issue/{issueId}/comments
+
+# Create subtasks if warranted
+curl -X POST -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" \\
+  -d '{"teamId":"...","title":"Subtask title","parentId":"..."}' \\
+  ${baseUrl}/api/proxy/issues
+\`\`\`
+
+**Implementation:**
+\`\`\`bash
+# Add summary comment
+curl -X POST -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" \\
+  -d '{"body":"## Implementation Summary\\n\\n..."}' \\
+  ${baseUrl}/api/proxy/issue/{issueId}/comments
+\`\`\`
+
+**Review:**
+\`\`\`bash
+# Add review findings
+curl -X POST -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" \\
+  -d '{"body":"## Review\\n\\n..."}' \\
+  ${baseUrl}/api/proxy/issue/{issueId}/comments
+\`\`\`
+
+### 6. Report status
+
+\`\`\`bash
+curl -X POST -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" \\
+  -d '{"taskIdentifier":"LIN-42","action":"research","status":"completed","summary":"Found 3 API endpoints needing auth fixes"}' \\
+  ${baseUrl}/api/proxy/foreman/status
+\`\`\`
+
+### 7. Decide next action
+
+- Same task needs follow-up? (research → plan → implement → review) → go to step 3
+- Task complete? → go to step 1 for next task
+- Hit a blocker? → comment on issue, report status, STOP and notify user
+
+## Stop conditions
+
+- External dependency (waiting on another person/team)
+- Ambiguous requirements that need human judgment
+- 3+ consecutive failures on the same task
+- Destructive action needed (deleting data, force-pushing)
+- No more tasks in the stack
+
+When you stop, post a final status update explaining why.
+`;
+
+    res.type('text/plain').send(playbook);
   });
 
   return router;

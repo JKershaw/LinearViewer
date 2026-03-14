@@ -19,6 +19,7 @@ import { CustomPromptsStore } from './lib/custom-prompts-store.js'
 import { DispatchTokenStore } from './lib/dispatch-tokens.js'
 import { ProxyTokenStore } from './lib/proxy-tokens.js'
 import { ProxyEventStore } from './lib/proxy-events.js'
+import { ForemanStore } from './lib/foreman-store.js'
 import { FreeTierStore } from './lib/free-tier-store.js'
 import { fetchProjects, fetchProjectsList, fetchTeams } from './lib/linear.js'
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID } from './lib/tree.js'
@@ -44,6 +45,7 @@ import { renderCustomPromptsPage } from './lib/render-custom-prompts.js'
 import { renderDispatchPage } from './lib/render-dispatch.js'
 import { renderSwipePage } from './lib/render-swipe.js'
 import { renderProxyPage } from './lib/render-proxy.js'
+import { renderForemanPage } from './lib/render-foreman.js'
 import { DEFAULT_MODEL, AVAILABLE_MODELS } from './lib/openrouter.js'
 import { getFeatureFlags, isValidFeatureKey } from './lib/feature-defaults.js'
 
@@ -161,6 +163,12 @@ const proxyEventStore = new ProxyEventStore({
   collection: proxyEventsCollection
 })
 
+// Foreman status tracking
+const foremanStatusCollection = db.collection('foreman-status')
+const foremanStore = new ForemanStore({
+  collection: foremanStatusCollection
+})
+
 // Free tier usage tracking
 const freeTierCollection = db.collection('free-tier-usage')
 const freeTierStore = new FreeTierStore({
@@ -213,7 +221,7 @@ app.use(session({
 // Test Mode Setup
 // =============================================================================
 if (process.env.NODE_ENV === 'test') {
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, getWorkspaceAccessToken }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, foremanStore, getWorkspaceAccessToken }))
 }
 
 // =============================================================================
@@ -565,7 +573,7 @@ async function getWorkspaceAccessToken(urlKey) {
   return null;
 }
 
-app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, workspaceFromUrl, getWorkspaceAccessToken }))
+app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanStore, workspaceFromUrl, getWorkspaceAccessToken }))
 
 // Mount workspace API routes (audit, prompts, recommendations, comments, images)
 app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, customPromptsStore }))
@@ -839,6 +847,31 @@ app.get('/workspace/:urlKey/proxy', workspaceFromUrl, (req, res) => {
 });
 
 /**
+ * Foreman page - requires authentication and proxy feature flag.
+ * Displays foreman playbook, status log, and stack preview.
+ */
+app.get('/workspace/:urlKey/foreman', workspaceFromUrl, (req, res) => {
+  const workspace = req.workspace;
+  const deployInfo = getDeployInfo();
+  const openRouterSource = getOpenRouterSource(req);
+  const featureFlags = getFeatureFlags(req.session);
+
+  // Guard: proxy feature must be enabled (foreman uses proxy tokens)
+  if (featureFlags.proxy !== true) {
+    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
+  }
+
+  const html = renderForemanPage(workspace.name || 'Workspace', {
+    deployInfo,
+    urlKey: workspace.urlKey,
+    openRouterSource,
+    workspaces: req.session.workspaces,
+    featureFlags
+  });
+  res.send(html);
+});
+
+/**
  * Save model selection to session.
  * Accepts either a preset model ID or a custom model ID.
  */
@@ -1008,6 +1041,14 @@ app.listen(PORT, () => {
       }
     } catch (err) {
       console.error('Proxy event cleanup error:', err)
+    }
+    try {
+      const removedCount = await foremanStore.cleanup()
+      if (removedCount > 0) {
+        console.log(`Foreman status cleanup: removed ${removedCount} expired entries`)
+      }
+    } catch (err) {
+      console.error('Foreman status cleanup error:', err)
     }
   }, CLEANUP_INTERVAL_MS)
 })
