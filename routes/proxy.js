@@ -22,7 +22,16 @@ import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActi
 import { flattenTrees, sortIssuesForSwipe, applyBlockingOrder, clusterByParent } from '../lib/render-swipe.js';
 import { generatePrompt, hasPrompt, getAvailablePrompts } from '../lib/prompt-templates.js';
 import { parseRepoFromDescription } from '../lib/prompt-formatters.js';
-import { testMockData } from '../tests/fixtures/mock-data.js';
+
+// Lazy-load test fixtures only in test mode to avoid production dependency on test files
+let testMockData = null;
+async function getTestMockData() {
+  if (!testMockData) {
+    const mod = await import('../tests/fixtures/mock-data.js');
+    testMockData = mod.testMockData;
+  }
+  return testMockData;
+}
 
 const LINEAR_API_ENDPOINT = 'https://api.linear.app/graphql';
 
@@ -1314,9 +1323,14 @@ ${readEndpoints}${writeEndpoints}
 
       // Fetch projects and issues (use mock data in test mode)
       const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
-      const { projects, issues } = isTestMode
-        ? { projects: [...testMockData.projects], issues: [...testMockData.issues] }
-        : await fetchProjects(accessToken);
+      let projects, issues;
+      if (isTestMode) {
+        const mockData = await getTestMockData();
+        projects = [...mockData.projects];
+        issues = [...mockData.issues];
+      } else {
+        ({ projects, issues } = await fetchProjects(accessToken));
+      }
 
       // Build tree structure
       const forest = buildForest(issues);
@@ -1446,8 +1460,38 @@ ${readEndpoints}${writeEndpoints}
         return res.status(404).json({ error: `No prompt template for key: ${templateKey}` });
       }
 
-      // Fetch issue context
-      const { issue, parent, siblings, project, children, comments } = await fetchIssueContext(accessToken, identifier);
+      // Fetch issue context (use mock data in test mode)
+      const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
+      let issue, parent, siblings, project, children, comments;
+      if (isTestMode) {
+        const mockData = await getTestMockData();
+        const mockIssue = mockData.issues.find(i =>
+          i.id === identifier || i.identifier === identifier
+        );
+        if (!mockIssue) {
+          logEvent(req, '/api/proxy/prompt', 404);
+          return res.status(404).json({ error: 'Issue not found' });
+        }
+        const mockProject = mockData.projects.find(p => p.id === mockIssue.project?.id);
+        issue = {
+          id: mockIssue.id,
+          identifier: mockIssue.identifier || 'TEST-1',
+          title: mockIssue.title,
+          description: mockIssue.description || '',
+          state: mockIssue.state || { name: 'Todo', type: 'unstarted' },
+          labels: (mockIssue.labels?.nodes || []).map(l => l.name),
+          url: mockIssue.url || ''
+        };
+        parent = null;
+        siblings = [];
+        project = mockProject ? { name: mockProject.name, description: mockProject.content } : null;
+        children = mockData.issues.filter(i => i.parent?.id === mockIssue.id).map(i => ({
+          id: i.id, identifier: i.identifier, title: i.title, state: i.state
+        }));
+        comments = [];
+      } else {
+        ({ issue, parent, siblings, project, children, comments } = await fetchIssueContext(accessToken, identifier));
+      }
 
       // Generate the prompt
       const result = generatePrompt(templateKey, issue, { parent, siblings, project, children, comments }, {});
@@ -1506,8 +1550,9 @@ ${readEndpoints}${writeEndpoints}
         return res.status(400).json({ error: 'Invalid identifier format' });
       }
       if (isTestMode) {
+        const mockData = await getTestMockData();
         // Find mock issue by UUID or identifier
-        const mockIssue = testMockData.issues.find(i =>
+        const mockIssue = mockData.issues.find(i =>
           i.id === identifier || i.identifier === identifier
         );
         if (!mockIssue) {
@@ -1532,7 +1577,7 @@ ${readEndpoints}${writeEndpoints}
           goal = 'Continue implementation and update progress.';
         }
 
-        const mockProject = testMockData.projects.find(p => p.id === mockIssue.project?.id);
+        const mockProject = mockData.projects.find(p => p.id === mockIssue.project?.id);
 
         logEvent(req, '/api/proxy/recommend', 200);
         return res.json({
@@ -1721,12 +1766,12 @@ curl -s -H "Authorization: Bearer YOUR_TOKEN" ${baseUrl}/api/proxy/prompt/{ident
 
 Returns \`{ prompt, promptName, repo }\`.
 
-### 5. Execute the prompt
+### 4. Execute the prompt
 
 Use the Agent tool to spawn a sub-agent with the prompt content.
 The sub-agent does the actual work (research, coding, review).
 
-### 6. Update Linear
+### 5. Update Linear
 
 Based on the result:
 
@@ -1759,7 +1804,7 @@ curl -X POST -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application
   ${baseUrl}/api/proxy/issue/{issueId}/comments
 \`\`\`
 
-### 7. Report status
+### 6. Report status
 
 \`\`\`bash
 curl -X POST -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" \\
@@ -1767,7 +1812,7 @@ curl -X POST -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application
   ${baseUrl}/api/proxy/foreman/status
 \`\`\`
 
-### 8. Decide next action
+### 7. Decide next action
 
 - Same task needs follow-up? (research → plan → implement → review) → go to step 3
 - Task complete? → go to step 1 for next task

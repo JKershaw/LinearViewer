@@ -96,17 +96,11 @@ test.describe('Foreman API - Prompt Endpoint', () => {
     const resp = await request.get('/api/proxy/prompt/66666666-6666-6666-6666-666666666666/look-into', {
       headers: { Authorization: `Bearer ${readToken}` }
     });
-    // In test mode, fetchIssueContext calls the real Linear API which won't work,
-    // but proxy auth should succeed. We accept 200 (if mock works) or upstream error.
-    if (resp.status() === 200) {
-      const data = await resp.json();
-      expect(data.prompt).toBeTruthy();
-      expect(data.promptName).toBeTruthy();
-      expect(data.templateKey).toBe('look-into');
-    } else {
-      // Upstream Linear error expected in test mode — just verify auth passed
-      expect(resp.status()).not.toBe(401);
-    }
+    expect(resp.status()).toBe(200);
+    const data = await resp.json();
+    expect(data.prompt).toBeTruthy();
+    expect(data.promptName).toBeTruthy();
+    expect(data.templateKey).toBe('look-into');
   });
 
   test('GET /api/proxy/prompt with invalid identifier gets 400', async ({ request }) => {
