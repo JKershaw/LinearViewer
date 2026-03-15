@@ -175,20 +175,6 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     }
   })
 
-  // Endpoint to clear tile order for testing
-  router.get('/test/clear-tile-order', async (req, res) => {
-    try {
-      const prefs = await userPreferencesStore.getUserPreferences('test-linear-user-id');
-      await userPreferencesStore.saveUserPreferences('test-linear-user-id', {
-        ...prefs,
-        tileOrder: []
-      });
-      res.send('ok');
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
   // Endpoint to clear recent custom prompts for testing
   router.get('/test/clear-recent-prompts', async (req, res) => {
     try {
