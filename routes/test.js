@@ -32,7 +32,7 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   //   ?openRouterConnected=true - Set up OpenRouter API key in session
   //   ?freeTierEnabled=true     - Simulate free tier mode (no OAuth, no env key)
   router.get('/test/set-session', (req, res) => {
-    const { tokenExpired, noRefreshToken, multiWorkspace, maxWorkspaces, openRouterConnected, freeTierEnabled, features } = req.query
+    const { tokenExpired, noRefreshToken, multiWorkspace, maxWorkspaces, openRouterConnected, freeTierEnabled, features, swimSample } = req.query
 
     // Base workspace configuration - IDs must be valid UUIDs to pass validation
     const createWorkspace = (id, name, urlKey) => ({
@@ -107,6 +107,13 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       } catch {
         // Ignore invalid JSON
       }
+    }
+
+    // Set swim sample data flag for swim page testing/screenshots
+    if (swimSample) {
+      req.session.swimSample = true
+    } else {
+      delete req.session.swimSample
     }
 
     // Explicitly save session before responding to ensure it's persisted
