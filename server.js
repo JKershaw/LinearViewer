@@ -37,6 +37,7 @@ import { createTestRoutes } from './routes/test.js'
 import { createWorkspaceApiRoutes } from './routes/workspace-api.js'
 import { createLegacyRedirects } from './routes/legacy-redirects.js'
 import { testMockTeams, testMockData } from './tests/fixtures/mock-data.js'
+import { swimSampleData } from './tests/fixtures/swim-sample-data.js'
 import { renderAuditPage } from './lib/render-audit.js'
 import { renderPrivacyPolicy, renderTermsOfService } from './lib/render-legal.js'
 import { renderSettingsPage } from './lib/render-settings.js'
@@ -44,6 +45,7 @@ import { renderPromptsPage } from './lib/render-prompts.js'
 import { renderCustomPromptsPage } from './lib/render-custom-prompts.js'
 import { renderDispatchPage } from './lib/render-dispatch.js'
 import { renderSwipePage } from './lib/render-swipe.js'
+import { renderSwimPage } from './lib/render-swim.js'
 import { renderProxyPage } from './lib/render-proxy.js'
 import { renderForemanPage } from './lib/render-foreman.js'
 import { DEFAULT_MODEL, AVAILABLE_MODELS } from './lib/openrouter.js'
@@ -317,7 +319,7 @@ app.use(createOpenRouterAuthRoutes())
  * @param {string|null} teamId - Optional team ID to filter issues by
  * @returns {Promise<{trees, inProgressTrees, organizationName, teams, selectedTeamId}>} Prepared data for rendering
  */
-async function fetchAndPrepareProjects(accessToken, teamId = null) {
+async function fetchAndPrepareProjects(accessToken, teamId = null, mockOverride = null) {
   // Use mock data in test mode to avoid hitting Linear API
   const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
 
@@ -328,7 +330,7 @@ async function fetchAndPrepareProjects(accessToken, teamId = null) {
 
   // Fetch projects and issues (filtered by team if specified)
   let { organizationName, projects, issues } = isTestMode
-    ? testMockData
+    ? (mockOverride || testMockData)
     : await fetchProjects(accessToken, teamId);
 
   // In test mode, manually filter issues by team
@@ -680,6 +682,48 @@ app.get('/workspace/:urlKey/swipe/:identifier?', workspaceFromUrl, async (req, r
     const html = renderErrorPage('Something Went Wrong', 'Could not load your tasks. Please try again.', {
       action: 'Try again',
       actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/swipe`
+    });
+    res.status(500).send(html);
+  }
+});
+
+/**
+ * Swim page - requires authentication.
+ * Displays tasks in horizontal swim lanes for sequencing and parallelism.
+ * Prototype: not linked from navigation.
+ */
+app.get('/workspace/:urlKey/swim', workspaceFromUrl, async (req, res) => {
+  const workspace = req.workspace;
+  const deployInfo = getDeployInfo();
+  const openRouterSource = getOpenRouterSource(req);
+  const rawTeam = req.query.team;
+  const teamId = rawTeam && rawTeam !== 'all' && UUID_REGEX.test(rawTeam) ? rawTeam : null;
+
+  try {
+    // Use swim sample data if session flag is set (for E2E tests/screenshots)
+    const mockOverride = req.session.swimSample ? swimSampleData : null;
+    const { trees, inProgressTrees, recentActivityTrees, organizationName } = await fetchAndPrepareProjects(workspace.accessToken, teamId, mockOverride);
+    const html = renderSwimPage(
+      { projectTrees: trees, inProgressTrees, recentActivityTrees, organizationName },
+      {
+        deployInfo,
+        urlKey: workspace.urlKey,
+        openRouterSource,
+        workspaces: req.session.workspaces,
+        featureFlags: getFeatureFlags(req.session)
+      }
+    );
+    res.send(html);
+  } catch (error) {
+    console.error('Swim page error:', error);
+
+    if (error.response?.status === 401) {
+      return handleUnauthorizedError(workspace, req.session, teamId, openRouterSource, res);
+    }
+
+    const html = renderErrorPage('Something Went Wrong', 'Could not load your tasks. Please try again.', {
+      action: 'Try again',
+      actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/swim`
     });
     res.status(500).send(html);
   }

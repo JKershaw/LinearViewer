@@ -1,0 +1,428 @@
+/* ==========================================================================
+   Swim Page - Horizontal Lane View
+   ========================================================================== */
+
+.swim-page {
+  padding: 0.75rem 1rem 2rem;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+/* ==========================================================================
+   Settings Panel
+   ========================================================================== */
+
+.swim-settings-panel {
+  margin-bottom: 1rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: var(--bg-muted, #f8f9fa);
+}
+
+.swim-settings-toggle {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  background: none;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 12px;
+  color: var(--fg-dim, #666);
+  cursor: pointer;
+  text-align: left;
+  transition: color 0.15s;
+}
+
+.swim-settings-toggle:hover {
+  color: var(--fg, #1a1a1a);
+}
+
+.swim-settings-body {
+  padding: 0 0.75rem 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+}
+
+.swim-settings-body.hidden {
+  display: none;
+}
+
+.swim-setting {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.swim-setting-label {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 11px;
+  color: var(--fg-dim, #666);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+}
+
+.swim-setting-select {
+  padding: 0.25rem 0.5rem;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: var(--bg, #fff);
+  color: var(--fg, #1a1a1a);
+  cursor: pointer;
+}
+
+.swim-setting-range {
+  width: 100px;
+  cursor: pointer;
+}
+
+.swim-setting-checkbox {
+  cursor: pointer;
+}
+
+.swim-max-lanes-value {
+  font-weight: 600;
+  color: var(--fg, #1a1a1a);
+  min-width: 1.2em;
+  display: inline-block;
+}
+
+/* ==========================================================================
+   Lanes Container
+   ========================================================================== */
+
+.swim-container {
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 0.5rem;
+}
+
+.swim-lanes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: min-content;
+}
+
+.swim-lane {
+  display: flex;
+  align-items: stretch;
+  min-height: 52px;
+}
+
+.swim-lane-label {
+  flex-shrink: 0;
+  width: 130px;
+  padding: 0.4rem 0.6rem;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 11px;
+  color: var(--fg-dim, #666);
+  border-right: 2px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--bg-muted, #f8f9fa);
+  border-radius: 4px 0 0 4px;
+}
+
+.swim-lane-items {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0.35rem 0.5rem;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+/* Sequence arrow between boxes */
+.swim-lane-arrow {
+  color: #ccc;
+  font-size: 10px;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+/* ==========================================================================
+   Task Boxes
+   ========================================================================== */
+
+.swim-box {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  background: var(--bg, #fff);
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 200px;
+  overflow: hidden;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 12px;
+}
+
+.swim-box:hover {
+  background: var(--bg-muted, #f8f9fa);
+  border-color: #ccc;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+/* Status accent — left border */
+.swim-box.state-started { border-left: 3px solid #d4a600; }
+.swim-box.state-completed { border-left: 3px solid #16a085; }
+.swim-box.state-canceled { border-left: 3px solid #16a085; }
+.swim-box.state-unstarted { border-left: 3px solid #bbb; }
+.swim-box.state-backlog { border-left: 3px solid #ddd; }
+
+/* Blocked indicator */
+.swim-box.is-blocked {
+  border-color: #e8a0a0;
+  background: #fef8f8;
+}
+
+/* State indicator in box */
+.swim-box-state {
+  flex-shrink: 0;
+  font-size: 13px;
+}
+.swim-box-state.done { color: #16a085; }
+.swim-box-state.in-progress { color: #d4a600; }
+.swim-box-state.todo { color: #999; }
+.swim-box-state.backlog { color: #ccc; }
+
+.swim-box-id {
+  color: var(--fg-dim, #888);
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.swim-box-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--fg, #1a1a1a);
+  font-size: 12px;
+}
+
+/* Blocked-by label under box */
+.swim-box-blocked {
+  font-size: 9px;
+  color: #c0392b;
+  margin-top: 1px;
+}
+
+/* Compact mode */
+.swim-box.compact {
+  padding: 0.25rem 0.4rem;
+  max-width: 120px;
+  gap: 0.25rem;
+}
+
+.swim-box.compact .swim-box-title {
+  display: none;
+}
+
+.swim-box.compact .swim-box-id {
+  font-size: 11px;
+  color: var(--fg, #333);
+}
+
+/* ==========================================================================
+   Subtask Groups
+   ========================================================================== */
+
+.swim-group {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px dashed #ccc;
+  border-radius: 8px;
+  padding: 4px 6px;
+  background: var(--bg-muted, #fafafa);
+}
+
+.swim-group-label {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 9px;
+  color: var(--fg-dim, #999);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 3px;
+  padding-left: 2px;
+}
+
+.swim-group-items {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+/* ==========================================================================
+   Cross-Lane Link Indicators
+   ========================================================================== */
+
+.swim-link-badge {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 9px;
+  color: #c0392b;
+  white-space: nowrap;
+  padding: 0 0.2rem;
+}
+
+/* ==========================================================================
+   Popover
+   ========================================================================== */
+
+.swim-popover {
+  position: fixed;
+  z-index: 100;
+  width: 320px;
+  max-width: 90vw;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  background: var(--bg, #fff);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 1rem;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+}
+
+.swim-popover.hidden {
+  display: none;
+}
+
+.swim-popover-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.swim-popover-id {
+  font-size: 11px;
+  color: var(--fg-dim, #888);
+}
+
+.swim-popover-close {
+  border: none;
+  background: none;
+  font-size: 18px;
+  color: var(--fg-dim, #999);
+  cursor: pointer;
+  padding: 0 0.25rem;
+  line-height: 1;
+}
+
+.swim-popover-close:hover {
+  color: var(--fg, #1a1a1a);
+}
+
+.swim-popover-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--fg, #1a1a1a);
+  margin-bottom: 0.5rem;
+  word-break: break-word;
+}
+
+.swim-popover-meta {
+  font-size: 11px;
+  color: var(--fg-dim, #666);
+  margin-bottom: 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+}
+
+.swim-popover-desc {
+  font-size: 13px;
+  color: var(--fg, #333);
+  line-height: 1.5;
+  max-height: 120px;
+  overflow-y: auto;
+  margin-bottom: 0.5rem;
+  word-break: break-word;
+}
+
+.swim-popover-link {
+  font-size: 11px;
+  color: var(--fg-dim, #aaa);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.swim-popover-link:hover {
+  color: #2563eb;
+}
+
+/* ==========================================================================
+   Empty State
+   ========================================================================== */
+
+.swim-empty {
+  text-align: center;
+  color: var(--fg-dim, #666);
+  padding: 3rem 1rem;
+  font-style: italic;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 13px;
+}
+
+/* ==========================================================================
+   Responsive - Desktop
+   ========================================================================== */
+
+@media (min-width: 641px) {
+  .swim-page {
+    padding: 1rem 2rem 3rem;
+  }
+
+  .swim-lane-label {
+    width: 160px;
+    font-size: 12px;
+  }
+}
+
+/* ==========================================================================
+   Responsive - Small Phones
+   ========================================================================== */
+
+@media (max-width: 400px) {
+  .swim-page {
+    padding: 0.5rem 0.5rem 1.5rem;
+  }
+
+  .swim-lane-label {
+    width: 80px;
+    font-size: 10px;
+    padding: 0.3rem 0.4rem;
+  }
+
+  .swim-box {
+    padding: 0.25rem 0.4rem;
+    font-size: 11px;
+    max-width: 140px;
+  }
+
+  .swim-lane-items {
+    gap: 5px;
+    padding: 0.25rem 0.4rem;
+  }
+
+  .swim-settings-body {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}
