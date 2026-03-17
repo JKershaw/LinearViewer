@@ -55,10 +55,20 @@ describe('assignLanes', () => {
     assert.strictEqual(lanes[0].items[0].id, 'a');
   });
 
-  test('two independent issues get two lanes in dependency mode', () => {
+  test('two independent issues from same project share a lane', () => {
     const cards = [
-      createCard({ id: 'a', title: 'Task A' }),
-      createCard({ id: 'b', title: 'Task B' })
+      createCard({ id: 'a', title: 'Task A', projectName: 'P1' }),
+      createCard({ id: 'b', title: 'Task B', projectName: 'P1' })
+    ];
+    const { lanes } = assignLanes(cards, { grouping: 'dependency', maxLanes: 10 });
+    assert.strictEqual(lanes.length, 1);
+    assert.strictEqual(lanes[0].items.length, 2);
+  });
+
+  test('two independent issues from different projects get two lanes', () => {
+    const cards = [
+      createCard({ id: 'a', title: 'Task A', projectName: 'P1' }),
+      createCard({ id: 'b', title: 'Task B', projectName: 'P2' })
     ];
     const { lanes } = assignLanes(cards, { grouping: 'dependency', maxLanes: 10 });
     assert.strictEqual(lanes.length, 2);
@@ -108,10 +118,10 @@ describe('assignLanes', () => {
 describe('maxLanes', () => {
   test('merges lanes when exceeding maxLanes', () => {
     const cards = [
-      createCard({ id: 'a' }),
-      createCard({ id: 'b' }),
-      createCard({ id: 'c' }),
-      createCard({ id: 'd' })
+      createCard({ id: 'a', projectName: 'P1' }),
+      createCard({ id: 'b', projectName: 'P2' }),
+      createCard({ id: 'c', projectName: 'P3' }),
+      createCard({ id: 'd', projectName: 'P4' })
     ];
     const { lanes } = assignLanes(cards, { grouping: 'dependency', maxLanes: 2 });
     assert.strictEqual(lanes.length, 2);
@@ -133,8 +143,8 @@ describe('maxLanes', () => {
 
   test('does not merge if under maxLanes', () => {
     const cards = [
-      createCard({ id: 'a' }),
-      createCard({ id: 'b' })
+      createCard({ id: 'a', projectName: 'P1' }),
+      createCard({ id: 'b', projectName: 'P2' })
     ];
     const { lanes } = assignLanes(cards, { grouping: 'dependency', maxLanes: 5 });
     assert.strictEqual(lanes.length, 2);
