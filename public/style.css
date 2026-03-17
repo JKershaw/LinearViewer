@@ -50,8 +50,9 @@ body {
   color: var(--fg);
   padding: 2rem;
   max-width: 120ch;  /* Optimal reading width */
+  margin-left: auto;
+  margin-right: auto;
   overflow-x: hidden;
-  width: 100%;
 }
 
 /* =============================================================================
