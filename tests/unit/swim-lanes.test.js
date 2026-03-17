@@ -231,6 +231,51 @@ describe('project grouping', () => {
 });
 
 // =============================================================================
+// Lane Ordering by Project
+// =============================================================================
+
+describe('lane ordering by projectOrder', () => {
+  test('project grouping sorts lanes by project sortOrder', () => {
+    const cards = [
+      createCard({ id: 'a', projectName: 'Zebra' }),
+      createCard({ id: 'b', projectName: 'Alpha' }),
+      createCard({ id: 'c', projectName: 'Middle' })
+    ];
+    const projectOrder = { 'Alpha': 1, 'Middle': 2, 'Zebra': 3 };
+    const { lanes } = assignLanes(cards, { grouping: 'project', maxLanes: 10, projectOrder });
+    assert.strictEqual(lanes[0].label, 'Alpha');
+    assert.strictEqual(lanes[1].label, 'Middle');
+    assert.strictEqual(lanes[2].label, 'Zebra');
+  });
+
+  test('dependency grouping sorts lanes by primary project sortOrder', () => {
+    // Three independent tasks in different projects
+    const cards = [
+      createCard({ id: 'a', projectName: 'Zebra' }),
+      createCard({ id: 'b', projectName: 'Alpha' }),
+      createCard({ id: 'c', projectName: 'Middle' })
+    ];
+    const projectOrder = { 'Alpha': 1, 'Middle': 2, 'Zebra': 3 };
+    const { lanes } = assignLanes(cards, { grouping: 'dependency', maxLanes: 10, projectOrder });
+    // Each gets its own lane; should be sorted by project order
+    assert.strictEqual(lanes[0].items[0].projectName, 'Alpha');
+    assert.strictEqual(lanes[1].items[0].projectName, 'Middle');
+    assert.strictEqual(lanes[2].items[0].projectName, 'Zebra');
+  });
+
+  test('projects without sortOrder go to the end', () => {
+    const cards = [
+      createCard({ id: 'a', projectName: 'Known' }),
+      createCard({ id: 'b', projectName: 'Unknown' })
+    ];
+    const projectOrder = { 'Known': 1 };
+    const { lanes } = assignLanes(cards, { grouping: 'project', maxLanes: 10, projectOrder });
+    assert.strictEqual(lanes[0].label, 'Known');
+    assert.strictEqual(lanes[1].label, 'Unknown');
+  });
+});
+
+// =============================================================================
 // Assignee Grouping
 // =============================================================================
 

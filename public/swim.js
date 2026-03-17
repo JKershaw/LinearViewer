@@ -10,7 +10,7 @@
 // =============================================================================
 
 function assignLanes(issues, options) {
-  const { maxLanes = 6, grouping = 'dependency', showCompleted = false } = options || {};
+  const { maxLanes = 6, grouping = 'dependency', showCompleted = false, projectOrder = {} } = options || {};
 
   const filtered = showCompleted
     ? issues
@@ -26,9 +26,30 @@ function assignLanes(issues, options) {
     default: lanes = groupByDependency(filtered); break;
   }
 
+  if (grouping === 'project' || grouping === 'dependency') {
+    sortLanesByProjectOrder(lanes, projectOrder);
+  }
+
   lanes = mergeLanes(lanes, maxLanes);
   var links = computeLinks(filtered, lanes);
   return { lanes: lanes, links: links };
+}
+
+function sortLanesByProjectOrder(lanes, projectOrder) {
+  function getLaneSortKey(lane) {
+    var counts = new Map();
+    for (var i = 0; i < lane.items.length; i++) {
+      var name = lane.items[i].projectName || '';
+      counts.set(name, (counts.get(name) || 0) + 1);
+    }
+    var bestProject = (lane.items[0] && lane.items[0].projectName) || '';
+    var bestCount = 0;
+    counts.forEach(function(count, name) {
+      if (count > bestCount) { bestCount = count; bestProject = name; }
+    });
+    return projectOrder[bestProject] !== undefined ? projectOrder[bestProject] : Infinity;
+  }
+  lanes.sort(function(a, b) { return getLaneSortKey(a) - getLaneSortKey(b); });
 }
 
 function groupByDependency(issues) {
@@ -230,6 +251,7 @@ function computeLinks(issues, lanes) {
 
 var data = window.__SWIM_DATA__ || {};
 var allIssues = data.issues || [];
+var projectOrder = data.projectOrder || {};
 
 // Build reverse lookup: issue id → issues that block it
 var blockedByMap = new Map();
@@ -304,7 +326,8 @@ function render() {
   var result = assignLanes(allIssues, {
     maxLanes: settings.maxLanes,
     grouping: settings.grouping,
-    showCompleted: settings.showCompleted
+    showCompleted: settings.showCompleted,
+    projectOrder: projectOrder
   });
 
   var lanes = result.lanes;
