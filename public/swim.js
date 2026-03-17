@@ -100,7 +100,29 @@ function groupByDependency(issues) {
     components.push(component);
   }
 
-  return components.map(function(componentIds, idx) {
+  // Merge components that share the same single project
+  var projectBuckets = new Map();
+  var merged = [];
+
+  for (var ci = 0; ci < components.length; ci++) {
+    var compIds = components[ci];
+    var compProjects = new Set();
+    for (var pi = 0; pi < compIds.length; pi++) {
+      var iss = issueById.get(compIds[pi]);
+      if (iss && iss.projectName) compProjects.add(iss.projectName);
+    }
+    if (compProjects.size === 1) {
+      var projName = compProjects.values().next().value;
+      if (!projectBuckets.has(projName)) projectBuckets.set(projName, []);
+      var bucket = projectBuckets.get(projName);
+      for (var bi = 0; bi < compIds.length; bi++) bucket.push(compIds[bi]);
+    } else {
+      merged.push(compIds);
+    }
+  }
+  projectBuckets.forEach(function(ids) { merged.push(ids); });
+
+  return merged.map(function(componentIds, idx) {
     var items = orderByDependency(componentIds, issueById);
     var label = buildChainLabel(items);
     return { id: 'chain-' + idx, label: label, items: items };
@@ -210,6 +232,13 @@ function groupByStatus(issues) {
   });
 }
 
+function mergeLabels(a, b) {
+  var existing = new Set(a.split(' + '));
+  var incoming = b.split(' + ').filter(function(part) { return !existing.has(part); });
+  if (incoming.length === 0) return a;
+  return a + ' + ' + incoming.join(' + ');
+}
+
 function mergeLanes(lanes, maxLanes) {
   if (maxLanes < 1) maxLanes = 1;
   while (lanes.length > maxLanes) {
@@ -218,7 +247,7 @@ function mergeLanes(lanes, maxLanes) {
     var second = lanes.shift();
     lanes.push({
       id: second.id,
-      label: second.label + ' + ' + smallest.label,
+      label: mergeLabels(second.label, smallest.label),
       items: second.items.concat(smallest.items)
     });
   }
