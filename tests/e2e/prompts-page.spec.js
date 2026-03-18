@@ -126,15 +126,14 @@ test.describe('Prompts Page', () => {
       // Should have footer
       await expect(page.locator('.page-footer')).toBeVisible();
 
-      // Current page (prompts) should be bold, not a link
-      const currentPage = page.locator('.footer-current');
-      await expect(currentPage).toBeVisible();
-      await expect(currentPage).toContainText('prompts');
-
-      // Should have settings link with workspace prefix (not current page)
+      // Should have settings link with workspace prefix
       const settingsLink = page.locator(`.footer-action[href="/workspace/${TEST_WORKSPACE_URL_KEY}/settings"]`);
       await expect(settingsLink).toBeVisible();
       await expect(settingsLink).toContainText('settings');
+
+      // Should have swim link with workspace prefix
+      const swimLink = page.locator(`.footer-action[href="/workspace/${TEST_WORKSPACE_URL_KEY}/swim"]`);
+      await expect(swimLink).toBeVisible();
     });
   });
 });
