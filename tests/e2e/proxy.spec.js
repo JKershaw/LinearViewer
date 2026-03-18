@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/test-base.js';
 
 const TEST_WORKSPACE_URL_KEY = 'test-workspace';
 const PROXY_PAGE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/proxy`;
