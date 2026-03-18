@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/test-base.js';
 
 // Workspace URL key used in test session
 const TEST_WORKSPACE_URL_KEY = 'test-workspace';

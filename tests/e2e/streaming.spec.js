@@ -6,7 +6,7 @@
  *
  * LIN-185: Stream AI suggested prompt
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/test-base.js';
 
 const WORKSPACE_URL = '/workspace/test-workspace';
 const API_PREFIX = '/workspace/test-workspace';

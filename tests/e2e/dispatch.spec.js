@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/test-base.js';
 
 // Test workspace URL key (from test session setup)
 const TEST_WORKSPACE_URL_KEY = 'test-workspace';
@@ -29,6 +29,9 @@ async function clickMoreToggle(page, containerSelector, issueId) {
 
 test.describe('Dispatch Queue', () => {
   test.beforeEach(async ({ page }) => {
+    // These tests verify real badge polling behavior, so remove the count mock
+    await page.unroute('**/api/dispatch/count');
+
     // Clear dispatch queue and tokens before each test
     await page.goto('/test/clear-dispatch-queue');
     await page.goto('/test/clear-dispatch-tokens');
