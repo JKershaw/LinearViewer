@@ -139,7 +139,7 @@ function orderByDependency(ids, issueById) {
     var issue = issueById.get(id);
     var stateType = issue ? issue.stateType : 'unstarted';
     var rank = stateType in SEGMENT_RANK ? SEGMENT_RANK[stateType] : 1;
-    var idx = idToIndex.get(id) || 0;
+    var idx = idToIndex.has(id) ? idToIndex.get(id) : Infinity;
     return rank * 100000 + idx;
   }
 
