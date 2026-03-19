@@ -172,6 +172,32 @@ test.describe('Swim Page with Sample Data', () => {
     expect(arrows).toBeGreaterThan(0);
   });
 
+  test('lanes contain segment containers for global alignment', async ({ page }) => {
+    // Each lane should have at least one segment
+    const segments = await page.locator('.swim-lane-segment').count();
+    expect(segments).toBeGreaterThan(0);
+
+    // Segments should have data-segment attributes
+    const firstSegment = page.locator('.swim-lane-segment').first();
+    await expect(firstSegment).toHaveAttribute('data-segment');
+
+    // Segments should have min-width set
+    const style = await firstSegment.getAttribute('style');
+    expect(style).toContain('min-width');
+  });
+
+  test('in-progress items appear in segment 0', async ({ page }) => {
+    // Segment 0 should contain started items
+    const seg0StartedBoxes = page.locator('.swim-lane-segment[data-segment="0"] .swim-box.state-started');
+    const startedCount = await seg0StartedBoxes.count();
+    expect(startedCount).toBeGreaterThan(0);
+
+    // Segment 1 should not contain started items
+    const seg1StartedBoxes = page.locator('.swim-lane-segment[data-segment="1"] .swim-box.state-started');
+    const seg1StartedCount = await seg1StartedBoxes.count();
+    expect(seg1StartedCount).toBe(0);
+  });
+
   test('project grouping shows all 4 sample projects', async ({ page }) => {
     await page.locator('.swim-settings-toggle').click();
     await page.locator('#swim-grouping').selectOption('project');
