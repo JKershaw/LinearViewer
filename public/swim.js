@@ -137,7 +137,8 @@ function orderByDependency(ids, issueById) {
 
   function sortKey(id) {
     var issue = issueById.get(id);
-    var rank = SEGMENT_RANK[issue ? issue.stateType : 'unstarted'] || 1;
+    var stateType = issue ? issue.stateType : 'unstarted';
+    var rank = stateType in SEGMENT_RANK ? SEGMENT_RANK[stateType] : 1;
     var idx = idToIndex.get(id) || 0;
     return rank * 100000 + idx;
   }
