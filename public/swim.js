@@ -414,8 +414,8 @@ function renderBox(issue, settings) {
   var html = '<div class="swim-box ' + stateClass(issue.stateType) + compactClass +
     '" data-issue-id="' + escapeHtml(issue.id) + '">' +
     stateIndicator(issue.stateType) +
-    '<span class="swim-box-id">' + idHtml + '</span>' +
     '<span class="swim-box-title">' + titleHtml + '</span>' +
+    '<span class="swim-box-id">' + idHtml + '</span>' +
     '</div>';
 
   return html;
