@@ -197,12 +197,6 @@ body:has(.swim-page) {
 .swim-box.state-unstarted { border-left: 3px solid #bbb; }
 .swim-box.state-backlog { border-left: 3px solid #ddd; }
 
-/* Blocked indicator */
-.swim-box.is-blocked {
-  border-color: #e8a0a0;
-  background: #fef8f8;
-}
-
 /* State indicator in box */
 .swim-box-state {
   flex-shrink: 0;
@@ -227,13 +221,6 @@ body:has(.swim-page) {
   -webkit-box-orient: vertical;
   color: var(--fg, #1a1a1a);
   font-size: 12px;
-}
-
-/* Blocked-by label under box */
-.swim-box-blocked {
-  font-size: 9px;
-  color: #c0392b;
-  margin-top: 1px;
 }
 
 /* Compact mode */
@@ -284,18 +271,6 @@ body:has(.swim-page) {
   align-items: center;
   gap: 6px;
   flex-wrap: nowrap;
-}
-
-/* ==========================================================================
-   Cross-Lane Link Indicators
-   ========================================================================== */
-
-.swim-link-badge {
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
-  font-size: 9px;
-  color: #c0392b;
-  white-space: nowrap;
-  padding: 0 0.2rem;
 }
 
 /* ==========================================================================

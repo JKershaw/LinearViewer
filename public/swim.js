@@ -33,8 +33,7 @@ function assignLanes(issues, options) {
   }
 
   lanes = mergeLanes(lanes, maxLanes);
-  var links = computeLinks(filtered, lanes);
-  return { lanes: lanes, links: links };
+  return { lanes: lanes };
 }
 
 function sortLanesByProjectOrder(lanes, projectOrder) {
@@ -264,25 +263,6 @@ function mergeLanes(lanes, maxLanes) {
   return lanes;
 }
 
-function computeLinks(issues, lanes) {
-  var issueLane = new Map();
-  lanes.forEach(function(lane, li) {
-    lane.items.forEach(function(item) { issueLane.set(item.id, li); });
-  });
-  var issueIds = new Set(issues.map(function(i) { return i.id; }));
-  var links = [];
-  issues.forEach(function(issue) {
-    (issue.blocksIds || []).forEach(function(blockedId) {
-      if (!issueIds.has(blockedId)) return;
-      var fromLane = issueLane.get(issue.id);
-      var toLane = issueLane.get(blockedId);
-      if (fromLane !== undefined && toLane !== undefined && fromLane !== toLane) {
-        links.push({ from: issue.id, to: blockedId, type: 'blocks' });
-      }
-    });
-  });
-  return links;
-}
 
 // =============================================================================
 // Segment Assignment
@@ -384,15 +364,6 @@ var data = window.__SWIM_DATA__ || {};
 var allIssues = data.issues || [];
 var projectOrder = data.projectOrder || {};
 
-// Build reverse lookup: issue id → issues that block it
-var blockedByMap = new Map();
-allIssues.forEach(function(issue) {
-  (issue.blocksIds || []).forEach(function(blockedId) {
-    if (!blockedByMap.has(blockedId)) blockedByMap.set(blockedId, []);
-    blockedByMap.get(blockedId).push(issue);
-  });
-});
-
 var issueById = new Map(allIssues.map(function(i) { return [i.id, i]; }));
 
 function getSettings() {
@@ -405,8 +376,7 @@ function getSettings() {
     grouping: stored.grouping || document.getElementById('swim-grouping').value,
     maxLanes: stored.maxLanes || parseInt(document.getElementById('swim-max-lanes').value, 10),
     compact: stored.compact !== undefined ? stored.compact : document.getElementById('swim-compact').checked,
-    showCompleted: stored.showCompleted !== undefined ? stored.showCompleted : document.getElementById('swim-show-completed').checked,
-    showLinks: stored.showLinks !== undefined ? stored.showLinks : document.getElementById('swim-show-links').checked
+    showCompleted: stored.showCompleted !== undefined ? stored.showCompleted : document.getElementById('swim-show-completed').checked
   };
 }
 
@@ -420,7 +390,6 @@ function applySettingsToUI(settings) {
   document.querySelector('.swim-max-lanes-value').textContent = settings.maxLanes;
   document.getElementById('swim-compact').checked = settings.compact;
   document.getElementById('swim-show-completed').checked = settings.showCompleted;
-  document.getElementById('swim-show-links').checked = settings.showLinks;
 }
 
 function stateIndicator(stateType) {
@@ -436,13 +405,12 @@ function stateClass(stateType) {
   return 'state-' + (stateType || 'unstarted');
 }
 
-function renderBox(issue, settings, linksSet) {
+function renderBox(issue, settings) {
   var compactClass = settings.compact ? ' compact' : '';
-  var blockedClass = linksSet.has(issue.id) ? ' is-blocked' : '';
   var titleHtml = escapeHtml(issue.title || '');
   var idHtml = escapeHtml(issue.identifier || '');
 
-  var html = '<div class="swim-box ' + stateClass(issue.stateType) + compactClass + blockedClass +
+  var html = '<div class="swim-box ' + stateClass(issue.stateType) + compactClass +
     '" data-issue-id="' + escapeHtml(issue.id) + '">' +
     stateIndicator(issue.stateType) +
     '<span class="swim-box-id">' + idHtml + '</span>' +
@@ -462,18 +430,11 @@ function render() {
   });
 
   var lanes = result.lanes;
-  var links = result.links;
 
   // Assign segments and compute global widths
   assignSegments(lanes, { grouping: settings.grouping });
   var slotWidth = settings.compact ? 140 : 210;
   var segmentWidths = computeSegmentWidths(lanes, slotWidth);
-
-  // Build set of blocked issue IDs for visual indicator
-  var blockedIds = new Set();
-  if (settings.showLinks) {
-    links.forEach(function(link) { blockedIds.add(link.to); });
-  }
 
   var container = document.getElementById('swim-lanes');
 
@@ -522,11 +483,11 @@ function render() {
           html += '<div class="swim-group">';
           html += '<div class="swim-group-label">' + escapeHtml(issue.title || '').slice(0, 20) + '</div>';
           html += '<div class="swim-group-items">';
-          html += renderBox(issue, settings, blockedIds);
+          html += renderBox(issue, settings);
           rendered.add(issue.id);
           for (var ci = 0; ci < children.length; ci++) {
             html += '<span class="swim-lane-arrow">\u2192</span>';
-            html += renderBox(children[ci], settings, blockedIds);
+            html += renderBox(children[ci], settings);
             rendered.add(children[ci].id);
           }
           html += '</div></div>';
@@ -534,7 +495,7 @@ function render() {
           if (ii > 0 && !rendered.has(issue.id)) {
             html += '<span class="swim-lane-arrow">\u2192</span>';
           }
-          html += renderBox(issue, settings, blockedIds);
+          html += renderBox(issue, settings);
           rendered.add(issue.id);
         }
       }
@@ -622,8 +583,7 @@ function onSettingsChange() {
     grouping: document.getElementById('swim-grouping').value,
     maxLanes: parseInt(document.getElementById('swim-max-lanes').value, 10),
     compact: document.getElementById('swim-compact').checked,
-    showCompleted: document.getElementById('swim-show-completed').checked,
-    showLinks: document.getElementById('swim-show-links').checked
+    showCompleted: document.getElementById('swim-show-completed').checked
   };
   document.querySelector('.swim-max-lanes-value').textContent = settings.maxLanes;
   saveSettings(settings);
@@ -634,7 +594,6 @@ document.getElementById('swim-grouping').addEventListener('change', onSettingsCh
 document.getElementById('swim-max-lanes').addEventListener('input', onSettingsChange);
 document.getElementById('swim-compact').addEventListener('change', onSettingsChange);
 document.getElementById('swim-show-completed').addEventListener('change', onSettingsChange);
-document.getElementById('swim-show-links').addEventListener('change', onSettingsChange);
 
 // Box clicks → popover
 document.getElementById('swim-lanes').addEventListener('click', function(e) {

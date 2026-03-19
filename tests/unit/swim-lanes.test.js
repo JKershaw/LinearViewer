@@ -42,9 +42,8 @@ function createCard(overrides = {}) {
 
 describe('assignLanes', () => {
   test('returns empty lanes for empty input', () => {
-    const { lanes, links } = assignLanes([]);
+    const { lanes } = assignLanes([]);
     assert.deepStrictEqual(lanes, []);
-    assert.deepStrictEqual(links, []);
   });
 
   test('single issue gets one lane', () => {
@@ -176,39 +175,6 @@ describe('showCompleted', () => {
     const { lanes } = assignLanes(cards, { showCompleted: true });
     const allItems = lanes.flatMap(l => l.items);
     assert.strictEqual(allItems.length, 2);
-  });
-});
-
-// =============================================================================
-// Cross-Lane Links
-// =============================================================================
-
-describe('cross-lane links', () => {
-  test('detects blocking links across lanes', () => {
-    // a blocks d, but they are in different components (separate lanes)
-    const cards = [
-      createCard({ id: 'a', blocksIds: ['d'] }),
-      createCard({ id: 'b' }),
-      createCard({ id: 'c' }),
-      createCard({ id: 'd' })
-    ];
-    const { links } = assignLanes(cards, { grouping: 'dependency', maxLanes: 10 });
-    // a and d are connected via blocks, so they should be in the same lane in dependency mode
-    // Cross-lane links only appear when the blocker and blocked are in different lanes
-    // In dependency mode, a→d edge connects them, so they're in the same component
-    assert.strictEqual(links.length, 0);
-  });
-
-  test('cross-lane links appear in project grouping', () => {
-    const cards = [
-      createCard({ id: 'a', projectName: 'Alpha', blocksIds: ['b'] }),
-      createCard({ id: 'b', projectName: 'Beta' })
-    ];
-    const { links } = assignLanes(cards, { grouping: 'project', maxLanes: 10 });
-    assert.strictEqual(links.length, 1);
-    assert.strictEqual(links[0].from, 'a');
-    assert.strictEqual(links[0].to, 'b');
-    assert.strictEqual(links[0].type, 'blocks');
   });
 });
 
