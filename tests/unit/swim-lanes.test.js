@@ -5,7 +5,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { assignLanes } from '../../lib/swim-lanes.js';
+import { assignLanes, assignSegments } from '../../lib/swim-lanes.js';
 
 // =============================================================================
 // Test Helpers
@@ -364,5 +364,122 @@ describe('edge cases', () => {
     ];
     const { lanes } = assignLanes(cards, { showCompleted: false });
     assert.deepStrictEqual(lanes, []);
+  });
+});
+
+// =============================================================================
+// Segment Assignment
+// =============================================================================
+
+describe('assignSegments', () => {
+  test('assigns segment 0 to started items', () => {
+    const cards = [createCard({ id: 'a', stateType: 'started' })];
+    const { lanes } = assignLanes(cards);
+    assignSegments(lanes);
+    assert.strictEqual(lanes[0].items[0].segment, 0);
+  });
+
+  test('assigns segment 1 to unstarted items', () => {
+    const cards = [createCard({ id: 'a', stateType: 'unstarted' })];
+    const { lanes } = assignLanes(cards);
+    assignSegments(lanes);
+    assert.strictEqual(lanes[0].items[0].segment, 1);
+  });
+
+  test('assigns segment 2 to backlog items', () => {
+    const cards = [createCard({ id: 'a', stateType: 'backlog' })];
+    const { lanes } = assignLanes(cards);
+    assignSegments(lanes);
+    assert.strictEqual(lanes[0].items[0].segment, 2);
+  });
+
+  test('assigns segment 3 to completed items', () => {
+    const cards = [createCard({ id: 'a', stateType: 'completed' })];
+    const { lanes } = assignLanes(cards, { showCompleted: true });
+    assignSegments(lanes);
+    assert.strictEqual(lanes[0].items[0].segment, 3);
+  });
+
+  test('sorts items within lane by segment (started before unstarted)', () => {
+    const cards = [
+      createCard({ id: 'a', stateType: 'unstarted', projectName: 'P' }),
+      createCard({ id: 'b', stateType: 'started', projectName: 'P' })
+    ];
+    const { lanes } = assignLanes(cards);
+    assignSegments(lanes);
+    assert.strictEqual(lanes[0].items[0].id, 'b');
+    assert.strictEqual(lanes[0].items[0].segment, 0);
+    assert.strictEqual(lanes[0].items[1].id, 'a');
+    assert.strictEqual(lanes[0].items[1].segment, 1);
+  });
+
+  test('dependency promotion: todo blocker of started item gets segment 0', () => {
+    const cards = [
+      createCard({ id: 'blocker', stateType: 'unstarted', blocksIds: ['active'] }),
+      createCard({ id: 'active', stateType: 'started' })
+    ];
+    const { lanes } = assignLanes(cards, { grouping: 'dependency' });
+    assignSegments(lanes, { grouping: 'dependency' });
+    // Both should be segment 0 — blocker promoted because it blocks a started item
+    assert.strictEqual(lanes[0].items.find(i => i.id === 'blocker').segment, 0);
+    assert.strictEqual(lanes[0].items.find(i => i.id === 'active').segment, 0);
+  });
+
+  test('dependency promotion: transitive blocker also promoted', () => {
+    const cards = [
+      createCard({ id: 'root', stateType: 'unstarted', blocksIds: ['mid'] }),
+      createCard({ id: 'mid', stateType: 'unstarted', blocksIds: ['active'] }),
+      createCard({ id: 'active', stateType: 'started' })
+    ];
+    const { lanes } = assignLanes(cards, { grouping: 'dependency' });
+    assignSegments(lanes, { grouping: 'dependency' });
+    assert.strictEqual(lanes[0].items.find(i => i.id === 'root').segment, 0);
+    assert.strictEqual(lanes[0].items.find(i => i.id === 'mid').segment, 0);
+  });
+
+  test('no promotion in project grouping mode', () => {
+    const cards = [
+      createCard({ id: 'blocker', stateType: 'unstarted', blocksIds: ['active'], projectName: 'P' }),
+      createCard({ id: 'active', stateType: 'started', projectName: 'P' })
+    ];
+    const { lanes } = assignLanes(cards, { grouping: 'project' });
+    assignSegments(lanes, { grouping: 'project' });
+    assert.strictEqual(lanes[0].items.find(i => i.id === 'blocker').segment, 1);
+    assert.strictEqual(lanes[0].items.find(i => i.id === 'active').segment, 0);
+  });
+
+  test('parent of started child is promoted in dependency mode', () => {
+    const cards = [
+      createCard({ id: 'parent', stateType: 'unstarted' }),
+      createCard({ id: 'child', stateType: 'started', parentId: 'parent' })
+    ];
+    const { lanes } = assignLanes(cards, { grouping: 'dependency' });
+    assignSegments(lanes, { grouping: 'dependency' });
+    assert.strictEqual(lanes[0].items.find(i => i.id === 'parent').segment, 0);
+  });
+
+  test('empty lanes produce no segments', () => {
+    const lanes = [{ id: 'empty', label: 'Empty', items: [] }];
+    assignSegments(lanes);
+    assert.strictEqual(lanes[0].items.length, 0);
+  });
+});
+
+// =============================================================================
+// Status Tiebreaker in Dependency Ordering
+// =============================================================================
+
+describe('status tiebreaker in dependency ordering', () => {
+  test('started items sort before unstarted at same dependency level', () => {
+    // Three independent items in same project — no dependency edges
+    const cards = [
+      createCard({ id: 'todo1', stateType: 'unstarted', projectName: 'P' }),
+      createCard({ id: 'active', stateType: 'started', projectName: 'P' }),
+      createCard({ id: 'todo2', stateType: 'unstarted', projectName: 'P' })
+    ];
+    const { lanes } = assignLanes(cards, { grouping: 'dependency' });
+    const ids = lanes[0].items.map(i => i.id);
+    // 'active' should be first since it's started
+    assert.strictEqual(ids[0], 'active');
   });
 });

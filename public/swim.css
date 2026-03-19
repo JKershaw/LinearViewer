@@ -146,6 +146,15 @@ body:has(.swim-page) {
   min-width: 0;
 }
 
+/* Segment containers for global alignment */
+.swim-lane-segment {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  flex-wrap: nowrap;
+}
+
 /* Sequence arrow between boxes */
 .swim-lane-arrow {
   color: #ccc;

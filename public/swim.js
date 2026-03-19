@@ -9,6 +9,8 @@
 // Lane Assignment (client-side copy of lib/swim-lanes.js algorithm)
 // =============================================================================
 
+var SEGMENT_RANK = { started: 0, unstarted: 1, backlog: 2, completed: 3, canceled: 3 };
+
 function assignLanes(issues, options) {
   const { maxLanes = 6, grouping = 'dependency', showCompleted = false, projectOrder = {} } = options || {};
 
@@ -134,6 +136,13 @@ function orderByDependency(ids, issueById) {
   var issues = ids.map(function(id) { return issueById.get(id); }).filter(Boolean);
   var idToIndex = new Map(issues.map(function(iss, i) { return [iss.id, i]; }));
 
+  function sortKey(id) {
+    var issue = issueById.get(id);
+    var rank = SEGMENT_RANK[issue ? issue.stateType : 'unstarted'] || 1;
+    var idx = idToIndex.get(id) || 0;
+    return rank * 100000 + idx;
+  }
+
   var adj = new Map();
   var inDegree = new Map();
   ids.forEach(function(id) { adj.set(id, []); inDegree.set(id, 0); });
@@ -152,6 +161,7 @@ function orderByDependency(ids, issueById) {
   });
 
   var queue = issues.filter(function(i) { return (inDegree.get(i.id) || 0) === 0; }).map(function(i) { return i.id; });
+  queue.sort(function(a, b) { return sortKey(a) - sortKey(b); });
   var result = [];
 
   while (queue.length > 0) {
@@ -161,10 +171,10 @@ function orderByDependency(ids, issueById) {
       var newDeg = inDegree.get(nextId) - 1;
       inDegree.set(nextId, newDeg);
       if (newDeg === 0) {
-        var nextIdx = idToIndex.get(nextId);
+        var nextKey = sortKey(nextId);
         var insertPos = -1;
         for (var q = 0; q < queue.length; q++) {
-          if ((idToIndex.get(queue[q]) || Infinity) > nextIdx) { insertPos = q; break; }
+          if (sortKey(queue[q]) > nextKey) { insertPos = q; break; }
         }
         if (insertPos === -1) queue.push(nextId);
         else queue.splice(insertPos, 0, nextId);
@@ -275,6 +285,98 @@ function computeLinks(issues, lanes) {
 }
 
 // =============================================================================
+// Segment Assignment
+// =============================================================================
+
+function assignSegments(lanes, options) {
+  var grouping = (options && options.grouping) || 'dependency';
+
+  for (var li = 0; li < lanes.length; li++) {
+    var lane = lanes[li];
+    // Initial segment from stateType
+    for (var ii = 0; ii < lane.items.length; ii++) {
+      var rank = SEGMENT_RANK[lane.items[ii].stateType];
+      lane.items[ii].segment = rank !== undefined ? rank : 1;
+    }
+
+    // Dependency promotion
+    if (grouping === 'dependency') {
+      promoteDependencyBlockers(lane.items);
+    }
+
+    // Stable sort by segment
+    var indexed = lane.items.map(function(item, i) { return { item: item, orig: i }; });
+    indexed.sort(function(a, b) { return a.item.segment - b.item.segment || a.orig - b.orig; });
+    lane.items = indexed.map(function(e) { return e.item; });
+  }
+
+  return lanes;
+}
+
+function promoteDependencyBlockers(items) {
+  var itemById = new Map(items.map(function(i) { return [i.id, i]; }));
+  var itemIds = new Set(items.map(function(i) { return i.id; }));
+
+  // Build reverse map: blockedId → [blockerItems]
+  var blockerOf = new Map();
+  for (var i = 0; i < items.length; i++) {
+    var item = items[i];
+    var blocksIds = item.blocksIds || [];
+    for (var j = 0; j < blocksIds.length; j++) {
+      if (itemIds.has(blocksIds[j])) {
+        if (!blockerOf.has(blocksIds[j])) blockerOf.set(blocksIds[j], []);
+        blockerOf.get(blocksIds[j]).push(item);
+      }
+    }
+    if (item.parentId && itemById.has(item.parentId)) {
+      var parent = itemById.get(item.parentId);
+      if (!blockerOf.has(item.id)) blockerOf.set(item.id, []);
+      blockerOf.get(item.id).push(parent);
+    }
+  }
+
+  // BFS from segment-0 items, promoting their blockers
+  var queue = items.filter(function(i) { return i.segment === 0; }).map(function(i) { return i.id; });
+  var visited = new Set(queue);
+
+  while (queue.length > 0) {
+    var id = queue.shift();
+    var blockers = blockerOf.get(id) || [];
+    for (var b = 0; b < blockers.length; b++) {
+      if (!visited.has(blockers[b].id)) {
+        visited.add(blockers[b].id);
+        blockers[b].segment = 0;
+        queue.push(blockers[b].id);
+      }
+    }
+  }
+}
+
+function computeSegmentWidths(lanes, slotWidth) {
+  // Find the max number of items per segment across all lanes
+  var maxPerSegment = {};
+  for (var li = 0; li < lanes.length; li++) {
+    var counts = {};
+    for (var ii = 0; ii < lanes[li].items.length; ii++) {
+      var seg = lanes[li].items[ii].segment;
+      counts[seg] = (counts[seg] || 0) + 1;
+    }
+    for (var seg in counts) {
+      if (!maxPerSegment[seg] || counts[seg] > maxPerSegment[seg]) {
+        maxPerSegment[seg] = counts[seg];
+      }
+    }
+  }
+
+  // Convert to min-widths
+  var widths = {};
+  for (var seg in maxPerSegment) {
+    widths[seg] = maxPerSegment[seg] * slotWidth;
+  }
+  return widths;
+}
+
+// =============================================================================
 // Rendering
 // =============================================================================
 
@@ -362,6 +464,11 @@ function render() {
   var lanes = result.lanes;
   var links = result.links;
 
+  // Assign segments and compute global widths
+  assignSegments(lanes, { grouping: settings.grouping });
+  var slotWidth = settings.compact ? 140 : 210;
+  var segmentWidths = computeSegmentWidths(lanes, slotWidth);
+
   // Build set of blocked issue IDs for visual indicator
   var blockedIds = new Set();
   if (settings.showLinks) {
@@ -375,6 +482,9 @@ function render() {
     return;
   }
 
+  // Collect all segment indices in order
+  var segmentKeys = Object.keys(segmentWidths).map(Number).sort(function(a, b) { return a - b; });
+
   var html = '';
   for (var li = 0; li < lanes.length; li++) {
     var lane = lanes[li];
@@ -382,54 +492,54 @@ function render() {
     html += '<div class="swim-lane-label" title="' + escapeHtml(lane.label) + '">' + escapeHtml(lane.label) + '</div>';
     html += '<div class="swim-lane-items">';
 
-    // Group subtasks together
-    var rendered = new Set();
+    // Group items by segment
+    var itemsBySegment = {};
     for (var ii = 0; ii < lane.items.length; ii++) {
-      var issue = lane.items[ii];
-      if (rendered.has(issue.id)) continue;
-
-      // Check if this is a parent with children in this lane
-      var children = lane.items.filter(function(item) {
-        return item.parentId === issue.id && !rendered.has(item.id);
-      });
-
-      if (children.length > 0 && !issue.parentId) {
-        // Render as group
-        html += '<div class="swim-group">';
-        html += '<div class="swim-group-label">' + escapeHtml(issue.title || '').slice(0, 20) + '</div>';
-        html += '<div class="swim-group-items">';
-        html += renderBox(issue, settings, blockedIds);
-        rendered.add(issue.id);
-        for (var ci = 0; ci < children.length; ci++) {
-          html += '<span class="swim-lane-arrow">\u2192</span>';
-          html += renderBox(children[ci], settings, blockedIds);
-          rendered.add(children[ci].id);
-        }
-        html += '</div></div>';
-      } else {
-        if (ii > 0 && !rendered.has(issue.id)) {
-          html += '<span class="swim-lane-arrow">\u2192</span>';
-        }
-        html += renderBox(issue, settings, blockedIds);
-        rendered.add(issue.id);
-      }
+      var seg = lane.items[ii].segment;
+      if (!itemsBySegment[seg]) itemsBySegment[seg] = [];
+      itemsBySegment[seg].push(lane.items[ii]);
     }
 
-    // Show cross-lane link badges
-    if (settings.showLinks) {
-      for (var ii = 0; ii < lane.items.length; ii++) {
-        var item = lane.items[ii];
-        var blockers = blockedByMap.get(item.id);
-        if (blockers && blockers.length > 0) {
-          var crossLane = blockers.filter(function(b) {
-            // Is the blocker in a different lane?
-            return !lane.items.some(function(li) { return li.id === b.id; });
-          });
-          if (crossLane.length > 0) {
-            // Badge is already handled by the is-blocked class on the box
+    // Render each segment
+    for (var si = 0; si < segmentKeys.length; si++) {
+      var segKey = segmentKeys[si];
+      var segItems = itemsBySegment[segKey] || [];
+      var minWidth = segmentWidths[segKey] || 0;
+
+      html += '<div class="swim-lane-segment" data-segment="' + segKey + '" style="min-width:' + minWidth + 'px">';
+
+      var rendered = new Set();
+      for (var ii = 0; ii < segItems.length; ii++) {
+        var issue = segItems[ii];
+        if (rendered.has(issue.id)) continue;
+
+        // Check if this is a parent with children in this segment
+        var children = segItems.filter(function(item) {
+          return item.parentId === issue.id && !rendered.has(item.id);
+        });
+
+        if (children.length > 0 && !issue.parentId) {
+          html += '<div class="swim-group">';
+          html += '<div class="swim-group-label">' + escapeHtml(issue.title || '').slice(0, 20) + '</div>';
+          html += '<div class="swim-group-items">';
+          html += renderBox(issue, settings, blockedIds);
+          rendered.add(issue.id);
+          for (var ci = 0; ci < children.length; ci++) {
+            html += '<span class="swim-lane-arrow">\u2192</span>';
+            html += renderBox(children[ci], settings, blockedIds);
+            rendered.add(children[ci].id);
           }
+          html += '</div></div>';
+        } else {
+          if (ii > 0 && !rendered.has(issue.id)) {
+            html += '<span class="swim-lane-arrow">\u2192</span>';
+          }
+          html += renderBox(issue, settings, blockedIds);
+          rendered.add(issue.id);
         }
       }
+
+      html += '</div>';
     }
 
     html += '</div></div>';
