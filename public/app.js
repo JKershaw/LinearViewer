@@ -1151,9 +1151,13 @@ function initPrompts() {
     // Append proxy block if toggle is active
     prompt = await maybeAppendProxyBlock(prompt, urlKey)
 
-    // Get issue title from the DOM if available
+    // Get issue context from the DOM if available
     const issueEl = issueId ? document.querySelector(`[data-id="${issueId}"]`) : null
     const issueTitle = issueEl?.querySelector('.title, .title-dim')?.textContent || null
+    const detailsEl = issueId ? document.querySelector(`[data-details-for="${issueId}"]`) : null
+    const metaText = detailsEl?.querySelector('.detail-meta')?.textContent || ''
+    const issueIdentifier = metaText.split('·')[0].trim() || null
+    const issueUrl = detailsEl?.querySelector('a.detail-link[href*="linear.app"]')?.getAttribute('href') || null
 
     // Get repo from prompt/recommend container (set by prompt API response)
     const repo = promptContainer.dataset.repo || null
@@ -1165,7 +1169,9 @@ function initPrompts() {
         prompt,
         promptName,
         issueId: issueId || null,
+        issueIdentifier,
         issueTitle,
+        issueUrl,
         target
       }
       if (repo) payload.repo = repo

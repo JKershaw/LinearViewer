@@ -1121,7 +1121,14 @@ async function handleDispatchClick(e) {
     const response = await fetch(`${apiPrefix}/api/dispatch`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, target })
+      body: JSON.stringify({
+        prompt,
+        target,
+        issueId: filteredIssues[currentIndex]?.id || null,
+        issueIdentifier: filteredIssues[currentIndex]?.identifier || null,
+        issueTitle: filteredIssues[currentIndex]?.title || null,
+        issueUrl: filteredIssues[currentIndex]?.url || null
+      })
     });
 
     if (!response.ok) throw new Error('Dispatch failed');
