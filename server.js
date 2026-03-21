@@ -64,14 +64,13 @@ if (!process.env.SESSION_SECRET) {
   process.env.SESSION_SECRET = DEFAULT_SESSION_SECRET;
 }
 
-// OAuth vars only required in non-test mode (tests use mock auth)
-if (process.env.NODE_ENV !== 'test') {
-  for (const envVar of oauthEnvVars) {
-    if (!process.env[envVar]) {
-      console.error(`Error: Missing required environment variable: ${envVar}`);
-      process.exit(1);
-    }
-  }
+// OAuth vars: warn if missing but allow server to start (landing page still works)
+const oauthConfigured = oauthEnvVars.every(v => !!process.env[v]);
+if (!oauthConfigured && process.env.NODE_ENV !== 'test') {
+  const missing = oauthEnvVars.filter(v => !process.env[v]);
+  console.warn(`Warning: Missing OAuth environment variables: ${missing.join(', ')}`);
+  console.warn('The server will start, but Linear login will be unavailable.');
+  console.warn('Set these variables to enable OAuth, or see .env.example for reference.');
 }
 
 // =============================================================================

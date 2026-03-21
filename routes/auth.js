@@ -27,6 +27,14 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore }) {
    * and redirects user to Linear's OAuth authorization page.
    */
   router.get('/auth/linear', async (req, res) => {
+    // Guard: OAuth not configured
+    if (!process.env.LINEAR_CLIENT_ID || !process.env.LINEAR_CLIENT_SECRET || !process.env.LINEAR_REDIRECT_URI) {
+      return res.status(503).send(renderErrorPage(
+        'Login Unavailable',
+        'Linear OAuth is not configured. Set LINEAR_CLIENT_ID, LINEAR_CLIENT_SECRET, and LINEAR_REDIRECT_URI to enable login.'
+      ))
+    }
+
     // Clean up expired sessions before proceeding
     await sessionStore.cleanup()
 
@@ -80,6 +88,14 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore }) {
         actionUrl: '/auth/linear'
       })
       return res.status(400).send(html)
+    }
+
+    // Guard: OAuth not configured (shouldn't happen since /auth/linear guards too)
+    if (!process.env.LINEAR_CLIENT_ID || !process.env.LINEAR_CLIENT_SECRET || !process.env.LINEAR_REDIRECT_URI) {
+      return res.status(503).send(renderErrorPage(
+        'Login Unavailable',
+        'Linear OAuth is not configured.'
+      ))
     }
 
     try {
