@@ -224,7 +224,6 @@ function hasStoredState() {
 function getDefaultState() {
   return {
     expanded: [],
-    expandedProjectMeta: [],
     hideCompleted: [],
     collapsedProjects: [],
     inProgressCollapsed: false,
@@ -298,7 +297,7 @@ function resetDOM() {
       setArrow(header, true)
     }
     show(project.querySelector('.project-description'))
-    hide(project.querySelector('.project-meta'))
+    show(project.querySelector('.project-meta'))
     show(project.querySelector('.completed-toggle'))
   })
 
@@ -368,16 +367,9 @@ function applyState(state) {
   // Ensure state has all expected properties
   state.collapsedProjects = state.collapsedProjects || []
   state.expanded = state.expanded || []
-  state.expandedProjectMeta = state.expandedProjectMeta || []
   state.hideCompleted = state.hideCompleted || []
   state.inProgressCollapsed = state.inProgressCollapsed || false
   state.recentActivityCollapsed = state.recentActivityCollapsed || false
-
-  // Show expanded project meta
-  state.expandedProjectMeta.forEach(projectId => {
-    const meta = document.querySelector(`.project[data-id="${projectId}"] .project-meta`)
-    show(meta)
-  })
 
   // Apply in-progress section collapsed state
   if (state.inProgressCollapsed) {
@@ -693,19 +685,7 @@ function init() {
       return
     }
 
-    // 4. Project description click (show/hide meta)
-    const desc = e.target.closest('.project-description')
-    if (desc) {
-      const project = desc.closest('.project')
-      const projectId = project.dataset.id
-      toggleInArray(state.expandedProjectMeta, projectId)
-      persistState(state)
-      const meta = project.querySelector('.project-meta')
-      setHidden(meta, !state.expandedProjectMeta.includes(projectId))
-      return
-    }
-
-    // 5. Line click (expand issue details) - skip if clicking a link
+    // 4. Line click (expand issue details) - skip if clicking a link
     const line = e.target.closest('.line.expandable')
     if (line && !e.target.closest('a')) {
       toggleItem(line)
