@@ -37,7 +37,19 @@ function assignLanes(issues, options) {
 }
 
 function sortLanesByProjectOrder(lanes, projectOrder) {
-  function getLaneSortKey(lane) {
+  var STATUS_RANK = { started: 0, unstarted: 1, backlog: 2 };
+
+  function getLaneStatusRank(lane) {
+    var best = 2;
+    for (var i = 0; i < lane.items.length; i++) {
+      var rank = STATUS_RANK[lane.items[i].stateType] !== undefined ? STATUS_RANK[lane.items[i].stateType] : 1;
+      if (rank < best) best = rank;
+      if (best === 0) break;
+    }
+    return best;
+  }
+
+  function getLaneProjectOrder(lane) {
     var counts = new Map();
     for (var i = 0; i < lane.items.length; i++) {
       var name = lane.items[i].projectName || '';
@@ -50,7 +62,12 @@ function sortLanesByProjectOrder(lanes, projectOrder) {
     });
     return projectOrder[bestProject] !== undefined ? projectOrder[bestProject] : Infinity;
   }
-  lanes.sort(function(a, b) { return getLaneSortKey(a) - getLaneSortKey(b); });
+
+  lanes.sort(function(a, b) {
+    var statusDiff = getLaneStatusRank(a) - getLaneStatusRank(b);
+    if (statusDiff !== 0) return statusDiff;
+    return getLaneProjectOrder(a) - getLaneProjectOrder(b);
+  });
 }
 
 function groupByDependency(issues) {
