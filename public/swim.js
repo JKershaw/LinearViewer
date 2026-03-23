@@ -28,11 +28,12 @@ function assignLanes(issues, options) {
     default: lanes = groupByDependency(filtered); break;
   }
 
+  lanes = mergeLanes(lanes, maxLanes);
+
+  // Sort lanes AFTER merging (merge re-sorts by size internally)
   if (grouping === 'project' || grouping === 'dependency') {
     sortLanesByProjectOrder(lanes, projectOrder);
   }
-
-  lanes = mergeLanes(lanes, maxLanes);
   return { lanes: lanes };
 }
 
