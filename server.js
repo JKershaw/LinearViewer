@@ -47,7 +47,7 @@ import { renderDispatchPage } from './lib/render-dispatch.js'
 import { renderSwipePage } from './lib/render-swipe.js'
 import { renderSwimPage } from './lib/render-swim.js'
 import { renderRoadmapPage } from './lib/render-roadmap.js'
-import { calculateVelocity, buildExecutionQueue, groupByMilestone, projectTimeline, findCriticalPaths, assessRisks } from './lib/roadmap.js'
+import { calculateVelocity, buildExecutionQueue, groupByMilestone, projectTimeline, findCriticalPaths, assessRisks, issueToRoadmapCard } from './lib/roadmap.js'
 import { renderProxyPage } from './lib/render-proxy.js'
 import { renderForemanPage } from './lib/render-foreman.js'
 import { DEFAULT_MODEL, AVAILABLE_MODELS } from './lib/openrouter.js'
@@ -758,7 +758,11 @@ app.get('/workspace/:urlKey/roadmap', workspaceFromUrl, async (req, res) => {
     // Build roadmap model from deterministic layer
     const velocity = calculateVelocity(issues, 90);
     const executionQueue = buildExecutionQueue(issues);
-    const milestones = groupByMilestone(executionQueue, projects);
+    // Completed issues are excluded from executionQueue but needed for progress %
+    const completedIssues = issues
+      .filter(i => i.state?.type === 'completed')
+      .map(i => issueToRoadmapCard(i));
+    const milestones = groupByMilestone(executionQueue, projects, completedIssues);
 
     // Project timeline
     const timedMilestones = projectTimeline(milestones, velocity);

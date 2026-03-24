@@ -15,7 +15,8 @@ import {
   groupByMilestone,
   projectTimeline,
   findCriticalPaths,
-  assessRisks
+  assessRisks,
+  issueToRoadmapCard
 } from '../../lib/roadmap.js';
 import { renderRoadmapPage } from '../../lib/render-roadmap.js';
 import { summarizeRoadmapModel, buildRoadmapNarrativeMessages, buildRoadmapNarrativePrompt } from '../../lib/prompts/roadmap-narrative-template.js';
@@ -63,7 +64,10 @@ function daysAgo(n) {
 function buildRoadmapModel(issues, projects) {
   const velocity = calculateVelocity(issues, 90);
   const executionQueue = buildExecutionQueue(issues);
-  const milestones = groupByMilestone(executionQueue, projects);
+  const completedIssues = issues
+    .filter(i => i.state?.type === 'completed')
+    .map(i => issueToRoadmapCard(i));
+  const milestones = groupByMilestone(executionQueue, projects, completedIssues);
   const timedMilestones = projectTimeline(milestones, velocity);
   const criticalPaths = findCriticalPaths(executionQueue);
   const risks = assessRisks(timedMilestones, criticalPaths, velocity);
@@ -196,6 +200,47 @@ describe('roadmap data shape contract', () => {
       assert.ok(!('milestoneId' in risk), 'should not have milestoneId field');
       assert.ok(!('projectId' in risk), 'should not have projectId field');
     }
+  });
+
+  test('progressPercent reflects completed issues when passed to groupByMilestone', () => {
+    const issues = [
+      createIssue({
+        id: 'done-prog',
+        completedAt: daysAgo(3),
+        estimate: 3,
+        state: { name: 'Done', type: 'completed' },
+        project: { id: 'proj-1', name: 'ProgressTest' }
+      }),
+      createIssue({
+        id: 'todo-prog',
+        estimate: 5,
+        state: { name: 'Todo', type: 'unstarted' },
+        project: { id: 'proj-1', name: 'ProgressTest' }
+      })
+    ];
+    const projects = [{ id: 'proj-1', name: 'ProgressTest' }];
+    const model = buildRoadmapModel(issues, projects);
+
+    const milestone = model.milestones.find(m => m.name === 'ProgressTest');
+    assert.ok(milestone, 'should have ProgressTest milestone');
+    assert.strictEqual(milestone.completedTasks, 1, 'should count 1 completed task');
+    assert.strictEqual(milestone.totalTasks, 2, 'should count 2 total tasks');
+    assert.ok(milestone.progressPercent > 0, `progressPercent should be > 0, got ${milestone.progressPercent}`);
+    assert.strictEqual(milestone.progressPercent, 50, 'should be 50% complete');
+  });
+
+  test('issueToRoadmapCard handles null relatedIssue in relations', () => {
+    const issue = createIssue({
+      id: 'null-rel',
+      relations: { nodes: [
+        { type: 'blocks', relatedIssue: null },
+        { type: 'blocks', relatedIssue: { id: 'valid-target' } },
+        { type: 'related', relatedIssue: null }
+      ] }
+    });
+    const card = issueToRoadmapCard(issue);
+    // Should not crash and should only include valid blocking relations
+    assert.deepStrictEqual(card.blocksIds, ['valid-target']);
   });
 
   test('execution queue items have identifier and title for critical path rendering', () => {
@@ -458,6 +503,8 @@ describe('renderRoadmapPage with real model', () => {
     assert.ok('milestones' in parsed);
     assert.ok('hasAI' in parsed);
     assert.ok('urlKey' in parsed);
+    // executionQueue should NOT be in client payload (only needed server-side)
+    assert.ok(!('executionQueue' in parsed), 'executionQueue should not be in client payload');
   });
 });
 
