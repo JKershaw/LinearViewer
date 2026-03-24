@@ -369,7 +369,7 @@ async function fetchAndPrepareProjects(accessToken, teamId = null, mockOverride 
       return { project, incomplete, completed, completedCount };
     });
 
-  return { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId: teamId, issues };
+  return { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId: teamId };
 }
 
 /**
@@ -749,12 +749,16 @@ app.get('/workspace/:urlKey/roadmap', workspaceFromUrl, async (req, res) => {
   const teamId = rawTeam && rawTeam !== 'all' && UUID_REGEX.test(rawTeam) ? rawTeam : null;
 
   try {
-    const { trees, inProgressTrees, recentActivityTrees, organizationName, issues } = await fetchAndPrepareProjects(workspace.accessToken, teamId);
+    // Fetch raw data — roadmap needs raw issues for velocity/queue calculations
+    const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
+    const { organizationName, projects, issues } = isTestMode
+      ? testMockData
+      : await fetchProjects(workspace.accessToken, teamId);
 
     // Build roadmap model from deterministic layer
     const velocity = calculateVelocity(issues, 90);
     const executionQueue = buildExecutionQueue(issues);
-    const milestones = groupByMilestone(executionQueue, trees.map(t => t.project));
+    const milestones = groupByMilestone(executionQueue, projects);
 
     // Project timeline
     const timedMilestones = projectTimeline(milestones, velocity);

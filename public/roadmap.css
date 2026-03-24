@@ -60,7 +60,7 @@
 }
 
 .roadmap-milestone-card {
-  border: 1px solid #ddd;
+  border: 1px solid var(--fg-vdim);
   margin-bottom: 1em;
   padding: 1em;
   border-radius: 2px;
@@ -96,7 +96,7 @@
 .roadmap-milestone-stats {
   font-family: var(--font-structural);
   font-size: 0.8em;
-  color: #666;
+  color: var(--fg-dim);
   margin-top: 0.25em;
 }
 
@@ -104,7 +104,7 @@
   font-family: var(--font-structural);
   font-size: 0.8em;
   margin-top: 0.5em;
-  color: #888;
+  color: var(--fg-dim);
 }
 
 /* =============================================================================
@@ -189,7 +189,7 @@
   font-family: var(--font-structural);
   font-size: 0.85em;
   padding: 0.4em 0.6em;
-  border: 1px solid #ddd;
+  border: 1px solid var(--fg-vdim);
   border-radius: 2px;
   background: var(--bg);
   color: var(--fg);
@@ -204,7 +204,7 @@
   font-family: var(--font-structural);
   font-size: 0.85em;
   padding: 0.4em 1em;
-  border: 1px solid #ddd;
+  border: 1px solid var(--fg-vdim);
   border-radius: 2px;
   background: var(--bg);
   color: var(--fg);
@@ -227,7 +227,7 @@
   font-family: var(--font-structural);
   font-size: 0.85em;
   padding: 0.4em 1em;
-  border: 1px solid #ddd;
+  border: 1px solid var(--fg-vdim);
   border-radius: 2px;
   background: var(--bg);
   color: var(--fg);

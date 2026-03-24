@@ -915,9 +915,10 @@ ${goal}`;
 
   /**
    * Generate roadmap narrative via SSE streaming.
-   * @route GET /workspace/:urlKey/api/roadmap/narrative
+   * Client POSTs the roadmap model (already computed and embedded in the page).
+   * @route POST /workspace/:urlKey/api/roadmap/narrative
    */
-  router.get('/workspace/:urlKey/api/roadmap/narrative', workspaceFromUrl, async (req, res) => {
+  router.post('/workspace/:urlKey/api/roadmap/narrative', workspaceFromUrl, async (req, res) => {
     const featureFlags = getFeatureFlags(req.session);
     if (!featureFlags.roadmap) {
       return res.status(403).json({ error: 'Roadmap feature is not enabled' });
@@ -927,6 +928,11 @@ ${goal}`;
     const apiKeyToUse = sessionApiKey || process.env.OPENROUTER_API_KEY || process.env.OPENROUTER_FREE_TIER_KEY;
     if (!apiKeyToUse) {
       return res.status(503).json({ error: 'AI not configured. Connect OpenRouter or set OPENROUTER_API_KEY.' });
+    }
+
+    const { roadmapModel } = req.body;
+    if (!roadmapModel) {
+      return res.status(400).json({ error: 'roadmapModel is required' });
     }
 
     // Start SSE
@@ -939,7 +945,6 @@ ${goal}`;
 
     try {
       const { buildRoadmapNarrativePrompt } = await import('../lib/prompts/roadmap-narrative-template.js');
-      const roadmapModel = JSON.parse(req.query.model || '{}');
       const prompt = buildRoadmapNarrativePrompt(roadmapModel);
 
       const selectedModel = req.session.modelId || DEFAULT_MODEL;
@@ -963,6 +968,7 @@ ${goal}`;
 
   /**
    * Roadmap Q&A chat via SSE streaming.
+   * Client POSTs the question and the roadmap model.
    * @route POST /workspace/:urlKey/api/roadmap/chat
    */
   router.post('/workspace/:urlKey/api/roadmap/chat', workspaceFromUrl, async (req, res) => {

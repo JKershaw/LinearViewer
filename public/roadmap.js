@@ -1,11 +1,12 @@
 /**
  * Roadmap Page Client-Side Logic
  *
- * Reads window.__ROADMAP_DATA__ and renders:
- * - Velocity panel with trend indicators
- * - Milestone cards with progress bars, stats, critical paths, risks
+ * Reads window.__ROADMAP_DATA__ and handles:
  * - AI narrative generation (SSE streaming)
  * - AI chat Q&A (SSE streaming)
+ *
+ * The velocity panel and milestone cards are server-rendered.
+ * This script only adds interactive AI features when available.
  *
  * Loaded only on the /roadmap page.
  */
@@ -17,8 +18,6 @@
   if (!data) return;
 
   var urlKey = data.urlKey;
-  var velocity = data.velocity;
-  var milestones = data.milestones || [];
   var hasAI = data.hasAI;
 
   // =========================================================================
@@ -83,121 +82,17 @@
     return pump();
   }
 
-  // =========================================================================
-  // Velocity Panel
-  // =========================================================================
-
-  function renderVelocityPanel() {
-    var panel = document.querySelector('.roadmap-velocity-panel');
-    if (!panel || !velocity) return;
-
-    var trendClass = 'roadmap-trend roadmap-trend--stable';
-    var trendLabel = 'stable';
-    if (velocity.trend === 'increasing') {
-      trendClass = 'roadmap-trend roadmap-trend--increasing';
-      trendLabel = '↑ increasing';
-    } else if (velocity.trend === 'decreasing') {
-      trendClass = 'roadmap-trend roadmap-trend--decreasing';
-      trendLabel = '↓ decreasing';
-    }
-
-    var html = '';
-    if (velocity.completedPerWeek != null) {
-      html += '<span class="roadmap-velocity-stat">'
-        + escapeHtml(String(velocity.completedPerWeek)) + ' issues/week'
-        + '</span>';
-    }
-    if (velocity.pointsPerWeek != null) {
-      html += '<span class="roadmap-velocity-stat">'
-        + escapeHtml(String(velocity.pointsPerWeek)) + ' pts/week'
-        + '</span>';
-    }
-    html += '<span class="roadmap-velocity-stat">'
-      + 'trend: <span class="' + trendClass + '">' + escapeHtml(trendLabel) + '</span>'
-      + '</span>';
-
-    panel.innerHTML = html;
-  }
-
-  // =========================================================================
-  // Milestones
-  // =========================================================================
-
-  function buildProgressBar(percent, width) {
-    width = width || 30;
-    var filled = Math.round((percent / 100) * width);
-    var empty = width - filled;
-    var bar = '';
-    for (var i = 0; i < filled; i++) bar += '\u2501'; // ━
-    for (var j = 0; j < empty; j++) bar += '\u2500';  // ─
-    return '[' + bar + '] ' + percent + '%';
-  }
-
-  function renderMilestones() {
-    var container = document.querySelector('.roadmap-milestones');
-    if (!container) return;
-
-    if (milestones.length === 0) {
-      container.innerHTML = '<div style="color:var(--fg-dim)">No milestones found.</div>';
-      return;
-    }
-
-    var html = '';
-
-    for (var i = 0; i < milestones.length; i++) {
-      var m = milestones[i];
-      html += '<div class="roadmap-milestone-card">';
-
-      // Header
-      html += '<div class="roadmap-milestone-header">';
-      html += '<strong>' + escapeHtml(m.name) + '</strong>';
-      if (m.targetDate) {
-        html += '<span class="roadmap-milestone-date">' + escapeHtml(m.targetDate) + '</span>';
-      }
-      html += '</div>';
-
-      // Progress bar
-      var pct = m.progressPercent != null ? m.progressPercent : 0;
-      html += '<div class="roadmap-progress-bar">' + buildProgressBar(pct) + '</div>';
-
-      // Stats
-      var statParts = [];
-      if (m.remaining != null) statParts.push(m.remaining + ' remaining');
-      if (m.points != null) statParts.push(m.points + ' points');
-      if (m.weeksEstimate) {
-        var est = '~' + m.weeksEstimate + ' weeks';
-        if (m.weeksRange) est += ' (' + m.weeksRange + ')';
-        statParts.push(est);
-      }
-      if (statParts.length > 0) {
-        html += '<div class="roadmap-milestone-stats">'
-          + escapeHtml(statParts.join(' \u00b7 '))
-          + '</div>';
-      }
-
-      // Critical path
-      if (m.criticalPath && m.criticalPath.length > 0) {
-        var pathStr = '\u251c\u2500 ' + m.criticalPath.map(function(id) {
-          return escapeHtml(id);
-        }).join(' \u2192 ');
-        html += '<div class="roadmap-critical-path">' + pathStr + '</div>';
-      }
-
-      // Risks
-      if (m.risks && m.risks.length > 0) {
-        for (var r = 0; r < m.risks.length; r++) {
-          var risk = m.risks[r];
-          var severity = risk.severity || 'low';
-          html += '<div class="roadmap-risk roadmap-risk--' + escapeHtml(severity) + '">'
-            + escapeHtml(risk.label || risk.description || '')
-            + '</div>';
-        }
-      }
-
-      html += '</div>';
-    }
-
-    container.innerHTML = html;
+  /**
+   * Build the roadmap model payload for API requests.
+   * Strips the executionQueue to keep the payload small.
+   */
+  function getRoadmapModelPayload() {
+    return {
+      velocity: data.velocity,
+      milestones: data.milestones,
+      criticalPaths: data.criticalPaths,
+      risks: data.risks
+    };
   }
 
   // =========================================================================
@@ -215,6 +110,11 @@
       section.appendChild(content);
     }
 
+    var heading = document.createElement('h2');
+    heading.className = 'roadmap-section-heading';
+    heading.textContent = '│ Narrative';
+    section.insertBefore(heading, content);
+
     var btn = document.createElement('button');
     btn.className = 'roadmap-generate-btn';
     btn.textContent = 'Generate Narrative';
@@ -226,8 +126,12 @@
       content.textContent = '';
 
       fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/roadmap/narrative', {
-        method: 'GET',
-        headers: { 'Accept': 'text/event-stream' }
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'text/event-stream'
+        },
+        body: JSON.stringify({ roadmapModel: getRoadmapModelPayload() })
       }).then(function(response) {
         if (response.status === 401) {
           window.location.href = '/logout';
@@ -269,6 +173,11 @@
   function renderChat() {
     var section = document.querySelector('.roadmap-chat');
     if (!section || !hasAI) return;
+
+    var heading = document.createElement('h2');
+    heading.className = 'roadmap-section-heading';
+    heading.textContent = '│ Chat';
+    section.appendChild(heading);
 
     var history = document.createElement('div');
     history.className = 'roadmap-chat-history';
@@ -317,7 +226,10 @@
           'Content-Type': 'application/json',
           'Accept': 'text/event-stream'
         },
-        body: JSON.stringify({ question: question })
+        body: JSON.stringify({
+          question: question,
+          roadmapModel: getRoadmapModelPayload()
+        })
       }).then(function(response) {
         if (response.status === 401) {
           window.location.href = '/logout';
@@ -366,8 +278,6 @@
   // Init
   // =========================================================================
 
-  renderVelocityPanel();
-  renderMilestones();
   renderNarrative();
   renderChat();
 })();
