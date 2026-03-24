@@ -909,5 +909,109 @@ ${goal}`;
     }
   });
 
+  // ===========================================================================
+  // Roadmap API Endpoints
+  // ===========================================================================
+
+  /**
+   * Generate roadmap narrative via SSE streaming.
+   * @route GET /workspace/:urlKey/api/roadmap/narrative
+   */
+  router.get('/workspace/:urlKey/api/roadmap/narrative', workspaceFromUrl, async (req, res) => {
+    const featureFlags = getFeatureFlags(req.session);
+    if (!featureFlags.roadmap) {
+      return res.status(403).json({ error: 'Roadmap feature is not enabled' });
+    }
+
+    const sessionApiKey = req.session.openRouterApiKey;
+    const apiKeyToUse = sessionApiKey || process.env.OPENROUTER_API_KEY || process.env.OPENROUTER_FREE_TIER_KEY;
+    if (!apiKeyToUse) {
+      return res.status(503).json({ error: 'AI not configured. Connect OpenRouter or set OPENROUTER_API_KEY.' });
+    }
+
+    // Start SSE
+    res.set({
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    });
+    res.flushHeaders();
+
+    try {
+      const { buildRoadmapNarrativePrompt } = await import('../lib/prompts/roadmap-narrative-template.js');
+      const roadmapModel = JSON.parse(req.query.model || '{}');
+      const prompt = buildRoadmapNarrativePrompt(roadmapModel);
+
+      const selectedModel = req.session.modelId || DEFAULT_MODEL;
+
+      await getRecommendationStream(
+        prompt,
+        { apiKey: apiKeyToUse, model: selectedModel },
+        (type, data) => {
+          sendSSE(res, type, data);
+          if (type === 'done' || type === 'error') {
+            res.end();
+          }
+        }
+      );
+    } catch (error) {
+      console.error('Roadmap narrative error:', error);
+      sendSSE(res, 'error', { error: error.message });
+      res.end();
+    }
+  });
+
+  /**
+   * Roadmap Q&A chat via SSE streaming.
+   * @route POST /workspace/:urlKey/api/roadmap/chat
+   */
+  router.post('/workspace/:urlKey/api/roadmap/chat', workspaceFromUrl, async (req, res) => {
+    const featureFlags = getFeatureFlags(req.session);
+    if (!featureFlags.roadmap) {
+      return res.status(403).json({ error: 'Roadmap feature is not enabled' });
+    }
+
+    const sessionApiKey = req.session.openRouterApiKey;
+    const apiKeyToUse = sessionApiKey || process.env.OPENROUTER_API_KEY || process.env.OPENROUTER_FREE_TIER_KEY;
+    if (!apiKeyToUse) {
+      return res.status(503).json({ error: 'AI not configured. Connect OpenRouter or set OPENROUTER_API_KEY.' });
+    }
+
+    const { question, roadmapModel } = req.body;
+    if (!question || !roadmapModel) {
+      return res.status(400).json({ error: 'question and roadmapModel are required' });
+    }
+
+    // Start SSE
+    res.set({
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    });
+    res.flushHeaders();
+
+    try {
+      const { buildRoadmapChatPrompt } = await import('../lib/prompts/roadmap-chat-template.js');
+      const { system, user } = buildRoadmapChatPrompt(roadmapModel, question);
+
+      const selectedModel = req.session.modelId || DEFAULT_MODEL;
+
+      await getRecommendationStream(
+        `${system}\n\n${user}`,
+        { apiKey: apiKeyToUse, model: selectedModel },
+        (type, data) => {
+          sendSSE(res, type, data);
+          if (type === 'done' || type === 'error') {
+            res.end();
+          }
+        }
+      );
+    } catch (error) {
+      console.error('Roadmap chat error:', error);
+      sendSSE(res, 'error', { error: error.message });
+      res.end();
+    }
+  });
+
   return router;
 }
