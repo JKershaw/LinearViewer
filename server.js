@@ -47,7 +47,7 @@ import { renderDispatchPage } from './lib/render-dispatch.js'
 import { renderSwipePage } from './lib/render-swipe.js'
 import { renderSwimPage } from './lib/render-swim.js'
 import { renderRoadmapPage } from './lib/render-roadmap.js'
-import { calculateVelocity, buildExecutionQueue, groupByMilestone, projectTimeline, findCriticalPaths, assessRisks, issueToRoadmapCard } from './lib/roadmap.js'
+import { calculateVelocity, buildExecutionQueue, groupByMilestone, projectTimeline, findCriticalPaths, assessRisks, analyzeRoadmap, issueToRoadmapCard } from './lib/roadmap.js'
 import { renderProxyPage } from './lib/render-proxy.js'
 import { renderForemanPage } from './lib/render-foreman.js'
 import { DEFAULT_MODEL, AVAILABLE_MODELS } from './lib/openrouter.js'
@@ -771,11 +771,15 @@ app.get('/workspace/:urlKey/roadmap', workspaceFromUrl, async (req, res) => {
     const criticalPaths = findCriticalPaths(executionQueue);
     const risks = assessRisks(timedMilestones, criticalPaths, velocity);
 
+    // Deterministic pre-analysis for AI narrative
+    const analysis = analyzeRoadmap({ milestones: timedMilestones, velocity, criticalPaths });
+
     const roadmapModel = {
       velocity,
       milestones: timedMilestones,
       criticalPaths,
       risks,
+      analysis,
       executionQueue
     };
 
