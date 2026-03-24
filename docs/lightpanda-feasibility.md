@@ -100,3 +100,21 @@ projects: [
 ```
 
 This would give fast CI feedback (~10x faster) for basic DOM/content tests while keeping Chromium for full interaction coverage.
+
+## Workarounds Tested (All Failed)
+
+We tested every workaround suggested online. **None worked.**
+
+| Workaround | Result |
+|------------|--------|
+| `page.goto(page.url())` instead of `page.reload()` | Page loads but becomes unresponsive — DOM queries timeout |
+| `page.evaluate(() => location.reload())` | Same zombie state — page navigates but never recovers |
+| `click({ force: true })` | Still times out — force doesn't bypass the viewport issue |
+| `page.evaluate(() => el.click())` | **Crashes the CDP connection entirely** |
+| `scrollIntoView()` then Playwright click | Cascade crash after evaluate |
+| `dispatchEvent(new MouseEvent('click'))` | Cascade crash after evaluate |
+| Explicit large viewport (1280x2000) | Can't even create new context after prior crash |
+
+The `evaluate(el.click())` crash reveals that LightPanda's DOM event dispatch is fundamentally incomplete — it's not just Playwright's actionability checks being overly strict. The online suggestions are generic Playwright tips that don't account for LightPanda's incomplete browser engine.
+
+Test script: `tests/lightpanda-workarounds.js`
