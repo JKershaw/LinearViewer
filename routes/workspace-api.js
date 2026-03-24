@@ -925,9 +925,27 @@ ${goal}`;
     }
 
     const sessionApiKey = req.session.openRouterApiKey;
-    const apiKeyToUse = sessionApiKey || process.env.OPENROUTER_API_KEY || process.env.OPENROUTER_FREE_TIER_KEY;
+    const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
+    const isFreeTier = !sessionApiKey && !process.env.OPENROUTER_API_KEY && !!freeTierKey;
+    const apiKeyToUse = sessionApiKey || process.env.OPENROUTER_API_KEY || freeTierKey;
     if (!apiKeyToUse) {
       return res.status(503).json({ error: 'AI not configured. Connect OpenRouter or set OPENROUTER_API_KEY.' });
+    }
+
+    // Atomically check rate limits for free tier users
+    if (isFreeTier) {
+      const check = await freeTierStore.tryUse(req.workspace.urlKey);
+      if (!check.allowed) {
+        return res.status(429).json({
+          error: check.reason,
+          freeTier: {
+            used: true,
+            remaining: check.remaining,
+            limit: check.limit,
+            resetsAt: check.resetsAt
+          }
+        });
+      }
     }
 
     const { roadmapModel } = req.body;
@@ -977,13 +995,37 @@ ${goal}`;
     }
 
     const sessionApiKey = req.session.openRouterApiKey;
-    const apiKeyToUse = sessionApiKey || process.env.OPENROUTER_API_KEY || process.env.OPENROUTER_FREE_TIER_KEY;
+    const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
+    const isFreeTier = !sessionApiKey && !process.env.OPENROUTER_API_KEY && !!freeTierKey;
+    const apiKeyToUse = sessionApiKey || process.env.OPENROUTER_API_KEY || freeTierKey;
     if (!apiKeyToUse) {
       return res.status(503).json({ error: 'AI not configured. Connect OpenRouter or set OPENROUTER_API_KEY.' });
     }
 
+    // Atomically check rate limits for free tier users
+    if (isFreeTier) {
+      const check = await freeTierStore.tryUse(req.workspace.urlKey);
+      if (!check.allowed) {
+        return res.status(429).json({
+          error: check.reason,
+          freeTier: {
+            used: true,
+            remaining: check.remaining,
+            limit: check.limit,
+            resetsAt: check.resetsAt
+          }
+        });
+      }
+    }
+
     const { question, roadmapModel, history } = req.body;
-    if (!question || !roadmapModel) {
+    if (!question || typeof question !== 'string') {
+      return res.status(400).json({ error: 'question is required and must be a string' });
+    }
+    if (question.length > 2000) {
+      return res.status(400).json({ error: 'question must be 2000 characters or fewer' });
+    }
+    if (!roadmapModel) {
       return res.status(400).json({ error: 'question and roadmapModel are required' });
     }
 

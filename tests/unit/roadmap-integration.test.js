@@ -347,6 +347,70 @@ describe('renderRoadmapPage with real model', () => {
     assert.ok(html.includes('TST-2'), 'should show second issue identifier');
   });
 
+  test('renders trend classes matching CSS (BEM convention)', () => {
+    const issues = [
+      createIssue({
+        id: 'trend-1',
+        completedAt: daysAgo(3),
+        estimate: 3,
+        state: { name: 'Done', type: 'completed' },
+        project: { id: 'proj-1', name: 'Trend' }
+      })
+    ];
+    const projects = [{ id: 'proj-1', name: 'Trend' }];
+    const model = buildRoadmapModel(issues, projects);
+
+    const html = renderRoadmapPage(
+      { roadmapModel: model, organizationName: 'Test' },
+      { urlKey: 'test-ws' }
+    );
+
+    // Trend classes must use BEM double-dash format matching roadmap.css
+    const trendClassMatch = html.match(/roadmap-trend--(?:increasing|decreasing|stable)/);
+    assert.ok(trendClassMatch, 'trend class should use BEM format (roadmap-trend--*)');
+    // Must NOT use old non-BEM format
+    assert.ok(!html.includes('trend-up'), 'should not use old trend-up class');
+    assert.ok(!html.includes('trend-down'), 'should not use old trend-down class');
+    assert.ok(!html.includes('"trend-stable"'), 'should not use old trend-stable class');
+  });
+
+  test('renders risk badge classes matching CSS (BEM convention)', () => {
+    const issues = [
+      createIssue({
+        id: 'rbem-a',
+        estimate: null,
+        assignee: null,
+        state: { name: 'Todo', type: 'unstarted' },
+        project: { id: 'proj-1', name: 'BemRisk' },
+        relations: { nodes: [{ type: 'blocks', relatedIssue: { id: 'rbem-b' } }] }
+      }),
+      createIssue({
+        id: 'rbem-b',
+        estimate: null,
+        assignee: null,
+        state: { name: 'Todo', type: 'unstarted' },
+        project: { id: 'proj-1', name: 'BemRisk' },
+        relations: { nodes: [] }
+      })
+    ];
+    const projects = [{ id: 'proj-1', name: 'BemRisk' }];
+    const model = buildRoadmapModel(issues, projects);
+
+    const html = renderRoadmapPage(
+      { roadmapModel: model, organizationName: 'Test' },
+      { urlKey: 'test-ws' }
+    );
+
+    // If risks are present, they must use BEM double-dash format
+    if (html.includes('roadmap-risk-badge')) {
+      const riskBadgeMatches = html.match(/roadmap-risk-badge roadmap-risk--\w+/g);
+      assert.ok(riskBadgeMatches, 'risk badge should use BEM format (roadmap-risk--*)');
+      // Must NOT use single-dash format
+      const singleDashRisks = html.match(/roadmap-risk-(?!badge|-)(?:high|medium|low)/g);
+      assert.ok(!singleDashRisks, 'should not use single-dash risk classes (roadmap-risk-high)');
+    }
+  });
+
   test('hides AI sections when no openRouterSource', () => {
     const model = buildRoadmapModel([], []);
     const html = renderRoadmapPage(
