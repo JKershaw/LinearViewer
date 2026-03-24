@@ -13,7 +13,7 @@ import { fetchIssueContext, fetchRecommendationContext, fetchIssueComments } fro
 import { generatePrompt, generateCustomPrompt, hasPrompt, getAvailablePrompts } from '../lib/prompt-templates.js';
 import { PREPARING_LABEL, WORK_ISSUE_LABELS } from '../lib/workflow-config.js';
 import { parseRepoFromDescription } from '../lib/prompt-formatters.js';
-import { isRecommendationEnabled, getRecommendation, getRecommendationStream, DEFAULT_MODEL } from '../lib/openrouter.js';
+import { isRecommendationEnabled, getRecommendation, getRecommendationStream, streamChat, DEFAULT_MODEL } from '../lib/openrouter.js';
 import { runAudit, computeAuditFromData } from '../lib/audit.js';
 import { UUID_REGEX } from '../lib/workspace.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
@@ -906,6 +906,180 @@ ${goal}`;
     } catch (error) {
       console.error('Custom prompt delete error:', error);
       res.status(500).json({ error: 'Failed to delete custom prompt' });
+    }
+  });
+
+  // ===========================================================================
+  // Roadmap API Endpoints
+  // ===========================================================================
+
+  /**
+   * Generate roadmap narrative via SSE streaming.
+   * Client POSTs the roadmap model (already computed and embedded in the page).
+   * @route POST /workspace/:urlKey/api/roadmap/narrative
+   */
+  router.post('/workspace/:urlKey/api/roadmap/narrative', workspaceFromUrl, async (req, res) => {
+    const featureFlags = getFeatureFlags(req.session);
+    if (!featureFlags.roadmap) {
+      return res.status(403).json({ error: 'Roadmap feature is not enabled' });
+    }
+
+    const sessionApiKey = req.session.openRouterApiKey;
+    const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
+    const isFreeTier = !sessionApiKey && !process.env.OPENROUTER_API_KEY && !!freeTierKey;
+    const apiKeyToUse = sessionApiKey || process.env.OPENROUTER_API_KEY || freeTierKey;
+    if (!apiKeyToUse) {
+      return res.status(503).json({ error: 'AI not configured. Connect OpenRouter or set OPENROUTER_API_KEY.' });
+    }
+
+    // Atomically check rate limits for free tier users
+    if (isFreeTier) {
+      const check = await freeTierStore.tryUse(req.workspace.urlKey);
+      if (!check.allowed) {
+        return res.status(429).json({
+          error: check.reason,
+          freeTier: {
+            used: true,
+            remaining: check.remaining,
+            limit: check.limit,
+            resetsAt: check.resetsAt
+          }
+        });
+      }
+    }
+
+    const { roadmapModel } = req.body;
+    if (!roadmapModel) {
+      return res.status(400).json({ error: 'roadmapModel is required' });
+    }
+
+    // Build messages before starting SSE so errors return proper HTTP status codes
+    let messages;
+    try {
+      const { buildRoadmapNarrativeMessages } = await import('../lib/prompts/roadmap-narrative-template.js');
+      messages = buildRoadmapNarrativeMessages(roadmapModel);
+    } catch (error) {
+      console.error('Roadmap narrative build error:', error);
+      return res.status(500).json({ error: 'Failed to build narrative prompt' });
+    }
+
+    const selectedModel = req.session.modelId || DEFAULT_MODEL;
+
+    // Start SSE
+    res.set({
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    });
+    res.flushHeaders();
+
+    try {
+      await streamChat(
+        messages,
+        { apiKey: apiKeyToUse, model: selectedModel, maxTokens: 800 },
+        (type, data) => {
+          sendSSE(res, type, data);
+          if (type === 'done' || type === 'error') {
+            res.end();
+          }
+        }
+      );
+    } catch (error) {
+      console.error('Roadmap narrative error:', error);
+      sendSSE(res, 'error', { message: 'Failed to generate narrative' });
+      res.end();
+    }
+  });
+
+  /**
+   * Roadmap Q&A chat via SSE streaming.
+   * Client POSTs the question, roadmap model, and conversation history.
+   * @route POST /workspace/:urlKey/api/roadmap/chat
+   */
+  router.post('/workspace/:urlKey/api/roadmap/chat', workspaceFromUrl, async (req, res) => {
+    const featureFlags = getFeatureFlags(req.session);
+    if (!featureFlags.roadmap) {
+      return res.status(403).json({ error: 'Roadmap feature is not enabled' });
+    }
+
+    const sessionApiKey = req.session.openRouterApiKey;
+    const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
+    const isFreeTier = !sessionApiKey && !process.env.OPENROUTER_API_KEY && !!freeTierKey;
+    const apiKeyToUse = sessionApiKey || process.env.OPENROUTER_API_KEY || freeTierKey;
+    if (!apiKeyToUse) {
+      return res.status(503).json({ error: 'AI not configured. Connect OpenRouter or set OPENROUTER_API_KEY.' });
+    }
+
+    // Atomically check rate limits for free tier users
+    if (isFreeTier) {
+      const check = await freeTierStore.tryUse(req.workspace.urlKey);
+      if (!check.allowed) {
+        return res.status(429).json({
+          error: check.reason,
+          freeTier: {
+            used: true,
+            remaining: check.remaining,
+            limit: check.limit,
+            resetsAt: check.resetsAt
+          }
+        });
+      }
+    }
+
+    const { question, roadmapModel, history } = req.body;
+    if (!question || typeof question !== 'string' || !question.trim()) {
+      return res.status(400).json({ error: 'question is required and must be a non-empty string' });
+    }
+    if (question.length > 2000) {
+      return res.status(400).json({ error: 'question must be 2000 characters or fewer' });
+    }
+    if (!roadmapModel) {
+      return res.status(400).json({ error: 'question and roadmapModel are required' });
+    }
+
+    // Sanitize history: only allow user/assistant roles with string content
+    const safeHistory = Array.isArray(history)
+      ? history.filter(h =>
+          (h.role === 'user' || h.role === 'assistant') &&
+          typeof h.content === 'string'
+        )
+      : [];
+
+    // Build messages before starting SSE so errors return proper HTTP status codes
+    let messages;
+    try {
+      const { buildRoadmapChatMessages } = await import('../lib/prompts/roadmap-chat-template.js');
+      messages = buildRoadmapChatMessages(roadmapModel, question.trim(), safeHistory);
+    } catch (error) {
+      console.error('Roadmap chat build error:', error);
+      return res.status(500).json({ error: 'Failed to build chat prompt' });
+    }
+
+    const selectedModel = req.session.modelId || DEFAULT_MODEL;
+
+    // Start SSE
+    res.set({
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    });
+    res.flushHeaders();
+
+    try {
+      await streamChat(
+        messages,
+        { apiKey: apiKeyToUse, model: selectedModel, maxTokens: 500 },
+        (type, data) => {
+          sendSSE(res, type, data);
+          if (type === 'done' || type === 'error') {
+            res.end();
+          }
+        }
+      );
+    } catch (error) {
+      console.error('Roadmap chat error:', error);
+      sendSSE(res, 'error', { message: 'Failed to generate response' });
+      res.end();
     }
   });
 

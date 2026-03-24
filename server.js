@@ -46,6 +46,8 @@ import { renderCustomPromptsPage } from './lib/render-custom-prompts.js'
 import { renderDispatchPage } from './lib/render-dispatch.js'
 import { renderSwipePage } from './lib/render-swipe.js'
 import { renderSwimPage } from './lib/render-swim.js'
+import { renderRoadmapPage } from './lib/render-roadmap.js'
+import { calculateVelocity, buildExecutionQueue, groupByMilestone, projectTimeline, findCriticalPaths, assessRisks, issueToRoadmapCard } from './lib/roadmap.js'
 import { renderProxyPage } from './lib/render-proxy.js'
 import { renderForemanPage } from './lib/render-foreman.js'
 import { DEFAULT_MODEL, AVAILABLE_MODELS } from './lib/openrouter.js'
@@ -724,6 +726,80 @@ app.get('/workspace/:urlKey/swim', workspaceFromUrl, async (req, res) => {
     const html = renderErrorPage('Something Went Wrong', 'Could not load your tasks. Please try again.', {
       action: 'Try again',
       actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/swim`
+    });
+    res.status(500).send(html);
+  }
+});
+
+/**
+ * Roadmap page - requires authentication.
+ * Displays projected timeline, velocity, critical paths, and AI narrative.
+ */
+app.get('/workspace/:urlKey/roadmap', workspaceFromUrl, async (req, res) => {
+  const workspace = req.workspace;
+  const deployInfo = getDeployInfo();
+  const openRouterSource = getOpenRouterSource(req);
+  const featureFlags = getFeatureFlags(req.session);
+
+  if (!featureFlags.roadmap) {
+    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/`);
+  }
+
+  const rawTeam = req.query.team;
+  const teamId = rawTeam && rawTeam !== 'all' && UUID_REGEX.test(rawTeam) ? rawTeam : null;
+
+  try {
+    // Fetch raw data — roadmap needs raw issues for velocity/queue calculations
+    const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
+    const { organizationName, projects, issues } = isTestMode
+      ? testMockData
+      : await fetchProjects(workspace.accessToken, teamId);
+
+    // Build roadmap model from deterministic layer
+    const velocity = calculateVelocity(issues, 90);
+    const executionQueue = buildExecutionQueue(issues);
+    // Completed issues are excluded from executionQueue but needed for progress %
+    const completedIssues = issues
+      .filter(i => i.state?.type === 'completed')
+      .map(i => issueToRoadmapCard(i));
+    const milestones = groupByMilestone(executionQueue, projects, completedIssues);
+
+    // Project timeline
+    const timedMilestones = projectTimeline(milestones, velocity);
+
+    // Critical paths and risks
+    const criticalPaths = findCriticalPaths(executionQueue);
+    const risks = assessRisks(timedMilestones, criticalPaths, velocity);
+
+    const roadmapModel = {
+      velocity,
+      milestones: timedMilestones,
+      criticalPaths,
+      risks,
+      executionQueue
+    };
+
+    const html = renderRoadmapPage(
+      { roadmapModel, organizationName },
+      {
+        deployInfo,
+        urlKey: workspace.urlKey,
+        openRouterSource,
+        workspaces: req.session.workspaces,
+        featureFlags
+      }
+    );
+    res.send(html);
+  } catch (error) {
+    console.error('Roadmap page error:', error);
+
+    if (error.response?.status === 401) {
+      return handleUnauthorizedError(workspace, req.session, teamId, openRouterSource, res);
+    }
+
+    const html = renderErrorPage('Something Went Wrong', 'Could not load your roadmap. Please try again.', {
+      action: 'Try again',
+      actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/roadmap`
     });
     res.status(500).send(html);
   }

@@ -1,0 +1,279 @@
+/**
+ * Roadmap Page Styles
+ *
+ * CLI/terminal aesthetic for the roadmap view.
+ * Uses the same design language as the dashboard (from style.css).
+ */
+
+/* =============================================================================
+   Page Container
+   ============================================================================= */
+.roadmap-page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1rem 0;
+}
+
+/* =============================================================================
+   Velocity Panel
+   ============================================================================= */
+.roadmap-velocity-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 0;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--fg-vdim);
+  font-family: var(--font-structural);
+  font-size: 0.85em;
+  color: var(--fg-dim);
+}
+
+.roadmap-velocity-stat {
+  display: inline-block;
+  margin-right: 1.5rem;
+}
+
+.roadmap-trend {
+  font-weight: 600;
+}
+
+.roadmap-trend--increasing {
+  color: var(--green);
+}
+
+.roadmap-trend--stable {
+  color: var(--fg-dim);
+}
+
+.roadmap-trend--decreasing {
+  color: var(--red);
+}
+
+/* =============================================================================
+   Milestones
+   ============================================================================= */
+.roadmap-milestones {
+  display: flex;
+  flex-direction: column;
+}
+
+.roadmap-milestone-card {
+  border: 1px solid var(--fg-vdim);
+  margin-bottom: 1em;
+  padding: 1em;
+  border-radius: 2px;
+}
+
+.roadmap-milestone-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.5em;
+  font-family: var(--font-content);
+}
+
+.roadmap-milestone-header strong {
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.roadmap-milestone-header .roadmap-milestone-date {
+  font-family: var(--font-structural);
+  font-size: 0.85em;
+  color: var(--fg-dim);
+}
+
+.roadmap-progress-bar {
+  font-family: var(--font-structural);
+  font-size: 0.9em;
+  color: var(--fg);
+  margin: 0.4em 0;
+  letter-spacing: 0.05em;
+}
+
+.roadmap-milestone-stats {
+  font-family: var(--font-structural);
+  font-size: 0.8em;
+  color: var(--fg-dim);
+  margin-top: 0.25em;
+}
+
+.roadmap-critical-path {
+  font-family: var(--font-structural);
+  font-size: 0.8em;
+  margin-top: 0.5em;
+  color: var(--fg-dim);
+}
+
+/* =============================================================================
+   Risks
+   ============================================================================= */
+.roadmap-risk {
+  padding-left: 1em;
+  margin-top: 0.4em;
+  font-family: var(--font-structural);
+  font-size: 0.8em;
+  color: var(--fg-dim);
+}
+
+.roadmap-risk--high {
+  border-left: 3px solid var(--red);
+}
+
+.roadmap-risk--medium {
+  border-left: 3px solid #e67e22;
+}
+
+.roadmap-risk--low {
+  border-left: 3px solid var(--fg-vdim);
+}
+
+/* =============================================================================
+   Narrative
+   ============================================================================= */
+.roadmap-narrative {
+  margin-top: 2em;
+  padding-top: 1.5em;
+  border-top: 1px solid var(--fg-vdim);
+}
+
+.roadmap-narrative-content {
+  font-family: var(--font-structural);
+  font-size: 0.85em;
+  white-space: pre-wrap;
+  line-height: 1.6;
+  color: var(--fg);
+  margin-top: 0.75em;
+  min-height: 1.5em;
+}
+
+/* =============================================================================
+   Chat
+   ============================================================================= */
+.roadmap-chat {
+  margin-top: 1em;
+}
+
+.roadmap-chat-history {
+  max-height: 400px;
+  overflow-y: auto;
+  margin-bottom: 0.75em;
+  font-family: var(--font-structural);
+  font-size: 0.85em;
+  line-height: 1.6;
+}
+
+.roadmap-chat-message {
+  padding: 0.4em 0;
+  white-space: pre-wrap;
+}
+
+.roadmap-chat-message--user {
+  color: var(--blue);
+}
+
+.roadmap-chat-message--assistant {
+  color: var(--fg);
+}
+
+.roadmap-chat-input-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.roadmap-chat-input {
+  flex: 1;
+  width: 100%;
+  font-family: var(--font-structural);
+  font-size: 0.85em;
+  padding: 0.4em 0.6em;
+  border: 1px solid var(--fg-vdim);
+  border-radius: 2px;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.roadmap-chat-input:focus {
+  outline: none;
+  border-color: var(--blue);
+}
+
+.roadmap-chat-send {
+  font-family: var(--font-structural);
+  font-size: 0.85em;
+  padding: 0.4em 1em;
+  border: 1px solid var(--fg-vdim);
+  border-radius: 2px;
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.roadmap-chat-send:hover {
+  background: var(--bg-muted);
+}
+
+.roadmap-chat-send:disabled {
+  color: var(--fg-dim);
+  cursor: not-allowed;
+}
+
+/* =============================================================================
+   Generate Button
+   ============================================================================= */
+.roadmap-generate-btn {
+  font-family: var(--font-structural);
+  font-size: 0.85em;
+  padding: 0.4em 1em;
+  border: 1px solid var(--fg-vdim);
+  border-radius: 2px;
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.roadmap-generate-btn:hover {
+  background: var(--bg-muted);
+}
+
+.roadmap-generate-btn:disabled {
+  color: var(--fg-dim);
+  cursor: not-allowed;
+}
+
+/* =============================================================================
+   Utility
+   ============================================================================= */
+.hidden {
+  display: none;
+}
+
+/* =============================================================================
+   Mobile Responsive
+   ============================================================================= */
+@media (max-width: 600px) {
+  .roadmap-velocity-panel {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+
+  .roadmap-velocity-stat {
+    margin-right: 0;
+  }
+
+  .roadmap-milestone-header {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .roadmap-chat-input-row {
+    flex-direction: column;
+  }
+
+  .roadmap-chat-send {
+    align-self: flex-end;
+  }
+}
