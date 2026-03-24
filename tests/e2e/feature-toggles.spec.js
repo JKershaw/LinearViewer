@@ -28,13 +28,14 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('.feature-toggle-label:has-text("Linear API proxy")')).toBeVisible();
     await expect(page.locator('.feature-toggle-label:has-text("AI recommendations")')).toBeVisible();
     await expect(page.locator('.feature-toggle-label:has-text("Prompt buttons")')).toBeVisible();
+    await expect(page.locator('.feature-toggle-label:has-text("Narrative roadmap")')).toBeVisible();
   });
 
   test('shows correct default toggle states', async ({ page }) => {
     await page.goto(SETTINGS_URL);
     await page.waitForLoadState('networkidle');
 
-    // Defaults: linearMcp ON, featureBranches OFF, codeReview OFF, dispatch OFF, proxy OFF, aiRecommendations ON, promptButtons ON
+    // Defaults: linearMcp ON, featureBranches OFF, codeReview OFF, dispatch OFF, proxy OFF, aiRecommendations ON, promptButtons ON, roadmap OFF
     await expect(page.locator('[data-feature="linearMcp"] .toggle-state')).toHaveText('● on');
     await expect(page.locator('[data-feature="featureBranches"] .toggle-state')).toHaveText('○ off');
     await expect(page.locator('[data-feature="codeReview"] .toggle-state')).toHaveText('○ off');
@@ -42,6 +43,7 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('[data-feature="proxy"] .toggle-state')).toHaveText('○ off');
     await expect(page.locator('[data-feature="aiRecommendations"] .toggle-state')).toHaveText('● on');
     await expect(page.locator('[data-feature="promptButtons"] .toggle-state')).toHaveText('● on');
+    await expect(page.locator('[data-feature="roadmap"] .toggle-state')).toHaveText('○ off');
   });
 
   test('shows recommendation note on Linear references toggle', async ({ page }) => {
