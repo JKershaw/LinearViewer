@@ -953,6 +953,18 @@ ${goal}`;
       return res.status(400).json({ error: 'roadmapModel is required' });
     }
 
+    // Build messages before starting SSE so errors return proper HTTP status codes
+    let messages;
+    try {
+      const { buildRoadmapNarrativeMessages } = await import('../lib/prompts/roadmap-narrative-template.js');
+      messages = buildRoadmapNarrativeMessages(roadmapModel);
+    } catch (error) {
+      console.error('Roadmap narrative build error:', error);
+      return res.status(500).json({ error: 'Failed to build narrative prompt' });
+    }
+
+    const selectedModel = req.session.modelId || DEFAULT_MODEL;
+
     // Start SSE
     res.set({
       'Content-Type': 'text/event-stream',
@@ -962,10 +974,6 @@ ${goal}`;
     res.flushHeaders();
 
     try {
-      const { buildRoadmapNarrativeMessages } = await import('../lib/prompts/roadmap-narrative-template.js');
-      const messages = buildRoadmapNarrativeMessages(roadmapModel);
-      const selectedModel = req.session.modelId || DEFAULT_MODEL;
-
       await streamChat(
         messages,
         { apiKey: apiKeyToUse, model: selectedModel, maxTokens: 800 },
@@ -978,7 +986,7 @@ ${goal}`;
       );
     } catch (error) {
       console.error('Roadmap narrative error:', error);
-      sendSSE(res, 'error', { message: error.message });
+      sendSSE(res, 'error', { message: 'Failed to generate narrative' });
       res.end();
     }
   });
@@ -1019,8 +1027,8 @@ ${goal}`;
     }
 
     const { question, roadmapModel, history } = req.body;
-    if (!question || typeof question !== 'string') {
-      return res.status(400).json({ error: 'question is required and must be a string' });
+    if (!question || typeof question !== 'string' || !question.trim()) {
+      return res.status(400).json({ error: 'question is required and must be a non-empty string' });
     }
     if (question.length > 2000) {
       return res.status(400).json({ error: 'question must be 2000 characters or fewer' });
@@ -1028,6 +1036,26 @@ ${goal}`;
     if (!roadmapModel) {
       return res.status(400).json({ error: 'question and roadmapModel are required' });
     }
+
+    // Sanitize history: only allow user/assistant roles with string content
+    const safeHistory = Array.isArray(history)
+      ? history.filter(h =>
+          (h.role === 'user' || h.role === 'assistant') &&
+          typeof h.content === 'string'
+        )
+      : [];
+
+    // Build messages before starting SSE so errors return proper HTTP status codes
+    let messages;
+    try {
+      const { buildRoadmapChatMessages } = await import('../lib/prompts/roadmap-chat-template.js');
+      messages = buildRoadmapChatMessages(roadmapModel, question.trim(), safeHistory);
+    } catch (error) {
+      console.error('Roadmap chat build error:', error);
+      return res.status(500).json({ error: 'Failed to build chat prompt' });
+    }
+
+    const selectedModel = req.session.modelId || DEFAULT_MODEL;
 
     // Start SSE
     res.set({
@@ -1038,10 +1066,6 @@ ${goal}`;
     res.flushHeaders();
 
     try {
-      const { buildRoadmapChatMessages } = await import('../lib/prompts/roadmap-chat-template.js');
-      const messages = buildRoadmapChatMessages(roadmapModel, question, history || []);
-      const selectedModel = req.session.modelId || DEFAULT_MODEL;
-
       await streamChat(
         messages,
         { apiKey: apiKeyToUse, model: selectedModel, maxTokens: 500 },
@@ -1054,7 +1078,7 @@ ${goal}`;
       );
     } catch (error) {
       console.error('Roadmap chat error:', error);
-      sendSSE(res, 'error', { message: error.message });
+      sendSSE(res, 'error', { message: 'Failed to generate response' });
       res.end();
     }
   });

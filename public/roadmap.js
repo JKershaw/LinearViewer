@@ -249,6 +249,10 @@
           } else if (type === 'done') {
             // Store assistant response in history for follow-up context
             chatHistory.push({ role: 'assistant', content: assistantText });
+            // Cap history to last 40 entries to prevent unbounded memory growth
+            if (chatHistory.length > 40) {
+              chatHistory.splice(0, chatHistory.length - 40);
+            }
             sendBtn.disabled = false;
             input.disabled = false;
             input.focus();
