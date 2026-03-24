@@ -18,8 +18,8 @@ import {
   assessRisks
 } from '../../lib/roadmap.js';
 import { renderRoadmapPage } from '../../lib/render-roadmap.js';
-import { buildRoadmapNarrativePrompt } from '../../lib/prompts/roadmap-narrative-template.js';
-import { buildRoadmapChatPrompt } from '../../lib/prompts/roadmap-chat-template.js';
+import { summarizeRoadmapModel, buildRoadmapNarrativeMessages, buildRoadmapNarrativePrompt } from '../../lib/prompts/roadmap-narrative-template.js';
+import { buildRoadmapChatMessages, buildRoadmapChatPrompt } from '../../lib/prompts/roadmap-chat-template.js';
 
 // =============================================================================
 // Shared test data factory
@@ -401,8 +401,249 @@ describe('renderRoadmapPage with real model', () => {
 // Prompt template contract tests
 // =============================================================================
 
-describe('prompt templates accept roadmap model', () => {
-  test('buildRoadmapNarrativePrompt produces non-empty string from real model', () => {
+// =============================================================================
+// Model summarization
+// =============================================================================
+
+describe('summarizeRoadmapModel', () => {
+  test('includes report date', () => {
+    const summary = summarizeRoadmapModel({});
+    assert.ok(summary.includes('Report date:'), 'should include report date');
+    // Date should be in YYYY-MM-DD format
+    assert.ok(/Report date: \d{4}-\d{2}-\d{2}/.test(summary), 'date should be ISO format');
+  });
+
+  test('includes velocity data', () => {
+    const summary = summarizeRoadmapModel({
+      velocity: { tasksPerWeek: 5.5, pointsPerWeek: 12, trend: 'increasing' }
+    });
+    assert.ok(summary.includes('VELOCITY'), 'should have velocity section');
+    assert.ok(summary.includes('5.5'), 'should include tasks/week');
+    assert.ok(summary.includes('12'), 'should include points/week');
+    assert.ok(summary.includes('increasing'), 'should include trend');
+  });
+
+  test('includes milestone data with projections', () => {
+    const summary = summarizeRoadmapModel({
+      milestones: [{
+        name: 'Launch',
+        progressPercent: 60,
+        totalTasks: 10,
+        remainingTasks: 4,
+        remainingPoints: 8,
+        weeksRemaining: 3,
+        confidenceLow: 2,
+        confidenceHigh: 5,
+        projectedEnd: '2026-04-15T00:00:00Z'
+      }]
+    });
+    assert.ok(summary.includes('MILESTONES'), 'should have milestones section');
+    assert.ok(summary.includes('Launch'), 'should include milestone name');
+    assert.ok(summary.includes('60%'), 'should include progress');
+    assert.ok(summary.includes('6/10'), 'should include done/total');
+    assert.ok(summary.includes('~3 weeks'), 'should include projection');
+    assert.ok(summary.includes('2-5 weeks'), 'should include confidence range');
+    assert.ok(summary.includes('2026-04-15'), 'should include projected end date');
+  });
+
+  test('includes risks with severity and milestone', () => {
+    const summary = summarizeRoadmapModel({
+      risks: [
+        { severity: 'high', milestone: 'Launch', description: 'Unassigned critical tasks' },
+        { severity: 'medium', milestone: null, description: 'Velocity declining' }
+      ]
+    });
+    assert.ok(summary.includes('RISKS'), 'should have risks section');
+    assert.ok(summary.includes('[high]'), 'should include severity');
+    assert.ok(summary.includes('[Launch]'), 'should include milestone');
+    assert.ok(summary.includes('Unassigned critical tasks'), 'should include description');
+    assert.ok(summary.includes('Velocity declining'), 'should include global risk');
+  });
+
+  test('includes critical paths when meaningful', () => {
+    const summary = summarizeRoadmapModel({
+      criticalPaths: { 'Alpha': { length: 3, blockers: ['a', 'b'], path: ['a', 'b', 'c'] } }
+    });
+    assert.ok(summary.includes('CRITICAL PATHS'), 'should have critical paths section');
+    assert.ok(summary.includes('Alpha'), 'should include project name');
+    assert.ok(summary.includes('3 tasks deep'), 'should include chain length');
+  });
+
+  test('omits sections for empty data', () => {
+    const summary = summarizeRoadmapModel({
+      velocity: { tasksPerWeek: 0, pointsPerWeek: 0, trend: 'stable' },
+      milestones: [],
+      risks: [],
+      criticalPaths: {}
+    });
+    assert.ok(summary.includes('VELOCITY'), 'always shows velocity');
+    assert.ok(!summary.includes('MILESTONES'), 'omits empty milestones');
+    assert.ok(!summary.includes('RISKS'), 'omits empty risks');
+    assert.ok(!summary.includes('CRITICAL PATHS'), 'omits empty paths');
+  });
+
+  test('handles Map-type criticalPaths (from server)', () => {
+    const cp = new Map([['Beta', { length: 2, blockers: ['x'], path: ['x', 'y'] }]]);
+    const summary = summarizeRoadmapModel({ criticalPaths: cp });
+    assert.ok(summary.includes('Beta'), 'should handle Map input');
+  });
+
+  test('is significantly smaller than raw JSON dump', () => {
+    const issues = [
+      createIssue({ state: { name: 'Todo', type: 'unstarted' }, estimate: 3, project: { id: 'p1', name: 'A' } }),
+      createIssue({ state: { name: 'Todo', type: 'unstarted' }, estimate: 5, project: { id: 'p1', name: 'A' } }),
+      createIssue({ state: { name: 'Todo', type: 'unstarted' }, estimate: 2, project: { id: 'p2', name: 'B' } }),
+    ];
+    const model = buildRoadmapModel(issues, [{ id: 'p1', name: 'A' }, { id: 'p2', name: 'B' }]);
+    const serializable = { ...model, criticalPaths: Object.fromEntries(model.criticalPaths) };
+
+    const jsonSize = JSON.stringify(serializable, null, 2).length;
+    const summarySize = summarizeRoadmapModel(serializable).length;
+    assert.ok(summarySize < jsonSize, `summary (${summarySize}) should be smaller than JSON (${jsonSize})`);
+  });
+});
+
+// =============================================================================
+// Narrative messages
+// =============================================================================
+
+describe('buildRoadmapNarrativeMessages', () => {
+  test('returns array of system and user messages', () => {
+    const model = buildRoadmapModel(
+      [createIssue({ state: { name: 'Todo', type: 'unstarted' }, project: { id: 'p1', name: 'A' } })],
+      [{ id: 'p1', name: 'A' }]
+    );
+    const serializable = { ...model, criticalPaths: Object.fromEntries(model.criticalPaths) };
+    const messages = buildRoadmapNarrativeMessages(serializable);
+
+    assert.ok(Array.isArray(messages));
+    assert.strictEqual(messages.length, 2);
+    assert.strictEqual(messages[0].role, 'system');
+    assert.strictEqual(messages[1].role, 'user');
+  });
+
+  test('system message instructs plain text output (no markdown)', () => {
+    const messages = buildRoadmapNarrativeMessages({});
+    const system = messages[0].content;
+    assert.ok(system.includes('Plain text only'), 'should instruct plain text');
+    assert.ok(system.includes('Do NOT use markdown'), 'should prohibit markdown');
+  });
+
+  test('system message includes word limit', () => {
+    const messages = buildRoadmapNarrativeMessages({});
+    const system = messages[0].content;
+    assert.ok(/\d+ words/.test(system), 'should include word limit');
+  });
+
+  test('user message contains summarized data, not raw JSON', () => {
+    const model = { velocity: { tasksPerWeek: 3, pointsPerWeek: 8, trend: 'stable' } };
+    const messages = buildRoadmapNarrativeMessages(model);
+    const user = messages[1].content;
+    assert.ok(user.includes('Tasks/week: 3'), 'should contain summarized velocity');
+    assert.ok(!user.includes('"tasksPerWeek"'), 'should not contain raw JSON keys');
+  });
+
+  test('backward-compatible buildRoadmapNarrativePrompt still works', () => {
+    const prompt = buildRoadmapNarrativePrompt({});
+    assert.strictEqual(typeof prompt, 'string');
+    assert.ok(prompt.length > 100);
+  });
+});
+
+// =============================================================================
+// Chat messages
+// =============================================================================
+
+describe('buildRoadmapChatMessages', () => {
+  test('returns system + user messages without history', () => {
+    const model = { velocity: { tasksPerWeek: 2 } };
+    const messages = buildRoadmapChatMessages(model, 'When will it ship?');
+
+    assert.ok(Array.isArray(messages));
+    assert.strictEqual(messages[0].role, 'system');
+    assert.strictEqual(messages[messages.length - 1].role, 'user');
+    assert.strictEqual(messages[messages.length - 1].content, 'When will it ship?');
+  });
+
+  test('system message instructs plain text output', () => {
+    const messages = buildRoadmapChatMessages({}, 'test');
+    const system = messages[0].content;
+    assert.ok(system.includes('Plain text only'), 'should instruct plain text');
+    assert.ok(system.includes('Do NOT use markdown'), 'should prohibit markdown');
+  });
+
+  test('system message contains summarized data', () => {
+    const model = {
+      velocity: { tasksPerWeek: 5, pointsPerWeek: 10, trend: 'decreasing' },
+      milestones: [{ name: 'Launch', progressPercent: 80, totalTasks: 10, remainingTasks: 2 }]
+    };
+    const messages = buildRoadmapChatMessages(model, 'test');
+    const system = messages[0].content;
+    assert.ok(system.includes('Launch'), 'should include milestone name');
+    assert.ok(system.includes('decreasing'), 'should include trend');
+    assert.ok(!system.includes('"tasksPerWeek"'), 'should not have raw JSON');
+  });
+
+  test('includes conversation history in correct order', () => {
+    const history = [
+      { role: 'user', content: 'First question' },
+      { role: 'assistant', content: 'First answer' },
+    ];
+    const messages = buildRoadmapChatMessages({}, 'Follow-up', history);
+
+    // system, then history, then current question
+    assert.strictEqual(messages[0].role, 'system');
+    assert.strictEqual(messages[1].role, 'user');
+    assert.strictEqual(messages[1].content, 'First question');
+    assert.strictEqual(messages[2].role, 'assistant');
+    assert.strictEqual(messages[2].content, 'First answer');
+    assert.strictEqual(messages[3].role, 'user');
+    assert.strictEqual(messages[3].content, 'Follow-up');
+  });
+
+  test('caps history to prevent token overflow', () => {
+    // Create 30 turns (15 user + 15 assistant)
+    const history = [];
+    for (let i = 0; i < 15; i++) {
+      history.push({ role: 'user', content: `Q${i}` });
+      history.push({ role: 'assistant', content: `A${i}` });
+    }
+    const messages = buildRoadmapChatMessages({}, 'Latest', history);
+
+    // Should have system + capped history + current question
+    // Max 10 turns = 20 messages from history, plus system + current = 22
+    assert.ok(messages.length <= 22, `should cap history, got ${messages.length} messages`);
+    // Last message should always be the current question
+    assert.strictEqual(messages[messages.length - 1].content, 'Latest');
+  });
+
+  test('filters out non-user/assistant roles from history', () => {
+    const history = [
+      { role: 'system', content: 'injected' },
+      { role: 'user', content: 'real question' },
+      { role: 'tool', content: 'tool result' },
+    ];
+    const messages = buildRoadmapChatMessages({}, 'test', history);
+    const roles = messages.map(m => m.role);
+    // Should only have one system (the template's), user messages, no tool/extra system
+    assert.strictEqual(roles.filter(r => r === 'system').length, 1, 'should have exactly one system message');
+    assert.ok(!roles.includes('tool'), 'should filter out tool messages');
+  });
+
+  test('backward-compatible buildRoadmapChatPrompt still works', () => {
+    const { system, user } = buildRoadmapChatPrompt({}, 'test question');
+    assert.strictEqual(typeof system, 'string');
+    assert.strictEqual(user, 'test question');
+    assert.ok(system.includes('ROADMAP DATA'));
+  });
+});
+
+// =============================================================================
+// Full pipeline: model → summarize → messages → (would stream)
+// =============================================================================
+
+describe('prompt pipeline end-to-end', () => {
+  test('narrative messages from real model contain milestone data', () => {
     const issues = [
       createIssue({
         completedAt: daysAgo(5),
@@ -418,21 +659,15 @@ describe('prompt templates accept roadmap model', () => {
     ];
     const projects = [{ id: 'proj-1', name: 'Alpha' }];
     const model = buildRoadmapModel(issues, projects);
+    const serializable = { ...model, criticalPaths: Object.fromEntries(model.criticalPaths) };
 
-    // Convert Map to plain object (as the client sends)
-    const serializable = {
-      ...model,
-      criticalPaths: Object.fromEntries(model.criticalPaths)
-    };
-
-    const prompt = buildRoadmapNarrativePrompt(serializable);
-    assert.strictEqual(typeof prompt, 'string');
-    assert.ok(prompt.length > 100, 'prompt should be substantial');
-    assert.ok(prompt.includes('Alpha'), 'prompt should include milestone data');
-    assert.ok(prompt.includes('velocity'), 'prompt should reference velocity');
+    const messages = buildRoadmapNarrativeMessages(serializable);
+    const allContent = messages.map(m => m.content).join('\n');
+    assert.ok(allContent.includes('Alpha'), 'should contain milestone name');
+    assert.ok(allContent.includes('Tasks/week'), 'should contain velocity');
   });
 
-  test('buildRoadmapChatPrompt produces system and user from real model', () => {
+  test('chat messages from real model with history work correctly', () => {
     const issues = [
       createIssue({
         state: { name: 'Todo', type: 'unstarted' },
@@ -441,29 +676,19 @@ describe('prompt templates accept roadmap model', () => {
     ];
     const projects = [{ id: 'proj-1', name: 'Beta' }];
     const model = buildRoadmapModel(issues, projects);
+    const serializable = { ...model, criticalPaths: Object.fromEntries(model.criticalPaths) };
 
-    const serializable = {
-      ...model,
-      criticalPaths: Object.fromEntries(model.criticalPaths)
-    };
+    const history = [
+      { role: 'user', content: 'How is Beta going?' },
+      { role: 'assistant', content: 'Beta has 1 remaining task.' }
+    ];
+    const messages = buildRoadmapChatMessages(serializable, 'What blocks it?', history);
 
-    const { system, user } = buildRoadmapChatPrompt(serializable, 'When will Beta be done?');
-    assert.strictEqual(typeof system, 'string');
-    assert.strictEqual(typeof user, 'string');
-    assert.ok(system.length > 100, 'system prompt should be substantial');
-    assert.ok(system.includes('Beta'), 'system should include milestone data');
-    assert.strictEqual(user, 'When will Beta be done?');
-  });
-
-  test('narrative prompt handles empty model gracefully', () => {
-    const prompt = buildRoadmapNarrativePrompt({});
-    assert.strictEqual(typeof prompt, 'string');
-    assert.ok(prompt.length > 0);
-  });
-
-  test('chat prompt handles empty model gracefully', () => {
-    const { system, user } = buildRoadmapChatPrompt({}, 'What is happening?');
-    assert.strictEqual(typeof system, 'string');
-    assert.strictEqual(user, 'What is happening?');
+    // Verify structure: system, history user, history assistant, current user
+    assert.strictEqual(messages[0].role, 'system');
+    assert.ok(messages[0].content.includes('Beta'), 'system should include milestone');
+    assert.strictEqual(messages[1].content, 'How is Beta going?');
+    assert.strictEqual(messages[2].content, 'Beta has 1 remaining task.');
+    assert.strictEqual(messages[3].content, 'What blocks it?');
   });
 });

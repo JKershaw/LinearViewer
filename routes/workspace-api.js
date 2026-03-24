@@ -13,7 +13,7 @@ import { fetchIssueContext, fetchRecommendationContext, fetchIssueComments } fro
 import { generatePrompt, generateCustomPrompt, hasPrompt, getAvailablePrompts } from '../lib/prompt-templates.js';
 import { PREPARING_LABEL, WORK_ISSUE_LABELS } from '../lib/workflow-config.js';
 import { parseRepoFromDescription } from '../lib/prompt-formatters.js';
-import { isRecommendationEnabled, getRecommendation, getRecommendationStream, DEFAULT_MODEL } from '../lib/openrouter.js';
+import { isRecommendationEnabled, getRecommendation, getRecommendationStream, streamChat, DEFAULT_MODEL } from '../lib/openrouter.js';
 import { runAudit, computeAuditFromData } from '../lib/audit.js';
 import { UUID_REGEX } from '../lib/workspace.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
@@ -944,14 +944,13 @@ ${goal}`;
     res.flushHeaders();
 
     try {
-      const { buildRoadmapNarrativePrompt } = await import('../lib/prompts/roadmap-narrative-template.js');
-      const prompt = buildRoadmapNarrativePrompt(roadmapModel);
-
+      const { buildRoadmapNarrativeMessages } = await import('../lib/prompts/roadmap-narrative-template.js');
+      const messages = buildRoadmapNarrativeMessages(roadmapModel);
       const selectedModel = req.session.modelId || DEFAULT_MODEL;
 
-      await getRecommendationStream(
-        prompt,
-        { apiKey: apiKeyToUse, model: selectedModel },
+      await streamChat(
+        messages,
+        { apiKey: apiKeyToUse, model: selectedModel, maxTokens: 800 },
         (type, data) => {
           sendSSE(res, type, data);
           if (type === 'done' || type === 'error') {
@@ -961,14 +960,14 @@ ${goal}`;
       );
     } catch (error) {
       console.error('Roadmap narrative error:', error);
-      sendSSE(res, 'error', { error: error.message });
+      sendSSE(res, 'error', { message: error.message });
       res.end();
     }
   });
 
   /**
    * Roadmap Q&A chat via SSE streaming.
-   * Client POSTs the question and the roadmap model.
+   * Client POSTs the question, roadmap model, and conversation history.
    * @route POST /workspace/:urlKey/api/roadmap/chat
    */
   router.post('/workspace/:urlKey/api/roadmap/chat', workspaceFromUrl, async (req, res) => {
@@ -983,7 +982,7 @@ ${goal}`;
       return res.status(503).json({ error: 'AI not configured. Connect OpenRouter or set OPENROUTER_API_KEY.' });
     }
 
-    const { question, roadmapModel } = req.body;
+    const { question, roadmapModel, history } = req.body;
     if (!question || !roadmapModel) {
       return res.status(400).json({ error: 'question and roadmapModel are required' });
     }
@@ -997,14 +996,13 @@ ${goal}`;
     res.flushHeaders();
 
     try {
-      const { buildRoadmapChatPrompt } = await import('../lib/prompts/roadmap-chat-template.js');
-      const { system, user } = buildRoadmapChatPrompt(roadmapModel, question);
-
+      const { buildRoadmapChatMessages } = await import('../lib/prompts/roadmap-chat-template.js');
+      const messages = buildRoadmapChatMessages(roadmapModel, question, history || []);
       const selectedModel = req.session.modelId || DEFAULT_MODEL;
 
-      await getRecommendationStream(
-        `${system}\n\n${user}`,
-        { apiKey: apiKeyToUse, model: selectedModel },
+      await streamChat(
+        messages,
+        { apiKey: apiKeyToUse, model: selectedModel, maxTokens: 500 },
         (type, data) => {
           sendSSE(res, type, data);
           if (type === 'done' || type === 'error') {
@@ -1014,7 +1012,7 @@ ${goal}`;
       );
     } catch (error) {
       console.error('Roadmap chat error:', error);
-      sendSSE(res, 'error', { error: error.message });
+      sendSSE(res, 'error', { message: error.message });
       res.end();
     }
   });

@@ -3,7 +3,7 @@
  *
  * Reads window.__ROADMAP_DATA__ and handles:
  * - AI narrative generation (SSE streaming)
- * - AI chat Q&A (SSE streaming)
+ * - AI chat Q&A with conversation history (SSE streaming)
  *
  * The velocity panel and milestone cards are server-rendered.
  * This script only adds interactive AI features when available.
@@ -24,18 +24,8 @@
   // Helpers
   // =========================================================================
 
-  function escapeHtml(str) {
-    if (!str) return '';
-    return str
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-  }
-
   /**
    * Read an SSE stream from a fetch response, calling onEvent for each event.
-   * Mirrors the pattern from app.js readSSEStream.
    */
   function readSSEStream(response, onEvent) {
     var reader = response.body.getReader();
@@ -112,7 +102,7 @@
 
     var heading = document.createElement('h2');
     heading.className = 'roadmap-section-heading';
-    heading.textContent = '│ Narrative';
+    heading.textContent = '\u2502 Narrative';
     section.insertBefore(heading, content);
 
     var btn = document.createElement('button');
@@ -167,20 +157,23 @@
   }
 
   // =========================================================================
-  // Chat (AI)
+  // Chat (AI) with conversation history
   // =========================================================================
 
   function renderChat() {
     var section = document.querySelector('.roadmap-chat');
     if (!section || !hasAI) return;
 
+    // Conversation history for multi-turn context
+    var chatHistory = [];
+
     var heading = document.createElement('h2');
     heading.className = 'roadmap-section-heading';
-    heading.textContent = '│ Chat';
+    heading.textContent = '\u2502 Chat';
     section.appendChild(heading);
 
-    var history = document.createElement('div');
-    history.className = 'roadmap-chat-history';
+    var historyEl = document.createElement('div');
+    historyEl.className = 'roadmap-chat-history';
 
     var inputRow = document.createElement('div');
     inputRow.className = 'roadmap-chat-input-row';
@@ -196,29 +189,33 @@
 
     inputRow.appendChild(input);
     inputRow.appendChild(sendBtn);
-    section.appendChild(history);
+    section.appendChild(historyEl);
     section.appendChild(inputRow);
 
     function sendMessage() {
       var question = input.value.trim();
       if (!question) return;
 
-      // Show user message
+      // Show user message in UI
       var userMsg = document.createElement('div');
       userMsg.className = 'roadmap-chat-message roadmap-chat-message--user';
       userMsg.textContent = '> ' + question;
-      history.appendChild(userMsg);
+      historyEl.appendChild(userMsg);
+
+      // Add to conversation history
+      chatHistory.push({ role: 'user', content: question });
 
       // Create assistant message placeholder
       var assistantMsg = document.createElement('div');
       assistantMsg.className = 'roadmap-chat-message roadmap-chat-message--assistant';
-      history.appendChild(assistantMsg);
+      historyEl.appendChild(assistantMsg);
 
+      var assistantText = '';
       input.value = '';
       sendBtn.disabled = true;
       input.disabled = true;
 
-      history.scrollTop = history.scrollHeight;
+      historyEl.scrollTop = historyEl.scrollHeight;
 
       fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/roadmap/chat', {
         method: 'POST',
@@ -228,7 +225,8 @@
         },
         body: JSON.stringify({
           question: question,
-          roadmapModel: getRoadmapModelPayload()
+          roadmapModel: getRoadmapModelPayload(),
+          history: chatHistory.slice(0, -1) // exclude current question (server adds it)
         })
       }).then(function(response) {
         if (response.status === 401) {
@@ -245,9 +243,12 @@
         return readSSEStream(response, function(type, eventData) {
           if (type === 'token' || type === 'message') {
             var text = typeof eventData === 'object' ? (eventData.token || eventData.text || '') : eventData;
-            assistantMsg.textContent += text;
-            history.scrollTop = history.scrollHeight;
+            assistantText += text;
+            assistantMsg.textContent = assistantText;
+            historyEl.scrollTop = historyEl.scrollHeight;
           } else if (type === 'done') {
+            // Store assistant response in history for follow-up context
+            chatHistory.push({ role: 'assistant', content: assistantText });
             sendBtn.disabled = false;
             input.disabled = false;
             input.focus();
