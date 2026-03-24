@@ -25,6 +25,7 @@
     "undici": "^7.18.2"
   },
   "devDependencies": {
+    "@lightpanda/browser": "^1.2.0",
     "@playwright/test": "^1.57.0"
   }
 }
