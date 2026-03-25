@@ -100,6 +100,40 @@
   margin-top: 0.25em;
 }
 
+.roadmap-milestone-desc {
+  font-family: var(--font-structural);
+  font-size: 0.8em;
+  color: var(--fg-dim);
+  margin-top: 0.25em;
+  padding-left: 0.5em;
+  border-left: 2px solid var(--border);
+}
+
+.roadmap-task-tree {
+  font-family: var(--font-structural);
+  font-size: 0.8em;
+  margin-top: 0.5em;
+  color: var(--fg-dim);
+}
+
+.roadmap-tree-heading {
+  color: var(--fg-dim);
+  margin-bottom: 0.25em;
+}
+
+.roadmap-task-parent,
+.roadmap-task-item {
+  padding-left: 0.5em;
+}
+
+.roadmap-task-children {
+  padding-left: 1.5em;
+}
+
+.roadmap-task-child {
+  white-space: nowrap;
+}
+
 .roadmap-critical-path {
   font-family: var(--font-structural);
   font-size: 0.8em;

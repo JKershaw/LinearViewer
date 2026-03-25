@@ -548,7 +548,7 @@ describe('summarizeRoadmapModel', () => {
         projectedEnd: '2026-04-15T00:00:00Z'
       }]
     });
-    assert.ok(summary.includes('MILESTONES'), 'should have milestones section');
+    assert.ok(summary.includes('PROJECTS'), 'should have projects section');
     assert.ok(summary.includes('Launch'), 'should include milestone name');
     assert.ok(summary.includes('60%'), 'should include progress');
     assert.ok(summary.includes('6/10'), 'should include done/total');
@@ -588,7 +588,7 @@ describe('summarizeRoadmapModel', () => {
       criticalPaths: {}
     });
     assert.ok(summary.includes('VELOCITY'), 'always shows velocity');
-    assert.ok(!summary.includes('MILESTONES'), 'omits empty milestones');
+    assert.ok(!summary.includes('PROJECTS'), 'omits empty projects');
     assert.ok(!summary.includes('SIGNALS'), 'omits empty signals');
     assert.ok(!summary.includes('CRITICAL PATHS'), 'omits empty paths');
   });
@@ -801,5 +801,110 @@ describe('prompt pipeline end-to-end', () => {
     assert.strictEqual(messages[1].content, 'How is Beta going?');
     assert.strictEqual(messages[2].content, 'Beta has 1 remaining task.');
     assert.strictEqual(messages[3].content, 'What blocks it?');
+  });
+});
+
+// =============================================================================
+// Hierarchy data flow: parent-child issues through full pipeline
+// =============================================================================
+
+describe('hierarchy data flow', () => {
+  test('parent-child issues produce nested milestone data', () => {
+    const parent = createIssue({
+      id: 'h-parent',
+      title: 'Build Auth',
+      state: { name: 'In Progress', type: 'started' },
+      project: { id: 'proj-1', name: 'Auth Rewrite' }
+    });
+    const child1 = createIssue({
+      id: 'h-child-1',
+      title: 'Design Login',
+      state: { name: 'Done', type: 'completed' },
+      completedAt: daysAgo(2),
+      parent: { id: 'h-parent' },
+      project: { id: 'proj-1', name: 'Auth Rewrite' }
+    });
+    const child2 = createIssue({
+      id: 'h-child-2',
+      title: 'Implement OAuth',
+      state: { name: 'Todo', type: 'unstarted' },
+      parent: { id: 'h-parent' },
+      project: { id: 'proj-1', name: 'Auth Rewrite' }
+    });
+    const projects = [{ id: 'proj-1', name: 'Auth Rewrite', content: 'Replace legacy auth.' }];
+    const model = buildRoadmapModel([parent, child1, child2], projects);
+
+    const milestone = model.milestones.find(m => m.name === 'Auth Rewrite');
+    assert.ok(milestone, 'should have Auth Rewrite project');
+    assert.ok(milestone.description, 'should include project description');
+
+    // Parent should have nested subtasks
+    const parentTask = milestone.tasksInQueue.find(t => t.id === 'h-parent');
+    assert.ok(parentTask, 'parent should be in queue');
+    assert.ok(parentTask.subtasks.length > 0, 'parent should have subtasks');
+    assert.ok(parentTask.rollup, 'parent should have rollup');
+  });
+
+  test('summarizeRoadmapModel renders hierarchy as tree', () => {
+    const parent = createIssue({
+      id: 'tree-parent',
+      title: 'Build Feature',
+      state: { name: 'In Progress', type: 'started' },
+      project: { id: 'proj-1', name: 'Feature X' }
+    });
+    const child1 = createIssue({
+      id: 'tree-c1',
+      title: 'Design UI',
+      state: { name: 'Done', type: 'completed' },
+      completedAt: daysAgo(2),
+      parent: { id: 'tree-parent' },
+      project: { id: 'proj-1', name: 'Feature X' }
+    });
+    const child2 = createIssue({
+      id: 'tree-c2',
+      title: 'Write Tests',
+      state: { name: 'Todo', type: 'unstarted' },
+      parent: { id: 'tree-parent' },
+      project: { id: 'proj-1', name: 'Feature X' }
+    });
+    const projects = [{ id: 'proj-1', name: 'Feature X', content: 'New feature for customers.' }];
+    const model = buildRoadmapModel([parent, child1, child2], projects);
+    const serializable = { ...model, criticalPaths: Object.fromEntries(model.criticalPaths) };
+
+    const summary = summarizeRoadmapModel(serializable);
+    assert.ok(summary.includes('PROJECTS'), 'should use PROJECTS heading');
+    assert.ok(summary.includes('Feature X'), 'should include project name');
+    assert.ok(summary.includes('Description:'), 'should include project description');
+    assert.ok(summary.includes('subtasks done'), 'should show subtask rollup');
+    assert.ok(summary.includes('├─') || summary.includes('└─'), 'should use box-drawing chars');
+  });
+
+  test('renderRoadmapPage handles nested milestone data', () => {
+    const parent = createIssue({
+      id: 'rp-parent',
+      title: 'Parent Task',
+      state: { name: 'In Progress', type: 'started' },
+      project: { id: 'proj-1', name: 'Nested' }
+    });
+    const child = createIssue({
+      id: 'rp-child',
+      title: 'Child Task',
+      state: { name: 'Todo', type: 'unstarted' },
+      parent: { id: 'rp-parent' },
+      project: { id: 'proj-1', name: 'Nested' }
+    });
+    const projects = [{ id: 'proj-1', name: 'Nested', content: 'Test nesting.' }];
+    const model = buildRoadmapModel([parent, child], projects);
+
+    const html = renderRoadmapPage(
+      { roadmapModel: model, organizationName: 'Test' },
+      { urlKey: 'test-ws' }
+    );
+
+    assert.ok(html.includes('<!DOCTYPE html>'), 'should render HTML');
+    assert.ok(html.includes('roadmap-task-tree'), 'should include task tree');
+    assert.ok(html.includes('roadmap-task-parent'), 'should show parent tasks');
+    assert.ok(html.includes('roadmap-task-child'), 'should show child tasks');
+    assert.ok(html.includes('subtasks'), 'should show subtask count');
   });
 });
