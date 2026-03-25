@@ -9,9 +9,14 @@ import {
   calculateVelocity,
   buildExecutionQueue,
   groupByMilestone,
+  groupByProject,
   projectTimeline,
   findCriticalPaths,
-  assessRisks
+  assessRisks,
+  buildHierarchy,
+  computeParentRollup,
+  flattenTasks,
+  issueToRoadmapCard
 } from '../../lib/roadmap.js';
 
 // =============================================================================
@@ -729,5 +734,275 @@ describe('assessRisks', () => {
     const overdueRisk = result.find(r => r.type === 'overdue');
     assert.ok(overdueRisk, 'should flag overdue milestone');
     assert.strictEqual(overdueRisk.milestone, 'Alpha');
+  });
+});
+
+// =============================================================================
+// buildHierarchy
+// =============================================================================
+
+describe('buildHierarchy', () => {
+  test('empty input returns empty maps', () => {
+    const h = buildHierarchy([]);
+    assert.strictEqual(h.childrenOf.size, 0);
+    assert.strictEqual(h.parentOf.size, 0);
+  });
+
+  test('detects parent-child when both are in set', () => {
+    const cards = [
+      { id: 'parent-1', parentId: null },
+      { id: 'child-1', parentId: 'parent-1' },
+      { id: 'child-2', parentId: 'parent-1' },
+    ];
+    const h = buildHierarchy(cards);
+    assert.ok(h.isParent('parent-1'));
+    assert.ok(h.isLeaf('child-1'));
+    assert.ok(h.isLeaf('child-2'));
+    assert.ok(!h.isParent('child-1'));
+    assert.deepStrictEqual(h.childrenOf.get('parent-1').sort(), ['child-1', 'child-2']);
+  });
+
+  test('orphaned child (parent not in set) treated as standalone', () => {
+    const cards = [
+      { id: 'child-1', parentId: 'missing-parent' },
+    ];
+    const h = buildHierarchy(cards);
+    assert.ok(h.isLeaf('child-1'));
+    assert.ok(!h.parentOf.has('child-1'));
+  });
+
+  test('standalone tasks are leaves and not parents', () => {
+    const cards = [
+      { id: 'solo-1', parentId: null },
+      { id: 'solo-2', parentId: null },
+    ];
+    const h = buildHierarchy(cards);
+    assert.ok(h.isLeaf('solo-1'));
+    assert.ok(!h.isParent('solo-1'));
+  });
+});
+
+// =============================================================================
+// computeParentRollup
+// =============================================================================
+
+describe('computeParentRollup', () => {
+  test('counts states correctly', () => {
+    const children = [
+      { stateType: 'completed', estimate: 3 },
+      { stateType: 'started', estimate: 2 },
+      { stateType: 'unstarted', estimate: null },
+    ];
+    const rollup = computeParentRollup(children);
+    assert.strictEqual(rollup.subtaskTotal, 3);
+    assert.strictEqual(rollup.subtaskDone, 1);
+    assert.strictEqual(rollup.subtaskInProgress, 1);
+    assert.strictEqual(rollup.subtaskRemaining, 1);
+    assert.strictEqual(rollup.rollupEstimate, 5);
+  });
+
+  test('empty children gives zero rollup', () => {
+    const rollup = computeParentRollup([]);
+    assert.strictEqual(rollup.subtaskTotal, 0);
+    assert.strictEqual(rollup.subtaskDone, 0);
+  });
+});
+
+// =============================================================================
+// flattenTasks
+// =============================================================================
+
+describe('flattenTasks', () => {
+  test('flat list returns same items', () => {
+    const tasks = [{ id: 'a' }, { id: 'b' }];
+    const result = flattenTasks(tasks);
+    assert.strictEqual(result.length, 2);
+  });
+
+  test('nested subtasks are flattened', () => {
+    const tasks = [
+      { id: 'parent', subtasks: [{ id: 'child-1' }, { id: 'child-2' }] },
+      { id: 'solo' },
+    ];
+    const result = flattenTasks(tasks);
+    assert.strictEqual(result.length, 4);
+    assert.deepStrictEqual(result.map(t => t.id), ['parent', 'child-1', 'child-2', 'solo']);
+  });
+});
+
+// =============================================================================
+// groupByProject — hierarchy behavior
+// =============================================================================
+
+describe('groupByProject hierarchy', () => {
+  test('subtasks nested under parents in tasksInQueue', () => {
+    const parent = issueToRoadmapCard(createIssue({
+      id: 'parent-1',
+      state: { name: 'In Progress', type: 'started' },
+      project: { id: 'proj-1', name: 'Alpha' }
+    }));
+    const child1 = issueToRoadmapCard(createIssue({
+      id: 'child-1',
+      state: { name: 'Done', type: 'completed' },
+      parent: { id: 'parent-1' },
+      project: { id: 'proj-1', name: 'Alpha' }
+    }));
+    const child2 = issueToRoadmapCard(createIssue({
+      id: 'child-2',
+      state: { name: 'Todo', type: 'unstarted' },
+      parent: { id: 'parent-1' },
+      project: { id: 'proj-1', name: 'Alpha' }
+    }));
+    const queue = [parent, child2]; // child1 is completed, not in queue
+    const projects = [{ id: 'proj-1', name: 'Alpha' }];
+    const result = groupByProject(queue, projects, [child1]);
+    const alpha = result.find(m => m.name === 'Alpha');
+
+    // Top-level tasksInQueue should only have parent (not child2 separately)
+    assert.strictEqual(alpha.tasksInQueue.length, 1);
+    assert.strictEqual(alpha.tasksInQueue[0].id, 'parent-1');
+    assert.ok(alpha.tasksInQueue[0].subtasks.length > 0, 'parent should have subtasks');
+  });
+
+  test('parent rollup stats computed from children', () => {
+    const parent = issueToRoadmapCard(createIssue({
+      id: 'p1',
+      state: { name: 'In Progress', type: 'started' },
+      project: { id: 'proj-1', name: 'Alpha' }
+    }));
+    const child1 = issueToRoadmapCard(createIssue({
+      id: 'c1',
+      state: { name: 'Todo', type: 'unstarted' },
+      parent: { id: 'p1' },
+      estimate: 3,
+      project: { id: 'proj-1', name: 'Alpha' }
+    }));
+    const child2 = issueToRoadmapCard(createIssue({
+      id: 'c2',
+      state: { name: 'In Progress', type: 'started' },
+      parent: { id: 'p1' },
+      estimate: 2,
+      project: { id: 'proj-1', name: 'Alpha' }
+    }));
+    const queue = [parent, child1, child2];
+    const projects = [{ id: 'proj-1', name: 'Alpha' }];
+    const result = groupByProject(queue, projects);
+    const parentTask = result[0].tasksInQueue[0];
+    assert.ok(parentTask.rollup, 'parent should have rollup');
+    assert.strictEqual(parentTask.rollup.subtaskTotal, 2);
+    assert.strictEqual(parentTask.rollup.subtaskInProgress, 1);
+    assert.strictEqual(parentTask.rollup.subtaskRemaining, 1);
+    assert.strictEqual(parentTask.rollup.rollupEstimate, 5);
+  });
+
+  test('progress counts only leaf tasks', () => {
+    const parent = issueToRoadmapCard(createIssue({
+      id: 'p1',
+      state: { name: 'In Progress', type: 'started' },
+      project: { id: 'proj-1', name: 'Alpha' }
+    }));
+    const childDone = issueToRoadmapCard(createIssue({
+      id: 'c1',
+      state: { name: 'Done', type: 'completed' },
+      completedAt: daysAgo(1),
+      parent: { id: 'p1' },
+      project: { id: 'proj-1', name: 'Alpha' }
+    }));
+    const childTodo = issueToRoadmapCard(createIssue({
+      id: 'c2',
+      state: { name: 'Todo', type: 'unstarted' },
+      parent: { id: 'p1' },
+      project: { id: 'proj-1', name: 'Alpha' }
+    }));
+    // Parent in queue, one child done, one child in queue
+    const queue = [parent, childTodo];
+    const projects = [{ id: 'proj-1', name: 'Alpha' }];
+    const result = groupByProject(queue, projects, [childDone]);
+    const alpha = result[0];
+    // Should count only leaf tasks: 1 done + 1 remaining = 2 total, 50%
+    assert.strictEqual(alpha.completedTasks, 1);
+    assert.strictEqual(alpha.remainingTasks, 1);
+    assert.strictEqual(alpha.totalTasks, 2);
+    assert.strictEqual(alpha.progressPercent, 50);
+  });
+
+  test('standalone tasks unaffected by hierarchy logic', () => {
+    const solo = issueToRoadmapCard(createIssue({
+      id: 'solo-1',
+      state: { name: 'Todo', type: 'unstarted' },
+      project: { id: 'proj-1', name: 'Alpha' }
+    }));
+    const queue = [solo];
+    const projects = [{ id: 'proj-1', name: 'Alpha' }];
+    const result = groupByProject(queue, projects);
+    assert.strictEqual(result[0].tasksInQueue.length, 1);
+    assert.strictEqual(result[0].tasksInQueue[0].id, 'solo-1');
+    assert.deepStrictEqual(result[0].tasksInQueue[0].subtasks, []);
+    assert.strictEqual(result[0].tasksInQueue[0].rollup, null);
+  });
+
+  test('project description included when available', () => {
+    const task = issueToRoadmapCard(createIssue({
+      id: 'a',
+      state: { name: 'Todo', type: 'unstarted' },
+      project: { id: 'proj-1', name: 'Alpha' }
+    }));
+    const projects = [{ id: 'proj-1', name: 'Alpha', content: 'Replace legacy auth with OAuth 2.0.' }];
+    const result = groupByProject([task], projects);
+    assert.strictEqual(result[0].description, 'Replace legacy auth with OAuth 2.0.');
+  });
+
+  test('project description truncated at ~200 chars', () => {
+    const task = issueToRoadmapCard(createIssue({
+      id: 'a',
+      state: { name: 'Todo', type: 'unstarted' },
+      project: { id: 'proj-1', name: 'Alpha' }
+    }));
+    const longDesc = 'A'.repeat(300) + '\n\nSecond paragraph should be excluded.';
+    const projects = [{ id: 'proj-1', name: 'Alpha', content: longDesc }];
+    const result = groupByProject([task], projects);
+    assert.ok(result[0].description.length <= 200, 'description should be truncated');
+    assert.ok(result[0].description.endsWith('...'));
+  });
+});
+
+// =============================================================================
+// calculateVelocity — leaf-only counting
+// =============================================================================
+
+describe('calculateVelocity leaf-only', () => {
+  test('parent tasks excluded from velocity when children exist', () => {
+    const parent = createIssue({
+      id: 'parent-v',
+      completedAt: daysAgo(3),
+      state: { name: 'Done', type: 'completed' }
+    });
+    const child1 = createIssue({
+      id: 'child-v1',
+      completedAt: daysAgo(3),
+      parent: { id: 'parent-v' },
+      state: { name: 'Done', type: 'completed' }
+    });
+    const child2 = createIssue({
+      id: 'child-v2',
+      completedAt: daysAgo(3),
+      parent: { id: 'parent-v' },
+      state: { name: 'Done', type: 'completed' }
+    });
+    const result = calculateVelocity([parent, child1, child2], 30);
+    // Should count 2 children, not 3 (parent excluded)
+    const totalTasks = result.weeklyData.reduce((s, w) => s + w.tasks, 0);
+    assert.strictEqual(totalTasks, 2);
+  });
+
+  test('standalone tasks without children still counted', () => {
+    const solo = createIssue({
+      id: 'solo-v',
+      completedAt: daysAgo(3),
+      state: { name: 'Done', type: 'completed' }
+    });
+    const result = calculateVelocity([solo], 30);
+    const totalTasks = result.weeklyData.reduce((s, w) => s + w.tasks, 0);
+    assert.strictEqual(totalTasks, 1);
   });
 });
