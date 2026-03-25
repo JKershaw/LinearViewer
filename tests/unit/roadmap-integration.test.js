@@ -564,7 +564,7 @@ describe('summarizeRoadmapModel', () => {
         { severity: 'medium', milestone: null, description: 'Velocity declining' }
       ]
     });
-    assert.ok(summary.includes('RISKS'), 'should have risks section');
+    assert.ok(summary.includes('SIGNALS'), 'should have signals section');
     assert.ok(summary.includes('[high]'), 'should include severity');
     assert.ok(summary.includes('[Launch]'), 'should include milestone');
     assert.ok(summary.includes('Unassigned critical tasks'), 'should include description');
@@ -589,7 +589,7 @@ describe('summarizeRoadmapModel', () => {
     });
     assert.ok(summary.includes('VELOCITY'), 'always shows velocity');
     assert.ok(!summary.includes('MILESTONES'), 'omits empty milestones');
-    assert.ok(!summary.includes('RISKS'), 'omits empty risks');
+    assert.ok(!summary.includes('SIGNALS'), 'omits empty signals');
     assert.ok(!summary.includes('CRITICAL PATHS'), 'omits empty paths');
   });
 
@@ -636,14 +636,14 @@ describe('buildRoadmapNarrativeMessages', () => {
   test('system message instructs plain text output (no markdown)', () => {
     const messages = buildRoadmapNarrativeMessages({});
     const system = messages[0].content;
-    assert.ok(system.includes('Plain text only'), 'should instruct plain text');
-    assert.ok(system.includes('Do NOT use markdown'), 'should prohibit markdown');
+    assert.ok(system.includes('Plain text'), 'should instruct plain text');
+    assert.ok(system.includes('No markdown'), 'should prohibit markdown');
   });
 
-  test('system message includes word limit', () => {
+  test('system message instructs concise output', () => {
     const messages = buildRoadmapNarrativeMessages({});
     const system = messages[0].content;
-    assert.ok(/\d+ words/.test(system), 'should include word limit');
+    assert.ok(system.includes('concise'), 'should instruct conciseness');
   });
 
   test('user message contains summarized data, not raw JSON', () => {
