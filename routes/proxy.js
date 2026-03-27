@@ -404,9 +404,10 @@ const UPDATE_ISSUE_LABELS_MUTATION = gql`
  * @param {Object} options.foremanStore - Foreman status storage instance
  * @param {Function} options.workspaceFromUrl - Middleware to validate workspace
  * @param {Function} options.getWorkspaceAccessToken - Function to get workspace access token by urlKey
+ * @param {Function} options.getWorkspaceOpenRouterKey - Function to get OpenRouter API key from workspace sessions
  * @returns {Router} Express router with proxy routes
  */
-export function createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanStore, workspaceFromUrl, getWorkspaceAccessToken }) {
+export function createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanStore, workspaceFromUrl, getWorkspaceAccessToken, getWorkspaceOpenRouterKey }) {
   const router = Router();
 
   // =========================================================================
@@ -1671,10 +1672,13 @@ ${readEndpoints}${writeEndpoints}
 
       const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
 
+      // Resolve OpenRouter API key: session OAuth key (via workspace) or server env var
+      const sessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey);
+
       // Check if AI recommendations are available (skip in test mode)
-      if (!isTestMode && !isRecommendationEnabled()) {
+      if (!isTestMode && !isRecommendationEnabled(sessionApiKey)) {
         logEvent(req, '/api/proxy/recommend', 503);
-        return res.status(503).json({ error: 'AI recommendations not configured. Set OPENROUTER_API_KEY on the server.' });
+        return res.status(503).json({ error: 'AI recommendations not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.' });
       }
 
       const { identifier } = req.params;
@@ -1728,11 +1732,11 @@ ${readEndpoints}${writeEndpoints}
       const context = await fetchRecommendationContext(accessToken, identifier);
       const { issue, parent, siblings, project, children, comments, focusedChild } = context;
 
-      // Get AI-generated recommendation (uses server-side OPENROUTER_API_KEY)
+      // Get AI-generated recommendation (uses session OAuth key or server-side OPENROUTER_API_KEY)
       const recommendation = await getRecommendation(
         issue,
         { parent, siblings, project, children, comments, focusedChild },
-        { featureFlags: {} }
+        { apiKey: sessionApiKey, featureFlags: {} }
       );
 
       logEvent(req, '/api/proxy/recommend', 200);

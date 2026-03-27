@@ -577,7 +577,43 @@ async function getWorkspaceAccessToken(urlKey) {
   return null;
 }
 
-app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanStore, workspaceFromUrl, getWorkspaceAccessToken }))
+// getWorkspaceOpenRouterKey: looks up an OpenRouter API key from active sessions
+// for a given workspace. Returns the key from any session that has the workspace
+// and an OpenRouter OAuth connection. Uses a short-lived cache (30s).
+const _openRouterKeyCache = new Map(); // urlKey -> { key, cachedAt }
+const OPENROUTER_KEY_CACHE_TTL_MS = 30 * 1000; // 30 seconds
+
+async function getWorkspaceOpenRouterKey(urlKey) {
+  if (process.env.NODE_ENV === 'test' && urlKey === 'test-workspace') {
+    return null;
+  }
+
+  // Check cache first
+  const cached = _openRouterKeyCache.get(urlKey);
+  if (cached && Date.now() - cached.cachedAt < OPENROUTER_KEY_CACHE_TTL_MS) {
+    return cached.key;
+  }
+
+  try {
+    const sessions = await sessionsCollection.find({}).toArray();
+
+    for (const s of sessions) {
+      const data = typeof s.session === 'string' ? JSON.parse(s.session) : s.session;
+      const ws = data?.workspaces?.find(w => w.urlKey === urlKey);
+      if (ws && data.openRouterApiKey) {
+        _openRouterKeyCache.set(urlKey, { key: data.openRouterApiKey, cachedAt: Date.now() });
+        return data.openRouterApiKey;
+      }
+    }
+
+    _openRouterKeyCache.set(urlKey, { key: null, cachedAt: Date.now() });
+  } catch (err) {
+    console.error('Error looking up workspace OpenRouter key:', err);
+  }
+  return null;
+}
+
+app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanStore, workspaceFromUrl, getWorkspaceAccessToken, getWorkspaceOpenRouterKey }))
 
 // Mount workspace API routes (audit, prompts, recommendations, comments, images)
 app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, customPromptsStore }))
