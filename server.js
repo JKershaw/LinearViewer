@@ -578,18 +578,26 @@ async function getWorkspaceAccessToken(urlKey) {
 }
 
 // getWorkspaceOpenRouterKey: looks up an OpenRouter API key from active sessions
-// for a given workspace. Returns the key from any session that has the workspace
-// and an OpenRouter OAuth connection. Uses a short-lived cache (30s).
-const _openRouterKeyCache = new Map(); // urlKey -> { key, cachedAt }
+// for the token creator's session. Only returns a key when the linearUserId matches,
+// preventing one user's proxy token from consuming another user's OpenRouter quota.
+// Uses a short-lived cache (30s) keyed by urlKey+linearUserId.
+const _openRouterKeyCache = new Map(); // "urlKey:linearUserId" -> { key, cachedAt }
 const OPENROUTER_KEY_CACHE_TTL_MS = 30 * 1000; // 30 seconds
 
-async function getWorkspaceOpenRouterKey(urlKey) {
+async function getWorkspaceOpenRouterKey(urlKey, linearUserId) {
   if (process.env.NODE_ENV === 'test' && urlKey === 'test-workspace') {
     return null;
   }
 
+  // Without a creator user ID, we can't safely resolve a personal OAuth key
+  if (!linearUserId) {
+    return null;
+  }
+
+  const cacheKey = `${urlKey}:${linearUserId}`;
+
   // Check cache first
-  const cached = _openRouterKeyCache.get(urlKey);
+  const cached = _openRouterKeyCache.get(cacheKey);
   if (cached && Date.now() - cached.cachedAt < OPENROUTER_KEY_CACHE_TTL_MS) {
     return cached.key;
   }
@@ -599,14 +607,16 @@ async function getWorkspaceOpenRouterKey(urlKey) {
 
     for (const s of sessions) {
       const data = typeof s.session === 'string' ? JSON.parse(s.session) : s.session;
+      // Only use the key from the token creator's own session
+      if (data?.linearUserId !== linearUserId) continue;
       const ws = data?.workspaces?.find(w => w.urlKey === urlKey);
       if (ws && data.openRouterApiKey) {
-        _openRouterKeyCache.set(urlKey, { key: data.openRouterApiKey, cachedAt: Date.now() });
+        _openRouterKeyCache.set(cacheKey, { key: data.openRouterApiKey, cachedAt: Date.now() });
         return data.openRouterApiKey;
       }
     }
 
-    _openRouterKeyCache.set(urlKey, { key: null, cachedAt: Date.now() });
+    _openRouterKeyCache.set(cacheKey, { key: null, cachedAt: Date.now() });
   } catch (err) {
     console.error('Error looking up workspace OpenRouter key:', err);
   }
