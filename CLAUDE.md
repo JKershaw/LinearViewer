@@ -20,6 +20,7 @@ routes/
   openrouter-auth.js   OpenRouter OAuth PKCE routes
   workspace.js         Workspace management routes
   dispatch.js          Dispatch queue API (user + consumer endpoints)
+  proxy.js             Linear API proxy (token auth, read/write endpoints, cycles, labels, foreman)
   workspace-api.js     Workspace API routes (prompts, recommendations, audit, comments, images)
   test.js              Test-only routes for E2E tests (mock sessions, fixtures)
   legacy-redirects.js  Backward-compatible redirects for old URLs
@@ -46,6 +47,10 @@ lib/
     meta-prompt-template.js  Meta-prompt for AI recommendation generation
   dispatch-store.js    Dispatch queue storage
   dispatch-tokens.js   Consumer API token management
+  proxy-tokens.js      Proxy token hashing and validation
+  proxy-events.js      Proxy event audit logging
+  proxy-fetch.js       Proxy-aware fetch for HTTP_PROXY environments
+  render-proxy.js      Proxy token management UI
   components/
     navbar.js          Nav bar with workspace/team selectors, queue badge
     footer.js          Footer with deploy info, AI status
@@ -69,6 +74,7 @@ tests/e2e/
   dispatch-page.spec.js  Dispatch page UI tests
   free-tier.spec.js    Free tier rate limiting tests
   feature-toggles.spec.js  Feature toggle settings tests
+  proxy.spec.js        Proxy API tests (tokens, cycles, labels, auth)
 docs/
   dispatch-integration.md  Consumer integration guide
 playwright.config.js   Playwright test configuration
@@ -197,6 +203,57 @@ Items expire after 24 hours. Tokens are workspace-scoped and never expire (but c
 Feedback is append-only, inherits 30-day history TTL, and requires strict token ownership.
 
 **See [docs/dispatch-integration.md](docs/dispatch-integration.md)** for the full consumer integration guide.
+
+## Linear API Proxy
+
+The proxy allows authenticated users to generate secure tokens for external AI agents and automation tools to interact with their Linear workspace via a REST-like API.
+
+**Key features:**
+- Token-based authentication (Bearer tokens with SHA-256 hashing)
+- Read/write scope separation (`read` for queries, `readWrite` for mutations)
+- Single-use token support (consumed after first request)
+- Event audit logging (30-day TTL)
+- Rate limiting (60 requests/minute per IP)
+- Workspace isolation (tokens are scoped to a single workspace)
+
+**User-facing endpoints** (session auth, workspace-prefixed):
+- `POST /workspace/:urlKey/api/proxy/tokens` - Create a proxy token
+- `GET /workspace/:urlKey/api/proxy/tokens` - List tokens
+- `DELETE /workspace/:urlKey/api/proxy/tokens/:tokenId` - Revoke token
+- `GET /workspace/:urlKey/api/proxy/events` - View audit log
+
+**Consumer read endpoints** (Bearer token auth):
+- `GET /api/proxy/instructions` - Agent-readable API documentation
+- `GET /api/proxy/me` - Current user info
+- `GET /api/proxy/teams` - List teams
+- `GET /api/proxy/projects` - List active projects
+- `GET /api/proxy/issues?teamId={id}&limit={n}` - List issues (optional team filter, pagination)
+- `GET /api/proxy/issue/:issueId` - Full issue detail (comments, children, relations, cycle)
+- `GET /api/proxy/search?q={query}` - Search issues
+- `GET /api/proxy/states/:teamId` - Workflow states for a team
+- `GET /api/proxy/labels?teamId={id}` - Labels (id, name, color; optional team filter)
+- `GET /api/proxy/cycles?teamId={id}` - Cycles (optional team filter)
+- `GET /api/proxy/cycle/:cycleId` - Cycle detail with issues and progress
+- `GET /api/proxy/relations/:issueId` - Issue relations (blocks, blocked-by, related, duplicate)
+
+**Consumer write endpoints** (Bearer token auth, `readWrite` scope):
+- `POST /api/proxy/issues` - Create issue (supports `cycleId` for cycle assignment)
+- `PATCH /api/proxy/issue/:issueId` - Update issue (supports `cycleId`)
+- `POST /api/proxy/issue/:issueId/comments` - Add comment
+- `POST /api/proxy/issue/:issueId/relations` - Create relation
+- `POST /api/proxy/issue/:issueId/labels` - Add label
+- `DELETE /api/proxy/issue/:issueId/labels/:labelId` - Remove label
+
+**Foreman endpoints** (Bearer token auth, task automation):
+- `GET /api/proxy/stack?limit={n}` - Sorted task stack with available prompts
+- `GET /api/proxy/prompt/:identifier/:templateKey` - Generate deterministic prompt
+- `GET /api/proxy/recommend/:identifier` - AI-generated prompt recommendation
+- `GET /api/proxy/foreman/status` - List/post foreman status entries
+- `GET /api/proxy/foreman/playbook` - Foreman automation playbook
+
+Issue IDs accept both UUIDs and identifiers (e.g., `LIN-123`). All issue responses include cycle and label details (id, name, color).
+
+**See [docs/proxy-integration.md](docs/proxy-integration.md)** for the full consumer integration guide.
 
 ## Linear CLI (for AI Agents)
 

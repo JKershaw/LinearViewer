@@ -309,6 +309,41 @@ test.describe('Proxy API - Consumer Endpoints', () => {
     const data = await resp.json();
     expect(data.error).toContain('No valid fields');
   });
+
+  test('cycles endpoint validates teamId format', async ({ request }) => {
+    const resp = await request.get('/api/proxy/cycles?teamId=not-a-uuid', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(resp.status()).toBe(400);
+    const data = await resp.json();
+    expect(data.error).toContain('team ID');
+  });
+
+  test('cycle detail validates cycle ID format', async ({ request }) => {
+    const resp = await request.get('/api/proxy/cycle/not-a-uuid', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(resp.status()).toBe(400);
+    const data = await resp.json();
+    expect(data.error).toContain('cycle ID');
+  });
+
+  test('instructions include cycles endpoints', async ({ request }) => {
+    const resp = await request.get('/api/proxy/instructions', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    const text = await resp.text();
+    expect(text).toContain('/api/proxy/cycles');
+    expect(text).toContain('/api/proxy/cycle/');
+  });
+
+  test('instructions include enhanced label info', async ({ request }) => {
+    const resp = await request.get('/api/proxy/instructions', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    const text = await resp.text();
+    expect(text).toContain('id/name/color');
+  });
 });
 
 test.describe('Proxy API - Single-Use Tokens', () => {
