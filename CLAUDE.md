@@ -20,6 +20,7 @@ routes/
   openrouter-auth.js   OpenRouter OAuth PKCE routes
   workspace.js         Workspace management routes
   dispatch.js          Dispatch queue API (user + consumer endpoints)
+  proxy.js             Linear API proxy (token auth, read/write endpoints, cycles, labels, foreman)
   workspace-api.js     Workspace API routes (prompts, recommendations, audit, comments, images)
   test.js              Test-only routes for E2E tests (mock sessions, fixtures)
   legacy-redirects.js  Backward-compatible redirects for old URLs
@@ -46,6 +47,10 @@ lib/
     meta-prompt-template.js  Meta-prompt for AI recommendation generation
   dispatch-store.js    Dispatch queue storage
   dispatch-tokens.js   Consumer API token management
+  proxy-tokens.js      Proxy token hashing and validation
+  proxy-events.js      Proxy event audit logging
+  proxy-fetch.js       Proxy-aware fetch for HTTP_PROXY environments
+  render-proxy.js      Proxy token management UI
   components/
     navbar.js          Nav bar with workspace/team selectors, queue badge
     footer.js          Footer with deploy info, AI status
@@ -69,6 +74,7 @@ tests/e2e/
   dispatch-page.spec.js  Dispatch page UI tests
   free-tier.spec.js    Free tier rate limiting tests
   feature-toggles.spec.js  Feature toggle settings tests
+  proxy.spec.js        Proxy API tests (tokens, cycles, labels, auth)
 docs/
   dispatch-integration.md  Consumer integration guide
 playwright.config.js   Playwright test configuration

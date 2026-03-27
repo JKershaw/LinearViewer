@@ -121,11 +121,12 @@ const ISSUES_QUERY = gql`
         url
         state { name type }
         assignee { name }
-        labels { nodes { name } }
+        labels { nodes { id name color } }
         priority
         dueDate
         parent { id identifier }
         project { id name }
+        cycle { id name number }
       }
       pageInfo { hasNextPage endCursor }
     }
@@ -143,11 +144,12 @@ const ISSUES_QUERY_ALL = gql`
         url
         state { name type }
         assignee { name }
-        labels { nodes { name } }
+        labels { nodes { id name color } }
         priority
         dueDate
         parent { id identifier }
         project { id name }
+        cycle { id name number }
       }
       pageInfo { hasNextPage endCursor }
     }
@@ -164,13 +166,14 @@ const ISSUE_DETAIL_QUERY = gql`
       url
       state { name type }
       assignee { name }
-      labels { nodes { name } }
+      labels { nodes { id name color } }
       priority
       estimate
       dueDate
       createdAt
       completedAt
       project { id name }
+      cycle { id name number startsAt endsAt }
       parent { id identifier title }
       children {
         nodes {
@@ -205,8 +208,9 @@ const SEARCH_QUERY = gql`
         url
         state { name type }
         assignee { name }
-        labels { nodes { name } }
+        labels { nodes { id name color } }
         project { id name }
+        cycle { id name number }
       }
     }
   }
@@ -217,6 +221,64 @@ const STATES_QUERY = gql`
     workflowStates(filter: { team: { id: { eq: $teamId } } }) {
       nodes {
         id name type position
+      }
+    }
+  }
+`;
+
+const CYCLES_QUERY = gql`
+  query($teamId: ID) {
+    cycles(filter: { team: { id: { eq: $teamId } } }) {
+      nodes {
+        id
+        name
+        number
+        startsAt
+        endsAt
+        team { id name }
+      }
+    }
+  }
+`;
+
+const CYCLES_QUERY_ALL = gql`
+  query {
+    cycles {
+      nodes {
+        id
+        name
+        number
+        startsAt
+        endsAt
+        team { id name }
+      }
+    }
+  }
+`;
+
+const CYCLE_DETAIL_QUERY = gql`
+  query($id: String!) {
+    cycle(id: $id) {
+      id
+      name
+      number
+      description
+      startsAt
+      endsAt
+      completedAt
+      progress
+      scopeHistory
+      completedScopeHistory
+      team { id name }
+      issues {
+        nodes {
+          id
+          identifier
+          title
+          state { name type }
+          assignee { name }
+          priority
+        }
       }
     }
   }
@@ -611,7 +673,13 @@ GET ${baseUrl}/api/proxy/states/{teamId}
   → List workflow states for a team
 
 GET ${baseUrl}/api/proxy/labels?teamId={teamId}
-  → List labels (optionally filter by team)
+  → List labels (optionally filter by team, includes id/name/color)
+
+GET ${baseUrl}/api/proxy/cycles?teamId={teamId}
+  → List cycles (optionally filter by team)
+
+GET ${baseUrl}/api/proxy/cycle/{cycleId}
+  → Cycle detail with issues, progress, and scope history
 
 GET ${baseUrl}/api/proxy/relations/{issueId}
   → Get issue relations (blocks, blocked-by, related, duplicate)
@@ -638,12 +706,12 @@ GET ${baseUrl}/api/proxy/foreman/playbook
 ## Write Endpoints
 
 POST ${baseUrl}/api/proxy/issues
-  Body: { "teamId": "...", "title": "...", "description": "...", "projectId": "...", "stateId": "...", "assigneeId": "...", "priority": 0-4 }
-  → Create a new issue
+  Body: { "teamId": "...", "title": "...", "description": "...", "projectId": "...", "stateId": "...", "assigneeId": "...", "priority": 0-4, "cycleId": "..." }
+  → Create a new issue (optionally assign to a cycle)
 
 PATCH ${baseUrl}/api/proxy/issue/{issueId}
-  Body: { "title": "...", "description": "...", "stateId": "...", "assigneeId": "...", "priority": 0-4 }
-  → Update an existing issue
+  Body: { "title": "...", "description": "...", "stateId": "...", "assigneeId": "...", "priority": 0-4, "cycleId": "..." }
+  → Update an existing issue (set cycleId to assign/move to a cycle)
 
 POST ${baseUrl}/api/proxy/issue/{issueId}/comments
   Body: { "body": "..." }
@@ -940,6 +1008,71 @@ ${readEndpoints}${writeEndpoints}
   });
 
   /**
+   * GET /api/proxy/cycles
+   * List cycles, optionally filtered by team.
+   */
+  router.get('/api/proxy/cycles', proxyLimiter, authenticateProxyToken, async (req, res) => {
+    try {
+      const client = await getClient(req.proxyUrlKey);
+      if (!client) {
+        logEvent(req, '/api/proxy/cycles', 503);
+        return res.status(503).json({ error: 'Workspace not available' });
+      }
+
+      const teamId = req.query.teamId;
+      if (teamId && !UUID_REGEX.test(teamId)) {
+        logEvent(req, '/api/proxy/cycles', 400);
+        return res.status(400).json({ error: 'Invalid team ID format' });
+      }
+
+      const query = teamId ? CYCLES_QUERY : CYCLES_QUERY_ALL;
+      const variables = teamId ? { teamId } : {};
+      const data = await client.request(query, variables);
+      logEvent(req, '/api/proxy/cycles', 200);
+      res.json({ cycles: data.cycles?.nodes || [] });
+    } catch (err) {
+      const status = graphqlErrorStatus(err);
+      logEvent(req, '/api/proxy/cycles', status);
+      console.error('Proxy /cycles error:', err.message);
+      res.status(status).json({ error: 'Failed to fetch cycles', detail: graphqlErrorDetail(err) });
+    }
+  });
+
+  /**
+   * GET /api/proxy/cycle/:cycleId
+   * Get cycle detail with issues.
+   */
+  router.get('/api/proxy/cycle/:cycleId', proxyLimiter, authenticateProxyToken, async (req, res) => {
+    try {
+      const client = await getClient(req.proxyUrlKey);
+      if (!client) {
+        logEvent(req, '/api/proxy/cycle', 503);
+        return res.status(503).json({ error: 'Workspace not available' });
+      }
+
+      const { cycleId } = req.params;
+      if (!UUID_REGEX.test(cycleId)) {
+        logEvent(req, '/api/proxy/cycle', 400);
+        return res.status(400).json({ error: 'Invalid cycle ID format' });
+      }
+
+      const data = await client.request(CYCLE_DETAIL_QUERY, { id: cycleId });
+      if (!data.cycle) {
+        logEvent(req, '/api/proxy/cycle', 404);
+        return res.status(404).json({ error: 'Cycle not found' });
+      }
+
+      logEvent(req, '/api/proxy/cycle', 200);
+      res.json(data.cycle);
+    } catch (err) {
+      const status = graphqlErrorStatus(err);
+      logEvent(req, '/api/proxy/cycle', status);
+      console.error('Proxy /cycle error:', err.message);
+      res.status(status).json({ error: 'Failed to fetch cycle', detail: graphqlErrorDetail(err) });
+    }
+  });
+
+  /**
    * GET /api/proxy/relations/:issueId
    */
   router.get('/api/proxy/relations/:issueId', proxyLimiter, authenticateProxyToken, async (req, res) => {
@@ -991,7 +1124,7 @@ ${readEndpoints}${writeEndpoints}
         return res.status(503).json({ error: 'Workspace not available' });
       }
 
-      const { teamId, title, description, projectId, stateId, assigneeId, priority, parentId } = req.body;
+      const { teamId, title, description, projectId, stateId, assigneeId, priority, parentId, cycleId } = req.body;
 
       if (!teamId || !UUID_REGEX.test(teamId)) {
         logEvent(req, '/api/proxy/issues', 400);
@@ -1025,6 +1158,7 @@ ${readEndpoints}${writeEndpoints}
       if (stateId && UUID_REGEX.test(stateId)) input.stateId = stateId;
       if (assigneeId && UUID_REGEX.test(assigneeId)) input.assigneeId = assigneeId;
       if (parentId && UUID_REGEX.test(parentId)) input.parentId = parentId;
+      if (cycleId && UUID_REGEX.test(cycleId)) input.cycleId = cycleId;
       if (priority !== undefined && Number.isInteger(priority) && priority >= 0 && priority <= 4) {
         input.priority = priority;
       }
@@ -1058,7 +1192,7 @@ ${readEndpoints}${writeEndpoints}
         return res.status(400).json({ error: 'Invalid issue ID format' });
       }
 
-      const { title, description, stateId, assigneeId, priority, projectId, parentId } = req.body;
+      const { title, description, stateId, assigneeId, priority, projectId, parentId, cycleId } = req.body;
 
       if (title && title.length > MAX_NAME_LENGTH) {
         return res.status(400).json({ error: `title exceeds maximum length of ${MAX_NAME_LENGTH}` });
@@ -1083,6 +1217,7 @@ ${readEndpoints}${writeEndpoints}
       if (assigneeId && UUID_REGEX.test(assigneeId)) input.assigneeId = assigneeId;
       if (projectId && UUID_REGEX.test(projectId)) input.projectId = projectId;
       if (parentId && UUID_REGEX.test(parentId)) input.parentId = parentId;
+      if (cycleId && UUID_REGEX.test(cycleId)) input.cycleId = cycleId;
       if (priority !== undefined && Number.isInteger(priority) && priority >= 0 && priority <= 4) {
         input.priority = priority;
       }
