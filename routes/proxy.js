@@ -733,7 +733,15 @@ DELETE ${baseUrl}/api/proxy/issue/{issueId}/labels/{labelId}
 
 POST ${baseUrl}/api/proxy/foreman/status
   Body: { "taskIdentifier": "LIN-42", "action": "research", "status": "completed", "summary": "..." }
-  → Record a foreman status update` : '';
+  → Record a foreman status update
+
+## Shell Tip
+
+When posting bodies with markdown (backticks, quotes, special chars), use a file to avoid shell escaping issues:
+  cat > /tmp/body.json << 'PAYLOAD'
+  {"body":"Content with \`backticks\` and 'quotes' here"}
+  PAYLOAD
+  curl -X POST -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d @/tmp/body.json URL` : '';
 
     const text = `# Linear API Proxy
 
@@ -1914,42 +1922,40 @@ The sub-agent does the actual work (research, coding, review).
 
 ### 5. Update Linear
 
-Based on the result:
+**Important:** Comment bodies often contain markdown with backticks, single quotes, and special characters.
+Always use a file-based approach to avoid shell escaping issues:
 
-**Research/Plan:**
 \`\`\`bash
-# Add findings as a comment
-curl -X POST -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" \\
-  -d '{"body":"## Research Findings\\n\\n..."}' \\
-  ${baseUrl}/api/proxy/issue/{issueId}/comments
+# Write JSON body to a temp file (avoids shell escaping issues with backticks, quotes, etc.)
+cat > /tmp/comment.json << 'PAYLOAD'
+{"body":"## Research Findings\\n\\nFound issues in \`auth.js\` and \`proxy.js\`.\\n\\n- Fix applied in commit abc123"}
+PAYLOAD
 
-# Create subtasks if warranted
+# Post the comment
+curl -X POST -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" \\
+  -d @/tmp/comment.json \\
+  ${baseUrl}/api/proxy/issue/{issueId}/comments
+\`\`\`
+
+The \`-d @filepath\` syntax tells curl to read the request body from a file, which avoids
+all shell interpretation of backticks, quotes, and special characters in the JSON.
+
+**Create subtasks** (simple fields, inline is fine):
+\`\`\`bash
 curl -X POST -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" \\
   -d '{"teamId":"...","title":"Subtask title","parentId":"..."}' \\
   ${baseUrl}/api/proxy/issues
 \`\`\`
 
-**Implementation:**
-\`\`\`bash
-# Add summary comment
-curl -X POST -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" \\
-  -d '{"body":"## Implementation Summary\\n\\n..."}' \\
-  ${baseUrl}/api/proxy/issue/{issueId}/comments
-\`\`\`
-
-**Review:**
-\`\`\`bash
-# Add review findings
-curl -X POST -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" \\
-  -d '{"body":"## Review\\n\\n..."}' \\
-  ${baseUrl}/api/proxy/issue/{issueId}/comments
-\`\`\`
-
 ### 6. Report status
 
 \`\`\`bash
+cat > /tmp/status.json << 'PAYLOAD'
+{"taskIdentifier":"LIN-42","action":"research","status":"completed","summary":"Found 3 API endpoints needing auth fixes"}
+PAYLOAD
+
 curl -X POST -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" \\
-  -d '{"taskIdentifier":"LIN-42","action":"research","status":"completed","summary":"Found 3 API endpoints needing auth fixes"}' \\
+  -d @/tmp/status.json \\
   ${baseUrl}/api/proxy/foreman/status
 \`\`\`
 
