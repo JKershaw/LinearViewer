@@ -337,8 +337,8 @@ describe('blocked template', () => {
   test('includes goal with blocker concepts', () => {
     const result = generatePrompt('blocked', mockIssue, mockContext);
     assert.ok(result.prompt.includes('## Goal'));
-    assert.ok(result.prompt.includes('blocker type'));
-    assert.ok(result.prompt.includes('root cause'));
+    assert.ok(result.prompt.includes('Blocker Type'));
+    assert.ok(result.prompt.includes('Root Cause'));
   });
 
   test('has WORK_ISSUE category', () => {
