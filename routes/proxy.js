@@ -436,6 +436,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanSto
       req.proxyUrlKey = result.urlKey;
       req.proxyTokenLabel = result.label;
       req.proxyTokenScope = result.scope;
+      req.proxyCreatedBy = result.createdBy;
       next();
     } catch (err) {
       console.error('Proxy token validation error:', err.message);
@@ -558,7 +559,8 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanSto
       const result = await proxyTokenStore.createToken(workspace.urlKey, {
         label: label || 'default',
         scope: scope || 'read',
-        singleUse: singleUse === true || singleUse === 'true'
+        singleUse: singleUse === true || singleUse === 'true',
+        createdBy: req.session?.linearUserId || null
       });
 
       res.status(201).json({
@@ -1660,7 +1662,7 @@ ${readEndpoints}${writeEndpoints}
   /**
    * GET /api/proxy/recommend/:identifier
    * Returns an AI-generated prompt recommendation for an issue.
-   * Uses the server-side OPENROUTER_API_KEY (no session needed).
+   * Uses the token creator's OAuth key (if available) or server-side OPENROUTER_API_KEY.
    */
   router.get('/api/proxy/recommend/:identifier', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
@@ -1672,8 +1674,8 @@ ${readEndpoints}${writeEndpoints}
 
       const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
 
-      // Resolve OpenRouter API key: session OAuth key (via workspace) or server env var
-      const sessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey);
+      // Resolve OpenRouter API key: token creator's OAuth key or server env var
+      const sessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
 
       // Check if AI recommendations are available (skip in test mode)
       if (!isTestMode && !isRecommendationEnabled(sessionApiKey)) {
