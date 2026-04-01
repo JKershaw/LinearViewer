@@ -21,12 +21,32 @@ import { upsertWorkspace, saveSession, updateWorkspaceTokens } from '../lib/work
 export function createAuthRoutes({ sessionStore, userPreferencesStore }) {
   const router = Router()
 
+  const OAUTH_ENV_VARS = ['LINEAR_CLIENT_ID', 'LINEAR_CLIENT_SECRET', 'LINEAR_REDIRECT_URI'];
+
+  /**
+   * Check if OAuth environment variables are configured.
+   * Returns list of missing variable names, or empty array if all set.
+   * Skipped in test mode where mock auth is used.
+   */
+  function getMissingOAuthVars() {
+    if (process.env.NODE_ENV === 'test') return [];
+    return OAUTH_ENV_VARS.filter(v => !process.env[v]);
+  }
+
   /**
    * Step 1: Initiate OAuth flow
    * Generates a CSRF-prevention state token, stores it in session,
    * and redirects user to Linear's OAuth authorization page.
    */
   router.get('/auth/linear', async (req, res) => {
+    const missing = getMissingOAuthVars();
+    if (missing.length > 0) {
+      return res.status(503).send(renderErrorPage(
+        'OAuth Not Configured',
+        `Linear OAuth is not available. Missing environment variables: ${missing.join(', ')}. See .env.example for setup instructions.`
+      ));
+    }
+
     // Clean up expired sessions before proceeding
     await sessionStore.cleanup()
 
@@ -53,6 +73,14 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore }) {
    * Validates state, exchanges code for token, stores workspace in session.
    */
   router.get('/auth/callback', async (req, res) => {
+    const missing = getMissingOAuthVars();
+    if (missing.length > 0) {
+      return res.status(503).send(renderErrorPage(
+        'OAuth Not Configured',
+        `Linear OAuth is not available. Missing environment variables: ${missing.join(', ')}. See .env.example for setup instructions.`
+      ));
+    }
+
     await sessionStore.cleanup()
 
     const { code, state, error } = req.query
