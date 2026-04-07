@@ -172,6 +172,14 @@ body:has(.swim-page) {
   user-select: none;
 }
 
+/* Blocking arrow — same position, styled as dependency */
+.swim-lane-arrow.blocking {
+  color: #e67e22;
+  font-size: 12px;
+  font-weight: bold;
+  opacity: 0.7;
+}
+
 /* ==========================================================================
    Task Boxes
    ========================================================================== */

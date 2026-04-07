@@ -693,13 +693,24 @@ function render() {
           itemsByCol[col].push(segItems[ii]);
         }
 
+        var prevColItem = null;
         for (var col = 0; col < totalCols; col++) {
           var colItems = itemsByCol[col] || [];
+          // Insert arrow between adjacent occupied columns
+          if (colItems.length > 0 && prevColItem) {
+            var isBlocking = prevColItem.blocksIds && prevColItem.blocksIds.indexOf(colItems[0].id) !== -1;
+            if (isBlocking) {
+              html += '<span class="swim-lane-arrow blocking">\u2192</span>';
+            } else {
+              html += '<span class="swim-lane-arrow">\u2192</span>';
+            }
+          }
           html += '<div class="swim-column-slot" data-column="' + col + '" style="min-width:' + slotWidth + 'px">';
           for (var ci = 0; ci < colItems.length; ci++) {
             html += renderBox(colItems[ci], settings, blockedByMap);
           }
           html += '</div>';
+          if (colItems.length > 0) prevColItem = colItems[colItems.length - 1];
         }
       } else {
         // Default packed rendering (no columns)
@@ -720,14 +731,18 @@ function render() {
             html += renderBox(issue, settings);
             rendered.add(issue.id);
             for (var ci = 0; ci < children.length; ci++) {
-              html += '<span class="swim-lane-arrow">\u2192</span>';
+              var childBlocked = issue.blocksIds && issue.blocksIds.indexOf(children[ci].id) !== -1;
+              html += '<span class="swim-lane-arrow' + (childBlocked ? ' blocking' : '') + '">\u2192</span>';
               html += renderBox(children[ci], settings);
               rendered.add(children[ci].id);
             }
             html += '</div></div>';
           } else {
             if (ii > 0 && !rendered.has(issue.id)) {
-              html += '<span class="swim-lane-arrow">\u2192</span>';
+              // Check if previous item blocks this one
+              var prevIssue = segItems[ii - 1];
+              var prevBlocks = prevIssue && prevIssue.blocksIds && prevIssue.blocksIds.indexOf(issue.id) !== -1;
+              html += '<span class="swim-lane-arrow' + (prevBlocks ? ' blocking' : '') + '">\u2192</span>';
             }
             html += renderBox(issue, settings);
             rendered.add(issue.id);
@@ -777,19 +792,37 @@ function drawBlockingConnectors(lanes, blockedByMap) {
     }
   }
 
-  // Find all cross-lane blocking edges
-  var edges = [];
+  // Build item position index within each lane for adjacency check
+  var itemPosInLane = new Map();
+  for (var li = 0; li < lanes.length; li++) {
+    for (var ii = 0; ii < lanes[li].items.length; ii++) {
+      itemPosInLane.set(lanes[li].items[ii].id, ii);
+    }
+  }
+
+  // Find all blocking edges, categorized
+  var crossLaneEdges = [];
+  var sameLaneArcEdges = []; // non-adjacent within same lane
   blockedByMap.forEach(function(blockers, blockedId) {
     var blockedLane = itemLaneIndex.get(blockedId);
+    var blockedPos = itemPosInLane.get(blockedId);
     for (var i = 0; i < blockers.length; i++) {
       var blockerLane = itemLaneIndex.get(blockers[i].id);
-      if (blockerLane !== undefined && blockedLane !== undefined && blockerLane !== blockedLane) {
-        edges.push({ fromId: blockers[i].id, toId: blockedId });
+      var blockerPos = itemPosInLane.get(blockers[i].id);
+      if (blockerLane === undefined || blockedLane === undefined) continue;
+      if (blockerLane !== blockedLane) {
+        crossLaneEdges.push({ fromId: blockers[i].id, toId: blockedId });
+      } else {
+        // Same lane — check if non-adjacent (gap > 1 position)
+        if (Math.abs(blockedPos - blockerPos) > 1) {
+          sameLaneArcEdges.push({ fromId: blockers[i].id, toId: blockedId });
+        }
+        // Adjacent same-lane pairs are handled by CSS arrow styling
       }
     }
   });
 
-  if (edges.length === 0) return;
+  if (crossLaneEdges.length === 0 && sameLaneArcEdges.length === 0) return;
 
   // Create SVG element
   var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -847,9 +880,9 @@ function drawBlockingConnectors(lanes, blockedByMap) {
   var BOX_PADDING = 4;
 
   var edgeData = [];
-  for (var e = 0; e < edges.length; e++) {
-    var fromEl = document.querySelector('.swim-box[data-issue-id="' + edges[e].fromId + '"]');
-    var toEl = document.querySelector('.swim-box[data-issue-id="' + edges[e].toId + '"]');
+  for (var e = 0; e < crossLaneEdges.length; e++) {
+    var fromEl = document.querySelector('.swim-box[data-issue-id="' + crossLaneEdges[e].fromId + '"]');
+    var toEl = document.querySelector('.swim-box[data-issue-id="' + crossLaneEdges[e].toId + '"]');
     if (!fromEl || !toEl) continue;
 
     var fromRect = fromEl.getBoundingClientRect();
@@ -932,6 +965,35 @@ function drawBlockingConnectors(lanes, blockedByMap) {
     path.setAttribute('class', 'swim-connector-path');
     path.setAttribute('marker-end', 'url(#swim-arrow)');
     svg.appendChild(path);
+  }
+
+  // Draw same-lane non-adjacent blocking arcs
+  var ARC_HEIGHT = 20;
+  for (var ae = 0; ae < sameLaneArcEdges.length; ae++) {
+    var arcFromEl = document.querySelector('.swim-box[data-issue-id="' + sameLaneArcEdges[ae].fromId + '"]');
+    var arcToEl = document.querySelector('.swim-box[data-issue-id="' + sameLaneArcEdges[ae].toId + '"]');
+    if (!arcFromEl || !arcToEl) continue;
+
+    var arcFromRect = arcFromEl.getBoundingClientRect();
+    var arcToRect = arcToEl.getBoundingClientRect();
+
+    var ax1 = arcFromRect.right - containerRect.left;
+    var ay1 = arcFromRect.top - containerRect.top;
+    var ax2 = arcToRect.left - containerRect.left;
+    var ay2 = arcToRect.top - containerRect.top;
+
+    // Quadratic bezier arc above the items
+    var arcMidX = (ax1 + ax2) / 2;
+    var arcTopY = Math.min(ay1, ay2) - ARC_HEIGHT;
+
+    var arcD = 'M' + ax1 + ',' + ay1 +
+      ' Q' + arcMidX + ',' + arcTopY + ' ' + ax2 + ',' + ay2;
+
+    var arcPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    arcPath.setAttribute('d', arcD);
+    arcPath.setAttribute('class', 'swim-connector-path');
+    arcPath.setAttribute('marker-end', 'url(#swim-arrow)');
+    svg.appendChild(arcPath);
   }
 
   lanesEl.style.position = 'relative';
