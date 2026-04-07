@@ -1128,6 +1128,38 @@ h1 {
 }
 
 /* =============================================================================
+   Setup Notice (Local Development)
+   =============================================================================
+   Shown on landing page when running locally with no auth configured.
+   Uses box-drawing characters to match CLI aesthetic.
+*/
+.setup-notice {
+  margin: 1.5rem auto;
+  max-width: 60ch;
+  padding: 0.75rem 1rem;
+  background: var(--bg-muted);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+.setup-notice p {
+  margin: 0;
+  color: var(--fg-dim);
+}
+
+.setup-notice code {
+  background: var(--bg);
+  padding: 0.1rem 0.3rem;
+  border-radius: 2px;
+  font-size: 0.8rem;
+}
+
+.setup-notice a {
+  color: var(--blue);
+}
+
+/* =============================================================================
    Login Page (Landing Page CTA)
    =============================================================================
    Shown at the bottom of the landing page for unauthenticated users.

@@ -32,7 +32,7 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   //   ?openRouterConnected=true - Set up OpenRouter API key in session
   //   ?freeTierEnabled=true     - Simulate free tier mode (no OAuth, no env key)
   router.get('/test/set-session', (req, res) => {
-    const { tokenExpired, noRefreshToken, multiWorkspace, maxWorkspaces, openRouterConnected, freeTierEnabled, features, swimSample } = req.query
+    const { tokenExpired, noRefreshToken, multiWorkspace, maxWorkspaces, openRouterConnected, freeTierEnabled, features, swimSample, patMode } = req.query
 
     // Base workspace configuration - IDs must be valid UUIDs to pass validation
     const createWorkspace = (id, name, urlKey) => ({
@@ -72,6 +72,13 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       workspaces = [
         createWorkspace(TEST_UUID_1, 'Test Workspace', 'test-workspace')
       ]
+    }
+
+    // PAT mode: mark first workspace as personal access token
+    if (patMode) {
+      workspaces[0].isPAT = true;
+      workspaces[0].tokenExpiresAt = Number.MAX_SAFE_INTEGER;
+      delete workspaces[0].refreshToken;
     }
 
     req.session.workspaces = workspaces

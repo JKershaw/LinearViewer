@@ -21,7 +21,7 @@ import { ProxyTokenStore } from './lib/proxy-tokens.js'
 import { ProxyEventStore } from './lib/proxy-events.js'
 import { ForemanStore } from './lib/foreman-store.js'
 import { FreeTierStore } from './lib/free-tier-store.js'
-import { fetchProjects, fetchProjectsList, fetchTeams } from './lib/linear.js'
+import { fetchProjects, fetchProjectsList, fetchTeams, fetchOrganization, fetchViewer } from './lib/linear.js'
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID } from './lib/tree.js'
 import { parseRepoFromDescription } from './lib/prompt-formatters.js'
 import { renderPage, renderErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
@@ -73,6 +73,11 @@ if (process.env.NODE_ENV !== 'test') {
     console.warn(`Warning: Missing OAuth environment variables: ${missingVars.join(', ')}`);
     console.warn('The app will start, but Linear OAuth login will be unavailable until these are set.');
   }
+}
+
+// Personal Access Token mode: auto-authenticate without OAuth
+if (process.env.LINEAR_ACCESS_TOKEN) {
+  console.log('PAT mode: LINEAR_ACCESS_TOKEN is set. Users will be auto-authenticated.');
 }
 
 // =============================================================================
@@ -246,6 +251,54 @@ function getOpenRouterSource(req) {
 }
 
 // =============================================================================
+// PAT (Personal Access Token) Auto-Login Middleware
+// =============================================================================
+// When LINEAR_ACCESS_TOKEN is set and the user has no session, auto-create one.
+
+async function ensurePATSession(req, res, next) {
+  const pat = process.env.LINEAR_ACCESS_TOKEN;
+  if (!pat) return next();
+  if (req.session.workspaces?.length > 0) return next();
+
+  // Skip routes that don't need auth
+  if (req.path.startsWith('/auth/') || req.path === '/logout' ||
+      req.path.startsWith('/test/') || req.path === '/privacy' ||
+      req.path === '/terms') {
+    return next();
+  }
+
+  try {
+    const [org, viewer] = await Promise.all([
+      fetchOrganization(pat),
+      fetchViewer(pat)
+    ]);
+
+    const workspace = {
+      id: org.id,
+      name: org.name,
+      urlKey: org.urlKey || org.name,
+      addedAt: Date.now(),
+      accessToken: pat,
+      isPAT: true,
+      tokenExpiresAt: Number.MAX_SAFE_INTEGER
+    };
+
+    req.session.workspaces = [workspace];
+    req.session.activeWorkspaceId = workspace.id;
+    req.session.linearUserId = viewer.id;
+
+    await saveSession(req.session);
+    console.log(`PAT session created for workspace: ${org.name} (${org.urlKey})`);
+    next();
+  } catch (error) {
+    console.error('PAT auto-login failed:', error.message);
+    next();
+  }
+}
+
+app.use(ensurePATSession);
+
+// =============================================================================
 // Token Refresh Middleware
 // =============================================================================
 // Automatically refreshes access tokens before they expire (5-minute buffer).
@@ -259,6 +312,9 @@ function getOpenRouterSource(req) {
 async function ensureValidToken(req, res, next) {
   const workspace = getActiveWorkspace(req.session)
   if (!workspace) return next()
+
+  // PAT tokens never expire — skip refresh
+  if (workspace.isPAT) return next()
 
   // Check if token needs refresh (5-minute buffer)
   const needsTokenRefresh = workspace.tokenExpiresAt - Date.now() < TOKEN_REFRESH_BUFFER_MS
@@ -429,6 +485,17 @@ async function handleTokenRefreshAndRetry(workspace, session, teamId, openRouter
  * Handles 401 Unauthorized errors from the Linear API.
  */
 async function handleUnauthorizedError(workspace, session, teamId, openRouterSource, res) {
+  // PAT tokens cannot be refreshed — show a clear error
+  if (workspace.isPAT) {
+    const html = renderErrorPage('Access Token Invalid',
+      'Your LINEAR_ACCESS_TOKEN is no longer valid. Please check the token and restart the server.', {
+        action: 'Try again',
+        actionUrl: '/'
+      });
+    session.destroy(() => res.status(401).send(html));
+    return;
+  }
+
   if (workspace.refreshToken) {
     try {
       return await handleTokenRefreshAndRetry(workspace, session, teamId, openRouterSource, res);
@@ -456,8 +523,13 @@ app.get('/', (req, res) => {
     return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/`)
   }
 
+  // Show setup notice on localhost when nothing is configured
+  const isLocalhost = ['localhost', '127.0.0.1'].some(h => req.get('host')?.startsWith(h))
+  const hasNoAuth = !process.env.LINEAR_ACCESS_TOKEN && oauthEnvVars.some(v => !process.env[v])
+  const setupNotice = (isLocalhost && hasNoAuth) ? 'setup' : null
+
   // Unauthenticated users see the static landing page
-  const html = renderPage(landingTrees, [], [], landingData.organizationName, { isLanding: true, deployInfo })
+  const html = renderPage(landingTrees, [], [], landingData.organizationName, { isLanding: true, deployInfo, setupNotice })
   res.send(html)
 })
 

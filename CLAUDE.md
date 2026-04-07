@@ -74,6 +74,7 @@ tests/e2e/
   dispatch-page.spec.js  Dispatch page UI tests
   free-tier.spec.js    Free tier rate limiting tests
   feature-toggles.spec.js  Feature toggle settings tests
+  pat-auth.spec.js     PAT (personal access token) auth mode tests
   proxy.spec.js        Proxy API tests (tokens, cycles, labels, auth)
 docs/
   dispatch-integration.md  Consumer integration guide
@@ -116,6 +117,21 @@ GET /logout          → Destroy session, redirect to login
 - Tokens expire after 24 hours (with automatic refresh)
 - State parameter validated to prevent CSRF
 
+### Personal Access Token (PAT) Mode
+
+For local development without OAuth configuration:
+
+1. Get a personal API key from: https://linear.app/settings/api
+2. Set `LINEAR_ACCESS_TOKEN=lin_api_xxxxx` in your `.env` file
+3. Start the server — you'll be logged in automatically
+
+PAT mode:
+- Auto-creates a session on first visit (no OAuth redirect)
+- Single workspace only (tied to the token's organization)
+- Token never expires (no refresh needed)
+- OAuth still works alongside PAT if OAuth vars are configured
+- Logout destroys session, but next visit re-creates it automatically
+
 ### OpenRouter OAuth (PKCE)
 
 Users can connect their OpenRouter account for AI recommendations:
@@ -148,6 +164,7 @@ When `OPENROUTER_FREE_TIER_KEY` is set, users without an OpenRouter connection g
 LINEAR_CLIENT_ID        OAuth client ID from Linear
 LINEAR_CLIENT_SECRET    OAuth client secret from Linear
 LINEAR_REDIRECT_URI     Callback URL (must match Linear OAuth app config)
+LINEAR_ACCESS_TOKEN     Personal API key for auto-authentication (optional, bypasses OAuth)
 SESSION_SECRET          Secret for signing session cookies
 PORT                    Server port (default: 3000)
 MONGODB_URI             MongoDB connection string (optional, uses file storage if not set)
