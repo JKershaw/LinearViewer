@@ -816,7 +816,37 @@ function drawBlockingConnectors(lanes, blockedByMap) {
   defs.appendChild(marker);
   svg.appendChild(defs);
 
-  // Draw each edge
+  // Collect all box rects for obstacle avoidance
+  var allBoxEls = document.querySelectorAll('.swim-box');
+  var boxRects = [];
+  for (var bi = 0; bi < allBoxEls.length; bi++) {
+    var br = allBoxEls[bi].getBoundingClientRect();
+    boxRects.push({
+      left: br.left - containerRect.left,
+      right: br.right - containerRect.left,
+      top: br.top - containerRect.top,
+      bottom: br.bottom - containerRect.top
+    });
+  }
+
+  // Check if a vertical line at x intersects any box in the y range
+  function hitsBox(x, yMin, yMax, padding) {
+    for (var i = 0; i < boxRects.length; i++) {
+      var r = boxRects[i];
+      if (x >= r.left - padding && x <= r.right + padding &&
+          r.bottom > yMin && r.top < yMax) {
+        return r;
+      }
+    }
+    return null;
+  }
+
+  // Pre-compute edge geometries for channel assignment
+  var STUB_LEN = 12;
+  var CHANNEL_SPACING = 6;
+  var BOX_PADDING = 4;
+
+  var edgeData = [];
   for (var e = 0; e < edges.length; e++) {
     var fromEl = document.querySelector('.swim-box[data-issue-id="' + edges[e].fromId + '"]');
     var toEl = document.querySelector('.swim-box[data-issue-id="' + edges[e].toId + '"]');
@@ -825,26 +855,77 @@ function drawBlockingConnectors(lanes, blockedByMap) {
     var fromRect = fromEl.getBoundingClientRect();
     var toRect = toEl.getBoundingClientRect();
 
-    // Coordinates relative to the lanesEl
-    var x1 = fromRect.right - containerRect.left;
-    var y1 = fromRect.top + fromRect.height / 2 - containerRect.top;
-    var x2 = toRect.left - containerRect.left;
-    var y2 = toRect.top + toRect.height / 2 - containerRect.top;
+    edgeData.push({
+      x1: fromRect.right - containerRect.left,
+      y1: fromRect.top + fromRect.height / 2 - containerRect.top,
+      x2: toRect.left - containerRect.left,
+      y2: toRect.top + toRect.height / 2 - containerRect.top,
+      fromEl: fromEl,
+      toEl: toEl
+    });
+  }
 
-    // Route: right stub → vertical → horizontal into target
-    var stubLen = 10;
-    var midX = x1 + stubLen;
+  // Sort edges by their blocker's x position so we assign channels consistently
+  edgeData.sort(function(a, b) { return a.x1 - b.x1 || a.y1 - b.y1; });
 
-    // If target is further right, use a simple right-angle path
-    // If target is at similar x or left, route around
-    if (x2 > midX + 5) {
-      midX = (x1 + stubLen + x2) / 2;
+  // Track used vertical channels to prevent overlap
+  var usedChannels = []; // {x, yMin, yMax}
+
+  function findClearChannel(startX, yMin, yMax) {
+    var x = startX;
+    var maxAttempts = 30;
+    for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      // Check for box intersections
+      var hit = hitsBox(x, yMin, yMax, BOX_PADDING);
+      if (hit) {
+        // Jump past the box
+        x = hit.right + BOX_PADDING + 2;
+        continue;
+      }
+
+      // Check for channel overlap with existing connectors
+      var channelConflict = false;
+      for (var ci = 0; ci < usedChannels.length; ci++) {
+        var ch = usedChannels[ci];
+        if (Math.abs(x - ch.x) < CHANNEL_SPACING &&
+            ch.yMax > yMin && ch.yMin < yMax) {
+          channelConflict = true;
+          x = ch.x + CHANNEL_SPACING;
+          break;
+        }
+      }
+      if (channelConflict) continue;
+
+      // Found a clear channel
+      return x;
+    }
+    return x; // fallback
+  }
+
+  // Draw each edge with obstacle-avoiding routing
+  for (var e = 0; e < edgeData.length; e++) {
+    var ed = edgeData[e];
+    var yMin = Math.min(ed.y1, ed.y2);
+    var yMax = Math.max(ed.y1, ed.y2);
+
+    // Start the vertical segment just after the blocker
+    var candidateX = ed.x1 + STUB_LEN;
+
+    // Find a clear vertical channel
+    var midX = findClearChannel(candidateX, yMin, yMax);
+
+    // Don't route past the target — cap at target x minus a small margin
+    if (midX > ed.x2 - STUB_LEN) {
+      midX = ed.x2 - STUB_LEN;
     }
 
-    var d = 'M' + x1 + ',' + y1 +
-      ' L' + midX + ',' + y1 +
-      ' L' + midX + ',' + y2 +
-      ' L' + x2 + ',' + y2;
+    // Register this channel as used
+    usedChannels.push({ x: midX, yMin: yMin, yMax: yMax });
+
+    var d = 'M' + ed.x1 + ',' + ed.y1 +
+      ' L' + midX + ',' + ed.y1 +
+      ' L' + midX + ',' + ed.y2 +
+      ' L' + ed.x2 + ',' + ed.y2;
 
     var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     path.setAttribute('d', d);
