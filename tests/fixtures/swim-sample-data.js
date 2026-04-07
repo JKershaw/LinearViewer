@@ -38,7 +38,7 @@ export const swimSampleIssues = [
     url: 'https://linear.app/test/issue/AUTH-2', parent: null,
     project: { id: 'proj-auth' }, state: { name: 'In Progress', type: 'started' },
     assignee: { name: 'Alice' }, labels: { nodes: [] }, team: { id: TEAM_ENG },
-    relations: { nodes: [{ type: 'blocks', relatedIssue: { id: 'auth-3' } }] }
+    relations: { nodes: [{ type: 'blocks', relatedIssue: { id: 'auth-3' } }, { type: 'blocks', relatedIssue: { id: 'dash-2' } }] }
   },
   {
     id: 'auth-3', identifier: 'AUTH-3', title: 'Migrate existing users',
@@ -48,7 +48,7 @@ export const swimSampleIssues = [
     url: 'https://linear.app/test/issue/AUTH-3', parent: null,
     project: { id: 'proj-auth' }, state: { name: 'Todo', type: 'unstarted' },
     assignee: { name: 'Bob' }, labels: { nodes: [] }, team: { id: TEAM_ENG },
-    relations: { nodes: [{ type: 'blocks', relatedIssue: { id: 'auth-4' } }] }
+    relations: { nodes: [{ type: 'blocks', relatedIssue: { id: 'auth-4' } }, { type: 'blocks', relatedIssue: { id: 'api-5' } }] }
   },
   {
     id: 'auth-4', identifier: 'AUTH-4', title: 'E2E auth tests',
@@ -134,7 +134,7 @@ export const swimSampleIssues = [
     url: 'https://linear.app/test/issue/DASH-3', parent: null,
     project: { id: 'proj-dash' }, state: { name: 'In Progress', type: 'started' },
     assignee: { name: 'Bob' }, labels: { nodes: [{ name: 'bug' }] }, team: { id: TEAM_ENG },
-    relations: { nodes: [] }
+    relations: { nodes: [{ type: 'blocks', relatedIssue: { id: 'infra-2' } }] }
   },
 
   // =========================================================================
@@ -223,7 +223,7 @@ export const swimSampleIssues = [
     url: 'https://linear.app/test/issue/INFRA-3', parent: null,
     project: { id: 'proj-infra' }, state: { name: 'Todo', type: 'unstarted' },
     assignee: { name: 'Frank' }, labels: { nodes: [] }, team: { id: TEAM_ENG },
-    relations: { nodes: [] }
+    relations: { nodes: [{ type: 'blocks', relatedIssue: { id: 'api-4' } }] }
   },
   {
     id: 'infra-4', identifier: 'INFRA-4', title: 'CI pipeline optimization',

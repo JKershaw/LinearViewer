@@ -237,6 +237,34 @@ body:has(.swim-page) {
   flex-shrink: 0;
 }
 
+/* Blocked accent — overrides status border */
+.swim-box.blocked {
+  border-left: 3px solid #e67e22;
+}
+
+.swim-box-blocked-label {
+  width: 100%;
+  font-size: 9px;
+  color: #e67e22;
+  opacity: 0.8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Column slot containers for cross-lane alignment */
+.swim-column-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-height: 32px;
+}
+
+.swim-column-slot:empty {
+  /* Empty slots keep their min-width for gap alignment */
+}
+
 /* Compact mode */
 .swim-box.compact {
   padding: 0.25rem 0.4rem;
@@ -372,6 +400,27 @@ body:has(.swim-page) {
 
 .swim-popover-link:hover {
   color: #2563eb;
+}
+
+/* ==========================================================================
+   SVG Connector Lines
+   ========================================================================== */
+
+.swim-connectors {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 1;
+}
+
+.swim-connector-path {
+  fill: none;
+  stroke: #e67e22;
+  stroke-width: 2;
+  stroke-dasharray: 5 3;
+  opacity: 0.65;
 }
 
 /* ==========================================================================

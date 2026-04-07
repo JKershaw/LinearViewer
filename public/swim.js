@@ -351,8 +351,17 @@ function promoteDependencyBlockers(items) {
   }
 }
 
-function computeSegmentWidths(lanes, slotWidth) {
-  // Find the max number of items per segment across all lanes
+function computeSegmentWidths(lanes, slotWidth, columnCounts) {
+  // If column counts are provided (from cross-lane blocking), use those
+  if (columnCounts) {
+    var widths = {};
+    for (var seg in columnCounts) {
+      widths[seg] = columnCounts[seg] * slotWidth;
+    }
+    return widths;
+  }
+
+  // Otherwise, find the max number of items per segment across all lanes
   var maxPerSegment = {};
   for (var li = 0; li < lanes.length; li++) {
     var counts = {};
@@ -376,6 +385,149 @@ function computeSegmentWidths(lanes, slotWidth) {
 }
 
 // =============================================================================
+// Cross-Lane Column Positioning
+// =============================================================================
+
+function computeCrossLaneColumns(lanes, options) {
+  var maxGap = (options && options.maxGap !== undefined) ? options.maxGap : 2;
+
+  // Build global maps
+  var itemById = new Map();
+  var itemLane = new Map();
+  for (var li = 0; li < lanes.length; li++) {
+    for (var ii = 0; ii < lanes[li].items.length; ii++) {
+      var item = lanes[li].items[ii];
+      itemById.set(item.id, item);
+      itemLane.set(item.id, li);
+    }
+  }
+
+  // Build reverse map: blockedId → [blockerIds] (cross-lane, same-segment only)
+  var crossLaneBlockers = new Map();
+  itemById.forEach(function(item) {
+    var blocksIds = item.blocksIds || [];
+    for (var j = 0; j < blocksIds.length; j++) {
+      var blocked = itemById.get(blocksIds[j]);
+      if (!blocked) continue;
+      if (itemLane.get(item.id) !== itemLane.get(blocksIds[j]) &&
+          item.segment === blocked.segment) {
+        if (!crossLaneBlockers.has(blocksIds[j])) crossLaneBlockers.set(blocksIds[j], []);
+        crossLaneBlockers.get(blocksIds[j]).push(item.id);
+      }
+    }
+  });
+
+  // Collect unique segment indices
+  var segmentSet = new Set();
+  itemById.forEach(function(item) { segmentSet.add(item.segment); });
+
+  var columnCounts = {};
+
+  segmentSet.forEach(function(seg) {
+    // Gather items per lane for this segment
+    var laneItems = lanes.map(function(lane) {
+      return lane.items.filter(function(i) { return i.segment === seg; });
+    });
+
+    // Pass 1: assign default sequential columns
+    for (var l = 0; l < laneItems.length; l++) {
+      for (var i = 0; i < laneItems[l].length; i++) {
+        laneItems[l][i].column = i;
+      }
+    }
+
+    // Pass 2: push blocked items right of cross-lane blockers
+    var changed = true;
+    var iterations = 0;
+    while (changed && iterations < 20) {
+      changed = false;
+      iterations++;
+      for (var l = 0; l < laneItems.length; l++) {
+        for (var i = 0; i < laneItems[l].length; i++) {
+          var item = laneItems[l][i];
+          var blockers = crossLaneBlockers.get(item.id);
+          if (!blockers) continue;
+
+          var minCol = item.column;
+          for (var b = 0; b < blockers.length; b++) {
+            var blocker = itemById.get(blockers[b]);
+            if (blocker && blocker.segment === seg) {
+              minCol = Math.max(minCol, blocker.column + 1);
+            }
+          }
+
+          if (minCol > item.column) {
+            var shift = minCol - item.column;
+            for (var j = i; j < laneItems[l].length; j++) {
+              laneItems[l][j].column += shift;
+            }
+            changed = true;
+          }
+        }
+      }
+    }
+
+    // Pass 3: gap compression (respects blocker constraints)
+    for (var l = 0; l < laneItems.length; l++) {
+      var items = laneItems[l];
+      if (items.length === 0) continue;
+      var prevCol = -1;
+      for (var i = 0; i < items.length; i++) {
+        var gap = items[i].column - prevCol - 1;
+        if (gap > maxGap) {
+          var reduction = gap - maxGap;
+          var blockers = crossLaneBlockers.get(items[i].id);
+          if (blockers) {
+            var maxBlockerCol = -1;
+            for (var b = 0; b < blockers.length; b++) {
+              var bl = itemById.get(blockers[b]);
+              if (bl && bl.segment === seg) {
+                maxBlockerCol = Math.max(maxBlockerCol, bl.column);
+              }
+            }
+            if (maxBlockerCol >= 0) {
+              var minAllowed = maxBlockerCol + 1;
+              var wouldBe = items[i].column - reduction;
+              if (wouldBe < minAllowed) {
+                reduction = items[i].column - minAllowed;
+              }
+            }
+          }
+          if (reduction > 0) {
+            for (var j = i; j < items.length; j++) {
+              items[j].column -= reduction;
+            }
+          }
+        }
+        prevCol = items[i].column;
+      }
+    }
+
+    // Pass 4: collapse globally empty columns
+    var usedCols = new Set();
+    for (var l = 0; l < laneItems.length; l++) {
+      for (var i = 0; i < laneItems[l].length; i++) {
+        usedCols.add(laneItems[l][i].column);
+      }
+    }
+    if (usedCols.size > 0) {
+      var sorted = Array.from(usedCols).sort(function(a, b) { return a - b; });
+      var colMap = new Map(sorted.map(function(col, i) { return [col, i]; }));
+      for (var l = 0; l < laneItems.length; l++) {
+        for (var i = 0; i < laneItems[l].length; i++) {
+          laneItems[l][i].column = colMap.get(laneItems[l][i].column);
+        }
+      }
+      columnCounts[seg] = sorted.length;
+    } else {
+      columnCounts[seg] = 0;
+    }
+  });
+
+  return { columnCounts: columnCounts };
+}
+
+// =============================================================================
 // Rendering
 // =============================================================================
 
@@ -391,11 +543,15 @@ function getSettings() {
     stored = JSON.parse(localStorage.getItem('swim-settings') || '{}');
   } catch (e) { /* ignore */ }
 
+  var grouping = stored.grouping || document.getElementById('swim-grouping').value;
+  var showBlockersDefault = (grouping === 'project' || grouping === 'assignee');
+
   return {
-    grouping: stored.grouping || document.getElementById('swim-grouping').value,
+    grouping: grouping,
     maxLanes: stored.maxLanes || parseInt(document.getElementById('swim-max-lanes').value, 10),
     compact: stored.compact !== undefined ? stored.compact : document.getElementById('swim-compact').checked,
-    showCompleted: stored.showCompleted !== undefined ? stored.showCompleted : document.getElementById('swim-show-completed').checked
+    showCompleted: stored.showCompleted !== undefined ? stored.showCompleted : document.getElementById('swim-show-completed').checked,
+    showBlockers: stored.showBlockers !== undefined ? stored.showBlockers : showBlockersDefault
   };
 }
 
@@ -409,6 +565,7 @@ function applySettingsToUI(settings) {
   document.querySelector('.swim-max-lanes-value').textContent = settings.maxLanes;
   document.getElementById('swim-compact').checked = settings.compact;
   document.getElementById('swim-show-completed').checked = settings.showCompleted;
+  document.getElementById('swim-show-blockers').checked = !!settings.showBlockers;
 }
 
 function stateIndicator(stateType) {
@@ -424,19 +581,44 @@ function stateClass(stateType) {
   return 'state-' + (stateType || 'unstarted');
 }
 
-function renderBox(issue, settings) {
+function renderBox(issue, settings, blockedByMap) {
   var compactClass = settings.compact ? ' compact' : '';
   var titleHtml = escapeHtml(issue.title || '');
   var idHtml = escapeHtml(issue.identifier || '');
 
-  var html = '<div class="swim-box ' + stateClass(issue.stateType) + compactClass +
+  // Check if this issue is blocked by a cross-lane item
+  var blockers = blockedByMap ? (blockedByMap.get(issue.id) || []) : [];
+  var isBlocked = blockers.length > 0;
+  var blockedClass = isBlocked ? ' blocked' : '';
+
+  var html = '<div class="swim-box ' + stateClass(issue.stateType) + compactClass + blockedClass +
     '" data-issue-id="' + escapeHtml(issue.id) + '">' +
     stateIndicator(issue.stateType) +
     '<span class="swim-box-title">' + titleHtml + '</span>' +
-    '<span class="swim-box-id">' + idHtml + '</span>' +
-    '</div>';
+    '<span class="swim-box-id">' + idHtml + '</span>';
 
+  // Show "blocked by" label
+  if (isBlocked && !settings.compact) {
+    var blockerIds = blockers.map(function(b) { return b.identifier || b.id; });
+    html += '<span class="swim-box-blocked-label">\u2190 ' + escapeHtml(blockerIds.join(', ')) + '</span>';
+  }
+
+  html += '</div>';
   return html;
+}
+
+// Build reverse blockedBy map for rendering blocked labels
+function buildBlockedByMap(items) {
+  var blockedBy = new Map();
+  for (var i = 0; i < items.length; i++) {
+    var item = items[i];
+    var blocksIds = item.blocksIds || [];
+    for (var j = 0; j < blocksIds.length; j++) {
+      if (!blockedBy.has(blocksIds[j])) blockedBy.set(blocksIds[j], []);
+      blockedBy.get(blocksIds[j]).push(item);
+    }
+  }
+  return blockedBy;
 }
 
 function render() {
@@ -453,7 +635,16 @@ function render() {
   // Assign segments and compute global widths
   assignSegments(lanes, { grouping: settings.grouping });
   var slotWidth = settings.compact ? 140 : 210;
-  var segmentWidths = computeSegmentWidths(lanes, slotWidth);
+
+  // Compute cross-lane columns if showBlockers is on
+  var columnCounts = null;
+  var useColumns = settings.showBlockers;
+  if (useColumns) {
+    var colResult = computeCrossLaneColumns(lanes);
+    columnCounts = colResult.columnCounts;
+  }
+
+  var segmentWidths = computeSegmentWidths(lanes, slotWidth, columnCounts);
 
   var container = document.getElementById('swim-lanes');
 
@@ -464,6 +655,9 @@ function render() {
 
   // Collect all segment indices in order
   var segmentKeys = Object.keys(segmentWidths).map(Number).sort(function(a, b) { return a - b; });
+
+  // Build blockedBy map for labels
+  var blockedByMap = useColumns ? buildBlockedByMap(allIssues) : null;
 
   var html = '';
   for (var li = 0; li < lanes.length; li++) {
@@ -488,34 +682,56 @@ function render() {
 
       html += '<div class="swim-lane-segment" data-segment="' + segKey + '" style="min-width:' + minWidth + 'px">';
 
-      var rendered = new Set();
-      for (var ii = 0; ii < segItems.length; ii++) {
-        var issue = segItems[ii];
-        if (rendered.has(issue.id)) continue;
+      if (useColumns && columnCounts && columnCounts[segKey] > 0) {
+        // Column-based rendering: place items in column slots
+        var totalCols = columnCounts[segKey];
+        // Build a map: column → items for this lane+segment
+        var itemsByCol = {};
+        for (var ii = 0; ii < segItems.length; ii++) {
+          var col = segItems[ii].column !== undefined ? segItems[ii].column : ii;
+          if (!itemsByCol[col]) itemsByCol[col] = [];
+          itemsByCol[col].push(segItems[ii]);
+        }
 
-        // Check if this is a parent with children in this segment
-        var children = segItems.filter(function(item) {
-          return item.parentId === issue.id && !rendered.has(item.id);
-        });
+        for (var col = 0; col < totalCols; col++) {
+          var colItems = itemsByCol[col] || [];
+          html += '<div class="swim-column-slot" data-column="' + col + '" style="min-width:' + slotWidth + 'px">';
+          for (var ci = 0; ci < colItems.length; ci++) {
+            html += renderBox(colItems[ci], settings, blockedByMap);
+          }
+          html += '</div>';
+        }
+      } else {
+        // Default packed rendering (no columns)
+        var rendered = new Set();
+        for (var ii = 0; ii < segItems.length; ii++) {
+          var issue = segItems[ii];
+          if (rendered.has(issue.id)) continue;
 
-        if (children.length > 0 && !issue.parentId) {
-          html += '<div class="swim-group">';
-          html += '<div class="swim-group-label">' + escapeHtml(issue.title || '').slice(0, 20) + '</div>';
-          html += '<div class="swim-group-items">';
-          html += renderBox(issue, settings);
-          rendered.add(issue.id);
-          for (var ci = 0; ci < children.length; ci++) {
-            html += '<span class="swim-lane-arrow">\u2192</span>';
-            html += renderBox(children[ci], settings);
-            rendered.add(children[ci].id);
+          // Check if this is a parent with children in this segment
+          var children = segItems.filter(function(item) {
+            return item.parentId === issue.id && !rendered.has(item.id);
+          });
+
+          if (children.length > 0 && !issue.parentId) {
+            html += '<div class="swim-group">';
+            html += '<div class="swim-group-label">' + escapeHtml(issue.title || '').slice(0, 20) + '</div>';
+            html += '<div class="swim-group-items">';
+            html += renderBox(issue, settings);
+            rendered.add(issue.id);
+            for (var ci = 0; ci < children.length; ci++) {
+              html += '<span class="swim-lane-arrow">\u2192</span>';
+              html += renderBox(children[ci], settings);
+              rendered.add(children[ci].id);
+            }
+            html += '</div></div>';
+          } else {
+            if (ii > 0 && !rendered.has(issue.id)) {
+              html += '<span class="swim-lane-arrow">\u2192</span>';
+            }
+            html += renderBox(issue, settings);
+            rendered.add(issue.id);
           }
-          html += '</div></div>';
-        } else {
-          if (ii > 0 && !rendered.has(issue.id)) {
-            html += '<span class="swim-lane-arrow">\u2192</span>';
-          }
-          html += renderBox(issue, settings);
-          rendered.add(issue.id);
         }
       }
 
@@ -526,7 +742,127 @@ function render() {
   }
 
   container.innerHTML = html;
+
+  // Draw SVG connectors for cross-lane blocking
+  if (useColumns) {
+    // Use requestAnimationFrame to ensure DOM is laid out before measuring
+    requestAnimationFrame(function() {
+      drawBlockingConnectors(lanes, blockedByMap);
+    });
+  }
 }
+
+// =============================================================================
+// SVG Connector Lines
+// =============================================================================
+
+function drawBlockingConnectors(lanes, blockedByMap) {
+  // Remove any existing SVG
+  var existing = document.getElementById('swim-connectors');
+  if (existing) existing.remove();
+
+  if (!blockedByMap) return;
+
+  var container = document.querySelector('.swim-container');
+  var lanesEl = document.getElementById('swim-lanes');
+  if (!container || !lanesEl) return;
+
+  var containerRect = lanesEl.getBoundingClientRect();
+
+  // Build map of laneIndex per item
+  var itemLaneIndex = new Map();
+  for (var li = 0; li < lanes.length; li++) {
+    for (var ii = 0; ii < lanes[li].items.length; ii++) {
+      itemLaneIndex.set(lanes[li].items[ii].id, li);
+    }
+  }
+
+  // Find all cross-lane blocking edges
+  var edges = [];
+  blockedByMap.forEach(function(blockers, blockedId) {
+    var blockedLane = itemLaneIndex.get(blockedId);
+    for (var i = 0; i < blockers.length; i++) {
+      var blockerLane = itemLaneIndex.get(blockers[i].id);
+      if (blockerLane !== undefined && blockedLane !== undefined && blockerLane !== blockedLane) {
+        edges.push({ fromId: blockers[i].id, toId: blockedId });
+      }
+    }
+  });
+
+  if (edges.length === 0) return;
+
+  // Create SVG element
+  var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.id = 'swim-connectors';
+  svg.setAttribute('class', 'swim-connectors');
+  svg.setAttribute('width', lanesEl.scrollWidth);
+  svg.setAttribute('height', lanesEl.scrollHeight);
+
+  // Define arrowhead marker
+  var defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+  var marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+  marker.setAttribute('id', 'swim-arrow');
+  marker.setAttribute('viewBox', '0 0 8 8');
+  marker.setAttribute('refX', '7');
+  marker.setAttribute('refY', '4');
+  marker.setAttribute('markerWidth', '8');
+  marker.setAttribute('markerHeight', '8');
+  marker.setAttribute('orient', 'auto');
+  var arrowPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  arrowPath.setAttribute('d', 'M0,1 L7,4 L0,7 Z');
+  arrowPath.setAttribute('fill', '#e67e22');
+  arrowPath.setAttribute('opacity', '0.7');
+  marker.appendChild(arrowPath);
+  defs.appendChild(marker);
+  svg.appendChild(defs);
+
+  // Draw each edge
+  for (var e = 0; e < edges.length; e++) {
+    var fromEl = document.querySelector('.swim-box[data-issue-id="' + edges[e].fromId + '"]');
+    var toEl = document.querySelector('.swim-box[data-issue-id="' + edges[e].toId + '"]');
+    if (!fromEl || !toEl) continue;
+
+    var fromRect = fromEl.getBoundingClientRect();
+    var toRect = toEl.getBoundingClientRect();
+
+    // Coordinates relative to the lanesEl
+    var x1 = fromRect.right - containerRect.left;
+    var y1 = fromRect.top + fromRect.height / 2 - containerRect.top;
+    var x2 = toRect.left - containerRect.left;
+    var y2 = toRect.top + toRect.height / 2 - containerRect.top;
+
+    // Route: right stub → vertical → horizontal into target
+    var stubLen = 10;
+    var midX = x1 + stubLen;
+
+    // If target is further right, use a simple right-angle path
+    // If target is at similar x or left, route around
+    if (x2 > midX + 5) {
+      midX = (x1 + stubLen + x2) / 2;
+    }
+
+    var d = 'M' + x1 + ',' + y1 +
+      ' L' + midX + ',' + y1 +
+      ' L' + midX + ',' + y2 +
+      ' L' + x2 + ',' + y2;
+
+    var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', d);
+    path.setAttribute('class', 'swim-connector-path');
+    path.setAttribute('marker-end', 'url(#swim-arrow)');
+    svg.appendChild(path);
+  }
+
+  lanesEl.style.position = 'relative';
+  lanesEl.appendChild(svg);
+}
+
+// Redraw connectors on resize
+var resizeTimer;
+window.addEventListener('resize', function() {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(render, 150);
+});
 
 // =============================================================================
 // Popover
@@ -602,17 +938,25 @@ function onSettingsChange() {
     grouping: document.getElementById('swim-grouping').value,
     maxLanes: parseInt(document.getElementById('swim-max-lanes').value, 10),
     compact: document.getElementById('swim-compact').checked,
-    showCompleted: document.getElementById('swim-show-completed').checked
+    showCompleted: document.getElementById('swim-show-completed').checked,
+    showBlockers: document.getElementById('swim-show-blockers').checked
   };
   document.querySelector('.swim-max-lanes-value').textContent = settings.maxLanes;
   saveSettings(settings);
   render();
 }
 
-document.getElementById('swim-grouping').addEventListener('change', onSettingsChange);
+document.getElementById('swim-grouping').addEventListener('change', function() {
+  // Auto-flip showBlockers default when grouping changes
+  var grouping = document.getElementById('swim-grouping').value;
+  var showBlockersDefault = (grouping === 'project' || grouping === 'assignee');
+  document.getElementById('swim-show-blockers').checked = showBlockersDefault;
+  onSettingsChange();
+});
 document.getElementById('swim-max-lanes').addEventListener('input', onSettingsChange);
 document.getElementById('swim-compact').addEventListener('change', onSettingsChange);
 document.getElementById('swim-show-completed').addEventListener('change', onSettingsChange);
+document.getElementById('swim-show-blockers').addEventListener('change', onSettingsChange);
 
 // Box clicks → popover
 document.getElementById('swim-lanes').addEventListener('click', function(e) {
@@ -649,6 +993,11 @@ document.addEventListener('keydown', function(e) {
 
   if (Object.keys(stored).length > 0) {
     applySettingsToUI(stored);
+  } else {
+    // Apply smart defaults for showBlockers based on grouping
+    var grouping = document.getElementById('swim-grouping').value;
+    var showBlockersDefault = (grouping === 'project' || grouping === 'assignee');
+    document.getElementById('swim-show-blockers').checked = showBlockersDefault;
   }
 
   render();

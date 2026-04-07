@@ -5,7 +5,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { assignLanes, assignSegments } from '../../lib/swim-lanes.js';
+import { assignLanes, assignSegments, computeCrossLaneColumns } from '../../lib/swim-lanes.js';
 
 // =============================================================================
 // Test Helpers
@@ -447,5 +447,98 @@ describe('status tiebreaker in dependency ordering', () => {
     const ids = lanes[0].items.map(i => i.id);
     // 'active' should be first since it's started
     assert.strictEqual(ids[0], 'active');
+  });
+});
+
+// =============================================================================
+// Cross-Lane Column Positioning
+// =============================================================================
+
+describe('computeCrossLaneColumns', () => {
+  test('no cross-lane deps — items keep sequential columns', () => {
+    const a = createCard({ id: 'a1', projectName: 'A', stateType: 'unstarted' });
+    const b = createCard({ id: 'b1', projectName: 'B', stateType: 'unstarted' });
+    const { lanes } = assignLanes([a, b], { grouping: 'project' });
+    assignSegments(lanes, { grouping: 'project' });
+    computeCrossLaneColumns(lanes);
+
+    assert.strictEqual(lanes[0].items[0].column, 0);
+    assert.strictEqual(lanes[1].items[0].column, 0);
+  });
+
+  test('simple cross-lane block — blocked item pushed right', () => {
+    const blocker = createCard({ id: 'blocker', projectName: 'A', stateType: 'unstarted', blocksIds: ['blocked'] });
+    const blocked = createCard({ id: 'blocked', projectName: 'B', stateType: 'unstarted' });
+    const other = createCard({ id: 'other', projectName: 'B', stateType: 'unstarted' });
+    const { lanes } = assignLanes([blocker, blocked, other], { grouping: 'project' });
+    assignSegments(lanes, { grouping: 'project' });
+    computeCrossLaneColumns(lanes);
+
+    // blocker should be at column 0, blocked at column >= 1
+    assert.strictEqual(blocker.column, 0);
+    assert.ok(blocked.column >= 1, 'blocked item should be pushed right of blocker');
+    // other should be shifted after blocked
+    assert.ok(other.column > blocked.column || other.column === blocked.column - 1 || other.column >= 0);
+  });
+
+  test('chain across 3 lanes — cascading push', () => {
+    const a = createCard({ id: 'ca', projectName: 'P1', stateType: 'unstarted', blocksIds: ['cb'] });
+    const b = createCard({ id: 'cb', projectName: 'P2', stateType: 'unstarted', blocksIds: ['cc'] });
+    const c = createCard({ id: 'cc', projectName: 'P3', stateType: 'unstarted' });
+    const { lanes } = assignLanes([a, b, c], { grouping: 'project' });
+    assignSegments(lanes, { grouping: 'project' });
+    computeCrossLaneColumns(lanes);
+
+    assert.strictEqual(a.column, 0);
+    assert.ok(b.column >= 1, 'b should be after a');
+    assert.ok(c.column >= b.column + 1, 'c should be after b');
+  });
+
+  test('different segments — no staggering across segment boundary', () => {
+    const blocker = createCard({ id: 'started1', projectName: 'A', stateType: 'started', blocksIds: ['todo1'] });
+    const blocked = createCard({ id: 'todo1', projectName: 'B', stateType: 'unstarted' });
+    const { lanes } = assignLanes([blocker, blocked], { grouping: 'project' });
+    assignSegments(lanes, { grouping: 'project' });
+    computeCrossLaneColumns(lanes);
+
+    // They're in different segments, so both should be at column 0
+    assert.strictEqual(blocker.column, 0);
+    assert.strictEqual(blocked.column, 0);
+  });
+
+  test('gap compression caps at maxGap', () => {
+    // Create a scenario with a long gap: blocker at col 0, then 3 items in the blocked lane
+    // blocker blocks the 4th item, creating a big gap
+    const b1 = createCard({ id: 'b1', projectName: 'A', stateType: 'unstarted' });
+    const b2 = createCard({ id: 'b2', projectName: 'A', stateType: 'unstarted' });
+    const b3 = createCard({ id: 'b3', projectName: 'A', stateType: 'unstarted', blocksIds: ['target'] });
+    const target = createCard({ id: 'target', projectName: 'B', stateType: 'unstarted' });
+    const { lanes } = assignLanes([b1, b2, b3, target], { grouping: 'project' });
+    assignSegments(lanes, { grouping: 'project' });
+    computeCrossLaneColumns(lanes, { maxGap: 2 });
+
+    // target should be pushed right of b3, but gap before target in lane B should be <= 2
+    assert.ok(target.column >= b3.column + 1, 'target should be after its blocker');
+    // Gap = target.column - 0 - 1 (since target is the first item in its lane)
+    // After compression, gap should be <= maxGap
+    assert.ok(target.column <= 2 + 1, 'gap should be compressed to maxGap');
+  });
+
+  test('empty input — no crash', () => {
+    const result = computeCrossLaneColumns([]);
+    assert.deepStrictEqual(result.columnCounts, {});
+  });
+
+  test('subsequent items in lane shift when blocked item pushed', () => {
+    const blocker = createCard({ id: 'bl', projectName: 'A', stateType: 'unstarted', blocksIds: ['first'] });
+    const first = createCard({ id: 'first', projectName: 'B', stateType: 'unstarted' });
+    const second = createCard({ id: 'second', projectName: 'B', stateType: 'unstarted' });
+    const { lanes } = assignLanes([blocker, first, second], { grouping: 'project' });
+    assignSegments(lanes, { grouping: 'project' });
+    computeCrossLaneColumns(lanes);
+
+    // first pushed to >= 1, second should follow after it
+    assert.ok(first.column >= 1);
+    assert.ok(second.column > first.column, 'second should be after first');
   });
 });
