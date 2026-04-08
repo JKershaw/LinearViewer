@@ -344,7 +344,29 @@ test.describe('Swim Blocking Screenshots', () => {
     });
   });
 
-  test('18 - critical path: compact mode', async ({ page }) => {
+  test('18 - label filter: launch label, project grouping', async ({ page }) => {
+    await page.locator('.swim-settings-toggle').click();
+    await page.locator('#swim-grouping').selectOption('project');
+    await page.locator('#swim-label-filter').selectOption('launch');
+    await page.waitForTimeout(200);
+    await page.screenshot({
+      path: `${SCREENSHOT_DIR}/18-label-filter-launch-project.png`,
+      fullPage: true
+    });
+  });
+
+  test('19 - label filter: launch label, assignee grouping', async ({ page }) => {
+    await page.locator('.swim-settings-toggle').click();
+    await page.locator('#swim-grouping').selectOption('assignee');
+    await page.locator('#swim-label-filter').selectOption('launch');
+    await page.waitForTimeout(200);
+    await page.screenshot({
+      path: `${SCREENSHOT_DIR}/19-label-filter-launch-assignee.png`,
+      fullPage: true
+    });
+  });
+
+  test('20 - critical path: compact mode', async ({ page }) => {
     await page.locator('.swim-settings-toggle').click();
     await page.locator('#swim-grouping').selectOption('project');
     await page.locator('#swim-compact').check();
@@ -360,7 +382,7 @@ test.describe('Swim Blocking Screenshots', () => {
       await page.waitForTimeout(300);
     }
     await page.screenshot({
-      path: `${SCREENSHOT_DIR}/18-critical-path-compact.png`,
+      path: `${SCREENSHOT_DIR}/20-critical-path-compact.png`,
       fullPage: true
     });
   });

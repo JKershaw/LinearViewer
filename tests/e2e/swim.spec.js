@@ -249,6 +249,36 @@ test.describe('Swim Page with Sample Data', () => {
     expect(hiddenBoxes).toBe(0);
   });
 
+  test('label filter shows only matching issues and their blockers', async ({ page }) => {
+    await page.locator('.swim-settings-toggle').click();
+    await page.locator('#swim-label-filter').selectOption('launch');
+
+    // Should show fewer boxes than the full set
+    const boxes = await page.locator('.swim-box').count();
+    expect(boxes).toBeGreaterThan(0);
+    expect(boxes).toBeLessThan(20); // Full set has ~20 issues
+
+    // Goal issues should have the swim-goal class
+    const goalBoxes = await page.locator('.swim-box.swim-goal').count();
+    expect(goalBoxes).toBeGreaterThan(0);
+
+    // Show blockers should be auto-enabled
+    await expect(page.locator('#swim-show-blockers')).toBeChecked();
+  });
+
+  test('label filter clears when set back to All', async ({ page }) => {
+    await page.locator('.swim-settings-toggle').click();
+
+    // Set filter
+    await page.locator('#swim-label-filter').selectOption('launch');
+    const filteredCount = await page.locator('.swim-box').count();
+
+    // Clear filter
+    await page.locator('#swim-label-filter').selectOption('');
+    const fullCount = await page.locator('.swim-box').count();
+    expect(fullCount).toBeGreaterThan(filteredCount);
+  });
+
   test('project grouping shows all 4 sample projects', async ({ page }) => {
     await page.locator('.swim-settings-toggle').click();
     await page.locator('#swim-grouping').selectOption('project');

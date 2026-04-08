@@ -57,7 +57,7 @@ export const swimSampleIssues = [
     dueDate: null, completedAt: null,
     url: 'https://linear.app/test/issue/AUTH-4', parent: null,
     project: { id: 'proj-auth' }, state: { name: 'Backlog', type: 'backlog' },
-    assignee: null, labels: { nodes: [] }, team: { id: TEAM_ENG },
+    assignee: null, labels: { nodes: [{ name: 'launch' }] }, team: { id: TEAM_ENG },
     relations: { nodes: [] }
   },
   // Auth — independent task (parallel to chain)
@@ -123,7 +123,7 @@ export const swimSampleIssues = [
     dueDate: null, completedAt: null,
     url: 'https://linear.app/test/issue/DASH-2', parent: null,
     project: { id: 'proj-dash' }, state: { name: 'Todo', type: 'unstarted' },
-    assignee: { name: 'Diana' }, labels: { nodes: [] }, team: { id: TEAM_DES },
+    assignee: { name: 'Diana' }, labels: { nodes: [{ name: 'launch' }] }, team: { id: TEAM_DES },
     relations: { nodes: [] }
   },
   {
@@ -188,7 +188,7 @@ export const swimSampleIssues = [
     dueDate: null, completedAt: null,
     url: 'https://linear.app/test/issue/API-5', parent: null,
     project: { id: 'proj-api' }, state: { name: 'Todo', type: 'unstarted' },
-    assignee: { name: 'Alice' }, labels: { nodes: [{ name: 'blocked' }] }, team: { id: TEAM_ENG },
+    assignee: { name: 'Alice' }, labels: { nodes: [{ name: 'blocked' }, { name: 'launch' }] }, team: { id: TEAM_ENG },
     relations: { nodes: [] }
   },
 

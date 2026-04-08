@@ -538,6 +538,30 @@ var projectOrder = data.projectOrder || {};
 var issueById = new Map(allIssues.map(function(i) { return [i.id, i]; }));
 var currentLanes = []; // Updated by render() for chain walk access
 
+// Extract unique labels and populate the filter dropdown
+var allLabels = [];
+(function buildLabelList() {
+  var labelSet = {};
+  for (var i = 0; i < allIssues.length; i++) {
+    var labels = allIssues[i].labels;
+    if (labels) {
+      for (var j = 0; j < labels.length; j++) {
+        labelSet[labels[j]] = true;
+      }
+    }
+  }
+  allLabels = Object.keys(labelSet).sort();
+  var select = document.getElementById('swim-label-filter');
+  if (select) {
+    for (var k = 0; k < allLabels.length; k++) {
+      var opt = document.createElement('option');
+      opt.value = allLabels[k];
+      opt.textContent = allLabels[k];
+      select.appendChild(opt);
+    }
+  }
+})();
+
 function getSettings() {
   var stored = {};
   try {
@@ -552,7 +576,8 @@ function getSettings() {
     maxLanes: stored.maxLanes || parseInt(document.getElementById('swim-max-lanes').value, 10),
     compact: stored.compact !== undefined ? stored.compact : document.getElementById('swim-compact').checked,
     showCompleted: stored.showCompleted !== undefined ? stored.showCompleted : document.getElementById('swim-show-completed').checked,
-    showBlockers: stored.showBlockers !== undefined ? stored.showBlockers : showBlockersDefault
+    showBlockers: stored.showBlockers !== undefined ? stored.showBlockers : showBlockersDefault,
+    labelFilter: stored.labelFilter || document.getElementById('swim-label-filter').value || ''
   };
 }
 
@@ -567,6 +592,7 @@ function applySettingsToUI(settings) {
   document.getElementById('swim-compact').checked = settings.compact;
   document.getElementById('swim-show-completed').checked = settings.showCompleted;
   document.getElementById('swim-show-blockers').checked = !!settings.showBlockers;
+  document.getElementById('swim-label-filter').value = settings.labelFilter || '';
 }
 
 function stateIndicator(stateType) {
@@ -591,8 +617,9 @@ function renderBox(issue, settings, blockedByMap) {
   var blockers = blockedByMap ? (blockedByMap.get(issue.id) || []) : [];
   var isBlocked = blockers.length > 0;
   var blockedClass = isBlocked ? ' blocked' : '';
+  var goalClass = labelGoalIds.has(issue.id) ? ' swim-goal' : '';
 
-  var html = '<div class="swim-box ' + stateClass(issue.stateType) + compactClass + blockedClass +
+  var html = '<div class="swim-box ' + stateClass(issue.stateType) + compactClass + blockedClass + goalClass +
     '" data-issue-id="' + escapeHtml(issue.id) + '">' +
     stateIndicator(issue.stateType) +
     '<span class="swim-box-title">' + titleHtml + '</span>' +
@@ -622,9 +649,50 @@ function buildBlockedByMap(items) {
   return blockedBy;
 }
 
+/**
+ * Given a set of goal issue IDs, walk upstream blockers transitively
+ * and return the full set (goals + all upstream blockers).
+ */
+function expandUpstreamBlockers(goalIds) {
+  var result = new Set();
+  var queue = [];
+  goalIds.forEach(function(id) { result.add(id); queue.push(id); });
+
+  while (queue.length > 0) {
+    var id = queue.shift();
+    for (var i = 0; i < allIssues.length; i++) {
+      var iss = allIssues[i];
+      if (iss.blocksIds && iss.blocksIds.indexOf(id) !== -1 && !result.has(iss.id)) {
+        result.add(iss.id);
+        queue.push(iss.id);
+      }
+    }
+  }
+  return result;
+}
+
+var labelGoalIds = new Set(); // Tracks which issues are "goals" for visual marking
+
 function render() {
   var settings = getSettings();
-  var result = assignLanes(allIssues, {
+
+  // Apply label filter: show only labeled issues + their upstream blockers
+  var issuesToRender = allIssues;
+  labelGoalIds = new Set();
+  if (settings.labelFilter) {
+    var goalIds = new Set();
+    for (var i = 0; i < allIssues.length; i++) {
+      var labels = allIssues[i].labels;
+      if (labels && labels.indexOf(settings.labelFilter) !== -1) {
+        goalIds.add(allIssues[i].id);
+      }
+    }
+    labelGoalIds = goalIds;
+    var visibleIds = expandUpstreamBlockers(goalIds);
+    issuesToRender = allIssues.filter(function(iss) { return visibleIds.has(iss.id); });
+  }
+
+  var result = assignLanes(issuesToRender, {
     maxLanes: settings.maxLanes,
     grouping: settings.grouping,
     showCompleted: settings.showCompleted,
@@ -1509,7 +1577,8 @@ function onSettingsChange() {
     maxLanes: parseInt(document.getElementById('swim-max-lanes').value, 10),
     compact: document.getElementById('swim-compact').checked,
     showCompleted: document.getElementById('swim-show-completed').checked,
-    showBlockers: document.getElementById('swim-show-blockers').checked
+    showBlockers: document.getElementById('swim-show-blockers').checked,
+    labelFilter: document.getElementById('swim-label-filter').value || ''
   };
   document.querySelector('.swim-max-lanes-value').textContent = settings.maxLanes;
   saveSettings(settings);
@@ -1527,6 +1596,14 @@ document.getElementById('swim-max-lanes').addEventListener('input', onSettingsCh
 document.getElementById('swim-compact').addEventListener('change', onSettingsChange);
 document.getElementById('swim-show-completed').addEventListener('change', onSettingsChange);
 document.getElementById('swim-show-blockers').addEventListener('change', onSettingsChange);
+document.getElementById('swim-label-filter').addEventListener('change', function() {
+  // Auto-enable show blockers when a label filter is active
+  var hasFilter = document.getElementById('swim-label-filter').value !== '';
+  if (hasFilter) {
+    document.getElementById('swim-show-blockers').checked = true;
+  }
+  onSettingsChange();
+});
 
 // Box clicks → popover
 document.getElementById('swim-lanes').addEventListener('click', function(e) {
