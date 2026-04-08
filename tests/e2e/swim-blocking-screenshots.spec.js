@@ -299,4 +299,69 @@ test.describe('Swim Blocking Screenshots', () => {
       fullPage: true
     });
   });
+
+  // =========================================================================
+  // Critical Path Filter
+  // =========================================================================
+
+  test('16 - critical path: blocked item (API-5)', async ({ page }) => {
+    await page.locator('.swim-settings-toggle').click();
+    await page.locator('#swim-grouping').selectOption('project');
+    const showBlockers = page.locator('#swim-show-blockers');
+    if (await showBlockers.count() > 0) {
+      await showBlockers.check();
+    }
+    const api5 = page.locator('.swim-box[data-issue-id="api-5"]');
+    if (await api5.count() > 0) {
+      await api5.click();
+      await page.waitForTimeout(200);
+      await page.locator('#swim-popover-critical-path').click();
+      await page.waitForTimeout(300);
+    }
+    await page.screenshot({
+      path: `${SCREENSHOT_DIR}/16-critical-path-api5.png`,
+      fullPage: true
+    });
+  });
+
+  test('17 - critical path: mid-chain item (AUTH-3)', async ({ page }) => {
+    await page.locator('.swim-settings-toggle').click();
+    await page.locator('#swim-grouping').selectOption('project');
+    const showBlockers = page.locator('#swim-show-blockers');
+    if (await showBlockers.count() > 0) {
+      await showBlockers.check();
+    }
+    const auth3 = page.locator('.swim-box[data-issue-id="auth-3"]');
+    if (await auth3.count() > 0) {
+      await auth3.click();
+      await page.waitForTimeout(200);
+      await page.locator('#swim-popover-critical-path').click();
+      await page.waitForTimeout(300);
+    }
+    await page.screenshot({
+      path: `${SCREENSHOT_DIR}/17-critical-path-auth3.png`,
+      fullPage: true
+    });
+  });
+
+  test('18 - critical path: compact mode', async ({ page }) => {
+    await page.locator('.swim-settings-toggle').click();
+    await page.locator('#swim-grouping').selectOption('project');
+    await page.locator('#swim-compact').check();
+    const showBlockers = page.locator('#swim-show-blockers');
+    if (await showBlockers.count() > 0) {
+      await showBlockers.check();
+    }
+    const api5 = page.locator('.swim-box[data-issue-id="api-5"]');
+    if (await api5.count() > 0) {
+      await api5.click();
+      await page.waitForTimeout(200);
+      await page.locator('#swim-popover-critical-path').click();
+      await page.waitForTimeout(300);
+    }
+    await page.screenshot({
+      path: `${SCREENSHOT_DIR}/18-critical-path-compact.png`,
+      fullPage: true
+    });
+  });
 });

@@ -463,6 +463,67 @@ body:has(.swim-page) {
 }
 
 /* ==========================================================================
+   Critical Path Filter
+   ========================================================================== */
+
+.swim-cp-hidden {
+  display: none !important;
+}
+
+.swim-cp-hidden-lane {
+  display: none !important;
+}
+
+.swim-cp-hidden-segment {
+  display: none !important;
+}
+
+/* Target task gets a distinct highlight */
+.swim-cp-active .swim-box.swim-cp-target {
+  box-shadow: 0 0 0 2px #2563eb;
+  border-color: #2563eb;
+}
+
+/* Clear filter pill */
+.swim-cp-clear-pill {
+  display: inline-block;
+  margin-bottom: 0.5rem;
+  padding: 0.3rem 0.75rem;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 11px;
+  color: #2563eb;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.swim-cp-clear-pill:hover {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+/* Popover critical path button */
+.swim-popover-critical-path {
+  display: block;
+  margin-top: 0.5rem;
+  padding: 0.3rem 0;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 11px;
+  color: #2563eb;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: color 0.15s;
+}
+
+.swim-popover-critical-path:hover {
+  color: #1d4ed8;
+}
+
+/* ==========================================================================
    Empty State
    ========================================================================== */
 

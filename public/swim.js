@@ -1148,6 +1148,15 @@ function showPopover(issueId, anchorEl) {
   var issue = issueById.get(issueId);
   if (!issue) return;
 
+  currentPopoverIssueId = issueId;
+
+  // Update critical path button text based on current state
+  var cpBtn = document.getElementById('swim-popover-critical-path');
+  if (cpBtn) {
+    cpBtn.textContent = (criticalPathActive && criticalPathIssueId === issueId)
+      ? 'Clear critical path' : 'Show critical path';
+  }
+
   document.getElementById('swim-popover-id').textContent = issue.identifier || issue.id;
   document.getElementById('swim-popover-title').textContent = issue.title || '';
 
@@ -1270,6 +1279,170 @@ function getTransitiveChain(issueId) {
   return chain;
 }
 
+/**
+ * Walk upstream-only critical path: blockers + sequential predecessors.
+ * Answers "what's stopping me from working on this?"
+ */
+function getUpstreamChain(issueId) {
+  var chain = new Set();
+  chain.add(issueId);
+
+  // Walk upstream: find everything that blocks this (transitively)
+  var upQueue = [issueId];
+  while (upQueue.length > 0) {
+    var id = upQueue.shift();
+    for (var i = 0; i < allIssues.length; i++) {
+      var iss = allIssues[i];
+      if (iss.blocksIds && iss.blocksIds.indexOf(id) !== -1 && !chain.has(iss.id)) {
+        chain.add(iss.id);
+        upQueue.push(iss.id);
+      }
+    }
+  }
+
+  // Walk sequential predecessors in the same lane
+  for (var li = 0; li < currentLanes.length; li++) {
+    var laneItems = currentLanes[li].items;
+    var pos = -1;
+    for (var ii = 0; ii < laneItems.length; ii++) {
+      if (laneItems[ii].id === issueId) { pos = ii; break; }
+    }
+    if (pos <= 0) continue;
+    for (var pi = 0; pi < pos; pi++) {
+      var predId = laneItems[pi].id;
+      if (!chain.has(predId)) {
+        chain.add(predId);
+        // Also walk this predecessor's upstream blockers
+        var predUpQueue = [predId];
+        while (predUpQueue.length > 0) {
+          var pid = predUpQueue.shift();
+          for (var ai = 0; ai < allIssues.length; ai++) {
+            var iss = allIssues[ai];
+            if (iss.blocksIds && iss.blocksIds.indexOf(pid) !== -1 && !chain.has(iss.id)) {
+              chain.add(iss.id);
+              predUpQueue.push(iss.id);
+            }
+          }
+        }
+      }
+    }
+    break;
+  }
+
+  return chain;
+}
+
+// =============================================================================
+// Critical Path Filter
+// =============================================================================
+
+var criticalPathActive = false;
+var criticalPathIssueId = null;
+
+function showCriticalPath(issueId) {
+  criticalPathActive = true;
+  criticalPathIssueId = issueId;
+  var chain = getUpstreamChain(issueId);
+
+  var lanesEl = document.getElementById('swim-lanes');
+  if (!lanesEl) return;
+
+  // Hide non-chain boxes
+  var boxes = lanesEl.querySelectorAll('.swim-box');
+  for (var i = 0; i < boxes.length; i++) {
+    var id = boxes[i].getAttribute('data-issue-id');
+    if (!chain.has(id)) {
+      boxes[i].classList.add('swim-cp-hidden');
+    } else {
+      boxes[i].classList.add('swim-cp-visible');
+      if (id === issueId) boxes[i].classList.add('swim-cp-target');
+    }
+  }
+
+  // Hide connectors not in the chain
+  var paths = lanesEl.querySelectorAll('.swim-connector-path');
+  for (var i = 0; i < paths.length; i++) {
+    var from = paths[i].getAttribute('data-from');
+    var to = paths[i].getAttribute('data-to');
+    if (!chain.has(from) || !chain.has(to)) {
+      paths[i].classList.add('swim-cp-hidden');
+    }
+  }
+
+  // Collapse empty lanes
+  var lanes = lanesEl.querySelectorAll('.swim-lane');
+  for (var i = 0; i < lanes.length; i++) {
+    var visibleBoxes = lanes[i].querySelectorAll('.swim-box:not(.swim-cp-hidden)');
+    if (visibleBoxes.length === 0) {
+      lanes[i].classList.add('swim-cp-hidden-lane');
+    }
+  }
+
+  // Collapse empty segments
+  var segments = lanesEl.querySelectorAll('.swim-lane-segment');
+  for (var i = 0; i < segments.length; i++) {
+    var visibleInSeg = segments[i].querySelectorAll('.swim-box:not(.swim-cp-hidden)');
+    if (visibleInSeg.length === 0) {
+      segments[i].classList.add('swim-cp-hidden-segment');
+    }
+  }
+
+  lanesEl.classList.add('swim-cp-active');
+
+  // Show clear filter pill
+  showClearFilterPill();
+
+  // Update popover button text
+  var btn = document.getElementById('swim-popover-critical-path');
+  if (btn) btn.textContent = 'Clear critical path';
+}
+
+function clearCriticalPath() {
+  criticalPathActive = false;
+  criticalPathIssueId = null;
+
+  var lanesEl = document.getElementById('swim-lanes');
+  if (!lanesEl) return;
+
+  lanesEl.classList.remove('swim-cp-active');
+
+  var hidden = lanesEl.querySelectorAll('.swim-cp-hidden, .swim-cp-visible, .swim-cp-target, .swim-cp-hidden-lane, .swim-cp-hidden-segment');
+  for (var i = 0; i < hidden.length; i++) {
+    hidden[i].classList.remove('swim-cp-hidden', 'swim-cp-visible', 'swim-cp-target', 'swim-cp-hidden-lane', 'swim-cp-hidden-segment');
+  }
+
+  hideClearFilterPill();
+
+  // Update popover button text
+  var btn = document.getElementById('swim-popover-critical-path');
+  if (btn) btn.textContent = 'Show critical path';
+}
+
+function showClearFilterPill() {
+  var existing = document.getElementById('swim-cp-clear');
+  if (existing) return;
+
+  var pill = document.createElement('button');
+  pill.id = 'swim-cp-clear';
+  pill.className = 'swim-cp-clear-pill';
+  pill.textContent = 'Clear critical path filter';
+  pill.addEventListener('click', function() {
+    clearCriticalPath();
+    hidePopover();
+  });
+
+  var page = document.querySelector('.swim-page');
+  var container = document.querySelector('.swim-container');
+  if (page && container) {
+    page.insertBefore(pill, container);
+  }
+}
+
+function hideClearFilterPill() {
+  var pill = document.getElementById('swim-cp-clear');
+  if (pill) pill.remove();
+}
+
 function highlightChain(issueId) {
   // Always clear previous highlight first to prevent stale state
   clearChainHighlight();
@@ -1330,6 +1503,7 @@ document.querySelector('.swim-settings-toggle').addEventListener('click', functi
 
 // Settings changes
 function onSettingsChange() {
+  clearCriticalPath();
   var settings = {
     grouping: document.getElementById('swim-grouping').value,
     maxLanes: parseInt(document.getElementById('swim-max-lanes').value, 10),
@@ -1383,6 +1557,18 @@ document.getElementById('swim-lanes').addEventListener('mouseover', function(e) 
   }
 });
 
+// Critical path button in popover
+var currentPopoverIssueId = null;
+document.getElementById('swim-popover-critical-path').addEventListener('click', function() {
+  if (criticalPathActive && criticalPathIssueId === currentPopoverIssueId) {
+    clearCriticalPath();
+  } else {
+    clearCriticalPath(); // Clear any existing filter first
+    showCriticalPath(currentPopoverIssueId);
+  }
+  hidePopover();
+});
+
 // Close popover
 document.getElementById('swim-popover-close').addEventListener('click', hidePopover);
 document.addEventListener('click', function(e) {
@@ -1391,7 +1577,12 @@ document.addEventListener('click', function(e) {
   }
 });
 document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') hidePopover();
+  if (e.key === 'Escape') {
+    if (criticalPathActive) {
+      clearCriticalPath();
+    }
+    hidePopover();
+  }
 });
 
 // =============================================================================

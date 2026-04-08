@@ -198,6 +198,57 @@ test.describe('Swim Page with Sample Data', () => {
     expect(seg1StartedCount).toBe(0);
   });
 
+  test('popover has critical path button', async ({ page }) => {
+    await page.locator('.swim-box').first().click();
+    await expect(page.locator('#swim-popover-critical-path')).toBeVisible();
+    await expect(page.locator('#swim-popover-critical-path')).toHaveText('Show critical path');
+  });
+
+  test('critical path filter hides non-chain tasks', async ({ page }) => {
+    const totalBoxes = await page.locator('.swim-box').count();
+
+    // Click a box and activate critical path
+    await page.locator('.swim-box').first().click();
+    await page.locator('#swim-popover-critical-path').click();
+
+    // Some boxes should be hidden
+    const hiddenBoxes = await page.locator('.swim-box.swim-cp-hidden').count();
+    const visibleBoxes = await page.locator('.swim-box:not(.swim-cp-hidden)').count();
+    expect(visibleBoxes).toBeGreaterThan(0);
+    expect(visibleBoxes).toBeLessThanOrEqual(totalBoxes);
+
+    // Clear filter pill should be visible
+    await expect(page.locator('#swim-cp-clear')).toBeVisible();
+  });
+
+  test('critical path clears on Escape', async ({ page }) => {
+    await page.locator('.swim-box').first().click();
+    await page.locator('#swim-popover-critical-path').click();
+
+    // Filter is active
+    await expect(page.locator('#swim-cp-clear')).toBeVisible();
+
+    // Press Escape
+    await page.keyboard.press('Escape');
+
+    // Filter should be cleared
+    await expect(page.locator('#swim-cp-clear')).not.toBeVisible();
+    const hiddenBoxes = await page.locator('.swim-box.swim-cp-hidden').count();
+    expect(hiddenBoxes).toBe(0);
+  });
+
+  test('critical path clears on clear pill click', async ({ page }) => {
+    await page.locator('.swim-box').first().click();
+    await page.locator('#swim-popover-critical-path').click();
+
+    await page.locator('#swim-cp-clear').click();
+
+    // Filter should be cleared
+    await expect(page.locator('#swim-cp-clear')).not.toBeVisible();
+    const hiddenBoxes = await page.locator('.swim-box.swim-cp-hidden').count();
+    expect(hiddenBoxes).toBe(0);
+  });
+
   test('project grouping shows all 4 sample projects', async ({ page }) => {
     await page.locator('.swim-settings-toggle').click();
     await page.locator('#swim-grouping').selectOption('project');
