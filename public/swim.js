@@ -696,14 +696,13 @@ function render() {
         var prevColItem = null;
         for (var col = 0; col < totalCols; col++) {
           var colItems = itemsByCol[col] || [];
-          // Insert arrow between adjacent occupied columns
+          // Insert grey arrow for non-blocking sequence; blocking pairs get SVG connector instead
           if (colItems.length > 0 && prevColItem) {
             var isBlocking = prevColItem.blocksIds && prevColItem.blocksIds.indexOf(colItems[0].id) !== -1;
-            if (isBlocking) {
-              html += '<span class="swim-lane-arrow blocking">\u2192</span>';
-            } else {
+            if (!isBlocking) {
               html += '<span class="swim-lane-arrow">\u2192</span>';
             }
+            // blocking pairs: no HTML arrow — SVG connector will be drawn
           }
           html += '<div class="swim-column-slot" data-column="' + col + '" style="min-width:' + slotWidth + 'px">';
           for (var ci = 0; ci < colItems.length; ci++) {
@@ -732,17 +731,20 @@ function render() {
             rendered.add(issue.id);
             for (var ci = 0; ci < children.length; ci++) {
               var childBlocked = issue.blocksIds && issue.blocksIds.indexOf(children[ci].id) !== -1;
-              html += '<span class="swim-lane-arrow' + (childBlocked ? ' blocking' : '') + '">\u2192</span>';
+              if (!childBlocked) {
+                html += '<span class="swim-lane-arrow">\u2192</span>';
+              }
               html += renderBox(children[ci], settings);
               rendered.add(children[ci].id);
             }
             html += '</div></div>';
           } else {
             if (ii > 0 && !rendered.has(issue.id)) {
-              // Check if previous item blocks this one
               var prevIssue = segItems[ii - 1];
               var prevBlocks = prevIssue && prevIssue.blocksIds && prevIssue.blocksIds.indexOf(issue.id) !== -1;
-              html += '<span class="swim-lane-arrow' + (prevBlocks ? ' blocking' : '') + '">\u2192</span>';
+              if (!prevBlocks) {
+                html += '<span class="swim-lane-arrow">\u2192</span>';
+              }
             }
             html += renderBox(issue, settings);
             rendered.add(issue.id);
@@ -802,6 +804,7 @@ function drawBlockingConnectors(lanes, blockedByMap) {
 
   // Find all blocking edges, categorized
   var crossLaneEdges = [];
+  var sameLaneAdjacentEdges = [];
   var sameLaneArcEdges = []; // non-adjacent within same lane
   blockedByMap.forEach(function(blockers, blockedId) {
     var blockedLane = itemLaneIndex.get(blockedId);
@@ -812,17 +815,16 @@ function drawBlockingConnectors(lanes, blockedByMap) {
       if (blockerLane === undefined || blockedLane === undefined) continue;
       if (blockerLane !== blockedLane) {
         crossLaneEdges.push({ fromId: blockers[i].id, toId: blockedId });
+      } else if (Math.abs(blockedPos - blockerPos) > 1) {
+        sameLaneArcEdges.push({ fromId: blockers[i].id, toId: blockedId });
       } else {
-        // Same lane — check if non-adjacent (gap > 1 position)
-        if (Math.abs(blockedPos - blockerPos) > 1) {
-          sameLaneArcEdges.push({ fromId: blockers[i].id, toId: blockedId });
-        }
-        // Adjacent same-lane pairs are handled by CSS arrow styling
+        sameLaneAdjacentEdges.push({ fromId: blockers[i].id, toId: blockedId });
       }
     }
   });
 
-  if (crossLaneEdges.length === 0 && sameLaneArcEdges.length === 0) return;
+  var totalEdges = crossLaneEdges.length + sameLaneAdjacentEdges.length + sameLaneArcEdges.length;
+  if (totalEdges === 0) return;
 
   // Create SVG element
   var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -919,6 +921,8 @@ function drawBlockingConnectors(lanes, blockedByMap) {
     var toLane = itemLaneIndex.get(crossLaneEdges[e].toId);
 
     edgeData.push({
+      fromId: crossLaneEdges[e].fromId,
+      toId: crossLaneEdges[e].toId,
       x1: fromRect.right - containerRect.left,
       y1: fromRect.top + fromRect.height / 2 - containerRect.top,
       x2: toRect.left - containerRect.left,
@@ -1024,8 +1028,35 @@ function drawBlockingConnectors(lanes, blockedByMap) {
     var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     path.setAttribute('d', d);
     path.setAttribute('class', 'swim-connector-path');
+    path.setAttribute('data-from', ed.fromId);
+    path.setAttribute('data-to', ed.toId);
     path.setAttribute('marker-end', 'url(#swim-arrow)');
     svg.appendChild(path);
+  }
+
+  // Draw same-lane adjacent blocking connectors (horizontal lines)
+  for (var se = 0; se < sameLaneAdjacentEdges.length; se++) {
+    var adjFrom = document.querySelector('.swim-box[data-issue-id="' + sameLaneAdjacentEdges[se].fromId + '"]');
+    var adjTo = document.querySelector('.swim-box[data-issue-id="' + sameLaneAdjacentEdges[se].toId + '"]');
+    if (!adjFrom || !adjTo) continue;
+
+    var adjFromRect = adjFrom.getBoundingClientRect();
+    var adjToRect = adjTo.getBoundingClientRect();
+
+    var sx1 = adjFromRect.right - containerRect.left;
+    var sy1 = adjFromRect.top + adjFromRect.height / 2 - containerRect.top;
+    var sx2 = adjToRect.left - containerRect.left;
+    var sy2 = adjToRect.top + adjToRect.height / 2 - containerRect.top;
+
+    var sd = 'M' + sx1 + ',' + sy1 + ' L' + sx2 + ',' + sy2;
+
+    var sPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    sPath.setAttribute('d', sd);
+    sPath.setAttribute('class', 'swim-connector-path');
+    sPath.setAttribute('data-from', sameLaneAdjacentEdges[se].fromId);
+    sPath.setAttribute('data-to', sameLaneAdjacentEdges[se].toId);
+    sPath.setAttribute('marker-end', 'url(#swim-arrow)');
+    svg.appendChild(sPath);
   }
 
   // Draw same-lane non-adjacent blocking arcs
@@ -1053,6 +1084,8 @@ function drawBlockingConnectors(lanes, blockedByMap) {
     var arcPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     arcPath.setAttribute('d', arcD);
     arcPath.setAttribute('class', 'swim-connector-path');
+    arcPath.setAttribute('data-from', sameLaneArcEdges[ae].fromId);
+    arcPath.setAttribute('data-to', sameLaneArcEdges[ae].toId);
     arcPath.setAttribute('marker-end', 'url(#swim-arrow)');
     svg.appendChild(arcPath);
   }
@@ -1125,6 +1158,94 @@ function hidePopover() {
 }
 
 // =============================================================================
+// Chain Highlighting (hover)
+// =============================================================================
+
+/**
+ * Walk the transitive dependency chain from a given issue.
+ * Returns a Set of all issue IDs in the chain (upstream blockers + downstream blocked).
+ */
+function getTransitiveChain(issueId) {
+  var chain = new Set();
+  chain.add(issueId);
+
+  // Walk upstream: find everything that blocks this (transitively)
+  var upQueue = [issueId];
+  while (upQueue.length > 0) {
+    var id = upQueue.shift();
+    // Find blockers of this item
+    for (var i = 0; i < allIssues.length; i++) {
+      var iss = allIssues[i];
+      if (iss.blocksIds && iss.blocksIds.indexOf(id) !== -1 && !chain.has(iss.id)) {
+        chain.add(iss.id);
+        upQueue.push(iss.id);
+      }
+    }
+  }
+
+  // Walk downstream: find everything this blocks (transitively)
+  var downQueue = [issueId];
+  var visited = new Set([issueId]);
+  while (downQueue.length > 0) {
+    var id = downQueue.shift();
+    var issue = issueById.get(id);
+    if (!issue || !issue.blocksIds) continue;
+    for (var j = 0; j < issue.blocksIds.length; j++) {
+      var blockedId = issue.blocksIds[j];
+      if (!chain.has(blockedId) && issueById.has(blockedId)) {
+        chain.add(blockedId);
+        downQueue.push(blockedId);
+      }
+    }
+  }
+
+  return chain;
+}
+
+function highlightChain(issueId) {
+  var chain = getTransitiveChain(issueId);
+  var lanesEl = document.getElementById('swim-lanes');
+  if (!lanesEl) return;
+
+  lanesEl.classList.add('swim-chain-active');
+
+  // Highlight chain nodes
+  var boxes = lanesEl.querySelectorAll('.swim-box');
+  for (var i = 0; i < boxes.length; i++) {
+    if (chain.has(boxes[i].getAttribute('data-issue-id'))) {
+      boxes[i].classList.add('swim-chain-node');
+    }
+  }
+
+  // Highlight chain connectors
+  var paths = lanesEl.querySelectorAll('.swim-connector-path');
+  for (var i = 0; i < paths.length; i++) {
+    var from = paths[i].getAttribute('data-from');
+    var to = paths[i].getAttribute('data-to');
+    if (chain.has(from) && chain.has(to)) {
+      paths[i].classList.add('swim-chain-link');
+    }
+  }
+}
+
+function clearChainHighlight() {
+  var lanesEl = document.getElementById('swim-lanes');
+  if (!lanesEl) return;
+
+  lanesEl.classList.remove('swim-chain-active');
+
+  var nodes = lanesEl.querySelectorAll('.swim-chain-node');
+  for (var i = 0; i < nodes.length; i++) {
+    nodes[i].classList.remove('swim-chain-node');
+  }
+
+  var links = lanesEl.querySelectorAll('.swim-chain-link');
+  for (var i = 0; i < links.length; i++) {
+    links[i].classList.remove('swim-chain-link');
+  }
+}
+
+// =============================================================================
 // Event Handlers
 // =============================================================================
 
@@ -1170,6 +1291,24 @@ document.getElementById('swim-lanes').addEventListener('click', function(e) {
     showPopover(issueId, box);
     e.stopPropagation();
     return;
+  }
+});
+
+// Box hover → chain highlighting
+document.getElementById('swim-lanes').addEventListener('mouseover', function(e) {
+  var box = e.target.closest('.swim-box');
+  if (box) {
+    highlightChain(box.getAttribute('data-issue-id'));
+  }
+});
+document.getElementById('swim-lanes').addEventListener('mouseout', function(e) {
+  var box = e.target.closest('.swim-box');
+  if (box) {
+    // Only clear if we're not entering another box
+    var related = e.relatedTarget ? e.relatedTarget.closest('.swim-box') : null;
+    if (!related) {
+      clearChainHighlight();
+    }
   }
 });
 

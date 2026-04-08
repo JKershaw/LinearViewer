@@ -237,4 +237,66 @@ test.describe('Swim Blocking Screenshots', () => {
       fullPage: true
     });
   });
+
+  // =========================================================================
+  // Hover chain highlighting
+  // =========================================================================
+
+  test('13 - hover chain: project grouping, hover blocked item', async ({ page }) => {
+    await page.locator('.swim-settings-toggle').click();
+    await page.locator('#swim-grouping').selectOption('project');
+    const showBlockers = page.locator('#swim-show-blockers');
+    if (await showBlockers.count() > 0) {
+      await showBlockers.check();
+    }
+    // Hover API-5 (blocked by AUTH-3, which is blocked by AUTH-2)
+    const api5 = page.locator('.swim-box[data-issue-id="api-5"]');
+    if (await api5.count() > 0) {
+      await api5.hover();
+      await page.waitForTimeout(200);
+    }
+    await page.screenshot({
+      path: `${SCREENSHOT_DIR}/13-hover-chain-blocked.png`,
+      fullPage: true
+    });
+  });
+
+  test('14 - hover chain: project grouping, hover blocker item', async ({ page }) => {
+    await page.locator('.swim-settings-toggle').click();
+    await page.locator('#swim-grouping').selectOption('project');
+    const showBlockers = page.locator('#swim-show-blockers');
+    if (await showBlockers.count() > 0) {
+      await showBlockers.check();
+    }
+    // Hover AUTH-2 (blocks AUTH-3 which blocks API-5 and AUTH-4)
+    const auth2 = page.locator('.swim-box[data-issue-id="auth-2"]');
+    if (await auth2.count() > 0) {
+      await auth2.hover();
+      await page.waitForTimeout(200);
+    }
+    await page.screenshot({
+      path: `${SCREENSHOT_DIR}/14-hover-chain-blocker.png`,
+      fullPage: true
+    });
+  });
+
+  test('15 - hover chain: compact, hover mid-chain item', async ({ page }) => {
+    await page.locator('.swim-settings-toggle').click();
+    await page.locator('#swim-grouping').selectOption('project');
+    await page.locator('#swim-compact').check();
+    const showBlockers = page.locator('#swim-show-blockers');
+    if (await showBlockers.count() > 0) {
+      await showBlockers.check();
+    }
+    // Hover AUTH-3 (mid-chain: blocked by AUTH-2, blocks AUTH-4 and API-5)
+    const auth3 = page.locator('.swim-box[data-issue-id="auth-3"]');
+    if (await auth3.count() > 0) {
+      await auth3.hover();
+      await page.waitForTimeout(200);
+    }
+    await page.screenshot({
+      path: `${SCREENSHOT_DIR}/15-hover-chain-compact-mid.png`,
+      fullPage: true
+    });
+  });
 });

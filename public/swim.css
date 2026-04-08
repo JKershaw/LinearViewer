@@ -172,13 +172,6 @@ body:has(.swim-page) {
   user-select: none;
 }
 
-/* Blocking arrow — same position, styled as dependency */
-.swim-lane-arrow.blocking {
-  color: #e67e22;
-  font-size: 12px;
-  font-weight: bold;
-  opacity: 0.7;
-}
 
 /* ==========================================================================
    Task Boxes
@@ -429,6 +422,36 @@ body:has(.swim-page) {
   stroke-width: 2;
   stroke-dasharray: 5 3;
   opacity: 0.65;
+}
+
+/* ==========================================================================
+   Chain Highlighting (hover)
+   ========================================================================== */
+
+/* When chain is active, dim everything that isn't in the chain */
+.swim-lanes.swim-chain-active .swim-box {
+  opacity: 0.25;
+  transition: opacity 0.15s;
+}
+
+.swim-lanes.swim-chain-active .swim-lane-arrow {
+  opacity: 0.15;
+}
+
+.swim-lanes.swim-chain-active .swim-connector-path {
+  opacity: 0.1;
+}
+
+/* Chain nodes stay fully visible with a subtle highlight */
+.swim-lanes.swim-chain-active .swim-box.swim-chain-node {
+  opacity: 1;
+  box-shadow: 0 0 0 2px #e67e22;
+}
+
+/* Chain links stay fully visible and get bolder */
+.swim-lanes.swim-chain-active .swim-connector-path.swim-chain-link {
+  opacity: 0.85;
+  stroke-width: 2.5;
 }
 
 /* ==========================================================================
