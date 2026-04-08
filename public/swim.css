@@ -107,6 +107,11 @@ body:has(.swim-page) {
   overflow-y: visible;
   -webkit-overflow-scrolling: touch;
   padding-bottom: 0.5rem;
+  cursor: grab;
+}
+
+.swim-container:active {
+  cursor: grabbing;
 }
 
 .swim-lanes {

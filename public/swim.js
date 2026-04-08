@@ -1395,6 +1395,42 @@ document.addEventListener('keydown', function(e) {
 });
 
 // =============================================================================
+// Drag-to-scroll
+// =============================================================================
+
+(function initDragScroll() {
+  var container = document.querySelector('.swim-container');
+  if (!container) return;
+
+  var isDragging = false;
+  var startX, scrollLeft;
+
+  container.addEventListener('mousedown', function(e) {
+    // Don't drag when clicking on interactive elements
+    if (e.target.closest('.swim-box, .swim-popover, button, a, input, select, label')) return;
+    isDragging = true;
+    startX = e.pageX - container.offsetLeft;
+    scrollLeft = container.scrollLeft;
+    container.style.cursor = 'grabbing';
+    container.style.userSelect = 'none';
+    e.preventDefault();
+  });
+
+  window.addEventListener('mousemove', function(e) {
+    if (!isDragging) return;
+    var x = e.pageX - container.offsetLeft;
+    container.scrollLeft = scrollLeft - (x - startX);
+  });
+
+  window.addEventListener('mouseup', function() {
+    if (!isDragging) return;
+    isDragging = false;
+    container.style.cursor = '';
+    container.style.userSelect = '';
+  });
+})();
+
+// =============================================================================
 // Init
 // =============================================================================
 
