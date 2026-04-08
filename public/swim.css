@@ -164,13 +164,6 @@ body:has(.swim-page) {
   margin-right: 0;
 }
 
-/* Sequence arrow between boxes */
-.swim-lane-arrow {
-  color: #ccc;
-  font-size: 10px;
-  flex-shrink: 0;
-  user-select: none;
-}
 
 
 /* ==========================================================================
@@ -424,6 +417,14 @@ body:has(.swim-page) {
   opacity: 0.65;
 }
 
+/* Sequential (non-blocking) connectors — grey, subtler */
+.swim-sequential-path {
+  stroke: #bbb;
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+  opacity: 0.4;
+}
+
 /* ==========================================================================
    Chain Highlighting (hover)
    ========================================================================== */
@@ -434,12 +435,8 @@ body:has(.swim-page) {
   transition: opacity 0.15s;
 }
 
-.swim-lanes.swim-chain-active .swim-lane-arrow {
-  opacity: 0.2;
-}
-
 .swim-lanes.swim-chain-active .swim-connector-path {
-  opacity: 0.12;
+  opacity: 0.08;
 }
 
 /* Chain nodes stay fully visible with a subtle highlight */
@@ -452,6 +449,12 @@ body:has(.swim-page) {
 .swim-lanes.swim-chain-active .swim-connector-path.swim-chain-link {
   opacity: 0.85;
   stroke-width: 2.5;
+}
+
+/* Sequential chain links — visible but lighter than blocking */
+.swim-lanes.swim-chain-active .swim-sequential-path.swim-chain-link {
+  opacity: 0.55;
+  stroke-width: 2;
 }
 
 /* ==========================================================================

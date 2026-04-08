@@ -536,6 +536,7 @@ var allIssues = data.issues || [];
 var projectOrder = data.projectOrder || {};
 
 var issueById = new Map(allIssues.map(function(i) { return [i.id, i]; }));
+var currentLanes = []; // Updated by render() for chain walk access
 
 function getSettings() {
   var stored = {};
@@ -631,6 +632,7 @@ function render() {
   });
 
   var lanes = result.lanes;
+  currentLanes = lanes; // Store for chain walk access
 
   // Assign segments and compute global widths
   assignSegments(lanes, { grouping: settings.grouping });
@@ -696,14 +698,7 @@ function render() {
         var prevColItem = null;
         for (var col = 0; col < totalCols; col++) {
           var colItems = itemsByCol[col] || [];
-          // Insert grey arrow for non-blocking sequence; blocking pairs get SVG connector instead
-          if (colItems.length > 0 && prevColItem) {
-            var isBlocking = prevColItem.blocksIds && prevColItem.blocksIds.indexOf(colItems[0].id) !== -1;
-            if (!isBlocking) {
-              html += '<span class="swim-lane-arrow">\u2192</span>';
-            }
-            // blocking pairs: no HTML arrow — SVG connector will be drawn
-          }
+          // No HTML arrows — all connectors (blocking + sequential) drawn as SVG
           html += '<div class="swim-column-slot" data-column="' + col + '" style="min-width:' + slotWidth + 'px">';
           for (var ci = 0; ci < colItems.length; ci++) {
             html += renderBox(colItems[ci], settings, blockedByMap);
@@ -730,22 +725,12 @@ function render() {
             html += renderBox(issue, settings);
             rendered.add(issue.id);
             for (var ci = 0; ci < children.length; ci++) {
-              var childBlocked = issue.blocksIds && issue.blocksIds.indexOf(children[ci].id) !== -1;
-              if (!childBlocked) {
-                html += '<span class="swim-lane-arrow">\u2192</span>';
-              }
               html += renderBox(children[ci], settings);
               rendered.add(children[ci].id);
             }
             html += '</div></div>';
           } else {
-            if (ii > 0 && !rendered.has(issue.id)) {
-              var prevIssue = segItems[ii - 1];
-              var prevBlocks = prevIssue && prevIssue.blocksIds && prevIssue.blocksIds.indexOf(issue.id) !== -1;
-              if (!prevBlocks) {
-                html += '<span class="swim-lane-arrow">\u2192</span>';
-              }
-            }
+            // No HTML arrows — SVG handles all connectors
             html += renderBox(issue, settings);
             rendered.add(issue.id);
           }
@@ -760,13 +745,10 @@ function render() {
 
   container.innerHTML = html;
 
-  // Draw SVG connectors for cross-lane blocking
-  if (useColumns) {
-    // Use requestAnimationFrame to ensure DOM is laid out before measuring
-    requestAnimationFrame(function() {
-      drawBlockingConnectors(lanes, blockedByMap);
-    });
-  }
+  // Draw SVG connectors — always for sequential, plus blocking when enabled
+  requestAnimationFrame(function() {
+    drawBlockingConnectors(lanes, useColumns ? blockedByMap : null);
+  });
 }
 
 // =============================================================================
@@ -777,8 +759,6 @@ function drawBlockingConnectors(lanes, blockedByMap) {
   // Remove any existing SVG
   var existing = document.getElementById('swim-connectors');
   if (existing) existing.remove();
-
-  if (!blockedByMap) return;
 
   var container = document.querySelector('.swim-container');
   var lanesEl = document.getElementById('swim-lanes');
@@ -806,7 +786,7 @@ function drawBlockingConnectors(lanes, blockedByMap) {
   var crossLaneEdges = [];
   var sameLaneAdjacentEdges = [];
   var sameLaneArcEdges = []; // non-adjacent within same lane
-  blockedByMap.forEach(function(blockers, blockedId) {
+  if (blockedByMap) blockedByMap.forEach(function(blockers, blockedId) {
     var blockedLane = itemLaneIndex.get(blockedId);
     var blockedPos = itemPosInLane.get(blockedId);
     for (var i = 0; i < blockers.length; i++) {
@@ -823,7 +803,22 @@ function drawBlockingConnectors(lanes, blockedByMap) {
     }
   });
 
-  var totalEdges = crossLaneEdges.length + sameLaneAdjacentEdges.length + sameLaneArcEdges.length;
+  // Collect sequential (non-blocking) adjacent pairs in each lane
+  var sequentialEdges = [];
+  for (var li = 0; li < lanes.length; li++) {
+    var laneItems = lanes[li].items;
+    for (var ii = 0; ii < laneItems.length - 1; ii++) {
+      var curr = laneItems[ii];
+      var next = laneItems[ii + 1];
+      // Only if NOT already a blocking pair
+      var isBlocking = curr.blocksIds && curr.blocksIds.indexOf(next.id) !== -1;
+      if (!isBlocking) {
+        sequentialEdges.push({ fromId: curr.id, toId: next.id });
+      }
+    }
+  }
+
+  var totalEdges = crossLaneEdges.length + sameLaneAdjacentEdges.length + sameLaneArcEdges.length + sequentialEdges.length;
   if (totalEdges === 0) return;
 
   // Create SVG element
@@ -849,6 +844,23 @@ function drawBlockingConnectors(lanes, blockedByMap) {
   arrowPath.setAttribute('opacity', '0.7');
   marker.appendChild(arrowPath);
   defs.appendChild(marker);
+
+  // Grey arrowhead for sequential connectors
+  var greyMarker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+  greyMarker.setAttribute('id', 'swim-arrow-grey');
+  greyMarker.setAttribute('viewBox', '0 0 8 8');
+  greyMarker.setAttribute('refX', '7');
+  greyMarker.setAttribute('refY', '4');
+  greyMarker.setAttribute('markerWidth', '7');
+  greyMarker.setAttribute('markerHeight', '7');
+  greyMarker.setAttribute('orient', 'auto');
+  var greyArrowPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  greyArrowPath.setAttribute('d', 'M0,1 L7,4 L0,7 Z');
+  greyArrowPath.setAttribute('fill', '#bbb');
+  greyArrowPath.setAttribute('opacity', '0.6');
+  greyMarker.appendChild(greyArrowPath);
+  defs.appendChild(greyMarker);
+
   svg.appendChild(defs);
 
   // Collect all box rects for obstacle avoidance
@@ -1090,6 +1102,31 @@ function drawBlockingConnectors(lanes, blockedByMap) {
     svg.appendChild(arcPath);
   }
 
+  // Draw sequential (non-blocking) adjacent connectors as grey lines
+  for (var sq = 0; sq < sequentialEdges.length; sq++) {
+    var seqFrom = document.querySelector('.swim-box[data-issue-id="' + sequentialEdges[sq].fromId + '"]');
+    var seqTo = document.querySelector('.swim-box[data-issue-id="' + sequentialEdges[sq].toId + '"]');
+    if (!seqFrom || !seqTo) continue;
+
+    var seqFromRect = seqFrom.getBoundingClientRect();
+    var seqToRect = seqTo.getBoundingClientRect();
+
+    var sqx1 = seqFromRect.right - containerRect.left;
+    var sqy1 = seqFromRect.top + seqFromRect.height / 2 - containerRect.top;
+    var sqx2 = seqToRect.left - containerRect.left;
+    var sqy2 = seqToRect.top + seqToRect.height / 2 - containerRect.top;
+
+    var sqd = 'M' + sqx1 + ',' + sqy1 + ' L' + sqx2 + ',' + sqy2;
+
+    var sqPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    sqPath.setAttribute('d', sqd);
+    sqPath.setAttribute('class', 'swim-connector-path swim-sequential-path');
+    sqPath.setAttribute('data-from', sequentialEdges[sq].fromId);
+    sqPath.setAttribute('data-to', sequentialEdges[sq].toId);
+    sqPath.setAttribute('marker-end', 'url(#swim-arrow-grey)');
+    svg.appendChild(sqPath);
+  }
+
   lanesEl.style.position = 'relative';
   lanesEl.appendChild(svg);
 }
@@ -1197,6 +1234,37 @@ function getTransitiveChain(issueId) {
         downQueue.push(blockedId);
       }
     }
+  }
+
+  // Walk sequential predecessors in the same lane
+  // Everything queued before this task is part of its critical path
+  for (var li = 0; li < currentLanes.length; li++) {
+    var laneItems = currentLanes[li].items;
+    var pos = -1;
+    for (var ii = 0; ii < laneItems.length; ii++) {
+      if (laneItems[ii].id === issueId) { pos = ii; break; }
+    }
+    if (pos <= 0) continue;
+    // Add all predecessors in this lane
+    for (var pi = 0; pi < pos; pi++) {
+      var predId = laneItems[pi].id;
+      if (!chain.has(predId)) {
+        chain.add(predId);
+        // Also walk this predecessor's upstream blockers (cross-lane)
+        var predUpQueue = [predId];
+        while (predUpQueue.length > 0) {
+          var pid = predUpQueue.shift();
+          for (var ai = 0; ai < allIssues.length; ai++) {
+            var iss = allIssues[ai];
+            if (iss.blocksIds && iss.blocksIds.indexOf(pid) !== -1 && !chain.has(iss.id)) {
+              chain.add(iss.id);
+              predUpQueue.push(iss.id);
+            }
+          }
+        }
+      }
+    }
+    break; // Found the lane, done
   }
 
   return chain;

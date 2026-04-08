@@ -167,9 +167,9 @@ test.describe('Swim Page with Sample Data', () => {
     expect(laneCount).toBeGreaterThan(1);
   });
 
-  test('has sequence arrows between boxes', async ({ page }) => {
-    const arrows = await page.locator('.swim-lane-arrow').count();
-    expect(arrows).toBeGreaterThan(0);
+  test('has SVG connectors between boxes', async ({ page }) => {
+    const connectors = await page.locator('.swim-connector-path').count();
+    expect(connectors).toBeGreaterThan(0);
   });
 
   test('lanes contain segment containers for global alignment', async ({ page }) => {
