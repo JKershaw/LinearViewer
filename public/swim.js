@@ -1008,13 +1008,18 @@ function drawBlockingConnectors(lanes, blockedByMap) {
     var entryGapY = findClearGapY(entryGapBaseY, entryHorizMin, entryHorizMax);
     usedGapChannels.push({ gapY: entryGapY, xMin: entryHorizMin, xMax: entryHorizMax });
 
-    // Build path: card center → exit gap → horizontal → vertical → entry gap → horizontal → card center
+    // Build path with horizontal stubs so lines always exit/enter cards horizontally
+    var exitStubX = ed.x1 + STUB_LEN;
+    var entryStubX = ed.x2 - STUB_LEN;
+
     var d = 'M' + ed.x1 + ',' + ed.y1 +              // start at blocker right-center
-      ' L' + ed.x1 + ',' + exitGapY +                 // vertical to exit gap
+      ' L' + exitStubX + ',' + ed.y1 +                // horizontal stub out of blocker
+      ' L' + exitStubX + ',' + exitGapY +              // vertical to exit gap
       ' L' + midX + ',' + exitGapY +                   // horizontal in exit gap
       ' L' + midX + ',' + entryGapY +                  // vertical to entry gap
-      ' L' + ed.x2 + ',' + entryGapY +                 // horizontal in entry gap
-      ' L' + ed.x2 + ',' + ed.y2;                      // vertical into target
+      ' L' + entryStubX + ',' + entryGapY +            // horizontal in entry gap
+      ' L' + entryStubX + ',' + ed.y2 +                // vertical into target lane
+      ' L' + ed.x2 + ',' + ed.y2;                      // horizontal stub into target
 
     var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     path.setAttribute('d', d);
