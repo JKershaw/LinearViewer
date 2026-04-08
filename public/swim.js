@@ -835,8 +835,8 @@ function drawBlockingConnectors(lanes, blockedByMap) {
   marker.setAttribute('viewBox', '0 0 8 8');
   marker.setAttribute('refX', '7');
   marker.setAttribute('refY', '4');
-  marker.setAttribute('markerWidth', '8');
-  marker.setAttribute('markerHeight', '8');
+  marker.setAttribute('markerWidth', '5');
+  marker.setAttribute('markerHeight', '5');
   marker.setAttribute('orient', 'auto');
   var arrowPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
   arrowPath.setAttribute('d', 'M0,1 L7,4 L0,7 Z');
