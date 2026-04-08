@@ -874,7 +874,35 @@ function drawBlockingConnectors(lanes, blockedByMap) {
     return null;
   }
 
-  // Pre-compute edge geometries for channel assignment
+  // Compute lane boundary y-coordinates for gap routing
+  var laneEls = document.querySelectorAll('.swim-lane');
+  var laneBounds = []; // {top, bottom, midY}
+  for (var li = 0; li < laneEls.length; li++) {
+    var lr = laneEls[li].getBoundingClientRect();
+    laneBounds.push({
+      top: lr.top - containerRect.top,
+      bottom: lr.bottom - containerRect.top,
+      midY: lr.top + lr.height / 2 - containerRect.top
+    });
+  }
+
+  // Find the y-coordinate in the gap between two lanes (or above/below edge lanes)
+  function laneGapY(laneIdx, direction) {
+    // direction: 'above' = gap above this lane, 'below' = gap below
+    if (direction === 'above') {
+      if (laneIdx > 0) {
+        return (laneBounds[laneIdx - 1].bottom + laneBounds[laneIdx].top) / 2;
+      }
+      return laneBounds[laneIdx].top - 4;
+    } else {
+      if (laneIdx < laneBounds.length - 1) {
+        return (laneBounds[laneIdx].bottom + laneBounds[laneIdx + 1].top) / 2;
+      }
+      return laneBounds[laneIdx].bottom + 4;
+    }
+  }
+
+  // Pre-compute edge geometries
   var STUB_LEN = 12;
   var CHANNEL_SPACING = 6;
   var BOX_PADDING = 4;
@@ -887,36 +915,54 @@ function drawBlockingConnectors(lanes, blockedByMap) {
 
     var fromRect = fromEl.getBoundingClientRect();
     var toRect = toEl.getBoundingClientRect();
+    var fromLane = itemLaneIndex.get(crossLaneEdges[e].fromId);
+    var toLane = itemLaneIndex.get(crossLaneEdges[e].toId);
 
     edgeData.push({
       x1: fromRect.right - containerRect.left,
       y1: fromRect.top + fromRect.height / 2 - containerRect.top,
       x2: toRect.left - containerRect.left,
       y2: toRect.top + toRect.height / 2 - containerRect.top,
-      fromEl: fromEl,
-      toEl: toEl
+      fromLane: fromLane,
+      toLane: toLane
     });
   }
 
-  // Sort edges by their blocker's x position so we assign channels consistently
-  edgeData.sort(function(a, b) { return a.x1 - b.x1 || a.y1 - b.y1; });
+  // Sort edges by blocker x, then by vertical span (smaller spans first)
+  edgeData.sort(function(a, b) { return a.x1 - b.x1 || Math.abs(a.y1 - a.y2) - Math.abs(b.y1 - b.y2); });
+
+  // Track used horizontal channels in lane gaps to prevent overlap
+  var usedGapChannels = []; // {gapY, xMin, xMax}
+
+  function findClearGapY(baseGapY, xMin, xMax) {
+    var y = baseGapY;
+    for (var attempt = 0; attempt < 10; attempt++) {
+      var conflict = false;
+      for (var ci = 0; ci < usedGapChannels.length; ci++) {
+        var ch = usedGapChannels[ci];
+        if (Math.abs(y - ch.gapY) < CHANNEL_SPACING &&
+            ch.xMax > xMin && ch.xMin < xMax) {
+          conflict = true;
+          y = ch.gapY + CHANNEL_SPACING;
+          break;
+        }
+      }
+      if (!conflict) return y;
+    }
+    return y;
+  }
 
   // Track used vertical channels to prevent overlap
   var usedChannels = []; // {x, yMin, yMax}
 
-  function findClearChannel(startX, yMin, yMax) {
+  function findClearVertChannel(startX, yMin, yMax) {
     var x = startX;
-    var maxAttempts = 30;
-    for (var attempt = 0; attempt < maxAttempts; attempt++) {
-      // Check for box intersections
+    for (var attempt = 0; attempt < 30; attempt++) {
       var hit = hitsBox(x, yMin, yMax, BOX_PADDING);
       if (hit) {
-        // Jump past the box
         x = hit.right + BOX_PADDING + 2;
         continue;
       }
-
-      // Check for channel overlap with existing connectors
       var channelConflict = false;
       for (var ci = 0; ci < usedChannels.length; ci++) {
         var ch = usedChannels[ci];
@@ -927,38 +973,48 @@ function drawBlockingConnectors(lanes, blockedByMap) {
           break;
         }
       }
-      if (channelConflict) continue;
-
-      // Found a clear channel
-      return x;
+      if (!channelConflict) return x;
     }
-    return x; // fallback
+    return x;
   }
 
-  // Draw each edge with obstacle-avoiding routing
+  // Draw each edge: route through lane gaps so horizontals never cross cards
   for (var e = 0; e < edgeData.length; e++) {
     var ed = edgeData[e];
-    var yMin = Math.min(ed.y1, ed.y2);
-    var yMax = Math.max(ed.y1, ed.y2);
+    var goingDown = ed.toLane > ed.fromLane;
 
-    // Start the vertical segment just after the blocker
-    var candidateX = ed.x1 + STUB_LEN;
+    // Exit gap: gap between blocker's lane and the next lane toward target
+    var exitGapBaseY = laneGapY(ed.fromLane, goingDown ? 'below' : 'above');
+    // Entry gap: gap between target's lane and the lane toward blocker
+    var entryGapBaseY = laneGapY(ed.toLane, goingDown ? 'above' : 'below');
 
-    // Find a clear vertical channel
-    var midX = findClearChannel(candidateX, yMin, yMax);
-
-    // Don't route past the target — cap at target x minus a small margin
+    // Find the vertical channel x (avoiding boxes)
+    var yMin = Math.min(exitGapBaseY, entryGapBaseY);
+    var yMax = Math.max(exitGapBaseY, entryGapBaseY);
+    var midX = findClearVertChannel(ed.x1 + STUB_LEN, yMin, yMax);
     if (midX > ed.x2 - STUB_LEN) {
       midX = ed.x2 - STUB_LEN;
     }
-
-    // Register this channel as used
     usedChannels.push({ x: midX, yMin: yMin, yMax: yMax });
 
-    var d = 'M' + ed.x1 + ',' + ed.y1 +
-      ' L' + midX + ',' + ed.y1 +
-      ' L' + midX + ',' + ed.y2 +
-      ' L' + ed.x2 + ',' + ed.y2;
+    // Find clear horizontal gap channels (avoid overlapping parallel lines)
+    var exitHorizMin = Math.min(ed.x1, midX);
+    var exitHorizMax = Math.max(ed.x1, midX);
+    var exitGapY = findClearGapY(exitGapBaseY, exitHorizMin, exitHorizMax);
+    usedGapChannels.push({ gapY: exitGapY, xMin: exitHorizMin, xMax: exitHorizMax });
+
+    var entryHorizMin = Math.min(midX, ed.x2);
+    var entryHorizMax = Math.max(midX, ed.x2);
+    var entryGapY = findClearGapY(entryGapBaseY, entryHorizMin, entryHorizMax);
+    usedGapChannels.push({ gapY: entryGapY, xMin: entryHorizMin, xMax: entryHorizMax });
+
+    // Build path: card center → exit gap → horizontal → vertical → entry gap → horizontal → card center
+    var d = 'M' + ed.x1 + ',' + ed.y1 +              // start at blocker right-center
+      ' L' + ed.x1 + ',' + exitGapY +                 // vertical to exit gap
+      ' L' + midX + ',' + exitGapY +                   // horizontal in exit gap
+      ' L' + midX + ',' + entryGapY +                  // vertical to entry gap
+      ' L' + ed.x2 + ',' + entryGapY +                 // horizontal in entry gap
+      ' L' + ed.x2 + ',' + ed.y2;                      // vertical into target
 
     var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     path.setAttribute('d', d);

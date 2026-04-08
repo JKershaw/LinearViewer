@@ -198,4 +198,43 @@ test.describe('Swim Blocking Screenshots', () => {
       fullPage: true
     });
   });
+
+  // =========================================================================
+  // Dense layout — stress test for connector routing around cards
+  // =========================================================================
+
+  test('11 - dense: max lanes 2, project grouping, blockers ON', async ({ page }) => {
+    // Force all 4 projects into 2 lanes — makes lanes very dense
+    await page.locator('.swim-settings-toggle').click();
+    await page.locator('#swim-grouping').selectOption('project');
+    await page.locator('#swim-max-lanes').fill('2');
+    await page.locator('#swim-max-lanes').dispatchEvent('input');
+    const showBlockers = page.locator('#swim-show-blockers');
+    if (await showBlockers.count() > 0) {
+      await showBlockers.check();
+    }
+    await page.screenshot({
+      path: `${SCREENSHOT_DIR}/11-dense-max-lanes-2.png`,
+      fullPage: true
+    });
+  });
+
+  test('12 - dense: assignee grouping, compact, blockers ON (wide)', async ({ page }) => {
+    // Wider viewport to show more columns; compact boxes pack more densely
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await page.goto(SWIM_URL);
+    await page.waitForLoadState('networkidle');
+    await page.locator('.swim-settings-toggle').click();
+    await page.locator('#swim-grouping').selectOption('assignee');
+    await page.locator('#swim-compact').check();
+    const showBlockers = page.locator('#swim-show-blockers');
+    if (await showBlockers.count() > 0) {
+      await showBlockers.check();
+    }
+    await page.locator('#swim-show-completed').check();
+    await page.screenshot({
+      path: `${SCREENSHOT_DIR}/12-dense-assignee-compact-wide.png`,
+      fullPage: true
+    });
+  });
 });
