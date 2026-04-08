@@ -1203,6 +1203,9 @@ function getTransitiveChain(issueId) {
 }
 
 function highlightChain(issueId) {
+  // Always clear previous highlight first to prevent stale state
+  clearChainHighlight();
+
   var chain = getTransitiveChain(issueId);
   var lanesEl = document.getElementById('swim-lanes');
   if (!lanesEl) return;
@@ -1295,18 +1298,18 @@ document.getElementById('swim-lanes').addEventListener('click', function(e) {
 });
 
 // Box hover → chain highlighting
+var currentHighlightId = null;
 document.getElementById('swim-lanes').addEventListener('mouseover', function(e) {
   var box = e.target.closest('.swim-box');
   if (box) {
-    highlightChain(box.getAttribute('data-issue-id'));
-  }
-});
-document.getElementById('swim-lanes').addEventListener('mouseout', function(e) {
-  var box = e.target.closest('.swim-box');
-  if (box) {
-    // Only clear if we're not entering another box
-    var related = e.relatedTarget ? e.relatedTarget.closest('.swim-box') : null;
-    if (!related) {
+    var id = box.getAttribute('data-issue-id');
+    if (id !== currentHighlightId) {
+      currentHighlightId = id;
+      highlightChain(id);
+    }
+  } else {
+    if (currentHighlightId) {
+      currentHighlightId = null;
       clearChainHighlight();
     }
   }

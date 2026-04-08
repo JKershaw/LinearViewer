@@ -430,16 +430,16 @@ body:has(.swim-page) {
 
 /* When chain is active, dim everything that isn't in the chain */
 .swim-lanes.swim-chain-active .swim-box {
-  opacity: 0.25;
+  opacity: 0.35;
   transition: opacity 0.15s;
 }
 
 .swim-lanes.swim-chain-active .swim-lane-arrow {
-  opacity: 0.15;
+  opacity: 0.2;
 }
 
 .swim-lanes.swim-chain-active .swim-connector-path {
-  opacity: 0.1;
+  opacity: 0.12;
 }
 
 /* Chain nodes stay fully visible with a subtle highlight */
