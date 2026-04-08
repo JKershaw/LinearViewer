@@ -159,7 +159,7 @@ body:has(.swim-page) {
   flex-shrink: 0;
   flex-wrap: nowrap;
   padding-right: 1.5rem;
-  border-right: 1px solid #eee;
+  border-right: none;
   margin-right: 0.5rem;
 }
 
