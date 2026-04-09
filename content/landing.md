@@ -58,23 +58,22 @@ title: Linear Projects Viewer
   @priority: 2
   @completedAt: 2025-12-15T16:00:00.000Z
 
-# AI Integration
-> Get smart recommendations for your tasks
+# AI Prompts
+> A suggested next action for any task, on demand
 
-- ○ Task-specific prompts
-  Click any task to see AI-generated prompts tailored to your workflow
+- ○ Get a prompt for any task
+  Click a task to generate a focused prompt based on its title, description, parent, and siblings—ready to paste into your AI assistant
   @identifier: LV-7
   @priority: 2
-  @blocks: project-2-issue-2
-- ○ Connect OpenRouter
-  Link your OpenRouter account for personalized AI suggestions
+- ○ Bring your own API key
+  Connect your OpenRouter account. LinearViewer never stores your task data between sessions.
   @identifier: LV-8
   @priority: 1
-  @blocks: project-2-issue-0
+  @blocks: project-3-issue-0
   @url: https://openrouter.ai
   @linkText: Get an OpenRouter account →
-- ○ How it works
-  The AI analyzes your task context—parent issues, siblings, project goals—and recommends the best next action
+- ○ Or try it free
+  No account needed to start—a few prompts a day are on the house
   @identifier: LV-9
   @priority: 3
 
@@ -86,7 +85,7 @@ title: Linear Projects Viewer
   Node.js + a Linear OAuth app, that's it
   @identifier: LV-10
   @priority: 2
-  @blocks: project-3-issue-1
+  @blocks: project-4-issue-1
 - ○ AI-assisted setup
   Copy this prompt into your preferred AI assistant:
   ---

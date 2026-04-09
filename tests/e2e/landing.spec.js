@@ -48,7 +48,7 @@ test.describe('Landing Page', () => {
     await expect(page.locator('.project-header:has-text("Login")')).toBeVisible();
     await expect(page.locator('.project-header:has-text("Views")')).toBeVisible();
     await expect(page.locator('.project-header:has-text("What This Is")')).toBeVisible();
-    await expect(page.locator('.project-header:has-text("AI Integration")')).toBeVisible();
+    await expect(page.locator('.project-header:has-text("AI Prompts")')).toBeVisible();
     await expect(page.locator('.project-header:has-text("Self-Host")')).toBeVisible();
     await expect(page.locator('.project-header:has-text("Use Cases")')).toBeVisible();
     await expect(page.locator('.project-header:has-text("Source")')).toBeVisible();
