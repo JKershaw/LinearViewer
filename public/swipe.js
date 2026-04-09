@@ -707,6 +707,12 @@ async function loadComments(container) {
 // ==========================================================================
 
 function renderPromptButtons() {
+  // Prompt buttons require API access — not available for unauthenticated users
+  if (!urlKey) {
+    promptButtons.innerHTML = '';
+    return;
+  }
+
   const issue = filteredIssues[currentIndex];
   if (!issue) {
     promptButtons.innerHTML = '';

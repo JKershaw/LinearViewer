@@ -533,6 +533,28 @@ app.get('/', (req, res) => {
   res.send(html)
 })
 
+/**
+ * Landing swipe page - unauthenticated preview of the swipe view.
+ *
+ * Renders the swipe view with static landing page data so visitors can
+ * explore the UI before signing in.
+ *
+ * For authenticated users: Redirects to their workspace swipe page.
+ */
+app.get('/swipe', (req, res) => {
+  const workspace = req.session.workspaces?.[0]
+
+  if (workspace) {
+    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/swipe`)
+  }
+
+  const html = renderSwipePage(
+    { projectTrees: landingTrees, inProgressTrees: [], recentActivityTrees: [] },
+    { isLanding: true, deployInfo: getDeployInfo() }
+  )
+  res.send(html)
+})
+
 // =============================================================================
 // Legal Pages (public, no auth required)
 // =============================================================================
