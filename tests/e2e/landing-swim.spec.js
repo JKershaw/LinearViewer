@@ -49,9 +49,14 @@ test.describe('Landing Swim Page (/swim)', () => {
     expect(options).toContain('By status');
   });
 
-  test('footer is visible without action links', async ({ page }) => {
+  test('footer shows cross-view navigation links', async ({ page }) => {
     await expect(page.locator('.page-footer')).toBeVisible();
-    await expect(page.locator('.footer-actions')).not.toBeVisible();
+    await expect(page.locator('.footer-actions')).toBeVisible();
+    // swim is current page — shown in bold, not a link
+    await expect(page.locator('.footer-actions strong.footer-current')).toHaveText('swim');
+    // projects and swipe are links
+    await expect(page.locator('.footer-actions a[href="/"]')).toBeVisible();
+    await expect(page.locator('.footer-actions a[href="/swipe"]')).toBeVisible();
   });
 
   test('popover appears when clicking a swim box', async ({ page }) => {
