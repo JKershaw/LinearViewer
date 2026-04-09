@@ -558,6 +558,28 @@ app.get('/swipe/:identifier?', (req, res) => {
   res.send(html)
 })
 
+/**
+ * Landing swim page - unauthenticated preview of the swim lanes view.
+ *
+ * Renders the swim view with static landing page data so visitors can
+ * explore the UI before signing in.
+ *
+ * For authenticated users: Redirects to their workspace swim page.
+ */
+app.get('/swim', (req, res) => {
+  const workspace = req.session.workspaces?.[0]
+
+  if (workspace) {
+    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/swim`)
+  }
+
+  const html = renderSwimPage(
+    { projectTrees: landingTrees, inProgressTrees: [], recentActivityTrees: [] },
+    { isLanding: true, deployInfo: getDeployInfo() }
+  )
+  res.send(html)
+})
+
 // =============================================================================
 // Legal Pages (public, no auth required)
 // =============================================================================
