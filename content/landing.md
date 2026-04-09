@@ -13,6 +13,22 @@ title: Linear Projects Viewer
   @linkText: Login with Linear →
   @sameTab: true
 
+# Views
+> Three ways to explore your Linear issues
+
+- ◐ Projects tree
+  Collapsible hierarchy of all your projects and issues. You're looking at it now.
+  @identifier: LV-20
+  @priority: 2
+- ○ Swipe
+  Review issues one at a time. Focus on a single task without distraction.
+  @identifier: LV-21
+  @priority: 2
+- ○ Swim lanes
+  Visualize work as parallel tracks. See dependencies and sequence at a glance.
+  @identifier: LV-22
+  @priority: 2
+
 # What This Is
 > Linear is powerful but busy. This gives you just the tree.
 
