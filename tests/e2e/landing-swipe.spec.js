@@ -98,12 +98,41 @@ test.describe('Landing Swipe Page (/swipe)', () => {
     expect(found).toBe(true);
   });
 
+  test('URL updates to /swipe/:identifier as cards are navigated', async ({ page }) => {
+    // First card: URL should include its identifier
+    const firstIdentifier = await page.locator('.swipe-card-identifier').textContent();
+    expect(page.url()).toContain(`/swipe/${firstIdentifier}`);
+    expect(page.url()).not.toContain('workspace');
+
+    // Navigate to next card: URL should update to new identifier
+    await page.locator('.swipe-arrow-right').click();
+    const secondIdentifier = await page.locator('.swipe-card-identifier').textContent();
+    expect(page.url()).toContain(`/swipe/${secondIdentifier}`);
+    expect(secondIdentifier).not.toBe(firstIdentifier);
+  });
+
+  test('deep-link URL /swipe/:identifier loads specific card', async ({ page }) => {
+    // Navigate directly to a specific landing issue
+    await page.goto('/swipe/LV-8');
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('.swipe-card-identifier')).toHaveText('LV-8');
+    expect(page.url()).toContain('/swipe/LV-8');
+  });
+
+  test('authenticated users visiting /swipe/:identifier are redirected to workspace swipe', async ({ page }) => {
+    await page.goto('/test/set-session');
+    await page.goto('/swipe/LV-8');
+
+    // Server redirects to workspace swipe (identifier passed through,
+    // but client JS may update URL once it resolves against workspace data)
+    await expect(page).toHaveURL(/\/workspace\/.+\/swipe/);
+  });
+
   test('authenticated users are redirected to workspace swipe', async ({ page }) => {
-    // Set up an authenticated session
     await page.goto('/test/set-session');
     await page.goto('/swipe');
 
-    // Should redirect to the workspace swipe
     await expect(page).toHaveURL(/\/workspace\/.+\/swipe/);
   });
 });

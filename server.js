@@ -541,14 +541,39 @@ app.get('/', (req, res) => {
  *
  * For authenticated users: Redirects to their workspace swipe page.
  */
-app.get('/swipe', (req, res) => {
+app.get('/swipe/:identifier?', (req, res) => {
   const workspace = req.session.workspaces?.[0]
 
   if (workspace) {
-    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/swipe`)
+    const dest = req.params.identifier
+      ? `/workspace/${encodeURIComponent(workspace.urlKey)}/swipe/${encodeURIComponent(req.params.identifier)}`
+      : `/workspace/${encodeURIComponent(workspace.urlKey)}/swipe`
+    return res.redirect(dest)
   }
 
   const html = renderSwipePage(
+    { projectTrees: landingTrees, inProgressTrees: [], recentActivityTrees: [] },
+    { isLanding: true, deployInfo: getDeployInfo(), initialIdentifier: req.params.identifier || null }
+  )
+  res.send(html)
+})
+
+/**
+ * Landing swim page - unauthenticated preview of the swim lanes view.
+ *
+ * Renders the swim view with static landing page data so visitors can
+ * explore the UI before signing in.
+ *
+ * For authenticated users: Redirects to their workspace swim page.
+ */
+app.get('/swim', (req, res) => {
+  const workspace = req.session.workspaces?.[0]
+
+  if (workspace) {
+    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/swim`)
+  }
+
+  const html = renderSwimPage(
     { projectTrees: landingTrees, inProgressTrees: [], recentActivityTrees: [] },
     { isLanding: true, deployInfo: getDeployInfo() }
   )
