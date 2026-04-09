@@ -71,9 +71,14 @@ test.describe('Landing Swipe Page (/swipe)', () => {
     await expect(page.locator('.swipe-prompt-btn')).toHaveCount(0);
   });
 
-  test('footer is visible without action links', async ({ page }) => {
+  test('footer shows cross-view navigation links', async ({ page }) => {
     await expect(page.locator('.page-footer')).toBeVisible();
-    await expect(page.locator('.footer-actions')).not.toBeVisible();
+    await expect(page.locator('.footer-actions')).toBeVisible();
+    // swipe is current page — shown in bold, not a link
+    await expect(page.locator('.footer-actions strong.footer-current')).toHaveText('swipe');
+    // projects and swim are links
+    await expect(page.locator('.footer-actions a[href="/"]')).toBeVisible();
+    await expect(page.locator('.footer-actions a[href="/swim"]')).toBeVisible();
   });
 
   test('description accordion works when issue has description', async ({ page }) => {

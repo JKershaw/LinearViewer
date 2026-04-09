@@ -22,14 +22,17 @@ test.describe('Landing Page', () => {
     await expect(page.locator('header .reset-view')).not.toBeVisible();
   });
 
-  test('shows footer with GitHub link on landing page', async ({ page }) => {
+  test('shows footer with cross-view navigation and GitHub link', async ({ page }) => {
     await page.goto('/');
 
     // Footer should be visible
     await expect(page.locator('.page-footer')).toBeVisible();
 
-    // Should NOT have reset/audit actions (landing page is unauthenticated)
-    await expect(page.locator('.footer-actions')).not.toBeVisible();
+    // projects is current page — shown in bold, not a link
+    await expect(page.locator('.footer-actions strong.footer-current')).toHaveText('projects');
+    // swipe and swim are links
+    await expect(page.locator('.footer-actions a[href="/swipe"]')).toBeVisible();
+    await expect(page.locator('.footer-actions a[href="/swim"]')).toBeVisible();
 
     // Should show GitHub link (fallback when no Heroku deploy info in test mode)
     const footerLink = page.locator('.footer-link');
