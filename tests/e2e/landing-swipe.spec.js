@@ -32,10 +32,10 @@ test.describe('Landing Swipe Page (/swipe)', () => {
   });
 
   test('shows correct card count from landing data', async ({ page }) => {
-    // landing.md has 19 issues; 4 are completed, so the default "All" filter
-    // shows 15 non-completed issues
+    // landing.md has 22 issues; 4 are completed, so the default "All" filter
+    // shows 18 non-completed issues
     const positionText = await page.locator('.swipe-card-position').textContent();
-    expect(positionText).toMatch(/\/\s*15$/);
+    expect(positionText).toMatch(/\/\s*18$/);
   });
 
   test('left arrow is disabled on first card', async ({ page }) => {

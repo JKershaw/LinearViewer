@@ -43,11 +43,12 @@ test.describe('Landing Page', () => {
   test('displays static project preview from landing.md', async ({ page }) => {
     await page.goto('/');
 
-    // landing.md defines 6 projects: Login, What This Is, AI Integration, Self-Host, Use Cases, Source
-    await expect(page.locator('.project-header')).toHaveCount(6);
+    // landing.md defines 7 projects: Login, Views, What This Is, AI Integration, Self-Host, Use Cases, Source
+    await expect(page.locator('.project-header')).toHaveCount(7);
     await expect(page.locator('.project-header:has-text("Login")')).toBeVisible();
+    await expect(page.locator('.project-header:has-text("Views")')).toBeVisible();
     await expect(page.locator('.project-header:has-text("What This Is")')).toBeVisible();
-    await expect(page.locator('.project-header:has-text("AI Integration")')).toBeVisible();
+    await expect(page.locator('.project-header:has-text("AI Prompts")')).toBeVisible();
     await expect(page.locator('.project-header:has-text("Self-Host")')).toBeVisible();
     await expect(page.locator('.project-header:has-text("Use Cases")')).toBeVisible();
     await expect(page.locator('.project-header:has-text("Source")')).toBeVisible();
@@ -58,14 +59,14 @@ test.describe('Landing Page', () => {
 
     // State counts from landing.md content:
     // - 4 done (✓): Collapsible tree view, Always fresh, Auto-logout, Works everywhere
-    // - 1 in-progress (◐): Connect with Linear
-    // - 14 todo (○): You're looking at it, Task-specific prompts, Connect OpenRouter, How it works,
-    //                Run it yourself, AI-assisted setup, Customize it,
+    // - 2 in-progress (◐): Connect with Linear, Projects tree
+    // - 16 todo (○): You're looking at it, Swipe, Swim lanes, Task-specific prompts, Connect OpenRouter,
+    //                How it works, Run it yourself, AI-assisted setup, Customize it,
     //                Daily standups, Project reviews, Status overviews,
     //                What is Linear, View on GitHub, Bugs & feature requests, Built by John Kershaw
     await expect(page.locator('.state.done')).toHaveCount(4);
-    await expect(page.locator('.state.in-progress')).toHaveCount(1);
-    await expect(page.locator('.state.todo')).toHaveCount(14);
+    await expect(page.locator('.state.in-progress')).toHaveCount(2);
+    await expect(page.locator('.state.todo')).toHaveCount(16);
   });
 
   test('does not show logout link on landing page', async ({ page }) => {

@@ -606,7 +606,7 @@ test.describe('AI Recommendations', () => {
     let resolveDelay;
     const delayPromise = new Promise(resolve => { resolveDelay = resolve; });
 
-    await page.route(`**/api/recommend/${BLOCKED_ISSUE_ID}`, async (route) => {
+    await page.route(`**/api/recommend/${BLOCKED_ISSUE_ID}/stream`, async (route) => {
       // Wait for our signal before continuing with the request
       await delayPromise;
       await route.continue();
@@ -631,8 +631,8 @@ test.describe('AI Recommendations', () => {
 
     // Toggle button should be hidden during loading (LIN-111 fix)
     await expect(toggleBtn).toBeHidden();
-    // Reasoning should show loading text
-    await expect(reasoning).toContainText('Analyzing');
+    // Reasoning element is hidden during loading (SSE streams into it once response arrives)
+    await expect(reasoning).toBeHidden();
 
     // Now release the API request to complete
     resolveDelay();
