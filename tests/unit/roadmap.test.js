@@ -49,8 +49,13 @@ function createIssue(overrides = {}) {
   };
 }
 
+// Fixed reference date for deterministic week-boundary calculations.
+// Must be a Friday so daysAgo(2..4) and daysAgo(16..18) each fall within
+// a single ISO week with no Monday boundary crossing.
+const FIXED_NOW = new Date('2024-01-12T12:00:00Z'); // Friday, Jan 12 2024
+
 function daysAgo(n) {
-  const d = new Date();
+  const d = new Date(FIXED_NOW);
   d.setDate(d.getDate() - n);
   return d.toISOString();
 }
@@ -80,7 +85,7 @@ describe('calculateVelocity', () => {
         state: { name: 'Done', type: 'completed' }
       })
     ];
-    const result = calculateVelocity(issues, 30);
+    const result = calculateVelocity(issues, 30, FIXED_NOW);
     assert.ok(result.tasksPerWeek > 0, 'should have non-zero tasks per week');
     assert.ok(result.pointsPerWeek > 0, 'should have non-zero points per week');
   });
@@ -103,7 +108,7 @@ describe('calculateVelocity', () => {
         state: { name: 'Done', type: 'completed' }
       })
     ];
-    const result = calculateVelocity(issues, 30);
+    const result = calculateVelocity(issues, 30, FIXED_NOW);
     // 3 tasks across ~3 weeks → ~1 task/week
     assert.ok(result.tasksPerWeek > 0);
     assert.ok(result.weeklyData.length > 0, 'should have weekly data entries');
@@ -122,8 +127,8 @@ describe('calculateVelocity', () => {
         state: { name: 'Done', type: 'completed' }
       })
     ];
-    const result14 = calculateVelocity(issues, 14);
-    const result90 = calculateVelocity(issues, 90);
+    const result14 = calculateVelocity(issues, 14, FIXED_NOW);
+    const result90 = calculateVelocity(issues, 90, FIXED_NOW);
     // 14-day window should only include the recent issue
     assert.ok(result90.pointsPerWeek !== result14.pointsPerWeek || result90.tasksPerWeek !== result14.tasksPerWeek,
       'different windows should produce different results');
@@ -145,7 +150,7 @@ describe('calculateVelocity', () => {
         state: { name: 'Todo', type: 'unstarted' }
       })
     ];
-    const result = calculateVelocity(issues, 30);
+    const result = calculateVelocity(issues, 30, FIXED_NOW);
     // Only one completed issue with 2 points
     assert.ok(result.tasksPerWeek > 0);
     // Points should reflect only the completed issue's estimate
@@ -165,7 +170,7 @@ describe('calculateVelocity', () => {
         state: { name: 'Done', type: 'completed' }
       })
     ];
-    const result = calculateVelocity(issues, 30);
+    const result = calculateVelocity(issues, 30, FIXED_NOW);
     // 2 tasks but only 5 points total
     assert.ok(result.tasksPerWeek > 0);
     assert.ok(result.pointsPerWeek > 0);
@@ -181,7 +186,7 @@ describe('calculateVelocity', () => {
       // Earlier week: 1 task
       createIssue({ completedAt: daysAgo(16), state: { name: 'Done', type: 'completed' } }),
     ];
-    const result = calculateVelocity(issues, 30);
+    const result = calculateVelocity(issues, 30, FIXED_NOW);
     assert.strictEqual(result.trend, 'increasing');
   });
 
@@ -195,7 +200,7 @@ describe('calculateVelocity', () => {
       createIssue({ completedAt: daysAgo(17), state: { name: 'Done', type: 'completed' } }),
       createIssue({ completedAt: daysAgo(18), state: { name: 'Done', type: 'completed' } }),
     ];
-    const result = calculateVelocity(issues, 30);
+    const result = calculateVelocity(issues, 30, FIXED_NOW);
     assert.strictEqual(result.trend, 'decreasing');
   });
 
@@ -207,7 +212,7 @@ describe('calculateVelocity', () => {
       createIssue({ completedAt: daysAgo(17), state: { name: 'Done', type: 'completed' } }),
       createIssue({ completedAt: daysAgo(24), state: { name: 'Done', type: 'completed' } }),
     ];
-    const result = calculateVelocity(issues, 30);
+    const result = calculateVelocity(issues, 30, FIXED_NOW);
     assert.strictEqual(result.trend, 'stable');
   });
 
@@ -219,8 +224,8 @@ describe('calculateVelocity', () => {
         state: { name: 'Done', type: 'completed' }
       })
     ];
-    const result7 = calculateVelocity(issues, 7);
-    const result14 = calculateVelocity(issues, 14);
+    const result7 = calculateVelocity(issues, 7, FIXED_NOW);
+    const result14 = calculateVelocity(issues, 14, FIXED_NOW);
     // 7-day window should miss it; 14-day window should include it
     assert.strictEqual(result7.tasksPerWeek, 0);
     assert.ok(result14.tasksPerWeek > 0);
@@ -989,7 +994,7 @@ describe('calculateVelocity leaf-only', () => {
       parent: { id: 'parent-v' },
       state: { name: 'Done', type: 'completed' }
     });
-    const result = calculateVelocity([parent, child1, child2], 30);
+    const result = calculateVelocity([parent, child1, child2], 30, FIXED_NOW);
     // Should count 2 children, not 3 (parent excluded)
     const totalTasks = result.weeklyData.reduce((s, w) => s + w.tasks, 0);
     assert.strictEqual(totalTasks, 2);
@@ -1001,7 +1006,7 @@ describe('calculateVelocity leaf-only', () => {
       completedAt: daysAgo(3),
       state: { name: 'Done', type: 'completed' }
     });
-    const result = calculateVelocity([solo], 30);
+    const result = calculateVelocity([solo], 30, FIXED_NOW);
     const totalTasks = result.weeklyData.reduce((s, w) => s + w.tasks, 0);
     assert.strictEqual(totalTasks, 1);
   });
