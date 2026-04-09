@@ -353,8 +353,9 @@ function renderCard(direction) {
     </div>`;
   }
 
-  // Comments accordion (lazy loaded)
-  accordionHtml += `
+  // Comments accordion (lazy loaded) — only available when authenticated
+  if (urlKey) {
+    accordionHtml += `
   <div class="swipe-card-accordion">
     <div class="swipe-accordion-header" data-accordion="comments">
       <span class="swipe-accordion-toggle">\u25B6</span> Comments
@@ -363,6 +364,7 @@ function renderCard(direction) {
       <div class="swipe-comments-loading">Loading comments...</div>
     </div>
   </div>`;
+  }
 
   // Linear link
   const linkHtml = issue.url
