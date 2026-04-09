@@ -127,10 +127,12 @@ function formatRelativeTime(dateStr) {
 // URL Deep-Linking
 // ==========================================================================
 
+// Base path for swipe URLs — workspace-prefixed when authenticated, root when landing
+const swipeBase = urlKey ? `/workspace/${encodeURIComponent(urlKey)}/swipe` : '/swipe';
+
 function updateUrl() {
   const issue = filteredIssues[currentIndex];
-  const base = `/workspace/${encodeURIComponent(urlKey)}/swipe`;
-  const path = issue && issue.identifier ? `${base}/${encodeURIComponent(issue.identifier)}` : base;
+  const path = issue && issue.identifier ? `${swipeBase}/${encodeURIComponent(issue.identifier)}` : swipeBase;
   history.replaceState(null, '', path + window.location.search);
 }
 
@@ -282,7 +284,7 @@ function renderCard(direction) {
     const names = blocksTargets.map(i => {
       const display = _esc(i.identifier || i.title);
       if (i.identifier) {
-        return `<a href="/workspace/${encodeURIComponent(urlKey)}/swipe/${encodeURIComponent(i.identifier)}" class="swipe-blocking-issue" data-navigate-identifier="${_esc(i.identifier)}" title="${_esc(i.title)}">${display}</a>`;
+        return `<a href="${swipeBase}/${encodeURIComponent(i.identifier)}" class="swipe-blocking-issue" data-navigate-identifier="${_esc(i.identifier)}" title="${_esc(i.title)}">${display}</a>`;
       }
       return `<span class="swipe-blocking-issue">${display}</span>`;
     }).join(', ');
@@ -296,7 +298,7 @@ function renderCard(direction) {
     const names = blockedBySources.map(i => {
       const display = _esc(i.identifier || i.title);
       if (i.identifier) {
-        return `<a href="/workspace/${encodeURIComponent(urlKey)}/swipe/${encodeURIComponent(i.identifier)}" class="swipe-blocking-issue" data-navigate-identifier="${_esc(i.identifier)}" title="${_esc(i.title)}">${display}</a>`;
+        return `<a href="${swipeBase}/${encodeURIComponent(i.identifier)}" class="swipe-blocking-issue" data-navigate-identifier="${_esc(i.identifier)}" title="${_esc(i.title)}">${display}</a>`;
       }
       return `<span class="swipe-blocking-issue">${display}</span>`;
     }).join(', ');
@@ -313,7 +315,7 @@ function renderCard(direction) {
     const display = _esc(p.identifier || p.title);
     let nameHtml;
     if (p.identifier) {
-      nameHtml = `<a href="/workspace/${encodeURIComponent(urlKey)}/swipe/${encodeURIComponent(p.identifier)}" class="swipe-relation-issue swipe-relation-${stateCls}" data-navigate-identifier="${_esc(p.identifier)}" title="${_esc(p.title)}">${display}</a>`;
+      nameHtml = `<a href="${swipeBase}/${encodeURIComponent(p.identifier)}" class="swipe-relation-issue swipe-relation-${stateCls}" data-navigate-identifier="${_esc(p.identifier)}" title="${_esc(p.title)}">${display}</a>`;
     } else {
       nameHtml = `<span class="swipe-relation-issue swipe-relation-${stateCls}">${display}</span>`;
     }
@@ -328,7 +330,7 @@ function renderCard(direction) {
       const stateCls = getStateInfo(s.stateType).cls;
       const display = _esc(s.identifier || s.title);
       if (s.identifier) {
-        return `<a href="/workspace/${encodeURIComponent(urlKey)}/swipe/${encodeURIComponent(s.identifier)}" class="swipe-relation-issue swipe-relation-${stateCls}" data-navigate-identifier="${_esc(s.identifier)}" title="${_esc(s.title)}">${display}</a>`;
+        return `<a href="${swipeBase}/${encodeURIComponent(s.identifier)}" class="swipe-relation-issue swipe-relation-${stateCls}" data-navigate-identifier="${_esc(s.identifier)}" title="${_esc(s.title)}">${display}</a>`;
       }
       return `<span class="swipe-relation-issue swipe-relation-${stateCls}">${display}</span>`;
     }).join(' ');
