@@ -584,6 +584,13 @@ body:has(.swim-page) {
   max-height: calc(100vh - 140px);
 }
 
+/* .swim-lanes padding-top is for horizontal mode (first row's group label
+   escaping above). In vertical mode, every lane starts below its own lane
+   label, so the headroom belongs on .swim-lane-items instead. */
+.swim-page[data-orientation="vertical"] .swim-lanes {
+  padding-top: 0;
+}
+
 .swim-page[data-orientation="vertical"] .swim-lanes {
   flex-direction: row;
   align-items: flex-start;
@@ -618,7 +625,10 @@ body:has(.swim-page) {
   flex-direction: column;
   align-items: stretch;
   gap: 5px;
-  padding: 0.4rem 0.35rem;
+  /* 22px top padding reserves headroom for group decoration labels drawn
+     ~20px above the topmost card. Without it, the group label would
+     overlap the lane-label directly above. */
+  padding: 22px 0.35rem 0.4rem;
 }
 
 .swim-page[data-orientation="vertical"] .swim-lane-segment {
