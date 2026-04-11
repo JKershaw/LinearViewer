@@ -732,8 +732,8 @@ DELETE ${baseUrl}/api/proxy/issue/{issueId}/labels/{labelId}
   → Remove a label from an issue
 
 POST ${baseUrl}/api/proxy/foreman/status
-  Body: { "taskIdentifier": "LIN-42", "action": "research", "status": "completed", "summary": "..." }
-  → Record a foreman status update
+  Body: { "taskIdentifier": "LIN-42", "action": "research", "status": "completed", "summary": "...", "dispatchId": "..." }
+  → Record a foreman status update (dispatchId optional: pass the dispatch-history item ID from /api/dispatch/take to enable exact loop-reconstruction join)
 
 ## Shell Tip
 
@@ -1778,7 +1778,7 @@ ${readEndpoints}${writeEndpoints}
    * Record a foreman status update.
    */
   router.post('/api/proxy/foreman/status', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
-    const { taskIdentifier, action, status, summary } = req.body;
+    const { taskIdentifier, action, status, summary, dispatchId } = req.body;
 
     if (!taskIdentifier || typeof taskIdentifier !== 'string') {
       logEvent(req, '/api/proxy/foreman/status', 400);
@@ -1805,6 +1805,24 @@ ${readEndpoints}${writeEndpoints}
       return res.status(400).json({ error: 'Field exceeds max length (200)' });
     }
 
+    // dispatchId is optional. When present it must be a non-empty string ≤200 chars
+    // (same cap as other field inputs). Enables exact-match loop join in LIN-245;
+    // absence is back-compatible and consumers fall back to timestamp-window matching.
+    if (dispatchId !== undefined && dispatchId !== null) {
+      if (typeof dispatchId !== 'string' || dispatchId.length === 0) {
+        logEvent(req, '/api/proxy/foreman/status', 400);
+        return res.status(400).json({ error: 'dispatchId must be a non-empty string' });
+      }
+      if (dispatchId.length > 200) {
+        logEvent(req, '/api/proxy/foreman/status', 400);
+        return res.status(400).json({ error: 'Field exceeds max length (200)' });
+      }
+      if (DANGEROUS_CHARS_REGEX.test(dispatchId)) {
+        logEvent(req, '/api/proxy/foreman/status', 400);
+        return res.status(400).json({ error: 'Input contains invalid characters' });
+      }
+    }
+
     if (DANGEROUS_CHARS_REGEX.test(taskIdentifier) || DANGEROUS_CHARS_REGEX.test(action) ||
         DANGEROUS_CHARS_REGEX.test(status) || DANGEROUS_CHARS_REGEX.test(summary)) {
       logEvent(req, '/api/proxy/foreman/status', 400);
@@ -1817,7 +1835,8 @@ ${readEndpoints}${writeEndpoints}
         taskIdentifier,
         action,
         status,
-        summary
+        summary,
+        ...(dispatchId ? { dispatchId } : {})
       });
 
       logEvent(req, '/api/proxy/foreman/status', 201);
@@ -1958,6 +1977,13 @@ curl -X POST -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application
   -d @/tmp/status.json \\
   ${baseUrl}/api/proxy/foreman/status
 \`\`\`
+
+**Optional: \`dispatchId\` for exact loop tracking.** If you claimed this task via
+\`POST /api/dispatch/take/{itemId}\`, pass that same \`itemId\` as \`dispatchId\` in the
+status body. This lets the server's loop reconstruction join your status entry to the
+exact dispatch item instead of guessing by timestamp — important when the same issue
+is dispatched multiple times in overlapping windows. The field is optional and fully
+back-compatible; omit it when you don't have one.
 
 ### 7. Decide next action
 
