@@ -125,6 +125,8 @@ body:has(.swim-page) {
   display: flex;
   align-items: stretch;
   min-height: 52px;
+  position: relative;
+  z-index: 1;
 }
 
 .swim-lane-label {
@@ -283,37 +285,40 @@ body:has(.swim-page) {
 }
 
 /* ==========================================================================
-   Subtask Groups
+   Subtask Groups (post-layout SVG decoration)
+
+   Groups are drawn as a shaded rect behind parent+child cards. The SVG layer
+   sits beneath connectors and cards so it doesn't interfere with clicks or
+   line routing. Works in both column-slot and packed rendering paths.
    ========================================================================== */
 
-.swim-group {
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  border: 1px dashed #ccc;
-  border-radius: 8px;
-  padding: 4px 6px;
-  background: var(--bg-muted, #fafafa);
+.swim-group-decorations {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 0;
 }
 
-.swim-group-label {
+.swim-group-rect {
+  fill: rgba(37, 99, 235, 0.05);
+  stroke: rgba(37, 99, 235, 0.35);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+
+.swim-group-label-text {
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
   font-size: 9px;
-  color: var(--fg-dim, #999);
+  fill: rgba(37, 99, 235, 0.75);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  margin-bottom: 3px;
-  padding-left: 2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.swim-group-items {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: nowrap;
+/* Slight emphasis for the parent card within a group */
+.swim-box[data-group-role="parent"] {
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.25);
 }
 
 /* ==========================================================================
@@ -411,7 +416,7 @@ body:has(.swim-page) {
   left: 0;
   pointer-events: none;
   overflow: visible;
-  z-index: 1;
+  z-index: 2;
 }
 
 .swim-connector-path {

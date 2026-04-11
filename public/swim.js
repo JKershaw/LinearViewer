@@ -12,9 +12,14 @@
 var SEGMENT_RANK = { started: 0, unstarted: 1, backlog: 2, completed: 3, canceled: 3 };
 
 function assignLanes(issues, options) {
-  const { maxLanes = 6, grouping = 'dependency', showCompleted = false, projectOrder = {} } = options || {};
+  options = options || {};
+  var maxLanes = options.maxLanes !== undefined ? options.maxLanes : 6;
+  var grouping = options.grouping || 'dependency';
+  var showCompleted = !!options.showCompleted;
+  var projectOrder = options.projectOrder || {};
+  var groupSubtasks = options.groupSubtasks !== false; // default true
 
-  const filtered = showCompleted
+  var filtered = showCompleted
     ? issues
     : issues.filter(function(i) { return i.stateType !== 'completed' && i.stateType !== 'canceled'; });
 
@@ -34,7 +39,69 @@ function assignLanes(issues, options) {
   if (grouping === 'project' || grouping === 'dependency') {
     sortLanesByProjectOrder(lanes, projectOrder);
   }
+
+  // Cluster parent+children adjacently within each lane (all grouping modes)
+  if (groupSubtasks) {
+    for (var li = 0; li < lanes.length; li++) {
+      lanes[li].items = clusterSiblingsInLane(lanes[li].items);
+    }
+  }
+
   return { lanes: lanes };
+}
+
+function clusterSiblingsInLane(items) {
+  if (items.length < 2) return items;
+
+  var itemIdx = new Map();
+  for (var i = 0; i < items.length; i++) itemIdx.set(items[i].id, i);
+
+  // blockersOf: blockedId → Set of blocker IDs (within the lane)
+  var blockersOf = new Map();
+  for (var i = 0; i < items.length; i++) {
+    var blocksIds = items[i].blocksIds || [];
+    for (var j = 0; j < blocksIds.length; j++) {
+      if (itemIdx.has(blocksIds[j])) {
+        if (!blockersOf.has(blocksIds[j])) blockersOf.set(blocksIds[j], new Set());
+        blockersOf.get(blocksIds[j]).add(items[i].id);
+      }
+    }
+  }
+
+  var result = [];
+  var claimed = new Set();
+
+  function pullItemAndDescendants(item) {
+    result.push(item);
+    claimed.add(item.id);
+    var myIdx = itemIdx.get(item.id);
+
+    for (var j = myIdx + 1; j < items.length; j++) {
+      var candidate = items[j];
+      if (claimed.has(candidate.id)) continue;
+      if (candidate.parentId !== item.id) continue;
+
+      // Blocker check: don't pull candidate past one of its blockers
+      var candidateBlockers = blockersOf.get(candidate.id);
+      if (candidateBlockers && candidateBlockers.size > 0) {
+        var blocked = false;
+        for (var k = myIdx + 1; k < j; k++) {
+          if (claimed.has(items[k].id)) continue;
+          if (candidateBlockers.has(items[k].id)) { blocked = true; break; }
+        }
+        if (blocked) continue;
+      }
+
+      pullItemAndDescendants(candidate);
+    }
+  }
+
+  for (var ii = 0; ii < items.length; ii++) {
+    if (claimed.has(items[ii].id)) continue;
+    pullItemAndDescendants(items[ii]);
+  }
+
+  return result;
 }
 
 function sortLanesByProjectOrder(lanes, projectOrder) {
@@ -289,6 +356,8 @@ function mergeLanes(lanes, maxLanes) {
 
 function assignSegments(lanes, options) {
   var grouping = (options && options.grouping) || 'dependency';
+  var groupSubtasks = !(options && options.groupSubtasks === false);
+  var promoteParents = grouping === 'dependency' || groupSubtasks;
 
   for (var li = 0; li < lanes.length; li++) {
     var lane = lanes[li];
@@ -298,9 +367,9 @@ function assignSegments(lanes, options) {
       lane.items[ii].segment = rank !== undefined ? rank : 1;
     }
 
-    // Dependency promotion
-    if (grouping === 'dependency') {
-      promoteDependencyBlockers(lane.items);
+    // Parent promotion: keep parents adjacent to their active subtasks
+    if (promoteParents) {
+      promoteDependencyBlockers(lane.items, { parentsOnly: grouping !== 'dependency' });
     }
 
     // Stable sort by segment
@@ -312,7 +381,8 @@ function assignSegments(lanes, options) {
   return lanes;
 }
 
-function promoteDependencyBlockers(items) {
+function promoteDependencyBlockers(items, options) {
+  var parentsOnly = !!(options && options.parentsOnly);
   var itemById = new Map(items.map(function(i) { return [i.id, i]; }));
   var itemIds = new Set(items.map(function(i) { return i.id; }));
 
@@ -320,11 +390,13 @@ function promoteDependencyBlockers(items) {
   var blockerOf = new Map();
   for (var i = 0; i < items.length; i++) {
     var item = items[i];
-    var blocksIds = item.blocksIds || [];
-    for (var j = 0; j < blocksIds.length; j++) {
-      if (itemIds.has(blocksIds[j])) {
-        if (!blockerOf.has(blocksIds[j])) blockerOf.set(blocksIds[j], []);
-        blockerOf.get(blocksIds[j]).push(item);
+    if (!parentsOnly) {
+      var blocksIds = item.blocksIds || [];
+      for (var j = 0; j < blocksIds.length; j++) {
+        if (itemIds.has(blocksIds[j])) {
+          if (!blockerOf.has(blocksIds[j])) blockerOf.set(blocksIds[j], []);
+          blockerOf.get(blocksIds[j]).push(item);
+        }
       }
     }
     if (item.parentId && itemById.has(item.parentId)) {
@@ -577,6 +649,7 @@ function getSettings() {
     compact: stored.compact !== undefined ? stored.compact : document.getElementById('swim-compact').checked,
     showCompleted: stored.showCompleted !== undefined ? stored.showCompleted : document.getElementById('swim-show-completed').checked,
     showBlockers: stored.showBlockers !== undefined ? stored.showBlockers : showBlockersDefault,
+    groupSubtasks: stored.groupSubtasks !== undefined ? stored.groupSubtasks : document.getElementById('swim-group-subtasks').checked,
     labelFilter: stored.labelFilter || document.getElementById('swim-label-filter').value || ''
   };
 }
@@ -592,6 +665,7 @@ function applySettingsToUI(settings) {
   document.getElementById('swim-compact').checked = settings.compact;
   document.getElementById('swim-show-completed').checked = settings.showCompleted;
   document.getElementById('swim-show-blockers').checked = !!settings.showBlockers;
+  document.getElementById('swim-group-subtasks').checked = settings.groupSubtasks !== false;
   document.getElementById('swim-label-filter').value = settings.labelFilter || '';
 }
 
@@ -608,7 +682,7 @@ function stateClass(stateType) {
   return 'state-' + (stateType || 'unstarted');
 }
 
-function renderBox(issue, settings, blockedByMap) {
+function renderBox(issue, settings, blockedByMap, groupInfo) {
   var compactClass = settings.compact ? ' compact' : '';
   var titleHtml = escapeHtml(issue.title || '');
   var idHtml = escapeHtml(issue.identifier || '');
@@ -619,8 +693,15 @@ function renderBox(issue, settings, blockedByMap) {
   var blockedClass = isBlocked ? ' blocked' : '';
   var goalClass = labelGoalIds.has(issue.id) ? ' swim-goal' : '';
 
+  // Group membership attributes (for post-layout group decoration)
+  var groupAttrs = '';
+  if (groupInfo) {
+    groupAttrs += ' data-group-id="' + escapeHtml(groupInfo.groupId) + '"';
+    groupAttrs += ' data-group-role="' + groupInfo.role + '"';
+  }
+
   var html = '<div class="swim-box ' + stateClass(issue.stateType) + compactClass + blockedClass + goalClass +
-    '" data-issue-id="' + escapeHtml(issue.id) + '">' +
+    '" data-issue-id="' + escapeHtml(issue.id) + '"' + groupAttrs + '>' +
     stateIndicator(issue.stateType) +
     '<span class="swim-box-title">' + titleHtml + '</span>' +
     '<span class="swim-box-id">' + idHtml + '</span>';
@@ -696,14 +777,15 @@ function render() {
     maxLanes: settings.maxLanes,
     grouping: settings.grouping,
     showCompleted: settings.showCompleted,
-    projectOrder: projectOrder
+    projectOrder: projectOrder,
+    groupSubtasks: settings.groupSubtasks
   });
 
   var lanes = result.lanes;
   currentLanes = lanes; // Store for chain walk access
 
   // Assign segments and compute global widths
-  assignSegments(lanes, { grouping: settings.grouping });
+  assignSegments(lanes, { grouping: settings.grouping, groupSubtasks: settings.groupSubtasks });
   var slotWidth = settings.compact ? 140 : 210;
 
   // Compute cross-lane columns if showBlockers is on
@@ -728,6 +810,15 @@ function render() {
 
   // Build blockedBy map for labels
   var blockedByMap = useColumns ? buildBlockedByMap(allIssues) : null;
+
+  // Compute group membership: a group is a parent with ≥1 child in the same
+  // lane+segment. Each issue gets a groupInfo {groupId, role} passed to renderBox;
+  // the post-layout drawGroupDecorations walks these to paint shaded rects.
+  var groupInfoById = settings.groupSubtasks ? computeGroupMembership(lanes) : new Map();
+
+  function boxGroupInfo(issue) {
+    return groupInfoById.get(issue.id) || null;
+  }
 
   var html = '';
   for (var li = 0; li < lanes.length; li++) {
@@ -755,7 +846,6 @@ function render() {
       if (useColumns && columnCounts && columnCounts[segKey] > 0) {
         // Column-based rendering: place items in column slots
         var totalCols = columnCounts[segKey];
-        // Build a map: column → items for this lane+segment
         var itemsByCol = {};
         for (var ii = 0; ii < segItems.length; ii++) {
           var col = segItems[ii].column !== undefined ? segItems[ii].column : ii;
@@ -763,45 +853,18 @@ function render() {
           itemsByCol[col].push(segItems[ii]);
         }
 
-        var prevColItem = null;
         for (var col = 0; col < totalCols; col++) {
           var colItems = itemsByCol[col] || [];
-          // No HTML arrows — all connectors (blocking + sequential) drawn as SVG
           html += '<div class="swim-column-slot" data-column="' + col + '" style="min-width:' + slotWidth + 'px">';
           for (var ci = 0; ci < colItems.length; ci++) {
-            html += renderBox(colItems[ci], settings, blockedByMap);
+            html += renderBox(colItems[ci], settings, blockedByMap, boxGroupInfo(colItems[ci]));
           }
           html += '</div>';
-          if (colItems.length > 0) prevColItem = colItems[colItems.length - 1];
         }
       } else {
-        // Default packed rendering (no columns)
-        var rendered = new Set();
+        // Packed rendering: flat sibling boxes, group decoration drawn post-layout
         for (var ii = 0; ii < segItems.length; ii++) {
-          var issue = segItems[ii];
-          if (rendered.has(issue.id)) continue;
-
-          // Check if this is a parent with children in this segment
-          var children = segItems.filter(function(item) {
-            return item.parentId === issue.id && !rendered.has(item.id);
-          });
-
-          if (children.length > 0 && !issue.parentId) {
-            html += '<div class="swim-group">';
-            html += '<div class="swim-group-label">' + escapeHtml(issue.title || '').slice(0, 20) + '</div>';
-            html += '<div class="swim-group-items">';
-            html += renderBox(issue, settings);
-            rendered.add(issue.id);
-            for (var ci = 0; ci < children.length; ci++) {
-              html += renderBox(children[ci], settings);
-              rendered.add(children[ci].id);
-            }
-            html += '</div></div>';
-          } else {
-            // No HTML arrows — SVG handles all connectors
-            html += renderBox(issue, settings);
-            rendered.add(issue.id);
-          }
+          html += renderBox(segItems[ii], settings, blockedByMap, boxGroupInfo(segItems[ii]));
         }
       }
 
@@ -813,10 +876,167 @@ function render() {
 
   container.innerHTML = html;
 
-  // Draw SVG connectors — always for sequential, plus blocking when enabled
+  // Draw SVG connectors and (optionally) group decorations post-layout
   requestAnimationFrame(function() {
     drawBlockingConnectors(lanes, useColumns ? blockedByMap : null);
+    if (settings.groupSubtasks) {
+      drawGroupDecorations(groupInfoById);
+    }
   });
+}
+
+/**
+ * Build a map: issueId → { groupId, role }
+ * A group is a parent that has ≥1 child in the same lane+segment.
+ * Supports nested hierarchies — each parent-with-children level forms its own group.
+ */
+function computeGroupMembership(lanes) {
+  var groupInfo = new Map();
+  var groupCounter = 0;
+
+  for (var li = 0; li < lanes.length; li++) {
+    // Partition lane items by segment
+    var bySeg = {};
+    for (var ii = 0; ii < lanes[li].items.length; ii++) {
+      var item = lanes[li].items[ii];
+      var seg = item.segment !== undefined ? item.segment : 0;
+      if (!bySeg[seg]) bySeg[seg] = [];
+      bySeg[seg].push(item);
+    }
+
+    for (var segKey in bySeg) {
+      var segItems = bySeg[segKey];
+      var idSet = new Set(segItems.map(function(i) { return i.id; }));
+      // For each item that has children in this segment, create a group
+      var childrenByParent = new Map();
+      for (var s = 0; s < segItems.length; s++) {
+        var it = segItems[s];
+        if (it.parentId && idSet.has(it.parentId)) {
+          if (!childrenByParent.has(it.parentId)) childrenByParent.set(it.parentId, []);
+          childrenByParent.get(it.parentId).push(it.id);
+        }
+      }
+      childrenByParent.forEach(function(childIds, parentId) {
+        var gid = 'g' + (++groupCounter);
+        groupInfo.set(parentId, { groupId: gid, role: 'parent' });
+        for (var c = 0; c < childIds.length; c++) {
+          // Preserve outer group role if already parent of another nested group
+          var existing = groupInfo.get(childIds[c]);
+          if (existing && existing.role === 'parent') {
+            // Nested: this child is also a parent of grandchildren — keep it parent,
+            // track membership in outer group via separate attribute later if needed.
+            continue;
+          }
+          groupInfo.set(childIds[c], { groupId: gid, role: 'child' });
+        }
+      });
+    }
+  }
+
+  return groupInfo;
+}
+
+/**
+ * Post-layout: for every group, draw a shaded rect behind its parent+child cards.
+ * Uses getBoundingClientRect so it works regardless of columns/gaps/blocker pushes.
+ */
+function drawGroupDecorations(groupInfoById) {
+  // Remove any existing decoration SVG
+  var existing = document.getElementById('swim-group-decorations');
+  if (existing) existing.remove();
+
+  var lanesEl = document.getElementById('swim-lanes');
+  if (!lanesEl) return;
+
+  // Collect card rects by group
+  var groups = new Map(); // groupId → { rects: [...], parentTitle: str }
+  var cards = lanesEl.querySelectorAll('.swim-box[data-group-id]');
+  if (cards.length === 0) return;
+
+  var containerRect = lanesEl.getBoundingClientRect();
+
+  for (var i = 0; i < cards.length; i++) {
+    var card = cards[i];
+    var gid = card.getAttribute('data-group-id');
+    var role = card.getAttribute('data-group-role');
+    var r = card.getBoundingClientRect();
+    var rect = {
+      left: r.left - containerRect.left,
+      right: r.right - containerRect.left,
+      top: r.top - containerRect.top,
+      bottom: r.bottom - containerRect.top
+    };
+    if (!groups.has(gid)) {
+      groups.set(gid, { rects: [], parentTitle: '', parentCard: null });
+    }
+    var g = groups.get(gid);
+    g.rects.push(rect);
+    if (role === 'parent') {
+      var titleEl = card.querySelector('.swim-box-title');
+      g.parentTitle = titleEl ? (titleEl.textContent || '').trim() : '';
+      g.parentCard = card;
+    }
+  }
+
+  if (groups.size === 0) return;
+
+  // Build decoration SVG
+  var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.id = 'swim-group-decorations';
+  svg.setAttribute('class', 'swim-group-decorations');
+  svg.setAttribute('width', lanesEl.scrollWidth);
+  svg.setAttribute('height', lanesEl.scrollHeight);
+
+  var PAD_X = 6;
+  var PAD_Y = 6;
+  var LABEL_HEIGHT = 14;
+
+  groups.forEach(function(g, gid) {
+    if (g.rects.length < 2) return; // Need parent + ≥1 child to be a group
+    var minLeft = Infinity, minTop = Infinity, maxRight = -Infinity, maxBottom = -Infinity;
+    for (var i = 0; i < g.rects.length; i++) {
+      var r = g.rects[i];
+      if (r.left < minLeft) minLeft = r.left;
+      if (r.top < minTop) minTop = r.top;
+      if (r.right > maxRight) maxRight = r.right;
+      if (r.bottom > maxBottom) maxBottom = r.bottom;
+    }
+    var x = minLeft - PAD_X;
+    var y = minTop - PAD_Y - LABEL_HEIGHT;
+    var w = (maxRight - minLeft) + PAD_X * 2;
+    var h = (maxBottom - minTop) + PAD_Y * 2 + LABEL_HEIGHT;
+
+    var rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('x', x);
+    rect.setAttribute('y', y);
+    rect.setAttribute('width', w);
+    rect.setAttribute('height', h);
+    rect.setAttribute('rx', 8);
+    rect.setAttribute('ry', 8);
+    rect.setAttribute('class', 'swim-group-rect');
+    rect.setAttribute('data-group-id', gid);
+    svg.appendChild(rect);
+
+    // Label above the rect
+    if (g.parentTitle) {
+      var label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      label.setAttribute('x', x + PAD_X);
+      label.setAttribute('y', y + LABEL_HEIGHT - 3);
+      label.setAttribute('class', 'swim-group-label-text');
+      var labelText = g.parentTitle.length > 30 ? g.parentTitle.slice(0, 28) + '\u2026' : g.parentTitle;
+      label.textContent = labelText;
+      svg.appendChild(label);
+    }
+  });
+
+  lanesEl.style.position = 'relative';
+  // Insert decorations BEFORE connectors so connectors draw on top
+  var connectors = document.getElementById('swim-connectors');
+  if (connectors) {
+    lanesEl.insertBefore(svg, connectors);
+  } else {
+    lanesEl.appendChild(svg);
+  }
 }
 
 // =============================================================================
@@ -1578,6 +1798,7 @@ function onSettingsChange() {
     compact: document.getElementById('swim-compact').checked,
     showCompleted: document.getElementById('swim-show-completed').checked,
     showBlockers: document.getElementById('swim-show-blockers').checked,
+    groupSubtasks: document.getElementById('swim-group-subtasks').checked,
     labelFilter: document.getElementById('swim-label-filter').value || ''
   };
   document.querySelector('.swim-max-lanes-value').textContent = settings.maxLanes;
@@ -1596,6 +1817,7 @@ document.getElementById('swim-max-lanes').addEventListener('input', onSettingsCh
 document.getElementById('swim-compact').addEventListener('change', onSettingsChange);
 document.getElementById('swim-show-completed').addEventListener('change', onSettingsChange);
 document.getElementById('swim-show-blockers').addEventListener('change', onSettingsChange);
+document.getElementById('swim-group-subtasks').addEventListener('change', onSettingsChange);
 document.getElementById('swim-label-filter').addEventListener('change', function() {
   // Auto-enable show blockers when a label filter is active
   var hasFilter = document.getElementById('swim-label-filter').value !== '';
