@@ -129,9 +129,16 @@ Authorization: Bearer <token>
     "dispatchedAt": "2024-01-15T10:30:00.000Z",
     "dispatchedBy": "linear-user-id",
     "expiresAt": "2024-01-16T10:30:00.000Z"
-  }
+  },
+  "dispatchId": "uuid"
 }
 ```
+
+The top-level `dispatchId` field is identical to `item.id` and is exposed as a
+convenience for consumers that want to forward it to
+`POST /api/proxy/foreman/status` as the `dispatchId` body field. See
+[Forwarding `dispatchId` to foreman status](#forwarding-dispatchid-to-foreman-status)
+below.
 
 **Error Response (404):**
 ```json
@@ -183,6 +190,55 @@ Content-Type: application/json
 ```
 
 Feedback entries are displayed in the dispatch history UI and inherit the 30-day history TTL.
+
+### Forwarding `dispatchId` to foreman status
+
+If your consumer also writes foreman status entries via
+`POST /api/proxy/foreman/status` (the proxy API used by autonomous agents),
+you should forward the dispatched item's ID as the `dispatchId` body field.
+This lets the server's loop reconstruction (`lib/pipeline-loops.js`, see LIN-245)
+join your status entry to the **exact** dispatch attempt it belongs to instead
+of guessing by timestamp window.
+
+The field is optional and fully back-compatible — omit it if you're not using
+the foreman status API. When present it must be the same string returned in
+either `dispatchId` or `item.id` from the take response.
+
+```javascript
+// 1. Take a dispatched item
+const takeRes = await fetch(`${API_BASE}/api/dispatch/take/${itemId}`, {
+  method: 'POST',
+  headers: { 'Authorization': `Bearer ${DISPATCH_TOKEN}` }
+});
+const { item, dispatchId } = await takeRes.json();
+
+// 2. Do the work...
+const result = await processPrompt(item);
+
+// 3. When recording a foreman status entry for this work, pass dispatchId
+//    so the Pipeline view can join it to the exact loop:
+await fetch(`${API_BASE}/api/proxy/foreman/status`, {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${PROXY_TOKEN}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    taskIdentifier: item.issueIdentifier,
+    action: 'implementation',
+    status: result.ok ? 'completed' : 'failed',
+    summary: result.summary,
+    dispatchId           // ← forward the dispatch identity
+  })
+});
+```
+
+**Why it matters.** Without `dispatchId`, the loop reconstruction library has
+to guess which dispatch attempt a foreman entry decorates by checking whether
+its timestamp falls inside the dispatch window. That guess is correct in the
+common case but ambiguous when the same issue is dispatched multiple times in
+overlapping windows. Forwarding `dispatchId` removes the ambiguity entirely
+and is the recommended pattern for any consumer that posts foreman status.
 
 ## Queue Item Schema
 
@@ -279,10 +335,12 @@ async function pollAndProcess() {
         continue;
       }
 
-      const { item: claimed } = await takeRes.json();
+      const { item: claimed, dispatchId } = await takeRes.json();
 
-      // Process the claimed item
-      await processPrompt(claimed);
+      // Process the claimed item. Pass dispatchId through to processPrompt
+      // if you also write foreman status entries — see "Forwarding dispatchId
+      // to foreman status" above.
+      await processPrompt(claimed, dispatchId);
     }
   } catch (err) {
     console.error('Consumer error:', err);
