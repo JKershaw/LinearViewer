@@ -277,6 +277,103 @@ test.describe('Foreman API - Status Endpoints', () => {
     expect(data.items[0].timestamp).toBeTruthy();
   });
 
+  test('POST /api/proxy/foreman/status persists optional dispatchId and GET returns it', async ({ request }) => {
+    // Entry WITH dispatchId (exact-match join path for LIN-245)
+    const postWith = await request.post('/api/proxy/foreman/status', {
+      headers: {
+        Authorization: `Bearer ${writeToken}`,
+        'Content-Type': 'application/json'
+      },
+      data: {
+        taskIdentifier: 'LIN-42',
+        action: 'implementation',
+        status: 'completed',
+        summary: 'With dispatch reference',
+        dispatchId: 'dispatch-item-abc-123'
+      }
+    });
+    expect(postWith.status()).toBe(201);
+
+    // Entry WITHOUT dispatchId — back-compat path, field should be omitted entirely
+    const postWithout = await request.post('/api/proxy/foreman/status', {
+      headers: {
+        Authorization: `Bearer ${writeToken}`,
+        'Content-Type': 'application/json'
+      },
+      data: {
+        taskIdentifier: 'LIN-43',
+        action: 'research',
+        status: 'completed',
+        summary: 'No dispatch reference'
+      }
+    });
+    expect(postWithout.status()).toBe(201);
+
+    const listResp = await request.get('/api/proxy/foreman/status', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(listResp.status()).toBe(200);
+    const data = await listResp.json();
+
+    const withEntry = data.items.find(i => i.taskIdentifier === 'LIN-42');
+    const withoutEntry = data.items.find(i => i.taskIdentifier === 'LIN-43');
+    expect(withEntry).toBeTruthy();
+    expect(withEntry.dispatchId).toBe('dispatch-item-abc-123');
+    expect(withoutEntry).toBeTruthy();
+    // Old-shape entries must not gain a dispatchId key at all
+    expect(withoutEntry.dispatchId).toBeUndefined();
+  });
+
+  test('POST /api/proxy/foreman/status rejects invalid dispatchId', async ({ request }) => {
+    // Empty string → non-empty string required
+    const empty = await request.post('/api/proxy/foreman/status', {
+      headers: {
+        Authorization: `Bearer ${writeToken}`,
+        'Content-Type': 'application/json'
+      },
+      data: {
+        taskIdentifier: 'LIN-1',
+        action: 'research',
+        status: 'completed',
+        summary: 'test',
+        dispatchId: ''
+      }
+    });
+    expect(empty.status()).toBe(400);
+
+    // Wrong type
+    const wrongType = await request.post('/api/proxy/foreman/status', {
+      headers: {
+        Authorization: `Bearer ${writeToken}`,
+        'Content-Type': 'application/json'
+      },
+      data: {
+        taskIdentifier: 'LIN-1',
+        action: 'research',
+        status: 'completed',
+        summary: 'test',
+        dispatchId: 12345
+      }
+    });
+    expect(wrongType.status()).toBe(400);
+
+    // Too long
+    const tooLong = await request.post('/api/proxy/foreman/status', {
+      headers: {
+        Authorization: `Bearer ${writeToken}`,
+        'Content-Type': 'application/json'
+      },
+      data: {
+        taskIdentifier: 'LIN-1',
+        action: 'research',
+        status: 'completed',
+        summary: 'test',
+        dispatchId: 'x'.repeat(201)
+      }
+    });
+    expect(tooLong.status()).toBe(400);
+  });
+
   test('POST /api/proxy/foreman/status validates required fields', async ({ request }) => {
     // Missing taskIdentifier
     const resp1 = await request.post('/api/proxy/foreman/status', {
