@@ -372,6 +372,12 @@ function assignSegments(lanes, options) {
       promoteDependencyBlockers(lane.items, { parentsOnly: grouping !== 'dependency' });
     }
 
+    // Coherence: pull every member of a subtask tree to the most-forward
+    // segment of any member so grouped siblings stay together visually.
+    if (groupSubtasks) {
+      cohereSubtaskGroups(lane.items);
+    }
+
     // Stable sort by segment
     var indexed = lane.items.map(function(item, i) { return { item: item, orig: i }; });
     indexed.sort(function(a, b) { return a.item.segment - b.item.segment || a.orig - b.orig; });
@@ -379,6 +385,57 @@ function assignSegments(lanes, options) {
   }
 
   return lanes;
+}
+
+function cohereSubtaskGroups(items) {
+  if (items.length < 2) return;
+
+  var itemIds = new Set(items.map(function(i) { return i.id; }));
+
+  // Union-find over parent→child edges
+  var uf = new Map(items.map(function(i) { return [i.id, i.id]; }));
+  function find(x) {
+    var root = x;
+    while (uf.get(root) !== root) root = uf.get(root);
+    var cur = x;
+    while (uf.get(cur) !== root) {
+      var next = uf.get(cur);
+      uf.set(cur, root);
+      cur = next;
+    }
+    return root;
+  }
+  function union(a, b) {
+    var ra = find(a), rb = find(b);
+    if (ra !== rb) uf.set(ra, rb);
+  }
+
+  for (var k = 0; k < items.length; k++) {
+    var item = items[k];
+    if (item.parentId && itemIds.has(item.parentId)) {
+      union(item.id, item.parentId);
+    }
+  }
+
+  // Compute min segment per group root
+  var groupMinSeg = new Map();
+  for (var m = 0; m < items.length; m++) {
+    var it = items[m];
+    var root = find(it.id);
+    var cur = groupMinSeg.get(root);
+    if (cur === undefined || it.segment < cur) {
+      groupMinSeg.set(root, it.segment);
+    }
+  }
+
+  // Apply
+  for (var n = 0; n < items.length; n++) {
+    var itx = items[n];
+    var target = groupMinSeg.get(find(itx.id));
+    if (target !== undefined && target < itx.segment) {
+      itx.segment = target;
+    }
+  }
 }
 
 function promoteDependencyBlockers(items, options) {

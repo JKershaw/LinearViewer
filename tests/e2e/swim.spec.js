@@ -364,13 +364,10 @@ test.describe('Swim Page with Sample Data', () => {
     const slots = await page.locator('.swim-column-slot').count();
     expect(slots).toBeGreaterThan(0);
 
-    // Group decorations should still be drawn
-    const rects = await page.locator('.swim-group-rect').count();
-    expect(rects).toBeGreaterThan(0);
-
-    // And grouped cards should still have the data attributes
-    const parents = await page.locator('.swim-box[data-group-role="parent"]').count();
-    expect(parents).toBeGreaterThan(0);
+    // Group decorations are drawn in a requestAnimationFrame after re-render,
+    // so use auto-retrying assertions rather than a one-shot count().
+    await expect(page.locator('.swim-group-rect').first()).toBeVisible();
+    await expect(page.locator('.swim-box[data-group-role="parent"]').first()).toBeVisible();
   });
 
   test('group subtasks setting persists across reload', async ({ page }) => {

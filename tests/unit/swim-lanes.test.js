@@ -689,3 +689,124 @@ describe('subtask grouping — parent promotion in non-dependency modes', () => 
     assert.strictEqual(lanes[0].items.find(i => i.id === 'blocker').segment, 0);
   });
 });
+
+describe('subtask grouping — segment coherence across siblings', () => {
+  test('project mode: to-do sibling gets pulled to segment 0 alongside started sibling', () => {
+    // P has two children: C1 (started) and C2 (to-do). After cohere, everything
+    // should sit in segment 0 so the group decoration spans the whole family.
+    const cards = [
+      createCard({ id: 'p', stateType: 'unstarted', projectName: 'Proj' }),
+      createCard({ id: 'c1', stateType: 'started', parentId: 'p', projectName: 'Proj' }),
+      createCard({ id: 'c2', stateType: 'unstarted', parentId: 'p', projectName: 'Proj' })
+    ];
+    const { lanes } = assignLanes(cards, { grouping: 'project' });
+    assignSegments(lanes, { grouping: 'project', groupSubtasks: true });
+    const lane = lanes[0];
+    assert.strictEqual(lane.items.find(i => i.id === 'p').segment, 0);
+    assert.strictEqual(lane.items.find(i => i.id === 'c1').segment, 0);
+    assert.strictEqual(lane.items.find(i => i.id === 'c2').segment, 0);
+  });
+
+  test('backlog sibling pulled forward to match to-do sibling', () => {
+    // No started members — the most-forward segment in the group is to-do (1),
+    // so the backlog child should be pulled forward to match.
+    const cards = [
+      createCard({ id: 'p', stateType: 'unstarted', projectName: 'Proj' }),
+      createCard({ id: 'c1', stateType: 'unstarted', parentId: 'p', projectName: 'Proj' }),
+      createCard({ id: 'c2', stateType: 'backlog', parentId: 'p', projectName: 'Proj' })
+    ];
+    const { lanes } = assignLanes(cards, { grouping: 'project' });
+    assignSegments(lanes, { grouping: 'project', groupSubtasks: true });
+    const lane = lanes[0];
+    assert.strictEqual(lane.items.find(i => i.id === 'p').segment, 1);
+    assert.strictEqual(lane.items.find(i => i.id === 'c1').segment, 1);
+    assert.strictEqual(lane.items.find(i => i.id === 'c2').segment, 1);
+  });
+
+  test('completed sibling pulled forward with show-completed', () => {
+    // When show-completed is on, a completed subtask should join its active
+    // siblings in segment 0. The state indicator still reflects its true state.
+    const cards = [
+      createCard({ id: 'p', stateType: 'unstarted', projectName: 'Proj' }),
+      createCard({ id: 'c1', stateType: 'started', parentId: 'p', projectName: 'Proj' }),
+      createCard({ id: 'c2', stateType: 'completed', parentId: 'p', projectName: 'Proj' })
+    ];
+    const { lanes } = assignLanes(cards, {
+      grouping: 'project',
+      showCompleted: true
+    });
+    assignSegments(lanes, { grouping: 'project', groupSubtasks: true });
+    const lane = lanes[0];
+    assert.strictEqual(lane.items.find(i => i.id === 'p').segment, 0);
+    assert.strictEqual(lane.items.find(i => i.id === 'c1').segment, 0);
+    assert.strictEqual(lane.items.find(i => i.id === 'c2').segment, 0);
+  });
+
+  test('nested hierarchy: grandparent, parent, grandchild all unified', () => {
+    // G → P → C, with C started. G and P should both be pulled to 0.
+    const cards = [
+      createCard({ id: 'g', stateType: 'unstarted', projectName: 'Proj' }),
+      createCard({ id: 'p', stateType: 'unstarted', parentId: 'g', projectName: 'Proj' }),
+      createCard({ id: 'c', stateType: 'started', parentId: 'p', projectName: 'Proj' })
+    ];
+    const { lanes } = assignLanes(cards, { grouping: 'project' });
+    assignSegments(lanes, { grouping: 'project', groupSubtasks: true });
+    const lane = lanes[0];
+    assert.strictEqual(lane.items.find(i => i.id === 'g').segment, 0);
+    assert.strictEqual(lane.items.find(i => i.id === 'p').segment, 0);
+    assert.strictEqual(lane.items.find(i => i.id === 'c').segment, 0);
+  });
+
+  test('independent groups keep their own segments', () => {
+    // Two unrelated parent/child groups: one active (seg 0), one all to-do (seg 1).
+    // Each group coheres to its own min — they don't influence each other.
+    const cards = [
+      createCard({ id: 'p1', stateType: 'unstarted', projectName: 'Proj' }),
+      createCard({ id: 'c1', stateType: 'started', parentId: 'p1', projectName: 'Proj' }),
+      createCard({ id: 'p2', stateType: 'unstarted', projectName: 'Proj' }),
+      createCard({ id: 'c2', stateType: 'unstarted', parentId: 'p2', projectName: 'Proj' })
+    ];
+    const { lanes } = assignLanes(cards, { grouping: 'project' });
+    assignSegments(lanes, { grouping: 'project', groupSubtasks: true });
+    const lane = lanes[0];
+    assert.strictEqual(lane.items.find(i => i.id === 'p1').segment, 0);
+    assert.strictEqual(lane.items.find(i => i.id === 'c1').segment, 0);
+    assert.strictEqual(lane.items.find(i => i.id === 'p2').segment, 1);
+    assert.strictEqual(lane.items.find(i => i.id === 'c2').segment, 1);
+  });
+
+  test('coherence is skipped when groupSubtasks=false', () => {
+    // With the toggle off, siblings keep their individual segments.
+    const cards = [
+      createCard({ id: 'p', stateType: 'unstarted', projectName: 'Proj' }),
+      createCard({ id: 'c1', stateType: 'started', parentId: 'p', projectName: 'Proj' }),
+      createCard({ id: 'c2', stateType: 'unstarted', parentId: 'p', projectName: 'Proj' })
+    ];
+    const { lanes } = assignLanes(cards, {
+      grouping: 'project',
+      groupSubtasks: false
+    });
+    assignSegments(lanes, { grouping: 'project', groupSubtasks: false });
+    const lane = lanes[0];
+    // Parent and started child both at their natural segments
+    assert.strictEqual(lane.items.find(i => i.id === 'p').segment, 1);
+    assert.strictEqual(lane.items.find(i => i.id === 'c1').segment, 0);
+    assert.strictEqual(lane.items.find(i => i.id === 'c2').segment, 1);
+  });
+
+  test('nobody moves backwards: all-completed group stays in completed segment', () => {
+    // Group with no forward members: everyone stays where they are.
+    const cards = [
+      createCard({ id: 'p', stateType: 'completed', projectName: 'Proj' }),
+      createCard({ id: 'c', stateType: 'completed', parentId: 'p', projectName: 'Proj' })
+    ];
+    const { lanes } = assignLanes(cards, {
+      grouping: 'project',
+      showCompleted: true
+    });
+    assignSegments(lanes, { grouping: 'project', groupSubtasks: true });
+    const lane = lanes[0];
+    assert.strictEqual(lane.items.find(i => i.id === 'p').segment, 3);
+    assert.strictEqual(lane.items.find(i => i.id === 'c').segment, 3);
+  });
+});
