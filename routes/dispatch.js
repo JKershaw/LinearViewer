@@ -485,7 +485,12 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         return res.status(404).json({ error: 'Item not found or already taken' });
       }
 
-      res.json({ item });
+      // Echo `dispatchId` as a top-level alias of `item.id` so consumers see it
+      // without having to dig into the item shape. Forward this value as
+      // `dispatchId` when posting to /api/proxy/foreman/status to enable exact
+      // loop-reconstruction joins (see LIN-245). Purely additive — existing
+      // consumers that destructure `{ item }` are unaffected.
+      res.json({ item, dispatchId: item.id });
     } catch (err) {
       console.error('Take error:', err.message);
       res.status(500).json({ error: 'Failed to take item' });
