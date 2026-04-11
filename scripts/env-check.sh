@@ -98,6 +98,8 @@ elif [ -d "$HOME/.cache/ms-playwright" ]; then
   playwright_ok=1
 elif [ -d "/ms-playwright" ]; then
   playwright_ok=1
+elif [ -n "$PLAYWRIGHT_BROWSERS_PATH" ] && compgen -G "$PLAYWRIGHT_BROWSERS_PATH/chromium*" > /dev/null; then
+  playwright_ok=1
 fi
 
 if [ "$playwright_ok" -eq 1 ]; then

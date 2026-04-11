@@ -9,6 +9,11 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # Official Playwright image ships chromium + system deps preinstalled at
+    # a version matching the Playwright npm package. Keep this tag in sync
+    # with the "playwright" / "@playwright/test" version in package.json.
+    container:
+      image: mcr.microsoft.com/playwright:v1.57.0-noble
 
     steps:
       - uses: actions/checkout@v4
@@ -22,8 +27,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Playwright browsers
-        run: npx playwright install chromium --with-deps
+      - name: Verify Playwright version matches container
+        run: |
+          EXPECTED=1.57.0
+          ACTUAL=$(node -p "require('@playwright/test/package.json').version")
+          if [ "$EXPECTED" != "$ACTUAL" ]; then
+            echo "::error::Playwright version mismatch: container has v$EXPECTED but package.json resolves to v$ACTUAL."
+            echo "Update the container image tag in .github/workflows/test.yml and the pinned version in package.json together."
+            exit 1
+          fi
 
       - name: Run tests
         run: npm test
