@@ -1094,13 +1094,21 @@ function drawGroupDecorations(groupInfoById) {
     rect.setAttribute('data-group-id', gid);
     svg.appendChild(rect);
 
-    // Label above the rect
+    // Label above the rect — truncate to fit the rect width so narrow lanes
+    // (mobile / vertical mode) don't overflow their group into the neighbour.
     if (g.parentTitle) {
       var label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
       label.setAttribute('x', x + PAD_X);
       label.setAttribute('y', y + LABEL_HEIGHT - 3);
       label.setAttribute('class', 'swim-group-label-text');
-      var labelText = g.parentTitle.length > 30 ? g.parentTitle.slice(0, 28) + '\u2026' : g.parentTitle;
+      // Approx char width at 9px SF Mono ≈ 5.4px. Leave 2*PAD_X breathing room.
+      var availableWidth = Math.max(0, w - PAD_X * 2);
+      var maxChars = Math.max(4, Math.floor(availableWidth / 5.4));
+      var hardCap = 30;
+      var limit = Math.min(maxChars, hardCap);
+      var labelText = g.parentTitle.length > limit
+        ? g.parentTitle.slice(0, Math.max(1, limit - 1)) + '\u2026'
+        : g.parentTitle;
       label.textContent = labelText;
       svg.appendChild(label);
     }
