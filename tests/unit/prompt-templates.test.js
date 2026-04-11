@@ -454,11 +454,14 @@ describe('plan template', () => {
     assert.ok(!result.prompt.includes('Implement changes incrementally'), 'Should not include implementation instructions');
   });
 
-  test('includes scope assessment section', () => {
+  test('includes scope assessment section with execution structure choices', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
     assert.ok(result.prompt.includes('Scope Assessment'));
-    assert.ok(result.prompt.includes('Appropriately sized'));
-    assert.ok(result.prompt.includes('Needs breakdown'));
+    assert.ok(result.prompt.includes('surfaces'));
+    assert.ok(result.prompt.includes('Single pass'));
+    assert.ok(result.prompt.includes('Sequential chain'));
+    assert.ok(result.prompt.includes('Foundation + parallel'));
+    assert.ok(result.prompt.includes('Hybrid'));
   });
 
   test('includes subtask summary when subtasks present', () => {
