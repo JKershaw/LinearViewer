@@ -589,35 +589,41 @@ body:has(.swim-page) {
   flex-direction: column;
   align-items: stretch;
   min-height: 0;
-  min-width: 180px;
+  width: 160px;
   flex-shrink: 0;
 }
 
 .swim-page[data-orientation="vertical"] .swim-lane-label {
   width: auto;
-  padding: 0.4rem 0.6rem;
+  padding: 0.35rem 0.5rem;
+  font-size: 10px;
+  line-height: 1.3;
   border-right: none;
   border-bottom: 2px solid #e0e0e0;
   border-radius: 4px 4px 0 0;
   justify-content: center;
   text-align: center;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .swim-page[data-orientation="vertical"] .swim-lane-items {
   flex-direction: column;
   align-items: stretch;
-  gap: 6px;
-  padding: 0.5rem 0.4rem;
+  gap: 5px;
+  padding: 0.4rem 0.35rem;
 }
 
 .swim-page[data-orientation="vertical"] .swim-lane-segment {
   flex-direction: column;
   align-items: stretch;
-  gap: 6px;
+  gap: 5px;
   padding-right: 0;
   margin-right: 0;
-  padding-bottom: 1rem;
-  margin-bottom: 0.5rem;
+  padding-bottom: 0.75rem;
+  margin-bottom: 0.25rem;
 }
 
 .swim-page[data-orientation="vertical"] .swim-lane-segment:last-child {
@@ -626,19 +632,32 @@ body:has(.swim-page) {
 }
 
 .swim-page[data-orientation="vertical"] .swim-column-slot {
-  min-height: 32px;
+  min-height: 28px;
   flex-direction: row;
   justify-content: center;
 }
 
-/* Status accent — top border instead of left border in vertical mode */
+/* Tight cards: fill the lane, compact padding, 3-line title clamp */
 .swim-page[data-orientation="vertical"] .swim-box {
   max-width: none;
   width: 100%;
   box-sizing: border-box;
+  padding: 0.3rem 0.45rem;
+  gap: 0.15rem 0.3rem;
   border-left: 1px solid #e0e0e0;
 }
 
+.swim-page[data-orientation="vertical"] .swim-box-title {
+  -webkit-line-clamp: 3;
+  line-height: 1.3;
+  font-size: 11px;
+}
+
+.swim-page[data-orientation="vertical"] .swim-box-id {
+  font-size: 9px;
+}
+
+/* Status accent — top border instead of left border in vertical mode */
 .swim-page[data-orientation="vertical"] .swim-box.state-started { border-left: 1px solid #e0e0e0; border-top: 3px solid #d4a600; }
 .swim-page[data-orientation="vertical"] .swim-box.state-completed { border-left: 1px solid #e0e0e0; border-top: 3px solid #16a085; }
 .swim-page[data-orientation="vertical"] .swim-box.state-canceled { border-left: 1px solid #e0e0e0; border-top: 3px solid #16a085; }
@@ -646,15 +665,52 @@ body:has(.swim-page) {
 .swim-page[data-orientation="vertical"] .swim-box.state-backlog { border-left: 1px solid #e0e0e0; border-top: 3px solid #ddd; }
 .swim-page[data-orientation="vertical"] .swim-box.blocked { border-left: 1px solid #e0e0e0; border-top: 3px solid #e67e22; }
 
-/* Compact mode in vertical keeps cards narrow but short */
+/* Compact mode in vertical: full-width chip, ID only (title hidden by base rule) */
 .swim-page[data-orientation="vertical"] .swim-box.compact {
   max-width: none;
   width: 100%;
+  padding: 0.2rem 0.4rem;
 }
 
+/* Desktop — slightly roomier lanes when there's real estate */
+@media (min-width: 1280px) {
+  .swim-page[data-orientation="vertical"] .swim-lane {
+    width: 170px;
+  }
+}
+
+/* Tablet / small laptop */
+@media (max-width: 900px) {
+  .swim-page[data-orientation="vertical"] .swim-lane {
+    width: 150px;
+  }
+}
+
+/* Phone */
 @media (max-width: 640px) {
   .swim-page[data-orientation="vertical"] .swim-lane {
-    min-width: 140px;
+    width: 130px;
+  }
+  .swim-page[data-orientation="vertical"] .swim-lane-items {
+    padding: 0.35rem 0.3rem;
+  }
+}
+
+/* Small phone */
+@media (max-width: 400px) {
+  .swim-page[data-orientation="vertical"] .swim-lane {
+    width: 114px;
+  }
+  .swim-page[data-orientation="vertical"] .swim-box {
+    padding: 0.25rem 0.35rem;
+  }
+  .swim-page[data-orientation="vertical"] .swim-box-title {
+    font-size: 10px;
+    -webkit-line-clamp: 3;
+  }
+  .swim-page[data-orientation="vertical"] .swim-lane-label {
+    font-size: 9px;
+    padding: 0.3rem 0.4rem;
   }
 }
 

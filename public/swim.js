@@ -855,8 +855,8 @@ function render() {
   // "slotWidth" is the sequence-axis slot length — horizontal: width; vertical: height.
   // Vertical cards are shorter along the sequence axis than horizontal ones.
   var slotWidth = settings.compact
-    ? (orientation === 'vertical' ? 60 : 140)
-    : (orientation === 'vertical' ? 80 : 210);
+    ? (orientation === 'vertical' ? 44 : 140)
+    : (orientation === 'vertical' ? 72 : 210);
 
   // Compute cross-lane columns if showBlockers is on
   var columnCounts = null;
