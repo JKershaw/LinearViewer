@@ -699,9 +699,11 @@ function getSettings() {
 
   var grouping = stored.grouping || document.getElementById('swim-grouping').value;
   var showBlockersDefault = (grouping === 'project' || grouping === 'assignee');
+  var orientationEl = document.getElementById('swim-orientation');
 
   return {
     grouping: grouping,
+    orientation: stored.orientation || (orientationEl ? orientationEl.value : 'horizontal'),
     maxLanes: stored.maxLanes || parseInt(document.getElementById('swim-max-lanes').value, 10),
     compact: stored.compact !== undefined ? stored.compact : document.getElementById('swim-compact').checked,
     showCompleted: stored.showCompleted !== undefined ? stored.showCompleted : document.getElementById('swim-show-completed').checked,
@@ -717,6 +719,8 @@ function saveSettings(settings) {
 
 function applySettingsToUI(settings) {
   document.getElementById('swim-grouping').value = settings.grouping;
+  var orientationEl = document.getElementById('swim-orientation');
+  if (orientationEl) orientationEl.value = settings.orientation || 'horizontal';
   document.getElementById('swim-max-lanes').value = settings.maxLanes;
   document.querySelector('.swim-max-lanes-value').textContent = settings.maxLanes;
   document.getElementById('swim-compact').checked = settings.compact;
@@ -841,9 +845,18 @@ function render() {
   var lanes = result.lanes;
   currentLanes = lanes; // Store for chain walk access
 
+  // Apply orientation to the page root so CSS can switch layout
+  var orientation = settings.orientation === 'vertical' ? 'vertical' : 'horizontal';
+  var pageEl = document.querySelector('.swim-page');
+  if (pageEl) pageEl.setAttribute('data-orientation', orientation);
+
   // Assign segments and compute global widths
   assignSegments(lanes, { grouping: settings.grouping, groupSubtasks: settings.groupSubtasks });
-  var slotWidth = settings.compact ? 140 : 210;
+  // "slotWidth" is the sequence-axis slot length — horizontal: width; vertical: height.
+  // Vertical cards are shorter along the sequence axis than horizontal ones.
+  var slotWidth = settings.compact
+    ? (orientation === 'vertical' ? 44 : 140)
+    : (orientation === 'vertical' ? 72 : 210);
 
   // Compute cross-lane columns if showBlockers is on
   var columnCounts = null;
@@ -861,6 +874,9 @@ function render() {
     container.innerHTML = '<div class="swim-empty">No tasks to display</div>';
     return;
   }
+
+  // In vertical mode, inline sizes become heights instead of widths
+  var sizeProp = orientation === 'vertical' ? 'min-height' : 'min-width';
 
   // Collect all segment indices in order
   var segmentKeys = Object.keys(segmentWidths).map(Number).sort(function(a, b) { return a - b; });
@@ -898,7 +914,7 @@ function render() {
       var segItems = itemsBySegment[segKey] || [];
       var minWidth = segmentWidths[segKey] || 0;
 
-      html += '<div class="swim-lane-segment" data-segment="' + segKey + '" style="min-width:' + minWidth + 'px">';
+      html += '<div class="swim-lane-segment" data-segment="' + segKey + '" style="' + sizeProp + ':' + minWidth + 'px">';
 
       if (useColumns && columnCounts && columnCounts[segKey] > 0) {
         // Column-based rendering: place items in column slots
@@ -912,7 +928,7 @@ function render() {
 
         for (var col = 0; col < totalCols; col++) {
           var colItems = itemsByCol[col] || [];
-          html += '<div class="swim-column-slot" data-column="' + col + '" style="min-width:' + slotWidth + 'px">';
+          html += '<div class="swim-column-slot" data-column="' + col + '" style="' + sizeProp + ':' + slotWidth + 'px">';
           for (var ci = 0; ci < colItems.length; ci++) {
             html += renderBox(colItems[ci], settings, blockedByMap, boxGroupInfo(colItems[ci]));
           }
@@ -935,7 +951,11 @@ function render() {
 
   // Draw SVG connectors and (optionally) group decorations post-layout
   requestAnimationFrame(function() {
-    drawBlockingConnectors(lanes, useColumns ? blockedByMap : null);
+    if (orientation === 'vertical') {
+      drawBlockingConnectorsVertical(lanes, useColumns ? blockedByMap : null);
+    } else {
+      drawBlockingConnectors(lanes, useColumns ? blockedByMap : null);
+    }
     if (settings.groupSubtasks) {
       drawGroupDecorations(groupInfoById);
     }
@@ -1476,6 +1496,392 @@ function drawBlockingConnectors(lanes, blockedByMap) {
   lanesEl.appendChild(svg);
 }
 
+// =============================================================================
+// SVG Connector Lines — Vertical Orientation
+//
+// Mirror of drawBlockingConnectors: lanes are columns instead of rows, items
+// flow top-to-bottom, blockers exit the BOTTOM of their card and connect to
+// the TOP of the target. "Lane gaps" are vertical corridors between lane
+// columns, and routing passes through horizontal channels (same x-range, a
+// fixed y) instead of vertical ones.
+// =============================================================================
+
+function drawBlockingConnectorsVertical(lanes, blockedByMap) {
+  // Remove any existing SVG
+  var existing = document.getElementById('swim-connectors');
+  if (existing) existing.remove();
+
+  var container = document.querySelector('.swim-container');
+  var lanesEl = document.getElementById('swim-lanes');
+  if (!container || !lanesEl) return;
+
+  var containerRect = lanesEl.getBoundingClientRect();
+
+  // Build map of laneIndex per item
+  var itemLaneIndex = new Map();
+  for (var li = 0; li < lanes.length; li++) {
+    for (var ii = 0; ii < lanes[li].items.length; ii++) {
+      itemLaneIndex.set(lanes[li].items[ii].id, li);
+    }
+  }
+
+  // Build item position index within each lane for adjacency check
+  var itemPosInLane = new Map();
+  for (var li = 0; li < lanes.length; li++) {
+    for (var ii = 0; ii < lanes[li].items.length; ii++) {
+      itemPosInLane.set(lanes[li].items[ii].id, ii);
+    }
+  }
+
+  // Find all blocking edges, categorized
+  var crossLaneEdges = [];
+  var sameLaneAdjacentEdges = [];
+  var sameLaneArcEdges = [];
+  if (blockedByMap) blockedByMap.forEach(function(blockers, blockedId) {
+    var blockedLane = itemLaneIndex.get(blockedId);
+    var blockedPos = itemPosInLane.get(blockedId);
+    for (var i = 0; i < blockers.length; i++) {
+      var blockerLane = itemLaneIndex.get(blockers[i].id);
+      var blockerPos = itemPosInLane.get(blockers[i].id);
+      if (blockerLane === undefined || blockedLane === undefined) continue;
+      if (blockerLane !== blockedLane) {
+        crossLaneEdges.push({ fromId: blockers[i].id, toId: blockedId });
+      } else if (Math.abs(blockedPos - blockerPos) > 1) {
+        sameLaneArcEdges.push({ fromId: blockers[i].id, toId: blockedId });
+      } else {
+        sameLaneAdjacentEdges.push({ fromId: blockers[i].id, toId: blockedId });
+      }
+    }
+  });
+
+  // Collect sequential (non-blocking) adjacent pairs in each lane
+  var sequentialEdges = [];
+  for (var li = 0; li < lanes.length; li++) {
+    var laneItems = lanes[li].items;
+    for (var ii = 0; ii < laneItems.length - 1; ii++) {
+      var curr = laneItems[ii];
+      var next = laneItems[ii + 1];
+      var isBlocking = curr.blocksIds && curr.blocksIds.indexOf(next.id) !== -1;
+      if (!isBlocking) {
+        sequentialEdges.push({ fromId: curr.id, toId: next.id });
+      }
+    }
+  }
+
+  var totalEdges = crossLaneEdges.length + sameLaneAdjacentEdges.length + sameLaneArcEdges.length + sequentialEdges.length;
+  if (totalEdges === 0) return;
+
+  // Create SVG element
+  var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.id = 'swim-connectors';
+  svg.setAttribute('class', 'swim-connectors');
+  svg.setAttribute('width', lanesEl.scrollWidth);
+  svg.setAttribute('height', lanesEl.scrollHeight);
+
+  // Define arrowhead markers (orient="auto" rotates the arrow with the line direction)
+  var defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+  var marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+  marker.setAttribute('id', 'swim-arrow');
+  marker.setAttribute('viewBox', '0 0 8 8');
+  marker.setAttribute('refX', '7');
+  marker.setAttribute('refY', '4');
+  marker.setAttribute('markerWidth', '5');
+  marker.setAttribute('markerHeight', '5');
+  marker.setAttribute('orient', 'auto');
+  var arrowPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  arrowPath.setAttribute('d', 'M0,1 L7,4 L0,7 Z');
+  arrowPath.setAttribute('fill', '#e67e22');
+  arrowPath.setAttribute('opacity', '0.7');
+  marker.appendChild(arrowPath);
+  defs.appendChild(marker);
+
+  var greyMarker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+  greyMarker.setAttribute('id', 'swim-arrow-grey');
+  greyMarker.setAttribute('viewBox', '0 0 8 8');
+  greyMarker.setAttribute('refX', '7');
+  greyMarker.setAttribute('refY', '4');
+  greyMarker.setAttribute('markerWidth', '7');
+  greyMarker.setAttribute('markerHeight', '7');
+  greyMarker.setAttribute('orient', 'auto');
+  var greyArrowPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  greyArrowPath.setAttribute('d', 'M0,1 L7,4 L0,7 Z');
+  greyArrowPath.setAttribute('fill', '#bbb');
+  greyArrowPath.setAttribute('opacity', '0.6');
+  greyMarker.appendChild(greyArrowPath);
+  defs.appendChild(greyMarker);
+
+  svg.appendChild(defs);
+
+  // Collect all box rects for obstacle avoidance
+  var allBoxEls = document.querySelectorAll('.swim-box');
+  var boxRects = [];
+  for (var bi = 0; bi < allBoxEls.length; bi++) {
+    var br = allBoxEls[bi].getBoundingClientRect();
+    boxRects.push({
+      left: br.left - containerRect.left,
+      right: br.right - containerRect.left,
+      top: br.top - containerRect.top,
+      bottom: br.bottom - containerRect.top
+    });
+  }
+
+  // Check if a horizontal line at y intersects any box in the x range
+  function hitsBoxHoriz(y, xMin, xMax, padding) {
+    for (var i = 0; i < boxRects.length; i++) {
+      var r = boxRects[i];
+      if (y >= r.top - padding && y <= r.bottom + padding &&
+          r.right > xMin && r.left < xMax) {
+        return r;
+      }
+    }
+    return null;
+  }
+
+  // Compute lane boundary x-coordinates for gap routing
+  var laneEls = document.querySelectorAll('.swim-lane');
+  var laneBounds = []; // {left, right, midX}
+  for (var li = 0; li < laneEls.length; li++) {
+    var lr = laneEls[li].getBoundingClientRect();
+    laneBounds.push({
+      left: lr.left - containerRect.left,
+      right: lr.right - containerRect.left,
+      midX: lr.left + lr.width / 2 - containerRect.left
+    });
+  }
+
+  // Find the x-coordinate in the gap between two lanes
+  function laneGapX(laneIdx, direction) {
+    // direction: 'left' = gap to the left of this lane, 'right' = gap to the right
+    if (direction === 'left') {
+      if (laneIdx > 0) {
+        return (laneBounds[laneIdx - 1].right + laneBounds[laneIdx].left) / 2;
+      }
+      return laneBounds[laneIdx].left - 4;
+    } else {
+      if (laneIdx < laneBounds.length - 1) {
+        return (laneBounds[laneIdx].right + laneBounds[laneIdx + 1].left) / 2;
+      }
+      return laneBounds[laneIdx].right + 4;
+    }
+  }
+
+  var STUB_LEN = 12;
+  var CHANNEL_SPACING = 6;
+  var BOX_PADDING = 4;
+
+  // Pre-compute cross-lane edge geometries
+  var edgeData = [];
+  for (var e = 0; e < crossLaneEdges.length; e++) {
+    var fromEl = document.querySelector('.swim-box[data-issue-id="' + crossLaneEdges[e].fromId + '"]');
+    var toEl = document.querySelector('.swim-box[data-issue-id="' + crossLaneEdges[e].toId + '"]');
+    if (!fromEl || !toEl) continue;
+
+    var fromRect = fromEl.getBoundingClientRect();
+    var toRect = toEl.getBoundingClientRect();
+    var fromLane = itemLaneIndex.get(crossLaneEdges[e].fromId);
+    var toLane = itemLaneIndex.get(crossLaneEdges[e].toId);
+
+    edgeData.push({
+      fromId: crossLaneEdges[e].fromId,
+      toId: crossLaneEdges[e].toId,
+      // Start: horizontal center of blocker's BOTTOM
+      x1: fromRect.left + fromRect.width / 2 - containerRect.left,
+      y1: fromRect.bottom - containerRect.top,
+      // End: horizontal center of target's TOP
+      x2: toRect.left + toRect.width / 2 - containerRect.left,
+      y2: toRect.top - containerRect.top,
+      fromLane: fromLane,
+      toLane: toLane
+    });
+  }
+
+  // Sort edges by blocker y, then by horizontal span (smaller spans first)
+  edgeData.sort(function(a, b) { return a.y1 - b.y1 || Math.abs(a.x1 - a.x2) - Math.abs(b.x1 - b.x2); });
+
+  // Track used vertical channels in lane gaps (vertical corridors)
+  var usedGapChannels = []; // {gapX, yMin, yMax}
+
+  function findClearGapX(baseGapX, yMin, yMax) {
+    var x = baseGapX;
+    for (var attempt = 0; attempt < 10; attempt++) {
+      var conflict = false;
+      for (var ci = 0; ci < usedGapChannels.length; ci++) {
+        var ch = usedGapChannels[ci];
+        if (Math.abs(x - ch.gapX) < CHANNEL_SPACING &&
+            ch.yMax > yMin && ch.yMin < yMax) {
+          conflict = true;
+          x = ch.gapX + CHANNEL_SPACING;
+          break;
+        }
+      }
+      if (!conflict) return x;
+    }
+    return x;
+  }
+
+  // Track used horizontal channels (y coords used for horizontal runs)
+  var usedChannels = []; // {y, xMin, xMax}
+
+  function findClearHorizChannel(startY, xMin, xMax) {
+    var y = startY;
+    for (var attempt = 0; attempt < 30; attempt++) {
+      var hit = hitsBoxHoriz(y, xMin, xMax, BOX_PADDING);
+      if (hit) {
+        y = hit.bottom + BOX_PADDING + 2;
+        continue;
+      }
+      var channelConflict = false;
+      for (var ci = 0; ci < usedChannels.length; ci++) {
+        var ch = usedChannels[ci];
+        if (Math.abs(y - ch.y) < CHANNEL_SPACING &&
+            ch.xMax > xMin && ch.xMin < xMax) {
+          channelConflict = true;
+          y = ch.y + CHANNEL_SPACING;
+          break;
+        }
+      }
+      if (!channelConflict) return y;
+    }
+    return y;
+  }
+
+  // Draw each cross-lane edge: route through lane gaps so verticals never cross cards
+  for (var e = 0; e < edgeData.length; e++) {
+    var ed = edgeData[e];
+    var goingRight = ed.toLane > ed.fromLane;
+
+    // Exit gap: gap between blocker's lane and the next lane toward target
+    var exitGapBaseX = laneGapX(ed.fromLane, goingRight ? 'right' : 'left');
+    // Entry gap: gap between target's lane and the lane toward blocker
+    var entryGapBaseX = laneGapX(ed.toLane, goingRight ? 'left' : 'right');
+
+    // Find the horizontal channel y (avoiding boxes)
+    var xMin = Math.min(exitGapBaseX, entryGapBaseX);
+    var xMax = Math.max(exitGapBaseX, entryGapBaseX);
+    var midY = findClearHorizChannel(ed.y1 + STUB_LEN, xMin, xMax);
+    if (midY > ed.y2 - STUB_LEN) {
+      midY = ed.y2 - STUB_LEN;
+    }
+    usedChannels.push({ y: midY, xMin: xMin, xMax: xMax });
+
+    // Find clear vertical gap channels
+    var exitVertMin = Math.min(ed.y1, midY);
+    var exitVertMax = Math.max(ed.y1, midY);
+    var exitGapX = findClearGapX(exitGapBaseX, exitVertMin, exitVertMax);
+    usedGapChannels.push({ gapX: exitGapX, yMin: exitVertMin, yMax: exitVertMax });
+
+    var entryVertMin = Math.min(midY, ed.y2);
+    var entryVertMax = Math.max(midY, ed.y2);
+    var entryGapX = findClearGapX(entryGapBaseX, entryVertMin, entryVertMax);
+    usedGapChannels.push({ gapX: entryGapX, yMin: entryVertMin, yMax: entryVertMax });
+
+    // Build path with vertical stubs so lines always exit/enter cards vertically
+    var exitStubY = ed.y1 + STUB_LEN;
+    var entryStubY = ed.y2 - STUB_LEN;
+
+    var d = 'M' + ed.x1 + ',' + ed.y1 +              // start at blocker bottom-center
+      ' L' + ed.x1 + ',' + exitStubY +                // vertical stub out of blocker
+      ' L' + exitGapX + ',' + exitStubY +              // horizontal to exit gap column
+      ' L' + exitGapX + ',' + midY +                   // vertical in exit gap
+      ' L' + entryGapX + ',' + midY +                  // horizontal to entry gap column
+      ' L' + entryGapX + ',' + entryStubY +            // vertical in entry gap
+      ' L' + ed.x2 + ',' + entryStubY +                // horizontal into target lane
+      ' L' + ed.x2 + ',' + ed.y2;                      // vertical stub into target top
+
+    var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', d);
+    path.setAttribute('class', 'swim-connector-path');
+    path.setAttribute('data-from', ed.fromId);
+    path.setAttribute('data-to', ed.toId);
+    path.setAttribute('marker-end', 'url(#swim-arrow)');
+    svg.appendChild(path);
+  }
+
+  // Draw same-lane adjacent blocking connectors (vertical lines)
+  for (var se = 0; se < sameLaneAdjacentEdges.length; se++) {
+    var adjFrom = document.querySelector('.swim-box[data-issue-id="' + sameLaneAdjacentEdges[se].fromId + '"]');
+    var adjTo = document.querySelector('.swim-box[data-issue-id="' + sameLaneAdjacentEdges[se].toId + '"]');
+    if (!adjFrom || !adjTo) continue;
+
+    var adjFromRect = adjFrom.getBoundingClientRect();
+    var adjToRect = adjTo.getBoundingClientRect();
+
+    var sx1 = adjFromRect.left + adjFromRect.width / 2 - containerRect.left;
+    var sy1 = adjFromRect.bottom - containerRect.top;
+    var sx2 = adjToRect.left + adjToRect.width / 2 - containerRect.left;
+    var sy2 = adjToRect.top - containerRect.top;
+
+    var sd = 'M' + sx1 + ',' + sy1 + ' L' + sx2 + ',' + sy2;
+
+    var sPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    sPath.setAttribute('d', sd);
+    sPath.setAttribute('class', 'swim-connector-path');
+    sPath.setAttribute('data-from', sameLaneAdjacentEdges[se].fromId);
+    sPath.setAttribute('data-to', sameLaneAdjacentEdges[se].toId);
+    sPath.setAttribute('marker-end', 'url(#swim-arrow)');
+    svg.appendChild(sPath);
+  }
+
+  // Draw same-lane non-adjacent blocking arcs (bezier to the right of items)
+  var ARC_WIDTH = 20;
+  for (var ae = 0; ae < sameLaneArcEdges.length; ae++) {
+    var arcFromEl = document.querySelector('.swim-box[data-issue-id="' + sameLaneArcEdges[ae].fromId + '"]');
+    var arcToEl = document.querySelector('.swim-box[data-issue-id="' + sameLaneArcEdges[ae].toId + '"]');
+    if (!arcFromEl || !arcToEl) continue;
+
+    var arcFromRect = arcFromEl.getBoundingClientRect();
+    var arcToRect = arcToEl.getBoundingClientRect();
+
+    var ax1 = arcFromRect.right - containerRect.left;
+    var ay1 = arcFromRect.bottom - containerRect.top;
+    var ax2 = arcToRect.right - containerRect.left;
+    var ay2 = arcToRect.top - containerRect.top;
+
+    // Quadratic bezier arc to the right of the items
+    var arcMidY = (ay1 + ay2) / 2;
+    var arcRightX = Math.max(ax1, ax2) + ARC_WIDTH;
+
+    var arcD = 'M' + ax1 + ',' + ay1 +
+      ' Q' + arcRightX + ',' + arcMidY + ' ' + ax2 + ',' + ay2;
+
+    var arcPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    arcPath.setAttribute('d', arcD);
+    arcPath.setAttribute('class', 'swim-connector-path');
+    arcPath.setAttribute('data-from', sameLaneArcEdges[ae].fromId);
+    arcPath.setAttribute('data-to', sameLaneArcEdges[ae].toId);
+    arcPath.setAttribute('marker-end', 'url(#swim-arrow)');
+    svg.appendChild(arcPath);
+  }
+
+  // Draw sequential (non-blocking) adjacent connectors as grey vertical lines
+  for (var sq = 0; sq < sequentialEdges.length; sq++) {
+    var seqFrom = document.querySelector('.swim-box[data-issue-id="' + sequentialEdges[sq].fromId + '"]');
+    var seqTo = document.querySelector('.swim-box[data-issue-id="' + sequentialEdges[sq].toId + '"]');
+    if (!seqFrom || !seqTo) continue;
+
+    var seqFromRect = seqFrom.getBoundingClientRect();
+    var seqToRect = seqTo.getBoundingClientRect();
+
+    var sqx1 = seqFromRect.left + seqFromRect.width / 2 - containerRect.left;
+    var sqy1 = seqFromRect.bottom - containerRect.top;
+    var sqx2 = seqToRect.left + seqToRect.width / 2 - containerRect.left;
+    var sqy2 = seqToRect.top - containerRect.top;
+
+    var sqd = 'M' + sqx1 + ',' + sqy1 + ' L' + sqx2 + ',' + sqy2;
+
+    var sqPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    sqPath.setAttribute('d', sqd);
+    sqPath.setAttribute('class', 'swim-connector-path swim-sequential-path');
+    sqPath.setAttribute('data-from', sequentialEdges[sq].fromId);
+    sqPath.setAttribute('data-to', sequentialEdges[sq].toId);
+    sqPath.setAttribute('marker-end', 'url(#swim-arrow-grey)');
+    svg.appendChild(sqPath);
+  }
+
+  lanesEl.style.position = 'relative';
+  lanesEl.appendChild(svg);
+}
+
 // Redraw connectors on resize
 var resizeTimer;
 window.addEventListener('resize', function() {
@@ -1849,8 +2255,10 @@ document.querySelector('.swim-settings-toggle').addEventListener('click', functi
 // Settings changes
 function onSettingsChange() {
   clearCriticalPath();
+  var orientationEl = document.getElementById('swim-orientation');
   var settings = {
     grouping: document.getElementById('swim-grouping').value,
+    orientation: orientationEl ? orientationEl.value : 'horizontal',
     maxLanes: parseInt(document.getElementById('swim-max-lanes').value, 10),
     compact: document.getElementById('swim-compact').checked,
     showCompleted: document.getElementById('swim-show-completed').checked,
@@ -1872,6 +2280,8 @@ document.getElementById('swim-grouping').addEventListener('change', function() {
 });
 document.getElementById('swim-max-lanes').addEventListener('input', onSettingsChange);
 document.getElementById('swim-compact').addEventListener('change', onSettingsChange);
+var orientationEl = document.getElementById('swim-orientation');
+if (orientationEl) orientationEl.addEventListener('change', onSettingsChange);
 document.getElementById('swim-show-completed').addEventListener('change', onSettingsChange);
 document.getElementById('swim-show-blockers').addEventListener('change', onSettingsChange);
 document.getElementById('swim-group-subtasks').addEventListener('change', onSettingsChange);
@@ -1950,14 +2360,16 @@ document.addEventListener('keydown', function(e) {
   if (!container) return;
 
   var isDragging = false;
-  var startX, scrollLeft;
+  var startX, startY, scrollLeft, scrollTop;
 
   container.addEventListener('mousedown', function(e) {
     // Don't drag when clicking on interactive elements
     if (e.target.closest('.swim-box, .swim-popover, button, a, input, select, label')) return;
     isDragging = true;
     startX = e.pageX - container.offsetLeft;
+    startY = e.pageY - container.offsetTop;
     scrollLeft = container.scrollLeft;
+    scrollTop = container.scrollTop;
     container.style.cursor = 'grabbing';
     container.style.userSelect = 'none';
     e.preventDefault();
@@ -1966,7 +2378,9 @@ document.addEventListener('keydown', function(e) {
   window.addEventListener('mousemove', function(e) {
     if (!isDragging) return;
     var x = e.pageX - container.offsetLeft;
+    var y = e.pageY - container.offsetTop;
     container.scrollLeft = scrollLeft - (x - startX);
+    container.scrollTop = scrollTop - (y - startY);
   });
 
   window.addEventListener('mouseup', function() {
