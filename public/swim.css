@@ -566,6 +566,99 @@ body:has(.swim-page) {
 }
 
 /* ==========================================================================
+   Vertical Orientation
+
+   Mirror of the horizontal layout: lanes become columns laid out left-to-right,
+   items within a lane stack top-to-bottom, labels sit on top of each lane.
+   The swim algorithm is unchanged — only the visual axes are swapped.
+   ========================================================================== */
+
+.swim-page[data-orientation="vertical"] .swim-container {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: calc(100vh - 140px);
+}
+
+.swim-page[data-orientation="vertical"] .swim-lanes {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.swim-page[data-orientation="vertical"] .swim-lane {
+  flex-direction: column;
+  align-items: stretch;
+  min-height: 0;
+  min-width: 180px;
+  flex-shrink: 0;
+}
+
+.swim-page[data-orientation="vertical"] .swim-lane-label {
+  width: auto;
+  padding: 0.4rem 0.6rem;
+  border-right: none;
+  border-bottom: 2px solid #e0e0e0;
+  border-radius: 4px 4px 0 0;
+  justify-content: center;
+  text-align: center;
+}
+
+.swim-page[data-orientation="vertical"] .swim-lane-items {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 0.5rem 0.4rem;
+}
+
+.swim-page[data-orientation="vertical"] .swim-lane-segment {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding-right: 0;
+  margin-right: 0;
+  padding-bottom: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.swim-page[data-orientation="vertical"] .swim-lane-segment:last-child {
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
+
+.swim-page[data-orientation="vertical"] .swim-column-slot {
+  min-height: 32px;
+  flex-direction: row;
+  justify-content: center;
+}
+
+/* Status accent — top border instead of left border in vertical mode */
+.swim-page[data-orientation="vertical"] .swim-box {
+  max-width: none;
+  width: 100%;
+  box-sizing: border-box;
+  border-left: 1px solid #e0e0e0;
+}
+
+.swim-page[data-orientation="vertical"] .swim-box.state-started { border-left: 1px solid #e0e0e0; border-top: 3px solid #d4a600; }
+.swim-page[data-orientation="vertical"] .swim-box.state-completed { border-left: 1px solid #e0e0e0; border-top: 3px solid #16a085; }
+.swim-page[data-orientation="vertical"] .swim-box.state-canceled { border-left: 1px solid #e0e0e0; border-top: 3px solid #16a085; }
+.swim-page[data-orientation="vertical"] .swim-box.state-unstarted { border-left: 1px solid #e0e0e0; border-top: 3px solid #bbb; }
+.swim-page[data-orientation="vertical"] .swim-box.state-backlog { border-left: 1px solid #e0e0e0; border-top: 3px solid #ddd; }
+.swim-page[data-orientation="vertical"] .swim-box.blocked { border-left: 1px solid #e0e0e0; border-top: 3px solid #e67e22; }
+
+/* Compact mode in vertical keeps cards narrow but short */
+.swim-page[data-orientation="vertical"] .swim-box.compact {
+  max-width: none;
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .swim-page[data-orientation="vertical"] .swim-lane {
+    min-width: 140px;
+  }
+}
+
+/* ==========================================================================
    Responsive - Small Phones
    ========================================================================== */
 
