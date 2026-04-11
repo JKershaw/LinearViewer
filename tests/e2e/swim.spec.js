@@ -289,4 +289,99 @@ test.describe('Swim Page with Sample Data', () => {
     expect(labels).toContain('API v2');
     expect(labels).toContain('Infrastructure');
   });
+
+  test('group subtasks checkbox is checked by default', async ({ page }) => {
+    await page.locator('.swim-settings-toggle').click();
+    await expect(page.locator('#swim-group-subtasks')).toBeChecked();
+  });
+
+  test('subtask groups emit data-group-id attributes when enabled', async ({ page }) => {
+    // Sample data has DASH-1 parent with DASH-1a/1b/1c subtasks
+    const groupedBoxes = await page.locator('.swim-box[data-group-id]').count();
+    expect(groupedBoxes).toBeGreaterThan(0);
+
+    // At least one parent role and one child role should exist
+    const parents = await page.locator('.swim-box[data-group-role="parent"]').count();
+    const children = await page.locator('.swim-box[data-group-role="child"]').count();
+    expect(parents).toBeGreaterThan(0);
+    expect(children).toBeGreaterThan(0);
+  });
+
+  test('group decoration SVG is drawn when groups exist', async ({ page }) => {
+    // Wait for the post-layout decoration to be drawn
+    await expect(page.locator('#swim-group-decorations')).toBeAttached();
+    const rects = await page.locator('.swim-group-rect').count();
+    expect(rects).toBeGreaterThan(0);
+  });
+
+  test('subtask clustering: children are adjacent to parent in DOM order', async ({ page }) => {
+    // With clustering on, a parent's children should be the immediately
+    // following siblings within the same segment.
+    const parent = page.locator('.swim-box[data-group-role="parent"]').first();
+    const parentGroupId = await parent.getAttribute('data-group-id');
+    const parentIssueId = await parent.getAttribute('data-issue-id');
+
+    // All boxes in the same segment as this parent, in DOM order
+    const segment = parent.locator('xpath=ancestor::*[contains(@class, "swim-lane-segment")][1]');
+    const siblingBoxes = segment.locator('.swim-box');
+    const siblingCount = await siblingBoxes.count();
+
+    // Find the parent's index
+    let parentIdx = -1;
+    for (let i = 0; i < siblingCount; i++) {
+      const id = await siblingBoxes.nth(i).getAttribute('data-issue-id');
+      if (id === parentIssueId) { parentIdx = i; break; }
+    }
+    expect(parentIdx).toBeGreaterThanOrEqual(0);
+
+    // The box immediately after the parent should belong to the same group
+    const nextGroup = await siblingBoxes.nth(parentIdx + 1).getAttribute('data-group-id');
+    expect(nextGroup).toBe(parentGroupId);
+  });
+
+  test('disabling group subtasks removes decoration and data-group-id attributes', async ({ page }) => {
+    await page.locator('.swim-settings-toggle').click();
+
+    // Baseline: decoration visible
+    const initialRects = await page.locator('.swim-group-rect').count();
+    expect(initialRects).toBeGreaterThan(0);
+
+    // Turn it off
+    await page.locator('#swim-group-subtasks').uncheck();
+
+    // Decorations should be gone and no group data attributes remain
+    await expect(page.locator('.swim-group-rect')).toHaveCount(0);
+    await expect(page.locator('.swim-box[data-group-id]')).toHaveCount(0);
+  });
+
+  test('group subtasks works alongside show blockers', async ({ page }) => {
+    await page.locator('.swim-settings-toggle').click();
+
+    // Turn on show blockers (switches to column-slot rendering)
+    await page.locator('#swim-show-blockers').check();
+
+    // Column slots should be present
+    const slots = await page.locator('.swim-column-slot').count();
+    expect(slots).toBeGreaterThan(0);
+
+    // Group decorations should still be drawn
+    const rects = await page.locator('.swim-group-rect').count();
+    expect(rects).toBeGreaterThan(0);
+
+    // And grouped cards should still have the data attributes
+    const parents = await page.locator('.swim-box[data-group-role="parent"]').count();
+    expect(parents).toBeGreaterThan(0);
+  });
+
+  test('group subtasks setting persists across reload', async ({ page }) => {
+    await page.locator('.swim-settings-toggle').click();
+    await page.locator('#swim-group-subtasks').uncheck();
+
+    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/swim`);
+    await page.waitForLoadState('networkidle');
+
+    await page.locator('.swim-settings-toggle').click();
+    await expect(page.locator('#swim-group-subtasks')).not.toBeChecked();
+    await expect(page.locator('.swim-group-rect')).toHaveCount(0);
+  });
 });

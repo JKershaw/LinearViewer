@@ -542,3 +542,150 @@ describe('computeCrossLaneColumns', () => {
     assert.ok(second.column > first.column, 'second should be after first');
   });
 });
+
+// =============================================================================
+// Subtask Grouping (cluster siblings + parent promotion in all modes)
+// =============================================================================
+
+describe('subtask grouping — cluster siblings', () => {
+  test('children follow parent contiguously in dependency mode', () => {
+    const cards = [
+      createCard({ id: 'parent', projectName: 'P' }),
+      createCard({ id: 'other', projectName: 'P' }),
+      createCard({ id: 'child1', parentId: 'parent', projectName: 'P' }),
+      createCard({ id: 'child2', parentId: 'parent', projectName: 'P' })
+    ];
+    const { lanes } = assignLanes(cards, { grouping: 'dependency', maxLanes: 10 });
+    const ids = lanes[0].items.map(i => i.id);
+    const parentIdx = ids.indexOf('parent');
+    // children should be immediately after parent
+    assert.strictEqual(ids[parentIdx + 1], 'child1');
+    assert.strictEqual(ids[parentIdx + 2], 'child2');
+  });
+
+  test('children follow parent in project mode too', () => {
+    const cards = [
+      createCard({ id: 'parent', projectName: 'P' }),
+      createCard({ id: 'unrelated', projectName: 'P' }),
+      createCard({ id: 'child', parentId: 'parent', projectName: 'P' })
+    ];
+    const { lanes } = assignLanes(cards, { grouping: 'project', maxLanes: 10 });
+    const ids = lanes[0].items.map(i => i.id);
+    const parentIdx = ids.indexOf('parent');
+    assert.strictEqual(ids[parentIdx + 1], 'child', 'child should follow parent immediately');
+  });
+
+  test('nested subtasks: grandchild follows child follows parent', () => {
+    const cards = [
+      createCard({ id: 'grandparent', projectName: 'P' }),
+      createCard({ id: 'stray', projectName: 'P' }),
+      createCard({ id: 'parent', parentId: 'grandparent', projectName: 'P' }),
+      createCard({ id: 'child', parentId: 'parent', projectName: 'P' })
+    ];
+    const { lanes } = assignLanes(cards, { grouping: 'project', maxLanes: 10 });
+    const ids = lanes[0].items.map(i => i.id);
+    const gIdx = ids.indexOf('grandparent');
+    assert.strictEqual(ids[gIdx + 1], 'parent');
+    assert.strictEqual(ids[gIdx + 2], 'child');
+  });
+
+  test('does not pull child past its explicit blocker', () => {
+    // blocker blocks child, parent appears first. Cluster pass must NOT pull
+    // child before blocker, even to sit next to parent.
+    const cards = [
+      createCard({ id: 'parent', projectName: 'P' }),
+      createCard({ id: 'blocker', blocksIds: ['child'], projectName: 'P' }),
+      createCard({ id: 'child', parentId: 'parent', projectName: 'P' })
+    ];
+    const { lanes } = assignLanes(cards, { grouping: 'dependency', maxLanes: 10 });
+    const ids = lanes[0].items.map(i => i.id);
+    // blocker must appear before child
+    assert.ok(ids.indexOf('blocker') < ids.indexOf('child'), 'blocker must precede child');
+  });
+
+  test('groupSubtasks=false disables clustering', () => {
+    const cards = [
+      createCard({ id: 'parent', projectName: 'P' }),
+      createCard({ id: 'unrelated', projectName: 'P' }),
+      createCard({ id: 'child', parentId: 'parent', projectName: 'P' })
+    ];
+    const { lanes } = assignLanes(cards, { grouping: 'project', maxLanes: 10, groupSubtasks: false });
+    const ids = lanes[0].items.map(i => i.id);
+    // Without clustering, 'unrelated' stays between parent and child
+    assert.strictEqual(ids[0], 'parent');
+    assert.strictEqual(ids[1], 'unrelated');
+    assert.strictEqual(ids[2], 'child');
+  });
+
+  test('multiple independent parents each cluster their own subtasks', () => {
+    const cards = [
+      createCard({ id: 'p1', projectName: 'P' }),
+      createCard({ id: 'p2', projectName: 'P' }),
+      createCard({ id: 'c1', parentId: 'p1', projectName: 'P' }),
+      createCard({ id: 'c2', parentId: 'p2', projectName: 'P' })
+    ];
+    const { lanes } = assignLanes(cards, { grouping: 'project', maxLanes: 10 });
+    const ids = lanes[0].items.map(i => i.id);
+    // p1 immediately followed by c1; p2 immediately followed by c2
+    const p1Idx = ids.indexOf('p1');
+    const p2Idx = ids.indexOf('p2');
+    assert.strictEqual(ids[p1Idx + 1], 'c1');
+    assert.strictEqual(ids[p2Idx + 1], 'c2');
+  });
+});
+
+describe('subtask grouping — parent promotion in non-dependency modes', () => {
+  test('project mode: parent of started child gets segment 0 when groupSubtasks on', () => {
+    const cards = [
+      createCard({ id: 'parent', stateType: 'unstarted', projectName: 'P' }),
+      createCard({ id: 'child', stateType: 'started', parentId: 'parent', projectName: 'P' })
+    ];
+    const { lanes } = assignLanes(cards, { grouping: 'project' });
+    assignSegments(lanes, { grouping: 'project', groupSubtasks: true });
+    assert.strictEqual(lanes[0].items.find(i => i.id === 'parent').segment, 0);
+    assert.strictEqual(lanes[0].items.find(i => i.id === 'child').segment, 0);
+  });
+
+  test('assignee mode: parent of started child gets segment 0 when groupSubtasks on', () => {
+    const cards = [
+      createCard({ id: 'parent', stateType: 'unstarted', assignee: 'Alice' }),
+      createCard({ id: 'child', stateType: 'started', parentId: 'parent', assignee: 'Alice' })
+    ];
+    const { lanes } = assignLanes(cards, { grouping: 'assignee' });
+    assignSegments(lanes, { grouping: 'assignee', groupSubtasks: true });
+    assert.strictEqual(lanes[0].items.find(i => i.id === 'parent').segment, 0);
+  });
+
+  test('project mode: unrelated blockers are NOT promoted when groupSubtasks on', () => {
+    // In project mode with groupSubtasks, only parents (not arbitrary blockers)
+    // should be promoted, to preserve project-mode semantics.
+    const cards = [
+      createCard({ id: 'blocker', stateType: 'unstarted', blocksIds: ['active'], projectName: 'P' }),
+      createCard({ id: 'active', stateType: 'started', projectName: 'P' })
+    ];
+    const { lanes } = assignLanes(cards, { grouping: 'project' });
+    assignSegments(lanes, { grouping: 'project', groupSubtasks: true });
+    assert.strictEqual(lanes[0].items.find(i => i.id === 'blocker').segment, 1);
+    assert.strictEqual(lanes[0].items.find(i => i.id === 'active').segment, 0);
+  });
+
+  test('project mode with groupSubtasks=false: parent NOT promoted', () => {
+    const cards = [
+      createCard({ id: 'parent', stateType: 'unstarted', projectName: 'P' }),
+      createCard({ id: 'child', stateType: 'started', parentId: 'parent', projectName: 'P' })
+    ];
+    const { lanes } = assignLanes(cards, { grouping: 'project', groupSubtasks: false });
+    assignSegments(lanes, { grouping: 'project', groupSubtasks: false });
+    assert.strictEqual(lanes[0].items.find(i => i.id === 'parent').segment, 1);
+  });
+
+  test('dependency mode still promotes arbitrary blockers (backward compat)', () => {
+    const cards = [
+      createCard({ id: 'blocker', stateType: 'unstarted', blocksIds: ['active'] }),
+      createCard({ id: 'active', stateType: 'started' })
+    ];
+    const { lanes } = assignLanes(cards, { grouping: 'dependency' });
+    assignSegments(lanes, { grouping: 'dependency', groupSubtasks: true });
+    assert.strictEqual(lanes[0].items.find(i => i.id === 'blocker').segment, 0);
+  });
+});
