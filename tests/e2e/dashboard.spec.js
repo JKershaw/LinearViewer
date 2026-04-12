@@ -29,8 +29,8 @@ test.describe('Authenticated Dashboard', () => {
     await expect(inProgressHeader).toContainText('In Progress');
 
     // Should show in-progress issues as tree with their descendants
-    // issue-1 (in-progress) + issue-2 (child of issue-1, hidden) + issue-4 (in-progress) + issue-11 (blocked, in-progress) + issue-15 (code-review, in-review) = 5 lines total
-    await expect(page.locator('.in-progress-items .line')).toHaveCount(5);
+    // issue-1 (in-progress) + issue-2 (child of issue-1, hidden) + issue-4 (in-progress) + issue-11 (blocked, in-progress) + issue-14 (in-progress) + issue-15 (code-review, in-review) = 6 lines total
+    await expect(page.locator('.in-progress-items .line')).toHaveCount(6);
 
     // Top-level items are visible
     await expect(page.locator('.in-progress-items .line:has-text("Parent task in progress")')).toBeVisible();
@@ -47,16 +47,16 @@ test.describe('Authenticated Dashboard', () => {
 
   test('displays correct state indicators', async ({ page }) => {
     // Mock data defines 10 issues with various states and labels
-    // In-progress issues (type: 'started'): issue-1, issue-4, blocked issue, code-review issue
+    // In-progress issues (type: 'started'): issue-1, issue-4, issue-11, issue-14, issue-15
     // Each in-progress appears 2x (In Progress section + project section)
-    // In-progress count: 4 issues x 2 = 8
+    // In-progress count: 5 issues x 2 = 10
     const inProgressStates = page.locator('.state.in-progress');
-    await expect(inProgressStates).toHaveCount(8);
+    await expect(inProgressStates).toHaveCount(10);
 
-    // Todo issues (type: 'unstarted'): issue-2, bug issue, plan issue
-    // issue-2 appears 2x (child of in-progress parent), others appear 1x
-    // Todo count: 2 + 1 + 1 = 4
-    await expect(page.locator('.state.todo')).toHaveCount(4);
+    // Todo issues (type: 'unstarted'): issue-2, issue-13
+    // issue-2 appears 2x (child of in-progress parent), issue-13 appears 1x
+    // Todo count: 2 + 1 = 3
+    await expect(page.locator('.state.todo')).toHaveCount(3);
 
     // Backlog issues (type: 'backlog'): issue-5, preparing issue
     // Each appears 1x in project section only

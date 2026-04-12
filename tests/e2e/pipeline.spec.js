@@ -148,14 +148,17 @@ test.describe('Pipeline Page', () => {
       expect(Array.isArray(data.recent)).toBe(true);
     });
 
-    test('state endpoint returns queue with mock issues', async ({ page }) => {
+    test('state endpoint returns queue and active from mock issues', async ({ page }) => {
       const response = await page.request.get(`${API_PREFIX}/api/pipeline/state`);
       const data = await response.json();
 
-      // Mock data has several in-progress/todo issues; they should appear in queue
-      // (since no dispatch loops exist, nothing should be active)
+      // Classification is state-based: started → active, unstarted/backlog → queue
       expect(data.queue.length).toBeGreaterThan(0);
-      expect(data.active.length).toBe(0);
+      expect(data.active.length).toBeGreaterThan(0);
+      // Verify active tasks have started state
+      for (const task of data.active) {
+        expect(task.state.type).toBe('started');
+      }
     });
 
     test('task detail endpoint returns task data', async ({ page }) => {
