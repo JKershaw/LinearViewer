@@ -134,6 +134,7 @@ function updateUrl() {
   const issue = filteredIssues[currentIndex];
   const path = issue && issue.identifier ? `${swipeBase}/${encodeURIComponent(issue.identifier)}` : swipeBase;
   history.replaceState(null, '', path + window.location.search);
+  document.title = issue && issue.identifier ? `Swipe - ${issue.identifier} ${issue.title}` : 'Swipe - Tasks';
 }
 
 /**
