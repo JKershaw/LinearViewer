@@ -34,6 +34,20 @@
   color: var(--fg-dim);
 }
 
+.pipeline-header-status {
+  font-size: 0.85em;
+  color: var(--fg-dim);
+  margin-left: auto;
+}
+
+.pipeline-header-status.status-running {
+  color: var(--green);
+}
+
+.pipeline-header-status.status-active {
+  color: var(--fg-dim);
+}
+
 /* =============================================================================
    Three-Column Floor Layout
    ============================================================================= */
@@ -56,6 +70,11 @@
   color: var(--fg-dim);
   margin-bottom: 0.75rem;
   font-weight: normal;
+}
+
+.zone-count {
+  color: var(--fg-dim);
+  opacity: 0.7;
 }
 
 .pipeline-grid-wrap {
@@ -162,6 +181,15 @@
   margin-bottom: 0.25rem;
 }
 
+.cell-health {
+  font-size: 0.6em;
+  line-height: 1;
+}
+
+.cell-health.health-green { color: var(--green); }
+.cell-health.health-amber { color: var(--yellow); }
+.cell-health.health-red { color: var(--red); }
+
 .cell-id {
   font-size: 0.85em;
   color: var(--fg-dim);
@@ -214,6 +242,14 @@
   color: var(--fg-dim);
 }
 
+.cell-stage-badge {
+  border: 1px solid var(--fg-vdim);
+  border-radius: 3px;
+  padding: 0.05rem 0.3rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
 .cell-state {
   font-size: 0.85em;
 }
@@ -223,6 +259,28 @@
 .cell-state.state-waiting { color: var(--yellow); }
 .cell-state.state-complete { color: var(--green); }
 .cell-state.state-error { color: var(--red); }
+
+/* =============================================================================
+   Progress Bar
+   ============================================================================= */
+
+.cell-progress {
+  display: flex;
+  gap: 2px;
+  height: 3px;
+  margin-top: 0.4rem;
+}
+
+.progress-seg {
+  flex: 1;
+  border-radius: 1px;
+}
+
+.seg-complete { background: var(--green); }
+.seg-running { background: var(--green); opacity: 0.5; }
+.seg-waiting { background: var(--yellow); }
+.seg-error { background: var(--red); }
+.seg-neutral { background: var(--fg-vdim); }
 
 /* =============================================================================
    Queue Rail
@@ -236,12 +294,13 @@
 
 .queue-entry {
   display: flex;
-  align-items: baseline;
-  gap: 0.4rem;
-  padding: 0.3rem 0;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.4rem 0.5rem;
   font-size: 0.8em;
   cursor: pointer;
   border-bottom: 1px solid var(--fg-vdim);
+  border-left: 3px solid transparent;
 }
 
 .queue-entry:hover {
@@ -257,11 +316,14 @@
   border-bottom: none;
 }
 
-.queue-rank {
-  color: var(--fg-dim);
-  min-width: 2ch;
-  text-align: right;
-  flex-shrink: 0;
+/* Priority left border */
+.queue-entry[data-priority="1"] { border-left-color: var(--red); }
+.queue-entry[data-priority="2"] { border-left-color: var(--yellow); }
+.queue-entry[data-priority="3"] { border-left-color: var(--fg-dim); }
+
+/* "Next up" emphasis */
+.queue-next {
+  background: color-mix(in srgb, var(--green) 5%, var(--bg));
 }
 
 .queue-id {
@@ -273,10 +335,7 @@
 .queue-title {
   font-family: var(--font-content);
   color: var(--fg);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
+  line-height: 1.3;
 }
 
 /* =============================================================================
