@@ -21,6 +21,7 @@ routes/
   workspace.js         Workspace management routes
   dispatch.js          Dispatch queue API (user + consumer endpoints)
   proxy.js             Linear API proxy (token auth, read/write endpoints, cycles, labels, foreman)
+  pipeline.js          Pipeline page and JSON polling routes
   workspace-api.js     Workspace API routes (prompts, recommendations, audit, comments, images)
   test.js              Test-only routes for E2E tests (mock sessions, fixtures)
   legacy-redirects.js  Backward-compatible redirects for old URLs
@@ -36,6 +37,9 @@ lib/
   render-settings.js   Settings page renderer
   render-prompts.js    Prompts catalog page renderer
   render-dispatch.js   Dispatch page renderer (prompt, queue, tokens, history)
+  render-pipeline.js   Pipeline page renderer (floor view shell)
+  pipeline-state.js    Pipeline state builder (snapshot assembly)
+  pipeline-loops.js    Pipeline loop reconstruction library
   feature-defaults.js  Feature toggle keys, defaults, and helpers
   user-preferences.js  Cross-device preference storage (MongoDB)
   session-store.js     MongoDB/MangoDB session store
@@ -61,6 +65,8 @@ public/
   audit.css            Operator dashboard styles
   settings.css         Settings page styles
   dispatch.css         Dispatch page styles
+  pipeline.css         Pipeline page styles (floor view, cells, overlay)
+  pipeline.js          Pipeline page client-side logic (polling, diffing, overlays)
   app.js               Client-side collapse/expand, localStorage persistence
   dispatch.js          Dispatch page client-side logic (prompt, queue, tokens, history)
   audit.js             Operator dashboard client-side logic
