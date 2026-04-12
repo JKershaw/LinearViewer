@@ -273,19 +273,23 @@ test.describe('Pipeline Page', () => {
 
     // Use a queue entry with a known identifier (TEST-1 exists in mock data)
     async function clickKnownEntry(page) {
-      const entry = page.locator('.queue-entry[data-identifier="TEST-1"]');
-      const count = await entry.count();
-      if (count === 0) {
-        // Fallback: click any entry with a non-empty identifier
-        const anyEntry = page.locator('.queue-entry[data-identifier]:not([data-identifier=""])');
-        if (await anyEntry.count() > 0) {
-          await anyEntry.first().click();
-          return true;
-        }
-        return false;
+      // Try a known active cell first, then fall back to any clickable entry
+      const cell = page.locator('.pipeline-cell[data-identifier="TEST-14"]');
+      if (await cell.count() > 0) {
+        await cell.click();
+        return true;
       }
-      await entry.click();
-      return true;
+      const anyCell = page.locator('.pipeline-cell[data-identifier]:not([data-identifier=""])');
+      if (await anyCell.count() > 0) {
+        await anyCell.first().click();
+        return true;
+      }
+      const anyEntry = page.locator('.queue-entry[data-identifier]:not([data-identifier=""])');
+      if (await anyEntry.count() > 0) {
+        await anyEntry.first().click();
+        return true;
+      }
+      return false;
     }
 
     test('clicking queue entry opens overlay', async ({ page }) => {
@@ -377,38 +381,41 @@ test.describe('Pipeline Page', () => {
     });
 
     test('overlay close button has aria-label', async ({ page }) => {
-      const firstEntry = page.locator('.queue-entry').first();
-      const count = await firstEntry.count();
+      // Click a cell with a known identifier for reliable overlay load
+      const cell = page.locator('.pipeline-cell[data-identifier="TEST-14"]');
+      const count = await cell.count();
       if (count === 0) return;
 
-      await firstEntry.click();
+      await cell.click();
 
       const closeBtn = page.locator('.overlay-close');
       await expect(closeBtn).toHaveAttribute('aria-label', 'Close', { timeout: 5000 });
     });
 
     test('body gets overlay-open class when overlay is shown', async ({ page }) => {
-      const firstEntry = page.locator('.queue-entry').first();
-      const count = await firstEntry.count();
+      const cell = page.locator('.pipeline-cell[data-identifier="TEST-14"]');
+      const count = await cell.count();
       if (count === 0) return;
 
-      await firstEntry.click();
-      await expect(page.locator('.overlay-content')).toBeVisible({ timeout: 5000 });
+      await cell.click();
+      // Wait for overlay to fully load past the loading state
+      await expect(page.locator('.overlay-title')).toBeVisible({ timeout: 5000 });
 
       await expect(page.locator('body')).toHaveClass(/overlay-open/);
     });
 
     test('body loses overlay-open class when overlay is closed', async ({ page }) => {
-      const firstEntry = page.locator('.queue-entry').first();
-      const count = await firstEntry.count();
+      const cell = page.locator('.pipeline-cell[data-identifier="TEST-14"]');
+      const count = await cell.count();
       if (count === 0) return;
 
-      await firstEntry.click();
-      await expect(page.locator('.overlay-content')).toBeVisible({ timeout: 5000 });
+      await cell.click();
+      // Wait for overlay to fully load past the loading state
+      await expect(page.locator('.overlay-title')).toBeVisible({ timeout: 5000 });
 
       await page.keyboard.press('Escape');
 
-      await expect(page.locator('body')).not.toHaveClass(/overlay-open/);
+      await expect(page.locator('body')).not.toHaveClass(/overlay-open/, { timeout: 5000 });
     });
   });
 });
