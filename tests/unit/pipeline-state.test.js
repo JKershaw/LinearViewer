@@ -412,8 +412,8 @@ describe('buildPipelineSnapshot — plan scenarios', () => {
     assert.strictEqual(snap.active[0].loopCount, 7);
   });
 
-  test('(6) leaf with no loops → queue, not active', async () => {
-    const issue = makeIssue({ id: 'a', identifier: 'LIN-1' });
+  test('(6) unstarted leaf with no loops → queue, not active', async () => {
+    const issue = makeIssue({ id: 'a', identifier: 'LIN-1', state: { name: 'Todo', type: 'unstarted' } });
     const snap = await buildPipelineSnapshot('ws', makeDeps({
       projects: [makeProject()],
       issues: [issue],
@@ -422,6 +422,43 @@ describe('buildPipelineSnapshot — plan scenarios', () => {
     assert.strictEqual(snap.active.length, 0);
     const queueIds = snap.queue.map(t => t.identifier);
     assert.ok(queueIds.includes('LIN-1'), `expected LIN-1 in queue, got ${JSON.stringify(queueIds)}`);
+  });
+
+  test('(6b) started leaf with no loops → active (state-based classification)', async () => {
+    const issue = makeIssue({ id: 'a', identifier: 'LIN-1', state: { name: 'In Progress', type: 'started' } });
+    const snap = await buildPipelineSnapshot('ws', makeDeps({
+      projects: [makeProject()],
+      issues: [issue],
+      loops: []
+    }));
+    assert.strictEqual(snap.active.length, 1);
+    assert.strictEqual(snap.active[0].identifier, 'LIN-1');
+    assert.strictEqual(snap.active[0].healthColor, 'green');
+    assert.strictEqual(snap.active[0].agentState, null);
+    assert.strictEqual(snap.queue.length, 0);
+  });
+
+  test('(6c) backlog leaf → queue, not active', async () => {
+    const issue = makeIssue({ id: 'a', identifier: 'LIN-1', state: { name: 'Backlog', type: 'backlog' } });
+    const snap = await buildPipelineSnapshot('ws', makeDeps({
+      projects: [makeProject()],
+      issues: [issue],
+      loops: []
+    }));
+    assert.strictEqual(snap.active.length, 0);
+    const queueIds = snap.queue.map(t => t.identifier);
+    assert.ok(queueIds.includes('LIN-1'), `expected LIN-1 in queue, got ${JSON.stringify(queueIds)}`);
+  });
+
+  test('(6d) completed leaf → neither active nor queue', async () => {
+    const issue = makeIssue({ id: 'a', identifier: 'LIN-1', state: { name: 'Done', type: 'completed' }, completedAt: '2026-04-10T00:00:00Z' });
+    const snap = await buildPipelineSnapshot('ws', makeDeps({
+      projects: [makeProject()],
+      issues: [issue],
+      loops: []
+    }));
+    assert.strictEqual(snap.active.length, 0);
+    assert.strictEqual(snap.queue.length, 0);
   });
 
   test('(7) recently resolved loops populate recent, sorted by resolvedAt desc', async () => {
