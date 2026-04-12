@@ -76,6 +76,27 @@ function safeHealth(color) {
   return VALID_HEALTH.has(color) ? color : 'green';
 }
 
+function progressSegClass(loop) {
+  const fs = loop.foremanStatus;
+  if (fs === 'completed') return 'seg-complete';
+  if (fs === 'failed') return 'seg-error';
+  if (fs === 'blocked') return 'seg-waiting';
+  const as = loop.agentState;
+  if (as === 'complete') return 'seg-complete';
+  if (as === 'error') return 'seg-error';
+  if (as === 'waiting') return 'seg-waiting';
+  if (as === 'running') return 'seg-running';
+  return 'seg-neutral';
+}
+
+function renderProgressBar(loops) {
+  if (!loops || loops.length === 0) return '';
+  const segs = loops.map(l =>
+    `<div class="progress-seg ${progressSegClass(l)}"></div>`
+  ).join('');
+  return `<div class="cell-progress">${segs}</div>`;
+}
+
 // ─── Grid cell rendering ────────────────────────────────────────────────────
 
 function renderCell(task) {
@@ -93,17 +114,21 @@ function renderCell(task) {
     parentTag = `<button class="cell-parent-tag" data-parent-id="${escapeHtml(p.identifier)}" title="${escapeHtml(p.title)}">◀ ${escapeHtml(p.identifier)}</button>`;
   }
 
+  const health = safeHealth(task.healthColor);
+
   el.innerHTML = `
     ${parentTag}
     <div class="cell-header">
+      <span class="cell-health health-${health}">●</span>
       <span class="cell-id">${escapeHtml(task.identifier)}</span>
-      <span class="cell-loops health-${safeHealth(task.healthColor)}">${task.loopCount || 0}</span>
+      <span class="cell-loops health-${health}">×${task.loopCount || 0}</span>
     </div>
     <div class="cell-title">${escapeHtml(task.title || '')}</div>
     <div class="cell-footer">
-      <span class="cell-stage">${escapeHtml(stageLabel(task.currentStage))}</span>
+      <span class="cell-stage cell-stage-badge">${escapeHtml(stageLabel(task.currentStage))}</span>
       <span class="cell-state ${si.css}">${si.symbol}</span>
     </div>
+    ${renderProgressBar(task.loops)}
   `;
 
   // Click cell → leaf detail overlay
@@ -126,13 +151,16 @@ function renderCell(task) {
 
 function updateCell(el, task) {
   const si = stateIndicator(task.agentState);
-  el.className = `pipeline-cell health-${safeHealth(task.healthColor)}`;
+  const health = safeHealth(task.healthColor);
+  el.className = `pipeline-cell health-${health}`;
   if (task.agentState) el.dataset.agentState = task.agentState;
 
+  const healthDot = el.querySelector('.cell-health');
+  if (healthDot) healthDot.className = `cell-health health-${health}`;
   const loopsEl = el.querySelector('.cell-loops');
   if (loopsEl) {
-    loopsEl.textContent = task.loopCount || 0;
-    loopsEl.className = `cell-loops health-${safeHealth(task.healthColor)}`;
+    loopsEl.textContent = `×${task.loopCount || 0}`;
+    loopsEl.className = `cell-loops health-${health}`;
   }
   const titleEl = el.querySelector('.cell-title');
   if (titleEl) titleEl.textContent = task.title || '';
@@ -143,6 +171,11 @@ function updateCell(el, task) {
     stateEl.textContent = si.symbol;
     stateEl.className = `cell-state ${si.css}`;
   }
+  // Update progress bar
+  const existingProgress = el.querySelector('.cell-progress');
+  if (existingProgress) existingProgress.remove();
+  const progressHtml = renderProgressBar(task.loops);
+  if (progressHtml) el.insertAdjacentHTML('beforeend', progressHtml);
 }
 
 // ─── Grid diffing ───────────────────────────────────────────────────────────
@@ -198,9 +231,9 @@ function renderQueue(queueTasks) {
   if (empty) empty.classList.add('hidden');
 
   list.innerHTML = queueTasks.slice(0, 20).map((task, i) => {
-    const num = i + 1;
-    return `<li class="queue-entry" data-identifier="${escapeHtml(task.identifier)}">
-      <span class="queue-rank">${num}.</span>
+    const nextClass = i === 0 ? ' queue-next' : '';
+    const prio = task.priority ?? 0;
+    return `<li class="queue-entry${nextClass}" data-identifier="${escapeHtml(task.identifier)}" data-priority="${prio}">
       <span class="queue-id">${escapeHtml(task.identifier)}</span>
       <span class="queue-title">${escapeHtml(task.title || '')}</span>
     </li>`;
@@ -244,6 +277,38 @@ function updateFetchedAt(fetchedAt) {
   }
 }
 
+// ─── Counts and status summary ─────────────────────────────────────────────
+
+function updateCounts(snapshot) {
+  const queue = snapshot.queue || [];
+  const active = snapshot.active || [];
+  const recent = snapshot.recent || [];
+
+  const queueEl = document.getElementById('pipeline-queue-count');
+  if (queueEl) queueEl.textContent = queue.length > 0 ? `· ${queue.length} ` : '';
+
+  const activeEl = document.getElementById('pipeline-active-count');
+  if (activeEl) activeEl.textContent = active.length > 0 ? `· ${active.length} ` : '';
+
+  const activityEl = document.getElementById('pipeline-activity-count');
+  if (activityEl) activityEl.textContent = recent.length > 0 ? `· ${recent.length} ` : '';
+
+  const statusEl = document.getElementById('pipeline-status');
+  if (statusEl) {
+    const running = active.filter(t => t.agentState === 'running').length;
+    if (running > 0) {
+      statusEl.textContent = `● ${running} running`;
+      statusEl.className = 'pipeline-header-status status-running';
+    } else if (active.length > 0) {
+      statusEl.textContent = `○ ${active.length} active`;
+      statusEl.className = 'pipeline-header-status status-active';
+    } else {
+      statusEl.textContent = '';
+      statusEl.className = 'pipeline-header-status';
+    }
+  }
+}
+
 // ─── Full render from snapshot ──────────────────────────────────────────────
 
 function renderSnapshot(snapshot) {
@@ -251,6 +316,7 @@ function renderSnapshot(snapshot) {
   renderQueue(snapshot.queue || []);
   renderActivity(snapshot.recent || []);
   updateFetchedAt(snapshot.fetchedAt);
+  updateCounts(snapshot);
 }
 
 // ─── Polling ────────────────────────────────────────────────────────────────

@@ -127,6 +127,10 @@ test.describe('Pipeline Page', () => {
 
   test.describe('Pipeline API', () => {
     test.beforeEach(async ({ page }) => {
+      // Clear dispatch/foreman state to prevent cross-test contamination
+      await page.goto('/test/clear-dispatch-queue');
+      await page.goto('/test/clear-dispatch-history');
+      await page.goto('/test/clear-foreman-status');
       await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ pipeline: true }))}`);
     });
 
