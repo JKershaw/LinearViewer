@@ -18,11 +18,16 @@
 let pipelineData = null;
 let pollId = null;
 let overlayPollId = null;
+let _visibilityHandler = null;
 const POLL_MS = 5000;
 const OVERLAY_POLL_MS = 2000;
 
 /** @type {Map<string, HTMLElement>} identifier → cell DOM node */
 const cellMap = new Map();
+
+/** Tracked overlay handlers for cleanup (prevent accumulation on re-render) */
+let _overlayEscHandler = null;
+let _overlayClickHandler = null;
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -66,11 +71,16 @@ function stateIndicator(agentState) {
   return STATE_INDICATORS[agentState] || STATE_INDICATORS.queued;
 }
 
+const VALID_HEALTH = new Set(['green', 'amber', 'red']);
+function safeHealth(color) {
+  return VALID_HEALTH.has(color) ? color : 'green';
+}
+
 // ─── Grid cell rendering ────────────────────────────────────────────────────
 
 function renderCell(task) {
   const el = document.createElement('div');
-  el.className = `pipeline-cell health-${task.healthColor || 'green'}`;
+  el.className = `pipeline-cell health-${safeHealth(task.healthColor)}`;
   el.dataset.identifier = task.identifier;
   if (task.agentState) el.dataset.agentState = task.agentState;
 
@@ -87,7 +97,7 @@ function renderCell(task) {
     ${parentTag}
     <div class="cell-header">
       <span class="cell-id">${escapeHtml(task.identifier)}</span>
-      <span class="cell-loops health-${task.healthColor || 'green'}">${task.loopCount || 0}</span>
+      <span class="cell-loops health-${safeHealth(task.healthColor)}">${task.loopCount || 0}</span>
     </div>
     <div class="cell-title">${escapeHtml(task.title || '')}</div>
     <div class="cell-footer">
@@ -116,13 +126,13 @@ function renderCell(task) {
 
 function updateCell(el, task) {
   const si = stateIndicator(task.agentState);
-  el.className = `pipeline-cell health-${task.healthColor || 'green'}`;
+  el.className = `pipeline-cell health-${safeHealth(task.healthColor)}`;
   if (task.agentState) el.dataset.agentState = task.agentState;
 
   const loopsEl = el.querySelector('.cell-loops');
   if (loopsEl) {
     loopsEl.textContent = task.loopCount || 0;
-    loopsEl.className = `cell-loops health-${task.healthColor || 'green'}`;
+    loopsEl.className = `cell-loops health-${safeHealth(task.healthColor)}`;
   }
   const titleEl = el.querySelector('.cell-title');
   if (titleEl) titleEl.textContent = task.title || '';
@@ -195,12 +205,6 @@ function renderQueue(queueTasks) {
       <span class="queue-title">${escapeHtml(task.title || '')}</span>
     </li>`;
   }).join('');
-
-  // Click queue entry → leaf detail
-  list.addEventListener('click', (e) => {
-    const entry = e.target.closest('.queue-entry');
-    if (entry) openLeafOverlay(entry.dataset.identifier);
-  });
 }
 
 // ─── Activity rail ──────────────────────────────────────────────────────────
@@ -276,10 +280,9 @@ function startPolling() {
     if (!document.hidden) pollState();
   }, POLL_MS);
 
-  // Immediate re-fetch when tab becomes visible
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) pollState();
-  });
+  // Immediate re-fetch when tab becomes visible (tracked for cleanup)
+  _visibilityHandler = () => { if (!document.hidden) pollState(); };
+  document.addEventListener('visibilitychange', _visibilityHandler);
 }
 
 // ─── Overlay: shared infrastructure ─────────────────────────────────────────
@@ -288,12 +291,26 @@ function getOverlayEl() {
   return document.getElementById('pipeline-overlay');
 }
 
+function removeOverlayHandlers() {
+  if (_overlayEscHandler) {
+    document.removeEventListener('keydown', _overlayEscHandler);
+    _overlayEscHandler = null;
+  }
+  if (_overlayClickHandler) {
+    const overlay = getOverlayEl();
+    if (overlay) overlay.removeEventListener('click', _overlayClickHandler);
+    _overlayClickHandler = null;
+  }
+}
+
 function closeOverlay() {
+  removeOverlayHandlers();
   const overlay = getOverlayEl();
   if (!overlay) return;
   overlay.classList.add('hidden');
   overlay.setAttribute('aria-hidden', 'true');
   overlay.innerHTML = '';
+  document.body.classList.remove('overlay-open');
   if (overlayPollId) {
     clearInterval(overlayPollId);
     overlayPollId = null;
@@ -301,29 +318,31 @@ function closeOverlay() {
 }
 
 function showOverlay(html) {
+  // Clean up any previously tracked handlers before re-adding
+  removeOverlayHandlers();
+
   const overlay = getOverlayEl();
   if (!overlay) return;
   overlay.innerHTML = html;
   overlay.classList.remove('hidden');
   overlay.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('overlay-open');
 
   // Close button
   const closeBtn = overlay.querySelector('.overlay-close');
   if (closeBtn) closeBtn.addEventListener('click', closeOverlay);
 
-  // Escape key
-  const escHandler = (e) => {
-    if (e.key === 'Escape') {
-      closeOverlay();
-      document.removeEventListener('keydown', escHandler);
-    }
+  // Escape key (tracked for cleanup)
+  _overlayEscHandler = (e) => {
+    if (e.key === 'Escape') closeOverlay();
   };
-  document.addEventListener('keydown', escHandler);
+  document.addEventListener('keydown', _overlayEscHandler);
 
-  // Click outside content to close
-  overlay.addEventListener('click', (e) => {
+  // Click outside content to close (tracked for cleanup)
+  _overlayClickHandler = (e) => {
     if (e.target === overlay) closeOverlay();
-  });
+  };
+  overlay.addEventListener('click', _overlayClickHandler);
 }
 
 // ─── Overlay: leaf detail ───────────────────────────────────────────────────
@@ -397,7 +416,7 @@ function renderLeafOverlayContent(task) {
       </div>
       <div class="overlay-meta">
         <span class="overlay-stage">${escapeHtml(stageLabel(task.currentStage))}</span>
-        <span class="overlay-loops-count health-${task.healthColor || 'green'}">${task.loopCount || 0} loops</span>
+        <span class="overlay-loops-count health-${safeHealth(task.healthColor)}">${task.loopCount || 0} loops</span>
         <span class="overlay-state ${si.css}">${si.symbol} ${escapeHtml(task.agentState || 'idle')}</span>
         ${task.url ? `<a class="overlay-linear-link" href="${escapeHtml(task.url)}" target="_blank">view on linear</a>` : ''}
       </div>
@@ -476,8 +495,6 @@ function wireOverlayControls(task, urlKey) {
       recommendBtn.disabled = true;
 
       try {
-        const res = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/pipeline/task/${encodeURIComponent(task.identifier)}`);
-        // Use the proxy recommend endpoint
         const recRes = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/recommendations/${encodeURIComponent(task.identifier)}`);
         if (recRes.status === 401) {
           window.location.href = '/logout';
@@ -596,7 +613,7 @@ async function openParentOverlay(identifier) {
           <button class="overlay-close" aria-label="Close">×</button>
         </div>
         <div class="overlay-meta">
-          <span class="overlay-loops-count health-${task.healthColor || 'green'}">${task.loopCount || 0} loops</span>
+          <span class="overlay-loops-count health-${safeHealth(task.healthColor)}">${task.loopCount || 0} loops</span>
           <span class="overlay-state ${si.css}">${si.symbol} ${escapeHtml(task.agentState || 'idle')}</span>
           ${task.url ? `<a class="overlay-linear-link" href="${escapeHtml(task.url)}" target="_blank">view on linear</a>` : ''}
         </div>
@@ -629,6 +646,15 @@ function init() {
     return;
   }
 
+  // Set up queue click delegation once (not per-render)
+  const queueList = document.getElementById('pipeline-queue-list');
+  if (queueList) {
+    queueList.addEventListener('click', (e) => {
+      const entry = e.target.closest('.queue-entry');
+      if (entry) openLeafOverlay(entry.dataset.identifier);
+    });
+  }
+
   renderSnapshot(pipelineData.snapshot);
   startPolling();
 }
@@ -638,6 +664,8 @@ function init() {
 window.addEventListener('beforeunload', () => {
   if (pollId) { clearInterval(pollId); pollId = null; }
   if (overlayPollId) { clearInterval(overlayPollId); overlayPollId = null; }
+  if (_visibilityHandler) { document.removeEventListener('visibilitychange', _visibilityHandler); _visibilityHandler = null; }
+  removeOverlayHandlers();
 });
 
 document.addEventListener('DOMContentLoaded', init);

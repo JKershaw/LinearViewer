@@ -117,8 +117,10 @@ export function createPipelineRoutes({
     } catch (error) {
       console.error('Pipeline task detail error:', error);
 
+      // error.status: manually set by pipeline-state.js (e.g. 404)
+      // error.response?.status: graphql-request error shape (e.g. 401)
       if (error.status === 404) {
-        return res.status(404).json({ error: `Issue not found: ${identifier}` });
+        return res.status(404).json({ error: 'Issue not found' });
       }
       if (error.response?.status === 401) {
         return res.status(401).json({ error: 'Unauthorized' });
