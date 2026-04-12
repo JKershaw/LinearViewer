@@ -15,6 +15,7 @@ import { renderPipelinePage } from '../lib/render-pipeline.js';
 import { renderErrorPage } from '../lib/render.js';
 import { buildPipelineSnapshot, getTaskForIssue } from '../lib/pipeline-state.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
+import { testMockData } from '../tests/fixtures/mock-data.js';
 
 /**
  * @param {Object} deps
@@ -41,12 +42,19 @@ export function createPipelineRoutes({
   /**
    * Helper: build the deps object for pipeline-state functions.
    */
-  function stateDeps() {
-    return {
+  const isTestMode = process.env.NODE_ENV === 'test';
+
+  function stateDeps(workspace) {
+    const deps = {
       getWorkspaceAccessToken,
       dispatchStore: dispatchQueueStore,
       foremanStore
     };
+    // In test mode, inject mock fetchProjects to avoid hitting the Linear API
+    if (isTestMode && workspace?.accessToken === 'test-token') {
+      deps.fetchProjects = async () => testMockData;
+    }
+    return deps;
   }
 
   // ─── HTML page ──────────────────────────────────────────────────────────────
@@ -57,8 +65,13 @@ export function createPipelineRoutes({
     const openRouterSource = getOpenRouterSource(req);
     const featureFlags = getFeatureFlags(req.session);
 
+    // Guard: pipeline feature must be enabled
+    if (featureFlags.pipeline !== true) {
+      return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
+    }
+
     try {
-      const snapshot = await buildPipelineSnapshot(workspace.urlKey, stateDeps());
+      const snapshot = await buildPipelineSnapshot(workspace.urlKey, stateDeps(workspace));
 
       const html = renderPipelinePage(
         { snapshot, organizationName: workspace.name || 'Workspace' },
@@ -92,7 +105,7 @@ export function createPipelineRoutes({
     const workspace = req.workspace;
 
     try {
-      const snapshot = await buildPipelineSnapshot(workspace.urlKey, stateDeps());
+      const snapshot = await buildPipelineSnapshot(workspace.urlKey, stateDeps(workspace));
       res.json(snapshot);
     } catch (error) {
       console.error('Pipeline state error:', error);
@@ -112,7 +125,7 @@ export function createPipelineRoutes({
     const { identifier } = req.params;
 
     try {
-      const task = await getTaskForIssue(workspace.urlKey, identifier, stateDeps());
+      const task = await getTaskForIssue(workspace.urlKey, identifier, stateDeps(workspace));
       res.json(task);
     } catch (error) {
       console.error('Pipeline task detail error:', error);
