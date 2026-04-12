@@ -420,10 +420,9 @@ function renderLoopEntry(loop, isLatest) {
 
   let feedbackHtml = '';
   if (loop.feedback && loop.feedback.length > 0) {
-    feedbackHtml = loop.feedback.map((f, i) => {
-      const prefix = i === loop.feedback.length - 1 ? '└─' : '├─';
+    feedbackHtml = loop.feedback.map((f) => {
       const fTime = relativeTime(f.timestamp);
-      return `<div class="loop-feedback-entry">${prefix} ${escapeHtml(f.message || '')} <span class="loop-feedback-time">· ${fTime}</span></div>`;
+      return `<div class="loop-feedback-entry">${escapeHtml(f.message || '')} <span class="loop-feedback-time">· ${fTime}</span></div>`;
     }).join('');
     feedbackHtml = `<div class="loop-feedback">${feedbackHtml}</div>`;
   }
@@ -488,7 +487,7 @@ function renderLeafOverlayContent(task) {
       </div>
       ${controlsHtml}
       <div class="overlay-loops">
-        <h3 class="overlay-section-title">│ loop history │</h3>
+        <h3 class="overlay-section-title">loop history</h3>
         ${loopsHtml}
       </div>
       <div class="overlay-git-placeholder">git integration: pending</div>
@@ -578,7 +577,7 @@ function wireOverlayControls(task, urlKey) {
           resultEl.classList.remove('hidden');
           resultEl.innerHTML = `
             <div class="recommend-prompt">
-              <h4 class="recommend-label">│ recommended prompt │</h4>
+              <h4 class="recommend-label">recommended prompt</h4>
               <pre class="recommend-text">${escapeHtml(prompt)}</pre>
             </div>
           `;
@@ -684,7 +683,7 @@ async function openParentOverlay(identifier) {
           ${task.url ? `<a class="overlay-linear-link" href="${escapeHtml(task.url)}" target="_blank">view on linear</a>` : ''}
         </div>
         <div class="overlay-loops">
-          <h3 class="overlay-section-title">│ loop history │</h3>
+          <h3 class="overlay-section-title">loop history</h3>
           ${loopsHtml}
         </div>
       </div>
