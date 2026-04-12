@@ -1036,6 +1036,9 @@ function buildPromptActions() {
     html += '<button class="swipe-prompt-dispatch" data-target="cli">cli</button>';
     html += '<button class="swipe-prompt-dispatch" data-target="web">web</button>';
     html += '<button class="swipe-prompt-dispatch" data-target="dash">dash</button>';
+    if (['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+      html += '<button class="swipe-prompt-dispatch" data-target="local">local</button>';
+    }
   }
   if (proxyEnabled) {
     const active = localStorage.getItem('proxy-toggle-active') === 'true' ? ' active' : '';

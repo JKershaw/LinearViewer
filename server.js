@@ -775,6 +775,7 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
     } catch (e) { /* non-fatal */ }
 
     const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace.accessToken, teamId);
+    const isLocalhost = ['localhost', '127.0.0.1'].some(h => req.get('host')?.startsWith(h));
     const html = renderPage(trees, inProgressTrees, recentActivityTrees, organizationName, {
       teams,
       selectedTeamId,
@@ -783,7 +784,8 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
       deployInfo,
       urlKey: workspace.urlKey,
       featureFlags: getFeatureFlags(req.session),
-      customPrompts
+      customPrompts,
+      isLocalhost
     });
     res.send(html);
   } catch (error) {
@@ -1101,13 +1103,16 @@ app.get('/workspace/:urlKey/dispatch', workspaceFromUrl, async (req, res) => {
     // Non-fatal: dispatch page works without repo selector
   }
 
+  const isLocalhost = ['localhost', '127.0.0.1'].some(h => req.get('host')?.startsWith(h));
+
   const html = renderDispatchPage(workspace.name || 'Workspace', {
     deployInfo,
     urlKey: workspace.urlKey,
     openRouterSource,
     workspaces: req.session.workspaces,
     featureFlags,
-    projectRepos
+    projectRepos,
+    isLocalhost
   });
   res.send(html);
 });

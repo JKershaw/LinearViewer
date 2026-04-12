@@ -64,9 +64,9 @@ test.describe('Dispatch Queue', () => {
     // Wait for prompt to load
     await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
 
-    // Verify three dispatch buttons exist with correct data-target attributes
+    // Verify four dispatch buttons exist with correct data-target attributes (includes local on localhost)
     const dispatchBtns = promptContainer.locator('.prompt-dispatch');
-    await expect(dispatchBtns).toHaveCount(3);
+    await expect(dispatchBtns).toHaveCount(4);
 
     const cliBtn = promptContainer.locator('.prompt-dispatch[data-target="cli"]');
     await expect(cliBtn).toBeVisible();
@@ -79,6 +79,10 @@ test.describe('Dispatch Queue', () => {
     const dashBtn = promptContainer.locator('.prompt-dispatch[data-target="dash"]');
     await expect(dashBtn).toBeVisible();
     await expect(dashBtn).toHaveText('dash');
+
+    const localBtn = promptContainer.locator('.prompt-dispatch[data-target="local"]');
+    await expect(localBtn).toBeVisible();
+    await expect(localBtn).toHaveText('local');
   });
 
   test('clicking dispatch adds item to queue and shows feedback', async ({ page }) => {
@@ -811,9 +815,9 @@ test.describe('Custom Prompt Dispatch', () => {
     await expect(textarea).toBeVisible();
     await expect(textarea).toHaveAttribute('placeholder', 'Type a custom prompt or /command...');
 
-    // Verify three dispatch buttons with correct targets
+    // Verify four dispatch buttons with correct targets (includes local on localhost)
     const buttons = page.locator('.dispatch-prompt-send');
-    await expect(buttons).toHaveCount(3);
+    await expect(buttons).toHaveCount(4);
 
     const cliBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
     await expect(cliBtn).toBeVisible();
@@ -826,6 +830,10 @@ test.describe('Custom Prompt Dispatch', () => {
     const dashBtn = page.locator('.dispatch-prompt-send[data-target="dash"]');
     await expect(dashBtn).toBeVisible();
     await expect(dashBtn).toHaveText('dash');
+
+    const localBtn = page.locator('.dispatch-prompt-send[data-target="local"]');
+    await expect(localBtn).toBeVisible();
+    await expect(localBtn).toHaveText('local');
   });
 
   test('can dispatch custom freeform text', async ({ page }) => {
