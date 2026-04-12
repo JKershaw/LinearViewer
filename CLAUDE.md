@@ -28,6 +28,7 @@ routes/
 lib/
   linear.js            GraphQL client for Linear API
   linear-cli.js        CLI tool for AI agents to query/modify Linear
+  bash-tool.js         Safe bash executor with data/code separation (stdin + argv modes)
   openrouter.js        OpenRouter API client for AI recommendations
   free-tier-store.js   Free tier usage tracking and rate limiting
   tree.js              Transforms flat issues → nested tree structure
