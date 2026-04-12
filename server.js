@@ -46,6 +46,7 @@ import { renderCustomPromptsPage } from './lib/render-custom-prompts.js'
 import { renderDispatchPage } from './lib/render-dispatch.js'
 import { renderSwipePage } from './lib/render-swipe.js'
 import { renderSwimPage } from './lib/render-swim.js'
+import { createPipelineRoutes } from './routes/pipeline.js'
 import { renderRoadmapPage } from './lib/render-roadmap.js'
 import { calculateVelocity, buildExecutionQueue, groupByProject, projectTimeline, findCriticalPaths, assessRisks, analyzeRoadmap, issueToRoadmapCard } from './lib/roadmap.js'
 import { renderProxyPage } from './lib/render-proxy.js'
@@ -745,6 +746,9 @@ app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanStore, work
 
 // Mount workspace API routes (audit, prompts, recommendations, comments, images)
 app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, customPromptsStore }))
+
+// Mount pipeline routes (page + JSON polling)
+app.use(createPipelineRoutes({ workspaceFromUrl, getWorkspaceAccessToken, dispatchQueueStore, foremanStore, getOpenRouterSource, getDeployInfo, handleUnauthorizedError }))
 
 /**
  * Workspace project view - renders the interactive tree view.
