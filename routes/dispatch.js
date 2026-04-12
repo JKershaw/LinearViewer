@@ -16,6 +16,7 @@
 
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
+import { spawnClaudeSession } from '../lib/harbour-spawn.js';
 
 // Rate limiters for dispatch endpoints to prevent abuse
 // Consumer feedback: 100 requests per minute per IP
@@ -134,10 +135,18 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         return res.status(400).json({ error: 'prompt is required and must be a string' });
       }
 
-      // Validate target if provided (must be 'cli', 'web', or 'dash')
-      const VALID_TARGETS = ['cli', 'web', 'dash'];
+      // Validate target if provided
+      const VALID_TARGETS = ['cli', 'web', 'dash', 'local'];
       if (target !== undefined && !VALID_TARGETS.includes(target)) {
         return res.status(400).json({ error: `target must be one of: ${VALID_TARGETS.join(', ')}` });
+      }
+
+      // Reject local target from non-localhost requests
+      if (target === 'local') {
+        const host = (req.get('host') || '').split(':')[0];
+        if (!['localhost', '127.0.0.1'].includes(host)) {
+          return res.status(400).json({ error: 'local target is only available on localhost' });
+        }
       }
 
       // Validate input lengths to prevent database bloat
@@ -192,6 +201,12 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         repo: repo || null
       });
 
+      // Spawn a local Claude session if target is 'local'
+      let spawn = undefined;
+      if (target === 'local') {
+        spawn = spawnClaudeSession(prompt);
+      }
+
       res.status(201).json({
         success: true,
         item: {
@@ -200,7 +215,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
           issueIdentifier: item.issueIdentifier,
           target: item.target,
           dispatchedAt: item.dispatchedAt
-        }
+        },
+        ...(spawn ? { spawn } : {})
       });
     } catch (err) {
       console.error('Dispatch error:', err.message);

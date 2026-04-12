@@ -52,7 +52,7 @@ test.describe('Dispatch Page', () => {
       await expect(textarea).toHaveAttribute('placeholder', 'Type a custom prompt or /command...');
 
       const buttons = page.locator('.dispatch-prompt-send');
-      await expect(buttons).toHaveCount(3);
+      await expect(buttons).toHaveCount(4); // cli, web, dash, local (on localhost)
     });
 
     test('can dispatch custom freeform text', async ({ page }) => {
