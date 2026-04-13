@@ -19,6 +19,7 @@ const urlKey = data.urlKey || '';
 const hasAI = data.hasAI || false;
 const dispatchEnabled = data.dispatchEnabled || false;
 const proxyEnabled = data.proxyEnabled || false;
+const isLocalhost = data.isLocalhost || false;
 const initialIdentifier = data.initialIdentifier || null;
 
 // Build reverse lookup: issueId → array of issues that block it (incomplete only)
@@ -1036,7 +1037,7 @@ function buildPromptActions() {
     html += '<button class="swipe-prompt-dispatch" data-target="cli">cli</button>';
     html += '<button class="swipe-prompt-dispatch" data-target="web">web</button>';
     html += '<button class="swipe-prompt-dispatch" data-target="dash">dash</button>';
-    if (['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+    if (isLocalhost) {
       html += '<button class="swipe-prompt-dispatch" data-target="local">local</button>';
     }
   }

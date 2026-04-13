@@ -831,6 +831,7 @@ app.get('/workspace/:urlKey/swipe/:identifier?', workspaceFromUrl, async (req, r
     } catch (e) { /* non-fatal */ }
 
     const { trees, inProgressTrees, recentActivityTrees, organizationName } = await fetchAndPrepareProjects(workspace.accessToken, teamId);
+    const isLocalhost = ['localhost', '127.0.0.1'].some(h => req.get('host')?.startsWith(h));
     const html = renderSwipePage(
       { projectTrees: trees, inProgressTrees, recentActivityTrees, organizationName },
       {
@@ -840,7 +841,8 @@ app.get('/workspace/:urlKey/swipe/:identifier?', workspaceFromUrl, async (req, r
         workspaces: req.session.workspaces,
         featureFlags: getFeatureFlags(req.session),
         customPrompts,
-        initialIdentifier: req.params.identifier || null
+        initialIdentifier: req.params.identifier || null,
+        isLocalhost
       }
     );
     res.send(html);
