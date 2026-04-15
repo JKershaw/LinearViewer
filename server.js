@@ -207,7 +207,7 @@ app.use((req, res, next) => {
 
 app.use(express.static('public'))
 app.use(express.urlencoded({ extended: false }))
-app.use(express.json())
+app.use(express.json({ limit: '250kb' }))
 
 // Session middleware configuration:
 // - resave: false - don't save session if unmodified

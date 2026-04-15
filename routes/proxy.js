@@ -68,6 +68,32 @@ const MAX_SEARCH_LENGTH = 500;
 const MAX_DESCRIPTION_LENGTH = 100000;
 const MAX_COMMENT_LENGTH = 50000;
 
+// Timeout for individual GraphQL requests to Linear.
+// Prevents the proxy from hanging silently when Linear is slow or payloads are large,
+// which causes downstream "stream idle timeout" errors in CLI clients like curl.
+const GRAPHQL_TIMEOUT_MS = 25_000;
+
+// Longer timeout for endpoints that make multiple sequential API calls
+// (stack fetches all issues with pagination, recommend calls Linear + OpenRouter).
+const MULTI_REQUEST_TIMEOUT_MS = 50_000;
+
+/**
+ * Race a promise against a timeout. Throws a TimeoutError if the promise
+ * doesn't settle within `ms` milliseconds, giving the same error shape as
+ * AbortSignal.timeout() so graphqlErrorStatus() maps it to 504.
+ */
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => {
+        const err = new DOMException('Linear API request timed out', 'TimeoutError');
+        reject(err);
+      }, ms);
+    })
+  ]);
+}
+
 // Pattern to detect null bytes and dangerous control characters
 const DANGEROUS_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
 
@@ -456,13 +482,18 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanSto
 
   /**
    * Helper to create a Linear GraphQL client for the workspace.
+   * Includes an AbortSignal timeout so the proxy fails fast instead of
+   * hanging silently (which causes "stream idle timeout" in CLI callers).
    */
-  async function getClient(urlKey) {
+  async function getClient(urlKey, { timeoutMs = GRAPHQL_TIMEOUT_MS } = {}) {
     const accessToken = await getWorkspaceAccessToken(urlKey);
     if (!accessToken) {
       return null;
     }
-    const clientOptions = { headers: { Authorization: accessToken } };
+    const clientOptions = {
+      headers: { Authorization: accessToken },
+      signal: AbortSignal.timeout(timeoutMs),
+    };
     if (proxyFetch) clientOptions.fetch = proxyFetch;
     return new GraphQLClient(LINEAR_API_ENDPOINT, clientOptions);
   }
@@ -493,6 +524,9 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanSto
    *  - anything else       → 500
    */
   function graphqlErrorStatus(err) {
+    // AbortSignal.timeout() raises a TimeoutError (name === 'TimeoutError')
+    // and manual AbortController.abort() raises AbortError.
+    if (err.name === 'TimeoutError' || err.name === 'AbortError') return 504;
     const status = err.response?.status
       || err.response?.errors?.[0]?.extensions?.statusCode;
     if (status === 401 || status === 403) return 401;
@@ -509,6 +543,9 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanSto
    * or validation details to external consumers.
    */
   function graphqlErrorDetail(err) {
+    if (err.name === 'TimeoutError' || err.name === 'AbortError') {
+      return 'Linear API request timed out — the response may be too large or Linear is slow. Try a more specific query.';
+    }
     const gqlMessage = err.response?.errors?.[0]?.message;
     const raw = gqlMessage || err.message || 'Unknown error';
 
@@ -1475,7 +1512,7 @@ ${readEndpoints}${writeEndpoints}
         projects = [...mockData.projects];
         issues = [...mockData.issues];
       } else {
-        ({ projects, issues } = await fetchProjects(accessToken));
+        ({ projects, issues } = await withTimeout(fetchProjects(accessToken), MULTI_REQUEST_TIMEOUT_MS));
       }
 
       // Build tree structure
@@ -1636,7 +1673,7 @@ ${readEndpoints}${writeEndpoints}
         }));
         comments = [];
       } else {
-        ({ issue, parent, siblings, project, children, comments } = await fetchIssueContext(accessToken, identifier));
+        ({ issue, parent, siblings, project, children, comments } = await withTimeout(fetchIssueContext(accessToken, identifier), GRAPHQL_TIMEOUT_MS));
       }
 
       // Generate the prompt
@@ -1739,14 +1776,18 @@ ${readEndpoints}${writeEndpoints}
       }
 
       // Fetch issue context with two-tier support for parent tasks
-      const context = await fetchRecommendationContext(accessToken, identifier);
+      const context = await withTimeout(fetchRecommendationContext(accessToken, identifier), GRAPHQL_TIMEOUT_MS);
       const { issue, parent, siblings, project, children, comments, focusedChild } = context;
 
       // Get AI-generated recommendation (uses session OAuth key or server-side OPENROUTER_API_KEY)
-      const recommendation = await getRecommendation(
-        issue,
-        { parent, siblings, project, children, comments, focusedChild },
-        { apiKey: sessionApiKey, featureFlags: {} }
+      // Uses a longer timeout since this makes a Linear API call + an OpenRouter LLM call.
+      const recommendation = await withTimeout(
+        getRecommendation(
+          issue,
+          { parent, siblings, project, children, comments, focusedChild },
+          { apiKey: sessionApiKey, featureFlags: {} }
+        ),
+        MULTI_REQUEST_TIMEOUT_MS
       );
 
       logEvent(req, '/api/proxy/recommend', 200);
