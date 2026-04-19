@@ -456,6 +456,11 @@ test.describe('Custom Prompts on Swipe Page', () => {
     await page.goto('/test/clear-custom-prompts');
   });
 
+  async function openPromptsAccordion(page) {
+    const header = page.locator('.swipe-accordion-header[data-accordion="prompts"]');
+    await header.click();
+  }
+
   test('custom prompt buttons appear in more section on swipe page', async ({ page }) => {
     // Create a custom prompt via API
     await page.request.post(API_BASE, {
@@ -465,6 +470,8 @@ test.describe('Custom Prompts on Swipe Page', () => {
     // Navigate to swipe page
     await page.goto(SWIPE_URL);
     await page.waitForLoadState('networkidle');
+
+    await openPromptsAccordion(page);
 
     // Click "more" to reveal hidden prompts
     const moreBtn = page.locator('.swipe-prompt-btn-more');
@@ -487,6 +494,8 @@ test.describe('Custom Prompts on Swipe Page', () => {
     await page.goto(SWIPE_URL);
     await page.waitForLoadState('networkidle');
 
+    await openPromptsAccordion(page);
+
     // Click "more" to reveal hidden prompts
     const moreBtn = page.locator('.swipe-prompt-btn-more');
     await moreBtn.click();
@@ -495,20 +504,20 @@ test.describe('Custom Prompts on Swipe Page', () => {
     const customBtn = page.locator(`.swipe-prompt-btn[data-prompt="custom:${prompt.id}"]`);
     await customBtn.click();
 
-    // Wait for prompt result to load
-    const promptResult = page.locator('#swipe-prompt-result');
-    await expect(promptResult).not.toHaveClass(/hidden/, { timeout: 10000 });
+    // Wait for fresh result (prompt section transitions to data-phase="fresh")
+    const section = page.locator('.prompt-section');
+    await expect(section).toHaveAttribute('data-phase', 'fresh', { timeout: 10000 });
 
-    // Verify prompt name
-    await expect(page.locator('#swipe-prompt-name')).toHaveText('Swipe Title');
-
-    // Verify variable substitution
-    await expect(page.locator('#swipe-prompt-text')).toContainText('Analyze:');
+    // Verify prompt name and substitution
+    await expect(section.locator('.swipe-prompt-name')).toHaveText('Swipe Title');
+    await expect(section.locator('.swipe-prompt-text')).toContainText('Analyze:');
   });
 
   test('no custom prompt buttons when none exist on swipe page', async ({ page }) => {
     await page.goto(SWIPE_URL);
     await page.waitForLoadState('networkidle');
+
+    await openPromptsAccordion(page);
 
     // Click "more" to reveal hidden prompts
     const moreBtn = page.locator('.swipe-prompt-btn-more');

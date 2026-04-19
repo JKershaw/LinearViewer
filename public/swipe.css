@@ -478,11 +478,18 @@ a.swipe-relation-issue:hover {
 }
 
 /* ==========================================================================
-   Prompt Section
+   Prompt Section (rendered inside the fourth card accordion)
    ========================================================================== */
 
-.swipe-prompts {
-  margin-top: 0.25rem;
+.swipe-accordion-body .prompt-section {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+}
+
+/* Cache hint appended to the closed accordion header */
+.swipe-prompts-cache-hint {
+  color: var(--fg-dim, #aaa);
+  font-size: 11px;
+  margin-left: 0.25rem;
 }
 
 /* Prompt Buttons - compact centered row */
@@ -490,7 +497,7 @@ a.swipe-relation-issue:hover {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-bottom: 0.75rem;
+  margin: 0.5rem 0 0.25rem;
   justify-content: center;
 }
 
@@ -567,7 +574,7 @@ a.swipe-relation-issue:hover {
   display: none;
   flex-wrap: wrap;
   gap: 6px;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
   justify-content: center;
 }
 
@@ -575,28 +582,27 @@ a.swipe-relation-issue:hover {
   display: flex;
 }
 
-/* Prompt Result */
-.swipe-prompt-result {
-  border: 1px solid #e0e0e0;
-  border-radius: 10px;
-  overflow: hidden;
-}
-
-.swipe-prompt-result.hidden {
-  display: none;
-}
-
-.swipe-prompt-header {
+/* Prompt Section Header (fresh / generating / error) */
+.prompt-section .swipe-prompt-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 0.3rem;
-  padding: 0.4rem 0.75rem;
-  background: var(--bg-muted, #f8f9fa);
-  border-bottom: 1px solid #eee;
+  padding: 0.4rem 0;
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
   font-size: 11px;
+}
+
+.prompt-section[data-phase="idle"] .swipe-prompt-header {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.prompt-section[data-phase="fresh"] .swipe-prompt-header,
+.prompt-section[data-phase="generating"] .swipe-prompt-header,
+.prompt-section[data-phase="error"] .swipe-prompt-header {
+  border-bottom: 1px solid #eee;
+  margin-bottom: 0.4rem;
 }
 
 .swipe-prompt-name {
@@ -608,9 +614,11 @@ a.swipe-relation-issue:hover {
   display: flex;
   flex-wrap: wrap;
   gap: 0.3rem;
+  margin-left: auto;
 }
 
-.swipe-prompt-actions button {
+.swipe-prompt-actions button,
+.prompt-section .swipe-prompt-change {
   padding: 0.2rem 0.45rem;
   border: 1px solid #ddd;
   border-radius: 3px;
@@ -622,7 +630,8 @@ a.swipe-relation-issue:hover {
   transition: background 0.15s;
 }
 
-.swipe-prompt-actions button:hover {
+.swipe-prompt-actions button:hover,
+.prompt-section .swipe-prompt-change:hover {
   background: var(--bg-muted, #f8f9fa);
 }
 
@@ -631,8 +640,14 @@ a.swipe-relation-issue:hover {
   cursor: default;
 }
 
+.prompt-section .prompt-proxy-toggle.active {
+  background: #eff4ff;
+  color: #2563eb;
+  border-color: #2563eb;
+}
+
 .swipe-prompt-text {
-  padding: 0.75rem;
+  padding: 0.5rem 0 0;
   font-size: 13px;
   line-height: 1.6;
   max-height: 400px;
@@ -640,13 +655,13 @@ a.swipe-relation-issue:hover {
   color: var(--fg, #1a1a1a);
 }
 
-/* Streaming fade-in for the container */
+/* Streaming fade-in for the section */
 @keyframes promptFadeIn {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
-.swipe-prompt-result.streaming {
+.prompt-section.streaming {
   animation: promptFadeIn 0.3s ease-out both;
 }
 
@@ -661,14 +676,14 @@ a.swipe-relation-issue:hover {
 }
 
 /* Subtle indicator on the element currently being written to */
-.swipe-prompt-result.streaming .swipe-prompt-text .stream-cursor {
+.prompt-section.streaming .swipe-prompt-text .stream-cursor {
   border-left: 2px solid rgba(0,0,0,0.12);
   padding-left: 0.5rem;
   transition: border-color 0.3s;
 }
 
 /* Bottom gradient mask during streaming — text appears to materialise */
-.swipe-prompt-result.streaming .swipe-prompt-text {
+.prompt-section.streaming .swipe-prompt-text {
   mask-image: linear-gradient(to bottom, #000 75%, transparent 100%);
   -webkit-mask-image: linear-gradient(to bottom, #000 75%, transparent 100%);
 }
@@ -701,9 +716,9 @@ a.swipe-relation-issue:hover {
 }
 
 
-/* Reasoning toggle */
-.swipe-reasoning-toggle {
-  padding: 0.4rem 0.75rem;
+/* Reasoning toggle (inside prompt section) */
+.prompt-section .swipe-reasoning-toggle {
+  padding: 0.4rem 0;
   font-size: 11px;
   color: var(--fg-dim, #666);
   cursor: pointer;
@@ -711,13 +726,13 @@ a.swipe-relation-issue:hover {
   border-bottom: 1px solid #eee;
   user-select: none;
 }
-.swipe-reasoning-toggle:hover {
+.prompt-section .swipe-reasoning-toggle:hover {
   color: var(--fg, #1a1a1a);
 }
 
 /* Reasoning content (collapsible) */
-.swipe-reasoning-content {
-  padding: 0.5rem 0.75rem;
+.prompt-section .swipe-reasoning-content {
+  padding: 0.4rem 0;
   font-size: 12px;
   line-height: 1.5;
   color: var(--fg-dim, #888);
