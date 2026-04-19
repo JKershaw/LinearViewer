@@ -16,7 +16,33 @@
 
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 import { spawnClaudeSession } from '../lib/harbour-spawn.js';
+
+// Directory for Harbour dispatch prompt staging files. The OS tmp dir is
+// shared between the Node server and the Harbour terminal that reads the
+// staged prompt back out via `cat` inside the spawned `sh -c` command.
+const HARBOUR_STAGING_DIR = path.join(os.tmpdir(), 'harbour-dispatch');
+
+/**
+ * Writes the prompt to a staging file under HARBOUR_STAGING_DIR (mode 0600
+ * inside a 0700 dir). The file is read back by the Harbour-spawned `sh -c`
+ * command via `cat`, sidestepping argv length limits and shell-escaping
+ * pain for multi-line prompts. Cleanup is the responsibility of the
+ * cloned repo's Claude `SessionStart` hook.
+ *
+ * @param {string} itemId - Dispatch item UUID (used as filename)
+ * @param {string} prompt - Raw prompt text
+ * @returns {string} Absolute path to the staging file
+ */
+function writeHarbourStagingFile(itemId, prompt) {
+  fs.mkdirSync(HARBOUR_STAGING_DIR, { mode: 0o700, recursive: true });
+  const filePath = path.join(HARBOUR_STAGING_DIR, `${itemId}.prompt`);
+  fs.writeFileSync(filePath, prompt, { mode: 0o600 });
+  return filePath;
+}
 
 // Rate limiters for dispatch endpoints to prevent abuse
 // Consumer feedback: 100 requests per minute per IP
@@ -72,9 +98,10 @@ const DANGEROUS_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
  * @param {Object} options.dispatchTokenStore - Token storage instance
  * @param {Function} options.workspaceFromUrl - Middleware to validate workspace
  * @param {Object} options.userPreferencesStore - User preferences store for recent prompts
+ * @param {Object} [options.harbourFeedbackTokenStore] - Short-TTL feedback token store for Harbour dispatches
  * @returns {Router} Express router with dispatch routes
  */
-export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore }) {
+export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore }) {
   const router = Router();
 
   // =========================================================================
@@ -113,6 +140,44 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       console.error('Token validation error:', err.message);
       return res.status(500).json({ error: 'Authentication error' });
     }
+  }
+
+  /**
+   * Middleware for the dispatch feedback endpoint. Accepts either:
+   *  - A short-lived single-use Harbour feedback token (bound to the
+   *    itemId in the URL); or
+   *  - A workspace-scoped consumer dispatch token (existing path).
+   *
+   * Harbour tokens are tried first because they're the more constrained
+   * credential — a leaked harbour token can post one feedback against one
+   * item, where a leaked dispatch token would have full workspace scope.
+   * On success sets req.dispatchUrlKey and req.dispatchTokenLabel.
+   */
+  async function authenticateFeedbackToken(req, res, next) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Missing or invalid Authorization header' });
+    }
+    const token = authHeader.slice(7);
+    if (!token) {
+      return res.status(401).json({ error: 'Empty token' });
+    }
+
+    if (harbourFeedbackTokenStore) {
+      try {
+        const result = await harbourFeedbackTokenStore.validateAndConsume(token, req.params.itemId);
+        if (result) {
+          req.dispatchUrlKey = result.urlKey;
+          req.dispatchTokenLabel = 'harbour';
+          return next();
+        }
+      } catch (err) {
+        console.error('Harbour feedback token validation error:', err.message);
+        // Fall through to standard dispatch token check
+      }
+    }
+
+    return authenticateDispatchToken(req, res, next);
   }
 
   // =========================================================================
@@ -201,10 +266,50 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         repo: repo || null
       });
 
-      // Spawn a local Claude session if target is 'local'
+      // Spawn a Harbour Claude session when target is 'local' (the API value
+      // 'local' is preserved for backward compatibility; user-facing surfaces
+      // refer to this as "Harbour"). When the dispatch carries a `repo`, we
+      // stage the prompt to a file, mint a short-lived single-use feedback
+      // token, and ask harbour-spawn to compose a clone+claude `sh -c`. The
+      // item is then atomically moved into history with tokenLabel 'harbour'
+      // so the addFeedback ownership check accepts the hook callback.
       let spawn = undefined;
       if (target === 'local') {
-        spawn = spawnClaudeSession(prompt);
+        if (item.repo && harbourFeedbackTokenStore) {
+          try {
+            const stagingFilePath = writeHarbourStagingFile(item._id, prompt);
+            const minted = await harbourFeedbackTokenStore.mintToken(item._id, workspace.urlKey);
+            const feedbackUrl = `${req.protocol}://${req.get('host')}/api/dispatch/feedback/${item._id}`;
+
+            spawn = spawnClaudeSession(prompt, {
+              repo: item.repo,
+              dispatchId: item._id,
+              feedbackUrl,
+              token: minted.token,
+              stagingFilePath
+            });
+
+            if (spawn.success) {
+              // Best-effort take so the hook can post feedback against an
+              // archived "taken" item. If the take fails (e.g. the user
+              // already cancelled the queued item between insert and now),
+              // the spawn still proceeds — the hook callback will simply
+              // 404, which is acceptable.
+              try {
+                await dispatchQueueStore.takeItem(item._id, workspace.urlKey, 'harbour');
+              } catch (takeErr) {
+                console.error('Harbour take after spawn failed:', takeErr.message);
+              }
+            }
+          } catch (err) {
+            console.error('Harbour spawn setup failed:', err.message);
+            spawn = { success: false, error: 'Harbour spawn setup failed' };
+          }
+        } else {
+          // No repo (or no feedback token store wired): fall back to direct
+          // claude launch with the prompt embedded as argv (LIN-257 path).
+          spawn = spawnClaudeSession(prompt);
+        }
       }
 
       res.status(201).json({
@@ -519,7 +624,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
    * Requires token authentication. Only the token that took the item can post feedback.
    * Rate limited to 100 requests per minute per IP.
    */
-  router.post('/api/dispatch/feedback/:itemId', feedbackLimiter, authenticateDispatchToken, async (req, res) => {
+  router.post('/api/dispatch/feedback/:itemId', feedbackLimiter, authenticateFeedbackToken, async (req, res) => {
     const { itemId } = req.params;
 
     // Validate itemId format

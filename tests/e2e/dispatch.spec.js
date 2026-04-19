@@ -82,7 +82,7 @@ test.describe('Dispatch Queue', () => {
 
     const localBtn = promptContainer.locator('.prompt-dispatch[data-target="local"]');
     await expect(localBtn).toBeVisible();
-    await expect(localBtn).toHaveText('local');
+    await expect(localBtn).toHaveText('harbour');
   });
 
   test('clicking dispatch adds item to queue and shows feedback', async ({ page }) => {
@@ -833,7 +833,7 @@ test.describe('Custom Prompt Dispatch', () => {
 
     const localBtn = page.locator('.dispatch-prompt-send[data-target="local"]');
     await expect(localBtn).toBeVisible();
-    await expect(localBtn).toHaveText('local');
+    await expect(localBtn).toHaveText('harbour');
   });
 
   test('can dispatch custom freeform text', async ({ page }) => {

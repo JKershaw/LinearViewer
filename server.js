@@ -17,6 +17,7 @@ import { UserPreferencesStore } from './lib/user-preferences.js'
 import { DispatchQueueStore } from './lib/dispatch-store.js'
 import { CustomPromptsStore } from './lib/custom-prompts-store.js'
 import { DispatchTokenStore } from './lib/dispatch-tokens.js'
+import { HarbourFeedbackTokenStore } from './lib/harbour-feedback-tokens.js'
 import { ProxyTokenStore } from './lib/proxy-tokens.js'
 import { ProxyEventStore } from './lib/proxy-events.js'
 import { ForemanStore } from './lib/foreman-store.js'
@@ -159,6 +160,14 @@ const dispatchQueueStore = new DispatchQueueStore({
 
 const dispatchTokenStore = new DispatchTokenStore({
   collection: dispatchTokensCollection
+})
+
+// Short-TTL single-use tokens that authorise repo-level Claude hooks to
+// post feedback against a specific Harbour dispatch item. Bound to the
+// itemId at mint time, so leak surface is one feedback POST per item.
+const harbourFeedbackTokensCollection = db.collection('harbour-feedback-tokens')
+const harbourFeedbackTokenStore = new HarbourFeedbackTokenStore({
+  collection: harbourFeedbackTokensCollection
 })
 
 // Proxy collections
@@ -651,7 +660,7 @@ function workspaceFromUrl(req, res, next) {
 }
 
 // Mount dispatch routes (requires workspaceFromUrl middleware)
-app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore }))
+app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore }))
 
 // Mount proxy routes
 // getWorkspaceAccessToken: looks up a workspace access token from active sessions.
@@ -1355,6 +1364,14 @@ app.listen(PORT, () => {
       }
     } catch (err) {
       console.error('Foreman status cleanup error:', err)
+    }
+    try {
+      const removedCount = await harbourFeedbackTokenStore.cleanup()
+      if (removedCount > 0) {
+        console.log(`Harbour feedback token cleanup: removed ${removedCount} expired tokens`)
+      }
+    } catch (err) {
+      console.error('Harbour feedback token cleanup error:', err)
     }
   }, CLEANUP_INTERVAL_MS)
 })
