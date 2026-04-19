@@ -106,8 +106,11 @@ test.describe('Swipe Page', () => {
     }
   });
 
-  test('prompt buttons are displayed', async ({ page }) => {
-    // Should have prompt buttons
+  test('prompt buttons are displayed after opening Prompts accordion', async ({ page }) => {
+    const promptsHeader = page.locator('.swipe-accordion-header[data-accordion="prompts"]');
+    await expect(promptsHeader).toBeVisible();
+    await promptsHeader.click();
+
     const promptBtns = page.locator('.swipe-prompt-btn');
     await expect(promptBtns.first()).toBeVisible();
   });
