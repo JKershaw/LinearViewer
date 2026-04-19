@@ -116,7 +116,7 @@
       html += '<button class="swipe-prompt-dispatch" data-action="dispatch" data-target="web">web</button>';
       html += '<button class="swipe-prompt-dispatch" data-action="dispatch" data-target="dash">dash</button>';
       if (isLocalhost) {
-        html += '<button class="swipe-prompt-dispatch" data-action="dispatch" data-target="local">local</button>';
+        html += '<button class="swipe-prompt-dispatch" data-action="dispatch" data-target="local">harbour</button>';
       }
     }
     html += '<button class="swipe-prompt-change" data-action="change" title="Choose another prompt">\u21BB change</button>';

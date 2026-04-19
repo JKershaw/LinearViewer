@@ -234,7 +234,8 @@ function renderDispatchQueueList(container, items, urlKey) {
   container.innerHTML = items.map(item => {
     const time = new Date(item.dispatchedAt).toLocaleString()
     const title = item.issueTitle || item.promptName || 'Prompt'
-    const target = item.target || 'cli'
+    // Display 'local' API value as user-facing 'harbour' label
+    const target = item.target === 'local' ? 'harbour' : (item.target || 'cli')
     const metaParts = [item.issueIdentifier, item.repo, target, time].filter(Boolean)
     const meta = metaParts.join(' \u00b7 ')
 
@@ -602,7 +603,9 @@ function renderDispatchHistoryList(container, items, total, offset, urlKey) {
     const resolved = formatDispatchTime(item.resolvedAt)
     const tokenInfo = item.takenByTokenLabel ? ` \u00b7 by ${escapeHtml(item.takenByTokenLabel)}` : ''
     const repoInfo = item.repo ? ` \u00b7 ${escapeHtml(item.repo)}` : ''
-    const targetInfo = item.target ? ` \u00b7 ${escapeHtml(item.target)}` : ''
+    // Display 'local' API value as user-facing 'harbour' label
+    const targetDisplay = item.target === 'local' ? 'harbour' : item.target
+    const targetInfo = targetDisplay ? ` \u00b7 ${escapeHtml(targetDisplay)}` : ''
     const hasPrompt = item.prompt && item.prompt.trim()
     const hasFeedback = item.feedback && item.feedback.length > 0
     const expandableClass = hasPrompt ? ' expandable' : ''
