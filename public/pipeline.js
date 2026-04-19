@@ -381,6 +381,9 @@ function closeOverlay() {
     clearInterval(overlayPollId);
     overlayPollId = null;
   }
+  if (typeof _preservedRecapMount !== 'undefined') {
+    _preservedRecapMount = null;
+  }
 }
 
 function showOverlay(html) {
@@ -486,6 +489,9 @@ function renderLeafOverlayContent(task) {
         ${task.url ? `<a class="overlay-linear-link" href="${escapeHtml(task.url)}" target="_blank">view on linear</a>` : ''}
       </div>
       ${controlsHtml}
+      <div class="overlay-recap-wrap">
+        <div class="recap-section overlay-recap-mount" data-recap-mount="1" data-identifier="${escapeHtml(task.identifier)}"></div>
+      </div>
       <div class="overlay-loops">
         <h3 class="overlay-section-title">loop history</h3>
         ${loopsHtml}
@@ -495,8 +501,47 @@ function renderLeafOverlayContent(task) {
   `;
 }
 
+/**
+ * Preserve the recap-section DOM across overlay re-renders. Polling replaces
+ * the full overlay innerHTML, so without this the recap would flash/reset
+ * every poll. We swap the existing mount back in when the identifier matches.
+ */
+let _preservedRecapMount = null;
+
+function capturePreservedRecap() {
+  const overlay = getOverlayEl();
+  if (!overlay) return;
+  const existing = overlay.querySelector('[data-recap-mount="1"]');
+  if (existing && existing.dataset.initialized === '1') {
+    _preservedRecapMount = existing;
+  }
+}
+
+function restorePreservedRecap(identifier) {
+  const overlay = getOverlayEl();
+  if (!overlay) return;
+  const slot = overlay.querySelector('[data-recap-mount="1"]');
+  if (!slot) return;
+
+  if (_preservedRecapMount && _preservedRecapMount.dataset.identifier === identifier) {
+    slot.replaceWith(_preservedRecapMount);
+    _preservedRecapMount = null;
+    return;
+  }
+
+  // Fresh mount — initialize
+  slot.dataset.initialized = '1';
+  if (window.RecapSection) {
+    window.RecapSection.init(slot, {
+      urlKey: pipelineData?.urlKey,
+      identifier
+    });
+  }
+}
+
 async function openLeafOverlay(identifier) {
   closeOverlay();
+  _preservedRecapMount = null;
 
   const urlKey = pipelineData?.urlKey;
   if (!urlKey) return;
@@ -519,6 +564,7 @@ async function openLeafOverlay(identifier) {
 
     showOverlay(renderLeafOverlayContent(task));
     wireOverlayControls(task, urlKey);
+    restorePreservedRecap(task.identifier || identifier);
 
     // Start overlay polling
     overlayPollId = setInterval(async () => {
@@ -529,8 +575,10 @@ async function openLeafOverlay(identifier) {
         const updated = await r.json();
         const overlay = getOverlayEl();
         if (!overlay || overlay.classList.contains('hidden')) return;
+        capturePreservedRecap();
         showOverlay(renderLeafOverlayContent(updated));
         wireOverlayControls(updated, urlKey);
+        restorePreservedRecap(updated.identifier || identifier);
       } catch (e) { /* ignore refresh errors */ }
     }, OVERLAY_POLL_MS);
   } catch (e) {

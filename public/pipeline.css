@@ -764,3 +764,15 @@ body.overlay-open {
     padding: 1rem;
   }
 }
+
+/* Recap section inside the leaf-detail overlay (LIN-261) */
+.overlay-recap-wrap {
+  margin: 0.5rem 0 1rem 0;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--border, rgba(0, 0, 0, 0.08));
+  border-bottom: 1px solid var(--border, rgba(0, 0, 0, 0.08));
+}
+
+.overlay-recap-mount {
+  padding: 0.25rem 0;
+}

@@ -157,7 +157,7 @@ describe('renderPipelinePage', () => {
     // And there must be exactly one literal </script> — the genuine closing tag
     // for <script src="/pipeline.js"> at the bottom of the document.
     const literalCloses = html.match(/<\/script>/g) || [];
-    assert.strictEqual(literalCloses.length, 3, 'exactly three literal </script> tags (data embed, common.js, pipeline.js)');
+    assert.strictEqual(literalCloses.length, 4, 'exactly four literal </script> tags (data embed, common.js, recap.js, pipeline.js)');
 
     // Side-effect test: confirm the escaped payload is valid JSON and does
     // not contain the attacker payload as live script content.

@@ -21,6 +21,7 @@ import { ProxyTokenStore } from './lib/proxy-tokens.js'
 import { ProxyEventStore } from './lib/proxy-events.js'
 import { ForemanStore } from './lib/foreman-store.js'
 import { FreeTierStore } from './lib/free-tier-store.js'
+import { RecapCacheStore } from './lib/recap-cache.js'
 import { fetchProjects, fetchProjectsList, fetchTeams, fetchOrganization, fetchViewer } from './lib/linear.js'
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID } from './lib/tree.js'
 import { parseRepoFromDescription } from './lib/prompt-formatters.js'
@@ -184,6 +185,12 @@ const freeTierStore = new FreeTierStore({
   collection: freeTierCollection,
   dailyLimit: parseInt(process.env.FREE_TIER_DAILY_LIMIT, 10) || 5,
   hourlyLimit: parseInt(process.env.FREE_TIER_HOURLY_LIMIT, 10) || 50
+})
+
+// Recap cache (LIN-261): AI-generated task recaps, keyed on context hash
+const recapCacheCollection = db.collection('recap-cache')
+const recapCacheStore = new RecapCacheStore({
+  collection: recapCacheCollection
 })
 
 // =============================================================================
@@ -745,7 +752,7 @@ async function getWorkspaceOpenRouterKey(urlKey, linearUserId) {
 app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanStore, workspaceFromUrl, getWorkspaceAccessToken, getWorkspaceOpenRouterKey }))
 
 // Mount workspace API routes (audit, prompts, recommendations, comments, images)
-app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, customPromptsStore }))
+app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, customPromptsStore, recapCacheStore }))
 
 // Mount pipeline routes (page + JSON polling)
 app.use(createPipelineRoutes({ workspaceFromUrl, getWorkspaceAccessToken, dispatchQueueStore, foremanStore, getOpenRouterSource, getDeployInfo, handleUnauthorizedError }))
