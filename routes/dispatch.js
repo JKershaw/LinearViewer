@@ -268,47 +268,51 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
 
       // Spawn a Harbour Claude session when target is 'local' (the API value
       // 'local' is preserved for backward compatibility; user-facing surfaces
-      // refer to this as "Harbour"). When the dispatch carries a `repo`, we
-      // stage the prompt to a file, mint a short-lived single-use feedback
-      // token, and ask harbour-spawn to compose a clone+claude `sh -c`. The
-      // item is then atomically moved into history with tokenLabel 'harbour'
-      // so the addFeedback ownership check accepts the hook callback.
+      // refer to this as "Harbour"). We ALWAYS stage the prompt to a file
+      // for target='local' — regardless of whether a repo was picked — so
+      // the prompt never lands inline on jsh's stdin line (where embedded
+      // newlines break single-quote parsing and appear as "pasted over many
+      // lines"). When a feedback token store is wired we also mint a short-
+      // lived token and pass the feedback URL in the OSC env; when a repo
+      // is set, spawnClaudeSession prepends `git clone` + `cd`. Successful
+      // spawns move the item into history with tokenLabel 'harbour' so the
+      // addFeedback ownership check accepts the hook callback.
       let spawn = undefined;
       if (target === 'local') {
-        if (item.repo && harbourFeedbackTokenStore) {
-          try {
-            const stagingFilePath = writeHarbourStagingFile(item._id, prompt);
+        try {
+          const stagingFilePath = writeHarbourStagingFile(item._id, prompt);
+
+          let feedbackUrl;
+          let mintedToken;
+          if (harbourFeedbackTokenStore) {
             const minted = await harbourFeedbackTokenStore.mintToken(item._id, workspace.urlKey);
-            const feedbackUrl = `${req.protocol}://${req.get('host')}/api/dispatch/feedback/${item._id}`;
-
-            spawn = spawnClaudeSession(prompt, {
-              repo: item.repo,
-              dispatchId: item._id,
-              feedbackUrl,
-              token: minted.token,
-              stagingFilePath
-            });
-
-            if (spawn.success) {
-              // Best-effort take so the hook can post feedback against an
-              // archived "taken" item. If the take fails (e.g. the user
-              // already cancelled the queued item between insert and now),
-              // the spawn still proceeds — the hook callback will simply
-              // 404, which is acceptable.
-              try {
-                await dispatchQueueStore.takeItem(item._id, workspace.urlKey, 'harbour');
-              } catch (takeErr) {
-                console.error('Harbour take after spawn failed:', takeErr.message);
-              }
-            }
-          } catch (err) {
-            console.error('Harbour spawn setup failed:', err.message);
-            spawn = { success: false, error: 'Harbour spawn setup failed' };
+            feedbackUrl = `${req.protocol}://${req.get('host')}/api/dispatch/feedback/${item._id}`;
+            mintedToken = minted.token;
           }
-        } else {
-          // No repo (or no feedback token store wired): fall back to direct
-          // claude launch with the prompt embedded as argv (LIN-257 path).
-          spawn = spawnClaudeSession(prompt);
+
+          spawn = spawnClaudeSession(prompt, {
+            repo: item.repo || undefined,
+            dispatchId: item._id,
+            feedbackUrl,
+            token: mintedToken,
+            stagingFilePath
+          });
+
+          if (spawn.success && harbourFeedbackTokenStore) {
+            // Best-effort take so the hook can post feedback against an
+            // archived "taken" item. If the take fails (e.g. the user
+            // already cancelled the queued item between insert and now),
+            // the spawn still proceeds — the hook callback will simply
+            // 404, which is acceptable.
+            try {
+              await dispatchQueueStore.takeItem(item._id, workspace.urlKey, 'harbour');
+            } catch (takeErr) {
+              console.error('Harbour take after spawn failed:', takeErr.message);
+            }
+          }
+        } catch (err) {
+          console.error('Harbour spawn setup failed:', err.message);
+          spawn = { success: false, error: 'Harbour spawn setup failed' };
         }
       }
 
