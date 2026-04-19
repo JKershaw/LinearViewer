@@ -370,6 +370,19 @@ function renderCard(direction) {
   </div>`;
   }
 
+  // Recap accordion (lazy loaded, LIN-261) — only available when authenticated
+  if (urlKey) {
+    accordionHtml += `
+  <div class="swipe-card-accordion">
+    <div class="swipe-accordion-header" data-accordion="recap">
+      <span class="swipe-accordion-toggle">\u25B6</span> Recap
+    </div>
+    <div class="swipe-accordion-body" data-accordion-body="recap">
+      <div class="recap-section" data-recap-placeholder="1"></div>
+    </div>
+  </div>`;
+  }
+
   // Linear link
   const linkHtml = issue.url
     ? `<div class="swipe-card-link"><a href="${_esc(issue.url)}" target="_blank">View in Linear \u2192</a></div>`
@@ -671,6 +684,21 @@ function handleAccordionClick(e) {
   // Lazy load comments on first open
   if (type === 'comments' && !isOpen && body.querySelector('.swipe-comments-loading')) {
     loadComments(body);
+  }
+
+  // Lazy init recap on first open
+  if (type === 'recap' && !isOpen) {
+    const placeholder = body.querySelector('[data-recap-placeholder="1"]');
+    if (placeholder && window.RecapSection) {
+      placeholder.removeAttribute('data-recap-placeholder');
+      const issue = filteredIssues[currentIndex];
+      if (issue && urlKey) {
+        window.RecapSection.init(placeholder, {
+          urlKey,
+          identifier: issue.identifier || issue.id
+        });
+      }
+    }
   }
 }
 

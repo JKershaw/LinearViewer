@@ -14,6 +14,8 @@ import { generatePrompt, generateCustomPrompt, hasPrompt, getAvailablePrompts } 
 import { PREPARING_LABEL, WORK_ISSUE_LABELS } from '../lib/workflow-config.js';
 import { parseRepoFromDescription } from '../lib/prompt-formatters.js';
 import { isRecommendationEnabled, getRecommendation, getRecommendationStream, streamChat, DEFAULT_MODEL } from '../lib/openrouter.js';
+import { generateRecap } from '../lib/recap.js';
+import { hashContext } from '../lib/recap-cache.js';
 import { runAudit, computeAuditFromData } from '../lib/audit.js';
 import { UUID_REGEX } from '../lib/workspace.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
@@ -27,7 +29,7 @@ import { testMockTeams, testMockData } from '../tests/fixtures/mock-data.js';
  * @param {Function} options.getOpenRouterSource - Helper to determine OpenRouter source
  * @returns {Router} Express router
  */
-export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, customPromptsStore }) {
+export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, customPromptsStore, recapCacheStore }) {
   const router = Router();
 
   // ===========================================================================
@@ -736,6 +738,257 @@ ${goal}`;
       res.status(500).json({ error: 'Failed to fetch comments', message: error.message })
     }
   })
+
+  // ===========================================================================
+  // Recap API (LIN-261)
+  // ===========================================================================
+
+  const IDENTIFIER_REGEX = /^[A-Z]+-\d+$/i;
+
+  function isValidRecapId(id) {
+    return typeof id === 'string' && (UUID_REGEX.test(id) || IDENTIFIER_REGEX.test(id));
+  }
+
+  /**
+   * GET recap status + body (if fresh).
+   *
+   * @route GET /workspace/:urlKey/api/recap/:issueId
+   * @returns {Object} { status: 'fresh'|'stale'|'missing', recap?, generatedAt?, model? }
+   */
+  router.get('/workspace/:urlKey/api/recap/:issueId', workspaceFromUrl, async (req, res) => {
+    const workspace = req.workspace;
+    const { issueId } = req.params;
+
+    if (!isValidRecapId(issueId)) {
+      return res.status(400).json({ error: 'Invalid issue ID format' });
+    }
+    if (!recapCacheStore) {
+      return res.status(503).json({ error: 'Recap cache not configured' });
+    }
+
+    try {
+      const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
+      let context;
+      if (isTestMode) {
+        context = await buildMockRecapContext(issueId);
+        if (!context) return res.status(404).json({ error: 'Issue not found' });
+      } else {
+        context = await fetchRecommendationContext(workspace.accessToken, issueId);
+      }
+
+      const canonicalId = context.issue?.id || issueId;
+      const inputHash = hashContext(context);
+      const cached = await recapCacheStore.get(workspace.urlKey, canonicalId);
+
+      if (!cached) {
+        return res.json({ status: 'missing' });
+      }
+      if (cached.inputHash !== inputHash) {
+        return res.json({
+          status: 'stale',
+          generatedAt: cached.generatedAt,
+          model: cached.model
+        });
+      }
+      return res.json({
+        status: 'fresh',
+        recap: cached.recap,
+        generatedAt: cached.generatedAt,
+        model: cached.model
+      });
+    } catch (error) {
+      console.error('Recap GET error:', error);
+      if (error.response?.status === 401) {
+        return res.status(401).json({ error: 'Token expired or invalid' });
+      }
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      res.status(500).json({ error: 'Failed to fetch recap status', message: error.message });
+    }
+  });
+
+  /**
+   * POST recap generate.
+   * Regenerates the recap via Haiku (or configured model) and caches it.
+   *
+   * @route POST /workspace/:urlKey/api/recap/:issueId
+   * @returns {Object} { status: 'fresh', recap, generatedAt, model }
+   */
+  router.post('/workspace/:urlKey/api/recap/:issueId', workspaceFromUrl, async (req, res) => {
+    const workspace = req.workspace;
+    const { issueId } = req.params;
+
+    if (!isValidRecapId(issueId)) {
+      return res.status(400).json({ error: 'Invalid issue ID format' });
+    }
+    if (!recapCacheStore) {
+      return res.status(503).json({ error: 'Recap cache not configured' });
+    }
+
+    const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
+    const sessionApiKey = req.session.openRouterApiKey;
+    const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
+    const isFreeTier = !sessionApiKey && !process.env.OPENROUTER_API_KEY && !!freeTierKey;
+
+    if (!isTestMode && !isRecommendationEnabled(sessionApiKey) && !freeTierKey) {
+      return res.status(503).json({ error: 'AI recap is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.' });
+    }
+
+    if (!isTestMode && isFreeTier) {
+      const check = await freeTierStore.tryUse(workspace.urlKey);
+      if (!check.allowed) {
+        return res.status(429).json({
+          error: check.reason,
+          freeTier: {
+            used: true,
+            remaining: check.remaining,
+            limit: check.limit,
+            resetsAt: check.resetsAt
+          }
+        });
+      }
+    }
+
+    try {
+      let context;
+      if (isTestMode) {
+        context = await buildMockRecapContext(issueId);
+        if (!context) return res.status(404).json({ error: 'Issue not found' });
+      } else {
+        context = await fetchRecommendationContext(workspace.accessToken, issueId);
+      }
+
+      const canonicalId = context.issue?.id || issueId;
+      const inputHash = hashContext(context);
+      const selectedModel = req.session.modelId || DEFAULT_MODEL;
+
+      let recap;
+      let modelUsed;
+      if (isTestMode) {
+        const mocked = buildMockRecap(context);
+        recap = mocked;
+        modelUsed = selectedModel;
+      } else {
+        const apiKeyToUse = sessionApiKey || (isFreeTier ? freeTierKey : undefined);
+        const result = await generateRecap(
+          context.issue,
+          context,
+          { apiKey: apiKeyToUse, model: selectedModel }
+        );
+        recap = result.recap;
+        modelUsed = result.model;
+      }
+
+      await recapCacheStore.put(workspace.urlKey, canonicalId, {
+        inputHash,
+        recap,
+        model: modelUsed
+      });
+      const stored = await recapCacheStore.get(workspace.urlKey, canonicalId);
+
+      res.json({
+        status: 'fresh',
+        recap: stored?.recap ?? recap,
+        generatedAt: stored?.generatedAt ?? new Date(),
+        model: modelUsed
+      });
+    } catch (error) {
+      console.error('Recap POST error:', error);
+      if (error.response?.status === 401) {
+        return res.status(401).json({ error: 'Token expired or invalid' });
+      }
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      if (error.message?.includes('OpenRouter')) {
+        return res.status(503).json({ error: 'AI service temporarily unavailable', message: error.message });
+      }
+      res.status(500).json({ error: 'Failed to generate recap', message: error.message });
+    }
+  });
+
+  /** Build a mock recommendation context from test fixtures. */
+  async function buildMockRecapContext(issueId) {
+    const mockIssue = testMockData.issues.find(i => i.id === issueId || i.identifier === issueId || i.url?.endsWith(`/${issueId}`));
+    if (!mockIssue) return null;
+    const project = testMockData.projects.find(p => p.id === mockIssue.project?.id) || null;
+    const labels = (mockIssue.labels?.nodes || []).map(l => l.name);
+    const comments = (mockIssue.comments?.nodes || []).map(c => ({
+      id: c.id,
+      body: c.body,
+      createdAt: c.createdAt,
+      user: { name: c.user?.name || 'Unknown' }
+    }));
+    const children = (mockIssue.children?.nodes || []).map(c => ({
+      id: c.id,
+      identifier: c.identifier || c.id,
+      title: c.title,
+      state: c.state || { type: 'unstarted', name: 'Todo' },
+      labels: (c.labels?.nodes || []).map(l => l.name)
+    }));
+    return {
+      issue: {
+        id: mockIssue.id,
+        identifier: mockIssue.identifier || mockIssue.id,
+        title: mockIssue.title,
+        description: mockIssue.description || '',
+        state: mockIssue.state,
+        labels,
+        url: mockIssue.url
+      },
+      parent: null,
+      siblings: [],
+      project: project ? { id: project.id, name: project.name } : null,
+      children,
+      comments,
+      focusedChild: null
+    };
+  }
+
+  /** Build a small deterministic recap for test mode. */
+  function buildMockRecap(context) {
+    const labels = context.issue?.labels || [];
+    const done = [];
+    const pending = [];
+    const deviations = [];
+
+    if ((context.comments || []).length > 0) {
+      done.push({
+        item: 'Discussion captured in comments',
+        evidence: `${context.comments.length} comment(s) recorded`
+      });
+    }
+    if (context.issue?.description) {
+      done.push({
+        item: 'Description documented',
+        evidence: 'Description is present on the issue'
+      });
+    }
+    const remainingChildren = (context.children || []).filter(
+      c => c.state?.type !== 'completed' && c.state?.type !== 'canceled'
+    );
+    for (const c of remainingChildren.slice(0, 3)) {
+      pending.push({
+        item: `Complete subtask ${c.identifier}`,
+        predicted: c.title || ''
+      });
+    }
+    if (pending.length === 0) {
+      pending.push({
+        item: 'Continue implementation',
+        predicted: 'Pick up from current state'
+      });
+    }
+    if (labels.includes('blocked') || labels.includes('Blocked')) {
+      deviations.push({
+        item: 'Task is blocked',
+        type: 'blocker',
+        evidence: 'Blocked label applied'
+      });
+    }
+    return { done, pending, deviations };
+  }
 
   // ===========================================================================
   // Image Proxy API
