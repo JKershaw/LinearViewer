@@ -663,6 +663,8 @@ function computeCrossLaneColumns(lanes, options) {
 var data = window.__SWIM_DATA__ || {};
 var allIssues = data.issues || [];
 var projectOrder = data.projectOrder || {};
+var urlKey = data.urlKey || '';
+var swipeBase = urlKey ? '/workspace/' + encodeURIComponent(urlKey) + '/swipe' : '/swipe';
 
 var issueById = new Map(allIssues.map(function(i) { return [i.id, i]; }));
 var currentLanes = []; // Updated by render() for chain walk access
@@ -1916,7 +1918,9 @@ function showPopover(issueId, anchorEl) {
       ? 'Clear critical path' : 'Show critical path';
   }
 
-  document.getElementById('swim-popover-id').textContent = issue.identifier || issue.id;
+  var idEl = document.getElementById('swim-popover-id');
+  idEl.textContent = issue.identifier || issue.id;
+  idEl.href = issue.identifier ? swipeBase + '/' + encodeURIComponent(issue.identifier) : swipeBase;
   document.getElementById('swim-popover-title').textContent = issue.title || '';
 
   var meta = [];

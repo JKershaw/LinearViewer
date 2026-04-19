@@ -357,6 +357,12 @@ body:has(.swim-page) {
 .swim-popover-id {
   font-size: 11px;
   color: var(--fg-dim, #888);
+  text-decoration: none;
+}
+
+.swim-popover-id:hover {
+  color: var(--fg, #1a1a1a);
+  text-decoration: underline;
 }
 
 .swim-popover-close {
