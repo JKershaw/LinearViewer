@@ -24,6 +24,7 @@ import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActi
 import { flattenTrees, sortIssuesForSwipe, applyBlockingOrder, clusterByParent } from '../lib/render-swipe.js';
 import { generatePrompt, hasPrompt } from '../lib/prompt-templates.js';
 import { parseRepoFromDescription } from '../lib/prompt-formatters.js';
+import { armKeepalive } from '../lib/http-keepalive.js';
 
 // Lazy-load test fixtures only in test mode to avoid production dependency on test files
 let testMockData = null;
@@ -1860,29 +1861,10 @@ ${readEndpoints}${writeEndpoints}
         });
       }
 
-      // Heroku's router closes a connection that hasn't sent its first byte within
-      // 30s (H12). The Linear + OpenRouter chain below can exceed that. If we're
-      // still working at 25s, flush a 200 and keep the connection alive with a
-      // whitespace heartbeat every 15s; JSON.parse ignores interior whitespace so
-      // callers still get a valid JSON body. Once flushed, errors must ride in the
-      // body with a logical `statusCode` field since the HTTP status is committed.
-      let keepaliveActive = false;
-      let keepaliveInterval;
-      const keepaliveKick = setTimeout(() => {
-        keepaliveActive = true;
-        res.status(200);
-        res.setHeader('Content-Type', 'application/json; charset=utf-8');
-        res.flushHeaders();
-        keepaliveInterval = setInterval(() => {
-          if (res.writableEnded || res.destroyed) return;
-          try { res.write(' '); } catch { /* client disconnected */ }
-        }, 15_000);
-      }, 25_000);
-      const stopKeepalive = () => {
-        clearTimeout(keepaliveKick);
-        if (keepaliveInterval) clearInterval(keepaliveInterval);
-      };
-
+      // Linear + OpenRouter can exceed Heroku's 30s router cap (H12). Arm a
+      // delayed whitespace keepalive so the dyno can keep the connection open
+      // while the LLM call completes.
+      const keepalive = armKeepalive(res);
       try {
         // Fetch issue context with two-tier support for parent tasks
         const context = await withTimeout(fetchRecommendationContext(accessToken, identifier), GRAPHQL_TIMEOUT_MS);
@@ -1899,22 +1881,17 @@ ${readEndpoints}${writeEndpoints}
           MULTI_REQUEST_TIMEOUT_MS
         );
 
-        stopKeepalive();
-        const body = {
+        keepalive.stop();
+        logEvent(req, '/api/proxy/recommend', 200);
+        keepalive.send(200, {
           identifier: issue.identifier,
           reasoning: recommendation.reasoning,
           prompt: recommendation.prompt,
           truncated: recommendation.truncated,
           repo: parseRepoFromDescription(project?.description)
-        };
-        logEvent(req, '/api/proxy/recommend', 200);
-        if (keepaliveActive) {
-          res.end(JSON.stringify(body));
-        } else {
-          res.json(body);
-        }
+        });
       } catch (err) {
-        stopKeepalive();
+        keepalive.stop();
         let status;
         let body;
         if (err.message?.includes('not found')) {
@@ -1929,11 +1906,7 @@ ${readEndpoints}${writeEndpoints}
           console.error('Proxy /recommend error:', err.message);
         }
         logEvent(req, '/api/proxy/recommend', status);
-        if (keepaliveActive) {
-          res.end(JSON.stringify({ ...body, statusCode: status }));
-        } else {
-          res.status(status).json(body);
-        }
+        keepalive.send(status, body);
       }
     } catch (err) {
       if (err.message?.includes('not found')) {
@@ -1978,89 +1951,106 @@ ${readEndpoints}${writeEndpoints}
       const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
       const sessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
 
-      let context;
-      if (isTestMode) {
-        context = await buildMockRecapContextFromFixtures(identifier);
-        if (!context) {
-          logEvent(req, '/api/proxy/recap', 404);
-          return res.status(404).json({ error: 'Issue not found' });
+      // Regenerate path calls OpenRouter; arm a Heroku H12 guard.
+      const keepalive = armKeepalive(res);
+      try {
+        let context;
+        if (isTestMode) {
+          context = await buildMockRecapContextFromFixtures(identifier);
+          if (!context) {
+            keepalive.stop();
+            logEvent(req, '/api/proxy/recap', 404);
+            return keepalive.send(404, { error: 'Issue not found' });
+          }
+        } else {
+          context = await withTimeout(fetchRecommendationContext(accessToken, identifier), GRAPHQL_TIMEOUT_MS);
         }
-      } else {
-        context = await withTimeout(fetchRecommendationContext(accessToken, identifier), GRAPHQL_TIMEOUT_MS);
-      }
 
-      const canonicalId = context.issue?.id || identifier;
-      const inputHash = hashContext(context);
-      const cached = await recapCacheStore.get(req.proxyUrlKey, canonicalId);
+        const canonicalId = context.issue?.id || identifier;
+        const inputHash = hashContext(context);
+        const cached = await recapCacheStore.get(req.proxyUrlKey, canonicalId);
 
-      if (cached && cached.inputHash === inputHash) {
+        if (cached && cached.inputHash === inputHash) {
+          keepalive.stop();
+          logEvent(req, '/api/proxy/recap', 200);
+          return keepalive.send(200, {
+            status: 'fresh',
+            identifier: context.issue?.identifier || identifier,
+            recap: cached.recap,
+            generatedAt: cached.generatedAt,
+            model: cached.model
+          });
+        }
+
+        if (noRefresh) {
+          keepalive.stop();
+          logEvent(req, '/api/proxy/recap', 200);
+          return keepalive.send(200, {
+            status: cached ? 'stale' : 'missing',
+            identifier: context.issue?.identifier || identifier,
+            generatedAt: cached?.generatedAt,
+            model: cached?.model
+          });
+        }
+
+        if (!isTestMode && !isRecommendationEnabled(sessionApiKey)) {
+          keepalive.stop();
+          logEvent(req, '/api/proxy/recap', 503);
+          return keepalive.send(503, { error: 'AI recap is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.' });
+        }
+
+        let recap;
+        let modelUsed;
+        if (isTestMode) {
+          recap = buildMockRecapFromContext(context);
+          modelUsed = DEFAULT_MODEL;
+        } else {
+          const result = await withTimeout(
+            generateRecap(context.issue, context, { apiKey: sessionApiKey, model: DEFAULT_MODEL }),
+            MULTI_REQUEST_TIMEOUT_MS
+          );
+          recap = result.recap;
+          modelUsed = result.model;
+        }
+
+        await recapCacheStore.put(req.proxyUrlKey, canonicalId, {
+          inputHash,
+          recap,
+          model: modelUsed
+        });
+        const stored = await recapCacheStore.get(req.proxyUrlKey, canonicalId);
+
+        keepalive.stop();
         logEvent(req, '/api/proxy/recap', 200);
-        return res.json({
+        keepalive.send(200, {
           status: 'fresh',
           identifier: context.issue?.identifier || identifier,
-          recap: cached.recap,
-          generatedAt: cached.generatedAt,
-          model: cached.model
+          recap: stored?.recap ?? recap,
+          generatedAt: stored?.generatedAt ?? new Date(),
+          model: modelUsed
         });
+      } catch (err) {
+        keepalive.stop();
+        let status;
+        let body;
+        if (err.message?.includes('not found')) {
+          status = 404;
+          body = { error: 'Issue not found' };
+        } else if (err.message?.includes('OpenRouter')) {
+          status = 503;
+          body = { error: 'AI service temporarily unavailable', detail: err.message };
+        } else {
+          status = graphqlErrorStatus(err);
+          body = { error: 'Failed to fetch recap', detail: graphqlErrorDetail(err) };
+          console.error('Proxy /recap error:', err.message);
+        }
+        logEvent(req, '/api/proxy/recap', status);
+        keepalive.send(status, body);
       }
-
-      if (noRefresh) {
-        logEvent(req, '/api/proxy/recap', 200);
-        return res.json({
-          status: cached ? 'stale' : 'missing',
-          identifier: context.issue?.identifier || identifier,
-          generatedAt: cached?.generatedAt,
-          model: cached?.model
-        });
-      }
-
-      if (!isTestMode && !isRecommendationEnabled(sessionApiKey)) {
-        logEvent(req, '/api/proxy/recap', 503);
-        return res.status(503).json({ error: 'AI recap is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.' });
-      }
-
-      let recap;
-      let modelUsed;
-      if (isTestMode) {
-        recap = buildMockRecapFromContext(context);
-        modelUsed = DEFAULT_MODEL;
-      } else {
-        const result = await withTimeout(
-          generateRecap(context.issue, context, { apiKey: sessionApiKey, model: DEFAULT_MODEL }),
-          MULTI_REQUEST_TIMEOUT_MS
-        );
-        recap = result.recap;
-        modelUsed = result.model;
-      }
-
-      await recapCacheStore.put(req.proxyUrlKey, canonicalId, {
-        inputHash,
-        recap,
-        model: modelUsed
-      });
-      const stored = await recapCacheStore.get(req.proxyUrlKey, canonicalId);
-
-      logEvent(req, '/api/proxy/recap', 200);
-      res.json({
-        status: 'fresh',
-        identifier: context.issue?.identifier || identifier,
-        recap: stored?.recap ?? recap,
-        generatedAt: stored?.generatedAt ?? new Date(),
-        model: modelUsed
-      });
     } catch (err) {
-      if (err.message?.includes('not found')) {
-        logEvent(req, '/api/proxy/recap', 404);
-        return res.status(404).json({ error: 'Issue not found' });
-      }
-      if (err.message?.includes('OpenRouter')) {
-        logEvent(req, '/api/proxy/recap', 503);
-        return res.status(503).json({ error: 'AI service temporarily unavailable', detail: err.message });
-      }
-      const status = graphqlErrorStatus(err);
-      logEvent(req, '/api/proxy/recap', status);
-      console.error('Proxy /recap error:', err.message);
-      res.status(status).json({ error: 'Failed to fetch recap', detail: graphqlErrorDetail(err) });
+      logEvent(req, '/api/proxy/recap', 500);
+      console.error('Proxy /recap outer error:', err.message);
+      res.status(500).json({ error: 'Failed to fetch recap', detail: err.message });
     }
   });
 
@@ -2094,49 +2084,72 @@ ${readEndpoints}${writeEndpoints}
         return res.status(503).json({ error: 'AI recap is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.' });
       }
 
-      let context;
-      if (isTestMode) {
-        context = await buildMockRecapContextFromFixtures(identifier);
-        if (!context) {
-          logEvent(req, '/api/proxy/recap', 404);
-          return res.status(404).json({ error: 'Issue not found' });
+      // Force-regenerate always calls OpenRouter; arm a Heroku H12 guard.
+      const keepalive = armKeepalive(res);
+      try {
+        let context;
+        if (isTestMode) {
+          context = await buildMockRecapContextFromFixtures(identifier);
+          if (!context) {
+            keepalive.stop();
+            logEvent(req, '/api/proxy/recap', 404);
+            return keepalive.send(404, { error: 'Issue not found' });
+          }
+        } else {
+          context = await withTimeout(fetchRecommendationContext(accessToken, identifier), GRAPHQL_TIMEOUT_MS);
         }
-      } else {
-        context = await withTimeout(fetchRecommendationContext(accessToken, identifier), GRAPHQL_TIMEOUT_MS);
+
+        const canonicalId = context.issue?.id || identifier;
+        const inputHash = hashContext(context);
+
+        let recap;
+        let modelUsed;
+        if (isTestMode) {
+          recap = buildMockRecapFromContext(context);
+          modelUsed = DEFAULT_MODEL;
+        } else {
+          const result = await withTimeout(
+            generateRecap(context.issue, context, { apiKey: sessionApiKey, model: DEFAULT_MODEL }),
+            MULTI_REQUEST_TIMEOUT_MS
+          );
+          recap = result.recap;
+          modelUsed = result.model;
+        }
+
+        await recapCacheStore.put(req.proxyUrlKey, canonicalId, {
+          inputHash,
+          recap,
+          model: modelUsed
+        });
+        const stored = await recapCacheStore.get(req.proxyUrlKey, canonicalId);
+
+        keepalive.stop();
+        logEvent(req, '/api/proxy/recap', 200);
+        keepalive.send(200, {
+          status: 'fresh',
+          identifier: context.issue?.identifier || identifier,
+          recap: stored?.recap ?? recap,
+          generatedAt: stored?.generatedAt ?? new Date(),
+          model: modelUsed
+        });
+      } catch (err) {
+        keepalive.stop();
+        let status;
+        let body;
+        if (err.message?.includes('not found')) {
+          status = 404;
+          body = { error: 'Issue not found' };
+        } else if (err.message?.includes('OpenRouter')) {
+          status = 503;
+          body = { error: 'AI service temporarily unavailable', detail: err.message };
+        } else {
+          status = graphqlErrorStatus(err);
+          body = { error: 'Failed to fetch recap', detail: graphqlErrorDetail(err) };
+          console.error('Proxy /recap error:', err.message);
+        }
+        logEvent(req, '/api/proxy/recap', status);
+        keepalive.send(status, body);
       }
-
-      const canonicalId = context.issue?.id || identifier;
-      const inputHash = hashContext(context);
-
-      let recap;
-      let modelUsed;
-      if (isTestMode) {
-        recap = buildMockRecapFromContext(context);
-        modelUsed = DEFAULT_MODEL;
-      } else {
-        const result = await withTimeout(
-          generateRecap(context.issue, context, { apiKey: sessionApiKey, model: DEFAULT_MODEL }),
-          MULTI_REQUEST_TIMEOUT_MS
-        );
-        recap = result.recap;
-        modelUsed = result.model;
-      }
-
-      await recapCacheStore.put(req.proxyUrlKey, canonicalId, {
-        inputHash,
-        recap,
-        model: modelUsed
-      });
-      const stored = await recapCacheStore.get(req.proxyUrlKey, canonicalId);
-
-      logEvent(req, '/api/proxy/recap', 200);
-      res.json({
-        status: 'fresh',
-        identifier: context.issue?.identifier || identifier,
-        recap: stored?.recap ?? recap,
-        generatedAt: stored?.generatedAt ?? new Date(),
-        model: modelUsed
-      });
     } catch (err) {
       if (err.message?.includes('not found')) {
         logEvent(req, '/api/proxy/recap', 404);
