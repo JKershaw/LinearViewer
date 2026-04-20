@@ -236,6 +236,122 @@
 }
 
 /* =============================================================================
+   Collapsible Sections (Tokens list, Event Log)
+   ============================================================================= */
+.proxy-collapsible {
+  margin-top: 0.5rem;
+}
+
+.proxy-collapsible-summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--fg-vdim);
+  border-radius: 3px;
+  font-family: var(--font-content);
+  font-size: 0.85em;
+  color: var(--fg-dim);
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.proxy-collapsible-summary::-webkit-details-marker {
+  display: none;
+}
+
+.proxy-collapsible-summary::before {
+  content: '▸';
+  color: var(--fg-dim);
+  font-size: 0.8em;
+  width: 1ch;
+  display: inline-block;
+}
+
+.proxy-collapsible[open] > .proxy-collapsible-summary::before {
+  content: '▾';
+}
+
+.proxy-collapsible-summary:hover {
+  color: var(--fg);
+  border-color: var(--fg-dim);
+}
+
+.proxy-collapsible-count {
+  color: var(--fg-vdim);
+}
+
+.proxy-collapsible[open] > .proxy-collapsible-summary {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  border-bottom-color: transparent;
+}
+
+/* =============================================================================
+   Show-more (tokens)
+   ============================================================================= */
+.token-show-more {
+  margin-top: 0.5rem;
+  font-size: 0.85em;
+  color: var(--fg-dim);
+}
+
+.token-show-more:hover {
+  color: var(--fg);
+}
+
+/* =============================================================================
+   Token Expiry Badges
+   ============================================================================= */
+.token-expiry {
+  font-family: var(--font-structural);
+  font-size: 0.75em;
+  font-weight: 400;
+  padding: 0.05rem 0.35rem;
+  margin-left: 0.4rem;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--fg-dim);
+  vertical-align: middle;
+}
+
+.token-expiry.warn {
+  background: rgba(234, 179, 8, 0.12);
+  color: var(--yellow);
+}
+
+.token-expiry.expired {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--red);
+}
+
+/* =============================================================================
+   Events Pager
+   ============================================================================= */
+.proxy-events-pager {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--fg-vdim);
+  font-family: var(--font-content);
+  font-size: 0.85em;
+}
+
+.proxy-events-pager-info {
+  color: var(--fg-dim);
+  flex: 1;
+  text-align: center;
+}
+
+.proxy-events-pager .action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* =============================================================================
    Responsive
    ============================================================================= */
 @media (max-width: 640px) {

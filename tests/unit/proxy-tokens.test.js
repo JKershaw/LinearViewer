@@ -183,13 +183,25 @@ describe('ProxyTokenStore', () => {
       assert.strictEqual(validated, null, 'Expired token should not validate');
     });
 
-    test('token without TTL does not expire', async () => {
-      const result = await store.createToken('workspace-1');
+    test('token with explicit null TTL does not expire', async () => {
+      const result = await store.createToken('workspace-1', { ttl: null });
       const docs = collection._docs();
-      assert.strictEqual(docs[0].expiresAt, null, 'No-TTL token should have null expiresAt');
+      assert.strictEqual(docs[0].expiresAt, null, 'Explicit null TTL should yield null expiresAt');
 
       const validated = await store.validateToken(result.token);
       assert.ok(validated, 'Non-expiring token should validate');
+    });
+
+    test('token gets default TTL when none specified', async () => {
+      const result = await store.createToken('workspace-1');
+      const docs = collection._docs();
+      assert.ok(docs[0].expiresAt instanceof Date, 'Default expiresAt should be set');
+
+      const days = (docs[0].expiresAt.getTime() - Date.now()) / (24 * 60 * 60 * 1000);
+      assert.ok(days > 80 && days < 95, `Default TTL should be ~90 days, got ${days.toFixed(1)}`);
+
+      const validated = await store.validateToken(result.token);
+      assert.ok(validated, 'Token within default TTL should validate');
     });
   });
 
