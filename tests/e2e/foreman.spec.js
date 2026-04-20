@@ -717,12 +717,12 @@ test.describe('Foreman Page UI', () => {
     expect(page.url()).toContain('/settings');
   });
 
-  test('foreman page shows all three sections', async ({ page }) => {
+  test('foreman page shows all three observation sections', async ({ page }) => {
     await page.goto('/workspace/test-workspace/foreman');
     const headers = page.locator('.foreman-section-header');
-    await expect(headers.nth(0)).toContainText('Playbook');
-    await expect(headers.nth(1)).toContainText('Status Log');
-    await expect(headers.nth(2)).toContainText('Stack Preview');
+    await expect(headers.nth(0)).toContainText('Now working');
+    await expect(headers.nth(1)).toContainText('Timeline');
+    await expect(headers.nth(2)).toContainText('Up next');
   });
 
   test('foreman page has copy button and +proxy toggle', async ({ page }) => {
@@ -780,7 +780,7 @@ test.describe('Foreman Page UI', () => {
 
     // Wait for status to load
     const statusList = page.locator('#foreman-status-list');
-    await expect(statusList.locator('.foreman-status-item')).toBeVisible({ timeout: 10000 });
+    await expect(statusList.locator('.foreman-timeline-item').first()).toBeVisible({ timeout: 10000 });
     await expect(statusList).toContainText('TEST-99');
     await expect(statusList).toContainText('research');
     await expect(statusList).toContainText('completed');
@@ -794,10 +794,10 @@ test.describe('Foreman Page UI', () => {
 
     // Wait for stack to load
     const stackList = page.locator('#foreman-stack-list');
-    await expect(stackList.locator('.foreman-stack-item').first()).toBeVisible({ timeout: 10000 });
+    await expect(stackList.locator('.foreman-stack-card').first()).toBeVisible({ timeout: 10000 });
 
-    // Should show task identifiers
-    const items = stackList.locator('.foreman-stack-item');
+    // Should show task cards
+    const items = stackList.locator('.foreman-stack-card');
     const count = await items.count();
     expect(count).toBeGreaterThan(0);
     expect(count).toBeLessThanOrEqual(5);
