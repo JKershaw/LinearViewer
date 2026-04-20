@@ -322,11 +322,12 @@
         <span class="foreman-meta-value" title="${escapeHtml(formatAbsoluteTime(activeEntry.timestamp))}">${escapeHtml(formatRelativeTime(activeEntry.timestamp))}</span>
       </div>`
     );
-    if (task?.projectName) {
+    const projectName = task?.project?.name;
+    if (projectName) {
       metaRows.push(
         `<div class="foreman-meta-row">
           <span class="foreman-meta-label">Project</span>
-          <span class="foreman-meta-value">${escapeHtml(task.projectName)}</span>
+          <span class="foreman-meta-value">${escapeHtml(projectName)}</span>
         </div>`
       );
     }
@@ -508,7 +509,7 @@
     }
 
     stackList.innerHTML = tasks.map((task, idx) => {
-      const state = getStateInfo(task.stateType);
+      const state = getStateInfo(task.state?.type);
       const identifier = task.identifier || task.id || '';
       const labels = normaliseLabels(task.labels);
       const labelsHtml = labels.length
@@ -517,8 +518,9 @@
       const priorityHtml = task.priority
         ? `<span class="foreman-stack-priority">${renderPriorityDots(task.priority)}</span>`
         : '';
-      const projectHtml = task.projectName
-        ? `<span class="foreman-stack-project">${escapeHtml(task.projectName)}</span>`
+      const projectName = task.project?.name;
+      const projectHtml = projectName
+        ? `<span class="foreman-stack-project">${escapeHtml(projectName)}</span>`
         : '';
 
       const linkOpen = task.url

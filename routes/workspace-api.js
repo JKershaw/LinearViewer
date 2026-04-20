@@ -19,6 +19,7 @@ import { hashContext } from '../lib/recap-cache.js';
 import { runAudit, computeAuditFromData } from '../lib/audit.js';
 import { UUID_REGEX } from '../lib/workspace.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
+import { armKeepalive } from '../lib/http-keepalive.js';
 import { testMockTeams, testMockData } from '../tests/fixtures/mock-data.js';
 
 /**
@@ -311,12 +312,16 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       }
     }
 
+    // Linear + OpenRouter can exceed Heroku's 30s router cap (H12). Arm a
+    // whitespace keepalive around the slow path.
+    const keepalive = armKeepalive(res);
     try {
       // Use mock data in test mode
       if (isTestMode) {
         const mockIssue = testMockData.issues.find(i => i.id === issueId)
         if (!mockIssue) {
-          return res.status(404).json({ error: 'Issue not found' })
+          keepalive.stop();
+          return keepalive.send(404, { error: 'Issue not found' })
         }
 
         // Atomically check free tier limits and record usage in test mode
@@ -324,7 +329,8 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         if (testIsFreeTier) {
           const check = await freeTierStore.tryUse(workspace.urlKey)
           if (!check.allowed) {
-            return res.status(429).json({
+            keepalive.stop();
+            return keepalive.send(429, {
               error: check.reason,
               freeTier: {
                 used: true,
@@ -393,7 +399,8 @@ ${goal}`
           }
         }
 
-        return res.json(result)
+        keepalive.stop();
+        return keepalive.send(200, result)
       }
 
       // Fetch issue context from Linear (uses two-tier context for parent tasks)
@@ -425,26 +432,22 @@ ${goal}`
         }
       }
 
-      res.json(result)
+      keepalive.stop();
+      keepalive.send(200, result)
     } catch (error) {
+      keepalive.stop();
       console.error('Recommendation error:', error)
 
-      // Handle 401 from Linear API
       if (error.response?.status === 401) {
-        return res.status(401).json({ error: 'Token expired or invalid' })
+        return keepalive.send(401, { error: 'Token expired or invalid' })
       }
-
-      // Handle issue not found
       if (error.message?.includes('not found')) {
-        return res.status(404).json({ error: error.message })
+        return keepalive.send(404, { error: error.message })
       }
-
-      // Handle OpenRouter errors
       if (error.message?.includes('OpenRouter')) {
-        return res.status(503).json({ error: 'AI service temporarily unavailable', message: error.message })
+        return keepalive.send(503, { error: 'AI service temporarily unavailable', message: error.message })
       }
-
-      res.status(500).json({ error: 'Failed to get recommendation', message: error.message })
+      keepalive.send(500, { error: 'Failed to get recommendation', message: error.message })
     }
   })
 
@@ -850,11 +853,16 @@ ${goal}`;
       }
     }
 
+    // Force-regenerate always calls OpenRouter; arm a Heroku H12 guard.
+    const keepalive = armKeepalive(res);
     try {
       let context;
       if (isTestMode) {
         context = await buildMockRecapContext(issueId);
-        if (!context) return res.status(404).json({ error: 'Issue not found' });
+        if (!context) {
+          keepalive.stop();
+          return keepalive.send(404, { error: 'Issue not found' });
+        }
       } else {
         context = await fetchRecommendationContext(workspace.accessToken, issueId);
       }
@@ -887,24 +895,26 @@ ${goal}`;
       });
       const stored = await recapCacheStore.get(workspace.urlKey, canonicalId);
 
-      res.json({
+      keepalive.stop();
+      keepalive.send(200, {
         status: 'fresh',
         recap: stored?.recap ?? recap,
         generatedAt: stored?.generatedAt ?? new Date(),
         model: modelUsed
       });
     } catch (error) {
+      keepalive.stop();
       console.error('Recap POST error:', error);
       if (error.response?.status === 401) {
-        return res.status(401).json({ error: 'Token expired or invalid' });
+        return keepalive.send(401, { error: 'Token expired or invalid' });
       }
       if (error.message?.includes('not found')) {
-        return res.status(404).json({ error: error.message });
+        return keepalive.send(404, { error: error.message });
       }
       if (error.message?.includes('OpenRouter')) {
-        return res.status(503).json({ error: 'AI service temporarily unavailable', message: error.message });
+        return keepalive.send(503, { error: 'AI service temporarily unavailable', message: error.message });
       }
-      res.status(500).json({ error: 'Failed to generate recap', message: error.message });
+      keepalive.send(500, { error: 'Failed to generate recap', message: error.message });
     }
   });
 
