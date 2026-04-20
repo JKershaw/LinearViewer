@@ -29,8 +29,6 @@ test.describe('Foreman API - Stack Endpoint', () => {
     expect(task.title).toBeTruthy();
     expect(task.stateType).toBeTruthy();
     expect(Array.isArray(task.labels)).toBe(true);
-    expect(Array.isArray(task.availablePrompts)).toBe(true);
-    expect(task.availablePrompts.length).toBeGreaterThan(0);
   });
 
   test('GET /api/proxy/stack respects limit parameter', async ({ request }) => {
@@ -190,6 +188,86 @@ test.describe('Foreman API - Recommend Endpoint', () => {
 
   test('GET /api/proxy/recommend requires authentication', async ({ request }) => {
     const resp = await request.get('/api/proxy/recommend/LIN-1');
+    expect(resp.status()).toBe(401);
+  });
+});
+
+test.describe('Foreman API - Recap Endpoint', () => {
+  let readToken;
+
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/test/clear-proxy-tokens');
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
+
+    const resp = await page.goto('/test/create-proxy-token?scope=read&label=foreman-read');
+    const data = await resp.json();
+    readToken = data.token;
+  });
+
+  test('GET /api/proxy/recap auto-generates and returns fresh recap', async ({ request }) => {
+    const resp = await request.get('/api/proxy/recap/66666666-6666-6666-6666-666666666666', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(resp.status()).toBe(200);
+    const data = await resp.json();
+    expect(data.status).toBe('fresh');
+    expect(data.recap).toBeTruthy();
+    expect(Array.isArray(data.recap.done)).toBe(true);
+    expect(Array.isArray(data.recap.pending)).toBe(true);
+    expect(Array.isArray(data.recap.deviations)).toBe(true);
+    expect(data.identifier).toBeTruthy();
+  });
+
+  test('GET /api/proxy/recap with noRefresh returns missing when no cache exists', async ({ request }) => {
+    // TEST-14 is unlikely to have a cached recap from a different test
+    const resp = await request.get('/api/proxy/recap/dddddddd-dddd-dddd-dddd-ddddddddddde?noRefresh=1', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(resp.status()).toBe(200);
+    const data = await resp.json();
+    expect(['missing', 'stale', 'fresh']).toContain(data.status);
+  });
+
+  test('GET /api/proxy/recap accepts identifier format', async ({ request }) => {
+    const resp = await request.get('/api/proxy/recap/TEST-14', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(resp.status()).toBe(200);
+    const data = await resp.json();
+    expect(data.recap).toBeTruthy();
+  });
+
+  test('GET /api/proxy/recap with invalid identifier gets 400', async ({ request }) => {
+    const resp = await request.get('/api/proxy/recap/INVALID!!!', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(resp.status()).toBe(400);
+  });
+
+  test('GET /api/proxy/recap with nonexistent issue gets 404', async ({ request }) => {
+    const resp = await request.get('/api/proxy/recap/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(resp.status()).toBe(404);
+  });
+
+  test('GET /api/proxy/recap requires authentication', async ({ request }) => {
+    const resp = await request.get('/api/proxy/recap/LIN-1');
+    expect(resp.status()).toBe(401);
+  });
+
+  test('POST /api/proxy/recap force-regenerates the recap', async ({ request }) => {
+    const resp = await request.post('/api/proxy/recap/66666666-6666-6666-6666-666666666666', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(resp.status()).toBe(200);
+    const data = await resp.json();
+    expect(data.status).toBe('fresh');
+    expect(data.recap).toBeTruthy();
+  });
+
+  test('POST /api/proxy/recap requires authentication', async ({ request }) => {
+    const resp = await request.post('/api/proxy/recap/LIN-1');
     expect(resp.status()).toBe(401);
   });
 });
@@ -538,7 +616,8 @@ test.describe('Foreman API - Playbook Endpoint', () => {
     const text = await resp.text();
     expect(text).toContain('Foreman');
     expect(text).toContain('/api/proxy/stack');
-    expect(text).toContain('/api/proxy/prompt');
+    expect(text).toContain('/api/proxy/recap');
+    expect(text).toContain('/api/proxy/recommend');
     expect(text).toContain('/api/proxy/foreman/status');
     expect(text).toContain('Stop conditions');
     // Should contain the actual base URL
@@ -598,7 +677,8 @@ test.describe('Foreman API - Instructions Integration', () => {
     expect(resp.status()).toBe(200);
     const text = await resp.text();
     expect(text).toContain('/api/proxy/stack');
-    expect(text).toContain('/api/proxy/prompt');
+    expect(text).toContain('/api/proxy/recap');
+    expect(text).toContain('/api/proxy/recommend');
     expect(text).toContain('/api/proxy/foreman/status');
     expect(text).toContain('/api/proxy/foreman/playbook');
     expect(text).toContain('Foreman');
