@@ -259,12 +259,13 @@
     }
 
     stackList.innerHTML = tasks.map(task => {
-      const stateClass = getStateClass(task.stateType);
+      const stateType = task.state?.type || '';
+      const stateClass = getStateClass(stateType);
       const labels = (task.labels || []).join(', ');
       return `<div class="foreman-stack-item">
         <span class="foreman-stack-identifier">${escapeHtml(task.identifier || task.id)}</span>
         <span class="foreman-stack-title" title="${escapeHtml(task.title)}">${escapeHtml(task.title)}</span>
-        <span class="foreman-stack-state ${stateClass}">${escapeHtml(task.stateType || '')}</span>
+        <span class="foreman-stack-state ${stateClass}">${escapeHtml(stateType)}</span>
         ${labels ? `<span class="foreman-stack-labels">${escapeHtml(labels)}</span>` : ''}
       </div>`;
     }).join('');

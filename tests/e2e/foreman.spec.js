@@ -27,7 +27,8 @@ test.describe('Foreman API - Stack Endpoint', () => {
     expect(task.id).toBeTruthy();
     expect(task.identifier).toBeDefined();
     expect(task.title).toBeTruthy();
-    expect(task.stateType).toBeTruthy();
+    expect(task.state).toBeTruthy();
+    expect(task.state.type).toBeTruthy();
     expect(Array.isArray(task.labels)).toBe(true);
   });
 
@@ -42,7 +43,7 @@ test.describe('Foreman API - Stack Endpoint', () => {
     expect(data.total).toBeGreaterThanOrEqual(data.tasks.length);
   });
 
-  test('GET /api/proxy/stack includes subtask info', async ({ request }) => {
+  test('GET /api/proxy/stack includes child/parent info', async ({ request }) => {
     const resp = await request.get('/api/proxy/stack?limit=50', {
       headers: { Authorization: `Bearer ${readToken}` }
     });
@@ -52,15 +53,16 @@ test.describe('Foreman API - Stack Endpoint', () => {
     // Find the parent task (issue-1: "Parent task in progress") - it has a child (issue-2)
     const parent = data.tasks.find(t => t.title === 'Parent task in progress');
     if (parent) {
-      expect(Array.isArray(parent.subtasks)).toBe(true);
-      expect(parent.subtasks.length).toBeGreaterThan(0);
-      expect(parent.subtasks[0].identifier).toBeTruthy();
+      expect(Array.isArray(parent.children)).toBe(true);
+      expect(parent.children.length).toBeGreaterThan(0);
+      expect(parent.children[0].identifier).toBeTruthy();
     }
 
-    // Find child task - should have parentId
+    // Child task should carry a parent object with id/identifier
     const child = data.tasks.find(t => t.title === 'Child task todo');
     if (child) {
-      expect(child.parentId).toBeTruthy();
+      expect(child.parent).toBeTruthy();
+      expect(child.parent.id).toBeTruthy();
     }
   });
 
