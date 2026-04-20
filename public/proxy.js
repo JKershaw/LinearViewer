@@ -16,7 +16,15 @@
   const generateFeedback = document.getElementById('proxy-generate-feedback');
   const createTokenForm = document.getElementById('proxy-create-token-form');
   const tokenList = document.querySelector('.proxy-token-list');
+  const tokensCollapsible = document.getElementById('proxy-tokens-collapsible');
+  const tokensCount = document.getElementById('proxy-tokens-count');
   const eventsList = document.querySelector('.proxy-events-list');
+  const eventsCollapsible = document.getElementById('proxy-events-collapsible');
+  const eventsCount = document.getElementById('proxy-events-count');
+  const eventsPager = document.getElementById('proxy-events-pager');
+  const eventsPagerInfo = eventsPager?.querySelector('.proxy-events-pager-info');
+  const eventsPrevBtn = eventsPager?.querySelector('.proxy-events-prev');
+  const eventsNextBtn = eventsPager?.querySelector('.proxy-events-next');
   const refreshBtn = document.querySelector('.proxy-events-refresh');
 
   const urlKey = tokenList?.dataset?.urlKey || generateBtn?.closest('[data-url-key]')?.dataset?.urlKey;
@@ -24,6 +32,14 @@
 
   const apiBase = `/workspace/${encodeURIComponent(urlKey)}/api/proxy`;
   const baseUrl = window.location.origin;
+
+  const TOKENS_INITIAL_VISIBLE = 5;
+  const EVENTS_PAGE_SIZE = 25;
+
+  let tokensExpanded = false;
+  let eventsExpanded = false;
+  let eventsOffset = 0;
+  let eventsTotal = 0;
 
   // =========================================================================
   // Generate & Copy Agent Prompt
@@ -66,8 +82,9 @@
           showFeedback(generateFeedback, 'Generated (copy manually)', false);
         }
 
-        // Refresh token list
-        loadTokens();
+        // Refresh token list (only renders if expanded; always refreshes count)
+        refreshTokenCount();
+        if (tokensExpanded) loadTokens();
       } catch (err) {
         showFeedback(generateFeedback, err.message, true);
       } finally {
@@ -126,6 +143,12 @@ This will return all available endpoints with examples. Your token scope is: ${s
         const data = await resp.json();
         showTokenModal(data.token, data.label, data.scope);
         createTokenForm.reset();
+
+        // Open the tokens section so the new token is visible, and refresh
+        if (tokensCollapsible && !tokensCollapsible.open) {
+          tokensCollapsible.open = true;
+        }
+        refreshTokenCount();
         loadTokens();
       } catch (err) {
         alert('Failed to create token: ' + err.message);
@@ -133,17 +156,39 @@ This will return all available endpoints with examples. Your token scope is: ${s
     });
   }
 
-  async function loadTokens() {
-    if (!tokenList) return;
-
+  async function fetchTokens() {
     try {
       const resp = await fetch(`${apiBase}/tokens`);
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
-      renderTokenList(data.tokens || []);
+      return data.tokens || [];
     } catch {
-      tokenList.innerHTML = '<div class="token-list-empty">Failed to load tokens</div>';
+      return null;
     }
+  }
+
+  async function refreshTokenCount() {
+    if (!tokensCount) return;
+    const tokens = await fetchTokens();
+    if (tokens === null) {
+      tokensCount.textContent = '';
+      return;
+    }
+    tokensCount.textContent = tokens.length ? `(${tokens.length})` : '(0)';
+  }
+
+  async function loadTokens() {
+    if (!tokenList) return;
+
+    const tokens = await fetchTokens();
+    if (tokens === null) {
+      tokenList.innerHTML = '<div class="token-list-empty">Failed to load tokens</div>';
+      return;
+    }
+    if (tokensCount) {
+      tokensCount.textContent = tokens.length ? `(${tokens.length})` : '(0)';
+    }
+    renderTokenList(tokens);
   }
 
   function renderTokenList(tokens) {
@@ -152,24 +197,18 @@ This will return all available endpoints with examples. Your token scope is: ${s
       return;
     }
 
-    tokenList.innerHTML = tokens.map(t => {
-      const scopeBadge = t.scope === 'readWrite' ? ' [rw]' : ' [r]';
-      const consumedBadge = t.consumed ? ' (consumed)' : '';
-      const meta = [
-        formatTimeAgo(t.createdAt),
-        t.lastUsedAt ? `used ${formatTimeAgo(t.lastUsedAt)}` : 'never used'
-      ].join(' · ');
+    const initial = tokens.slice(0, TOKENS_INITIAL_VISIBLE);
+    const rest = tokens.slice(TOKENS_INITIAL_VISIBLE);
 
-      return `<div class="token-item">
-        <div class="token-info">
-          <div class="token-label-text">${escapeHtml(t.label)}${scopeBadge}${consumedBadge}</div>
-          <div class="token-meta">${escapeHtml(meta)}</div>
-        </div>
-        <button class="action-btn token-revoke" data-token-id="${escapeHtml(t.tokenId)}">revoke</button>
-      </div>`;
-    }).join('');
+    const itemsHtml = initial.map(renderTokenItem).join('');
+    const hiddenHtml = rest.length
+      ? `<div class="token-items-extra" hidden>${rest.map(renderTokenItem).join('')}</div>
+         <button type="button" class="action-btn token-show-more">show ${rest.length} more</button>`
+      : '';
 
-    // Attach revoke handlers
+    tokenList.innerHTML = itemsHtml + hiddenHtml;
+
+    // Revoke handlers
     tokenList.querySelectorAll('.token-revoke').forEach(btn => {
       btn.addEventListener('click', async () => {
         const tokenId = btn.dataset.tokenId;
@@ -184,6 +223,47 @@ This will return all available endpoints with examples. Your token scope is: ${s
         }
       });
     });
+
+    // Show-more handler
+    const showMore = tokenList.querySelector('.token-show-more');
+    if (showMore) {
+      showMore.addEventListener('click', () => {
+        const extra = tokenList.querySelector('.token-items-extra');
+        if (extra) extra.hidden = false;
+        showMore.remove();
+      });
+    }
+  }
+
+  function renderTokenItem(t) {
+    const scopeBadge = t.scope === 'readWrite' ? ' [rw]' : ' [r]';
+    const consumedBadge = t.consumed ? ' (consumed)' : '';
+    const expiryBadge = renderExpiryBadge(t.expiresAt);
+    const meta = [
+      formatTimeAgo(t.createdAt),
+      t.lastUsedAt ? `used ${formatTimeAgo(t.lastUsedAt)}` : 'never used'
+    ].join(' \u00B7 ');
+
+    return `<div class="token-item">
+      <div class="token-info">
+        <div class="token-label-text">${escapeHtml(t.label)}${scopeBadge}${consumedBadge}${expiryBadge}</div>
+        <div class="token-meta">${escapeHtml(meta)}</div>
+      </div>
+      <button class="action-btn token-revoke" data-token-id="${escapeHtml(t.tokenId)}">revoke</button>
+    </div>`;
+  }
+
+  function renderExpiryBadge(expiresAt) {
+    if (!expiresAt) return '';
+    const ms = new Date(expiresAt).getTime() - Date.now();
+    if (Number.isNaN(ms)) return '';
+    if (ms <= 0) {
+      return ' <span class="token-expiry expired">expired</span>';
+    }
+    const days = Math.floor(ms / (24 * 60 * 60 * 1000));
+    const cls = days <= 7 ? 'warn' : 'ok';
+    const text = days < 1 ? 'expires <1d' : `expires in ${days}d`;
+    return ` <span class="token-expiry ${cls}">${text}</span>`;
   }
 
   function showTokenModal(token, label, scope) {
@@ -236,12 +316,18 @@ This will return all available endpoints with examples. Your token scope is: ${s
     if (!eventsList) return;
 
     try {
-      const resp = await fetch(`${apiBase}/events?limit=50`);
+      const resp = await fetch(`${apiBase}/events?limit=${EVENTS_PAGE_SIZE}&offset=${eventsOffset}`);
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
+      eventsTotal = Number.isFinite(data.total) ? data.total : (data.items?.length || 0);
+      if (eventsCount) {
+        eventsCount.textContent = eventsTotal ? `(${eventsTotal})` : '(0)';
+      }
       renderEvents(data.items || []);
+      updateEventsPager();
     } catch {
       eventsList.innerHTML = '<div class="proxy-events-empty">Failed to load events</div>';
+      if (eventsPager) eventsPager.hidden = true;
     }
   }
 
@@ -263,8 +349,85 @@ This will return all available endpoints with examples. Your token scope is: ${s
     }).join('');
   }
 
+  function updateEventsPager() {
+    if (!eventsPager) return;
+
+    if (eventsTotal <= EVENTS_PAGE_SIZE) {
+      eventsPager.hidden = true;
+      return;
+    }
+
+    eventsPager.hidden = false;
+
+    const pageStart = eventsOffset + 1;
+    const pageEnd = Math.min(eventsOffset + EVENTS_PAGE_SIZE, eventsTotal);
+    if (eventsPagerInfo) {
+      eventsPagerInfo.textContent = `${pageStart}–${pageEnd} of ${eventsTotal}`;
+    }
+    if (eventsPrevBtn) eventsPrevBtn.disabled = eventsOffset === 0;
+    if (eventsNextBtn) eventsNextBtn.disabled = pageEnd >= eventsTotal;
+  }
+
+  async function refreshEventsCount() {
+    if (!eventsCount) return;
+    try {
+      const resp = await fetch(`${apiBase}/events?limit=1&offset=0`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      const total = Number.isFinite(data.total) ? data.total : 0;
+      eventsCount.textContent = total ? `(${total})` : '(0)';
+    } catch {
+      eventsCount.textContent = '';
+    }
+  }
+
+  if (eventsPrevBtn) {
+    eventsPrevBtn.addEventListener('click', () => {
+      eventsOffset = Math.max(0, eventsOffset - EVENTS_PAGE_SIZE);
+      loadEvents();
+    });
+  }
+  if (eventsNextBtn) {
+    eventsNextBtn.addEventListener('click', () => {
+      eventsOffset += EVENTS_PAGE_SIZE;
+      loadEvents();
+    });
+  }
+
   if (refreshBtn) {
-    refreshBtn.addEventListener('click', loadEvents);
+    refreshBtn.addEventListener('click', (e) => {
+      // Prevent the surrounding <details> from toggling if the refresh sits
+      // near the summary.
+      e.stopPropagation();
+      eventsOffset = 0;
+      if (eventsExpanded) {
+        loadEvents();
+      } else {
+        refreshEventsCount();
+      }
+    });
+  }
+
+  // =========================================================================
+  // Collapsible Sections — lazy-load on first expand
+  // =========================================================================
+
+  if (tokensCollapsible) {
+    tokensCollapsible.addEventListener('toggle', () => {
+      if (tokensCollapsible.open && !tokensExpanded) {
+        tokensExpanded = true;
+        loadTokens();
+      }
+    });
+  }
+
+  if (eventsCollapsible) {
+    eventsCollapsible.addEventListener('toggle', () => {
+      if (eventsCollapsible.open && !eventsExpanded) {
+        eventsExpanded = true;
+        loadEvents();
+      }
+    });
   }
 
   // =========================================================================
@@ -293,8 +456,8 @@ This will return all available endpoints with examples. Your token scope is: ${s
   }
 
   // =========================================================================
-  // Init
+  // Init — fetch counts only; full lists lazy-load when sections expand
   // =========================================================================
-  loadTokens();
-  loadEvents();
+  refreshTokenCount();
+  refreshEventsCount();
 })();

@@ -31,14 +31,24 @@ test.describe('Proxy Page', () => {
     await expect(page).toHaveURL(/\/settings$/);
   });
 
+  test('token list and event log are collapsed by default', async ({ page }) => {
+    await page.goto(PROXY_PAGE_URL);
+    await page.waitForLoadState('networkidle');
+
+    // Both collapsibles should be present but closed
+    await expect(page.locator('#proxy-tokens-collapsible')).not.toHaveAttribute('open', '');
+    await expect(page.locator('#proxy-events-collapsible')).not.toHaveAttribute('open', '');
+
+    // Token list content is not visible while collapsed
+    await expect(page.locator('.proxy-token-list')).not.toBeVisible();
+    await expect(page.locator('.proxy-events-list')).not.toBeVisible();
+  });
+
   test('can create and revoke proxy tokens via UI', async ({ page }) => {
     await page.goto(PROXY_PAGE_URL);
     await page.waitForLoadState('networkidle');
 
-    // Should show empty state
-    await expect(page.locator('.proxy-token-list')).toContainText('No proxy tokens yet');
-
-    // Create a token
+    // Create a token (auto-expands the tokens section)
     await page.fill('#proxy-create-token-form input[name="label"]', 'test-ui-token');
     await page.click('#proxy-create-token-form button[type="submit"]');
 
@@ -50,15 +60,47 @@ test.describe('Proxy Page', () => {
     await page.click('.token-modal-close');
     await expect(page.locator('.token-modal')).not.toBeVisible();
 
-    // Token should appear in list
+    // Tokens collapsible auto-opens and token appears in list
+    await expect(page.locator('#proxy-tokens-collapsible')).toHaveAttribute('open', '');
     await expect(page.locator('.proxy-token-list')).toContainText('test-ui-token');
 
     // Revoke the token
     page.on('dialog', dialog => dialog.accept());
     await page.click('.token-revoke');
 
-    // Should be empty again
+    // Should be empty again (list stays open)
     await expect(page.locator('.proxy-token-list')).toContainText('No proxy tokens yet');
+  });
+
+  test('tokens section shows show-more when more than 5 tokens exist', async ({ page }) => {
+    // Seed 7 tokens via the test endpoint
+    for (let i = 0; i < 7; i++) {
+      await page.goto(`/test/create-proxy-token?label=seed-${i}`);
+    }
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
+
+    await page.goto(PROXY_PAGE_URL);
+    await page.waitForLoadState('networkidle');
+
+    // Expand tokens section
+    await page.locator('#proxy-tokens-collapsible summary').click();
+
+    // Wait for tokens to render
+    await page.waitForSelector('.token-item');
+
+    // Only 5 tokens visible initially + show-more button
+    const visibleItemsCount = await page.locator('.token-item:visible').count();
+    expect(visibleItemsCount).toBe(5);
+
+    const showMore = page.locator('.token-show-more');
+    await expect(showMore).toBeVisible();
+    await expect(showMore).toContainText('show 2 more');
+
+    await showMore.click();
+
+    // All 7 tokens now visible, button gone
+    await expect(page.locator('.token-show-more')).toHaveCount(0);
+    expect(await page.locator('.token-item:visible').count()).toBe(7);
   });
 });
 
@@ -106,6 +148,51 @@ test.describe('Proxy API - Token Management', () => {
     });
     const listData2 = await listResp2.json();
     expect(listData2.tokens).toHaveLength(0);
+  });
+
+  test('created tokens get a default expiry', async ({ request, page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
+    const cookies = await page.context().cookies();
+    const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+
+    const createResp = await request.post(`${API_PREFIX}/tokens`, {
+      headers: { Cookie: cookieHeader, 'Content-Type': 'application/json' },
+      data: { label: 'ttl-default', scope: 'read' }
+    });
+    expect(createResp.status()).toBe(201);
+
+    const listResp = await request.get(`${API_PREFIX}/tokens`, {
+      headers: { Cookie: cookieHeader }
+    });
+    const listData = await listResp.json();
+    const token = listData.tokens.find(t => t.label === 'ttl-default');
+    expect(token).toBeTruthy();
+    expect(token.expiresAt).toBeTruthy();
+
+    const days = (new Date(token.expiresAt).getTime() - Date.now()) / (24 * 60 * 60 * 1000);
+    expect(days).toBeGreaterThan(80);
+    expect(days).toBeLessThan(95);
+  });
+
+  test('tokens list is sorted newest-first', async ({ request, page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
+    const cookies = await page.context().cookies();
+    const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+
+    for (const label of ['first', 'second', 'third']) {
+      await request.post(`${API_PREFIX}/tokens`, {
+        headers: { Cookie: cookieHeader, 'Content-Type': 'application/json' },
+        data: { label, scope: 'read' }
+      });
+      // Small delay so createdAt timestamps differ
+      await new Promise(r => setTimeout(r, 15));
+    }
+
+    const listResp = await request.get(`${API_PREFIX}/tokens`, {
+      headers: { Cookie: cookieHeader }
+    });
+    const listData = await listResp.json();
+    expect(listData.tokens.map(t => t.label)).toEqual(['third', 'second', 'first']);
   });
 });
 
