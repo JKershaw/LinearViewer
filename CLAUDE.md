@@ -478,4 +478,4 @@ sleep 30 && curl -s "https://api.github.com/repos/JKershaw/LinearViewer/actions/
 | `status` | `queued`, `in_progress`, `completed` |
 | `conclusion` | `success`, `failure`, `cancelled`, `skipped` (only when completed) |
 
-**Note**: CI runs on pushes to `main` and pull requests targeting `main`. Feature branch pushes don't trigger CI until a PR is created.
+**Note**: CI runs only on pushes to `main` (i.e. after a PR merges). Pull requests and feature branches don't trigger CI — local pre-commit/pre-push tests cover those.
