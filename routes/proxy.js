@@ -17,10 +17,12 @@ import { GraphQLClient, gql } from 'graphql-request';
 import rateLimit from 'express-rate-limit';
 import { createProxyFetch } from '../lib/proxy-fetch.js';
 import { fetchProjects, fetchIssueContext, fetchRecommendationContext } from '../lib/linear.js';
-import { isRecommendationEnabled, getRecommendation } from '../lib/openrouter.js';
+import { isRecommendationEnabled, getRecommendation, DEFAULT_MODEL } from '../lib/openrouter.js';
+import { generateRecap } from '../lib/recap.js';
+import { hashContext } from '../lib/recap-cache.js';
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID } from '../lib/tree.js';
 import { flattenTrees, sortIssuesForSwipe, applyBlockingOrder, clusterByParent } from '../lib/render-swipe.js';
-import { generatePrompt, hasPrompt, getAvailablePrompts } from '../lib/prompt-templates.js';
+import { generatePrompt, hasPrompt } from '../lib/prompt-templates.js';
 import { parseRepoFromDescription } from '../lib/prompt-formatters.js';
 
 // Lazy-load test fixtures only in test mode to avoid production dependency on test files
@@ -31,6 +33,93 @@ async function getTestMockData() {
     testMockData = mod.testMockData;
   }
   return testMockData;
+}
+
+/**
+ * Build a mock recommendation context from test fixtures (mirrors workspace-api.js).
+ */
+async function buildMockRecapContextFromFixtures(issueId) {
+  const mockData = await getTestMockData();
+  const mockIssue = mockData.issues.find(i => i.id === issueId || i.identifier === issueId || i.url?.endsWith(`/${issueId}`));
+  if (!mockIssue) return null;
+  const project = mockData.projects.find(p => p.id === mockIssue.project?.id) || null;
+  const labels = (mockIssue.labels?.nodes || []).map(l => l.name);
+  const comments = (mockIssue.comments?.nodes || []).map(c => ({
+    id: c.id,
+    body: c.body,
+    createdAt: c.createdAt,
+    user: { name: c.user?.name || 'Unknown' }
+  }));
+  const children = (mockIssue.children?.nodes || []).map(c => ({
+    id: c.id,
+    identifier: c.identifier || c.id,
+    title: c.title,
+    state: c.state || { type: 'unstarted', name: 'Todo' },
+    labels: (c.labels?.nodes || []).map(l => l.name)
+  }));
+  return {
+    issue: {
+      id: mockIssue.id,
+      identifier: mockIssue.identifier || mockIssue.id,
+      title: mockIssue.title,
+      description: mockIssue.description || '',
+      state: mockIssue.state,
+      labels,
+      url: mockIssue.url
+    },
+    parent: null,
+    siblings: [],
+    project: project ? { id: project.id, name: project.name } : null,
+    children,
+    comments,
+    focusedChild: null
+  };
+}
+
+/**
+ * Build a small deterministic recap for test mode.
+ */
+function buildMockRecapFromContext(context) {
+  const labels = context.issue?.labels || [];
+  const done = [];
+  const pending = [];
+  const deviations = [];
+
+  if ((context.comments || []).length > 0) {
+    done.push({
+      item: 'Discussion captured in comments',
+      evidence: `${context.comments.length} comment(s) recorded`
+    });
+  }
+  if (context.issue?.description) {
+    done.push({
+      item: 'Description documented',
+      evidence: 'Description is present on the issue'
+    });
+  }
+  const remainingChildren = (context.children || []).filter(
+    c => c.state?.type !== 'completed' && c.state?.type !== 'canceled'
+  );
+  for (const c of remainingChildren.slice(0, 3)) {
+    pending.push({
+      item: `Complete subtask ${c.identifier}`,
+      predicted: c.title || ''
+    });
+  }
+  if (pending.length === 0) {
+    pending.push({
+      item: 'Continue implementation',
+      predicted: 'Pick up from current state'
+    });
+  }
+  if (labels.includes('blocked') || labels.includes('Blocked')) {
+    deviations.push({
+      item: 'Task is blocked',
+      type: 'blocker',
+      evidence: 'Blocked label applied'
+    });
+  }
+  return { done, pending, deviations };
 }
 
 const LINEAR_API_ENDPOINT = 'https://api.linear.app/graphql';
@@ -428,12 +517,13 @@ const UPDATE_ISSUE_LABELS_MUTATION = gql`
  * @param {Object} options.proxyTokenStore - Proxy token storage instance
  * @param {Object} options.proxyEventStore - Proxy event storage instance
  * @param {Object} options.foremanStore - Foreman status storage instance
+ * @param {Object} options.recapCacheStore - Recap cache storage instance
  * @param {Function} options.workspaceFromUrl - Middleware to validate workspace
  * @param {Function} options.getWorkspaceAccessToken - Function to get workspace access token by urlKey
  * @param {Function} options.getWorkspaceOpenRouterKey - Function to get OpenRouter API key from workspace sessions
  * @returns {Router} Express router with proxy routes
  */
-export function createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanStore, workspaceFromUrl, getWorkspaceAccessToken, getWorkspaceOpenRouterKey }) {
+export function createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, workspaceFromUrl, getWorkspaceAccessToken, getWorkspaceOpenRouterKey }) {
   const router = Router();
 
   // =========================================================================
@@ -727,13 +817,16 @@ GET ${baseUrl}/api/proxy/relations/{issueId}
 ## Foreman Endpoints
 
 GET ${baseUrl}/api/proxy/stack?limit={n}
-  → Sorted task stack (default 5, max 50) with available prompts per task
-
-GET ${baseUrl}/api/proxy/prompt/{identifier}/{templateKey}
-  → Generate a prompt for an issue (e.g., /prompt/LIN-42/research)
+  → Sorted task stack (default 5, max 50)
 
 GET ${baseUrl}/api/proxy/recommend/{identifier}
   → AI-generated prompt recommendation for an issue (requires OPENROUTER_API_KEY on server)
+
+GET ${baseUrl}/api/proxy/recap/{identifier}
+  → AI recap of progress: { done, pending, deviations }. Auto-regenerates when stale; pass ?noRefresh=1 to skip regeneration.
+
+POST ${baseUrl}/api/proxy/recap/{identifier}
+  → Force-regenerate the recap and return the fresh result.
 
 GET ${baseUrl}/api/proxy/foreman/status
   → List recent foreman status entries
@@ -1580,32 +1673,24 @@ ${readEndpoints}${writeEndpoints}
       sortIssuesForSwipe(allIssues);
       const sortedIssues = clusterByParent(applyBlockingOrder(allIssues));
 
-      // Add available prompts and trim to limit
-      const tasks = sortedIssues.slice(0, limit).map(issue => {
-        // Build a minimal issue object for getAvailablePrompts
-        const issueForPrompts = {
-          labels: { nodes: (issue.labels || []).map(name => ({ name })) },
-          state: { type: issue.stateType }
-        };
-        return {
-          id: issue.id,
-          identifier: issue.identifier,
-          title: issue.title,
-          description: issue.description,
-          priority: issue.priority,
-          url: issue.url,
-          stateType: issue.stateType,
-          stateName: issue.stateName,
-          labels: issue.labels,
-          projectName: issue.projectName,
-          parentId: issue.parentId || null,
-          parentIdentifier: issue.parentIdentifier || null,
-          parentTitle: issue.parentTitle || null,
-          subtasks: issue.subtasks || [],
-          blocksIds: issue.blocksIds || [],
-          availablePrompts: getAvailablePrompts(issueForPrompts)
-        };
-      });
+      // Trim to limit
+      const tasks = sortedIssues.slice(0, limit).map(issue => ({
+        id: issue.id,
+        identifier: issue.identifier,
+        title: issue.title,
+        description: issue.description,
+        priority: issue.priority,
+        url: issue.url,
+        stateType: issue.stateType,
+        stateName: issue.stateName,
+        labels: issue.labels,
+        projectName: issue.projectName,
+        parentId: issue.parentId || null,
+        parentIdentifier: issue.parentIdentifier || null,
+        parentTitle: issue.parentTitle || null,
+        subtasks: issue.subtasks || [],
+        blocksIds: issue.blocksIds || []
+      }));
 
       logEvent(req, '/api/proxy/stack', 200);
       res.json({ tasks, total: sortedIssues.length });
@@ -1815,6 +1900,208 @@ ${readEndpoints}${writeEndpoints}
   });
 
   /**
+   * GET /api/proxy/recap/:identifier
+   * Returns the AI-generated recap (done/pending/deviations) for an issue.
+   * Auto-regenerates when missing or stale unless `?noRefresh=1` is passed.
+   */
+  router.get('/api/proxy/recap/:identifier', proxyLimiter, authenticateProxyToken, async (req, res) => {
+    try {
+      const accessToken = await getWorkspaceAccessToken(req.proxyUrlKey);
+      if (!accessToken) {
+        logEvent(req, '/api/proxy/recap', 503);
+        return res.status(503).json({ error: 'Workspace not available' });
+      }
+      if (!recapCacheStore) {
+        logEvent(req, '/api/proxy/recap', 503);
+        return res.status(503).json({ error: 'Recap cache not configured' });
+      }
+
+      const { identifier } = req.params;
+      if (!UUID_REGEX.test(identifier) && !/^[A-Z]+-\d+$/i.test(identifier)) {
+        logEvent(req, '/api/proxy/recap', 400);
+        return res.status(400).json({ error: 'Invalid identifier format' });
+      }
+
+      const noRefresh = req.query.noRefresh === '1' || req.query.noRefresh === 'true';
+      const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
+      const sessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
+
+      let context;
+      if (isTestMode) {
+        context = await buildMockRecapContextFromFixtures(identifier);
+        if (!context) {
+          logEvent(req, '/api/proxy/recap', 404);
+          return res.status(404).json({ error: 'Issue not found' });
+        }
+      } else {
+        context = await withTimeout(fetchRecommendationContext(accessToken, identifier), GRAPHQL_TIMEOUT_MS);
+      }
+
+      const canonicalId = context.issue?.id || identifier;
+      const inputHash = hashContext(context);
+      const cached = await recapCacheStore.get(req.proxyUrlKey, canonicalId);
+
+      if (cached && cached.inputHash === inputHash) {
+        logEvent(req, '/api/proxy/recap', 200);
+        return res.json({
+          status: 'fresh',
+          identifier: context.issue?.identifier || identifier,
+          recap: cached.recap,
+          generatedAt: cached.generatedAt,
+          model: cached.model
+        });
+      }
+
+      if (noRefresh) {
+        logEvent(req, '/api/proxy/recap', 200);
+        return res.json({
+          status: cached ? 'stale' : 'missing',
+          identifier: context.issue?.identifier || identifier,
+          generatedAt: cached?.generatedAt,
+          model: cached?.model
+        });
+      }
+
+      if (!isTestMode && !isRecommendationEnabled(sessionApiKey)) {
+        logEvent(req, '/api/proxy/recap', 503);
+        return res.status(503).json({ error: 'AI recap is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.' });
+      }
+
+      let recap;
+      let modelUsed;
+      if (isTestMode) {
+        recap = buildMockRecapFromContext(context);
+        modelUsed = DEFAULT_MODEL;
+      } else {
+        const result = await withTimeout(
+          generateRecap(context.issue, context, { apiKey: sessionApiKey, model: DEFAULT_MODEL }),
+          MULTI_REQUEST_TIMEOUT_MS
+        );
+        recap = result.recap;
+        modelUsed = result.model;
+      }
+
+      await recapCacheStore.put(req.proxyUrlKey, canonicalId, {
+        inputHash,
+        recap,
+        model: modelUsed
+      });
+      const stored = await recapCacheStore.get(req.proxyUrlKey, canonicalId);
+
+      logEvent(req, '/api/proxy/recap', 200);
+      res.json({
+        status: 'fresh',
+        identifier: context.issue?.identifier || identifier,
+        recap: stored?.recap ?? recap,
+        generatedAt: stored?.generatedAt ?? new Date(),
+        model: modelUsed
+      });
+    } catch (err) {
+      if (err.message?.includes('not found')) {
+        logEvent(req, '/api/proxy/recap', 404);
+        return res.status(404).json({ error: 'Issue not found' });
+      }
+      if (err.message?.includes('OpenRouter')) {
+        logEvent(req, '/api/proxy/recap', 503);
+        return res.status(503).json({ error: 'AI service temporarily unavailable', detail: err.message });
+      }
+      const status = graphqlErrorStatus(err);
+      logEvent(req, '/api/proxy/recap', status);
+      console.error('Proxy /recap error:', err.message);
+      res.status(status).json({ error: 'Failed to fetch recap', detail: graphqlErrorDetail(err) });
+    }
+  });
+
+  /**
+   * POST /api/proxy/recap/:identifier
+   * Force-regenerate the recap and return it.
+   */
+  router.post('/api/proxy/recap/:identifier', proxyLimiter, authenticateProxyToken, async (req, res) => {
+    try {
+      const accessToken = await getWorkspaceAccessToken(req.proxyUrlKey);
+      if (!accessToken) {
+        logEvent(req, '/api/proxy/recap', 503);
+        return res.status(503).json({ error: 'Workspace not available' });
+      }
+      if (!recapCacheStore) {
+        logEvent(req, '/api/proxy/recap', 503);
+        return res.status(503).json({ error: 'Recap cache not configured' });
+      }
+
+      const { identifier } = req.params;
+      if (!UUID_REGEX.test(identifier) && !/^[A-Z]+-\d+$/i.test(identifier)) {
+        logEvent(req, '/api/proxy/recap', 400);
+        return res.status(400).json({ error: 'Invalid identifier format' });
+      }
+
+      const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
+      const sessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
+
+      if (!isTestMode && !isRecommendationEnabled(sessionApiKey)) {
+        logEvent(req, '/api/proxy/recap', 503);
+        return res.status(503).json({ error: 'AI recap is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.' });
+      }
+
+      let context;
+      if (isTestMode) {
+        context = await buildMockRecapContextFromFixtures(identifier);
+        if (!context) {
+          logEvent(req, '/api/proxy/recap', 404);
+          return res.status(404).json({ error: 'Issue not found' });
+        }
+      } else {
+        context = await withTimeout(fetchRecommendationContext(accessToken, identifier), GRAPHQL_TIMEOUT_MS);
+      }
+
+      const canonicalId = context.issue?.id || identifier;
+      const inputHash = hashContext(context);
+
+      let recap;
+      let modelUsed;
+      if (isTestMode) {
+        recap = buildMockRecapFromContext(context);
+        modelUsed = DEFAULT_MODEL;
+      } else {
+        const result = await withTimeout(
+          generateRecap(context.issue, context, { apiKey: sessionApiKey, model: DEFAULT_MODEL }),
+          MULTI_REQUEST_TIMEOUT_MS
+        );
+        recap = result.recap;
+        modelUsed = result.model;
+      }
+
+      await recapCacheStore.put(req.proxyUrlKey, canonicalId, {
+        inputHash,
+        recap,
+        model: modelUsed
+      });
+      const stored = await recapCacheStore.get(req.proxyUrlKey, canonicalId);
+
+      logEvent(req, '/api/proxy/recap', 200);
+      res.json({
+        status: 'fresh',
+        identifier: context.issue?.identifier || identifier,
+        recap: stored?.recap ?? recap,
+        generatedAt: stored?.generatedAt ?? new Date(),
+        model: modelUsed
+      });
+    } catch (err) {
+      if (err.message?.includes('not found')) {
+        logEvent(req, '/api/proxy/recap', 404);
+        return res.status(404).json({ error: 'Issue not found' });
+      }
+      if (err.message?.includes('OpenRouter')) {
+        logEvent(req, '/api/proxy/recap', 503);
+        return res.status(503).json({ error: 'AI service temporarily unavailable', detail: err.message });
+      }
+      const status = graphqlErrorStatus(err);
+      logEvent(req, '/api/proxy/recap', status);
+      console.error('Proxy /recap POST error:', err.message);
+      res.status(status).json({ error: 'Failed to generate recap', detail: graphqlErrorDetail(err) });
+    }
+  });
+
+  /**
    * POST /api/proxy/foreman/status
    * Record a foreman status update.
    */
@@ -1926,88 +2213,106 @@ You are a foreman managing a Linear task stack. You work through tasks iterative
 
 - Base URL: ${baseUrl}
 - Auth header: Authorization: Bearer YOUR_TOKEN
+- Your token needs \`readWrite\` scope — foreman workflows post status, comments, and sometimes state changes.
+- Response shapes for every endpoint: \`GET ${baseUrl}/api/proxy/instructions\`.
 
 All curl commands below need the auth header:
   -H "Authorization: Bearer YOUR_TOKEN"
 
 ## Loop
 
-### 1. Fetch the stack
+### 1. Choose a task
+
+Fetch the stack:
 
 \`\`\`bash
 curl -s -H "Authorization: Bearer YOUR_TOKEN" ${baseUrl}/api/proxy/stack?limit=5
 \`\`\`
 
-Returns the top tasks sorted by priority, blocking dependencies, and parent-child clustering.
+The stack is pre-sorted (bugs → started → unstarted → backlog, then priority; blockers before blocked; subtasks clustered with parents). Pick the top task. **The top may be a parent** — parents with incomplete subtasks are structure, not work. Descend to the first incomplete subtask; a parent doesn't have its own work unit. Skip completed/canceled.
 
-### 2. Pick the next task
+### 2. Read + recap
 
-- If the top task has incomplete subtasks, work on the first incomplete subtask instead
-- Skip completed/canceled tasks
-- The stack is pre-sorted: bugs first, then by state (started → unstarted → backlog), then by priority
-- Blocking issues appear before the issues they block
+Read the full task (description, comments, children, relations):
 
-### 3. Get the prompt
+\`\`\`bash
+curl -s -H "Authorization: Bearer YOUR_TOKEN" ${baseUrl}/api/proxy/issue/{identifier}
+\`\`\`
 
-**Option A — AI recommendation** (recommended, adapts to task context):
+Then fetch the recap (auto-regenerates when stale):
+
+\`\`\`bash
+curl -s -H "Authorization: Bearer YOUR_TOKEN" ${baseUrl}/api/proxy/recap/{identifier}
+\`\`\`
+
+Returns \`{ status, recap: { done, pending, deviations } }\`. Read it before deciding anything — it is the ground truth for what's done, what's pending, and what deviated.
+
+To force regeneration after you push new comments or status changes:
+
+\`\`\`bash
+curl -X POST -H "Authorization: Bearer YOUR_TOKEN" ${baseUrl}/api/proxy/recap/{identifier}
+\`\`\`
+
+### 3. Follow the AI-recommended prompt
 
 \`\`\`bash
 curl -s -H "Authorization: Bearer YOUR_TOKEN" ${baseUrl}/api/proxy/recommend/{identifier}
 \`\`\`
 
-Returns \`{ reasoning, prompt, repo }\`. The AI analyzes the task and generates the right prompt automatically.
-Read the \`reasoning\` to understand why it chose that approach, then use the \`prompt\`.
+Returns \`{ reasoning, prompt, repo }\`. Read the \`reasoning\` to understand why this prompt was chosen, then spawn a sub-agent with the \`prompt\` content. The sub-agent does the actual work (research, planning, coding, review).
 
-**Option B — Template prompt** (deterministic, you choose the template):
+The recommender walks preparing → blocked/bug → plan → (implementation | breakdown) → review. The natural terminal step is \`review\` — when a clean review is the prompt returned and it comes back passing, the task is complete.
 
-Each task in the stack includes \`availablePrompts\` — an array of valid template keys.
-Select based on task state:
-- New/unstarted → \`research\` or \`look-into\`
-- Needs breakdown → \`breakdown\`
-- Ready for planning → \`plan\`
-- Has a plan → \`implementation\`
-- Implementation done → \`review\`
-- Bug-labeled → \`bug\`
+**Linear writes**: the generated prompt assumes the sub-agent can write to Linear (via MCP or the proxy itself). If it can't, treat its output as advisory and post the changes yourself via \`/api/proxy/issue/{identifier}/comments\`, \`PATCH /api/proxy/issue/{identifier}\`, etc.
+
+### 4. When the sub-agent stops, decide
+
+Re-fetch the recap (POST to force regeneration), then pick one branch:
+
+**a. Resume** — sub-agent paused on an expected procedural step. Reply "yes, proceed" to the same prompt and continue. Safe resume cases:
+- "Should I commit this?"
+- "Should I push?"
+- "Run the tests?"
+- "Install the dependencies listed in package.json?"
+
+Never auto-resume destructive actions (force-push, \`rm -rf\`, dropping data, deleting branches, removing files outside the task scope). Cap consecutive resumes on the same prompt at 3 — if the sub-agent keeps pausing without progress, escalate to "help".
+
+**b. Continue** — current prompt finished cleanly, recap still shows pending work or unresolved deviations. Go back to step 3 for the next AI-recommended prompt.
+
+**Review verdict takes precedence over recap.** The recap lags by one Linear write, so when the last prompt was \`review\`, read the verdict in the sub-agent's output directly:
+- **Approve** → go to 4.c (complete)
+- **Request Changes** → go to 4.b (continue — recommender will likely return \`implementation\`)
+- **Needs Discussion** → go to 4.d (help)
+
+**c. Complete** — verdict is Approve, and recap \`pending\` is empty with no unresolved deviations. **Verify before declaring complete**: re-fetch \`GET /api/proxy/issue/{identifier}\` and confirm the expected terminal state actually landed (status moved out of In Review / In Progress, summary comment exists). If the sub-agent said it updated Linear but the issue doesn't reflect it, drop to 4.d (help) instead. Otherwise post a completion status and go back to step 1.
+
+**d. Help** — real blocker, unresolved deviation the agent can't address, ambiguous requirements, \`review\` returned "Needs Discussion", 3+ consecutive resumes without progress, or \`/recommend\` returned the same prompt type 3 times in a row (suspected implementation ↔ review loop). Post a status with a clear summary of the recap + recommended prompt + blocker, and STOP.
+
+## Updating Linear
+
+Comment bodies often contain markdown with backticks, quotes, and special characters. Always write JSON bodies to a file to avoid shell escaping issues:
 
 \`\`\`bash
-curl -s -H "Authorization: Bearer YOUR_TOKEN" ${baseUrl}/api/proxy/prompt/{identifier}/{templateKey}
-\`\`\`
-
-Returns \`{ prompt, promptName, repo }\`.
-
-### 4. Execute the prompt
-
-Use the Agent tool to spawn a sub-agent with the prompt content.
-The sub-agent does the actual work (research, coding, review).
-
-### 5. Update Linear
-
-**Important:** Comment bodies often contain markdown with backticks, single quotes, and special characters.
-Always use a file-based approach to avoid shell escaping issues:
-
-\`\`\`bash
-# Write JSON body to a temp file (avoids shell escaping issues with backticks, quotes, etc.)
 cat > /tmp/comment.json << 'PAYLOAD'
 {"body":"## Research Findings\\n\\nFound issues in \`auth.js\` and \`proxy.js\`.\\n\\n- Fix applied in commit abc123"}
 PAYLOAD
 
-# Post the comment
 curl -X POST -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" \\
   -d @/tmp/comment.json \\
-  ${baseUrl}/api/proxy/issue/{issueId}/comments
+  ${baseUrl}/api/proxy/issue/{identifier}/comments
 \`\`\`
 
-The \`-d @filepath\` syntax tells curl to read the request body from a file, which avoids
-all shell interpretation of backticks, quotes, and special characters in the JSON.
+Simple fields are fine inline:
 
-**Create subtasks** (simple fields, inline is fine):
 \`\`\`bash
 curl -X POST -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" \\
   -d '{"teamId":"...","title":"Subtask title","parentId":"..."}' \\
   ${baseUrl}/api/proxy/issues
 \`\`\`
 
-### 6. Report status
+## Reporting status
+
+Report after each decision (resume, continue, complete, help):
 
 \`\`\`bash
 cat > /tmp/status.json << 'PAYLOAD'
@@ -2019,28 +2324,21 @@ curl -X POST -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application
   ${baseUrl}/api/proxy/foreman/status
 \`\`\`
 
-**Optional: \`dispatchId\` for exact loop tracking.** If you claimed this task via
-\`POST /api/dispatch/take/{itemId}\`, pass that same \`itemId\` as \`dispatchId\` in the
-status body. This lets the server's loop reconstruction join your status entry to the
-exact dispatch item instead of guessing by timestamp — important when the same issue
-is dispatched multiple times in overlapping windows. The field is optional and fully
-back-compatible; omit it when you don't have one.
+\`action\` values: \`resume\`, \`continue\`, \`complete\`, \`help\`, or the prompt name (\`research\`, \`plan\`, \`implementation\`, \`review\`, etc.).
 
-### 7. Decide next action
-
-- Same task needs follow-up? (research → plan → implement → review) → go to step 3
-- Task complete? → go to step 1 for next task
-- Hit a blocker? → comment on issue, report status, STOP and notify user
+**Optional: \`dispatchId\` for exact loop tracking.** If you claimed this task via \`POST /api/dispatch/take/{itemId}\`, pass that same \`itemId\` as \`dispatchId\`. This lets loop reconstruction join your status to the exact dispatch item instead of guessing by timestamp. Omit when not applicable.
 
 ## Stop conditions
 
 - External dependency (waiting on another person/team)
 - Ambiguous requirements that need human judgment
-- 3+ consecutive failures on the same task
+- 3+ consecutive resumes without progress on the same prompt
+- \`/recommend\` returns the same prompt type 3 times in a row on the same task
+- Sub-agent claimed a Linear write that didn't actually land (see 4.c)
 - Destructive action needed (deleting data, force-pushing)
 - No more tasks in the stack
 
-When you stop, post a final status update explaining why.
+When you stop, post a final status update with a clear summary of the recap and what you need.
 `;
 
     res.type('text/plain').send(playbook);
