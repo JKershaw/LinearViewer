@@ -1860,29 +1860,81 @@ ${readEndpoints}${writeEndpoints}
         });
       }
 
-      // Fetch issue context with two-tier support for parent tasks
-      const context = await withTimeout(fetchRecommendationContext(accessToken, identifier), GRAPHQL_TIMEOUT_MS);
-      const { issue, parent, siblings, project, children, comments, focusedChild } = context;
+      // Heroku's router closes a connection that hasn't sent its first byte within
+      // 30s (H12). The Linear + OpenRouter chain below can exceed that. If we're
+      // still working at 25s, flush a 200 and keep the connection alive with a
+      // whitespace heartbeat every 15s; JSON.parse ignores interior whitespace so
+      // callers still get a valid JSON body. Once flushed, errors must ride in the
+      // body with a logical `statusCode` field since the HTTP status is committed.
+      let keepaliveActive = false;
+      let keepaliveInterval;
+      const keepaliveKick = setTimeout(() => {
+        keepaliveActive = true;
+        res.status(200);
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.flushHeaders();
+        keepaliveInterval = setInterval(() => {
+          if (res.writableEnded || res.destroyed) return;
+          try { res.write(' '); } catch { /* client disconnected */ }
+        }, 15_000);
+      }, 25_000);
+      const stopKeepalive = () => {
+        clearTimeout(keepaliveKick);
+        if (keepaliveInterval) clearInterval(keepaliveInterval);
+      };
 
-      // Get AI-generated recommendation (uses session OAuth key or server-side OPENROUTER_API_KEY)
-      // Uses a longer timeout since this makes a Linear API call + an OpenRouter LLM call.
-      const recommendation = await withTimeout(
-        getRecommendation(
-          issue,
-          { parent, siblings, project, children, comments, focusedChild },
-          { apiKey: sessionApiKey, featureFlags: {} }
-        ),
-        MULTI_REQUEST_TIMEOUT_MS
-      );
+      try {
+        // Fetch issue context with two-tier support for parent tasks
+        const context = await withTimeout(fetchRecommendationContext(accessToken, identifier), GRAPHQL_TIMEOUT_MS);
+        const { issue, parent, siblings, project, children, comments, focusedChild } = context;
 
-      logEvent(req, '/api/proxy/recommend', 200);
-      res.json({
-        identifier: issue.identifier,
-        reasoning: recommendation.reasoning,
-        prompt: recommendation.prompt,
-        truncated: recommendation.truncated,
-        repo: parseRepoFromDescription(project?.description)
-      });
+        // Get AI-generated recommendation (uses session OAuth key or server-side OPENROUTER_API_KEY)
+        // Uses a longer timeout since this makes a Linear API call + an OpenRouter LLM call.
+        const recommendation = await withTimeout(
+          getRecommendation(
+            issue,
+            { parent, siblings, project, children, comments, focusedChild },
+            { apiKey: sessionApiKey, featureFlags: {} }
+          ),
+          MULTI_REQUEST_TIMEOUT_MS
+        );
+
+        stopKeepalive();
+        const body = {
+          identifier: issue.identifier,
+          reasoning: recommendation.reasoning,
+          prompt: recommendation.prompt,
+          truncated: recommendation.truncated,
+          repo: parseRepoFromDescription(project?.description)
+        };
+        logEvent(req, '/api/proxy/recommend', 200);
+        if (keepaliveActive) {
+          res.end(JSON.stringify(body));
+        } else {
+          res.json(body);
+        }
+      } catch (err) {
+        stopKeepalive();
+        let status;
+        let body;
+        if (err.message?.includes('not found')) {
+          status = 404;
+          body = { error: 'Issue not found' };
+        } else if (err.message?.includes('OpenRouter')) {
+          status = 503;
+          body = { error: 'AI service temporarily unavailable', detail: err.message };
+        } else {
+          status = graphqlErrorStatus(err);
+          body = { error: 'Failed to get recommendation', detail: graphqlErrorDetail(err) };
+          console.error('Proxy /recommend error:', err.message);
+        }
+        logEvent(req, '/api/proxy/recommend', status);
+        if (keepaliveActive) {
+          res.end(JSON.stringify({ ...body, statusCode: status }));
+        } else {
+          res.status(status).json(body);
+        }
+      }
     } catch (err) {
       if (err.message?.includes('not found')) {
         logEvent(req, '/api/proxy/recommend', 404);
