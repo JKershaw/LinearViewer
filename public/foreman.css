@@ -6,6 +6,61 @@
  */
 
 /* =============================================================================
+   Onboarding Strip
+   ============================================================================= */
+.foreman-onboarding {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  list-style: none;
+  padding: 0.75rem 1rem;
+  margin: 0 0 1.5rem 0;
+  border: 1px dashed var(--fg-vdim);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.015);
+  font-family: var(--font-content);
+  font-size: 0.85em;
+  color: var(--fg-dim);
+}
+
+.foreman-onboarding li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 1 1 14rem;
+}
+
+.foreman-onboarding a {
+  color: var(--blue);
+  text-decoration: none;
+}
+
+.foreman-onboarding a:hover {
+  text-decoration: underline;
+}
+
+.foreman-onboarding-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4em;
+  height: 1.4em;
+  border-radius: 50%;
+  border: 1px solid var(--fg-vdim);
+  font-family: var(--font-structural);
+  font-size: 0.85em;
+  color: var(--fg);
+  background: var(--bg);
+}
+
+@media (max-width: 640px) {
+  .foreman-onboarding {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}
+
+/* =============================================================================
    Foreman Section
    ============================================================================= */
 .foreman-section {
@@ -94,10 +149,46 @@
   margin: 0;
   max-height: 24em;
   overflow-y: auto;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
 
 .foreman-playbook-output.has-content {
   color: var(--fg);
+  cursor: copy;
+}
+
+.foreman-playbook-output.has-content:hover,
+.foreman-playbook-output.has-content:focus {
+  border-color: var(--blue);
+  background: rgba(0, 0, 0, 0.04);
+  outline: none;
+}
+
+/* Confirmation flash on the copy button after a successful copy */
+#foreman-copy-btn.copied {
+  background: var(--green);
+  color: var(--bg);
+  border-color: var(--green);
+}
+
+.foreman-token-label {
+  font-family: var(--font-content);
+  font-size: 0.85em;
+  color: var(--fg-dim);
+}
+
+.foreman-live-indicator {
+  font-family: var(--font-structural);
+  font-size: 0.75em;
+  color: var(--green);
+  margin-left: 0.4rem;
+  vertical-align: middle;
+  animation: foreman-live-pulse 2s ease-in-out infinite;
+}
+
+@keyframes foreman-live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 /* =============================================================================
@@ -236,6 +327,25 @@
   border-bottom: none;
 }
 
+/* Stack items that are anchors (linked to Linear) */
+a.foreman-stack-item-link {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+a.foreman-stack-item-link:hover,
+a.foreman-stack-item-link:focus {
+  background: rgba(0, 0, 0, 0.035);
+  outline: none;
+}
+
+a.foreman-stack-item-link:hover .foreman-stack-title,
+a.foreman-stack-item-link:focus .foreman-stack-title {
+  text-decoration: underline;
+}
+
 .foreman-stack-identifier {
   font-family: var(--font-structural);
   font-weight: 500;
@@ -285,6 +395,22 @@
 
 .foreman-refresh:hover {
   color: var(--fg);
+}
+
+/* Status log pager */
+.foreman-status-pager {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  margin-top: 0.25rem;
+  font-family: var(--font-content);
+  font-size: 0.85em;
+  color: var(--fg-dim);
+}
+
+.foreman-status-pager-info {
+  color: var(--fg-vdim);
 }
 
 /* =============================================================================

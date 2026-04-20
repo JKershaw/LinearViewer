@@ -738,7 +738,9 @@ test.describe('Foreman Page UI', () => {
 
   test('proxy page links to foreman page', async ({ page }) => {
     await page.goto('/workspace/test-workspace/proxy');
-    const foremanLink = page.locator('a[href*="/foreman"]');
+    // Target the section-body link (the header-contained one with experimental badge),
+    // not the footer link — the footer now also includes a foreman link.
+    const foremanLink = page.locator('main a[href*="/foreman"]');
     await expect(foremanLink).toBeVisible();
     await expect(foremanLink).toContainText('Foreman');
     await expect(page.locator('.foreman-experimental')).toBeVisible();
