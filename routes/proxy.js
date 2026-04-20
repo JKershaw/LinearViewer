@@ -2213,6 +2213,8 @@ You are a foreman managing a Linear task stack. You work through tasks iterative
 
 - Base URL: ${baseUrl}
 - Auth header: Authorization: Bearer YOUR_TOKEN
+- Your token needs \`readWrite\` scope — foreman workflows post status, comments, and sometimes state changes.
+- Response shapes for every endpoint: \`GET ${baseUrl}/api/proxy/instructions\`.
 
 All curl commands below need the auth header:
   -H "Authorization: Bearer YOUR_TOKEN"
@@ -2227,7 +2229,7 @@ Fetch the stack:
 curl -s -H "Authorization: Bearer YOUR_TOKEN" ${baseUrl}/api/proxy/stack?limit=5
 \`\`\`
 
-The stack is pre-sorted (bugs → started → unstarted → backlog, then priority; blockers before blocked). Pick the top task. If it has incomplete subtasks, work on the first incomplete subtask instead. Skip completed/canceled.
+The stack is pre-sorted (bugs → started → unstarted → backlog, then priority; blockers before blocked; subtasks clustered with parents). Pick the top task. **The top may be a parent** — parents with incomplete subtasks are structure, not work. Descend to the first incomplete subtask; a parent doesn't have its own work unit. Skip completed/canceled.
 
 ### 2. Read + recap
 
@@ -2261,6 +2263,8 @@ Returns \`{ reasoning, prompt, repo }\`. Read the \`reasoning\` to understand wh
 
 The recommender walks preparing → blocked/bug → plan → (implementation | breakdown) → review. The natural terminal step is \`review\` — when a clean review is the prompt returned and it comes back passing, the task is complete.
 
+**Linear writes**: the generated prompt assumes the sub-agent can write to Linear (via MCP or the proxy itself). If it can't, treat its output as advisory and post the changes yourself via \`/api/proxy/issue/{identifier}/comments\`, \`PATCH /api/proxy/issue/{identifier}\`, etc.
+
 ### 4. When the sub-agent stops, decide
 
 Re-fetch the recap (POST to force regeneration), then pick one branch:
@@ -2275,9 +2279,14 @@ Never auto-resume destructive actions (force-push, \`rm -rf\`, dropping data, de
 
 **b. Continue** — current prompt finished cleanly, recap still shows pending work or unresolved deviations. Go back to step 3 for the next AI-recommended prompt.
 
-**c. Complete** — recap \`pending\` is empty, no unresolved deviations, and the last prompt executed was \`review\` (or the recommender's \`reasoning\` indicates no further action). Post a completion status and go back to step 1 for the next task.
+**Review verdict takes precedence over recap.** The recap lags by one Linear write, so when the last prompt was \`review\`, read the verdict in the sub-agent's output directly:
+- **Approve** → go to 4.c (complete)
+- **Request Changes** → go to 4.b (continue — recommender will likely return \`implementation\`)
+- **Needs Discussion** → go to 4.d (help)
 
-**d. Help** — real blocker, unresolved deviation the agent can't address, ambiguous requirements, or 3+ consecutive resumes without progress. Post a status with a clear summary of the recap + recommended prompt + blocker, and STOP.
+**c. Complete** — verdict is Approve, and recap \`pending\` is empty with no unresolved deviations. **Verify before declaring complete**: re-fetch \`GET /api/proxy/issue/{identifier}\` and confirm the expected terminal state actually landed (status moved out of In Review / In Progress, summary comment exists). If the sub-agent said it updated Linear but the issue doesn't reflect it, drop to 4.d (help) instead. Otherwise post a completion status and go back to step 1.
+
+**d. Help** — real blocker, unresolved deviation the agent can't address, ambiguous requirements, \`review\` returned "Needs Discussion", 3+ consecutive resumes without progress, or \`/recommend\` returned the same prompt type 3 times in a row (suspected implementation ↔ review loop). Post a status with a clear summary of the recap + recommended prompt + blocker, and STOP.
 
 ## Updating Linear
 
@@ -2324,6 +2333,8 @@ curl -X POST -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application
 - External dependency (waiting on another person/team)
 - Ambiguous requirements that need human judgment
 - 3+ consecutive resumes without progress on the same prompt
+- \`/recommend\` returns the same prompt type 3 times in a row on the same task
+- Sub-agent claimed a Linear write that didn't actually land (see 4.c)
 - Destructive action needed (deleting data, force-pushing)
 - No more tasks in the stack
 
