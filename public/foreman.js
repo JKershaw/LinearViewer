@@ -28,6 +28,15 @@
   const statusPagerInfo = document.getElementById('foreman-status-pager-info');
   const stackList = document.getElementById('foreman-stack-list');
   const stackRefreshBtn = document.getElementById('foreman-stack-refresh');
+  const sessionsSection = document.getElementById('foreman-sessions-section');
+  const sessionsList = document.getElementById('foreman-sessions');
+  const threadsSection = document.getElementById('foreman-threads-section');
+  const threadsList = document.getElementById('foreman-threads');
+  const filtersBar = document.getElementById('foreman-filters');
+  const filterSessionChip = document.getElementById('foreman-filter-session');
+  const filterSessionValue = document.getElementById('foreman-filter-session-value');
+  const filterTaskChip = document.getElementById('foreman-filter-task');
+  const filterTaskValue = document.getElementById('foreman-filter-task-value');
 
   const urlKey = tokenSelect?.dataset?.urlKey;
   if (!urlKey) return;
@@ -42,8 +51,14 @@
   let pollTimer = null;
   const STATUS_PAGE_SIZE = 20;
   const POLL_INTERVAL_MS = 10000;
+  const ACTIVE_SESSION_WINDOW_MS = 5 * 60 * 1000; // a session is "live" if it posted in the last 5 min
   const statusItems = [];
   const stackByIdentifier = new Map();
+  let sessions = [];
+
+  // Filter state (composable): session (tokenId) + taskIdentifier.
+  // `null` in either slot means "no filter for that dimension".
+  const filters = { tokenId: null, taskIdentifier: null };
 
   // =========================================================================
   // Visual helpers — adapted from public/swipe.js for consistency
@@ -187,8 +202,14 @@
       await loadTokens();
       if (tokenSelect && data.tokenId) tokenSelect.value = data.tokenId;
 
-      await Promise.all([loadStatus({ reset: true }), loadStack()]);
+      await Promise.all([
+        loadSessions(),
+        loadThreads(),
+        loadStatus({ reset: true }),
+        loadStack()
+      ]);
       renderNow();
+      renderFilters();
       startPolling();
 
       if (setupHint) setupHint.textContent = 'Playbook ready \u2713 — click output above to copy';
@@ -357,6 +378,15 @@
   // Timeline (status log, paginated)
   // =========================================================================
 
+  function buildStatusQuery({ offset }) {
+    const params = new URLSearchParams();
+    params.set('limit', String(STATUS_PAGE_SIZE));
+    params.set('offset', String(offset));
+    if (filters.tokenId) params.set('tokenId', filters.tokenId);
+    if (filters.taskIdentifier) params.set('taskIdentifier', filters.taskIdentifier);
+    return params.toString();
+  }
+
   async function loadStatus({ reset = false } = {}) {
     if (!statusList) return;
     if (!currentToken) {
@@ -370,7 +400,8 @@
     }
 
     try {
-      const resp = await fetch(`/api/proxy/foreman/status?limit=${STATUS_PAGE_SIZE}&offset=${statusOffset}`, {
+      const query = buildStatusQuery({ offset: statusOffset });
+      const resp = await fetch(`/api/proxy/foreman/status?${query}`, {
         headers: { Authorization: `Bearer ${currentToken}` }
       });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -401,9 +432,15 @@
     statusList.innerHTML = items.map(item => {
       const visual = getStatusVisual(item.status);
       const task = stackByIdentifier.get(item.taskIdentifier);
-      const identifierHtml = task?.url
-        ? `<a class="foreman-timeline-identifier" href="${escapeHtml(task.url)}" target="_blank" rel="noopener noreferrer" title="Open ${escapeHtml(item.taskIdentifier)} in Linear">${escapeHtml(item.taskIdentifier)}</a>`
-        : `<span class="foreman-timeline-identifier">${escapeHtml(item.taskIdentifier)}</span>`;
+      const id = escapeHtml(item.taskIdentifier);
+      const linkHtml = task?.url
+        ? `<a class="foreman-timeline-identifier-link" href="${escapeHtml(task.url)}" target="_blank" rel="noopener noreferrer" title="Open ${id} in Linear">\u2197</a>`
+        : '';
+      // The identifier is a filter-setting button; the arrow next to it opens Linear.
+      const identifierHtml = `<button class="foreman-timeline-identifier" type="button" data-filter-task="${id}" title="Filter timeline to ${id}">${id}</button>${linkHtml}`;
+      const sessionBadge = item.tokenLabel
+        ? `<span class="foreman-timeline-session" title="Session token: ${escapeHtml(item.tokenLabel)}">${escapeHtml(item.tokenLabel)}</span>`
+        : '';
       return `<article class="foreman-timeline-item ${visual.cls}">
         <span class="foreman-state ${visual.cls}" aria-hidden="true">${visual.char}</span>
         <div class="foreman-timeline-body">
@@ -411,6 +448,7 @@
             ${identifierHtml}
             <span class="foreman-timeline-action">${escapeHtml(item.action)}</span>
             <span class="foreman-timeline-status">${escapeHtml(visual.label || item.status)}</span>
+            ${sessionBadge}
             <span class="foreman-timeline-time" title="${escapeHtml(formatAbsoluteTime(item.timestamp))}">${escapeHtml(formatRelativeTime(item.timestamp))}</span>
           </div>
           ${item.summary ? `<div class="foreman-timeline-summary">${escapeHtml(item.summary)}</div>` : ''}
@@ -513,6 +551,203 @@
   if (stackRefreshBtn) stackRefreshBtn.addEventListener('click', () => loadStack());
 
   // =========================================================================
+  // Sessions (per-token groupings)
+  // =========================================================================
+
+  async function loadSessions() {
+    if (!sessionsList || !currentToken) return;
+    try {
+      const resp = await fetch('/api/proxy/foreman/sessions', {
+        headers: { Authorization: `Bearer ${currentToken}` }
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      sessions = data.sessions || [];
+      renderSessions();
+    } catch {
+      // Non-fatal: just don't show sessions. The timeline still works.
+    }
+  }
+
+  function renderSessions() {
+    if (!sessionsSection || !sessionsList) return;
+
+    // Only show the section when there's more than one session worth distinguishing.
+    if (sessions.length < 2) {
+      sessionsSection.hidden = true;
+      return;
+    }
+    sessionsSection.hidden = false;
+
+    const now = Date.now();
+    const chips = [
+      `<button class="foreman-session-chip${!filters.tokenId ? ' is-selected' : ''}" type="button" data-token-id="" role="tab" aria-selected="${!filters.tokenId}">all sessions · ${sessions.reduce((a, s) => a + s.itemCount, 0)}</button>`
+    ].concat(sessions.map(s => {
+      const active = (now - new Date(s.lastSeen).getTime()) < ACTIVE_SESSION_WINDOW_MS;
+      const selected = filters.tokenId === s.id;
+      const visual = getStatusVisual(s.lastStatus);
+      const label = s.label || (s.tokenId ? s.tokenId.slice(0, 8) : 'unattributed');
+      const badge = active ? '<span class="foreman-session-live" title="Last update within 5 min">\u25CF live</span>' : '';
+      return `<button class="foreman-session-chip${selected ? ' is-selected' : ''}${active ? ' is-active' : ''}" type="button"
+          data-token-id="${escapeHtml(s.id)}"
+          role="tab"
+          aria-selected="${selected}"
+          title="Last: ${escapeHtml(s.lastAction || '')} · ${escapeHtml(s.lastStatus || '')} · ${escapeHtml(formatRelativeTime(s.lastSeen))}">
+          <span class="foreman-state ${visual.cls}" aria-hidden="true">${visual.char}</span>
+          <span class="foreman-session-chip-label">${escapeHtml(label)}</span>
+          <span class="foreman-session-chip-count">${s.itemCount}</span>
+          ${badge}
+        </button>`;
+    })).join('');
+
+    sessionsList.innerHTML = chips;
+  }
+
+  if (sessionsList) {
+    sessionsList.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-token-id]');
+      if (!btn) return;
+      const raw = btn.getAttribute('data-token-id');
+      setFilter('tokenId', raw || null);
+    });
+  }
+
+  // =========================================================================
+  // Task threads (per-identifier groupings)
+  // =========================================================================
+
+  async function loadThreads() {
+    if (!threadsList || !currentToken) return;
+    try {
+      const params = new URLSearchParams();
+      if (filters.tokenId) params.set('tokenId', filters.tokenId);
+      const resp = await fetch(`/api/proxy/foreman/tasks${params.toString() ? '?' + params.toString() : ''}`, {
+        headers: { Authorization: `Bearer ${currentToken}` }
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      renderThreads(data.tasks || []);
+    } catch {
+      // Non-fatal.
+    }
+  }
+
+  function renderThreads(tasks) {
+    if (!threadsSection || !threadsList) return;
+    if (tasks.length < 2) {
+      threadsSection.hidden = true;
+      return;
+    }
+    threadsSection.hidden = false;
+
+    // Cap to the 8 most-recent threads so the chip row stays scannable.
+    const visible = tasks.slice(0, 8);
+    threadsList.innerHTML = visible.map(t => {
+      const selected = filters.taskIdentifier === t.taskIdentifier;
+      const visual = getStatusVisual(t.lastStatus);
+      return `<button class="foreman-thread-chip${selected ? ' is-selected' : ''}" type="button"
+          data-task-identifier="${escapeHtml(t.taskIdentifier)}"
+          title="${escapeHtml(t.lastAction || '')} · ${escapeHtml(t.lastStatus || '')} · ${escapeHtml(formatRelativeTime(t.lastSeen))}">
+          <span class="foreman-state ${visual.cls}" aria-hidden="true">${visual.char}</span>
+          <span class="foreman-thread-chip-id">${escapeHtml(t.taskIdentifier)}</span>
+          <span class="foreman-thread-chip-count">${t.itemCount}</span>
+        </button>`;
+    }).join('');
+  }
+
+  if (threadsList) {
+    threadsList.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-task-identifier]');
+      if (!btn) return;
+      const id = btn.getAttribute('data-task-identifier');
+      setFilter('taskIdentifier', filters.taskIdentifier === id ? null : id);
+    });
+  }
+
+  // Any in-page "identifier" button (timeline) sets the task filter too.
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-filter-task]');
+    if (!btn) return;
+    const id = btn.getAttribute('data-filter-task');
+    setFilter('taskIdentifier', filters.taskIdentifier === id ? null : id);
+  });
+
+  // =========================================================================
+  // Filter state + URL-hash persistence
+  // =========================================================================
+
+  function setFilter(key, value) {
+    if (filters[key] === value) return;
+    filters[key] = value;
+    writeHash();
+    renderFilters();
+    renderSessions();
+    // Task threads depend on the session filter (they're scoped), so reload.
+    loadThreads();
+    // Reload timeline with new filters; renderNow() runs off the returned data.
+    loadStatus({ reset: true });
+  }
+
+  function renderFilters() {
+    if (!filtersBar) return;
+    const anyFilter = !!(filters.tokenId || filters.taskIdentifier);
+    filtersBar.hidden = !anyFilter;
+    if (filterSessionChip) {
+      filterSessionChip.hidden = !filters.tokenId;
+      if (filters.tokenId && filterSessionValue) {
+        const s = sessions.find(x => x.id === filters.tokenId);
+        filterSessionValue.textContent = s?.label || filters.tokenId;
+      }
+    }
+    if (filterTaskChip) {
+      filterTaskChip.hidden = !filters.taskIdentifier;
+      if (filters.taskIdentifier && filterTaskValue) {
+        filterTaskValue.textContent = filters.taskIdentifier;
+      }
+    }
+  }
+
+  if (filtersBar) {
+    filtersBar.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-clear]');
+      if (!btn) return;
+      const which = btn.getAttribute('data-clear');
+      if (which === 'session') setFilter('tokenId', null);
+      if (which === 'task') setFilter('taskIdentifier', null);
+    });
+  }
+
+  // URL hash: #session=<tokenId>&task=<identifier>
+  // Persists filter selection across reloads and makes links shareable.
+  function readHash() {
+    const hash = (location.hash || '').replace(/^#/, '');
+    if (!hash) return;
+    const params = new URLSearchParams(hash);
+    if (params.has('session')) filters.tokenId = params.get('session') || null;
+    if (params.has('task')) filters.taskIdentifier = params.get('task') || null;
+  }
+
+  function writeHash() {
+    const params = new URLSearchParams();
+    if (filters.tokenId) params.set('session', filters.tokenId);
+    if (filters.taskIdentifier) params.set('task', filters.taskIdentifier);
+    const next = params.toString();
+    const want = next ? `#${next}` : '';
+    if (location.hash !== want) {
+      // Replace rather than push so the back button doesn't trap users on filter changes.
+      history.replaceState(null, '', location.pathname + location.search + want);
+    }
+  }
+
+  window.addEventListener('hashchange', () => {
+    readHash();
+    renderFilters();
+    renderSessions();
+    loadThreads();
+    loadStatus({ reset: true });
+  });
+
+  // =========================================================================
   // Polling
   // =========================================================================
 
@@ -521,6 +756,8 @@
     if (liveIndicator) liveIndicator.hidden = false;
     pollTimer = setInterval(() => {
       if (document.hidden) return;
+      loadSessions();
+      loadThreads();
       loadStatus({ reset: true });
       loadStack();
     }, POLL_INTERVAL_MS);
@@ -547,6 +784,8 @@
   // Init
   // =========================================================================
   (async function init() {
+    readHash();
+    renderFilters();
     await loadTokens();
     if (tokenSelect && !tokenSelect.disabled) {
       generateAndLoad();

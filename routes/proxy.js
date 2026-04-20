@@ -2164,6 +2164,10 @@ ${readEndpoints}${writeEndpoints}
         action,
         status,
         summary,
+        // Attribute the write to the posting token so the UI can group
+        // entries into sessions. Label is snapshotted so it survives revocation.
+        tokenId: req.proxyTokenId,
+        tokenLabel: req.proxyTokenLabel,
         ...(dispatchId ? { dispatchId } : {})
       });
 
@@ -2178,14 +2182,33 @@ ${readEndpoints}${writeEndpoints}
 
   /**
    * GET /api/proxy/foreman/status
-   * List recent foreman status entries.
+   * List recent foreman status entries. Optional filters: tokenId (session) +
+   * taskIdentifier (task thread).
    */
   router.get('/api/proxy/foreman/status', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
       const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
       const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
 
-      const result = await foremanStore.listStatus(req.proxyUrlKey, { limit, offset });
+      const filters = {};
+      if (req.query.tokenId) {
+        const raw = String(req.query.tokenId);
+        if (raw.length > MAX_NAME_LENGTH || DANGEROUS_CHARS_REGEX.test(raw)) {
+          logEvent(req, '/api/proxy/foreman/status', 400);
+          return res.status(400).json({ error: 'Invalid tokenId' });
+        }
+        filters.tokenId = raw;
+      }
+      if (req.query.taskIdentifier) {
+        const raw = String(req.query.taskIdentifier);
+        if (raw.length > MAX_NAME_LENGTH || DANGEROUS_CHARS_REGEX.test(raw)) {
+          logEvent(req, '/api/proxy/foreman/status', 400);
+          return res.status(400).json({ error: 'Invalid taskIdentifier' });
+        }
+        filters.taskIdentifier = raw;
+      }
+
+      const result = await foremanStore.listStatus(req.proxyUrlKey, { limit, offset, ...filters });
 
       logEvent(req, '/api/proxy/foreman/status', 200);
       res.json(result);
@@ -2193,6 +2216,51 @@ ${readEndpoints}${writeEndpoints}
       logEvent(req, '/api/proxy/foreman/status', 500);
       console.error('Foreman status list error:', err.message);
       res.status(500).json({ error: 'Failed to list status' });
+    }
+  });
+
+  /**
+   * GET /api/proxy/foreman/sessions
+   * Lists foreman sessions for a workspace, keyed by posting token. Each
+   * session shows its most recent activity so observers can pick "which agent
+   * to watch" at a glance. Entries without a tokenId (legacy) roll up into a
+   * synthetic "unattributed" session.
+   */
+  router.get('/api/proxy/foreman/sessions', proxyLimiter, authenticateProxyToken, async (req, res) => {
+    try {
+      const result = await foremanStore.listSessions(req.proxyUrlKey);
+      logEvent(req, '/api/proxy/foreman/sessions', 200);
+      res.json(result);
+    } catch (err) {
+      logEvent(req, '/api/proxy/foreman/sessions', 500);
+      console.error('Foreman sessions list error:', err.message);
+      res.status(500).json({ error: 'Failed to list sessions' });
+    }
+  });
+
+  /**
+   * GET /api/proxy/foreman/tasks
+   * Lists task threads (groups of status entries by Linear identifier).
+   * Optional `tokenId` filter narrows to a single session.
+   */
+  router.get('/api/proxy/foreman/tasks', proxyLimiter, authenticateProxyToken, async (req, res) => {
+    try {
+      const filters = {};
+      if (req.query.tokenId) {
+        const raw = String(req.query.tokenId);
+        if (raw.length > MAX_NAME_LENGTH || DANGEROUS_CHARS_REGEX.test(raw)) {
+          logEvent(req, '/api/proxy/foreman/tasks', 400);
+          return res.status(400).json({ error: 'Invalid tokenId' });
+        }
+        filters.tokenId = raw;
+      }
+      const result = await foremanStore.listTaskThreads(req.proxyUrlKey, filters);
+      logEvent(req, '/api/proxy/foreman/tasks', 200);
+      res.json(result);
+    } catch (err) {
+      logEvent(req, '/api/proxy/foreman/tasks', 500);
+      console.error('Foreman tasks list error:', err.message);
+      res.status(500).json({ error: 'Failed to list tasks' });
     }
   });
 

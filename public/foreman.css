@@ -79,6 +79,196 @@
 
 .foreman-live-indicator[hidden] { display: none; }
 
+/* =============================================================================
+   Sessions + task threads (chip rows)
+   ============================================================================= */
+.foreman-sessions-section[hidden],
+.foreman-threads-section[hidden] { display: none; }
+
+.foreman-sessions-hint {
+  color: var(--fg-dim);
+  font-size: 0.8em;
+  font-family: var(--font-content);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.foreman-sessions,
+.foreman-threads {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.foreman-session-chip,
+.foreman-thread-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--fg-vdim);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-content);
+  font-size: 0.82em;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+  min-height: 32px;
+}
+
+.foreman-session-chip:hover,
+.foreman-thread-chip:hover {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: var(--fg-dim);
+}
+
+.foreman-session-chip.is-selected,
+.foreman-thread-chip.is-selected {
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+}
+
+.foreman-session-chip.is-selected .foreman-state,
+.foreman-thread-chip.is-selected .foreman-state { color: var(--bg); }
+
+.foreman-session-chip.is-active {
+  box-shadow: 0 0 0 2px rgba(22, 160, 133, 0.15);
+}
+
+.foreman-session-chip-label,
+.foreman-thread-chip-id {
+  font-family: var(--font-structural);
+  font-size: 0.95em;
+}
+
+.foreman-session-chip-count,
+.foreman-thread-chip-count {
+  padding: 0 0.35rem;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--fg-dim);
+  font-family: var(--font-structural);
+  font-size: 0.85em;
+}
+
+.foreman-session-chip.is-selected .foreman-session-chip-count,
+.foreman-thread-chip.is-selected .foreman-thread-chip-count {
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--bg);
+}
+
+.foreman-session-live {
+  color: var(--green, #16a085);
+  font-family: var(--font-structural);
+  font-size: 0.75em;
+  animation: foreman-live-pulse 2s ease-in-out infinite;
+}
+
+.foreman-session-chip.is-selected .foreman-session-live { color: var(--bg); }
+
+/* =============================================================================
+   Applied-filters bar (session + task chips)
+   ============================================================================= */
+.foreman-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.6rem;
+  border: 1px dashed var(--fg-vdim);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.02);
+  font-family: var(--font-content);
+  font-size: 0.82em;
+  color: var(--fg-dim);
+}
+
+.foreman-filters[hidden] { display: none; }
+
+.foreman-filters-label {
+  color: var(--fg-dim);
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-family: var(--font-structural);
+}
+
+.foreman-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid var(--fg-vdim);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.foreman-filter-chip[hidden] { display: none; }
+
+.foreman-filter-chip-label { color: var(--fg-dim); }
+
+.foreman-filter-chip-value {
+  font-family: var(--font-structural);
+  font-size: 0.95em;
+}
+
+.foreman-filter-chip-clear {
+  border: none;
+  background: none;
+  color: var(--fg-dim);
+  cursor: pointer;
+  font-size: 0.9em;
+  padding: 0 0.2rem;
+  line-height: 1;
+}
+
+.foreman-filter-chip-clear:hover { color: var(--red, #c0392b); }
+
+/* =============================================================================
+   Timeline identifier button (filter-toggle) + arrow-to-Linear
+   ============================================================================= */
+button.foreman-timeline-identifier {
+  font-family: var(--font-structural);
+  font-weight: 600;
+  color: var(--fg);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  border-bottom: 1px dotted currentColor;
+}
+
+button.foreman-timeline-identifier:hover { opacity: 0.75; }
+
+.foreman-timeline-identifier-link {
+  color: var(--fg-dim);
+  font-family: var(--font-structural);
+  font-size: 0.85em;
+  text-decoration: none;
+  padding: 0 0.25rem;
+}
+.foreman-timeline-identifier-link:hover { color: var(--blue, #2a66c9); }
+
+.foreman-timeline-session {
+  font-family: var(--font-structural);
+  font-size: 0.75em;
+  color: var(--fg-dim);
+  padding: 0.05rem 0.35rem;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.03);
+  max-width: 16ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @keyframes foreman-live-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
@@ -624,6 +814,31 @@ a.foreman-stack-card-link:focus .foreman-stack-title {
 
   .foreman-setup-hint {
     display: none;
+  }
+
+  /* Chip rows scroll horizontally below 640px so the view doesn't wrap into
+     tall chrome. Keeps the observation stack dominant on tiny screens. */
+  .foreman-sessions,
+  .foreman-threads {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .foreman-session-chip,
+  .foreman-thread-chip {
+    flex-shrink: 0;
+    scroll-snap-align: start;
+  }
+
+  .foreman-sessions-hint {
+    display: none;
+  }
+
+  .foreman-timeline-session {
+    max-width: 10ch;
   }
 
   .foreman-stack-card-inner {

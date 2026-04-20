@@ -594,6 +594,116 @@ test.describe('Foreman API - Status Endpoints', () => {
     const resp = await request.get('/api/proxy/foreman/status');
     expect(resp.status()).toBe(401);
   });
+
+  test('POST /api/proxy/foreman/status attributes the posting token label', async ({ request }) => {
+    await request.post('/api/proxy/foreman/status', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { taskIdentifier: 'LIN-50', action: 'review', status: 'completed', summary: 'Good' }
+    });
+
+    const resp = await request.get('/api/proxy/foreman/status?limit=1', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    const data = await resp.json();
+    expect(data.items[0].tokenLabel).toBe('foreman-write');
+    expect(typeof data.items[0].tokenId).toBe('string');
+    expect(data.items[0].tokenId.length).toBeGreaterThan(0);
+  });
+
+  test('GET /api/proxy/foreman/status supports tokenId + taskIdentifier filters', async ({ page, request }) => {
+    // Post some entries across two task identifiers
+    for (const id of ['LIN-A', 'LIN-A', 'LIN-B']) {
+      await request.post('/api/proxy/foreman/status', {
+        headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+        data: { taskIdentifier: id, action: 'plan', status: 'completed', summary: `for ${id}` }
+      });
+    }
+
+    // Filter by taskIdentifier
+    const byTask = await (await request.get('/api/proxy/foreman/status?taskIdentifier=LIN-A', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    })).json();
+    expect(byTask.items).toHaveLength(2);
+    expect(byTask.items.every(i => i.taskIdentifier === 'LIN-A')).toBe(true);
+
+    // Discover the tokenId for foreman-write via the first entry, then filter by it
+    const first = await (await request.get('/api/proxy/foreman/status?limit=1', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    })).json();
+    const tid = first.items[0].tokenId;
+    const byToken = await (await request.get(`/api/proxy/foreman/status?tokenId=${encodeURIComponent(tid)}`, {
+      headers: { Authorization: `Bearer ${readToken}` }
+    })).json();
+    expect(byToken.items.length).toBe(3);
+    expect(byToken.items.every(i => i.tokenId === tid)).toBe(true);
+
+    // Unknown tokenId returns empty
+    const none = await (await request.get('/api/proxy/foreman/status?tokenId=does-not-exist', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    })).json();
+    expect(none.items).toHaveLength(0);
+  });
+
+  test('GET /api/proxy/foreman/sessions groups entries by token', async ({ page, request }) => {
+    // Create a second write token
+    const secondResp = await page.goto('/test/create-proxy-token?scope=readWrite&label=foreman-write-2');
+    const secondData = await secondResp.json();
+    const secondWriteToken = secondData.token;
+
+    await request.post('/api/proxy/foreman/status', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { taskIdentifier: 'LIN-10', action: 'research', status: 'completed', summary: 's1' }
+    });
+    await request.post('/api/proxy/foreman/status', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { taskIdentifier: 'LIN-11', action: 'plan', status: 'in-progress', summary: 's2' }
+    });
+    await request.post('/api/proxy/foreman/status', {
+      headers: { Authorization: `Bearer ${secondWriteToken}`, 'Content-Type': 'application/json' },
+      data: { taskIdentifier: 'LIN-12', action: 'review', status: 'blocked', summary: 's3' }
+    });
+
+    const resp = await request.get('/api/proxy/foreman/sessions', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(resp.status()).toBe(200);
+    const data = await resp.json();
+
+    expect(data.sessions).toHaveLength(2);
+    const byLabel = new Map(data.sessions.map(s => [s.label, s]));
+    expect(byLabel.get('foreman-write').itemCount).toBe(2);
+    expect(byLabel.get('foreman-write-2').itemCount).toBe(1);
+    // Sessions are sorted newest-first (by lastSeen)
+    expect(new Date(data.sessions[0].lastSeen) >= new Date(data.sessions[1].lastSeen)).toBe(true);
+  });
+
+  test('GET /api/proxy/foreman/tasks groups entries by task identifier', async ({ request }) => {
+    for (const [id, summary] of [['LIN-7', 'a'], ['LIN-7', 'b'], ['LIN-8', 'c']]) {
+      await request.post('/api/proxy/foreman/status', {
+        headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+        data: { taskIdentifier: id, action: 'plan', status: 'in-progress', summary }
+      });
+    }
+
+    const resp = await request.get('/api/proxy/foreman/tasks', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    const data = await resp.json();
+    expect(data.tasks).toHaveLength(2);
+    const lin7 = data.tasks.find(t => t.taskIdentifier === 'LIN-7');
+    expect(lin7.itemCount).toBe(2);
+    expect(lin7.lastStatus).toBe('in-progress');
+  });
+
+  test('GET /api/proxy/foreman/sessions requires authentication', async ({ request }) => {
+    const resp = await request.get('/api/proxy/foreman/sessions');
+    expect(resp.status()).toBe(401);
+  });
+
+  test('GET /api/proxy/foreman/tasks requires authentication', async ({ request }) => {
+    const resp = await request.get('/api/proxy/foreman/tasks');
+    expect(resp.status()).toBe(401);
+  });
 });
 
 test.describe('Foreman API - Playbook Endpoint', () => {
@@ -717,12 +827,16 @@ test.describe('Foreman Page UI', () => {
     expect(page.url()).toContain('/settings');
   });
 
-  test('foreman page shows all three observation sections', async ({ page }) => {
+  test('foreman page shows the observation sections in order', async ({ page }) => {
     await page.goto('/workspace/test-workspace/foreman');
-    const headers = page.locator('.foreman-section-header');
-    await expect(headers.nth(0)).toContainText('Now working');
-    await expect(headers.nth(1)).toContainText('Timeline');
-    await expect(headers.nth(2)).toContainText('Up next');
+    // Section headers in DOM order: Sessions (hidden until ≥2 exist), Now
+    // working, Timeline, Task threads (hidden until ≥2 exist), Up next.
+    // Match the headers present in the observation stack regardless of
+    // whether the Sessions / Task threads chrome is currently shown.
+    const visible = page.locator('.foreman-section:not([hidden]) .foreman-section-header');
+    await expect(visible.nth(0)).toContainText('Now working');
+    await expect(visible.nth(1)).toContainText('Timeline');
+    await expect(visible.nth(2)).toContainText('Up next');
   });
 
   test('foreman page has copy button and +proxy toggle', async ({ page }) => {
