@@ -24,6 +24,7 @@ import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActi
 import { flattenTrees, sortIssuesForSwipe, applyBlockingOrder, clusterByParent } from '../lib/render-swipe.js';
 import { generatePrompt, hasPrompt } from '../lib/prompt-templates.js';
 import { parseRepoFromDescription } from '../lib/prompt-formatters.js';
+import { armKeepalive } from '../lib/http-keepalive.js';
 
 // Lazy-load test fixtures only in test mode to avoid production dependency on test files
 let testMockData = null;
@@ -781,58 +782,106 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanSto
 ## Read Endpoints
 
 GET ${baseUrl}/api/proxy/me
-  → Current authenticated user (name, email)
+  → Current authenticated user
+  → { "id": "...", "name": "Jane Doe", "email": "jane@example.com" }
 
 GET ${baseUrl}/api/proxy/teams
-  → List all teams (id, name, key)
+  → List all teams
+  → { "teams": [{ "id": "...", "name": "Engineering", "key": "ENG" }] }
 
 GET ${baseUrl}/api/proxy/projects
-  → List active projects (id, name, url)
+  → List active projects
+  → { "projects": [{ "id": "...", "name": "...", "url": "https://linear.app/..." }] }
 
 GET ${baseUrl}/api/proxy/issues?teamId={teamId}&limit={n}
   → List issues (optionally filter by team, default limit 50, max 250)
+  → { "issues": [{ "id": "...", "identifier": "LIN-1", "title": "...",
+                   "state": { "name": "In Progress", "type": "started" },
+                   "labels": { "nodes": [{ "id": "...", "name": "bug", "color": "#f00" }] },
+                   "cycle": { "id": "...", "number": 12 } }] }
+  → Note: labels arrive as {nodes: [...]} (Linear GraphQL shape).
 
 GET ${baseUrl}/api/proxy/issue/{issueId}
-  → Full issue detail (description, comments, children, relations)
-  → issueId: UUID or identifier like "LIN-123"
+  → Full issue detail; issueId: UUID or identifier like "LIN-123"
+  → {
+      "id": "...", "identifier": "LIN-123", "title": "...", "description": "...",
+      "state": { "name": "In Progress", "type": "started" },
+      "labels":   { "nodes": [{ "name": "bug" }] },
+      "children": { "nodes": [{ "id": "...", "identifier": "LIN-124", "title": "..." }] },
+      "parent":   { "id": "...", "identifier": "LIN-100", "title": "..." },
+      "comments": { "nodes": [{ "id": "...", "body": "...", "createdAt": "..." }] }
+    }
+  → Note: labels / children / comments use Linear's {nodes: [...]} wrapper.
 
 GET ${baseUrl}/api/proxy/search?q={query}
   → Search issues by text (max 50 results)
+  → { "issues": [ /* same shape as /issues */ ] }
 
 GET ${baseUrl}/api/proxy/states/{teamId}
-  → List workflow states for a team
+  → Workflow states for a team
+  → { "states": [{ "id": "...", "name": "In Progress", "type": "started", "position": 1 }] }
 
 GET ${baseUrl}/api/proxy/labels?teamId={teamId}
-  → List labels (optionally filter by team, includes id/name/color)
+  → Labels (id, name, color); optional team filter
+  → { "labels": [{ "id": "...", "name": "bug", "color": "#f00" }] }
 
 GET ${baseUrl}/api/proxy/cycles?teamId={teamId}
-  → List cycles (optionally filter by team)
+  → Cycles (optional team filter)
+  → { "cycles": [{ "id": "...", "number": 12, "startsAt": "...", "endsAt": "..." }] }
 
 GET ${baseUrl}/api/proxy/cycle/{cycleId}
   → Cycle detail with issues, progress, and scope history
 
 GET ${baseUrl}/api/proxy/relations/{issueId}
-  → Get issue relations (blocks, blocked-by, related, duplicate)
+  → Issue relations (blocks, blocked-by, related, duplicate)
+  → { "relations": [{ "type": "blocks", "relatedIssue": { "id": "...", "identifier": "LIN-9" } }] }
 
 ## Foreman Endpoints
 
 GET ${baseUrl}/api/proxy/stack?limit={n}
-  → Sorted task stack (default 5, max 50)
+  → Sorted task stack (default 5, max 50). Top-level shape:
+  → { "tasks": [...], "total": 98 }
+  → Each task has a FLAT Linear-native shape. Expect \`state.name\`, \`parent.identifier\`,
+    \`children\` (NOT \`subtasks\`), and \`labels\` as a plain string array:
+  → {
+      "id": "...",
+      "identifier": "LIN-296",
+      "title": "...",
+      "description": "...",
+      "priority": 1,
+      "url": "https://linear.app/...",
+      "state":    { "name": "In Progress", "type": "started" },
+      "labels":   ["milestone-x"],
+      "project":  { "name": "Safety & Security" },
+      "parent":   { "id": "...", "identifier": "LIN-295", "title": "..." },
+      "children": [{ "id": "...", "identifier": "LIN-297", "title": "...", "state": { "type": "unstarted" } }],
+      "blocksIds": []
+    }
+  → \`parent\` and \`project\` are null when absent. \`children\` is [] when there are none.
 
 GET ${baseUrl}/api/proxy/recommend/{identifier}
-  → AI-generated prompt recommendation for an issue (requires OPENROUTER_API_KEY on server)
+  → AI-generated prompt recommendation (requires OpenRouter on the server; >25s responses
+    stream whitespace-keepalive bytes inside a single 200 response, which JSON.parse ignores)
+  → { "identifier": "LIN-123", "reasoning": "...", "prompt": "...", "truncated": false, "repo": "owner/name" }
 
 GET ${baseUrl}/api/proxy/recap/{identifier}
-  → AI recap of progress: { done, pending, deviations }. Auto-regenerates when stale; pass ?noRefresh=1 to skip regeneration.
+  → Cached AI recap; auto-regenerates when stale. Pass \`?noRefresh=1\` to skip regeneration.
+  → { "status": "fresh" | "stale" | "missing",
+      "identifier": "LIN-123",
+      "recap": { "done": "...", "pending": "...", "deviations": "..." },
+      "generatedAt": "2026-04-20T12:00:00Z",
+      "model": "..." }
 
 POST ${baseUrl}/api/proxy/recap/{identifier}
-  → Force-regenerate the recap and return the fresh result.
+  → Force-regenerate the recap and return the fresh result (same shape as GET above).
 
 GET ${baseUrl}/api/proxy/foreman/status
-  → List recent foreman status entries
+  → Recent foreman status entries
+  → { "items": [{ "id": "...", "taskIdentifier": "LIN-42", "action": "research",
+                   "status": "completed", "summary": "...", "createdAt": "..." }] }
 
 GET ${baseUrl}/api/proxy/foreman/playbook
-  → Get the foreman playbook prompt (plain text)`;
+  → Foreman playbook (plain text, not JSON)`;
 
     const writeEndpoints = scope === 'readWrite' ? `
 
@@ -900,10 +949,30 @@ ${readEndpoints}${writeEndpoints}
 
 ## Notes
 
-- All responses are JSON
-- Issue IDs can be UUIDs or identifiers (e.g., "LIN-123")
-- Dates are ISO 8601 format
-- Rate limit: 60 requests per minute
+- All responses are JSON (except \`/api/proxy/foreman/playbook\` and \`/api/proxy/instructions\`, which are plain text).
+- Issue IDs can be UUIDs or identifiers (e.g., "LIN-123").
+- Dates are ISO 8601 format.
+- Rate limit: 60 requests per minute.
+
+## Client Notes
+
+- **Validate Content-Type before parsing.** If the body is empty or
+  \`Content-Type\` isn't \`application/json\`, it's almost always transient
+  client-side network flakiness, not a proxy error. Retry once before
+  surfacing the failure.
+- **\`/api/proxy/recommend\` can exceed 25s.** The server emits whitespace
+  heartbeats inside a single 200 response to stay inside Heroku's router
+  cap. \`JSON.parse\` ignores interior whitespace, so a plain
+  \`response.json()\` works — just don't set a client-side timeout below
+  ~60s for this endpoint.
+- **Status-vs-body on long-running endpoints.** Once a long-running
+  response has started streaming keepalive bytes, the HTTP status is
+  committed as 200; any error is conveyed in the body as
+  \`{ "error": "...", "statusCode": 5xx }\`. Check for an \`error\` key
+  before trusting \`200\`.
+- **\`/stack\` uses a flat Linear-native shape.** Use \`task.state.name\`,
+  \`task.parent?.identifier\`, and \`task.children\` — do NOT expect
+  \`state.nodes\`, \`parentIdentifier\`, or \`subtasks\`.
 `;
 
     res.type('text/plain').send(text);
@@ -1647,33 +1716,37 @@ ${readEndpoints}${writeEndpoints}
         if (!seenIds.has(issue.id)) { seenIds.add(issue.id); allIssues.push(issue); }
       }
 
-      // Build parent/subtask relationships
+      // Build parent/child relationships (kept flat internally; transformed at
+      // the response boundary into Linear-native shape).
       const cardById = new Map(allIssues.map(i => [i.id, i]));
-      const subtaskMap = new Map();
+      const childrenMap = new Map();
       for (const issue of allIssues) {
         if (issue.parentId && cardById.has(issue.parentId)) {
           const parent = cardById.get(issue.parentId);
           issue.parentIdentifier = parent.identifier;
           issue.parentTitle = parent.title;
-          if (!subtaskMap.has(issue.parentId)) subtaskMap.set(issue.parentId, []);
-          subtaskMap.get(issue.parentId).push({
+          if (!childrenMap.has(issue.parentId)) childrenMap.set(issue.parentId, []);
+          childrenMap.get(issue.parentId).push({
             id: issue.id,
             identifier: issue.identifier,
             title: issue.title,
-            stateType: issue.stateType
+            state: { type: issue.stateType }
           });
         }
       }
-      for (const [parentId, children] of subtaskMap) {
+      for (const [parentId, children] of childrenMap) {
         const parent = cardById.get(parentId);
-        if (parent) parent.subtasks = children;
+        if (parent) parent.children = children;
       }
 
       // Sort and cluster
       sortIssuesForSwipe(allIssues);
       const sortedIssues = clusterByParent(applyBlockingOrder(allIssues));
 
-      // Trim to limit
+      // Trim to limit and transform to Linear-native shape. Agents assume
+      // `state.name`, `parent.identifier`, `children` (not `subtasks`), so we
+      // expose that shape uniformly here. Internal flat fields remain
+      // available only to this handler.
       const tasks = sortedIssues.slice(0, limit).map(issue => ({
         id: issue.id,
         identifier: issue.identifier,
@@ -1681,14 +1754,13 @@ ${readEndpoints}${writeEndpoints}
         description: issue.description,
         priority: issue.priority,
         url: issue.url,
-        stateType: issue.stateType,
-        stateName: issue.stateName,
-        labels: issue.labels,
-        projectName: issue.projectName,
-        parentId: issue.parentId || null,
-        parentIdentifier: issue.parentIdentifier || null,
-        parentTitle: issue.parentTitle || null,
-        subtasks: issue.subtasks || [],
+        state: { name: issue.stateName, type: issue.stateType },
+        labels: issue.labels || [],
+        project: issue.projectName ? { name: issue.projectName } : null,
+        parent: issue.parentId
+          ? { id: issue.parentId, identifier: issue.parentIdentifier || null, title: issue.parentTitle || null }
+          : null,
+        children: issue.children || [],
         blocksIds: issue.blocksIds || []
       }));
 
@@ -1860,29 +1932,10 @@ ${readEndpoints}${writeEndpoints}
         });
       }
 
-      // Heroku's router closes a connection that hasn't sent its first byte within
-      // 30s (H12). The Linear + OpenRouter chain below can exceed that. If we're
-      // still working at 25s, flush a 200 and keep the connection alive with a
-      // whitespace heartbeat every 15s; JSON.parse ignores interior whitespace so
-      // callers still get a valid JSON body. Once flushed, errors must ride in the
-      // body with a logical `statusCode` field since the HTTP status is committed.
-      let keepaliveActive = false;
-      let keepaliveInterval;
-      const keepaliveKick = setTimeout(() => {
-        keepaliveActive = true;
-        res.status(200);
-        res.setHeader('Content-Type', 'application/json; charset=utf-8');
-        res.flushHeaders();
-        keepaliveInterval = setInterval(() => {
-          if (res.writableEnded || res.destroyed) return;
-          try { res.write(' '); } catch { /* client disconnected */ }
-        }, 15_000);
-      }, 25_000);
-      const stopKeepalive = () => {
-        clearTimeout(keepaliveKick);
-        if (keepaliveInterval) clearInterval(keepaliveInterval);
-      };
-
+      // Linear + OpenRouter can exceed Heroku's 30s router cap (H12). Arm a
+      // delayed whitespace keepalive so the dyno can keep the connection open
+      // while the LLM call completes.
+      const keepalive = armKeepalive(res);
       try {
         // Fetch issue context with two-tier support for parent tasks
         const context = await withTimeout(fetchRecommendationContext(accessToken, identifier), GRAPHQL_TIMEOUT_MS);
@@ -1899,22 +1952,17 @@ ${readEndpoints}${writeEndpoints}
           MULTI_REQUEST_TIMEOUT_MS
         );
 
-        stopKeepalive();
-        const body = {
+        keepalive.stop();
+        logEvent(req, '/api/proxy/recommend', 200);
+        keepalive.send(200, {
           identifier: issue.identifier,
           reasoning: recommendation.reasoning,
           prompt: recommendation.prompt,
           truncated: recommendation.truncated,
           repo: parseRepoFromDescription(project?.description)
-        };
-        logEvent(req, '/api/proxy/recommend', 200);
-        if (keepaliveActive) {
-          res.end(JSON.stringify(body));
-        } else {
-          res.json(body);
-        }
+        });
       } catch (err) {
-        stopKeepalive();
+        keepalive.stop();
         let status;
         let body;
         if (err.message?.includes('not found')) {
@@ -1929,11 +1977,7 @@ ${readEndpoints}${writeEndpoints}
           console.error('Proxy /recommend error:', err.message);
         }
         logEvent(req, '/api/proxy/recommend', status);
-        if (keepaliveActive) {
-          res.end(JSON.stringify({ ...body, statusCode: status }));
-        } else {
-          res.status(status).json(body);
-        }
+        keepalive.send(status, body);
       }
     } catch (err) {
       if (err.message?.includes('not found')) {
@@ -1978,89 +2022,106 @@ ${readEndpoints}${writeEndpoints}
       const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
       const sessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
 
-      let context;
-      if (isTestMode) {
-        context = await buildMockRecapContextFromFixtures(identifier);
-        if (!context) {
-          logEvent(req, '/api/proxy/recap', 404);
-          return res.status(404).json({ error: 'Issue not found' });
+      // Regenerate path calls OpenRouter; arm a Heroku H12 guard.
+      const keepalive = armKeepalive(res);
+      try {
+        let context;
+        if (isTestMode) {
+          context = await buildMockRecapContextFromFixtures(identifier);
+          if (!context) {
+            keepalive.stop();
+            logEvent(req, '/api/proxy/recap', 404);
+            return keepalive.send(404, { error: 'Issue not found' });
+          }
+        } else {
+          context = await withTimeout(fetchRecommendationContext(accessToken, identifier), GRAPHQL_TIMEOUT_MS);
         }
-      } else {
-        context = await withTimeout(fetchRecommendationContext(accessToken, identifier), GRAPHQL_TIMEOUT_MS);
-      }
 
-      const canonicalId = context.issue?.id || identifier;
-      const inputHash = hashContext(context);
-      const cached = await recapCacheStore.get(req.proxyUrlKey, canonicalId);
+        const canonicalId = context.issue?.id || identifier;
+        const inputHash = hashContext(context);
+        const cached = await recapCacheStore.get(req.proxyUrlKey, canonicalId);
 
-      if (cached && cached.inputHash === inputHash) {
+        if (cached && cached.inputHash === inputHash) {
+          keepalive.stop();
+          logEvent(req, '/api/proxy/recap', 200);
+          return keepalive.send(200, {
+            status: 'fresh',
+            identifier: context.issue?.identifier || identifier,
+            recap: cached.recap,
+            generatedAt: cached.generatedAt,
+            model: cached.model
+          });
+        }
+
+        if (noRefresh) {
+          keepalive.stop();
+          logEvent(req, '/api/proxy/recap', 200);
+          return keepalive.send(200, {
+            status: cached ? 'stale' : 'missing',
+            identifier: context.issue?.identifier || identifier,
+            generatedAt: cached?.generatedAt,
+            model: cached?.model
+          });
+        }
+
+        if (!isTestMode && !isRecommendationEnabled(sessionApiKey)) {
+          keepalive.stop();
+          logEvent(req, '/api/proxy/recap', 503);
+          return keepalive.send(503, { error: 'AI recap is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.' });
+        }
+
+        let recap;
+        let modelUsed;
+        if (isTestMode) {
+          recap = buildMockRecapFromContext(context);
+          modelUsed = DEFAULT_MODEL;
+        } else {
+          const result = await withTimeout(
+            generateRecap(context.issue, context, { apiKey: sessionApiKey, model: DEFAULT_MODEL }),
+            MULTI_REQUEST_TIMEOUT_MS
+          );
+          recap = result.recap;
+          modelUsed = result.model;
+        }
+
+        await recapCacheStore.put(req.proxyUrlKey, canonicalId, {
+          inputHash,
+          recap,
+          model: modelUsed
+        });
+        const stored = await recapCacheStore.get(req.proxyUrlKey, canonicalId);
+
+        keepalive.stop();
         logEvent(req, '/api/proxy/recap', 200);
-        return res.json({
+        keepalive.send(200, {
           status: 'fresh',
           identifier: context.issue?.identifier || identifier,
-          recap: cached.recap,
-          generatedAt: cached.generatedAt,
-          model: cached.model
+          recap: stored?.recap ?? recap,
+          generatedAt: stored?.generatedAt ?? new Date(),
+          model: modelUsed
         });
+      } catch (err) {
+        keepalive.stop();
+        let status;
+        let body;
+        if (err.message?.includes('not found')) {
+          status = 404;
+          body = { error: 'Issue not found' };
+        } else if (err.message?.includes('OpenRouter')) {
+          status = 503;
+          body = { error: 'AI service temporarily unavailable', detail: err.message };
+        } else {
+          status = graphqlErrorStatus(err);
+          body = { error: 'Failed to fetch recap', detail: graphqlErrorDetail(err) };
+          console.error('Proxy /recap error:', err.message);
+        }
+        logEvent(req, '/api/proxy/recap', status);
+        keepalive.send(status, body);
       }
-
-      if (noRefresh) {
-        logEvent(req, '/api/proxy/recap', 200);
-        return res.json({
-          status: cached ? 'stale' : 'missing',
-          identifier: context.issue?.identifier || identifier,
-          generatedAt: cached?.generatedAt,
-          model: cached?.model
-        });
-      }
-
-      if (!isTestMode && !isRecommendationEnabled(sessionApiKey)) {
-        logEvent(req, '/api/proxy/recap', 503);
-        return res.status(503).json({ error: 'AI recap is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.' });
-      }
-
-      let recap;
-      let modelUsed;
-      if (isTestMode) {
-        recap = buildMockRecapFromContext(context);
-        modelUsed = DEFAULT_MODEL;
-      } else {
-        const result = await withTimeout(
-          generateRecap(context.issue, context, { apiKey: sessionApiKey, model: DEFAULT_MODEL }),
-          MULTI_REQUEST_TIMEOUT_MS
-        );
-        recap = result.recap;
-        modelUsed = result.model;
-      }
-
-      await recapCacheStore.put(req.proxyUrlKey, canonicalId, {
-        inputHash,
-        recap,
-        model: modelUsed
-      });
-      const stored = await recapCacheStore.get(req.proxyUrlKey, canonicalId);
-
-      logEvent(req, '/api/proxy/recap', 200);
-      res.json({
-        status: 'fresh',
-        identifier: context.issue?.identifier || identifier,
-        recap: stored?.recap ?? recap,
-        generatedAt: stored?.generatedAt ?? new Date(),
-        model: modelUsed
-      });
     } catch (err) {
-      if (err.message?.includes('not found')) {
-        logEvent(req, '/api/proxy/recap', 404);
-        return res.status(404).json({ error: 'Issue not found' });
-      }
-      if (err.message?.includes('OpenRouter')) {
-        logEvent(req, '/api/proxy/recap', 503);
-        return res.status(503).json({ error: 'AI service temporarily unavailable', detail: err.message });
-      }
-      const status = graphqlErrorStatus(err);
-      logEvent(req, '/api/proxy/recap', status);
-      console.error('Proxy /recap error:', err.message);
-      res.status(status).json({ error: 'Failed to fetch recap', detail: graphqlErrorDetail(err) });
+      logEvent(req, '/api/proxy/recap', 500);
+      console.error('Proxy /recap outer error:', err.message);
+      res.status(500).json({ error: 'Failed to fetch recap', detail: err.message });
     }
   });
 
@@ -2094,49 +2155,72 @@ ${readEndpoints}${writeEndpoints}
         return res.status(503).json({ error: 'AI recap is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.' });
       }
 
-      let context;
-      if (isTestMode) {
-        context = await buildMockRecapContextFromFixtures(identifier);
-        if (!context) {
-          logEvent(req, '/api/proxy/recap', 404);
-          return res.status(404).json({ error: 'Issue not found' });
+      // Force-regenerate always calls OpenRouter; arm a Heroku H12 guard.
+      const keepalive = armKeepalive(res);
+      try {
+        let context;
+        if (isTestMode) {
+          context = await buildMockRecapContextFromFixtures(identifier);
+          if (!context) {
+            keepalive.stop();
+            logEvent(req, '/api/proxy/recap', 404);
+            return keepalive.send(404, { error: 'Issue not found' });
+          }
+        } else {
+          context = await withTimeout(fetchRecommendationContext(accessToken, identifier), GRAPHQL_TIMEOUT_MS);
         }
-      } else {
-        context = await withTimeout(fetchRecommendationContext(accessToken, identifier), GRAPHQL_TIMEOUT_MS);
+
+        const canonicalId = context.issue?.id || identifier;
+        const inputHash = hashContext(context);
+
+        let recap;
+        let modelUsed;
+        if (isTestMode) {
+          recap = buildMockRecapFromContext(context);
+          modelUsed = DEFAULT_MODEL;
+        } else {
+          const result = await withTimeout(
+            generateRecap(context.issue, context, { apiKey: sessionApiKey, model: DEFAULT_MODEL }),
+            MULTI_REQUEST_TIMEOUT_MS
+          );
+          recap = result.recap;
+          modelUsed = result.model;
+        }
+
+        await recapCacheStore.put(req.proxyUrlKey, canonicalId, {
+          inputHash,
+          recap,
+          model: modelUsed
+        });
+        const stored = await recapCacheStore.get(req.proxyUrlKey, canonicalId);
+
+        keepalive.stop();
+        logEvent(req, '/api/proxy/recap', 200);
+        keepalive.send(200, {
+          status: 'fresh',
+          identifier: context.issue?.identifier || identifier,
+          recap: stored?.recap ?? recap,
+          generatedAt: stored?.generatedAt ?? new Date(),
+          model: modelUsed
+        });
+      } catch (err) {
+        keepalive.stop();
+        let status;
+        let body;
+        if (err.message?.includes('not found')) {
+          status = 404;
+          body = { error: 'Issue not found' };
+        } else if (err.message?.includes('OpenRouter')) {
+          status = 503;
+          body = { error: 'AI service temporarily unavailable', detail: err.message };
+        } else {
+          status = graphqlErrorStatus(err);
+          body = { error: 'Failed to fetch recap', detail: graphqlErrorDetail(err) };
+          console.error('Proxy /recap error:', err.message);
+        }
+        logEvent(req, '/api/proxy/recap', status);
+        keepalive.send(status, body);
       }
-
-      const canonicalId = context.issue?.id || identifier;
-      const inputHash = hashContext(context);
-
-      let recap;
-      let modelUsed;
-      if (isTestMode) {
-        recap = buildMockRecapFromContext(context);
-        modelUsed = DEFAULT_MODEL;
-      } else {
-        const result = await withTimeout(
-          generateRecap(context.issue, context, { apiKey: sessionApiKey, model: DEFAULT_MODEL }),
-          MULTI_REQUEST_TIMEOUT_MS
-        );
-        recap = result.recap;
-        modelUsed = result.model;
-      }
-
-      await recapCacheStore.put(req.proxyUrlKey, canonicalId, {
-        inputHash,
-        recap,
-        model: modelUsed
-      });
-      const stored = await recapCacheStore.get(req.proxyUrlKey, canonicalId);
-
-      logEvent(req, '/api/proxy/recap', 200);
-      res.json({
-        status: 'fresh',
-        identifier: context.issue?.identifier || identifier,
-        recap: stored?.recap ?? recap,
-        generatedAt: stored?.generatedAt ?? new Date(),
-        model: modelUsed
-      });
     } catch (err) {
       if (err.message?.includes('not found')) {
         logEvent(req, '/api/proxy/recap', 404);

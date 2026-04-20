@@ -429,7 +429,8 @@ test.describe('Proxy API - Consumer Endpoints', () => {
       headers: { Authorization: `Bearer ${readToken}` }
     });
     const text = await resp.text();
-    expect(text).toContain('id/name/color');
+    // Label info is now surfaced via a sample JSON payload showing id/name/color fields.
+    expect(text).toMatch(/labels.*\{.*id.*name.*color/s);
   });
 });
 
