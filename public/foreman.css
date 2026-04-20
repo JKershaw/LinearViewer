@@ -1,100 +1,61 @@
 /**
  * Foreman Page Styles
  *
- * Styles for the /foreman page.
- * Reuses proxy/dispatch visual language for consistency.
+ * Visual language borrowed from the swipe page (state colors, accent bars,
+ * priority dots, tag pills, uppercase meta labels) so the foreman page reads
+ * as a live-observation view of the same underlying tasks.
+ *
+ * Mobile-first: everything wraps/stacks gracefully below 640px.
  */
 
 /* =============================================================================
-   Onboarding Strip
+   Page scaffolding
    ============================================================================= */
-.foreman-onboarding {
+.foreman-page .foreman-main {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 0.5rem 1rem 2rem;
   display: flex;
+  flex-direction: column;
   gap: 1rem;
-  flex-wrap: wrap;
-  list-style: none;
-  padding: 0.75rem 1rem;
-  margin: 0 0 1.5rem 0;
-  border: 1px dashed var(--fg-vdim);
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.015);
-  font-family: var(--font-content);
-  font-size: 0.85em;
-  color: var(--fg-dim);
 }
 
-.foreman-onboarding li {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  flex: 1 1 14rem;
-}
-
-.foreman-onboarding a {
-  color: var(--blue);
-  text-decoration: none;
-}
-
-.foreman-onboarding a:hover {
-  text-decoration: underline;
-}
-
-.foreman-onboarding-num {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.4em;
-  height: 1.4em;
-  border-radius: 50%;
-  border: 1px solid var(--fg-vdim);
-  font-family: var(--font-structural);
-  font-size: 0.85em;
-  color: var(--fg);
-  background: var(--bg);
-}
-
-@media (max-width: 640px) {
-  .foreman-onboarding {
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-}
-
-/* =============================================================================
-   Foreman Section
-   ============================================================================= */
-.foreman-section {
-  margin-bottom: 2rem;
-  padding: 1rem;
-  background: rgba(0, 0, 0, 0.02);
-  border-radius: 4px;
-}
-
-.foreman-section-header {
-  font-family: var(--font-content);
-  font-size: 1em;
-  font-weight: 500;
-  color: var(--fg);
-  margin: 0 0 0.75rem 0;
+.foreman-header {
+  padding: 0.5rem 1rem 0.25rem;
+  max-width: 640px;
+  margin: 0 auto;
 }
 
 .foreman-subtitle {
   color: var(--fg-dim);
   font-family: var(--font-content);
   font-size: 0.9em;
-  margin-top: 0.5rem;
+  margin-top: 0.25rem;
 }
 
-.foreman-hint {
-  color: var(--fg-dim);
+.foreman-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.foreman-section-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.foreman-section-header {
   font-family: var(--font-content);
-  font-size: 0.85em;
-  margin: 0 0 0.75rem 0;
+  font-size: 0.95em;
+  font-weight: 600;
+  color: var(--fg);
+  margin: 0;
+  letter-spacing: 0.01em;
 }
 
-/* =============================================================================
-   Experimental Badge
-   ============================================================================= */
 .foreman-experimental {
   display: inline-block;
   font-size: 0.7em;
@@ -109,45 +70,679 @@
   letter-spacing: 0.03em;
 }
 
+.foreman-live-indicator {
+  font-family: var(--font-structural);
+  font-size: 0.75em;
+  color: var(--green, #16a085);
+  animation: foreman-live-pulse 2s ease-in-out infinite;
+}
+
+.foreman-live-indicator[hidden] { display: none; }
+
 /* =============================================================================
-   Playbook Prompt
+   Sessions + task threads (chip rows)
    ============================================================================= */
-.foreman-playbook-box {
+.foreman-sessions-section[hidden],
+.foreman-threads-section[hidden] { display: none; }
+
+.foreman-sessions-hint {
+  color: var(--fg-dim);
+  font-size: 0.8em;
+  font-family: var(--font-content);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.foreman-sessions,
+.foreman-threads {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.foreman-session-chip,
+.foreman-thread-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.6rem;
   border: 1px solid var(--fg-vdim);
-  border-radius: 4px;
-  padding: 0.75rem;
+  border-radius: 999px;
   background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-content);
+  font-size: 0.82em;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+  min-height: 32px;
+}
+
+.foreman-session-chip:hover,
+.foreman-thread-chip:hover {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: var(--fg-dim);
+}
+
+.foreman-session-chip.is-selected,
+.foreman-thread-chip.is-selected {
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+}
+
+.foreman-session-chip.is-selected .foreman-state,
+.foreman-thread-chip.is-selected .foreman-state { color: var(--bg); }
+
+.foreman-session-chip.is-active {
+  box-shadow: 0 0 0 2px rgba(22, 160, 133, 0.15);
+}
+
+.foreman-session-chip-label,
+.foreman-thread-chip-id {
+  font-family: var(--font-structural);
+  font-size: 0.95em;
+}
+
+.foreman-session-chip-count,
+.foreman-thread-chip-count {
+  padding: 0 0.35rem;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--fg-dim);
+  font-family: var(--font-structural);
+  font-size: 0.85em;
+}
+
+.foreman-session-chip.is-selected .foreman-session-chip-count,
+.foreman-thread-chip.is-selected .foreman-thread-chip-count {
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--bg);
+}
+
+.foreman-session-live {
+  color: var(--green, #16a085);
+  font-family: var(--font-structural);
+  font-size: 0.75em;
+  animation: foreman-live-pulse 2s ease-in-out infinite;
+}
+
+.foreman-session-chip.is-selected .foreman-session-live { color: var(--bg); }
+
+/* =============================================================================
+   Applied-filters bar (session + task chips)
+   ============================================================================= */
+.foreman-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.6rem;
+  border: 1px dashed var(--fg-vdim);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.02);
+  font-family: var(--font-content);
+  font-size: 0.82em;
+  color: var(--fg-dim);
+}
+
+.foreman-filters[hidden] { display: none; }
+
+.foreman-filters-label {
+  color: var(--fg-dim);
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-family: var(--font-structural);
+}
+
+.foreman-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid var(--fg-vdim);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.foreman-filter-chip[hidden] { display: none; }
+
+.foreman-filter-chip-label { color: var(--fg-dim); }
+
+.foreman-filter-chip-value {
+  font-family: var(--font-structural);
+  font-size: 0.95em;
+}
+
+.foreman-filter-chip-clear {
+  border: none;
+  background: none;
+  color: var(--fg-dim);
+  cursor: pointer;
+  font-size: 0.9em;
+  padding: 0 0.2rem;
+  line-height: 1;
+}
+
+.foreman-filter-chip-clear:hover { color: var(--red, #c0392b); }
+
+/* =============================================================================
+   Timeline identifier button (filter-toggle) + arrow-to-Linear
+   ============================================================================= */
+button.foreman-timeline-identifier {
+  font-family: var(--font-structural);
+  font-weight: 600;
+  color: var(--fg);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  border-bottom: 1px dotted currentColor;
+}
+
+button.foreman-timeline-identifier:hover { opacity: 0.75; }
+
+.foreman-timeline-identifier-link {
+  color: var(--fg-dim);
+  font-family: var(--font-structural);
+  font-size: 0.85em;
+  text-decoration: none;
+  padding: 0 0.25rem;
+}
+.foreman-timeline-identifier-link:hover { color: var(--blue, #2a66c9); }
+
+.foreman-timeline-session {
+  font-family: var(--font-structural);
+  font-size: 0.75em;
+  color: var(--fg-dim);
+  padding: 0.05rem 0.35rem;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.03);
+  max-width: 16ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes foreman-live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.foreman-empty,
+.foreman-now-empty {
+  color: var(--fg-dim);
+  font-size: 0.9em;
+  padding: 0.75rem 1rem;
+  text-align: center;
+  border: 1px dashed var(--fg-vdim);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.015);
+}
+
+/* =============================================================================
+   Shared visual primitives (state icon, accent bar, meta rows, label tags)
+   ============================================================================= */
+.foreman-state {
+  font-family: var(--font-structural);
+  font-size: 1em;
+  display: inline-block;
+  min-width: 1em;
+  text-align: center;
+}
+.foreman-state.done { color: var(--green, #16a085); }
+.foreman-state.in-progress { color: var(--yellow, #d4a600); }
+.foreman-state.todo { color: var(--fg-dim, #999); }
+.foreman-state.backlog { color: var(--fg-vdim, #ccc); }
+.foreman-state.failed { color: var(--red, #c0392b); }
+
+.foreman-card-accent {
+  height: 3px;
+  width: 100%;
+}
+.foreman-card-accent.in-progress { background: linear-gradient(90deg, #d4a600, #e8c547); }
+.foreman-card-accent.done { background: linear-gradient(90deg, #16a085, #2ecc71); }
+.foreman-card-accent.todo { background: #ddd; }
+.foreman-card-accent.backlog { background: #eee; }
+.foreman-card-accent.failed { background: linear-gradient(90deg, #c0392b, #e74c3c); }
+
+.foreman-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.foreman-meta-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  font-size: 0.85em;
+}
+
+.foreman-meta-label {
+  font-family: var(--font-structural);
+  color: var(--fg-dim, #999);
+  font-size: 0.75em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  min-width: 64px;
+  padding-top: 0.15rem;
+  flex-shrink: 0;
+}
+
+.foreman-meta-value {
+  color: var(--fg, #333);
+  word-break: break-word;
+  min-width: 0;
+  flex: 1;
+}
+
+.foreman-meta-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.foreman-label-tag {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.75em;
+  font-family: var(--font-structural);
+  border: 1px solid var(--fg-vdim, #e0e0e0);
+  border-radius: 10px;
+  color: var(--fg-dim, #666);
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.priority-dots {
+  letter-spacing: 1px;
+  font-family: var(--font-structural);
+}
+.priority-dots .filled { color: var(--fg, #1a1a1a); }
+.priority-dots .empty { color: var(--fg-vdim, #ddd); }
+
+/* =============================================================================
+   Now working — active task card
+   ============================================================================= */
+.foreman-now-card {
+  border: 1px solid var(--fg-vdim, #e0e0e0);
+  border-radius: 12px;
+  background: var(--bg, #fff);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.foreman-card-inner {
+  padding: 0.9rem 1rem 1rem;
+}
+
+.foreman-now-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-structural);
+  font-size: 0.85em;
+  color: var(--fg-dim);
+  margin-bottom: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.foreman-now-identifier {
+  font-weight: 600;
+  color: var(--fg);
+  text-decoration: none;
+}
+
+a.foreman-now-identifier {
+  border-bottom: 1px dotted currentColor;
+}
+
+a.foreman-now-identifier:hover { opacity: 0.75; }
+
+.foreman-now-action {
+  font-family: var(--font-structural);
+  font-size: 0.9em;
+  color: var(--fg-dim);
+  padding: 0.05rem 0.4rem;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.foreman-now-title {
+  font-size: 1.1em;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--fg);
+  margin-bottom: 0.5rem;
+  word-break: break-word;
+}
+
+.foreman-now-summary {
+  margin: 0 0 0.75rem 0;
+  padding: 0.5rem 0.75rem;
+  border-left: 3px solid var(--fg-vdim);
+  background: rgba(0, 0, 0, 0.02);
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  color: var(--fg);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* =============================================================================
+   Timeline (status log)
+   ============================================================================= */
+.foreman-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.foreman-timeline-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.5rem 0.75rem;
+  border-left: 3px solid transparent;
+  border-radius: 0 6px 6px 0;
+  background: rgba(0, 0, 0, 0.015);
+}
+
+.foreman-timeline-item.in-progress { border-left-color: var(--yellow, #d4a600); }
+.foreman-timeline-item.done { border-left-color: var(--green, #16a085); }
+.foreman-timeline-item.failed { border-left-color: var(--red, #c0392b); }
+.foreman-timeline-item.todo,
+.foreman-timeline-item.backlog { border-left-color: var(--fg-vdim, #ccc); }
+
+.foreman-timeline-item > .foreman-state {
+  padding-top: 0.1rem;
+}
+
+.foreman-timeline-body {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-content);
+}
+
+.foreman-timeline-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.85em;
+}
+
+.foreman-timeline-identifier {
+  font-family: var(--font-structural);
+  font-weight: 600;
+  color: var(--fg);
+  text-decoration: none;
+}
+
+a.foreman-timeline-identifier {
+  border-bottom: 1px dotted currentColor;
+}
+a.foreman-timeline-identifier:hover { opacity: 0.75; }
+
+.foreman-timeline-action {
+  color: var(--fg-dim);
+}
+
+.foreman-timeline-status {
+  font-family: var(--font-structural);
+  font-size: 0.9em;
+  color: var(--fg-dim);
+  padding: 0.05rem 0.35rem;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.foreman-timeline-item.done .foreman-timeline-status { color: var(--green, #16a085); }
+.foreman-timeline-item.in-progress .foreman-timeline-status { color: var(--yellow, #b8860b); }
+.foreman-timeline-item.failed .foreman-timeline-status { color: var(--red, #c0392b); }
+
+.foreman-timeline-time {
+  margin-left: auto;
+  color: var(--fg-vdim);
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+
+.foreman-timeline-summary {
+  margin-top: 0.25rem;
+  font-size: 0.88em;
+  color: var(--fg);
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+.foreman-status-pager {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.25rem 0;
+  font-family: var(--font-content);
+  font-size: 0.85em;
+  color: var(--fg-dim);
+}
+
+.foreman-status-pager[hidden] { display: none; }
+
+.foreman-status-pager-info { color: var(--fg-vdim); }
+
+/* =============================================================================
+   Up next (stack) — swipe-card style
+   ============================================================================= */
+.foreman-stack-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.foreman-stack-card {
+  display: block;
+  border: 1px solid var(--fg-vdim, #e0e0e0);
+  border-radius: 10px;
+  background: var(--bg, #fff);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  color: inherit;
+  text-decoration: none;
+  transition: background 0.12s ease, box-shadow 0.12s ease, transform 0.12s ease;
+}
+
+a.foreman-stack-card-link {
+  cursor: pointer;
+}
+
+a.foreman-stack-card-link:hover,
+a.foreman-stack-card-link:focus {
+  background: rgba(0, 0, 0, 0.02);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  outline: none;
+}
+
+.foreman-stack-card-inner {
+  padding: 0.6rem 0.85rem 0.7rem;
+}
+
+.foreman-stack-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-structural);
+  font-size: 0.8em;
+  color: var(--fg-dim);
+  margin-bottom: 0.3rem;
+}
+
+.foreman-stack-identifier {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.foreman-stack-position {
+  margin-left: auto;
+  color: var(--fg-vdim);
+  font-size: 0.85em;
+}
+
+.foreman-stack-title {
+  font-size: 0.95em;
+  line-height: 1.35;
+  font-weight: 500;
+  color: var(--fg);
+  margin-bottom: 0.35rem;
+  word-break: break-word;
+}
+
+a.foreman-stack-card-link:hover .foreman-stack-title,
+a.foreman-stack-card-link:focus .foreman-stack-title {
+  text-decoration: underline;
+}
+
+.foreman-stack-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.8em;
+  color: var(--fg-dim);
+  margin-bottom: 0.3rem;
+}
+
+.foreman-stack-meta:empty { display: none; }
+
+.foreman-stack-project {
+  color: var(--fg-dim);
+}
+
+.foreman-stack-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+/* =============================================================================
+   Setup section (collapsible playbook + controls)
+   ============================================================================= */
+.foreman-setup {
+  border: 1px solid var(--fg-vdim);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.015);
+  overflow: hidden;
+}
+
+.foreman-setup-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.85rem;
+  cursor: pointer;
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  color: var(--fg);
+  list-style: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.foreman-setup-summary::-webkit-details-marker { display: none; }
+
+.foreman-setup-toggle {
+  font-family: var(--font-structural);
+  color: var(--fg-dim);
+  transition: transform 0.15s ease;
+  display: inline-block;
+  font-size: 0.8em;
+}
+
+.foreman-setup[open] .foreman-setup-toggle {
+  transform: rotate(90deg);
+}
+
+.foreman-setup-label {
+  font-weight: 600;
+}
+
+.foreman-setup-hint {
+  color: var(--fg-dim);
+  font-size: 0.85em;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.foreman-setup-body {
+  padding: 0.5rem 0.85rem 0.85rem;
+  border-top: 1px solid var(--fg-vdim);
+  background: var(--bg);
+}
+
+.foreman-playbook-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
 }
 
 .foreman-playbook-controls {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 0.75rem;
+  gap: 0.5rem;
   flex-wrap: wrap;
+}
+
+.foreman-token-label {
+  font-family: var(--font-content);
+  font-size: 0.85em;
+  color: var(--fg-dim);
+}
+
+.foreman-token-select {
+  font-family: var(--font-content);
+  font-size: 0.85em;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--fg-vdim);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--fg);
+  max-width: 20ch;
+}
+
+.foreman-token-select:focus {
+  outline: none;
+  border-color: var(--blue, #2a66c9);
 }
 
 .foreman-playbook-feedback {
   font-size: 0.85em;
-  color: var(--green);
+  color: var(--green, #16a085);
 }
 
-.foreman-playbook-feedback.error {
-  color: var(--red);
-}
+.foreman-playbook-feedback.error { color: var(--red, #c0392b); }
 
 .foreman-playbook-output {
   font-family: var(--font-structural);
-  font-size: 0.8em;
+  font-size: 0.78em;
   padding: 0.75rem;
   background: rgba(0, 0, 0, 0.03);
   border: 1px solid var(--fg-vdim);
-  border-radius: 3px;
+  border-radius: 4px;
   white-space: pre-wrap;
   word-break: break-word;
   color: var(--fg-dim);
   margin: 0;
-  max-height: 24em;
+  max-height: 20em;
   overflow-y: auto;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
@@ -159,274 +754,106 @@
 
 .foreman-playbook-output.has-content:hover,
 .foreman-playbook-output.has-content:focus {
-  border-color: var(--blue);
+  border-color: var(--blue, #2a66c9);
   background: rgba(0, 0, 0, 0.04);
   outline: none;
 }
 
-/* Confirmation flash on the copy button after a successful copy */
 #foreman-copy-btn.copied {
-  background: var(--green);
-  color: var(--bg);
-  border-color: var(--green);
+  background: var(--green, #16a085);
+  color: var(--bg, #fff);
+  border-color: var(--green, #16a085);
 }
 
-.foreman-token-label {
-  font-family: var(--font-content);
-  font-size: 0.85em;
-  color: var(--fg-dim);
-}
-
-.foreman-live-indicator {
-  font-family: var(--font-structural);
-  font-size: 0.75em;
-  color: var(--green);
-  margin-left: 0.4rem;
-  vertical-align: middle;
-  animation: foreman-live-pulse 2s ease-in-out infinite;
-}
-
-@keyframes foreman-live-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-
-/* =============================================================================
-   Token Selector
-   ============================================================================= */
-.foreman-token-select {
-  font-family: var(--font-content);
-  font-size: 0.85em;
-  padding: 0.25rem 0.4rem;
-  border: 1px solid var(--fg-vdim);
-  border-radius: 3px;
-  background: var(--bg);
-  color: var(--fg);
-  max-width: 20ch;
-}
-
-.foreman-token-select:focus {
-  outline: none;
-  border-color: var(--blue);
-}
-
-.foreman-no-token {
-  color: var(--fg-dim);
-  font-size: 0.85em;
-  font-family: var(--font-content);
-}
-
-.foreman-no-token a {
-  color: var(--blue);
-  text-decoration: none;
-}
-
-.foreman-no-token a:hover {
-  text-decoration: underline;
-}
-
-/* =============================================================================
-   Status Log
-   ============================================================================= */
-.foreman-status-list {
-  margin-top: 0.5rem;
-}
-
-.foreman-status-loading,
-.foreman-status-empty {
-  color: var(--fg-dim);
-  font-size: 0.9em;
-  padding: 0.25rem 0;
-}
-
-.foreman-status-item {
-  display: flex;
-  align-items: baseline;
-  gap: 0.75rem;
-  padding: 0.35rem 0;
-  border-bottom: 1px solid var(--fg-vdim);
-  font-size: 0.85em;
-  font-family: var(--font-content);
-}
-
-.foreman-status-item:last-child {
-  border-bottom: none;
-}
-
-.foreman-status-task {
-  font-family: var(--font-structural);
-  font-weight: 500;
-  min-width: 8ch;
-  color: var(--fg);
-}
-
-.foreman-status-action {
-  color: var(--fg-dim);
-  min-width: 12ch;
-}
-
-.foreman-status-badge {
-  font-family: var(--font-structural);
-  font-size: 0.9em;
-  min-width: 10ch;
-}
-
-.foreman-status-badge.status-completed {
-  color: var(--green);
-}
-
-.foreman-status-badge.status-in-progress {
-  color: var(--yellow, #b8860b);
-}
-
-.foreman-status-badge.status-failed,
-.foreman-status-badge.status-blocked {
-  color: var(--red);
-}
-
-.foreman-status-summary {
-  flex: 1;
-  color: var(--fg);
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.foreman-status-time {
-  color: var(--fg-dim);
-  font-size: 0.85em;
-  white-space: nowrap;
-}
-
-/* =============================================================================
-   Stack Preview
-   ============================================================================= */
-.foreman-stack-list {
-  margin-top: 0.5rem;
-}
-
-.foreman-stack-loading,
-.foreman-stack-empty {
-  color: var(--fg-dim);
-  font-size: 0.9em;
-  padding: 0.25rem 0;
-}
-
-.foreman-stack-item {
-  display: flex;
-  align-items: baseline;
-  gap: 0.75rem;
-  padding: 0.4rem 0;
-  border-bottom: 1px solid var(--fg-vdim);
-  font-size: 0.85em;
-  font-family: var(--font-content);
-}
-
-.foreman-stack-item:last-child {
-  border-bottom: none;
-}
-
-/* Stack items that are anchors (linked to Linear) */
-a.foreman-stack-item-link {
-  color: inherit;
-  text-decoration: none;
-  cursor: pointer;
-  transition: background 0.12s ease;
-}
-
-a.foreman-stack-item-link:hover,
-a.foreman-stack-item-link:focus {
-  background: rgba(0, 0, 0, 0.035);
-  outline: none;
-}
-
-a.foreman-stack-item-link:hover .foreman-stack-title,
-a.foreman-stack-item-link:focus .foreman-stack-title {
-  text-decoration: underline;
-}
-
-.foreman-stack-identifier {
-  font-family: var(--font-structural);
-  font-weight: 500;
-  min-width: 8ch;
-  color: var(--fg);
-}
-
-.foreman-stack-title {
-  flex: 1;
-  color: var(--fg);
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.foreman-stack-state {
-  font-family: var(--font-structural);
-  font-size: 0.9em;
-  min-width: 8ch;
-}
-
-.foreman-stack-state.state-started {
-  color: var(--yellow, #b8860b);
-}
-
-.foreman-stack-state.state-unstarted {
-  color: var(--fg-dim);
-}
-
-.foreman-stack-state.state-backlog {
-  color: var(--fg-vdim);
-}
-
-.foreman-stack-labels {
-  color: var(--fg-dim);
-  font-size: 0.9em;
-  white-space: nowrap;
-}
-
-/* Refresh buttons */
 .foreman-refresh {
-  color: var(--fg-dim);
-  font-size: 0.85em;
-  vertical-align: middle;
-}
-
-.foreman-refresh:hover {
-  color: var(--fg);
-}
-
-/* Status log pager */
-.foreman-status-pager {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 0;
-  margin-top: 0.25rem;
-  font-family: var(--font-content);
-  font-size: 0.85em;
+  font-size: 0.8em;
   color: var(--fg-dim);
 }
-
-.foreman-status-pager-info {
-  color: var(--fg-vdim);
-}
+.foreman-refresh:hover { color: var(--fg); }
 
 /* =============================================================================
-   Responsive
+   Mobile (≤640px) — everything wraps/stacks; tap targets stay finger-sized
    ============================================================================= */
 @media (max-width: 640px) {
-  .foreman-playbook-controls {
+  .foreman-page .foreman-main {
+    padding: 0.5rem 0.75rem 2rem;
+    gap: 0.75rem;
+  }
+
+  .foreman-header {
+    padding: 0.5rem 0.75rem 0.25rem;
+  }
+
+  .foreman-meta-row {
     flex-direction: column;
-    align-items: flex-start;
+    gap: 0.1rem;
   }
 
-  .foreman-status-item {
-    flex-wrap: wrap;
+  .foreman-meta-label {
+    min-width: 0;
+    padding-top: 0;
   }
 
-  .foreman-stack-item {
-    flex-wrap: wrap;
+  .foreman-timeline-head {
+    row-gap: 0.15rem;
+  }
+
+  .foreman-timeline-time {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .foreman-playbook-controls {
+    gap: 0.4rem;
+  }
+
+  .foreman-token-select {
+    max-width: 100%;
+    flex: 1 1 auto;
+  }
+
+  .foreman-setup-hint {
+    display: none;
+  }
+
+  /* Chip rows scroll horizontally below 640px so the view doesn't wrap into
+     tall chrome. Keeps the observation stack dominant on tiny screens. */
+  .foreman-sessions,
+  .foreman-threads {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .foreman-session-chip,
+  .foreman-thread-chip {
+    flex-shrink: 0;
+    scroll-snap-align: start;
+  }
+
+  .foreman-sessions-hint {
+    display: none;
+  }
+
+  .foreman-timeline-session {
+    max-width: 10ch;
+  }
+
+  .foreman-stack-card-inner {
+    padding: 0.7rem 0.85rem 0.75rem;
+  }
+
+  .foreman-stack-title {
+    font-size: 1em;
+  }
+
+  /* Touch-friendly action buttons */
+  .foreman-playbook-controls .action-btn,
+  .foreman-section-header-row .action-btn {
+    min-height: 36px;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
   }
 }
