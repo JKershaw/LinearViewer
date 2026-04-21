@@ -5,7 +5,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { stripCodeBlockMarkers, truncateComments, formatSubtaskOverview } from '../../lib/openrouter.js';
+import { stripCodeBlockMarkers, formatSubtaskOverview } from '../../lib/openrouter.js';
 
 // =============================================================================
 // stripCodeBlockMarkers Tests
@@ -74,76 +74,6 @@ describe('stripCodeBlockMarkers', () => {
     // Strips outer pair, leaves inner backticks
     const expected = '```\n# Implement\n```';
     assert.strictEqual(stripCodeBlockMarkers(input), expected);
-  });
-});
-
-// =============================================================================
-// truncateComments Tests
-// =============================================================================
-
-describe('truncateComments', () => {
-  test('returns empty array for null input', () => {
-    assert.deepStrictEqual(truncateComments(null), []);
-  });
-
-  test('returns empty array for undefined input', () => {
-    assert.deepStrictEqual(truncateComments(undefined), []);
-  });
-
-  test('returns empty array for empty array input', () => {
-    assert.deepStrictEqual(truncateComments([]), []);
-  });
-
-  test('takes last 3 comments when more than 3 exist', () => {
-    const comments = [
-      { body: 'comment 1', user: 'user1', createdAt: '2024-01-01' },
-      { body: 'comment 2', user: 'user2', createdAt: '2024-01-02' },
-      { body: 'comment 3', user: 'user3', createdAt: '2024-01-03' },
-      { body: 'comment 4', user: 'user4', createdAt: '2024-01-04' },
-      { body: 'comment 5', user: 'user5', createdAt: '2024-01-05' }
-    ];
-    const result = truncateComments(comments);
-    assert.strictEqual(result.length, 3);
-    assert.strictEqual(result[0].body, 'comment 3');
-    assert.strictEqual(result[1].body, 'comment 4');
-    assert.strictEqual(result[2].body, 'comment 5');
-  });
-
-  test('returns all comments when 3 or fewer exist', () => {
-    const comments = [
-      { body: 'comment 1', user: 'user1', createdAt: '2024-01-01' },
-      { body: 'comment 2', user: 'user2', createdAt: '2024-01-02' }
-    ];
-    const result = truncateComments(comments);
-    assert.strictEqual(result.length, 2);
-  });
-
-  test('truncates long comment bodies to 500 chars', () => {
-    const longBody = 'a'.repeat(600);
-    const comments = [
-      { body: longBody, user: 'user1', createdAt: '2024-01-01' }
-    ];
-    const result = truncateComments(comments);
-    assert.strictEqual(result[0].body.length, 503); // 500 + '...'
-    assert.ok(result[0].body.endsWith('...'));
-  });
-
-  test('preserves short comment bodies unchanged', () => {
-    const comments = [
-      { body: 'short comment', user: 'user1', createdAt: '2024-01-01' }
-    ];
-    const result = truncateComments(comments);
-    assert.strictEqual(result[0].body, 'short comment');
-  });
-
-  test('preserves other properties of comment objects', () => {
-    const comments = [
-      { body: 'test', user: 'user1', createdAt: '2024-01-01', extra: 'data' }
-    ];
-    const result = truncateComments(comments);
-    assert.strictEqual(result[0].user, 'user1');
-    assert.strictEqual(result[0].createdAt, '2024-01-01');
-    assert.strictEqual(result[0].extra, 'data');
   });
 });
 
