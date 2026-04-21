@@ -742,6 +742,66 @@ test.describe('Foreman API - Playbook Endpoint', () => {
   });
 });
 
+test.describe('Workspace API - Foreman Prompt Endpoint', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
+  });
+
+  test('GET /workspace/:urlKey/api/foreman-prompt/:issueId returns targeted playbook', async ({ page, request }) => {
+    const cookies = await page.context().cookies();
+    const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+
+    const resp = await request.get(
+      '/workspace/test-workspace/api/foreman-prompt/66666666-6666-6666-6666-666666666666',
+      { headers: { Cookie: cookieHeader } }
+    );
+    expect(resp.status()).toBe(200);
+
+    const data = await resp.json();
+    expect(data.label).toBe('foreman');
+    expect(data.promptName).toContain('Foreman');
+    expect(data.prompt).toContain('Confirm the task');
+    expect(data.prompt).toContain('/api/proxy/recap');
+    // Should NOT include stack-walk for a targeted run
+    expect(data.prompt).not.toContain('Choose a task');
+    expect(data.prompt).not.toContain('/api/proxy/stack?limit=5');
+  });
+
+  test('GET /workspace/:urlKey/api/foreman-prompt rejects invalid issue ID', async ({ page, request }) => {
+    const cookies = await page.context().cookies();
+    const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+
+    const resp = await request.get(
+      '/workspace/test-workspace/api/foreman-prompt/not-a-uuid',
+      { headers: { Cookie: cookieHeader } }
+    );
+    expect(resp.status()).toBe(400);
+  });
+
+  test('GET /workspace/:urlKey/api/foreman-prompt returns 404 for unknown issue', async ({ page, request }) => {
+    const cookies = await page.context().cookies();
+    const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+
+    const resp = await request.get(
+      '/workspace/test-workspace/api/foreman-prompt/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+      { headers: { Cookie: cookieHeader } }
+    );
+    expect(resp.status()).toBe(404);
+  });
+
+  test('GET /workspace/:urlKey/api/foreman-prompt returns 403 when proxy feature disabled', async ({ page, request }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: false }))}`);
+    const cookies = await page.context().cookies();
+    const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+
+    const resp = await request.get(
+      '/workspace/test-workspace/api/foreman-prompt/66666666-6666-6666-6666-666666666666',
+      { headers: { Cookie: cookieHeader } }
+    );
+    expect(resp.status()).toBe(403);
+  });
+});
+
 test.describe('Foreman API - Event Logging', () => {
   test('foreman endpoint calls create proxy events', async ({ page, request }) => {
     await page.goto('/test/clear-proxy-tokens');
