@@ -448,6 +448,40 @@ describe('status tiebreaker in dependency ordering', () => {
     // 'active' should be first since it's started
     assert.strictEqual(ids[0], 'active');
   });
+
+  test('honors caller input order as tiebreaker when state is equal', () => {
+    // Three independent to-do items in the same project. Caller pre-sorts by
+    // priority (urgent → low), so input order IS the tiebreaker we want to
+    // survive the topological sort.
+    const cards = [
+      createCard({ id: 'urgent', stateType: 'unstarted', priority: 1, projectName: 'P' }),
+      createCard({ id: 'medium', stateType: 'unstarted', priority: 3, projectName: 'P' }),
+      createCard({ id: 'low', stateType: 'unstarted', priority: 4, projectName: 'P' })
+    ];
+    const { lanes } = assignLanes(cards, { grouping: 'dependency' });
+    const ids = lanes[0].items.map(i => i.id);
+    assert.deepStrictEqual(ids, ['urgent', 'medium', 'low']);
+  });
+
+  test('input-order tiebreaker holds across independent blocking chains in one lane', () => {
+    // Two unrelated two-card chains in the same project. Caller feeds the
+    // higher-priority chain second — chain order in the merged lane should
+    // still reflect the caller's sort.
+    const cards = [
+      createCard({ id: 'low-a', stateType: 'unstarted', priority: 4, projectName: 'P', blocksIds: ['low-b'] }),
+      createCard({ id: 'low-b', stateType: 'unstarted', priority: 4, projectName: 'P' }),
+      createCard({ id: 'hi-a', stateType: 'unstarted', priority: 1, projectName: 'P', blocksIds: ['hi-b'] }),
+      createCard({ id: 'hi-b', stateType: 'unstarted', priority: 1, projectName: 'P' })
+    ];
+    // Caller hands us priority-sorted input:
+    const sorted = [cards[2], cards[3], cards[0], cards[1]];
+    const { lanes } = assignLanes(sorted, { grouping: 'dependency' });
+    const ids = lanes[0].items.map(i => i.id);
+    // Blocking order preserved within each chain, and high-priority chain first
+    assert.ok(ids.indexOf('hi-a') < ids.indexOf('hi-b'), 'hi-a before hi-b');
+    assert.ok(ids.indexOf('low-a') < ids.indexOf('low-b'), 'low-a before low-b');
+    assert.ok(ids.indexOf('hi-a') < ids.indexOf('low-a'), 'high-priority chain precedes low-priority chain');
+  });
 });
 
 // =============================================================================

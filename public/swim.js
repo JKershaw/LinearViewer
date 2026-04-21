@@ -25,12 +25,17 @@ function assignLanes(issues, options) {
 
   if (filtered.length === 0) return { lanes: [], links: [] };
 
+  // Caller's pre-sort order (priority, bug-first, state) — threaded into
+  // orderByDependency as a tiebreaker so priority survives the topo sort.
+  var globalIndex = new Map();
+  for (var gi = 0; gi < filtered.length; gi++) globalIndex.set(filtered[gi].id, gi);
+
   var lanes;
   switch (grouping) {
     case 'project': lanes = groupByProject(filtered); break;
     case 'assignee': lanes = groupByAssignee(filtered); break;
     case 'status': lanes = groupByStatus(filtered); break;
-    default: lanes = groupByDependency(filtered); break;
+    default: lanes = groupByDependency(filtered, globalIndex); break;
   }
 
   lanes = mergeLanes(lanes, maxLanes);
@@ -138,7 +143,7 @@ function sortLanesByProjectOrder(lanes, projectOrder) {
   });
 }
 
-function groupByDependency(issues) {
+function groupByDependency(issues, globalIndex) {
   var issueById = new Map(issues.map(function(i) { return [i.id, i]; }));
   var issueIds = new Set(issues.map(function(i) { return i.id; }));
   var adj = new Map();
@@ -209,23 +214,26 @@ function groupByDependency(issues) {
   projectBuckets.forEach(function(ids) { merged.push(ids); });
 
   return merged.map(function(componentIds, idx) {
-    var items = orderByDependency(componentIds, issueById);
+    var items = orderByDependency(componentIds, issueById, globalIndex);
     var label = buildChainLabel(items);
     return { id: 'chain-' + idx, label: label, items: items };
   });
 }
 
-function orderByDependency(ids, issueById) {
+function orderByDependency(ids, issueById, globalIndex) {
   var idSet = new Set(ids);
   var issues = ids.map(function(id) { return issueById.get(id); }).filter(Boolean);
-  var idToIndex = new Map(issues.map(function(iss, i) { return [iss.id, i]; }));
+  var localIndex = new Map(issues.map(function(iss, i) { return [iss.id, i]; }));
 
   function sortKey(id) {
     var issue = issueById.get(id);
     var stateType = issue ? issue.stateType : 'unstarted';
     var rank = stateType in SEGMENT_RANK ? SEGMENT_RANK[stateType] : 1;
-    var idx = idToIndex.has(id) ? idToIndex.get(id) : Infinity;
-    return rank * 100000 + idx;
+    var idx;
+    if (globalIndex && globalIndex.has(id)) idx = globalIndex.get(id);
+    else if (localIndex.has(id)) idx = localIndex.get(id);
+    else idx = Infinity;
+    return rank * 1000000 + idx;
   }
 
   var adj = new Map();
