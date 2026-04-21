@@ -802,6 +802,55 @@ test.describe('Workspace API - Foreman Prompt Endpoint', () => {
   });
 });
 
+test.describe('Foreman Button - Main Projects View', () => {
+  test('Foreman button renders next to prompt buttons when proxy flag is on', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
+    await page.goto('/workspace/test-workspace/');
+    await page.waitForLoadState('networkidle');
+
+    // Scope to the first actionable issue's prompt buttons row
+    const firstPromptsBar = page.locator('.detail-prompts').first();
+    await expect(firstPromptsBar).toBeAttached();
+    await expect(firstPromptsBar.locator('.foreman-btn')).toHaveCount(1);
+    await expect(firstPromptsBar.locator('.foreman-btn')).toContainText('Foreman');
+  });
+
+  test('Foreman button is hidden when proxy flag is off', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: false }))}`);
+    await page.goto('/workspace/test-workspace/');
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('.foreman-btn')).toHaveCount(0);
+  });
+});
+
+test.describe('Foreman Button - Swipe View', () => {
+  test('Foreman button renders inside the swipe prompt picker when proxy flag is on', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
+    await page.goto('/workspace/test-workspace/swipe');
+    await page.waitForLoadState('networkidle');
+
+    const promptsHeader = page.locator('.swipe-accordion-header[data-accordion="prompts"]');
+    await expect(promptsHeader).toBeVisible();
+    await promptsHeader.click();
+
+    const foremanBtn = page.locator('.swipe-prompt-btn.foreman-btn');
+    await expect(foremanBtn).toBeVisible();
+    await expect(foremanBtn).toContainText('Foreman');
+  });
+
+  test('Foreman button is hidden in swipe picker when proxy flag is off', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: false }))}`);
+    await page.goto('/workspace/test-workspace/swipe');
+    await page.waitForLoadState('networkidle');
+
+    const promptsHeader = page.locator('.swipe-accordion-header[data-accordion="prompts"]');
+    await promptsHeader.click();
+
+    await expect(page.locator('.swipe-prompt-btn.foreman-btn')).toHaveCount(0);
+  });
+});
+
 test.describe('Foreman API - Event Logging', () => {
   test('foreman endpoint calls create proxy events', async ({ page, request }) => {
     await page.goto('/test/clear-proxy-tokens');
