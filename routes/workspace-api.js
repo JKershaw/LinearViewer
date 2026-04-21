@@ -13,6 +13,7 @@ import { fetchIssueContext, fetchRecommendationContext, fetchIssueComments } fro
 import { generatePrompt, generateCustomPrompt, hasPrompt, getAvailablePrompts } from '../lib/prompt-templates.js';
 import { PREPARING_LABEL, WORK_ISSUE_LABELS } from '../lib/workflow-config.js';
 import { parseRepoFromDescription } from '../lib/prompt-formatters.js';
+import { buildForemanPlaybook } from '../lib/prompts/foreman-playbook.js';
 import { isRecommendationEnabled, getRecommendation, getRecommendationStream, streamChat, DEFAULT_MODEL } from '../lib/openrouter.js';
 import { generateRecap } from '../lib/recap.js';
 import { hashContext } from '../lib/recap-cache.js';
@@ -234,6 +235,83 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       }
 
       res.status(500).json({ error: 'Failed to generate prompt', message: error.message })
+    }
+  })
+
+  // ===========================================================================
+  // Foreman Prompt API
+  // ===========================================================================
+
+  /**
+   * Generate a foreman playbook pinned to a specific issue.
+   *
+   * The unparameterized playbook is still served at /api/proxy/foreman/playbook
+   * for external agents. This endpoint is the in-app entry point: it targets a
+   * single issue so the user can copy or dispatch a focused run.
+   *
+   * Gated on the proxy feature flag because the playbook instructs the agent
+   * to use proxy endpoints exclusively.
+   *
+   * @route GET /workspace/:urlKey/api/foreman-prompt/:issueId
+   * @param {string} issueId - The Linear issue ID (UUID)
+   * @returns {Object} { label, promptName, prompt, repo } or error
+   */
+  router.get('/workspace/:urlKey/api/foreman-prompt/:issueId', workspaceFromUrl, async (req, res) => {
+    const workspace = req.workspace
+    const { issueId } = req.params
+
+    const featureFlags = getFeatureFlags(req.session)
+    if (featureFlags.proxy !== true) {
+      return res.status(403).json({ error: 'Proxy feature is not enabled' })
+    }
+
+    if (!UUID_REGEX.test(issueId)) {
+      return res.status(400).json({ error: 'Invalid issue ID format' })
+    }
+
+    const baseUrl = `${req.protocol}://${req.get('host')}`
+
+    try {
+      // Use mock data in test mode
+      if (process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token') {
+        const mockIssue = testMockData.issues.find(i => i.id === issueId)
+        if (!mockIssue) {
+          return res.status(404).json({ error: 'Issue not found' })
+        }
+        const identifier = mockIssue.url?.split('/').pop() || ''
+        const mockProject = testMockData.projects.find(p => p.id === mockIssue.project?.id)
+        const prompt = buildForemanPlaybook({
+          baseUrl,
+          issue: { identifier, title: mockIssue.title }
+        })
+        return res.json({
+          label: 'foreman',
+          promptName: `Foreman run — ${identifier}`,
+          prompt,
+          repo: parseRepoFromDescription(mockProject?.content || null)
+        })
+      }
+
+      const { issue, project } = await fetchIssueContext(workspace.accessToken, issueId)
+      const prompt = buildForemanPlaybook({
+        baseUrl,
+        issue: { identifier: issue.identifier, title: issue.title }
+      })
+      res.json({
+        label: 'foreman',
+        promptName: `Foreman run — ${issue.identifier}`,
+        prompt,
+        repo: parseRepoFromDescription(project?.description)
+      })
+    } catch (error) {
+      console.error('Foreman prompt error:', error)
+      if (error.response?.status === 401) {
+        return res.status(401).json({ error: 'Token expired or invalid' })
+      }
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message })
+      }
+      res.status(500).json({ error: 'Failed to generate foreman prompt', message: error.message })
     }
   })
 

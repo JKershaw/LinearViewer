@@ -938,6 +938,12 @@ function hideIssuePromptUI(detailsContainer, issueId) {
   if (recommendContainer) {
     recommendContainer.classList.add('hidden')
   }
+
+  // Hide foreman container
+  const foremanContainer = detailsContainer?.querySelector(`[data-foreman-for="${issueId}"]`)
+  if (foremanContainer) {
+    foremanContainer.classList.add('hidden')
+  }
 }
 
 /**
@@ -959,7 +965,7 @@ function initPrompts() {
   // Handle clicks on promptable labels
   document.addEventListener('click', async (e) => {
     const labelLink = e.target.closest('.label-prompt')
-    if (!labelLink || labelLink.classList.contains('more-toggle') || labelLink.classList.contains('suggest-btn')) return
+    if (!labelLink || labelLink.classList.contains('more-toggle') || labelLink.classList.contains('suggest-btn') || labelLink.classList.contains('foreman-btn')) return
 
     e.preventDefault()
     e.stopPropagation()
@@ -2125,6 +2131,82 @@ function initProxyToggle() {
   })
 }
 
+/**
+ * Initialize the Foreman button. Parallel to initRecommendations() but fetches
+ * a deterministic playbook (no streaming) and renders it inside the
+ * .foreman-container using the same copy/dispatch affordances.
+ */
+function initForeman() {
+  let activeForemanFetch = null
+
+  document.addEventListener('click', async (e) => {
+    const foremanBtn = e.target.closest('.foreman-btn')
+    if (!foremanBtn) return
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    const issueId = foremanBtn.dataset.issueId
+    const detailsContainer = foremanBtn.closest('.details')
+    const container = detailsContainer?.querySelector(`[data-foreman-for="${issueId}"]`)
+    if (!container) return
+
+    // Toggle off when already visible
+    if (!container.classList.contains('hidden')) {
+      container.classList.add('hidden')
+      return
+    }
+
+    if (activeForemanFetch) activeForemanFetch.abort()
+    const abortController = new AbortController()
+    activeForemanFetch = abortController
+
+    // Dismiss sibling prompt UI for this issue
+    hideIssuePromptUI(detailsContainer, issueId)
+
+    const promptText = container.querySelector('.prompt-text')
+    promptText.textContent = 'Loading...'
+    container.classList.remove('hidden')
+    setPromptActionsDisabled(container, true)
+
+    try {
+      const urlKey = container.dataset.urlKey
+      const apiPrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : ''
+      const response = await fetch(
+        `${apiPrefix}/api/foreman-prompt/${issueId}`,
+        { signal: abortController.signal }
+      )
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}))
+        throw new Error(error.error || 'Failed to load foreman prompt')
+      }
+
+      const data = await response.json()
+
+      if (activeForemanFetch === abortController) {
+        promptText.dataset.rawPrompt = data.prompt
+        promptText.innerHTML = renderMarkdown(data.prompt)
+        if (data.repo) {
+          container.dataset.repo = data.repo
+        } else {
+          delete container.dataset.repo
+        }
+        setPromptActionsDisabled(container, false)
+      }
+    } catch (error) {
+      if (error.name === 'AbortError') return
+      setPromptActionsDisabled(container, false)
+      promptText.textContent = `Error: ${error.message}`
+      console.error('Failed to fetch foreman prompt:', error)
+    } finally {
+      if (activeForemanFetch === abortController) {
+        activeForemanFetch = null
+      }
+    }
+  })
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   init()
   initNavBar()
@@ -2132,6 +2214,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initPrompts()
   initMorePrompts()
   initRecommendations()
+  initForeman()
   initQueuePanel()
   initFeatureToggles()
   initFreeTierStatus()

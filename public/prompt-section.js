@@ -72,12 +72,15 @@
    * Build the picker (idle state): prompt pill row.
    */
   function renderPicker(opts, state) {
-    const { hasAI, defaultPromptKeys, morePromptKeys, promptMeta, customPrompts } = opts;
+    const { hasAI, hasForeman, defaultPromptKeys, morePromptKeys, promptMeta, customPrompts } = opts;
     const moreVisible = state.moreVisible;
     let html = '<div class="swipe-prompt-header"><span class="swipe-prompt-name">prompt</span></div>';
     html += '<div class="swipe-prompt-buttons">';
     if (hasAI) {
       html += `<button class="swipe-prompt-btn ai-btn" data-prompt="__ai__">\u2726 AI Recommend</button>`;
+    }
+    if (hasForeman) {
+      html += `<button class="swipe-prompt-btn foreman-btn" data-prompt="__foreman__" title="Foreman playbook pinned to this task">Foreman</button>`;
     }
     for (const key of defaultPromptKeys) {
       const name = promptMeta[key] || key;
@@ -223,7 +226,13 @@
 
       state.phase = 'generating';
       state.activeLabel = label;
-      state.activeLabelName = label === '__ai__' ? 'AI Recommend' : (opts.promptMeta[label] || label);
+      if (label === '__ai__') {
+        state.activeLabelName = 'AI Recommend';
+      } else if (label === '__foreman__') {
+        state.activeLabelName = 'Foreman';
+      } else {
+        state.activeLabelName = opts.promptMeta[label] || label;
+      }
       render();
 
       const apiPrefix = opts.urlKey ? `/workspace/${encodeURIComponent(opts.urlKey)}` : '';
@@ -236,6 +245,21 @@
             throw new Error(error.error || 'Failed to load prompt');
           }
           await handleStreamingResponse(response, label, ac);
+        } else if (label === '__foreman__') {
+          const response = await fetch(`${apiPrefix}/api/foreman-prompt/${issueId}`, { signal: ac.signal });
+          if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to load foreman prompt');
+          }
+          const result = await response.json();
+          if (abortController !== ac || destroyed) return;
+          const html = renderMarkdown(result.prompt);
+          const entry = { label, name: result.promptName || 'Foreman', raw: result.prompt, html };
+          promptCache.set(`${issueId}:${label}`, entry);
+          lastPromptLabel.set(issueId, label);
+          state.phase = 'fresh';
+          state.result = entry;
+          render();
         } else {
           const response = await fetch(`${apiPrefix}/api/prompt/${issueId}/${encodeURIComponent(label)}`, { signal: ac.signal });
           if (!response.ok) {
