@@ -21,7 +21,7 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('.settings-header:has-text("Workflow")')).toBeVisible();
 
     // All feature toggle labels should be present (split across sections)
-    await expect(page.locator('.feature-toggle-label:has-text("Linear references in prompts")')).toBeVisible();
+    await expect(page.locator('.feature-toggle-label:has-text("Use Linear MCP")')).toBeVisible();
     await expect(page.locator('.feature-toggle-label:has-text("Feature branch workflow")')).toBeVisible();
     await expect(page.locator('.feature-toggle-label:has-text("Code review before completing")')).toBeVisible();
     await expect(page.locator('.feature-toggle-label:has-text("Dispatch queue")')).toBeVisible();
