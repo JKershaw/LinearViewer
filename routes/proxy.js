@@ -26,6 +26,7 @@ import { generatePrompt, hasPrompt } from '../lib/prompt-templates.js';
 import { parseRepoFromDescription } from '../lib/prompt-formatters.js';
 import { buildForemanPlaybook } from '../lib/prompts/foreman-playbook.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
+import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
 
 // Lazy-load test fixtures only in test mode to avoid production dependency on test files
 let testMockData = null;
@@ -153,7 +154,6 @@ const proxyTokenCreationLimiter = rateLimit({
   skip: () => process.env.NODE_ENV === 'test'
 });
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_NAME_LENGTH = 1000;
 const MAX_SEARCH_LENGTH = 500;
 const MAX_DESCRIPTION_LENGTH = 100000;
@@ -1095,7 +1095,7 @@ ${readEndpoints}${writeEndpoints}
       const { issueId } = req.params;
 
       // Allow UUID or identifier (e.g., "LIN-123")
-      if (!UUID_REGEX.test(issueId) && !/^[A-Z]+-\d+$/i.test(issueId)) {
+      if (!isValidIssueId(issueId)) {
         logEvent(req, '/api/proxy/issue', 400);
         return res.status(400).json({ error: 'Invalid issue ID format' });
       }
@@ -1285,7 +1285,7 @@ ${readEndpoints}${writeEndpoints}
       }
 
       const { issueId } = req.params;
-      if (!UUID_REGEX.test(issueId) && !/^[A-Z]+-\d+$/i.test(issueId)) {
+      if (!isValidIssueId(issueId)) {
         logEvent(req, '/api/proxy/relations', 400);
         return res.status(400).json({ error: 'Invalid issue ID format' });
       }
@@ -1388,7 +1388,7 @@ ${readEndpoints}${writeEndpoints}
       }
 
       const { issueId } = req.params;
-      if (!UUID_REGEX.test(issueId) && !/^[A-Z]+-\d+$/i.test(issueId)) {
+      if (!isValidIssueId(issueId)) {
         logEvent(req, '/api/proxy/issue', 400);
         return res.status(400).json({ error: 'Invalid issue ID format' });
       }
@@ -1452,7 +1452,7 @@ ${readEndpoints}${writeEndpoints}
       }
 
       const { issueId } = req.params;
-      if (!UUID_REGEX.test(issueId) && !/^[A-Z]+-\d+$/i.test(issueId)) {
+      if (!isValidIssueId(issueId)) {
         return res.status(400).json({ error: 'Invalid issue ID format' });
       }
 
@@ -1496,7 +1496,7 @@ ${readEndpoints}${writeEndpoints}
       }
 
       const { issueId } = req.params;
-      if (!UUID_REGEX.test(issueId) && !/^[A-Z]+-\d+$/i.test(issueId)) {
+      if (!isValidIssueId(issueId)) {
         return res.status(400).json({ error: 'Invalid issue ID format' });
       }
 
@@ -1507,7 +1507,7 @@ ${readEndpoints}${writeEndpoints}
         return res.status(400).json({ error: `type must be one of: ${validTypes.join(', ')}` });
       }
 
-      if (!relatedIssueId || (!UUID_REGEX.test(relatedIssueId) && !/^[A-Z]+-\d+$/i.test(relatedIssueId))) {
+      if (!relatedIssueId || !isValidIssueId(relatedIssueId)) {
         return res.status(400).json({ error: 'Valid relatedIssueId is required' });
       }
 
@@ -1549,7 +1549,7 @@ ${readEndpoints}${writeEndpoints}
       }
 
       const { issueId } = req.params;
-      if (!UUID_REGEX.test(issueId) && !/^[A-Z]+-\d+$/i.test(issueId)) {
+      if (!isValidIssueId(issueId)) {
         return res.status(400).json({ error: 'Invalid issue ID format' });
       }
 
@@ -1602,7 +1602,7 @@ ${readEndpoints}${writeEndpoints}
       }
 
       const { issueId, labelId } = req.params;
-      if (!UUID_REGEX.test(issueId) && !/^[A-Z]+-\d+$/i.test(issueId)) {
+      if (!isValidIssueId(issueId)) {
         return res.status(400).json({ error: 'Invalid issue ID format' });
       }
       if (!UUID_REGEX.test(labelId)) {
@@ -1780,7 +1780,7 @@ ${readEndpoints}${writeEndpoints}
       const { identifier, templateKey } = req.params;
 
       // Validate identifier format (UUID or LIN-123 pattern)
-      if (!UUID_REGEX.test(identifier) && !/^[A-Z]+-\d+$/i.test(identifier)) {
+      if (!isValidIssueId(identifier)) {
         logEvent(req, '/api/proxy/prompt', 400);
         return res.status(400).json({ error: 'Invalid identifier format' });
       }
@@ -1879,7 +1879,7 @@ ${readEndpoints}${writeEndpoints}
       const { identifier } = req.params;
 
       // Validate identifier format (UUID or LIN-123 pattern)
-      if (!UUID_REGEX.test(identifier) && !/^[A-Z]+-\d+$/i.test(identifier)) {
+      if (!isValidIssueId(identifier)) {
         logEvent(req, '/api/proxy/recommend', 400);
         return res.status(400).json({ error: 'Invalid identifier format' });
       }
@@ -2004,7 +2004,7 @@ ${readEndpoints}${writeEndpoints}
       }
 
       const { identifier } = req.params;
-      if (!UUID_REGEX.test(identifier) && !/^[A-Z]+-\d+$/i.test(identifier)) {
+      if (!isValidIssueId(identifier)) {
         logEvent(req, '/api/proxy/recap', 400);
         return res.status(400).json({ error: 'Invalid identifier format' });
       }
@@ -2133,7 +2133,7 @@ ${readEndpoints}${writeEndpoints}
       }
 
       const { identifier } = req.params;
-      if (!UUID_REGEX.test(identifier) && !/^[A-Z]+-\d+$/i.test(identifier)) {
+      if (!isValidIssueId(identifier)) {
         logEvent(req, '/api/proxy/recap', 400);
         return res.status(400).json({ error: 'Invalid identifier format' });
       }

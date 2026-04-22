@@ -18,7 +18,7 @@ import { isRecommendationEnabled, getRecommendation, getRecommendationStream, st
 import { generateRecap } from '../lib/recap.js';
 import { hashContext } from '../lib/recap-cache.js';
 import { runAudit, computeAuditFromData } from '../lib/audit.js';
-import { UUID_REGEX } from '../lib/workspace.js';
+import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
 import { testMockTeams, testMockData } from '../tests/fixtures/mock-data.js';
@@ -102,8 +102,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
 
     const { issueId, labelName } = req.params
 
-    // Validate issue ID format (must be valid UUID)
-    if (!UUID_REGEX.test(issueId)) {
+    if (!isValidIssueId(issueId)) {
       return res.status(400).json({ error: 'Invalid issue ID format' })
     }
 
@@ -265,7 +264,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       return res.status(403).json({ error: 'Proxy feature is not enabled' })
     }
 
-    if (!UUID_REGEX.test(issueId)) {
+    if (!isValidIssueId(issueId)) {
       return res.status(400).json({ error: 'Invalid issue ID format' })
     }
 
@@ -362,8 +361,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
 
     const { issueId } = req.params
 
-    // Validate issue ID format (must be valid UUID)
-    if (!UUID_REGEX.test(issueId)) {
+    if (!isValidIssueId(issueId)) {
       return res.status(400).json({ error: 'Invalid issue ID format' })
     }
 
@@ -601,7 +599,7 @@ ${goal}`;
 
     // --- Pre-flight validation (regular HTTP errors) ---
 
-    if (!UUID_REGEX.test(issueId)) {
+    if (!isValidIssueId(issueId)) {
       return res.status(400).json({ error: 'Invalid issue ID format' });
     }
 
@@ -783,8 +781,7 @@ ${goal}`;
     const workspace = req.workspace
     const { issueId } = req.params
 
-    // Validate issue ID format (must be valid UUID)
-    if (!issueId || !UUID_REGEX.test(issueId)) {
+    if (!isValidIssueId(issueId)) {
       return res.status(400).json({ error: 'Invalid issue ID format' })
     }
 
@@ -826,12 +823,6 @@ ${goal}`;
   // Recap API (LIN-261)
   // ===========================================================================
 
-  const IDENTIFIER_REGEX = /^[A-Z]+-\d+$/i;
-
-  function isValidRecapId(id) {
-    return typeof id === 'string' && (UUID_REGEX.test(id) || IDENTIFIER_REGEX.test(id));
-  }
-
   /**
    * GET recap status + body (if fresh).
    *
@@ -842,7 +833,7 @@ ${goal}`;
     const workspace = req.workspace;
     const { issueId } = req.params;
 
-    if (!isValidRecapId(issueId)) {
+    if (!isValidIssueId(issueId)) {
       return res.status(400).json({ error: 'Invalid issue ID format' });
     }
     if (!recapCacheStore) {
@@ -902,7 +893,7 @@ ${goal}`;
     const workspace = req.workspace;
     const { issueId } = req.params;
 
-    if (!isValidRecapId(issueId)) {
+    if (!isValidIssueId(issueId)) {
       return res.status(400).json({ error: 'Invalid issue ID format' });
     }
     if (!recapCacheStore) {

@@ -289,7 +289,7 @@ test.describe('Prompt API', () => {
   });
 
   test('returns 400 for invalid issue ID format', async ({ page }) => {
-    const response = await page.request.get(`${API_PREFIX}/api/prompt/invalid-id/blocked`);
+    const response = await page.request.get(`${API_PREFIX}/api/prompt/INVALID!!!/blocked`);
     expect(response.status()).toBe(400);
 
     const body = await response.json();
@@ -758,7 +758,7 @@ test.describe('Recommendation API', () => {
   });
 
   test('returns 400 for invalid issue ID format', async ({ page }) => {
-    const response = await page.request.get(`${API_PREFIX}/api/recommend/invalid-id`);
+    const response = await page.request.get(`${API_PREFIX}/api/recommend/INVALID!!!`);
     expect(response.status()).toBe(400);
   });
 

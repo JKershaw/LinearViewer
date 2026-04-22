@@ -141,7 +141,7 @@ test.describe('Streaming AI Recommendations - API', () => {
 
   test('returns 400 for invalid issue ID', async ({ page }) => {
     const response = await page.request.get(
-      `${API_PREFIX}/api/recommend/invalid-id/stream`
+      `${API_PREFIX}/api/recommend/INVALID!!!/stream`
     );
     expect(response.status()).toBe(400);
   });

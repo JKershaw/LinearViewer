@@ -772,7 +772,7 @@ test.describe('Workspace API - Foreman Prompt Endpoint', () => {
     const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
 
     const resp = await request.get(
-      '/workspace/test-workspace/api/foreman-prompt/not-a-uuid',
+      '/workspace/test-workspace/api/foreman-prompt/INVALID!!!',
       { headers: { Cookie: cookieHeader } }
     );
     expect(resp.status()).toBe(400);
