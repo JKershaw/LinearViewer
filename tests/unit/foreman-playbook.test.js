@@ -64,9 +64,9 @@ describe('buildForemanPlaybook (targeted at an issue)', () => {
     assert.ok(!text.includes('No more tasks in the stack'));
   });
 
-  test('completion branch stays on the task instead of looping', () => {
+  test('completion branch terminates instead of looping', () => {
     const text = buildForemanPlaybook({ baseUrl: BASE_URL, issue });
-    assert.ok(text.includes('stay on this task until a stop condition is met'));
+    assert.ok(text.includes('STOP — task is complete'));
     assert.ok(!text.includes('post a completion status and go back to step 1'));
   });
 
