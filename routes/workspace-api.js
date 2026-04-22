@@ -282,7 +282,8 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         const mockProject = testMockData.projects.find(p => p.id === mockIssue.project?.id)
         const prompt = buildForemanPlaybook({
           baseUrl,
-          issue: { identifier, title: mockIssue.title }
+          issue: { identifier, title: mockIssue.title },
+          features: { linearMcp: featureFlags.linearMcp === true }
         })
         return res.json({
           label: 'foreman',
@@ -295,7 +296,8 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       const { issue, project } = await fetchIssueContext(workspace.accessToken, issueId)
       const prompt = buildForemanPlaybook({
         baseUrl,
-        issue: { identifier: issue.identifier, title: issue.title }
+        issue: { identifier: issue.identifier, title: issue.title },
+        features: { linearMcp: featureFlags.linearMcp === true }
       })
       res.json({
         label: 'foreman',

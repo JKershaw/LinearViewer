@@ -89,3 +89,59 @@ describe('buildForemanPlaybook (targeted at an issue)', () => {
     assert.ok(text.includes('### 1. Choose a task'));
   });
 });
+
+describe('buildForemanPlaybook (feature.linearMcp)', () => {
+  const issue = { identifier: 'LIN-42', title: 'Fix login bug' };
+
+  test('defaults to curl for Linear writes when no features passed', () => {
+    const text = buildForemanPlaybook({ baseUrl: BASE_URL, issue });
+    assert.ok(text.includes('Make those writes using the proxy endpoints'));
+    assert.ok(text.includes('/api/proxy/issue/{identifier}/comments'));
+    assert.ok(!text.includes('mcp__linear__save_comment'));
+  });
+
+  test('defaults to curl when linearMcp is explicitly false', () => {
+    const text = buildForemanPlaybook({
+      baseUrl: BASE_URL,
+      issue,
+      features: { linearMcp: false }
+    });
+    assert.ok(text.includes('Make those writes using the proxy endpoints'));
+    assert.ok(!text.includes('mcp__linear__save_comment'));
+  });
+
+  test('instructs MCP for Linear writes when linearMcp is true', () => {
+    const text = buildForemanPlaybook({
+      baseUrl: BASE_URL,
+      issue,
+      features: { linearMcp: true }
+    });
+    assert.ok(text.includes('Use the Linear MCP tools for all Linear writes'));
+    assert.ok(text.includes('mcp__linear__save_comment'));
+    assert.ok(text.includes('mcp__linear__save_issue'));
+    assert.ok(text.includes('Make those writes using the Linear MCP tools'));
+  });
+
+  test('MCP mode still keeps orchestration calls on curl', () => {
+    const text = buildForemanPlaybook({
+      baseUrl: BASE_URL,
+      issue,
+      features: { linearMcp: true }
+    });
+    assert.ok(text.includes(`${BASE_URL}/api/proxy/stack`) || text.includes('/api/proxy/stack?limit=5') || text.includes('curl'));
+    assert.ok(text.includes(`${BASE_URL}/api/proxy/recap`));
+    assert.ok(text.includes(`${BASE_URL}/api/proxy/recommend`));
+    assert.ok(text.includes(`${BASE_URL}/api/proxy/foreman/status`));
+    assert.ok(text.includes('Orchestration endpoints'));
+  });
+
+  test('MCP mode omits the curl heredoc write examples', () => {
+    const text = buildForemanPlaybook({
+      baseUrl: BASE_URL,
+      issue,
+      features: { linearMcp: true }
+    });
+    assert.ok(!text.includes('/tmp/comment.json'));
+    assert.ok(!text.includes('/api/proxy/issue/{identifier}/comments'));
+  });
+});
