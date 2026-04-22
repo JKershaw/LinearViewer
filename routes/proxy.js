@@ -628,38 +628,28 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanSto
   }
 
   /**
-   * Extract a safe, human-readable error message from a GraphQL error.
-   * graphql-request stores the server errors in err.response.errors.
+   * Extract a human-readable error message from a GraphQL error.
    *
-   * Sanitizes the message to avoid leaking internal schema structures
-   * or validation details to external consumers.
+   * graphql-request splits errors into two buckets:
+   *  - err.response.errors[].message  → originated from Linear's GraphQL
+   *    response. These describe resource state or API misuse and are safe
+   *    to pass through — callers (especially autonomous agents) need them
+   *    to self-diagnose.
+   *  - err.message                    → network / fetch / parse failure,
+   *    potentially containing internal stack traces or proxy-level details.
+   *    Log server-side and return a generic message to the caller.
    */
   function graphqlErrorDetail(err) {
     if (err.name === 'TimeoutError' || err.name === 'AbortError') {
       return 'Linear API request timed out — the response may be too large or Linear is slow. Try a more specific query.';
     }
+
     const gqlMessage = err.response?.errors?.[0]?.message;
-    const raw = gqlMessage || err.message || 'Unknown error';
-
-    // Strip messages that could reveal internal schema or field details.
-    // Keep common user-facing messages (not found, permission, validation).
-    const safePatterns = [
-      /not found/i,
-      /does not exist/i,
-      /permission/i,
-      /unauthorized/i,
-      /forbidden/i,
-      /rate limit/i,
-      /invalid.*id/i,
-      /already exists/i,
-    ];
-
-    if (safePatterns.some(p => p.test(raw))) {
-      return raw;
+    if (gqlMessage) {
+      return gqlMessage;
     }
 
-    // For anything else, return a generic message and log the real one
-    console.error('GraphQL error detail (suppressed from response):', raw);
+    console.error('GraphQL error detail (suppressed from response):', err.message || 'Unknown error');
     return 'Linear API request failed';
   }
 
