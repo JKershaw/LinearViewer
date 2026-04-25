@@ -275,6 +275,45 @@ test.describe('Swipe Page', () => {
     await expect(page.locator('.swipe-card-identifier')).toHaveText('TEST-15');
   });
 
+  test('label filter dropdown lists labels in use', async ({ page }) => {
+    const select = page.locator('.swipe-filter-select');
+    const optionValues = await select.locator('option').evaluateAll(opts => opts.map(o => o.value));
+
+    // Mock data has issues labelled bug, urgent, preparing, feature, blocked
+    expect(optionValues).toContain('label:bug');
+    expect(optionValues).toContain('label:urgent');
+    expect(optionValues).toContain('label:feature');
+  });
+
+  test('selecting a label filter shows only issues with that label', async ({ page }) => {
+    const select = page.locator('.swipe-filter-select');
+    await select.selectOption('label:bug');
+
+    // First card should be a bug
+    const labels = await page.locator('.swipe-card-labels .swipe-label-tag').allTextContents();
+    expect(labels).toContain('bug');
+
+    // Step through every card in the filter and verify each has the bug label
+    const counterText = await page.locator('.swipe-card-position').textContent();
+    const total = parseInt(counterText.match(/\/\s*(\d+)/)[1], 10);
+    expect(total).toBeGreaterThan(0);
+
+    for (let i = 1; i < total; i++) {
+      await page.locator('.swipe-arrow-right').click();
+      const cardLabels = await page.locator('.swipe-card-labels .swipe-label-tag').allTextContents();
+      expect(cardLabels).toContain('bug');
+    }
+  });
+
+  test('label filter preserves swipe sort order (bugs/non-completed first)', async ({ page }) => {
+    const select = page.locator('.swipe-filter-select');
+    await select.selectOption('label:bug');
+
+    // Sort puts completed/canceled last, so first card under "bug" must not be done
+    const stateClass = await page.locator('.swipe-card-status .state').getAttribute('class');
+    expect(stateClass).not.toContain('done');
+  });
+
   test('clicking blocking issue link navigates to that card', async ({ page }) => {
     // Load TEST-15 which blocks TEST-14 (session already set by beforeEach)
     await page.goto(`${SWIPE_URL}/TEST-15`);

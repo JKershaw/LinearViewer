@@ -290,6 +290,82 @@ describe('buildFilterGroups', () => {
     assert.ok(soloGroup, 'project filter should appear');
     assert.strictEqual(soloGroup.count, 1);
   });
+
+  test('includes a label filter for every label in use', () => {
+    const cards = [
+      createCard({ id: 'a', labels: ['bug'] }),
+      createCard({ id: 'b', labels: ['feature'] }),
+      createCard({ id: 'c', labels: ['bug', 'urgent'] }),
+    ];
+    const groups = buildFilterGroups(cards);
+    assert.ok(groups.find(g => g.key === 'label:bug'));
+    assert.ok(groups.find(g => g.key === 'label:feature'));
+    assert.ok(groups.find(g => g.key === 'label:urgent'));
+  });
+
+  test('label count equals number of issues carrying that label', () => {
+    const cards = [
+      createCard({ id: 'a', labels: ['bug'] }),
+      createCard({ id: 'b', labels: ['bug'] }),
+      createCard({ id: 'c', labels: ['feature'] }),
+    ];
+    const groups = buildFilterGroups(cards);
+    assert.strictEqual(groups.find(g => g.key === 'label:bug').count, 2);
+    assert.strictEqual(groups.find(g => g.key === 'label:feature').count, 1);
+  });
+
+  test('issue with multiple labels contributes to each group', () => {
+    const cards = [
+      createCard({ id: 'a', labels: ['bug', 'urgent'] }),
+    ];
+    const groups = buildFilterGroups(cards);
+    assert.strictEqual(groups.find(g => g.key === 'label:bug').count, 1);
+    assert.strictEqual(groups.find(g => g.key === 'label:urgent').count, 1);
+  });
+
+  test('does not include label entries when no issues carry labels', () => {
+    const cards = [
+      createCard({ id: 'a', labels: [] }),
+      createCard({ id: 'b', labels: [] }),
+    ];
+    const groups = buildFilterGroups(cards);
+    assert.ok(!groups.some(g => g.key.startsWith('label:')));
+  });
+
+  test('skips empty-string label names', () => {
+    const cards = [
+      createCard({ id: 'a', labels: ['', 'bug'] }),
+    ];
+    const groups = buildFilterGroups(cards);
+    assert.ok(!groups.some(g => g.key === 'label:'));
+    assert.ok(groups.find(g => g.key === 'label:bug'));
+  });
+
+  test('deduplicates a label that appears twice on the same issue', () => {
+    const cards = [
+      createCard({ id: 'a', labels: ['bug', 'bug'] }),
+      createCard({ id: 'b', labels: ['bug'] }),
+    ];
+    const groups = buildFilterGroups(cards);
+    assert.strictEqual(groups.find(g => g.key === 'label:bug').count, 2);
+  });
+
+  test('label entries appear after project entries, sorted by count desc then name asc', () => {
+    const cards = [
+      createCard({ id: 'a', projectName: 'Alpha', labels: ['feature'] }),
+      createCard({ id: 'b', projectName: 'Alpha', labels: ['bug'] }),
+      createCard({ id: 'c', projectName: 'Alpha', labels: ['bug'] }),
+      createCard({ id: 'd', projectName: 'Alpha', labels: ['atlas'] }),
+    ];
+    const groups = buildFilterGroups(cards);
+    const projectIdx = groups.findIndex(g => g.key.startsWith('project:'));
+    const firstLabelIdx = groups.findIndex(g => g.key.startsWith('label:'));
+    assert.ok(firstLabelIdx > projectIdx, 'label filters appear after project filters');
+
+    const labelKeys = groups.filter(g => g.key.startsWith('label:')).map(g => g.key);
+    // bug (2) first; then atlas, feature alphabetically (both 1)
+    assert.deepStrictEqual(labelKeys, ['label:bug', 'label:atlas', 'label:feature']);
+  });
 });
 
 // =============================================================================
