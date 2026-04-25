@@ -148,6 +148,9 @@ function applyFilter(filterKey) {
     const started = projectIssues.filter(i => i.stateType === 'started');
     const rest = projectIssues.filter(i => i.stateType !== 'started');
     filteredIssues = [...started, ...rest];
+  } else if (filterKey.startsWith('label:')) {
+    const labelName = filterKey.slice(6);
+    filteredIssues = allIssues.filter(i => (i.labels || []).includes(labelName));
   } else {
     filteredIssues = allIssues;
   }
