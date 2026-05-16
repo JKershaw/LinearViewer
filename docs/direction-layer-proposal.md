@@ -2,6 +2,14 @@
 
 *A thinking document. Last updated May 2026.*
 
+> **2026-05-16 revision note.** An earlier draft described the Ship view as
+> "unbuilt" and the Roadmap feature as "shelved." Both were stale: the Ship
+> view exists as a working prototype (`lib/ship-layout.js`, `lib/render-ship.js`)
+> with a deterministic `heading` primitive that routes cards to its FORWARD
+> sector, and the Roadmap is a complete feature behind the `roadmap` flag
+> (default off), with deterministic + LLM layers already wired. This revision
+> updates the framing to reconcile what exists with what the MVP needs to add.
+
 ## Summary
 
 LinearViewer is an experimental workbench for orchestrating AI coding agents against a Linear backlog. Through daily use, a structural gap has emerged: the project has many views that show *what* work exists, but none that show *whether the work is pointed anywhere worth going*. This document argues that gap reflects a broader shift — AI-augmented development has moved the bottleneck of software work from execution to direction-setting — and proposes a small experiment as the first step toward closing it: a "north star" document plus an LLM analyzer with read-only Linear access, producing both alignment scoring of current work and feedback on the quality of the north star itself. It's framed as the MVP for what would later become a fuller direction layer, eventually visualized by the unbuilt Ship view.
@@ -51,9 +59,11 @@ LinearViewer was built for the lower layers. The direction layer is where it now
 The project has, without naming it, been building two kinds of instrument:
 
 - **State views** (tree, swipe, swim, pipeline) — legibility of where work currently is
-- **Direction views** (the unbuilt Ship view) — legibility of whether work is pointed at the goal
+- **Direction views** (the Ship view prototype) — legibility of whether work is pointed at the goal
 
 These read from different layers. State views read the task graph from Linear. A direction view would need an additional input: the goal itself.
+
+The Ship prototype already encodes the *shape* of a direction view: a central rect for in-progress, a reserved FORWARD sector for whatever the goal is, port/starboard for projects, aft for bugs, drift for unassigned work. What it doesn't yet have is a non-task-shaped source of goal-ness. Today its `heading` is configurable to a Linear project or label — deterministic, cheap, but inheriting exactly the task-shaped pathologies described below. The MVP in this document is the missing intent input the prototype's FORWARD sector is waiting for.
 
 Linear doesn't have a primitive for that. Its data model is built around things that get finished — tasks, projects, milestones, cycles. A goal isn't shaped like any of those. It's *unbounded, ongoing, normative* — the measure against which tasks are judged, not a thing to be completed. Trying to express it as a Linear task is a category error: it would inherit task-shaped pathologies (can be archived, can be marked done, can be deprioritized) precisely because Linear is built around things that get finished.
 
@@ -79,10 +89,10 @@ Track record still has a role, just a different one: it becomes a **sensor**, no
 The MVP for a direction layer is small. It doesn't need a new visualization. It doesn't need tag-based grouping. It doesn't need feedback mechanisms that close the loop. It needs:
 
 1. A north star document (prose, markdown, stored alongside the project)
-2. An LLM with read-only Linear tool access
+2. An LLM analyzer that reads current Linear state (via the existing deterministic summary, not live tool calls) and scores it against the north star
 3. A UI surface to invoke it and display results
 
-The shelved Roadmap feature is a gift here. It provides UI scaffolding for displaying LLM-generated summaries, and probably the prompt/tool-call infrastructure that fed it. The repurposing is small: the north star is the new input, and the LLM's job changes from *describe what's there* to *judge it against intent*.
+The Roadmap feature — currently behind the `roadmap` feature flag (default off) — is a gift here. It already has: a deterministic layer (`lib/roadmap.js`) that summarises velocity, execution queue, critical paths, risks, blockers, and stale-task signals; a page renderer with AI-populated sections; and two SSE-streaming LLM endpoints (`narrative`, `chat`) that both feed the model a pre-computed text snapshot. The repurposing is small: the north star is the new input, and the LLM's job changes from *describe what's there* to *judge it against intent*. The same summarization pattern carries over — the model reads text, not tools.
 
 ### The two buttons
 
@@ -117,14 +127,16 @@ Same model. Same data. Dual operation, single feature.
 
 For the first pass, the north star can be a file on disk that I copy in and out of a text input on the Roadmap page. No CRUD UI, no editor, no versioning. The point is to validate the loop, not to build a north star management system. Once the loop is validated, the storage and UI can mature.
 
-The heavier work is in how the LLM is invoked. The existing Roadmap LLM call needs to be rewritten to:
+The heavier work is in how the LLM is invoked. Two new prompts plug into the existing `streamChat` infrastructure:
 
 1. Accept the north star as primary input
-2. Use read-only Linear tool calls to gather current state (issues, statuses, recent activity, labels)
-3. Produce structured output for either the forward or backward analysis
-4. Be cheap enough to run repeatedly during a working day
+2. Receive the deterministic Linear summary (the same one the Roadmap narrative consumes — already token-efficient and grounded)
+3. Produce structured output for either the forward or backward analysis, with per-item alignment classifications legible enough to drive downstream consumers (including, eventually, the Ship view's FORWARD sector)
+4. Be cheap enough to run repeatedly during a working day — the default model (`anthropic/claude-haiku-4.5`) is sized for this
 
 That last point matters more than it sounds. The value of the direction layer is partly continuous attention — drift detected weekly is much less useful than drift detected daily. If a reading costs cents and takes seconds, it gets run. If it costs dollars and takes minutes, it doesn't.
+
+Choosing snapshot-summarization over live tool calls is deliberate: the deterministic layer already produces a compact, faithful representation of current state, and feeding it as text keeps each reading a single API call with no agentic recursion. Tool calls remain an option if a future iteration needs drill-down (e.g. fetching a specific issue's comments to judge alignment) — but the MVP doesn't.
 
 ## Risks and open questions
 
@@ -138,9 +150,11 @@ That last point matters more than it sounds. The value of the direction layer is
 
 ## Future: ship view and beyond
 
-The proposal above is deliberately upstream of the Ship view. The Ship view, as previously sketched, is a centripetal visualization: a central square representing the project, with quadrants for incoming features/value (front), trailing bugs (rear), internal pressure (port), and external pressure (starboard). Items gravitate toward the center as priority rises; blockers are shown as edges. Crucially, the forward lane is defined by *alignment with the north star*, not by category — a feature ticket that doesn't move a KPI doesn't earn front-lane status.
+The proposal above is deliberately upstream of the Ship view's *intent layer*, but not of the visualization itself — that already exists as a prototype. The Ship view is a centripetal visualization: a central rect for in-progress items, a reserved FORWARD sector for whatever the goal is, port/starboard quadrants subdivided by project, an aft sector for bugs, and a drift rim for unassigned work. The prototype's current `heading` primitive accepts a Linear project or label and routes matching cards to FORWARD by deterministic string match. That works, but it's exactly the task-shaped category error the proposal warns about: a Linear primitive standing in for an intent, with the empty FORWARD arc as the only honest signal when the heading doesn't fit.
 
-That visualization remains the long-term target. But it depends on inputs the MVP is designed to produce: the LLM's alignment scoring is what determines whether an item belongs on the front lane vs a side. So the right sequencing is to build and validate the scoring first, *then* visualize. If the scoring works, the Ship view becomes a visualization of the MVP's output rather than a new system. If the scoring doesn't work, the Ship view would have been a beautifully-rendered display of bad data.
+The intended state is for the forward lane to be defined by *alignment with the north star*, not by category — a feature ticket that doesn't move a KPI doesn't earn front-lane status. The MVP produces exactly the signal that would replace the prototype's heading: per-item front/side/rear/archive classifications from the LLM analyzer, which `assignLane` can consume as a third `heading.kind: 'north-star'` mode alongside the existing `'project'` and `'label'`.
+
+So the right sequencing is to build and validate the scoring first, then wire it into the existing Ship view as an additional heading source. If the scoring works, the Ship prototype becomes a visualization of the MVP's output rather than the current heuristic. If the scoring doesn't work, the prototype is unaffected — it falls back to the project/label heading it already supports.
 
 Two things worth noting about the future direction:
 
