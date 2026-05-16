@@ -32,7 +32,7 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   //   ?openRouterConnected=true - Set up OpenRouter API key in session
   //   ?freeTierEnabled=true     - Simulate free tier mode (no OAuth, no env key)
   router.get('/test/set-session', (req, res) => {
-    const { tokenExpired, noRefreshToken, multiWorkspace, maxWorkspaces, openRouterConnected, freeTierEnabled, features, swimSample, patMode } = req.query
+    const { tokenExpired, noRefreshToken, multiWorkspace, maxWorkspaces, openRouterConnected, freeTierEnabled, features, swimSample, shipSample, patMode } = req.query
 
     // Base workspace configuration - IDs must be valid UUIDs to pass validation
     const createWorkspace = (id, name, urlKey) => ({
@@ -121,6 +121,14 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       req.session.swimSample = true
     } else {
       delete req.session.swimSample
+    }
+
+    // Dense ship sample (8 projects, 6 WIP, ~36 cards) for stress-testing the
+    // Ship view's layout at realistic density.
+    if (shipSample) {
+      req.session.shipSample = true
+    } else {
+      delete req.session.shipSample
     }
 
     // Explicitly save session before responding to ensure it's persisted

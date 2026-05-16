@@ -40,6 +40,7 @@ import { createWorkspaceApiRoutes } from './routes/workspace-api.js'
 import { createLegacyRedirects } from './routes/legacy-redirects.js'
 import { testMockTeams, testMockData } from './tests/fixtures/mock-data.js'
 import { swimSampleData } from './tests/fixtures/swim-sample-data.js'
+import { shipDenseSampleData } from './tests/fixtures/ship-dense-sample-data.js'
 import { renderAuditPage } from './lib/render-audit.js'
 import { renderPrivacyPolicy, renderTermsOfService } from './lib/render-legal.js'
 import { renderSettingsPage } from './lib/render-settings.js'
@@ -48,6 +49,7 @@ import { renderCustomPromptsPage } from './lib/render-custom-prompts.js'
 import { renderDispatchPage } from './lib/render-dispatch.js'
 import { renderSwipePage } from './lib/render-swipe.js'
 import { renderSwimPage } from './lib/render-swim.js'
+import { renderShipPage } from './lib/render-ship.js'
 import { createPipelineRoutes } from './routes/pipeline.js'
 import { renderRoadmapPage } from './lib/render-roadmap.js'
 import { calculateVelocity, buildExecutionQueue, groupByProject, projectTimeline, findCriticalPaths, assessRisks, analyzeRoadmap, issueToRoadmapCard } from './lib/roadmap.js'
@@ -597,6 +599,25 @@ app.get('/swim', (req, res) => {
   res.send(html)
 })
 
+/**
+ * Landing ship page — unauthenticated preview of the radial Ship view.
+ * For authenticated users: redirects to their workspace ship page.
+ * Prototype: not linked from navigation.
+ */
+app.get('/ship', (req, res) => {
+  const workspace = req.session.workspaces?.[0]
+
+  if (workspace) {
+    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/ship`)
+  }
+
+  const html = renderShipPage(
+    { projectTrees: landingTrees, inProgressTrees: [], recentActivityTrees: [] },
+    { isLanding: true, deployInfo: getDeployInfo() }
+  )
+  res.send(html)
+})
+
 // =============================================================================
 // Legal Pages (public, no auth required)
 // =============================================================================
@@ -914,6 +935,52 @@ app.get('/workspace/:urlKey/swim', workspaceFromUrl, async (req, res) => {
     const html = renderErrorPage('Something Went Wrong', 'Could not load your tasks. Please try again.', {
       action: 'Try again',
       actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/swim`
+    });
+    res.status(500).send(html);
+  }
+});
+
+/**
+ * Ship page - requires authentication.
+ * Radial view: in-progress items at the centre, everything else orbiting by priority and sector.
+ * Prototype: not linked from navigation.
+ */
+app.get('/workspace/:urlKey/ship', workspaceFromUrl, async (req, res) => {
+  const workspace = req.workspace;
+  const deployInfo = getDeployInfo();
+  const openRouterSource = getOpenRouterSource(req);
+  const rawTeam = req.query.team;
+  const teamId = rawTeam && rawTeam !== 'all' && UUID_REGEX.test(rawTeam) ? rawTeam : null;
+
+  try {
+    // shipSample = dense fixture (8 projects, 6 WIP, ~36 cards) for density tests.
+    // swimSample = leaner fixture reused from the swim view.
+    const mockOverride = req.session.shipSample ? shipDenseSampleData
+      : req.session.swimSample ? swimSampleData
+      : null;
+    const { trees, inProgressTrees, recentActivityTrees, organizationName } =
+      await fetchAndPrepareProjects(workspace.accessToken, teamId, mockOverride);
+    const html = renderShipPage(
+      { projectTrees: trees, inProgressTrees, recentActivityTrees, organizationName },
+      {
+        deployInfo,
+        urlKey: workspace.urlKey,
+        openRouterSource,
+        workspaces: req.session.workspaces,
+        featureFlags: getFeatureFlags(req.session)
+      }
+    );
+    res.send(html);
+  } catch (error) {
+    console.error('Ship page error:', error);
+
+    if (error.response?.status === 401) {
+      return handleUnauthorizedError(workspace, req.session, teamId, openRouterSource, res);
+    }
+
+    const html = renderErrorPage('Something Went Wrong', 'Could not load your tasks. Please try again.', {
+      action: 'Try again',
+      actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/ship`
     });
     res.status(500).send(html);
   }

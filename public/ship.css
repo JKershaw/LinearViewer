@@ -1,0 +1,291 @@
+/* ==========================================================================
+   Ship Page — Radial view
+   ========================================================================== */
+
+body:has(.ship-page) {
+  max-width: none;
+  overflow: hidden; /* the .ship-page itself owns scrolling */
+}
+
+.ship-page {
+  position: relative;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  cursor: grab;
+  /* Fill remaining viewport beneath navbar; height tweaked once nav is measured. */
+  height: calc(100vh - 56px);
+  background: var(--bg, #fff);
+}
+
+.ship-page:active {
+  cursor: grabbing;
+}
+
+/* ==========================================================================
+   Canvas — radial coord space, larger than viewport so user can scroll around
+   ========================================================================== */
+
+.ship-canvas {
+  position: relative;
+  /* Sized by client JS based on outermost ring + buffer. */
+  margin: 0 auto;
+  min-width: 100%;
+  min-height: 100%;
+}
+
+/* ==========================================================================
+   Ship — central rectangle holding in-progress items.
+   Max 2 cards wide, grows in length along the bow→stern (vertical) axis.
+   ========================================================================== */
+
+.ship-rect {
+  position: absolute;
+  /* Top-left, width, height, and padding all set inline by client JS so the
+     rect's footprint exactly matches computeShipDimensions() output. */
+  border: 1.5px solid #2c3e50;
+  border-radius: 4px;
+  background: rgba(44, 62, 80, 0.04);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-sizing: border-box;
+  z-index: 5;
+}
+
+.ship-rect-label {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 9px;
+  color: #2c3e50;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.6;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.ship-rect-cards {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.ship-rect-empty {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 11px;
+  color: var(--fg-dim, #888);
+  text-align: center;
+  padding: 1rem 0.5rem;
+  font-style: italic;
+  grid-column: 1 / -1;
+}
+
+/* ==========================================================================
+   Orbit — cards positioned absolutely around the ship.
+   ========================================================================== */
+
+.ship-orbit {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none; /* let cards opt back in */
+}
+
+.ship-orbit .swim-box {
+  position: absolute;
+  pointer-events: auto;
+  /* JS sets left/top to the centre of the card; this transform centres the box on that point. */
+  transform: translate(-50%, -50%);
+  width: 160px;
+  max-width: 160px;
+  font-size: 11px;
+  z-index: 3;
+}
+
+/* Inside the ship rect, override the absolute positioning (cards flow in the grid). */
+.ship-rect-cards .swim-box {
+  position: static;
+  transform: none;
+  width: auto;
+  max-width: none;
+}
+
+/* ==========================================================================
+   Sector hints — very subtle radial guides so the geometry reads
+   ========================================================================== */
+
+.ship-sector-guide {
+  position: absolute;
+  pointer-events: none;
+  z-index: 1;
+  top: 0; left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.ship-sector-guide circle {
+  fill: none;
+  stroke: rgba(0, 0, 0, 0.16);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+}
+
+.ship-sector-guide line {
+  stroke: rgba(44, 62, 80, 0.45);
+  stroke-width: 1.25;
+  stroke-dasharray: 6 4;
+}
+
+.ship-sector-label {
+  position: absolute;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #2c3e50;
+  background: #fff;
+  border: 1px solid rgba(44, 62, 80, 0.25);
+  padding: 3px 9px;
+  border-radius: 3px;
+  pointer-events: none;
+  z-index: 6; /* above .ship-rect (5) so labels never get clipped by the ship */
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   Heading control — chip above the ship rect + dropdown picker
+   The chip matches .ship-sector-label's register so the heading reads as part
+   of the chart, not a foreign UI surface.
+   ========================================================================== */
+
+.ship-heading-control {
+  position: absolute;
+  /* JS sets left/top to the chip's anchor point above the ship rect. */
+  transform: translate(-50%, -100%);
+  z-index: 7; /* above ship-rect (5) and sector labels (6) */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.ship-heading-chip {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #2c3e50;
+  background: #fff;
+  border: 1px solid rgba(44, 62, 80, 0.25);
+  padding: 3px 9px;
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 120ms ease, color 120ms ease;
+}
+
+.ship-heading-chip:hover {
+  border-color: rgba(44, 62, 80, 0.55);
+}
+
+.ship-heading-chip[data-state="empty"] {
+  color: rgba(44, 62, 80, 0.55);
+  border-style: dashed;
+}
+
+.ship-heading-picker {
+  background: #fff;
+  border: 1px solid rgba(44, 62, 80, 0.25);
+  border-radius: 4px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 220px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.ship-heading-picker.hidden {
+  display: none;
+}
+
+.ship-heading-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 11px;
+  color: #2c3e50;
+}
+
+.ship-heading-row-label {
+  min-width: 56px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-size: 10px;
+  color: rgba(44, 62, 80, 0.7);
+}
+
+.ship-heading-row select {
+  flex: 1;
+  font-family: inherit;
+  font-size: 11px;
+  padding: 3px 6px;
+  border: 1px solid rgba(44, 62, 80, 0.25);
+  border-radius: 3px;
+  background: #fff;
+  color: #2c3e50;
+}
+
+.ship-heading-clear {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(44, 62, 80, 0.7);
+  background: none;
+  border: 1px dashed rgba(44, 62, 80, 0.25);
+  border-radius: 3px;
+  padding: 4px 8px;
+  cursor: pointer;
+  margin-top: 2px;
+}
+
+.ship-heading-clear:hover {
+  color: #2c3e50;
+  border-color: rgba(44, 62, 80, 0.55);
+}
+
+/* ==========================================================================
+   Popover — reuses .swim-popover-* classes from swim.css, no new rules needed.
+   ========================================================================== */
+
+.ship-empty {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  color: var(--fg-dim, #666);
+  font-style: italic;
+  font-size: 13px;
+}
+
+/* ==========================================================================
+   Mobile fallback — degrade to a vertical list, sectors as headings.
+   v1: just make sure nothing breaks. Proper mobile design lives in LIN-270.
+   ========================================================================== */
+
+@media (max-width: 640px) {
+  .ship-orbit .swim-box {
+    width: 130px;
+    max-width: 130px;
+    font-size: 10px;
+  }
+}
