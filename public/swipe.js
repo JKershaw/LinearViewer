@@ -6,6 +6,12 @@
  * embedded as the fourth card accordion.
  */
 
+// Terminal states are non-actionable; mirrored from lib/tree.js (no shared import in public/).
+const TERMINAL_STATES = ['completed', 'canceled', 'duplicate'];
+function isTerminalState(stateType) {
+  return TERMINAL_STATES.includes(stateType);
+}
+
 // ==========================================================================
 // State
 // ==========================================================================
@@ -25,11 +31,10 @@ const proxyEnabled = data.proxyEnabled || false;
 const isLocalhost = data.isLocalhost || false;
 const initialIdentifier = data.initialIdentifier || null;
 
-// Build reverse lookup: issueId → array of issues that block it (incomplete only)
+// Build reverse lookup: issueId → array of issues that block it (non-terminal only)
 const blockedByMap = new Map();
 for (const issue of allIssues) {
-  const isFinished = issue.stateType === 'completed' || issue.stateType === 'canceled';
-  if (isFinished) continue;
+  if (isTerminalState(issue.stateType)) continue;
   for (const blockedId of issue.blocksIds || []) {
     if (!blockedByMap.has(blockedId)) blockedByMap.set(blockedId, []);
     blockedByMap.get(blockedId).push(issue);
@@ -177,6 +182,7 @@ function getStateInfo(stateType) {
   switch (stateType) {
     case 'completed':
     case 'canceled':
+    case 'duplicate':
       return { char: '\u2713', cls: 'done' };
     case 'started':
       return { char: '\u25D0', cls: 'in-progress' };
@@ -261,7 +267,7 @@ function renderCard(direction) {
   // Blocking relationship rows
   const blocksTargets = (issue.blocksIds || [])
     .map(id => issueById.get(id))
-    .filter(i => i && i.stateType !== 'completed' && i.stateType !== 'canceled');
+    .filter(i => i && !isTerminalState(i.stateType));
   const blockedBySources = blockedByMap.get(issue.id) || [];
 
   if (blocksTargets.length > 0) {

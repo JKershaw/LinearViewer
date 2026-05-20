@@ -155,11 +155,12 @@ describe('maxLanes', () => {
 // =============================================================================
 
 describe('showCompleted', () => {
-  test('filters out completed issues by default', () => {
+  test('filters out terminal-state issues by default (completed/canceled/duplicate)', () => {
     const cards = [
       createCard({ id: 'a', stateType: 'unstarted' }),
       createCard({ id: 'b', stateType: 'completed' }),
-      createCard({ id: 'c', stateType: 'canceled' })
+      createCard({ id: 'c', stateType: 'canceled' }),
+      createCard({ id: 'd', stateType: 'duplicate' })
     ];
     const { lanes } = assignLanes(cards);
     const allItems = lanes.flatMap(l => l.items);
@@ -167,14 +168,15 @@ describe('showCompleted', () => {
     assert.strictEqual(allItems[0].id, 'a');
   });
 
-  test('includes completed when showCompleted=true', () => {
+  test('includes completed/duplicate when showCompleted=true', () => {
     const cards = [
       createCard({ id: 'a', stateType: 'unstarted' }),
-      createCard({ id: 'b', stateType: 'completed' })
+      createCard({ id: 'b', stateType: 'completed' }),
+      createCard({ id: 'c', stateType: 'duplicate' })
     ];
     const { lanes } = assignLanes(cards, { showCompleted: true });
     const allItems = lanes.flatMap(l => l.items);
-    assert.strictEqual(allItems.length, 2);
+    assert.strictEqual(allItems.length, 3);
   });
 });
 
@@ -296,6 +298,20 @@ describe('status grouping', () => {
     assert.strictEqual(lanes[1].label, 'Todo');
     assert.strictEqual(lanes[2].label, 'Backlog');
   });
+
+  test('folds duplicate-state issues into the Canceled lane (LIN-276)', () => {
+    const cards = [
+      createCard({ id: 'a', stateType: 'canceled' }),
+      createCard({ id: 'b', stateType: 'duplicate' })
+    ];
+    const { lanes } = assignLanes(cards, { grouping: 'status', maxLanes: 10, showCompleted: true });
+    // Only one lane — both cards merged into 'Canceled'.
+    assert.strictEqual(lanes.length, 1);
+    assert.strictEqual(lanes[0].label, 'Canceled');
+    assert.strictEqual(lanes[0].items.length, 2);
+    const ids = lanes[0].items.map(i => i.id).sort();
+    assert.deepStrictEqual(ids, ['a', 'b']);
+  });
 });
 
 // =============================================================================
@@ -323,10 +339,11 @@ describe('edge cases', () => {
     assert.strictEqual(lanes[0].items.length, 1);
   });
 
-  test('all issues completed with showCompleted=false returns empty', () => {
+  test('all issues in terminal state with showCompleted=false returns empty', () => {
     const cards = [
       createCard({ id: 'a', stateType: 'completed' }),
-      createCard({ id: 'b', stateType: 'canceled' })
+      createCard({ id: 'b', stateType: 'canceled' }),
+      createCard({ id: 'c', stateType: 'duplicate' })
     ];
     const { lanes } = assignLanes(cards, { showCompleted: false });
     assert.deepStrictEqual(lanes, []);

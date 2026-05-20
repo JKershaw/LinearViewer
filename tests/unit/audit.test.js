@@ -475,6 +475,36 @@ describe('Completed Tasks Exclusion', () => {
     assert.strictEqual(report.health.noAssignee.count, 0);
   });
 
+  test('excludes duplicate tasks from health checks (LIN-276)', () => {
+    const dataWithDuplicateTask = {
+      teams: [],
+      projects: [],
+      workflowStates: [],
+      labels: [],
+      issues: [
+        {
+          id: 'i1',
+          title: 'Duplicate task',
+          description: '',
+          project: null,
+          state: { name: 'Duplicate', type: 'duplicate' },
+          assignee: null,
+          estimate: null,
+          dueDate: null,
+          labels: { nodes: [] }
+        }
+      ]
+    };
+
+    const report = computeAuditFromData(dataWithDuplicateTask);
+
+    // Duplicate task should be treated identically to canceled — not flagged.
+    assert.strictEqual(report.health.orphans.count, 0);
+    assert.strictEqual(report.health.unlabeled.count, 0);
+    assert.strictEqual(report.health.shortDescription.count, 0);
+    assert.strictEqual(report.health.noAssignee.count, 0);
+  });
+
   test('still counts completed tasks in state totals', () => {
     const dataWithCompletedTasks = {
       teams: [],

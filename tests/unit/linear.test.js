@@ -169,10 +169,20 @@ describe('selectFocusSubtask', () => {
       assert.strictEqual(result.id, '2');
     });
 
-    test('returns null when all tasks are completed', () => {
+    test('returns null when all tasks are in terminal states', () => {
       const children = [
         { id: '1', identifier: 'LIN-1', state: { type: 'completed' } },
-        { id: '2', identifier: 'LIN-2', state: { type: 'canceled' } }
+        { id: '2', identifier: 'LIN-2', state: { type: 'canceled' } },
+        { id: '3', identifier: 'LIN-3', state: { type: 'duplicate' } }
+      ];
+      const result = selectFocusSubtask(children);
+      assert.strictEqual(result, undefined);
+    });
+
+    test('skips duplicate tasks in fallback (LIN-276)', () => {
+      // Only a duplicate child — fallback must not select it.
+      const children = [
+        { id: '1', identifier: 'LIN-1', state: { type: 'duplicate' } }
       ];
       const result = selectFocusSubtask(children);
       assert.strictEqual(result, undefined);
@@ -441,6 +451,18 @@ describe('isBlocked', () => {
           nodes: [{
             type: 'blocks',
             issue: { id: 'blocker', state: { type: 'canceled' } }
+          }]
+        }
+      };
+      assert.strictEqual(isBlocked(issue), false);
+    });
+
+    test('returns false when blocker is duplicate (LIN-276)', () => {
+      const issue = {
+        inverseRelations: {
+          nodes: [{
+            type: 'blocks',
+            issue: { id: 'blocker', state: { type: 'duplicate' } }
           }]
         }
       };

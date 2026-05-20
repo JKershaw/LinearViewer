@@ -36,16 +36,18 @@ function createCard(overrides = {}) {
 // =============================================================================
 
 describe('sortIssuesForSwipe', () => {
-  test('puts completed/canceled issues last', () => {
+  test('puts terminal-state issues (completed/canceled/duplicate) last', () => {
     const cards = [
       createCard({ id: 'done', stateType: 'completed' }),
       createCard({ id: 'todo', stateType: 'unstarted' }),
       createCard({ id: 'canceled', stateType: 'canceled' }),
+      createCard({ id: 'dup', stateType: 'duplicate' }),
     ];
     sortIssuesForSwipe(cards);
     assert.strictEqual(cards[0].id, 'todo');
-    assert.ok(['done', 'canceled'].includes(cards[1].id));
-    assert.ok(['done', 'canceled'].includes(cards[2].id));
+    // The other three are all terminal and may appear in any order among themselves.
+    const tail = new Set(cards.slice(1).map(c => c.id));
+    assert.deepStrictEqual(tail, new Set(['done', 'canceled', 'dup']));
   });
 
   test('puts bugs before non-bugs within same state group', () => {
@@ -124,6 +126,13 @@ describe('applyBlockingOrder', () => {
     const blocker = createCard({ id: 'blocker', stateType: 'completed', blocksIds: ['blocked'] });
     const blocked = createCard({ id: 'blocked', stateType: 'unstarted' });
     // blocker is completed so its edge is ignored — original order preserved
+    const result = applyBlockingOrder([blocked, blocker]);
+    assert.deepStrictEqual(result.map(i => i.id), ['blocked', 'blocker']);
+  });
+
+  test('ignores blocking edges from duplicate issues (LIN-276)', () => {
+    const blocker = createCard({ id: 'blocker', stateType: 'duplicate', blocksIds: ['blocked'] });
+    const blocked = createCard({ id: 'blocked', stateType: 'unstarted' });
     const result = applyBlockingOrder([blocked, blocker]);
     assert.deepStrictEqual(result.map(i => i.id), ['blocked', 'blocker']);
   });

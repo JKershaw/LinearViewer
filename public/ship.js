@@ -9,6 +9,12 @@
  */
 
 (function () {
+  // Terminal states are non-actionable; mirrored from lib/tree.js (no shared import in public/).
+  var TERMINAL_STATES = ['completed', 'canceled', 'duplicate'];
+  function isTerminalState(stateType) {
+    return TERMINAL_STATES.indexOf(stateType) !== -1;
+  }
+
   // =============================================================================
   // Layout primitives (mirror of lib/ship-layout.js)
   // =============================================================================
@@ -464,7 +470,7 @@
     }
     for (var k2 = 0; k2 < orbitCards.length; k2++) {
       var c2 = orbitCards[k2];
-      if (c2.stateType === 'completed' || c2.stateType === 'canceled') {
+      if (isTerminalState(c2.stateType)) {
         ring[c2.id] = OUTERMOST;
       }
     }
@@ -585,8 +591,8 @@
   }
 
   function stateIndicator(stateType) {
+    if (isTerminalState(stateType)) return '<span class="swim-box-state done">✓</span>';
     switch (stateType) {
-      case 'completed': case 'canceled': return '<span class="swim-box-state done">✓</span>';
       case 'started': return '<span class="swim-box-state in-progress">◐</span>';
       case 'backlog': return '<span class="swim-box-state backlog">◌</span>';
       default: return '<span class="swim-box-state todo">○</span>';

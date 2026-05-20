@@ -9,7 +9,13 @@
 // Lane Assignment (client-side copy of lib/swim-lanes.js algorithm)
 // =============================================================================
 
-var SEGMENT_RANK = { started: 0, unstarted: 1, backlog: 2, completed: 3, canceled: 3 };
+// Terminal states are non-actionable; mirrored from lib/tree.js (no shared import in public/).
+var TERMINAL_STATES = ['completed', 'canceled', 'duplicate'];
+function isTerminalState(stateType) {
+  return TERMINAL_STATES.indexOf(stateType) !== -1;
+}
+
+var SEGMENT_RANK = { started: 0, unstarted: 1, backlog: 2, completed: 3, canceled: 3, duplicate: 3 };
 
 function assignLanes(issues, options) {
   options = options || {};
@@ -21,7 +27,7 @@ function assignLanes(issues, options) {
 
   var filtered = showCompleted
     ? issues
-    : issues.filter(function(i) { return i.stateType !== 'completed' && i.stateType !== 'canceled'; });
+    : issues.filter(function(i) { return !isTerminalState(i.stateType); });
 
   if (filtered.length === 0) return { lanes: [], links: [] };
 
@@ -326,7 +332,9 @@ function groupByStatus(issues) {
   var labels = { started: 'In Progress', unstarted: 'Todo', backlog: 'Backlog', completed: 'Done', canceled: 'Canceled' };
   var groups = new Map();
   issues.forEach(function(issue) {
-    var key = issue.stateType || 'unstarted';
+    // Fold duplicate into canceled so the two share a lane (LIN-276).
+    var rawKey = issue.stateType || 'unstarted';
+    var key = rawKey === 'duplicate' ? 'canceled' : rawKey;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(issue);
   });
@@ -741,8 +749,8 @@ function applySettingsToUI(settings) {
 }
 
 function stateIndicator(stateType) {
+  if (isTerminalState(stateType)) return '<span class="swim-box-state done">\u2713</span>';
   switch (stateType) {
-    case 'completed': case 'canceled': return '<span class="swim-box-state done">\u2713</span>';
     case 'started': return '<span class="swim-box-state in-progress">\u25D0</span>';
     case 'backlog': return '<span class="swim-box-state backlog">\u25CC</span>';
     default: return '<span class="swim-box-state todo">\u25CB</span>';
