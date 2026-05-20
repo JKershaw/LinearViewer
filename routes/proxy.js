@@ -20,7 +20,7 @@ import { fetchProjects, fetchIssueContext, fetchRecommendationContext } from '..
 import { isRecommendationEnabled, getRecommendation, DEFAULT_MODEL } from '../lib/openrouter.js';
 import { generateRecap } from '../lib/recap.js';
 import { hashContext } from '../lib/recap-cache.js';
-import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID } from '../lib/tree.js';
+import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, isTerminalState, NO_PROJECT_ID } from '../lib/tree.js';
 import { flattenTrees, sortIssuesForSwipe, applyBlockingOrder, clusterByParent } from '../lib/render-swipe.js';
 import { generatePrompt, hasPrompt } from '../lib/prompt-templates.js';
 import { parseRepoFromDescription } from '../lib/prompt-formatters.js';
@@ -101,7 +101,7 @@ function buildMockRecapFromContext(context) {
     });
   }
   const remainingChildren = (context.children || []).filter(
-    c => c.state?.type !== 'completed' && c.state?.type !== 'canceled'
+    c => !isTerminalState(c.state?.type)
   );
   for (const c of remainingChildren.slice(0, 3)) {
     pending.push({

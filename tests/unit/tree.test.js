@@ -5,7 +5,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { buildForest, buildInProgressForest, NO_PROJECT_ID } from '../../lib/tree.js';
+import { buildForest, buildInProgressForest, NO_PROJECT_ID, isTerminalState, isCompleted, TERMINAL_STATE_TYPES } from '../../lib/tree.js';
 
 // =============================================================================
 // Test Helpers
@@ -217,5 +217,51 @@ describe('buildInProgressForest', () => {
       const projIds = result.map(r => r.projectId).sort();
       assert.deepStrictEqual(projIds, ['proj-1', 'proj-2']);
     });
+  });
+});
+
+// =============================================================================
+// isTerminalState / isCompleted Tests (LIN-276)
+// =============================================================================
+
+describe('isTerminalState', () => {
+  test('returns true for completed', () => {
+    assert.strictEqual(isTerminalState('completed'), true);
+  });
+  test('returns true for canceled', () => {
+    assert.strictEqual(isTerminalState('canceled'), true);
+  });
+  test('returns true for duplicate', () => {
+    assert.strictEqual(isTerminalState('duplicate'), true);
+  });
+  test('returns false for active states', () => {
+    assert.strictEqual(isTerminalState('started'), false);
+    assert.strictEqual(isTerminalState('unstarted'), false);
+    assert.strictEqual(isTerminalState('backlog'), false);
+  });
+  test('returns false for undefined / unknown', () => {
+    assert.strictEqual(isTerminalState(undefined), false);
+    assert.strictEqual(isTerminalState(null), false);
+    assert.strictEqual(isTerminalState('whatever'), false);
+  });
+  test('TERMINAL_STATE_TYPES includes duplicate', () => {
+    assert.ok(TERMINAL_STATE_TYPES.includes('duplicate'));
+    assert.ok(TERMINAL_STATE_TYPES.includes('canceled'));
+    assert.ok(TERMINAL_STATE_TYPES.includes('completed'));
+  });
+});
+
+describe('isCompleted', () => {
+  test('treats duplicate-state issues as completed (LIN-276)', () => {
+    const issue = { state: { name: 'Duplicate', type: 'duplicate' } };
+    assert.strictEqual(isCompleted(issue), true);
+  });
+  test('treats canceled-state issues as completed', () => {
+    const issue = { state: { name: 'Canceled', type: 'canceled' } };
+    assert.strictEqual(isCompleted(issue), true);
+  });
+  test('treats started-state issues as not completed', () => {
+    const issue = { state: { name: 'In Progress', type: 'started' } };
+    assert.strictEqual(isCompleted(issue), false);
   });
 });

@@ -68,6 +68,7 @@
     switch (stateType) {
       case 'completed':
       case 'canceled':
+      case 'duplicate':
         return { char: '\u2713', cls: 'done', label: stateType };
       case 'started':
         return { char: '\u25D0', cls: 'in-progress', label: 'started' };

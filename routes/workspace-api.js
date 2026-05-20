@@ -21,6 +21,7 @@ import { runAudit, computeAuditFromData } from '../lib/audit.js';
 import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
+import { isTerminalState } from '../lib/tree.js';
 import { testMockTeams, testMockData } from '../tests/fixtures/mock-data.js';
 
 /**
@@ -1047,7 +1048,7 @@ ${goal}`;
       });
     }
     const remainingChildren = (context.children || []).filter(
-      c => c.state?.type !== 'completed' && c.state?.type !== 'canceled'
+      c => !isTerminalState(c.state?.type)
     );
     for (const c of remainingChildren.slice(0, 3)) {
       pending.push({
