@@ -477,14 +477,17 @@ describe('getLoopsForIssue', () => {
   });
 
   test('filters to a single issue', async () => {
+    // Use recent dates so the 30-day lookback in _buildLoops keeps them.
+    const recentDispatched = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const recentResolved = new Date(Date.now() - 30 * 60 * 1000).toISOString();
     const stores = makeMockStores({
       history: [
-        historyItem({ id: 'h-a', issueIdentifier: ISSUE_A }),
-        historyItem({ id: 'h-b', issueIdentifier: ISSUE_B })
+        historyItem({ id: 'h-a', issueIdentifier: ISSUE_A, dispatchedAt: recentDispatched, resolvedAt: recentResolved }),
+        historyItem({ id: 'h-b', issueIdentifier: ISSUE_B, dispatchedAt: recentDispatched, resolvedAt: recentResolved })
       ],
       foreman: [
-        foremanEntry({ id: 'f-a', taskIdentifier: ISSUE_A }),
-        foremanEntry({ id: 'f-b', taskIdentifier: ISSUE_B })
+        foremanEntry({ id: 'f-a', taskIdentifier: ISSUE_A, timestamp: recentResolved }),
+        foremanEntry({ id: 'f-b', taskIdentifier: ISSUE_B, timestamp: recentResolved })
       ]
     });
     const loops = await getLoopsForIssue('ws', ISSUE_A, stores);
@@ -515,10 +518,13 @@ describe('getLoopsForWorkspace', () => {
   });
 
   test('returns flat list across all issues', async () => {
+    // Use recent dates so the 30-day lookback in _buildLoops keeps them.
+    const recentDispatched = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const recentResolved = new Date(Date.now() - 30 * 60 * 1000).toISOString();
     const stores = makeMockStores({
       history: [
-        historyItem({ id: 'h-a', issueIdentifier: ISSUE_A }),
-        historyItem({ id: 'h-b', issueIdentifier: ISSUE_B })
+        historyItem({ id: 'h-a', issueIdentifier: ISSUE_A, dispatchedAt: recentDispatched, resolvedAt: recentResolved }),
+        historyItem({ id: 'h-b', issueIdentifier: ISSUE_B, dispatchedAt: recentDispatched, resolvedAt: recentResolved })
       ]
     });
     const loops = await getLoopsForWorkspace('ws', stores);

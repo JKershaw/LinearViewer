@@ -15,6 +15,10 @@ import { execute, execArgs } from '../../lib/bash-tool.js';
 
 // Temp directory for file-write tests
 const tmpDir = path.join(os.tmpdir(), 'bash-tool-test-' + process.pid);
+fs.mkdirSync(tmpDir, { recursive: true });
+
+// Resolve to realpath so cwd comparisons work on macOS (where /var → /private/var)
+const realTmpDir = fs.realpathSync(tmpDir);
 
 // Setup / teardown
 test('setup temp dir', () => {
@@ -254,7 +258,7 @@ describe('execute()', () => {
       cwd: tmpDir,
     });
 
-    assert.strictEqual(result.stdout.trim(), tmpDir);
+    assert.strictEqual(result.stdout.trim(), realTmpDir);
   });
 });
 
@@ -415,7 +419,7 @@ describe('execArgs()', () => {
       cwd: tmpDir,
     });
 
-    assert.strictEqual(result.stdout.trim(), tmpDir);
+    assert.strictEqual(result.stdout.trim(), realTmpDir);
   });
 });
 
