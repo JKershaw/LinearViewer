@@ -1,8 +1,8 @@
 /**
  * Roadmap Page Styles
  *
- * CLI/terminal aesthetic for the roadmap view.
- * Uses the same design language as the dashboard (from style.css).
+ * CLI/terminal aesthetic for the roadmap view. Delivery-focused layout:
+ * page heading → recently shipped → by-project → narrative → chat.
  */
 
 /* =============================================================================
@@ -14,45 +14,164 @@
   padding: 1rem 0;
 }
 
-/* =============================================================================
-   Velocity Panel
-   ============================================================================= */
-.roadmap-velocity-panel {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 0;
-  margin-bottom: 1.5rem;
-  border-bottom: 1px solid var(--fg-vdim);
+.roadmap-section {
+  margin-bottom: 2rem;
+}
+
+.roadmap-section-heading {
+  font-family: var(--font-structural);
+  font-size: 1.1em;
+  font-weight: 600;
+  margin: 0 0 0.75rem 0;
+  color: var(--fg);
+}
+
+.roadmap-section-total {
+  font-weight: 400;
+  font-size: 0.85em;
+  color: var(--fg-dim);
+  margin-left: 0.5em;
+}
+
+.roadmap-empty {
   font-family: var(--font-structural);
   font-size: 0.85em;
   color: var(--fg-dim);
-}
-
-.roadmap-velocity-stat {
-  display: inline-block;
-  margin-right: 1.5rem;
-}
-
-.roadmap-trend {
-  font-weight: 600;
-}
-
-.roadmap-trend--increasing {
-  color: var(--green);
-}
-
-.roadmap-trend--stable {
-  color: var(--fg-dim);
-}
-
-.roadmap-trend--decreasing {
-  color: var(--red);
+  margin: 0.5em 0;
+  padding-left: 0.75em;
 }
 
 /* =============================================================================
-   Milestones
+   Page Header
+   ============================================================================= */
+.roadmap-header {
+  /* Override the global `header { text-align: center }` so the roadmap
+     heading aligns with the rest of the page content. */
+  text-align: left;
+  margin: 0 0 1.5rem 0;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--fg-vdim);
+}
+
+.roadmap-page-title {
+  font-family: var(--font-structural);
+  font-size: 1.4em;
+  font-weight: 700;
+  margin: 0 0 0.25rem 0;
+  color: var(--fg);
+}
+
+.roadmap-header-meta {
+  font-family: var(--font-structural);
+  font-size: 0.85em;
+  color: var(--fg-dim);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.roadmap-header-workspace {
+  color: var(--fg);
+  font-weight: 500;
+}
+
+.roadmap-header-cadence {
+  color: var(--fg);
+}
+
+/* =============================================================================
+   Recently Shipped (Ship Log)
+   ============================================================================= */
+.roadmap-ship-log {
+  font-family: var(--font-structural);
+}
+
+.ship-bucket {
+  margin-bottom: 1rem;
+}
+
+.ship-bucket-heading {
+  font-family: var(--font-structural);
+  font-size: 0.9em;
+  font-weight: 600;
+  color: var(--fg);
+  margin: 0 0 0.4em 0;
+}
+
+.ship-count {
+  font-weight: 400;
+  color: var(--fg-dim);
+  margin-left: 0.25em;
+}
+
+.ship-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.ship-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  gap: 0.5em;
+  padding: 0.2em 0;
+  font-size: 0.85em;
+  color: var(--fg);
+}
+
+.ship-icon {
+  color: var(--green);
+  font-weight: 600;
+}
+
+.ship-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ship-state {
+  color: var(--fg-dim);
+  font-size: 0.95em;
+  margin-right: 0.25em;
+}
+
+.ship-meta {
+  font-size: 0.85em;
+  color: var(--fg-dim);
+  white-space: nowrap;
+}
+
+.ship-project {
+  color: var(--fg-dim);
+}
+
+.ship-date {
+  font-variant-numeric: tabular-nums;
+}
+
+.ship-more {
+  margin-top: 0.25em;
+}
+
+.ship-more summary {
+  font-size: 0.8em;
+  color: var(--fg-dim);
+  cursor: pointer;
+  padding: 0.2em 0;
+  user-select: none;
+}
+
+.ship-more summary:hover {
+  color: var(--fg);
+}
+
+.ship-list--hidden {
+  margin-top: 0.25em;
+}
+
+/* =============================================================================
+   Project Cards
    ============================================================================= */
 .roadmap-milestones {
   display: flex;
@@ -66,23 +185,32 @@
   border-radius: 2px;
 }
 
+.roadmap-milestone-card:last-child {
+  margin-bottom: 0;
+}
+
 .roadmap-milestone-header {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
+  gap: 1em;
   margin-bottom: 0.5em;
-  font-family: var(--font-content);
+  font-family: var(--font-structural);
 }
 
-.roadmap-milestone-header strong {
+.roadmap-milestone-name {
+  font-size: 1em;
   font-weight: 600;
   color: var(--fg);
+  margin: 0;
 }
 
-.roadmap-milestone-header .roadmap-milestone-date {
+.roadmap-milestone-progress-text {
   font-family: var(--font-structural);
-  font-size: 0.85em;
+  font-size: 0.8em;
   color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .roadmap-progress-bar {
@@ -91,28 +219,30 @@
   color: var(--fg);
   margin: 0.4em 0;
   letter-spacing: 0.05em;
-}
-
-.roadmap-milestone-stats {
-  font-family: var(--font-structural);
-  font-size: 0.8em;
-  color: var(--fg-dim);
-  margin-top: 0.25em;
+  display: block;
 }
 
 .roadmap-milestone-desc {
   font-family: var(--font-structural);
   font-size: 0.8em;
   color: var(--fg-dim);
-  margin-top: 0.25em;
+  margin: 0.25em 0;
   padding-left: 0.5em;
-  border-left: 2px solid var(--border);
+  border-left: 2px solid var(--fg-vdim);
 }
 
+/* =============================================================================
+   Task Tree (in progress, upcoming, critical path)
+   ============================================================================= */
 .roadmap-task-tree {
   font-family: var(--font-structural);
   font-size: 0.8em;
-  margin-top: 0.5em;
+  margin-top: 0.6em;
+  color: var(--fg);
+}
+
+.roadmap-task-tree--upcoming {
+  margin-top: 0.4em;
   color: var(--fg-dim);
 }
 
@@ -122,7 +252,8 @@
 }
 
 .roadmap-task-parent,
-.roadmap-task-item {
+.roadmap-task-item,
+.roadmap-path-item {
   padding-left: 0.5em;
 }
 
@@ -132,45 +263,124 @@
 
 .roadmap-task-child {
   white-space: nowrap;
+  color: var(--fg-dim);
+}
+
+.task-id {
+  color: var(--fg-dim);
+  font-size: 0.9em;
+  margin-right: 0.2em;
+}
+
+.task-rollup {
+  color: var(--fg-dim);
+  font-size: 0.9em;
+  margin-left: 0.25em;
+}
+
+.roadmap-upcoming {
+  margin-top: 0.5em;
+}
+
+.roadmap-upcoming summary {
+  font-family: var(--font-structural);
+  font-size: 0.8em;
+  color: var(--fg-dim);
+  cursor: pointer;
+  padding: 0.2em 0;
+  user-select: none;
+}
+
+.roadmap-upcoming summary:hover {
+  color: var(--fg);
 }
 
 .roadmap-critical-path {
   font-family: var(--font-structural);
   font-size: 0.8em;
-  margin-top: 0.5em;
-  color: var(--fg-dim);
+  margin-top: 0.6em;
+  color: var(--fg);
 }
 
 /* =============================================================================
    Risks
    ============================================================================= */
-.roadmap-risk {
-  padding-left: 1em;
-  margin-top: 0.4em;
+.roadmap-risks {
+  margin-top: 0.6em;
   font-family: var(--font-structural);
   font-size: 0.8em;
-  color: var(--fg-dim);
+  color: var(--fg);
+}
+
+.roadmap-risk {
+  padding: 0.3em 0.5em;
+  margin-top: 0.25em;
+  color: var(--fg);
+}
+
+.roadmap-risk-sev {
+  display: inline-block;
+  font-size: 0.85em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-right: 0.5em;
 }
 
 .roadmap-risk--high {
   border-left: 3px solid var(--red);
 }
 
+.roadmap-risk--high .roadmap-risk-sev {
+  color: var(--red);
+}
+
 .roadmap-risk--medium {
   border-left: 3px solid #e67e22;
+}
+
+.roadmap-risk--medium .roadmap-risk-sev {
+  color: #e67e22;
 }
 
 .roadmap-risk--low {
   border-left: 3px solid var(--fg-vdim);
 }
 
+.roadmap-risk--low .roadmap-risk-sev {
+  color: var(--fg-dim);
+}
+
 /* =============================================================================
    Narrative
    ============================================================================= */
 .roadmap-narrative {
-  margin-top: 2em;
   padding-top: 1.5em;
   border-top: 1px solid var(--fg-vdim);
+}
+
+.roadmap-narrative-status {
+  font-family: var(--font-structural);
+  font-size: 0.8em;
+  color: var(--fg-dim);
+  margin: 0.5em 0;
+  min-height: 1.2em;
+}
+
+.roadmap-narrative-status--loading::after {
+  content: '';
+  display: inline-block;
+  width: 0;
+  margin-left: 0.4em;
+  animation: roadmap-narrative-dots 1.4s steps(3, end) infinite;
+  overflow: hidden;
+}
+
+@keyframes roadmap-narrative-dots {
+  0% { width: 0; }
+  33% { width: 0.3em; }
+  66% { width: 0.6em; }
+  100% { width: 0.9em; }
 }
 
 .roadmap-narrative-content {
@@ -179,8 +389,12 @@
   white-space: pre-wrap;
   line-height: 1.6;
   color: var(--fg);
-  margin-top: 0.75em;
+  margin-top: 0.5em;
   min-height: 1.5em;
+}
+
+.roadmap-narrative .roadmap-generate-btn {
+  margin-top: 0.75em;
 }
 
 /* =============================================================================
@@ -234,29 +448,7 @@
   border-color: var(--blue);
 }
 
-.roadmap-chat-send {
-  font-family: var(--font-structural);
-  font-size: 0.85em;
-  padding: 0.4em 1em;
-  border: 1px solid var(--fg-vdim);
-  border-radius: 2px;
-  background: var(--bg);
-  color: var(--fg);
-  cursor: pointer;
-}
-
-.roadmap-chat-send:hover {
-  background: var(--bg-muted);
-}
-
-.roadmap-chat-send:disabled {
-  color: var(--fg-dim);
-  cursor: not-allowed;
-}
-
-/* =============================================================================
-   Generate Button
-   ============================================================================= */
+.roadmap-chat-send,
 .roadmap-generate-btn {
   font-family: var(--font-structural);
   font-size: 0.85em;
@@ -268,10 +460,12 @@
   cursor: pointer;
 }
 
+.roadmap-chat-send:hover,
 .roadmap-generate-btn:hover {
   background: var(--bg-muted);
 }
 
+.roadmap-chat-send:disabled,
 .roadmap-generate-btn:disabled {
   color: var(--fg-dim);
   cursor: not-allowed;
@@ -288,26 +482,32 @@
    Mobile Responsive
    ============================================================================= */
 @media (max-width: 600px) {
-  .roadmap-velocity-panel {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.25rem;
+  .roadmap-page {
+    padding: 0.5rem 0;
   }
 
-  .roadmap-velocity-stat {
-    margin-right: 0;
+  .ship-item {
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto auto;
+    row-gap: 0.1em;
+  }
+
+  .ship-meta {
+    grid-column: 2;
+    font-size: 0.8em;
   }
 
   .roadmap-milestone-header {
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.25em;
+    align-items: flex-start;
+  }
+
+  .roadmap-chat-history {
+    max-height: 250px;
   }
 
   .roadmap-chat-input-row {
     flex-direction: column;
-  }
-
-  .roadmap-chat-send {
-    align-self: flex-end;
   }
 }

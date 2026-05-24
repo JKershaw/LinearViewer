@@ -18,16 +18,25 @@ test.describe('Roadmap Page', () => {
     await expect(page.locator('.roadmap-page')).toBeVisible();
   });
 
-  test('shows velocity panel with stats', async ({ page }) => {
+  test('shows page header with delivery-cadence framing', async ({ page }) => {
     await page.goto(ROADMAP_URL);
     await page.waitForLoadState('networkidle');
 
-    // Velocity panel should be visible with expected structure
-    await expect(page.locator('.roadmap-velocity-panel')).toBeVisible();
-    await expect(page.locator('.roadmap-velocity-stats')).toBeVisible();
-    // Should show tasks/week and points/week labels
-    await expect(page.locator('text=tasks/week')).toBeVisible();
-    await expect(page.locator('text=points/week')).toBeVisible();
+    await expect(page.locator('.roadmap-header')).toBeVisible();
+    await expect(page.locator('.roadmap-page-title')).toContainText('Roadmap');
+    // Time window anchor
+    await expect(page.locator('.roadmap-header-meta')).toContainText('last 90 days');
+    // Velocity panel (projection-flavored) was removed
+    await expect(page.locator('.roadmap-velocity-panel')).toHaveCount(0);
+  });
+
+  test('shows recently shipped section', async ({ page }) => {
+    await page.goto(ROADMAP_URL);
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('.roadmap-ship-log')).toBeVisible();
+    await expect(page.locator('.roadmap-ship-log .roadmap-section-heading'))
+      .toContainText('Recently shipped');
   });
 
   test('shows milestone cards with progress bars', async ({ page }) => {
@@ -47,17 +56,19 @@ test.describe('Roadmap Page', () => {
     }
   });
 
-  test('milestone cards show remaining tasks and points', async ({ page }) => {
+  test('milestone cards show progress without projection fields', async ({ page }) => {
     await page.goto(ROADMAP_URL);
     await page.waitForLoadState('networkidle');
 
     const firstCard = page.locator('.roadmap-milestone-card').first();
-    const statsText = await firstCard.locator('.roadmap-milestone-stats').textContent();
-    // Should contain task and point info
-    expect(statsText).toContain('remaining:');
-    expect(statsText).toContain('points:');
-    expect(statsText).toContain('projected:');
-    expect(statsText).toContain('confidence:');
+    const cardText = await firstCard.textContent();
+    // Progress is shown in the header (e.g. "50% · 6/12 done")
+    expect(cardText).toMatch(/\d+%/);
+    expect(cardText).toContain('done');
+    // Projection-flavored fields should not appear
+    expect(cardText).not.toContain('projected:');
+    expect(cardText).not.toContain('confidence:');
+    expect(cardText).not.toMatch(/points:\s*\d/);
   });
 
   test('redirects to projects when feature flag is off', async ({ page }) => {

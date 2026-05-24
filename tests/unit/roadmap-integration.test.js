@@ -303,7 +303,8 @@ describe('renderRoadmapPage with real model', () => {
     assert.ok(html.includes('<!DOCTYPE html>'), 'should be a full HTML doc');
     assert.ok(html.includes('Roadmap'), 'should include page title');
     assert.ok(html.includes('Alpha'), 'should include milestone name');
-    assert.ok(html.includes('tasks/week'), 'should include velocity stats');
+    assert.ok(html.includes('shipped/week') || html.includes('last 90 days'),
+      'should include delivery-cadence framing in the header');
     assert.ok(html.includes('roadmap-milestone-card'), 'should include milestone cards');
   });
 
@@ -328,11 +329,14 @@ describe('renderRoadmapPage with real model', () => {
     assert.ok(html.includes('Beta'), 'should include milestone name');
   });
 
-  test('renders risks when present', () => {
+  test('renders current-state risks (unassigned) when present', () => {
+    // Mix of assigned and unassigned tasks so the solo-dev suppression doesn't
+    // fire. The unassigned task is on the critical path, which should emit
+    // an `unassigned-critical` risk — a current-state risk we still surface.
     const issues = [
       createIssue({
         id: 'risk-a',
-        estimate: null,
+        estimate: 2,
         assignee: null,
         state: { name: 'Todo', type: 'unstarted' },
         project: { id: 'proj-1', name: 'Risky' },
@@ -340,11 +344,18 @@ describe('renderRoadmapPage with real model', () => {
       }),
       createIssue({
         id: 'risk-b',
-        estimate: null,
-        assignee: null,
+        estimate: 2,
+        assignee: { name: 'Alice' },
         state: { name: 'Todo', type: 'unstarted' },
         project: { id: 'proj-1', name: 'Risky' },
         relations: { nodes: [] }
+      }),
+      createIssue({
+        id: 'risk-c',
+        estimate: 2,
+        assignee: { name: 'Bob' },
+        state: { name: 'In Progress', type: 'started' },
+        project: { id: 'proj-1', name: 'Risky' }
       })
     ];
     const projects = [{ id: 'proj-1', name: 'Risky' }];
@@ -355,9 +366,8 @@ describe('renderRoadmapPage with real model', () => {
       { urlKey: 'test-ws' }
     );
 
-    // Should render risks (unassigned + unestimated on critical path)
-    assert.ok(html.includes('roadmap-risk-badge') || html.includes('roadmap-risks'),
-      'should include risk indicators');
+    assert.ok(html.includes('roadmap-risks'), 'should include risks container');
+    assert.ok(html.includes('roadmap-risk--high'), 'should mark severity');
   });
 
   test('renders critical path when dependencies exist', () => {
@@ -392,7 +402,7 @@ describe('renderRoadmapPage with real model', () => {
     assert.ok(html.includes('TST-2'), 'should show second issue identifier');
   });
 
-  test('renders trend classes matching CSS (BEM convention)', () => {
+  test('does not render velocity trend (delivery-focused page)', () => {
     const issues = [
       createIssue({
         id: 'trend-1',
@@ -410,13 +420,9 @@ describe('renderRoadmapPage with real model', () => {
       { urlKey: 'test-ws' }
     );
 
-    // Trend classes must use BEM double-dash format matching roadmap.css
-    const trendClassMatch = html.match(/roadmap-trend--(?:increasing|decreasing|stable)/);
-    assert.ok(trendClassMatch, 'trend class should use BEM format (roadmap-trend--*)');
-    // Must NOT use old non-BEM format
-    assert.ok(!html.includes('trend-up'), 'should not use old trend-up class');
-    assert.ok(!html.includes('trend-down'), 'should not use old trend-down class');
-    assert.ok(!html.includes('"trend-stable"'), 'should not use old trend-stable class');
+    // Trend indicators were removed when the page was refocused on delivery.
+    assert.ok(!html.includes('roadmap-trend'), 'should not render trend classes');
+    assert.ok(!html.includes('roadmap-velocity-panel'), 'should not render velocity panel');
   });
 
   test('renders risk badge classes matching CSS (BEM convention)', () => {
@@ -524,17 +530,18 @@ describe('summarizeRoadmapModel', () => {
     assert.ok(/Report date: \d{4}-\d{2}-\d{2}/.test(summary), 'date should be ISO format');
   });
 
-  test('includes velocity data', () => {
+  test('includes delivery cadence (tasks/week only, no points or projection)', () => {
     const summary = summarizeRoadmapModel({
       velocity: { tasksPerWeek: 5.5, pointsPerWeek: 12, trend: 'increasing' }
     });
-    assert.ok(summary.includes('VELOCITY'), 'should have velocity section');
+    assert.ok(summary.includes('DELIVERY CADENCE'), 'should have delivery cadence section');
     assert.ok(summary.includes('5.5'), 'should include tasks/week');
-    assert.ok(summary.includes('12'), 'should include points/week');
-    assert.ok(summary.includes('increasing'), 'should include trend');
+    assert.ok(!summary.includes('Points/week'), 'should not include points/week');
+    assert.ok(!summary.includes('12'), 'should not surface points number');
+    assert.ok(!summary.includes('increasing'), 'should not include trend label');
   });
 
-  test('includes milestone data with projections', () => {
+  test('includes milestone progress without projections', () => {
     const summary = summarizeRoadmapModel({
       milestones: [{
         name: 'Launch',
@@ -552,23 +559,26 @@ describe('summarizeRoadmapModel', () => {
     assert.ok(summary.includes('Launch'), 'should include milestone name');
     assert.ok(summary.includes('60%'), 'should include progress');
     assert.ok(summary.includes('6/10'), 'should include done/total');
-    assert.ok(summary.includes('~3 weeks'), 'should include projection');
-    assert.ok(summary.includes('2-5 weeks'), 'should include confidence range');
-    assert.ok(summary.includes('2026-04-15'), 'should include projected end date');
+    assert.ok(!summary.includes('~3 weeks'), 'should NOT include weeks projection');
+    assert.ok(!summary.includes('2-5 weeks'), 'should NOT include confidence range');
+    assert.ok(!summary.includes('2026-04-15'), 'should NOT include projected end date');
+    assert.ok(!summary.includes('8 points'), 'should NOT include points remaining');
   });
 
-  test('includes risks with severity and milestone', () => {
+  test('includes current-state risks but filters projection-derived ones', () => {
     const summary = summarizeRoadmapModel({
       risks: [
-        { severity: 'high', milestone: 'Launch', description: 'Unassigned critical tasks' },
-        { severity: 'medium', milestone: null, description: 'Velocity declining' }
+        { type: 'unassigned-critical', severity: 'high', milestone: 'Launch', description: 'Unassigned critical tasks' },
+        { type: 'velocity-declining', severity: 'medium', milestone: null, description: 'Velocity is declining. Projections may be optimistic.' },
+        { type: 'overdue', severity: 'high', milestone: 'Launch', description: 'Projected completion exceeds due date.' },
+        { type: 'unestimated-critical', severity: 'medium', milestone: 'Launch', description: '2 critical-path tasks have no estimate.' }
       ]
     });
     assert.ok(summary.includes('SIGNALS'), 'should have signals section');
-    assert.ok(summary.includes('[high]'), 'should include severity');
-    assert.ok(summary.includes('[Launch]'), 'should include milestone');
-    assert.ok(summary.includes('Unassigned critical tasks'), 'should include description');
-    assert.ok(summary.includes('Velocity declining'), 'should include global risk');
+    assert.ok(summary.includes('Unassigned critical tasks'), 'should keep unassigned-critical');
+    assert.ok(!summary.includes('Velocity is declining'), 'should filter velocity-declining');
+    assert.ok(!summary.includes('exceeds due date'), 'should filter overdue');
+    assert.ok(!summary.includes('no estimate'), 'should filter unestimated-critical');
   });
 
   test('includes critical paths when meaningful', () => {
@@ -587,7 +597,7 @@ describe('summarizeRoadmapModel', () => {
       risks: [],
       criticalPaths: {}
     });
-    assert.ok(summary.includes('VELOCITY'), 'always shows velocity');
+    assert.ok(summary.includes('DELIVERY CADENCE'), 'always shows delivery cadence');
     assert.ok(!summary.includes('PROJECTS'), 'omits empty projects');
     assert.ok(!summary.includes('SIGNALS'), 'omits empty signals');
     assert.ok(!summary.includes('CRITICAL PATHS'), 'omits empty paths');
@@ -650,7 +660,8 @@ describe('buildRoadmapNarrativeMessages', () => {
     const model = { velocity: { tasksPerWeek: 3, pointsPerWeek: 8, trend: 'stable' } };
     const messages = buildRoadmapNarrativeMessages(model);
     const user = messages[1].content;
-    assert.ok(user.includes('Tasks/week: 3'), 'should contain summarized velocity');
+    assert.ok(user.includes('per week'), 'should contain summarized delivery cadence');
+    assert.ok(user.includes('3'), 'should contain tasks/week number');
     assert.ok(!user.includes('"tasksPerWeek"'), 'should not contain raw JSON keys');
   });
 
@@ -691,7 +702,7 @@ describe('buildRoadmapChatMessages', () => {
     const messages = buildRoadmapChatMessages(model, 'test');
     const system = messages[0].content;
     assert.ok(system.includes('Launch'), 'should include milestone name');
-    assert.ok(system.includes('decreasing'), 'should include trend');
+    assert.ok(system.includes('80%'), 'should include progress percentage');
     assert.ok(!system.includes('"tasksPerWeek"'), 'should not have raw JSON');
   });
 
@@ -775,7 +786,7 @@ describe('prompt pipeline end-to-end', () => {
     const messages = buildRoadmapNarrativeMessages(serializable);
     const allContent = messages.map(m => m.content).join('\n');
     assert.ok(allContent.includes('Alpha'), 'should contain milestone name');
-    assert.ok(allContent.includes('Tasks/week'), 'should contain velocity');
+    assert.ok(allContent.includes('per week'), 'should contain delivery cadence');
   });
 
   test('chat messages from real model with history work correctly', () => {
