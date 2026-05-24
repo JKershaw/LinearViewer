@@ -21,7 +21,11 @@ export default defineConfig({
     },
   },
   webServer: {
-    command: 'NODE_ENV=test PORT=3001 SESSION_SECRET=test-secret-for-playwright node server.js',
+    // Unset OpenRouter env keys so tests can deterministically exercise the
+    // "no AI configured" 503 path regardless of the developer's local .env.
+    // Tests that need an API key set it session-side via
+    // /test/set-session?openRouterConnected=true.
+    command: 'NODE_ENV=test PORT=3001 SESSION_SECRET=test-secret-for-playwright OPENROUTER_API_KEY= OPENROUTER_FREE_TIER_KEY= node server.js',
     url: 'http://localhost:3001',
     reuseExistingServer: !process.env.CI,
     timeout: 120000,

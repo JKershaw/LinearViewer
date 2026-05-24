@@ -138,28 +138,6 @@ test.describe('Roadmap Page', () => {
 });
 
 test.describe('Roadmap API Endpoints', () => {
-  test('narrative endpoint returns 403 when feature flag is off', async ({ request }) => {
-    const noRoadmap = encodeURIComponent(JSON.stringify({ roadmap: false }));
-    await request.get(`/test/set-session?features=${noRoadmap}`);
-
-    const response = await request.post(`/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/narrative`, {
-      data: { roadmapModel: { velocity: {}, milestones: [] } }
-    });
-    expect(response.status()).toBe(403);
-  });
-
-  test('narrative endpoint returns 503 when no AI configured', async ({ request }) => {
-    await request.get(`/test/set-session?features=${FEATURES}`);
-
-    // Without OPENROUTER_API_KEY, should get 503
-    const response = await request.post(`/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/narrative`, {
-      data: { roadmapModel: { velocity: {}, milestones: [] } }
-    });
-    expect(response.status()).toBe(503);
-    const body = await response.json();
-    expect(body.error).toContain('AI not configured');
-  });
-
   test('chat endpoint returns 403 when feature flag is off', async ({ request }) => {
     const noRoadmap = encodeURIComponent(JSON.stringify({ roadmap: false }));
     await request.get(`/test/set-session?features=${noRoadmap}`);
@@ -180,6 +158,90 @@ test.describe('Roadmap API Endpoints', () => {
     expect(response.status()).toBe(503);
     const body = await response.json();
     expect(body.error).toContain('AI not configured');
+  });
+});
+
+// =============================================================================
+// Pipeline layer endpoints (technical / product / trajectory / north-star / gap)
+// =============================================================================
+
+test.describe('Roadmap Pipeline Layer Endpoints', () => {
+  const TECH_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/narrative/technical`;
+  const PRODUCT_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/narrative/product`;
+  const TRAJECTORY_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/narrative/trajectory`;
+  const NS_READING_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/narrative/north-star`;
+  const GAP_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/narrative/gap`;
+
+  const SAMPLE_MODEL = { velocity: { tasksPerWeek: 4 }, milestones: [] };
+
+  const endpoints = [
+    { name: 'technical', url: TECH_URL, body: { roadmapModel: SAMPLE_MODEL } },
+    { name: 'product',   url: PRODUCT_URL, body: { roadmapModel: SAMPLE_MODEL, tech: 'tech narrative text' } },
+    { name: 'trajectory', url: TRAJECTORY_URL, body: { roadmapModel: SAMPLE_MODEL, tech: 'tech text', product: 'product text' } },
+    { name: 'north-star reading', url: NS_READING_URL, body: { roadmapModel: SAMPLE_MODEL, northStar: 'be useful' } },
+    { name: 'gap', url: GAP_URL, body: { northStar: 'be useful', trajectory: 'going there', nsReading: 'aligned' } },
+  ];
+
+  for (const ep of endpoints) {
+    test(`${ep.name}: returns 403 when feature flag is off`, async ({ request }) => {
+      const noRoadmap = encodeURIComponent(JSON.stringify({ roadmap: false }));
+      await request.get(`/test/set-session?features=${noRoadmap}`);
+      const response = await request.post(ep.url, { data: ep.body });
+      expect(response.status()).toBe(403);
+    });
+
+    test(`${ep.name}: returns 503 when no AI configured`, async ({ request }) => {
+      await request.get(`/test/set-session?features=${FEATURES}`);
+      const response = await request.post(ep.url, { data: ep.body });
+      expect(response.status()).toBe(503);
+      const body = await response.json();
+      expect(body.error).toContain('AI not configured');
+    });
+  }
+
+  // Per-endpoint body validation
+  test('technical: returns 400 when roadmapModel missing', async ({ request }) => {
+    await request.get(`/test/set-session?features=${FEATURES}&openRouterConnected=true`);
+    const response = await request.post(TECH_URL, { data: {} });
+    expect(response.status()).toBe(400);
+  });
+
+  test('product: returns 400 when tech missing', async ({ request }) => {
+    await request.get(`/test/set-session?features=${FEATURES}&openRouterConnected=true`);
+    const response = await request.post(PRODUCT_URL, { data: { roadmapModel: SAMPLE_MODEL } });
+    expect(response.status()).toBe(400);
+  });
+
+  test('trajectory: returns 400 when product missing', async ({ request }) => {
+    await request.get(`/test/set-session?features=${FEATURES}&openRouterConnected=true`);
+    const response = await request.post(TRAJECTORY_URL, {
+      data: { roadmapModel: SAMPLE_MODEL, tech: 'x' }
+    });
+    expect(response.status()).toBe(400);
+  });
+
+  test('north-star reading: returns 400 when northStar missing', async ({ request }) => {
+    await request.get(`/test/set-session?features=${FEATURES}&openRouterConnected=true`);
+    const response = await request.post(NS_READING_URL, {
+      data: { roadmapModel: SAMPLE_MODEL }
+    });
+    expect(response.status()).toBe(400);
+  });
+
+  test('north-star reading: returns 400 when northStar is empty string', async ({ request }) => {
+    await request.get(`/test/set-session?features=${FEATURES}&openRouterConnected=true`);
+    const response = await request.post(NS_READING_URL, {
+      data: { roadmapModel: SAMPLE_MODEL, northStar: '' }
+    });
+    expect(response.status()).toBe(400);
+  });
+
+  test('gap: returns 400 when any of northStar/trajectory/nsReading missing', async ({ request }) => {
+    await request.get(`/test/set-session?features=${FEATURES}&openRouterConnected=true`);
+    const response = await request.post(GAP_URL, {
+      data: { northStar: 'x', trajectory: 'y' }
+    });
+    expect(response.status()).toBe(400);
   });
 });
 
