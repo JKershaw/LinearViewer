@@ -139,6 +139,9 @@
             var text = typeof eventData === 'object' ? (eventData.token || eventData.text || '') : eventData;
             content.textContent += text;
           } else if (type === 'done') {
+            if (eventData && eventData.finishReason === 'length') {
+              content.textContent += '\n\n[output truncated — hit token limit. Try Regenerate.]';
+            }
             btn.disabled = false;
             btn.textContent = 'Regenerate';
           } else if (type === 'error') {
@@ -247,6 +250,10 @@
             assistantMsg.textContent = assistantText;
             historyEl.scrollTop = historyEl.scrollHeight;
           } else if (type === 'done') {
+            if (eventData && eventData.finishReason === 'length') {
+              assistantText += '\n\n[output truncated — hit token limit]';
+              assistantMsg.textContent = assistantText;
+            }
             // Store assistant response in history for follow-up context
             chatHistory.push({ role: 'assistant', content: assistantText });
             // Cap history to last 40 entries to prevent unbounded memory growth

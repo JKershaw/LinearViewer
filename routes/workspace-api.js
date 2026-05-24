@@ -1311,7 +1311,7 @@ ${goal}`;
     try {
       await streamChat(
         messages,
-        { apiKey: apiKeyToUse, model: selectedModel, maxTokens: 800 },
+        { apiKey: apiKeyToUse, model: selectedModel, maxTokens: 2500 },
         (type, data) => {
           sendSSE(res, type, data);
           if (type === 'done' || type === 'error') {
@@ -1403,7 +1403,7 @@ ${goal}`;
     try {
       await streamChat(
         messages,
-        { apiKey: apiKeyToUse, model: selectedModel, maxTokens: 500 },
+        { apiKey: apiKeyToUse, model: selectedModel, maxTokens: 1500 },
         (type, data) => {
           sendSSE(res, type, data);
           if (type === 'done' || type === 'error') {
