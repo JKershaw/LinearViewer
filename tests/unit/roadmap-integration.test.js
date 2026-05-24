@@ -303,7 +303,8 @@ describe('renderRoadmapPage with real model', () => {
     assert.ok(html.includes('<!DOCTYPE html>'), 'should be a full HTML doc');
     assert.ok(html.includes('Roadmap'), 'should include page title');
     assert.ok(html.includes('Alpha'), 'should include milestone name');
-    assert.ok(html.includes('tasks/week'), 'should include velocity stats');
+    assert.ok(html.includes('shipped/week') || html.includes('last 90 days'),
+      'should include delivery-cadence framing in the header');
     assert.ok(html.includes('roadmap-milestone-card'), 'should include milestone cards');
   });
 
@@ -328,11 +329,14 @@ describe('renderRoadmapPage with real model', () => {
     assert.ok(html.includes('Beta'), 'should include milestone name');
   });
 
-  test('renders risks when present', () => {
+  test('renders current-state risks (unassigned) when present', () => {
+    // Mix of assigned and unassigned tasks so the solo-dev suppression doesn't
+    // fire. The unassigned task is on the critical path, which should emit
+    // an `unassigned-critical` risk — a current-state risk we still surface.
     const issues = [
       createIssue({
         id: 'risk-a',
-        estimate: null,
+        estimate: 2,
         assignee: null,
         state: { name: 'Todo', type: 'unstarted' },
         project: { id: 'proj-1', name: 'Risky' },
@@ -340,11 +344,18 @@ describe('renderRoadmapPage with real model', () => {
       }),
       createIssue({
         id: 'risk-b',
-        estimate: null,
-        assignee: null,
+        estimate: 2,
+        assignee: { name: 'Alice' },
         state: { name: 'Todo', type: 'unstarted' },
         project: { id: 'proj-1', name: 'Risky' },
         relations: { nodes: [] }
+      }),
+      createIssue({
+        id: 'risk-c',
+        estimate: 2,
+        assignee: { name: 'Bob' },
+        state: { name: 'In Progress', type: 'started' },
+        project: { id: 'proj-1', name: 'Risky' }
       })
     ];
     const projects = [{ id: 'proj-1', name: 'Risky' }];
@@ -355,9 +366,8 @@ describe('renderRoadmapPage with real model', () => {
       { urlKey: 'test-ws' }
     );
 
-    // Should render risks (unassigned + unestimated on critical path)
-    assert.ok(html.includes('roadmap-risk-badge') || html.includes('roadmap-risks'),
-      'should include risk indicators');
+    assert.ok(html.includes('roadmap-risks'), 'should include risks container');
+    assert.ok(html.includes('roadmap-risk--high'), 'should mark severity');
   });
 
   test('renders critical path when dependencies exist', () => {
@@ -392,7 +402,7 @@ describe('renderRoadmapPage with real model', () => {
     assert.ok(html.includes('TST-2'), 'should show second issue identifier');
   });
 
-  test('renders trend classes matching CSS (BEM convention)', () => {
+  test('does not render velocity trend (delivery-focused page)', () => {
     const issues = [
       createIssue({
         id: 'trend-1',
@@ -410,13 +420,9 @@ describe('renderRoadmapPage with real model', () => {
       { urlKey: 'test-ws' }
     );
 
-    // Trend classes must use BEM double-dash format matching roadmap.css
-    const trendClassMatch = html.match(/roadmap-trend--(?:increasing|decreasing|stable)/);
-    assert.ok(trendClassMatch, 'trend class should use BEM format (roadmap-trend--*)');
-    // Must NOT use old non-BEM format
-    assert.ok(!html.includes('trend-up'), 'should not use old trend-up class');
-    assert.ok(!html.includes('trend-down'), 'should not use old trend-down class');
-    assert.ok(!html.includes('"trend-stable"'), 'should not use old trend-stable class');
+    // Trend indicators were removed when the page was refocused on delivery.
+    assert.ok(!html.includes('roadmap-trend'), 'should not render trend classes');
+    assert.ok(!html.includes('roadmap-velocity-panel'), 'should not render velocity panel');
   });
 
   test('renders risk badge classes matching CSS (BEM convention)', () => {

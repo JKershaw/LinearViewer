@@ -2,10 +2,10 @@
  * Roadmap Page Client-Side Logic
  *
  * Reads window.__ROADMAP_DATA__ and handles:
- * - AI narrative generation (SSE streaming)
+ * - AI narrative generation (auto-runs on page load when AI is connected)
  * - AI chat Q&A with conversation history (SSE streaming)
  *
- * The velocity panel and milestone cards are server-rendered.
+ * The page heading, ship log, and milestone cards are server-rendered.
  * This script only adds interactive AI features when available.
  *
  * Loaded only on the /roadmap page.
@@ -93,27 +93,31 @@
     var section = document.querySelector('.roadmap-narrative');
     if (!section || !hasAI) return;
 
-    var content = section.querySelector('.roadmap-narrative-content');
-    if (!content) {
-      content = document.createElement('div');
-      content.className = 'roadmap-narrative-content';
-      section.appendChild(content);
-    }
-
     var heading = document.createElement('h2');
     heading.className = 'roadmap-section-heading';
-    heading.textContent = '\u2502 Narrative';
-    section.insertBefore(heading, content);
+    heading.textContent = '│ Narrative';
+    section.appendChild(heading);
+
+    var status = document.createElement('div');
+    status.className = 'roadmap-narrative-status';
+    section.appendChild(status);
+
+    var content = document.createElement('div');
+    content.className = 'roadmap-narrative-content';
+    section.appendChild(content);
 
     var btn = document.createElement('button');
     btn.className = 'roadmap-generate-btn';
-    btn.textContent = 'Generate Narrative';
-    section.insertBefore(btn, content);
+    btn.textContent = 'Regenerate';
+    btn.style.display = 'none';
+    section.appendChild(btn);
 
-    btn.addEventListener('click', function() {
+    function generate() {
       btn.disabled = true;
-      btn.textContent = 'generating...';
+      btn.style.display = 'none';
       content.textContent = '';
+      status.textContent = 'Generating narrative from delivery data…';
+      status.classList.add('roadmap-narrative-status--loading');
 
       fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/roadmap/narrative', {
         method: 'POST',
@@ -128,35 +132,58 @@
           return;
         }
         if (!response.ok) {
+          status.textContent = '';
+          status.classList.remove('roadmap-narrative-status--loading');
           content.textContent = 'Error generating narrative.';
           btn.disabled = false;
-          btn.textContent = 'Generate Narrative';
+          btn.style.display = '';
+          btn.textContent = 'Try again';
           return;
         }
 
+        var firstToken = true;
         return readSSEStream(response, function(type, eventData) {
           if (type === 'token' || type === 'message') {
             var text = typeof eventData === 'object' ? (eventData.token || eventData.text || '') : eventData;
+            if (firstToken && text) {
+              status.textContent = '';
+              status.classList.remove('roadmap-narrative-status--loading');
+              firstToken = false;
+            }
             content.textContent += text;
           } else if (type === 'done') {
+            status.textContent = '';
+            status.classList.remove('roadmap-narrative-status--loading');
             if (eventData && eventData.finishReason === 'length') {
               content.textContent += '\n\n[output truncated — hit token limit. Try Regenerate.]';
             }
             btn.disabled = false;
+            btn.style.display = '';
             btn.textContent = 'Regenerate';
           } else if (type === 'error') {
             var errMsg = typeof eventData === 'object' ? (eventData.message || 'Error') : eventData;
+            status.textContent = '';
+            status.classList.remove('roadmap-narrative-status--loading');
             content.textContent += '\n[error: ' + errMsg + ']';
             btn.disabled = false;
-            btn.textContent = 'Generate Narrative';
+            btn.style.display = '';
+            btn.textContent = 'Try again';
           }
         });
       }).catch(function() {
+        status.textContent = '';
+        status.classList.remove('roadmap-narrative-status--loading');
         content.textContent = 'Error generating narrative.';
         btn.disabled = false;
-        btn.textContent = 'Generate Narrative';
+        btn.style.display = '';
+        btn.textContent = 'Try again';
       });
-    });
+    }
+
+    btn.addEventListener('click', generate);
+    // Auto-generate on page load. The narrative is the most informative
+    // output the page can produce, so users shouldn't have to click for it.
+    generate();
   }
 
   // =========================================================================
@@ -172,7 +199,7 @@
 
     var heading = document.createElement('h2');
     heading.className = 'roadmap-section-heading';
-    heading.textContent = '\u2502 Chat';
+    heading.textContent = '│ Chat';
     section.appendChild(heading);
 
     var historyEl = document.createElement('div');
