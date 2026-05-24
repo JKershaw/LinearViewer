@@ -138,28 +138,6 @@ test.describe('Roadmap Page', () => {
 });
 
 test.describe('Roadmap API Endpoints', () => {
-  test('narrative endpoint returns 403 when feature flag is off', async ({ request }) => {
-    const noRoadmap = encodeURIComponent(JSON.stringify({ roadmap: false }));
-    await request.get(`/test/set-session?features=${noRoadmap}`);
-
-    const response = await request.post(`/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/narrative`, {
-      data: { roadmapModel: { velocity: {}, milestones: [] } }
-    });
-    expect(response.status()).toBe(403);
-  });
-
-  test('narrative endpoint returns 503 when no AI configured', async ({ request }) => {
-    await request.get(`/test/set-session?features=${FEATURES}`);
-
-    // Without OPENROUTER_API_KEY, should get 503
-    const response = await request.post(`/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/narrative`, {
-      data: { roadmapModel: { velocity: {}, milestones: [] } }
-    });
-    expect(response.status()).toBe(503);
-    const body = await response.json();
-    expect(body.error).toContain('AI not configured');
-  });
-
   test('chat endpoint returns 403 when feature flag is off', async ({ request }) => {
     const noRoadmap = encodeURIComponent(JSON.stringify({ roadmap: false }));
     await request.get(`/test/set-session?features=${noRoadmap}`);
@@ -180,5 +158,190 @@ test.describe('Roadmap API Endpoints', () => {
     expect(response.status()).toBe(503);
     const body = await response.json();
     expect(body.error).toContain('AI not configured');
+  });
+});
+
+// =============================================================================
+// Pipeline layer endpoints (technical / product / trajectory / north-star / gap)
+// =============================================================================
+
+test.describe('Roadmap Pipeline Layer Endpoints', () => {
+  const TECH_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/narrative/technical`;
+  const PRODUCT_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/narrative/product`;
+  const TRAJECTORY_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/narrative/trajectory`;
+  const NS_READING_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/narrative/north-star`;
+  const GAP_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/narrative/gap`;
+
+  const SAMPLE_MODEL = { velocity: { tasksPerWeek: 4 }, milestones: [] };
+
+  const endpoints = [
+    { name: 'technical', url: TECH_URL, body: { roadmapModel: SAMPLE_MODEL } },
+    { name: 'product',   url: PRODUCT_URL, body: { roadmapModel: SAMPLE_MODEL, tech: 'tech narrative text' } },
+    { name: 'trajectory', url: TRAJECTORY_URL, body: { roadmapModel: SAMPLE_MODEL, tech: 'tech text', product: 'product text' } },
+    { name: 'north-star reading', url: NS_READING_URL, body: { roadmapModel: SAMPLE_MODEL, northStar: 'be useful' } },
+    { name: 'gap', url: GAP_URL, body: { northStar: 'be useful', trajectory: 'going there', nsReading: 'aligned' } },
+  ];
+
+  for (const ep of endpoints) {
+    test(`${ep.name}: returns 403 when feature flag is off`, async ({ request }) => {
+      const noRoadmap = encodeURIComponent(JSON.stringify({ roadmap: false }));
+      await request.get(`/test/set-session?features=${noRoadmap}`);
+      const response = await request.post(ep.url, { data: ep.body });
+      expect(response.status()).toBe(403);
+    });
+
+    test(`${ep.name}: returns 503 when no AI configured`, async ({ request }) => {
+      await request.get(`/test/set-session?features=${FEATURES}`);
+      const response = await request.post(ep.url, { data: ep.body });
+      expect(response.status()).toBe(503);
+      const body = await response.json();
+      expect(body.error).toContain('AI not configured');
+    });
+  }
+
+  // Per-endpoint body validation
+  test('technical: returns 400 when roadmapModel missing', async ({ request }) => {
+    await request.get(`/test/set-session?features=${FEATURES}&openRouterConnected=true`);
+    const response = await request.post(TECH_URL, { data: {} });
+    expect(response.status()).toBe(400);
+  });
+
+  test('product: returns 400 when tech missing', async ({ request }) => {
+    await request.get(`/test/set-session?features=${FEATURES}&openRouterConnected=true`);
+    const response = await request.post(PRODUCT_URL, { data: { roadmapModel: SAMPLE_MODEL } });
+    expect(response.status()).toBe(400);
+  });
+
+  test('trajectory: returns 400 when product missing', async ({ request }) => {
+    await request.get(`/test/set-session?features=${FEATURES}&openRouterConnected=true`);
+    const response = await request.post(TRAJECTORY_URL, {
+      data: { roadmapModel: SAMPLE_MODEL, tech: 'x' }
+    });
+    expect(response.status()).toBe(400);
+  });
+
+  test('north-star reading: returns 400 when northStar missing', async ({ request }) => {
+    await request.get(`/test/set-session?features=${FEATURES}&openRouterConnected=true`);
+    const response = await request.post(NS_READING_URL, {
+      data: { roadmapModel: SAMPLE_MODEL }
+    });
+    expect(response.status()).toBe(400);
+  });
+
+  test('north-star reading: returns 400 when northStar is empty string', async ({ request }) => {
+    await request.get(`/test/set-session?features=${FEATURES}&openRouterConnected=true`);
+    const response = await request.post(NS_READING_URL, {
+      data: { roadmapModel: SAMPLE_MODEL, northStar: '' }
+    });
+    expect(response.status()).toBe(400);
+  });
+
+  test('gap: returns 400 when any of northStar/trajectory/nsReading missing', async ({ request }) => {
+    await request.get(`/test/set-session?features=${FEATURES}&openRouterConnected=true`);
+    const response = await request.post(GAP_URL, {
+      data: { northStar: 'x', trajectory: 'y' }
+    });
+    expect(response.status()).toBe(400);
+  });
+});
+
+test.describe('Roadmap North Star Storage', () => {
+  const NORTH_STAR_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/north-star`;
+
+  test('GET returns 403 when feature flag is off', async ({ request }) => {
+    const noRoadmap = encodeURIComponent(JSON.stringify({ roadmap: false }));
+    await request.get(`/test/set-session?features=${noRoadmap}`);
+
+    const response = await request.get(NORTH_STAR_URL);
+    expect(response.status()).toBe(403);
+  });
+
+  test('PUT returns 403 when feature flag is off', async ({ request }) => {
+    const noRoadmap = encodeURIComponent(JSON.stringify({ roadmap: false }));
+    await request.get(`/test/set-session?features=${noRoadmap}`);
+
+    const response = await request.put(NORTH_STAR_URL, {
+      data: { northStar: 'test' }
+    });
+    expect(response.status()).toBe(403);
+  });
+
+  test('GET returns empty string by default', async ({ request }) => {
+    await request.get(`/test/set-session?features=${FEATURES}`);
+
+    const response = await request.get(NORTH_STAR_URL);
+    expect(response.status()).toBe(200);
+    const body = await response.json();
+    expect(body).toHaveProperty('northStar');
+    expect(body.northStar).toBe('');
+  });
+
+  test('PUT then GET round-trips the value', async ({ request }) => {
+    await request.get(`/test/set-session?features=${FEATURES}`);
+
+    const text = 'Become the simplest way for non-technical founders to ship a product.';
+    const putRes = await request.put(NORTH_STAR_URL, {
+      data: { northStar: text }
+    });
+    expect(putRes.status()).toBe(200);
+    const putBody = await putRes.json();
+    expect(putBody).toMatchObject({ ok: true });
+
+    const getRes = await request.get(NORTH_STAR_URL);
+    expect(getRes.status()).toBe(200);
+    const getBody = await getRes.json();
+    expect(getBody.northStar).toBe(text);
+  });
+
+  test('PUT rejects non-string body', async ({ request }) => {
+    await request.get(`/test/set-session?features=${FEATURES}`);
+
+    const response = await request.put(NORTH_STAR_URL, {
+      data: { northStar: 123 }
+    });
+    expect(response.status()).toBe(400);
+  });
+
+  test('PUT rejects oversized input', async ({ request }) => {
+    await request.get(`/test/set-session?features=${FEATURES}`);
+
+    const huge = 'x'.repeat(9000);
+    const response = await request.put(NORTH_STAR_URL, {
+      data: { northStar: huge }
+    });
+    expect(response.status()).toBe(400);
+  });
+
+  test('PUT accepts empty string (clearing the value)', async ({ request }) => {
+    await request.get(`/test/set-session?features=${FEATURES}`);
+
+    // Set a value first
+    await request.put(NORTH_STAR_URL, { data: { northStar: 'initial' } });
+
+    // Now clear it
+    const clearRes = await request.put(NORTH_STAR_URL, {
+      data: { northStar: '' }
+    });
+    expect(clearRes.status()).toBe(200);
+
+    const getRes = await request.get(NORTH_STAR_URL);
+    const body = await getRes.json();
+    expect(body.northStar).toBe('');
+  });
+
+  test('values are scoped per workspace', async ({ request }) => {
+    // Set up two workspaces via the multiWorkspace test flag
+    await request.get(`/test/set-session?features=${FEATURES}&multiWorkspace=true`);
+
+    const url1 = `/workspace/test-workspace/api/roadmap/north-star`;
+    const url2 = `/workspace/second-workspace/api/roadmap/north-star`;
+
+    await request.put(url1, { data: { northStar: 'star one' } });
+    await request.put(url2, { data: { northStar: 'star two' } });
+
+    const get1 = await request.get(url1);
+    const get2 = await request.get(url2);
+    expect((await get1.json()).northStar).toBe('star one');
+    expect((await get2.json()).northStar).toBe('star two');
   });
 });

@@ -190,6 +190,9 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore }) {
           if (savedPrefs.features) {
             req.session.features = savedPrefs.features
           }
+          if (savedPrefs.northStarByWorkspace) {
+            req.session.northStarByWorkspace = savedPrefs.northStarByWorkspace
+          }
         }
 
         // Add/update workspace in session

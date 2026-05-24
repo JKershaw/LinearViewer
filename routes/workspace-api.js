@@ -1248,30 +1248,94 @@ ${goal}`;
   // Roadmap API Endpoints
   // ===========================================================================
 
+  const NORTH_STAR_MAX_CHARS = 8000;
+
   /**
-   * Generate roadmap narrative via SSE streaming.
-   * Client POSTs the roadmap model (already computed and embedded in the page).
-   * @route POST /workspace/:urlKey/api/roadmap/narrative
+   * Get the saved north star for this workspace.
+   * Reads from session; auth callback hydrates the session from user prefs.
+   * @route GET /workspace/:urlKey/api/roadmap/north-star
    */
-  router.post('/workspace/:urlKey/api/roadmap/narrative', workspaceFromUrl, async (req, res) => {
+  router.get('/workspace/:urlKey/api/roadmap/north-star', workspaceFromUrl, (req, res) => {
+    const featureFlags = getFeatureFlags(req.session);
+    if (!featureFlags.roadmap) {
+      return res.status(403).json({ error: 'Roadmap feature is not enabled' });
+    }
+    const byWorkspace = req.session.northStarByWorkspace || {};
+    const northStar = byWorkspace[req.workspace.urlKey] || '';
+    res.json({ northStar });
+  });
+
+  /**
+   * Set the north star for this workspace.
+   * Writes to session (authoritative) and best-effort to user preferences for
+   * cross-device sync, mirroring the modelId/features pattern.
+   * @route PUT /workspace/:urlKey/api/roadmap/north-star
+   */
+  router.put('/workspace/:urlKey/api/roadmap/north-star', workspaceFromUrl, async (req, res) => {
     const featureFlags = getFeatureFlags(req.session);
     if (!featureFlags.roadmap) {
       return res.status(403).json({ error: 'Roadmap feature is not enabled' });
     }
 
+    const { northStar } = req.body || {};
+    if (typeof northStar !== 'string') {
+      return res.status(400).json({ error: 'northStar must be a string' });
+    }
+    if (northStar.length > NORTH_STAR_MAX_CHARS) {
+      return res.status(400).json({ error: `northStar must be ${NORTH_STAR_MAX_CHARS} characters or fewer` });
+    }
+
+    if (!req.session.northStarByWorkspace) {
+      req.session.northStarByWorkspace = {};
+    }
+    req.session.northStarByWorkspace[req.workspace.urlKey] = northStar;
+
+    // Best-effort write-through to user preferences for cross-device sync.
+    // Non-fatal: session is authoritative.
+    if (userPreferencesStore && req.session.linearUserId) {
+      try {
+        const existing = await userPreferencesStore.getUserPreferences(req.session.linearUserId);
+        const existingMap = existing.northStarByWorkspace || {};
+        await userPreferencesStore.saveUserPreferences(req.session.linearUserId, {
+          ...existing,
+          northStarByWorkspace: {
+            ...existingMap,
+            [req.workspace.urlKey]: northStar
+          }
+        });
+      } catch (err) {
+        console.error('Failed to persist north star to preferences store:', err);
+      }
+    }
+
+    res.json({ ok: true });
+  });
+
+  /**
+   * Shared gating + free-tier check for all roadmap LLM endpoints.
+   * Sends the appropriate error response and returns null on failure.
+   * Returns { apiKey, model } when ready to proceed.
+   */
+  async function gateRoadmapLLMRequest(req, res) {
+    const featureFlags = getFeatureFlags(req.session);
+    if (!featureFlags.roadmap) {
+      res.status(403).json({ error: 'Roadmap feature is not enabled' });
+      return null;
+    }
+
     const sessionApiKey = req.session.openRouterApiKey;
     const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
     const isFreeTier = !sessionApiKey && !process.env.OPENROUTER_API_KEY && !!freeTierKey;
-    const apiKeyToUse = sessionApiKey || process.env.OPENROUTER_API_KEY || freeTierKey;
-    if (!apiKeyToUse) {
-      return res.status(503).json({ error: 'AI not configured. Connect OpenRouter or set OPENROUTER_API_KEY.' });
+    const apiKey = sessionApiKey || process.env.OPENROUTER_API_KEY || freeTierKey;
+    if (!apiKey) {
+      res.status(503).json({ error: 'AI not configured. Connect OpenRouter or set OPENROUTER_API_KEY.' });
+      return null;
     }
 
-    // Atomically check rate limits for free tier users
     if (isFreeTier) {
       const check = await freeTierStore.tryUse(req.workspace.urlKey);
       if (!check.allowed) {
-        return res.status(429).json({
+        res.status(429).json({
           error: check.reason,
           freeTier: {
             used: true,
@@ -1280,27 +1344,19 @@ ${goal}`;
             resetsAt: check.resetsAt
           }
         });
+        return null;
       }
     }
 
-    const { roadmapModel } = req.body;
-    if (!roadmapModel) {
-      return res.status(400).json({ error: 'roadmapModel is required' });
-    }
+    const model = req.session.modelId || DEFAULT_MODEL;
+    return { apiKey, model };
+  }
 
-    // Build messages before starting SSE so errors return proper HTTP status codes
-    let messages;
-    try {
-      const { buildRoadmapNarrativeMessages } = await import('../lib/prompts/roadmap-narrative-template.js');
-      messages = buildRoadmapNarrativeMessages(roadmapModel);
-    } catch (error) {
-      console.error('Roadmap narrative build error:', error);
-      return res.status(500).json({ error: 'Failed to build narrative prompt' });
-    }
-
-    const selectedModel = req.session.modelId || DEFAULT_MODEL;
-
-    // Start SSE
+  /**
+   * Stream a built messages array via SSE for a roadmap pipeline layer.
+   * Assumes gating has already passed.
+   */
+  async function streamRoadmapLayer(res, { messages, apiKey, model, maxTokens, layerName }) {
     res.set({
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
@@ -1311,7 +1367,7 @@ ${goal}`;
     try {
       await streamChat(
         messages,
-        { apiKey: apiKeyToUse, model: selectedModel, maxTokens: 2500 },
+        { apiKey, model, maxTokens },
         (type, data) => {
           sendSSE(res, type, data);
           if (type === 'done' || type === 'error') {
@@ -1320,10 +1376,153 @@ ${goal}`;
         }
       );
     } catch (error) {
-      console.error('Roadmap narrative error:', error);
-      sendSSE(res, 'error', { message: 'Failed to generate narrative' });
+      console.error(`Roadmap ${layerName} stream error:`, error);
+      sendSSE(res, 'error', { message: `Failed to generate ${layerName}` });
       res.end();
     }
+  }
+
+  /**
+   * Layer 1 — Technical narrative.
+   * @route POST /workspace/:urlKey/api/roadmap/narrative/technical
+   */
+  router.post('/workspace/:urlKey/api/roadmap/narrative/technical', workspaceFromUrl, async (req, res) => {
+    const gate = await gateRoadmapLLMRequest(req, res);
+    if (!gate) return;
+
+    const { roadmapModel } = req.body || {};
+    if (!roadmapModel) {
+      return res.status(400).json({ error: 'roadmapModel is required' });
+    }
+
+    let messages;
+    try {
+      const { buildRoadmapNarrativeMessages } = await import('../lib/prompts/roadmap-narrative-template.js');
+      messages = buildRoadmapNarrativeMessages(roadmapModel);
+    } catch (error) {
+      console.error('Roadmap technical build error:', error);
+      return res.status(500).json({ error: 'Failed to build technical prompt' });
+    }
+
+    await streamRoadmapLayer(res, { messages, ...gate, maxTokens: 2500, layerName: 'technical narrative' });
+  });
+
+  /**
+   * Layer 2 — Product perspective.
+   * @route POST /workspace/:urlKey/api/roadmap/narrative/product
+   */
+  router.post('/workspace/:urlKey/api/roadmap/narrative/product', workspaceFromUrl, async (req, res) => {
+    const gate = await gateRoadmapLLMRequest(req, res);
+    if (!gate) return;
+
+    const { roadmapModel, tech } = req.body || {};
+    if (!roadmapModel) {
+      return res.status(400).json({ error: 'roadmapModel is required' });
+    }
+    if (typeof tech !== 'string' || !tech.trim()) {
+      return res.status(400).json({ error: 'tech (layer 1 narrative) is required as a non-empty string' });
+    }
+
+    let messages;
+    try {
+      const { buildRoadmapProductMessages } = await import('../lib/prompts/roadmap-product-template.js');
+      messages = buildRoadmapProductMessages(roadmapModel, tech);
+    } catch (error) {
+      console.error('Roadmap product build error:', error);
+      return res.status(500).json({ error: 'Failed to build product prompt' });
+    }
+
+    await streamRoadmapLayer(res, { messages, ...gate, maxTokens: 2000, layerName: 'product perspective' });
+  });
+
+  /**
+   * Layer 3a — Trajectory / aspirational.
+   * @route POST /workspace/:urlKey/api/roadmap/narrative/trajectory
+   */
+  router.post('/workspace/:urlKey/api/roadmap/narrative/trajectory', workspaceFromUrl, async (req, res) => {
+    const gate = await gateRoadmapLLMRequest(req, res);
+    if (!gate) return;
+
+    const { roadmapModel, tech, product } = req.body || {};
+    if (!roadmapModel) {
+      return res.status(400).json({ error: 'roadmapModel is required' });
+    }
+    if (typeof tech !== 'string' || !tech.trim()) {
+      return res.status(400).json({ error: 'tech (layer 1 narrative) is required as a non-empty string' });
+    }
+    if (typeof product !== 'string' || !product.trim()) {
+      return res.status(400).json({ error: 'product (layer 2 narrative) is required as a non-empty string' });
+    }
+
+    let messages;
+    try {
+      const { buildRoadmapTrajectoryMessages } = await import('../lib/prompts/roadmap-trajectory-template.js');
+      messages = buildRoadmapTrajectoryMessages(roadmapModel, tech, product);
+    } catch (error) {
+      console.error('Roadmap trajectory build error:', error);
+      return res.status(500).json({ error: 'Failed to build trajectory prompt' });
+    }
+
+    await streamRoadmapLayer(res, { messages, ...gate, maxTokens: 2000, layerName: 'trajectory reading' });
+  });
+
+  /**
+   * Layer 3b — North star reading.
+   * @route POST /workspace/:urlKey/api/roadmap/narrative/north-star
+   */
+  router.post('/workspace/:urlKey/api/roadmap/narrative/north-star', workspaceFromUrl, async (req, res) => {
+    const gate = await gateRoadmapLLMRequest(req, res);
+    if (!gate) return;
+
+    const { roadmapModel, northStar } = req.body || {};
+    if (!roadmapModel) {
+      return res.status(400).json({ error: 'roadmapModel is required' });
+    }
+    if (typeof northStar !== 'string' || !northStar.trim()) {
+      return res.status(400).json({ error: 'northStar is required as a non-empty string' });
+    }
+
+    let messages;
+    try {
+      const { buildRoadmapNorthStarMessages } = await import('../lib/prompts/roadmap-north-star-template.js');
+      messages = buildRoadmapNorthStarMessages(roadmapModel, northStar);
+    } catch (error) {
+      console.error('Roadmap north-star build error:', error);
+      return res.status(500).json({ error: 'Failed to build north-star prompt' });
+    }
+
+    await streamRoadmapLayer(res, { messages, ...gate, maxTokens: 2500, layerName: 'north-star reading' });
+  });
+
+  /**
+   * Layer 4 — Gap analysis.
+   * @route POST /workspace/:urlKey/api/roadmap/narrative/gap
+   */
+  router.post('/workspace/:urlKey/api/roadmap/narrative/gap', workspaceFromUrl, async (req, res) => {
+    const gate = await gateRoadmapLLMRequest(req, res);
+    if (!gate) return;
+
+    const { northStar, trajectory, nsReading } = req.body || {};
+    if (typeof northStar !== 'string' || !northStar.trim()) {
+      return res.status(400).json({ error: 'northStar is required as a non-empty string' });
+    }
+    if (typeof trajectory !== 'string' || !trajectory.trim()) {
+      return res.status(400).json({ error: 'trajectory (layer 3a output) is required as a non-empty string' });
+    }
+    if (typeof nsReading !== 'string' || !nsReading.trim()) {
+      return res.status(400).json({ error: 'nsReading (layer 3b output) is required as a non-empty string' });
+    }
+
+    let messages;
+    try {
+      const { buildRoadmapGapMessages } = await import('../lib/prompts/roadmap-gap-template.js');
+      messages = buildRoadmapGapMessages(northStar, trajectory, nsReading);
+    } catch (error) {
+      console.error('Roadmap gap build error:', error);
+      return res.status(500).json({ error: 'Failed to build gap prompt' });
+    }
+
+    await streamRoadmapLayer(res, { messages, ...gate, maxTokens: 1500, layerName: 'gap analysis' });
   });
 
   /**

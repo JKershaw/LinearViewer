@@ -159,10 +159,10 @@ POST /auth/openrouter/disconnect → Remove stored API key
 When `OPENROUTER_FREE_TIER_KEY` is set, users without an OpenRouter connection get limited free prompts:
 
 - API key source priority: user OAuth > env key > free tier key > none
-- Per-workspace daily limit: 5 prompts (resets at midnight UTC)
+- Per-workspace daily limit: 20 prompts (resets at midnight UTC)
 - Global hourly limit: 50 prompts across all workspaces
 - Uses atomic check-and-increment (`tryUse()`) to prevent race conditions
-- Footer shows `ai: ● free (N/5)` status; settings page shows usage info
+- Footer shows `ai: ● free (N/20)` status; settings page shows usage info
 - Returns 429 with usage metadata when limits exceeded
 
 ## Environment Variables
