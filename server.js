@@ -194,7 +194,7 @@ const foremanStore = new ForemanStore({
 const freeTierCollection = db.collection('free-tier-usage')
 const freeTierStore = new FreeTierStore({
   collection: freeTierCollection,
-  dailyLimit: parseInt(process.env.FREE_TIER_DAILY_LIMIT, 10) || 5,
+  dailyLimit: parseInt(process.env.FREE_TIER_DAILY_LIMIT, 10) || 20,
   hourlyLimit: parseInt(process.env.FREE_TIER_HOURLY_LIMIT, 10) || 50
 })
 
