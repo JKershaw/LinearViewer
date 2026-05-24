@@ -5,7 +5,8 @@
  * configurations. Used for visual review during development of the
  * blocking/staggering feature.
  *
- * Run: npx playwright test tests/e2e/swim-blocking-screenshots.spec.js --project=chromium
+ * Run manually: npx playwright test --config=playwright.visual.config.js tests/visual/swim-blocking-screenshots.spec.js
+ * Not part of `npm test` — these write artifacts, they do not assert.
  * Screenshots: tests/screenshots/swim-blocking/
  */
 import { test, expect } from '../fixtures/test-base.js';

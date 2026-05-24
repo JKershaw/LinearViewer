@@ -234,7 +234,7 @@ CLI aesthetic, consistent with the rest of the app.
 
 ---
 
-## Step 7: Screenshot Maker (`tests/e2e/swim-screenshots.spec.js`)
+## Step 7: Screenshot Maker (`tests/visual/swim-screenshots.spec.js`)
 
 A Playwright test file specifically for generating screenshots of the swim view
 with different configurations. Not part of the regular test suite — run manually.
@@ -257,7 +257,7 @@ with different configurations. Not part of the regular test suite — run manual
 
 **Output:** Screenshots saved to `tests/screenshots/swim/` directory.
 
-**Run command:** `npx playwright test tests/e2e/swim-screenshots.spec.js --project=chromium`
+**Run command:** `npx playwright test --config=playwright.visual.config.js tests/visual/swim-screenshots.spec.js`
 
 The test file uses `test.describe.configure({ mode: 'serial' })` since screenshots
 are sequential. Each test case:

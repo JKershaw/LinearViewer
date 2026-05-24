@@ -2,7 +2,8 @@
  * Swim Page Screenshot Maker
  *
  * Captures screenshots of the swim view with different configurations.
- * Run manually: npx playwright test tests/e2e/swim-screenshots.spec.js --project=chromium
+ * Run manually: npx playwright test --config=playwright.visual.config.js tests/visual/swim-screenshots.spec.js
+ * Not part of `npm test` — these write artifacts, they do not assert.
  *
  * Screenshots saved to: tests/screenshots/swim/
  */

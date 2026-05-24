@@ -469,7 +469,7 @@ describe('renderRoadmapPage with real model', () => {
       { urlKey: 'test-ws', openRouterSource: null }
     );
 
-    assert.ok(html.includes('roadmap-narrative hidden'), 'narrative should be hidden');
+    assert.ok(html.includes('roadmap-pipeline hidden'), 'pipeline should be hidden');
     assert.ok(html.includes('roadmap-chat hidden'), 'chat should be hidden');
   });
 
@@ -480,7 +480,7 @@ describe('renderRoadmapPage with real model', () => {
       { urlKey: 'test-ws', openRouterSource: 'oauth' }
     );
 
-    assert.ok(!html.includes('roadmap-narrative hidden'), 'narrative should be visible');
+    assert.ok(!html.includes('roadmap-pipeline hidden'), 'pipeline should be visible');
     assert.ok(!html.includes('roadmap-chat hidden'), 'chat should be visible');
   });
 

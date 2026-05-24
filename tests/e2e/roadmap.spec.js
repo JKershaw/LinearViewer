@@ -82,14 +82,14 @@ test.describe('Roadmap Page', () => {
     expect(page.url()).not.toContain('/roadmap');
   });
 
-  test('narrative section hidden without AI', async ({ page }) => {
+  test('pipeline section hidden without AI', async ({ page }) => {
     await page.goto(ROADMAP_URL);
     await page.waitForLoadState('networkidle');
 
-    // Without OpenRouter, narrative section should be hidden
-    const narrativeSection = page.locator('.roadmap-narrative');
-    if (await narrativeSection.count() > 0) {
-      await expect(narrativeSection).toHaveClass(/hidden/);
+    // Without OpenRouter, pipeline section should be hidden
+    const pipelineSection = page.locator('.roadmap-pipeline');
+    if (await pipelineSection.count() > 0) {
+      await expect(pipelineSection).toHaveClass(/hidden/);
     }
   });
 
@@ -242,6 +242,165 @@ test.describe('Roadmap Pipeline Layer Endpoints', () => {
       data: { northStar: 'x', trajectory: 'y' }
     });
     expect(response.status()).toBe(400);
+  });
+});
+
+// =============================================================================
+// Pipeline UI scaffolding (north star textarea, five section placeholders,
+// generate-reading button). With AI configured via openRouterConnected=true.
+// =============================================================================
+
+test.describe('Roadmap Pipeline UI', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto(`/test/set-session?features=${FEATURES}&openRouterConnected=true`);
+  });
+
+  test('renders north star textarea, all five section placeholders, and generate button', async ({ page }) => {
+    await page.goto(ROADMAP_URL);
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('.roadmap-pipeline')).toBeVisible();
+    await expect(page.locator('.roadmap-north-star-input')).toBeVisible();
+    await expect(page.locator('.roadmap-generate-reading-btn')).toBeVisible();
+
+    // Five section placeholders, identified by layer attribute
+    await expect(page.locator('[data-layer="technical"]')).toBeVisible();
+    await expect(page.locator('[data-layer="product"]')).toBeVisible();
+    await expect(page.locator('[data-layer="trajectory"]')).toBeVisible();
+    await expect(page.locator('[data-layer="north-star-reading"]')).toBeVisible();
+    await expect(page.locator('[data-layer="gap"]')).toBeVisible();
+  });
+
+  test('trajectory and north-star-reading render as siblings with identical structure', async ({ page }) => {
+    await page.goto(ROADMAP_URL);
+    await page.waitForLoadState('networkidle');
+
+    // The two forked layers should share a parent container with the same
+    // heading element so visual framing renders neither as primary.
+    const trajectory = page.locator('[data-layer="trajectory"]');
+    const nsReading = page.locator('[data-layer="north-star-reading"]');
+    await expect(trajectory.locator('.roadmap-layer-heading')).toBeVisible();
+    await expect(nsReading.locator('.roadmap-layer-heading')).toBeVisible();
+  });
+
+  test('north star textarea is hidden when AI is not configured', async ({ page }) => {
+    // Override the beforeEach: set session WITHOUT openRouterConnected
+    await page.goto(`/test/set-session?features=${FEATURES}`);
+    await page.goto(ROADMAP_URL);
+    await page.waitForLoadState('networkidle');
+
+    const pipelineSection = page.locator('.roadmap-pipeline');
+    if (await pipelineSection.count() > 0) {
+      await expect(pipelineSection).toHaveClass(/hidden/);
+    }
+  });
+
+  test('north star textarea loads saved value on page load', async ({ page }) => {
+    // Save a value via the API using the page's cookie context
+    const saved = 'Be the simplest way to ship.';
+    const pageRequest = page.context().request;
+    await pageRequest.put(`/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/north-star`, {
+      data: { northStar: saved }
+    });
+
+    await page.goto(ROADMAP_URL);
+    await page.waitForLoadState('networkidle');
+
+    const textarea = page.locator('.roadmap-north-star-input');
+    await expect(textarea).toHaveValue(saved);
+  });
+
+  test('north star textarea saves changes on blur', async ({ page }) => {
+    await page.goto(ROADMAP_URL);
+    await page.waitForLoadState('networkidle');
+
+    const textarea = page.locator('.roadmap-north-star-input');
+    await textarea.fill('Updated north star value.');
+    await textarea.blur();
+
+    // Wait briefly for the blurred save to land
+    await page.waitForTimeout(500);
+
+    const pageRequest = page.context().request;
+    const response = await pageRequest.get(`/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/north-star`);
+    const body = await response.json();
+    expect(body.northStar).toBe('Updated north star value.');
+  });
+
+  test('all five sections show "not yet" state before generate', async ({ page }) => {
+    await page.goto(ROADMAP_URL);
+    await page.waitForLoadState('networkidle');
+
+    // Each layer placeholder should have status text indicating it has not yet generated
+    const layers = ['technical', 'product', 'trajectory', 'north-star-reading', 'gap'];
+    for (const layer of layers) {
+      const section = page.locator(`[data-layer="${layer}"]`);
+      await expect(section).toBeVisible();
+      // Default state class signals "not yet generated"
+      await expect(section).toHaveAttribute('data-state', 'idle');
+    }
+  });
+
+  test('clicking generate-reading runs all five layers when north star is set', async ({ page }) => {
+    // Pre-set a north star so layers 3b and 4 fire
+    const pageRequest = page.context().request;
+    await pageRequest.put(`/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/north-star`, {
+      data: { northStar: 'Be the simplest way to ship.' }
+    });
+
+    await page.goto(ROADMAP_URL);
+    await page.waitForLoadState('networkidle');
+
+    const btn = page.locator('.roadmap-generate-reading-btn');
+    await btn.click();
+
+    // Each layer should populate from its mock SSE stream
+    const expectedTexts = {
+      'technical': 'Mock technical narrative',
+      'product': 'Mock product perspective',
+      'trajectory': 'Mock trajectory',
+      'north-star-reading': 'Mock north star reading',
+      'gap': 'Mock gap analysis'
+    };
+
+    for (const [layer, text] of Object.entries(expectedTexts)) {
+      const content = page.locator(`[data-layer="${layer}"] .roadmap-layer-content`);
+      await expect(content).toContainText(text, { timeout: 10000 });
+    }
+
+    // Each layer's data-state should be 'done' after completion
+    for (const layer of Object.keys(expectedTexts)) {
+      await expect(page.locator(`[data-layer="${layer}"]`)).toHaveAttribute('data-state', 'done', { timeout: 10000 });
+    }
+
+    // Button should be re-enabled with regenerate label
+    await expect(btn).toBeEnabled();
+    await expect(btn).toContainText(/regenerate/i);
+  });
+
+  test('without a north star, layers 3b and 4 show CTA and do not run', async ({ page }) => {
+    // Ensure north star is empty
+    const pageRequest = page.context().request;
+    await pageRequest.put(`/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/north-star`, {
+      data: { northStar: '' }
+    });
+
+    await page.goto(ROADMAP_URL);
+    await page.waitForLoadState('networkidle');
+
+    const btn = page.locator('.roadmap-generate-reading-btn');
+    await btn.click();
+
+    // Layers 1, 2, 3a populate
+    await expect(page.locator('[data-layer="technical"] .roadmap-layer-content')).toContainText('Mock technical', { timeout: 10000 });
+    await expect(page.locator('[data-layer="product"] .roadmap-layer-content')).toContainText('Mock product', { timeout: 10000 });
+    await expect(page.locator('[data-layer="trajectory"] .roadmap-layer-content')).toContainText('Mock trajectory', { timeout: 10000 });
+
+    // Layer 3b and 4 stay in not-available state, no streamed content
+    await expect(page.locator('[data-layer="north-star-reading"]')).toHaveAttribute('data-state', 'not-available');
+    await expect(page.locator('[data-layer="gap"]')).toHaveAttribute('data-state', 'not-available');
+    await expect(page.locator('[data-layer="north-star-reading"] .roadmap-layer-content')).toBeEmpty();
+    await expect(page.locator('[data-layer="gap"] .roadmap-layer-content')).toBeEmpty();
   });
 });
 

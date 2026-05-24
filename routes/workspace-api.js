@@ -1383,6 +1383,28 @@ ${goal}`;
   }
 
   /**
+   * Test-mode mock SSE for a pipeline layer. Splits the canned text into two
+   * chunks so the streaming UI exercises the token-accumulation path.
+   */
+  function emitMockLayerStream(res, text) {
+    res.set({
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    });
+    res.flushHeaders();
+    const half = Math.max(1, Math.floor(text.length / 2));
+    sendSSE(res, 'token', { token: text.slice(0, half) });
+    sendSSE(res, 'token', { token: text.slice(half) });
+    sendSSE(res, 'done', { finishReason: 'stop' });
+    res.end();
+  }
+
+  function isRoadmapTestMode(req) {
+    return process.env.NODE_ENV === 'test' && req.workspace && req.workspace.accessToken === 'test-token';
+  }
+
+  /**
    * Layer 1 — Technical narrative.
    * @route POST /workspace/:urlKey/api/roadmap/narrative/technical
    */
@@ -1393,6 +1415,10 @@ ${goal}`;
     const { roadmapModel } = req.body || {};
     if (!roadmapModel) {
       return res.status(400).json({ error: 'roadmapModel is required' });
+    }
+
+    if (isRoadmapTestMode(req)) {
+      return emitMockLayerStream(res, 'Mock technical narrative covering recent delivery.');
     }
 
     let messages;
@@ -1421,6 +1447,10 @@ ${goal}`;
     }
     if (typeof tech !== 'string' || !tech.trim()) {
       return res.status(400).json({ error: 'tech (layer 1 narrative) is required as a non-empty string' });
+    }
+
+    if (isRoadmapTestMode(req)) {
+      return emitMockLayerStream(res, 'Mock product perspective synthesizing themes from layer 1.');
     }
 
     let messages;
@@ -1454,6 +1484,10 @@ ${goal}`;
       return res.status(400).json({ error: 'product (layer 2 narrative) is required as a non-empty string' });
     }
 
+    if (isRoadmapTestMode(req)) {
+      return emitMockLayerStream(res, 'Mock trajectory at this pace pointing toward simpler onboarding.');
+    }
+
     let messages;
     try {
       const { buildRoadmapTrajectoryMessages } = await import('../lib/prompts/roadmap-trajectory-template.js');
@@ -1480,6 +1514,10 @@ ${goal}`;
     }
     if (typeof northStar !== 'string' || !northStar.trim()) {
       return res.status(400).json({ error: 'northStar is required as a non-empty string' });
+    }
+
+    if (isRoadmapTestMode(req)) {
+      return emitMockLayerStream(res, 'Mock north star reading: aligned to stated intent.');
     }
 
     let messages;
@@ -1511,6 +1549,10 @@ ${goal}`;
     }
     if (typeof nsReading !== 'string' || !nsReading.trim()) {
       return res.status(400).json({ error: 'nsReading (layer 3b output) is required as a non-empty string' });
+    }
+
+    if (isRoadmapTestMode(req)) {
+      return emitMockLayerStream(res, 'Mock gap analysis: trajectory and intent largely agree.');
     }
 
     let messages;
