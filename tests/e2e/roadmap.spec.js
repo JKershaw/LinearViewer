@@ -182,3 +182,104 @@ test.describe('Roadmap API Endpoints', () => {
     expect(body.error).toContain('AI not configured');
   });
 });
+
+test.describe('Roadmap North Star Storage', () => {
+  const NORTH_STAR_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/north-star`;
+
+  test('GET returns 403 when feature flag is off', async ({ request }) => {
+    const noRoadmap = encodeURIComponent(JSON.stringify({ roadmap: false }));
+    await request.get(`/test/set-session?features=${noRoadmap}`);
+
+    const response = await request.get(NORTH_STAR_URL);
+    expect(response.status()).toBe(403);
+  });
+
+  test('PUT returns 403 when feature flag is off', async ({ request }) => {
+    const noRoadmap = encodeURIComponent(JSON.stringify({ roadmap: false }));
+    await request.get(`/test/set-session?features=${noRoadmap}`);
+
+    const response = await request.put(NORTH_STAR_URL, {
+      data: { northStar: 'test' }
+    });
+    expect(response.status()).toBe(403);
+  });
+
+  test('GET returns empty string by default', async ({ request }) => {
+    await request.get(`/test/set-session?features=${FEATURES}`);
+
+    const response = await request.get(NORTH_STAR_URL);
+    expect(response.status()).toBe(200);
+    const body = await response.json();
+    expect(body).toHaveProperty('northStar');
+    expect(body.northStar).toBe('');
+  });
+
+  test('PUT then GET round-trips the value', async ({ request }) => {
+    await request.get(`/test/set-session?features=${FEATURES}`);
+
+    const text = 'Become the simplest way for non-technical founders to ship a product.';
+    const putRes = await request.put(NORTH_STAR_URL, {
+      data: { northStar: text }
+    });
+    expect(putRes.status()).toBe(200);
+    const putBody = await putRes.json();
+    expect(putBody).toMatchObject({ ok: true });
+
+    const getRes = await request.get(NORTH_STAR_URL);
+    expect(getRes.status()).toBe(200);
+    const getBody = await getRes.json();
+    expect(getBody.northStar).toBe(text);
+  });
+
+  test('PUT rejects non-string body', async ({ request }) => {
+    await request.get(`/test/set-session?features=${FEATURES}`);
+
+    const response = await request.put(NORTH_STAR_URL, {
+      data: { northStar: 123 }
+    });
+    expect(response.status()).toBe(400);
+  });
+
+  test('PUT rejects oversized input', async ({ request }) => {
+    await request.get(`/test/set-session?features=${FEATURES}`);
+
+    const huge = 'x'.repeat(9000);
+    const response = await request.put(NORTH_STAR_URL, {
+      data: { northStar: huge }
+    });
+    expect(response.status()).toBe(400);
+  });
+
+  test('PUT accepts empty string (clearing the value)', async ({ request }) => {
+    await request.get(`/test/set-session?features=${FEATURES}`);
+
+    // Set a value first
+    await request.put(NORTH_STAR_URL, { data: { northStar: 'initial' } });
+
+    // Now clear it
+    const clearRes = await request.put(NORTH_STAR_URL, {
+      data: { northStar: '' }
+    });
+    expect(clearRes.status()).toBe(200);
+
+    const getRes = await request.get(NORTH_STAR_URL);
+    const body = await getRes.json();
+    expect(body.northStar).toBe('');
+  });
+
+  test('values are scoped per workspace', async ({ request }) => {
+    // Set up two workspaces via the multiWorkspace test flag
+    await request.get(`/test/set-session?features=${FEATURES}&multiWorkspace=true`);
+
+    const url1 = `/workspace/test-workspace/api/roadmap/north-star`;
+    const url2 = `/workspace/second-workspace/api/roadmap/north-star`;
+
+    await request.put(url1, { data: { northStar: 'star one' } });
+    await request.put(url2, { data: { northStar: 'star two' } });
+
+    const get1 = await request.get(url1);
+    const get2 = await request.get(url2);
+    expect((await get1.json()).northStar).toBe('star one');
+    expect((await get2.json()).northStar).toBe('star two');
+  });
+});

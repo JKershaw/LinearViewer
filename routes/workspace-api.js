@@ -1248,6 +1248,69 @@ ${goal}`;
   // Roadmap API Endpoints
   // ===========================================================================
 
+  const NORTH_STAR_MAX_CHARS = 8000;
+
+  /**
+   * Get the saved north star for this workspace.
+   * Reads from session; auth callback hydrates the session from user prefs.
+   * @route GET /workspace/:urlKey/api/roadmap/north-star
+   */
+  router.get('/workspace/:urlKey/api/roadmap/north-star', workspaceFromUrl, (req, res) => {
+    const featureFlags = getFeatureFlags(req.session);
+    if (!featureFlags.roadmap) {
+      return res.status(403).json({ error: 'Roadmap feature is not enabled' });
+    }
+    const byWorkspace = req.session.northStarByWorkspace || {};
+    const northStar = byWorkspace[req.workspace.urlKey] || '';
+    res.json({ northStar });
+  });
+
+  /**
+   * Set the north star for this workspace.
+   * Writes to session (authoritative) and best-effort to user preferences for
+   * cross-device sync, mirroring the modelId/features pattern.
+   * @route PUT /workspace/:urlKey/api/roadmap/north-star
+   */
+  router.put('/workspace/:urlKey/api/roadmap/north-star', workspaceFromUrl, async (req, res) => {
+    const featureFlags = getFeatureFlags(req.session);
+    if (!featureFlags.roadmap) {
+      return res.status(403).json({ error: 'Roadmap feature is not enabled' });
+    }
+
+    const { northStar } = req.body || {};
+    if (typeof northStar !== 'string') {
+      return res.status(400).json({ error: 'northStar must be a string' });
+    }
+    if (northStar.length > NORTH_STAR_MAX_CHARS) {
+      return res.status(400).json({ error: `northStar must be ${NORTH_STAR_MAX_CHARS} characters or fewer` });
+    }
+
+    if (!req.session.northStarByWorkspace) {
+      req.session.northStarByWorkspace = {};
+    }
+    req.session.northStarByWorkspace[req.workspace.urlKey] = northStar;
+
+    // Best-effort write-through to user preferences for cross-device sync.
+    // Non-fatal: session is authoritative.
+    if (userPreferencesStore && req.session.linearUserId) {
+      try {
+        const existing = await userPreferencesStore.getUserPreferences(req.session.linearUserId);
+        const existingMap = existing.northStarByWorkspace || {};
+        await userPreferencesStore.saveUserPreferences(req.session.linearUserId, {
+          ...existing,
+          northStarByWorkspace: {
+            ...existingMap,
+            [req.workspace.urlKey]: northStar
+          }
+        });
+      } catch (err) {
+        console.error('Failed to persist north star to preferences store:', err);
+      }
+    }
+
+    res.json({ ok: true });
+  });
+
   /**
    * Generate roadmap narrative via SSE streaming.
    * Client POSTs the roadmap model (already computed and embedded in the page).
