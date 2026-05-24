@@ -1430,7 +1430,7 @@ ${goal}`;
       return res.status(500).json({ error: 'Failed to build technical prompt' });
     }
 
-    await streamRoadmapLayer(res, { messages, ...gate, maxTokens: 2500, layerName: 'technical narrative' });
+    await streamRoadmapLayer(res, { messages, ...gate, maxTokens: 5000, layerName: 'technical narrative' });
   });
 
   /**
@@ -1462,7 +1462,7 @@ ${goal}`;
       return res.status(500).json({ error: 'Failed to build product prompt' });
     }
 
-    await streamRoadmapLayer(res, { messages, ...gate, maxTokens: 2000, layerName: 'product perspective' });
+    await streamRoadmapLayer(res, { messages, ...gate, maxTokens: 4000, layerName: 'product perspective' });
   });
 
   /**
@@ -1497,7 +1497,7 @@ ${goal}`;
       return res.status(500).json({ error: 'Failed to build trajectory prompt' });
     }
 
-    await streamRoadmapLayer(res, { messages, ...gate, maxTokens: 2000, layerName: 'trajectory reading' });
+    await streamRoadmapLayer(res, { messages, ...gate, maxTokens: 4000, layerName: 'trajectory reading' });
   });
 
   /**
@@ -1529,7 +1529,7 @@ ${goal}`;
       return res.status(500).json({ error: 'Failed to build north-star prompt' });
     }
 
-    await streamRoadmapLayer(res, { messages, ...gate, maxTokens: 2500, layerName: 'north-star reading' });
+    await streamRoadmapLayer(res, { messages, ...gate, maxTokens: 5000, layerName: 'north-star reading' });
   });
 
   /**
@@ -1564,7 +1564,7 @@ ${goal}`;
       return res.status(500).json({ error: 'Failed to build gap prompt' });
     }
 
-    await streamRoadmapLayer(res, { messages, ...gate, maxTokens: 1500, layerName: 'gap analysis' });
+    await streamRoadmapLayer(res, { messages, ...gate, maxTokens: 3000, layerName: 'gap analysis' });
   });
 
   /**
@@ -1644,7 +1644,7 @@ ${goal}`;
     try {
       await streamChat(
         messages,
-        { apiKey: apiKeyToUse, model: selectedModel, maxTokens: 1500 },
+        { apiKey: apiKeyToUse, model: selectedModel, maxTokens: 3000 },
         (type, data) => {
           sendSSE(res, type, data);
           if (type === 'done' || type === 'error') {
