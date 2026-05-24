@@ -108,13 +108,11 @@
 
     var btn = document.createElement('button');
     btn.className = 'roadmap-generate-btn';
-    btn.textContent = 'Regenerate';
-    btn.style.display = 'none';
+    btn.textContent = 'Generate narrative';
     section.appendChild(btn);
 
     function generate() {
       btn.disabled = true;
-      btn.style.display = 'none';
       content.textContent = '';
       status.textContent = 'Generating narrative from delivery data…';
       status.classList.add('roadmap-narrative-status--loading');
@@ -136,7 +134,6 @@
           status.classList.remove('roadmap-narrative-status--loading');
           content.textContent = 'Error generating narrative.';
           btn.disabled = false;
-          btn.style.display = '';
           btn.textContent = 'Try again';
           return;
         }
@@ -158,7 +155,6 @@
               content.textContent += '\n\n[output truncated — hit token limit. Try Regenerate.]';
             }
             btn.disabled = false;
-            btn.style.display = '';
             btn.textContent = 'Regenerate';
           } else if (type === 'error') {
             var errMsg = typeof eventData === 'object' ? (eventData.message || 'Error') : eventData;
@@ -166,7 +162,6 @@
             status.classList.remove('roadmap-narrative-status--loading');
             content.textContent += '\n[error: ' + errMsg + ']';
             btn.disabled = false;
-            btn.style.display = '';
             btn.textContent = 'Try again';
           }
         });
@@ -175,15 +170,11 @@
         status.classList.remove('roadmap-narrative-status--loading');
         content.textContent = 'Error generating narrative.';
         btn.disabled = false;
-        btn.style.display = '';
         btn.textContent = 'Try again';
       });
     }
 
     btn.addEventListener('click', generate);
-    // Auto-generate on page load. The narrative is the most informative
-    // output the page can produce, so users shouldn't have to click for it.
-    generate();
   }
 
   // =========================================================================
