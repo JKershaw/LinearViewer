@@ -352,49 +352,166 @@
 }
 
 /* =============================================================================
-   Narrative
+   Pipeline (five-layer narrative)
    ============================================================================= */
-.roadmap-narrative {
+.roadmap-pipeline {
   padding-top: 1.5em;
   border-top: 1px solid var(--fg-vdim);
 }
 
-.roadmap-narrative-status {
+.roadmap-north-star {
+  margin: 0.75em 0 1em;
+}
+
+.roadmap-north-star-label {
+  display: block;
+  font-family: var(--font-structural);
+  font-size: 0.85em;
+  color: var(--fg-dim);
+  margin-bottom: 0.3em;
+}
+
+.roadmap-north-star-input {
+  width: 100%;
+  font-family: var(--font-structural);
+  font-size: 0.85em;
+  line-height: 1.5;
+  padding: 0.5em;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--fg-vdim);
+  border-radius: 2px;
+  resize: vertical;
+  min-height: 4em;
+}
+
+.roadmap-north-star-input:focus {
+  outline: none;
+  border-color: var(--fg-dim);
+}
+
+.roadmap-north-star-help {
+  font-family: var(--font-structural);
+  font-size: 0.75em;
+  color: var(--fg-vdim);
+  margin: 0.3em 0 0;
+}
+
+.roadmap-pipeline-controls {
+  margin: 0.75em 0 1.25em;
+}
+
+.roadmap-generate-reading-btn {
+  font-family: var(--font-structural);
+  font-size: 0.85em;
+  padding: 0.4em 0.9em;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--fg-dim);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.roadmap-generate-reading-btn:hover:not(:disabled) {
+  background: var(--fg-vdim);
+}
+
+.roadmap-generate-reading-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.roadmap-layer {
+  margin: 1em 0;
+}
+
+.roadmap-layer-heading {
+  font-family: var(--font-structural);
+  font-size: 0.95em;
+  font-weight: 600;
+  color: var(--fg);
+  margin: 0 0 0.4em;
+}
+
+.roadmap-layer-status {
   font-family: var(--font-structural);
   font-size: 0.8em;
   color: var(--fg-dim);
-  margin: 0.5em 0;
+  margin: 0 0 0.4em;
   min-height: 1.2em;
 }
 
-.roadmap-narrative-status--loading::after {
+.roadmap-layer-status--loading::after {
   content: '';
   display: inline-block;
   width: 0;
   margin-left: 0.4em;
-  animation: roadmap-narrative-dots 1.4s steps(3, end) infinite;
+  animation: roadmap-pipeline-dots 1.4s steps(3, end) infinite;
   overflow: hidden;
 }
 
-@keyframes roadmap-narrative-dots {
+@keyframes roadmap-pipeline-dots {
   0% { width: 0; }
   33% { width: 0.3em; }
   66% { width: 0.6em; }
   100% { width: 0.9em; }
 }
 
-.roadmap-narrative-content {
+.roadmap-layer-content {
   font-family: var(--font-structural);
   font-size: 0.85em;
   white-space: pre-wrap;
   line-height: 1.6;
   color: var(--fg);
-  margin-top: 0.5em;
   min-height: 1.5em;
 }
 
-.roadmap-narrative .roadmap-generate-btn {
-  margin-top: 0.75em;
+.roadmap-layer[data-state="not-available"] .roadmap-layer-content {
+  color: var(--fg-dim);
+  font-style: italic;
+}
+
+.roadmap-layer[data-state="not-available"] .roadmap-layer-status {
+  color: var(--fg-dim);
+}
+
+.roadmap-layer[data-state="failed"] .roadmap-layer-status {
+  color: var(--accent, #c33);
+}
+
+.roadmap-layer-retry {
+  font-family: var(--font-structural);
+  font-size: 0.8em;
+  padding: 0.25em 0.7em;
+  margin-top: 0.4em;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--fg-dim);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.roadmap-layer-retry:hover {
+  background: var(--fg-vdim);
+}
+
+/* Fork — trajectory and north-star-reading rendered as visual siblings.
+   Side-by-side on wider viewports, stacked on narrow. Neither is "primary";
+   the design depends on equal visual weight. */
+.roadmap-fork {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25em;
+}
+
+@media (max-width: 640px) {
+  .roadmap-fork {
+    grid-template-columns: 1fr;
+  }
+}
+
+.roadmap-fork .roadmap-layer {
+  margin: 0;
 }
 
 /* =============================================================================
