@@ -2,7 +2,8 @@
  * Ship Page Screenshot Maker
  *
  * Captures screenshots of the Ship view for visual review.
- * Run: npx playwright test tests/e2e/ship-screenshots.spec.js --project=chromium
+ * Run manually: npx playwright test --config=playwright.visual.config.js tests/visual/ship-screenshots.spec.js
+ * Not part of `npm test` — these write artifacts, they do not assert.
  *
  * Output: tests/screenshots/ship/
  */
