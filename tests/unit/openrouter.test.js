@@ -12,6 +12,7 @@ import {
   isEpicShapedParent,
   EPIC_CHILD_THRESHOLD,
   COUSIN_CAP,
+  SIBLING_CAP,
   EPIC_TITLE_PATTERN
 } from '../../lib/openrouter.js';
 
@@ -218,7 +219,74 @@ describe('isEpicShapedParent', () => {
   test('exported constants have expected values', () => {
     assert.strictEqual(EPIC_CHILD_THRESHOLD, 4);
     assert.strictEqual(COUSIN_CAP, 20);
+    assert.strictEqual(SIBLING_CAP, 5);
     assert.ok(EPIC_TITLE_PATTERN instanceof RegExp);
+  });
+});
+
+describe('formatIssueContext siblings', () => {
+  const baseIssue = {
+    id: 'i-cur',
+    identifier: 'LIN-100',
+    title: 'Current issue',
+    description: 'Body',
+    state: { name: 'Todo', type: 'unstarted' },
+    labels: []
+  };
+
+  function makeSibling(num, stateType = 'unstarted', stateName = 'Todo') {
+    return {
+      id: `s-${num}`,
+      identifier: `LIN-${100 + num}`,
+      title: `Sibling ${num}`,
+      state: { name: stateName, type: stateType }
+    };
+  }
+
+  test('when truncation fires: renders explicit MCP-fetch nudge, not bare "…and N more"', () => {
+    // SIBLING_CAP + 7 total siblings, cap is 5, so 7 should be reported as "not shown"
+    const siblings = Array.from({ length: SIBLING_CAP }, (_, i) => makeSibling(i + 1));
+    const context = {
+      parent: { id: 'p1', identifier: 'LIN-50', title: 'Migration Epic', state: { name: 'In Progress', type: 'started' } },
+      parentChildCount: SIBLING_CAP + 7 + 1,
+      siblings,
+      siblingsTotal: SIBLING_CAP + 7,
+      cousins: [],
+      cousinsTotal: 0,
+      children: [],
+      comments: []
+    };
+    const result = formatIssueContext(baseIssue, context);
+    // Positive assertion on the instruction string
+    assert.ok(result.includes('7 siblings not shown.'), 'must report exact N not shown');
+    assert.ok(
+      result.includes('fetch the parent epic\'s full child list via Linear MCP'),
+      'must include explicit MCP-fetch instruction'
+    );
+    assert.ok(
+      result.includes('Strategy Framing'),
+      'must cross-reference the Strategy Framing step that consumes this list'
+    );
+    // Negative assertion: bare "…and N more" is the failure mode being prevented
+    assert.ok(!result.includes('…and '), 'must NOT use bare "…and N more"');
+    assert.ok(!result.match(/siblings.*and \d+ more/), 'must NOT use bare "and N more"');
+  });
+
+  test('when truncation does NOT fire: MCP-fetch nudge is absent', () => {
+    const context = {
+      parent: { id: 'p1', identifier: 'LIN-50', title: 'Migration Epic', state: { name: 'In Progress', type: 'started' } },
+      parentChildCount: 4,
+      siblings: [makeSibling(1), makeSibling(2), makeSibling(3)],
+      siblingsTotal: 3,
+      cousins: [],
+      cousinsTotal: 0,
+      children: [],
+      comments: []
+    };
+    const result = formatIssueContext(baseIssue, context);
+    assert.ok(result.includes('**Sibling Tasks:**'));
+    assert.ok(!result.includes('siblings not shown'), 'nudge must be absent when not truncated');
+    assert.ok(!result.includes('full child list via Linear MCP'), 'MCP-fetch instruction absent when not truncated');
   });
 });
 
