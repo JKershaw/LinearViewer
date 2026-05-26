@@ -17,7 +17,8 @@ import { GraphQLClient, gql } from 'graphql-request';
 import rateLimit from 'express-rate-limit';
 import { createProxyFetch } from '../lib/proxy-fetch.js';
 import { fetchProjects, fetchIssueContext, fetchRecommendationContext } from '../lib/linear.js';
-import { isRecommendationEnabled, getRecommendation, DEFAULT_MODEL } from '../lib/openrouter.js';
+import { isRecommendationEnabled, getRecommendation } from '../lib/openrouter.js';
+import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { generateRecap } from '../lib/recap.js';
 import { hashContext } from '../lib/recap-cache.js';
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, isTerminalState, NO_PROJECT_ID } from '../lib/tree.js';
@@ -525,7 +526,7 @@ const UPDATE_ISSUE_LABELS_MUTATION = gql`
  * @param {Function} options.getWorkspaceOpenRouterKey - Function to get OpenRouter API key from workspace sessions
  * @returns {Router} Express router with proxy routes
  */
-export function createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, workspaceFromUrl, getWorkspaceAccessToken, getWorkspaceOpenRouterKey }) {
+export function createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, workspaceFromUrl, getWorkspaceAccessToken, getWorkspaceOpenRouterKey, workspacePreferencesStore }) {
   const router = Router();
 
   // =========================================================================
@@ -1934,11 +1935,12 @@ ${readEndpoints}${writeEndpoints}
 
         // Get AI-generated recommendation (uses session OAuth key or server-side OPENROUTER_API_KEY)
         // Uses a longer timeout since this makes a Linear API call + an OpenRouter LLM call.
+        const selectedModel = await resolveWorkspaceModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore });
         const recommendation = await withTimeout(
           getRecommendation(
             issue,
             { parent, siblings, project, children, comments, focusedChild },
-            { apiKey: sessionApiKey, featureFlags: {} }
+            { apiKey: sessionApiKey, model: selectedModel, featureFlags: {} }
           ),
           MULTI_REQUEST_TIMEOUT_MS
         );
@@ -2061,14 +2063,15 @@ ${readEndpoints}${writeEndpoints}
           return keepalive.send(503, { error: 'AI recap is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.' });
         }
 
+        const selectedModel = await resolveWorkspaceModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore });
         let recap;
         let modelUsed;
         if (isTestMode) {
           recap = buildMockRecapFromContext(context);
-          modelUsed = DEFAULT_MODEL;
+          modelUsed = selectedModel;
         } else {
           const result = await withTimeout(
-            generateRecap(context.issue, context, { apiKey: sessionApiKey, model: DEFAULT_MODEL }),
+            generateRecap(context.issue, context, { apiKey: sessionApiKey, model: selectedModel }),
             MULTI_REQUEST_TIMEOUT_MS
           );
           recap = result.recap;
@@ -2164,14 +2167,15 @@ ${readEndpoints}${writeEndpoints}
         const canonicalId = context.issue?.id || identifier;
         const inputHash = hashContext(context);
 
+        const selectedModel = await resolveWorkspaceModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore });
         let recap;
         let modelUsed;
         if (isTestMode) {
           recap = buildMockRecapFromContext(context);
-          modelUsed = DEFAULT_MODEL;
+          modelUsed = selectedModel;
         } else {
           const result = await withTimeout(
-            generateRecap(context.issue, context, { apiKey: sessionApiKey, model: DEFAULT_MODEL }),
+            generateRecap(context.issue, context, { apiKey: sessionApiKey, model: selectedModel }),
             MULTI_REQUEST_TIMEOUT_MS
           );
           recap = result.recap;

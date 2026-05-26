@@ -56,7 +56,8 @@ import { renderRoadmapPage } from './lib/render-roadmap.js'
 import { calculateVelocity, buildExecutionQueue, groupByProject, projectTimeline, findCriticalPaths, assessRisks, analyzeRoadmap, issueToRoadmapCard } from './lib/roadmap.js'
 import { renderProxyPage } from './lib/render-proxy.js'
 import { renderForemanPage } from './lib/render-foreman.js'
-import { DEFAULT_MODEL, AVAILABLE_MODELS } from './lib/openrouter.js'
+import { AVAILABLE_MODELS } from './lib/openrouter.js'
+import { resolveWorkspaceModel } from './lib/workspace-preferences.js'
 import { getFeatureFlags, isValidFeatureKey } from './lib/feature-defaults.js'
 
 // =============================================================================
@@ -1096,15 +1097,15 @@ app.get('/workspace/:urlKey/audit', workspaceFromUrl, (req, res) => {
  * Settings page - requires authentication.
  * Displays user preferences and AI configuration.
  */
-app.get('/workspace/:urlKey/settings', workspaceFromUrl, (req, res) => {
+app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
   const workspace = req.workspace;
 
   // Determine OpenRouter connection status
   const openRouterSource = getOpenRouterSource(req);
   const deployInfo = getDeployInfo();
 
-  // Get current model selection (from session or default)
-  const currentModel = req.session.modelId || DEFAULT_MODEL;
+  // Get current workspace model selection (helper handles default)
+  const currentModel = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore });
 
   // Check for model validation error from redirect
   const modelError = req.query.error;
