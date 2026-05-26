@@ -14,7 +14,8 @@ import { generatePrompt, generateCustomPrompt, hasPrompt, getAvailablePrompts } 
 import { PREPARING_LABEL, WORK_ISSUE_LABELS } from '../lib/workflow-config.js';
 import { parseRepoFromDescription } from '../lib/prompt-formatters.js';
 import { buildForemanPlaybook } from '../lib/prompts/foreman-playbook.js';
-import { isRecommendationEnabled, getRecommendation, getRecommendationStream, streamChat, DEFAULT_MODEL } from '../lib/openrouter.js';
+import { isRecommendationEnabled, getRecommendation, getRecommendationStream, streamChat } from '../lib/openrouter.js';
+import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { generateRecap } from '../lib/recap.js';
 import { hashContext } from '../lib/recap-cache.js';
 import { runAudit, computeAuditFromData } from '../lib/audit.js';
@@ -32,7 +33,7 @@ import { testMockTeams, testMockData } from '../tests/fixtures/mock-data.js';
  * @param {Function} options.getOpenRouterSource - Helper to determine OpenRouter source
  * @returns {Router} Express router
  */
-export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, customPromptsStore, recapCacheStore }) {
+export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore }) {
   const router = Router();
 
   // ===========================================================================
@@ -487,7 +488,7 @@ ${goal}`
       const { issue, parent, siblings, project, children, comments, focusedChild } = context
 
       // Get AI-generated prompt (pass session API key, free tier key, and model if available)
-      const selectedModel = req.session.modelId || DEFAULT_MODEL
+      const selectedModel = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore })
       const apiKeyToUse = sessionApiKey || (isFreeTier ? freeTierKey : undefined)
       const recommendation = await getRecommendation(issue, { parent, siblings, project, children, comments, focusedChild }, { apiKey: apiKeyToUse, model: selectedModel, featureFlags: getFeatureFlags(req.session) })
 
@@ -719,7 +720,7 @@ ${goal}`;
       if (closed) return;
 
       // Phase 2: Stream AI recommendation
-      const selectedModel = req.session.modelId || DEFAULT_MODEL;
+      const selectedModel = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore });
       const apiKeyToUse = sessionApiKey || (isFreeTier ? freeTierKey : undefined);
 
       // Build metadata to merge into the done event
@@ -941,7 +942,7 @@ ${goal}`;
 
       const canonicalId = context.issue?.id || issueId;
       const inputHash = hashContext(context);
-      const selectedModel = req.session.modelId || DEFAULT_MODEL;
+      const selectedModel = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore });
 
       let recap;
       let modelUsed;
@@ -1348,7 +1349,7 @@ ${goal}`;
       }
     }
 
-    const model = req.session.modelId || DEFAULT_MODEL;
+    const model = await resolveWorkspaceModel({ urlKey: req.workspace.urlKey, workspacePreferencesStore });
     return { apiKey, model };
   }
 
@@ -1631,7 +1632,7 @@ ${goal}`;
       return res.status(500).json({ error: 'Failed to build chat prompt' });
     }
 
-    const selectedModel = req.session.modelId || DEFAULT_MODEL;
+    const selectedModel = await resolveWorkspaceModel({ urlKey: req.workspace.urlKey, workspacePreferencesStore });
 
     // Start SSE
     res.set({

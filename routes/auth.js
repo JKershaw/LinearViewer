@@ -181,12 +181,10 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore }) {
         // Store Linear user ID for preference persistence
         req.session.linearUserId = viewer.id
 
-        // Load saved user preferences and apply to session
+        // Load saved user preferences and apply to session.
+        // modelId lives at the workspace level (LIN-283) — no session hydration here.
         if (userPreferencesStore) {
           const savedPrefs = await userPreferencesStore.getUserPreferences(viewer.id)
-          if (savedPrefs.modelId) {
-            req.session.modelId = savedPrefs.modelId
-          }
           if (savedPrefs.features) {
             req.session.features = savedPrefs.features
           }

@@ -14,6 +14,7 @@ import { MongoClient } from 'mongodb'
 import { MangoClient } from '@jkershaw/mangodb'
 import { MongoSessionStore } from './lib/session-store.js'
 import { UserPreferencesStore } from './lib/user-preferences.js'
+import { WorkspacePreferencesStore } from './lib/workspace-preferences.js'
 import { DispatchQueueStore } from './lib/dispatch-store.js'
 import { CustomPromptsStore } from './lib/custom-prompts-store.js'
 import { DispatchTokenStore } from './lib/dispatch-tokens.js'
@@ -55,7 +56,8 @@ import { renderRoadmapPage } from './lib/render-roadmap.js'
 import { calculateVelocity, buildExecutionQueue, groupByProject, projectTimeline, findCriticalPaths, assessRisks, analyzeRoadmap, issueToRoadmapCard } from './lib/roadmap.js'
 import { renderProxyPage } from './lib/render-proxy.js'
 import { renderForemanPage } from './lib/render-foreman.js'
-import { DEFAULT_MODEL, AVAILABLE_MODELS } from './lib/openrouter.js'
+import { AVAILABLE_MODELS } from './lib/openrouter.js'
+import { resolveWorkspaceModel } from './lib/workspace-preferences.js'
 import { getFeatureFlags, isValidFeatureKey } from './lib/feature-defaults.js'
 
 // =============================================================================
@@ -141,6 +143,14 @@ const sessionStore = new MongoSessionStore({
 
 const userPreferencesStore = new UserPreferencesStore({
   collection: userPreferencesCollection
+})
+
+// Workspace preferences (LIN-283): shared across all users of a Linear org,
+// keyed by urlKey. Holds the workspace AI model selection so that UI and
+// proxy traffic use the same model.
+const workspacePreferencesCollection = db.collection('workspace-preferences')
+const workspacePreferencesStore = new WorkspacePreferencesStore({
+  collection: workspacePreferencesCollection
 })
 
 // Custom prompts (workspace-scoped)
@@ -248,7 +258,7 @@ app.use(session({
 // Test Mode Setup
 // =============================================================================
 if (process.env.NODE_ENV === 'test') {
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, foremanStore, getWorkspaceAccessToken }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, getWorkspaceAccessToken }))
 }
 
 // =============================================================================
@@ -779,10 +789,10 @@ async function getWorkspaceOpenRouterKey(urlKey, linearUserId) {
   return null;
 }
 
-app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, workspaceFromUrl, getWorkspaceAccessToken, getWorkspaceOpenRouterKey }))
+app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, workspaceFromUrl, getWorkspaceAccessToken, getWorkspaceOpenRouterKey, workspacePreferencesStore }))
 
 // Mount workspace API routes (audit, prompts, recommendations, comments, images)
-app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, customPromptsStore, recapCacheStore }))
+app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore }))
 
 // Mount pipeline routes (page + JSON polling)
 app.use(createPipelineRoutes({ workspaceFromUrl, getWorkspaceAccessToken, dispatchQueueStore, foremanStore, getOpenRouterSource, getDeployInfo, handleUnauthorizedError }))
@@ -1087,15 +1097,15 @@ app.get('/workspace/:urlKey/audit', workspaceFromUrl, (req, res) => {
  * Settings page - requires authentication.
  * Displays user preferences and AI configuration.
  */
-app.get('/workspace/:urlKey/settings', workspaceFromUrl, (req, res) => {
+app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
   const workspace = req.workspace;
 
   // Determine OpenRouter connection status
   const openRouterSource = getOpenRouterSource(req);
   const deployInfo = getDeployInfo();
 
-  // Get current model selection (from session or default)
-  const currentModel = req.session.modelId || DEFAULT_MODEL;
+  // Get current workspace model selection (helper handles default)
+  const currentModel = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore });
 
   // Check for model validation error from redirect
   const modelError = req.query.error;
@@ -1254,7 +1264,9 @@ app.get('/workspace/:urlKey/foreman', workspaceFromUrl, (req, res) => {
 });
 
 /**
- * Save model selection to session.
+ * Save the workspace AI model selection.
+ * Persists to the workspace preferences store so all LLM call sites
+ * (UI + proxy) see the same value.
  * Accepts either a preset model ID or a custom model ID.
  */
 app.post('/workspace/:urlKey/settings/model', workspaceFromUrl, async (req, res) => {
@@ -1288,31 +1300,22 @@ app.post('/workspace/:urlKey/settings/model', workspaceFromUrl, async (req, res)
     return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings?error=invalid-format`);
   }
 
-  // Validation passed - save the model
-  req.session.modelId = selectedModel;
+  // Validation passed — save the model to workspace preferences.
+  // This is workspace-scoped (shared across all users of the org) so the
+  // selection applies to both UI and proxy/agent traffic.
   try {
-    await saveSession(req.session);
+    const existingPrefs = await workspacePreferencesStore.getWorkspacePreferences(workspace.urlKey);
+    const ok = await workspacePreferencesStore.saveWorkspacePreferences(workspace.urlKey, {
+      ...existingPrefs,
+      modelId: selectedModel
+    });
+    if (!ok) throw new Error('saveWorkspacePreferences returned false');
   } catch (err) {
-    console.error('Failed to save model preference:', err);
+    console.error('Failed to save workspace model preference:', err);
     return res.status(500).send(renderErrorPage('Settings Error', 'Failed to save model preference. Please try again.', {
       action: 'Back to settings',
       actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/settings`
     }));
-  }
-
-  // Best-effort persist to user preferences store for cross-device sync.
-  // Non-fatal: session is the authoritative source; preferences are for convenience
-  // across devices. If this fails, the model still works for the current session.
-  if (req.session.linearUserId) {
-    try {
-      const existingPrefs = await userPreferencesStore.getUserPreferences(req.session.linearUserId);
-      await userPreferencesStore.saveUserPreferences(req.session.linearUserId, {
-        ...existingPrefs,
-        modelId: selectedModel
-      });
-    } catch (err) {
-      console.error('Failed to persist model preference to preferences store:', err);
-    }
   }
 
   res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);

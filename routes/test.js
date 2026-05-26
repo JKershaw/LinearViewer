@@ -20,7 +20,7 @@ import { isValidFeatureKey } from '../lib/feature-defaults.js';
  * @param {Function} options.getWorkspaceAccessToken - Function to look up workspace access token
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, foremanStore, getWorkspaceAccessToken }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, getWorkspaceAccessToken }) {
   const router = Router();
 
   // Endpoint to set a test session without going through OAuth flow
@@ -289,6 +289,43 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       res.status(500).json({ error: err.message })
     }
   })
+
+  // Endpoint to clear a specific recap cache entry for tests.
+  // Query params: ?urlKey=...&issueId=...
+  router.get('/test/clear-recap-cache', async (req, res) => {
+    try {
+      const urlKey = req.query.urlKey || 'test-workspace';
+      const issueId = req.query.issueId;
+      if (!issueId) {
+        return res.status(400).json({ error: 'issueId required' });
+      }
+      await recapCacheStore.delete(urlKey, issueId);
+      res.send('ok');
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Endpoint to seed/clear the workspace model preference for tests.
+  // Query params: ?modelId=<id>  → save, or omit/empty → delete
+  router.get('/test/set-workspace-model', async (req, res) => {
+    try {
+      const urlKey = req.query.urlKey || 'test-workspace';
+      const modelId = req.query.modelId || '';
+      if (modelId) {
+        const existing = await workspacePreferencesStore.getWorkspacePreferences(urlKey);
+        await workspacePreferencesStore.saveWorkspacePreferences(urlKey, {
+          ...existing,
+          modelId
+        });
+      } else {
+        await workspacePreferencesStore.deleteWorkspacePreferences(urlKey);
+      }
+      res.send('ok');
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
 
   // Endpoint to test workspace access token lookup from sessions
   // Uses a non-test-workspace urlKey to bypass the test-mode shortcut
