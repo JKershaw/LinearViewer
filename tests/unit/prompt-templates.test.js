@@ -387,6 +387,41 @@ describe('bug template', () => {
     const template = PROMPT_TEMPLATES['bug'];
     assert.strictEqual(template.category, PROMPT_CATEGORIES.WORK_ISSUE);
   });
+
+  // LIN-279 AC #4: bug template is byte-identical pre/post the Strategy Framing change.
+  test('bug template does NOT include Strategy Framing', () => {
+    const result = generatePrompt('bug', mockIssue, mockContext);
+    assert.ok(!result.prompt.includes('Strategy Framing'), 'bug prompt must not include Strategy Framing');
+  });
+
+  test('bug template Goal block is byte-identical to inline snapshot', () => {
+    const result = generatePrompt('bug', mockIssue, mockContext);
+    // Inline snapshot of the bug template's ## Goal section, frozen at the time of LIN-279.
+    // Any change to bug Goal content will fail this assertion — that is the AC #4 lock.
+    // Note: the template's section array is .filter(Boolean)-ed, which strips empty
+    // strings — so adjacent items end up separated by a single '\n', not '\n\n'.
+    // This snapshot reflects the post-filter shape.
+    const expectedGoalBlock = [
+      '## Goal',
+      '**Role**: Act as a software debugger investigating unexpected behavior. You have authority to reproduce issues, trace root causes, and propose fixes, but should not deploy changes without review.',
+      'Start by reading any prior investigation notes in comments. Confirm the reproduction steps and root-cause hypotheses still match what you can observe now. If the behavior has changed since investigation, note it and re-verify before proposing a fix.',
+      'Identify reproduction steps, hypothesize likely causes, and suggest a debugging approach.',
+      'Investigation process:',
+      '1. Reproduce the issue (document exact steps)',
+      '2. Identify likely causes:',
+      '   - Run `git log --oneline -15 -- <affected file(s)>` and read recent commits; if 3+ commits touch the same file, that signals tight coupling or fragile code',
+      '   - Check `git log --all --grep="<keyword from bug description>"` to see if this was fixed before (if no results, widen the keyword or skip — absence of results doesn\'t mean no prior fix)',
+      '   - Examine the affected code paths for tight coupling or unusual patterns',
+      '3. Debug systematically (add logging, trace execution)',
+      '4. Propose fix with minimal scope',
+      '5. Verify fix doesn\'t introduce regressions',
+      '**When fixed**: Remove the `bug` label in Linear'
+    ].join('\n');
+    assert.ok(
+      result.prompt.includes(expectedGoalBlock),
+      'bug template Goal block must match snapshot byte-for-byte'
+    );
+  });
 });
 
 // =============================================================================
@@ -494,6 +529,36 @@ describe('plan template', () => {
   test('does not include preparing label removal when not present', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
     assert.ok(!result.prompt.includes('Label Update'));
+  });
+
+  // LIN-279: Strategy Framing must run before Scope Assessment.
+  // Reversing the order produces post-hoc justification of the cheap default.
+  test('includes Strategy Framing block', () => {
+    const result = generatePrompt('plan', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('Strategy Framing'), 'plan prompt must include Strategy Framing');
+  });
+
+  test('Strategy Framing appears before Scope Assessment', () => {
+    const result = generatePrompt('plan', mockIssue, mockContext);
+    const sfIdx = result.prompt.indexOf('Strategy Framing');
+    const saIdx = result.prompt.indexOf('Scope Assessment');
+    assert.notStrictEqual(sfIdx, -1, 'Strategy Framing must be present');
+    assert.notStrictEqual(saIdx, -1, 'Scope Assessment must be present');
+    assert.ok(sfIdx < saIdx, 'Strategy Framing must appear before Scope Assessment (ordering invariant)');
+  });
+
+  test('Strategy Framing block names cost-of-doing and cost-of-not-doing', () => {
+    const result = generatePrompt('plan', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('Cost of doing'), 'must name cost-of-doing axis');
+    assert.ok(result.prompt.includes('Cost of not doing'), 'must name cost-of-not-doing axis');
+  });
+
+  test('Strategy Framing block instructs naming routed-around contract gap', () => {
+    const result = generatePrompt('plan', mockIssue, mockContext);
+    // The block must instruct the consumer to NAME the gap (identifier or "none identified"),
+    // not just to describe it in prose. A bare description silently reintroduces the failure mode.
+    assert.ok(result.prompt.includes('NAME the routed-around contract gap'), 'must instruct naming the gap');
+    assert.ok(result.prompt.includes('none identified'), 'must allow "none identified" as an explicit alternative');
   });
 });
 

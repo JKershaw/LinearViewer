@@ -5,7 +5,15 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { stripCodeBlockMarkers, formatSubtaskOverview } from '../../lib/openrouter.js';
+import {
+  stripCodeBlockMarkers,
+  formatSubtaskOverview,
+  formatIssueContext,
+  isEpicShapedParent,
+  EPIC_CHILD_THRESHOLD,
+  COUSIN_CAP,
+  EPIC_TITLE_PATTERN
+} from '../../lib/openrouter.js';
 
 // =============================================================================
 // stripCodeBlockMarkers Tests
@@ -153,5 +161,229 @@ describe('formatSubtaskOverview', () => {
     const result = formatSubtaskOverview(children, null);
     assert.ok(!result.includes('✓ Done'));
     assert.ok(result.includes('○ Remaining: LIN-1'));
+  });
+});
+
+// =============================================================================
+// LIN-279: Strategy Framing context — isEpicShapedParent + cousin rendering
+// =============================================================================
+
+describe('isEpicShapedParent', () => {
+  test('returns true when parentChildCount >= EPIC_CHILD_THRESHOLD', () => {
+    const parent = { title: 'Plain parent' };
+    assert.strictEqual(isEpicShapedParent(parent, EPIC_CHILD_THRESHOLD), true);
+    assert.strictEqual(isEpicShapedParent(parent, EPIC_CHILD_THRESHOLD + 1), true);
+    assert.strictEqual(isEpicShapedParent(parent, EPIC_CHILD_THRESHOLD - 1), false);
+  });
+
+  test('returns true when parent title contains "Phase"', () => {
+    assert.strictEqual(isEpicShapedParent({ title: 'Phase 2 cleanup' }, 1), true);
+  });
+
+  test('returns true when parent title contains "Migration"', () => {
+    assert.strictEqual(isEpicShapedParent({ title: 'ESM Migration' }, 1), true);
+  });
+
+  test('returns true when parent title contains "Epic"', () => {
+    assert.strictEqual(isEpicShapedParent({ title: 'Auth Epic' }, 1), true);
+  });
+
+  test('returns true when parent title contains a Unicode em-dash (not a hyphen)', () => {
+    // em-dash is U+2014, distinct from hyphen-minus (-) and en-dash (–)
+    assert.strictEqual(isEpicShapedParent({ title: 'Auth — refresh tokens' }, 1), true);
+    // Plain hyphen-minus must NOT trigger
+    assert.strictEqual(isEpicShapedParent({ title: 'Auth - refresh tokens' }, 1), false);
+  });
+
+  test('matches tracker tokens case-insensitively', () => {
+    assert.strictEqual(isEpicShapedParent({ title: 'phase 1' }, 1), true);
+    assert.strictEqual(isEpicShapedParent({ title: 'EPIC: launch' }, 1), true);
+  });
+
+  test('returns false when parent has 1 child and title is plain', () => {
+    assert.strictEqual(isEpicShapedParent({ title: 'Plain task' }, 1), false);
+  });
+
+  test('returns false when parent is null', () => {
+    assert.strictEqual(isEpicShapedParent(null, 5), false);
+    assert.strictEqual(isEpicShapedParent(null, null), false);
+  });
+
+  test('fail-safe: includes when child count missing but title carries tracker language', () => {
+    // Ambiguous child count, but the title is unambiguous — include.
+    assert.strictEqual(isEpicShapedParent({ title: 'Phase 1: prep' }, null), true);
+    assert.strictEqual(isEpicShapedParent({ title: 'Big Migration' }, undefined), true);
+  });
+
+  test('exported constants have expected values', () => {
+    assert.strictEqual(EPIC_CHILD_THRESHOLD, 4);
+    assert.strictEqual(COUSIN_CAP, 20);
+    assert.ok(EPIC_TITLE_PATTERN instanceof RegExp);
+  });
+});
+
+describe('formatIssueContext cousins', () => {
+  const baseIssue = {
+    id: 'i-cur',
+    identifier: 'LIN-100',
+    title: 'Current issue',
+    description: 'Body',
+    state: { name: 'Todo', type: 'unstarted' },
+    labels: []
+  };
+
+  function makeCousin(num, stateType = 'unstarted', stateName = 'Todo') {
+    return {
+      id: `c-${num}`,
+      identifier: `LIN-${200 + num}`,
+      title: `Cousin ${num}`,
+      state: { name: stateName, type: stateType }
+    };
+  }
+
+  test('includes Related-work section when parent is epic-shaped and cousins are present', () => {
+    const context = {
+      parent: { id: 'p1', identifier: 'LIN-50', title: 'Migration Epic', state: { name: 'In Progress', type: 'started' } },
+      parentChildCount: 5,
+      siblings: [
+        { id: 's1', identifier: 'LIN-101', title: 'Sibling A', state: { name: 'In Progress', type: 'started' } }
+      ],
+      cousins: [makeCousin(1), makeCousin(2)],
+      cousinsTotal: 2,
+      children: [],
+      comments: []
+    };
+    const result = formatIssueContext(baseIssue, context);
+    assert.ok(result.includes('Related work in the parent epic:'), 'must render cousin section');
+    assert.ok(result.includes('LIN-201'));
+    assert.ok(result.includes('Cousin 1'));
+  });
+
+  test('omits Related-work section when parentChildCount === 1', () => {
+    const context = {
+      parent: { id: 'p1', identifier: 'LIN-50', title: 'Plain parent', state: { name: 'In Progress', type: 'started' } },
+      parentChildCount: 1,
+      siblings: [],
+      cousins: [],
+      cousinsTotal: 0,
+      children: [],
+      comments: []
+    };
+    const result = formatIssueContext(baseIssue, context);
+    assert.ok(!result.includes('Related work in the parent epic'), 'must omit cousin section');
+  });
+
+  test('omits Related-work section when parent has multiple children but title is plain AND child count < threshold', () => {
+    const context = {
+      parent: { id: 'p1', identifier: 'LIN-50', title: 'Plain parent', state: { name: 'In Progress', type: 'started' } },
+      parentChildCount: EPIC_CHILD_THRESHOLD - 1,
+      siblings: [
+        { id: 's1', identifier: 'LIN-101', title: 'Sibling A', state: { name: 'Todo', type: 'unstarted' } }
+      ],
+      cousins: [makeCousin(1)],
+      cousinsTotal: 1,
+      children: [],
+      comments: []
+    };
+    const result = formatIssueContext(baseIssue, context);
+    assert.ok(!result.includes('Related work in the parent epic'), 'must omit cousin section when not epic-shaped');
+  });
+
+  test('when truncation fires: renders explicit MCP-fetch nudge, not bare "…and N more"', () => {
+    // 25 cousins total, cap is 20, so 5 should be reported as "not shown"
+    const cousins = Array.from({ length: COUSIN_CAP }, (_, i) => makeCousin(i + 1));
+    const context = {
+      parent: { id: 'p1', identifier: 'LIN-50', title: 'Migration Epic', state: { name: 'In Progress', type: 'started' } },
+      parentChildCount: 8,
+      siblings: [],
+      cousins,
+      cousinsTotal: COUSIN_CAP + 5,
+      children: [],
+      comments: []
+    };
+    const result = formatIssueContext(baseIssue, context);
+    // Positive assertion on the instruction string
+    assert.ok(result.includes('5 cousins not shown.'), 'must report exact N not shown');
+    assert.ok(
+      result.includes('fetch the parent epic\'s full descendant tree via Linear MCP'),
+      'must include explicit MCP-fetch instruction'
+    );
+    assert.ok(
+      result.includes('Strategy Framing'),
+      'must cross-reference the Strategy Framing step that consumes this list'
+    );
+    // Negative assertion: bare "…and N more" is the failure mode being prevented
+    assert.ok(!result.includes('…and '), 'must NOT use bare "…and N more"');
+    assert.ok(!result.match(/and \d+ more/), 'must NOT use bare "and N more"');
+  });
+
+  test('when truncation does NOT fire: MCP-fetch nudge is absent', () => {
+    const context = {
+      parent: { id: 'p1', identifier: 'LIN-50', title: 'Migration Epic', state: { name: 'In Progress', type: 'started' } },
+      parentChildCount: 5,
+      siblings: [],
+      cousins: [makeCousin(1), makeCousin(2), makeCousin(3)],
+      cousinsTotal: 3,
+      children: [],
+      comments: []
+    };
+    const result = formatIssueContext(baseIssue, context);
+    assert.ok(result.includes('Related work in the parent epic'));
+    assert.ok(!result.includes('cousins not shown'), 'nudge must be absent when not truncated');
+    assert.ok(!result.includes('via Linear MCP'), 'MCP-fetch instruction absent when not truncated');
+  });
+
+  test('cousins section appears AFTER Sibling Tasks and BEFORE Existing Subtasks', () => {
+    const context = {
+      parent: { id: 'p1', identifier: 'LIN-50', title: 'Migration Epic', state: { name: 'In Progress', type: 'started' } },
+      parentChildCount: 5,
+      siblings: [
+        { id: 's1', identifier: 'LIN-101', title: 'Sibling A', state: { name: 'Todo', type: 'unstarted' } }
+      ],
+      cousins: [makeCousin(1)],
+      cousinsTotal: 1,
+      children: [
+        { id: 'c1', identifier: 'LIN-301', title: 'Child 1', state: { name: 'Todo', type: 'unstarted' } }
+      ],
+      comments: []
+    };
+    const result = formatIssueContext(baseIssue, context);
+    const siblingIdx = result.indexOf('**Sibling Tasks:**');
+    const cousinIdx = result.indexOf('**Related work in the parent epic:**');
+    const childrenIdx = result.indexOf('**Existing Subtasks:**');
+    assert.notStrictEqual(siblingIdx, -1);
+    assert.notStrictEqual(cousinIdx, -1);
+    assert.notStrictEqual(childrenIdx, -1);
+    assert.ok(siblingIdx < cousinIdx, 'cousins must appear after Sibling Tasks');
+    assert.ok(cousinIdx < childrenIdx, 'cousins must appear before Existing Subtasks');
+  });
+
+  test('two-tier focusedChild branch skips cousins to avoid double-rendering', () => {
+    // In two-tier mode, the parent IS the current issue and "cousins" would be
+    // the focusedChild's siblings — already in the children list. Skip them.
+    const context = {
+      parent: { id: 'p1', identifier: 'LIN-50', title: 'Migration Epic', state: { name: 'In Progress', type: 'started' } },
+      parentChildCount: 6,
+      siblings: [],
+      cousins: [makeCousin(1), makeCousin(2)],
+      cousinsTotal: 2,
+      children: [
+        { id: 'fc', identifier: 'LIN-150', title: 'Focused subtask', state: { name: 'Todo', type: 'unstarted' } }
+      ],
+      comments: [],
+      focusedChild: {
+        issue: {
+          id: 'fc',
+          identifier: 'LIN-150',
+          title: 'Focused subtask',
+          description: 'Sub body',
+          state: { name: 'Todo', type: 'unstarted' },
+          labels: []
+        },
+        comments: []
+      }
+    };
+    const result = formatIssueContext(baseIssue, context);
+    assert.ok(!result.includes('Related work in the parent epic'), 'cousins must be skipped in two-tier branch');
   });
 });
