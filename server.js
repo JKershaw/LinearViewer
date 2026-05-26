@@ -1263,7 +1263,9 @@ app.get('/workspace/:urlKey/foreman', workspaceFromUrl, (req, res) => {
 });
 
 /**
- * Save model selection to session.
+ * Save the workspace AI model selection.
+ * Persists to the workspace preferences store so all LLM call sites
+ * (UI + proxy) see the same value.
  * Accepts either a preset model ID or a custom model ID.
  */
 app.post('/workspace/:urlKey/settings/model', workspaceFromUrl, async (req, res) => {
@@ -1297,31 +1299,22 @@ app.post('/workspace/:urlKey/settings/model', workspaceFromUrl, async (req, res)
     return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings?error=invalid-format`);
   }
 
-  // Validation passed - save the model
-  req.session.modelId = selectedModel;
+  // Validation passed — save the model to workspace preferences.
+  // This is workspace-scoped (shared across all users of the org) so the
+  // selection applies to both UI and proxy/agent traffic.
   try {
-    await saveSession(req.session);
+    const existingPrefs = await workspacePreferencesStore.getWorkspacePreferences(workspace.urlKey);
+    const ok = await workspacePreferencesStore.saveWorkspacePreferences(workspace.urlKey, {
+      ...existingPrefs,
+      modelId: selectedModel
+    });
+    if (!ok) throw new Error('saveWorkspacePreferences returned false');
   } catch (err) {
-    console.error('Failed to save model preference:', err);
+    console.error('Failed to save workspace model preference:', err);
     return res.status(500).send(renderErrorPage('Settings Error', 'Failed to save model preference. Please try again.', {
       action: 'Back to settings',
       actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/settings`
     }));
-  }
-
-  // Best-effort persist to user preferences store for cross-device sync.
-  // Non-fatal: session is the authoritative source; preferences are for convenience
-  // across devices. If this fails, the model still works for the current session.
-  if (req.session.linearUserId) {
-    try {
-      const existingPrefs = await userPreferencesStore.getUserPreferences(req.session.linearUserId);
-      await userPreferencesStore.saveUserPreferences(req.session.linearUserId, {
-        ...existingPrefs,
-        modelId: selectedModel
-      });
-    } catch (err) {
-      console.error('Failed to persist model preference to preferences store:', err);
-    }
   }
 
   res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
