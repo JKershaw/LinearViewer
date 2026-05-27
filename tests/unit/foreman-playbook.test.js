@@ -154,18 +154,10 @@ describe('buildMiniForemanStep', () => {
     assert.ok(text.includes(`${BASE_URL}/api/proxy/recommend/LIN-281`));
   });
 
-  test('names the issue in the header', () => {
+  test('starts directly with the fetch instruction (no header)', () => {
     const text = buildMiniForemanStep({ baseUrl: BASE_URL, issue });
-    assert.ok(text.startsWith('# Mini-foreman — LIN-281: Mini-foreman prompt button'));
-  });
-
-  test('handles missing title gracefully', () => {
-    const text = buildMiniForemanStep({
-      baseUrl: BASE_URL,
-      issue: { identifier: 'LIN-99' }
-    });
-    assert.ok(text.startsWith('# Mini-foreman — LIN-99'));
-    assert.ok(!text.includes('LIN-99: '));
+    assert.ok(text.startsWith('Fetch the freshest prompt'));
+    assert.ok(!text.includes('# Mini-foreman'));
   });
 
   test('references the prompt field from the response', () => {
