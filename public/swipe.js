@@ -26,6 +26,7 @@ const customPrompts = data.customPrompts || [];
 const urlKey = data.urlKey || '';
 const hasAI = data.hasAI || false;
 const hasForeman = data.hasForeman || false;
+const hasMiniForeman = data.hasMiniForeman || false;
 const dispatchEnabled = data.dispatchEnabled || false;
 const proxyEnabled = data.proxyEnabled || false;
 const isLocalhost = data.isLocalhost || false;
@@ -677,6 +678,7 @@ function handleAccordionClick(e) {
           issue,
           hasAI,
           hasForeman,
+          hasMiniForeman,
           dispatchEnabled,
           proxyEnabled,
           isLocalhost,
