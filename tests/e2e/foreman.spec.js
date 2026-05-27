@@ -952,6 +952,50 @@ test.describe('Foreman Button - Swipe View', () => {
   });
 });
 
+test.describe('Mini-foreman Button - Swipe View', () => {
+  test('Mini-foreman button renders inside the swipe prompt picker when proxy flag is on', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
+    await page.goto('/workspace/test-workspace/swipe');
+    await page.waitForLoadState('networkidle');
+
+    const promptsHeader = page.locator('.swipe-accordion-header[data-accordion="prompts"]');
+    await expect(promptsHeader).toBeVisible();
+    await promptsHeader.click();
+
+    const miniBtn = page.locator('.swipe-prompt-btn.mini-foreman-btn');
+    await expect(miniBtn).toBeVisible();
+    await expect(miniBtn).toContainText('Mini-foreman');
+  });
+
+  test('Mini-foreman button is hidden in swipe picker when proxy flag is off', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: false }))}`);
+    await page.goto('/workspace/test-workspace/swipe');
+    await page.waitForLoadState('networkidle');
+
+    const promptsHeader = page.locator('.swipe-accordion-header[data-accordion="prompts"]');
+    await promptsHeader.click();
+
+    await expect(page.locator('.swipe-prompt-btn.mini-foreman-btn')).toHaveCount(0);
+  });
+
+  test('Clicking Mini-foreman in the swipe picker loads the instruction block', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
+    await page.goto('/workspace/test-workspace/swipe');
+    await page.waitForLoadState('networkidle');
+
+    const promptsHeader = page.locator('.swipe-accordion-header[data-accordion="prompts"]');
+    await expect(promptsHeader).toBeVisible();
+    await promptsHeader.click();
+
+    const miniBtn = page.locator('.swipe-prompt-btn.mini-foreman-btn');
+    await expect(miniBtn).toBeVisible();
+    await miniBtn.click();
+
+    const body = page.locator('[data-prompt-body]');
+    await expect(body).toContainText('/api/proxy/recommend/', { timeout: 5000 });
+  });
+});
+
 test.describe('Foreman API - Event Logging', () => {
   test('foreman endpoint calls create proxy events', async ({ page, request }) => {
     await page.goto('/test/clear-proxy-tokens');

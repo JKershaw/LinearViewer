@@ -72,7 +72,7 @@
    * Build the picker (idle state): prompt pill row.
    */
   function renderPicker(opts, state) {
-    const { hasAI, hasForeman, defaultPromptKeys, morePromptKeys, promptMeta, customPrompts } = opts;
+    const { hasAI, hasForeman, hasMiniForeman, defaultPromptKeys, morePromptKeys, promptMeta, customPrompts } = opts;
     const moreVisible = state.moreVisible;
     let html = '<div class="swipe-prompt-header"><span class="swipe-prompt-name">prompt</span></div>';
     html += '<div class="swipe-prompt-buttons">';
@@ -81,6 +81,9 @@
     }
     if (hasForeman) {
       html += `<button class="swipe-prompt-btn foreman-btn" data-prompt="__foreman__" title="Foreman playbook pinned to this task">Foreman</button>`;
+    }
+    if (hasMiniForeman) {
+      html += `<button class="swipe-prompt-btn mini-foreman-btn" data-prompt="__mini-foreman__" title="One-step API fetch: agent pulls a fresh prompt from the proxy and runs it once">Mini-foreman</button>`;
     }
     for (const key of defaultPromptKeys) {
       const name = promptMeta[key] || key;
@@ -230,6 +233,8 @@
         state.activeLabelName = 'AI Recommend';
       } else if (label === '__foreman__') {
         state.activeLabelName = 'Foreman';
+      } else if (label === '__mini-foreman__') {
+        state.activeLabelName = 'Mini-foreman';
       } else {
         state.activeLabelName = opts.promptMeta[label] || label;
       }
@@ -255,6 +260,21 @@
           if (abortController !== ac || destroyed) return;
           const html = renderMarkdown(result.prompt);
           const entry = { label, name: result.promptName || 'Foreman', raw: result.prompt, html };
+          promptCache.set(`${issueId}:${label}`, entry);
+          lastPromptLabel.set(issueId, label);
+          state.phase = 'fresh';
+          state.result = entry;
+          render();
+        } else if (label === '__mini-foreman__') {
+          const response = await fetch(`${apiPrefix}/api/mini-foreman-prompt/${issueId}`, { signal: ac.signal });
+          if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to load mini-foreman prompt');
+          }
+          const result = await response.json();
+          if (abortController !== ac || destroyed) return;
+          const html = renderMarkdown(result.prompt);
+          const entry = { label, name: result.promptName || 'Mini-foreman', raw: result.prompt, html };
           promptCache.set(`${issueId}:${label}`, entry);
           lastPromptLabel.set(issueId, label);
           state.phase = 'fresh';
