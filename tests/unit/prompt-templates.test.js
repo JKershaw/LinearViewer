@@ -14,6 +14,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { hasPrompt, getPromptLabels, generatePrompt, getAvailablePrompts, getPromptDescriptionsForAI, PROMPT_TEMPLATES, PROMPT_CATEGORIES, getPreWorkLabels, isPreWorkLabel } from '../../lib/prompt-templates.js';
 import { PREPARING_LABEL, WORK_ISSUE_LABELS } from '../../lib/workflow-config.js';
+import { COMPLETION_SIGNALS } from '../../lib/completion-signals.js';
 
 // =============================================================================
 // hasPrompt Tests
@@ -800,6 +801,41 @@ describe('review template', () => {
     const result = generatePrompt('review', mockIssue, mockContext);
     assert.ok(result.prompt.includes('Fetch details'), 'should include fetch step');
     assert.ok(result.prompt.includes('Add findings as a comment'), 'should include comment step');
+  });
+
+  test('includes Test Quality Check sub-section', () => {
+    const result = generatePrompt('review', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('### Test Quality Check'), 'should include Test Quality Check section header');
+  });
+
+  test('Test Quality Check names e2e/integration and a checklist item locks the wording', () => {
+    const result = generatePrompt('review', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('e2e'), 'should reference e2e in test-level guidance');
+    assert.ok(
+      result.prompt.includes('Tests exist at the appropriate level (e2e/integration for cross-module or user-facing behavior, not only unit tests)'),
+      'should include the new Review Checklist item phrase verbatim'
+    );
+  });
+
+  test('Test Quality Check is positioned between Gap Analysis and Review Checklist', () => {
+    const result = generatePrompt('review', mockIssue, mockContext);
+    const gapIdx = result.prompt.indexOf('### Gap Analysis');
+    const testIdx = result.prompt.indexOf('### Test Quality Check');
+    const checklistIdx = result.prompt.indexOf('### Review Checklist');
+    assert.ok(gapIdx !== -1, 'Gap Analysis section exists');
+    assert.ok(testIdx !== -1, 'Test Quality Check section exists');
+    assert.ok(checklistIdx !== -1, 'Review Checklist section exists');
+    assert.ok(gapIdx < testIdx, 'Gap Analysis comes before Test Quality Check');
+    assert.ok(testIdx < checklistIdx, 'Test Quality Check comes before Review Checklist');
+  });
+
+  test('review completion signals include test-level coverage', () => {
+    const reviewSignal = COMPLETION_SIGNALS['review'];
+    assert.ok(reviewSignal, 'review completion signal is defined');
+    assert.ok(
+      reviewSignal.signals.includes('Tests exist at appropriate level (e2e/integration where needed)'),
+      'review signals array includes the new test-level coverage signal'
+    );
   });
 });
 
