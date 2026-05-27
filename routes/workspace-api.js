@@ -13,7 +13,7 @@ import { fetchIssueContext, fetchRecommendationContext, fetchIssueComments } fro
 import { generatePrompt, generateCustomPrompt, hasPrompt, getAvailablePrompts } from '../lib/prompt-templates.js';
 import { PREPARING_LABEL, WORK_ISSUE_LABELS } from '../lib/workflow-config.js';
 import { parseRepoFromDescription } from '../lib/prompt-formatters.js';
-import { buildForemanPlaybook } from '../lib/prompts/foreman-playbook.js';
+import { buildForemanPlaybook, buildMiniForemanStep } from '../lib/prompts/foreman-playbook.js';
 import { isRecommendationEnabled, getRecommendation, getRecommendationStream, streamChat } from '../lib/openrouter.js';
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { generateRecap } from '../lib/recap.js';
@@ -315,6 +315,80 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         return res.status(404).json({ error: error.message })
       }
       res.status(500).json({ error: 'Failed to generate foreman prompt', message: error.message })
+    }
+  })
+
+  /**
+   * Generate a mini-foreman step pinned to a specific issue.
+   *
+   * Mirrors /workspace/:urlKey/api/foreman-prompt/:issueId but returns a
+   * single-iteration instruction block that tells the agent to fetch the
+   * freshest /api/proxy/recommend/{identifier} response and execute it once.
+   * No loop, no role recitation — a one-shot variant of the foreman.
+   *
+   * Gated on the proxy feature flag because the block instructs the agent to
+   * use proxy endpoints.
+   *
+   * @route GET /workspace/:urlKey/api/mini-foreman-prompt/:issueId
+   * @param {string} issueId - The Linear issue ID (UUID)
+   * @returns {Object} { label, promptName, prompt, repo } or error
+   */
+  router.get('/workspace/:urlKey/api/mini-foreman-prompt/:issueId', workspaceFromUrl, async (req, res) => {
+    const workspace = req.workspace
+    const { issueId } = req.params
+
+    const featureFlags = getFeatureFlags(req.session)
+    if (featureFlags.proxy !== true) {
+      return res.status(403).json({ error: 'Proxy feature is not enabled' })
+    }
+
+    if (!isValidIssueId(issueId)) {
+      return res.status(400).json({ error: 'Invalid issue ID format' })
+    }
+
+    const baseUrl = `${req.protocol}://${req.get('host')}`
+
+    try {
+      // Use mock data in test mode
+      if (process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token') {
+        const mockIssue = testMockData.issues.find(i => i.id === issueId)
+        if (!mockIssue) {
+          return res.status(404).json({ error: 'Issue not found' })
+        }
+        const identifier = mockIssue.url?.split('/').pop() || ''
+        const mockProject = testMockData.projects.find(p => p.id === mockIssue.project?.id)
+        const prompt = buildMiniForemanStep({
+          baseUrl,
+          issue: { identifier, title: mockIssue.title }
+        })
+        return res.json({
+          label: 'mini-foreman',
+          promptName: `Mini-foreman — ${identifier}`,
+          prompt,
+          repo: parseRepoFromDescription(mockProject?.content || null)
+        })
+      }
+
+      const { issue, project } = await fetchIssueContext(workspace.accessToken, issueId)
+      const prompt = buildMiniForemanStep({
+        baseUrl,
+        issue: { identifier: issue.identifier, title: issue.title }
+      })
+      res.json({
+        label: 'mini-foreman',
+        promptName: `Mini-foreman — ${issue.identifier}`,
+        prompt,
+        repo: parseRepoFromDescription(project?.description)
+      })
+    } catch (error) {
+      console.error('Mini-foreman prompt error:', error)
+      if (error.response?.status === 401) {
+        return res.status(401).json({ error: 'Token expired or invalid' })
+      }
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message })
+      }
+      res.status(500).json({ error: 'Failed to generate mini-foreman prompt', message: error.message })
     }
   })
 
