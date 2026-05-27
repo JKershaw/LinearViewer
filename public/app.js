@@ -944,6 +944,12 @@ function hideIssuePromptUI(detailsContainer, issueId) {
   if (foremanContainer) {
     foremanContainer.classList.add('hidden')
   }
+
+  // Hide mini-foreman container
+  const miniForemanContainer = detailsContainer?.querySelector(`[data-mini-foreman-for="${issueId}"]`)
+  if (miniForemanContainer) {
+    miniForemanContainer.classList.add('hidden')
+  }
 }
 
 /**
@@ -965,7 +971,7 @@ function initPrompts() {
   // Handle clicks on promptable labels
   document.addEventListener('click', async (e) => {
     const labelLink = e.target.closest('.label-prompt')
-    if (!labelLink || labelLink.classList.contains('more-toggle') || labelLink.classList.contains('suggest-btn') || labelLink.classList.contains('foreman-btn')) return
+    if (!labelLink || labelLink.classList.contains('more-toggle') || labelLink.classList.contains('suggest-btn') || labelLink.classList.contains('foreman-btn') || labelLink.classList.contains('mini-foreman-btn')) return
 
     e.preventDefault()
     e.stopPropagation()
@@ -2207,6 +2213,91 @@ function initForeman() {
   })
 }
 
+/**
+ * Initialize the Mini-foreman button. Parallel to initForeman() but fetches a
+ * short instruction-only block that tells the agent to call
+ * /api/proxy/recommend/{identifier} at run time and execute the response once.
+ * Reuses the same copy/dispatch/+proxy affordances.
+ */
+function initMiniForeman() {
+  let activeMiniForemanFetch = null
+
+  document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.mini-foreman-btn')
+    if (!btn) return
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    const issueId = btn.dataset.issueId
+    const detailsContainer = btn.closest('.details')
+    const container = detailsContainer?.querySelector(`[data-mini-foreman-for="${issueId}"]`)
+    if (!container) return
+
+    // Toggle off when already visible
+    if (!container.classList.contains('hidden')) {
+      container.classList.add('hidden')
+      return
+    }
+
+    if (activeMiniForemanFetch) activeMiniForemanFetch.abort()
+    const abortController = new AbortController()
+    activeMiniForemanFetch = abortController
+
+    // Dismiss sibling prompt UI for this issue
+    hideIssuePromptUI(detailsContainer, issueId)
+
+    const promptText = container.querySelector('.prompt-text')
+    promptText.textContent = 'Loading...'
+    container.classList.remove('hidden')
+    setPromptActionsDisabled(container, true)
+
+    // Mint a proxy token in parallel so YOUR_TOKEN can be substituted with a
+    // real Bearer token. If token minting fails, the block still works — the
+    // agent will see "YOUR_TOKEN" and the proxy will reject the call, which is
+    // the intended "stop on proxy failure" behaviour.
+    const urlKey = container.dataset.urlKey
+    const apiPrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : ''
+
+    try {
+      const [response, token] = await Promise.all([
+        fetch(`${apiPrefix}/api/mini-foreman-prompt/${issueId}`, { signal: abortController.signal }),
+        urlKey ? getOrCreateProxyToken(urlKey) : Promise.resolve(null)
+      ])
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}))
+        throw new Error(error.error || 'Failed to load mini-foreman prompt')
+      }
+
+      const data = await response.json()
+
+      if (activeMiniForemanFetch === abortController) {
+        const promptBody = token
+          ? data.prompt.replace(/YOUR_TOKEN/g, token)
+          : data.prompt
+        promptText.dataset.rawPrompt = promptBody
+        promptText.innerHTML = renderMarkdown(promptBody)
+        if (data.repo) {
+          container.dataset.repo = data.repo
+        } else {
+          delete container.dataset.repo
+        }
+        setPromptActionsDisabled(container, false)
+      }
+    } catch (error) {
+      if (error.name === 'AbortError') return
+      setPromptActionsDisabled(container, false)
+      promptText.textContent = `Error: ${error.message}`
+      console.error('Failed to fetch mini-foreman prompt:', error)
+    } finally {
+      if (activeMiniForemanFetch === abortController) {
+        activeMiniForemanFetch = null
+      }
+    }
+  })
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   init()
   initNavBar()
@@ -2215,6 +2306,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initMorePrompts()
   initRecommendations()
   initForeman()
+  initMiniForeman()
   initQueuePanel()
   initFeatureToggles()
   initFreeTierStatus()

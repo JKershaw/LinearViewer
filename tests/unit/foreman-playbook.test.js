@@ -5,7 +5,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { buildForemanPlaybook } from '../../lib/prompts/foreman-playbook.js';
+import { buildForemanPlaybook, buildMiniForemanStep } from '../../lib/prompts/foreman-playbook.js';
 
 const BASE_URL = 'https://example.com';
 
@@ -143,5 +143,63 @@ describe('buildForemanPlaybook (feature.linearMcp)', () => {
     });
     assert.ok(!text.includes('/tmp/comment.json'));
     assert.ok(!text.includes('/api/proxy/issue/{identifier}/comments'));
+  });
+});
+
+describe('buildMiniForemanStep', () => {
+  const issue = { identifier: 'LIN-281', title: 'Mini-foreman prompt button' };
+
+  test('embeds the recommend endpoint with the identifier', () => {
+    const text = buildMiniForemanStep({ baseUrl: BASE_URL, issue });
+    assert.ok(text.includes(`${BASE_URL}/api/proxy/recommend/LIN-281`));
+  });
+
+  test('names the issue in the header', () => {
+    const text = buildMiniForemanStep({ baseUrl: BASE_URL, issue });
+    assert.ok(text.startsWith('# Mini-foreman — LIN-281: Mini-foreman prompt button'));
+  });
+
+  test('handles missing title gracefully', () => {
+    const text = buildMiniForemanStep({
+      baseUrl: BASE_URL,
+      issue: { identifier: 'LIN-99' }
+    });
+    assert.ok(text.startsWith('# Mini-foreman — LIN-99'));
+    assert.ok(!text.includes('LIN-99: '));
+  });
+
+  test('references the prompt field from the response', () => {
+    const text = buildMiniForemanStep({ baseUrl: BASE_URL, issue });
+    assert.ok(text.includes('prompt'));
+    assert.ok(text.includes('Extract the `prompt` field'));
+  });
+
+  test('instructs the agent to stop on proxy failure (no fallback)', () => {
+    const text = buildMiniForemanStep({ baseUrl: BASE_URL, issue });
+    assert.ok(/stop|Stop|STOP/.test(text));
+    assert.ok(/proxy failure|non-2xx|timeout/.test(text));
+  });
+
+  test('does not include a loop or role recitation', () => {
+    const text = buildMiniForemanStep({ baseUrl: BASE_URL, issue });
+    assert.ok(!text.includes('go back to step 1'));
+    assert.ok(!text.includes('Current role:'));
+    assert.ok(!text.includes('### 4.'));
+  });
+
+  test('is short — roughly a 10-line instruction block', () => {
+    const text = buildMiniForemanStep({ baseUrl: BASE_URL, issue });
+    const lineCount = text.split('\n').length;
+    assert.ok(lineCount <= 15, `expected ≤15 lines, got ${lineCount}`);
+  });
+
+  test('uses Authorization Bearer header', () => {
+    const text = buildMiniForemanStep({ baseUrl: BASE_URL, issue });
+    assert.ok(text.includes('Authorization: Bearer YOUR_TOKEN'));
+  });
+
+  test('falls back to {identifier} placeholder when issue has no identifier', () => {
+    const text = buildMiniForemanStep({ baseUrl: BASE_URL, issue: {} });
+    assert.ok(text.includes(`${BASE_URL}/api/proxy/recommend/{identifier}`));
   });
 });

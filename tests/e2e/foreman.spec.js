@@ -802,6 +802,107 @@ test.describe('Workspace API - Foreman Prompt Endpoint', () => {
   });
 });
 
+test.describe('Workspace API - Mini-foreman Prompt Endpoint', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
+  });
+
+  test('GET /workspace/:urlKey/api/mini-foreman-prompt/:issueId returns instruction block', async ({ page, request }) => {
+    const cookies = await page.context().cookies();
+    const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+
+    const resp = await request.get(
+      '/workspace/test-workspace/api/mini-foreman-prompt/66666666-6666-6666-6666-666666666666',
+      { headers: { Cookie: cookieHeader } }
+    );
+    expect(resp.status()).toBe(200);
+
+    const data = await resp.json();
+    expect(data.label).toBe('mini-foreman');
+    expect(data.promptName).toContain('Mini-foreman');
+    expect(data.prompt).toContain('/api/proxy/recommend/');
+    expect(data.prompt).toContain('Authorization: Bearer YOUR_TOKEN');
+    // Should NOT include the full foreman loop/recitation machinery
+    expect(data.prompt).not.toContain('Current role:');
+    expect(data.prompt).not.toContain('go back to step 1');
+  });
+
+  test('GET /workspace/:urlKey/api/mini-foreman-prompt rejects invalid issue ID', async ({ page, request }) => {
+    const cookies = await page.context().cookies();
+    const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+
+    const resp = await request.get(
+      '/workspace/test-workspace/api/mini-foreman-prompt/INVALID!!!',
+      { headers: { Cookie: cookieHeader } }
+    );
+    expect(resp.status()).toBe(400);
+  });
+
+  test('GET /workspace/:urlKey/api/mini-foreman-prompt returns 404 for unknown issue', async ({ page, request }) => {
+    const cookies = await page.context().cookies();
+    const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+
+    const resp = await request.get(
+      '/workspace/test-workspace/api/mini-foreman-prompt/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+      { headers: { Cookie: cookieHeader } }
+    );
+    expect(resp.status()).toBe(404);
+  });
+
+  test('GET /workspace/:urlKey/api/mini-foreman-prompt returns 403 when proxy feature disabled', async ({ page, request }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: false }))}`);
+    const cookies = await page.context().cookies();
+    const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+
+    const resp = await request.get(
+      '/workspace/test-workspace/api/mini-foreman-prompt/66666666-6666-6666-6666-666666666666',
+      { headers: { Cookie: cookieHeader } }
+    );
+    expect(resp.status()).toBe(403);
+  });
+});
+
+test.describe('Mini-foreman Button - Main Projects View', () => {
+  test('Mini-foreman button renders next to Foreman button when proxy flag is on', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
+    await page.goto('/workspace/test-workspace/');
+    await page.waitForLoadState('networkidle');
+
+    const firstPromptsBar = page.locator('.detail-prompts').first();
+    await expect(firstPromptsBar).toBeAttached();
+    await expect(firstPromptsBar.locator('.mini-foreman-btn')).toHaveCount(1);
+    await expect(firstPromptsBar.locator('.mini-foreman-btn')).toContainText('Mini-foreman');
+  });
+
+  test('Mini-foreman button is hidden when proxy flag is off', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: false }))}`);
+    await page.goto('/workspace/test-workspace/');
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('.mini-foreman-btn')).toHaveCount(0);
+  });
+
+  test('Clicking Mini-foreman button reveals the instruction block', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
+    await page.goto('/workspace/test-workspace/');
+    await page.waitForLoadState('networkidle');
+
+    // Expand the first issue's details, then its prompts section, then click mini-foreman
+    const firstLine = page.locator('.line.expandable').first();
+    await firstLine.click();
+    const firstDetails = page.locator('.details').first();
+    await firstDetails.locator('.detail-toggle[data-toggle="prompts"]').click();
+
+    const miniBtn = firstDetails.locator('.mini-foreman-btn');
+    await expect(miniBtn).toBeVisible();
+    await miniBtn.click();
+
+    const container = firstDetails.locator('.mini-foreman-container');
+    await expect(container).toBeVisible();
+    await expect(container.locator('.prompt-text')).toContainText('/api/proxy/recommend/', { timeout: 5000 });
+  });
+});
+
 test.describe('Foreman Button - Main Projects View', () => {
   test('Foreman button renders next to prompt buttons when proxy flag is on', async ({ page }) => {
     await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
