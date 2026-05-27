@@ -1108,6 +1108,14 @@ ${readEndpoints}${writeEndpoints}
         return res.status(404).json({ error: 'Issue not found' });
       }
 
+      if (data.issue.comments?.nodes) {
+        data.issue.comments.nodes.sort((a, b) => {
+          const ta = new Date(a.createdAt).getTime();
+          const tb = new Date(b.createdAt).getTime();
+          return (isNaN(ta) ? 0 : ta) - (isNaN(tb) ? 0 : tb);
+        });
+      }
+
       logEvent(req, '/api/proxy/issue', 200);
       res.json(data.issue);
     } catch (err) {
