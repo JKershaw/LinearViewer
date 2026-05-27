@@ -648,6 +648,10 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanSto
 
     const gqlMessage = err.response?.errors?.[0]?.message;
     if (gqlMessage) {
+      const status = err.response?.status || err.response?.errors?.[0]?.extensions?.statusCode;
+      if (status === 401 || status === 403) {
+        console.error(`Linear auth error (HTTP ${status}): ${gqlMessage}`);
+      }
       return gqlMessage;
     }
 
