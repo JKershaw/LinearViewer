@@ -329,6 +329,7 @@ const SEARCH_QUERY = gql`
         labels { nodes { id name color } }
         project { id name }
         cycle { id name number }
+        parent { id identifier }
       }
     }
   }
@@ -807,7 +808,7 @@ GET ${baseUrl}/api/proxy/issue/{issueId}
 
 GET ${baseUrl}/api/proxy/search?q={query}
   → Search issues by text (max 50 results)
-  → { "issues": [ /* same shape as /issues */ ] }
+  → { "issues": [ /* same shape as /issues, including parent field; children not included — call /issue/{id} for full hierarchy */ ] }
 
 GET ${baseUrl}/api/proxy/states/{teamId}
   → Workflow states for a team
@@ -880,12 +881,12 @@ GET ${baseUrl}/api/proxy/foreman/playbook
 ## Write Endpoints
 
 POST ${baseUrl}/api/proxy/issues
-  Body: { "teamId": "...", "title": "...", "description": "...", "projectId": "...", "stateId": "...", "assigneeId": "...", "priority": 0-4, "cycleId": "..." }
-  → Create a new issue (optionally assign to a cycle)
+  Body: { "teamId": "...", "title": "...", "description": "...", "projectId": "...", "stateId": "...", "assigneeId": "...", "priority": 0-4, "cycleId": "...", "parentId": "..." }
+  → Create a new issue; set parentId (UUID) to create as a sub-issue
 
 PATCH ${baseUrl}/api/proxy/issue/{issueId}
-  Body: { "title": "...", "description": "...", "stateId": "...", "assigneeId": "...", "priority": 0-4, "cycleId": "..." }
-  → Update an existing issue (set cycleId to assign/move to a cycle)
+  Body: { "title": "...", "description": "...", "stateId": "...", "assigneeId": "...", "priority": 0-4, "cycleId": "...", "parentId": "...|null" }
+  → Update an existing issue; set cycleId to assign/move to a cycle; set parentId to a UUID to re-parent, or null to promote to top-level
 
 POST ${baseUrl}/api/proxy/issue/{issueId}/comments
   Body: { "body": "..." }
@@ -1418,7 +1419,8 @@ ${readEndpoints}${writeEndpoints}
       if (stateId && UUID_REGEX.test(stateId)) input.stateId = stateId;
       if (assigneeId && UUID_REGEX.test(assigneeId)) input.assigneeId = assigneeId;
       if (projectId && UUID_REGEX.test(projectId)) input.projectId = projectId;
-      if (parentId && UUID_REGEX.test(parentId)) input.parentId = parentId;
+      if (parentId === null) input.parentId = null;
+      else if (parentId && UUID_REGEX.test(parentId)) input.parentId = parentId;
       if (cycleId && UUID_REGEX.test(cycleId)) input.cycleId = cycleId;
       if (priority !== undefined && Number.isInteger(priority) && priority >= 0 && priority <= 4) {
         input.priority = priority;

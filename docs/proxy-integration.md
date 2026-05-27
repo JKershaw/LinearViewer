@@ -193,7 +193,29 @@ GET /api/proxy/issue/{issueId}
 
 `issueId` can be a UUID or identifier (e.g., `LIN-123`).
 
-Response includes full context: description, comments, children, relations, cycle, and labels with id/name/color.
+Response includes full context: description, comments, children, parent, relations, cycle, and labels.
+
+```json
+{
+  "id": "uuid",
+  "identifier": "ENG-42",
+  "title": "Fix login bug",
+  "description": "Markdown content...",
+  "url": "https://linear.app/...",
+  "state": { "name": "In Progress", "type": "started" },
+  "assignee": { "name": "Alice" },
+  "labels": { "nodes": [{ "id": "uuid", "name": "bug", "color": "#eb5757" }] },
+  "priority": 1,
+  "dueDate": "2024-03-01",
+  "project": { "id": "uuid", "name": "Project Alpha" },
+  "cycle": { "id": "uuid", "name": "Sprint 5", "number": 5 },
+  "parent": { "id": "uuid", "identifier": "ENG-40", "title": "Auth overhaul" },
+  "children": { "nodes": [{ "id": "uuid", "identifier": "ENG-43", "title": "Sub-task", "state": { "name": "Todo", "type": "unstarted" } }] },
+  "comments": { "nodes": [{ "id": "uuid", "body": "Fixed in PR #12.", "createdAt": "2024-02-28T10:00:00.000Z", "user": { "name": "Bob" } }] }
+}
+```
+
+`parent` is `null` when the issue has no parent. `children.nodes` is empty (`[]`) when there are no sub-issues. `labels`, `children`, and `comments` use Linear's `{ nodes: [...] }` wrapper.
 
 #### Search Issues
 
@@ -205,7 +227,7 @@ GET /api/proxy/search?q={query}
 |-----------|------|----------|-------------|
 | `q` | string | Yes | Search text (max 500 chars) |
 
-Returns up to 50 matching issues.
+Returns up to 50 matching issues. Response shape matches the list issues endpoint (including the `parent` field). Children are not included in search results — call `GET /api/proxy/issue/{id}` for the full sub-issue hierarchy.
 
 #### List Workflow States
 
@@ -362,7 +384,18 @@ Content-Type: application/json
 }
 ```
 
-Accepts the same fields as create (except `teamId`). At least one field must be provided.
+At least one field must be provided.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `title` | string | Issue title (max 1000 chars) |
+| `description` | string | Markdown description (max 100K chars) |
+| `projectId` | UUID | Assign to project |
+| `stateId` | UUID | Set workflow state |
+| `assigneeId` | UUID | Assign to user |
+| `parentId` | UUID \| `null` | Set parent issue (UUID), or `null` to remove the parent and promote the issue to top-level |
+| `cycleId` | UUID | Assign to cycle |
+| `priority` | int | Priority 0 (none) to 4 (urgent) |
 
 #### Add Comment
 
