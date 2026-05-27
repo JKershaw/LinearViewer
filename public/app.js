@@ -2252,18 +2252,16 @@ function initMiniForeman() {
     container.classList.remove('hidden')
     setPromptActionsDisabled(container, true)
 
-    // Mint a proxy token in parallel so YOUR_TOKEN can be substituted with a
-    // real Bearer token. If token minting fails, the block still works — the
-    // agent will see "YOUR_TOKEN" and the proxy will reject the call, which is
-    // the intended "stop on proxy failure" behaviour.
-    const urlKey = container.dataset.urlKey
-    const apiPrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : ''
-
+    // The block ships with YOUR_TOKEN as a placeholder. Users supply the real
+    // token via the +proxy toggle (same pattern as Foreman), which appends a
+    // proxy instructions block with a minted token at copy/dispatch time.
     try {
-      const [response, token] = await Promise.all([
-        fetch(`${apiPrefix}/api/mini-foreman-prompt/${issueId}`, { signal: abortController.signal }),
-        urlKey ? getOrCreateProxyToken(urlKey) : Promise.resolve(null)
-      ])
+      const urlKey = container.dataset.urlKey
+      const apiPrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : ''
+      const response = await fetch(
+        `${apiPrefix}/api/mini-foreman-prompt/${issueId}`,
+        { signal: abortController.signal }
+      )
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({}))
@@ -2273,11 +2271,8 @@ function initMiniForeman() {
       const data = await response.json()
 
       if (activeMiniForemanFetch === abortController) {
-        const promptBody = token
-          ? data.prompt.replace(/YOUR_TOKEN/g, token)
-          : data.prompt
-        promptText.dataset.rawPrompt = promptBody
-        promptText.innerHTML = renderMarkdown(promptBody)
+        promptText.dataset.rawPrompt = data.prompt
+        promptText.innerHTML = renderMarkdown(data.prompt)
         if (data.repo) {
           container.dataset.repo = data.repo
         } else {
