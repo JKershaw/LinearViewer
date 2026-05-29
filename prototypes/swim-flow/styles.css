@@ -90,13 +90,14 @@ body {
 .card[data-state="backlog"] { border-top-color: var(--line); }
 .card[data-state="done"]    { border-top-color: var(--green); }
 
-.card .row { display: flex; align-items: baseline; gap: 6px; }
+.card .row { display: flex; align-items: center; gap: 6px; }
+.card .title { flex: 0 1 auto; min-width: 0; }
 .card .dot { font-size: 12px; line-height: 1; }
 .card[data-state="started"] .dot { color: var(--yellow); }
 .card[data-state="todo"]    .dot { color: var(--grey); }
 .card[data-state="backlog"] .dot { color: var(--grey); }
 .card[data-state="done"]    .dot { color: var(--green); }
-.card .id { font-weight: 700; }
+.card .id { font-weight: 700; white-space: nowrap; }
 .card .title {
   color: var(--fg);
   overflow: hidden;
@@ -126,8 +127,44 @@ body {
 }
 
 /* ── Layout: vertical stack (side-rail) ─────────────────────────────────── */
-.stack { display: flex; flex-direction: column; gap: 12px; }
-.stack.has-rail { padding-right: 64px; }
+.stack { display: flex; flex-direction: column; gap: 10px; }
+.stack.has-rail { padding-right: 112px; }
+.root-sep { height: 10px; }
+
+/* Nested subtask "blue boxes" — depth deepens the tint */
+.group-box {
+  position: relative;
+  border: 1px solid rgba(37, 99, 235, 0.28);
+  border-radius: 9px;
+  background: rgba(37, 99, 235, 0.04);
+  padding: 8px;
+}
+.group-box[data-depth="1"] { background: rgba(37, 99, 235, 0.06); }
+.group-box[data-depth="2"] { background: rgba(37, 99, 235, 0.085); }
+.group-box[data-depth="3"] { background: rgba(37, 99, 235, 0.11); }
+.group-box[data-depth="4"] { background: rgba(37, 99, 235, 0.13); }
+.group-kids { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+/* the parent/header card of a group reads as the box title */
+.card.header {
+  border: 1px solid transparent;
+  border-top: 3px solid var(--yellow);
+  background: rgba(255, 255, 255, 0.85);
+}
+.card .caret { color: var(--accent); font-size: 10px; margin-right: 2px; }
+
+/* type badge */
+.card .type {
+  margin-left: auto;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--dim);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+.card[data-type="epic"] .type { color: #9333ea; border-color: rgba(147, 51, 234, 0.4); }
+.card[data-type="story"] .type { color: var(--accent); border-color: rgba(37, 99, 235, 0.4); }
 
 /* ── Layout: breathing spine ────────────────────────────────────────────── */
 .spine { display: flex; flex-direction: column; align-items: center; gap: 18px; }
@@ -140,10 +177,14 @@ body {
   margin: 10px 0;
 }
 
-/* edges */
+/* edges (spine/hybrid) */
 .edge { fill: none; stroke: var(--accent); stroke-width: 1.6; opacity: 0.75; }
 .edge.parent { stroke: var(--accent); stroke-dasharray: 3 3; opacity: 0.45; }
 .edge-head { fill: var(--accent); opacity: 0.75; }
+
+/* gutter bars (side-rail) */
+.gbar { fill: none; stroke-width: 3; stroke-linecap: round; opacity: 0.9; }
+.gtick { fill: none; stroke-width: 1.8; opacity: 0.85; }
 
 /* long-range chip reference */
 .xref {
@@ -158,3 +199,10 @@ body {
 }
 
 .hint { color: var(--dim); font-size: 11px; padding: 4px 12px 0; }
+
+/* ── Mobile (driven by the width toggle, not viewport) ──────────────────── */
+.stage[data-w="mobile"] .stack.has-rail { padding-right: 80px; }
+.stage[data-w="mobile"] .group-box { padding: 5px; border-radius: 7px; }
+.stage[data-w="mobile"] .group-kids { gap: 6px; margin-top: 6px; }
+.stage[data-w="mobile"] .card { padding: 6px 8px; }
+.stage[data-w="mobile"] .card .type { display: none; }
