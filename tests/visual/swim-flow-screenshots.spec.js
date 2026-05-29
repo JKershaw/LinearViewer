@@ -36,3 +36,12 @@ test('flow - mobile', async ({ page }) => {
   await openFlow(page);
   await page.screenshot({ path: `${DIR}/flow-mobile.png`, fullPage: true });
 });
+
+test('flow - hover focus', async ({ page }) => {
+  await page.setViewportSize({ width: 1000, height: 1400 });
+  await openFlow(page);
+  // AUTH-2 is a chain hub (blocks AUTH-3 and DASH-2) — hovering dims everything else
+  await page.locator('.swim-fcard[data-issue-id="auth-2"]').hover();
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: `${DIR}/flow-hover-focus.png`, fullPage: true });
+});

@@ -18,14 +18,14 @@ test.describe('Swim Page — Vertical Orientation', () => {
     await page.waitForLoadState('networkidle');
   });
 
-  test('orientation select exists and defaults to horizontal', async ({ page }) => {
+  test('orientation select exists and defaults to flow', async ({ page }) => {
     await page.locator('.swim-settings-toggle').click();
     const select = page.locator('#swim-orientation');
     await expect(select).toBeVisible();
-    await expect(select).toHaveValue('horizontal');
+    await expect(select).toHaveValue('flow');
 
-    // Page root should reflect horizontal by default
-    await expect(page.locator('.swim-page')).toHaveAttribute('data-orientation', 'horizontal');
+    // Page root should reflect flow by default
+    await expect(page.locator('.swim-page')).toHaveAttribute('data-orientation', 'flow');
   });
 
   test('switching to vertical sets data-orientation on the page', async ({ page }) => {

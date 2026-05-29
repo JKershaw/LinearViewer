@@ -808,7 +808,7 @@ body:has(.swim-page) {
   gap: 8px;
   max-width: 920px;
   margin: 0 auto;
-  padding: 12px 96px 48px 4px;
+  padding: 12px 60px 48px 4px;
 }
 .swim-flow-edges { position: absolute; inset: 0; pointer-events: none; overflow: visible; z-index: 0; }
 .swim-flow-sep { height: 14px; }
@@ -843,7 +843,7 @@ body:has(.swim-page) {
   border: 1px solid rgba(37, 99, 235, 0.28);
   border-radius: 9px;
   background: rgba(37, 99, 235, 0.045);
-  padding: 8px;
+  padding: 7px 5px 8px 8px;
 }
 .swim-fgroup[data-depth="1"] { background: rgba(37, 99, 235, 0.06); }
 .swim-fgroup[data-depth="2"] { background: rgba(37, 99, 235, 0.085); }
@@ -926,9 +926,16 @@ body:has(.swim-page) {
 .swim-blk-head { fill: #ea7317; }
 .swim-blk-origin { fill: #ea7317; }
 
+/* hover-focus: dim spines not in the hovered card's chain */
+.swim-flow-edges.swim-edges-dim path,
+.swim-flow-edges.swim-edges-dim polygon,
+.swim-flow-edges.swim-edges-dim circle { opacity: 0.1; transition: opacity 0.12s; }
+.swim-flow-edges.swim-edges-dim .swim-edge-hl { opacity: 1; }
+.swim-flow-edges.swim-edges-dim .swim-blk-spine.swim-edge-hl { stroke-width: 2.4; }
+
 @media (max-width: 640px) {
-  .swim-flow { padding: 10px 74px 40px 2px; }
-  .swim-fgroup { padding: 5px; border-radius: 7px; }
+  .swim-flow { padding: 10px 52px 40px 2px; }
+  .swim-fgroup { padding: 5px 4px 5px 6px; border-radius: 7px; }
   .swim-fgroup-kids { gap: 6px; margin-top: 6px; }
   .swim-fc-meta { padding-left: 18px; gap: 6px; }
 }

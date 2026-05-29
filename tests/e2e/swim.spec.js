@@ -3,8 +3,20 @@ import { test, expect } from '../fixtures/test-base.js';
 const TEST_WORKSPACE_URL_KEY = 'test-workspace';
 const SWIM_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/swim`;
 
+// Flow is the default layout; these specs exercise the lane view, so pin
+// orientation to horizontal (only when nothing is stored, so reload-persistence
+// tests still work).
+async function pinHorizontal(page) {
+  await page.addInitScript(() => {
+    if (!localStorage.getItem('swim-settings')) {
+      localStorage.setItem('swim-settings', JSON.stringify({ orientation: 'horizontal' }));
+    }
+  });
+}
+
 test.describe('Swim Page', () => {
   test.beforeEach(async ({ page }) => {
+    await pinHorizontal(page);
     await page.goto('/test/set-session');
     await page.goto(SWIM_URL);
     await page.waitForLoadState('networkidle');
@@ -157,6 +169,7 @@ test.describe('Swim Page', () => {
 
 test.describe('Swim Page with Sample Data', () => {
   test.beforeEach(async ({ page }) => {
+    await pinHorizontal(page);
     await page.goto('/test/set-session?swimSample=true');
     await page.goto(SWIM_URL);
     await page.waitForLoadState('networkidle');

@@ -721,7 +721,7 @@ function getSettings() {
 
   return {
     grouping: grouping,
-    orientation: stored.orientation || (orientationEl ? orientationEl.value : 'horizontal'),
+    orientation: stored.orientation || (orientationEl ? orientationEl.value : 'flow'),
     maxLanes: stored.maxLanes || parseInt(document.getElementById('swim-max-lanes').value, 10),
     compact: stored.compact !== undefined ? stored.compact : document.getElementById('swim-compact').checked,
     showCompleted: stored.showCompleted !== undefined ? stored.showCompleted : document.getElementById('swim-show-completed').checked,
@@ -738,7 +738,7 @@ function saveSettings(settings) {
 function applySettingsToUI(settings) {
   document.getElementById('swim-grouping').value = settings.grouping;
   var orientationEl = document.getElementById('swim-orientation');
-  if (orientationEl) orientationEl.value = settings.orientation || 'horizontal';
+  if (orientationEl) orientationEl.value = settings.orientation || 'flow';
   document.getElementById('swim-max-lanes').value = settings.maxLanes;
   document.querySelector('.swim-max-lanes-value').textContent = settings.maxLanes;
   document.getElementById('swim-compact').checked = settings.compact;
@@ -1038,9 +1038,9 @@ function drawFlowSpines(model) {
   model.nodes.forEach(function(n) { if (rect[n.id]) maxRight = Math.max(maxRight, rect[n.id].right); });
   var width = flow.clientWidth;
   var mobile = width < 560;
-  var STEP = mobile ? 11 : 14;
-  var start = maxRight + (mobile ? 10 : 14);
-  function chanX(c) { return Math.min(start + c * STEP, width - 5); }
+  var STEP = mobile ? 9 : 11;
+  var start = maxRight + (mobile ? 6 : 8);
+  function chanX(c) { return Math.min(start + c * STEP, width - 4); }
 
   var svg = document.createElementNS(SVGNS, 'svg');
   svg.setAttribute('class', 'swim-flow-edges');
@@ -1048,26 +1048,26 @@ function drawFlowSpines(model) {
   svg.setAttribute('height', flow.scrollHeight);
   svg.setAttribute('viewBox', '0 0 ' + width + ' ' + flow.scrollHeight);
 
-  function path(d, cls) { var p = document.createElementNS(SVGNS, 'path'); p.setAttribute('d', d); p.setAttribute('class', cls); svg.appendChild(p); }
-  function arrowLeft(x, y) { var a = document.createElementNS(SVGNS, 'polygon'); a.setAttribute('points', (x + 7) + ',' + (y - 4) + ' ' + (x + 7) + ',' + (y + 4) + ' ' + x + ',' + y); a.setAttribute('class', 'swim-blk-head'); svg.appendChild(a); }
-  function dot(x, y) { var c = document.createElementNS(SVGNS, 'circle'); c.setAttribute('cx', x); c.setAttribute('cy', y); c.setAttribute('r', 2.3); c.setAttribute('class', 'swim-blk-origin'); svg.appendChild(c); }
+  function path(d, cls, attr, val) { var p = document.createElementNS(SVGNS, 'path'); p.setAttribute('d', d); p.setAttribute('class', cls); if (attr) p.setAttribute(attr, val); svg.appendChild(p); }
+  function arrowLeft(x, y, id) { var a = document.createElementNS(SVGNS, 'polygon'); a.setAttribute('points', (x + 7) + ',' + (y - 4) + ' ' + (x + 7) + ',' + (y + 4) + ' ' + x + ',' + y); a.setAttribute('class', 'swim-blk-head'); if (id) a.setAttribute('data-node', id); svg.appendChild(a); }
+  function dot(x, y, id) { var c = document.createElementNS(SVGNS, 'circle'); c.setAttribute('cx', x); c.setAttribute('cy', y); c.setAttribute('r', 2.3); c.setAttribute('class', 'swim-blk-origin'); if (id) c.setAttribute('data-node', id); svg.appendChild(c); }
 
   drawables.forEach(function(d) {
     var cx = chanX(d.chan);
     if (d.kind === 'spine') {
       var pts = d.nodes.filter(function(id) { return rect[id]; });
       var first = rect[pts[0]], last = rect[pts[pts.length - 1]];
-      path('M' + cx + ',' + first.cy + ' L' + cx + ',' + last.cy, 'swim-blk-spine');
+      path('M' + cx + ',' + first.cy + ' L' + cx + ',' + last.cy, 'swim-blk-spine', 'data-nodes', pts.join(' '));
       pts.forEach(function(id, i) {
         var r = rect[id];
-        path('M' + (r.right + 1) + ',' + r.cy + ' L' + cx + ',' + r.cy, 'swim-blk-tick');
-        if (i === 0) dot(r.right + 1, r.cy); else arrowLeft(r.right + 1, r.cy);
+        path('M' + (r.right + 1) + ',' + r.cy + ' L' + cx + ',' + r.cy, 'swim-blk-tick', 'data-node', id);
+        if (i === 0) dot(r.right + 1, r.cy, id); else arrowLeft(r.right + 1, r.cy, id);
       });
     } else {
       var rf = rect[d.from], rt = rect[d.to];
-      path('M' + (rf.right + 1) + ',' + rf.cy + ' L' + cx + ',' + rf.cy + ' L' + cx + ',' + rt.cy + ' L' + (rt.right + 1) + ',' + rt.cy, 'swim-blk-spine');
-      dot(rf.right + 1, rf.cy);
-      arrowLeft(rt.right + 1, rt.cy);
+      path('M' + (rf.right + 1) + ',' + rf.cy + ' L' + cx + ',' + rf.cy + ' L' + cx + ',' + rt.cy + ' L' + (rt.right + 1) + ',' + rt.cy, 'swim-blk-spine', 'data-nodes', d.from + ' ' + d.to);
+      dot(rf.right + 1, rf.cy, d.from);
+      arrowLeft(rt.right + 1, rt.cy, d.to);
     }
   });
 
@@ -2595,6 +2595,21 @@ function highlightChain(issueId) {
       paths[i].classList.add('swim-chain-link');
     }
   }
+
+  // Flow view: dim all spine elements, then re-light the ones in the chain
+  var flowEdges = lanesEl.querySelector('.swim-flow-edges');
+  if (flowEdges) {
+    flowEdges.classList.add('swim-edges-dim');
+    var edgeEls = flowEdges.querySelectorAll('[data-node], [data-nodes]');
+    for (var e = 0; e < edgeEls.length; e++) {
+      var single = edgeEls[e].getAttribute('data-node');
+      var multi = edgeEls[e].getAttribute('data-nodes');
+      var on = false;
+      if (single) on = chain.has(single);
+      else if (multi) { var parts = multi.split(' '); for (var m = 0; m < parts.length; m++) { if (chain.has(parts[m])) { on = true; break; } } }
+      if (on) edgeEls[e].classList.add('swim-edge-hl');
+    }
+  }
 }
 
 function clearChainHighlight() {
@@ -2611,6 +2626,13 @@ function clearChainHighlight() {
   var links = lanesEl.querySelectorAll('.swim-chain-link');
   for (var i = 0; i < links.length; i++) {
     links[i].classList.remove('swim-chain-link');
+  }
+
+  var flowEdges = lanesEl.querySelector('.swim-flow-edges');
+  if (flowEdges) {
+    flowEdges.classList.remove('swim-edges-dim');
+    var hl = flowEdges.querySelectorAll('.swim-edge-hl');
+    for (var h = 0; h < hl.length; h++) hl[h].classList.remove('swim-edge-hl');
   }
 }
 

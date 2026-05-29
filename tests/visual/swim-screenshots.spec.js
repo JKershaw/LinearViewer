@@ -17,10 +17,13 @@ test.describe.configure({ mode: 'serial' });
 
 test.describe('Swim Screenshots', () => {
   test.beforeEach(async ({ page }) => {
+    // Flow is the default layout; this maker captures the lane view, so pin
+    // orientation to horizontal.
+    await page.addInitScript(() => {
+      localStorage.setItem('swim-settings', JSON.stringify({ orientation: 'horizontal' }));
+    });
     // Use swim sample data for realistic screenshots
     await page.goto('/test/set-session?swimSample=true');
-    // Clear any persisted settings
-    await page.evaluate(() => localStorage.removeItem('swim-settings'));
     await page.goto(SWIM_URL);
     await page.waitForLoadState('networkidle');
   });
