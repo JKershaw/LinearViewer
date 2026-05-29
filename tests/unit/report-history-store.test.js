@@ -25,6 +25,9 @@ function createMockCollection() {
       docs.push(doc);
       return { insertedId: doc._id };
     },
+    async findOne(query) {
+      return docs.find(d => matches(d, query)) || null;
+    },
     find(query = {}) {
       const results = docs.filter(d => matches(d, query));
       return { async toArray() { return results.slice(); } };
@@ -128,6 +131,41 @@ describe('ReportHistoryStore.list', () => {
   test('scopes by workspace', async () => {
     await store.save('ws-1', { model: 'm', narrative: sampleNarrative() });
     assert.strictEqual((await store.list('ws-2')).total, 0);
+  });
+
+  test('returns lightweight summaries (no narrative / orientation bodies)', async () => {
+    await store.save('ws-1', { model: 'm', northStar: 'aim', narrative: sampleNarrative() });
+    const { items } = await store.list('ws-1');
+    const row = items[0];
+    assert.deepStrictEqual(Object.keys(row).sort(), ['generatedAt', 'id', 'model', 'northStar']);
+    assert.strictEqual(row.narrative, undefined);
+    assert.strictEqual(row.orientation, undefined);
+    assert.strictEqual(row.northStar, 'aim');
+  });
+});
+
+describe('ReportHistoryStore.get', () => {
+  let store;
+  beforeEach(() => { store = new ReportHistoryStore({ collection: createMockCollection() }); });
+
+  test('returns the full record (narrative + orientation)', async () => {
+    const saved = await store.save('ws-1', {
+      model: 'm', northStar: 'aim', narrative: sampleNarrative('a'),
+      orientation: [{ identifier: 'LIN-1', bearing: 'N', reason: 'r', archived: false }]
+    });
+    const got = await store.get('ws-1', saved.id);
+    assert.strictEqual(got.id, saved.id);
+    assert.strictEqual(got.narrative.gap, 'gap a');
+    assert.strictEqual(got.orientation.length, 1);
+  });
+
+  test('returns null for missing id', async () => {
+    assert.strictEqual(await store.get('ws-1', 'nope'), null);
+  });
+
+  test('scopes by workspace', async () => {
+    const saved = await store.save('ws-1', { model: 'm', narrative: sampleNarrative() });
+    assert.strictEqual(await store.get('ws-2', saved.id), null);
   });
 });
 

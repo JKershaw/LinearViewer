@@ -293,12 +293,19 @@
         // Errors are surfaced per-layer; nothing extra to do here.
       })
       .then(function() {
-        // Persist the completed run so it survives a reload (best-effort).
-        saveReport(northStar, collected);
         if (generateBtn) {
           generateBtn.disabled = false;
           generateBtn.textContent = 'Regenerate reading';
         }
+        // Persist the completed run (best-effort), then refresh the history
+        // list and select the new reading. The panels already show the
+        // freshly-streamed content, so we don't re-apply it.
+        return saveReport(northStar, collected).then(function(saved) {
+          return loadHistory().then(function() {
+            var id = saved ? saved.id : historyState.latestId;
+            if (id) selectReport(id, false);
+          });
+        });
       });
   }
 
@@ -306,17 +313,21 @@
    * Persist a completed report run. Best-effort: durability is a convenience,
    * not part of the generation flow, so failures are swallowed. Skips the save
    * entirely when no layer produced content (e.g. the first layer failed).
+   * Resolves with the saved report (or null).
    */
   function saveReport(northStar, collected) {
     var hasContent = collected.technical || collected.product ||
       collected.trajectory || collected.northStarReading || collected.gap;
-    if (!hasContent) return;
+    if (!hasContent) return Promise.resolve(null);
 
-    fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/roadmap/reports', {
+    return fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/roadmap/reports', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ northStar: northStar || '', narrative: collected })
-    }).catch(function() { /* swallow — durability is best-effort */ });
+    })
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(body) { return (body && body.report) || null; })
+      .catch(function() { return null; /* durability is best-effort */ });
   }
 
   function renderPipeline() {
@@ -346,10 +357,19 @@
       runPipeline(textarea.value, btn);
     });
 
-    // Rehydrate the most recent saved report so a reload no longer loses the
-    // reading (Step 0 / LIN-299).
-    rehydrateLatestReport(btn);
+    // Load saved report history (LIN-302); show the latest reading on load so
+    // a reload no longer loses it.
+    loadHistory().then(function(summaries) {
+      if (summaries.length) {
+        btn.textContent = 'Regenerate reading';
+        selectReport(summaries[0].id, true);
+      }
+    });
   }
+
+  // =========================================================================
+  // Report history (LIN-302) — browse and view past readings
+  // =========================================================================
 
   // Maps a stored narrative field to its layer placeholder id.
   var NARRATIVE_FIELD_TO_LAYER = {
@@ -360,40 +380,162 @@
     gap: 'gap'
   };
 
-  /**
-   * Fetch the newest saved report and render it into the layer placeholders.
-   * Only fills layers that have stored text; empty/null layers are left as-is.
-   */
-  function rehydrateLatestReport(generateBtn) {
-    fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/roadmap/reports?limit=1')
-      .then(function(r) { return r.ok ? r.json() : null; })
-      .then(function(body) {
-        if (!body || !body.reports || !body.reports.length) return;
-        applyReport(body.reports[0], generateBtn);
-      })
-      .catch(function() { /* no saved report — leave placeholders idle */ });
+  var historyState = { summaries: [], latestId: null };
+
+  function formatWhen(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   }
 
-  function applyReport(report, generateBtn) {
-    var narrative = (report && report.narrative) || {};
-    var applied = false;
+  function nsSnippet(ns) {
+    if (!ns || !ns.trim()) return '(no north star)';
+    var t = ns.trim().replace(/\s+/g, ' ');
+    return '★ "' + (t.length > 48 ? t.slice(0, 47) + '…' : t) + '"';
+  }
 
+  /** Fetch the summary list and render the history panel. Resolves with summaries. */
+  function loadHistory() {
+    return fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/roadmap/reports')
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(body) {
+        var reports = (body && body.reports) || [];
+        historyState.summaries = reports;
+        historyState.latestId = reports.length ? reports[0].id : null;
+        renderHistoryList(reports);
+        return reports;
+      })
+      .catch(function() { return []; });
+  }
+
+  function renderHistoryList(summaries) {
+    var container = document.getElementById('roadmap-history');
+    if (!container) return;
+    container.innerHTML = '';
+    if (!summaries.length) return;
+
+    var details = document.createElement('details');
+    details.className = 'roadmap-history-details';
+
+    var summaryEl = document.createElement('summary');
+    summaryEl.textContent = '│ Past readings (' + summaries.length + ')';
+    details.appendChild(summaryEl);
+
+    var listEl = document.createElement('div');
+    listEl.className = 'roadmap-history-list';
+
+    summaries.forEach(function(s, i) {
+      var row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'roadmap-history-row';
+      row.setAttribute('data-report-id', s.id);
+
+      var marker = document.createElement('span');
+      marker.className = 'roadmap-history-marker';
+      marker.textContent = '  ';
+
+      var when = document.createElement('span');
+      when.className = 'roadmap-history-when';
+      when.textContent = formatWhen(s.generatedAt);
+
+      var ns = document.createElement('span');
+      ns.className = 'roadmap-history-ns';
+      ns.textContent = nsSnippet(s.northStar);
+
+      row.appendChild(marker);
+      row.appendChild(when);
+      row.appendChild(ns);
+
+      if (i === 0) {
+        var tag = document.createElement('span');
+        tag.className = 'roadmap-history-latest';
+        tag.textContent = 'latest';
+        row.appendChild(tag);
+      }
+
+      row.addEventListener('click', function() { selectReport(s.id, true); });
+      listEl.appendChild(row);
+    });
+
+    details.appendChild(listEl);
+    container.appendChild(details);
+  }
+
+  function markSelectedRow(id) {
+    var rows = document.querySelectorAll('#roadmap-history .roadmap-history-row');
+    Array.prototype.forEach.call(rows, function(row) {
+      var selected = row.getAttribute('data-report-id') === id;
+      row.classList.toggle('roadmap-history-row--selected', selected);
+      var marker = row.querySelector('.roadmap-history-marker');
+      if (marker) marker.textContent = selected ? '> ' : '  ';
+    });
+  }
+
+  function setViewingBanner(isLatest, summary) {
+    var banner = document.getElementById('roadmap-history-viewing');
+    if (!banner) return;
+    banner.innerHTML = '';
+    if (isLatest) { banner.hidden = true; return; }
+    banner.hidden = false;
+
+    var txt = document.createElement('span');
+    txt.textContent = 'Viewing a saved reading from ' + formatWhen(summary.generatedAt) + ' · ';
+    var link = document.createElement('button');
+    link.type = 'button';
+    link.className = 'roadmap-history-view-latest';
+    link.textContent = 'view latest';
+    link.addEventListener('click', function() {
+      if (historyState.latestId) selectReport(historyState.latestId, true);
+    });
+    banner.appendChild(txt);
+    banner.appendChild(link);
+  }
+
+  /**
+   * Mark a report as selected in the list and update the viewing banner. When
+   * applyToPanels is true, fetch the full record and render it into the panels;
+   * pass false right after generating (the panels already show that content).
+   */
+  function selectReport(id, applyToPanels) {
+    var isLatest = id === historyState.latestId;
+    var summary = historyState.summaries.filter(function(s) { return s.id === id; })[0] || {};
+    markSelectedRow(id);
+    setViewingBanner(isLatest, summary);
+    if (!applyToPanels) return Promise.resolve();
+
+    return fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/roadmap/reports/' + encodeURIComponent(id))
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(body) { if (body && body.report) applyReport(body.report); })
+      .catch(function() { /* leave panels as-is */ });
+  }
+
+  /**
+   * Render a full report into the five panels. Resets every panel first so
+   * switching between readings never leaves a stale panel from the one
+   * previously viewed (e.g. a gap analysis from a reading that had a north
+   * star, when viewing one that didn't).
+   */
+  function applyReport(report) {
+    var narrative = (report && report.narrative) || {};
     Object.keys(NARRATIVE_FIELD_TO_LAYER).forEach(function(field) {
-      var text = narrative[field];
-      if (!text) return;
       var section = layerSection(NARRATIVE_FIELD_TO_LAYER[field]);
       if (!section) return;
       var content = section.querySelector('.roadmap-layer-content');
       var status = section.querySelector('.roadmap-layer-status');
-      if (content) content.textContent = text;
+      var retry = section.querySelector('.roadmap-layer-retry');
+      if (retry) retry.remove();
       if (status) status.textContent = '';
-      section.setAttribute('data-state', 'done');
-      applied = true;
-    });
 
-    if (applied && generateBtn) {
-      generateBtn.textContent = 'Regenerate reading';
-    }
+      var text = narrative[field];
+      if (text) {
+        if (content) content.textContent = text;
+        section.setAttribute('data-state', 'done');
+      } else {
+        if (content) content.textContent = '';
+        section.setAttribute('data-state', 'idle');
+      }
+    });
   }
 
   // =========================================================================

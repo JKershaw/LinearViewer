@@ -495,6 +495,105 @@
   background: var(--fg-vdim);
 }
 
+/* =============================================================================
+   Report history (LIN-302) — past readings list + viewing banner
+   ============================================================================= */
+.roadmap-history {
+  margin: 0 0 1em;
+}
+
+.roadmap-history-details summary {
+  font-family: var(--font-structural);
+  font-size: 0.8em;
+  color: var(--fg-dim);
+  cursor: pointer;
+  padding: 0.2em 0;
+  user-select: none;
+}
+
+.roadmap-history-details summary:hover {
+  color: var(--fg);
+}
+
+.roadmap-history-list {
+  margin-top: 0.4em;
+  display: flex;
+  flex-direction: column;
+}
+
+.roadmap-history-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6em;
+  width: 100%;
+  text-align: left;
+  font-family: var(--font-structural);
+  font-size: 0.8em;
+  color: var(--fg);
+  background: none;
+  border: none;
+  padding: 0.3em 0.4em;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.roadmap-history-row:hover {
+  background: var(--fg-vdim);
+}
+
+.roadmap-history-row--selected {
+  background: var(--fg-vdim);
+}
+
+.roadmap-history-marker {
+  white-space: pre;
+  color: var(--fg-dim);
+}
+
+.roadmap-history-when {
+  color: var(--fg);
+  flex: 0 0 auto;
+}
+
+.roadmap-history-ns {
+  color: var(--fg-dim);
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.roadmap-history-latest {
+  margin-left: auto;
+  flex: 0 0 auto;
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-dim);
+}
+
+.roadmap-history-viewing {
+  font-family: var(--font-structural);
+  font-size: 0.8em;
+  color: var(--fg-dim);
+  padding: 0.4em 0.5em;
+  margin-bottom: 0.8em;
+  border-left: 3px solid var(--fg-dim);
+  background: var(--fg-vdim);
+}
+
+.roadmap-history-view-latest {
+  font-family: var(--font-structural);
+  font-size: 1em;
+  color: var(--fg);
+  background: none;
+  border: none;
+  padding: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 /* Fork — trajectory and north-star-reading rendered as visual siblings.
    Side-by-side on wider viewports, stacked on narrow. Neither is "primary";
    the design depends on equal visual weight. */

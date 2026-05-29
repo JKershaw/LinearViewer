@@ -560,12 +560,32 @@ test.describe('Roadmap Report History', () => {
     expect(report.narrative.technical).toBe('tech a');
     expect(report.orientation).toEqual([]);          // shape present for Step 1
 
+    // List returns lightweight summaries (no narrative bodies).
     const listRes = await request.get(REPORTS_URL);
     expect(listRes.status()).toBe(200);
     const listBody = await listRes.json();
     expect(listBody.total).toBe(1);
     expect(listBody.reports[0].id).toBe(report.id);
-    expect(listBody.reports[0].narrative.gap).toBe('gap a');
+    expect(listBody.reports[0].northStar).toBe('be useful');
+    expect(listBody.reports[0].narrative).toBeUndefined();
+
+    // The full record (with narratives) is fetched by id.
+    const oneRes = await request.get(`${REPORTS_URL}/${report.id}`);
+    expect(oneRes.status()).toBe(200);
+    expect((await oneRes.json()).report.narrative.gap).toBe('gap a');
+  });
+
+  test('GET :id returns 404 for an unknown report', async ({ request }) => {
+    const response = await request.get(`${REPORTS_URL}/does-not-exist`);
+    expect(response.status()).toBe(404);
+  });
+
+  test('GET :id returns 403 when feature flag is off', async ({ request }) => {
+    const { report } = await (await request.post(REPORTS_URL, { data: { narrative: sampleNarrative() } })).json();
+    const noRoadmap = encodeURIComponent(JSON.stringify({ roadmap: false }));
+    await request.get(`/test/set-session?features=${noRoadmap}`);
+    const response = await request.get(`${REPORTS_URL}/${report.id}`);
+    expect(response.status()).toBe(403);
   });
 
   test('list returns newest-first', async ({ request }) => {
@@ -634,5 +654,46 @@ test.describe('Roadmap Report History — reload rehydration (UI)', () => {
     await expect(page.locator('[data-layer="technical"]')).toHaveAttribute('data-state', 'done');
     // Button reflects that a prior reading exists.
     await expect(page.locator('.roadmap-generate-reading-btn')).toContainText(/regenerate/i);
+  });
+
+  test('history lists past readings; selecting an older one shows a viewing banner', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${FEATURES}&openRouterConnected=true`);
+    const pageRequest = page.context().request;
+    await pageRequest.get('/test/clear-report-history');
+    await pageRequest.put(`/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/north-star`, {
+      data: { northStar: 'Be the simplest way to ship.' }
+    });
+
+    await page.goto(ROADMAP_URL);
+    await page.waitForLoadState('networkidle');
+
+    const btn = page.locator('.roadmap-generate-reading-btn');
+
+    // First reading → history shows one entry.
+    await btn.click();
+    await expect(page.locator('[data-layer="gap"]')).toHaveAttribute('data-state', 'done', { timeout: 10000 });
+    await expect(page.locator('.roadmap-history-details summary')).toContainText('Past readings (1)', { timeout: 10000 });
+
+    // Second reading → two entries.
+    await btn.click();
+    await expect(page.locator('[data-layer="gap"]')).toHaveAttribute('data-state', 'done', { timeout: 10000 });
+    await expect(page.locator('.roadmap-history-details summary')).toContainText('Past readings (2)', { timeout: 10000 });
+
+    // Open the list; newest is tagged "latest"; banner hidden while on latest.
+    await page.locator('.roadmap-history-details summary').click();
+    const rows = page.locator('.roadmap-history-row');
+    await expect(rows).toHaveCount(2);
+    await expect(rows.nth(0).locator('.roadmap-history-latest')).toBeVisible();
+    await expect(page.locator('#roadmap-history-viewing')).toBeHidden();
+
+    // Select the older reading → viewing banner appears, row marked selected.
+    await rows.nth(1).click();
+    await expect(page.locator('#roadmap-history-viewing')).toBeVisible();
+    await expect(page.locator('#roadmap-history-viewing')).toContainText('Viewing a saved reading');
+    await expect(rows.nth(1)).toHaveClass(/roadmap-history-row--selected/);
+
+    // "view latest" returns to the newest reading and hides the banner.
+    await page.locator('.roadmap-history-view-latest').click();
+    await expect(page.locator('#roadmap-history-viewing')).toBeHidden();
   });
 });
