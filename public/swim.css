@@ -154,12 +154,13 @@ body:has(.swim-page) {
   display: flex;
   align-items: center;
   gap: 8px;
-  /* 22px top padding reserves per-lane headroom for group decoration labels
-     drawn ~20px above the topmost card (see drawGroupDecorations in swim.js).
-     Without it, a group whose parent sits below the first lane has its label
-     and rect spill upward into the lane above (LIN-303). Mirrors the
-     per-lane headroom already applied in vertical mode. */
-  padding: 22px 0.5rem 0.35rem;
+  /* Top padding reserves per-lane headroom for group decoration labels drawn
+     ~18px above the topmost card (see drawGroupDecorations in swim.js). Without
+     it, a group whose parent sits below the first lane has its label and rect
+     spill upward into the lane above (LIN-303). The extra margin over the label
+     offset keeps the label clear of the lane above even with tall (wrapped)
+     cards on mobile. Mirrors the per-lane headroom in vertical mode. */
+  padding: 26px 0.5rem 0.35rem;
   flex-wrap: nowrap;
   min-width: 0;
 }
@@ -319,12 +320,31 @@ body:has(.swim-page) {
   stroke-dasharray: 4 3;
 }
 
+/* Nested groups: a touch more fill + solid border so the layering reads as
+   "inside" rather than "another box beside". */
+.swim-group-rect.nested {
+  fill: rgba(37, 99, 235, 0.08);
+  stroke: rgba(37, 99, 235, 0.45);
+  stroke-dasharray: none;
+}
+
+/* Opaque pill behind each label so the dashed border never strikes through
+   the text (keeps the title readable). */
+.swim-group-label-bg {
+  fill: #ffffff;
+}
+
+.swim-group-label-bg.nested {
+  fill: #f4f7ff;
+}
+
 .swim-group-label-text {
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
   font-size: 9px;
-  fill: rgba(37, 99, 235, 0.75);
+  fill: rgba(37, 99, 235, 0.85);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  font-weight: 600;
 }
 
 /* Slight emphasis for the parent card within a group */
@@ -637,10 +657,10 @@ body:has(.swim-page) {
   flex-direction: column;
   align-items: stretch;
   gap: 5px;
-  /* 22px top padding reserves headroom for group decoration labels drawn
-     ~20px above the topmost card. Without it, the group label would
-     overlap the lane-label directly above. */
-  padding: 22px 0.35rem 0.4rem;
+  /* Top padding reserves headroom for group decoration labels drawn ~18px above
+     the topmost card. Without it, the group label would overlap the lane-label
+     directly above. */
+  padding: 26px 0.35rem 0.4rem;
 }
 
 .swim-page[data-orientation="vertical"] .swim-lane-segment {
@@ -719,7 +739,8 @@ body:has(.swim-page) {
     width: 130px;
   }
   .swim-page[data-orientation="vertical"] .swim-lane-items {
-    padding: 0.35rem 0.3rem;
+    /* Keep the top headroom for group-decoration labels (LIN-303). */
+    padding: 26px 0.3rem 0.35rem;
   }
 }
 
@@ -764,7 +785,9 @@ body:has(.swim-page) {
 
   .swim-lane-items {
     gap: 5px;
-    padding: 0.25rem 0.4rem;
+    /* Keep the top headroom for group-decoration labels (LIN-303); only the
+       horizontal padding shrinks on small phones. */
+    padding: 26px 0.4rem 0.25rem;
   }
 
   .swim-settings-body {

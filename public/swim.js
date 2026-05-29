@@ -777,6 +777,9 @@ function renderBox(issue, settings, blockedByMap, groupInfo) {
   if (groupInfo) {
     groupAttrs += ' data-group-id="' + escapeHtml(groupInfo.groupId) + '"';
     groupAttrs += ' data-group-role="' + groupInfo.role + '"';
+    if (groupInfo.members && groupInfo.members.length) {
+      groupAttrs += ' data-group-members="' + escapeHtml(groupInfo.members.join(' ')) + '"';
+    }
   }
 
   var html = '<div class="swim-box ' + stateClass(issue.stateType) + compactClass + blockedClass + goalClass +
@@ -903,9 +906,13 @@ function render() {
   var blockedByMap = useColumns ? buildBlockedByMap(allIssues) : null;
 
   // Compute group membership: a group is a parent with ≥1 child in the same
-  // lane+segment. Each issue gets a groupInfo {groupId, role} passed to renderBox;
-  // the post-layout drawGroupDecorations walks these to paint shaded rects.
-  var groupInfoById = settings.groupSubtasks ? computeGroupMembership(lanes) : new Map();
+  // lane+segment. Each issue gets a groupInfo {groupId, role, members} passed to
+  // renderBox; the post-layout drawGroupDecorations walks these (+ group levels)
+  // to paint nested shaded rects.
+  var groupResult = settings.groupSubtasks
+    ? computeGroupMembership(lanes)
+    : { membership: new Map(), groupMeta: new Map() };
+  var groupInfoById = groupResult.membership;
 
   function boxGroupInfo(issue) {
     return groupInfoById.get(issue.id) || null;
@@ -975,18 +982,32 @@ function render() {
       drawBlockingConnectors(lanes, useColumns ? blockedByMap : null);
     }
     if (settings.groupSubtasks) {
-      drawGroupDecorations(groupInfoById);
+      drawGroupDecorations(groupResult.groupMeta);
     }
   });
 }
 
 /**
- * Build a map: issueId → { groupId, role }
- * A group is a parent that has ≥1 child in the same lane+segment.
- * Supports nested hierarchies — each parent-with-children level forms its own group.
+ * Build group membership for subtask decorations, with full nesting support.
+ *
+ * A group is a parent that has ≥1 child in the same lane+segment. Hierarchies
+ * nest: a child that is itself a parent forms its own (inner) group while still
+ * belonging to every ancestor group. So the outer group's bounding rect wraps
+ * the inner group, instead of the two rendering as disconnected siblings.
+ *
+ * Returns:
+ *   {
+ *     membership: Map issueId → {
+ *       groupId,            // innermost group the box sits in (back-compat + clustering)
+ *       role,               // 'parent' if it heads a group, else 'child'
+ *       members: [groupId]  // every group whose rect should enclose this box
+ *     },
+ *     groupMeta: Map groupId → { level }   // 0 = outermost, deeper = more nested
+ *   }
  */
 function computeGroupMembership(lanes) {
-  var groupInfo = new Map();
+  var membership = new Map();
+  var groupMeta = new Map();
   var groupCounter = 0;
 
   for (var li = 0; li < lanes.length; li++) {
@@ -1002,7 +1023,9 @@ function computeGroupMembership(lanes) {
     for (var segKey in bySeg) {
       var segItems = bySeg[segKey];
       var idSet = new Set(segItems.map(function(i) { return i.id; }));
-      // For each item that has children in this segment, create a group
+      var itemById = new Map(segItems.map(function(i) { return [i.id, i]; }));
+
+      // Parents that have ≥1 child within this segment become groups.
       var childrenByParent = new Map();
       for (var s = 0; s < segItems.length; s++) {
         var it = segItems[s];
@@ -1011,31 +1034,61 @@ function computeGroupMembership(lanes) {
           childrenByParent.get(it.parentId).push(it.id);
         }
       }
+      if (childrenByParent.size === 0) continue;
+
+      // Assign a group id + nesting level to each group-parent.
+      var groupIdByParent = new Map();
       childrenByParent.forEach(function(childIds, parentId) {
         var gid = 'g' + (++groupCounter);
-        groupInfo.set(parentId, { groupId: gid, role: 'parent' });
-        for (var c = 0; c < childIds.length; c++) {
-          // Preserve outer group role if already parent of another nested group
-          var existing = groupInfo.get(childIds[c]);
-          if (existing && existing.role === 'parent') {
-            // Nested: this child is also a parent of grandchildren — keep it parent,
-            // track membership in outer group via separate attribute later if needed.
-            continue;
-          }
-          groupInfo.set(childIds[c], { groupId: gid, role: 'child' });
+        groupIdByParent.set(parentId, gid);
+        // Level = how many ancestor group-parents sit above this one in-segment.
+        var level = 0;
+        var anc = itemById.get(parentId);
+        anc = anc ? anc.parentId : null;
+        while (anc && idSet.has(anc)) {
+          if (childrenByParent.has(anc)) level++;
+          var ancItem = itemById.get(anc);
+          anc = ancItem ? ancItem.parentId : null;
         }
+        groupMeta.set(gid, { level: level });
       });
+
+      // For each box, collect the chain of ancestor groups (outermost-last as we
+      // walk up). `members` drives bounding boxes; `groupId` is the innermost.
+      for (var s2 = 0; s2 < segItems.length; s2++) {
+        var box = segItems[s2];
+        var members = [];
+        var innermost = null;
+        var ownGid = groupIdByParent.get(box.id) || null;
+        if (ownGid) { members.push(ownGid); innermost = ownGid; }
+        var p = box.parentId;
+        while (p && idSet.has(p)) {
+          if (groupIdByParent.has(p)) {
+            var agid = groupIdByParent.get(p);
+            members.push(agid);
+            if (!innermost) innermost = agid; // first ancestor hit = closest
+          }
+          var pItem = itemById.get(p);
+          p = pItem ? pItem.parentId : null;
+        }
+        if (members.length === 0) continue;
+        membership.set(box.id, {
+          groupId: innermost,
+          role: ownGid ? 'parent' : 'child',
+          members: members
+        });
+      }
     }
   }
 
-  return groupInfo;
+  return { membership: membership, groupMeta: groupMeta };
 }
 
 /**
  * Post-layout: for every group, draw a shaded rect behind its parent+child cards.
  * Uses getBoundingClientRect so it works regardless of columns/gaps/blocker pushes.
  */
-function drawGroupDecorations(groupInfoById) {
+function drawGroupDecorations(groupMeta) {
   // Remove any existing decoration SVG
   var existing = document.getElementById('swim-group-decorations');
   if (existing) existing.remove();
@@ -1043,17 +1096,27 @@ function drawGroupDecorations(groupInfoById) {
   var lanesEl = document.getElementById('swim-lanes');
   if (!lanesEl) return;
 
-  // Collect card rects by group
-  var groups = new Map(); // groupId → { rects: [...], parentTitle: str }
-  var cards = lanesEl.querySelectorAll('.swim-box[data-group-id]');
+  groupMeta = groupMeta || new Map();
+
+  // Collect card rects by group. A box contributes to every group listed in its
+  // data-group-members, so an outer group's rect wraps its nested inner groups.
+  var groups = new Map();
+  var cards = lanesEl.querySelectorAll('.swim-box[data-group-members]');
   if (cards.length === 0) return;
 
   var containerRect = lanesEl.getBoundingClientRect();
 
+  function ensure(gid) {
+    if (!groups.has(gid)) {
+      var meta = groupMeta.get(gid);
+      groups.set(gid, { rects: [], parentTitle: '', level: meta ? meta.level : 0 });
+    }
+    return groups.get(gid);
+  }
+
   for (var i = 0; i < cards.length; i++) {
     var card = cards[i];
-    var gid = card.getAttribute('data-group-id');
-    var role = card.getAttribute('data-group-role');
+    var members = (card.getAttribute('data-group-members') || '').split(' ').filter(Boolean);
     var r = card.getBoundingClientRect();
     var rect = {
       left: r.left - containerRect.left,
@@ -1061,15 +1124,16 @@ function drawGroupDecorations(groupInfoById) {
       top: r.top - containerRect.top,
       bottom: r.bottom - containerRect.top
     };
-    if (!groups.has(gid)) {
-      groups.set(gid, { rects: [], parentTitle: '', parentCard: null });
+    for (var m = 0; m < members.length; m++) {
+      ensure(members[m]).rects.push(rect);
     }
-    var g = groups.get(gid);
-    g.rects.push(rect);
-    if (role === 'parent') {
-      var titleEl = card.querySelector('.swim-box-title');
-      g.parentTitle = titleEl ? (titleEl.textContent || '').trim() : '';
-      g.parentCard = card;
+    // The parent box carries the group's title (its own group = data-group-id).
+    if (card.getAttribute('data-group-role') === 'parent') {
+      var ownGid = card.getAttribute('data-group-id');
+      if (ownGid) {
+        var titleEl = card.querySelector('.swim-box-title');
+        ensure(ownGid).parentTitle = titleEl ? (titleEl.textContent || '').trim() : '';
+      }
     }
   }
 
@@ -1082,12 +1146,19 @@ function drawGroupDecorations(groupInfoById) {
   svg.setAttribute('width', lanesEl.scrollWidth);
   svg.setAttribute('height', lanesEl.scrollHeight);
 
-  var PAD_X = 6;
-  var PAD_Y = 6;
-  var LABEL_HEIGHT = 14;
+  var LABEL_HEIGHT = 12;
+  // Padding shrinks with nesting depth so a nested group sits visibly *inside*
+  // its parent on every side, rather than sharing edges with it. The outermost
+  // group needs (padY + LABEL_HEIGHT) of headroom above its cards; the per-lane
+  // top padding in swim.css reserves a comfortable margin beyond that.
+  function padX(level) { return Math.max(4, 10 - level * 5); }
+  function padY(level) { return Math.max(3, 6 - level * 3); }
 
+  // Measure every group box first, then paint outer -> inner (rects, then labels
+  // on top) so a label is never struck through by another group's dashed border.
+  var drawn = [];
   groups.forEach(function(g, gid) {
-    if (g.rects.length < 2) return; // Need parent + ≥1 child to be a group
+    if (g.rects.length < 2) return; // Need parent + >=1 child to be a group
     var minLeft = Infinity, minTop = Infinity, maxRight = -Infinity, maxBottom = -Infinity;
     for (var i = 0; i < g.rects.length; i++) {
       var r = g.rects[i];
@@ -1096,42 +1167,70 @@ function drawGroupDecorations(groupInfoById) {
       if (r.right > maxRight) maxRight = r.right;
       if (r.bottom > maxBottom) maxBottom = r.bottom;
     }
-    var x = minLeft - PAD_X;
-    var y = minTop - PAD_Y - LABEL_HEIGHT;
-    var w = (maxRight - minLeft) + PAD_X * 2;
-    var h = (maxBottom - minTop) + PAD_Y * 2 + LABEL_HEIGHT;
-
-    var rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    rect.setAttribute('x', x);
-    rect.setAttribute('y', y);
-    rect.setAttribute('width', w);
-    rect.setAttribute('height', h);
-    rect.setAttribute('rx', 8);
-    rect.setAttribute('ry', 8);
-    rect.setAttribute('class', 'swim-group-rect');
-    rect.setAttribute('data-group-id', gid);
-    svg.appendChild(rect);
-
-    // Label above the rect — truncate to fit the rect width so narrow lanes
-    // (mobile / vertical mode) don't overflow their group into the neighbour.
-    if (g.parentTitle) {
-      var label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      label.setAttribute('x', x + PAD_X);
-      label.setAttribute('y', y + LABEL_HEIGHT - 3);
-      label.setAttribute('class', 'swim-group-label-text');
-      // Approx char width at 9px SF Mono ≈ 5.4px. Leave 2*PAD_X breathing room.
-      var availableWidth = Math.max(0, w - PAD_X * 2);
-      var maxChars = Math.max(4, Math.floor(availableWidth / 5.4));
-      var hardCap = 30;
-      var limit = Math.min(maxChars, hardCap);
-      var labelText = g.parentTitle.length > limit
-        ? g.parentTitle.slice(0, Math.max(1, limit - 1)) + '\u2026'
-        : g.parentTitle;
-      label.textContent = labelText;
-      svg.appendChild(label);
-    }
+    var px = padX(g.level), py = padY(g.level);
+    drawn.push({
+      gid: gid,
+      level: g.level,
+      parentTitle: g.parentTitle,
+      x: minLeft - px,
+      y: minTop - py - LABEL_HEIGHT,
+      w: (maxRight - minLeft) + px * 2,
+      h: (maxBottom - minTop) + py * 2 + LABEL_HEIGHT,
+      px: px
+    });
   });
 
+  // Outer groups (lower level) first so inner rects/labels paint over them.
+  drawn.sort(function(a, b) { return a.level - b.level; });
+
+  for (var d = 0; d < drawn.length; d++) {
+    var box = drawn[d];
+    var rectEl = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rectEl.setAttribute('x', box.x);
+    rectEl.setAttribute('y', box.y);
+    rectEl.setAttribute('width', box.w);
+    rectEl.setAttribute('height', box.h);
+    rectEl.setAttribute('rx', 8);
+    rectEl.setAttribute('ry', 8);
+    rectEl.setAttribute('class', 'swim-group-rect' + (box.level > 0 ? ' nested' : ''));
+    rectEl.setAttribute('data-group-id', box.gid);
+    rectEl.setAttribute('data-group-level', box.level);
+    svg.appendChild(rectEl);
+  }
+
+  for (var d2 = 0; d2 < drawn.length; d2++) {
+    var b = drawn[d2];
+    if (!b.parentTitle) continue;
+    // Truncate to fit the rect so narrow lanes don't overflow into neighbours.
+    var availableWidth = Math.max(0, b.w - b.px * 2);
+    var maxChars = Math.max(4, Math.floor(availableWidth / 5.4));
+    var limit = Math.min(maxChars, 30);
+    var labelText = b.parentTitle.length > limit
+      ? b.parentTitle.slice(0, Math.max(1, limit - 1)) + '\u2026'
+      : b.parentTitle;
+
+    var textX = b.x + b.px;
+    var textBaseline = b.y + LABEL_HEIGHT - 4;
+    // A filled pill behind the label hides the dashed border underneath so the
+    // text reads cleanly (previously the border struck through it).
+    var bgWidth = labelText.length * 5.4 + 8;
+    var bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    bg.setAttribute('x', textX - 4);
+    bg.setAttribute('y', b.y + 1);
+    bg.setAttribute('width', bgWidth);
+    bg.setAttribute('height', LABEL_HEIGHT);
+    bg.setAttribute('rx', 3);
+    bg.setAttribute('ry', 3);
+    bg.setAttribute('class', 'swim-group-label-bg' + (b.level > 0 ? ' nested' : ''));
+    svg.appendChild(bg);
+
+    var label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    label.setAttribute('x', textX);
+    label.setAttribute('y', textBaseline);
+    label.setAttribute('class', 'swim-group-label-text' + (b.level > 0 ? ' nested' : ''));
+    label.textContent = labelText;
+    svg.appendChild(label);
+  }
   lanesEl.style.position = 'relative';
   // Insert decorations BEFORE connectors so connectors draw on top
   var connectors = document.getElementById('swim-connectors');
