@@ -24,6 +24,7 @@ import { ProxyEventStore } from './lib/proxy-events.js'
 import { ForemanStore } from './lib/foreman-store.js'
 import { FreeTierStore } from './lib/free-tier-store.js'
 import { RecapCacheStore } from './lib/recap-cache.js'
+import { ReportHistoryStore } from './lib/report-history-store.js'
 import { fetchProjects, fetchProjectsList, fetchTeams, fetchOrganization, fetchViewer } from './lib/linear.js'
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID } from './lib/tree.js'
 import { parseRepoFromDescription } from './lib/prompt-formatters.js'
@@ -214,6 +215,12 @@ const recapCacheStore = new RecapCacheStore({
   collection: recapCacheCollection
 })
 
+// Report history (LIN-299): durable per-workspace roadmap report runs
+const reportHistoryCollection = db.collection('report-history')
+const reportHistoryStore = new ReportHistoryStore({
+  collection: reportHistoryCollection
+})
+
 // =============================================================================
 // Express App Configuration
 // =============================================================================
@@ -258,7 +265,7 @@ app.use(session({
 // Test Mode Setup
 // =============================================================================
 if (process.env.NODE_ENV === 'test') {
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, getWorkspaceAccessToken }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, reportHistoryStore, getWorkspaceAccessToken }))
 }
 
 // =============================================================================
@@ -792,7 +799,7 @@ async function getWorkspaceOpenRouterKey(urlKey, linearUserId) {
 app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, workspaceFromUrl, getWorkspaceAccessToken, getWorkspaceOpenRouterKey, workspacePreferencesStore }))
 
 // Mount workspace API routes (audit, prompts, recommendations, comments, images)
-app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore }))
+app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, reportHistoryStore }))
 
 // Mount pipeline routes (page + JSON polling)
 app.use(createPipelineRoutes({ workspaceFromUrl, getWorkspaceAccessToken, dispatchQueueStore, foremanStore, getOpenRouterSource, getDeployInfo, handleUnauthorizedError }))

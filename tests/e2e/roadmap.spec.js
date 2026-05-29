@@ -253,6 +253,9 @@ test.describe('Roadmap Pipeline Layer Endpoints', () => {
 test.describe('Roadmap Pipeline UI', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto(`/test/set-session?features=${FEATURES}&openRouterConnected=true`);
+    // Start from a clean report store so on-load rehydration (LIN-299) doesn't
+    // pre-fill the layer placeholders these tests expect to be idle.
+    await page.context().request.get('/test/clear-report-history');
   });
 
   test('renders north star textarea, all five section placeholders, and generate button', async ({ page }) => {
@@ -502,5 +505,134 @@ test.describe('Roadmap North Star Storage', () => {
     const get2 = await request.get(url2);
     expect((await get1.json()).northStar).toBe('star one');
     expect((await get2.json()).northStar).toBe('star two');
+  });
+});
+
+// =============================================================================
+// Report history store (LIN-299): save/list/read of durable report runs.
+// =============================================================================
+
+test.describe('Roadmap Report History', () => {
+  const REPORTS_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/reports`;
+
+  const sampleNarrative = (tag = '') => ({
+    technical: 'tech ' + tag,
+    product: 'product ' + tag,
+    trajectory: 'trajectory ' + tag,
+    northStarReading: 'ns reading ' + tag,
+    gap: 'gap ' + tag
+  });
+
+  test.beforeEach(async ({ request }) => {
+    await request.get(`/test/set-session?features=${FEATURES}`);
+    await request.get('/test/clear-report-history');
+  });
+
+  test('POST returns 403 when feature flag is off', async ({ request }) => {
+    const noRoadmap = encodeURIComponent(JSON.stringify({ roadmap: false }));
+    await request.get(`/test/set-session?features=${noRoadmap}`);
+    const response = await request.post(REPORTS_URL, { data: { narrative: sampleNarrative() } });
+    expect(response.status()).toBe(403);
+  });
+
+  test('GET returns 403 when feature flag is off', async ({ request }) => {
+    const noRoadmap = encodeURIComponent(JSON.stringify({ roadmap: false }));
+    await request.get(`/test/set-session?features=${noRoadmap}`);
+    const response = await request.get(REPORTS_URL);
+    expect(response.status()).toBe(403);
+  });
+
+  test('POST returns 400 when narrative missing', async ({ request }) => {
+    const response = await request.post(REPORTS_URL, { data: { northStar: 'x' } });
+    expect(response.status()).toBe(400);
+  });
+
+  test('POST then GET round-trips a report (model + timestamp stamped server-side)', async ({ request }) => {
+    const postRes = await request.post(REPORTS_URL, {
+      data: { northStar: 'be useful', narrative: sampleNarrative('a') }
+    });
+    expect(postRes.status()).toBe(201);
+    const { report } = await postRes.json();
+    expect(report.id).toBeTruthy();
+    expect(report.model).toBeTruthy();               // stamped server-side
+    expect(report.generatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(report.northStar).toBe('be useful');
+    expect(report.narrative.technical).toBe('tech a');
+    expect(report.orientation).toEqual([]);          // shape present for Step 1
+
+    const listRes = await request.get(REPORTS_URL);
+    expect(listRes.status()).toBe(200);
+    const listBody = await listRes.json();
+    expect(listBody.total).toBe(1);
+    expect(listBody.reports[0].id).toBe(report.id);
+    expect(listBody.reports[0].narrative.gap).toBe('gap a');
+  });
+
+  test('list returns newest-first', async ({ request }) => {
+    const first = await (await request.post(REPORTS_URL, { data: { narrative: sampleNarrative('first') } })).json();
+    await new Promise(r => setTimeout(r, 20));
+    const second = await (await request.post(REPORTS_URL, { data: { narrative: sampleNarrative('second') } })).json();
+
+    const listBody = await (await request.get(REPORTS_URL)).json();
+    expect(listBody.total).toBe(2);
+    expect(listBody.reports[0].id).toBe(second.report.id);
+    expect(listBody.reports[1].id).toBe(first.report.id);
+  });
+
+  test('limit caps the number of returned reports', async ({ request }) => {
+    await request.post(REPORTS_URL, { data: { narrative: sampleNarrative('1') } });
+    await request.post(REPORTS_URL, { data: { narrative: sampleNarrative('2') } });
+    const listBody = await (await request.get(`${REPORTS_URL}?limit=1`)).json();
+    expect(listBody.total).toBe(2);
+    expect(listBody.reports.length).toBe(1);
+  });
+
+  test('reports are scoped per workspace', async ({ request }) => {
+    await request.get(`/test/set-session?features=${FEATURES}&multiWorkspace=true`);
+    await request.get('/test/clear-report-history?urlKey=test-workspace');
+    await request.get('/test/clear-report-history?urlKey=second-workspace');
+
+    const url1 = `/workspace/test-workspace/api/roadmap/reports`;
+    const url2 = `/workspace/second-workspace/api/roadmap/reports`;
+    await request.post(url1, { data: { narrative: sampleNarrative('ws1') } });
+
+    expect((await (await request.get(url1)).json()).total).toBe(1);
+    expect((await (await request.get(url2)).json()).total).toBe(0);
+  });
+});
+
+test.describe('Roadmap Report History — reload rehydration (UI)', () => {
+  test('a generated reading is restored after reload', async ({ page }) => {
+    // Session setup must happen on the page's own cookie context.
+    await page.goto(`/test/set-session?features=${FEATURES}&openRouterConnected=true`);
+    const pageRequest = page.context().request;
+    await pageRequest.get('/test/clear-report-history');
+
+    // Pre-set a north star so all five layers run.
+    await pageRequest.put(`/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/north-star`, {
+      data: { northStar: 'Be the simplest way to ship.' }
+    });
+
+    await page.goto(ROADMAP_URL);
+    await page.waitForLoadState('networkidle');
+
+    await page.locator('.roadmap-generate-reading-btn').click();
+    // Wait for the run to complete (gap is the last layer).
+    await expect(page.locator('[data-layer="gap"]')).toHaveAttribute('data-state', 'done', { timeout: 10000 });
+
+    // Give the best-effort save POST time to land before reloading.
+    await page.waitForTimeout(800);
+
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+
+    // The most recent report should be rehydrated into the layer placeholders.
+    await expect(page.locator('[data-layer="technical"] .roadmap-layer-content'))
+      .toContainText('Mock technical', { timeout: 10000 });
+    await expect(page.locator('[data-layer="gap"] .roadmap-layer-content'))
+      .toContainText('Mock gap', { timeout: 10000 });
+    await expect(page.locator('[data-layer="technical"]')).toHaveAttribute('data-state', 'done');
+    // Button reflects that a prior reading exists.
+    await expect(page.locator('.roadmap-generate-reading-btn')).toContainText(/regenerate/i);
   });
 });
