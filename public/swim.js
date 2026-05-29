@@ -959,40 +959,44 @@ function renderFlow(issues, settings) {
     return flowCard(model.byId[id], model, false);
   }
 
-  // group nodes → state band → project, where a node is a "local root" in its
-  // band unless its parent is in the same band (then it nests under the parent).
-  var bands = {};
+  function projOrder(name) { return (projectOrder && projectOrder[name] != null) ? projectOrder[name] : 999; }
+
+  // Columns = projects present, in project order (aligned across every band).
+  var projSet = {};
+  model.nodes.forEach(function(n) { projSet[n.projectName || 'No Project'] = true; });
+  var projects = Object.keys(projSet).sort(function(a, b) { return projOrder(a) - projOrder(b) || (a < b ? -1 : 1); });
+
+  // band → project → local roots (a node nests under its parent only when the
+  // parent is in the same band; otherwise it is a local root in its cell)
+  var cell = {};
   model.nodes.forEach(function(n) {
     var seg = bandOf[n.id];
     var parentInBand = n.parentId && model.byId[n.parentId] && bandOf[n.parentId] === seg;
     if (parentInBand) return;
     var proj = n.projectName || 'No Project';
-    if (!bands[seg]) bands[seg] = {};
-    if (!bands[seg][proj]) bands[seg][proj] = [];
-    bands[seg][proj].push(n.id);
+    if (!cell[seg]) cell[seg] = {};
+    if (!cell[seg][proj]) cell[seg][proj] = [];
+    cell[seg][proj].push(n.id);
   });
-  function projOrder(name) { return (projectOrder && projectOrder[name] != null) ? projectOrder[name] : 999; }
 
-  var segKeys = Object.keys(bands).map(Number).sort(function(a, b) { return a - b; });
-  var html = '<div class="swim-flow">';
+  var segKeys = Object.keys(cell).map(Number).sort(function(a, b) { return a - b; });
+  var html = '<div class="swim-flow swim-grid" style="grid-template-columns:repeat(' + projects.length + ', var(--swim-col-w))">';
+  // project header row
+  projects.forEach(function(p) { html += '<div class="swim-fcol-head">' + escapeHtml(p) + '</div>'; });
+  // state bands, each a full-width label then one cell per project column
   segKeys.forEach(function(seg) {
-    html += '<div class="swim-fband" data-segment="' + seg + '">';
-    html += '<div class="swim-fband-label">' + escapeHtml(SEG_LABEL[seg] || ('State ' + seg)) + '</div>';
-    var projNames = Object.keys(bands[seg]).sort(function(a, b) { return projOrder(a) - projOrder(b) || (a < b ? -1 : 1); });
-    projNames.forEach(function(proj) {
-      html += '<div class="swim-fgroup swim-fproject" data-depth="0">';
-      html += '<div class="swim-fgroup-label">' + escapeHtml(proj) + '</div>';
-      html += '<div class="swim-fgroup-kids">';
-      var rids = sortIds(bands[seg][proj]);
-      for (var i = 0; i < rids.length; i++) html += renderNode(rids[i], seg, 1);
-      html += '</div></div>';
+    html += '<div class="swim-fband-label" data-segment="' + seg + '">' + escapeHtml(SEG_LABEL[seg] || ('State ' + seg)) + '</div>';
+    projects.forEach(function(p) {
+      html += '<div class="swim-fcell" data-segment="' + seg + '">';
+      var ids = (cell[seg] && cell[seg][p]) ? sortIds(cell[seg][p]) : [];
+      for (var i = 0; i < ids.length; i++) html += renderNode(ids[i], seg, 0);
+      html += '</div>';
     });
-    html += '</div>';
   });
   html += '</div>';
   container.innerHTML = html;
 
-  requestAnimationFrame(function() { drawFlowSpines(model); });
+  requestAnimationFrame(function() { drawFlowConnectors(model); });
 }
 
 function drawFlowSpines(model) {
@@ -1072,6 +1076,65 @@ function drawFlowSpines(model) {
   });
 
   flow.appendChild(svg);
+}
+
+// 2D grid connectors: orange dashed angular lines between blocking cards.
+// Same-column edges run straight down; cross-column edges elbow through the
+// mid-Y between the two cards.
+function drawFlowConnectors(model) {
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  var grid = document.querySelector('.swim-grid');
+  if (!grid) return;
+  var prev = grid.querySelector('.swim-flow-edges');
+  if (prev) prev.parentNode.removeChild(prev);
+
+  var gb = grid.getBoundingClientRect();
+  function rectOf(id) {
+    var el = grid.querySelector('.swim-box[data-issue-id="' + id + '"]');
+    if (!el) return null;
+    var r = el.getBoundingClientRect();
+    return {
+      left: r.left - gb.left, right: r.right - gb.left,
+      top: r.top - gb.top, bottom: r.bottom - gb.top,
+      cx: (r.left + r.right) / 2 - gb.left, cy: (r.top + r.bottom) / 2 - gb.top
+    };
+  }
+
+  var W = grid.scrollWidth, H = grid.scrollHeight;
+  var svg = document.createElementNS(SVGNS, 'svg');
+  svg.setAttribute('class', 'swim-flow-edges');
+  svg.setAttribute('width', W);
+  svg.setAttribute('height', H);
+  svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+
+  function path(d, attr, val) { var p = document.createElementNS(SVGNS, 'path'); p.setAttribute('d', d); p.setAttribute('class', 'swim-blk-spine'); if (attr) p.setAttribute(attr, val); svg.appendChild(p); }
+  function arrow(x, y, dir, id) {
+    var a = document.createElementNS(SVGNS, 'polygon'), pts;
+    if (dir === 'down') pts = (x - 4) + ',' + (y - 6) + ' ' + (x + 4) + ',' + (y - 6) + ' ' + x + ',' + y;
+    else pts = (x - 4) + ',' + (y + 6) + ' ' + (x + 4) + ',' + (y + 6) + ' ' + x + ',' + y;
+    a.setAttribute('points', pts); a.setAttribute('class', 'swim-blk-head');
+    if (id) a.setAttribute('data-node', id);
+    svg.appendChild(a);
+  }
+
+  model.blocks.forEach(function(e) {
+    var a = rectOf(e[0]), b = rectOf(e[1]);
+    if (!a || !b) return;
+    var sameCol = Math.abs(a.cx - b.cx) < 10;
+    var down = b.cy >= a.cy;
+    var startY, endY, dir;
+    if (down) { startY = a.bottom; endY = b.top; dir = 'down'; }
+    else { startY = a.top; endY = b.bottom; dir = 'up'; }
+    if (sameCol) {
+      path('M' + a.cx + ',' + startY + ' L' + b.cx + ',' + endY, 'data-nodes', e[0] + ' ' + e[1]);
+    } else {
+      var midY = (startY + endY) / 2;
+      path('M' + a.cx + ',' + startY + ' L' + a.cx + ',' + midY + ' L' + b.cx + ',' + midY + ' L' + b.cx + ',' + endY, 'data-nodes', e[0] + ' ' + e[1]);
+    }
+    arrow(b.cx, endY, dir, e[1]);
+  });
+
+  grid.appendChild(svg);
 }
 
 function render() {

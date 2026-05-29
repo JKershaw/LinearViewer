@@ -26,7 +26,7 @@ async function openFlow(page) {
 }
 
 test('flow - desktop', async ({ page }) => {
-  await page.setViewportSize({ width: 1000, height: 1400 });
+  await page.setViewportSize({ width: 1320, height: 1400 });
   await openFlow(page);
   await page.screenshot({ path: `${DIR}/flow-desktop.png`, fullPage: true });
 });
@@ -38,7 +38,7 @@ test('flow - mobile', async ({ page }) => {
 });
 
 test('flow - hover focus', async ({ page }) => {
-  await page.setViewportSize({ width: 1000, height: 1400 });
+  await page.setViewportSize({ width: 1320, height: 1400 });
   await openFlow(page);
   // AUTH-2 is a chain hub (blocks AUTH-3 and DASH-2) — hovering dims everything else
   await page.locator('.swim-fcard[data-issue-id="auth-2"]').hover();

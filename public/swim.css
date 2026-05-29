@@ -933,8 +933,45 @@ body:has(.swim-page) {
 .swim-flow-edges.swim-edges-dim .swim-edge-hl { opacity: 1; }
 .swim-flow-edges.swim-edges-dim .swim-blk-spine.swim-edge-hl { stroke-width: 2.4; }
 
+/* 2D grid layout: state bands (rows) × project columns */
+.swim-page[data-orientation="flow"] .swim-container { overflow-x: auto; }
+.swim-flow.swim-grid {
+  display: grid;
+  position: relative;
+  --swim-col-w: 248px;
+  column-gap: 16px;
+  row-gap: 4px;
+  width: max-content;
+  max-width: none;
+  margin: 0;
+  padding: 10px 8px 48px;
+  align-items: start;
+}
+.swim-fcol-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  align-self: end;
+  padding: 4px 2px 5px;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: #2563eb;
+  background: var(--bg, #fff);
+}
+.swim-grid .swim-fband-label {
+  grid-column: 1 / -1;
+  margin: 12px 2px 2px;
+  border-top: 1px solid #eee;
+  padding-top: 8px;
+}
+.swim-fcell { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.swim-grid .swim-fcard,
+.swim-grid .swim-fgroup { width: auto; }
+
 @media (max-width: 640px) {
-  .swim-flow { padding: 10px 52px 40px 2px; }
+  .swim-flow.swim-grid { --swim-col-w: 208px; column-gap: 12px; padding: 8px 6px 40px; }
   .swim-fgroup { padding: 5px 4px 5px 6px; border-radius: 7px; }
   .swim-fgroup-kids { gap: 6px; margin-top: 6px; }
   .swim-fc-meta { padding-left: 18px; gap: 6px; }
