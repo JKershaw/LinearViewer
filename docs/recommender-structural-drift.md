@@ -5,6 +5,19 @@
 Design note / problem statement. No code changes proposed as committed work yet —
 this exists so the blind spot is concrete and pointable-at before we decide to act.
 
+> **Correction (reconciliation with shipped work).** A later sweep of the Linear workspace
+> showed this pattern is **already mitigated**, and that this note's central diagnosis is
+> **partly wrong**. LIN-279 ("Plan step: add strategy-framing…") and LIN-240 ("Improve agent
+> prompts to prevent local-fix regressions…") shipped fixes for the meso and micro altitudes
+> respectively. Crucially, LIN-279 found the failure is a **rubric** failure, not the
+> information-blindness this note emphasizes: planning agents *do* find adjacent tickets via
+> MCP — the prompt simply installed "minimise *this* ticket's blast radius" as the only scoring
+> axis. The biggest lever was changing *what the agent optimises* (adding a *cost-of-not-doing*
+> axis), not *what it is fed*. The cross-issue context idea below (the "cousins" feed) was the
+> *smaller* lever, and it too has shipped (LIN-279 Layer 2, plus LIN-284 sibling-truncation
+> surfacing). Read the proposed-fix section below with that ordering reversed, and see
+> [`drift-at-every-altitude.md`](./drift-at-every-altitude.md) for the reconciled synthesis.
+
 ## Summary
 
 The AI recommendation loop (`/api/proxy/recommend`, `/workspace/:urlKey/api/recommend/:id/stream`)
