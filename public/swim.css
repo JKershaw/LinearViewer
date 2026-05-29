@@ -813,6 +813,30 @@ body:has(.swim-page) {
 .swim-flow-edges { position: absolute; inset: 0; pointer-events: none; overflow: visible; z-index: 0; }
 .swim-flow-sep { height: 14px; }
 
+/* state bands (In Progress / Todo / Backlog) — the vertical segments */
+.swim-fband { display: flex; flex-direction: column; gap: 8px; }
+.swim-fband-label {
+  font-size: 11px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: #6b7280;
+  margin: 10px 2px 0;
+}
+.swim-fband[data-segment="0"] .swim-fband-label { color: #d97706; }
+.swim-fband[data-segment="3"] .swim-fband-label { color: #16a085; }
+
+/* project = a top-level group box */
+.swim-fproject { margin: 0; }
+.swim-fgroup-label {
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: #2563eb;
+  margin-bottom: 2px;
+}
+
 /* nested subtask "blue boxes" — depth deepens the tint */
 .swim-fgroup {
   position: relative;
