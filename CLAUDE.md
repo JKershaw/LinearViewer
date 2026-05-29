@@ -95,6 +95,8 @@ Changes to prompt behavior (feature flags, workflow instructions, context format
 - **Handwritten prompts**: `lib/prompt-templates.js` → `generatePrompt()` — deterministic, template-based
 - **AI-generated prompts**: `lib/openrouter.js` → `lib/prompts/meta-prompt-template.js` — LLM generates via meta-prompt
 
+The ticket staleness check (re-ground against current code: list referenced files/symbols, `git log --since=<createdAt>`, re-read source at HEAD before trusting the ticket) lives in BOTH paths — `formatStalenessCheck()` in the handwritten path and the "Re-ground the Ticket" structure block + quality rule in the meta-prompt.
+
 ## Code Style
 
 - ES modules (`import`/`export`)
