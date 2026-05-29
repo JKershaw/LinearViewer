@@ -919,8 +919,6 @@ function renderFlow(issues, settings) {
   var SEG = { started: 0, unstarted: 1, backlog: 2, completed: 3, canceled: 3, duplicate: 3 };
   var SEG_LABEL = { 0: 'In Progress', 1: 'Todo', 2: 'Backlog', 3: 'Done' };
 
-  // Cohere subtask trees: every member shares the most-forward state of the
-  // tree, so a parent + children stay in one band (like swim's cohereSubtaskGroups).
   function topAncestor(id) {
     var cur = id, guard = 0;
     while (model.byId[cur] && model.byId[cur].parentId && model.byId[model.byId[cur].parentId] && guard++ < 1000) {
@@ -928,38 +926,50 @@ function renderFlow(issues, settings) {
     }
     return cur;
   }
-  var treeMinSeg = {};
-  model.nodes.forEach(function(n) {
-    var top = topAncestor(n.id);
+
+  // A subtask tree is "active" if any member is in progress. Todo tasks in an
+  // active tree get hoisted to the In Progress band so the group's actionable
+  // work surfaces together. Backlog tasks are never hoisted — they stay in the
+  // Backlog band even when the group is active.
+  var treeActive = {};
+  model.nodes.forEach(function(n) { if (n.stateType === 'started') treeActive[topAncestor(n.id)] = true; });
+  function effBand(n) {
     var s = SEG[n.stateType] != null ? SEG[n.stateType] : 1;
-    if (treeMinSeg[top] == null || s < treeMinSeg[top]) treeMinSeg[top] = s;
-  });
-  function rootSeg(id) { return treeMinSeg[topAncestor(id)]; }
+    if (s === 1 && treeActive[topAncestor(n.id)]) return 0; // todo in an active group → In Progress
+    return s;
+  }
+  var bandOf = {};
+  model.nodes.forEach(function(n) { bandOf[n.id] = effBand(n); });
 
   function sortIds(ids) {
     return ids.slice().sort(function(a, b) { return (model.rank[a] - model.rank[b]) || (model.byId[a]._fi - model.byId[b]._fi); });
   }
-  function renderNode(id, depth) {
-    var kids = sortIds(model.childrenOf[id]);
+  // Only nest children that share the same band; out-of-band members render in
+  // their own band as local roots (so a backlog tail detaches from the group).
+  function renderNode(id, seg, depth) {
+    var kids = sortIds(model.childrenOf[id].filter(function(c) { return bandOf[c] === seg; }));
     if (kids.length) {
       var h = '<div class="swim-fgroup" data-depth="' + Math.min(depth, 4) + '">';
       h += flowCard(model.byId[id], model, true);
       h += '<div class="swim-fgroup-kids">';
-      for (var i = 0; i < kids.length; i++) h += renderNode(kids[i], depth + 1);
+      for (var i = 0; i < kids.length; i++) h += renderNode(kids[i], seg, depth + 1);
       h += '</div></div>';
       return h;
     }
     return flowCard(model.byId[id], model, false);
   }
 
-  // group top-level roots → state band → project
+  // group nodes → state band → project, where a node is a "local root" in its
+  // band unless its parent is in the same band (then it nests under the parent).
   var bands = {};
-  model.roots.forEach(function(r) {
-    var seg = rootSeg(r.id);
-    var proj = r.projectName || 'No Project';
+  model.nodes.forEach(function(n) {
+    var seg = bandOf[n.id];
+    var parentInBand = n.parentId && model.byId[n.parentId] && bandOf[n.parentId] === seg;
+    if (parentInBand) return;
+    var proj = n.projectName || 'No Project';
     if (!bands[seg]) bands[seg] = {};
     if (!bands[seg][proj]) bands[seg][proj] = [];
-    bands[seg][proj].push(r.id);
+    bands[seg][proj].push(n.id);
   });
   function projOrder(name) { return (projectOrder && projectOrder[name] != null) ? projectOrder[name] : 999; }
 
@@ -974,7 +984,7 @@ function renderFlow(issues, settings) {
       html += '<div class="swim-fgroup-label">' + escapeHtml(proj) + '</div>';
       html += '<div class="swim-fgroup-kids">';
       var rids = sortIds(bands[seg][proj]);
-      for (var i = 0; i < rids.length; i++) html += renderNode(rids[i], 1);
+      for (var i = 0; i < rids.length; i++) html += renderNode(rids[i], seg, 1);
       html += '</div></div>';
     });
     html += '</div>';
