@@ -115,6 +115,28 @@ export const swimSampleIssues = [
     assignee: null, labels: { nodes: [] }, team: { id: TEAM_ENG },
     relations: { nodes: [] }
   },
+  // Nested subtasks: DASH-1b (Widget rendering engine) is itself a parent —
+  // exercises subtask-groups-within-subtask-groups (a group nested inside a group).
+  {
+    id: 'dash-1b1', identifier: 'DASH-1b1', title: 'Canvas paint pipeline',
+    description: 'Batched canvas draw calls with dirty-rect tracking',
+    estimate: 3, priority: 2, sortOrder: 1, createdAt: '2024-01-08T01:00:00Z',
+    dueDate: null, completedAt: null,
+    url: 'https://linear.app/test/issue/DASH-1b1', parent: { id: 'dash-1b' },
+    project: { id: 'proj-dash' }, state: { name: 'In Progress', type: 'started' },
+    assignee: { name: 'Charlie' }, labels: { nodes: [] }, team: { id: TEAM_ENG },
+    relations: { nodes: [{ type: 'blocks', relatedIssue: { id: 'dash-1b2' } }] }
+  },
+  {
+    id: 'dash-1b2', identifier: 'DASH-1b2', title: 'Virtualized scroll buffer',
+    description: 'Recycle off-screen widget nodes to cap DOM size',
+    estimate: 2, priority: 3, sortOrder: 2, createdAt: '2024-01-08T02:00:00Z',
+    dueDate: null, completedAt: null,
+    url: 'https://linear.app/test/issue/DASH-1b2', parent: { id: 'dash-1b' },
+    project: { id: 'proj-dash' }, state: { name: 'Todo', type: 'unstarted' },
+    assignee: null, labels: { nodes: [] }, team: { id: TEAM_ENG },
+    relations: { nodes: [] }
+  },
   // Dashboard — independent tasks
   {
     id: 'dash-2', identifier: 'DASH-2', title: 'Dashboard navigation redesign',
