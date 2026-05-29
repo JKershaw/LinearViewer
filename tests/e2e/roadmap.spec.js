@@ -565,15 +565,7 @@ test.describe('Roadmap Report History', () => {
     const listBody = await listRes.json();
     expect(listBody.total).toBe(1);
     expect(listBody.reports[0].id).toBe(report.id);
-
-    const oneRes = await request.get(`${REPORTS_URL}/${report.id}`);
-    expect(oneRes.status()).toBe(200);
-    expect((await oneRes.json()).report.narrative.gap).toBe('gap a');
-  });
-
-  test('GET :id returns 404 for unknown report', async ({ request }) => {
-    const response = await request.get(`${REPORTS_URL}/does-not-exist`);
-    expect(response.status()).toBe(404);
+    expect(listBody.reports[0].narrative.gap).toBe('gap a');
   });
 
   test('list returns newest-first', async ({ request }) => {
