@@ -1466,6 +1466,33 @@ ${goal}`;
   });
 
   /**
+   * Fetch a single saved report (full record) by id — backs the history UI's
+   * view-on-click. The list endpoint returns summaries only, so this is the
+   * way to retrieve a report's narrative bodies.
+   * @route GET /workspace/:urlKey/api/roadmap/reports/:id
+   */
+  router.get('/workspace/:urlKey/api/roadmap/reports/:id', workspaceFromUrl, async (req, res) => {
+    const featureFlags = getFeatureFlags(req.session);
+    if (!featureFlags.roadmap) {
+      return res.status(403).json({ error: 'Roadmap feature is not enabled' });
+    }
+    if (!reportHistoryStore) {
+      return res.status(503).json({ error: 'Report history not configured' });
+    }
+
+    try {
+      const report = await reportHistoryStore.get(req.workspace.urlKey, req.params.id);
+      if (!report) {
+        return res.status(404).json({ error: 'Report not found' });
+      }
+      res.json({ report });
+    } catch (error) {
+      console.error('Report get error:', error);
+      res.status(500).json({ error: 'Failed to fetch report' });
+    }
+  });
+
+  /**
    * Shared gating + free-tier check for all roadmap LLM endpoints.
    * Sends the appropriate error response and returns null on failure.
    * Returns { apiKey, model } when ready to proceed.
