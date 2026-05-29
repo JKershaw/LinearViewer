@@ -382,3 +382,42 @@ test.describe('Swim Page with Sample Data', () => {
     await expect(page.locator('.swim-group-rect')).toHaveCount(0);
   });
 });
+
+test.describe('Swim Flow layout', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/test/set-session?swimSample=true');
+    await page.evaluate(() => localStorage.removeItem('swim-settings'));
+    await page.goto(SWIM_URL);
+    await page.waitForLoadState('networkidle');
+    await page.locator('.swim-settings-toggle').click();
+    await page.locator('#swim-orientation').selectOption('flow');
+  });
+
+  test('renders flow cards and nested subtask groups', async ({ page }) => {
+    await expect(page.locator('.swim-flow')).toBeVisible();
+    expect(await page.locator('.swim-fcard').count()).toBeGreaterThan(0);
+    // Sample data has nested subtask groups (DASH-1 → DASH-1b → DASH-1b1/2)
+    expect(await page.locator('.swim-fgroup').count()).toBeGreaterThan(0);
+    // Card shows title text, not just the id
+    await expect(page.locator('.swim-fcard .swim-box-title').first()).not.toBeEmpty();
+  });
+
+  test('draws orange blocking spines', async ({ page }) => {
+    await expect(page.locator('.swim-flow-edges')).toBeAttached();
+    await expect(page.locator('.swim-blk-spine').first()).toBeAttached();
+  });
+
+  test('clicking a flow card opens the popover', async ({ page }) => {
+    await page.locator('.swim-fcard').first().click();
+    await expect(page.locator('#swim-popover')).not.toHaveClass(/hidden/);
+    await expect(page.locator('#swim-popover-title')).not.toBeEmpty();
+  });
+
+  test('flow layout persists across reload', async ({ page }) => {
+    await page.goto(SWIM_URL);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('.swim-flow')).toBeVisible();
+    await page.locator('.swim-settings-toggle').click();
+    await expect(page.locator('#swim-orientation')).toHaveValue('flow');
+  });
+});

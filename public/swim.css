@@ -795,3 +795,116 @@ body:has(.swim-page) {
     gap: 0.5rem;
   }
 }
+
+/* =============================================================================
+   Flow (side-rail) view — vertical stack, nested subtask boxes, orange spines
+   ============================================================================= */
+.swim-page[data-orientation="flow"] .swim-container { overflow: visible; }
+
+.swim-flow {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 12px 96px 48px 4px;
+}
+.swim-flow-edges { position: absolute; inset: 0; pointer-events: none; overflow: visible; z-index: 0; }
+.swim-flow-sep { height: 14px; }
+
+/* nested subtask "blue boxes" — depth deepens the tint */
+.swim-fgroup {
+  position: relative;
+  border: 1px solid rgba(37, 99, 235, 0.28);
+  border-radius: 9px;
+  background: rgba(37, 99, 235, 0.045);
+  padding: 8px;
+}
+.swim-fgroup[data-depth="1"] { background: rgba(37, 99, 235, 0.06); }
+.swim-fgroup[data-depth="2"] { background: rgba(37, 99, 235, 0.085); }
+.swim-fgroup[data-depth="3"] { background: rgba(37, 99, 235, 0.11); }
+.swim-fgroup[data-depth="4"] { background: rgba(37, 99, 235, 0.13); }
+.swim-fgroup-kids { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+
+/* cards (full width, one per row) */
+.swim-flow .swim-fcard {
+  position: relative;
+  z-index: 1;
+  display: block;
+  max-width: none;
+  margin: 0;
+  background: #fff;
+  border: 1px solid #e2e2e2;
+  border-top: 3px solid #9ca3af;
+  border-radius: 6px;
+  padding: 7px 10px 8px;
+  cursor: pointer;
+}
+.swim-flow .swim-fcard.state-started { border-top-color: #d97706; }
+.swim-flow .swim-fcard.state-unstarted { border-top-color: #9ca3af; }
+.swim-flow .swim-fcard.state-backlog { border-top-color: #e2e2e2; }
+.swim-flow .swim-fcard.state-completed,
+.swim-flow .swim-fcard.state-canceled { border-top-color: #16a34a; }
+.swim-flow .swim-fcard-header { background: rgba(255, 255, 255, 0.85); }
+.swim-flow .swim-fcard.swim-goal { box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.35); }
+/* neutralise lane-mode accents that don't fit the flow card */
+.swim-flow .swim-fcard.state-started,
+.swim-flow .swim-fcard.state-unstarted,
+.swim-flow .swim-fcard.state-backlog,
+.swim-flow .swim-fcard.state-completed,
+.swim-flow .swim-fcard.state-canceled,
+.swim-flow .swim-fcard.blocked { border-left: 1px solid #e2e2e2; }
+
+.swim-fc-row { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
+.swim-flow .swim-box-id {
+  width: auto;
+  text-align: left;
+  font-weight: 700;
+  font-size: 11px;
+  color: #1a1a1a;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.swim-flow .swim-box-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: block;
+  -webkit-line-clamp: initial;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+}
+
+.swim-fc-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 5px;
+  padding-left: 22px;
+  font-size: 11px;
+  color: #8a8a8a;
+}
+.swim-fc-who { color: #475569; }
+.swim-fc-prio { font-weight: 700; }
+.swim-fc-prio.p1 { color: #dc2626; }
+.swim-fc-prio.p2 { color: #ea580c; }
+.swim-fc-prio.p3 { color: #d97706; }
+.swim-fc-prio.p4 { color: #9ca3af; }
+.swim-fc-lbl { color: #475569; background: #eef2f7; border-radius: 3px; padding: 0 5px; }
+.swim-fc-blocked { color: #ea7317; font-weight: 600; }
+
+/* orange dashed blocking spines */
+.swim-blk-spine { fill: none; stroke: #ea7317; stroke-width: 1.8; stroke-dasharray: 5 3; opacity: 0.95; stroke-linejoin: round; }
+.swim-blk-tick { fill: none; stroke: #ea7317; stroke-width: 1.4; stroke-dasharray: 4 3; opacity: 0.85; }
+.swim-blk-head { fill: #ea7317; }
+.swim-blk-origin { fill: #ea7317; }
+
+@media (max-width: 640px) {
+  .swim-flow { padding: 10px 74px 40px 2px; }
+  .swim-fgroup { padding: 5px; border-radius: 7px; }
+  .swim-fgroup-kids { gap: 6px; margin-top: 6px; }
+  .swim-fc-meta { padding-left: 18px; gap: 6px; }
+}

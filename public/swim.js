@@ -836,6 +836,193 @@ function expandUpstreamBlockers(goalIds) {
 
 var labelGoalIds = new Set(); // Tracks which issues are "goals" for visual marking
 
+// =============================================================================
+// Flow (side-rail) view — vertical stack, nested subtask boxes, orange spines
+// =============================================================================
+
+var FLOW_PRIO = { 1: 'Urgent', 2: 'High', 3: 'Medium', 4: 'Low' };
+
+function flowStateLabel(t) {
+  var m = { started: 'In Progress', unstarted: 'Todo', backlog: 'Backlog', completed: 'Done', canceled: 'Canceled', duplicate: 'Duplicate' };
+  return m[t] || t || 'Todo';
+}
+
+function buildFlowModel(issues, showCompleted) {
+  var nodes = showCompleted ? issues.slice() : issues.filter(function(i) { return !isTerminalState(i.stateType); });
+  var byId = {};
+  nodes.forEach(function(n, i) { n._fi = i; byId[n.id] = n; });
+  var childrenOf = {};
+  nodes.forEach(function(n) { childrenOf[n.id] = []; });
+  var blocks = [], blockedBy = {}, parentEdges = [];
+  nodes.forEach(function(n) {
+    (n.blocksIds || []).forEach(function(t) { if (byId[t]) { blocks.push([n.id, t]); (blockedBy[t] = blockedBy[t] || []).push(n.id); } });
+    if (n.parentId && byId[n.parentId]) { childrenOf[n.parentId].push(n.id); parentEdges.push([n.parentId, n.id]); }
+  });
+  var depth = {};
+  function d(id) { if (depth[id] != null) return depth[id]; var n = byId[id]; return depth[id] = (n.parentId && byId[n.parentId]) ? d(n.parentId) + 1 : 0; }
+  nodes.forEach(function(n) { d(n.id); });
+  var directed = blocks.concat(parentEdges);
+  var indeg = {}, adj = {};
+  nodes.forEach(function(n) { indeg[n.id] = 0; adj[n.id] = []; });
+  directed.forEach(function(e) { adj[e[0]].push(e[1]); indeg[e[1]]++; });
+  var rank = {}, q = [];
+  nodes.forEach(function(n) { if (indeg[n.id] === 0) { rank[n.id] = 0; q.push(n.id); } });
+  while (q.length) { var u = q.shift(); adj[u].forEach(function(v) { rank[v] = Math.max(rank[v] || 0, (rank[u] || 0) + 1); if (--indeg[v] === 0) q.push(v); }); }
+  nodes.forEach(function(n) { if (rank[n.id] == null) rank[n.id] = 0; });
+  var roots = nodes.filter(function(n) { return !n.parentId || !byId[n.parentId]; });
+  return { nodes: nodes, byId: byId, childrenOf: childrenOf, depth: depth, roots: roots, blocks: blocks, blockedBy: blockedBy, rank: rank };
+}
+
+function flowPathCover(model) {
+  var rank = model.rank, byId = model.byId;
+  function rk(id) { return (rank[id] || 0) * 100000 + byId[id]._fi; }
+  var outAdj = {};
+  model.blocks.forEach(function(e) { (outAdj[e[0]] = outAdj[e[0]] || []).push(e[1]); });
+  Object.keys(outAdj).forEach(function(s) { outAdj[s].sort(function(a, b) { return rk(a) - rk(b); }); });
+  var order = model.nodes.map(function(n) { return n.id; }).sort(function(a, b) { return rk(a) - rk(b); });
+  var nextOf = {}, claimed = {};
+  order.forEach(function(u) { var outs = outAdj[u] || []; for (var i = 0; i < outs.length; i++) { if (!claimed[outs[i]]) { nextOf[u] = outs[i]; claimed[outs[i]] = true; break; } } });
+  var spines = [];
+  order.forEach(function(u) { if (claimed[u]) return; var p = [u], cur = u; while (nextOf[cur]) { cur = nextOf[cur]; p.push(cur); } if (p.length > 1) spines.push(p); });
+  var branches = [];
+  model.blocks.forEach(function(e) { if (nextOf[e[0]] !== e[1]) branches.push(e); });
+  return { spines: spines, branches: branches };
+}
+
+function flowCard(issue, model, isHeader) {
+  var blockers = model.blockedBy[issue.id] || [];
+  var goalClass = labelGoalIds.has(issue.id) ? ' swim-goal' : '';
+  var headerClass = isHeader ? ' swim-fcard-header' : '';
+  var meta = '<span class="swim-fc-state">' + escapeHtml(issue.stateName || flowStateLabel(issue.stateType)) + '</span>';
+  if (issue.assignee) meta += '<span class="swim-fc-who">@' + escapeHtml(issue.assignee) + '</span>';
+  if (issue.priority) meta += '<span class="swim-fc-prio p' + issue.priority + '">' + escapeHtml(FLOW_PRIO[issue.priority] || ('P' + issue.priority)) + '</span>';
+  (issue.labels || []).forEach(function(l) { meta += '<span class="swim-fc-lbl">' + escapeHtml(l) + '</span>'; });
+  if (blockers.length) {
+    var bl = blockers.map(function(id) { var b = model.byId[id]; return b ? (b.identifier || b.id) : id; });
+    meta += '<span class="swim-fc-blocked">⛒ blocked by ' + escapeHtml(bl.join(', ')) + '</span>';
+  }
+  return '<div class="swim-box swim-fcard' + headerClass + goalClass + ' ' + stateClass(issue.stateType) +
+    '" data-issue-id="' + escapeHtml(issue.id) + '">' +
+    '<div class="swim-fc-row">' + stateIndicator(issue.stateType) +
+      '<span class="swim-box-id">' + escapeHtml(issue.identifier || '') + '</span>' +
+      '<span class="swim-box-title">' + escapeHtml(issue.title || '') + '</span>' +
+    '</div>' +
+    '<div class="swim-fc-meta">' + meta + '</div>' +
+  '</div>';
+}
+
+function renderFlow(issues, settings) {
+  var model = buildFlowModel(issues, settings.showCompleted);
+  var container = document.getElementById('swim-lanes');
+  if (model.nodes.length === 0) { container.innerHTML = '<div class="swim-empty">No tasks to display</div>'; return; }
+
+  function sortIds(ids) {
+    return ids.slice().sort(function(a, b) { return (model.rank[a] - model.rank[b]) || (model.byId[a]._fi - model.byId[b]._fi); });
+  }
+  function renderNode(id, depth) {
+    var kids = sortIds(model.childrenOf[id]);
+    if (kids.length) {
+      var h = '<div class="swim-fgroup" data-depth="' + Math.min(depth, 4) + '">';
+      h += flowCard(model.byId[id], model, true);
+      h += '<div class="swim-fgroup-kids">';
+      for (var i = 0; i < kids.length; i++) h += renderNode(kids[i], depth + 1);
+      h += '</div></div>';
+      return h;
+    }
+    return flowCard(model.byId[id], model, false);
+  }
+
+  var roots = model.roots.slice().sort(function(a, b) { return (model.rank[a.id] - model.rank[b.id]) || (a._fi - b._fi); });
+  var html = '<div class="swim-flow">';
+  for (var i = 0; i < roots.length; i++) {
+    if (i > 0) html += '<div class="swim-flow-sep"></div>';
+    html += renderNode(roots[i].id, 0);
+  }
+  html += '</div>';
+  container.innerHTML = html;
+
+  requestAnimationFrame(function() { drawFlowSpines(model); });
+}
+
+function drawFlowSpines(model) {
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  var flow = document.querySelector('.swim-flow');
+  if (!flow) return;
+  var prev = flow.querySelector('.swim-flow-edges');
+  if (prev) prev.parentNode.removeChild(prev);
+
+  var base = flow.getBoundingClientRect();
+  var rect = {};
+  model.nodes.forEach(function(n) {
+    var el = flow.querySelector('.swim-box[data-issue-id="' + n.id + '"]');
+    if (!el) return;
+    var r = el.getBoundingClientRect();
+    rect[n.id] = { right: r.right - base.left, cy: r.top - base.top + r.height / 2 };
+  });
+
+  var pc = flowPathCover(model);
+  var drawables = [];
+  pc.spines.forEach(function(p) {
+    var ys = p.filter(function(id) { return rect[id]; }).map(function(id) { return rect[id].cy; });
+    if (ys.length < 2) return;
+    drawables.push({ kind: 'spine', nodes: p, top: Math.min.apply(null, ys), bot: Math.max.apply(null, ys) });
+  });
+  pc.branches.forEach(function(e) {
+    if (!rect[e[0]] || !rect[e[1]]) return;
+    var y1 = rect[e[0]].cy, y2 = rect[e[1]].cy;
+    drawables.push({ kind: 'branch', from: e[0], to: e[1], top: Math.min(y1, y2), bot: Math.max(y1, y2) });
+  });
+  drawables.sort(function(a, b) { return a.top - b.top || (b.bot - b.top) - (a.bot - a.top); });
+
+  var active = [];
+  drawables.forEach(function(d) {
+    active = active.filter(function(a) { return a.bot > d.top; });
+    var used = {};
+    active.forEach(function(a) { used[a.chan] = true; });
+    var c = 0; while (used[c]) c++;
+    d.chan = c; active.push({ bot: d.bot, chan: c });
+  });
+
+  var maxRight = 0;
+  model.nodes.forEach(function(n) { if (rect[n.id]) maxRight = Math.max(maxRight, rect[n.id].right); });
+  var width = flow.clientWidth;
+  var mobile = width < 560;
+  var STEP = mobile ? 11 : 14;
+  var start = maxRight + (mobile ? 10 : 14);
+  function chanX(c) { return Math.min(start + c * STEP, width - 5); }
+
+  var svg = document.createElementNS(SVGNS, 'svg');
+  svg.setAttribute('class', 'swim-flow-edges');
+  svg.setAttribute('width', width);
+  svg.setAttribute('height', flow.scrollHeight);
+  svg.setAttribute('viewBox', '0 0 ' + width + ' ' + flow.scrollHeight);
+
+  function path(d, cls) { var p = document.createElementNS(SVGNS, 'path'); p.setAttribute('d', d); p.setAttribute('class', cls); svg.appendChild(p); }
+  function arrowLeft(x, y) { var a = document.createElementNS(SVGNS, 'polygon'); a.setAttribute('points', (x + 7) + ',' + (y - 4) + ' ' + (x + 7) + ',' + (y + 4) + ' ' + x + ',' + y); a.setAttribute('class', 'swim-blk-head'); svg.appendChild(a); }
+  function dot(x, y) { var c = document.createElementNS(SVGNS, 'circle'); c.setAttribute('cx', x); c.setAttribute('cy', y); c.setAttribute('r', 2.3); c.setAttribute('class', 'swim-blk-origin'); svg.appendChild(c); }
+
+  drawables.forEach(function(d) {
+    var cx = chanX(d.chan);
+    if (d.kind === 'spine') {
+      var pts = d.nodes.filter(function(id) { return rect[id]; });
+      var first = rect[pts[0]], last = rect[pts[pts.length - 1]];
+      path('M' + cx + ',' + first.cy + ' L' + cx + ',' + last.cy, 'swim-blk-spine');
+      pts.forEach(function(id, i) {
+        var r = rect[id];
+        path('M' + (r.right + 1) + ',' + r.cy + ' L' + cx + ',' + r.cy, 'swim-blk-tick');
+        if (i === 0) dot(r.right + 1, r.cy); else arrowLeft(r.right + 1, r.cy);
+      });
+    } else {
+      var rf = rect[d.from], rt = rect[d.to];
+      path('M' + (rf.right + 1) + ',' + rf.cy + ' L' + cx + ',' + rf.cy + ' L' + cx + ',' + rt.cy + ' L' + (rt.right + 1) + ',' + rt.cy, 'swim-blk-spine');
+      dot(rf.right + 1, rf.cy);
+      arrowLeft(rt.right + 1, rt.cy);
+    }
+  });
+
+  flow.appendChild(svg);
+}
+
 function render() {
   var settings = getSettings();
 
@@ -853,6 +1040,15 @@ function render() {
     labelGoalIds = goalIds;
     var visibleIds = expandUpstreamBlockers(goalIds);
     issuesToRender = allIssues.filter(function(iss) { return visibleIds.has(iss.id); });
+  }
+
+  // Flow (side-rail) view bypasses lane/segment/column layout entirely.
+  if (settings.orientation === 'flow') {
+    var flowPageEl = document.querySelector('.swim-page');
+    if (flowPageEl) flowPageEl.setAttribute('data-orientation', 'flow');
+    currentLanes = [];
+    renderFlow(issuesToRender, settings);
+    return;
   }
 
   var result = assignLanes(issuesToRender, {
