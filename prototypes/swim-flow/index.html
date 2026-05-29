@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>swim-flow prototype</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="bar">
+    <h1>swim-flow</h1>
+    <span class="label">layout</span>
+    <div class="group">
+      <button data-set-v="rail">side-rail</button>
+      <button data-set-v="spine">spine (chips)</button>
+      <button data-set-v="hybrid">hybrid (full)</button>
+    </div>
+    <span class="label">width</span>
+    <div class="group">
+      <button data-set-w="desktop">desktop</button>
+      <button data-set-w="mobile">mobile</button>
+    </div>
+  </div>
+  <div class="hint">click a card to expand · solid arrows = blocks · dashed = parent/subtask · ⤴/⤵ = long-range link</div>
+  <div class="stage" id="stage" data-v="spine" data-w="desktop"></div>
+
+  <script src="data.js"></script>
+  <script src="layout.js"></script>
+</body>
+</html>

@@ -721,7 +721,7 @@ function getSettings() {
 
   return {
     grouping: grouping,
-    orientation: stored.orientation || (orientationEl ? orientationEl.value : 'horizontal'),
+    orientation: stored.orientation || (orientationEl ? orientationEl.value : 'flow'),
     maxLanes: stored.maxLanes || parseInt(document.getElementById('swim-max-lanes').value, 10),
     compact: stored.compact !== undefined ? stored.compact : document.getElementById('swim-compact').checked,
     showCompleted: stored.showCompleted !== undefined ? stored.showCompleted : document.getElementById('swim-show-completed').checked,
@@ -738,7 +738,7 @@ function saveSettings(settings) {
 function applySettingsToUI(settings) {
   document.getElementById('swim-grouping').value = settings.grouping;
   var orientationEl = document.getElementById('swim-orientation');
-  if (orientationEl) orientationEl.value = settings.orientation || 'horizontal';
+  if (orientationEl) orientationEl.value = settings.orientation || 'flow';
   document.getElementById('swim-max-lanes').value = settings.maxLanes;
   document.querySelector('.swim-max-lanes-value').textContent = settings.maxLanes;
   document.getElementById('swim-compact').checked = settings.compact;
@@ -836,6 +836,307 @@ function expandUpstreamBlockers(goalIds) {
 
 var labelGoalIds = new Set(); // Tracks which issues are "goals" for visual marking
 
+// =============================================================================
+// Flow (side-rail) view — vertical stack, nested subtask boxes, orange spines
+// =============================================================================
+
+var FLOW_PRIO = { 1: 'Urgent', 2: 'High', 3: 'Medium', 4: 'Low' };
+
+function flowStateLabel(t) {
+  var m = { started: 'In Progress', unstarted: 'Todo', backlog: 'Backlog', completed: 'Done', canceled: 'Canceled', duplicate: 'Duplicate' };
+  return m[t] || t || 'Todo';
+}
+
+function buildFlowModel(issues, showCompleted) {
+  var nodes = showCompleted ? issues.slice() : issues.filter(function(i) { return !isTerminalState(i.stateType); });
+  var byId = {};
+  nodes.forEach(function(n, i) { n._fi = i; byId[n.id] = n; });
+  var childrenOf = {};
+  nodes.forEach(function(n) { childrenOf[n.id] = []; });
+  var blocks = [], blockedBy = {}, parentEdges = [];
+  nodes.forEach(function(n) {
+    (n.blocksIds || []).forEach(function(t) { if (byId[t]) { blocks.push([n.id, t]); (blockedBy[t] = blockedBy[t] || []).push(n.id); } });
+    if (n.parentId && byId[n.parentId]) { childrenOf[n.parentId].push(n.id); parentEdges.push([n.parentId, n.id]); }
+  });
+  var depth = {};
+  function d(id) { if (depth[id] != null) return depth[id]; var n = byId[id]; return depth[id] = (n.parentId && byId[n.parentId]) ? d(n.parentId) + 1 : 0; }
+  nodes.forEach(function(n) { d(n.id); });
+  var directed = blocks.concat(parentEdges);
+  var indeg = {}, adj = {};
+  nodes.forEach(function(n) { indeg[n.id] = 0; adj[n.id] = []; });
+  directed.forEach(function(e) { adj[e[0]].push(e[1]); indeg[e[1]]++; });
+  var rank = {}, q = [];
+  nodes.forEach(function(n) { if (indeg[n.id] === 0) { rank[n.id] = 0; q.push(n.id); } });
+  while (q.length) { var u = q.shift(); adj[u].forEach(function(v) { rank[v] = Math.max(rank[v] || 0, (rank[u] || 0) + 1); if (--indeg[v] === 0) q.push(v); }); }
+  nodes.forEach(function(n) { if (rank[n.id] == null) rank[n.id] = 0; });
+  var roots = nodes.filter(function(n) { return !n.parentId || !byId[n.parentId]; });
+  return { nodes: nodes, byId: byId, childrenOf: childrenOf, depth: depth, roots: roots, blocks: blocks, blockedBy: blockedBy, rank: rank };
+}
+
+function flowPathCover(model) {
+  var rank = model.rank, byId = model.byId;
+  function rk(id) { return (rank[id] || 0) * 100000 + byId[id]._fi; }
+  var outAdj = {};
+  model.blocks.forEach(function(e) { (outAdj[e[0]] = outAdj[e[0]] || []).push(e[1]); });
+  Object.keys(outAdj).forEach(function(s) { outAdj[s].sort(function(a, b) { return rk(a) - rk(b); }); });
+  var order = model.nodes.map(function(n) { return n.id; }).sort(function(a, b) { return rk(a) - rk(b); });
+  var nextOf = {}, claimed = {};
+  order.forEach(function(u) { var outs = outAdj[u] || []; for (var i = 0; i < outs.length; i++) { if (!claimed[outs[i]]) { nextOf[u] = outs[i]; claimed[outs[i]] = true; break; } } });
+  var spines = [];
+  order.forEach(function(u) { if (claimed[u]) return; var p = [u], cur = u; while (nextOf[cur]) { cur = nextOf[cur]; p.push(cur); } if (p.length > 1) spines.push(p); });
+  var branches = [];
+  model.blocks.forEach(function(e) { if (nextOf[e[0]] !== e[1]) branches.push(e); });
+  return { spines: spines, branches: branches };
+}
+
+function flowCard(issue, model, isHeader) {
+  var blockers = model.blockedBy[issue.id] || [];
+  var goalClass = labelGoalIds.has(issue.id) ? ' swim-goal' : '';
+  var headerClass = isHeader ? ' swim-fcard-header' : '';
+  var meta = '<span class="swim-fc-state">' + escapeHtml(issue.stateName || flowStateLabel(issue.stateType)) + '</span>';
+  if (issue.assignee) meta += '<span class="swim-fc-who">@' + escapeHtml(issue.assignee) + '</span>';
+  if (issue.priority) meta += '<span class="swim-fc-prio p' + issue.priority + '">' + escapeHtml(FLOW_PRIO[issue.priority] || ('P' + issue.priority)) + '</span>';
+  (issue.labels || []).forEach(function(l) { meta += '<span class="swim-fc-lbl">' + escapeHtml(l) + '</span>'; });
+  if (blockers.length) {
+    var bl = blockers.map(function(id) { var b = model.byId[id]; return b ? (b.identifier || b.id) : id; });
+    meta += '<span class="swim-fc-blocked">⛒ blocked by ' + escapeHtml(bl.join(', ')) + '</span>';
+  }
+  return '<div class="swim-box swim-fcard' + headerClass + goalClass + ' ' + stateClass(issue.stateType) +
+    '" data-issue-id="' + escapeHtml(issue.id) + '">' +
+    '<div class="swim-fc-row">' + stateIndicator(issue.stateType) +
+      '<span class="swim-box-id">' + escapeHtml(issue.identifier || '') + '</span>' +
+      '<span class="swim-box-title">' + escapeHtml(issue.title || '') + '</span>' +
+    '</div>' +
+    '<div class="swim-fc-meta">' + meta + '</div>' +
+  '</div>';
+}
+
+function renderFlow(issues, settings) {
+  var model = buildFlowModel(issues, settings.showCompleted);
+  var container = document.getElementById('swim-lanes');
+  if (model.nodes.length === 0) { container.innerHTML = '<div class="swim-empty">No tasks to display</div>'; return; }
+
+  var SEG = { started: 0, unstarted: 1, backlog: 2, completed: 3, canceled: 3, duplicate: 3 };
+  var SEG_LABEL = { 0: 'In Progress', 1: 'Todo', 2: 'Backlog', 3: 'Done' };
+
+  function topAncestor(id) {
+    var cur = id, guard = 0;
+    while (model.byId[cur] && model.byId[cur].parentId && model.byId[model.byId[cur].parentId] && guard++ < 1000) {
+      cur = model.byId[cur].parentId;
+    }
+    return cur;
+  }
+
+  // A subtask tree is "active" if any member is in progress. Todo tasks in an
+  // active tree get hoisted to the In Progress band so the group's actionable
+  // work surfaces together. Backlog tasks are never hoisted — they stay in the
+  // Backlog band even when the group is active.
+  var treeActive = {};
+  model.nodes.forEach(function(n) { if (n.stateType === 'started') treeActive[topAncestor(n.id)] = true; });
+  function effBand(n) {
+    var s = SEG[n.stateType] != null ? SEG[n.stateType] : 1;
+    if (s === 1 && treeActive[topAncestor(n.id)]) return 0; // todo in an active group → In Progress
+    return s;
+  }
+  var bandOf = {};
+  model.nodes.forEach(function(n) { bandOf[n.id] = effBand(n); });
+
+  function sortIds(ids) {
+    return ids.slice().sort(function(a, b) { return (model.rank[a] - model.rank[b]) || (model.byId[a]._fi - model.byId[b]._fi); });
+  }
+  // Only nest children that share the same band; out-of-band members render in
+  // their own band as local roots (so a backlog tail detaches from the group).
+  function renderNode(id, seg, depth) {
+    var kids = sortIds(model.childrenOf[id].filter(function(c) { return bandOf[c] === seg; }));
+    if (kids.length) {
+      var h = '<div class="swim-fgroup" data-depth="' + Math.min(depth, 4) + '">';
+      h += flowCard(model.byId[id], model, true);
+      h += '<div class="swim-fgroup-kids">';
+      for (var i = 0; i < kids.length; i++) h += renderNode(kids[i], seg, depth + 1);
+      h += '</div></div>';
+      return h;
+    }
+    return flowCard(model.byId[id], model, false);
+  }
+
+  function projOrder(name) { return (projectOrder && projectOrder[name] != null) ? projectOrder[name] : 999; }
+
+  // Columns = projects present, in project order (aligned across every band).
+  var projSet = {};
+  model.nodes.forEach(function(n) { projSet[n.projectName || 'No Project'] = true; });
+  var projects = Object.keys(projSet).sort(function(a, b) { return projOrder(a) - projOrder(b) || (a < b ? -1 : 1); });
+
+  // band → project → local roots (a node nests under its parent only when the
+  // parent is in the same band; otherwise it is a local root in its cell)
+  var cell = {};
+  model.nodes.forEach(function(n) {
+    var seg = bandOf[n.id];
+    var parentInBand = n.parentId && model.byId[n.parentId] && bandOf[n.parentId] === seg;
+    if (parentInBand) return;
+    var proj = n.projectName || 'No Project';
+    if (!cell[seg]) cell[seg] = {};
+    if (!cell[seg][proj]) cell[seg][proj] = [];
+    cell[seg][proj].push(n.id);
+  });
+
+  var segKeys = Object.keys(cell).map(Number).sort(function(a, b) { return a - b; });
+  var html = '<div class="swim-flow swim-grid" style="grid-template-columns:repeat(' + projects.length + ', var(--swim-col-w))">';
+  // project header row
+  projects.forEach(function(p) { html += '<div class="swim-fcol-head">' + escapeHtml(p) + '</div>'; });
+  // state bands, each a full-width label then one cell per project column
+  segKeys.forEach(function(seg) {
+    html += '<div class="swim-fband-label" data-segment="' + seg + '">' + escapeHtml(SEG_LABEL[seg] || ('State ' + seg)) + '</div>';
+    projects.forEach(function(p) {
+      html += '<div class="swim-fcell" data-segment="' + seg + '">';
+      var ids = (cell[seg] && cell[seg][p]) ? sortIds(cell[seg][p]) : [];
+      for (var i = 0; i < ids.length; i++) html += renderNode(ids[i], seg, 0);
+      html += '</div>';
+    });
+  });
+  html += '</div>';
+  container.innerHTML = html;
+
+  requestAnimationFrame(function() { drawFlowConnectors(model); });
+}
+
+function drawFlowSpines(model) {
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  var flow = document.querySelector('.swim-flow');
+  if (!flow) return;
+  var prev = flow.querySelector('.swim-flow-edges');
+  if (prev) prev.parentNode.removeChild(prev);
+
+  var base = flow.getBoundingClientRect();
+  var rect = {};
+  model.nodes.forEach(function(n) {
+    var el = flow.querySelector('.swim-box[data-issue-id="' + n.id + '"]');
+    if (!el) return;
+    var r = el.getBoundingClientRect();
+    rect[n.id] = { right: r.right - base.left, cy: r.top - base.top + r.height / 2 };
+  });
+
+  var pc = flowPathCover(model);
+  var drawables = [];
+  pc.spines.forEach(function(p) {
+    var ys = p.filter(function(id) { return rect[id]; }).map(function(id) { return rect[id].cy; });
+    if (ys.length < 2) return;
+    drawables.push({ kind: 'spine', nodes: p, top: Math.min.apply(null, ys), bot: Math.max.apply(null, ys) });
+  });
+  pc.branches.forEach(function(e) {
+    if (!rect[e[0]] || !rect[e[1]]) return;
+    var y1 = rect[e[0]].cy, y2 = rect[e[1]].cy;
+    drawables.push({ kind: 'branch', from: e[0], to: e[1], top: Math.min(y1, y2), bot: Math.max(y1, y2) });
+  });
+  drawables.sort(function(a, b) { return a.top - b.top || (b.bot - b.top) - (a.bot - a.top); });
+
+  var active = [];
+  drawables.forEach(function(d) {
+    active = active.filter(function(a) { return a.bot > d.top; });
+    var used = {};
+    active.forEach(function(a) { used[a.chan] = true; });
+    var c = 0; while (used[c]) c++;
+    d.chan = c; active.push({ bot: d.bot, chan: c });
+  });
+
+  var maxRight = 0;
+  model.nodes.forEach(function(n) { if (rect[n.id]) maxRight = Math.max(maxRight, rect[n.id].right); });
+  var width = flow.clientWidth;
+  var mobile = width < 560;
+  var STEP = mobile ? 9 : 11;
+  var start = maxRight + (mobile ? 6 : 8);
+  function chanX(c) { return Math.min(start + c * STEP, width - 4); }
+
+  var svg = document.createElementNS(SVGNS, 'svg');
+  svg.setAttribute('class', 'swim-flow-edges');
+  svg.setAttribute('width', width);
+  svg.setAttribute('height', flow.scrollHeight);
+  svg.setAttribute('viewBox', '0 0 ' + width + ' ' + flow.scrollHeight);
+
+  function path(d, cls, attr, val) { var p = document.createElementNS(SVGNS, 'path'); p.setAttribute('d', d); p.setAttribute('class', cls); if (attr) p.setAttribute(attr, val); svg.appendChild(p); }
+  function arrowLeft(x, y, id) { var a = document.createElementNS(SVGNS, 'polygon'); a.setAttribute('points', (x + 7) + ',' + (y - 4) + ' ' + (x + 7) + ',' + (y + 4) + ' ' + x + ',' + y); a.setAttribute('class', 'swim-blk-head'); if (id) a.setAttribute('data-node', id); svg.appendChild(a); }
+  function dot(x, y, id) { var c = document.createElementNS(SVGNS, 'circle'); c.setAttribute('cx', x); c.setAttribute('cy', y); c.setAttribute('r', 2.3); c.setAttribute('class', 'swim-blk-origin'); if (id) c.setAttribute('data-node', id); svg.appendChild(c); }
+
+  drawables.forEach(function(d) {
+    var cx = chanX(d.chan);
+    if (d.kind === 'spine') {
+      var pts = d.nodes.filter(function(id) { return rect[id]; });
+      var first = rect[pts[0]], last = rect[pts[pts.length - 1]];
+      path('M' + cx + ',' + first.cy + ' L' + cx + ',' + last.cy, 'swim-blk-spine', 'data-nodes', pts.join(' '));
+      pts.forEach(function(id, i) {
+        var r = rect[id];
+        path('M' + (r.right + 1) + ',' + r.cy + ' L' + cx + ',' + r.cy, 'swim-blk-tick', 'data-node', id);
+        if (i === 0) dot(r.right + 1, r.cy, id); else arrowLeft(r.right + 1, r.cy, id);
+      });
+    } else {
+      var rf = rect[d.from], rt = rect[d.to];
+      path('M' + (rf.right + 1) + ',' + rf.cy + ' L' + cx + ',' + rf.cy + ' L' + cx + ',' + rt.cy + ' L' + (rt.right + 1) + ',' + rt.cy, 'swim-blk-spine', 'data-nodes', d.from + ' ' + d.to);
+      dot(rf.right + 1, rf.cy, d.from);
+      arrowLeft(rt.right + 1, rt.cy, d.to);
+    }
+  });
+
+  flow.appendChild(svg);
+}
+
+// 2D grid connectors: orange dashed angular lines between blocking cards.
+// Same-column edges run straight down; cross-column edges elbow through the
+// mid-Y between the two cards.
+function drawFlowConnectors(model) {
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  var grid = document.querySelector('.swim-grid');
+  if (!grid) return;
+  var prev = grid.querySelector('.swim-flow-edges');
+  if (prev) prev.parentNode.removeChild(prev);
+
+  var gb = grid.getBoundingClientRect();
+  function rectOf(id) {
+    var el = grid.querySelector('.swim-box[data-issue-id="' + id + '"]');
+    if (!el) return null;
+    var r = el.getBoundingClientRect();
+    return {
+      left: r.left - gb.left, right: r.right - gb.left,
+      top: r.top - gb.top, bottom: r.bottom - gb.top,
+      cx: (r.left + r.right) / 2 - gb.left, cy: (r.top + r.bottom) / 2 - gb.top
+    };
+  }
+
+  var W = grid.scrollWidth, H = grid.scrollHeight;
+  var svg = document.createElementNS(SVGNS, 'svg');
+  svg.setAttribute('class', 'swim-flow-edges');
+  svg.setAttribute('width', W);
+  svg.setAttribute('height', H);
+  svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+
+  function path(d, attr, val) { var p = document.createElementNS(SVGNS, 'path'); p.setAttribute('d', d); p.setAttribute('class', 'swim-blk-spine'); if (attr) p.setAttribute(attr, val); svg.appendChild(p); }
+  function arrow(x, y, dir, id) {
+    var a = document.createElementNS(SVGNS, 'polygon'), pts;
+    if (dir === 'down') pts = (x - 4) + ',' + (y - 6) + ' ' + (x + 4) + ',' + (y - 6) + ' ' + x + ',' + y;
+    else pts = (x - 4) + ',' + (y + 6) + ' ' + (x + 4) + ',' + (y + 6) + ' ' + x + ',' + y;
+    a.setAttribute('points', pts); a.setAttribute('class', 'swim-blk-head');
+    if (id) a.setAttribute('data-node', id);
+    svg.appendChild(a);
+  }
+
+  model.blocks.forEach(function(e) {
+    var a = rectOf(e[0]), b = rectOf(e[1]);
+    if (!a || !b) return;
+    var sameCol = Math.abs(a.cx - b.cx) < 10;
+    var down = b.cy >= a.cy;
+    var startY, endY, dir;
+    if (down) { startY = a.bottom; endY = b.top; dir = 'down'; }
+    else { startY = a.top; endY = b.bottom; dir = 'up'; }
+    if (sameCol) {
+      path('M' + a.cx + ',' + startY + ' L' + b.cx + ',' + endY, 'data-nodes', e[0] + ' ' + e[1]);
+    } else {
+      var midY = (startY + endY) / 2;
+      path('M' + a.cx + ',' + startY + ' L' + a.cx + ',' + midY + ' L' + b.cx + ',' + midY + ' L' + b.cx + ',' + endY, 'data-nodes', e[0] + ' ' + e[1]);
+    }
+    arrow(b.cx, endY, dir, e[1]);
+  });
+
+  grid.appendChild(svg);
+}
+
 function render() {
   var settings = getSettings();
 
@@ -853,6 +1154,15 @@ function render() {
     labelGoalIds = goalIds;
     var visibleIds = expandUpstreamBlockers(goalIds);
     issuesToRender = allIssues.filter(function(iss) { return visibleIds.has(iss.id); });
+  }
+
+  // Flow (side-rail) view bypasses lane/segment/column layout entirely.
+  if (settings.orientation === 'flow') {
+    var flowPageEl = document.querySelector('.swim-page');
+    if (flowPageEl) flowPageEl.setAttribute('data-orientation', 'flow');
+    currentLanes = [];
+    renderFlow(issuesToRender, settings);
+    return;
   }
 
   var result = assignLanes(issuesToRender, {
@@ -2348,6 +2658,21 @@ function highlightChain(issueId) {
       paths[i].classList.add('swim-chain-link');
     }
   }
+
+  // Flow view: dim all spine elements, then re-light the ones in the chain
+  var flowEdges = lanesEl.querySelector('.swim-flow-edges');
+  if (flowEdges) {
+    flowEdges.classList.add('swim-edges-dim');
+    var edgeEls = flowEdges.querySelectorAll('[data-node], [data-nodes]');
+    for (var e = 0; e < edgeEls.length; e++) {
+      var single = edgeEls[e].getAttribute('data-node');
+      var multi = edgeEls[e].getAttribute('data-nodes');
+      var on = false;
+      if (single) on = chain.has(single);
+      else if (multi) { var parts = multi.split(' '); for (var m = 0; m < parts.length; m++) { if (chain.has(parts[m])) { on = true; break; } } }
+      if (on) edgeEls[e].classList.add('swim-edge-hl');
+    }
+  }
 }
 
 function clearChainHighlight() {
@@ -2364,6 +2689,13 @@ function clearChainHighlight() {
   var links = lanesEl.querySelectorAll('.swim-chain-link');
   for (var i = 0; i < links.length; i++) {
     links[i].classList.remove('swim-chain-link');
+  }
+
+  var flowEdges = lanesEl.querySelector('.swim-flow-edges');
+  if (flowEdges) {
+    flowEdges.classList.remove('swim-edges-dim');
+    var hl = flowEdges.querySelectorAll('.swim-edge-hl');
+    for (var h = 0; h < hl.length; h++) hl[h].classList.remove('swim-edge-hl');
   }
 }
 
