@@ -9,6 +9,7 @@
   --green: #16a34a;
   --yellow: #d97706;
   --grey: #9ca3af;
+  --block: #ea7317;
   --blue-soft: rgba(37, 99, 235, 0.08);
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
@@ -105,7 +106,33 @@ body {
   white-space: nowrap;
 }
 
+/* meta row */
+.card .meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 5px;
+  padding-left: 18px;
+  font-size: 11px;
+  color: var(--dim);
+  flex-wrap: wrap;
+}
+.card .meta .who { color: #475569; }
+.card .meta .prio { font-weight: 700; }
+.card .meta .prio.p-urgent { color: #dc2626; }
+.card .meta .prio.p-high { color: #ea580c; }
+.card .meta .prio.p-med { color: var(--yellow); }
+.card .meta .prio.p-low { color: var(--grey); }
+.card .meta .lbl {
+  color: #475569;
+  background: #eef2f7;
+  border-radius: 3px;
+  padding: 0 5px;
+}
+.card .meta .blockedby { color: var(--block); font-weight: 600; }
+
 /* Compact chip variant */
+.card.chip .meta { display: none; }
 .card.chip {
   padding: 5px 8px;
   border-top-width: 3px;
@@ -182,9 +209,11 @@ body {
 .edge.parent { stroke: var(--accent); stroke-dasharray: 3 3; opacity: 0.45; }
 .edge-head { fill: var(--accent); opacity: 0.75; }
 
-/* gutter bars (side-rail) */
-.gbar { fill: none; stroke-width: 3; stroke-linecap: round; opacity: 0.9; }
-.gtick { fill: none; stroke-width: 1.8; opacity: 0.85; }
+/* gutter spines (side-rail) — original orange dashed style */
+.blk-spine { fill: none; stroke: var(--block); stroke-width: 1.8; stroke-dasharray: 5 3; opacity: 0.95; stroke-linejoin: round; }
+.blk-tick { fill: none; stroke: var(--block); stroke-width: 1.4; stroke-dasharray: 4 3; opacity: 0.85; }
+.blk-head { fill: var(--block); }
+.blk-origin { fill: var(--block); }
 
 /* long-range chip reference */
 .xref {

@@ -4,7 +4,8 @@
   'use strict';
 
   var DOT = { started: '◐', todo: '○', backlog: '○', done: '✓' };
-  var PALETTE = ['#2563eb', '#16a34a', '#d97706', '#9333ea', '#dc2626', '#0891b2', '#db2777', '#65a30d'];
+  var STATE_LABEL = { started: 'In Progress', todo: 'Todo', backlog: 'Backlog', done: 'Done' };
+  var PRIO = { urgent: 'Urgent', high: 'High', med: 'Med', low: 'Low' };
   var NS = 'http://www.w3.org/2000/svg';
 
   // ── Model ────────────────────────────────────────────────────────────────
@@ -22,6 +23,9 @@
       (n.blocks || []).forEach(function (t) { if (byId[t]) blocks.push([n.id, t]); });
       if (n.parent && byId[n.parent]) { parents.push([n.parent, n.id]); childrenOf[n.parent].push(n.id); }
     });
+    var blockedBy = {};
+    blocks.forEach(function (e) { (blockedBy[e[1]] = blockedBy[e[1]] || []).push(e[0]); });
+    nodes.forEach(function (n) { n._blockedBy = blockedBy[n.id] || []; });
     function depthOf(id) {
       if (depth[id] != null) return depth[id];
       var n = byId[id];
@@ -65,12 +69,21 @@
     el.setAttribute('data-state', n.state);
     el.setAttribute('data-type', n.type || 'task');
     var caret = opts.header ? '<span class="caret">▾</span>' : '';
+    var labels = (n.labels || []).map(function (l) { return '<span class="lbl">' + l + '</span>'; }).join('');
+    var blk = (n._blockedBy && n._blockedBy.length)
+      ? '<span class="blockedby">⛒ blocked by ' + n._blockedBy.join(', ') + '</span>' : '';
     el.innerHTML =
       '<div class="row">' + caret +
         '<span class="dot">' + DOT[n.state] + '</span>' +
         '<span class="id">' + n.id + '</span>' +
         '<span class="title">' + n.title + '</span>' +
         '<span class="type">' + (n.type || 'task') + '</span>' +
+      '</div>' +
+      '<div class="meta">' +
+        '<span class="state">' + (STATE_LABEL[n.state] || n.state) + '</span>' +
+        (n.a ? '<span class="who">@' + n.a + '</span>' : '') +
+        (n.p ? '<span class="prio p-' + n.p + '">' + (PRIO[n.p] || n.p) + '</span>' : '') +
+        labels + blk +
       '</div>';
     el.addEventListener('click', function () { el.classList.toggle('expanded'); });
     return el;
@@ -129,64 +142,92 @@
       renderNode(r.id, 0, stack);
     });
 
-    drawGutterBars(stage, svg, model);
+    drawGutterLines(stage, svg, model);
   }
 
-  // Each blocker projects one vertical bar; everything it blocks hangs off it.
-  function drawGutterBars(stage, svg, model) {
+  // Merge blocking chains into continuous orange dashed "spines": a run of
+  // A→B→C draws as one line passing each box; fan-out / fan-in branch off.
+  function drawGutterLines(stage, svg, model) {
     sizeSvg(stage, svg);
+    var rect = {};
+    model.nodes.forEach(function (n) { var r = rectOf(stage, n.id); if (r) rect[n.id] = r; });
+    function rk(id) { return model.rank[id] * 1000 + model.byId[id]._i; }
 
-    // group blocks edges by source
-    var bySource = {};
-    model.blocks.forEach(function (e) {
-      var a = rectOf(stage, e[0]), b = rectOf(stage, e[1]);
-      if (!a || !b) return;
-      (bySource[e[0]] = bySource[e[0]] || { src: e[0], srcRect: a, targets: [] }).targets.push({ id: e[1], rect: b });
+    // out-adjacency over blocking edges, sorted so the straightest continuation wins
+    var outAdj = {};
+    model.blocks.forEach(function (e) { (outAdj[e[0]] = outAdj[e[0]] || []).push(e[1]); });
+    Object.keys(outAdj).forEach(function (s) { outAdj[s].sort(function (a, b) { return rk(a) - rk(b); }); });
+
+    // greedy path cover: each node continues into one not-yet-claimed successor
+    var order = model.nodes.slice().sort(function (a, b) { return rk(a.id) - rk(b.id); });
+    var nextOf = {}, claimed = {};
+    order.forEach(function (n) {
+      var outs = outAdj[n.id] || [];
+      for (var i = 0; i < outs.length; i++) { if (!claimed[outs[i]]) { nextOf[n.id] = outs[i]; claimed[outs[i]] = true; break; } }
     });
-    var groups = Object.keys(bySource).map(function (s) {
-      var g = bySource[s];
-      var ys = [g.srcRect.cy].concat(g.targets.map(function (t) { return t.rect.cy; }));
-      g.top = Math.min.apply(null, ys); g.bot = Math.max.apply(null, ys);
-      return g;
-    }).sort(function (a, b) { return a.top - b.top; });
+    var spines = [];
+    order.forEach(function (n) {
+      if (claimed[n.id]) return;
+      var path = [n.id], cur = n.id;
+      while (nextOf[cur]) { cur = nextOf[cur]; path.push(cur); }
+      if (path.length > 1) spines.push(path);
+    });
+    var branches = [];
+    model.blocks.forEach(function (e) { if (nextOf[e[0]] !== e[1]) branches.push(e); });
 
-    // uniform tick origin to the right of all cards
-    var maxRight = 0;
-    model.nodes.forEach(function (n) { var r = rectOf(stage, n.id); if (r) maxRight = Math.max(maxRight, r.right); });
-    var tickStart = maxRight + 8;
-    var mobile = stage.getAttribute('data-w') === 'mobile';
-    var STEP = mobile ? 10 : 13, stageW = stage.getBoundingClientRect().width;
-
-    // interval colouring → channel
+    // pack everything into gutter channels by y-interval
+    var drawables = [];
+    spines.forEach(function (p) {
+      var ys = p.map(function (id) { return rect[id].cy; });
+      drawables.push({ kind: 'spine', nodes: p, top: Math.min.apply(null, ys), bot: Math.max.apply(null, ys) });
+    });
+    branches.forEach(function (e) {
+      var y1 = rect[e[0]].cy, y2 = rect[e[1]].cy;
+      drawables.push({ kind: 'branch', from: e[0], to: e[1], top: Math.min(y1, y2), bot: Math.max(y1, y2) });
+    });
+    drawables.sort(function (a, b) { return a.top - b.top || (b.bot - b.top) - (a.bot - a.top); });
     var active = [];
-    groups.forEach(function (g, i) {
-      active = active.filter(function (a) { return a.bot > g.top; });
+    drawables.forEach(function (d) {
+      active = active.filter(function (a) { return a.bot > d.top; });
       var used = {}; active.forEach(function (a) { used[a.chan] = true; });
       var c = 0; while (used[c]) c++;
-      g.chan = c; g.color = PALETTE[i % PALETTE.length];
-      active.push({ bot: g.bot, chan: c });
+      d.chan = c; active.push({ bot: d.bot, chan: c });
     });
 
-    groups.forEach(function (g) {
-      var cx = Math.min(tickStart + 12 + g.chan * STEP, stageW - 6);
-      var col = g.color;
-      // vertical bar
-      var bar = pathEl('M' + cx + ',' + g.top + ' L' + cx + ',' + g.bot, 'gbar');
-      bar.setAttribute('stroke', col); svg.appendChild(bar);
-      // source connector + dot
-      var sc = pathEl('M' + g.srcRect.right + ',' + g.srcRect.cy + ' L' + cx + ',' + g.srcRect.cy, 'gtick');
-      sc.setAttribute('stroke', col); svg.appendChild(sc);
-      var dot = svgNode('circle'); dot.setAttribute('cx', g.srcRect.right); dot.setAttribute('cy', g.srcRect.cy);
-      dot.setAttribute('r', 2.5); dot.setAttribute('fill', col); svg.appendChild(dot);
-      // target connectors + arrowheads
-      g.targets.forEach(function (t) {
-        var tc = pathEl('M' + cx + ',' + t.rect.cy + ' L' + (t.rect.right + 1) + ',' + t.rect.cy, 'gtick');
-        tc.setAttribute('stroke', col); svg.appendChild(tc);
-        var ah = svgNode('polygon');
-        var ax = t.rect.right + 1;
-        ah.setAttribute('points', (ax + 7) + ',' + (t.rect.cy - 4) + ' ' + (ax + 7) + ',' + (t.rect.cy + 4) + ' ' + ax + ',' + t.rect.cy);
-        ah.setAttribute('fill', col); svg.appendChild(ah);
-      });
+    var maxRight = 0;
+    model.nodes.forEach(function (n) { if (rect[n.id]) maxRight = Math.max(maxRight, rect[n.id].right); });
+    var mobile = stage.getAttribute('data-w') === 'mobile';
+    var STEP = mobile ? 11 : 14, stageW = stage.getBoundingClientRect().width;
+    var base = maxRight + (mobile ? 10 : 14);
+    function chanX(c) { return Math.min(base + c * STEP, stageW - 5); }
+
+    function arrowLeft(xTip, y) {
+      var a = svgNode('polygon');
+      a.setAttribute('points', (xTip + 7) + ',' + (y - 4) + ' ' + (xTip + 7) + ',' + (y + 4) + ' ' + xTip + ',' + y);
+      a.setAttribute('class', 'blk-head'); svg.appendChild(a);
+    }
+    function originDot(x, y) {
+      var d = svgNode('circle'); d.setAttribute('cx', x); d.setAttribute('cy', y);
+      d.setAttribute('r', 2.3); d.setAttribute('class', 'blk-origin'); svg.appendChild(d);
+    }
+
+    drawables.forEach(function (d) {
+      var cx = chanX(d.chan);
+      if (d.kind === 'spine') {
+        var first = rect[d.nodes[0]], last = rect[d.nodes[d.nodes.length - 1]];
+        svg.appendChild(pathEl('M' + cx + ',' + first.cy + ' L' + cx + ',' + last.cy, 'blk-spine'));
+        d.nodes.forEach(function (id, i) {
+          var r = rect[id];
+          svg.appendChild(pathEl('M' + (r.right + 1) + ',' + r.cy + ' L' + cx + ',' + r.cy, 'blk-tick'));
+          if (i === 0) originDot(r.right + 1, r.cy); else arrowLeft(r.right + 1, r.cy);
+        });
+      } else {
+        var rf = rect[d.from], rt = rect[d.to];
+        svg.appendChild(pathEl('M' + (rf.right + 1) + ',' + rf.cy + ' L' + cx + ',' + rf.cy +
+          ' L' + cx + ',' + rt.cy + ' L' + (rt.right + 1) + ',' + rt.cy, 'blk-spine'));
+        originDot(rf.right + 1, rf.cy);
+        arrowLeft(rt.right + 1, rt.cy);
+      }
     });
   }
 
