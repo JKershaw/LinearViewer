@@ -33,7 +33,7 @@ import { testMockTeams, testMockData } from '../tests/fixtures/mock-data.js';
  * @param {Function} options.getOpenRouterSource - Helper to determine OpenRouter source
  * @returns {Router} Express router
  */
-export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore }) {
+export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, reportHistoryStore }) {
   const router = Router();
 
   // ===========================================================================
@@ -1384,6 +1384,110 @@ ${goal}`;
     }
 
     res.json({ ok: true });
+  });
+
+  // ===========================================================================
+  // Roadmap Report History (LIN-299)
+  //
+  // Durable per-workspace storage for completed report runs so the roadmap
+  // reading survives a page reload. These are plain DB read/writes — NOT LLM
+  // calls — so they are gated on the roadmap feature flag only (no free-tier
+  // check, no H12 keepalive). The save happens client-side after all five
+  // narrative streams complete.
+  // ===========================================================================
+
+  /**
+   * Persist a completed report run.
+   * The resolved model and timestamp are stamped server-side so the record is
+   * trustworthy and consistent with how the layer endpoints pick their model.
+   * @route POST /workspace/:urlKey/api/roadmap/reports
+   */
+  router.post('/workspace/:urlKey/api/roadmap/reports', workspaceFromUrl, async (req, res) => {
+    const featureFlags = getFeatureFlags(req.session);
+    if (!featureFlags.roadmap) {
+      return res.status(403).json({ error: 'Roadmap feature is not enabled' });
+    }
+    if (!reportHistoryStore) {
+      return res.status(503).json({ error: 'Report history not configured' });
+    }
+
+    const { northStar, narrative, orientation } = req.body || {};
+    if (!narrative || typeof narrative !== 'object' || Array.isArray(narrative)) {
+      return res.status(400).json({ error: 'narrative object is required' });
+    }
+    if (northStar !== undefined && typeof northStar !== 'string') {
+      return res.status(400).json({ error: 'northStar must be a string' });
+    }
+    if (orientation !== undefined && !Array.isArray(orientation)) {
+      return res.status(400).json({ error: 'orientation must be an array' });
+    }
+
+    try {
+      const model = await resolveWorkspaceModel({ urlKey: req.workspace.urlKey, workspacePreferencesStore });
+      const report = await reportHistoryStore.save(req.workspace.urlKey, {
+        model,
+        northStar: typeof northStar === 'string' ? northStar : '',
+        narrative,
+        orientation
+      });
+      res.status(201).json({ report });
+    } catch (error) {
+      console.error('Report save error:', error);
+      res.status(500).json({ error: 'Failed to save report' });
+    }
+  });
+
+  /**
+   * List saved reports for this workspace, newest-first.
+   * @route GET /workspace/:urlKey/api/roadmap/reports?limit={n}
+   */
+  router.get('/workspace/:urlKey/api/roadmap/reports', workspaceFromUrl, async (req, res) => {
+    const featureFlags = getFeatureFlags(req.session);
+    if (!featureFlags.roadmap) {
+      return res.status(403).json({ error: 'Roadmap feature is not enabled' });
+    }
+    if (!reportHistoryStore) {
+      return res.status(503).json({ error: 'Report history not configured' });
+    }
+
+    let limit;
+    if (req.query.limit !== undefined) {
+      const parsed = parseInt(req.query.limit, 10);
+      if (!Number.isNaN(parsed) && parsed > 0) limit = Math.min(parsed, 50);
+    }
+
+    try {
+      const { items, total } = await reportHistoryStore.list(req.workspace.urlKey, { limit });
+      res.json({ reports: items, total });
+    } catch (error) {
+      console.error('Report list error:', error);
+      res.status(500).json({ error: 'Failed to list reports' });
+    }
+  });
+
+  /**
+   * Fetch a single saved report by id.
+   * @route GET /workspace/:urlKey/api/roadmap/reports/:id
+   */
+  router.get('/workspace/:urlKey/api/roadmap/reports/:id', workspaceFromUrl, async (req, res) => {
+    const featureFlags = getFeatureFlags(req.session);
+    if (!featureFlags.roadmap) {
+      return res.status(403).json({ error: 'Roadmap feature is not enabled' });
+    }
+    if (!reportHistoryStore) {
+      return res.status(503).json({ error: 'Report history not configured' });
+    }
+
+    try {
+      const report = await reportHistoryStore.get(req.workspace.urlKey, req.params.id);
+      if (!report) {
+        return res.status(404).json({ error: 'Report not found' });
+      }
+      res.json({ report });
+    } catch (error) {
+      console.error('Report get error:', error);
+      res.status(500).json({ error: 'Failed to fetch report' });
+    }
   });
 
   /**

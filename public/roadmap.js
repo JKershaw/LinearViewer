@@ -234,6 +234,16 @@
     var roadmapModel = getRoadmapModelPayload();
     var hasNorthStar = !!(northStar && northStar.trim());
 
+    // Accumulate each layer's final text so the completed run can be persisted
+    // (Step 0 / LIN-299). Layers that fail or are skipped stay null.
+    var collected = {
+      technical: null,
+      product: null,
+      trajectory: null,
+      northStarReading: null,
+      gap: null
+    };
+
     LAYER_IDS.forEach(resetLayer);
     if (generateBtn) {
       generateBtn.disabled = true;
@@ -248,7 +258,9 @@
 
     return runLayer('technical', 'technical', { roadmapModel })
       .then(function(tech) {
+        collected.technical = tech;
         return runLayer('product', 'product', { roadmapModel, tech }).then(function(product) {
+          collected.product = product;
           return { tech, product };
         });
       })
@@ -265,9 +277,13 @@
         return Promise.allSettled([trajectoryPromise, nsPromise]).then(function(results) {
           var trajectory = results[0].status === 'fulfilled' ? results[0].value : null;
           var nsReading = results[1].status === 'fulfilled' ? results[1].value : null;
+          collected.trajectory = trajectory;
+          collected.northStarReading = nsReading;
           if (!hasNorthStar) return;
           if (trajectory && nsReading) {
-            return runLayer('gap', 'gap', { northStar, trajectory, nsReading }).catch(function() {});
+            return runLayer('gap', 'gap', { northStar, trajectory, nsReading })
+              .then(function(gap) { collected.gap = gap; })
+              .catch(function() {});
           }
           // One fork leg failed; downgrade gap to a clearer message.
           setLayerState('gap', 'not-available', 'Gap analysis needs both trajectory and north star reading to succeed.');
@@ -277,11 +293,30 @@
         // Errors are surfaced per-layer; nothing extra to do here.
       })
       .then(function() {
+        // Persist the completed run so it survives a reload (best-effort).
+        saveReport(northStar, collected);
         if (generateBtn) {
           generateBtn.disabled = false;
           generateBtn.textContent = 'Regenerate reading';
         }
       });
+  }
+
+  /**
+   * Persist a completed report run. Best-effort: durability is a convenience,
+   * not part of the generation flow, so failures are swallowed. Skips the save
+   * entirely when no layer produced content (e.g. the first layer failed).
+   */
+  function saveReport(northStar, collected) {
+    var hasContent = collected.technical || collected.product ||
+      collected.trajectory || collected.northStarReading || collected.gap;
+    if (!hasContent) return;
+
+    fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/roadmap/reports', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ northStar: northStar || '', narrative: collected })
+    }).catch(function() { /* swallow — durability is best-effort */ });
   }
 
   function renderPipeline() {
@@ -310,6 +345,55 @@
     btn.addEventListener('click', function() {
       runPipeline(textarea.value, btn);
     });
+
+    // Rehydrate the most recent saved report so a reload no longer loses the
+    // reading (Step 0 / LIN-299).
+    rehydrateLatestReport(btn);
+  }
+
+  // Maps a stored narrative field to its layer placeholder id.
+  var NARRATIVE_FIELD_TO_LAYER = {
+    technical: 'technical',
+    product: 'product',
+    trajectory: 'trajectory',
+    northStarReading: 'north-star-reading',
+    gap: 'gap'
+  };
+
+  /**
+   * Fetch the newest saved report and render it into the layer placeholders.
+   * Only fills layers that have stored text; empty/null layers are left as-is.
+   */
+  function rehydrateLatestReport(generateBtn) {
+    fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/roadmap/reports?limit=1')
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(body) {
+        if (!body || !body.reports || !body.reports.length) return;
+        applyReport(body.reports[0], generateBtn);
+      })
+      .catch(function() { /* no saved report — leave placeholders idle */ });
+  }
+
+  function applyReport(report, generateBtn) {
+    var narrative = (report && report.narrative) || {};
+    var applied = false;
+
+    Object.keys(NARRATIVE_FIELD_TO_LAYER).forEach(function(field) {
+      var text = narrative[field];
+      if (!text) return;
+      var section = layerSection(NARRATIVE_FIELD_TO_LAYER[field]);
+      if (!section) return;
+      var content = section.querySelector('.roadmap-layer-content');
+      var status = section.querySelector('.roadmap-layer-status');
+      if (content) content.textContent = text;
+      if (status) status.textContent = '';
+      section.setAttribute('data-state', 'done');
+      applied = true;
+    });
+
+    if (applied && generateBtn) {
+      generateBtn.textContent = 'Regenerate reading';
+    }
   }
 
   // =========================================================================
