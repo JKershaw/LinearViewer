@@ -45,3 +45,13 @@ test('flow - hover focus', async ({ page }) => {
   await page.waitForTimeout(250);
   await page.screenshot({ path: `${DIR}/flow-hover-focus.png`, fullPage: true });
 });
+
+test('flow - long-haul reveal', async ({ page }) => {
+  await page.setViewportSize({ width: 1320, height: 1400 });
+  await openFlow(page);
+  // INFRA-2 is blocked by DASH-3 across the API column — a suppressed long-haul
+  // edge at rest. Hovering should reveal the full traced line over the gap.
+  await page.locator('.swim-fcard[data-issue-id="infra-2"]').hover();
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: `${DIR}/flow-longhaul-reveal.png`, fullPage: true });
+});

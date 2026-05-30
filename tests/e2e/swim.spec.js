@@ -420,6 +420,21 @@ test.describe('Swim Flow layout', () => {
     await expect(page.locator('.swim-blk-spine').first()).toBeAttached();
   });
 
+  test('long-haul edge is hidden at rest and revealed on hover', async ({ page }) => {
+    // DASH-3 blocks INFRA-2 across the API column — its line crosses an
+    // intervening card, so it is suppressed (swim-blk-long, opacity 0) at rest
+    // and marked with endpoint nubs (swim-blk-stub).
+    const longLine = page.locator('.swim-flow-edges .swim-blk-long').first();
+    await expect(longLine).toBeAttached();
+    await expect(page.locator('.swim-flow-edges .swim-blk-stub').first()).toBeAttached();
+    expect(await longLine.evaluate(el => getComputedStyle(el).opacity)).toBe('0');
+
+    // Hovering the target traces the full line.
+    await page.locator('.swim-fcard[data-issue-id="infra-2"]').hover();
+    await expect(longLine).toHaveClass(/swim-edge-hl/);
+    await expect.poll(() => longLine.evaluate(el => getComputedStyle(el).opacity)).toBe('1');
+  });
+
   test('clicking a flow card opens the popover', async ({ page }) => {
     await page.locator('.swim-fcard').first().click();
     await expect(page.locator('#swim-popover')).not.toHaveClass(/hidden/);

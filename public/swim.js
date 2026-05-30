@@ -847,6 +847,13 @@ function flowStateLabel(t) {
   return m[t] || t || 'Todo';
 }
 
+var FLOW_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function flowDueLabel(d) {
+  var dt = new Date(d);
+  if (isNaN(dt)) return d;
+  return FLOW_MONTHS[dt.getUTCMonth()] + ' ' + dt.getUTCDate();
+}
+
 function buildFlowModel(issues, showCompleted) {
   var nodes = showCompleted ? issues.slice() : issues.filter(function(i) { return !isTerminalState(i.stateType); });
   var byId = {};
@@ -896,10 +903,15 @@ function flowCard(issue, model, isHeader) {
   var meta = '<span class="swim-fc-state">' + escapeHtml(issue.stateName || flowStateLabel(issue.stateType)) + '</span>';
   if (issue.assignee) meta += '<span class="swim-fc-who">@' + escapeHtml(issue.assignee) + '</span>';
   if (issue.priority) meta += '<span class="swim-fc-prio p' + issue.priority + '">' + escapeHtml(FLOW_PRIO[issue.priority] || ('P' + issue.priority)) + '</span>';
+  if (issue.dueDate) meta += '<span class="swim-fc-due">due ' + escapeHtml(flowDueLabel(issue.dueDate)) + '</span>';
   (issue.labels || []).forEach(function(l) { meta += '<span class="swim-fc-lbl">' + escapeHtml(l) + '</span>'; });
   if (blockers.length) {
     var bl = blockers.map(function(id) { var b = model.byId[id]; return b ? (b.identifier || b.id) : id; });
     meta += '<span class="swim-fc-blocked">⛒ blocked by ' + escapeHtml(bl.join(', ')) + '</span>';
+  }
+  var desc = '';
+  if (issue.description) {
+    desc = '<div class="swim-fc-desc">' + escapeHtml(issue.description) + '</div>';
   }
   return '<div class="swim-box swim-fcard' + headerClass + goalClass + ' ' + stateClass(issue.stateType) +
     '" data-issue-id="' + escapeHtml(issue.id) + '">' +
@@ -907,6 +919,7 @@ function flowCard(issue, model, isHeader) {
       '<span class="swim-box-id">' + escapeHtml(issue.identifier || '') + '</span>' +
       '<span class="swim-box-title">' + escapeHtml(issue.title || '') + '</span>' +
     '</div>' +
+    desc +
     '<div class="swim-fc-meta">' + meta + '</div>' +
   '</div>';
 }
@@ -1100,6 +1113,24 @@ function drawFlowConnectors(model) {
     };
   }
 
+  // All card rects, for detecting whether a horizontal run would cross a card.
+  var cards = [];
+  var cardEls = grid.querySelectorAll('.swim-box[data-issue-id]');
+  for (var ci = 0; ci < cardEls.length; ci++) {
+    var cr = cardEls[ci].getBoundingClientRect();
+    cards.push({ id: cardEls[ci].getAttribute('data-issue-id'),
+      left: cr.left - gb.left, right: cr.right - gb.left, top: cr.top - gb.top, bottom: cr.bottom - gb.top });
+  }
+  function crossesCard(y, x1, x2, fromId, toId) {
+    var lo = Math.min(x1, x2) + 2, hi = Math.max(x1, x2) - 2;
+    for (var i = 0; i < cards.length; i++) {
+      var c = cards[i];
+      if (c.id === fromId || c.id === toId) continue;
+      if (y > c.top && y < c.bottom && c.right > lo && c.left < hi) return true;
+    }
+    return false;
+  }
+
   var W = grid.scrollWidth, H = grid.scrollHeight;
   var svg = document.createElementNS(SVGNS, 'svg');
   svg.setAttribute('class', 'swim-flow-edges');
@@ -1107,7 +1138,7 @@ function drawFlowConnectors(model) {
   svg.setAttribute('height', H);
   svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
 
-  function path(d, attr, val) { var p = document.createElementNS(SVGNS, 'path'); p.setAttribute('d', d); p.setAttribute('class', 'swim-blk-spine'); if (attr) p.setAttribute(attr, val); svg.appendChild(p); }
+  function path(d, attr, val, extraCls) { var p = document.createElementNS(SVGNS, 'path'); p.setAttribute('d', d); p.setAttribute('class', 'swim-blk-spine' + (extraCls || '')); if (attr) p.setAttribute(attr, val); svg.appendChild(p); }
   // horizontal arrowhead, dir 'left' points into a card's right edge, 'right'
   // into a card's left edge
   function arrowH(x, y, dir, id) {
@@ -1124,33 +1155,70 @@ function drawFlowConnectors(model) {
     c.setAttribute('class', 'swim-blk-origin'); if (id) c.setAttribute('data-node', id);
     svg.appendChild(c);
   }
+  // short fading nub marking a suppressed long-haul edge at an endpoint
+  function stub(x1, y, x2, nodes) {
+    var p = document.createElementNS(SVGNS, 'path');
+    p.setAttribute('d', 'M' + x1 + ',' + y + ' L' + x2 + ',' + y);
+    p.setAttribute('class', 'swim-blk-stub'); p.setAttribute('data-nodes', nodes);
+    svg.appendChild(p);
+  }
 
   // Route every edge through the gutter beside the cards so the dashed line
-  // never crosses a card body. Same-column edges run down a channel to the
-  // right of the column; cross-column edges hop out of the source column's
-  // gutter and into the side of the target card.
-  var GUT = 7;
+  // never crosses a card body. Same-column / target-right edges run down a
+  // channel to the right of the source column; target-left edges run down a
+  // channel to its left. Edges sharing a gutter whose vertical spans overlap
+  // are packed into parallel sub-channels so fan-outs don't bunch into one line.
+  var GUT = 13, STEP = 7;
+  var edges = [];
   model.blocks.forEach(function(e) {
     var a = rectOf(e[0]), b = rectOf(e[1]);
     if (!a || !b) return;
     var sameCol = Math.abs(a.cx - b.cx) < 10;
-    if (sameCol) {
-      var chX = Math.min(a.right + GUT, W - 3);
-      path('M' + a.right + ',' + a.cy + ' L' + chX + ',' + a.cy + ' L' + chX + ',' + b.cy + ' L' + b.right + ',' + b.cy, 'data-nodes', e[0] + ' ' + e[1]);
-      dot(a.right, a.cy, e[0]);
-      arrowH(b.right, b.cy, 'left', e[1]);
-    } else if (b.cx > a.cx) {
-      // target is to the right: exit A's right gutter, enter B from the left
-      var rX = Math.min(a.right + GUT, W - 3);
-      path('M' + a.right + ',' + a.cy + ' L' + rX + ',' + a.cy + ' L' + rX + ',' + b.cy + ' L' + b.left + ',' + b.cy, 'data-nodes', e[0] + ' ' + e[1]);
-      dot(a.right, a.cy, e[0]);
-      arrowH(b.left, b.cy, 'right', e[1]);
-    } else {
-      // target is to the left: exit A's left gutter, enter B from the right
-      var lX = Math.max(a.left - GUT, 3);
-      path('M' + a.left + ',' + a.cy + ' L' + lX + ',' + a.cy + ' L' + lX + ',' + b.cy + ' L' + b.right + ',' + b.cy, 'data-nodes', e[0] + ' ' + e[1]);
-      dot(a.left, a.cy, e[0]);
-      arrowH(b.right, b.cy, 'left', e[1]);
+    var side = (sameCol || b.cx > a.cx) ? 'R' : 'L';
+    var baseX = side === 'R' ? a.right : a.left;
+    edges.push({ e: e, a: a, b: b, sameCol: sameCol, side: side, baseX: baseX,
+      top: Math.min(a.cy, b.cy), bot: Math.max(a.cy, b.cy) });
+  });
+
+  // Greedy interval colouring per gutter: chains keep one channel (their spans
+  // only touch, never overlap), fan-outs spread onto adjacent channels.
+  var groups = {};
+  edges.forEach(function(ed) { var k = ed.side + Math.round(ed.baseX); (groups[k] = groups[k] || []).push(ed); });
+  Object.keys(groups).forEach(function(k) {
+    var list = groups[k].sort(function(p, q) { return p.top - q.top || (q.bot - q.top) - (p.bot - p.top); });
+    var active = [];
+    list.forEach(function(ed) {
+      active = active.filter(function(x) { return x.bot > ed.top; });
+      var used = {}; active.forEach(function(x) { used[x.chan] = true; });
+      var c = 0; while (used[c]) c++;
+      ed.chan = c; active.push(ed);
+    });
+  });
+
+  edges.forEach(function(ed) {
+    var a = ed.a, b = ed.b, dir = ed.side === 'R' ? 1 : -1;
+    var chX = Math.max(3, Math.min(W - 3, ed.baseX + dir * (GUT + ed.chan * STEP)));
+    var startX = ed.side === 'R' ? a.right : a.left;
+    var endX, arrowDir;
+    if (ed.sameCol) { endX = ed.side === 'R' ? b.right : b.left; arrowDir = ed.side === 'R' ? 'left' : 'right'; }
+    else if (b.cx > a.cx) { endX = b.left; arrowDir = 'right'; }
+    else { endX = b.right; arrowDir = 'left'; }
+    var nodes = ed.e[0] + ' ' + ed.e[1];
+
+    // Would the cross-band horizontal run plough through an intervening card?
+    var longHaul = !ed.sameCol && crossesCard(b.cy, chX, endX, ed.e[0], ed.e[1]);
+    var pathCls = longHaul ? ' swim-blk-long' : '';
+    path('M' + startX + ',' + a.cy + ' L' + chX + ',' + a.cy + ' L' + chX + ',' + b.cy + ' L' + endX + ',' + b.cy, 'data-nodes', nodes, pathCls);
+    dot(startX, a.cy, ed.e[0]);
+    arrowH(endX, b.cy, arrowDir, ed.e[1]);
+
+    if (longHaul) {
+      // At rest the long span is hidden; leave a nub at each end so the link is
+      // discoverable (the target already shows "blocked by …"). Hover traces
+      // the full line and its identity.
+      stub(startX, a.cy, chX, nodes);
+      var tEnd = endX + (arrowDir === 'left' ? 11 : -11);
+      stub(endX, b.cy, tEnd, nodes);
     }
   });
 
