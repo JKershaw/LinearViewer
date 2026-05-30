@@ -1108,30 +1108,50 @@ function drawFlowConnectors(model) {
   svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
 
   function path(d, attr, val) { var p = document.createElementNS(SVGNS, 'path'); p.setAttribute('d', d); p.setAttribute('class', 'swim-blk-spine'); if (attr) p.setAttribute(attr, val); svg.appendChild(p); }
-  function arrow(x, y, dir, id) {
+  // horizontal arrowhead, dir 'left' points into a card's right edge, 'right'
+  // into a card's left edge
+  function arrowH(x, y, dir, id) {
     var a = document.createElementNS(SVGNS, 'polygon'), pts;
-    if (dir === 'down') pts = (x - 4) + ',' + (y - 6) + ' ' + (x + 4) + ',' + (y - 6) + ' ' + x + ',' + y;
-    else pts = (x - 4) + ',' + (y + 6) + ' ' + (x + 4) + ',' + (y + 6) + ' ' + x + ',' + y;
+    if (dir === 'left') pts = (x + 6) + ',' + (y - 4) + ' ' + (x + 6) + ',' + (y + 4) + ' ' + x + ',' + y;
+    else pts = (x - 6) + ',' + (y - 4) + ' ' + (x - 6) + ',' + (y + 4) + ' ' + x + ',' + y;
     a.setAttribute('points', pts); a.setAttribute('class', 'swim-blk-head');
     if (id) a.setAttribute('data-node', id);
     svg.appendChild(a);
   }
+  function dot(x, y, id) {
+    var c = document.createElementNS(SVGNS, 'circle');
+    c.setAttribute('cx', x); c.setAttribute('cy', y); c.setAttribute('r', 2.4);
+    c.setAttribute('class', 'swim-blk-origin'); if (id) c.setAttribute('data-node', id);
+    svg.appendChild(c);
+  }
 
+  // Route every edge through the gutter beside the cards so the dashed line
+  // never crosses a card body. Same-column edges run down a channel to the
+  // right of the column; cross-column edges hop out of the source column's
+  // gutter and into the side of the target card.
+  var GUT = 7;
   model.blocks.forEach(function(e) {
     var a = rectOf(e[0]), b = rectOf(e[1]);
     if (!a || !b) return;
     var sameCol = Math.abs(a.cx - b.cx) < 10;
-    var down = b.cy >= a.cy;
-    var startY, endY, dir;
-    if (down) { startY = a.bottom; endY = b.top; dir = 'down'; }
-    else { startY = a.top; endY = b.bottom; dir = 'up'; }
     if (sameCol) {
-      path('M' + a.cx + ',' + startY + ' L' + b.cx + ',' + endY, 'data-nodes', e[0] + ' ' + e[1]);
+      var chX = Math.min(a.right + GUT, W - 3);
+      path('M' + a.right + ',' + a.cy + ' L' + chX + ',' + a.cy + ' L' + chX + ',' + b.cy + ' L' + b.right + ',' + b.cy, 'data-nodes', e[0] + ' ' + e[1]);
+      dot(a.right, a.cy, e[0]);
+      arrowH(b.right, b.cy, 'left', e[1]);
+    } else if (b.cx > a.cx) {
+      // target is to the right: exit A's right gutter, enter B from the left
+      var rX = Math.min(a.right + GUT, W - 3);
+      path('M' + a.right + ',' + a.cy + ' L' + rX + ',' + a.cy + ' L' + rX + ',' + b.cy + ' L' + b.left + ',' + b.cy, 'data-nodes', e[0] + ' ' + e[1]);
+      dot(a.right, a.cy, e[0]);
+      arrowH(b.left, b.cy, 'right', e[1]);
     } else {
-      var midY = (startY + endY) / 2;
-      path('M' + a.cx + ',' + startY + ' L' + a.cx + ',' + midY + ' L' + b.cx + ',' + midY + ' L' + b.cx + ',' + endY, 'data-nodes', e[0] + ' ' + e[1]);
+      // target is to the left: exit A's left gutter, enter B from the right
+      var lX = Math.max(a.left - GUT, 3);
+      path('M' + a.left + ',' + a.cy + ' L' + lX + ',' + a.cy + ' L' + lX + ',' + b.cy + ' L' + b.right + ',' + b.cy, 'data-nodes', e[0] + ' ' + e[1]);
+      dot(a.left, a.cy, e[0]);
+      arrowH(b.right, b.cy, 'left', e[1]);
     }
-    arrow(b.cx, endY, dir, e[1]);
   });
 
   grid.appendChild(svg);

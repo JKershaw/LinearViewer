@@ -810,7 +810,7 @@ body:has(.swim-page) {
   margin: 0 auto;
   padding: 12px 60px 48px 4px;
 }
-.swim-flow-edges { position: absolute; inset: 0; pointer-events: none; overflow: visible; z-index: 0; }
+.swim-flow-edges { position: absolute; inset: 0; pointer-events: none; overflow: visible; z-index: 3; }
 .swim-flow-sep { height: 14px; }
 
 /* state bands (In Progress / Todo / Backlog) — the vertical segments */
@@ -950,7 +950,7 @@ body:has(.swim-page) {
 .swim-fcol-head {
   position: sticky;
   top: 0;
-  z-index: 2;
+  z-index: 6;
   align-self: end;
   padding: 4px 2px 5px;
   font-size: 10px;
