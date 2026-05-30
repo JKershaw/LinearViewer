@@ -1113,6 +1113,24 @@ function drawFlowConnectors(model) {
     };
   }
 
+  // All card rects, for detecting whether a horizontal run would cross a card.
+  var cards = [];
+  var cardEls = grid.querySelectorAll('.swim-box[data-issue-id]');
+  for (var ci = 0; ci < cardEls.length; ci++) {
+    var cr = cardEls[ci].getBoundingClientRect();
+    cards.push({ id: cardEls[ci].getAttribute('data-issue-id'),
+      left: cr.left - gb.left, right: cr.right - gb.left, top: cr.top - gb.top, bottom: cr.bottom - gb.top });
+  }
+  function crossesCard(y, x1, x2, fromId, toId) {
+    var lo = Math.min(x1, x2) + 2, hi = Math.max(x1, x2) - 2;
+    for (var i = 0; i < cards.length; i++) {
+      var c = cards[i];
+      if (c.id === fromId || c.id === toId) continue;
+      if (y > c.top && y < c.bottom && c.right > lo && c.left < hi) return true;
+    }
+    return false;
+  }
+
   var W = grid.scrollWidth, H = grid.scrollHeight;
   var svg = document.createElementNS(SVGNS, 'svg');
   svg.setAttribute('class', 'swim-flow-edges');
@@ -1120,7 +1138,7 @@ function drawFlowConnectors(model) {
   svg.setAttribute('height', H);
   svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
 
-  function path(d, attr, val) { var p = document.createElementNS(SVGNS, 'path'); p.setAttribute('d', d); p.setAttribute('class', 'swim-blk-spine'); if (attr) p.setAttribute(attr, val); svg.appendChild(p); }
+  function path(d, attr, val, extraCls) { var p = document.createElementNS(SVGNS, 'path'); p.setAttribute('d', d); p.setAttribute('class', 'swim-blk-spine' + (extraCls || '')); if (attr) p.setAttribute(attr, val); svg.appendChild(p); }
   // horizontal arrowhead, dir 'left' points into a card's right edge, 'right'
   // into a card's left edge
   function arrowH(x, y, dir, id) {
@@ -1136,6 +1154,13 @@ function drawFlowConnectors(model) {
     c.setAttribute('cx', x); c.setAttribute('cy', y); c.setAttribute('r', 2.4);
     c.setAttribute('class', 'swim-blk-origin'); if (id) c.setAttribute('data-node', id);
     svg.appendChild(c);
+  }
+  // short fading nub marking a suppressed long-haul edge at an endpoint
+  function stub(x1, y, x2, nodes) {
+    var p = document.createElementNS(SVGNS, 'path');
+    p.setAttribute('d', 'M' + x1 + ',' + y + ' L' + x2 + ',' + y);
+    p.setAttribute('class', 'swim-blk-stub'); p.setAttribute('data-nodes', nodes);
+    svg.appendChild(p);
   }
 
   // Route every edge through the gutter beside the cards so the dashed line
@@ -1178,9 +1203,23 @@ function drawFlowConnectors(model) {
     if (ed.sameCol) { endX = ed.side === 'R' ? b.right : b.left; arrowDir = ed.side === 'R' ? 'left' : 'right'; }
     else if (b.cx > a.cx) { endX = b.left; arrowDir = 'right'; }
     else { endX = b.right; arrowDir = 'left'; }
-    path('M' + startX + ',' + a.cy + ' L' + chX + ',' + a.cy + ' L' + chX + ',' + b.cy + ' L' + endX + ',' + b.cy, 'data-nodes', ed.e[0] + ' ' + ed.e[1]);
+    var nodes = ed.e[0] + ' ' + ed.e[1];
+
+    // Would the cross-band horizontal run plough through an intervening card?
+    var longHaul = !ed.sameCol && crossesCard(b.cy, chX, endX, ed.e[0], ed.e[1]);
+    var pathCls = longHaul ? ' swim-blk-long' : '';
+    path('M' + startX + ',' + a.cy + ' L' + chX + ',' + a.cy + ' L' + chX + ',' + b.cy + ' L' + endX + ',' + b.cy, 'data-nodes', nodes, pathCls);
     dot(startX, a.cy, ed.e[0]);
     arrowH(endX, b.cy, arrowDir, ed.e[1]);
+
+    if (longHaul) {
+      // At rest the long span is hidden; leave a nub at each end so the link is
+      // discoverable (the target already shows "blocked by …"). Hover traces
+      // the full line and its identity.
+      stub(startX, a.cy, chX, nodes);
+      var tEnd = endX + (arrowDir === 'left' ? 11 : -11);
+      stub(endX, b.cy, tEnd, nodes);
+    }
   });
 
   grid.appendChild(svg);

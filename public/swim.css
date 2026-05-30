@@ -941,6 +941,10 @@ body:has(.swim-page) {
 .swim-blk-tick { fill: none; stroke: #ea7317; stroke-width: 1.4; stroke-dasharray: 4 3; opacity: 0.85; }
 .swim-blk-head { fill: #ea7317; }
 .swim-blk-origin { fill: #ea7317; }
+/* long-haul edges (would cross an intervening card) are hidden at rest and
+   represented by endpoint nubs + a target tag; the full line shows on hover */
+.swim-blk-long { opacity: 0; transition: opacity 0.12s; }
+.swim-blk-stub { fill: none; stroke: #ea7317; stroke-width: 1.6; stroke-dasharray: 4 3; opacity: 0.5; stroke-linecap: round; }
 
 /* hover-focus: dim spines not in the hovered card's chain */
 .swim-flow-edges.swim-edges-dim path,
@@ -948,6 +952,9 @@ body:has(.swim-page) {
 .swim-flow-edges.swim-edges-dim circle { opacity: 0.1; transition: opacity 0.12s; }
 .swim-flow-edges.swim-edges-dim .swim-edge-hl { opacity: 1; }
 .swim-flow-edges.swim-edges-dim .swim-blk-spine.swim-edge-hl { stroke-width: 2.4; }
+/* keep long-haul lines hidden while dimmed unless they are the hovered chain */
+.swim-flow-edges.swim-edges-dim .swim-blk-long { opacity: 0; }
+.swim-flow-edges.swim-edges-dim .swim-blk-long.swim-edge-hl { opacity: 1; }
 
 /* 2D grid layout: state bands (rows) × project columns */
 .swim-page[data-orientation="flow"] .swim-container { overflow-x: auto; }
