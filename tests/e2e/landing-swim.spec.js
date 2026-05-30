@@ -9,7 +9,9 @@ test.describe('Landing Swim Page (/swim)', () => {
   test('renders swim page for unauthenticated users', async ({ page }) => {
     await expect(page.locator('.swim-settings-toggle')).toBeVisible();
     await expect(page.locator('#swim-lanes')).toBeVisible();
-    await expect(page.locator('.swim-lane').first()).toBeVisible();
+    // Flow is the default layout — the landing preview renders the flow grid
+    await expect(page.locator('.swim-flow')).toBeVisible();
+    await expect(page.locator('.swim-box').first()).toBeVisible();
   });
 
   test('shows landing nav with Sign in link', async ({ page }) => {
