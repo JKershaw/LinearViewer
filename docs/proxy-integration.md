@@ -329,18 +329,18 @@ Response:
 {
   "relations": {
     "nodes": [
-      { "type": "blocks", "relatedIssue": { "id": "uuid", "identifier": "ENG-43", "title": "...", "state": { "name": "Todo", "type": "unstarted" } } }
+      { "id": "rel-uuid", "type": "blocks", "relatedIssue": { "id": "uuid", "identifier": "ENG-43", "title": "...", "state": { "name": "Todo", "type": "unstarted" } } }
     ]
   },
   "inverseRelations": {
     "nodes": [
-      { "type": "blocks", "issue": { "id": "uuid", "identifier": "ENG-41", "title": "...", "state": { "name": "Done", "type": "completed" } } }
+      { "id": "rel-uuid", "type": "blocks", "issue": { "id": "uuid", "identifier": "ENG-41", "title": "...", "state": { "name": "Done", "type": "completed" } } }
     ]
   }
 }
 ```
 
-`relations` and `inverseRelations` use Linear's `{nodes: [...]}` wrapper, the same convention as `relations` on `/issue/{id}` and `labels`/`children`/`comments` across the read endpoints. `relatedIssue` is the target of an outgoing relation; `issue` is the source of an inverse one (e.g. the issue that blocks this one).
+`relations` and `inverseRelations` use Linear's `{nodes: [...]}` wrapper, the same convention as `relations` on `/issue/{id}` and `labels`/`children`/`comments` across the read endpoints. `relatedIssue` is the target of an outgoing relation; `issue` is the source of an inverse one (e.g. the issue that blocks this one). Each node's `id` is the relation's own id — pass it to the delete-relation endpoint below.
 
 #### Get Task Recap
 
@@ -498,6 +498,24 @@ Content-Type: application/json
 | `relatedIssueId` | UUID/identifier | Yes | The related issue |
 
 Note: `blocked-by` is a convenience type — internally it creates a `blocks` relation with swapped issue IDs.
+
+#### Delete Relation
+
+```
+DELETE /api/proxy/issue/{issueId}/relations/{relationId}
+```
+
+Removes a relation. `relationId` is the relation's own `id` (the `id` field on each node returned by `GET /relations/{issueId}` or `GET /issue/{id}`), **not** an issue id.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `issueId` | UUID/identifier | Yes | Issue the relation belongs to (URL consistency; not used to resolve the relation) |
+| `relationId` | UUID | Yes | The relation's own id |
+
+Response:
+```json
+{ "success": true }
+```
 
 #### Add Label
 

@@ -267,6 +267,7 @@ The proxy allows authenticated users to generate secure tokens for external AI a
 - `PATCH /api/proxy/issue/:issueId` - Update issue (supports `cycleId`)
 - `POST /api/proxy/issue/:issueId/comments` - Add comment
 - `POST /api/proxy/issue/:issueId/relations` - Create relation
+- `DELETE /api/proxy/issue/:issueId/relations/:relationId` - Remove relation (relationId is the relation's own id, surfaced on read endpoints)
 - `POST /api/proxy/issue/:issueId/labels` - Add label
 - `DELETE /api/proxy/issue/:issueId/labels/:labelId` - Remove label
 

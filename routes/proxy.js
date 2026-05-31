@@ -349,12 +349,14 @@ const ISSUE_DETAIL_QUERY = gql`
       }
       relations {
         nodes {
+          id
           type
           relatedIssue { id identifier title state { name type } }
         }
       }
       inverseRelations {
         nodes {
+          id
           type
           issue { id identifier title state { name type } }
         }
@@ -477,12 +479,14 @@ const RELATIONS_QUERY = gql`
     issue(id: $issueId) {
       relations {
         nodes {
+          id
           type
           relatedIssue { id identifier title state { name type } }
         }
       }
       inverseRelations {
         nodes {
+          id
           type
           issue { id identifier title state { name type } }
         }
@@ -537,6 +541,14 @@ const CREATE_RELATION_MUTATION = gql`
         issue { id identifier }
         relatedIssue { id identifier }
       }
+    }
+  }
+`;
+
+const DELETE_RELATION_MUTATION = gql`
+  mutation($id: String!) {
+    issueRelationDelete(id: $id) {
+      success
     }
   }
 `;
@@ -880,11 +892,12 @@ GET ${baseUrl}/api/proxy/cycle/{cycleId}
 
 GET ${baseUrl}/api/proxy/relations/{issueId}
   → Issue relations (blocks, blocked-by, related, duplicate)
-  → { "relations":        { "nodes": [{ "type": "blocks", "relatedIssue": { "id": "...", "identifier": "LIN-9" } }] },
-      "inverseRelations": { "nodes": [{ "type": "blocks", "issue": { "id": "...", "identifier": "LIN-7" } }] } }
+  → { "relations":        { "nodes": [{ "id": "...", "type": "blocks", "relatedIssue": { "id": "...", "identifier": "LIN-9" } }] },
+      "inverseRelations": { "nodes": [{ "id": "...", "type": "blocks", "issue": { "id": "...", "identifier": "LIN-7" } }] } }
   → Note: relations / inverseRelations use Linear's {nodes: [...]} wrapper,
     same as relations on /issue/{id}. \`relatedIssue\` is the target of an
     outgoing relation; \`issue\` is the source of an inverse (e.g. blocked-by) one.
+    Each node's \`id\` is the relation id — pass it to DELETE .../relations/{id}.
 
 ## Foreman Endpoints
 
@@ -967,6 +980,11 @@ POST ${baseUrl}/api/proxy/issue/{issueId}/comments
 POST ${baseUrl}/api/proxy/issue/{issueId}/relations
   Body: { "type": "blocks|related|duplicate", "relatedIssueId": "..." }
   → Create a relation between issues
+
+DELETE ${baseUrl}/api/proxy/issue/{issueId}/relations/{relationId}
+  → Remove a relation. relationId is the relation's own id (the \`id\` field on
+    each node from GET /relations/{issueId} or GET /issue/{id}), NOT an issue id.
+  → { "success": true }
 
 POST ${baseUrl}/api/proxy/issue/{issueId}/labels
   Body: { "labelId": "..." }
@@ -1613,6 +1631,44 @@ ${readEndpoints}${writeEndpoints}
       logEvent(req, '/api/proxy/issue/relations', status);
       console.error('Proxy create relation error:', err.message);
       res.status(status).json({ error: 'Failed to create relation', detail: graphqlErrorDetail(err) });
+    }
+  });
+
+  /**
+   * DELETE /api/proxy/issue/:issueId/relations/:relationId
+   * Remove a relation. The relationId is the IssueRelation's own id, which is
+   * exposed on the nodes returned by GET /relations/:issueId and GET /issue/:id.
+   *
+   * Note: :issueId is accepted for a consistent URL shape with the other
+   * /issue/:issueId/... endpoints, but the delete is keyed solely on relationId
+   * (Linear deletes by relation id, not by the issue pair). It is validated for
+   * format but not otherwise used.
+   */
+  router.delete('/api/proxy/issue/:issueId/relations/:relationId', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
+    try {
+      const client = await getClient(req.proxyUrlKey);
+      if (!client) {
+        logEvent(req, '/api/proxy/issue/relations', 503);
+        return res.status(503).json({ error: 'Workspace not available' });
+      }
+
+      const { issueId, relationId } = req.params;
+      if (!isValidIssueId(issueId)) {
+        return res.status(400).json({ error: 'Invalid issue ID format' });
+      }
+      if (!UUID_REGEX.test(relationId)) {
+        logEvent(req, '/api/proxy/issue/relations', 400);
+        return res.status(400).json({ error: 'Invalid relation ID format' });
+      }
+
+      const data = await client.request(DELETE_RELATION_MUTATION, { id: relationId });
+      logEvent(req, '/api/proxy/issue/relations', 200);
+      res.json(data.issueRelationDelete);
+    } catch (err) {
+      const status = graphqlErrorStatus(err);
+      logEvent(req, '/api/proxy/issue/relations', status);
+      console.error('Proxy delete relation error:', err.message);
+      res.status(status).json({ error: 'Failed to delete relation', detail: graphqlErrorDetail(err) });
     }
   });
 

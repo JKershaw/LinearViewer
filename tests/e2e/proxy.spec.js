@@ -371,6 +371,24 @@ test.describe('Proxy API - Consumer Endpoints', () => {
     expect(data.error).toContain('type');
   });
 
+  test('delete relation endpoint validates relationId format', async ({ request }) => {
+    const resp = await request.delete('/api/proxy/issue/11111111-1111-1111-1111-111111111111/relations/not-a-uuid', {
+      headers: { Authorization: `Bearer ${writeToken}` }
+    });
+    expect(resp.status()).toBe(400);
+    const data = await resp.json();
+    expect(data.error).toContain('relation ID');
+  });
+
+  test('delete relation endpoint requires write scope', async ({ request }) => {
+    const resp = await request.delete('/api/proxy/issue/11111111-1111-1111-1111-111111111111/relations/22222222-2222-2222-2222-222222222222', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(resp.status()).toBe(403);
+    const data = await resp.json();
+    expect(data.error).toContain('read-write');
+  });
+
   test('label add endpoint validates labelId', async ({ request }) => {
     const resp = await request.post('/api/proxy/issue/11111111-1111-1111-1111-111111111111/labels', {
       headers: {
