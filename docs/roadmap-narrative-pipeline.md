@@ -132,7 +132,7 @@ Cap output length around 200–300 words. The gap is the punchline; long gap ana
 All five prompts share three rules. Repeat them in each prompt rather than relying on a shared system message — repetition is safer than hoping a top-level instruction gets respected through five distinct calls.
 
 - Plain text only — no markdown. Output renders in a monospace UI.
-- Use original task and project names; no renaming, no paraphrasing identifiers.
+- Use original task and project names on first mention; after that a short, recognizable short-form is allowed (full name first, short reference after) so prose doesn't read like a list of database keys. No inventing names, no altering identifiers (e.g. LIN-123).
 - Cite specific items when making claims. Vague claims are not claims.
 
 ## Failure modes
