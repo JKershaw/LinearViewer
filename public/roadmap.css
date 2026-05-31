@@ -487,6 +487,15 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
   font-size: 0.9em;
 }
 
+/* Idle recap: a placeholder hint so the empty box reads as intentional before
+   any reading exists. Keyed on state, so it vanishes the moment generation
+   starts (pending/streaming) or a saved reading rehydrates (done). */
+.roadmap-layer--digest[data-state="idle"] .roadmap-layer-content::before {
+  content: 'Generate a reading to see the recap.';
+  color: var(--fg-dim);
+  font-style: italic;
+}
+
 /* Pending: the digest waits at the top while the layers below generate. */
 .roadmap-layer[data-state="pending"] .roadmap-layer-status {
   color: var(--fg-dim);

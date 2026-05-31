@@ -306,6 +306,18 @@ test.describe('Roadmap Pipeline UI', () => {
     await expect(page.locator('[data-layer="gap"]')).toBeVisible();
   });
 
+  test('idle digest shows a placeholder hint before any reading exists', async ({ page }) => {
+    await page.goto(ROADMAP_URL);
+    await page.waitForLoadState('networkidle');
+
+    const digest = page.locator('[data-layer="digest"]');
+    expect(await digest.getAttribute('data-state')).toBe('idle');
+    const hint = await digest.locator('.roadmap-layer-content').evaluate(
+      el => getComputedStyle(el, '::before').content
+    );
+    expect(hint).toContain('Generate a reading');
+  });
+
   test('digest stays open as the recap; the five detail layers fold and start collapsed', async ({ page }) => {
     await page.goto(ROADMAP_URL);
     await page.waitForLoadState('networkidle');
