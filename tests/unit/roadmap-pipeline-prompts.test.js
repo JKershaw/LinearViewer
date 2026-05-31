@@ -363,6 +363,30 @@ describe('buildRoadmapNorthStarMessages (layer 3b — north star reading)', () =
       'should include project names from the data summary');
   });
 
+  test('embeds prior readings as descriptive context when provided', () => {
+    const messages = buildRoadmapNorthStarMessages(SAMPLE_MODEL, SAMPLE_NORTH_STAR, {
+      tech: 'TECH-NARRATIVE-MARKER',
+      product: 'PRODUCT-NARRATIVE-MARKER'
+    });
+    const user = messages[1].content;
+    assert.ok(user.includes('TECH-NARRATIVE-MARKER'), 'should embed the technical narrative');
+    assert.ok(user.includes('PRODUCT-NARRATIVE-MARKER'), 'should embed the product perspective');
+    assert.ok(/descriptive context|do not (let|defer)|anchor/i.test(user),
+      'should frame prior readings as non-authoritative context');
+  });
+
+  test('system prompt no longer forbids prior layers; warns against anchoring instead', () => {
+    const system = buildRoadmapNorthStarMessages(SAMPLE_MODEL, SAMPLE_NORTH_STAR)[0].content;
+    assert.ok(!/read fresh from the source data/i.test(system), 'should drop the read-fresh prohibition');
+    assert.ok(/anchor|defer|descriptive context/i.test(system), 'should warn against anchoring on prior readings');
+  });
+
+  test('omits the prior-readings block when none are given', () => {
+    const messages = buildRoadmapNorthStarMessages(SAMPLE_MODEL, SAMPLE_NORTH_STAR);
+    assert.ok(!/PRODUCT PERSPECTIVE \(layer 2\)/.test(messages[1].content),
+      'no prior-readings block without tech/product');
+  });
+
   test('honors cross-cutting rules', () => {
     const messages = buildRoadmapNorthStarMessages(SAMPLE_MODEL, SAMPLE_NORTH_STAR);
     assertCrossCuttingRules(messages[0].content, 'layer 3b');
@@ -431,6 +455,18 @@ describe('buildRoadmapGapMessages (layer 4 — gap)', () => {
     assert.ok(user.includes(SAMPLE_NORTH_STAR), 'must embed north star');
     assert.ok(user.includes(SAMPLE_TRAJECTORY), 'must embed trajectory reading');
     assert.ok(user.includes(SAMPLE_NS_READING), 'must embed north star reading');
+  });
+
+  test('embeds the underlying roadmap data for re-grounding when the model is provided', () => {
+    const messages = buildRoadmapGapMessages(SAMPLE_NORTH_STAR, SAMPLE_TRAJECTORY, SAMPLE_NS_READING, SAMPLE_MODEL);
+    const user = messages[1].content;
+    assert.ok(/UNDERLYING ROADMAP DATA|re-ground/i.test(user), 'should label an underlying-data block');
+    assert.ok(user.includes('Harbour OS'), 'should include project names from the data summary');
+  });
+
+  test('omits the data block when no model is provided (prose-only fallback)', () => {
+    const messages = buildRoadmapGapMessages(SAMPLE_NORTH_STAR, SAMPLE_TRAJECTORY, SAMPLE_NS_READING);
+    assert.ok(!/UNDERLYING ROADMAP DATA/.test(messages[1].content), 'no data block without a model');
   });
 
   test('honors cross-cutting rules', () => {

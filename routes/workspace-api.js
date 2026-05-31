@@ -1896,7 +1896,7 @@ ${goal}`;
     const gate = await gateRoadmapLLMRequest(req, res);
     if (!gate) return;
 
-    const { roadmapModel, northStar } = req.body || {};
+    const { roadmapModel, northStar, tech, product } = req.body || {};
     if (!roadmapModel) {
       return res.status(400).json({ error: 'roadmapModel is required' });
     }
@@ -1908,10 +1908,17 @@ ${goal}`;
       return emitMockLayerStream(res, 'Mock north star reading: aligned to stated intent.');
     }
 
+    // tech/product are optional descriptive context (layers 1/2). When present
+    // the reading re-grounds against them; when absent it degrades to data-only.
+    const priorReadings = {
+      tech: typeof tech === 'string' ? tech : '',
+      product: typeof product === 'string' ? product : ''
+    };
+
     let messages;
     try {
       const { buildRoadmapNorthStarMessages } = await import('../lib/prompts/roadmap-north-star-template.js');
-      messages = buildRoadmapNorthStarMessages(roadmapModel, northStar);
+      messages = buildRoadmapNorthStarMessages(roadmapModel, northStar, priorReadings);
     } catch (error) {
       console.error('Roadmap north-star build error:', error);
       return res.status(500).json({ error: 'Failed to build north-star prompt' });
@@ -1928,7 +1935,7 @@ ${goal}`;
     const gate = await gateRoadmapLLMRequest(req, res);
     if (!gate) return;
 
-    const { northStar, trajectory, nsReading } = req.body || {};
+    const { northStar, trajectory, nsReading, roadmapModel } = req.body || {};
     if (typeof northStar !== 'string' || !northStar.trim()) {
       return res.status(400).json({ error: 'northStar is required as a non-empty string' });
     }
@@ -1946,7 +1953,8 @@ ${goal}`;
     let messages;
     try {
       const { buildRoadmapGapMessages } = await import('../lib/prompts/roadmap-gap-template.js');
-      messages = buildRoadmapGapMessages(northStar, trajectory, nsReading);
+      // roadmapModel is optional re-grounding context; null when the client omits it.
+      messages = buildRoadmapGapMessages(northStar, trajectory, nsReading, roadmapModel || null);
     } catch (error) {
       console.error('Roadmap gap build error:', error);
       return res.status(500).json({ error: 'Failed to build gap prompt' });
