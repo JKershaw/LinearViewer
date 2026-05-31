@@ -1997,3 +1997,118 @@ h1 {
   border-radius: 2px;
   vertical-align: middle;
 }
+
+/* =========================================================================
+   Brief Section
+   Current-state task brief (Markdown). Shares the recap header/spinner look.
+   ========================================================================= */
+.brief-section {
+  font-family: var(--font-content);
+  color: var(--fg);
+  font-size: 0.9em;
+}
+
+.brief-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75ch;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.brief-status-label {
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.brief-meta {
+  color: var(--fg-dim);
+  font-size: 0.85em;
+}
+
+.brief-refresh {
+  margin-left: auto;
+  font-family: inherit;
+  font-size: 0.85em;
+  padding: 0.15rem 0.6rem;
+  background: transparent;
+  border: 1px solid var(--fg-dim);
+  border-radius: 3px;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.brief-refresh:hover {
+  border-color: var(--fg);
+  background: var(--bg-alt, rgba(0, 0, 0, 0.03));
+}
+
+.brief-refresh:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.brief-placeholder {
+  color: var(--fg-dim);
+  font-style: italic;
+  padding: 0.35rem 0;
+}
+
+.brief-empty {
+  color: var(--fg-dim);
+  padding: 0.35rem 0;
+}
+
+.brief-error {
+  color: var(--red, #c62828);
+  font-style: normal;
+}
+
+.brief-generating {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5ch;
+  color: var(--fg-dim);
+  font-style: normal;
+}
+
+.brief-spinner {
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  border: 2px solid var(--fg-dim);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: recap-spin 0.9s linear infinite;
+}
+
+.brief-content {
+  color: var(--fg);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.brief-content h2 {
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fg-dim);
+  margin: 0.75rem 0 0.25rem;
+}
+
+.brief-content h2:first-child {
+  margin-top: 0;
+}
+
+.brief-content ul {
+  margin: 0.25rem 0 0.5rem;
+  padding-left: 1.5ch;
+}
+
+.brief-content li {
+  margin: 0.15rem 0;
+}
+
+.brief-content p {
+  margin: 0.25rem 0 0.5rem;
+}

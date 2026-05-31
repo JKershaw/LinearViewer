@@ -24,6 +24,7 @@ import { ProxyEventStore } from './lib/proxy-events.js'
 import { ForemanStore } from './lib/foreman-store.js'
 import { FreeTierStore } from './lib/free-tier-store.js'
 import { RecapCacheStore } from './lib/recap-cache.js'
+import { BriefCacheStore } from './lib/brief-cache.js'
 import { ReportHistoryStore } from './lib/report-history-store.js'
 import { fetchProjects, fetchProjectsList, fetchTeams, fetchOrganization, fetchViewer } from './lib/linear.js'
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID } from './lib/tree.js'
@@ -213,6 +214,12 @@ const freeTierStore = new FreeTierStore({
 const recapCacheCollection = db.collection('recap-cache')
 const recapCacheStore = new RecapCacheStore({
   collection: recapCacheCollection
+})
+
+// Brief cache: AI-generated current-state task briefs, keyed on context hash
+const briefCacheCollection = db.collection('brief-cache')
+const briefCacheStore = new BriefCacheStore({
+  collection: briefCacheCollection
 })
 
 // Report history (LIN-299): durable per-workspace roadmap report runs
@@ -799,7 +806,7 @@ async function getWorkspaceOpenRouterKey(urlKey, linearUserId) {
 app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, workspaceFromUrl, getWorkspaceAccessToken, getWorkspaceOpenRouterKey, workspacePreferencesStore }))
 
 // Mount workspace API routes (audit, prompts, recommendations, comments, images)
-app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, reportHistoryStore }))
+app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore }))
 
 // Mount pipeline routes (page + JSON polling)
 app.use(createPipelineRoutes({ workspaceFromUrl, getWorkspaceAccessToken, dispatchQueueStore, foremanStore, getOpenRouterSource, getDeployInfo, handleUnauthorizedError }))

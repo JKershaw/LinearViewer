@@ -17,6 +17,7 @@ import { buildForemanPlaybook, buildMiniForemanStep } from '../lib/prompts/forem
 import { isRecommendationEnabled, getRecommendation, getRecommendationStream, streamChat } from '../lib/openrouter.js';
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { generateRecap } from '../lib/recap.js';
+import { generateBrief } from '../lib/brief.js';
 import { hashContext } from '../lib/recap-cache.js';
 import { runAudit, computeAuditFromData } from '../lib/audit.js';
 import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
@@ -33,7 +34,7 @@ import { testMockTeams, testMockData } from '../tests/fixtures/mock-data.js';
  * @param {Function} options.getOpenRouterSource - Helper to determine OpenRouter source
  * @returns {Router} Express router
  */
-export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, reportHistoryStore }) {
+export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore }) {
   const router = Router();
 
   // ===========================================================================
@@ -1064,6 +1065,212 @@ ${goal}`;
       keepalive.send(500, { error: 'Failed to generate recap', message: error.message });
     }
   });
+
+  // ===========================================================================
+  // Brief API (current-state task brief)
+  // ===========================================================================
+
+  /**
+   * GET brief status + body (if fresh).
+   *
+   * @route GET /workspace/:urlKey/api/brief/:issueId
+   * @returns {Object} { status: 'fresh'|'stale'|'missing', brief?, generatedAt?, model? }
+   */
+  router.get('/workspace/:urlKey/api/brief/:issueId', workspaceFromUrl, async (req, res) => {
+    const workspace = req.workspace;
+    const { issueId } = req.params;
+
+    if (!isValidIssueId(issueId)) {
+      return res.status(400).json({ error: 'Invalid issue ID format' });
+    }
+    if (!briefCacheStore) {
+      return res.status(503).json({ error: 'Brief cache not configured' });
+    }
+
+    try {
+      const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
+      let context;
+      if (isTestMode) {
+        context = await buildMockRecapContext(issueId);
+        if (!context) return res.status(404).json({ error: 'Issue not found' });
+      } else {
+        context = await fetchRecommendationContext(workspace.accessToken, issueId);
+      }
+
+      const canonicalId = context.issue?.id || issueId;
+      const inputHash = hashContext(context);
+      const cached = await briefCacheStore.get(workspace.urlKey, canonicalId);
+
+      if (!cached) {
+        return res.json({ status: 'missing' });
+      }
+      if (cached.inputHash !== inputHash) {
+        return res.json({
+          status: 'stale',
+          generatedAt: cached.generatedAt,
+          model: cached.model
+        });
+      }
+      return res.json({
+        status: 'fresh',
+        brief: cached.brief,
+        generatedAt: cached.generatedAt,
+        model: cached.model
+      });
+    } catch (error) {
+      console.error('Brief GET error:', error);
+      if (error.response?.status === 401) {
+        return res.status(401).json({ error: 'Token expired or invalid' });
+      }
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      res.status(500).json({ error: 'Failed to fetch brief status', message: error.message });
+    }
+  });
+
+  /**
+   * POST brief generate.
+   * Regenerates the brief via Haiku (or configured model) and caches it.
+   *
+   * @route POST /workspace/:urlKey/api/brief/:issueId
+   * @returns {Object} { status: 'fresh', brief, generatedAt, model }
+   */
+  router.post('/workspace/:urlKey/api/brief/:issueId', workspaceFromUrl, async (req, res) => {
+    const workspace = req.workspace;
+    const { issueId } = req.params;
+
+    if (!isValidIssueId(issueId)) {
+      return res.status(400).json({ error: 'Invalid issue ID format' });
+    }
+    if (!briefCacheStore) {
+      return res.status(503).json({ error: 'Brief cache not configured' });
+    }
+
+    const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
+    const sessionApiKey = req.session.openRouterApiKey;
+    const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
+    const isFreeTier = !sessionApiKey && !process.env.OPENROUTER_API_KEY && !!freeTierKey;
+
+    if (!isTestMode && !isRecommendationEnabled(sessionApiKey) && !freeTierKey) {
+      return res.status(503).json({ error: 'AI brief is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.' });
+    }
+
+    if (!isTestMode && isFreeTier) {
+      const check = await freeTierStore.tryUse(workspace.urlKey);
+      if (!check.allowed) {
+        return res.status(429).json({
+          error: check.reason,
+          freeTier: {
+            used: true,
+            remaining: check.remaining,
+            limit: check.limit,
+            resetsAt: check.resetsAt
+          }
+        });
+      }
+    }
+
+    // Force-regenerate always calls OpenRouter; arm a Heroku H12 guard.
+    const keepalive = armKeepalive(res);
+    try {
+      let context;
+      if (isTestMode) {
+        context = await buildMockRecapContext(issueId);
+        if (!context) {
+          keepalive.stop();
+          return keepalive.send(404, { error: 'Issue not found' });
+        }
+      } else {
+        context = await fetchRecommendationContext(workspace.accessToken, issueId);
+      }
+
+      const canonicalId = context.issue?.id || issueId;
+      const inputHash = hashContext(context);
+      const selectedModel = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore });
+
+      let brief;
+      let modelUsed;
+      if (isTestMode) {
+        brief = buildMockBrief(context);
+        modelUsed = selectedModel;
+      } else {
+        const apiKeyToUse = sessionApiKey || (isFreeTier ? freeTierKey : undefined);
+        const result = await generateBrief(
+          context.issue,
+          context,
+          { apiKey: apiKeyToUse, model: selectedModel }
+        );
+        brief = result.brief;
+        modelUsed = result.model;
+      }
+
+      await briefCacheStore.put(workspace.urlKey, canonicalId, {
+        inputHash,
+        brief,
+        model: modelUsed
+      });
+      const stored = await briefCacheStore.get(workspace.urlKey, canonicalId);
+
+      keepalive.stop();
+      keepalive.send(200, {
+        status: 'fresh',
+        brief: stored?.brief ?? brief,
+        generatedAt: stored?.generatedAt ?? new Date(),
+        model: modelUsed
+      });
+    } catch (error) {
+      keepalive.stop();
+      console.error('Brief POST error:', error);
+      if (error.response?.status === 401) {
+        return keepalive.send(401, { error: 'Token expired or invalid' });
+      }
+      if (error.message?.includes('not found')) {
+        return keepalive.send(404, { error: error.message });
+      }
+      if (error.message?.includes('OpenRouter')) {
+        return keepalive.send(503, { error: 'AI service temporarily unavailable', message: error.message });
+      }
+      keepalive.send(500, { error: 'Failed to generate brief', message: error.message });
+    }
+  });
+
+  /** Build a small deterministic brief (Markdown) for test mode. */
+  function buildMockBrief(context) {
+    const issue = context.issue || {};
+    const remaining = (context.children || []).filter(c => !isTerminalState(c.state?.type));
+    const labels = issue.labels || [];
+
+    const lines = [];
+    lines.push('## Current');
+    lines.push(`${issue.title || 'Untitled task'} — ${issue.description ? issue.description.split('\n')[0] : 'No description provided.'}`);
+    if (remaining.length > 0) {
+      lines.push('');
+      lines.push(`Remaining: ${remaining.map(c => c.identifier).join(', ')}.`);
+    }
+    lines.push('');
+
+    lines.push('## Constraints');
+    if (labels.includes('blocked') || labels.includes('Blocked')) {
+      lines.push('- Task is blocked; resolve the blocker before proceeding.');
+    } else {
+      lines.push('- _None._');
+    }
+    lines.push('');
+
+    lines.push('## Open questions');
+    lines.push('- _None._');
+    lines.push('');
+
+    lines.push('## Changelog');
+    if ((context.comments || []).length > 0) {
+      lines.push(`- **Discussion captured in ${context.comments.length} comment(s)** — context lives in the thread, not yet folded into the spec.`);
+    } else {
+      lines.push('- _None._');
+    }
+
+    return lines.join('\n');
+  }
 
   /** Build a mock recommendation context from test fixtures. */
   async function buildMockRecapContext(issueId) {
