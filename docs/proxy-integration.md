@@ -340,7 +340,7 @@ Response:
 }
 ```
 
-`relations` and `inverseRelations` use Linear's `{nodes: [...]}` wrapper, the same convention as `relations` on `/issue/{id}` and `labels`/`children`/`comments` across the read endpoints. `relatedIssue` is the target of an outgoing relation; `issue` is the source of an inverse one (e.g. the issue that blocks this one). Each node's `id` is the relation's own id — pass it to the delete-relation endpoint below.
+`relations` and `inverseRelations` use Linear's `{nodes: [...]}` wrapper, the same convention as `relations` on `/issues/{id}` and `labels`/`children`/`comments` across the read endpoints. `relatedIssue` is the target of an outgoing relation; `issue` is the source of an inverse one (e.g. the issue that blocks this one). Each node's `id` is the relation's own id — pass it to the delete-relation endpoint below.
 
 #### Get Task Recap
 
@@ -408,6 +408,191 @@ With `?noRefresh=1` and no cache, `status` is `"missing"` (or `"stale"`) and the
 > UI is served straight from cache here (and vice versa). Regeneration calls OpenRouter
 > and can exceed 25s; the server streams whitespace keepalive bytes inside a single
 > `200` response, so don't set a client timeout below ~60s for these endpoints.
+
+### Foreman / Task Automation Endpoints
+
+These endpoints back the "foreman" workflow: pick the next task, generate a prompt for it, and record agent progress. The **recap** and **brief** endpoints above are part of this group too. All are read-scope except `POST /api/proxy/foreman/status`, which requires `readWrite`.
+
+#### Get Task Stack
+
+```
+GET /api/proxy/stack?limit={n}
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `limit` | int | No | Max tasks (1-50, default 5) |
+
+Returns a prioritized, deduplicated task list using the same ordering as the in-app swipe view (in-progress first, then project order, clustered by parent and blocking order).
+
+```json
+{
+  "tasks": [
+    {
+      "id": "uuid",
+      "identifier": "ENG-42",
+      "title": "Fix login bug",
+      "description": "...",
+      "priority": 1,
+      "url": "https://linear.app/...",
+      "state": { "name": "In Progress", "type": "started" },
+      "labels": [],
+      "project": { "name": "Project Alpha" },
+      "parent": { "id": "uuid", "identifier": "ENG-40", "title": "Auth overhaul" },
+      "children": [{ "id": "uuid", "identifier": "ENG-43", "title": "Sub-task", "state": { "type": "unstarted" } }],
+      "blocksIds": []
+    }
+  ],
+  "total": 12
+}
+```
+
+`total` is the full count before `limit` is applied. `parent` is `null` for top-level issues; `children` is `[]` when there are none.
+
+#### Generate Prompt (deterministic)
+
+```
+GET /api/proxy/prompt/{identifier}/{templateKey}
+```
+
+Generates a deterministic, template-based prompt for an issue. `templateKey` must be a known template (e.g. `work-issue`, `plan`, `code-review`, `triage`, `breakdown`) — an unknown key returns `404`.
+
+```json
+{
+  "identifier": "ENG-42",
+  "templateKey": "plan",
+  "promptName": "Plan",
+  "prompt": "...",
+  "repo": "owner/repo"
+}
+```
+
+`repo` is parsed from the project description when present, otherwise `null`.
+
+#### Recommend Prompt (AI)
+
+```
+GET /api/proxy/recommend/{identifier}
+```
+
+Returns an AI-generated prompt recommendation. Requires an OpenRouter key (the token creator's OAuth connection, or the server's `OPENROUTER_API_KEY`); returns `503` when neither is configured. Like recap/brief, this calls an LLM and can exceed 25s — the server streams keepalive whitespace inside a single `200`, so don't set a client timeout below ~60s.
+
+```json
+{
+  "identifier": "ENG-42",
+  "reasoning": "Why this approach was chosen...",
+  "prompt": "...",
+  "truncated": false,
+  "repo": "owner/repo"
+}
+```
+
+#### Record Foreman Status
+
+```
+POST /api/proxy/foreman/status
+Content-Type: application/json
+
+{ "taskIdentifier": "ENG-42", "action": "implement", "status": "done", "summary": "Landed the fix in PR #42", "dispatchId": "optional-correlation-id" }
+```
+
+**Requires `readWrite`.** Append-only progress log (30-day TTL). Each entry is attributed to the posting token so the UI can group entries into sessions.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `taskIdentifier` | string | Yes | Linear identifier (max 200 chars) |
+| `action` | string | Yes | What the agent did (max 200 chars) |
+| `status` | string | Yes | Outcome, e.g. `done` / `blocked` (max 200 chars) |
+| `summary` | string | Yes | Human-readable detail (max 10000 chars) |
+| `dispatchId` | string | No | Correlation id for exact loop-join (max 200 chars) |
+
+Returns `201 { "success": true }`.
+
+#### List Foreman Status
+
+```
+GET /api/proxy/foreman/status?limit={n}&offset={n}&tokenId={id}&taskIdentifier={id}
+```
+
+Lists recent status entries, newest first. `limit` is 1-100 (default 20). Optional `tokenId` (filter to one session; use `__unattributed__` for entries with no token) and `taskIdentifier` (filter to one task thread).
+
+```json
+{
+  "items": [
+    {
+      "id": "...",
+      "taskIdentifier": "ENG-42",
+      "action": "implement",
+      "status": "done",
+      "summary": "...",
+      "timestamp": "2026-04-20T12:00:00.000Z",
+      "tokenId": "...",
+      "tokenLabel": "My Agent",
+      "dispatchId": "..."
+    }
+  ],
+  "total": 7
+}
+```
+
+`tokenId`, `tokenLabel`, and `dispatchId` appear only when they were recorded on the entry.
+
+#### List Foreman Sessions
+
+```
+GET /api/proxy/foreman/sessions
+```
+
+Groups status entries into sessions by posting token, so an observer can pick which agent to watch. Legacy entries without a token roll up into a synthetic `unattributed` session (`id` / `tokenId` of `__unattributed__` / `null`).
+
+```json
+{
+  "sessions": [
+    {
+      "id": "tokenId-or-__unattributed__",
+      "tokenId": "...",
+      "label": "My Agent",
+      "firstSeen": "2026-04-20T11:00:00.000Z",
+      "lastSeen": "2026-04-20T12:00:00.000Z",
+      "itemCount": 5,
+      "lastTaskIdentifier": "ENG-42",
+      "lastAction": "implement",
+      "lastStatus": "done"
+    }
+  ]
+}
+```
+
+#### List Foreman Task Threads
+
+```
+GET /api/proxy/foreman/tasks?tokenId={id}
+```
+
+Groups status entries by Linear task identifier ("what tasks have been touched?"). Optional `tokenId` narrows to a single session.
+
+```json
+{
+  "tasks": [
+    {
+      "taskIdentifier": "ENG-42",
+      "firstSeen": "2026-04-20T11:00:00.000Z",
+      "lastSeen": "2026-04-20T12:00:00.000Z",
+      "itemCount": 3,
+      "lastAction": "implement",
+      "lastStatus": "done"
+    }
+  ]
+}
+```
+
+#### Get Foreman Playbook
+
+```
+GET /api/proxy/foreman/playbook
+```
+
+Returns the foreman automation playbook as **plain text** (`text/plain`) — operating instructions for an agent orchestrating the stack → recommend → status loop.
 
 ### Write Endpoints
 
@@ -505,7 +690,7 @@ Note: `blocked-by` is a convenience type — internally it creates a `blocks` re
 DELETE /api/proxy/issues/{issueId}/relations/{relationId}
 ```
 
-Removes a relation. `relationId` is the relation's own `id` (the `id` field on each node returned by `GET /relations/{issueId}` or `GET /issue/{id}`), **not** an issue id.
+Removes a relation. `relationId` is the relation's own `id` (the `id` field on each node returned by `GET /relations/{issueId}` or `GET /issues/{id}`), **not** an issue id.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
