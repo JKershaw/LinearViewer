@@ -20,6 +20,7 @@ import { fetchProjects, fetchIssueContext, fetchRecommendationContext } from '..
 import { isRecommendationEnabled, getRecommendation } from '../lib/openrouter.js';
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { generateRecap } from '../lib/recap.js';
+import { generateBrief } from '../lib/brief.js';
 import { hashContext } from '../lib/recap-cache.js';
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, isTerminalState, NO_PROJECT_ID } from '../lib/tree.js';
 import { flattenTrees, sortIssuesForSwipe, applyBlockingOrder, clusterByParent } from '../lib/render-swipe.js';
@@ -124,6 +125,47 @@ function buildMockRecapFromContext(context) {
     });
   }
   return { done, pending, deviations };
+}
+
+/**
+ * Build a small deterministic brief (fixed-section Markdown) for test mode.
+ * Mirrors buildMockBrief in routes/workspace-api.js so the proxy and in-app
+ * paths return the same shape under test.
+ */
+function buildMockBriefFromContext(context) {
+  const issue = context.issue || {};
+  const remaining = (context.children || []).filter(c => !isTerminalState(c.state?.type));
+  const labels = issue.labels || [];
+
+  const lines = [];
+  lines.push('## Current');
+  lines.push(`${issue.title || 'Untitled task'} — ${issue.description ? issue.description.split('\n')[0] : 'No description provided.'}`);
+  if (remaining.length > 0) {
+    lines.push('');
+    lines.push(`Remaining: ${remaining.map(c => c.identifier).join(', ')}.`);
+  }
+  lines.push('');
+
+  lines.push('## Constraints');
+  if (labels.includes('blocked') || labels.includes('Blocked')) {
+    lines.push('- Task is blocked; resolve the blocker before proceeding.');
+  } else {
+    lines.push('- _None._');
+  }
+  lines.push('');
+
+  lines.push('## Open questions');
+  lines.push('- _None._');
+  lines.push('');
+
+  lines.push('## Changelog');
+  if ((context.comments || []).length > 0) {
+    lines.push(`- **Discussion captured in ${context.comments.length} comment(s)** — context lives in the thread, not yet folded into the spec.`);
+  } else {
+    lines.push('- _None._');
+  }
+
+  return lines.join('\n');
 }
 
 const LINEAR_API_ENDPOINT = 'https://api.linear.app/graphql';
@@ -522,12 +564,13 @@ const UPDATE_ISSUE_LABELS_MUTATION = gql`
  * @param {Object} options.proxyEventStore - Proxy event storage instance
  * @param {Object} options.foremanStore - Foreman status storage instance
  * @param {Object} options.recapCacheStore - Recap cache storage instance
+ * @param {Object} options.briefCacheStore - Brief cache storage instance
  * @param {Function} options.workspaceFromUrl - Middleware to validate workspace
  * @param {Function} options.getWorkspaceAccessToken - Function to get workspace access token by urlKey
  * @param {Function} options.getWorkspaceOpenRouterKey - Function to get OpenRouter API key from workspace sessions
  * @returns {Router} Express router with proxy routes
  */
-export function createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, workspaceFromUrl, getWorkspaceAccessToken, getWorkspaceOpenRouterKey, workspacePreferencesStore }) {
+export function createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, briefCacheStore, workspaceFromUrl, getWorkspaceAccessToken, getWorkspaceOpenRouterKey, workspacePreferencesStore }) {
   const router = Router();
 
   // =========================================================================
@@ -871,6 +914,21 @@ GET ${baseUrl}/api/proxy/recap/{identifier}
 
 POST ${baseUrl}/api/proxy/recap/{identifier}
   → Force-regenerate the recap and return the fresh result (same shape as GET above).
+
+GET ${baseUrl}/api/proxy/brief/{identifier}
+  → Current-state task brief: a distilled, present-tense version of the task
+    (Current / Constraints / Open questions / Changelog) for use as starting context.
+    Auto-regenerates when stale. Pass \`?noRefresh=1\` to skip regeneration.
+  → { "status": "fresh" | "stale" | "missing",
+      "identifier": "LIN-123",
+      "brief": "## Current\\n...\\n## Constraints\\n...\\n## Open questions\\n...\\n## Changelog\\n...",
+      "generatedAt": "2026-04-20T12:00:00Z",
+      "model": "..." }
+  → \`brief\` is fixed-section Markdown (not structured fields); read it before the
+    full description — it supersedes stale wording and folds in comments/subtask state.
+
+POST ${baseUrl}/api/proxy/brief/{identifier}
+  → Force-regenerate the brief and return the fresh result (same shape as GET above).
 
 GET ${baseUrl}/api/proxy/foreman/status
   → Recent foreman status entries
@@ -2243,6 +2301,250 @@ ${readEndpoints}${writeEndpoints}
       logEvent(req, '/api/proxy/recap', status);
       console.error('Proxy /recap POST error:', err.message);
       res.status(status).json({ error: 'Failed to generate recap', detail: graphqlErrorDetail(err) });
+    }
+  });
+
+  /**
+   * GET /api/proxy/brief/:identifier
+   * Returns the current-state task brief (fixed-section Markdown) for an issue.
+   * Auto-regenerates when missing or stale unless `?noRefresh=1` is passed.
+   */
+  router.get('/api/proxy/brief/:identifier', proxyLimiter, authenticateProxyToken, async (req, res) => {
+    try {
+      const accessToken = await getWorkspaceAccessToken(req.proxyUrlKey);
+      if (!accessToken) {
+        logEvent(req, '/api/proxy/brief', 503);
+        return res.status(503).json({ error: 'Workspace not available' });
+      }
+      if (!briefCacheStore) {
+        logEvent(req, '/api/proxy/brief', 503);
+        return res.status(503).json({ error: 'Brief cache not configured' });
+      }
+
+      const { identifier } = req.params;
+      if (!isValidIssueId(identifier)) {
+        logEvent(req, '/api/proxy/brief', 400);
+        return res.status(400).json({ error: 'Invalid identifier format' });
+      }
+
+      const noRefresh = req.query.noRefresh === '1' || req.query.noRefresh === 'true';
+      const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
+      const sessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
+
+      // Regenerate path calls OpenRouter; arm a Heroku H12 guard.
+      const keepalive = armKeepalive(res);
+      try {
+        let context;
+        if (isTestMode) {
+          context = await buildMockRecapContextFromFixtures(identifier);
+          if (!context) {
+            keepalive.stop();
+            logEvent(req, '/api/proxy/brief', 404);
+            return keepalive.send(404, { error: 'Issue not found' });
+          }
+        } else {
+          context = await withTimeout(fetchRecommendationContext(accessToken, identifier), GRAPHQL_TIMEOUT_MS);
+        }
+
+        const canonicalId = context.issue?.id || identifier;
+        const inputHash = hashContext(context);
+        const cached = await briefCacheStore.get(req.proxyUrlKey, canonicalId);
+
+        if (cached && cached.inputHash === inputHash) {
+          keepalive.stop();
+          logEvent(req, '/api/proxy/brief', 200);
+          return keepalive.send(200, {
+            status: 'fresh',
+            identifier: context.issue?.identifier || identifier,
+            brief: cached.brief,
+            generatedAt: cached.generatedAt,
+            model: cached.model
+          });
+        }
+
+        if (noRefresh) {
+          keepalive.stop();
+          logEvent(req, '/api/proxy/brief', 200);
+          return keepalive.send(200, {
+            status: cached ? 'stale' : 'missing',
+            identifier: context.issue?.identifier || identifier,
+            generatedAt: cached?.generatedAt,
+            model: cached?.model
+          });
+        }
+
+        if (!isTestMode && !isRecommendationEnabled(sessionApiKey)) {
+          keepalive.stop();
+          logEvent(req, '/api/proxy/brief', 503);
+          return keepalive.send(503, { error: 'AI brief is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.' });
+        }
+
+        const selectedModel = await resolveWorkspaceModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore });
+        let brief;
+        let modelUsed;
+        if (isTestMode) {
+          brief = buildMockBriefFromContext(context);
+          modelUsed = selectedModel;
+        } else {
+          const result = await withTimeout(
+            generateBrief(context.issue, context, { apiKey: sessionApiKey, model: selectedModel }),
+            MULTI_REQUEST_TIMEOUT_MS
+          );
+          brief = result.brief;
+          modelUsed = result.model;
+        }
+
+        await briefCacheStore.put(req.proxyUrlKey, canonicalId, {
+          inputHash,
+          brief,
+          model: modelUsed
+        });
+        const stored = await briefCacheStore.get(req.proxyUrlKey, canonicalId);
+
+        keepalive.stop();
+        logEvent(req, '/api/proxy/brief', 200);
+        keepalive.send(200, {
+          status: 'fresh',
+          identifier: context.issue?.identifier || identifier,
+          brief: stored?.brief ?? brief,
+          generatedAt: stored?.generatedAt ?? new Date(),
+          model: modelUsed
+        });
+      } catch (err) {
+        keepalive.stop();
+        let status;
+        let body;
+        if (err.message?.includes('not found')) {
+          status = 404;
+          body = { error: 'Issue not found' };
+        } else if (err.message?.includes('OpenRouter')) {
+          status = 503;
+          body = { error: 'AI service temporarily unavailable', detail: err.message };
+        } else {
+          status = graphqlErrorStatus(err);
+          body = { error: 'Failed to fetch brief', detail: graphqlErrorDetail(err) };
+          console.error('Proxy /brief error:', err.message);
+        }
+        logEvent(req, '/api/proxy/brief', status);
+        keepalive.send(status, body);
+      }
+    } catch (err) {
+      logEvent(req, '/api/proxy/brief', 500);
+      console.error('Proxy /brief outer error:', err.message);
+      res.status(500).json({ error: 'Failed to fetch brief', detail: err.message });
+    }
+  });
+
+  /**
+   * POST /api/proxy/brief/:identifier
+   * Force-regenerate the brief and return it.
+   */
+  router.post('/api/proxy/brief/:identifier', proxyLimiter, authenticateProxyToken, async (req, res) => {
+    try {
+      const accessToken = await getWorkspaceAccessToken(req.proxyUrlKey);
+      if (!accessToken) {
+        logEvent(req, '/api/proxy/brief', 503);
+        return res.status(503).json({ error: 'Workspace not available' });
+      }
+      if (!briefCacheStore) {
+        logEvent(req, '/api/proxy/brief', 503);
+        return res.status(503).json({ error: 'Brief cache not configured' });
+      }
+
+      const { identifier } = req.params;
+      if (!isValidIssueId(identifier)) {
+        logEvent(req, '/api/proxy/brief', 400);
+        return res.status(400).json({ error: 'Invalid identifier format' });
+      }
+
+      const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
+      const sessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
+
+      if (!isTestMode && !isRecommendationEnabled(sessionApiKey)) {
+        logEvent(req, '/api/proxy/brief', 503);
+        return res.status(503).json({ error: 'AI brief is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.' });
+      }
+
+      // Force-regenerate always calls OpenRouter; arm a Heroku H12 guard.
+      const keepalive = armKeepalive(res);
+      try {
+        let context;
+        if (isTestMode) {
+          context = await buildMockRecapContextFromFixtures(identifier);
+          if (!context) {
+            keepalive.stop();
+            logEvent(req, '/api/proxy/brief', 404);
+            return keepalive.send(404, { error: 'Issue not found' });
+          }
+        } else {
+          context = await withTimeout(fetchRecommendationContext(accessToken, identifier), GRAPHQL_TIMEOUT_MS);
+        }
+
+        const canonicalId = context.issue?.id || identifier;
+        const inputHash = hashContext(context);
+
+        const selectedModel = await resolveWorkspaceModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore });
+        let brief;
+        let modelUsed;
+        if (isTestMode) {
+          brief = buildMockBriefFromContext(context);
+          modelUsed = selectedModel;
+        } else {
+          const result = await withTimeout(
+            generateBrief(context.issue, context, { apiKey: sessionApiKey, model: selectedModel }),
+            MULTI_REQUEST_TIMEOUT_MS
+          );
+          brief = result.brief;
+          modelUsed = result.model;
+        }
+
+        await briefCacheStore.put(req.proxyUrlKey, canonicalId, {
+          inputHash,
+          brief,
+          model: modelUsed
+        });
+        const stored = await briefCacheStore.get(req.proxyUrlKey, canonicalId);
+
+        keepalive.stop();
+        logEvent(req, '/api/proxy/brief', 200);
+        keepalive.send(200, {
+          status: 'fresh',
+          identifier: context.issue?.identifier || identifier,
+          brief: stored?.brief ?? brief,
+          generatedAt: stored?.generatedAt ?? new Date(),
+          model: modelUsed
+        });
+      } catch (err) {
+        keepalive.stop();
+        let status;
+        let body;
+        if (err.message?.includes('not found')) {
+          status = 404;
+          body = { error: 'Issue not found' };
+        } else if (err.message?.includes('OpenRouter')) {
+          status = 503;
+          body = { error: 'AI service temporarily unavailable', detail: err.message };
+        } else {
+          status = graphqlErrorStatus(err);
+          body = { error: 'Failed to generate brief', detail: graphqlErrorDetail(err) };
+          console.error('Proxy /brief error:', err.message);
+        }
+        logEvent(req, '/api/proxy/brief', status);
+        keepalive.send(status, body);
+      }
+    } catch (err) {
+      if (err.message?.includes('not found')) {
+        logEvent(req, '/api/proxy/brief', 404);
+        return res.status(404).json({ error: 'Issue not found' });
+      }
+      if (err.message?.includes('OpenRouter')) {
+        logEvent(req, '/api/proxy/brief', 503);
+        return res.status(503).json({ error: 'AI service temporarily unavailable', detail: err.message });
+      }
+      const status = graphqlErrorStatus(err);
+      logEvent(req, '/api/proxy/brief', status);
+      console.error('Proxy /brief POST error:', err.message);
+      res.status(status).json({ error: 'Failed to generate brief', detail: graphqlErrorDetail(err) });
     }
   });
 

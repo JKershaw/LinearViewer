@@ -336,6 +336,73 @@ Response:
 }
 ```
 
+#### Get Task Recap
+
+```
+GET  /api/proxy/recap/{identifier}
+POST /api/proxy/recap/{identifier}
+```
+
+An AI-generated progress summary (`done` / `pending` / `deviations`). `GET` returns
+the cached recap and auto-regenerates when it's missing or stale; pass `?noRefresh=1`
+to read without regenerating. `POST` force-regenerates. Both accept a UUID or an
+identifier (e.g. `ENG-42`). Read scope is sufficient.
+
+Response:
+```json
+{
+  "status": "fresh",
+  "identifier": "ENG-42",
+  "recap": { "done": [], "pending": [], "deviations": [] },
+  "generatedAt": "2026-04-20T12:00:00Z",
+  "model": "anthropic/claude-haiku-4.5"
+}
+```
+
+With `?noRefresh=1` and no cache, `status` is `"missing"` (or `"stale"`) and the
+`recap` field is omitted.
+
+#### Get Task Brief
+
+```
+GET  /api/proxy/brief/{identifier}
+POST /api/proxy/brief/{identifier}
+```
+
+A current-state **brief**: a distilled, present-tense version of the task —
+`## Current`, `## Constraints`, `## Open questions`, `## Changelog` — intended as the
+starting context for an agent picking up an aged task. As a description grows, drifts,
+and pivots, the brief supersedes stale wording and folds in signal from comments and
+subtask state; on conflict the most recent/specific signal wins. Read it before
+trusting the raw description.
+
+`GET` returns the cached brief and auto-regenerates when missing or stale; pass
+`?noRefresh=1` to read without regenerating. `POST` force-regenerates. Both accept a
+UUID or an identifier. Read scope is sufficient.
+
+Unlike the other endpoints, `brief` is **fixed-section Markdown**, not structured
+fields. The headings are stable, so a consumer can recover individual sections
+deterministically while still handing the whole string to an LLM verbatim.
+
+Response:
+```json
+{
+  "status": "fresh",
+  "identifier": "ENG-42",
+  "brief": "## Current\n...\n## Constraints\n...\n## Open questions\n...\n## Changelog\n...",
+  "generatedAt": "2026-04-20T12:00:00Z",
+  "model": "anthropic/claude-haiku-4.5"
+}
+```
+
+With `?noRefresh=1` and no cache, `status` is `"missing"` (or `"stale"`) and the
+`brief` field is omitted.
+
+> Both recap and brief share the in-app cache, so an artifact generated in the swipe
+> UI is served straight from cache here (and vice versa). Regeneration calls OpenRouter
+> and can exceed 25s; the server streams whitespace keepalive bytes inside a single
+> `200` response, so don't set a client timeout below ~60s for these endpoints.
+
 ### Write Endpoints
 
 All write endpoints require a `readWrite` scoped token. Read-only tokens receive `403`.

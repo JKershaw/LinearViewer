@@ -803,7 +803,7 @@ async function getWorkspaceOpenRouterKey(urlKey, linearUserId) {
   return null;
 }
 
-app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, workspaceFromUrl, getWorkspaceAccessToken, getWorkspaceOpenRouterKey, workspacePreferencesStore }))
+app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, briefCacheStore, workspaceFromUrl, getWorkspaceAccessToken, getWorkspaceOpenRouterKey, workspacePreferencesStore }))
 
 // Mount workspace API routes (audit, prompts, recommendations, comments, images)
 app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore }))
