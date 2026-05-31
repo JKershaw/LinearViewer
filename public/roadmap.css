@@ -42,6 +42,48 @@
 }
 
 /* =============================================================================
+   Collapsible sections & layers (native <details>)
+   The top sections and the five detail layers fold; the digest recap stays
+   open. The default disclosure triangle is suppressed for a CLI-flavoured
+   marker, and collapsed layer summaries carry a state glyph so progress and
+   outcome are visible without expanding.
+   ============================================================================= */
+.roadmap-section > summary.roadmap-section-heading,
+details.roadmap-layer > summary.roadmap-layer-heading {
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.roadmap-section > summary::-webkit-details-marker,
+details.roadmap-layer > summary::-webkit-details-marker {
+  display: none;
+}
+
+.roadmap-section > summary::after,
+details.roadmap-layer > summary::after {
+  content: ' ▸';
+  color: var(--fg-dim);
+  font-size: 0.85em;
+}
+
+.roadmap-section[open] > summary::after,
+details.roadmap-layer[open] > summary::after {
+  content: ' ▾';
+}
+
+.roadmap-section > summary:hover,
+details.roadmap-layer > summary:hover {
+  color: var(--fg);
+}
+
+/* Per-layer state glyph on the summary, visible while the layer is collapsed. */
+details.roadmap-layer[data-state="streaming"] > summary::before { content: '◐ '; color: var(--fg-dim); }
+details.roadmap-layer[data-state="done"] > summary::before { content: '✓ '; color: var(--ok, #2a8f4e); }
+details.roadmap-layer[data-state="failed"] > summary::before { content: '✕ '; color: var(--accent, #c33); }
+details.roadmap-layer[data-state="not-available"] > summary::before { content: '○ '; color: var(--fg-dim); }
+
+/* =============================================================================
    Page Header
    ============================================================================= */
 .roadmap-header {

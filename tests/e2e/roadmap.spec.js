@@ -45,6 +45,8 @@ test.describe('Roadmap Page', () => {
 
     // Should have milestone section
     await expect(page.locator('.roadmap-milestones')).toBeVisible();
+    // By project is collapsed by default — expand it before inspecting cards.
+    await page.locator('.roadmap-milestones > summary').click();
     // Should have at least one milestone card
     const cards = page.locator('.roadmap-milestone-card');
     const count = await cards.count();
@@ -54,6 +56,24 @@ test.describe('Roadmap Page', () => {
     for (let i = 0; i < count; i++) {
       await expect(cards.nth(i).locator('.roadmap-progress-bar')).toBeVisible();
     }
+  });
+
+  test('major sections start collapsed; the ship-log recap is open when AI is off', async ({ page }) => {
+    await page.goto(ROADMAP_URL);
+    await page.waitForLoadState('networkidle');
+
+    const byProject = page.locator('.roadmap-milestones');
+    // By project is a <details>, collapsed by default — its cards are hidden.
+    expect(await byProject.evaluate(el => el.open)).toBe(false);
+    await expect(page.locator('.roadmap-milestone-card').first()).toBeHidden();
+
+    // Without AI there is no digest, so the ship log is the recap and starts open.
+    expect(await page.locator('.roadmap-ship-log').evaluate(el => el.open)).toBe(true);
+
+    // Clicking the summary expands the section.
+    await byProject.locator('> summary').click();
+    expect(await byProject.evaluate(el => el.open)).toBe(true);
+    await expect(page.locator('.roadmap-milestone-card').first()).toBeVisible();
   });
 
   test('milestone cards show progress without projection fields', async ({ page }) => {
@@ -284,6 +304,28 @@ test.describe('Roadmap Pipeline UI', () => {
     await expect(page.locator('[data-layer="trajectory"]')).toBeVisible();
     await expect(page.locator('[data-layer="north-star-reading"]')).toBeVisible();
     await expect(page.locator('[data-layer="gap"]')).toBeVisible();
+  });
+
+  test('digest stays open as the recap; the five detail layers fold and start collapsed', async ({ page }) => {
+    await page.goto(ROADMAP_URL);
+    await page.waitForLoadState('networkidle');
+
+    // The digest recap is always-visible (a div, not a collapsible details).
+    const digest = page.locator('[data-layer="digest"]');
+    expect(await digest.evaluate(el => el.tagName)).toBe('DIV');
+    await expect(digest.locator('.roadmap-layer-heading')).toBeVisible();
+
+    // The five detail layers are <details>, collapsed, with content hidden.
+    for (const layer of ['technical', 'product', 'trajectory', 'north-star-reading', 'gap']) {
+      const el = page.locator(`[data-layer="${layer}"]`);
+      expect(await el.evaluate(node => node.tagName)).toBe('DETAILS');
+      expect(await el.evaluate(node => node.open)).toBe(false);
+      await expect(el.locator('.roadmap-layer-content')).toBeHidden();
+    }
+
+    // Expanding one reveals its content area.
+    await page.locator('[data-layer="technical"] > summary').click();
+    await expect(page.locator('[data-layer="technical"] .roadmap-layer-content')).toBeVisible();
   });
 
   test('digest placeholder renders first (above the technical narrative)', async ({ page }) => {

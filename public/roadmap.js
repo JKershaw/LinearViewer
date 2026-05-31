@@ -112,6 +112,8 @@
     var section = layerSection(layerId);
     if (!section) return;
     section.setAttribute('data-state', 'idle');
+    // Collapsible layers re-collapse on a fresh run (reset to the recap view).
+    if (section.tagName === 'DETAILS') section.open = false;
     var status = section.querySelector('.roadmap-layer-status');
     var content = section.querySelector('.roadmap-layer-content');
     if (status) status.textContent = '';
@@ -164,6 +166,8 @@
 
       function fail(message) {
         section.setAttribute('data-state', 'failed');
+        // Auto-expand a collapsed layer that failed so its error + retry show.
+        if (section.tagName === 'DETAILS') section.open = true;
         if (status) {
           status.textContent = message || 'Failed';
           status.classList.remove('roadmap-layer-status--loading');
@@ -588,14 +592,12 @@
   function renderChat() {
     var section = document.querySelector('.roadmap-chat');
     if (!section || !hasAI) return;
+    // The chat section is a collapsible <details>; its heading lives in the
+    // server-rendered <summary>, so populate the body rather than the section.
+    var body = section.querySelector('.roadmap-chat-body') || section;
 
     // Conversation history for multi-turn context
     var chatHistory = [];
-
-    var heading = document.createElement('h2');
-    heading.className = 'roadmap-section-heading';
-    heading.textContent = '│ Chat';
-    section.appendChild(heading);
 
     var historyEl = document.createElement('div');
     historyEl.className = 'roadmap-chat-history';
@@ -614,8 +616,8 @@
 
     inputRow.appendChild(input);
     inputRow.appendChild(sendBtn);
-    section.appendChild(historyEl);
-    section.appendChild(inputRow);
+    body.appendChild(historyEl);
+    body.appendChild(inputRow);
 
     function sendMessage() {
       var question = input.value.trim();
