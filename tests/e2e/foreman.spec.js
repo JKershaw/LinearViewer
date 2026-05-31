@@ -274,6 +274,86 @@ test.describe('Foreman API - Recap Endpoint', () => {
   });
 });
 
+test.describe('Foreman API - Brief Endpoint', () => {
+  let readToken;
+
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/test/clear-proxy-tokens');
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
+
+    const resp = await page.goto('/test/create-proxy-token?scope=read&label=foreman-read');
+    const data = await resp.json();
+    readToken = data.token;
+  });
+
+  test('GET /api/proxy/brief auto-generates and returns fresh brief', async ({ request }) => {
+    const resp = await request.get('/api/proxy/brief/66666666-6666-6666-6666-666666666666', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(resp.status()).toBe(200);
+    const data = await resp.json();
+    expect(data.status).toBe('fresh');
+    expect(typeof data.brief).toBe('string');
+    expect(data.brief).toContain('## Current');
+    expect(data.brief).toContain('## Changelog');
+    expect(data.identifier).toBeTruthy();
+    expect(data.generatedAt).toBeTruthy();
+  });
+
+  test('GET /api/proxy/brief with noRefresh returns missing when no cache exists', async ({ request }) => {
+    // Distinct issue to stay independent of other tests that may have cached a brief
+    const resp = await request.get('/api/proxy/brief/dddddddd-dddd-dddd-dddd-ddddddddddde?noRefresh=1', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(resp.status()).toBe(200);
+    const data = await resp.json();
+    expect(['missing', 'stale', 'fresh']).toContain(data.status);
+  });
+
+  test('GET /api/proxy/brief accepts identifier format', async ({ request }) => {
+    const resp = await request.get('/api/proxy/brief/TEST-14', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(resp.status()).toBe(200);
+    const data = await resp.json();
+    expect(data.brief).toContain('## Current');
+  });
+
+  test('GET /api/proxy/brief with invalid identifier gets 400', async ({ request }) => {
+    const resp = await request.get('/api/proxy/brief/INVALID!!!', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(resp.status()).toBe(400);
+  });
+
+  test('GET /api/proxy/brief with nonexistent issue gets 404', async ({ request }) => {
+    const resp = await request.get('/api/proxy/brief/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(resp.status()).toBe(404);
+  });
+
+  test('GET /api/proxy/brief requires authentication', async ({ request }) => {
+    const resp = await request.get('/api/proxy/brief/LIN-1');
+    expect(resp.status()).toBe(401);
+  });
+
+  test('POST /api/proxy/brief force-regenerates the brief', async ({ request }) => {
+    const resp = await request.post('/api/proxy/brief/66666666-6666-6666-6666-666666666666', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(resp.status()).toBe(200);
+    const data = await resp.json();
+    expect(data.status).toBe('fresh');
+    expect(data.brief).toContain('## Current');
+  });
+
+  test('POST /api/proxy/brief requires authentication', async ({ request }) => {
+    const resp = await request.post('/api/proxy/brief/LIN-1');
+    expect(resp.status()).toBe(401);
+  });
+});
+
 test.describe('Foreman API - Status Endpoints', () => {
   let readToken;
   let writeToken;

@@ -274,6 +274,8 @@ The proxy allows authenticated users to generate secure tokens for external AI a
 - `GET /api/proxy/stack?limit={n}` - Sorted task stack with available prompts
 - `GET /api/proxy/prompt/:identifier/:templateKey` - Generate deterministic prompt
 - `GET /api/proxy/recommend/:identifier` - AI-generated prompt recommendation
+- `GET|POST /api/proxy/recap/:identifier` - Cached AI recap (done/pending/deviations); GET auto-regenerates when stale (`?noRefresh=1` to skip), POST force-regenerates
+- `GET|POST /api/proxy/brief/:identifier` - Current-state task brief as fixed-section Markdown (Current/Constraints/Open questions/Changelog); GET auto-regenerates when stale (`?noRefresh=1` to skip), POST force-regenerates
 - `GET /api/proxy/foreman/status` - List/post foreman status entries
 - `GET /api/proxy/foreman/playbook` - Foreman automation playbook
 
