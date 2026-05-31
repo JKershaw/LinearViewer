@@ -372,7 +372,20 @@ function renderCard(direction) {
   </div>`;
   }
 
-  // Prompts accordion (lazy loaded, fourth position) — only available when authenticated
+  // Brief accordion (lazy loaded) — only available when authenticated
+  if (urlKey) {
+    accordionHtml += `
+  <div class="swipe-card-accordion">
+    <div class="swipe-accordion-header" data-accordion="brief">
+      <span class="swipe-accordion-toggle">▶</span> Brief
+    </div>
+    <div class="swipe-accordion-body" data-accordion-body="brief">
+      <div class="brief-section" data-brief-placeholder="1"></div>
+    </div>
+  </div>`;
+  }
+
+  // Prompts accordion (lazy loaded, fifth position) — only available when authenticated
   if (urlKey) {
     const cached = window.PromptSection && window.PromptSection.getCached
       ? window.PromptSection.getCached(issue.id)
@@ -659,6 +672,20 @@ function handleAccordionClick(e) {
       const issue = filteredIssues[currentIndex];
       if (issue && urlKey) {
         window.RecapSection.init(placeholder, {
+          urlKey,
+          identifier: issue.identifier || issue.id
+        });
+      }
+    }
+  }
+
+  if (type === 'brief' && !isOpen) {
+    const placeholder = body.querySelector('[data-brief-placeholder="1"]');
+    if (placeholder && window.BriefSection) {
+      placeholder.removeAttribute('data-brief-placeholder');
+      const issue = filteredIssues[currentIndex];
+      if (issue && urlKey) {
+        window.BriefSection.init(placeholder, {
           urlKey,
           identifier: issue.identifier || issue.id
         });
