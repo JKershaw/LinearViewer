@@ -248,39 +248,7 @@ The proxy allows authenticated users to generate secure tokens for external AI a
 - `DELETE /workspace/:urlKey/api/proxy/tokens/:tokenId` - Revoke token
 - `GET /workspace/:urlKey/api/proxy/events` - View audit log
 
-**Consumer read endpoints** (Bearer token auth):
-- `GET /api/proxy/instructions` - Agent-readable API documentation
-- `GET /api/proxy/me` - Current user info
-- `GET /api/proxy/teams` - List teams
-- `GET /api/proxy/projects` - List active projects
-- `GET /api/proxy/issues?teamId={id}&limit={n}` - List issues (optional team filter, pagination)
-- `GET /api/proxy/issue/:issueId` - Full issue detail (comments, children, relations, cycle)
-- `GET /api/proxy/search?q={query}` - Search issues
-- `GET /api/proxy/states/:teamId` - Workflow states for a team
-- `GET /api/proxy/labels?teamId={id}` - Labels (id, name, color; optional team filter)
-- `GET /api/proxy/cycles?teamId={id}` - Cycles (optional team filter)
-- `GET /api/proxy/cycle/:cycleId` - Cycle detail with issues and progress
-- `GET /api/proxy/relations/:issueId` - Issue relations (blocks, blocked-by, related, duplicate)
-
-**Consumer write endpoints** (Bearer token auth, `readWrite` scope):
-- `POST /api/proxy/issues` - Create issue (supports `cycleId` for cycle assignment)
-- `PATCH /api/proxy/issue/:issueId` - Update issue (supports `cycleId`)
-- `POST /api/proxy/issue/:issueId/comments` - Add comment
-- `POST /api/proxy/issue/:issueId/relations` - Create relation
-- `DELETE /api/proxy/issue/:issueId/relations/:relationId` - Remove relation (relationId is the relation's own id, surfaced on read endpoints)
-- `POST /api/proxy/issue/:issueId/labels` - Add label
-- `DELETE /api/proxy/issue/:issueId/labels/:labelId` - Remove label
-
-**Foreman endpoints** (Bearer token auth, task automation):
-- `GET /api/proxy/stack?limit={n}` - Sorted task stack with available prompts
-- `GET /api/proxy/prompt/:identifier/:templateKey` - Generate deterministic prompt
-- `GET /api/proxy/recommend/:identifier` - AI-generated prompt recommendation
-- `GET|POST /api/proxy/recap/:identifier` - Cached AI recap (done/pending/deviations); GET auto-regenerates when stale (`?noRefresh=1` to skip), POST force-regenerates
-- `GET|POST /api/proxy/brief/:identifier` - Current-state task brief as fixed-section Markdown (Current/Constraints/Open questions/Changelog); GET auto-regenerates when stale (`?noRefresh=1` to skip), POST force-regenerates
-- `GET /api/proxy/foreman/status` - List/post foreman status entries
-- `GET /api/proxy/foreman/playbook` - Foreman automation playbook
-
-Issue IDs accept both UUIDs and identifiers (e.g., `LIN-123`). All issue responses include cycle and label details (id, name, color).
+Consumer endpoints are Bearer-token authenticated and fall into three groups: **read** (issues, teams, projects, cycles, labels, search, relations), **write** (`readWrite` scope — create/update issues, comments, relations, labels), and **foreman** task automation (stack, prompt, recommend, recap, brief, status, sessions, tasks, playbook). The full endpoint catalog, request/response shapes, and scope rules are the consumer contract and live in the integration guide — that's the source of truth, not this file. (Issue IDs accept both UUIDs and identifiers like `LIN-123`.)
 
 **See [docs/proxy-integration.md](docs/proxy-integration.md)** for the full consumer integration guide.
 

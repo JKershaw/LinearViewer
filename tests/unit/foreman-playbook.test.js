@@ -96,7 +96,7 @@ describe('buildForemanPlaybook (feature.linearMcp)', () => {
   test('defaults to curl for Linear writes when no features passed', () => {
     const text = buildForemanPlaybook({ baseUrl: BASE_URL, issue });
     assert.ok(text.includes('Make those writes using the proxy endpoints'));
-    assert.ok(text.includes('/api/proxy/issue/{identifier}/comments'));
+    assert.ok(text.includes('/api/proxy/issues/{identifier}/comments'));
     assert.ok(!text.includes('mcp__linear__save_comment'));
   });
 
@@ -142,7 +142,7 @@ describe('buildForemanPlaybook (feature.linearMcp)', () => {
       features: { linearMcp: true }
     });
     assert.ok(!text.includes('/tmp/comment.json'));
-    assert.ok(!text.includes('/api/proxy/issue/{identifier}/comments'));
+    assert.ok(!text.includes('/api/proxy/issues/{identifier}/comments'));
   });
 });
 
