@@ -47,10 +47,56 @@ describe('proxy relationship queries', () => {
     assert.match(q, /inverseRelations\s*\{/, 'must fetch inverseRelations');
   });
 
+  test('RELATIONS_QUERY selects relation id (needed for delete)', () => {
+    // Each relation node must expose its own `id` so consumers can discover
+    // the relationId to pass to DELETE .../relations/:relationId. Scope the
+    // assertion to the node fields BEFORE the nested relatedIssue/issue blocks,
+    // so a nested `id` (relatedIssue { id }) can't satisfy it by accident.
+    const q = extractQuery('RELATIONS_QUERY');
+    const relBlock = q.match(/relations\s*\{\s*nodes\s*\{([^}]*relatedIssue)/s);
+    const invBlock = q.match(/inverseRelations\s*\{\s*nodes\s*\{([^}]*issue)/s);
+    assert.ok(relBlock, 'outgoing relations node block not found');
+    assert.ok(invBlock, 'inverseRelations node block not found');
+    assert.match(relBlock[1], /\bid\b/, 'outgoing relation node must select id');
+    assert.match(invBlock[1], /\bid\b/, 'inverse relation node must select id');
+  });
+
   test('ISSUE_DETAIL_QUERY includes inverseRelations (blocked-by)', () => {
     const q = extractQuery('ISSUE_DETAIL_QUERY');
     assert.match(q, /relations\s*\{/, 'must fetch outgoing relations');
     assert.match(q, /inverseRelations\s*\{/, 'must fetch inverseRelations so agents can see blockers');
+  });
+
+  test('ISSUE_DETAIL_QUERY selects relation id on relation nodes', () => {
+    const q = extractQuery('ISSUE_DETAIL_QUERY');
+    // Isolate the two relation node blocks (relatedIssue = outgoing,
+    // issue-keyed = inverse) and confirm both carry id.
+    const relBlock = q.match(/relations\s*\{\s*nodes\s*\{([^}]*relatedIssue)/s);
+    const invBlock = q.match(/inverseRelations\s*\{\s*nodes\s*\{([^}]*issue)/s);
+    assert.ok(relBlock, 'outgoing relations node block not found');
+    assert.ok(invBlock, 'inverseRelations node block not found');
+    assert.match(relBlock[1], /\bid\b/, 'outgoing relation node must select id');
+    assert.match(invBlock[1], /\bid\b/, 'inverse relation node must select id');
+  });
+
+  test('DELETE_RELATION_MUTATION deletes by relation id', () => {
+    const q = extractQuery('DELETE_RELATION_MUTATION');
+    assert.match(q, /issueRelationDelete\s*\(\s*id:\s*\$id\s*\)/, 'must call issueRelationDelete(id: $id)');
+    assert.match(q, /\$id:\s*String!/, 'id must be String!');
+  });
+
+  test('DELETE relation handler is registered with write scope', () => {
+    // Route exists, keyed on relationId, gated by requireWriteScope, and
+    // validates the relation id as a UUID.
+    assert.match(
+      proxySource,
+      /router\.delete\(\s*'\/api\/proxy\/issue\/:issueId\/relations\/:relationId'[^)]*requireWriteScope/s,
+      'DELETE relations route must exist and require write scope'
+    );
+    const handlerStart = proxySource.indexOf("'/api/proxy/issue/:issueId/relations/:relationId'");
+    const block = proxySource.slice(handlerStart, handlerStart + 800);
+    assert.match(block, /UUID_REGEX\.test\(relationId\)/, 'must validate relationId as UUID');
+    assert.match(block, /DELETE_RELATION_MUTATION/, 'must call the delete mutation');
   });
 
   test('/relations handler wraps relations in the {nodes} shape', () => {
