@@ -28,13 +28,13 @@ curl -H "Authorization: Bearer YOUR_TOKEN" \
 
 # 3. Get full issue detail
 curl -H "Authorization: Bearer YOUR_TOKEN" \
-  https://your-instance.com/api/proxy/issue/LIN-42
+  https://your-instance.com/api/proxy/issues/LIN-42
 
 # 4. Add a comment (requires readWrite token)
 curl -X POST -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"body": "Analysis complete. See PR #42."}' \
-  https://your-instance.com/api/proxy/issue/ISSUE_UUID/comments
+  https://your-instance.com/api/proxy/issues/ISSUE_UUID/comments
 ```
 
 ## Authentication
@@ -188,7 +188,7 @@ Response includes pagination:
 #### Get Issue Detail
 
 ```
-GET /api/proxy/issue/{issueId}
+GET /api/proxy/issues/{issueId}
 ```
 
 `issueId` can be a UUID or identifier (e.g., `LIN-123`).
@@ -227,7 +227,7 @@ GET /api/proxy/search?q={query}
 |-----------|------|----------|-------------|
 | `q` | string | Yes | Search text (max 500 chars) |
 
-Returns up to 50 matching issues. Response shape matches the list issues endpoint (including the `parent` field). Children are not included in search results — call `GET /api/proxy/issue/{id}` for the full sub-issue hierarchy.
+Returns up to 50 matching issues. Response shape matches the list issues endpoint (including the `parent` field). Children are not included in search results — call `GET /api/proxy/issues/{id}` for the full sub-issue hierarchy.
 
 #### List Workflow States
 
@@ -447,7 +447,7 @@ Content-Type: application/json
 #### Update Issue
 
 ```
-PATCH /api/proxy/issue/{issueId}
+PATCH /api/proxy/issues/{issueId}
 Content-Type: application/json
 
 {
@@ -473,7 +473,7 @@ At least one field must be provided.
 #### Add Comment
 
 ```
-POST /api/proxy/issue/{issueId}/comments
+POST /api/proxy/issues/{issueId}/comments
 Content-Type: application/json
 
 { "body": "Investigation complete. Root cause identified." }
@@ -486,7 +486,7 @@ Content-Type: application/json
 #### Create Relation
 
 ```
-POST /api/proxy/issue/{issueId}/relations
+POST /api/proxy/issues/{issueId}/relations
 Content-Type: application/json
 
 { "type": "blocks", "relatedIssueId": "uuid" }
@@ -502,7 +502,7 @@ Note: `blocked-by` is a convenience type — internally it creates a `blocks` re
 #### Delete Relation
 
 ```
-DELETE /api/proxy/issue/{issueId}/relations/{relationId}
+DELETE /api/proxy/issues/{issueId}/relations/{relationId}
 ```
 
 Removes a relation. `relationId` is the relation's own `id` (the `id` field on each node returned by `GET /relations/{issueId}` or `GET /issue/{id}`), **not** an issue id.
@@ -520,7 +520,7 @@ Response:
 #### Add Label
 
 ```
-POST /api/proxy/issue/{issueId}/labels
+POST /api/proxy/issues/{issueId}/labels
 Content-Type: application/json
 
 { "labelId": "uuid" }
@@ -533,7 +533,7 @@ Note: Uses Read-Modify-Write internally. Concurrent label modifications may over
 #### Remove Label
 
 ```
-DELETE /api/proxy/issue/{issueId}/labels/{labelId}
+DELETE /api/proxy/issues/{issueId}/labels/{labelId}
 ```
 
 Idempotent — returns success if label was not present.
@@ -574,7 +574,7 @@ const task = tasks[0];
 console.log(`Working on: ${task.identifier} - ${task.title}`);
 
 // Get issue detail
-const issueRes = await fetch(`${API_BASE}/api/proxy/issue/${task.identifier}`, { headers });
+const issueRes = await fetch(`${API_BASE}/api/proxy/issues/${task.identifier}`, { headers });
 const issue = await issueRes.json();
 
 // Get AI-generated prompt
@@ -585,7 +585,7 @@ console.log(`AI reasoning: ${reasoning}`);
 console.log(`Prompt: ${prompt}`);
 
 // Do work, then post results as a comment
-await fetch(`${API_BASE}/api/proxy/issue/${issue.id}/comments`, {
+await fetch(`${API_BASE}/api/proxy/issues/${issue.id}/comments`, {
   method: 'POST',
   headers: { ...headers, 'Content-Type': 'application/json' },
   body: JSON.stringify({ body: '## Results\n\nAnalysis complete.' })

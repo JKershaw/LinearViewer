@@ -254,7 +254,7 @@ The proxy allows authenticated users to generate secure tokens for external AI a
 - `GET /api/proxy/teams` - List teams
 - `GET /api/proxy/projects` - List active projects
 - `GET /api/proxy/issues?teamId={id}&limit={n}` - List issues (optional team filter, pagination)
-- `GET /api/proxy/issue/:issueId` - Full issue detail (comments, children, relations, cycle)
+- `GET /api/proxy/issues/:issueId` - Full issue detail (comments, children, relations, cycle)
 - `GET /api/proxy/search?q={query}` - Search issues
 - `GET /api/proxy/states/:teamId` - Workflow states for a team
 - `GET /api/proxy/labels?teamId={id}` - Labels (id, name, color; optional team filter)
@@ -264,12 +264,12 @@ The proxy allows authenticated users to generate secure tokens for external AI a
 
 **Consumer write endpoints** (Bearer token auth, `readWrite` scope):
 - `POST /api/proxy/issues` - Create issue (supports `cycleId` for cycle assignment)
-- `PATCH /api/proxy/issue/:issueId` - Update issue (supports `cycleId`)
-- `POST /api/proxy/issue/:issueId/comments` - Add comment
-- `POST /api/proxy/issue/:issueId/relations` - Create relation
-- `DELETE /api/proxy/issue/:issueId/relations/:relationId` - Remove relation (relationId is the relation's own id, surfaced on read endpoints)
-- `POST /api/proxy/issue/:issueId/labels` - Add label
-- `DELETE /api/proxy/issue/:issueId/labels/:labelId` - Remove label
+- `PATCH /api/proxy/issues/:issueId` - Update issue (supports `cycleId`)
+- `POST /api/proxy/issues/:issueId/comments` - Add comment
+- `POST /api/proxy/issues/:issueId/relations` - Create relation
+- `DELETE /api/proxy/issues/:issueId/relations/:relationId` - Remove relation (relationId is the relation's own id, surfaced on read endpoints)
+- `POST /api/proxy/issues/:issueId/labels` - Add label
+- `DELETE /api/proxy/issues/:issueId/labels/:labelId` - Remove label
 
 **Foreman endpoints** (Bearer token auth, task automation):
 - `GET /api/proxy/stack?limit={n}` - Sorted task stack with available prompts

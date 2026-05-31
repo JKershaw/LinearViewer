@@ -859,7 +859,7 @@ GET ${baseUrl}/api/proxy/issues?teamId={teamId}&limit={n}
                    "cycle": { "id": "...", "number": 12 } }] }
   → Note: labels arrive as {nodes: [...]} (Linear GraphQL shape).
 
-GET ${baseUrl}/api/proxy/issue/{issueId}
+GET ${baseUrl}/api/proxy/issues/{issueId}
   → Full issue detail; issueId: UUID or identifier like "LIN-123"
   → {
       "id": "...", "identifier": "LIN-123", "title": "...", "description": "...",
@@ -969,28 +969,28 @@ POST ${baseUrl}/api/proxy/issues
   Body: { "teamId": "...", "title": "...", "description": "...", "projectId": "...", "stateId": "...", "assigneeId": "...", "priority": 0-4, "cycleId": "...", "parentId": "..." }
   → Create a new issue; set parentId (UUID) to create as a sub-issue
 
-PATCH ${baseUrl}/api/proxy/issue/{issueId}
+PATCH ${baseUrl}/api/proxy/issues/{issueId}
   Body: { "title": "...", "description": "...", "stateId": "...", "assigneeId": "...", "priority": 0-4, "cycleId": "...", "parentId": "...|null" }
   → Update an existing issue; set cycleId to assign/move to a cycle; set parentId to a UUID to re-parent, or null to promote to top-level
 
-POST ${baseUrl}/api/proxy/issue/{issueId}/comments
+POST ${baseUrl}/api/proxy/issues/{issueId}/comments
   Body: { "body": "..." }
   → Add a comment to an issue
 
-POST ${baseUrl}/api/proxy/issue/{issueId}/relations
+POST ${baseUrl}/api/proxy/issues/{issueId}/relations
   Body: { "type": "blocks|related|duplicate", "relatedIssueId": "..." }
   → Create a relation between issues
 
-DELETE ${baseUrl}/api/proxy/issue/{issueId}/relations/{relationId}
+DELETE ${baseUrl}/api/proxy/issues/{issueId}/relations/{relationId}
   → Remove a relation. relationId is the relation's own id (the \`id\` field on
     each node from GET /relations/{issueId} or GET /issue/{id}), NOT an issue id.
   → { "success": true }
 
-POST ${baseUrl}/api/proxy/issue/{issueId}/labels
+POST ${baseUrl}/api/proxy/issues/{issueId}/labels
   Body: { "labelId": "..." }
   → Add a label to an issue
 
-DELETE ${baseUrl}/api/proxy/issue/{issueId}/labels/{labelId}
+DELETE ${baseUrl}/api/proxy/issues/{issueId}/labels/{labelId}
   → Remove a label from an issue
 
 POST ${baseUrl}/api/proxy/foreman/status
@@ -1174,13 +1174,13 @@ ${readEndpoints}${writeEndpoints}
   });
 
   /**
-   * GET /api/proxy/issue/:issueId
+   * GET /api/proxy/issues/:issueId
    */
-  router.get('/api/proxy/issue/:issueId', proxyLimiter, authenticateProxyToken, async (req, res) => {
+  router.get('/api/proxy/issues/:issueId', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
       const client = await getClient(req.proxyUrlKey);
       if (!client) {
-        logEvent(req, '/api/proxy/issue', 503);
+        logEvent(req, '/api/proxy/issues/:id', 503);
         return res.status(503).json({ error: 'Workspace not available' });
       }
 
@@ -1188,13 +1188,13 @@ ${readEndpoints}${writeEndpoints}
 
       // Allow UUID or identifier (e.g., "LIN-123")
       if (!isValidIssueId(issueId)) {
-        logEvent(req, '/api/proxy/issue', 400);
+        logEvent(req, '/api/proxy/issues/:id', 400);
         return res.status(400).json({ error: 'Invalid issue ID format' });
       }
 
       const data = await client.request(ISSUE_DETAIL_QUERY, { id: issueId });
       if (!data.issue) {
-        logEvent(req, '/api/proxy/issue', 404);
+        logEvent(req, '/api/proxy/issues/:id', 404);
         return res.status(404).json({ error: 'Issue not found' });
       }
 
@@ -1206,11 +1206,11 @@ ${readEndpoints}${writeEndpoints}
         });
       }
 
-      logEvent(req, '/api/proxy/issue', 200);
+      logEvent(req, '/api/proxy/issues/:id', 200);
       res.json(data.issue);
     } catch (err) {
       const status = graphqlErrorStatus(err);
-      logEvent(req, '/api/proxy/issue', status);
+      logEvent(req, '/api/proxy/issues/:id', status);
       console.error('Proxy /issue error:', err.message);
       res.status(status).json({ error: 'Failed to fetch issue', detail: graphqlErrorDetail(err) });
     }
@@ -1479,20 +1479,20 @@ ${readEndpoints}${writeEndpoints}
   });
 
   /**
-   * PATCH /api/proxy/issue/:issueId
+   * PATCH /api/proxy/issues/:issueId
    * Update an issue.
    */
-  router.patch('/api/proxy/issue/:issueId', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
+  router.patch('/api/proxy/issues/:issueId', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
       const client = await getClient(req.proxyUrlKey);
       if (!client) {
-        logEvent(req, '/api/proxy/issue', 503);
+        logEvent(req, '/api/proxy/issues/:id', 503);
         return res.status(503).json({ error: 'Workspace not available' });
       }
 
       const { issueId } = req.params;
       if (!isValidIssueId(issueId)) {
-        logEvent(req, '/api/proxy/issue', 400);
+        logEvent(req, '/api/proxy/issues/:id', 400);
         return res.status(400).json({ error: 'Invalid issue ID format' });
       }
 
@@ -1528,30 +1528,30 @@ ${readEndpoints}${writeEndpoints}
       }
 
       if (Object.keys(input).length === 0) {
-        logEvent(req, '/api/proxy/issue', 400);
+        logEvent(req, '/api/proxy/issues/:id', 400);
         return res.status(400).json({ error: 'No valid fields to update' });
       }
 
       const data = await client.request(UPDATE_ISSUE_MUTATION, { id: issueId, input });
-      logEvent(req, '/api/proxy/issue', 200);
+      logEvent(req, '/api/proxy/issues/:id', 200);
       res.json(data.issueUpdate);
     } catch (err) {
       const status = graphqlErrorStatus(err);
-      logEvent(req, '/api/proxy/issue', status);
+      logEvent(req, '/api/proxy/issues/:id', status);
       console.error('Proxy update issue error:', err.message);
       res.status(status).json({ error: 'Failed to update issue', detail: graphqlErrorDetail(err) });
     }
   });
 
   /**
-   * POST /api/proxy/issue/:issueId/comments
+   * POST /api/proxy/issues/:issueId/comments
    * Add a comment to an issue.
    */
-  router.post('/api/proxy/issue/:issueId/comments', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
+  router.post('/api/proxy/issues/:issueId/comments', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
       const client = await getClient(req.proxyUrlKey);
       if (!client) {
-        logEvent(req, '/api/proxy/issue/comments', 503);
+        logEvent(req, '/api/proxy/issues/comments', 503);
         return res.status(503).json({ error: 'Workspace not available' });
       }
 
@@ -1562,7 +1562,7 @@ ${readEndpoints}${writeEndpoints}
 
       const { body } = req.body;
       if (!body || typeof body !== 'string') {
-        logEvent(req, '/api/proxy/issue/comments', 400);
+        logEvent(req, '/api/proxy/issues/comments', 400);
         return res.status(400).json({ error: 'body is required' });
       }
 
@@ -1577,25 +1577,25 @@ ${readEndpoints}${writeEndpoints}
       const data = await client.request(CREATE_COMMENT_MUTATION, {
         input: { issueId, body }
       });
-      logEvent(req, '/api/proxy/issue/comments', 201);
+      logEvent(req, '/api/proxy/issues/comments', 201);
       res.status(201).json(data.commentCreate);
     } catch (err) {
       const status = graphqlErrorStatus(err);
-      logEvent(req, '/api/proxy/issue/comments', status);
+      logEvent(req, '/api/proxy/issues/comments', status);
       console.error('Proxy create comment error:', err.message);
       res.status(status).json({ error: 'Failed to create comment', detail: graphqlErrorDetail(err) });
     }
   });
 
   /**
-   * POST /api/proxy/issue/:issueId/relations
+   * POST /api/proxy/issues/:issueId/relations
    * Create a relation between issues.
    */
-  router.post('/api/proxy/issue/:issueId/relations', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
+  router.post('/api/proxy/issues/:issueId/relations', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
       const client = await getClient(req.proxyUrlKey);
       if (!client) {
-        logEvent(req, '/api/proxy/issue/relations', 503);
+        logEvent(req, '/api/proxy/issues/relations', 503);
         return res.status(503).json({ error: 'Workspace not available' });
       }
 
@@ -1607,7 +1607,7 @@ ${readEndpoints}${writeEndpoints}
       const { type, relatedIssueId } = req.body;
       const validTypes = ['blocks', 'blocked-by', 'duplicate', 'related'];
       if (!type || !validTypes.includes(type)) {
-        logEvent(req, '/api/proxy/issue/relations', 400);
+        logEvent(req, '/api/proxy/issues/relations', 400);
         return res.status(400).json({ error: `type must be one of: ${validTypes.join(', ')}` });
       }
 
@@ -1624,18 +1624,18 @@ ${readEndpoints}${writeEndpoints}
       }
 
       const data = await client.request(CREATE_RELATION_MUTATION, { input });
-      logEvent(req, '/api/proxy/issue/relations', 201);
+      logEvent(req, '/api/proxy/issues/relations', 201);
       res.status(201).json(data.issueRelationCreate);
     } catch (err) {
       const status = graphqlErrorStatus(err);
-      logEvent(req, '/api/proxy/issue/relations', status);
+      logEvent(req, '/api/proxy/issues/relations', status);
       console.error('Proxy create relation error:', err.message);
       res.status(status).json({ error: 'Failed to create relation', detail: graphqlErrorDetail(err) });
     }
   });
 
   /**
-   * DELETE /api/proxy/issue/:issueId/relations/:relationId
+   * DELETE /api/proxy/issues/:issueId/relations/:relationId
    * Remove a relation. The relationId is the IssueRelation's own id, which is
    * exposed on the nodes returned by GET /relations/:issueId and GET /issue/:id.
    *
@@ -1644,11 +1644,11 @@ ${readEndpoints}${writeEndpoints}
    * (Linear deletes by relation id, not by the issue pair). It is validated for
    * format but not otherwise used.
    */
-  router.delete('/api/proxy/issue/:issueId/relations/:relationId', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
+  router.delete('/api/proxy/issues/:issueId/relations/:relationId', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
       const client = await getClient(req.proxyUrlKey);
       if (!client) {
-        logEvent(req, '/api/proxy/issue/relations', 503);
+        logEvent(req, '/api/proxy/issues/relations', 503);
         return res.status(503).json({ error: 'Workspace not available' });
       }
 
@@ -1657,23 +1657,23 @@ ${readEndpoints}${writeEndpoints}
         return res.status(400).json({ error: 'Invalid issue ID format' });
       }
       if (!UUID_REGEX.test(relationId)) {
-        logEvent(req, '/api/proxy/issue/relations', 400);
+        logEvent(req, '/api/proxy/issues/relations', 400);
         return res.status(400).json({ error: 'Invalid relation ID format' });
       }
 
       const data = await client.request(DELETE_RELATION_MUTATION, { id: relationId });
-      logEvent(req, '/api/proxy/issue/relations', 200);
+      logEvent(req, '/api/proxy/issues/relations', 200);
       res.json(data.issueRelationDelete);
     } catch (err) {
       const status = graphqlErrorStatus(err);
-      logEvent(req, '/api/proxy/issue/relations', status);
+      logEvent(req, '/api/proxy/issues/relations', status);
       console.error('Proxy delete relation error:', err.message);
       res.status(status).json({ error: 'Failed to delete relation', detail: graphqlErrorDetail(err) });
     }
   });
 
   /**
-   * POST /api/proxy/issue/:issueId/labels
+   * POST /api/proxy/issues/:issueId/labels
    * Add a label to an issue.
    *
    * Note: This performs a Read-Modify-Write cycle (fetch current labels, then
@@ -1682,11 +1682,11 @@ ${readEndpoints}${writeEndpoints}
    * UI and this proxy simultaneously) could overwrite each other. This is an
    * inherent limitation of Linear's label API — there is no atomic add/remove.
    */
-  router.post('/api/proxy/issue/:issueId/labels', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
+  router.post('/api/proxy/issues/:issueId/labels', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
       const client = await getClient(req.proxyUrlKey);
       if (!client) {
-        logEvent(req, '/api/proxy/issue/labels', 503);
+        logEvent(req, '/api/proxy/issues/labels', 503);
         return res.status(503).json({ error: 'Workspace not available' });
       }
 
@@ -1697,20 +1697,20 @@ ${readEndpoints}${writeEndpoints}
 
       const { labelId } = req.body;
       if (!labelId || !UUID_REGEX.test(labelId)) {
-        logEvent(req, '/api/proxy/issue/labels', 400);
+        logEvent(req, '/api/proxy/issues/labels', 400);
         return res.status(400).json({ error: 'Valid labelId is required' });
       }
 
       // Fetch current labels
       const issueData = await client.request(ISSUE_LABELS_QUERY, { issueId });
       if (!issueData.issue) {
-        logEvent(req, '/api/proxy/issue/labels', 404);
+        logEvent(req, '/api/proxy/issues/labels', 404);
         return res.status(404).json({ error: 'Issue not found' });
       }
 
       const currentLabelIds = (issueData.issue.labels?.nodes || []).map(l => l.id);
       if (currentLabelIds.includes(labelId)) {
-        logEvent(req, '/api/proxy/issue/labels', 200);
+        logEvent(req, '/api/proxy/issues/labels', 200);
         return res.json({ success: true, message: 'Label already present' });
       }
 
@@ -1718,28 +1718,28 @@ ${readEndpoints}${writeEndpoints}
         id: issueId,
         input: { labelIds: [...currentLabelIds, labelId] }
       });
-      logEvent(req, '/api/proxy/issue/labels', 200);
+      logEvent(req, '/api/proxy/issues/labels', 200);
       res.json(data.issueUpdate);
     } catch (err) {
       const status = graphqlErrorStatus(err);
-      logEvent(req, '/api/proxy/issue/labels', status);
+      logEvent(req, '/api/proxy/issues/labels', status);
       console.error('Proxy add label error:', err.message);
       res.status(status).json({ error: 'Failed to add label', detail: graphqlErrorDetail(err) });
     }
   });
 
   /**
-   * DELETE /api/proxy/issue/:issueId/labels/:labelId
+   * DELETE /api/proxy/issues/:issueId/labels/:labelId
    * Remove a label from an issue.
    *
    * Note: Same Read-Modify-Write race condition caveat as the add-label
    * endpoint above. See POST /labels comment for details.
    */
-  router.delete('/api/proxy/issue/:issueId/labels/:labelId', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
+  router.delete('/api/proxy/issues/:issueId/labels/:labelId', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
       const client = await getClient(req.proxyUrlKey);
       if (!client) {
-        logEvent(req, '/api/proxy/issue/labels', 503);
+        logEvent(req, '/api/proxy/issues/labels', 503);
         return res.status(503).json({ error: 'Workspace not available' });
       }
 
@@ -1754,7 +1754,7 @@ ${readEndpoints}${writeEndpoints}
       // Fetch current labels
       const issueData = await client.request(ISSUE_LABELS_QUERY, { issueId });
       if (!issueData.issue) {
-        logEvent(req, '/api/proxy/issue/labels', 404);
+        logEvent(req, '/api/proxy/issues/labels', 404);
         return res.status(404).json({ error: 'Issue not found' });
       }
 
@@ -1762,7 +1762,7 @@ ${readEndpoints}${writeEndpoints}
       const filtered = currentLabelIds.filter(id => id !== labelId);
 
       if (filtered.length === currentLabelIds.length) {
-        logEvent(req, '/api/proxy/issue/labels', 200);
+        logEvent(req, '/api/proxy/issues/labels', 200);
         return res.json({ success: true, message: 'Label not present' });
       }
 
@@ -1770,11 +1770,11 @@ ${readEndpoints}${writeEndpoints}
         id: issueId,
         input: { labelIds: filtered }
       });
-      logEvent(req, '/api/proxy/issue/labels', 200);
+      logEvent(req, '/api/proxy/issues/labels', 200);
       res.json(data.issueUpdate);
     } catch (err) {
       const status = graphqlErrorStatus(err);
-      logEvent(req, '/api/proxy/issue/labels', status);
+      logEvent(req, '/api/proxy/issues/labels', status);
       console.error('Proxy remove label error:', err.message);
       res.status(status).json({ error: 'Failed to remove label', detail: graphqlErrorDetail(err) });
     }

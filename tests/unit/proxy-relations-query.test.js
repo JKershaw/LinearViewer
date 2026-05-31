@@ -10,7 +10,7 @@
  *    argument is `String!`. The type mismatch fails validation for every
  *    input, so GET /api/proxy/relations/:issueId 500'd on every call.
  *  - ISSUE_DETAIL_QUERY fetched only `relations` (outgoing), omitting
- *    `inverseRelations`, so GET /api/proxy/issue/:issueId could not surface
+ *    `inverseRelations`, so GET /api/proxy/issues/:issueId could not surface
  *    blocked-by relationships.
  *
  * Run with: node --test tests/unit/proxy-relations-query.test.js
@@ -90,10 +90,10 @@ describe('proxy relationship queries', () => {
     // validates the relation id as a UUID.
     assert.match(
       proxySource,
-      /router\.delete\(\s*'\/api\/proxy\/issue\/:issueId\/relations\/:relationId'[^)]*requireWriteScope/s,
+      /router\.delete\(\s*'\/api\/proxy\/issues\/:issueId\/relations\/:relationId'[^)]*requireWriteScope/s,
       'DELETE relations route must exist and require write scope'
     );
-    const handlerStart = proxySource.indexOf("'/api/proxy/issue/:issueId/relations/:relationId'");
+    const handlerStart = proxySource.indexOf("'/api/proxy/issues/:issueId/relations/:relationId'");
     const block = proxySource.slice(handlerStart, handlerStart + 800);
     assert.match(block, /UUID_REGEX\.test\(relationId\)/, 'must validate relationId as UUID');
     assert.match(block, /DELETE_RELATION_MUTATION/, 'must call the delete mutation');

@@ -332,7 +332,7 @@ test.describe('Proxy API - Consumer Endpoints', () => {
   });
 
   test('issue detail validates ID format', async ({ request }) => {
-    const resp = await request.get('/api/proxy/issue/not-valid!!!', {
+    const resp = await request.get('/api/proxy/issues/not-valid!!!', {
       headers: { Authorization: `Bearer ${readToken}` }
     });
     expect(resp.status()).toBe(400);
@@ -346,7 +346,7 @@ test.describe('Proxy API - Consumer Endpoints', () => {
   });
 
   test('comment endpoint validates body', async ({ request }) => {
-    const resp = await request.post('/api/proxy/issue/11111111-1111-1111-1111-111111111111/comments', {
+    const resp = await request.post('/api/proxy/issues/11111111-1111-1111-1111-111111111111/comments', {
       headers: {
         Authorization: `Bearer ${writeToken}`,
         'Content-Type': 'application/json'
@@ -359,7 +359,7 @@ test.describe('Proxy API - Consumer Endpoints', () => {
   });
 
   test('relation endpoint validates type', async ({ request }) => {
-    const resp = await request.post('/api/proxy/issue/11111111-1111-1111-1111-111111111111/relations', {
+    const resp = await request.post('/api/proxy/issues/11111111-1111-1111-1111-111111111111/relations', {
       headers: {
         Authorization: `Bearer ${writeToken}`,
         'Content-Type': 'application/json'
@@ -372,7 +372,7 @@ test.describe('Proxy API - Consumer Endpoints', () => {
   });
 
   test('delete relation endpoint validates relationId format', async ({ request }) => {
-    const resp = await request.delete('/api/proxy/issue/11111111-1111-1111-1111-111111111111/relations/not-a-uuid', {
+    const resp = await request.delete('/api/proxy/issues/11111111-1111-1111-1111-111111111111/relations/not-a-uuid', {
       headers: { Authorization: `Bearer ${writeToken}` }
     });
     expect(resp.status()).toBe(400);
@@ -381,7 +381,7 @@ test.describe('Proxy API - Consumer Endpoints', () => {
   });
 
   test('delete relation endpoint requires write scope', async ({ request }) => {
-    const resp = await request.delete('/api/proxy/issue/11111111-1111-1111-1111-111111111111/relations/22222222-2222-2222-2222-222222222222', {
+    const resp = await request.delete('/api/proxy/issues/11111111-1111-1111-1111-111111111111/relations/22222222-2222-2222-2222-222222222222', {
       headers: { Authorization: `Bearer ${readToken}` }
     });
     expect(resp.status()).toBe(403);
@@ -390,7 +390,7 @@ test.describe('Proxy API - Consumer Endpoints', () => {
   });
 
   test('label add endpoint validates labelId', async ({ request }) => {
-    const resp = await request.post('/api/proxy/issue/11111111-1111-1111-1111-111111111111/labels', {
+    const resp = await request.post('/api/proxy/issues/11111111-1111-1111-1111-111111111111/labels', {
       headers: {
         Authorization: `Bearer ${writeToken}`,
         'Content-Type': 'application/json'
@@ -403,7 +403,7 @@ test.describe('Proxy API - Consumer Endpoints', () => {
   });
 
   test('update endpoint requires valid fields', async ({ request }) => {
-    const resp = await request.patch('/api/proxy/issue/11111111-1111-1111-1111-111111111111', {
+    const resp = await request.patch('/api/proxy/issues/11111111-1111-1111-1111-111111111111', {
       headers: {
         Authorization: `Bearer ${writeToken}`,
         'Content-Type': 'application/json'
