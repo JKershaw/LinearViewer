@@ -20,7 +20,8 @@ import {
 } from '../../lib/prompts/roadmap-product-template.js';
 import {
   buildRoadmapTrajectoryMessages,
-  buildRoadmapTrajectoryPrompt
+  buildRoadmapTrajectoryPrompt,
+  summarizeTrajectoryPace
 } from '../../lib/prompts/roadmap-trajectory-template.js';
 import {
   buildRoadmapNorthStarMessages,
@@ -30,6 +31,10 @@ import {
   buildRoadmapGapMessages,
   buildRoadmapGapPrompt
 } from '../../lib/prompts/roadmap-gap-template.js';
+import {
+  buildRoadmapDigestMessages,
+  buildRoadmapDigestPrompt
+} from '../../lib/prompts/roadmap-digest-template.js';
 
 // =============================================================================
 // Shared fixtures
@@ -63,6 +68,33 @@ The work suggests a direction toward smoother user entry.`;
 const SAMPLE_NS_READING = `Harbour OS: aligned — onboarding work directly serves "time-to-first-value".
 Overall: largely aligned to the simplicity goal.`;
 
+// Richer model exercising the deterministic temporal signals (velocity trend,
+// recent-vs-prior shift, cycle time) that the trajectory layer now receives.
+const PACE_MODEL = {
+  velocity: {
+    tasksPerWeek: 4,
+    trend: 'increasing',
+    weeklyData: [
+      { week: '2026-W14', tasks: 2, points: 0 },
+      { week: '2026-W15', tasks: 3, points: 0 },
+      { week: '2026-W16', tasks: 5, points: 0 },
+      { week: '2026-W17', tasks: 6, points: 0 }
+    ]
+  },
+  milestones: [{
+    name: 'Harbour OS',
+    progressPercent: 40,
+    totalTasks: 10,
+    remainingTasks: 6,
+    tasksInQueue: [],
+    recentlyCompleted: [
+      { title: 'Add user onboarding flow', createdAt: '2026-05-01T00:00:00Z', completedAt: '2026-05-10T00:00:00Z', estimate: 2 },
+      { title: 'Wire up auth', createdAt: '2026-05-02T00:00:00Z', completedAt: '2026-05-06T00:00:00Z', estimate: 1 }
+    ]
+  }],
+  criticalPaths: {}
+};
+
 // =============================================================================
 // Cross-cutting rules — apply to every layer
 // =============================================================================
@@ -83,6 +115,10 @@ function assertCrossCuttingRules(systemContent, layerLabel) {
   assert.ok(
     /cite|specific/i.test(systemContent),
     `${layerLabel}: system should require citing specific items`
+  );
+  assert.ok(
+    /first mention|short-form|short reference/i.test(systemContent),
+    `${layerLabel}: system should permit a short-form reference after first mention`
   );
 }
 
@@ -217,6 +253,56 @@ describe('buildRoadmapTrajectoryMessages (layer 3a — trajectory)', () => {
     const prompt = buildRoadmapTrajectoryPrompt(SAMPLE_MODEL, SAMPLE_TECH, SAMPLE_PRODUCT);
     assert.strictEqual(typeof prompt, 'string');
     assert.ok(prompt.length > 100);
+  });
+
+  test('system prompt instructs grounding hedged direction in observed pace', () => {
+    const messages = buildRoadmapTrajectoryMessages(PACE_MODEL, SAMPLE_TECH, SAMPLE_PRODUCT);
+    const system = messages[0].content;
+    assert.ok(/DELIVERY PACE/.test(system),
+      'should reference the DELIVERY PACE block');
+    assert.ok(/observed|measurement of the past|not a forecast/i.test(system),
+      'should frame pace as observed measurement, not a forecast');
+  });
+
+  test('user message embeds the observed delivery pace block', () => {
+    const messages = buildRoadmapTrajectoryMessages(PACE_MODEL, SAMPLE_TECH, SAMPLE_PRODUCT);
+    const user = messages[1].content;
+    assert.ok(/DELIVERY PACE/.test(user), 'pace block must reach the model');
+    assert.ok(/Velocity trend: increasing/.test(user), 'should surface velocity trend');
+    assert.ok(/Recent shift/.test(user), 'should surface recent velocity shift');
+    assert.ok(/cycle time/i.test(user), 'should surface cycle time');
+  });
+});
+
+// =============================================================================
+// Trajectory delivery-pace summary (Win #2 — temporal signals)
+// =============================================================================
+
+describe('summarizeTrajectoryPace', () => {
+  test('surfaces tasks/week, trend, recent shift, and cycle time when present', () => {
+    const pace = summarizeTrajectoryPace(PACE_MODEL);
+    assert.ok(/DELIVERY PACE/.test(pace));
+    assert.ok(/Tasks shipped per week \(90-day avg\): 4/.test(pace));
+    assert.ok(/Velocity trend: increasing/.test(pace));
+    // last 2 weeks (5,6 -> 5.5) vs prior 2 (2,3 -> 2.5) = up 120%
+    assert.ok(/Recent shift: last 2 weeks 5.5\/wk vs prior 2 weeks 2.5\/wk \(up 120%\)/.test(pace),
+      `recent shift line missing/wrong:\n${pace}`);
+    // cycle times 9d and 4d -> median 9, avg 6.5
+    assert.ok(/Typical cycle time: 9d median \(avg 6.5d, sample 2 tasks\)/.test(pace),
+      `cycle time line missing/wrong:\n${pace}`);
+  });
+
+  test('degrades to just the average when temporal signals are sparse', () => {
+    const pace = summarizeTrajectoryPace(SAMPLE_MODEL);
+    assert.ok(/DELIVERY PACE/.test(pace));
+    assert.ok(/Tasks shipped per week \(90-day avg\): 4/.test(pace));
+    // No trend, weeklyData, or createdAt timestamps -> no shift/cycle-time lines
+    assert.ok(!/Recent shift/.test(pace), 'should omit shift when no weekly data');
+    assert.ok(!/cycle time/i.test(pace), 'should omit cycle time when no created timestamps');
+  });
+
+  test('does not throw on an empty model', () => {
+    assert.doesNotThrow(() => summarizeTrajectoryPace({}));
   });
 });
 
@@ -354,6 +440,105 @@ describe('buildRoadmapGapMessages (layer 4 — gap)', () => {
 
   test('backward-compatible buildRoadmapGapPrompt returns a string', () => {
     const prompt = buildRoadmapGapPrompt(SAMPLE_NORTH_STAR, SAMPLE_TRAJECTORY, SAMPLE_NS_READING);
+    assert.strictEqual(typeof prompt, 'string');
+    assert.ok(prompt.length > 100);
+  });
+});
+
+// =============================================================================
+// Digest — the at-a-glance synthesis layer (generates last, renders first)
+// =============================================================================
+
+describe('buildRoadmapDigestMessages (digest — synthesis layer)', () => {
+  const FULL_INPUTS = {
+    northStar: SAMPLE_NORTH_STAR,
+    technical: SAMPLE_TECH,
+    product: SAMPLE_PRODUCT,
+    trajectory: SAMPLE_TRAJECTORY,
+    nsReading: SAMPLE_NS_READING,
+    gap: 'Where they agree: onboarding. Where they diverge: none material. Questions: should mini-foreman serve intent-legibility?'
+  };
+
+  test('returns [system, user] messages array', () => {
+    const messages = buildRoadmapDigestMessages(FULL_INPUTS);
+    assert.ok(Array.isArray(messages));
+    assert.strictEqual(messages.length, 2);
+    assert.strictEqual(messages[0].role, 'system');
+    assert.strictEqual(messages[1].role, 'user');
+  });
+
+  test('system prompt requires exactly the four slots in order', () => {
+    const system = buildRoadmapDigestMessages(FULL_INPUTS)[0].content;
+    for (const slot of ['SHIPPED', 'WHERE WE ARE', 'THE RISK', 'THE DECISION']) {
+      assert.ok(system.includes(slot), `should require the ${slot} slot`);
+    }
+    // Order: SHIPPED < WHERE WE ARE < THE RISK < THE DECISION
+    assert.ok(
+      system.indexOf('SHIPPED') < system.indexOf('WHERE WE ARE') &&
+      system.indexOf('WHERE WE ARE') < system.indexOf('THE RISK') &&
+      system.indexOf('THE RISK') < system.indexOf('THE DECISION'),
+      'slots should be specified in reader-priority order'
+    );
+  });
+
+  test('system prompt forbids a reasoning section and preamble (lede only)', () => {
+    const system = buildRoadmapDigestMessages(FULL_INPUTS)[0].content;
+    assert.ok(/no reasoning section|no preamble/i.test(system),
+      'digest must not emit a reasoning block — it is a clean lede');
+  });
+
+  test('THE RISK slot unifies delivery risk and alignment/drift risk', () => {
+    const system = buildRoadmapDigestMessages(FULL_INPUTS)[0].content;
+    assert.ok(/unif/i.test(system), 'should instruct unifying the two risk kinds');
+    assert.ok(/delivery risk/i.test(system) && /(alignment|drift)/i.test(system),
+      'should name both delivery risk and alignment/drift risk');
+  });
+
+  test('THE DECISION slot escalates the open question without answering it', () => {
+    const system = buildRoadmapDigestMessages(FULL_INPUTS)[0].content;
+    assert.ok(/decision/i.test(system) && /do not answer/i.test(system),
+      'should ask for the open decision and forbid answering it');
+  });
+
+  test('caps length for a scannable lede', () => {
+    const system = buildRoadmapDigestMessages(FULL_INPUTS)[0].content;
+    assert.ok(/150 words|under ~150|brevity/i.test(system),
+      'should cap the digest to a short lede');
+  });
+
+  test('user message embeds the prior layers it synthesises', () => {
+    const user = buildRoadmapDigestMessages(FULL_INPUTS)[1].content;
+    assert.ok(user.includes(SAMPLE_TECH), 'must embed technical narrative');
+    assert.ok(user.includes(SAMPLE_PRODUCT), 'must embed product perspective');
+    assert.ok(user.includes(SAMPLE_TRAJECTORY), 'must embed trajectory');
+    assert.ok(user.includes(SAMPLE_NS_READING), 'must embed north star reading');
+    assert.ok(user.includes(SAMPLE_NORTH_STAR), 'must embed the north star itself');
+  });
+
+  test('honors cross-cutting rules', () => {
+    assertCrossCuttingRules(buildRoadmapDigestMessages(FULL_INPUTS)[0].content, 'digest');
+  });
+
+  test('degrades cleanly with no north star (risk from delivery only)', () => {
+    const messages = buildRoadmapDigestMessages({
+      technical: SAMPLE_TECH,
+      product: SAMPLE_PRODUCT,
+      trajectory: SAMPLE_TRAJECTORY
+      // no northStar / nsReading / gap
+    });
+    const system = messages[0].content;
+    const user = messages[1].content;
+    assert.ok(/no north star is set/i.test(system),
+      'system should acknowledge the missing north star and adjust the risk/decision slots');
+    assert.ok(/delivery risk only/i.test(system),
+      'system should tell it to draw the risk from delivery only');
+    // The user message must not fabricate empty NS sections.
+    assert.ok(!/NORTH STAR READING/.test(user), 'should omit the ns-reading section when absent');
+    assert.ok(!/GAP ANALYSIS/.test(user), 'should omit the gap section when absent');
+  });
+
+  test('backward-compatible buildRoadmapDigestPrompt returns a string', () => {
+    const prompt = buildRoadmapDigestPrompt(FULL_INPUTS);
     assert.strictEqual(typeof prompt, 'string');
     assert.ok(prompt.length > 100);
   });

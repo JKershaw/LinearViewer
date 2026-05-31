@@ -2,14 +2,15 @@
  * Roadmap Page Client-Side Logic
  *
  * Reads window.__ROADMAP_DATA__ and handles:
- * - The five-layer narrative pipeline (technical → product → trajectory ∥
- *   north-star reading → gap), each streamed into its own server-rendered
- *   placeholder section
+ * - The narrative pipeline (technical → product → trajectory ∥ north-star
+ *   reading → gap → digest), each streamed into its own server-rendered
+ *   placeholder section. The digest is the synthesis layer: it generates last
+ *   but renders first, at the top of the reading.
  * - North star textarea: loads on page render, saves on blur
  * - AI chat Q&A with conversation history (SSE streaming)
  *
  * The page heading, ship log, milestone cards, north star textarea, and
- * the five layer placeholders are server-rendered. This script wires up
+ * the layer placeholders are server-rendered. This script wires up
  * interaction when AI is available.
  *
  * Loaded only on the /roadmap page.
@@ -93,7 +94,7 @@
   // Pipeline (AI) — five layers streamed into server-rendered placeholders
   // =========================================================================
 
-  var LAYER_IDS = ['technical', 'product', 'trajectory', 'north-star-reading', 'gap'];
+  var LAYER_IDS = ['digest', 'technical', 'product', 'trajectory', 'north-star-reading', 'gap'];
 
   function layerSection(layerId) {
     return document.querySelector('[data-layer="' + layerId + '"]');
@@ -111,6 +112,8 @@
     var section = layerSection(layerId);
     if (!section) return;
     section.setAttribute('data-state', 'idle');
+    // Collapsible layers re-collapse on a fresh run (reset to the recap view).
+    if (section.tagName === 'DETAILS') section.open = false;
     var status = section.querySelector('.roadmap-layer-status');
     var content = section.querySelector('.roadmap-layer-content');
     if (status) status.textContent = '';
@@ -163,6 +166,8 @@
 
       function fail(message) {
         section.setAttribute('data-state', 'failed');
+        // Auto-expand a collapsed layer that failed so its error + retry show.
+        if (section.tagName === 'DETAILS') section.open = true;
         if (status) {
           status.textContent = message || 'Failed';
           status.classList.remove('roadmap-layer-status--loading');
@@ -221,13 +226,15 @@
   }
 
   /**
-   * Orchestrate the five-layer pipeline.
+   * Orchestrate the pipeline.
    *
-   *   technical → product → (trajectory ∥ north-star-reading) → gap
+   *   technical → product → (trajectory ∥ north-star-reading) → gap → digest
    *
-   * When the north star is empty, layers 3b and 4 are skipped — those
-   * sections render a CTA instead. Failures in individual layers leave
-   * the rest of the pipeline running where possible per the design doc's
+   * The digest is the synthesis layer: it generates last (it reads every layer
+   * above) but renders first, at the top of the reading. When the north star is
+   * empty, layers 3b and 4 are skipped — those sections render a CTA instead —
+   * and the digest still runs from layers 1/2/3a. Failures in individual layers
+   * leave the rest of the pipeline running where possible per the design doc's
    * §"Failure modes".
    */
   function runPipeline(northStar, generateBtn) {
@@ -237,6 +244,7 @@
     // Accumulate each layer's final text so the completed run can be persisted
     // (Step 0 / LIN-299). Layers that fail or are skipped stay null.
     var collected = {
+      digest: null,
       technical: null,
       product: null,
       trajectory: null,
@@ -249,6 +257,10 @@
       generateBtn.disabled = true;
       generateBtn.textContent = 'Generating…';
     }
+
+    // The digest renders first but generates last; show a pending note up top so
+    // the empty lead section doesn't read as broken while the layers below run.
+    setLayerState('digest', 'pending', 'Summarises once the reading below completes.');
 
     // Mark fork-right and gap as "not available" up front when no north star.
     if (!hasNorthStar) {
@@ -279,14 +291,24 @@
           var nsReading = results[1].status === 'fulfilled' ? results[1].value : null;
           collected.trajectory = trajectory;
           collected.northStarReading = nsReading;
-          if (!hasNorthStar) return;
-          if (trajectory && nsReading) {
-            return runLayer('gap', 'gap', { northStar, trajectory, nsReading })
-              .then(function(gap) { collected.gap = gap; })
-              .catch(function() {});
+
+          var gapPromise = Promise.resolve();
+          if (hasNorthStar) {
+            if (trajectory && nsReading) {
+              gapPromise = runLayer('gap', 'gap', { northStar, trajectory, nsReading })
+                .then(function(gap) { collected.gap = gap; })
+                .catch(function() {});
+            } else {
+              // One fork leg failed; downgrade gap to a clearer message.
+              setLayerState('gap', 'not-available', 'Gap analysis needs both trajectory and north star reading to succeed.');
+            }
           }
-          // One fork leg failed; downgrade gap to a clearer message.
-          setLayerState('gap', 'not-available', 'Gap analysis needs both trajectory and north star reading to succeed.');
+
+          // Digest runs last — it synthesises every layer above into the
+          // at-a-glance summary that renders at the top of the reading.
+          return gapPromise.then(function() {
+            return runDigest(collected, northStar);
+          });
         });
       })
       .catch(function() {
@@ -310,13 +332,37 @@
   }
 
   /**
+   * Run the digest layer — the synthesis that renders at the top. It generates
+   * last because it reads every prior layer, and degrades cleanly when the
+   * trajectory / north-star reading / gap are missing (no north star, or a fork
+   * leg failed). Needs at least the technical and product layers to have content.
+   * Resolves once the digest has streamed (or been skipped); never rejects.
+   */
+  function runDigest(collected, northStar) {
+    if (!collected.technical || !collected.product) {
+      setLayerState('digest', 'not-available', 'Summary needs the technical and product layers.');
+      return Promise.resolve();
+    }
+    return runLayer('digest', 'digest', {
+      technical: collected.technical,
+      product: collected.product,
+      trajectory: collected.trajectory || '',
+      nsReading: collected.northStarReading || '',
+      gap: collected.gap || '',
+      northStar: northStar || ''
+    })
+      .then(function(digest) { collected.digest = digest; })
+      .catch(function() { /* surfaced per-layer with a retry button */ });
+  }
+
+  /**
    * Persist a completed report run. Best-effort: durability is a convenience,
    * not part of the generation flow, so failures are swallowed. Skips the save
    * entirely when no layer produced content (e.g. the first layer failed).
    * Resolves with the saved report (or null).
    */
   function saveReport(northStar, collected) {
-    var hasContent = collected.technical || collected.product ||
+    var hasContent = collected.digest || collected.technical || collected.product ||
       collected.trajectory || collected.northStarReading || collected.gap;
     if (!hasContent) return Promise.resolve(null);
 
@@ -373,6 +419,7 @@
 
   // Maps a stored narrative field to its layer placeholder id.
   var NARRATIVE_FIELD_TO_LAYER = {
+    digest: 'digest',
     technical: 'technical',
     product: 'product',
     trajectory: 'trajectory',
@@ -545,14 +592,12 @@
   function renderChat() {
     var section = document.querySelector('.roadmap-chat');
     if (!section || !hasAI) return;
+    // The chat section is a collapsible <details>; its heading lives in the
+    // server-rendered <summary>, so populate the body rather than the section.
+    var body = section.querySelector('.roadmap-chat-body') || section;
 
     // Conversation history for multi-turn context
     var chatHistory = [];
-
-    var heading = document.createElement('h2');
-    heading.className = 'roadmap-section-heading';
-    heading.textContent = '│ Chat';
-    section.appendChild(heading);
 
     var historyEl = document.createElement('div');
     historyEl.className = 'roadmap-chat-history';
@@ -571,8 +616,8 @@
 
     inputRow.appendChild(input);
     inputRow.appendChild(sendBtn);
-    section.appendChild(historyEl);
-    section.appendChild(inputRow);
+    body.appendChild(historyEl);
+    body.appendChild(inputRow);
 
     function sendMessage() {
       var question = input.value.trim();

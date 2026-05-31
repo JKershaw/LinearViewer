@@ -45,6 +45,8 @@ test.describe('Roadmap Page', () => {
 
     // Should have milestone section
     await expect(page.locator('.roadmap-milestones')).toBeVisible();
+    // By project is collapsed by default — expand it before inspecting cards.
+    await page.locator('.roadmap-milestones > summary').click();
     // Should have at least one milestone card
     const cards = page.locator('.roadmap-milestone-card');
     const count = await cards.count();
@@ -54,6 +56,24 @@ test.describe('Roadmap Page', () => {
     for (let i = 0; i < count; i++) {
       await expect(cards.nth(i).locator('.roadmap-progress-bar')).toBeVisible();
     }
+  });
+
+  test('major sections start collapsed; the ship-log recap is open when AI is off', async ({ page }) => {
+    await page.goto(ROADMAP_URL);
+    await page.waitForLoadState('networkidle');
+
+    const byProject = page.locator('.roadmap-milestones');
+    // By project is a <details>, collapsed by default — its cards are hidden.
+    expect(await byProject.evaluate(el => el.open)).toBe(false);
+    await expect(page.locator('.roadmap-milestone-card').first()).toBeHidden();
+
+    // Without AI there is no digest, so the ship log is the recap and starts open.
+    expect(await page.locator('.roadmap-ship-log').evaluate(el => el.open)).toBe(true);
+
+    // Clicking the summary expands the section.
+    await byProject.locator('> summary').click();
+    expect(await byProject.evaluate(el => el.open)).toBe(true);
+    await expect(page.locator('.roadmap-milestone-card').first()).toBeVisible();
   });
 
   test('milestone cards show progress without projection fields', async ({ page }) => {
@@ -171,6 +191,7 @@ test.describe('Roadmap Pipeline Layer Endpoints', () => {
   const TRAJECTORY_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/narrative/trajectory`;
   const NS_READING_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/narrative/north-star`;
   const GAP_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/narrative/gap`;
+  const DIGEST_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/narrative/digest`;
 
   const SAMPLE_MODEL = { velocity: { tasksPerWeek: 4 }, milestones: [] };
 
@@ -180,6 +201,7 @@ test.describe('Roadmap Pipeline Layer Endpoints', () => {
     { name: 'trajectory', url: TRAJECTORY_URL, body: { roadmapModel: SAMPLE_MODEL, tech: 'tech text', product: 'product text' } },
     { name: 'north-star reading', url: NS_READING_URL, body: { roadmapModel: SAMPLE_MODEL, northStar: 'be useful' } },
     { name: 'gap', url: GAP_URL, body: { northStar: 'be useful', trajectory: 'going there', nsReading: 'aligned' } },
+    { name: 'digest', url: DIGEST_URL, body: { technical: 'tech text', product: 'product text' } },
   ];
 
   for (const ep of endpoints) {
@@ -243,6 +265,15 @@ test.describe('Roadmap Pipeline Layer Endpoints', () => {
     });
     expect(response.status()).toBe(400);
   });
+
+  test('digest: returns 400 when technical or product missing', async ({ request }) => {
+    await request.get(`/test/set-session?features=${FEATURES}&openRouterConnected=true`);
+    // Missing product
+    const response = await request.post(DIGEST_URL, {
+      data: { technical: 'tech only' }
+    });
+    expect(response.status()).toBe(400);
+  });
 });
 
 // =============================================================================
@@ -258,7 +289,7 @@ test.describe('Roadmap Pipeline UI', () => {
     await page.context().request.get('/test/clear-report-history');
   });
 
-  test('renders north star textarea, all five section placeholders, and generate button', async ({ page }) => {
+  test('renders north star textarea, the digest + five section placeholders, and generate button', async ({ page }) => {
     await page.goto(ROADMAP_URL);
     await page.waitForLoadState('networkidle');
 
@@ -266,12 +297,63 @@ test.describe('Roadmap Pipeline UI', () => {
     await expect(page.locator('.roadmap-north-star-input')).toBeVisible();
     await expect(page.locator('.roadmap-generate-reading-btn')).toBeVisible();
 
-    // Five section placeholders, identified by layer attribute
+    // Section placeholders, identified by layer attribute
+    await expect(page.locator('[data-layer="digest"]')).toBeVisible();
     await expect(page.locator('[data-layer="technical"]')).toBeVisible();
     await expect(page.locator('[data-layer="product"]')).toBeVisible();
     await expect(page.locator('[data-layer="trajectory"]')).toBeVisible();
     await expect(page.locator('[data-layer="north-star-reading"]')).toBeVisible();
     await expect(page.locator('[data-layer="gap"]')).toBeVisible();
+  });
+
+  test('idle digest shows a placeholder hint before any reading exists', async ({ page }) => {
+    await page.goto(ROADMAP_URL);
+    await page.waitForLoadState('networkidle');
+
+    const digest = page.locator('[data-layer="digest"]');
+    expect(await digest.getAttribute('data-state')).toBe('idle');
+    const hint = await digest.locator('.roadmap-layer-content').evaluate(
+      el => getComputedStyle(el, '::before').content
+    );
+    expect(hint).toContain('Generate a reading');
+  });
+
+  test('digest stays open as the recap; the five detail layers fold and start collapsed', async ({ page }) => {
+    await page.goto(ROADMAP_URL);
+    await page.waitForLoadState('networkidle');
+
+    // The digest recap is always-visible (a div, not a collapsible details).
+    const digest = page.locator('[data-layer="digest"]');
+    expect(await digest.evaluate(el => el.tagName)).toBe('DIV');
+    await expect(digest.locator('.roadmap-layer-heading')).toBeVisible();
+
+    // The five detail layers are <details>, collapsed, with content hidden.
+    for (const layer of ['technical', 'product', 'trajectory', 'north-star-reading', 'gap']) {
+      const el = page.locator(`[data-layer="${layer}"]`);
+      expect(await el.evaluate(node => node.tagName)).toBe('DETAILS');
+      expect(await el.evaluate(node => node.open)).toBe(false);
+      await expect(el.locator('.roadmap-layer-content')).toBeHidden();
+    }
+
+    // Expanding one reveals its content area.
+    await page.locator('[data-layer="technical"] > summary').click();
+    await expect(page.locator('[data-layer="technical"] .roadmap-layer-content')).toBeVisible();
+  });
+
+  test('digest placeholder renders first (above the technical narrative)', async ({ page }) => {
+    await page.goto(ROADMAP_URL);
+    await page.waitForLoadState('networkidle');
+
+    // The digest is the lede: its placeholder must precede every other layer
+    // in document order, even though it generates last.
+    const order = await page.evaluate(() => {
+      const layers = Array.from(document.querySelectorAll('[data-layer]'));
+      return layers.map(el => el.getAttribute('data-layer'));
+    });
+    expect(order[0]).toBe('digest');
+    expect(order.indexOf('digest')).toBeLessThan(order.indexOf('technical'));
+    // And it carries the emphasis modifier so it reads as the lede, not a peer.
+    await expect(page.locator('[data-layer="digest"]')).toHaveClass(/roadmap-layer--digest/);
   });
 
   test('trajectory and north-star-reading render as siblings with identical structure', async ({ page }) => {
@@ -330,12 +412,12 @@ test.describe('Roadmap Pipeline UI', () => {
     expect(body.northStar).toBe('Updated north star value.');
   });
 
-  test('all five sections show "not yet" state before generate', async ({ page }) => {
+  test('all sections show "not yet" state before generate', async ({ page }) => {
     await page.goto(ROADMAP_URL);
     await page.waitForLoadState('networkidle');
 
     // Each layer placeholder should have status text indicating it has not yet generated
-    const layers = ['technical', 'product', 'trajectory', 'north-star-reading', 'gap'];
+    const layers = ['digest', 'technical', 'product', 'trajectory', 'north-star-reading', 'gap'];
     for (const layer of layers) {
       const section = page.locator(`[data-layer="${layer}"]`);
       await expect(section).toBeVisible();
@@ -344,7 +426,7 @@ test.describe('Roadmap Pipeline UI', () => {
     }
   });
 
-  test('clicking generate-reading runs all five layers when north star is set', async ({ page }) => {
+  test('clicking generate-reading runs all layers (including the digest) when north star is set', async ({ page }) => {
     // Pre-set a north star so layers 3b and 4 fire
     const pageRequest = page.context().request;
     await pageRequest.put(`/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/north-star`, {
@@ -357,13 +439,15 @@ test.describe('Roadmap Pipeline UI', () => {
     const btn = page.locator('.roadmap-generate-reading-btn');
     await btn.click();
 
-    // Each layer should populate from its mock SSE stream
+    // Each layer should populate from its mock SSE stream. The digest is the
+    // synthesis layer — it generates last but lives at the top of the reading.
     const expectedTexts = {
       'technical': 'Mock technical narrative',
       'product': 'Mock product perspective',
       'trajectory': 'Mock trajectory',
       'north-star-reading': 'Mock north star reading',
-      'gap': 'Mock gap analysis'
+      'gap': 'Mock gap analysis',
+      'digest': 'Mock summary'
     };
 
     for (const [layer, text] of Object.entries(expectedTexts)) {
@@ -404,6 +488,10 @@ test.describe('Roadmap Pipeline UI', () => {
     await expect(page.locator('[data-layer="gap"]')).toHaveAttribute('data-state', 'not-available');
     await expect(page.locator('[data-layer="north-star-reading"] .roadmap-layer-content')).toBeEmpty();
     await expect(page.locator('[data-layer="gap"] .roadmap-layer-content')).toBeEmpty();
+
+    // The digest still runs — it degrades to layers 1/2/3a when there's no north star.
+    await expect(page.locator('[data-layer="digest"] .roadmap-layer-content')).toContainText('Mock summary', { timeout: 10000 });
+    await expect(page.locator('[data-layer="digest"]')).toHaveAttribute('data-state', 'done', { timeout: 10000 });
   });
 });
 

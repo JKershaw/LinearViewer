@@ -53,6 +53,7 @@ Five LLM calls, each producing a string. The context passed to each prompt is ju
 3a. Trajectory    summary + tech + product → trajectory   ┐ run in
 3b. North Star    summary + north_star     → ns_reading   ┘ either order
 4. Gap            north_star + trajectory + ns_reading → gap
+5. Digest         tech + product + trajectory + ns_reading + gap (+ north_star) → digest   (generates last, renders first)
 ```
 
 Each output is streamed to the UI as it generates. Partial states are sensible products: if layer N fails or has not run yet, layers 1..N-1 still ship.
@@ -127,12 +128,54 @@ Pitfalls:
 
 Cap output length around 200–300 words. The gap is the punchline; long gap analyses dilute it.
 
+### Digest — at-a-glance summary (the synthesis layer)
+
+Persona: an editor writing the lede that sits at the very top of the reading.
+
+Added after the original five-layer design, the digest is the answer to a
+structural problem the five layers created: five full-length, equal-weight
+sections in pipeline order, with the most actionable finding (the gap) buried
+last and no top-level read for someone who wants the picture in fifteen seconds.
+The digest reads *all* the layers above it and distils them into four tight
+slots:
+
+- **SHIPPED** — what was actually delivered (headline, not a list).
+- **WHERE WE ARE** — the current state of the work.
+- **THE RISK** — the single most important risk, deliberately *unifying* the two
+  notions of risk that otherwise live apart: delivery risk (blockers, stale or
+  unassigned critical-path work — surfaced in layer 1) and alignment risk (drift
+  — surfaced in layers 3b/4). It names which kind it is.
+- **THE DECISION** — the one open question the human must adjudicate, hoisted out
+  of the gap analysis's "questions this raises" (where it was a buried
+  parenthetical) to the top of the page. It states the question; it does not
+  answer it.
+
+Two deliberate differences from the other layers:
+
+- **It generates last but renders first.** It needs every layer above as input,
+  so it is the final LLM call; but its placeholder sits at the top of the
+  reading, and the client streams into it last. While the layers below generate,
+  the top slot shows a "summarises once the reading below completes" pending
+  state rather than sitting empty.
+- **No reasoning block.** Every other layer emits an internal REASONING section
+  before its prose. The digest does not — the reasoning already happened in
+  layers 1–4, and a reasoning dump at the very top of the page would defeat the
+  "legible at a glance" purpose. It emits only the four slots.
+
+Degradation: with no north star there is no ns_reading or gap, so THE RISK draws
+on delivery risk only and THE DECISION reports that no alignment decision is
+forced. The digest still runs from layers 1/2/3a. It needs at least layers 1 and
+2 to have produced content; if they failed, the digest is skipped.
+
+Cost note: the digest is a sixth LLM call, so a full run consumes one more
+free-tier unit than before. Acceptable for an occasional, button-driven feature.
+
 ## Cross-cutting rules
 
 All five prompts share three rules. Repeat them in each prompt rather than relying on a shared system message — repetition is safer than hoping a top-level instruction gets respected through five distinct calls.
 
 - Plain text only — no markdown. Output renders in a monospace UI.
-- Use original task and project names; no renaming, no paraphrasing identifiers.
+- Use original task and project names on first mention; after that a short, recognizable short-form is allowed (full name first, short reference after) so prose doesn't read like a list of database keys. No inventing names, no altering identifiers (e.g. LIN-123).
 - Cite specific items when making claims. Vague claims are not claims.
 
 ## Failure modes
