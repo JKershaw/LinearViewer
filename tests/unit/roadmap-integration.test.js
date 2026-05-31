@@ -622,6 +622,50 @@ describe('summarizeRoadmapModel', () => {
     const summarySize = summarizeRoadmapModel(serializable).length;
     assert.ok(summarySize < jsonSize, `summary (${summarySize}) should be smaller than JSON (${jsonSize})`);
   });
+
+  test('surfaces identifier, priority, labels, and description on in-progress tasks', () => {
+    const summary = summarizeRoadmapModel({
+      milestones: [{
+        name: 'Launch', progressPercent: 50, totalTasks: 2, remainingTasks: 1,
+        tasksInQueue: [{
+          id: 'i1', identifier: 'LIN-204', title: 'Add OAuth flow', stateType: 'started',
+          priority: 2, labels: ['feature', 'auth'], description: 'Wire up Linear OAuth callback handling.'
+        }]
+      }]
+    });
+    assert.ok(summary.includes('In progress:'), 'should have in-progress section');
+    assert.ok(summary.includes('LIN-204'), 'should cite the identifier');
+    assert.ok(summary.includes('[high]'), 'priority 2 should render as [high]');
+    assert.ok(summary.includes('{feature, auth}'), 'should list labels in braces');
+    assert.ok(summary.includes('Wire up Linear OAuth'), 'should include the description line');
+  });
+
+  test('shows Next up (unstarted) and excludes backlog', () => {
+    const summary = summarizeRoadmapModel({
+      milestones: [{
+        name: 'Launch', progressPercent: 0, totalTasks: 3, remainingTasks: 3,
+        tasksInQueue: [
+          { id: 'a', identifier: 'LIN-1', title: 'Active work', stateType: 'started' },
+          { id: 'b', identifier: 'LIN-2', title: 'Committed todo', stateType: 'unstarted' },
+          { id: 'c', identifier: 'LIN-3', title: 'Someday maybe', stateType: 'backlog' }
+        ]
+      }]
+    });
+    assert.ok(summary.includes('Next up:'), 'should have a next-up section');
+    assert.ok(summary.includes('LIN-2') && summary.includes('Committed todo'), 'unstarted work appears under next up');
+    assert.ok(!summary.includes('Someday maybe') && !summary.includes('LIN-3'), 'backlog work is excluded entirely');
+  });
+
+  test('omits priority/labels when unset (no false signal)', () => {
+    const summary = summarizeRoadmapModel({
+      milestones: [{
+        name: 'Launch', progressPercent: 0, totalTasks: 1, remainingTasks: 1,
+        tasksInQueue: [{ id: 'a', identifier: 'LIN-9', title: 'Plain task', stateType: 'unstarted', priority: 0, labels: [] }]
+      }]
+    });
+    assert.ok(!/\[(urgent|high|medium|low)\]/.test(summary), 'no priority bracket when priority is 0');
+    assert.ok(!summary.includes('{'), 'no label braces when there are no labels');
+  });
 });
 
 // =============================================================================

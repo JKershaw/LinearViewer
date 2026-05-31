@@ -16,7 +16,8 @@ import {
   buildHierarchy,
   computeParentRollup,
   flattenTasks,
-  issueToRoadmapCard
+  issueToRoadmapCard,
+  firstParaTruncated
 } from '../../lib/roadmap.js';
 
 // =============================================================================
@@ -31,7 +32,7 @@ function createIssue(overrides = {}) {
     id: overrides.id || `issue-${counter}`,
     identifier: overrides.identifier || `TEST-${counter}`,
     title: overrides.title || `Test Issue ${counter}`,
-    description: '',
+    description: overrides.description ?? '',
     estimate: overrides.estimate ?? null,
     priority: overrides.priority ?? 2,
     sortOrder: overrides.sortOrder ?? counter,
@@ -368,6 +369,40 @@ describe('buildExecutionQueue', () => {
     assert.ok(Array.isArray(item.blocksIds));
     assert.ok(item.assignee !== undefined);
     assert.ok(item.projectName !== undefined);
+  });
+
+  test('card carries a truncated task description', () => {
+    const item = issueToRoadmapCard(createIssue({
+      description: 'Short intent line.\n\nA second paragraph that should be dropped.'
+    }));
+    assert.strictEqual(item.description, 'Short intent line.', 'keeps first paragraph only');
+  });
+
+  test('card description is null when the issue has none', () => {
+    const item = issueToRoadmapCard(createIssue({ description: '' }));
+    assert.strictEqual(item.description, null);
+  });
+});
+
+// =============================================================================
+// firstParaTruncated
+// =============================================================================
+
+describe('firstParaTruncated', () => {
+  test('returns null for empty input', () => {
+    assert.strictEqual(firstParaTruncated(''), null);
+    assert.strictEqual(firstParaTruncated(null), null);
+  });
+
+  test('takes the first paragraph and collapses whitespace', () => {
+    assert.strictEqual(firstParaTruncated('one   two\nthree\n\nlater'), 'one two three');
+  });
+
+  test('truncates to the bound with an ellipsis', () => {
+    const long = 'x'.repeat(300);
+    const out = firstParaTruncated(long, 200);
+    assert.strictEqual(out.length, 200);
+    assert.ok(out.endsWith('...'));
   });
 });
 

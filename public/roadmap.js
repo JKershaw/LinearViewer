@@ -283,7 +283,12 @@
           product: prior.product
         });
         var nsPromise = hasNorthStar
-          ? runLayer('north-star-reading', 'north-star', { roadmapModel, northStar })
+          ? runLayer('north-star-reading', 'north-star', {
+              roadmapModel,
+              northStar,
+              tech: prior.tech,
+              product: prior.product
+            })
           : Promise.resolve(null);
 
         return Promise.allSettled([trajectoryPromise, nsPromise]).then(function(results) {
@@ -295,7 +300,7 @@
           var gapPromise = Promise.resolve();
           if (hasNorthStar) {
             if (trajectory && nsReading) {
-              gapPromise = runLayer('gap', 'gap', { northStar, trajectory, nsReading })
+              gapPromise = runLayer('gap', 'gap', { northStar, trajectory, nsReading, roadmapModel })
                 .then(function(gap) { collected.gap = gap; })
                 .catch(function() {});
             } else {
