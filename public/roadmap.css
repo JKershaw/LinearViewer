@@ -425,6 +425,32 @@
   margin: 1em 0;
 }
 
+/* Digest — the at-a-glance summary. Emphasised with a boxed, accented frame so
+   it reads as the lede the reader scans first, not another equal-weight section
+   (the whole point of the synthesis layer). */
+.roadmap-layer--digest {
+  border: 1px solid var(--fg-dim);
+  border-left: 3px solid var(--fg);
+  border-radius: 3px;
+  padding: 0.8em 1em;
+  margin-bottom: 1.8em;
+  background: var(--fg-vdim);
+}
+
+.roadmap-layer--digest .roadmap-layer-heading {
+  font-size: 1.05em;
+}
+
+.roadmap-layer--digest .roadmap-layer-content {
+  font-size: 0.9em;
+}
+
+/* Pending: the digest waits at the top while the layers below generate. */
+.roadmap-layer[data-state="pending"] .roadmap-layer-status {
+  color: var(--fg-dim);
+  font-style: italic;
+}
+
 .roadmap-layer-heading {
   font-family: var(--font-structural);
   font-size: 0.95em;

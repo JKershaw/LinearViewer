@@ -1749,6 +1749,49 @@ ${goal}`;
   });
 
   /**
+   * Digest — the at-a-glance summary (synthesis layer). Generated last because
+   * it reads every prior layer, but rendered first (top of the reading). Needs
+   * at least the technical and product layers; trajectory / nsReading / gap /
+   * northStar are optional so it degrades cleanly when there is no north star
+   * or a fork leg failed.
+   * @route POST /workspace/:urlKey/api/roadmap/narrative/digest
+   */
+  router.post('/workspace/:urlKey/api/roadmap/narrative/digest', workspaceFromUrl, async (req, res) => {
+    const gate = await gateRoadmapLLMRequest(req, res);
+    if (!gate) return;
+
+    const { technical, product, trajectory, nsReading, gap, northStar } = req.body || {};
+    if (typeof technical !== 'string' || !technical.trim()) {
+      return res.status(400).json({ error: 'technical (layer 1 output) is required as a non-empty string' });
+    }
+    if (typeof product !== 'string' || !product.trim()) {
+      return res.status(400).json({ error: 'product (layer 2 output) is required as a non-empty string' });
+    }
+
+    if (isRoadmapTestMode(req)) {
+      return emitMockLayerStream(res, 'Mock summary: SHIPPED recent work. WHERE WE ARE on track. THE RISK is delivery. THE DECISION is for the human.');
+    }
+
+    let messages;
+    try {
+      const { buildRoadmapDigestMessages } = await import('../lib/prompts/roadmap-digest-template.js');
+      messages = buildRoadmapDigestMessages({
+        northStar: typeof northStar === 'string' ? northStar : '',
+        technical,
+        product,
+        trajectory: typeof trajectory === 'string' ? trajectory : '',
+        nsReading: typeof nsReading === 'string' ? nsReading : '',
+        gap: typeof gap === 'string' ? gap : ''
+      });
+    } catch (error) {
+      console.error('Roadmap digest build error:', error);
+      return res.status(500).json({ error: 'Failed to build digest prompt' });
+    }
+
+    await streamRoadmapLayer(res, { messages, ...gate, maxTokens: 1200, layerName: 'summary' });
+  });
+
+  /**
    * Roadmap Q&A chat via SSE streaming.
    * Client POSTs the question, roadmap model, and conversation history.
    * @route POST /workspace/:urlKey/api/roadmap/chat

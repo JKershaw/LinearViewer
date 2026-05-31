@@ -31,6 +31,10 @@ import {
   buildRoadmapGapMessages,
   buildRoadmapGapPrompt
 } from '../../lib/prompts/roadmap-gap-template.js';
+import {
+  buildRoadmapDigestMessages,
+  buildRoadmapDigestPrompt
+} from '../../lib/prompts/roadmap-digest-template.js';
 
 // =============================================================================
 // Shared fixtures
@@ -436,6 +440,105 @@ describe('buildRoadmapGapMessages (layer 4 — gap)', () => {
 
   test('backward-compatible buildRoadmapGapPrompt returns a string', () => {
     const prompt = buildRoadmapGapPrompt(SAMPLE_NORTH_STAR, SAMPLE_TRAJECTORY, SAMPLE_NS_READING);
+    assert.strictEqual(typeof prompt, 'string');
+    assert.ok(prompt.length > 100);
+  });
+});
+
+// =============================================================================
+// Digest — the at-a-glance synthesis layer (generates last, renders first)
+// =============================================================================
+
+describe('buildRoadmapDigestMessages (digest — synthesis layer)', () => {
+  const FULL_INPUTS = {
+    northStar: SAMPLE_NORTH_STAR,
+    technical: SAMPLE_TECH,
+    product: SAMPLE_PRODUCT,
+    trajectory: SAMPLE_TRAJECTORY,
+    nsReading: SAMPLE_NS_READING,
+    gap: 'Where they agree: onboarding. Where they diverge: none material. Questions: should mini-foreman serve intent-legibility?'
+  };
+
+  test('returns [system, user] messages array', () => {
+    const messages = buildRoadmapDigestMessages(FULL_INPUTS);
+    assert.ok(Array.isArray(messages));
+    assert.strictEqual(messages.length, 2);
+    assert.strictEqual(messages[0].role, 'system');
+    assert.strictEqual(messages[1].role, 'user');
+  });
+
+  test('system prompt requires exactly the four slots in order', () => {
+    const system = buildRoadmapDigestMessages(FULL_INPUTS)[0].content;
+    for (const slot of ['SHIPPED', 'WHERE WE ARE', 'THE RISK', 'THE DECISION']) {
+      assert.ok(system.includes(slot), `should require the ${slot} slot`);
+    }
+    // Order: SHIPPED < WHERE WE ARE < THE RISK < THE DECISION
+    assert.ok(
+      system.indexOf('SHIPPED') < system.indexOf('WHERE WE ARE') &&
+      system.indexOf('WHERE WE ARE') < system.indexOf('THE RISK') &&
+      system.indexOf('THE RISK') < system.indexOf('THE DECISION'),
+      'slots should be specified in reader-priority order'
+    );
+  });
+
+  test('system prompt forbids a reasoning section and preamble (lede only)', () => {
+    const system = buildRoadmapDigestMessages(FULL_INPUTS)[0].content;
+    assert.ok(/no reasoning section|no preamble/i.test(system),
+      'digest must not emit a reasoning block — it is a clean lede');
+  });
+
+  test('THE RISK slot unifies delivery risk and alignment/drift risk', () => {
+    const system = buildRoadmapDigestMessages(FULL_INPUTS)[0].content;
+    assert.ok(/unif/i.test(system), 'should instruct unifying the two risk kinds');
+    assert.ok(/delivery risk/i.test(system) && /(alignment|drift)/i.test(system),
+      'should name both delivery risk and alignment/drift risk');
+  });
+
+  test('THE DECISION slot escalates the open question without answering it', () => {
+    const system = buildRoadmapDigestMessages(FULL_INPUTS)[0].content;
+    assert.ok(/decision/i.test(system) && /do not answer/i.test(system),
+      'should ask for the open decision and forbid answering it');
+  });
+
+  test('caps length for a scannable lede', () => {
+    const system = buildRoadmapDigestMessages(FULL_INPUTS)[0].content;
+    assert.ok(/150 words|under ~150|brevity/i.test(system),
+      'should cap the digest to a short lede');
+  });
+
+  test('user message embeds the prior layers it synthesises', () => {
+    const user = buildRoadmapDigestMessages(FULL_INPUTS)[1].content;
+    assert.ok(user.includes(SAMPLE_TECH), 'must embed technical narrative');
+    assert.ok(user.includes(SAMPLE_PRODUCT), 'must embed product perspective');
+    assert.ok(user.includes(SAMPLE_TRAJECTORY), 'must embed trajectory');
+    assert.ok(user.includes(SAMPLE_NS_READING), 'must embed north star reading');
+    assert.ok(user.includes(SAMPLE_NORTH_STAR), 'must embed the north star itself');
+  });
+
+  test('honors cross-cutting rules', () => {
+    assertCrossCuttingRules(buildRoadmapDigestMessages(FULL_INPUTS)[0].content, 'digest');
+  });
+
+  test('degrades cleanly with no north star (risk from delivery only)', () => {
+    const messages = buildRoadmapDigestMessages({
+      technical: SAMPLE_TECH,
+      product: SAMPLE_PRODUCT,
+      trajectory: SAMPLE_TRAJECTORY
+      // no northStar / nsReading / gap
+    });
+    const system = messages[0].content;
+    const user = messages[1].content;
+    assert.ok(/no north star is set/i.test(system),
+      'system should acknowledge the missing north star and adjust the risk/decision slots');
+    assert.ok(/delivery risk only/i.test(system),
+      'system should tell it to draw the risk from delivery only');
+    // The user message must not fabricate empty NS sections.
+    assert.ok(!/NORTH STAR READING/.test(user), 'should omit the ns-reading section when absent');
+    assert.ok(!/GAP ANALYSIS/.test(user), 'should omit the gap section when absent');
+  });
+
+  test('backward-compatible buildRoadmapDigestPrompt returns a string', () => {
+    const prompt = buildRoadmapDigestPrompt(FULL_INPUTS);
     assert.strictEqual(typeof prompt, 'string');
     assert.ok(prompt.length > 100);
   });
