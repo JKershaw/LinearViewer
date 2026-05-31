@@ -327,14 +327,20 @@ GET /api/proxy/relations/{issueId}
 Response:
 ```json
 {
-  "relations": [
-    { "type": "blocks", "relatedIssue": { "id": "uuid", "identifier": "ENG-43", "title": "...", "state": { "name": "Todo", "type": "unstarted" } } }
-  ],
-  "inverseRelations": [
-    { "type": "blocks", "issue": { "id": "uuid", "identifier": "ENG-41", "title": "...", "state": { "name": "Done", "type": "completed" } } }
-  ]
+  "relations": {
+    "nodes": [
+      { "type": "blocks", "relatedIssue": { "id": "uuid", "identifier": "ENG-43", "title": "...", "state": { "name": "Todo", "type": "unstarted" } } }
+    ]
+  },
+  "inverseRelations": {
+    "nodes": [
+      { "type": "blocks", "issue": { "id": "uuid", "identifier": "ENG-41", "title": "...", "state": { "name": "Done", "type": "completed" } } }
+    ]
+  }
 }
 ```
+
+`relations` and `inverseRelations` use Linear's `{nodes: [...]}` wrapper, the same convention as `relations` on `/issue/{id}` and `labels`/`children`/`comments` across the read endpoints. `relatedIssue` is the target of an outgoing relation; `issue` is the source of an inverse one (e.g. the issue that blocks this one).
 
 #### Get Task Recap
 

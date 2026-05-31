@@ -52,4 +52,15 @@ describe('proxy relationship queries', () => {
     assert.match(q, /relations\s*\{/, 'must fetch outgoing relations');
     assert.match(q, /inverseRelations\s*\{/, 'must fetch inverseRelations so agents can see blockers');
   });
+
+  test('/relations handler wraps relations in the {nodes} shape', () => {
+    // The handler must return relations/inverseRelations as { nodes: [...] },
+    // matching /issue and the rest of the read surface (labels/children/
+    // comments). A flat-array response would reintroduce the inconsistency.
+    const handlerStart = proxySource.indexOf("logEvent(req, '/api/proxy/relations', 200)");
+    assert.ok(handlerStart !== -1, '/relations 200 handler not found');
+    const block = proxySource.slice(handlerStart, handlerStart + 400);
+    assert.match(block, /relations:\s*\{\s*nodes:/, 'relations must be wrapped as { nodes: [...] }');
+    assert.match(block, /inverseRelations:\s*\{\s*nodes:/, 'inverseRelations must be wrapped as { nodes: [...] }');
+  });
 });

@@ -880,7 +880,11 @@ GET ${baseUrl}/api/proxy/cycle/{cycleId}
 
 GET ${baseUrl}/api/proxy/relations/{issueId}
   → Issue relations (blocks, blocked-by, related, duplicate)
-  → { "relations": [{ "type": "blocks", "relatedIssue": { "id": "...", "identifier": "LIN-9" } }] }
+  → { "relations":        { "nodes": [{ "type": "blocks", "relatedIssue": { "id": "...", "identifier": "LIN-9" } }] },
+      "inverseRelations": { "nodes": [{ "type": "blocks", "issue": { "id": "...", "identifier": "LIN-7" } }] } }
+  → Note: relations / inverseRelations use Linear's {nodes: [...]} wrapper,
+    same as relations on /issue/{id}. \`relatedIssue\` is the target of an
+    outgoing relation; \`issue\` is the source of an inverse (e.g. blocked-by) one.
 
 ## Foreman Endpoints
 
@@ -1375,9 +1379,12 @@ ${readEndpoints}${writeEndpoints}
       }
 
       logEvent(req, '/api/proxy/relations', 200);
+      // Wrap in Linear's {nodes:[...]} shape to match /issue and the rest of
+      // the raw-read surface (labels/children/comments), so consumers see a
+      // single consistent convention across endpoints.
       res.json({
-        relations: data.issue.relations?.nodes || [],
-        inverseRelations: data.issue.inverseRelations?.nodes || []
+        relations: { nodes: data.issue.relations?.nodes || [] },
+        inverseRelations: { nodes: data.issue.inverseRelations?.nodes || [] }
       });
     } catch (err) {
       const status = graphqlErrorStatus(err);
