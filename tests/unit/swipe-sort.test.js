@@ -5,7 +5,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { sortIssuesForSwipe, applyBlockingOrder, clusterByParent, buildFilterGroups } from '../../lib/render-swipe.js';
+import { sortIssuesForSwipe, applyBlockingOrder, clusterByParent, buildFilterGroups, flattenTrees } from '../../lib/render-swipe.js';
 
 // =============================================================================
 // Test Helpers
@@ -427,5 +427,54 @@ describe('project filter starting index', () => {
     assert.deepStrictEqual(partitioned.map(i => i.id), ['ip1', 'ip2', 'bug', 'todo']);
     const firstNonStarted = partitioned.findIndex(i => i.stateType !== 'started');
     assert.strictEqual(firstNonStarted, 2);
+  });
+});
+
+// =============================================================================
+// blocksIds extraction (issueToCard via flattenTrees)
+// =============================================================================
+
+describe('blocksIds extraction', () => {
+  // Build a single-project tree shaped like buildForest output, so flattenTrees
+  // runs the real issueToCard mapping on the supplied raw issue.
+  function treeFor(issue) {
+    return [{ project: { name: 'P' }, incomplete: [{ issue, children: [] }] }];
+  }
+
+  test('collects relatedIssue ids from blocks relations', () => {
+    const issue = {
+      id: 'a',
+      state: { type: 'unstarted', name: 'Todo' },
+      relations: { nodes: [
+        { type: 'blocks', relatedIssue: { id: 'b' } },
+        { type: 'related', relatedIssue: { id: 'c' } },
+        { type: 'blocks', relatedIssue: { id: 'd' } },
+      ] },
+    };
+    const [card] = flattenTrees(treeFor(issue), 'project');
+    assert.deepStrictEqual(card.blocksIds, ['b', 'd']);
+  });
+
+  test('drops blocks relations with a null relatedIssue (dangling/deleted)', () => {
+    // A blocks relation pointing at a deleted or inaccessible issue arrives
+    // with relatedIssue === null. This must not throw, and the dangling edge
+    // must be filtered out.
+    const issue = {
+      id: 'a',
+      state: { type: 'unstarted', name: 'Todo' },
+      relations: { nodes: [
+        { type: 'blocks', relatedIssue: null },
+        { type: 'blocks', relatedIssue: { id: 'b' } },
+      ] },
+    };
+    let card;
+    assert.doesNotThrow(() => { [card] = flattenTrees(treeFor(issue), 'project'); });
+    assert.deepStrictEqual(card.blocksIds, ['b']);
+  });
+
+  test('blocksIds is empty when there are no relations', () => {
+    const issue = { id: 'a', state: { type: 'unstarted', name: 'Todo' } };
+    const [card] = flattenTrees(treeFor(issue), 'project');
+    assert.deepStrictEqual(card.blocksIds, []);
   });
 });

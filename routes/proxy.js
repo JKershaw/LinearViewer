@@ -353,6 +353,12 @@ const ISSUE_DETAIL_QUERY = gql`
           relatedIssue { id identifier title state { name type } }
         }
       }
+      inverseRelations {
+        nodes {
+          type
+          issue { id identifier title state { name type } }
+        }
+      }
     }
   }
 `;
@@ -467,7 +473,7 @@ const LABELS_BY_TEAM_QUERY = gql`
 `;
 
 const RELATIONS_QUERY = gql`
-  query($issueId: ID!) {
+  query($issueId: String!) {
     issue(id: $issueId) {
       relations {
         nodes {
