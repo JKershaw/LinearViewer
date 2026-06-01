@@ -956,7 +956,7 @@ POST ${baseUrl}/api/proxy/brief/{identifier}
 GET ${baseUrl}/api/proxy/foreman/status
   → Recent foreman status entries
   → { "items": [{ "id": "...", "taskIdentifier": "LIN-42", "action": "research",
-                   "status": "completed", "summary": "...", "createdAt": "..." }] }
+                   "status": "completed", "summary": "...", "timestamp": "..." }], "total": 7 }
 
 GET ${baseUrl}/api/proxy/foreman/playbook
   → Foreman playbook (plain text, not JSON)`;
