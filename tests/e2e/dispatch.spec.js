@@ -805,6 +805,10 @@ test.describe('Custom Prompt Dispatch', () => {
   async function openDispatchPage(page) {
     await page.goto(DISPATCH_URL);
     await page.waitForLoadState('networkidle');
+    // Dispatch options now live behind a disclosure trigger; expand it so the
+    // option buttons are interactable.
+    await page.locator('.dispatch-toggle').click();
+    await expect(page.locator('#dispatch-options')).not.toHaveClass(/\bhidden\b/);
   }
 
   test('custom prompt input visible on dispatch page', async ({ page }) => {

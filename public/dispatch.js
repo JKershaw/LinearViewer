@@ -199,6 +199,58 @@ function initDispatchPagePrompt() {
   })
 }
 
+/**
+ * Initialize the Dispatch options disclosure on the dispatch page.
+ *
+ * Mirrors the navbar disclosure convention (state owned by the trigger via
+ * aria-expanded + a .hidden panel; close on outside-click and Esc) but is
+ * self-contained — it does not touch the delegated .dispatch-prompt-send
+ * handler in initDispatchPagePrompt().
+ *
+ * Note: the panel sits inside .dispatch-section, which owns the delegated send
+ * handler, so we must NOT stopPropagation on panel clicks (that would prevent
+ * the send handler from firing). Instead, the outside-click listener uses a
+ * contains() guard to leave in-panel clicks alone.
+ */
+function initDispatchToggle() {
+  const toggle = document.querySelector('.dispatch-toggle')
+  const panel = document.getElementById('dispatch-options')
+  if (!toggle || !panel) return
+
+  const isOpen = () => toggle.getAttribute('aria-expanded') === 'true'
+
+  function closePanel() {
+    toggle.setAttribute('aria-expanded', 'false')
+    panel.classList.add('hidden')
+  }
+
+  function openPanel() {
+    toggle.setAttribute('aria-expanded', 'true')
+    panel.classList.remove('hidden')
+  }
+
+  toggle.addEventListener('click', () => {
+    if (isOpen()) closePanel()
+    else openPanel()
+  })
+
+  // Close on outside-click. Guard with contains() rather than stopPropagation
+  // so clicks on option buttons still reach the delegated send handler.
+  document.addEventListener('click', (e) => {
+    if (!isOpen()) return
+    if (toggle.contains(e.target) || panel.contains(e.target)) return
+    closePanel()
+  })
+
+  // Close on Esc and return focus to the trigger.
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && isOpen()) {
+      closePanel()
+      toggle.focus()
+    }
+  })
+}
+
 // =============================================================================
 // Queue List
 // =============================================================================
@@ -696,6 +748,7 @@ window.addEventListener('beforeunload', () => {
 
 document.addEventListener('DOMContentLoaded', () => {
   initDispatchPagePrompt()
+  initDispatchToggle()
   initQueueList()
   initDispatchTokenManagement()
   initDispatchHistory()

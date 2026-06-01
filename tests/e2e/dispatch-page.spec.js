@@ -44,6 +44,10 @@ test.describe('Dispatch Page', () => {
       await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
+      // Dispatch options now live behind a disclosure trigger; expand it so the
+      // option buttons are interactable for the tests in this block.
+      await page.locator('.dispatch-toggle').click();
+      await expect(page.locator('#dispatch-options')).not.toHaveClass(/\bhidden\b/);
     });
 
     test('custom prompt input is visible', async ({ page }) => {
@@ -51,6 +55,7 @@ test.describe('Dispatch Page', () => {
       await expect(textarea).toBeVisible();
       await expect(textarea).toHaveAttribute('placeholder', 'Type a custom prompt or /command...');
 
+      // Buttons live in the (now-open) options panel
       const buttons = page.locator('.dispatch-prompt-send');
       await expect(buttons).toHaveCount(4); // cli, web, dash, local (on localhost)
     });
@@ -245,6 +250,99 @@ test.describe('Dispatch Page', () => {
     });
   });
 
+  test.describe('Dispatch Options Disclosure', () => {
+    test.beforeEach(async ({ page }) => {
+      await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+      await page.goto(DISPATCH_URL);
+      await page.waitForLoadState('networkidle');
+    });
+
+    test('options are hidden until the trigger is clicked', async ({ page }) => {
+      const toggle = page.locator('.dispatch-toggle');
+      const panel = page.locator('#dispatch-options');
+
+      await expect(toggle).toBeVisible();
+      await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      await expect(toggle).toHaveAttribute('aria-controls', 'dispatch-options');
+      await expect(panel).toHaveClass(/\bhidden\b/);
+      await expect(page.locator('.dispatch-prompt-send[data-target="cli"]')).not.toBeVisible();
+    });
+
+    test('clicking the trigger expands the panel', async ({ page }) => {
+      const toggle = page.locator('.dispatch-toggle');
+      const panel = page.locator('#dispatch-options');
+
+      await toggle.click();
+
+      await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      await expect(panel).not.toHaveClass(/\bhidden\b/);
+      await expect(page.locator('.dispatch-prompt-send[data-target="cli"]')).toBeVisible();
+    });
+
+    test('clicking the trigger again collapses the panel', async ({ page }) => {
+      const toggle = page.locator('.dispatch-toggle');
+      const panel = page.locator('#dispatch-options');
+
+      await toggle.click();
+      await expect(panel).not.toHaveClass(/\bhidden\b/);
+
+      await toggle.click();
+      await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      await expect(panel).toHaveClass(/\bhidden\b/);
+    });
+
+    test('panel closes on outside click', async ({ page }) => {
+      const toggle = page.locator('.dispatch-toggle');
+      const panel = page.locator('#dispatch-options');
+
+      await toggle.click();
+      await expect(panel).not.toHaveClass(/\bhidden\b/);
+
+      // Click somewhere outside the trigger and panel
+      await page.locator('h1').click();
+
+      await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      await expect(panel).toHaveClass(/\bhidden\b/);
+    });
+
+    test('panel closes on Esc keydown', async ({ page }) => {
+      const toggle = page.locator('.dispatch-toggle');
+      const panel = page.locator('#dispatch-options');
+
+      await toggle.click();
+      await expect(panel).not.toHaveClass(/\bhidden\b/);
+
+      await page.keyboard.press('Escape');
+
+      await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      await expect(panel).toHaveClass(/\bhidden\b/);
+    });
+
+    test('clicking an option inside the panel still dispatches (send handler fires)', async ({ page }) => {
+      await page.goto('/test/clear-dispatch-queue');
+      await page.goto(DISPATCH_URL);
+      await page.waitForLoadState('networkidle');
+
+      const textarea = page.locator('.dispatch-prompt-input');
+      await textarea.fill('Dispatch from inside the panel');
+
+      await page.locator('.dispatch-toggle').click();
+
+      const dispatchBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
+      await dispatchBtn.click();
+
+      // The delegated send handler must still fire despite the disclosure handler
+      await expect(dispatchBtn).toHaveText('dispatched!');
+      await expect(textarea).toHaveValue('');
+
+      const listResponse = await page.request.get(`${API_PREFIX}/api/dispatch`);
+      const { items } = await listResponse.json();
+      const customItem = items.find(i => i.prompt === 'Dispatch from inside the panel');
+      expect(customItem).toBeDefined();
+      expect(customItem.target).toBe('cli');
+    });
+  });
+
   test.describe('Queue List', () => {
     test.beforeEach(async ({ page }) => {
       await page.goto('/test/clear-dispatch-queue');
@@ -303,9 +401,10 @@ test.describe('Dispatch Page', () => {
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
 
-      // Dispatch from the page
+      // Dispatch from the page (expand the options panel first)
       const textarea = page.locator('.dispatch-prompt-input');
       await textarea.fill('Live dispatch test');
+      await page.locator('.dispatch-toggle').click();
       const dispatchBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
       await dispatchBtn.click();
       await expect(dispatchBtn).toHaveText('dispatched!');
