@@ -488,6 +488,9 @@ test.describe('Feature Toggle Settings', () => {
     await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/dispatch`);
     await page.waitForLoadState('networkidle');
 
+    // The +proxy toggle lives inside the Dispatch options disclosure panel;
+    // expand it so the button is visible.
+    await page.locator('.dispatch-toggle').click();
     await expect(page.locator('.prompt-proxy-toggle')).toBeVisible();
   });
 

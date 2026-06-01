@@ -71,14 +71,6 @@
 
 /* Action buttons: see common-actions.css (.action-btn) */
 
-.action-btns-label {
-  font-family: var(--font-content);
-  font-size: 0.85em;
-  color: var(--fg-dim);
-  margin-right: 0.15rem;
-  user-select: none;
-}
-
 /* =============================================================================
    Dispatch Prompt
    ============================================================================= */
@@ -118,6 +110,23 @@
 
 .dispatch-prompt-actions {
   gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* Disclosure trigger reuses the .action-btn / .action-btn.save look */
+.dispatch-toggle {
+  user-select: none;
+}
+
+/* Options panel: inline expand below the trigger, matching the tree aesthetic.
+   Show/hide is driven by the global .hidden class (display: none !important). */
+.dispatch-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  flex-basis: 100%;
+  padding: 0.4rem 0 0.1rem;
 }
 
 .dispatch-prompt-feedback {
