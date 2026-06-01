@@ -1327,12 +1327,36 @@ h1 {
   align-items: center;
 }
 
-.prompt-actions-label {
+/* LIN-295: Dispatch disclosure — a single trigger expands the options panel.
+   Shared by the main project view (.prompt-dispatch-toggle) and the swipe view
+   (.dispatch-toggle inside .swipe-prompt-actions). The panel relies on the
+   global .hidden rule (display: none !important) for show/hide. */
+.dispatch-toggle {
+  user-select: none;
+}
+
+.dispatch-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* Disclosure trigger on the main project view: matches the .prompt-dispatch look */
+.prompt-dispatch-toggle {
+  background: none;
+  border: 1px solid var(--blue, #4EA7FC);
+  padding: 0.25rem 0.5rem;
   font-family: var(--font-content);
   font-size: 0.8em;
-  color: var(--fg-dim);
-  margin-right: 0.15rem;
-  user-select: none;
+  color: var(--blue, #4EA7FC);
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.prompt-dispatch-toggle:hover {
+  background: var(--blue, #4EA7FC);
+  color: white;
 }
 
 /* Dispatch button - similar to copy but with accent color */

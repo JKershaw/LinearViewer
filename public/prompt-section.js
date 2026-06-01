@@ -118,12 +118,18 @@
       html += `<button class="prompt-proxy-toggle${active}" data-action="proxy-toggle" title="Append proxy API instructions to prompt">+proxy</button>`;
     }
     if (dispatchEnabled) {
+      // LIN-295: collapse dispatch targets behind a single Dispatch \u25BE disclosure.
+      // Panel ID is per-issue so concurrent prompt sections never collide.
+      const panelId = `swipe-dispatch-options-${(opts.issue && opts.issue.id) || 'x'}`;
+      html += `<button class="swipe-prompt-dispatch-toggle dispatch-toggle" data-action="dispatch-toggle" aria-expanded="false" aria-haspopup="true" aria-controls="${esc(panelId)}">Dispatch \u25BE</button>`;
+      html += `<div class="dispatch-options hidden" id="${esc(panelId)}">`;
       html += '<button class="swipe-prompt-dispatch" data-action="dispatch" data-target="cli">cli</button>';
       html += '<button class="swipe-prompt-dispatch" data-action="dispatch" data-target="web">web</button>';
       html += '<button class="swipe-prompt-dispatch" data-action="dispatch" data-target="dash">dash</button>';
       if (isLocalhost) {
         html += '<button class="swipe-prompt-dispatch" data-action="dispatch" data-target="local">harbour</button>';
       }
+      html += '</div>';
     }
     html += '<button class="swipe-prompt-change" data-action="change" title="Choose another prompt">\u21BB change</button>';
     return html;
@@ -445,6 +451,17 @@
         return;
       }
 
+      if (action === 'dispatch-toggle') {
+        const panel = btn.getAttribute('aria-controls')
+          ? container.querySelector(`#${CSS.escape(btn.getAttribute('aria-controls'))}`)
+          : null;
+        if (!panel) return;
+        const open = btn.getAttribute('aria-expanded') === 'true';
+        btn.setAttribute('aria-expanded', open ? 'false' : 'true');
+        panel.classList.toggle('hidden', open);
+        return;
+      }
+
       if (action === 'dispatch') {
         handleDispatch(btn);
         return;
@@ -505,7 +522,35 @@
       }
     }
 
+    // LIN-295: close this section's open dispatch panel(s). Scoped to the
+    // container so one prompt section never affects another's panel state.
+    function closeDispatchPanels() {
+      container.querySelectorAll('.dispatch-toggle[aria-expanded="true"]').forEach((toggle) => {
+        toggle.setAttribute('aria-expanded', 'false');
+        const id = toggle.getAttribute('aria-controls');
+        const panel = id ? container.querySelector(`#${CSS.escape(id)}`) : null;
+        if (panel) panel.classList.add('hidden');
+      });
+    }
+
+    function onDocClick(e) {
+      // Close when the click lands outside this container, or inside it but not
+      // on the trigger/panel. Leaving in-panel clicks alone keeps the panel open
+      // after a dispatch so the button feedback stays visible.
+      if (container.contains(e.target) &&
+          (e.target.closest('.dispatch-toggle') || e.target.closest('.dispatch-options'))) {
+        return;
+      }
+      closeDispatchPanels();
+    }
+
+    function onDocKeydown(e) {
+      if (e.key === 'Escape') closeDispatchPanels();
+    }
+
     container.addEventListener('click', handleClick);
+    document.addEventListener('click', onDocClick);
+    document.addEventListener('keydown', onDocKeydown);
     render();
 
     return {
@@ -513,6 +558,8 @@
         destroyed = true;
         if (abortController) abortController.abort();
         container.removeEventListener('click', handleClick);
+        document.removeEventListener('click', onDocClick);
+        document.removeEventListener('keydown', onDocKeydown);
       },
       getCachedLabel() {
         const l = lastPromptLabel.get(issueId);

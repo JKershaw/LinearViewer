@@ -334,3 +334,91 @@ test.describe('Swipe Page', () => {
     expect(page.url()).toContain('/swipe/TEST-14');
   });
 });
+
+// LIN-295: the swipe view's shared prompt section (public/prompt-section.js)
+// collapses dispatch targets behind a single "Dispatch ▾" disclosure trigger.
+test.describe('Swipe Dispatch Options Disclosure', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/test/clear-dispatch-queue');
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+    await page.goto(SWIPE_URL);
+    await page.waitForLoadState('networkidle');
+  });
+
+  // Open the Prompts accordion and fetch a prompt so the action cluster renders.
+  async function loadPromptSection(page) {
+    await page.locator('.swipe-accordion-header[data-accordion="prompts"]').click();
+    const section = page.locator('.prompt-section');
+    await section.locator('.swipe-prompt-btn').first().click();
+    // Fresh state renders the action cluster with the disclosure trigger.
+    await expect(section.locator('.dispatch-toggle')).toBeVisible({ timeout: 10000 });
+    return section;
+  }
+
+  test('dispatch targets are hidden until the trigger is clicked', async ({ page }) => {
+    const section = await loadPromptSection(page);
+    const toggle = section.locator('.dispatch-toggle');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    const cliBtn = section.locator('.swipe-prompt-dispatch[data-target="cli"]');
+    await expect(cliBtn).toBeHidden();
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(cliBtn).toBeVisible();
+  });
+
+  test('clicking the trigger again collapses the panel', async ({ page }) => {
+    const section = await loadPromptSection(page);
+    const toggle = section.locator('.dispatch-toggle');
+    const cliBtn = section.locator('.swipe-prompt-dispatch[data-target="cli"]');
+
+    await toggle.click();
+    await expect(cliBtn).toBeVisible();
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(cliBtn).toBeHidden();
+  });
+
+  test('clicking outside the panel collapses it', async ({ page }) => {
+    const section = await loadPromptSection(page);
+    const toggle = section.locator('.dispatch-toggle');
+    const cliBtn = section.locator('.swipe-prompt-dispatch[data-target="cli"]');
+
+    await toggle.click();
+    await expect(cliBtn).toBeVisible();
+
+    await section.locator('.swipe-prompt-name').click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(cliBtn).toBeHidden();
+  });
+
+  test('pressing Escape collapses the panel', async ({ page }) => {
+    const section = await loadPromptSection(page);
+    const toggle = section.locator('.dispatch-toggle');
+    const cliBtn = section.locator('.swipe-prompt-dispatch[data-target="cli"]');
+
+    await toggle.click();
+    await expect(cliBtn).toBeVisible();
+
+    await page.keyboard.press('Escape');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(cliBtn).toBeHidden();
+  });
+
+  test('dispatch fires from inside the panel and the panel stays open', async ({ page }) => {
+    const section = await loadPromptSection(page);
+    const toggle = section.locator('.dispatch-toggle');
+    await toggle.click();
+
+    const cliBtn = section.locator('.swipe-prompt-dispatch[data-target="cli"]');
+    await cliBtn.click();
+
+    // Delegated dispatch handler fires from inside the panel (✓ feedback).
+    await expect(cliBtn).toHaveText('✓');
+    // Panel is intentionally not auto-closed after dispatch.
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(cliBtn).toBeVisible();
+  });
+});

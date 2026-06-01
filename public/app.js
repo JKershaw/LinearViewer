@@ -965,6 +965,55 @@ function setPromptActionsDisabled(container, disabled) {
 }
 
 /**
+ * Close every open dispatch options panel on the page.
+ */
+function closeAllDispatchPanels() {
+  document.querySelectorAll('.dispatch-toggle[aria-expanded="true"]').forEach((toggle) => {
+    toggle.setAttribute('aria-expanded', 'false')
+    const panel = document.getElementById(toggle.getAttribute('aria-controls'))
+    if (panel) panel.classList.add('hidden')
+  })
+}
+
+/**
+ * LIN-295: Dispatch options disclosure for the main project view.
+ *
+ * The dashboard renders many dispatch clusters (one per prompt/recommend/foreman
+ * container, across multiple sections), so this is delegated on document and
+ * iterates over all `.dispatch-toggle` triggers rather than assuming a singleton.
+ * State is owned by each trigger (aria-expanded) and its `.dispatch-options`
+ * panel, resolved via aria-controls. Mirrors the dispatch page convention;
+ * close on outside-click and Esc.
+ *
+ * Note: the delegated `.prompt-dispatch` send handler (initPrompts) lives on
+ * document too and calls stopPropagation, which does NOT stop sibling document
+ * listeners — so we leave clicks inside a panel alone (guard below) and the send
+ * handler still fires. The panel is intentionally not auto-closed after dispatch
+ * so the "dispatched!" button feedback stays visible.
+ */
+function initDispatchToggles() {
+  document.addEventListener('click', (e) => {
+    const toggle = e.target.closest('.dispatch-toggle')
+    if (toggle) {
+      const panel = document.getElementById(toggle.getAttribute('aria-controls'))
+      if (!panel) return
+      const open = toggle.getAttribute('aria-expanded') === 'true'
+      toggle.setAttribute('aria-expanded', open ? 'false' : 'true')
+      panel.classList.toggle('hidden', open)
+      return
+    }
+    // Outside-click: close any open panels. Leave clicks inside a panel alone so
+    // the delegated .prompt-dispatch send handler still fires.
+    if (e.target.closest('.dispatch-options')) return
+    closeAllDispatchPanels()
+  })
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeAllDispatchPanels()
+  })
+}
+
+/**
  * Initialize prompt functionality for clickable labels
  */
 function initPrompts() {
@@ -2298,6 +2347,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initNavBar()
   initSearch()
   initPrompts()
+  initDispatchToggles()
   initMorePrompts()
   initRecommendations()
   initForeman()
