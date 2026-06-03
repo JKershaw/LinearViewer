@@ -1,6 +1,6 @@
 # Linear Projects Viewer
 
-A minimal, CLI-aesthetic web app that displays your Linear projects and issues as a collapsible tree.
+A minimal, CLI-aesthetic web app that displays your Linear projects and issues as a collapsible tree — plus a growing set of focused views and an API surface for AI agents.
 
 ```
 Platform Projects
@@ -18,9 +18,17 @@ Platform Projects
 
 ## Features
 
-- **OAuth Login** - Sign in with your Linear account, choose your workspace
-- **Tree View** - Hierarchical display of projects and nested issues
-- **In Progress Section** - Dedicated view of all in-progress issues across projects
+### Views
+
+- **Tree View** - Hierarchical display of projects and nested issues, with an In Progress section across all projects
+- **Swipe** - Mobile-first triage, one issue at a time, with an integrated prompt
+- **Swim** - Swim-lane / flow layout showing sequence, parallelism, and dependencies
+- **Roadmap** - Narrative project summary with an at-a-glance digest, recap, and Brief; report history is browsable
+- **Ship** - Radial view of work heading toward delivery
+- **Pipeline** - Floor view reconstructing work loops from activity
+
+### Interaction
+
 - **Status Indicators** - ✓ done, ◐ in-progress, ○ todo
 - **Collapsible** - Click to expand/collapse projects and sub-issues
 - **Issue Details** - Click any issue to see description, assignee, dates, labels
@@ -28,6 +36,28 @@ Platform Projects
 - **Reset View** - One-click reset to default collapse state
 - **Landing Preview** - Static projects preview for unauthenticated users
 - **Mobile Friendly** - Responsive design for all screen sizes
+
+### AI
+
+- **AI Prompts** - Generate a focused prompt for any task from its title, description, parent, and siblings
+- **AI Recommendations** - LLM-suggested next actions via OpenRouter (handwritten and AI-generated prompt paths)
+- **Bring Your Own Key** - Connect your OpenRouter account via OAuth, or fall back to a server key
+- **Free Tier** - Rate-limited free prompts when a server free-tier key is configured
+
+### For AI Agents
+
+- **Dispatch Queue** - Queue prompts for external consumers (AI agents, automation) with bearer-token auth
+- **Linear API Proxy** - Token-scoped REST-like access to the Linear workspace (read / readWrite), with audit logging and rate limiting
+- **Foreman** - Task automation endpoints (stack, prompt, recommend, recap, brief, status, sessions, tasks, playbook)
+- **Linear CLI** - `node lib/linear-cli.js <command>` for agents to query and modify Linear directly
+
+## Authentication
+
+Three ways to sign in:
+
+- **Linear OAuth 2.0** - Sign in with your Linear account, choose your workspace. Sessions last 24 hours with automatic refresh.
+- **Personal Access Token (PAT)** - Set `LINEAR_ACCESS_TOKEN` for zero-config local development; you're logged in automatically.
+- **OpenRouter OAuth (PKCE)** - Optionally connect an OpenRouter account for AI features; returns a permanent API key stored alongside your session.
 
 ## Setup
 
@@ -40,6 +70,8 @@ Platform Projects
    - **Redirect URI**: `http://localhost:3000/auth/callback`
 4. Save and copy your **Client ID** and **Client Secret**
 
+> Prefer no OAuth setup for local dev? Skip straight to a [Personal Access Token](#authentication) — set `LINEAR_ACCESS_TOKEN` in `.env` and you're done.
+
 ### 2. Configure Environment
 
 ```bash
@@ -49,22 +81,34 @@ cp .env.example .env
 Edit `.env` with your credentials:
 
 ```
+# Linear OAuth
 LINEAR_CLIENT_ID=your-client-id
 LINEAR_CLIENT_SECRET=your-client-secret
 LINEAR_REDIRECT_URI=http://localhost:3000/auth/callback
+
+# Or, for local dev without OAuth: a personal API key from linear.app/settings/api
+LINEAR_ACCESS_TOKEN=lin_api_xxxxx
+
+# Sessions
 SESSION_SECRET=any-random-string-for-sessions
 PORT=3000
 MONGODB_URI=mongodb://localhost:27017  # Optional: uses file-based storage if not set
+
+# OpenRouter (optional, enables AI features)
+OPENROUTER_API_KEY=your-openrouter-key
+OPENROUTER_REDIRECT_URI=http://localhost:3000/auth/openrouter/callback
+OPENROUTER_FREE_TIER_KEY=server-key-for-free-tier  # Optional: enables rate-limited free prompts
 ```
 
 ### 3. Install and Run
 
 ```bash
 npm install
+npx playwright install   # first-time setup, for E2E tests
 npm start
 ```
 
-Visit `http://localhost:3000` and click **Login with Linear**.
+Visit `http://localhost:3000` and click **Login with Linear** (or, in PAT mode, you'll be logged in automatically).
 
 ## Usage
 
@@ -77,7 +121,15 @@ Visit `http://localhost:3000` and click **Login with Linear**.
 | Click "reset" link | Reset all collapse states to default |
 | Visit `/logout` | Sign out |
 
-Session lasts 24 hours, then you'll need to log in again.
+OAuth sessions last 24 hours (with automatic refresh); PAT sessions re-create automatically on the next visit.
+
+## Testing
+
+```bash
+npm test        # Run unit tests + Playwright E2E tests
+npm run test:unit # Run unit tests only
+npm run test:ui   # Run E2E tests with the Playwright UI
+```
 
 ## Deployment
 
@@ -88,16 +140,24 @@ LINEAR_REDIRECT_URI=https://yourdomain.com/auth/callback
 SESSION_SECRET=generate-a-secure-random-string
 ```
 
-And add `https://yourdomain.com/auth/callback` to your Linear OAuth app's redirect URIs.
+And add `https://yourdomain.com/auth/callback` to your Linear OAuth app's redirect URIs. HTTPS and secure cookies are enforced in production.
 
 ## Tech Stack
 
-- **Server**: Express.js (Node.js)
+- **Server**: Express.js (Node.js, ES modules)
 - **API**: Linear GraphQL API via `graphql-request`
-- **Auth**: OAuth 2.0 with Linear
+- **Auth**: Linear OAuth 2.0, Personal Access Token, and OpenRouter OAuth (PKCE)
+- **AI**: OpenRouter API client for recommendations and prompt generation
 - **Sessions**: MongoDB (production) or MangoDB file-based storage (development)
 - **Frontend**: Vanilla JS, no build step
 - **Styling**: Light theme, monospace font, CLI aesthetic
+- **Testing**: Playwright E2E with GitHub Actions CI
+
+## Documentation
+
+- [`CLAUDE.md`](CLAUDE.md) - Architecture and full project reference
+- [`docs/dispatch-integration.md`](docs/dispatch-integration.md) - Dispatch queue consumer guide
+- [`docs/proxy-integration.md`](docs/proxy-integration.md) - Linear API Proxy consumer guide
 
 ## License
 
