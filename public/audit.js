@@ -313,7 +313,7 @@ function renderLabelsContent(labels) {
     }
   };
 
-  // Workflow labels (simplified 3-label system: preparing, blocked, bug)
+  // Workflow labels (blocked, bug)
   const workflowLabelsTags = workflow.labels.map(renderWorkflowLabel).join('');
 
   // Other labels (non-workflow)

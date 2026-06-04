@@ -1,7 +1,6 @@
 import { test, expect } from '../fixtures/test-base.js';
 
 // UUIDs for test issues (from mock-data.js)
-const PREPARING_ISSUE_ID = '66666666-6666-6666-6666-666666666666';
 const BLOCKED_ISSUE_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 const BUG_ISSUE_ID = 'dddddddd-dddd-dddd-dddd-ddddddddddde';
 const PLAN_ISSUE_ID = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeef';

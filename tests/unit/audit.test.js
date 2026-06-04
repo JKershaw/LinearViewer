@@ -3,13 +3,12 @@
  *
  * Run with: node --test tests/unit/audit.test.js
  *
- * Tests the simplified 3-label system (preparing, blocked, bug).
+ * Tests the workflow label system (blocked, bug).
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { computeAuditFromData } from '../../lib/audit.js';
 import { getQueueForLabel, matchesPattern, isInQueue, QUEUE_CONFIG, QUEUE_TYPES } from '../../lib/queue-config.js';
-import { PREPARING_LABEL } from '../../lib/workflow-config.js';
 
 // =============================================================================
 // Queue Config Tests
@@ -17,25 +16,21 @@ import { PREPARING_LABEL } from '../../lib/workflow-config.js';
 
 describe('Queue Config', () => {
   test('matchesPattern returns true for exact match', () => {
-    assert.strictEqual(matchesPattern('preparing', ['preparing']), true);
+    assert.strictEqual(matchesPattern('bug', ['bug']), true);
   });
 
   test('matchesPattern is case-insensitive', () => {
-    assert.strictEqual(matchesPattern('Preparing', ['preparing']), true);
-    assert.strictEqual(matchesPattern('PREPARING', ['preparing']), true);
-    assert.strictEqual(matchesPattern('preparing', ['PREPARING']), true);
+    assert.strictEqual(matchesPattern('Bug', ['bug']), true);
+    assert.strictEqual(matchesPattern('BUG', ['bug']), true);
+    assert.strictEqual(matchesPattern('bug', ['BUG']), true);
   });
 
   test('matchesPattern returns false for non-match', () => {
-    assert.strictEqual(matchesPattern('bug', ['preparing']), false);
-    assert.strictEqual(matchesPattern('feature', ['preparing', 'blocked']), false);
+    assert.strictEqual(matchesPattern('feature', ['bug']), false);
+    assert.strictEqual(matchesPattern('feature', ['bug', 'blocked']), false);
   });
 
-  test('getQueueForLabel returns queue name for label-based queues', () => {
-    assert.strictEqual(getQueueForLabel('preparing'), 'Preparing');
-  });
-
-  test('getQueueForLabel returns null for non-label-based queues and unmapped labels', () => {
+  test('getQueueForLabel returns null for all labels (no label-based queues)', () => {
     assert.strictEqual(getQueueForLabel('bug'), null);
     assert.strictEqual(getQueueForLabel('blocked'), null);
     assert.strictEqual(getQueueForLabel('feature'), null);
@@ -47,25 +42,25 @@ describe('Queue Config', () => {
     assert.ok(requiredQueues.length > 0, 'Should have required queues');
 
     const requiredNames = requiredQueues.map(q => q.name);
-    assert.ok(requiredNames.includes('Preparing'), 'Preparing should be required');
     assert.ok(requiredNames.includes('Ready'), 'Ready should be required');
     assert.ok(requiredNames.includes('In-Progress'), 'In-Progress should be required');
   });
 
   test('isInQueue matches label-based queues correctly', () => {
-    const preparingQueue = QUEUE_CONFIG.find(q => q.name === 'Preparing');
+    // No label-based queues exist in config; exercise the branch synthetically.
+    const labelQueue = { name: 'Test', type: QUEUE_TYPES.LABEL, labelPatterns: ['bug'] };
 
-    const issueWithPreparing = {
-      labels: { nodes: [{ name: 'preparing' }] },
-      state: { type: 'backlog' }
-    };
-    const issueWithoutPreparing = {
+    const issueWithBug = {
       labels: { nodes: [{ name: 'bug' }] },
       state: { type: 'backlog' }
     };
+    const issueWithoutBug = {
+      labels: { nodes: [{ name: 'blocked' }] },
+      state: { type: 'backlog' }
+    };
 
-    assert.strictEqual(isInQueue(issueWithPreparing, preparingQueue), true);
-    assert.strictEqual(isInQueue(issueWithoutPreparing, preparingQueue), false);
+    assert.strictEqual(isInQueue(issueWithBug, labelQueue), true);
+    assert.strictEqual(isInQueue(issueWithoutBug, labelQueue), false);
   });
 
   test('isInQueue matches state-based queues correctly', () => {
@@ -87,14 +82,14 @@ describe('Queue Config', () => {
   test('isInQueue matches implicit queues correctly', () => {
     const readyQueue = QUEUE_CONFIG.find(q => q.name === 'Ready');
 
-    // Backlog with no preparing label = Ready
+    // Backlog state = Ready
     const readyIssue = {
       labels: { nodes: [] },
       state: { type: 'backlog' }
     };
-    // Backlog with preparing = NOT Ready
-    const notReadyIssue = {
-      labels: { nodes: [{ name: 'preparing' }] },
+    // Backlog with a work-issue label is still Ready (labels do not exclude)
+    const labeledBacklogIssue = {
+      labels: { nodes: [{ name: 'bug' }] },
       state: { type: 'backlog' }
     };
     // Started state = NOT Ready
@@ -104,7 +99,7 @@ describe('Queue Config', () => {
     };
 
     assert.strictEqual(isInQueue(readyIssue, readyQueue), true);
-    assert.strictEqual(isInQueue(notReadyIssue, readyQueue), false);
+    assert.strictEqual(isInQueue(labeledBacklogIssue, readyQueue), true);
     assert.strictEqual(isInQueue(startedIssue, readyQueue), false);
   });
 });
@@ -129,9 +124,8 @@ describe('Audit Computation', () => {
       { id: 'ws3', name: 'Done', type: 'completed', team: { id: 'team1', name: 'Engineering' } }
     ],
     labels: [
-      { id: 'l1', name: 'preparing', color: '#000', issues: { nodes: [{ id: 'i1' }] } },
       { id: 'l2', name: 'blocked', color: '#f00', issues: { nodes: [{ id: 'i2' }] } },
-      { id: 'l3', name: 'bug', color: '#f00', issues: { nodes: [{ id: 'i4' }] } }
+      { id: 'l3', name: 'bug', color: '#f00', issues: { nodes: [{ id: 'i1' }] } }
     ],
     issues: [
       {
@@ -143,7 +137,7 @@ describe('Audit Computation', () => {
         assignee: { id: 'u1', name: 'Alice' },
         estimate: 3,
         dueDate: '2025-01-15',
-        labels: { nodes: [{ id: 'l1', name: 'preparing' }] }
+        labels: { nodes: [{ id: 'l3', name: 'bug' }] }
       },
       {
         id: 'i2',
@@ -223,11 +217,10 @@ describe('Audit Computation', () => {
   test('maps labels to queues correctly', () => {
     const report = computeAuditFromData(baseMockData);
 
-    // preparing should be mapped
-    assert.strictEqual(report.labels.mappedCount, 1);
-    assert.ok(report.labels.mapped.some(l => l.name === 'preparing' && l.queue === 'Preparing'));
+    // No label-based queues exist, so nothing maps to a queue
+    assert.strictEqual(report.labels.mappedCount, 0);
 
-    // blocked and bug should be unmapped (not label-based queues)
+    // blocked and bug are both unmapped (not label-based queues)
     assert.strictEqual(report.labels.unmappedCount, 2);
     assert.ok(report.labels.unmapped.some(l => l.name === 'blocked'));
     assert.ok(report.labels.unmapped.some(l => l.name === 'bug'));
@@ -239,15 +232,9 @@ describe('Audit Computation', () => {
     // Workflow labels object should exist
     assert.ok(report.labels.workflow, 'Should have workflow labels analysis');
 
-    // Should have 3 workflow labels (preparing, blocked, bug)
-    assert.strictEqual(report.labels.workflow.labels.length, 3);
-    assert.strictEqual(report.labels.workflow.totalCount, 3);
-
-    // preparing exists in mock data
-    const preparing = report.labels.workflow.labels.find(l => l.name === 'preparing');
-    assert.ok(preparing, 'Should have preparing workflow label');
-    assert.strictEqual(preparing.exists, true);
-    assert.strictEqual(preparing.issueCount, 1);
+    // Should have 2 workflow labels (blocked, bug)
+    assert.strictEqual(report.labels.workflow.labels.length, 2);
+    assert.strictEqual(report.labels.workflow.totalCount, 2);
 
     // blocked exists in mock data
     const blocked = report.labels.workflow.labels.find(l => l.name === 'blocked');
@@ -259,8 +246,8 @@ describe('Audit Computation', () => {
     assert.ok(bug, 'Should have bug workflow label');
     assert.strictEqual(bug.exists, true);
 
-    // Present count should be 3 (preparing, blocked, bug all exist)
-    assert.strictEqual(report.labels.workflow.presentCount, 3);
+    // Present count should be 2 (blocked, bug both exist)
+    assert.strictEqual(report.labels.workflow.presentCount, 2);
     assert.strictEqual(report.labels.workflow.missingCount, 0);
   });
 
@@ -279,8 +266,7 @@ describe('Audit Computation', () => {
     assert.strictEqual(report.labels.otherCount, 1);
     assert.ok(report.labels.other.some(l => l.name === 'custom-label'));
 
-    // Workflow labels (preparing, blocked, bug) should NOT appear in other
-    assert.ok(!report.labels.other.some(l => l.name === 'preparing'));
+    // Workflow labels (blocked, bug) should NOT appear in other
     assert.ok(!report.labels.other.some(l => l.name === 'blocked'));
     assert.ok(!report.labels.other.some(l => l.name === 'bug'));
   });
@@ -288,13 +274,12 @@ describe('Audit Computation', () => {
   test('identifies queue readiness with hybrid approach', () => {
     const report = computeAuditFromData(baseMockData);
 
-    // With backlog and started states, and preparing label:
-    // - Preparing: exists (label-based, preparing exists)
+    // With backlog and started states:
     // - Ready: exists (implicit, backlog state exists)
     // - In-Progress: exists (state-based, started state exists)
     // - Review: does not exist (state-based, review state not in workflowStates)
 
-    // All required queues exist (Preparing, Ready, In-Progress)
+    // All required queues exist (Ready, In-Progress)
     assert.ok(report.queues.isReady, 'Should be ready (all required queues exist)');
     assert.strictEqual(report.queues.missingRequired.length, 0);
   });
@@ -302,7 +287,7 @@ describe('Audit Computation', () => {
   test('calculates readiness score correctly', () => {
     const report = computeAuditFromData(baseMockData);
 
-    // All 3 required queues exist (Preparing, Ready, In-Progress) = 100%
+    // All required queues exist (Ready, In-Progress) = 100%
     assert.strictEqual(report.queues.readinessScore, 100);
   });
 
@@ -370,7 +355,7 @@ describe('Multiple Labels Handling', () => {
       projects: [],
       workflowStates: [],
       labels: [
-        { id: 'l1', name: 'preparing', color: '#000', issues: { nodes: [{ id: 'i1' }] } },
+        { id: 'l1', name: 'blocked', color: '#000', issues: { nodes: [{ id: 'i1' }] } },
         { id: 'l2', name: 'bug', color: '#f00', issues: { nodes: [{ id: 'i1' }] } }
       ],
       issues: [
@@ -383,7 +368,7 @@ describe('Multiple Labels Handling', () => {
           assignee: null,
           estimate: null,
           dueDate: null,
-          labels: { nodes: [{ id: 'l1', name: 'preparing' }, { id: 'l2', name: 'bug' }] }
+          labels: { nodes: [{ id: 'l1', name: 'blocked' }, { id: 'l2', name: 'bug' }] }
         }
       ]
     };
@@ -393,9 +378,9 @@ describe('Multiple Labels Handling', () => {
     // Task should not be counted as unlabeled
     assert.strictEqual(report.health.unlabeled.count, 0);
 
-    // preparing should be mapped, bug should be unmapped
-    assert.strictEqual(report.labels.mappedCount, 1); // preparing
-    assert.strictEqual(report.labels.unmappedCount, 1); // bug
+    // No label-based queues, so both labels are unmapped
+    assert.strictEqual(report.labels.mappedCount, 0);
+    assert.strictEqual(report.labels.unmappedCount, 2);
   });
 });
 

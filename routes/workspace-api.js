@@ -11,7 +11,7 @@
 import { Router } from 'express';
 import { fetchIssueContext, fetchRecommendationContext, fetchIssueComments } from '../lib/linear.js';
 import { generatePrompt, generateCustomPrompt, hasPrompt, getAvailablePrompts } from '../lib/prompt-templates.js';
-import { PREPARING_LABEL, WORK_ISSUE_LABELS } from '../lib/workflow-config.js';
+import { WORK_ISSUE_LABELS } from '../lib/workflow-config.js';
 import { parseRepoFromDescription } from '../lib/prompt-formatters.js';
 import { buildForemanPlaybook, buildMiniForemanStep } from '../lib/prompts/foreman-playbook.js';
 import { isRecommendationEnabled, getRecommendation, getRecommendationStream, streamChat } from '../lib/openrouter.js';
@@ -504,11 +504,8 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         let reasoning = 'Start by getting an overview of what this task involves before deciding on the next steps.'
         let goal = 'Summarize what this task involves and how it fits into the broader project context.'
 
-        // Provide contextual mock prompts based on labels (simplified 3-label system)
-        if (labels.includes(PREPARING_LABEL)) {
-          reasoning = 'This task needs preparation before implementation. Research, breakdown, or design work is needed.'
-          goal = 'Complete the necessary preparation work so this task is ready for implementation.'
-        } else if (labels.includes(WORK_ISSUE_LABELS.BLOCKED)) {
+        // Provide contextual mock prompts based on labels
+        if (labels.includes(WORK_ISSUE_LABELS.BLOCKED)) {
           reasoning = 'This task is blocked. Analyzing the blocker will help identify ways to unblock progress.'
           goal = 'Identify the blocker type and root cause, evaluate options to unblock, and recommend the best path.'
         } else if (labels.includes(WORK_ISSUE_LABELS.BUG)) {
@@ -631,10 +628,7 @@ ${goal}`
     let reasoning = 'Start by getting an overview of what this task involves before deciding on the next steps.';
     let goal = 'Summarize what this task involves and how it fits into the broader project context.';
 
-    if (labels.includes(PREPARING_LABEL)) {
-      reasoning = 'This task needs preparation before implementation. Research, breakdown, or design work is needed.';
-      goal = 'Complete the necessary preparation work so this task is ready for implementation.';
-    } else if (labels.includes(WORK_ISSUE_LABELS.BLOCKED)) {
+    if (labels.includes(WORK_ISSUE_LABELS.BLOCKED)) {
       reasoning = 'This task is blocked. Analyzing the blocker will help identify ways to unblock progress.';
       goal = 'Identify the blocker type and root cause, evaluate options to unblock, and recommend the best path.';
     } else if (labels.includes(WORK_ISSUE_LABELS.BUG)) {

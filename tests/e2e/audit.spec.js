@@ -97,8 +97,8 @@ test.describe('Operator Dashboard', () => {
       const queueSection = page.locator('.report-section:has(.section-header:has-text("Queue Readiness"))');
       await expect(queueSection).toBeVisible();
 
-      // Should show queue items (4 queues: Preparing, Ready, In-Progress, Review)
-      await expect(queueSection.locator('.queue-item')).toHaveCount(4);
+      // Should show queue items (3 queues: Ready, In-Progress, Review)
+      await expect(queueSection.locator('.queue-item')).toHaveCount(3);
     });
 
     test('sections are collapsible', async ({ page }) => {
@@ -195,8 +195,8 @@ test.describe('Audit API', () => {
     expect(report.labels.workflow).toHaveProperty('presentCount');
     expect(report.labels.workflow).toHaveProperty('missingCount');
     expect(report.labels.workflow).toHaveProperty('totalCount');
-    expect(report.labels.workflow.labels).toHaveLength(3);
-    expect(report.labels.workflow.totalCount).toBe(3);
+    expect(report.labels.workflow.labels).toHaveLength(2);
+    expect(report.labels.workflow.totalCount).toBe(2);
     expect(report.labels).toHaveProperty('other');
     expect(report.labels).toHaveProperty('otherCount');
 
