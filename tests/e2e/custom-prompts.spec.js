@@ -513,6 +513,41 @@ test.describe('Custom Prompts on Swipe Page', () => {
     await expect(section.locator('.swipe-prompt-text')).toContainText('Analyze:');
   });
 
+  test('dispatch targets are collapsed behind a Dispatch ▾ trigger on swipe', async ({ page }) => {
+    // Enable dispatch so the action cluster renders the dispatch disclosure.
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+
+    const createRes = await page.request.post(API_BASE, {
+      data: { name: 'Swipe Dispatch', template: 'Analyze: {{title}}' }
+    });
+    const { prompt } = await createRes.json();
+
+    await page.goto(SWIPE_URL);
+    await page.waitForLoadState('networkidle');
+
+    await openPromptsAccordion(page);
+    await page.locator('.swipe-prompt-btn-more').click();
+    await page.locator(`.swipe-prompt-btn[data-prompt="custom:${prompt.id}"]`).click();
+
+    const section = page.locator('.prompt-section');
+    await expect(section).toHaveAttribute('data-phase', 'fresh', { timeout: 10000 });
+
+    // Targets are collapsed behind the disclosure trigger.
+    const toggle = section.locator('.disclosure-toggle');
+    await expect(toggle).toBeVisible();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(section.locator('.swipe-prompt-dispatch[data-target="cli"]')).toBeHidden();
+
+    // Expand reveals the targets.
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(section.locator('.swipe-prompt-dispatch[data-target="cli"]')).toBeVisible();
+
+    // Escape collapses it.
+    await page.keyboard.press('Escape');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  });
+
   test('no custom prompt buttons when none exist on swipe page', async ({ page }) => {
     await page.goto(SWIPE_URL);
     await page.waitForLoadState('networkidle');

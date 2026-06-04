@@ -148,9 +148,97 @@ window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
 };
 
 // =============================================================================
+// Disclosure (collapsible options panels)
+// =============================================================================
+
+/**
+ * Generic, delegated disclosure behaviour shared by every collapsible options
+ * panel on every page (e.g. the dashboard/swipe "Dispatch ▾" triggers).
+ *
+ * Markup convention: a trigger element carries `.disclosure-toggle` and
+ * `aria-expanded`; its panel is resolved either via `aria-controls`
+ * (getElementById) or, failing that, the trigger's immediate next sibling.
+ * The panel is shown/hidden through the global `.hidden` class.
+ *
+ * Why delegated rather than per-element init:
+ *  - The dashboard renders many triggers (one per issue × prompt/recommend/
+ *    foreman), so a single shared listener avoids per-instance wiring and the
+ *    id-collision footgun — the panel is resolved relative to the clicked
+ *    trigger, never by a global id lookup that could match the wrong instance.
+ *  - The swipe view builds its trigger client-side and re-renders it on every
+ *    state change; a document-level listener catches those clicks regardless of
+ *    when the element was injected, with no teardown or double-bind concerns.
+ *
+ * Critically, this listener never calls stopPropagation: clicks on option
+ * buttons inside a panel must still reach their own delegated handlers
+ * (`.prompt-dispatch` in app.js, `data-action="dispatch"` in prompt-section.js),
+ * which sit on ancestors of the panel. Outside-click close uses a contains()
+ * guard instead.
+ *
+ * @global
+ */
+window.initDisclosure = function initDisclosure() {
+  if (window.__disclosureInit) return;
+  window.__disclosureInit = true;
+
+  function panelFor(toggle) {
+    const id = toggle.getAttribute('aria-controls');
+    const byId = id && document.getElementById(id);
+    return byId || toggle.nextElementSibling || null;
+  }
+
+  function openToggles() {
+    return document.querySelectorAll('.disclosure-toggle[aria-expanded="true"]');
+  }
+
+  function closePanel(toggle) {
+    const panel = panelFor(toggle);
+    toggle.setAttribute('aria-expanded', 'false');
+    if (panel) panel.classList.add('hidden');
+  }
+
+  function openPanel(toggle) {
+    const panel = panelFor(toggle);
+    toggle.setAttribute('aria-expanded', 'true');
+    if (panel) panel.classList.remove('hidden');
+  }
+
+  document.addEventListener('click', (e) => {
+    const toggle = e.target.closest('.disclosure-toggle');
+    if (toggle) {
+      const wasOpen = toggle.getAttribute('aria-expanded') === 'true';
+      // One open panel at a time (mirrors the navbar selectors).
+      openToggles().forEach((t) => { if (t !== toggle) closePanel(t); });
+      if (wasOpen) closePanel(toggle);
+      else openPanel(toggle);
+      return;
+    }
+
+    // Outside click: close any open panel whose trigger/panel doesn't contain
+    // the click. In-panel option clicks are left alone (no stopPropagation), so
+    // they still bubble to their own send handlers.
+    openToggles().forEach((t) => {
+      const panel = panelFor(t);
+      if (t.contains(e.target) || (panel && panel.contains(e.target))) return;
+      closePanel(t);
+    });
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const open = openToggles();
+    if (!open.length) return;
+    const last = open[open.length - 1];
+    open.forEach(closePanel);
+    last.focus();
+  });
+};
+
+// =============================================================================
 // Auto-initialization
 // =============================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
   initDeployTime();
+  initDisclosure();
 });
