@@ -501,3 +501,47 @@ describe('buildMetaPromptTemplate plan completeness check', () => {
     );
   });
 });
+
+// =============================================================================
+// Surface Assessment (refactoring recommendations) — AI path
+//
+// Research must surface a refactor recommendation, and plan must sequence a named
+// prerequisite refactor as a separate blocking subtask. These guard the meta-prompt
+// rules against drift and mirror the handwritten-path tests in
+// tests/unit/prompt-templates.test.js.
+// =============================================================================
+
+describe('buildMetaPromptTemplate Surface Assessment', () => {
+  function build() {
+    return buildMetaPromptTemplate({
+      issueContext: 'Test context',
+      identifier: 'LIN-1',
+      hasSubtasks: false,
+      subtaskCount: 0,
+      completedCount: 0,
+      inProgressCount: 0,
+      remainingCount: 0,
+      hasComments: false,
+      commentCount: 0,
+      aiHints: 'hints'
+    });
+  }
+
+  test('research-prompts rule requires a Surface Assessment naming any refactor', () => {
+    const result = build();
+    assert.ok(result.includes('Surface Assessment'), 'meta-prompt must require a Surface Assessment');
+    assert.ok(result.includes('refactor needed'), 'must offer the refactor-needed option');
+  });
+
+  test('plan-prompts rule sequences a prerequisite refactor as a separate blocking subtask', () => {
+    const result = build();
+    assert.ok(
+      result.includes('separate blocking subtask'),
+      'plan rule must encode a prerequisite refactor as a separate blocking subtask'
+    );
+    assert.ok(
+      result.includes('do not absorb the refactor into implementation steps'),
+      'plan rule must preserve the sequencing guarantee'
+    );
+  });
+});

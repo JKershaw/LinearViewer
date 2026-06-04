@@ -1052,3 +1052,49 @@ describe('getPromptDescriptionsForAI', () => {
     }
   });
 });
+
+// =============================================================================
+// Surface Assessment (refactoring recommendations) — handwritten path
+//
+// The handwritten path must match the meta-prompt: research surfaces a refactor
+// recommendation (Surface Assessment), and plan turns a named prerequisite refactor
+// into a separate blocking subtask. The mirror tests for the AI path live in
+// tests/unit/openrouter.test.js.
+// =============================================================================
+
+describe('Surface Assessment (handwritten path)', () => {
+  const mockIssue = {
+    id: 'issue-sa',
+    identifier: 'TEST-SA1',
+    title: 'Add a thing',
+    description: 'Add a thing to the codebase',
+    url: 'https://linear.app/test/issue/TEST-SA1',
+    state: { name: 'Todo', type: 'unstarted' },
+    labels: []
+  };
+  const mockContext = { parent: null, siblings: [], project: null, children: [], comments: [] };
+
+  test('research template ends research with a Surface Assessment', () => {
+    const result = generatePrompt('research', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('Surface Assessment'), 'research must include Surface Assessment');
+    assert.ok(result.prompt.includes('refactor needed'), 'must offer the refactor-needed option');
+  });
+
+  test('research routes the Surface Assessment into the comment so plan can read it', () => {
+    const result = generatePrompt('research', mockIssue, mockContext);
+    assert.ok(
+      /\*\*Comment\*\*:[^\n]*Surface Assessment/.test(result.prompt),
+      'Surface Assessment must be part of the comment output, not only the description'
+    );
+  });
+
+  test('plan template sequences a prerequisite refactor as a separate blocking subtask', () => {
+    const result = generatePrompt('plan', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('Surface Assessment'), 'plan must reference the prior Surface Assessment');
+    assert.ok(result.prompt.includes('blocking subtask'), 'plan must encode a prerequisite refactor as a blocking subtask');
+    assert.ok(
+      result.prompt.includes('do not absorb the refactor into implementation'),
+      'plan must preserve the sequencing guarantee'
+    );
+  });
+});
