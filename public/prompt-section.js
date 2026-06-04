@@ -118,12 +118,22 @@
       html += `<button class="prompt-proxy-toggle${active}" data-action="proxy-toggle" title="Append proxy API instructions to prompt">+proxy</button>`;
     }
     if (dispatchEnabled) {
+      // Collapse the dispatch targets behind a single "Dispatch ▾" trigger. The
+      // trigger uses the shared .disclosure-toggle convention (initDisclosure in
+      // common.js, delegated at document level — no per-card wiring needed). It
+      // carries no data-action, so the card's own handleClick ignores it; the
+      // panel is resolved as the trigger's next sibling (no id needed). The
+      // option buttons keep data-action="dispatch" so they still reach
+      // handleDispatch from inside the panel.
+      html += '<button class="swipe-prompt-dispatch-toggle disclosure-toggle" aria-expanded="false" aria-haspopup="true">Dispatch ▾</button>';
+      html += '<div class="swipe-prompt-options hidden">';
       html += '<button class="swipe-prompt-dispatch" data-action="dispatch" data-target="cli">cli</button>';
       html += '<button class="swipe-prompt-dispatch" data-action="dispatch" data-target="web">web</button>';
       html += '<button class="swipe-prompt-dispatch" data-action="dispatch" data-target="dash">dash</button>';
       if (isLocalhost) {
         html += '<button class="swipe-prompt-dispatch" data-action="dispatch" data-target="local">harbour</button>';
       }
+      html += '</div>';
     }
     html += '<button class="swipe-prompt-change" data-action="change" title="Choose another prompt">\u21BB change</button>';
     return html;

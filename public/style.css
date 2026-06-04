@@ -1327,12 +1327,32 @@ h1 {
   align-items: center;
 }
 
-.prompt-actions-label {
+/* Dispatch disclosure trigger — mirrors .prompt-dispatch (blue accent) so the
+   single "Dispatch ▾" entry point reads as the primary dispatch affordance. */
+.dispatch-disclosure {
+  background: none;
+  border: 1px solid var(--blue, #4EA7FC);
+  padding: 0.25rem 0.5rem;
   font-family: var(--font-content);
   font-size: 0.8em;
-  color: var(--fg-dim);
-  margin-right: 0.15rem;
+  color: var(--blue, #4EA7FC);
+  cursor: pointer;
+  border-radius: 3px;
   user-select: none;
+}
+
+.dispatch-disclosure:hover {
+  background: var(--blue, #4EA7FC);
+  color: white;
+}
+
+/* Inline options panel revealed by the disclosure trigger. Show/hide is driven
+   by the global .hidden class; when shown it lays its targets out in a row. */
+.prompt-options {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 /* Dispatch button - similar to copy but with accent color */

@@ -27,6 +27,18 @@ async function clickMoreToggle(page, containerSelector, issueId) {
   await moreToggle.click();
 }
 
+/**
+ * Helper to open the collapsed "Dispatch ▾" options panel within a prompt
+ * container so the cli/web/dash/harbour target buttons become interactable.
+ * No-op if the panel is already open.
+ */
+async function openDispatchOptions(container) {
+  const toggle = container.locator('.disclosure-toggle');
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') {
+    await toggle.click();
+  }
+}
+
 test.describe('Dispatch Queue', () => {
   test.beforeEach(async ({ page }) => {
     // These tests verify real badge polling behavior, so remove the count mock
@@ -63,6 +75,9 @@ test.describe('Dispatch Queue', () => {
 
     // Wait for prompt to load
     await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
+
+    // Dispatch targets are now collapsed behind a "Dispatch ▾" disclosure.
+    await openDispatchOptions(promptContainer);
 
     // Verify four dispatch buttons exist with correct data-target attributes (includes local on localhost)
     const dispatchBtns = promptContainer.locator('.prompt-dispatch');
@@ -104,6 +119,9 @@ test.describe('Dispatch Queue', () => {
     const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
     await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
 
+    // Dispatch targets are now collapsed behind a "Dispatch ▾" disclosure.
+    await openDispatchOptions(promptContainer);
+
     // Click dispatch button
     const dispatchBtn = promptContainer.locator('.prompt-dispatch[data-target="cli"]');
     await dispatchBtn.click();
@@ -137,6 +155,9 @@ test.describe('Dispatch Queue', () => {
     // Wait for prompt to load
     const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
     await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
+
+    // Dispatch targets are now collapsed behind a "Dispatch ▾" disclosure.
+    await openDispatchOptions(promptContainer);
 
     // Click dispatch button
     const dispatchBtn = promptContainer.locator('.prompt-dispatch[data-target="cli"]');
@@ -176,6 +197,9 @@ test.describe('Dispatch Queue', () => {
     const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
     await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
 
+    // Dispatch targets are now collapsed behind a "Dispatch ▾" disclosure.
+    await openDispatchOptions(promptContainer);
+
     const dispatchBtn = promptContainer.locator('.prompt-dispatch[data-target="cli"]');
     await dispatchBtn.click();
 
@@ -203,6 +227,9 @@ test.describe('Dispatch Queue', () => {
 
     const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
     await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
+
+    // Dispatch targets are now collapsed behind a "Dispatch ▾" disclosure.
+    await openDispatchOptions(promptContainer);
 
     const dispatchBtn = promptContainer.locator('.prompt-dispatch[data-target="cli"]');
     await dispatchBtn.click();
@@ -238,6 +265,9 @@ test.describe('Dispatch Queue', () => {
 
     const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
     await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
+
+    // Dispatch targets are now collapsed behind a "Dispatch ▾" disclosure.
+    await openDispatchOptions(promptContainer);
 
     const dispatchBtn = promptContainer.locator('.prompt-dispatch[data-target="cli"]');
     await dispatchBtn.click();
@@ -282,6 +312,9 @@ test.describe('Dispatch Queue', () => {
     const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
     await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
 
+    // Dispatch targets are now collapsed behind a "Dispatch ▾" disclosure.
+    await openDispatchOptions(promptContainer);
+
     await promptContainer.locator('.prompt-dispatch[data-target="cli"]').click();
 
     // Open panel (wait for async badge update)
@@ -322,6 +355,9 @@ test.describe('Dispatch Queue', () => {
     const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
     await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
 
+    // Dispatch targets are now collapsed behind a "Dispatch ▾" disclosure.
+    await openDispatchOptions(promptContainer);
+
     const dispatchBtn = promptContainer.locator('.prompt-dispatch[data-target="cli"]');
     await dispatchBtn.click();
     await expect(dispatchBtn).toHaveText('dispatched!');
@@ -344,6 +380,73 @@ test.describe('Dispatch Queue', () => {
 
     // Badge should update via polling (within 2 seconds given 1s interval)
     await expect(badge).toHaveClass(/hidden/, { timeout: 3000 });
+  });
+
+  // ==========================================================================
+  // LIN-295 Phase 2: "Dispatch ▾" disclosure on the main tree view
+  // ==========================================================================
+
+  // Reveal a loaded prompt container for the blocked issue (without opening the
+  // dispatch panel — these tests drive the disclosure explicitly).
+  async function revealPrompt(page) {
+    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
+    await taskLine.click();
+    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
+    await labelLink.click();
+    const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
+    await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
+    return promptContainer;
+  }
+
+  test('dispatch targets are collapsed behind a Dispatch ▾ trigger', async ({ page }) => {
+    const promptContainer = await revealPrompt(page);
+    const toggle = promptContainer.locator('.disclosure-toggle');
+
+    await expect(toggle).toBeVisible();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    // Targets are hidden until expanded.
+    await expect(promptContainer.locator('.prompt-dispatch[data-target="cli"]')).toBeHidden();
+
+    // Expand.
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(promptContainer.locator('.prompt-dispatch[data-target="cli"]')).toBeVisible();
+
+    // Collapse via the trigger.
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(promptContainer.locator('.prompt-dispatch[data-target="cli"]')).toBeHidden();
+  });
+
+  test('Dispatch panel closes on outside click and Escape', async ({ page }) => {
+    const promptContainer = await revealPrompt(page);
+    const toggle = promptContainer.locator('.disclosure-toggle');
+
+    // Outside click (the prompt name is outside both trigger and panel) closes it.
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await promptContainer.locator('.prompt-name').click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    // Escape closes it.
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await page.keyboard.press('Escape');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  test('dispatch still fires from inside the expanded panel', async ({ page }) => {
+    const promptContainer = await revealPrompt(page);
+    await openDispatchOptions(promptContainer);
+
+    const dispatchBtn = promptContainer.locator('.prompt-dispatch[data-target="cli"]');
+    await dispatchBtn.click();
+    await expect(dispatchBtn).toHaveText('dispatched!');
+
+    // The panel stays open after dispatch so the button feedback remains visible.
+    await expect(promptContainer.locator('.disclosure-toggle')).toHaveAttribute('aria-expanded', 'true');
   });
 });
 

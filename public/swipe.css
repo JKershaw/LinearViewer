@@ -640,6 +640,15 @@ a.swipe-relation-issue:hover {
   cursor: default;
 }
 
+/* Inline dispatch options panel revealed by the "Dispatch ▾" trigger. Hidden
+   via the global .hidden class; when shown it lays its targets out in a row. */
+.swipe-prompt-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  align-items: center;
+}
+
 .prompt-section .prompt-proxy-toggle.active {
   background: #eff4ff;
   color: #2563eb;
