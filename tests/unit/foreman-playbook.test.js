@@ -190,6 +190,14 @@ describe('buildMiniForemanStep', () => {
     assert.ok(text.includes('Authorization: Bearer YOUR_TOKEN'));
   });
 
+  test('clarifies that YOUR_TOKEN is the readWrite proxy token, reused throughout', () => {
+    const text = buildMiniForemanStep({ baseUrl: BASE_URL, issue });
+    assert.ok(text.includes('`YOUR_TOKEN` is a placeholder'));
+    assert.ok(text.includes('readWrite'));
+    assert.ok(/same token/.test(text));
+    assert.ok(/do not substitute a different token/.test(text));
+  });
+
   test('falls back to {identifier} placeholder when issue has no identifier', () => {
     const text = buildMiniForemanStep({ baseUrl: BASE_URL, issue: {} });
     assert.ok(text.includes(`${BASE_URL}/api/proxy/recommend/{identifier}`));
