@@ -709,9 +709,18 @@ describe('retro template', () => {
     assert.ok(!result.prompt.includes('status to "In Progress"'), 'retro should not change status');
   });
 
-  test('writes findings back as a comment', () => {
+  test('presents findings to the user without auto-saving them', () => {
     const result = generatePrompt('retro', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Add findings as a comment'), 'should post retro as a comment');
+    assert.ok(result.prompt.includes('Present your findings to the user'), 'should present findings to the user');
+    assert.ok(!result.prompt.includes('Add findings as a comment'), 'should NOT auto-post a comment');
+    assert.ok(result.prompt.includes('Do not write them back to Linear'), 'should leave next steps to the user');
+  });
+
+  test('handles both completed and in-flight work', () => {
+    const result = generatePrompt('retro', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('in-flight') || result.prompt.includes('in-progress'),
+      'should cover in-progress retros');
+    assert.ok(result.prompt.includes('risk'), 'in-flight retros should flag risks instead of downstream effects');
   });
 
   test('instructs reconstruction from git and Linear history', () => {
@@ -729,8 +738,9 @@ describe('retro template', () => {
 
   test('is excluded from the AI recommendation meta-prompt (user-initiated only)', () => {
     const hints = formatAIHintsForMetaPrompt();
-    assert.ok(!hints.includes('Reconstruct what happened from Linear and git history'),
-      'retro aiHint goal should not appear in the meta-prompt');
+    assert.ok(!hints.includes('reorient'),
+      'retro aiHint should not appear in the meta-prompt');
+    assert.ok(!/\*\*retro\*\*/.test(hints), 'retro should not be listed as an action type');
     // Sanity check: other prompts still flow into the meta-prompt
     assert.ok(hints.includes('research') || hints.includes('plan'),
       'other prompts should still be present in the meta-prompt');
