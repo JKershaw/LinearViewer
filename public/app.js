@@ -1143,9 +1143,12 @@ function initPrompts() {
     // Append proxy block if toggle is active
     prompt = await maybeAppendProxyBlock(prompt, urlKey)
 
-    // Get issue title from the DOM if available
-    const issueEl = issueId ? document.querySelector(`[data-id="${issueId}"]`) : null
-    const issueTitle = issueEl?.querySelector('.title, .title-dim')?.textContent || null
+    // Get issue context from the DOM. The .line carries data-id and
+    // data-identifier; the surrounding .node wrapper shares data-id, so query
+    // the line specifically to read the identifier (the pipeline-loops join key).
+    const lineEl = issueId ? document.querySelector(`.line[data-id="${issueId}"]`) : null
+    const issueTitle = lineEl?.querySelector('.title, .title-dim')?.textContent || null
+    const issueIdentifier = lineEl?.dataset.identifier || null
 
     // Get repo from prompt/recommend container (set by prompt API response)
     const repo = promptContainer.dataset.repo || null
@@ -1153,31 +1156,17 @@ function initPrompts() {
     try {
       dispatchBtn.textContent = 'sending...'
 
-      const payload = {
+      await dispatchPrompt({
+        urlKey,
         prompt,
         promptName,
-        issueId: issueId || null,
-        issueTitle,
-        target
-      }
-      if (repo) payload.repo = repo
-
-      const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        issue: { id: issueId, identifier: issueIdentifier, title: issueTitle },
+        target,
+        repo: repo || undefined
       })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Dispatch failed')
-      }
 
       dispatchBtn.textContent = 'dispatched!'
       dispatchBtn.classList.add('dispatched')
-
-      // Update queue badge if exists
-      updateQueueBadge(urlKey)
 
       setTimeout(() => {
         dispatchBtn.textContent = originalLabel

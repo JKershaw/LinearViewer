@@ -641,16 +641,17 @@ function wireOverlayControls(task, urlKey) {
               dispatchBtn.textContent = 'dispatching...';
               dispatchBtn.disabled = true;
               try {
-                const dRes = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    prompt,
-                    promptName,
-                    target: task.identifier
-                  })
+                // `task` carries id/identifier/title/url — dispatch against the
+                // issue with the default 'cli' target (this overlay has no
+                // target selector). Previously `target` was set to the issue
+                // identifier, which the server rejects as an invalid target.
+                await window.dispatchPrompt({
+                  urlKey,
+                  prompt,
+                  promptName,
+                  issue: task,
+                  target: 'cli'
                 });
-                if (!dRes.ok) throw new Error('Dispatch failed');
                 dispatchBtn.textContent = 'dispatched!';
                 // Trigger a poll to refresh the grid
                 setTimeout(pollState, 1000);

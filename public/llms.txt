@@ -64,6 +64,7 @@ Both In Progress and Projects sections use the same nested structure:
 - `.node > .details` - details panel (sibling of .line within same node)
 - `.node > .children` - container for nested child nodes
 - `[data-id="{linear-issue-id}"]` - task by Linear issue ID (on both .node and .line)
+- `[data-identifier="{LIN-123}"]` - task by Linear identifier (on .line element)
 - `[data-status="todo|in-progress|done"]` - filter by status
 - `[data-section="in-progress|project"]` - scope to section (expand state is independent per section)
 - `[data-parent="{id}"]` - parent ID (on .line element)
