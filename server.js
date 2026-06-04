@@ -54,6 +54,8 @@ import { renderSwipePage } from './lib/render-swipe.js'
 import { renderSwimPage } from './lib/render-swim.js'
 import { renderShipPage } from './lib/render-ship.js'
 import { createPipelineRoutes } from './routes/pipeline.js'
+import { getLoopsForWorkspace } from './lib/pipeline-loops.js'
+import { buildSessionCounts } from './lib/sessions-view.js'
 import { renderRoadmapPage } from './lib/render-roadmap.js'
 import { calculateVelocity, buildExecutionQueue, groupByProject, projectTimeline, findCriticalPaths, assessRisks, analyzeRoadmap, issueToRoadmapCard } from './lib/roadmap.js'
 import { renderProxyPage } from './lib/render-proxy.js'
@@ -806,7 +808,7 @@ async function getWorkspaceOpenRouterKey(urlKey, linearUserId) {
 app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, briefCacheStore, workspaceFromUrl, getWorkspaceAccessToken, getWorkspaceOpenRouterKey, workspacePreferencesStore }))
 
 // Mount workspace API routes (audit, prompts, recommendations, comments, images)
-app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore }))
+app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, foremanStore }))
 
 // Mount pipeline routes (page + JSON polling)
 app.use(createPipelineRoutes({ workspaceFromUrl, getWorkspaceAccessToken, dispatchQueueStore, foremanStore, getOpenRouterSource, getDeployInfo, handleUnauthorizedError }))
@@ -891,7 +893,15 @@ app.get('/workspace/:urlKey/swipe/:identifier?', workspaceFromUrl, async (req, r
       customPrompts = (await customPromptsStore.list(workspace.urlKey)).map(p => ({ id: p.id, name: p.name }));
     } catch (e) { /* non-fatal */ }
 
-    const { trees, inProgressTrees, recentActivityTrees, organizationName } = await fetchAndPrepareProjects(workspace.accessToken, teamId);
+    // Fetch projects and dispatched-session counts in parallel. The counts feed
+    // each card's "Dispatched Sessions [N]" header (no per-card fetch). Counts
+    // are non-critical — a store hiccup must never break the page, so fall back
+    // to an empty map.
+    const [{ trees, inProgressTrees, recentActivityTrees, organizationName }, allLoops] = await Promise.all([
+      fetchAndPrepareProjects(workspace.accessToken, teamId),
+      getLoopsForWorkspace(workspace.urlKey, { dispatchStore: dispatchQueueStore, foremanStore }).catch(() => [])
+    ]);
+    const sessionCounts = buildSessionCounts(allLoops);
     const isLocalhost = ['localhost', '127.0.0.1'].some(h => req.get('host')?.startsWith(h));
     const html = renderSwipePage(
       { projectTrees: trees, inProgressTrees, recentActivityTrees, organizationName },
@@ -903,7 +913,8 @@ app.get('/workspace/:urlKey/swipe/:identifier?', workspaceFromUrl, async (req, r
         featureFlags: getFeatureFlags(req.session),
         customPrompts,
         initialIdentifier: req.params.identifier || null,
-        isLocalhost
+        isLocalhost,
+        sessionCounts
       }
     );
     res.send(html);

@@ -19,6 +19,8 @@ import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
 import { hashContext } from '../lib/recap-cache.js';
+import { getLoopsForIssue } from '../lib/pipeline-loops.js';
+import { toSessionView } from '../lib/sessions-view.js';
 import { runAudit, computeAuditFromData } from '../lib/audit.js';
 import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
@@ -34,7 +36,7 @@ import { testMockTeams, testMockData } from '../tests/fixtures/mock-data.js';
  * @param {Function} options.getOpenRouterSource - Helper to determine OpenRouter source
  * @returns {Router} Express router
  */
-export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore }) {
+export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, foremanStore }) {
   const router = Router();
 
   // ===========================================================================
@@ -895,6 +897,46 @@ ${goal}`;
       res.status(500).json({ error: 'Failed to fetch comments', message: error.message })
     }
   })
+
+  // ===========================================================================
+  // Dispatched Sessions API
+  // ===========================================================================
+
+  /**
+   * GET the dispatched sessions (pipeline Loops) for a single issue.
+   *
+   * Reads the local dispatch + foreman stores only — no Linear call, no access
+   * token — so it's cheap and works offline. The `:identifier` is the Linear
+   * identifier (e.g. LIN-42), which is the join key the Swipe card already holds.
+   * Returns newest-first so the most recent session is at the top.
+   *
+   * @route GET /workspace/:urlKey/api/sessions/:identifier
+   * @returns {Object} { sessions: Array<SessionView> }
+   */
+  router.get('/workspace/:urlKey/api/sessions/:identifier', workspaceFromUrl, async (req, res) => {
+    const workspace = req.workspace;
+    const { identifier } = req.params;
+
+    if (!identifier || identifier.length > 100) {
+      return res.status(400).json({ error: 'Invalid issue identifier' });
+    }
+    if (!dispatchQueueStore || !foremanStore) {
+      return res.status(503).json({ error: 'Sessions are not available' });
+    }
+
+    try {
+      const loops = await getLoopsForIssue(workspace.urlKey, identifier, {
+        dispatchStore: dispatchQueueStore,
+        foremanStore
+      });
+      // getLoopsForIssue returns oldest-first; reverse for newest-first display.
+      const sessions = loops.map(toSessionView).reverse();
+      res.json({ sessions });
+    } catch (error) {
+      console.error('Sessions GET error:', error);
+      res.status(500).json({ error: 'Failed to fetch sessions', message: error.message });
+    }
+  });
 
   // ===========================================================================
   // Recap API (LIN-261)

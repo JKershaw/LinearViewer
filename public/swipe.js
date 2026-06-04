@@ -385,6 +385,22 @@ function renderCard(direction) {
   </div>`;
   }
 
+  // Dispatched Sessions accordion (lazy loaded) — only when dispatch is enabled,
+  // since no dispatch means no sessions can exist. Header shows the count baked
+  // in server-side, so "[N]" is visible at a glance without opening.
+  if (urlKey && dispatchEnabled) {
+    const count = issue.sessionCount || 0;
+    accordionHtml += `
+  <div class="swipe-card-accordion">
+    <div class="swipe-accordion-header" data-accordion="sessions">
+      <span class="swipe-accordion-toggle">▶</span> Dispatched Sessions <span class="swipe-sessions-count">[${count}]</span>
+    </div>
+    <div class="swipe-accordion-body" data-accordion-body="sessions">
+      <div class="sessions-section" data-sessions-placeholder="1"></div>
+    </div>
+  </div>`;
+  }
+
   // Prompts accordion (lazy loaded, fifth position) — only available when authenticated
   if (urlKey) {
     const cached = window.PromptSection && window.PromptSection.getCached
@@ -688,6 +704,26 @@ function handleAccordionClick(e) {
         window.BriefSection.init(placeholder, {
           urlKey,
           identifier: issue.identifier || issue.id
+        });
+      }
+    }
+  }
+
+  if (type === 'sessions' && !isOpen) {
+    const placeholder = body.querySelector('[data-sessions-placeholder="1"]');
+    if (placeholder && window.SessionsSection) {
+      placeholder.removeAttribute('data-sessions-placeholder');
+      const issue = filteredIssues[currentIndex];
+      if (issue && urlKey) {
+        window.SessionsSection.init(placeholder, {
+          urlKey,
+          identifier: issue.identifier || issue.id,
+          onCount: (n) => {
+            // Reconcile the header [N] with the authoritative fetch.
+            const countEl = header.querySelector('.swipe-sessions-count');
+            if (countEl) countEl.textContent = `[${n}]`;
+            issue.sessionCount = n;
+          }
         });
       }
     }

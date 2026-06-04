@@ -334,3 +334,115 @@ test.describe('Swipe Page', () => {
     expect(page.url()).toContain('/swipe/TEST-14');
   });
 });
+
+// ============================================================================
+// Dispatched Sessions accordion
+// ============================================================================
+
+test.describe('Swipe Dispatched Sessions', () => {
+  const API = `/workspace/${TEST_WORKSPACE_URL_KEY}`;
+  const DISPATCH_FEATURES = JSON.stringify({ dispatch: true });
+
+  // Acts as a dispatch consumer to seed real sessions, mirroring
+  // pipeline-scenarios.spec.js. Sessions come from the local dispatch/foreman
+  // stores, so no Linear mock is needed.
+  async function clearSessions(page) {
+    await page.goto('/test/clear-dispatch-queue');
+    await page.goto('/test/clear-dispatch-history');
+    await page.goto('/test/clear-dispatch-tokens');
+  }
+
+  async function createConsumerToken(page) {
+    const resp = await page.goto('/test/create-dispatch-token');
+    return JSON.parse(await resp.text()).token;
+  }
+
+  async function dispatchForIssue(page, issueIdentifier, promptName = 'implementation') {
+    const resp = await page.request.post(`${API}/api/dispatch`, {
+      data: { prompt: `Work on ${issueIdentifier}`, promptName, issueIdentifier, target: 'cli' }
+    });
+    expect(resp.status(), `dispatch failed: ${await resp.text()}`).toBe(201);
+    return (await resp.json()).item;
+  }
+
+  async function takeItem(page, itemId, token) {
+    await page.request.post(`/api/dispatch/take/${itemId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
+
+  async function postFeedback(page, itemId, token, message) {
+    const resp = await page.request.post(`/api/dispatch/feedback/${itemId}`, {
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      data: { message }
+    });
+    expect(resp.ok(), `feedback failed: ${await resp.text()}`).toBeTruthy();
+  }
+
+  async function openSwipeAt(page, identifier) {
+    await page.goto(`${SWIPE_URL}/${identifier}`);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('.swipe-card-identifier')).toHaveText(identifier);
+  }
+
+  function sessionsAccordion(page) {
+    return page.locator('.swipe-accordion-header[data-accordion="sessions"]');
+  }
+
+  test.beforeEach(async ({ page }) => {
+    await clearSessions(page);
+    await page.goto(`/test/set-session?features=${encodeURIComponent(DISPATCH_FEATURES)}`);
+  });
+
+  test('accordion header shows the baked-in session count', async ({ page }) => {
+    await dispatchForIssue(page, 'TEST-14');
+    await dispatchForIssue(page, 'TEST-14');
+
+    await openSwipeAt(page, 'TEST-14');
+
+    const header = sessionsAccordion(page);
+    await expect(header).toBeVisible();
+    await expect(header.locator('.swipe-sessions-count')).toHaveText('[2]');
+  });
+
+  test('opening the accordion lists the sessions', async ({ page }) => {
+    await dispatchForIssue(page, 'TEST-14', 'research');
+    await dispatchForIssue(page, 'TEST-14', 'implementation');
+
+    await openSwipeAt(page, 'TEST-14');
+    await sessionsAccordion(page).click();
+
+    const entries = page.locator('[data-accordion-body="sessions"] .session-entry');
+    await expect(entries).toHaveCount(2);
+  });
+
+  test('shows the empty state for an issue with no sessions', async ({ page }) => {
+    await openSwipeAt(page, 'TEST-13');
+
+    const header = sessionsAccordion(page);
+    await expect(header.locator('.swipe-sessions-count')).toHaveText('[0]');
+
+    await header.click();
+    await expect(page.locator('[data-accordion-body="sessions"] .sessions-empty')).toContainText('No sessions yet');
+  });
+
+  test('renders feedback on a session', async ({ page }) => {
+    const token = await createConsumerToken(page);
+    const item = await dispatchForIssue(page, 'TEST-15');
+    await takeItem(page, item.id, token);
+    await postFeedback(page, item.id, token, 'agent finished the work');
+
+    await openSwipeAt(page, 'TEST-15');
+    await sessionsAccordion(page).click();
+
+    await expect(page.locator('[data-accordion-body="sessions"] .session-feedback-entry'))
+      .toContainText('agent finished the work');
+  });
+
+  test('accordion is absent when dispatch feature is disabled', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: false }))}`);
+    await openSwipeAt(page, 'TEST-14');
+
+    await expect(sessionsAccordion(page)).toHaveCount(0);
+  });
+});

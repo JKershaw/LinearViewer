@@ -263,6 +263,10 @@ main.pipeline-page[data-url-key]       - page container
 - Overlay polls `/workspace/{urlKey}/api/pipeline/task/{identifier}` every 2s
 - Health colors: green (≤3 loops), amber (≤6), red (>6)
 
+### Dispatched Sessions (Swipe)
+- `GET /workspace/{urlKey}/api/sessions/{identifier}` → `{ sessions: [...] }` (newest-first dispatch loops for one issue, with feedback)
+- Swipe card "Dispatched Sessions [N]" accordion (`data-accordion="sessions"`); shown only when the `dispatch` feature flag is on. `[N]` count is baked into the card server-side.
+
 ## Common Workflows
 
 1. **Find in-progress tasks**: Look in "In Progress" section at top (displays as tree with subtasks)
