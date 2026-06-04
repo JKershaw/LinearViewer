@@ -211,6 +211,16 @@ const GRAPHQL_TIMEOUT_MS = 25_000;
 // (stack fetches all issues with pagination, recommend calls Linear + OpenRouter).
 const MULTI_REQUEST_TIMEOUT_MS = 50_000;
 
+// Backstop for the Linear context fetch on recommendation-style endpoints
+// (recommend/recap/brief/status). These fetches run behind an armed keepalive
+// (http-keepalive.js flushes a 200 + heartbeat at 25s and then holds the
+// connection open), so a 25s cap on the fetch would fire at the same instant
+// the keepalive starts covering for slowness — surfacing a 504 on healthy large
+// epics instead of letting the request complete. A larger budget keeps the cap
+// as a backstop for a genuinely hung Linear while letting normal large epics
+// finish. Paired with an AbortSignal so a trip actually cancels the request.
+const CONTEXT_FETCH_TIMEOUT_MS = 45_000;
+
 /**
  * Race a promise against a timeout. Throws a TimeoutError if the promise
  * doesn't settle within `ms` milliseconds, giving the same error shape as
@@ -226,6 +236,30 @@ function withTimeout(promise, ms) {
       }, ms);
     })
   ]);
+}
+
+/**
+ * Like withTimeout, but cancels the underlying work via AbortSignal when the
+ * deadline passes instead of leaving the HTTP request running orphaned. workFn
+ * receives the signal to thread into fetch (e.g. fetchRecommendationContext).
+ * Clears its timer on settle so a fast success doesn't abort a later request,
+ * and preserves the TimeoutError shape so graphqlErrorStatus()/graphqlErrorDetail()
+ * still map a trip to a 504.
+ */
+async function fetchWithTimeout(workFn, ms) {
+  const controller = new AbortController();
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new DOMException('Linear API request timed out', 'TimeoutError'));
+    }, ms);
+  });
+  try {
+    return await Promise.race([workFn(controller.signal), timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // Pattern to detect null bytes and dangerous control characters
@@ -2071,7 +2105,7 @@ ${readEndpoints}${writeEndpoints}
       const keepalive = armKeepalive(res);
       try {
         // Fetch issue context with two-tier support for parent tasks
-        const context = await withTimeout(fetchRecommendationContext(accessToken, identifier), GRAPHQL_TIMEOUT_MS);
+        const context = await fetchWithTimeout((signal) => fetchRecommendationContext(accessToken, identifier, { signal }), CONTEXT_FETCH_TIMEOUT_MS);
         const { issue, parent, siblings, project, children, comments, focusedChild } = context;
 
         // Get AI-generated recommendation (uses session OAuth key or server-side OPENROUTER_API_KEY)
@@ -2168,7 +2202,7 @@ ${readEndpoints}${writeEndpoints}
             return keepalive.send(404, { error: 'Issue not found' });
           }
         } else {
-          context = await withTimeout(fetchRecommendationContext(accessToken, identifier), GRAPHQL_TIMEOUT_MS);
+          context = await fetchWithTimeout((signal) => fetchRecommendationContext(accessToken, identifier, { signal }), CONTEXT_FETCH_TIMEOUT_MS);
         }
 
         const canonicalId = context.issue?.id || identifier;
@@ -2302,7 +2336,7 @@ ${readEndpoints}${writeEndpoints}
             return keepalive.send(404, { error: 'Issue not found' });
           }
         } else {
-          context = await withTimeout(fetchRecommendationContext(accessToken, identifier), GRAPHQL_TIMEOUT_MS);
+          context = await fetchWithTimeout((signal) => fetchRecommendationContext(accessToken, identifier, { signal }), CONTEXT_FETCH_TIMEOUT_MS);
         }
 
         const canonicalId = context.issue?.id || identifier;
@@ -2412,7 +2446,7 @@ ${readEndpoints}${writeEndpoints}
             return keepalive.send(404, { error: 'Issue not found' });
           }
         } else {
-          context = await withTimeout(fetchRecommendationContext(accessToken, identifier), GRAPHQL_TIMEOUT_MS);
+          context = await fetchWithTimeout((signal) => fetchRecommendationContext(accessToken, identifier, { signal }), CONTEXT_FETCH_TIMEOUT_MS);
         }
 
         const canonicalId = context.issue?.id || identifier;
@@ -2546,7 +2580,7 @@ ${readEndpoints}${writeEndpoints}
             return keepalive.send(404, { error: 'Issue not found' });
           }
         } else {
-          context = await withTimeout(fetchRecommendationContext(accessToken, identifier), GRAPHQL_TIMEOUT_MS);
+          context = await fetchWithTimeout((signal) => fetchRecommendationContext(accessToken, identifier, { signal }), CONTEXT_FETCH_TIMEOUT_MS);
         }
 
         const canonicalId = context.issue?.id || identifier;
