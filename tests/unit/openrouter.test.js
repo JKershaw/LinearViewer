@@ -15,6 +15,7 @@ import {
   SIBLING_CAP,
   EPIC_TITLE_PATTERN
 } from '../../lib/openrouter.js';
+import { buildMetaPromptTemplate } from '../../lib/prompts/meta-prompt-template.js';
 
 // =============================================================================
 // stripCodeBlockMarkers Tests
@@ -453,5 +454,50 @@ describe('formatIssueContext cousins', () => {
     };
     const result = formatIssueContext(baseIssue, context);
     assert.ok(!result.includes('Related work in the parent epic'), 'cousins must be skipped in two-tier branch');
+  });
+});
+
+// =============================================================================
+// Meta-prompt: Plan completeness check (mirrors handwritten path)
+// =============================================================================
+
+describe('buildMetaPromptTemplate plan completeness check', () => {
+  function build() {
+    return buildMetaPromptTemplate({
+      issueContext: 'Test context',
+      identifier: 'LIN-1',
+      hasSubtasks: false,
+      subtaskCount: 0,
+      completedCount: 0,
+      inProgressCount: 0,
+      remainingCount: 0,
+      hasComments: false,
+      commentCount: 0,
+      aiHints: 'hints'
+    });
+  }
+
+  // The completeness check guards the breadth failure: the same concept is often
+  // implemented in more than one place under a different name, and a clean search
+  // for the cited symbol is not proof the surface list is complete.
+  test('Plan-prompts rule instructs a completeness check on the surface list', () => {
+    const result = build();
+    assert.ok(result.includes('completeness check'), 'meta-prompt must require a completeness check');
+  });
+
+  test('completeness check searches the concept, not just the cited symbol', () => {
+    const result = build();
+    assert.ok(
+      result.includes('not proof of completeness'),
+      'must state that a clean search for the cited symbol is not proof of completeness'
+    );
+  });
+
+  test('completeness check allows a genuinely single-surface result', () => {
+    const result = build();
+    assert.ok(
+      result.includes('single-surface result is valid'),
+      'must not misfire on genuinely localized changes'
+    );
   });
 });

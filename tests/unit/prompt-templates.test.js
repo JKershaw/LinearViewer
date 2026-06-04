@@ -563,6 +563,37 @@ describe('plan template', () => {
     assert.ok(result.prompt.includes('NAME the routed-around contract gap'), 'must instruct naming the gap');
     assert.ok(result.prompt.includes('none identified'), 'must allow "none identified" as an explicit alternative');
   });
+
+  // Completeness check: the surface list must be verified complete, not just correct.
+  // Guards the breadth failure — the same concept implemented in more than one place
+  // under a different name, where a clean search for the cited symbol looks like proof
+  // of completeness but is not.
+  test('includes a Completeness check on the surface list', () => {
+    const result = generatePrompt('plan', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('Completeness check'), 'plan prompt must include a Completeness check');
+    assert.ok(
+      result.prompt.includes('not proof of completeness'),
+      'must warn that a clean search for the cited symbol is not proof of completeness'
+    );
+  });
+
+  test('Completeness check follows surface enumeration and precedes the session-fit question', () => {
+    const result = generatePrompt('plan', mockIssue, mockContext);
+    const listIdx = result.prompt.indexOf('List the surfaces your plan touches');
+    const compIdx = result.prompt.indexOf('Completeness check');
+    const fitIdx = result.prompt.indexOf('does this fit one focused session');
+    assert.ok(listIdx !== -1 && compIdx !== -1 && fitIdx !== -1, 'all three anchors must be present');
+    assert.ok(listIdx < compIdx, 'Completeness check must follow surface enumeration');
+    assert.ok(compIdx < fitIdx, 'Completeness check must precede the session-fit question');
+  });
+
+  test('Completeness check does not misfire on genuinely single-surface work', () => {
+    const result = generatePrompt('plan', mockIssue, mockContext);
+    assert.ok(
+      result.prompt.includes('single-surface change is a valid result'),
+      'must explicitly allow a single-surface result so scope is a decision, not invented breadth'
+    );
+  });
 });
 
 // =============================================================================
