@@ -12,7 +12,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { hasPrompt, getPromptLabels, generatePrompt, getAvailablePrompts, getPromptDescriptionsForAI, PROMPT_TEMPLATES, PROMPT_CATEGORIES, getPreWorkLabels, isPreWorkLabel } from '../../lib/prompt-templates.js';
+import { hasPrompt, getPromptLabels, generatePrompt, getAvailablePrompts, getPromptDescriptionsForAI, PROMPT_TEMPLATES, PROMPT_CATEGORIES, getPreWorkLabels, isPreWorkLabel, formatAIHintsForMetaPrompt } from '../../lib/prompt-templates.js';
 import { PREPARING_LABEL, WORK_ISSUE_LABELS } from '../../lib/workflow-config.js';
 import { COMPLETION_SIGNALS } from '../../lib/completion-signals.js';
 
@@ -725,6 +725,15 @@ describe('retro template', () => {
     assert.ok(result.prompt.includes('## Goal'));
     assert.ok(result.prompt.includes('hindsight'));
     assert.ok(result.prompt.includes('Lessons'));
+  });
+
+  test('is excluded from the AI recommendation meta-prompt (user-initiated only)', () => {
+    const hints = formatAIHintsForMetaPrompt();
+    assert.ok(!hints.includes('Reconstruct what happened from Linear and git history'),
+      'retro aiHint goal should not appear in the meta-prompt');
+    // Sanity check: other prompts still flow into the meta-prompt
+    assert.ok(hints.includes('research') || hints.includes('plan'),
+      'other prompts should still be present in the meta-prompt');
   });
 });
 
