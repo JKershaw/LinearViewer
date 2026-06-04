@@ -97,11 +97,12 @@ describe('getPromptLabels', () => {
     assert.ok(labels.includes('context'));
     assert.ok(labels.includes('implementation'));
     assert.ok(labels.includes('review'));
+    assert.ok(labels.includes('retro'));
   });
 
-  test('has exactly 14 templates', () => {
+  test('has exactly 15 templates', () => {
     const labels = getPromptLabels();
-    assert.strictEqual(labels.length, 14);
+    assert.strictEqual(labels.length, 15);
   });
 });
 
@@ -274,7 +275,8 @@ describe('PROMPT_TEMPLATES', () => {
       'spike',
       'context',
       'implementation',
-      'review'
+      'review',
+      'retro'
     ];
     for (const labelName of expectedTemplates) {
       assert.ok(PROMPT_TEMPLATES[labelName], `Template for ${labelName} should exist`);
@@ -665,6 +667,64 @@ describe('look-into template', () => {
     assert.ok(result.prompt.includes('Fetch details'), 'should include fetch step');
     assert.ok(result.prompt.includes('Present your findings to the user'), 'should present findings to user');
     assert.ok(!result.prompt.includes('Add findings as a comment'), 'should NOT write back to Linear');
+  });
+});
+
+// =============================================================================
+// retro Template Tests
+// =============================================================================
+
+describe('retro template', () => {
+  const mockIssue = {
+    id: 'issue-retro',
+    identifier: 'TEST-R1',
+    title: 'Add export feature',
+    description: 'Let users export their data',
+    url: 'https://linear.app/test/issue/TEST-R1',
+    state: { name: 'Done', type: 'completed' },
+    labels: [],
+    assignee: null
+  };
+
+  const mockContext = {
+    parent: null,
+    siblings: [],
+    project: { name: 'Product', description: 'Product work' },
+    children: [],
+    comments: []
+  };
+
+  test('returns retro as name', () => {
+    const result = generatePrompt('retro', mockIssue, mockContext);
+    assert.strictEqual(result.name, 'retro');
+  });
+
+  test('has UNIVERSAL category', () => {
+    const template = PROMPT_TEMPLATES['retro'];
+    assert.strictEqual(template.category, PROMPT_CATEGORIES.UNIVERSAL);
+  });
+
+  test('does NOT include status change instruction (read-only template)', () => {
+    const result = generatePrompt('retro', mockIssue, mockContext);
+    assert.ok(!result.prompt.includes('status to "In Progress"'), 'retro should not change status');
+  });
+
+  test('writes findings back as a comment', () => {
+    const result = generatePrompt('retro', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('Add findings as a comment'), 'should post retro as a comment');
+  });
+
+  test('instructs reconstruction from git and Linear history', () => {
+    const result = generatePrompt('retro', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('git log --grep=TEST-R1'), 'should reference task commits by identifier');
+    assert.ok(result.prompt.includes('Downstream'), 'should cover downstream effects');
+  });
+
+  test('includes goal with retrospective concepts', () => {
+    const result = generatePrompt('retro', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('## Goal'));
+    assert.ok(result.prompt.includes('hindsight'));
+    assert.ok(result.prompt.includes('Lessons'));
   });
 });
 

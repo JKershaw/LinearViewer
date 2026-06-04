@@ -47,7 +47,7 @@ lib/
   parse-landing.js     Parses markdown content for landing page
   prompt-templates.js  Prompt template query functions and main entry point
   prompt-formatters.js Shared formatting helpers for prompt templates
-  prompt-template-defs.js  Prompt template definitions (14 templates)
+  prompt-template-defs.js  Prompt template definitions (15 templates)
   prompts/
     meta-prompt-template.js  Meta-prompt for AI recommendation generation
   dispatch-store.js    Dispatch queue storage

@@ -37,12 +37,12 @@ describe('COMPLETION_SIGNALS', () => {
     ...expectedLabelTypes,
     'plan', 'code-review',
     'look-into', 'triage', 'breakdown', 'research', 'scoping',
-    'design', 'spike', 'context', 'implementation', 'review'
+    'design', 'spike', 'context', 'implementation', 'review', 'retro'
   ];
 
-  test('has all 15 expected prompt types', () => {
+  test('has all 16 expected prompt types', () => {
     const keys = Object.keys(COMPLETION_SIGNALS);
-    assert.strictEqual(keys.length, 15, 'Should have exactly 15 prompt types');
+    assert.strictEqual(keys.length, 16, 'Should have exactly 16 prompt types');
     for (const type of expectedPromptTypes) {
       assert.ok(type in COMPLETION_SIGNALS, `Should have ${type} signal`);
     }
@@ -127,10 +127,10 @@ describe('Signal Content', () => {
 // =============================================================================
 
 describe('getDefinedSignalTypes', () => {
-  test('returns all 15 signal types', () => {
+  test('returns all 16 signal types', () => {
     const defined = getDefinedSignalTypes();
     assert.ok(Array.isArray(defined));
-    assert.strictEqual(defined.length, 15);
+    assert.strictEqual(defined.length, 16);
   });
 
   test('returns all expected types', () => {
@@ -138,7 +138,7 @@ describe('getDefinedSignalTypes', () => {
     const expectedTypes = [
       PREPARING_LABEL, 'blocked', 'bug',
       'plan', 'code-review', 'look-into', 'triage', 'breakdown',
-      'research', 'scoping', 'design', 'spike', 'context', 'implementation', 'review'
+      'research', 'scoping', 'design', 'spike', 'context', 'implementation', 'review', 'retro'
     ];
     for (const type of expectedTypes) {
       assert.ok(defined.includes(type), `Should include ${type}`);
@@ -165,11 +165,11 @@ describe('hasSignals', () => {
     assert.strictEqual(hasSignals(''), false);
   });
 
-  test('returns true for all 15 defined types', () => {
+  test('returns true for all 16 defined types', () => {
     const allTypes = [
       PREPARING_LABEL, 'blocked', 'bug',
       'plan', 'code-review', 'look-into', 'triage', 'breakdown',
-      'research', 'scoping', 'design', 'spike', 'context', 'implementation', 'review'
+      'research', 'scoping', 'design', 'spike', 'context', 'implementation', 'review', 'retro'
     ];
     for (const type of allTypes) {
       assert.strictEqual(hasSignals(type), true, `${type} should have signals`);
@@ -201,11 +201,11 @@ describe('getSignal', () => {
     assert.strictEqual(getSignal('nonexistent'), null);
   });
 
-  test('returns signal for all 15 defined types', () => {
+  test('returns signal for all 16 defined types', () => {
     const allTypes = [
       PREPARING_LABEL, 'blocked', 'bug',
       'plan', 'code-review', 'look-into', 'triage', 'breakdown',
-      'research', 'scoping', 'design', 'spike', 'context', 'implementation', 'review'
+      'research', 'scoping', 'design', 'spike', 'context', 'implementation', 'review', 'retro'
     ];
     for (const type of allTypes) {
       const signal = getSignal(type);
@@ -299,11 +299,11 @@ describe('formatSignalsForPrompt', () => {
     assert.strictEqual(formatSignalsForPrompt('nonexistent'), null);
   });
 
-  test('returns formatted string for all 15 types', () => {
+  test('returns formatted string for all 16 types', () => {
     const allTypes = [
       PREPARING_LABEL, 'blocked', 'bug',
       'plan', 'code-review', 'look-into', 'triage', 'breakdown',
-      'research', 'scoping', 'design', 'spike', 'context', 'implementation', 'review'
+      'research', 'scoping', 'design', 'spike', 'context', 'implementation', 'review', 'retro'
     ];
     for (const type of allTypes) {
       const formatted = formatSignalsForPrompt(type);
