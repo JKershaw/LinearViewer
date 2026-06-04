@@ -97,6 +97,8 @@ Changes to prompt behavior (feature flags, workflow instructions, context format
 
 The ticket staleness check (re-ground against current code: list referenced files/symbols, `git log --since=<createdAt>`, re-read source at HEAD before trusting the ticket) lives in BOTH paths — `formatStalenessCheck()` in the handwritten path and the "Re-ground the Ticket" structure block + quality rule in the meta-prompt.
 
+When changing prompt behavior, see **[docs/prompt-change-validation.md](docs/prompt-change-validation.md)** for the repeatable process (both-paths rule, overfitting guards, structural tests, and the offline A/B eval harness `scripts/eval-completeness-check.mjs`).
+
 ## Code Style
 
 - ES modules (`import`/`export`)
