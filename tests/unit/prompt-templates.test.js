@@ -3,8 +3,7 @@
  *
  * Run with: node --test tests/unit/prompt-templates.test.js
  *
- * Tests the simplified 3-label system:
- * - preparing: Pre-implementation work
+ * Tests the workflow label system:
  * - blocked: Work stuck on external dependency
  * - bug: Investigating unexpected behavior
  *
@@ -12,8 +11,8 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { hasPrompt, getPromptLabels, generatePrompt, getAvailablePrompts, getPromptDescriptionsForAI, PROMPT_TEMPLATES, PROMPT_CATEGORIES, getPreWorkLabels, isPreWorkLabel, formatAIHintsForMetaPrompt } from '../../lib/prompt-templates.js';
-import { PREPARING_LABEL, WORK_ISSUE_LABELS } from '../../lib/workflow-config.js';
+import { hasPrompt, getPromptLabels, generatePrompt, getAvailablePrompts, getPromptDescriptionsForAI, PROMPT_TEMPLATES, PROMPT_CATEGORIES, formatAIHintsForMetaPrompt } from '../../lib/prompt-templates.js';
+import { WORK_ISSUE_LABELS } from '../../lib/workflow-config.js';
 import { COMPLETION_SIGNALS } from '../../lib/completion-signals.js';
 
 // =============================================================================
@@ -103,37 +102,6 @@ describe('getPromptLabels', () => {
   test('has exactly 15 templates', () => {
     const labels = getPromptLabels();
     assert.strictEqual(labels.length, 15);
-  });
-});
-
-// =============================================================================
-// getPreWorkLabels Tests
-// =============================================================================
-
-describe('getPreWorkLabels', () => {
-  test('returns array with preparing label', () => {
-    const labels = getPreWorkLabels();
-    assert.ok(Array.isArray(labels));
-    assert.strictEqual(labels.length, 1);
-    assert.ok(labels.includes(PREPARING_LABEL));
-  });
-});
-
-// =============================================================================
-// isPreWorkLabel Tests
-// =============================================================================
-
-describe('isPreWorkLabel', () => {
-  test('returns true for preparing label', () => {
-    assert.strictEqual(isPreWorkLabel('preparing'), true);
-    assert.strictEqual(isPreWorkLabel('Preparing'), true);
-    assert.strictEqual(isPreWorkLabel('PREPARING'), true);
-  });
-
-  test('returns false for other labels', () => {
-    assert.strictEqual(isPreWorkLabel('blocked'), false);
-    assert.strictEqual(isPreWorkLabel('bug'), false);
-    assert.strictEqual(isPreWorkLabel('in-breakdown'), false);
   });
 });
 
@@ -518,20 +486,16 @@ describe('plan template', () => {
     assert.ok(result.prompt.includes('## If Blocked'));
   });
 
-  test('includes preparing label removal instruction when issue has preparing label', () => {
+  test('does not include preparing label removal instruction', () => {
     const issueWithPreparing = {
       ...mockIssue,
       labels: ['preparing']
     };
     const result = generatePrompt('plan', issueWithPreparing, mockContext);
-    assert.ok(result.prompt.includes('Label Update'));
-    assert.ok(result.prompt.includes('preparing'));
-    assert.ok(result.prompt.includes('Remove it'));
-  });
-
-  test('does not include preparing label removal when not present', () => {
-    const result = generatePrompt('plan', mockIssue, mockContext);
+    // The preparing label may still appear as data in the Labels section,
+    // but the "remove the preparing label" instruction must be gone.
     assert.ok(!result.prompt.includes('Label Update'));
+    assert.ok(!result.prompt.includes('Remove it in Linear'));
   });
 
   // LIN-279: Strategy Framing must run before Scope Assessment.
@@ -813,12 +777,12 @@ describe('triage template', () => {
     assert.strictEqual(template.category, PROMPT_CATEGORIES.UNIVERSAL);
   });
 
-  test('includes label selection guide with 3 labels', () => {
+  test('includes label selection guide with work-issue labels', () => {
     const result = generatePrompt('triage', mockIssue, mockContext);
     assert.ok(result.prompt.includes('Label Selection Guide'));
-    assert.ok(result.prompt.includes('preparing'));
     assert.ok(result.prompt.includes('blocked'));
     assert.ok(result.prompt.includes('bug'));
+    assert.ok(!result.prompt.includes('preparing'));
   });
 });
 
@@ -984,14 +948,14 @@ describe('getAvailablePrompts', () => {
     assert.ok(!available.includes('code-review'), 'Should not include code-review');
   });
 
-  test('does not return plan or code-review when preparing label present', () => {
+  test('returns plan and code-review regardless of labels (no preparing gating)', () => {
     const issue = {
       state: { type: 'backlog' },
       labels: { nodes: [{ name: 'preparing' }] }
     };
     const available = getAvailablePrompts(issue);
-    assert.ok(!available.includes('plan'), 'Should not include plan when preparing present');
-    assert.ok(!available.includes('code-review'), 'Should not include code-review when preparing present');
+    assert.ok(available.includes('plan'), 'Should include plan regardless of labels');
+    assert.ok(available.includes('code-review'), 'Should include code-review regardless of labels');
   });
 
   test('returns label-based prompts alongside state-based prompts', () => {

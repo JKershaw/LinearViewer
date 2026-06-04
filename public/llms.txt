@@ -119,14 +119,9 @@ Both In Progress and Projects sections use the same nested structure:
 - `.detail-content[data-content="prompts"]` - Prompts section content (hidden by default)
 - `.in-progress-header` - collapsible section header
 
-## Workflow Labels (Simplified 3-Label System)
+## Workflow Labels
 
-Tasks use a simplified label system with just 3 labels:
-
-**`preparing`** - Pre-implementation work in progress
-- Use when task needs research, breakdown, design, or other prep work
-- Tasks with this label are excluded from the "Ready" queue
-- Remove when preparation is complete and task is ready to implement
+Tasks use 2 workflow labels:
 
 **`blocked`** - Work stuck on external dependency
 - Use when work cannot continue due to dependency, decision, or missing info
@@ -140,22 +135,19 @@ Tasks use a simplified label system with just 3 labels:
 
 ### Label Rules
 
-1. **`preparing` excludes from Ready**: Tasks with `preparing` label need more work before implementation
-2. **Work issues can coexist**: `blocked` and `bug` can exist alongside `preparing`
-3. **Remove when done**: Remove labels when their purpose is complete
+1. **Work issues can coexist**: `blocked` and `bug` can apply to the same task
+2. **Remove when done**: Remove labels when their purpose is complete
 
 ### Typical Flow
 
-1. New task arrives → add `preparing` if it needs research/breakdown
-2. Preparation complete → remove `preparing` (task enters Ready queue)
-3. Work begins → set status to "In Progress"
-4. If blocked → add `blocked` label
-5. If bug found → add `bug` label
-6. Work complete → set status to "Done"
+1. New task arrives → it is Ready once it's in a backlog/unstarted state
+2. Work begins → set status to "In Progress"
+3. If blocked → add `blocked` label
+4. If bug found → add `bug` label
+5. Work complete → set status to "Done"
 
 ### Readiness Checks
 
-- `preparing`: "Could an implementor start work based on what is known?"
 - `blocked`: "Can work resume based on this analysis?"
 - `bug`: "Could someone implement a fix based on this?"
 

@@ -3,15 +3,13 @@
  *
  * Run with: node --test tests/unit/workflow-config.test.js
  *
- * Tests the simplified 3-label system:
- * - preparing: Pre-implementation work
+ * Tests the workflow label system:
  * - blocked: Work stuck on external dependency
  * - bug: Investigating unexpected behavior
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import {
-  PREPARING_LABEL,
   WORK_ISSUE_LABELS,
   VIRTUAL_PROMPTS,
   getWorkIssueLabels
@@ -20,12 +18,6 @@ import {
 // =============================================================================
 // Constants Tests
 // =============================================================================
-
-describe('PREPARING_LABEL', () => {
-  test('has correct value', () => {
-    assert.strictEqual(PREPARING_LABEL, 'preparing');
-  });
-});
 
 describe('WORK_ISSUE_LABELS', () => {
   test('has expected work issue labels', () => {
@@ -69,21 +61,21 @@ describe('getWorkIssueLabels', () => {
 // Simplified Label System Tests
 // =============================================================================
 
-describe('Simplified 3-label system', () => {
-  test('total workflow labels is 3', () => {
-    const allLabels = [PREPARING_LABEL, ...getWorkIssueLabels()];
-    assert.strictEqual(allLabels.length, 3);
+describe('Workflow label system', () => {
+  test('total workflow labels is 2', () => {
+    const allLabels = [...getWorkIssueLabels()];
+    assert.strictEqual(allLabels.length, 2);
   });
 
   test('all labels are lowercase', () => {
-    const allLabels = [PREPARING_LABEL, ...getWorkIssueLabels()];
+    const allLabels = [...getWorkIssueLabels()];
     for (const label of allLabels) {
       assert.strictEqual(label, label.toLowerCase(), `${label} should be lowercase`);
     }
   });
 
   test('no duplicate labels', () => {
-    const allLabels = [PREPARING_LABEL, ...getWorkIssueLabels()];
+    const allLabels = [...getWorkIssueLabels()];
     const unique = new Set(allLabels);
     assert.strictEqual(unique.size, allLabels.length);
   });
