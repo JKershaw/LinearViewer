@@ -483,16 +483,18 @@
       if (!raw) return;
       const target = btn.dataset.target;
       const prompt = await maybeAppendProxy(raw, opts.urlKey);
-      const apiPrefix = opts.urlKey ? `/workspace/${encodeURIComponent(opts.urlKey)}` : '';
       btn.disabled = true;
       const originalText = btn.textContent;
       try {
-        const response = await fetch(`${apiPrefix}/api/dispatch`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt, target })
+        // `issue` is the full card object (id/identifier/title/url) \u2014 passing it
+        // through is what ties Swipe-dispatched sessions back to their task.
+        await window.dispatchPrompt({
+          urlKey: opts.urlKey,
+          prompt,
+          promptName: (state.result && state.result.name) || 'Prompt',
+          issue,
+          target
         });
-        if (!response.ok) throw new Error('Dispatch failed');
         btn.textContent = '\u2713';
       } catch {
         btn.textContent = 'err';

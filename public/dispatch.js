@@ -80,20 +80,16 @@ async function dispatchPageCustomPrompt({ urlKey, prompt, target, repo, btn, tex
     : prompt
 
   try {
-    const payload = { prompt: finalPrompt, promptName: 'Custom', target }
-    if (repo) payload.repo = repo
-
-    const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+    // Custom prompts are not anchored to a Linear issue — opt out of the
+    // issue-link contract explicitly.
+    await dispatchPrompt({
+      urlKey,
+      prompt: finalPrompt,
+      promptName: 'Custom',
+      target,
+      repo: repo || undefined,
+      issueless: true
     })
-
-    if (response.status === 401) {
-      window.location.href = '/logout'
-      return
-    }
-    if (!response.ok) throw new Error('Failed to dispatch')
 
     btn.textContent = 'dispatched!'
     if (feedbackEl) {
@@ -124,6 +120,10 @@ async function dispatchPageCustomPrompt({ urlKey, prompt, target, repo, btn, tex
     if (typeof updateQueueBadge === 'function') updateQueueBadge(urlKey)
     refreshQueueList(urlKey)
   } catch (e) {
+    if (e && e.status === 401) {
+      window.location.href = '/logout'
+      return
+    }
     console.error('Failed to dispatch custom prompt:', e)
     btn.textContent = 'failed'
     if (feedbackEl) {
