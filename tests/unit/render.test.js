@@ -10,7 +10,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { renderLabels, renderPage } from '../../lib/render.js';
+import { renderLabels, renderDisplayLabels, renderPage } from '../../lib/render.js';
 
 // =============================================================================
 // renderLabels Tests
@@ -18,13 +18,16 @@ import { renderLabels, renderPage } from '../../lib/render.js';
 
 describe('renderLabels', () => {
   describe('regular labels', () => {
+    // These exercise the display-label text in isolation. Prompt buttons now
+    // render for every issue (including completed), so they use
+    // renderDisplayLabels() rather than renderLabels() to avoid the prompt HTML.
     test('renders regular label as plain text', () => {
       const issue = {
         id: 'issue-1',
         labels: { nodes: [{ name: 'feature' }] },
-        state: { type: 'completed' } // completed = no plan/code-review links
+        state: { type: 'completed' }
       };
-      const result = renderLabels(issue);
+      const result = renderDisplayLabels(issue);
       assert.strictEqual(result, 'feature');
     });
 
@@ -32,22 +35,22 @@ describe('renderLabels', () => {
       const issue = {
         id: 'issue-1',
         labels: { nodes: [{ name: 'feature' }, { name: 'priority' }] },
-        state: { type: 'completed' } // completed = no plan/code-review
+        state: { type: 'completed' }
       };
-      const result = renderLabels(issue);
+      const result = renderDisplayLabels(issue);
       assert.ok(result.includes('feature'));
       assert.ok(result.includes('priority'));
       // Labels are comma-separated in renderDisplayLabels
       assert.strictEqual(result, 'feature, priority');
     });
 
-    test('returns empty string for no labels on completed issue', () => {
+    test('returns empty string for no labels', () => {
       const issue = {
         id: 'issue-1',
         labels: { nodes: [] },
         state: { type: 'completed' }
       };
-      const result = renderLabels(issue);
+      const result = renderDisplayLabels(issue);
       assert.strictEqual(result, '');
     });
 
@@ -57,7 +60,7 @@ describe('renderLabels', () => {
         labels: null,
         state: { type: 'completed' }
       };
-      const result = renderLabels(issue);
+      const result = renderDisplayLabels(issue);
       assert.strictEqual(result, '');
     });
   });
@@ -128,15 +131,17 @@ describe('renderLabels', () => {
       assert.ok(result.includes('data-label="research"'));
     });
 
-    test('does not add prompts for completed issue', () => {
+    test('shows prompts for completed issue (e.g. for a retro look-back)', () => {
       const issue = {
         id: 'issue-done',
         labels: { nodes: [] },
         state: { type: 'completed' }
       };
       const result = renderLabels(issue);
-      assert.ok(!result.includes('data-label="plan"'));
-      assert.ok(!result.includes('data-label="look-into"'));
+      assert.ok(result.includes('data-label="plan"'));
+      assert.ok(result.includes('data-label="look-into"'));
+      // retro lives behind "more" and should be reachable on a finished task
+      assert.ok(result.includes('data-label="retro"'));
     });
 
     test('shows same prompts even with preparing label', () => {
@@ -208,8 +213,8 @@ describe('renderLabels', () => {
         labels: {},
         state: { type: 'completed' }
       };
-      const result = renderLabels(issue);
-      assert.strictEqual(result, '');
+      // No display labels to show; prompt buttons still render regardless of state
+      assert.strictEqual(renderDisplayLabels(issue), '');
     });
 
     test('handles issue with only regular labels and eligible state', () => {

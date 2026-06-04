@@ -12,7 +12,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { hasPrompt, getPromptLabels, generatePrompt, getAvailablePrompts, getPromptDescriptionsForAI, PROMPT_TEMPLATES, PROMPT_CATEGORIES, getPreWorkLabels, isPreWorkLabel } from '../../lib/prompt-templates.js';
+import { hasPrompt, getPromptLabels, generatePrompt, getAvailablePrompts, getPromptDescriptionsForAI, PROMPT_TEMPLATES, PROMPT_CATEGORIES, getPreWorkLabels, isPreWorkLabel, formatAIHintsForMetaPrompt } from '../../lib/prompt-templates.js';
 import { PREPARING_LABEL, WORK_ISSUE_LABELS } from '../../lib/workflow-config.js';
 import { COMPLETION_SIGNALS } from '../../lib/completion-signals.js';
 
@@ -97,11 +97,12 @@ describe('getPromptLabels', () => {
     assert.ok(labels.includes('context'));
     assert.ok(labels.includes('implementation'));
     assert.ok(labels.includes('review'));
+    assert.ok(labels.includes('retro'));
   });
 
-  test('has exactly 14 templates', () => {
+  test('has exactly 15 templates', () => {
     const labels = getPromptLabels();
-    assert.strictEqual(labels.length, 14);
+    assert.strictEqual(labels.length, 15);
   });
 });
 
@@ -274,7 +275,8 @@ describe('PROMPT_TEMPLATES', () => {
       'spike',
       'context',
       'implementation',
-      'review'
+      'review',
+      'retro'
     ];
     for (const labelName of expectedTemplates) {
       assert.ok(PROMPT_TEMPLATES[labelName], `Template for ${labelName} should exist`);
@@ -665,6 +667,83 @@ describe('look-into template', () => {
     assert.ok(result.prompt.includes('Fetch details'), 'should include fetch step');
     assert.ok(result.prompt.includes('Present your findings to the user'), 'should present findings to user');
     assert.ok(!result.prompt.includes('Add findings as a comment'), 'should NOT write back to Linear');
+  });
+});
+
+// =============================================================================
+// retro Template Tests
+// =============================================================================
+
+describe('retro template', () => {
+  const mockIssue = {
+    id: 'issue-retro',
+    identifier: 'TEST-R1',
+    title: 'Add export feature',
+    description: 'Let users export their data',
+    url: 'https://linear.app/test/issue/TEST-R1',
+    state: { name: 'Done', type: 'completed' },
+    labels: [],
+    assignee: null
+  };
+
+  const mockContext = {
+    parent: null,
+    siblings: [],
+    project: { name: 'Product', description: 'Product work' },
+    children: [],
+    comments: []
+  };
+
+  test('returns retro as name', () => {
+    const result = generatePrompt('retro', mockIssue, mockContext);
+    assert.strictEqual(result.name, 'retro');
+  });
+
+  test('has UNIVERSAL category', () => {
+    const template = PROMPT_TEMPLATES['retro'];
+    assert.strictEqual(template.category, PROMPT_CATEGORIES.UNIVERSAL);
+  });
+
+  test('does NOT include status change instruction (read-only template)', () => {
+    const result = generatePrompt('retro', mockIssue, mockContext);
+    assert.ok(!result.prompt.includes('status to "In Progress"'), 'retro should not change status');
+  });
+
+  test('presents findings to the user without auto-saving them', () => {
+    const result = generatePrompt('retro', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('Present your findings to the user'), 'should present findings to the user');
+    assert.ok(!result.prompt.includes('Add findings as a comment'), 'should NOT auto-post a comment');
+    assert.ok(result.prompt.includes('Do not write them back to Linear'), 'should leave next steps to the user');
+  });
+
+  test('handles both completed and in-flight work', () => {
+    const result = generatePrompt('retro', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('in-flight') || result.prompt.includes('in-progress'),
+      'should cover in-progress retros');
+    assert.ok(result.prompt.includes('risk'), 'in-flight retros should flag risks instead of downstream effects');
+  });
+
+  test('instructs reconstruction from git and Linear history', () => {
+    const result = generatePrompt('retro', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('git log --grep=TEST-R1'), 'should reference task commits by identifier');
+    assert.ok(result.prompt.includes('Downstream'), 'should cover downstream effects');
+  });
+
+  test('includes goal with retrospective concepts', () => {
+    const result = generatePrompt('retro', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('## Goal'));
+    assert.ok(result.prompt.includes('hindsight'));
+    assert.ok(result.prompt.includes('Lessons'));
+  });
+
+  test('is excluded from the AI recommendation meta-prompt (user-initiated only)', () => {
+    const hints = formatAIHintsForMetaPrompt();
+    assert.ok(!hints.includes('reorient'),
+      'retro aiHint should not appear in the meta-prompt');
+    assert.ok(!/\*\*retro\*\*/.test(hints), 'retro should not be listed as an action type');
+    // Sanity check: other prompts still flow into the meta-prompt
+    assert.ok(hints.includes('research') || hints.includes('plan'),
+      'other prompts should still be present in the meta-prompt');
   });
 });
 
