@@ -104,30 +104,34 @@ setup or tweak needed, where a human intervened and why, and what it implies for
 
 ### Stage A
 
-- **Reporting/transport is a harness concern, handled by the runner.** The dispatch consumer
-  (runner) uses a **Stop hook** that phones home automatically when the Claude session ends — so
-  completion telemetry returns without the prompt teaching it. This is cleaner than betting on the
-  model remembering to curl an endpoint.
-- **Where the report lands:** the Stop hook posts to the dispatch **feedback** channel (history),
-  not the foreman channel. So `foreman/sessions|status|tasks` being empty during the LIN-288 run
-  did **not** mean "no telemetry" — I just couldn't see the feedback history through the proxy yet
-  (no list/read endpoint until this branch deploys). Correction to my first read.
-- **Auto-append is about Linear access, not phone-home.** `POST /api/proxy/dispatch` appends a
-  proxy-context block to the prompt by default (`appendProxyContext:false` to opt out): base URL +
-  token + a pointer to `/instructions`, giving the worker the rich Linear access that the old local
-  MCP used to provide. It does **not** instruct the worker to report (the Stop hook owns that). It
-  only asks the worker to END with an evidence-rich summary (PR/commit/CI) so whatever the hook
-  forwards carries proof, not a bare "done".
-  - Token: **standing readWrite for now** (explicit choice) — flagged in-code as security debt;
-    planned hardening is a per-item, short-TTL, narrowly-scoped token (mirrors Harbour's).
-- **Watch ergonomics:** added `GET /api/proxy/dispatch` (list, filter by `issueIdentifier`/`status`)
-  so the orchestrator can find its own item by issue, and `GET /api/proxy/dispatch/:id` to read the
-  status + feedback the Stop hook posted.
-- **Open question for tuning:** does the Stop hook forward the session's final summary, or just a
-  static "session ended" signal? If the former, the evidence-summary instruction is load-bearing
-  (it shapes the payload); if the latter, evidence has to come from the orchestrator's own CI/PR
-  lookups. Either way the trust caveat holds: a worker/hook self-reporting "done" is still
-  self-report (invariant 2 / LIN-292) — the judge weights external CI/PR/diff over the claim.
+**Captured from the live LIN-288 run (item `58f96bed…`, dispatched 2026-06-05 18:57, target `web`).**
+
+- **The loop physically worked.** The dispatched worker did the research task end-to-end: set
+  LIN-288 → In Progress, investigated, and at **19:02:43 posted a findings comment** + updated the
+  description, correctly keeping the `bug` label. The execution path is sound.
+- **But the dispatch feedback channel did NOT carry the result.** The 5 feedback entries are all
+  runner *lifecycle narration* from the first ~30s ("Starting…", "Prompt: ```# Investigate
+  LIN-288…", "Sending /remote-control command…") — process telemetry, not result telemetry. They
+  end at 18:58:19; the actual deliverable landed in Linear ~4.5 min later (19:02:43) and was
+  **never posted to the feedback channel.**
+- **Therefore completion is judged from external evidence, full stop.** Not as a trust nicety —
+  the self-report channel literally doesn't contain the result. The orchestrator/judge has to read
+  Linear state (new comment, status change) / git / PR to know the task is done. This is invariant
+  2 confirmed empirically, and stronger than expected: watching the dispatch item's feedback ≠
+  watching the work.
+- **Architecture implied:** the runner posts *launch* lifecycle to the dispatch feedback, then
+  hands the real work to a remote-control session that writes its results into **Linear** (via the
+  proxy), decoupled from the dispatch item. So the autopilot watches *outcomes in Linear/git*, not
+  the feedback stream.
+- **Anomaly to watch:** the feedback also contained "Starting: Summarising project in linearviewer"
+  and "Prompt: Summarise this project briefly" — content from a *different* prompt than LIN-288,
+  interleaved with the LIN-288 echoes. Looks like launcher/prior-session bleed or multiplexing into
+  one item's feedback; would confuse an orchestrator that parsed the stream. Flagged for the runner.
+
+**Net for the design:** the auto-appended Linear access is what made the result observable (it
+landed in Linear). The "end with an evidence-rich summary" line only helps if the Stop hook is
+later changed to forward the worker's final message — today it forwards launch narration, not the
+summary. The judge reads Linear/git/PR regardless.
 
 ### Stage B
 
