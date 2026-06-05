@@ -689,12 +689,14 @@ test.describe('Proxy API - Dispatch', () => {
     });
     const { item } = await take.json();
     expect(item.prompt).toContain('fix the bug');
-    expect(item.prompt).toContain('Linear access & reporting');
-    expect(item.prompt).toContain('/api/proxy/foreman/status');
+    expect(item.prompt).toContain('Linear access');
+    expect(item.prompt).toContain('/api/proxy/instructions');
     // The embedded token lets the worker authenticate back to the proxy.
     expect(item.prompt).toContain(`Bearer ${writeToken}`);
-    // Evidence discipline is taught in the prompt itself.
+    // Reporting is the runner's Stop hook, not the prompt — but the evidence
+    // discipline for the final summary is still taught at source.
     expect(item.prompt).toContain('evidence');
+    expect(item.prompt).not.toContain('/api/proxy/foreman/status');
   });
 
   test('appendProxyContext:false leaves the prompt untouched', async ({ request }) => {
@@ -709,7 +711,7 @@ test.describe('Proxy API - Dispatch', () => {
     });
     const { item } = await take.json();
     expect(item.prompt).toBe('self-contained prompt');
-    expect(item.prompt).not.toContain('Linear access & reporting');
+    expect(item.prompt).not.toContain('Linear access');
   });
 
   test('watch returns 404 for unknown id', async ({ request }) => {

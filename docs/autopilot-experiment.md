@@ -104,30 +104,30 @@ setup or tweak needed, where a human intervened and why, and what it implies for
 
 ### Stage A
 
-- **Telemetry is not automatic.** The dispatch contract is push-by-consumer: data only
-  returns if something explicitly POSTs to `/api/dispatch/feedback/:id` (free-form, needs a
-  *dispatch* token) or `/api/proxy/foreman/status` (structured, needs a *proxy* token). A bare
-  dispatched prompt runs and stops silently.
-- **No prompt path teaches phone-home.** Grep confirms `dispatch/feedback` / `feedbackUrl` appear
-  only in dispatch infra + Harbour — never in `prompt-template-defs.js`, `prompt-templates.js`,
-  `openrouter.js`, or the meta-prompt. So the standard AI-recommended prompt (what was dispatched
-  for LIN-288) leaves the worker unaware the reporting channels exist.
-- **Confirmed against the live run:** `foreman/sessions|status|tasks` were all empty for the
-  workspace while LIN-288 ran under remote control — i.e. the worker was executing but reporting
-  nothing.
-- **Fix adopted (this branch): auto-append the proxy to dispatched items.** `POST /api/proxy/dispatch`
-  now appends a proxy-context block to the prompt by default (`appendProxyContext:false` to opt
-  out): base URL + a token + a pointer to `/instructions`, plus an explicit instruction to report
-  via `POST /foreman/status` with **external evidence (PR/commit/CI)** in the summary. This makes
-  Linear access + phone-home ambient in every dispatch (replacing the old local MCP) and surfaces
-  the evidence discipline in the prompt itself.
+- **Reporting/transport is a harness concern, handled by the runner.** The dispatch consumer
+  (runner) uses a **Stop hook** that phones home automatically when the Claude session ends — so
+  completion telemetry returns without the prompt teaching it. This is cleaner than betting on the
+  model remembering to curl an endpoint.
+- **Where the report lands:** the Stop hook posts to the dispatch **feedback** channel (history),
+  not the foreman channel. So `foreman/sessions|status|tasks` being empty during the LIN-288 run
+  did **not** mean "no telemetry" — I just couldn't see the feedback history through the proxy yet
+  (no list/read endpoint until this branch deploys). Correction to my first read.
+- **Auto-append is about Linear access, not phone-home.** `POST /api/proxy/dispatch` appends a
+  proxy-context block to the prompt by default (`appendProxyContext:false` to opt out): base URL +
+  token + a pointer to `/instructions`, giving the worker the rich Linear access that the old local
+  MCP used to provide. It does **not** instruct the worker to report (the Stop hook owns that). It
+  only asks the worker to END with an evidence-rich summary (PR/commit/CI) so whatever the hook
+  forwards carries proof, not a bare "done".
   - Token: **standing readWrite for now** (explicit choice) — flagged in-code as security debt;
-    planned hardening is a per-item, short-TTL, report-only scoped token (mirrors Harbour's).
+    planned hardening is a per-item, short-TTL, narrowly-scoped token (mirrors Harbour's).
 - **Watch ergonomics:** added `GET /api/proxy/dispatch` (list, filter by `issueIdentifier`/`status`)
-  so the orchestrator can find its own item by issue instead of remembering each UUID.
-- **Caveat that survives all of the above:** auto-append fixes *transport*, not *trust*. A worker
-  POSTing its own `status:"completed"` is still self-report (invariant 2 / LIN-292); the judge must
-  still weight CI/PR/diff over the claim.
+  so the orchestrator can find its own item by issue, and `GET /api/proxy/dispatch/:id` to read the
+  status + feedback the Stop hook posted.
+- **Open question for tuning:** does the Stop hook forward the session's final summary, or just a
+  static "session ended" signal? If the former, the evidence-summary instruction is load-bearing
+  (it shapes the payload); if the latter, evidence has to come from the orchestrator's own CI/PR
+  lookups. Either way the trust caveat holds: a worker/hook self-reporting "done" is still
+  self-report (invariant 2 / LIN-292) — the judge weights external CI/PR/diff over the claim.
 
 ### Stage B
 
