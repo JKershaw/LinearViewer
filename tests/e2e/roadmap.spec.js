@@ -182,97 +182,62 @@ test.describe('Roadmap API Endpoints', () => {
 });
 
 // =============================================================================
-// Pipeline layer endpoints (technical / product / trajectory / north-star / gap)
+// Server-orchestrated generate endpoint (LIN-317): one SSE stream, all layers.
+// Replaces the old per-layer narrative endpoints that 413'd on large workspaces.
 // =============================================================================
 
-test.describe('Roadmap Pipeline Layer Endpoints', () => {
-  const TECH_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/narrative/technical`;
-  const PRODUCT_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/narrative/product`;
-  const TRAJECTORY_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/narrative/trajectory`;
-  const NS_READING_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/narrative/north-star`;
-  const GAP_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/narrative/gap`;
-  const DIGEST_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/narrative/digest`;
+test.describe('Roadmap Generate Endpoint', () => {
+  const GENERATE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/generate`;
 
-  const SAMPLE_MODEL = { velocity: { tasksPerWeek: 4 }, milestones: [] };
-
-  const endpoints = [
-    { name: 'technical', url: TECH_URL, body: { roadmapModel: SAMPLE_MODEL } },
-    { name: 'product',   url: PRODUCT_URL, body: { roadmapModel: SAMPLE_MODEL, tech: 'tech narrative text' } },
-    { name: 'trajectory', url: TRAJECTORY_URL, body: { roadmapModel: SAMPLE_MODEL, tech: 'tech text', product: 'product text' } },
-    { name: 'north-star reading', url: NS_READING_URL, body: { roadmapModel: SAMPLE_MODEL, northStar: 'be useful' } },
-    { name: 'gap', url: GAP_URL, body: { northStar: 'be useful', trajectory: 'going there', nsReading: 'aligned' } },
-    { name: 'digest', url: DIGEST_URL, body: { technical: 'tech text', product: 'product text' } },
-  ];
-
-  for (const ep of endpoints) {
-    test(`${ep.name}: returns 403 when feature flag is off`, async ({ request }) => {
-      const noRoadmap = encodeURIComponent(JSON.stringify({ roadmap: false }));
-      await request.get(`/test/set-session?features=${noRoadmap}`);
-      const response = await request.post(ep.url, { data: ep.body });
-      expect(response.status()).toBe(403);
-    });
-
-    test(`${ep.name}: returns 503 when no AI configured`, async ({ request }) => {
-      await request.get(`/test/set-session?features=${FEATURES}`);
-      const response = await request.post(ep.url, { data: ep.body });
-      expect(response.status()).toBe(503);
-      const body = await response.json();
-      expect(body.error).toContain('AI not configured');
-    });
-  }
-
-  // Per-endpoint body validation
-  test('technical: returns 400 when roadmapModel missing', async ({ request }) => {
-    await request.get(`/test/set-session?features=${FEATURES}&openRouterConnected=true`);
-    const response = await request.post(TECH_URL, { data: {} });
-    expect(response.status()).toBe(400);
+  test('returns 403 when feature flag is off', async ({ request }) => {
+    const noRoadmap = encodeURIComponent(JSON.stringify({ roadmap: false }));
+    await request.get(`/test/set-session?features=${noRoadmap}`);
+    const response = await request.post(GENERATE_URL, { data: { northStar: 'be useful' } });
+    expect(response.status()).toBe(403);
   });
 
-  test('product: returns 400 when tech missing', async ({ request }) => {
-    await request.get(`/test/set-session?features=${FEATURES}&openRouterConnected=true`);
-    const response = await request.post(PRODUCT_URL, { data: { roadmapModel: SAMPLE_MODEL } });
-    expect(response.status()).toBe(400);
+  test('returns 503 when no AI configured', async ({ request }) => {
+    await request.get(`/test/set-session?features=${FEATURES}`);
+    const response = await request.post(GENERATE_URL, { data: { northStar: 'be useful' } });
+    expect(response.status()).toBe(503);
+    const body = await response.json();
+    expect(body.error).toContain('AI not configured');
   });
 
-  test('trajectory: returns 400 when product missing', async ({ request }) => {
+  test('streams every layer tagged over one SSE connection (with north star)', async ({ request }) => {
     await request.get(`/test/set-session?features=${FEATURES}&openRouterConnected=true`);
-    const response = await request.post(TRAJECTORY_URL, {
-      data: { roadmapModel: SAMPLE_MODEL, tech: 'x' }
-    });
-    expect(response.status()).toBe(400);
+    const response = await request.post(GENERATE_URL, { data: { northStar: 'Be the simplest way to ship.' } });
+    expect(response.status()).toBe(200);
+    expect(response.headers()['content-type']).toContain('text/event-stream');
+
+    const body = await response.text();
+    // Every layer streams, tagged with its layer id, over the one connection.
+    for (const layer of ['technical', 'product', 'trajectory', 'north-star-reading', 'gap', 'digest']) {
+      expect(body).toContain(`"layer":"${layer}"`);
+    }
+    // Layer lifecycle events and the mock content are present.
+    expect(body).toContain('event: layer-start');
+    expect(body).toContain('event: layer-done');
+    expect(body).toContain('Mock technical narrative');
+    expect(body).toContain('Mock summary');
+    // Terminal done event closes the stream.
+    expect(body.trim().endsWith('event: done\ndata: {}')).toBe(true);
   });
 
-  test('north-star reading: returns 400 when northStar missing', async ({ request }) => {
+  test('without a north star, skips north-star-reading and gap but still runs the digest', async ({ request }) => {
     await request.get(`/test/set-session?features=${FEATURES}&openRouterConnected=true`);
-    const response = await request.post(NS_READING_URL, {
-      data: { roadmapModel: SAMPLE_MODEL }
-    });
-    expect(response.status()).toBe(400);
-  });
+    const response = await request.post(GENERATE_URL, { data: { northStar: '' } });
+    expect(response.status()).toBe(200);
 
-  test('north-star reading: returns 400 when northStar is empty string', async ({ request }) => {
-    await request.get(`/test/set-session?features=${FEATURES}&openRouterConnected=true`);
-    const response = await request.post(NS_READING_URL, {
-      data: { roadmapModel: SAMPLE_MODEL, northStar: '' }
-    });
-    expect(response.status()).toBe(400);
-  });
-
-  test('gap: returns 400 when any of northStar/trajectory/nsReading missing', async ({ request }) => {
-    await request.get(`/test/set-session?features=${FEATURES}&openRouterConnected=true`);
-    const response = await request.post(GAP_URL, {
-      data: { northStar: 'x', trajectory: 'y' }
-    });
-    expect(response.status()).toBe(400);
-  });
-
-  test('digest: returns 400 when technical or product missing', async ({ request }) => {
-    await request.get(`/test/set-session?features=${FEATURES}&openRouterConnected=true`);
-    // Missing product
-    const response = await request.post(DIGEST_URL, {
-      data: { technical: 'tech only' }
-    });
-    expect(response.status()).toBe(400);
+    const body = await response.text();
+    // Layers 1/2/3a and the digest run.
+    expect(body).toContain('"layer":"technical"');
+    expect(body).toContain('"layer":"product"');
+    expect(body).toContain('"layer":"trajectory"');
+    expect(body).toContain('"layer":"digest"');
+    // The fork-right reading and the gap are skipped server-side.
+    expect(body).not.toContain('"layer":"north-star-reading"');
+    expect(body).not.toContain('"layer":"gap"');
   });
 });
 

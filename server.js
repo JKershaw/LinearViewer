@@ -57,7 +57,7 @@ import { createPipelineRoutes } from './routes/pipeline.js'
 import { getLoopsForWorkspace } from './lib/pipeline-loops.js'
 import { buildSessionCounts } from './lib/sessions-view.js'
 import { renderRoadmapPage } from './lib/render-roadmap.js'
-import { calculateVelocity, buildExecutionQueue, groupByProject, projectTimeline, findCriticalPaths, assessRisks, analyzeRoadmap, issueToRoadmapCard } from './lib/roadmap.js'
+import { buildRoadmapModel } from './lib/roadmap.js'
 import { renderProxyPage } from './lib/render-proxy.js'
 import { renderForemanPage } from './lib/render-foreman.js'
 import { AVAILABLE_MODELS } from './lib/openrouter.js'
@@ -1046,32 +1046,7 @@ app.get('/workspace/:urlKey/roadmap', workspaceFromUrl, async (req, res) => {
       : await fetchProjects(workspace.accessToken, teamId);
 
     // Build roadmap model from deterministic layer
-    const velocity = calculateVelocity(issues, 90);
-    const executionQueue = buildExecutionQueue(issues);
-    // Completed issues are excluded from executionQueue but needed for progress %
-    const completedIssues = issues
-      .filter(i => i.state?.type === 'completed')
-      .map(i => issueToRoadmapCard(i));
-    const milestones = groupByProject(executionQueue, projects, completedIssues);
-
-    // Project timeline
-    const timedMilestones = projectTimeline(milestones, velocity);
-
-    // Critical paths and risks
-    const criticalPaths = findCriticalPaths(executionQueue);
-    const risks = assessRisks(timedMilestones, criticalPaths, velocity);
-
-    // Deterministic pre-analysis for AI narrative
-    const analysis = analyzeRoadmap({ milestones: timedMilestones, velocity, criticalPaths });
-
-    const roadmapModel = {
-      velocity,
-      milestones: timedMilestones,
-      criticalPaths,
-      risks,
-      analysis,
-      executionQueue
-    };
+    const roadmapModel = buildRoadmapModel(projects, issues);
 
     const html = renderRoadmapPage(
       { roadmapModel, organizationName },

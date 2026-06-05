@@ -42,9 +42,29 @@ Two structural observations:
 - **3a and 3b are siblings, not parent and child.** Neither is "the truth." The truth — to whatever extent it exists — lives in the gap between them. Visual framing should reflect this; rendering one before the other or one larger than the other will anchor the reader on it.
 - **3a remains useful in the absence of a north star.** It is the aspirational reading the third chat reframe produced. If the north star primitive does not exist yet for a workspace, the pipeline degrades cleanly to layers 1, 2, and 3a — which is itself a meaningful product.
 
+> **Update (LIN-317, 2026-06-05): orchestration moved from client to server.**
+> This document originally specified *client-side* orchestration — the server
+> embedded the full `roadmapModel` in the page and the client sent a slice of it
+> back on each per-layer call. On large workspaces that request body crossed the
+> `express.json` 250kb cap and the layer call failed with an instant HTTP 413
+> before any LLM ran. The pipeline is now driven by a single server endpoint
+> (`POST /workspace/:urlKey/api/roadmap/generate`): the server fetches Linear
+> **once**, builds the model into a request-local variable, and streams every
+> layer over **one** SSE connection, each event tagged with its layer id. The
+> sequencing, chaining, and degradation rules below are unchanged — only *where*
+> the orchestration runs moved. Per-layer failures now emit a `layer-error`
+> event on the shared stream and the pipeline continues; the model never crosses
+> the wire, so the payload-size cliff is gone and the five per-layer fetches can
+> no longer observe inconsistent snapshots.
+
 ## The pipeline
 
-Five LLM calls, each producing a string. The context passed to each prompt is just the concatenation of what came before that is relevant. No agentic recursion, no tool calls, no orchestration logic beyond sequencing and string concatenation.
+Five LLM calls, each producing a string (six with the digest). The context
+passed to each prompt is just the concatenation of what came before that is
+relevant. No agentic recursion, no tool calls, no orchestration logic beyond
+sequencing and string concatenation — now executed server-side in one request
+closure (see the LIN-317 note above) rather than across independent client
+calls.
 
 ```
 0. Data        →  summary       (deterministic, no LLM)

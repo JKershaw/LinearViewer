@@ -17,7 +17,8 @@ import {
   computeParentRollup,
   flattenTasks,
   issueToRoadmapCard,
-  firstParaTruncated
+  firstParaTruncated,
+  buildRoadmapModel
 } from '../../lib/roadmap.js';
 
 // =============================================================================
@@ -1044,5 +1045,63 @@ describe('calculateVelocity leaf-only', () => {
     const result = calculateVelocity([solo], 30, FIXED_NOW);
     const totalTasks = result.weeklyData.reduce((s, w) => s + w.tasks, 0);
     assert.strictEqual(totalTasks, 1);
+  });
+});
+
+// =============================================================================
+// buildRoadmapModel — the assembled model the page route and the generate
+// endpoint both consume (LIN-317). Guards the extraction from server.js so the
+// model shape can't silently drift from what the LLM layers expect.
+// =============================================================================
+
+describe('buildRoadmapModel', () => {
+  test('returns the full model shape from raw projects + issues', () => {
+    const projects = [{ id: 'proj-1', name: 'Project Alpha' }];
+    const issues = [
+      createIssue({ id: 'a', state: { name: 'In Progress', type: 'started' } }),
+      createIssue({ id: 'b', state: { name: 'Todo', type: 'unstarted' } }),
+      createIssue({ id: 'c', completedAt: daysAgo(3), state: { name: 'Done', type: 'completed' } })
+    ];
+
+    const model = buildRoadmapModel(projects, issues);
+
+    // Every key the renderer and the prompt builders read must be present.
+    for (const key of ['velocity', 'milestones', 'criticalPaths', 'risks', 'analysis', 'executionQueue']) {
+      assert.ok(key in model, `missing ${key}`);
+    }
+    assert.ok(Array.isArray(model.milestones));
+    assert.ok(Array.isArray(model.executionQueue));
+    assert.strictEqual(typeof model.velocity, 'object');
+  });
+
+  test('matches the inline build it replaced (same model for same inputs)', () => {
+    const projects = [{ id: 'proj-1', name: 'Project Alpha' }];
+    const issues = [
+      createIssue({ id: 'a', state: { name: 'In Progress', type: 'started' } }),
+      createIssue({ id: 'b', completedAt: daysAgo(5), state: { name: 'Done', type: 'completed' } })
+    ];
+
+    // Reproduce the old inline server.js pipeline and compare.
+    const velocity = calculateVelocity(issues, 90);
+    const executionQueue = buildExecutionQueue(issues);
+    const completedIssues = issues
+      .filter(i => i.state?.type === 'completed')
+      .map(i => issueToRoadmapCard(i));
+    const milestones = groupByProject(executionQueue, projects, completedIssues);
+    const timedMilestones = projectTimeline(milestones, velocity);
+    const criticalPaths = findCriticalPaths(executionQueue);
+    const risks = assessRisks(timedMilestones, criticalPaths, velocity);
+
+    const model = buildRoadmapModel(projects, issues);
+
+    assert.deepStrictEqual(model.milestones, timedMilestones);
+    assert.deepStrictEqual(model.executionQueue, executionQueue);
+    assert.deepStrictEqual(model.risks, risks);
+  });
+
+  test('handles an empty workspace without throwing', () => {
+    const model = buildRoadmapModel([], []);
+    assert.deepStrictEqual(model.milestones, []);
+    assert.deepStrictEqual(model.executionQueue, []);
   });
 });

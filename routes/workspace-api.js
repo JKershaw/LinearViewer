@@ -9,7 +9,14 @@
  * - Images: Proxy Linear-hosted images with auth
  */
 import { Router } from 'express';
-import { fetchIssueContext, fetchRecommendationContext, fetchIssueComments } from '../lib/linear.js';
+import { fetchIssueContext, fetchRecommendationContext, fetchIssueComments, fetchProjects } from '../lib/linear.js';
+import { buildRoadmapModel } from '../lib/roadmap.js';
+import { buildRoadmapNarrativeMessages } from '../lib/prompts/roadmap-narrative-template.js';
+import { buildRoadmapProductMessages } from '../lib/prompts/roadmap-product-template.js';
+import { buildRoadmapTrajectoryMessages } from '../lib/prompts/roadmap-trajectory-template.js';
+import { buildRoadmapNorthStarMessages } from '../lib/prompts/roadmap-north-star-template.js';
+import { buildRoadmapGapMessages } from '../lib/prompts/roadmap-gap-template.js';
+import { buildRoadmapDigestMessages } from '../lib/prompts/roadmap-digest-template.js';
 import { generatePrompt, generateCustomPrompt, hasPrompt, getAvailablePrompts } from '../lib/prompt-templates.js';
 import { WORK_ISSUE_LABELS } from '../lib/workflow-config.js';
 import { parseRepoFromDescription } from '../lib/prompt-formatters.js';
@@ -1736,11 +1743,14 @@ ${goal}`;
   });
 
   /**
-   * Shared gating + free-tier check for all roadmap LLM endpoints.
+   * Resolve the LLM credentials + model for the roadmap generate endpoint.
+   * Does feature-flag and API-key gating, but does NOT charge the free tier —
+   * the generate endpoint charges per-layer so a full reading costs the same
+   * number of free-tier units as the old per-call pipeline did (LIN-317).
    * Sends the appropriate error response and returns null on failure.
-   * Returns { apiKey, model } when ready to proceed.
+   * Returns { apiKey, model, isFreeTier } when ready to proceed.
    */
-  async function gateRoadmapLLMRequest(req, res) {
+  async function resolveRoadmapLLM(req, res) {
     const featureFlags = getFeatureFlags(req.session);
     if (!featureFlags.roadmap) {
       res.status(403).json({ error: 'Roadmap feature is not enabled' });
@@ -1756,72 +1766,69 @@ ${goal}`;
       return null;
     }
 
-    if (isFreeTier) {
-      const check = await freeTierStore.tryUse(req.workspace.urlKey);
-      if (!check.allowed) {
-        res.status(429).json({
-          error: check.reason,
-          freeTier: {
-            used: true,
-            remaining: check.remaining,
-            limit: check.limit,
-            resetsAt: check.resetsAt
-          }
-        });
-        return null;
-      }
-    }
-
     const model = await resolveWorkspaceModel({ urlKey: req.workspace.urlKey, workspacePreferencesStore });
-    return { apiKey, model };
+    return { apiKey, model, isFreeTier };
   }
 
   /**
-   * Stream a built messages array via SSE for a roadmap pipeline layer.
-   * Assumes gating has already passed.
+   * Atomically charge one free-tier unit for a layer about to run. Returns the
+   * store's check result ({ allowed, ... }). Non-free-tier callers are always
+   * allowed without touching the store.
    */
-  async function streamRoadmapLayer(res, { messages, apiKey, model, maxTokens, layerName }) {
-    res.set({
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-    });
-    res.flushHeaders();
+  async function chargeRoadmapLayer(req, isFreeTier) {
+    if (!isFreeTier) return { allowed: true };
+    return freeTierStore.tryUse(req.workspace.urlKey);
+  }
 
+  /**
+   * Stream one pipeline layer over the shared SSE connection (LIN-317). All
+   * events are tagged with the layer id so the client can demultiplex many
+   * layers from one connection. Never sets headers (the caller flushes once)
+   * and never ends the response (the caller emits the terminal `done`). A layer
+   * failure emits a `layer-error` event and resolves { ok: false } so the
+   * pipeline can continue to the next layer per the design doc's failure modes.
+   *
+   * @returns {Promise<{ok: boolean, text: string, finishReason: ?string}>}
+   */
+  async function streamLayer(res, { messages, apiKey, model, maxTokens, layer, layerName }) {
+    sendSSE(res, 'layer-start', { layer });
+    let text = '';
+    let finishReason = null;
     try {
       await streamChat(
         messages,
         { apiKey, model, maxTokens },
         (type, data) => {
-          sendSSE(res, type, data);
-          if (type === 'done' || type === 'error') {
-            res.end();
+          if (type === 'token') {
+            const token = (data && data.token) || '';
+            text += token;
+            sendSSE(res, 'token', { layer, token });
+          } else if (type === 'done') {
+            finishReason = data ? data.finishReason : null;
           }
         }
       );
+      sendSSE(res, 'layer-done', { layer, finishReason });
+      return { ok: true, text, finishReason };
     } catch (error) {
       console.error(`Roadmap ${layerName} stream error:`, error);
-      sendSSE(res, 'error', { message: `Failed to generate ${layerName}` });
-      res.end();
+      sendSSE(res, 'layer-error', { layer, message: `Failed to generate ${layerName}` });
+      return { ok: false, text: '', finishReason: null };
     }
   }
 
   /**
-   * Test-mode mock SSE for a pipeline layer. Splits the canned text into two
-   * chunks so the streaming UI exercises the token-accumulation path.
+   * Test-mode mock for one layer: emits the same layer-tagged event sequence as
+   * streamLayer, split into two token chunks so the client's accumulation path
+   * is exercised. Returns the same shape as streamLayer.
    */
-  function emitMockLayerStream(res, text) {
-    res.set({
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-    });
-    res.flushHeaders();
+  function emitMockLayer(res, { layer, text }) {
+    sendSSE(res, 'layer-start', { layer });
     const half = Math.max(1, Math.floor(text.length / 2));
-    sendSSE(res, 'token', { token: text.slice(0, half) });
-    sendSSE(res, 'token', { token: text.slice(half) });
-    sendSSE(res, 'done', { finishReason: 'stop' });
-    res.end();
+    sendSSE(res, 'token', { layer, token: text.slice(0, half) });
+    sendSSE(res, 'token', { layer, token: text.slice(half) });
+    sendSSE(res, 'layer-done', { layer, finishReason: 'stop' });
+    return { ok: true, text, finishReason: 'stop' };
   }
 
   function isRoadmapTestMode(req) {
@@ -1829,217 +1836,173 @@ ${goal}`;
   }
 
   /**
-   * Layer 1 — Technical narrative.
-   * @route POST /workspace/:urlKey/api/roadmap/narrative/technical
+   * Server-orchestrated roadmap reading generation (LIN-317).
+   *
+   * Replaces the five client-driven per-layer calls (each of which sent the
+   * whole roadmapModel back and tripped the 250kb body-parser cap on large
+   * workspaces). Here the server fetches Linear ONCE, builds the model into a
+   * request-local variable, and runs every layer in sequence streaming each
+   * over a SINGLE SSE connection. The request body is tiny (north star +
+   * optional team), so the 413 cliff is gone. No persistent server state.
+   *
+   * Layer order: technical → product → (trajectory, north-star) → gap → digest.
+   * Each event is tagged with its layer id so the client demultiplexes one
+   * connection into the right placeholders. A layer failure emits a
+   * `layer-error` event and the pipeline continues where the design doc's
+   * failure modes allow (technical/product are hard prerequisites; a failed
+   * fork leg skips the gap; the digest still runs from layers 1/2/3a).
+   *
+   * Free tier: one unit is charged per layer that actually runs, matching the
+   * old per-call accounting. The first unit is reserved before streaming starts
+   * (clean 429); a mid-stream limit surfaces as a `layer-error` event since the
+   * HTTP status is already committed to 200.
+   *
+   * @route POST /workspace/:urlKey/api/roadmap/generate
    */
-  router.post('/workspace/:urlKey/api/roadmap/narrative/technical', workspaceFromUrl, async (req, res) => {
-    const gate = await gateRoadmapLLMRequest(req, res);
-    if (!gate) return;
+  router.post('/workspace/:urlKey/api/roadmap/generate', workspaceFromUrl, async (req, res) => {
+    const llm = await resolveRoadmapLLM(req, res);
+    if (!llm) return;
 
-    const { roadmapModel } = req.body || {};
-    if (!roadmapModel) {
-      return res.status(400).json({ error: 'roadmapModel is required' });
-    }
+    const testMode = isRoadmapTestMode(req);
 
-    if (isRoadmapTestMode(req)) {
-      return emitMockLayerStream(res, 'Mock technical narrative covering recent delivery.');
-    }
+    // North star comes from the body (tiny string — no 413 risk) and falls back
+    // to the saved session value. Team filter mirrors the page route.
+    const bodyNs = typeof req.body?.northStar === 'string' ? req.body.northStar : null;
+    const sessionNs = req.session.northStarByWorkspace?.[req.workspace.urlKey] || '';
+    const northStar = bodyNs != null ? bodyNs : sessionNs;
+    const hasNorthStar = !!(northStar && northStar.trim());
 
-    let messages;
+    const rawTeam = req.body?.team;
+    const teamId = rawTeam && rawTeam !== 'all' && UUID_REGEX.test(rawTeam) ? rawTeam : null;
+
+    // Fetch Linear once and build the model into a local variable. Errors here
+    // happen before any SSE headers are flushed, so they stay normal HTTP codes.
+    let roadmapModel;
     try {
-      const { buildRoadmapNarrativeMessages } = await import('../lib/prompts/roadmap-narrative-template.js');
-      messages = buildRoadmapNarrativeMessages(roadmapModel);
+      const { projects, issues } = testMode
+        ? testMockData
+        : await fetchProjects(req.workspace.accessToken, teamId);
+      roadmapModel = buildRoadmapModel(projects, issues);
     } catch (error) {
-      console.error('Roadmap technical build error:', error);
-      return res.status(500).json({ error: 'Failed to build technical prompt' });
+      console.error('Roadmap generate fetch error:', error);
+      if (error.response?.status === 401) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      return res.status(500).json({ error: 'Failed to load roadmap data' });
     }
 
-    await streamRoadmapLayer(res, { messages, ...gate, maxTokens: 5000, layerName: 'technical narrative' });
-  });
-
-  /**
-   * Layer 2 — Product perspective.
-   * @route POST /workspace/:urlKey/api/roadmap/narrative/product
-   */
-  router.post('/workspace/:urlKey/api/roadmap/narrative/product', workspaceFromUrl, async (req, res) => {
-    const gate = await gateRoadmapLLMRequest(req, res);
-    if (!gate) return;
-
-    const { roadmapModel, tech } = req.body || {};
-    if (!roadmapModel) {
-      return res.status(400).json({ error: 'roadmapModel is required' });
-    }
-    if (typeof tech !== 'string' || !tech.trim()) {
-      return res.status(400).json({ error: 'tech (layer 1 narrative) is required as a non-empty string' });
-    }
-
-    if (isRoadmapTestMode(req)) {
-      return emitMockLayerStream(res, 'Mock product perspective synthesizing themes from layer 1.');
-    }
-
-    let messages;
-    try {
-      const { buildRoadmapProductMessages } = await import('../lib/prompts/roadmap-product-template.js');
-      messages = buildRoadmapProductMessages(roadmapModel, tech);
-    } catch (error) {
-      console.error('Roadmap product build error:', error);
-      return res.status(500).json({ error: 'Failed to build product prompt' });
-    }
-
-    await streamRoadmapLayer(res, { messages, ...gate, maxTokens: 4000, layerName: 'product perspective' });
-  });
-
-  /**
-   * Layer 3a — Trajectory / aspirational.
-   * @route POST /workspace/:urlKey/api/roadmap/narrative/trajectory
-   */
-  router.post('/workspace/:urlKey/api/roadmap/narrative/trajectory', workspaceFromUrl, async (req, res) => {
-    const gate = await gateRoadmapLLMRequest(req, res);
-    if (!gate) return;
-
-    const { roadmapModel, tech, product } = req.body || {};
-    if (!roadmapModel) {
-      return res.status(400).json({ error: 'roadmapModel is required' });
-    }
-    if (typeof tech !== 'string' || !tech.trim()) {
-      return res.status(400).json({ error: 'tech (layer 1 narrative) is required as a non-empty string' });
-    }
-    if (typeof product !== 'string' || !product.trim()) {
-      return res.status(400).json({ error: 'product (layer 2 narrative) is required as a non-empty string' });
-    }
-
-    if (isRoadmapTestMode(req)) {
-      return emitMockLayerStream(res, 'Mock trajectory at this pace pointing toward simpler onboarding.');
-    }
-
-    let messages;
-    try {
-      const { buildRoadmapTrajectoryMessages } = await import('../lib/prompts/roadmap-trajectory-template.js');
-      messages = buildRoadmapTrajectoryMessages(roadmapModel, tech, product);
-    } catch (error) {
-      console.error('Roadmap trajectory build error:', error);
-      return res.status(500).json({ error: 'Failed to build trajectory prompt' });
-    }
-
-    await streamRoadmapLayer(res, { messages, ...gate, maxTokens: 4000, layerName: 'trajectory reading' });
-  });
-
-  /**
-   * Layer 3b — North star reading.
-   * @route POST /workspace/:urlKey/api/roadmap/narrative/north-star
-   */
-  router.post('/workspace/:urlKey/api/roadmap/narrative/north-star', workspaceFromUrl, async (req, res) => {
-    const gate = await gateRoadmapLLMRequest(req, res);
-    if (!gate) return;
-
-    const { roadmapModel, northStar, tech, product } = req.body || {};
-    if (!roadmapModel) {
-      return res.status(400).json({ error: 'roadmapModel is required' });
-    }
-    if (typeof northStar !== 'string' || !northStar.trim()) {
-      return res.status(400).json({ error: 'northStar is required as a non-empty string' });
-    }
-
-    if (isRoadmapTestMode(req)) {
-      return emitMockLayerStream(res, 'Mock north star reading: aligned to stated intent.');
-    }
-
-    // tech/product are optional descriptive context (layers 1/2). When present
-    // the reading re-grounds against them; when absent it degrades to data-only.
-    const priorReadings = {
-      tech: typeof tech === 'string' ? tech : '',
-      product: typeof product === 'string' ? product : ''
-    };
-
-    let messages;
-    try {
-      const { buildRoadmapNorthStarMessages } = await import('../lib/prompts/roadmap-north-star-template.js');
-      messages = buildRoadmapNorthStarMessages(roadmapModel, northStar, priorReadings);
-    } catch (error) {
-      console.error('Roadmap north-star build error:', error);
-      return res.status(500).json({ error: 'Failed to build north-star prompt' });
-    }
-
-    await streamRoadmapLayer(res, { messages, ...gate, maxTokens: 5000, layerName: 'north-star reading' });
-  });
-
-  /**
-   * Layer 4 — Gap analysis.
-   * @route POST /workspace/:urlKey/api/roadmap/narrative/gap
-   */
-  router.post('/workspace/:urlKey/api/roadmap/narrative/gap', workspaceFromUrl, async (req, res) => {
-    const gate = await gateRoadmapLLMRequest(req, res);
-    if (!gate) return;
-
-    const { northStar, trajectory, nsReading, roadmapModel } = req.body || {};
-    if (typeof northStar !== 'string' || !northStar.trim()) {
-      return res.status(400).json({ error: 'northStar is required as a non-empty string' });
-    }
-    if (typeof trajectory !== 'string' || !trajectory.trim()) {
-      return res.status(400).json({ error: 'trajectory (layer 3a output) is required as a non-empty string' });
-    }
-    if (typeof nsReading !== 'string' || !nsReading.trim()) {
-      return res.status(400).json({ error: 'nsReading (layer 3b output) is required as a non-empty string' });
-    }
-
-    if (isRoadmapTestMode(req)) {
-      return emitMockLayerStream(res, 'Mock gap analysis: trajectory and intent largely agree.');
-    }
-
-    let messages;
-    try {
-      const { buildRoadmapGapMessages } = await import('../lib/prompts/roadmap-gap-template.js');
-      // roadmapModel is optional re-grounding context; null when the client omits it.
-      messages = buildRoadmapGapMessages(northStar, trajectory, nsReading, roadmapModel || null);
-    } catch (error) {
-      console.error('Roadmap gap build error:', error);
-      return res.status(500).json({ error: 'Failed to build gap prompt' });
-    }
-
-    await streamRoadmapLayer(res, { messages, ...gate, maxTokens: 3000, layerName: 'gap analysis' });
-  });
-
-  /**
-   * Digest — the at-a-glance summary (synthesis layer). Generated last because
-   * it reads every prior layer, but rendered first (top of the reading). Needs
-   * at least the technical and product layers; trajectory / nsReading / gap /
-   * northStar are optional so it degrades cleanly when there is no north star
-   * or a fork leg failed.
-   * @route POST /workspace/:urlKey/api/roadmap/narrative/digest
-   */
-  router.post('/workspace/:urlKey/api/roadmap/narrative/digest', workspaceFromUrl, async (req, res) => {
-    const gate = await gateRoadmapLLMRequest(req, res);
-    if (!gate) return;
-
-    const { technical, product, trajectory, nsReading, gap, northStar } = req.body || {};
-    if (typeof technical !== 'string' || !technical.trim()) {
-      return res.status(400).json({ error: 'technical (layer 1 output) is required as a non-empty string' });
-    }
-    if (typeof product !== 'string' || !product.trim()) {
-      return res.status(400).json({ error: 'product (layer 2 output) is required as a non-empty string' });
-    }
-
-    if (isRoadmapTestMode(req)) {
-      return emitMockLayerStream(res, 'Mock summary: SHIPPED recent work. WHERE WE ARE on track. THE RISK is delivery. THE DECISION is for the human.');
-    }
-
-    let messages;
-    try {
-      const { buildRoadmapDigestMessages } = await import('../lib/prompts/roadmap-digest-template.js');
-      messages = buildRoadmapDigestMessages({
-        northStar: typeof northStar === 'string' ? northStar : '',
-        technical,
-        product,
-        trajectory: typeof trajectory === 'string' ? trajectory : '',
-        nsReading: typeof nsReading === 'string' ? nsReading : '',
-        gap: typeof gap === 'string' ? gap : ''
+    // Reserve the first free-tier unit before streaming so an already-exhausted
+    // free user gets a clean 429 rather than a 200 stream that errors instantly.
+    const firstCharge = await chargeRoadmapLayer(req, llm.isFreeTier);
+    if (!firstCharge.allowed) {
+      return res.status(429).json({
+        error: firstCharge.reason,
+        freeTier: {
+          used: true,
+          remaining: firstCharge.remaining,
+          limit: firstCharge.limit,
+          resetsAt: firstCharge.resetsAt
+        }
       });
-    } catch (error) {
-      console.error('Roadmap digest build error:', error);
-      return res.status(500).json({ error: 'Failed to build digest prompt' });
     }
 
-    await streamRoadmapLayer(res, { messages, ...gate, maxTokens: 1200, layerName: 'summary' });
+    res.set({
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    });
+    res.flushHeaders();
+
+    /**
+     * Run one layer over the shared connection. Charges a free-tier unit first
+     * (unless pre-charged); on a build error or rate limit emits a layer-error
+     * and resolves { ok: false } so the caller decides whether to continue.
+     */
+    async function runLayer({ layer, layerName, maxTokens, mockText, buildMessages, precharged }) {
+      if (!precharged) {
+        const check = await chargeRoadmapLayer(req, llm.isFreeTier);
+        if (!check.allowed) {
+          sendSSE(res, 'layer-error', { layer, message: check.reason || 'Free tier limit reached' });
+          return { ok: false, text: '' };
+        }
+      }
+      if (testMode) return emitMockLayer(res, { layer, text: mockText });
+      let messages;
+      try {
+        messages = buildMessages();
+      } catch (error) {
+        console.error(`Roadmap ${layerName} build error:`, error);
+        sendSSE(res, 'layer-error', { layer, message: `Failed to build ${layerName} prompt` });
+        return { ok: false, text: '' };
+      }
+      return streamLayer(res, { messages, apiKey: llm.apiKey, model: llm.model, maxTokens, layer, layerName });
+    }
+
+    try {
+      // Layer 1 — Technical (hard prerequisite; first unit already reserved).
+      const tech = await runLayer({
+        layer: 'technical', layerName: 'technical narrative', maxTokens: 5000, precharged: true,
+        mockText: 'Mock technical narrative covering recent delivery.',
+        buildMessages: () => buildRoadmapNarrativeMessages(roadmapModel)
+      });
+      if (tech.ok) {
+        // Layer 2 — Product (hard prerequisite; chains from technical).
+        const product = await runLayer({
+          layer: 'product', layerName: 'product perspective', maxTokens: 4000,
+          mockText: 'Mock product perspective synthesizing themes from layer 1.',
+          buildMessages: () => buildRoadmapProductMessages(roadmapModel, tech.text)
+        });
+        if (product.ok) {
+          // Layer 3a — Trajectory (chains from product; failure is non-fatal).
+          const trajectory = await runLayer({
+            layer: 'trajectory', layerName: 'trajectory reading', maxTokens: 4000,
+            mockText: 'Mock trajectory at this pace pointing toward simpler onboarding.',
+            buildMessages: () => buildRoadmapTrajectoryMessages(roadmapModel, tech.text, product.text)
+          });
+
+          // Layer 3b — North star reading (only with a north star; source-grounded).
+          let nsReading = { ok: false, text: '' };
+          if (hasNorthStar) {
+            nsReading = await runLayer({
+              layer: 'north-star-reading', layerName: 'north-star reading', maxTokens: 5000,
+              mockText: 'Mock north star reading: aligned to stated intent.',
+              buildMessages: () => buildRoadmapNorthStarMessages(roadmapModel, northStar, {
+                tech: tech.text, product: product.text
+              })
+            });
+          }
+
+          // Layer 4 — Gap (needs both fork legs to have succeeded).
+          let gap = { ok: false, text: '' };
+          if (hasNorthStar && trajectory.ok && nsReading.ok) {
+            gap = await runLayer({
+              layer: 'gap', layerName: 'gap analysis', maxTokens: 3000,
+              mockText: 'Mock gap analysis: trajectory and intent largely agree.',
+              buildMessages: () => buildRoadmapGapMessages(northStar, trajectory.text, nsReading.text, roadmapModel)
+            });
+          }
+
+          // Digest — synthesises everything above (generates last, renders first).
+          await runLayer({
+            layer: 'digest', layerName: 'summary', maxTokens: 1200,
+            mockText: 'Mock summary: SHIPPED recent work. WHERE WE ARE on track. THE RISK is delivery. THE DECISION is for the human.',
+            buildMessages: () => buildRoadmapDigestMessages({
+              northStar: hasNorthStar ? northStar : '',
+              technical: tech.text,
+              product: product.text,
+              trajectory: trajectory.text || '',
+              nsReading: nsReading.text || '',
+              gap: gap.text || ''
+            })
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Roadmap generate stream error:', error);
+    } finally {
+      sendSSE(res, 'done', {});
+      res.end();
+    }
   });
 
   /**
