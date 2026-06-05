@@ -296,7 +296,18 @@ const DANGEROUS_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
  * @returns {string} Block to append to the prompt
  */
 function buildProxyContextPreamble({ baseUrl, token, issueIdentifier }) {
-  const task = issueIdentifier || 'your task';
+  // Per-issue examples only make sense when we actually have an identifier;
+  // otherwise fall back to generic discovery endpoints (avoids rendering a
+  // malformed ".../issues/your task" with a literal space).
+  const contextLines = issueIdentifier
+    ? [
+        `Use it to pull context (e.g. GET ${baseUrl}/api/proxy/issues/${issueIdentifier},`,
+        `/relations/${issueIdentifier}) and to update Linear as you work (status, comments, labels).`
+      ]
+    : [
+        `Use it to pull context (e.g. GET ${baseUrl}/api/proxy/stack, /search?q=…,`,
+        `/issues/LIN-123) and to update Linear as you work (status, comments, labels).`
+      ];
   return [
     '',
     '',
@@ -307,8 +318,7 @@ function buildProxyContextPreamble({ baseUrl, token, issueIdentifier }) {
     `Auth header on every call: \`Authorization: Bearer ${token}\` (read+write).`,
     `Full endpoint catalog: GET ${baseUrl}/api/proxy/instructions`,
     '',
-    `Use it to pull context (e.g. GET ${baseUrl}/api/proxy/issues/${task},`,
-    `/relations/${task}) and to update Linear as you work (status, comments, labels).`,
+    ...contextLines,
     '',
     'Your runner reports back automatically when this session stops — you do not',
     'need to curl anything to phone home. Just END with a concise summary that',

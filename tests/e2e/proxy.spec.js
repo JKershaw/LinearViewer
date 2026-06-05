@@ -699,6 +699,24 @@ test.describe('Proxy API - Dispatch', () => {
     expect(item.prompt).not.toContain('/api/proxy/foreman/status');
   });
 
+  test('auto-append uses generic endpoints when there is no issueIdentifier', async ({ request }) => {
+    const enqueue = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'run a retro', promptName: 'Retro' } // no issueIdentifier
+    });
+    const { id } = await enqueue.json();
+    const take = await request.post(`/api/dispatch/take/${id}`, {
+      headers: { Authorization: `Bearer ${consumerToken}` }
+    });
+    const { item } = await take.json();
+    expect(item.prompt).toContain('Linear access');
+    // No malformed "/issues/your task" with a literal space.
+    expect(item.prompt).not.toContain('your task');
+    expect(item.prompt).not.toMatch(/issues\/\S+ \S+\)/);
+    // Falls back to generic discovery endpoints instead.
+    expect(item.prompt).toContain('/api/proxy/stack');
+  });
+
   test('appendProxyContext:false leaves the prompt untouched', async ({ request }) => {
     const enqueue = await request.post('/api/proxy/dispatch', {
       headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
