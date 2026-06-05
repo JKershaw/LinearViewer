@@ -91,7 +91,7 @@
   }
 
   // =========================================================================
-  // Pipeline (AI) — five layers streamed into server-rendered placeholders
+  // Pipeline (AI) — layers streamed from one server-orchestrated SSE endpoint
   // =========================================================================
 
   var LAYER_IDS = ['digest', 'technical', 'product', 'trajectory', 'north-star-reading', 'gap'];
@@ -138,111 +138,48 @@
     section.appendChild(btn);
   }
 
-  /**
-   * Stream one pipeline layer into its placeholder section.
-   * Resolves with the accumulated text; rejects on HTTP/SSE error.
-   */
-  function runLayer(layerId, endpoint, body) {
-    return new Promise(function(resolve, reject) {
-      var section = layerSection(layerId);
-      if (!section) {
-        reject(new Error('No section for layer ' + layerId));
-        return;
-      }
-      var status = section.querySelector('.roadmap-layer-status');
-      var content = section.querySelector('.roadmap-layer-content');
+  // Maps a generate-stream layer id to its collected-narrative field.
+  var LAYER_TO_FIELD = {
+    technical: 'technical',
+    product: 'product',
+    trajectory: 'trajectory',
+    'north-star-reading': 'northStarReading',
+    gap: 'gap',
+    digest: 'digest'
+  };
 
-      section.setAttribute('data-state', 'streaming');
-      if (status) {
-        status.textContent = 'Generating…';
-        status.classList.add('roadmap-layer-status--loading');
-      }
-      if (content) content.textContent = '';
-      var retry = section.querySelector('.roadmap-layer-retry');
-      if (retry) retry.remove();
-
-      var acc = '';
-      var firstToken = true;
-
-      function fail(message) {
-        section.setAttribute('data-state', 'failed');
-        // Auto-expand a collapsed layer that failed so its error + retry show.
-        if (section.tagName === 'DETAILS') section.open = true;
-        if (status) {
-          status.textContent = message || 'Failed';
-          status.classList.remove('roadmap-layer-status--loading');
-        }
-        addRetryButton(layerId, function() {
-          runLayer(layerId, endpoint, body).then(resolve, reject);
-        });
-        reject(new Error(message || 'layer failed'));
-      }
-
-      fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/roadmap/narrative/' + endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
-        body: JSON.stringify(body)
-      }).then(function(response) {
-        if (response.status === 401) {
-          window.location.href = '/logout';
-          return;
-        }
-        if (!response.ok) {
-          fail('HTTP ' + response.status);
-          return;
-        }
-        return readSSEStream(response, function(type, eventData) {
-          if (type === 'token' || type === 'message') {
-            var text = typeof eventData === 'object' ? (eventData.token || eventData.text || '') : eventData;
-            if (firstToken && text) {
-              if (status) {
-                status.textContent = '';
-                status.classList.remove('roadmap-layer-status--loading');
-              }
-              firstToken = false;
-            }
-            acc += text;
-            if (content) content.textContent = acc;
-          } else if (type === 'done') {
-            section.setAttribute('data-state', 'done');
-            if (status) {
-              status.textContent = '';
-              status.classList.remove('roadmap-layer-status--loading');
-            }
-            if (eventData && eventData.finishReason === 'length') {
-              acc += '\n\n[output truncated — hit token limit]';
-              if (content) content.textContent = acc;
-            }
-            resolve(acc);
-          } else if (type === 'error') {
-            var msg = typeof eventData === 'object' ? (eventData.message || 'Error') : eventData;
-            fail(msg);
-          }
-        });
-      }).catch(function(err) {
-        fail(err && err.message ? err.message : 'request failed');
-      });
-    });
+  // Read the current team filter from the URL so the generated reading matches
+  // the data shown on the page (the page route is team-scoped via ?team=).
+  function currentTeamParam() {
+    try {
+      var t = new URLSearchParams(window.location.search).get('team');
+      return t && t !== 'all' ? t : null;
+    } catch (e) {
+      return null;
+    }
   }
 
   /**
-   * Orchestrate the pipeline.
+   * Orchestrate the reading over ONE server-orchestrated SSE stream (LIN-317).
    *
-   *   technical → product → (trajectory ∥ north-star-reading) → gap → digest
+   *   technical → product → (trajectory, north-star-reading) → gap → digest
    *
-   * The digest is the synthesis layer: it generates last (it reads every layer
-   * above) but renders first, at the top of the reading. When the north star is
-   * empty, layers 3b and 4 are skipped — those sections render a CTA instead —
-   * and the digest still runs from layers 1/2/3a. Failures in individual layers
-   * leave the rest of the pipeline running where possible per the design doc's
-   * §"Failure modes".
+   * The server fetches Linear once, builds the model, and streams every layer
+   * over a single connection with each event tagged by its layer id; we
+   * demultiplex those events into the matching placeholders. This replaces the
+   * old five client-driven per-layer POSTs that each sent the whole model back
+   * and tripped the 250kb body cap (instant 413) on large workspaces.
+   *
+   * The digest generates last but renders first. When there is no north star,
+   * the server skips layers 3b and 4 and those sections show a CTA. Per-layer
+   * failures surface as `layer-error` events and leave the rest of the stream
+   * running per the design doc's §"Failure modes".
    */
   function runPipeline(northStar, generateBtn) {
-    var roadmapModel = getRoadmapModelPayload();
     var hasNorthStar = !!(northStar && northStar.trim());
 
     // Accumulate each layer's final text so the completed run can be persisted
-    // (Step 0 / LIN-299). Layers that fail or are skipped stay null.
+    // (LIN-299). Layers that fail or are skipped stay null.
     var collected = {
       digest: null,
       technical: null,
@@ -251,6 +188,10 @@
       northStarReading: null,
       gap: null
     };
+
+    // Per-layer streaming bookkeeping (keyed by layer id).
+    var acc = {};
+    var firstToken = {};
 
     LAYER_IDS.forEach(resetLayer);
     if (generateBtn) {
@@ -268,96 +209,133 @@
       setLayerState('gap', 'not-available', 'A north star is required for the gap analysis.');
     }
 
-    return runLayer('technical', 'technical', { roadmapModel })
-      .then(function(tech) {
-        collected.technical = tech;
-        return runLayer('product', 'product', { roadmapModel, tech }).then(function(product) {
-          collected.product = product;
-          return { tech, product };
-        });
-      })
-      .then(function(prior) {
-        var trajectoryPromise = runLayer('trajectory', 'trajectory', {
-          roadmapModel,
-          tech: prior.tech,
-          product: prior.product
-        });
-        var nsPromise = hasNorthStar
-          ? runLayer('north-star-reading', 'north-star', {
-              roadmapModel,
-              northStar,
-              tech: prior.tech,
-              product: prior.product
-            })
-          : Promise.resolve(null);
+    function startLayer(layer) {
+      var section = layerSection(layer);
+      if (!section) return;
+      acc[layer] = '';
+      firstToken[layer] = true;
+      section.setAttribute('data-state', 'streaming');
+      var status = section.querySelector('.roadmap-layer-status');
+      var content = section.querySelector('.roadmap-layer-content');
+      if (status) {
+        status.textContent = 'Generating…';
+        status.classList.add('roadmap-layer-status--loading');
+      }
+      if (content) content.textContent = '';
+      var retry = section.querySelector('.roadmap-layer-retry');
+      if (retry) retry.remove();
+    }
 
-        return Promise.allSettled([trajectoryPromise, nsPromise]).then(function(results) {
-          var trajectory = results[0].status === 'fulfilled' ? results[0].value : null;
-          var nsReading = results[1].status === 'fulfilled' ? results[1].value : null;
-          collected.trajectory = trajectory;
-          collected.northStarReading = nsReading;
-
-          var gapPromise = Promise.resolve();
-          if (hasNorthStar) {
-            if (trajectory && nsReading) {
-              gapPromise = runLayer('gap', 'gap', { northStar, trajectory, nsReading, roadmapModel })
-                .then(function(gap) { collected.gap = gap; })
-                .catch(function() {});
-            } else {
-              // One fork leg failed; downgrade gap to a clearer message.
-              setLayerState('gap', 'not-available', 'Gap analysis needs both trajectory and north star reading to succeed.');
-            }
-          }
-
-          // Digest runs last — it synthesises every layer above into the
-          // at-a-glance summary that renders at the top of the reading.
-          return gapPromise.then(function() {
-            return runDigest(collected, northStar);
-          });
-        });
-      })
-      .catch(function() {
-        // Errors are surfaced per-layer; nothing extra to do here.
-      })
-      .then(function() {
-        if (generateBtn) {
-          generateBtn.disabled = false;
-          generateBtn.textContent = 'Regenerate reading';
+    function appendToken(layer, token) {
+      if (!token) return;
+      var section = layerSection(layer);
+      if (!section) return;
+      if (acc[layer] == null) acc[layer] = '';
+      var status = section.querySelector('.roadmap-layer-status');
+      var content = section.querySelector('.roadmap-layer-content');
+      if (firstToken[layer]) {
+        if (status) {
+          status.textContent = '';
+          status.classList.remove('roadmap-layer-status--loading');
         }
-        // Persist the completed run (best-effort), then refresh the history
-        // list and select the new reading. The panels already show the
-        // freshly-streamed content, so we don't re-apply it.
-        return saveReport(northStar, collected).then(function(saved) {
-          return loadHistory().then(function() {
-            var id = saved ? saved.id : historyState.latestId;
-            if (id) selectReport(id, false);
+        firstToken[layer] = false;
+      }
+      acc[layer] += token;
+      if (content) content.textContent = acc[layer];
+    }
+
+    function finishLayer(layer, finishReason) {
+      var section = layerSection(layer);
+      if (!section) return;
+      section.setAttribute('data-state', 'done');
+      var status = section.querySelector('.roadmap-layer-status');
+      if (status) {
+        status.textContent = '';
+        status.classList.remove('roadmap-layer-status--loading');
+      }
+      if (finishReason === 'length') {
+        acc[layer] = (acc[layer] || '') + '\n\n[output truncated — hit token limit]';
+        var content = section.querySelector('.roadmap-layer-content');
+        if (content) content.textContent = acc[layer];
+      }
+      var field = LAYER_TO_FIELD[layer];
+      if (field) collected[field] = acc[layer] || '';
+    }
+
+    function failLayer(layer, message) {
+      var section = layerSection(layer);
+      if (!section) return;
+      section.setAttribute('data-state', 'failed');
+      // Auto-expand a collapsed layer that failed so its error + retry show.
+      if (section.tagName === 'DETAILS') section.open = true;
+      var status = section.querySelector('.roadmap-layer-status');
+      if (status) {
+        status.textContent = message || 'Failed';
+        status.classList.remove('roadmap-layer-status--loading');
+      }
+      // Retry re-runs the whole reading — the stream is server-orchestrated, so
+      // a single layer can't be re-requested in isolation.
+      addRetryButton(layer, function() { runPipeline(northStar, generateBtn); });
+    }
+
+    var body = { northStar: northStar || '' };
+    var team = currentTeamParam();
+    if (team) body.team = team;
+
+    return fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/roadmap/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
+      body: JSON.stringify(body)
+    }).then(function(response) {
+      if (response.status === 401) {
+        window.location.href = '/logout';
+        return;
+      }
+      if (!response.ok) {
+        // Pre-stream failure (e.g. 429 free-tier limit, 500). Surface the
+        // server's message on the digest slot at the top of the reading.
+        return response.json().then(function(b) { return b; }, function() { return null; })
+          .then(function(b) {
+            var msg = (b && b.error) ? b.error : ('HTTP ' + response.status);
+            setLayerState('digest', 'failed', msg);
           });
+      }
+      return readSSEStream(response, function(type, eventData) {
+        var layer = eventData && eventData.layer;
+        if (type === 'layer-start') {
+          if (layer) startLayer(layer);
+        } else if (type === 'token') {
+          if (layer) appendToken(layer, eventData.token || '');
+        } else if (type === 'layer-done') {
+          if (layer) finishLayer(layer, eventData.finishReason);
+        } else if (type === 'layer-error') {
+          if (layer) failLayer(layer, eventData.message);
+        }
+        // 'done' needs no action — the stream ending resolves the promise.
+      });
+    }).catch(function() {
+      setLayerState('digest', 'failed', 'Generation failed. Please try again.');
+    }).then(function() {
+      if (generateBtn) {
+        generateBtn.disabled = false;
+        generateBtn.textContent = 'Regenerate reading';
+      }
+      // If the digest never produced content (e.g. technical/product failed),
+      // replace its pending note with a clear not-available message.
+      var digestSection = layerSection('digest');
+      if (!collected.digest && digestSection && digestSection.getAttribute('data-state') === 'pending') {
+        setLayerState('digest', 'not-available', 'Summary needs the technical and product layers.');
+      }
+      // Persist the completed run (best-effort), then refresh the history list
+      // and select the new reading. The panels already show the freshly-streamed
+      // content, so selectReport just syncs the history selection state.
+      return saveReport(northStar, collected).then(function(saved) {
+        return loadHistory().then(function() {
+          var id = saved ? saved.id : historyState.latestId;
+          if (id) selectReport(id, false);
         });
       });
-  }
-
-  /**
-   * Run the digest layer — the synthesis that renders at the top. It generates
-   * last because it reads every prior layer, and degrades cleanly when the
-   * trajectory / north-star reading / gap are missing (no north star, or a fork
-   * leg failed). Needs at least the technical and product layers to have content.
-   * Resolves once the digest has streamed (or been skipped); never rejects.
-   */
-  function runDigest(collected, northStar) {
-    if (!collected.technical || !collected.product) {
-      setLayerState('digest', 'not-available', 'Summary needs the technical and product layers.');
-      return Promise.resolve();
-    }
-    return runLayer('digest', 'digest', {
-      technical: collected.technical,
-      product: collected.product,
-      trajectory: collected.trajectory || '',
-      nsReading: collected.northStarReading || '',
-      gap: collected.gap || '',
-      northStar: northStar || ''
-    })
-      .then(function(digest) { collected.digest = digest; })
-      .catch(function() { /* surfaced per-layer with a retry button */ });
+    });
   }
 
   /**
