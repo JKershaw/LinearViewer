@@ -140,17 +140,21 @@
   }
 
   function renderFresh(state, opts) {
-    const { name, html, reasoning } = state.result;
+    const { name, html, reasoning, warning } = state.result;
     const actions = renderActionCluster(opts);
     const reasoningToggle = reasoning
       ? `<div class="swipe-reasoning-toggle" data-action="reasoning-toggle">\u25B8 reasoning</div>
          <div class="swipe-reasoning-content hidden">${renderMarkdown(reasoning)}</div>`
+      : '';
+    const warningBanner = warning
+      ? `<div class="swipe-prompt-warning">\u26A0 ${esc(warning)}</div>`
       : '';
     return `
       <div class="swipe-prompt-header">
         <span class="swipe-prompt-name">${esc(name || 'prompt')}</span>
         <div class="swipe-prompt-actions">${actions}</div>
       </div>
+      ${warningBanner}
       ${reasoningToggle}
       <div class="swipe-prompt-text" data-prompt-body>${html}</div>`;
   }
@@ -323,6 +327,7 @@
       let sseBuffer = '';
       let renderPending = false;
       let prevChildCount = 0;
+      let truncated = false;
 
       // First render: swap to fresh with empty body so the stream animates inline
       state.phase = 'fresh';
@@ -391,6 +396,10 @@
               currentField = 'prompt';
               scheduleRender();
             }
+            // The `done` event carries truncation metadata (finish_reason === 'length').
+            if (parsed.truncated === true) {
+              truncated = true;
+            }
             if (parsed.error) {
               throw new Error(parsed.error);
             }
@@ -405,9 +414,18 @@
       container.classList.remove('streaming');
       const displayText = stripCodeBlockWrapper(promptRaw || reasoningRaw);
       const finalHtml = renderMarkdown(displayText);
+      // Surface failure modes the backend can't fully prevent: a max_tokens
+      // truncation (prompt likely cut off mid-text), or no prompt section at all
+      // (the model returned only reasoning, so what's shown is the reasoning).
+      let warning = null;
+      if (truncated) {
+        warning = 'Output hit the length limit — this prompt was cut short. Regenerate or shorten the task context.';
+      } else if (!promptRaw) {
+        warning = 'The model returned no prompt section — showing its reasoning instead. Try regenerating.';
+      }
       const entry = {
         label, name: 'AI Recommendation', raw: displayText,
-        html: finalHtml, reasoning: reasoningRaw
+        html: finalHtml, reasoning: reasoningRaw, warning
       };
       promptCache.set(`${issueId}:${label}`, entry);
       lastPromptLabel.set(issueId, label);
