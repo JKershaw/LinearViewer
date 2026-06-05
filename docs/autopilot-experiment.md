@@ -2,10 +2,16 @@
 
 ## Status
 
-Experiment plan for the first end-to-end spike of the Autopilot loop (see
+Experiment plan + results for the first end-to-end spike of the Autopilot loop (see
 [`autopilot.md`](./autopilot.md) for the design and invariants). Written before running so
-the question, the stages, and the success criteria are fixed in advance. The **Results**
-section at the bottom is filled in *after* the run — expect setup friction and tweaks.
+the question, the stages, and the success criteria were fixed in advance; the **Results**
+section records what actually happened.
+
+**Checkpoint (2026-06-05):** the dispatch API surface is built, deployed, and exercised across
+three live runs. Key result: the loop works, but completion must be judged from external evidence
+(Linear/git/PR) — the feedback channel is liveness, not result. Open work is consumer telemetry
+(terminal/heartbeat/failure events; hooks surviving remote-control handoff) before an autonomous
+orchestrator can drive it. Continuation tracked in Linear as **LIN-318** (In Progress).
 
 ## The question we are answering
 
@@ -31,9 +37,9 @@ look like, and is it enough for a judge to decide "done" without re-reading ever
     `target: local`. Returns `{ id, status: "queued", ... }`.
   - `GET /api/proxy/dispatch/:id` (read) — watch; returns `{ id, status, feedback: [...], ... }`,
     resolving across the live queue and the taken/feedback history. Feedback stays free-form.
-  - Discoverable via `/api/proxy/instructions`. Covered by E2E tests in `tests/e2e/proxy.spec.js`.
-  - **Deploy gap:** the proxy runs on production (`projects.jkershaw.com`); this branch isn't live
-    there yet, so calling it with the proxy token requires a deploy (merge to `main`) first.
+  - Plus `GET /api/proxy/dispatch` (list, filter by `issueIdentifier`/`status`) and auto-appended
+    proxy context on enqueue. Discoverable via `/api/proxy/instructions`; E2E in `tests/e2e/proxy.spec.js`.
+  - **Deployed** to production and exercised live (no longer a deploy gap).
 
 ## Stage A — plumbing spike (zero build, run first)
 
@@ -123,16 +129,72 @@ setup or tweak needed, where a human intervened and why, and what it implies for
   hands the real work to a remote-control session that writes its results into **Linear** (via the
   proxy), decoupled from the dispatch item. So the autopilot watches *outcomes in Linear/git*, not
   the feedback stream.
-- **Anomaly to watch:** the feedback also contained "Starting: Summarising project in linearviewer"
-  and "Prompt: Summarise this project briefly" — content from a *different* prompt than LIN-288,
-  interleaved with the LIN-288 echoes. Looks like launcher/prior-session bleed or multiplexing into
-  one item's feedback; would confuse an orchestrator that parsed the stream. Flagged for the runner.
+- The "Summarising project in linearviewer" / "Summarise this project briefly" entries are the
+  runner's **expected launcher preamble** (confirmed), not cross-prompt bleed.
 
 **Net for the design:** the auto-appended Linear access is what made the result observable (it
 landed in Linear). The "end with an evidence-rich summary" line only helps if the Stop hook is
 later changed to forward the worker's final message — today it forwards launch narration, not the
 summary. The judge reads Linear/git/PR regardless.
 
-### Stage B
+### Stage A (cont.) — consumer-improvement run, 2026-06-05 later
 
-- _pending_
+After the first run we wrote a **dispatch-consumer punch-list** (below). The runner was improved
+and we re-ran. Two more dispatches, both via the new `POST /api/proxy/dispatch`:
+
+- **Run 2 — LIN-288 planning task → `web` (item `cfa2eb90…`).** Improvements visible immediately:
+  phase tags `[started]`/`[working]`, prompt **reference** instead of a full dump (`(2016 chars)`),
+  session id + tty. But it then **stalled silently** after `remote-control slow to connect — sending
+  prompt anyway` → `Remote connected. Executing task…`, and ~18 min later nothing had reached the
+  feedback channel **or** Linear.
+- **Root cause (operator):** *hooks stop firing once a session hands off to remote control.* So on
+  the `web`/remote path the **Stop hook can't post the terminal event** — structurally, not a bug in
+  our watch verb. Both `web` runs therefore showed launcher narration and then went dark, even when
+  the underlying work completed.
+- **Run 3 — read-only retro → `cli` (item `cb9917e2…`), to test the hook hypothesis on a path that
+  keeps hooks alive.** It launched (`[started]` + `[working] Session launched`) and then **froze at
+  launch** — operator's laptop went to sleep right after spawn. Same silent-freeze signature as a
+  stall.
+
+**Combined finding:** a stalled run, a remote-handoff that drops the tail, and a sleeping laptop all
+produce the **identical silent freeze** on the channel. Today nothing distinguishes "working" from
+"dead" without manually checking Linear/git. That makes the punch-list's **terminal event (#1),
+heartbeat (#2), and failure report (#6)** the load-bearing changes — and confirms the orchestrator
+must treat **external evidence (Linear/git/PR) as the source of truth** for completion, with the
+feedback stream as liveness only.
+
+### Dispatch-consumer punch-list (for the runner, ranked by leverage)
+
+1. **Terminal completion event** — on stop, post `[done]`/`[failed]`/`[aborted]` + final summary +
+   an **evidence URL** (Linear comment / PR / commit). The single highest-value change. *(Blocked on
+   the remote-control path until hooks survive handoff — see below.)*
+2. **Liveness heartbeats** during the work window, so a hung/asleep session is distinguishable from a
+   working one in ~1 min instead of never.
+3. **Stop echoing the full prompt** — a short reference is enough. ✅ done in the improved runner.
+4. **Forward `dispatchId` → `/api/proxy/foreman/status`** so work joins to the exact dispatch attempt
+   (foreman channel is empty today).
+5. **Populate `url`/`urlLabel`** with the concrete artifact (all `null` today).
+6. **Explicit failure reporting** — stalls/disconnects/errors should be loud, not silent.
+7. **Hooks survive remote-control handoff** (newly found) — without this, #1 is impossible on `web`.
+   Either keep the Stop hook alive across the handoff, or have the launcher (not the remote session)
+   own the terminal post.
+
+### Stage B — orchestrator spike
+
+- **Partially exercised manually:** the human-as-orchestrator loop now runs over the API —
+  `POST /api/proxy/dispatch` (with auto-appended proxy context) → `GET /api/proxy/dispatch/:id` +
+  `GET /api/proxy/dispatch?issueIdentifier=…` to watch → cross-check the outcome in Linear. That
+  round-trip works.
+- **Not yet done:** an actual Claude *orchestrator* prompt driving the loop unattended (dispatch →
+  detect completion via Linear evidence → recap → decide next). Blocked less by the API than by the
+  consumer telemetry gaps above — without a terminal/heartbeat signal, an autonomous orchestrator
+  can't reliably tell when to advance.
+
+### Endpoints / changes shipped on this branch
+
+- `POST /api/proxy/dispatch` (enqueue) + `GET /api/proxy/dispatch/:id` (watch) + `GET /api/proxy/dispatch`
+  (list, filter by `issueIdentifier`/`status`).
+- Auto-append proxy context to dispatched prompts (Linear access; reporting left to the runner's Stop
+  hook). Standing readWrite token **for now**, flagged in-code as security debt. Fixed a malformed-URL
+  bug for dispatches without an `issueIdentifier`.
+- All covered by E2E tests in `tests/e2e/proxy.spec.js` (11 dispatch tests).
