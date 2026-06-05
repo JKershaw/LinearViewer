@@ -273,6 +273,51 @@ async function fetchWithTimeout(workFn, ms) {
 // Pattern to detect null bytes and dangerous control characters
 const DANGEROUS_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
 
+/**
+ * Builds the proxy-context block appended to a dispatched prompt so the worker
+ * inherits Linear access for this workspace — the richer replacement for the
+ * old local MCP. It does NOT teach phone-home: the dispatch runner's own Stop
+ * hook reports back automatically when the session ends, so reporting is a
+ * harness concern, not a prompt concern. We only ask the worker to END with an
+ * evidence-rich summary, so whatever the hook forwards carries proof rather
+ * than a bare "done" (the invariant-2 / LIN-292 discipline, applied at source).
+ *
+ * SECURITY DEBT — revisit (do not ship to broad use as-is): this embeds the
+ * caller's STANDING readWrite proxy token in plaintext inside the queued prompt
+ * (and anywhere that prompt is later rendered). A leaked prompt leaks full
+ * workspace write. Planned hardening: mint a per-dispatch, short-TTL token bound
+ * to this item with a narrow scope, mirroring the Harbour per-item feedback
+ * token. For now (by explicit choice): standing readWrite.
+ *
+ * @param {Object} params
+ * @param {string} params.baseUrl - e.g. https://host
+ * @param {string} params.token - Bearer token to embed (standing readWrite, for now)
+ * @param {string} [params.issueIdentifier] - e.g. "LIN-42"
+ * @returns {string} Block to append to the prompt
+ */
+function buildProxyContextPreamble({ baseUrl, token, issueIdentifier }) {
+  const task = issueIdentifier || 'your task';
+  return [
+    '',
+    '',
+    '---',
+    '## Linear access (auto-appended)',
+    '',
+    `You have a Linear API proxy for this workspace. Base: ${baseUrl}/api/proxy`,
+    `Auth header on every call: \`Authorization: Bearer ${token}\` (read+write).`,
+    `Full endpoint catalog: GET ${baseUrl}/api/proxy/instructions`,
+    '',
+    `Use it to pull context (e.g. GET ${baseUrl}/api/proxy/issues/${task},`,
+    `/relations/${task}) and to update Linear as you work (status, comments, labels).`,
+    '',
+    'Your runner reports back automatically when this session stops — you do not',
+    'need to curl anything to phone home. Just END with a concise summary that',
+    'names concrete evidence: PR link, commit SHA, and CI/test result, so the',
+    'report carries proof rather than a bare "done".',
+    ''
+  ].join('\n');
+}
+
 // =============================================================================
 // GraphQL Queries
 // =============================================================================
@@ -1042,9 +1087,14 @@ POST ${baseUrl}/api/proxy/foreman/status
 ## Dispatch Endpoints
 
 POST ${baseUrl}/api/proxy/dispatch
-  Body: { "prompt": "...", "promptName": "...", "issueId": "...", "issueIdentifier": "LIN-42", "issueTitle": "...", "issueUrl": "...", "target": "cli|web|dash", "repo": "..." }
+  Body: { "prompt": "...", "promptName": "...", "issueId": "...", "issueIdentifier": "LIN-42", "issueTitle": "...", "issueUrl": "...", "target": "cli|web|dash", "repo": "...", "appendProxyContext": true }
   → Queue a prompt for the workspace's dispatch consumer (the runner). Only "prompt" is required; target defaults to "cli". ("local"/Harbour is not available to proxy consumers.)
+  → By default a proxy-context block is appended to the prompt so the worker inherits Linear access for this workspace (the MCP replacement). Reporting is handled by the runner's Stop hook, not the prompt. Set "appendProxyContext": false to opt out.
   → { "id": "...", "status": "queued", "promptName": "...", "issueIdentifier": "...", "target": "cli", "dispatchedAt": "..." }
+
+GET ${baseUrl}/api/proxy/dispatch?issueIdentifier={LIN-42}&status={queued|taken}&limit={n}
+  → List your dispatch items (live queue + recent history), newest first. All query params optional. Use this to find an item's id when you only know the issue.
+  → { "items": [{ "id": "...", "status": "queued|taken|...", "issueIdentifier": "...", "feedbackCount": 1, ... }], "total": N }
 
 GET ${baseUrl}/api/proxy/dispatch/{id}
   → Watch a dispatched item: whether it is still queued or has been taken by the runner, plus any feedback posted back. Poll this after dispatching.
@@ -2924,8 +2974,23 @@ ${readEndpoints}${writeEndpoints}
         return res.status(400).json({ error: 'Invalid issueId format' });
       }
 
+      // Auto-append the proxy context (Linear access + reporting channel) by
+      // default, so the worker can both read context and report its result.
+      // Opt out with appendProxyContext:false (e.g. a self-contained prompt).
+      const { appendProxyContext } = req.body || {};
+      let finalPrompt = prompt;
+      if (appendProxyContext !== false) {
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        const bearerToken = (req.headers.authorization || '').slice(7);
+        finalPrompt = prompt + buildProxyContextPreamble({
+          baseUrl,
+          token: bearerToken,
+          issueIdentifier: issueIdentifier || null
+        });
+      }
+
       const item = await dispatchQueueStore.addItem(req.proxyUrlKey, {
-        prompt,
+        prompt: finalPrompt,
         promptName: promptName || 'Prompt',
         issueId: issueId || null,
         issueIdentifier: issueIdentifier || null,
@@ -2949,6 +3014,86 @@ ${readEndpoints}${writeEndpoints}
       logEvent(req, '/api/proxy/dispatch', 500);
       console.error('Proxy dispatch error:', err.message);
       res.status(500).json({ error: 'Failed to dispatch prompt' });
+    }
+  });
+
+  /**
+   * GET /api/proxy/dispatch
+   * List the workspace's dispatch items across both the live queue (status
+   * 'queued') and recent history (taken/cancelled/expired, with feedback),
+   * newest first. Lets the orchestrator discover its own in-flight items
+   * without having to remember every id it dispatched. Optional filters:
+   *   ?issueIdentifier=LIN-42   exact match on the issue identifier
+   *   ?status=queued|taken|...  exact match on lifecycle status
+   *   ?limit=N                  cap (default 20, max 100)
+   */
+  router.get('/api/proxy/dispatch', proxyLimiter, authenticateProxyToken, async (req, res) => {
+    if (!dispatchQueueStore) {
+      logEvent(req, '/api/proxy/dispatch', 503);
+      return res.status(503).json({ error: 'Dispatch is not available' });
+    }
+
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
+
+    let issueIdentifier = null;
+    if (req.query.issueIdentifier !== undefined) {
+      issueIdentifier = String(req.query.issueIdentifier);
+      if (issueIdentifier.length > MAX_IDENTIFIER_LENGTH || DANGEROUS_CHARS_REGEX.test(issueIdentifier)) {
+        logEvent(req, '/api/proxy/dispatch', 400);
+        return res.status(400).json({ error: 'Invalid issueIdentifier' });
+      }
+    }
+
+    let statusFilter = null;
+    if (req.query.status !== undefined) {
+      statusFilter = String(req.query.status);
+      if (statusFilter.length > MAX_NAME_LENGTH || DANGEROUS_CHARS_REGEX.test(statusFilter)) {
+        logEvent(req, '/api/proxy/dispatch', 400);
+        return res.status(400).json({ error: 'Invalid status' });
+      }
+    }
+
+    try {
+      // Live queue (still 'queued') + resolved history (with feedback), merged.
+      const [queued, history] = await Promise.all([
+        dispatchQueueStore.listItems(req.proxyUrlKey),
+        dispatchQueueStore.listHistory(req.proxyUrlKey, { limit: 200 })
+      ]);
+
+      const merged = [
+        ...queued.map(i => ({ ...i, status: 'queued', feedback: [] })),
+        ...history.items
+      ];
+
+      const filtered = merged.filter(i =>
+        (!issueIdentifier || i.issueIdentifier === issueIdentifier) &&
+        (!statusFilter || i.status === statusFilter)
+      );
+
+      filtered.sort((a, b) => {
+        const at = new Date(a.dispatchedAt || 0).getTime();
+        const bt = new Date(b.dispatchedAt || 0).getTime();
+        return bt - at;
+      });
+
+      const items = filtered.slice(0, limit).map(i => ({
+        id: i.id,
+        status: i.status,
+        promptName: i.promptName,
+        issueIdentifier: i.issueIdentifier,
+        issueUrl: i.issueUrl,
+        target: i.target,
+        dispatchedAt: i.dispatchedAt,
+        resolvedAt: i.resolvedAt || null,
+        feedbackCount: (i.feedback || []).length
+      }));
+
+      logEvent(req, '/api/proxy/dispatch', 200);
+      res.json({ items, total: filtered.length });
+    } catch (err) {
+      logEvent(req, '/api/proxy/dispatch', 500);
+      console.error('Proxy dispatch list error:', err.message);
+      res.status(500).json({ error: 'Failed to list dispatch items' });
     }
   });
 

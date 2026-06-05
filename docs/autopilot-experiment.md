@@ -104,7 +104,30 @@ setup or tweak needed, where a human intervened and why, and what it implies for
 
 ### Stage A
 
-- _pending_
+- **Reporting/transport is a harness concern, handled by the runner.** The dispatch consumer
+  (runner) uses a **Stop hook** that phones home automatically when the Claude session ends — so
+  completion telemetry returns without the prompt teaching it. This is cleaner than betting on the
+  model remembering to curl an endpoint.
+- **Where the report lands:** the Stop hook posts to the dispatch **feedback** channel (history),
+  not the foreman channel. So `foreman/sessions|status|tasks` being empty during the LIN-288 run
+  did **not** mean "no telemetry" — I just couldn't see the feedback history through the proxy yet
+  (no list/read endpoint until this branch deploys). Correction to my first read.
+- **Auto-append is about Linear access, not phone-home.** `POST /api/proxy/dispatch` appends a
+  proxy-context block to the prompt by default (`appendProxyContext:false` to opt out): base URL +
+  token + a pointer to `/instructions`, giving the worker the rich Linear access that the old local
+  MCP used to provide. It does **not** instruct the worker to report (the Stop hook owns that). It
+  only asks the worker to END with an evidence-rich summary (PR/commit/CI) so whatever the hook
+  forwards carries proof, not a bare "done".
+  - Token: **standing readWrite for now** (explicit choice) — flagged in-code as security debt;
+    planned hardening is a per-item, short-TTL, narrowly-scoped token (mirrors Harbour's).
+- **Watch ergonomics:** added `GET /api/proxy/dispatch` (list, filter by `issueIdentifier`/`status`)
+  so the orchestrator can find its own item by issue, and `GET /api/proxy/dispatch/:id` to read the
+  status + feedback the Stop hook posted.
+- **Open question for tuning:** does the Stop hook forward the session's final summary, or just a
+  static "session ended" signal? If the former, the evidence-summary instruction is load-bearing
+  (it shapes the payload); if the latter, evidence has to come from the orchestrator's own CI/PR
+  lookups. Either way the trust caveat holds: a worker/hook self-reporting "done" is still
+  self-report (invariant 2 / LIN-292) — the judge weights external CI/PR/diff over the claim.
 
 ### Stage B
 
