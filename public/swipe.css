@@ -664,6 +664,18 @@ a.swipe-relation-issue:hover {
   color: var(--fg, #1a1a1a);
 }
 
+/* Warning banner: surfaces a truncated/incomplete generation to the user */
+.swipe-prompt-warning {
+  margin-top: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #8a5a00;
+  background: #fff6e0;
+  border: 1px solid #f0d28a;
+  border-radius: 4px;
+}
+
 /* Streaming fade-in for the section */
 @keyframes promptFadeIn {
   from { opacity: 0; transform: translateY(6px); }
