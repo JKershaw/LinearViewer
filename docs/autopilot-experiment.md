@@ -26,8 +26,14 @@ look like, and is it enough for a judge to decide "done" without re-reading ever
   Claude Code as a local CLI or via web remote-control. It posts feedback via
   `POST /api/dispatch/feedback/:itemId` (`{ message, url?, urlLabel? }`) — feedback is a
   free-form string by design.
-- The proxy API does **not** yet expose a dispatch verb (it only references `dispatchId` as a
-  join key on `foreman/status`). That gap is the only Stage-B build.
+- The proxy API now exposes the dispatch verb pair (built for Stage B):
+  - `POST /api/proxy/dispatch` (readWrite) — enqueue; same body as the UI endpoint, minus
+    `target: local`. Returns `{ id, status: "queued", ... }`.
+  - `GET /api/proxy/dispatch/:id` (read) — watch; returns `{ id, status, feedback: [...], ... }`,
+    resolving across the live queue and the taken/feedback history. Feedback stays free-form.
+  - Discoverable via `/api/proxy/instructions`. Covered by E2E tests in `tests/e2e/proxy.spec.js`.
+  - **Deploy gap:** the proxy runs on production (`projects.jkershaw.com`); this branch isn't live
+    there yet, so calling it with the proxy token requires a deploy (merge to `main`) first.
 
 ## Stage A — plumbing spike (zero build, run first)
 

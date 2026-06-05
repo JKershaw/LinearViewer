@@ -202,6 +202,14 @@ const MAX_SEARCH_LENGTH = 500;
 const MAX_DESCRIPTION_LENGTH = 100000;
 const MAX_COMMENT_LENGTH = 50000;
 
+// Dispatch input limits (mirror routes/dispatch.js, the session-auth twin).
+const MAX_PROMPT_LENGTH = 10000000;    // 10MB max for prompt content
+const MAX_URL_LENGTH = 8000;           // URLs (covers long query strings)
+const MAX_IDENTIFIER_LENGTH = 100;     // Issue identifiers
+// Proxy consumers are remote, so 'local' (Harbour, spawns on the server's
+// own /dev/tty) is intentionally excluded from the targets they may set.
+const VALID_PROXY_DISPATCH_TARGETS = ['cli', 'web', 'dash'];
+
 // Timeout for individual GraphQL requests to Linear.
 // Prevents the proxy from hanging silently when Linear is slow or payloads are large,
 // which causes downstream "stream idle timeout" errors in CLI clients like curl.
@@ -622,7 +630,7 @@ const UPDATE_ISSUE_LABELS_MUTATION = gql`
  * @param {Function} options.getWorkspaceOpenRouterKey - Function to get OpenRouter API key from workspace sessions
  * @returns {Router} Express router with proxy routes
  */
-export function createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, briefCacheStore, workspaceFromUrl, getWorkspaceAccessToken, getWorkspaceOpenRouterKey, workspacePreferencesStore }) {
+export function createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, briefCacheStore, dispatchQueueStore, workspaceFromUrl, getWorkspaceAccessToken, getWorkspaceOpenRouterKey, workspacePreferencesStore }) {
   const router = Router();
 
   // =========================================================================
@@ -1030,6 +1038,18 @@ DELETE ${baseUrl}/api/proxy/issues/{issueId}/labels/{labelId}
 POST ${baseUrl}/api/proxy/foreman/status
   Body: { "taskIdentifier": "LIN-42", "action": "research", "status": "completed", "summary": "...", "dispatchId": "..." }
   → Record a foreman status update (dispatchId optional: pass the dispatch-history item ID from /api/dispatch/take to enable exact loop-reconstruction join)
+
+## Dispatch Endpoints
+
+POST ${baseUrl}/api/proxy/dispatch
+  Body: { "prompt": "...", "promptName": "...", "issueId": "...", "issueIdentifier": "LIN-42", "issueTitle": "...", "issueUrl": "...", "target": "cli|web|dash", "repo": "..." }
+  → Queue a prompt for the workspace's dispatch consumer (the runner). Only "prompt" is required; target defaults to "cli". ("local"/Harbour is not available to proxy consumers.)
+  → { "id": "...", "status": "queued", "promptName": "...", "issueIdentifier": "...", "target": "cli", "dispatchedAt": "..." }
+
+GET ${baseUrl}/api/proxy/dispatch/{id}
+  → Watch a dispatched item: whether it is still queued or has been taken by the runner, plus any feedback posted back. Poll this after dispatching.
+  → { "id": "...", "status": "queued|taken|cancelled|expired", "feedback": [{ "message": "...", "url": "...", "timestamp": "..." }], ... }
+  → Feedback is free-form text — read it to decide the next step; there is no structured "done" flag.
 
 ## Shell Tip
 
@@ -2825,6 +2845,162 @@ ${readEndpoints}${writeEndpoints}
 
     const playbook = buildForemanPlaybook({ baseUrl });
     res.type('text/plain').send(playbook);
+  });
+
+  // ===========================================================================
+  // Dispatch Endpoints (proxy-token twin of routes/dispatch.js)
+  // ===========================================================================
+
+  /**
+   * POST /api/proxy/dispatch
+   * Queue a prompt for the workspace's dispatch consumer (the runner).
+   * Proxy-token equivalent of POST /workspace/:urlKey/api/dispatch — same
+   * body shape and validation, but scoped by the token's workspace and
+   * requiring readWrite scope. Excludes target 'local' (Harbour spawns on
+   * the server's own tty, which a remote consumer can't drive). This is the
+   * write half the autopilot orchestrator uses to dispatch a chosen task.
+   */
+  router.post('/api/proxy/dispatch', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
+    if (!dispatchQueueStore) {
+      logEvent(req, '/api/proxy/dispatch', 503);
+      return res.status(503).json({ error: 'Dispatch is not available' });
+    }
+
+    try {
+      const { prompt, promptName, issueId, issueIdentifier, issueTitle, issueUrl, target, repo } = req.body || {};
+
+      if (!prompt || typeof prompt !== 'string') {
+        logEvent(req, '/api/proxy/dispatch', 400);
+        return res.status(400).json({ error: 'prompt is required and must be a string' });
+      }
+      if (target !== undefined && !VALID_PROXY_DISPATCH_TARGETS.includes(target)) {
+        logEvent(req, '/api/proxy/dispatch', 400);
+        return res.status(400).json({ error: `target must be one of: ${VALID_PROXY_DISPATCH_TARGETS.join(', ')}` });
+      }
+
+      if (prompt.length > MAX_PROMPT_LENGTH) {
+        logEvent(req, '/api/proxy/dispatch', 400);
+        return res.status(400).json({ error: `prompt exceeds maximum length of ${MAX_PROMPT_LENGTH}` });
+      }
+      if (promptName && promptName.length > MAX_NAME_LENGTH) {
+        logEvent(req, '/api/proxy/dispatch', 400);
+        return res.status(400).json({ error: `promptName exceeds maximum length of ${MAX_NAME_LENGTH}` });
+      }
+      if (issueIdentifier && issueIdentifier.length > MAX_IDENTIFIER_LENGTH) {
+        logEvent(req, '/api/proxy/dispatch', 400);
+        return res.status(400).json({ error: `issueIdentifier exceeds maximum length of ${MAX_IDENTIFIER_LENGTH}` });
+      }
+      if (issueTitle && issueTitle.length > MAX_NAME_LENGTH) {
+        logEvent(req, '/api/proxy/dispatch', 400);
+        return res.status(400).json({ error: `issueTitle exceeds maximum length of ${MAX_NAME_LENGTH}` });
+      }
+      if (issueUrl && issueUrl.length > MAX_URL_LENGTH) {
+        logEvent(req, '/api/proxy/dispatch', 400);
+        return res.status(400).json({ error: `issueUrl exceeds maximum length of ${MAX_URL_LENGTH}` });
+      }
+      if (repo && repo.length > MAX_NAME_LENGTH) {
+        logEvent(req, '/api/proxy/dispatch', 400);
+        return res.status(400).json({ error: `repo exceeds maximum length of ${MAX_NAME_LENGTH}` });
+      }
+
+      if (DANGEROUS_CHARS_REGEX.test(prompt)) {
+        logEvent(req, '/api/proxy/dispatch', 400);
+        return res.status(400).json({ error: 'prompt contains invalid characters' });
+      }
+      if (promptName && DANGEROUS_CHARS_REGEX.test(promptName)) {
+        logEvent(req, '/api/proxy/dispatch', 400);
+        return res.status(400).json({ error: 'promptName contains invalid characters' });
+      }
+      if (issueTitle && DANGEROUS_CHARS_REGEX.test(issueTitle)) {
+        logEvent(req, '/api/proxy/dispatch', 400);
+        return res.status(400).json({ error: 'issueTitle contains invalid characters' });
+      }
+      if (repo && DANGEROUS_CHARS_REGEX.test(repo)) {
+        logEvent(req, '/api/proxy/dispatch', 400);
+        return res.status(400).json({ error: 'repo contains invalid characters' });
+      }
+      if (issueId && !UUID_REGEX.test(issueId)) {
+        logEvent(req, '/api/proxy/dispatch', 400);
+        return res.status(400).json({ error: 'Invalid issueId format' });
+      }
+
+      const item = await dispatchQueueStore.addItem(req.proxyUrlKey, {
+        prompt,
+        promptName: promptName || 'Prompt',
+        issueId: issueId || null,
+        issueIdentifier: issueIdentifier || null,
+        issueTitle: issueTitle || null,
+        issueUrl: issueUrl || null,
+        dispatchedBy: req.proxyCreatedBy || null,
+        target: target || 'cli',
+        repo: repo || null
+      });
+
+      logEvent(req, '/api/proxy/dispatch', 201);
+      res.status(201).json({
+        id: item._id,
+        status: 'queued',
+        promptName: item.promptName,
+        issueIdentifier: item.issueIdentifier,
+        target: item.target,
+        dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt
+      });
+    } catch (err) {
+      logEvent(req, '/api/proxy/dispatch', 500);
+      console.error('Proxy dispatch error:', err.message);
+      res.status(500).json({ error: 'Failed to dispatch prompt' });
+    }
+  });
+
+  /**
+   * GET /api/proxy/dispatch/:id
+   * Watch a dispatched item: report whether it is still queued or has been
+   * taken by the runner, plus any feedback the runner has posted. This is the
+   * poll half of the autopilot loop — the orchestrator reads feedback here to
+   * decide its next step. Feedback is free-form by design; the orchestrator
+   * (the judge) reads it rather than relying on a structured "done" flag.
+   */
+  router.get('/api/proxy/dispatch/:id', proxyLimiter, authenticateProxyToken, async (req, res) => {
+    if (!dispatchQueueStore) {
+      logEvent(req, '/api/proxy/dispatch/:id', 503);
+      return res.status(503).json({ error: 'Dispatch is not available' });
+    }
+
+    const { id } = req.params;
+    if (!id || id.length > MAX_IDENTIFIER_LENGTH || DANGEROUS_CHARS_REGEX.test(id)) {
+      logEvent(req, '/api/proxy/dispatch/:id', 400);
+      return res.status(400).json({ error: 'Invalid dispatch id' });
+    }
+
+    try {
+      const item = await dispatchQueueStore.getItemStatus(req.proxyUrlKey, id);
+      if (!item) {
+        logEvent(req, '/api/proxy/dispatch/:id', 404);
+        return res.status(404).json({ error: 'Dispatch item not found' });
+      }
+
+      logEvent(req, '/api/proxy/dispatch/:id', 200);
+      res.json({
+        id: item.id,
+        status: item.status,
+        promptName: item.promptName,
+        issueIdentifier: item.issueIdentifier,
+        issueUrl: item.issueUrl,
+        target: item.target,
+        dispatchedAt: item.dispatchedAt,
+        resolvedAt: item.resolvedAt || null,
+        feedback: (item.feedback || []).map(f => ({
+          message: f.message,
+          url: f.url || null,
+          urlLabel: f.urlLabel || null,
+          timestamp: f.timestamp || null
+        }))
+      });
+    } catch (err) {
+      logEvent(req, '/api/proxy/dispatch/:id', 500);
+      console.error('Proxy dispatch watch error:', err.message);
+      res.status(500).json({ error: 'Failed to read dispatch item' });
+    }
   });
 
   return router;
