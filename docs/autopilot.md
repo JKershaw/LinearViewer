@@ -55,6 +55,9 @@ resolve — the moments that genuinely need a human.
 - Concentrate the human's attention onto a small, named surface instead of every task.
 - Make the trust model *mechanical* — enforced by the contract, not by an agent's good
   intentions.
+- **Be watchable.** After it orients itself, the autopilot emits short, high-level recaps a
+  human can follow at a glance — the default experience is sitting back and watching a live
+  Claude Code session narrate its progress, not reading task detail.
 
 **Non-goals** (these matter most — they are the lines the build must not cross)
 
@@ -97,17 +100,60 @@ One line each; the build spec will expand them.
   **dispatch the whole prompt to a separate worker** → watch feedback → decide
   (continue / complete / help). Distinct from the shipped single-session foreman, which
   alternates orchestrator and worker roles inside one session.
-- **Worker — a generic runner.** The thing that actually executes a dispatched prompt:
-  clone repo → run an agent → post feedback. Today only the Harbour runner auto-spawns;
-  Autopilot needs a transport-agnostic runner (a plain CLI runner, or Claude Code on the web
-  as the runner).
-- **Sensors — independent signal.** Oracle checks (CI, coverage, scanners, lint, types),
-  product-usage feedback from humans, and fresh-context reviews/retros. These are what make
-  invariant 2 real; they are independent *of the worker*, which is the whole point.
+- **Worker — the runner (already built).** Dispatch plus a separate consumer system that
+  runs Claude Code against a dispatched prompt — as a CLI on a local machine, or via the web
+  remote-control feature. This is the main runner, and the worker is a **full Claude Code
+  session with full tools**: it can run the tests and CI/CD checks itself, in-loop, rather
+  than depending on a separate evidence service. Feedback comes back as free-form text (a
+  string) — that stays first-class.
+- **Sensors — independent signal.** Oracle checks (tests, CI, coverage, scanners, lint,
+  types), product-usage feedback from humans, and fresh-context reviews/retros. Because the
+  worker is Claude Code it can *run* these checks itself in-loop; invariant 2's discipline is
+  then that the judge weights the **check's result** (exit code, CI status, the diff), not
+  the agent's narration of it. The orchestrator, reading from a separate session, is itself
+  an independent read.
 - **The human edge.** A small, named surface: adjudicate the normative questions and the
   judgment-class flags the loop raises. Everything else runs without them.
 
-## 6. How it relates to what exists
+## 6. Orientation: the autopilot's starting prompt
+
+The autopilot starts from a single prompt: **the guide** (how to drive the loop) plus a
+**deterministic situation snapshot** (where things stand right now). Deterministic matters —
+the snapshot is computed, not LLM-generated, so it is cheap and exact, and the orchestrator
+is *handed* its bearings instead of spending context rediscovering them. The snapshot
+contains at least:
+
+- **Periodical cadence state** — each periodical and when it last ran / whether it is due
+  (e.g. "code review: 14d ago → due; security: 3d ago; docs: never").
+- **Top of the stack** — the top-N sorted tasks (already available via `/stack`), ideally
+  tagged with north-star classification when present.
+- **The human's instruction, if any** — a scope ("work the Ship view", "complete project X")
+  or nothing.
+
+The autopilot's **first act is to orient**: apply a fixed precedence to the snapshot and
+announce what it will work on. A sensible default precedence:
+
+1. an explicit human instruction, else
+2. a periodical past its cadence threshold (maintenance debt), else
+3. the top of the stack (north-star-aligned first).
+
+This sits right on invariant 1: "what's worth doing next" is normative-adjacent, so the
+precedence must be a **human-authored policy the autopilot executes**, not a judgment it
+improvises. Orientation = apply the policy to the snapshot, emit the choice, let the human
+veto. The moment the autopilot reasons freely about what is *worth* doing, it has crossed
+the firewall.
+
+The guide must ask for two distinct outputs, each at a fixed altitude:
+
+- **Internal recitation** — the existing machine-discipline beat (role, next allowed action,
+  the strike counters) that keeps the loop honest across turns.
+- **External recap** — a short, high-level, human-legible line at each loop boundary
+  ("oriented: code review was due, starting it → generated 3 tasks → working LIN-340 →
+  worker reports tests pass, PR opened → continuing"). This is the surface the human watches.
+  It is *not* the foreman-status log (the durable machine record) and *not* the internal
+  recitation — it is the live channel for someone sitting back.
+
+## 7. How it relates to what exists
 
 Honest inventory, because the main risk is parallel-building:
 
@@ -120,17 +166,25 @@ Honest inventory, because the main risk is parallel-building:
 | External-evidence weighting | LIN-292 (epic LIN-289) | specced, unbuilt |
 | Periodic cross-task drift supervisor | LIN-291 | specced, unbuilt |
 | Measurement spine (benchmark / fuzzy / ablation) | LIN-263 / LIN-45 / LIN-293 | unbuilt |
-| Dispatch queue + feedback | `routes/dispatch.js` | shipped (feedback is free-form) |
-| Harbour (local) runner | `lib/harbour-spawn.js`, LIN-259 | shipped, Harbour-only |
+| Dispatch queue + feedback | `routes/dispatch.js` | shipped (feedback free-form — intentional) |
+| Runner: dispatch consumer running Claude Code (local CLI or web remote-control) | separate system | **shipped — the main runner** |
+| Harbour (local) runner | `lib/harbour-spawn.js`, LIN-259 | shipped — one such consumer |
 | API contract unification | LIN-306 / 309 / 310 / 311 | in-flight — **will move the contract Autopilot drives** |
 
 What is genuinely net-new (lives in no ticket yet, only in the design conversation):
 
 - The **thin-orchestrator-dispatches-to-separate-workers** architecture (vs. LIN-209's
-  single session).
-- A **generic, non-Harbour runner**.
-- A **structured feedback envelope** (`{ status, evidence: { ci, pr, sha, branch } }`) — the
-  unwritten prerequisite that turns LIN-292 from a sentence into a mechanism.
+  single session). The runner it dispatches to already exists; the orchestrator that drives
+  it this way does not.
+- The **deterministic orientation snapshot + human-authored precedence policy** (§6) — the
+  autopilot's starting prompt, and its first decision.
+- The **external recap** channel (§6) — the high-level, watchable narration, distinct from
+  the foreman-status log and the internal recitation.
+- A way for the loop to **consult evidence** at the `complete` boundary. Not a rigid schema —
+  feedback stays a free-form string; the worker (Claude Code) can run the checks in-loop and
+  surface the results. The requirement is that the judge *looks at* the evidence, not that
+  feedback conform to a shape. (This is LIN-292 made practical by the runner being Claude
+  Code.)
 - The **oracle-vs-judgment split** for periodicals (which classes self-ground, which stay
   human-adjudicated).
 - The realization that **LIN-291 is a periodical**, so the two should be one machine.
@@ -139,7 +193,7 @@ What is genuinely net-new (lives in no ticket yet, only in the design conversati
 
 ## What this document defers
 
-Everything actionable. "What to build vs. refactor vs. tidy," the runner choice, whether
-Autopilot waits on the LIN-306 API unification, the periodical template set, and the
-ticket structure are all the *next* steps. This document exists so those decisions have a
-fixed intent and four invariants to answer to.
+Everything actionable. "What to build vs. refactor vs. tidy," the exact rules of the
+orientation precedence policy, whether Autopilot waits on the LIN-306 API unification, the
+periodical template set, and the ticket structure are all the *next* steps. This document
+exists so those decisions have a fixed intent and four invariants to answer to.
