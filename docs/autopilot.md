@@ -191,9 +191,67 @@ What is genuinely net-new (lives in no ticket yet, only in the design conversati
 
 ---
 
+## 8. Implementation approach: the minimal path
+
+Autopilot does not need a new orchestration service. The foreman is **already** a generated,
+pasteable prompt — you paste it into a Claude session and it drives the loop. The minimal
+path is to treat Autopilot as **"Foreman v2"**: the same pattern, with an orientation
+snapshot and an optional goal baked into the kickoff prompt, plus the ability to **dispatch
+to a separate worker** instead of doing the work in-session. This deliberately makes
+Autopilot the *evolution* of LIN-209, not a parallel build — the cleanest answer to the
+parallel-build risk.
+
+### Kickoff UX
+
+Optionally type a goal → click generate → a complete prompt is produced → paste it into
+Claude → it orients, announces its choice, dispatches, watches, and recaps. The generated
+prompt carries the guide, the deterministic orientation snapshot, and (if given) the goal.
+A specific focus is just the goal field, or a hand-written prompt followed by the guide.
+
+### What is actually a build (small)
+
+- **A. Proxy dispatch verbs.** A proxy-token-authed `POST /api/proxy/dispatch` (enqueue)
+  **and** a read side (`GET` status / feedback for a dispatched item). This is the one real
+  API gap — today the proxy only references `dispatchId` as a join key; it cannot enqueue or
+  watch a dispatch. Enqueue **and** watch must ship together or the loop can't close.
+- **B. The kickoff generator.** A form (optional goal) + a builder that assembles
+  **guide + deterministic orientation snapshot + optional goal** into one pasteable prompt.
+  Mostly assembling existing pieces: `buildForemanPlaybook()` already exists; the new part is
+  a snapshot builder (periodical cadence + top-of-stack via `/stack`) and the goal slot.
+- **C. Periodicals cadence.** The only stateful bit — the snapshot needs "code review last
+  ran 14d ago." v1 can likely **derive** this from existing signals (`foreman/status`
+  history, git log, periodical-tagged Linear search) rather than build a store; add a store
+  later if derivation proves flaky.
+
+### What is just guide text (no build)
+
+- The **watchable external recap** (one high-level line per loop boundary).
+- The **precedence policy** (human instruction → overdue periodical → top of stack); the
+  goal field is the override branch.
+- The **evidence discipline** — instruct the orchestrator to confirm a dispatched worker's
+  `complete` against a real check / PR before accepting it.
+
+### Three caveats this path must not paper over
+
+1. **Evidence is the one place prose is load-bearing.** In the minimal path the orchestrator
+   reads the worker's *report* of CI. True independence means the guide must make the
+   orchestrator **look at CI/PR itself** (it is Claude Code; it can), not rubber-stamp a
+   sentence. This is invariant 2 / LIN-292 and the bit most likely to quietly degrade — it
+   needs a sharp, testable instruction, not a soft one.
+2. **The watch half of the API is easy to under-scope.** Enqueue alone feels like
+   "dispatching," but the orchestrator must poll its own dispatches' status/feedback to know
+   when to continue. Spec both together.
+3. **LIN-306 is unifying the very contract this extends.** Adding a proxy dispatch verb now
+   either builds on the about-to-change wire contract or front-runs it. Current lean: add it
+   now in today's idiom — it is small, LIN-306 will reshape it regardless, and blocking on
+   that refactor delays the thing we actually want to try.
+
+---
+
 ## What this document defers
 
-Everything actionable. "What to build vs. refactor vs. tidy," the exact rules of the
-orientation precedence policy, whether Autopilot waits on the LIN-306 API unification, the
-periodical template set, and the ticket structure are all the *next* steps. This document
-exists so those decisions have a fixed intent and four invariants to answer to.
+The remaining open decisions: the exact request/response shape of the dispatch verbs, the
+exact rules and cadence thresholds of the orientation precedence policy, the periodical
+template set, the precise sequencing against LIN-306, and the ticket structure. Those are
+the build-spec and reconciliation steps. This document exists so they have a fixed intent
+and four invariants to answer to.
