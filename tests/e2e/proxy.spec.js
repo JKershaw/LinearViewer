@@ -625,6 +625,57 @@ test.describe('Proxy API - Dispatch', () => {
     expect(watched.feedback[0].url).toContain('/pull/42');
   });
 
+  test('list finds items by issueIdentifier across queue and history', async ({ request }) => {
+    // One item left queued, one taken — the list should surface both and
+    // filtering by issueIdentifier should narrow to the right one.
+    const a = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'queued task', issueIdentifier: 'LIN-288' }
+    });
+    const aId = (await a.json()).id;
+
+    const b = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'taken task', issueIdentifier: 'LIN-999' }
+    });
+    const bId = (await b.json()).id;
+    await request.post(`/api/dispatch/take/${bId}`, {
+      headers: { Authorization: `Bearer ${consumerToken}` }
+    });
+    await request.post(`/api/dispatch/feedback/${bId}`, {
+      headers: { Authorization: `Bearer ${consumerToken}`, 'Content-Type': 'application/json' },
+      data: { message: 'done' }
+    });
+
+    // Unfiltered: both present.
+    const all = await request.get('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    const allData = await all.json();
+    const ids = allData.items.map(i => i.id);
+    expect(ids).toContain(aId);
+    expect(ids).toContain(bId);
+
+    // Filter by identifier resolves the id from just the issue.
+    const filtered = await request.get('/api/proxy/dispatch?issueIdentifier=LIN-288', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    const filteredData = await filtered.json();
+    expect(filteredData.items).toHaveLength(1);
+    expect(filteredData.items[0].id).toBe(aId);
+    expect(filteredData.items[0].status).toBe('queued');
+
+    // Status filter narrows to the taken item, with feedback counted.
+    const taken = await request.get('/api/proxy/dispatch?status=taken', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    const takenData = await taken.json();
+    expect(takenData.items.every(i => i.status === 'taken')).toBe(true);
+    const bRow = takenData.items.find(i => i.id === bId);
+    expect(bRow).toBeTruthy();
+    expect(bRow.feedbackCount).toBe(1);
+  });
+
   test('watch returns 404 for unknown id', async ({ request }) => {
     const resp = await request.get('/api/proxy/dispatch/00000000-0000-0000-0000-000000000000', {
       headers: { Authorization: `Bearer ${readToken}` }

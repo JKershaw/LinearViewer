@@ -1046,6 +1046,10 @@ POST ${baseUrl}/api/proxy/dispatch
   → Queue a prompt for the workspace's dispatch consumer (the runner). Only "prompt" is required; target defaults to "cli". ("local"/Harbour is not available to proxy consumers.)
   → { "id": "...", "status": "queued", "promptName": "...", "issueIdentifier": "...", "target": "cli", "dispatchedAt": "..." }
 
+GET ${baseUrl}/api/proxy/dispatch?issueIdentifier={LIN-42}&status={queued|taken}&limit={n}
+  → List your dispatch items (live queue + recent history), newest first. All query params optional. Use this to find an item's id when you only know the issue.
+  → { "items": [{ "id": "...", "status": "queued|taken|...", "issueIdentifier": "...", "feedbackCount": 1, ... }], "total": N }
+
 GET ${baseUrl}/api/proxy/dispatch/{id}
   → Watch a dispatched item: whether it is still queued or has been taken by the runner, plus any feedback posted back. Poll this after dispatching.
   → { "id": "...", "status": "queued|taken|cancelled|expired", "feedback": [{ "message": "...", "url": "...", "timestamp": "..." }], ... }
@@ -2949,6 +2953,86 @@ ${readEndpoints}${writeEndpoints}
       logEvent(req, '/api/proxy/dispatch', 500);
       console.error('Proxy dispatch error:', err.message);
       res.status(500).json({ error: 'Failed to dispatch prompt' });
+    }
+  });
+
+  /**
+   * GET /api/proxy/dispatch
+   * List the workspace's dispatch items across both the live queue (status
+   * 'queued') and recent history (taken/cancelled/expired, with feedback),
+   * newest first. Lets the orchestrator discover its own in-flight items
+   * without having to remember every id it dispatched. Optional filters:
+   *   ?issueIdentifier=LIN-42   exact match on the issue identifier
+   *   ?status=queued|taken|...  exact match on lifecycle status
+   *   ?limit=N                  cap (default 20, max 100)
+   */
+  router.get('/api/proxy/dispatch', proxyLimiter, authenticateProxyToken, async (req, res) => {
+    if (!dispatchQueueStore) {
+      logEvent(req, '/api/proxy/dispatch', 503);
+      return res.status(503).json({ error: 'Dispatch is not available' });
+    }
+
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
+
+    let issueIdentifier = null;
+    if (req.query.issueIdentifier !== undefined) {
+      issueIdentifier = String(req.query.issueIdentifier);
+      if (issueIdentifier.length > MAX_IDENTIFIER_LENGTH || DANGEROUS_CHARS_REGEX.test(issueIdentifier)) {
+        logEvent(req, '/api/proxy/dispatch', 400);
+        return res.status(400).json({ error: 'Invalid issueIdentifier' });
+      }
+    }
+
+    let statusFilter = null;
+    if (req.query.status !== undefined) {
+      statusFilter = String(req.query.status);
+      if (statusFilter.length > MAX_NAME_LENGTH || DANGEROUS_CHARS_REGEX.test(statusFilter)) {
+        logEvent(req, '/api/proxy/dispatch', 400);
+        return res.status(400).json({ error: 'Invalid status' });
+      }
+    }
+
+    try {
+      // Live queue (still 'queued') + resolved history (with feedback), merged.
+      const [queued, history] = await Promise.all([
+        dispatchQueueStore.listItems(req.proxyUrlKey),
+        dispatchQueueStore.listHistory(req.proxyUrlKey, { limit: 200 })
+      ]);
+
+      const merged = [
+        ...queued.map(i => ({ ...i, status: 'queued', feedback: [] })),
+        ...history.items
+      ];
+
+      const filtered = merged.filter(i =>
+        (!issueIdentifier || i.issueIdentifier === issueIdentifier) &&
+        (!statusFilter || i.status === statusFilter)
+      );
+
+      filtered.sort((a, b) => {
+        const at = new Date(a.dispatchedAt || 0).getTime();
+        const bt = new Date(b.dispatchedAt || 0).getTime();
+        return bt - at;
+      });
+
+      const items = filtered.slice(0, limit).map(i => ({
+        id: i.id,
+        status: i.status,
+        promptName: i.promptName,
+        issueIdentifier: i.issueIdentifier,
+        issueUrl: i.issueUrl,
+        target: i.target,
+        dispatchedAt: i.dispatchedAt,
+        resolvedAt: i.resolvedAt || null,
+        feedbackCount: (i.feedback || []).length
+      }));
+
+      logEvent(req, '/api/proxy/dispatch', 200);
+      res.json({ items, total: filtered.length });
+    } catch (err) {
+      logEvent(req, '/api/proxy/dispatch', 500);
+      console.error('Proxy dispatch list error:', err.message);
+      res.status(500).json({ error: 'Failed to list dispatch items' });
     }
   });
 
