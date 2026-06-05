@@ -527,3 +527,117 @@ test.describe('Proxy API - Session Token Lookup', () => {
     expect(data.found).toBe(false);
   });
 });
+
+test.describe('Proxy API - Dispatch', () => {
+  let readToken;
+  let writeToken;
+  let consumerToken;
+
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/test/clear-proxy-tokens');
+    await page.goto('/test/clear-dispatch-queue');
+    await page.goto('/test/clear-dispatch-history');
+
+    const readResp = await page.goto('/test/create-proxy-token?scope=read&label=dispatch-read');
+    readToken = (await readResp.json()).token;
+
+    const writeResp = await page.goto('/test/create-proxy-token?scope=readWrite&label=dispatch-write');
+    writeToken = (await writeResp.json()).token;
+
+    // A consumer dispatch token lets the test play the runner (take + feedback).
+    const consumerResp = await page.goto('/test/create-dispatch-token?label=runner');
+    consumerToken = (await consumerResp.json()).token;
+  });
+
+  test('read-only token cannot enqueue (403)', async ({ request }) => {
+    const resp = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${readToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'do the thing' }
+    });
+    expect(resp.status()).toBe(403);
+  });
+
+  test('enqueue requires a prompt (400)', async ({ request }) => {
+    const resp = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { promptName: 'no prompt here' }
+    });
+    expect(resp.status()).toBe(400);
+  });
+
+  test('enqueue rejects invalid target (400)', async ({ request }) => {
+    const resp = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'x', target: 'local' }
+    });
+    expect(resp.status()).toBe(400);
+  });
+
+  test('enqueue then watch reports queued with no feedback', async ({ request }) => {
+    const enqueue = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'review the README', promptName: 'review', issueIdentifier: 'LIN-1', target: 'cli' }
+    });
+    expect(enqueue.status()).toBe(201);
+    const created = await enqueue.json();
+    expect(created.id).toBeTruthy();
+    expect(created.status).toBe('queued');
+    expect(created.target).toBe('cli');
+
+    const watch = await request.get(`/api/proxy/dispatch/${created.id}`, {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(watch.status()).toBe(200);
+    const watched = await watch.json();
+    expect(watched.id).toBe(created.id);
+    expect(watched.status).toBe('queued');
+    expect(watched.issueIdentifier).toBe('LIN-1');
+    expect(watched.feedback).toEqual([]);
+  });
+
+  test('watch reflects taken status and runner feedback', async ({ request }) => {
+    const enqueue = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'fix the typo' }
+    });
+    const { id } = await enqueue.json();
+
+    // Runner claims the item, then posts feedback (the loop's return leg).
+    const take = await request.post(`/api/dispatch/take/${id}`, {
+      headers: { Authorization: `Bearer ${consumerToken}` }
+    });
+    expect(take.status()).toBe(200);
+
+    const feedback = await request.post(`/api/dispatch/feedback/${id}`, {
+      headers: { Authorization: `Bearer ${consumerToken}`, 'Content-Type': 'application/json' },
+      data: { message: 'Done — opened PR #42', url: 'https://github.com/x/y/pull/42', urlLabel: 'PR #42' }
+    });
+    expect(feedback.status()).toBe(200);
+
+    const watch = await request.get(`/api/proxy/dispatch/${id}`, {
+      headers: { Authorization: `Bearer ${writeToken}` }
+    });
+    expect(watch.status()).toBe(200);
+    const watched = await watch.json();
+    expect(watched.status).toBe('taken');
+    expect(watched.feedback).toHaveLength(1);
+    expect(watched.feedback[0].message).toContain('opened PR #42');
+    expect(watched.feedback[0].url).toContain('/pull/42');
+  });
+
+  test('watch returns 404 for unknown id', async ({ request }) => {
+    const resp = await request.get('/api/proxy/dispatch/00000000-0000-0000-0000-000000000000', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(resp.status()).toBe(404);
+  });
+
+  test('read-write instructions advertise the dispatch endpoints', async ({ request }) => {
+    const resp = await request.get('/api/proxy/instructions', {
+      headers: { Authorization: `Bearer ${writeToken}` }
+    });
+    const text = await resp.text();
+    expect(text).toContain('Dispatch Endpoints');
+    expect(text).toContain('/api/proxy/dispatch');
+  });
+});
