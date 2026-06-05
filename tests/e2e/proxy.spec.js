@@ -676,6 +676,42 @@ test.describe('Proxy API - Dispatch', () => {
     expect(bRow.feedbackCount).toBe(1);
   });
 
+  test('appends proxy context to the dispatched prompt by default', async ({ request }) => {
+    const enqueue = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'fix the bug', issueIdentifier: 'LIN-288' }
+    });
+    const { id } = await enqueue.json();
+
+    // The runner sees the augmented prompt when it takes the item.
+    const take = await request.post(`/api/dispatch/take/${id}`, {
+      headers: { Authorization: `Bearer ${consumerToken}` }
+    });
+    const { item } = await take.json();
+    expect(item.prompt).toContain('fix the bug');
+    expect(item.prompt).toContain('Linear access & reporting');
+    expect(item.prompt).toContain('/api/proxy/foreman/status');
+    // The embedded token lets the worker authenticate back to the proxy.
+    expect(item.prompt).toContain(`Bearer ${writeToken}`);
+    // Evidence discipline is taught in the prompt itself.
+    expect(item.prompt).toContain('evidence');
+  });
+
+  test('appendProxyContext:false leaves the prompt untouched', async ({ request }) => {
+    const enqueue = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'self-contained prompt', appendProxyContext: false }
+    });
+    const { id } = await enqueue.json();
+
+    const take = await request.post(`/api/dispatch/take/${id}`, {
+      headers: { Authorization: `Bearer ${consumerToken}` }
+    });
+    const { item } = await take.json();
+    expect(item.prompt).toBe('self-contained prompt');
+    expect(item.prompt).not.toContain('Linear access & reporting');
+  });
+
   test('watch returns 404 for unknown id', async ({ request }) => {
     const resp = await request.get('/api/proxy/dispatch/00000000-0000-0000-0000-000000000000', {
       headers: { Authorization: `Bearer ${readToken}` }

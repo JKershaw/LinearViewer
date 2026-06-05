@@ -273,6 +273,57 @@ async function fetchWithTimeout(workFn, ms) {
 // Pattern to detect null bytes and dangerous control characters
 const DANGEROUS_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
 
+/**
+ * Builds the proxy-context block appended to a dispatched prompt so the worker
+ * inherits Linear access (replacing the old local MCP) AND a channel to report
+ * its result. Without this, a dispatched worker stops silently — nothing in a
+ * bare prompt knows the reporting endpoints exist.
+ *
+ * The reporting instruction deliberately demands external evidence (PR/commit/CI)
+ * in the summary: the loop's trust model weights evidence over a bare "done"
+ * self-report (the invariant-2 / LIN-292 discipline), so we ask for it at source.
+ *
+ * SECURITY DEBT — revisit (do not ship to broad use as-is): this embeds the
+ * caller's STANDING readWrite proxy token in plaintext inside the queued prompt
+ * (and anywhere that prompt is later rendered). A leaked prompt leaks full
+ * workspace write. Planned hardening: mint a per-dispatch, short-TTL token bound
+ * to this item with a narrow report-only scope (read + foreman status), mirroring
+ * the Harbour per-item feedback token. For now (by explicit choice): standing readWrite.
+ *
+ * @param {Object} params
+ * @param {string} params.baseUrl - e.g. https://host
+ * @param {string} params.token - Bearer token to embed (standing readWrite, for now)
+ * @param {string} [params.issueIdentifier] - e.g. "LIN-42"
+ * @returns {string} Block to append to the prompt
+ */
+function buildProxyContextPreamble({ baseUrl, token, issueIdentifier }) {
+  const task = issueIdentifier || 'your task';
+  const taskJson = issueIdentifier || 'LIN-…';
+  return [
+    '',
+    '',
+    '---',
+    '## Linear access & reporting (auto-appended)',
+    '',
+    `You have a Linear API proxy for this workspace. Base: ${baseUrl}/api/proxy`,
+    `Auth header on every call: \`Authorization: Bearer ${token}\` (read+write).`,
+    `Full endpoint catalog: GET ${baseUrl}/api/proxy/instructions`,
+    '',
+    `Use it to pull context (e.g. GET ${baseUrl}/api/proxy/issues/${task},`,
+    `/relations/${task}) and to update Linear as you work.`,
+    '',
+    'When you finish OR stop, REPORT BACK so the loop can see your result:',
+    `  POST ${baseUrl}/api/proxy/foreman/status`,
+    `  Body: { "taskIdentifier": "${taskJson}", "action": "implementation",`,
+    '          "status": "completed" | "failed" | "blocked",',
+    '          "summary": "<one-paragraph recap WITH evidence>" }',
+    '',
+    'Put concrete external evidence in the summary — PR link, commit SHA, and',
+    'CI/test result. A bare "done" with no evidence is treated as unverified.',
+    ''
+  ].join('\n');
+}
+
 // =============================================================================
 // GraphQL Queries
 // =============================================================================
@@ -1042,8 +1093,9 @@ POST ${baseUrl}/api/proxy/foreman/status
 ## Dispatch Endpoints
 
 POST ${baseUrl}/api/proxy/dispatch
-  Body: { "prompt": "...", "promptName": "...", "issueId": "...", "issueIdentifier": "LIN-42", "issueTitle": "...", "issueUrl": "...", "target": "cli|web|dash", "repo": "..." }
+  Body: { "prompt": "...", "promptName": "...", "issueId": "...", "issueIdentifier": "LIN-42", "issueTitle": "...", "issueUrl": "...", "target": "cli|web|dash", "repo": "...", "appendProxyContext": true }
   → Queue a prompt for the workspace's dispatch consumer (the runner). Only "prompt" is required; target defaults to "cli". ("local"/Harbour is not available to proxy consumers.)
+  → By default a proxy-context block is appended to the prompt so the worker inherits Linear access + a reporting channel (POST /foreman/status). Set "appendProxyContext": false to opt out.
   → { "id": "...", "status": "queued", "promptName": "...", "issueIdentifier": "...", "target": "cli", "dispatchedAt": "..." }
 
 GET ${baseUrl}/api/proxy/dispatch?issueIdentifier={LIN-42}&status={queued|taken}&limit={n}
@@ -2928,8 +2980,23 @@ ${readEndpoints}${writeEndpoints}
         return res.status(400).json({ error: 'Invalid issueId format' });
       }
 
+      // Auto-append the proxy context (Linear access + reporting channel) by
+      // default, so the worker can both read context and report its result.
+      // Opt out with appendProxyContext:false (e.g. a self-contained prompt).
+      const { appendProxyContext } = req.body || {};
+      let finalPrompt = prompt;
+      if (appendProxyContext !== false) {
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        const bearerToken = (req.headers.authorization || '').slice(7);
+        finalPrompt = prompt + buildProxyContextPreamble({
+          baseUrl,
+          token: bearerToken,
+          issueIdentifier: issueIdentifier || null
+        });
+      }
+
       const item = await dispatchQueueStore.addItem(req.proxyUrlKey, {
-        prompt,
+        prompt: finalPrompt,
         promptName: promptName || 'Prompt',
         issueId: issueId || null,
         issueIdentifier: issueIdentifier || null,
