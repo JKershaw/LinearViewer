@@ -8,14 +8,16 @@ the question, the stages, and the success criteria were fixed in advance; the **
 section records what actually happened.
 
 **Checkpoint (2026-06-06):** the dispatch API surface is built, deployed, and exercised across
-**four** live runs. Key result: the loop works, but completion must be judged from external evidence
+**five** live runs. Key result: the loop works, but completion must be judged from external evidence
 (Linear/git/PR) — the feedback channel is liveness, not result. **Run 4 (clean `cli` retro)** was
 decisive: a session that completed normally **still failed to post its terminal event**, proving the
-gap is not the remote-control handoff but the **terminal-event delivery itself** — so the
-**launcher/consumer process must own the terminal post**, not a Stop hook inside the session (true on
-both `cli` and `web`). Open work is that consumer telemetry (launcher-owned terminal event +
-heartbeats + failure reporting) before an autonomous orchestrator can drive it. Operator is debugging
-the dispatch consumer now. Continuation tracked in Linear as **LIN-318** (In Progress).
+gap is the **terminal-event delivery itself** — so the **launcher/consumer process must own the
+terminal post**, not a Stop hook inside the session. **Run 5 verified the fix:** a `[done]` terminal
+event now lands on the channel on `cli` (first time ever), closing completion-detection. Remaining
+consumer telemetry: the `[done]` still lacks a **final summary + evidence URL**, the item `status`
+doesn't transition on a terminal event, and **heartbeats** + **`web` re-verification** are still open
+before an autonomous orchestrator can drive it. Continuation tracked in Linear as **LIN-318** (In
+Progress).
 
 ## The question we are answering
 
@@ -186,12 +188,37 @@ re-roots #1 in the **launcher**, not the session hook. The orchestrator must tre
 (Linear/git/PR) as the source of truth** for completion, with the feedback stream as liveness only.
 *(Operator is debugging the dispatch consumer to add the launcher-owned terminal post.)*
 
+- **Run 5 — read-only retro → `cli` (item `d1b3ac08…`, 2026-06-06 07:42), regression after the fix.**
+  The launcher-owned terminal post landed. **First time a dispatched session has ever posted a
+  terminal event to the channel:**
+  ```
+  #1 07:42:40  [started] Summarising project… (1074 chars)
+  #2 07:42:40  [working] Session launched (session 5339070c, tty /dev/ttys003)
+  #3 07:42:53  [working] Summary complete. Executing task...
+  #4 07:43:24  [done] Task completed in 45s          ← NEW terminal event
+  ```
+  Completion detection on the feedback stream now **closes** on `cli`. Punch-list #1 (terminal event)
+  is delivered by the launcher, confirming the Run-4 diagnosis. Two refinements remain:
+  1. The `[done]` carries **duration but no final summary and no evidence URL** (`url`/`urlLabel`
+     still `null`). The orchestrator can now detect *that* it finished, but not read *what* was done
+     from the channel — for real tasks it still goes to Linear/git/PR. #1's full ask (marker +
+     summary + evidence URL) is partially met.
+  2. The item's top-level **`status` stays `taken`** — the terminal signal lives only in the feedback
+     *text* (`[done]`). An orchestrator must parse the latest `[done]`/`[failed]` marker rather than
+     rely on `status` flipping. Open question: should the watch endpoint transition `status` on a
+     terminal feedback event?
+  `web` is expected to benefit from the same launcher-owned post (the launcher observes child exit
+  regardless of path) but is **not yet re-verified**.
+
 ### Dispatch-consumer punch-list (for the runner, ranked by leverage)
 
 1. **Terminal completion event** — on stop, post `[done]`/`[failed]`/`[aborted]` + final summary +
    an **evidence URL** (Linear comment / PR / commit). The single highest-value change. **Must be
    owned by the launcher/consumer process, not a Stop hook inside the session** — Run 4 proved a
    cleanly-completed `cli` session still fails to post a hook-based terminal event (see below).
+   ◐ **Partially done (Run 5):** the launcher now posts `[done] … in 45s` on `cli`. Still missing the
+   **final summary** and **evidence URL**, and the item `status` does not transition on the terminal
+   event (signal is feedback-text-only). `web` not yet re-verified.
 2. **Liveness heartbeats** during the work window, so a hung/asleep session is distinguishable from a
    working one in ~1 min instead of never.
 3. **Stop echoing the full prompt** — a short reference is enough. ✅ done in the improved runner.
