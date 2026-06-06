@@ -17,6 +17,15 @@ specced, periodicals is a stub). This is **not a greenfield design.** The single
 risk it guards against is building something parallel to what is already there; §6 names
 the overlap honestly so the reconciliation step can do its job.
 
+> **Update (2026-06-06) — Stage A is built and verified.** The first build decision (the
+> proxy dispatch verbs, §8.A) has been made and shipped, and the dispatch runner's telemetry
+> was driven to completion across **ten live runs**. The dispatch→runner→feedback leg now
+> works on both `cli` and `web`, with a derived terminal `status`, structured `[evidence]`
+> URLs, 30s liveness heartbeats, and a final recap. The remaining unbuilt piece is the
+> autonomous orchestrator itself (Stage B). The experiment, results, and the full
+> dispatch-consumer punch-list live in **[`autopilot-experiment.md`](./autopilot-experiment.md)**;
+> §7–§8 below are annotated with what has since shipped.
+
 ---
 
 ## 1. What it is
@@ -204,7 +213,8 @@ Honest inventory, because the main risk is parallel-building:
 | Periodic cross-task drift supervisor | LIN-291 | specced, unbuilt |
 | Measurement spine (benchmark / fuzzy / ablation) | LIN-263 / LIN-45 / LIN-293 | unbuilt |
 | Dispatch queue + feedback | `routes/dispatch.js` | shipped (feedback free-form — intentional) |
-| Runner: dispatch consumer running Claude Code (local CLI or web remote-control) | separate system | **shipped — the main runner** |
+| **Proxy dispatch verbs** (`POST /api/proxy/dispatch` enqueue, `GET …/:id` watch, `GET …` list) | proxy API | **shipped (this branch)** — derived terminal `status`, structured `[evidence]` URLs; see experiment doc |
+| Runner: dispatch consumer running Claude Code (local CLI or web remote-control) | separate system | **shipped + telemetry-complete** — phase tags, 30s heartbeats, recap, `[evidence]`, `[done]`/`[failed]` (Runs 1–10) |
 | Harbour (local) runner | `lib/harbour-spawn.js`, LIN-259 | shipped — one such consumer |
 | API contract unification | LIN-306 / 309 / 310 / 311 | in-flight — **will move the contract Autopilot drives** |
 
@@ -247,10 +257,14 @@ A specific focus is just the goal field, or a hand-written prompt followed by th
 
 ### What is actually a build (small)
 
-- **A. Proxy dispatch verbs.** A proxy-token-authed `POST /api/proxy/dispatch` (enqueue)
-  **and** a read side (`GET` status / feedback for a dispatched item). This is the one real
-  API gap — today the proxy only references `dispatchId` as a join key; it cannot enqueue or
-  watch a dispatch. Enqueue **and** watch must ship together or the loop can't close.
+- **A. Proxy dispatch verbs.** ✅ **shipped (2026-06-06).** `POST /api/proxy/dispatch` (enqueue)
+  shipped together with the read side — `GET /api/proxy/dispatch/:id` (watch) and
+  `GET /api/proxy/dispatch` (list/filter). The watch/list derive a terminal `status`
+  (`done`/`failed`/`aborted`) from the runner's feedback marker, the runner posts structured
+  `[evidence]` URLs + 30s heartbeats + a final recap, and enqueue auto-appends a proxy-context
+  block so the worker inherits Linear access. Verified end-to-end on `cli` and `web` across ten
+  runs — see [`autopilot-experiment.md`](./autopilot-experiment.md). (Standing readWrite token in
+  the auto-appended block is flagged in-code as security debt to revisit.)
 - **B. The kickoff generator.** A form (optional goal) + a builder that assembles
   **guide + deterministic orientation snapshot + optional goal** into one pasteable prompt.
   Mostly assembling existing pieces: `buildForemanPlaybook()` already exists; the new part is
@@ -274,10 +288,14 @@ A specific focus is just the goal field, or a hand-written prompt followed by th
    reads the worker's *report* of CI. True independence means the guide must make the
    orchestrator **look at CI/PR itself** (it is Claude Code; it can), not rubber-stamp a
    sentence. This is invariant 2 / LIN-292 and the bit most likely to quietly degrade — it
-   needs a sharp, testable instruction, not a soft one.
+   needs a sharp, testable instruction, not a soft one. *(Partly addressed: the runner now
+   emits structured `[evidence]` entries with artifact URLs, so the orchestrator has concrete
+   pointers to fetch and check rather than a sentence to trust. The still-soft part — the
+   guide instruction that it actually fetches/checks them — is Stage B's to get right.)*
 2. **The watch half of the API is easy to under-scope.** Enqueue alone feels like
    "dispatching," but the orchestrator must poll its own dispatches' status/feedback to know
-   when to continue. Spec both together.
+   when to continue. Spec both together. ✅ *Done: enqueue, watch (`/:id`), and list shipped
+   together; the watch side surfaces a derived terminal `status` and the full feedback stream.*
 3. **LIN-306 is unifying the very contract this extends.** Adding a proxy dispatch verb now
    either builds on the about-to-change wire contract or front-runs it. Current lean: add it
    now in today's idiom — it is small, LIN-306 will reshape it regardless, and blocking on
@@ -287,10 +305,12 @@ A specific focus is just the goal field, or a hand-written prompt followed by th
 
 ## What this document defers
 
-The remaining open decisions: the exact request/response shape of the dispatch verbs
-(including the **task-header field set** the orchestrator tracks per task — §6's context
-economy — and where `kind` is sourced from), the exact rules and cadence thresholds of the
-orientation precedence policy, the periodical template set, the precise sequencing against
-LIN-306, and the ticket structure. Those are
+The remaining open decisions: the **`kind` / task-header field set** the orchestrator tracks
+per task (§6's context economy — the dispatch verbs shipped, but they do not yet carry a
+`kind`, and the watch endpoint does not yet surface one), the exact rules and cadence
+thresholds of the orientation precedence policy, the periodical template set, the precise
+sequencing against LIN-306, and the ticket structure. Those are
 the build-spec and reconciliation steps. This document exists so they have a fixed intent
-and four invariants to answer to.
+and four invariants to answer to. *(The dispatch verbs' request/response shape — once an open
+decision here — is now settled and documented in
+[`proxy-integration.md`](./proxy-integration.md) and `autopilot-experiment.md`.)*

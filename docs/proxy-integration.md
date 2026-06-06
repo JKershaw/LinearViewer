@@ -723,6 +723,77 @@ DELETE /api/proxy/issues/{issueId}/labels/{labelId}
 
 Idempotent — returns success if label was not present.
 
+### Dispatch Endpoints
+
+These endpoints let a consumer (e.g. an autopilot orchestrator) hand a prompt to the workspace's **dispatch runner** — a separate system that polls the queue and runs the prompt as a Claude Code session (locally as `cli`, or via web remote-control) — and then watch it run to completion. Enqueue requires `readWrite`; the watch and list reads are `read`-scope.
+
+The runner reports progress back as **free-form feedback entries** (it owns the return leg via its own lifecycle; you do not poll it to run). Across a normal run the feedback stream carries, in order: phase tags (`[started]`/`[working]`), periodic **heartbeats** with activity telemetry, the session's final **recap** (`(recap 1/2)` …), structured **`[evidence]`** entries (each with a populated `url`), and a terminal **`[done]`** / **`[failed]`** / **`[aborted]`** marker. The watch/list endpoints derive a terminal `status` from that marker, so you can poll a field instead of parsing prose.
+
+> **Judge from evidence, not self-report.** The recap is the runner's own narration of what it did. Treat it as descriptive detail; confirm completion against the `[evidence]` URLs (PR/CI/commit/Linear) and Linear/git state. A `done` status with no corroborating artifact is "claimed, unverified."
+
+#### Enqueue a Dispatch
+
+```
+POST /api/proxy/dispatch
+Content-Type: application/json
+
+{ "prompt": "...", "promptName": "...", "issueId": "...", "issueIdentifier": "LIN-42", "issueTitle": "...", "issueUrl": "...", "target": "cli", "repo": "...", "appendProxyContext": true }
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `prompt` | string | Yes | The prompt to run (max ~10MB) |
+| `promptName` | string | No | Short label for the dispatch (max 100 chars) |
+| `issueId` / `issueIdentifier` / `issueTitle` / `issueUrl` | string | No | Optional linkage to a Linear issue |
+| `target` | string | No | `cli` \| `web` \| `dash` (default `cli`). `local`/Harbour is **not** available to proxy consumers |
+| `repo` | string | No | Optional repository hint |
+| `appendProxyContext` | bool | No | Default `true`: append a proxy-context block to the prompt so the worker inherits Linear access for this workspace (the MCP replacement). Set `false` to send the prompt verbatim |
+
+Returns `201`:
+```json
+{ "id": "uuid", "status": "queued", "promptName": "...", "issueIdentifier": "LIN-42", "target": "cli", "dispatchedAt": "2026-06-06T11:32:25.111Z" }
+```
+
+#### Watch a Dispatch
+
+```
+GET /api/proxy/dispatch/{id}
+```
+
+Poll this after enqueuing. `status` is terminal (`done`/`failed`/`aborted`) once the runner posts the matching feedback marker; until then it is `queued` or `taken`.
+
+```json
+{
+  "id": "uuid",
+  "status": "queued|taken|done|failed|aborted",
+  "promptName": "...",
+  "issueIdentifier": "LIN-42",
+  "issueUrl": "...",
+  "target": "cli",
+  "dispatchedAt": "...",
+  "resolvedAt": "...",
+  "feedback": [
+    { "message": "[working] 6 tools in 32s: Bash×6 · next heartbeat in ≤1m", "url": null, "urlLabel": null, "timestamp": "..." },
+    { "message": "[evidence] Pull request · 3 mentions", "url": "https://github.com/org/repo/pull/286", "urlLabel": null, "timestamp": "..." },
+    { "message": "[done] Task completed in 55s", "url": "https://github.com/org/repo/pull/286", "urlLabel": null, "timestamp": "..." }
+  ]
+}
+```
+
+Feedback is free-form text — read it (the recap, heartbeats) for detail; `status` gives the terminal signal and `[evidence]` entries give the artifact URLs to verify against. Poll until `status` is terminal.
+
+#### List Dispatches
+
+```
+GET /api/proxy/dispatch?issueIdentifier={LIN-42}&status={queued|taken|done|failed|aborted}&limit={n}
+```
+
+All query params optional. Merges the live queue and recent history, newest first — use it to resolve an item's `id` when you only know the issue. `status` is the same derived terminal status as the watch endpoint, so it is a valid filter value.
+
+```json
+{ "items": [ { "id": "uuid", "status": "done", "promptName": "...", "issueIdentifier": "LIN-42", "issueUrl": "...", "target": "cli", "dispatchedAt": "...", "resolvedAt": "...", "feedbackCount": 10 } ], "total": 1 }
+```
+
 ## Error Handling
 
 | Status | Error | Description |
