@@ -413,8 +413,9 @@ verbs carry no structured `kind` field", no solution baked in) driven by autopil
 fix, with merge-to-main authorized (Git makes it reversible; the post-merge deploy is the
 verification). What happened and what it taught:
 
-- **`/recommend/LIN-319` returned 504 twice** (Linear context-fetch timeout — the same 504 class
-  GitHub PR #319 addressed, here on a *tiny fresh* ticket, so likely transient infra slowness).
+- **`/recommend/LIN-319` returned 504 twice** (a timeout on the recommend path; *root cause later
+  investigated* — see "`/recommend` 504 root cause" below — it is the **OpenRouter generation leg**,
+  not Linear, despite the Linear-flavoured error text).
 - **Orchestrator mistake (corrected by the operator):** I treated the 504 as a fallback trigger and
   hand-authored an implementation prompt to keep going. That is a **silent workaround of an infra
   error**, which violates invariant 1 — the loop must *flag*, not paper over a broken signal. The
@@ -472,11 +473,12 @@ papering over it.
 **Net (B1→B3):** the loop drives cleanly over the API (B1), halts correctly on infra errors (B2 fix),
 and produces faithful `kind` trajectories from `/recommend` (B3). Three durable findings:
 1. **Halt on infra errors, don't improvise around them** — now a first-class rule in the guide.
-2. **`/recommend` is an intermittently-flaky hard dependency** — it 504'd (Linear context-fetch
-   timeout) in *both* B2 and B3-continuation, on a tiny fresh ticket. The whole loop's step-choice
-   hangs off it, so this is a real reliability risk for autonomous operation. **Follow-up candidate:**
-   harden `/recommend` against Linear slowness (cache/timeout/partial-context), or give the
-   orchestrator a *sanctioned* degraded mode (not a silent workaround).
+2. **`/recommend` is an intermittently-flaky hard dependency** — it 504'd in *both* B2 and
+   B3-continuation, on a tiny fresh ticket. The whole loop's step-choice hangs off it, so this is a
+   real reliability risk for autonomous operation. **Root cause (investigated, see note below): the
+   OpenRouter LLM-generation leg, not Linear.** **Follow-up candidate:** fix the misattributing error
+   message, then harden the LLM leg (retry/cache/faster model/relaxed budget), and give the orchestrator
+   a *sanctioned* single retry-after-backoff (not a silent workaround).
 3. **The merge-to-main write path is still unexercised end-to-end** — no run has reached PR → CI →
    merge → deploy. Muddied further in B3 by an impl-before-plan sequence, self-inflicted by letting
    B2's halted worker keep running: **a clean write-path test needs one worker per ticket and a healthy
@@ -487,6 +489,38 @@ and produces faithful `kind` trajectories from `/recommend` (B3). Three durable 
   *unattended* multi-step loop (B1–B3 were each supervised, with a human reading the external recaps);
   (c) deliberately provoking a task-level `[failed]`/stall to watch the `help` branch fire (B2/B3 only
   exercised the *infra-error* halt, not a worker-failure escalation).
+
+### `/recommend` 504 root cause (investigated 2026-06-06)
+
+The B-runs attributed the 504s to "Linear context-fetch slowness." A live probe **disproves** that
+and corrects the record:
+
+| call | time | result |
+|---|---|---|
+| `GET /me` | 0.86s | ok |
+| `GET /issues/LIN-319` | 0.64s | ok |
+| `GET /recommend/LIN-319` | **50.5s** | **504** |
+
+- **Linear is sub-second**; the recommend call tripped at **~50s = `MULTI_REQUEST_TIMEOUT_MS`**, the
+  wrapper around the **OpenRouter `getRecommendation` call** (`routes/proxy.js:2225`), *not* the 45s
+  `CONTEXT_FETCH_TIMEOUT_MS` Linear budget. **The slow leg is LLM generation, not Linear.**
+- **Misattribution bug:** `withTimeout()` (`routes/proxy.js:237`) hardcodes the message
+  `'Linear API request timed out'` and wraps *both* the Linear fetch and the OpenRouter call;
+  `graphqlErrorDetail()` (`:832`) returns that Linear-flavoured text for *any* `TimeoutError`; the
+  server log (`:2256`) prints the same. So a slow LLM is indistinguishable from slow Linear in both the
+  API response and the logs — which is what misled the earlier notes.
+- **Candidate causes (ranked):** (1) OpenRouter/model generation latency > 50s under provider-routing
+  variance — large output (reasoning + a full prompt, up to 8000 tokens per PR #320) on a slow route;
+  (2) tight serialized budget with **no retry/cache/fast-path** (Linear ≤45s → OpenRouter ≤50s,
+  serial); (3) model/output-size choice (`resolveWorkspaceModel`, no smaller-output variant);
+  (4) *real but not this case* — `ISSUE_DETAIL_QUERY` complexity (deep `parent→siblings→cousins`,
+  `inverseRelations`, `project.content`, no per-connection caps) can trip the 45s Linear budget on
+  large epics (the PR #319 class); (5) Heroku keepalive flushes `200` at ~25s and delivers the real
+  status in the JSON body (`statusCode`), so a 504 arrives as `HTTP 200` + in-body status.
+- **Fixes, in order:** distinguish the two timeout sources in the error/codes/logs (cheap, unblocks
+  diagnosis); then harden the LLM leg (bounded retry, brief cache à la `recap-cache.js`, faster/smaller
+  model, or relaxed/streamed budget). For autopilot, a *sanctioned* single retry-after-backoff is
+  justified because the failure is latency variance, not a hard error.
 
 ### Endpoints / changes shipped on this branch
 
