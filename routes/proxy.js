@@ -24,7 +24,7 @@ import { generateBrief } from '../lib/brief.js';
 import { hashContext } from '../lib/recap-cache.js';
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, isTerminalState, NO_PROJECT_ID } from '../lib/tree.js';
 import { flattenTrees, sortIssuesForSwipe, applyBlockingOrder, clusterByParent } from '../lib/render-swipe.js';
-import { generatePrompt, hasPrompt } from '../lib/prompt-templates.js';
+import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, DISPATCH_KINDS } from '../lib/prompt-templates.js';
 import { parseRepoFromDescription } from '../lib/prompt-formatters.js';
 import { buildForemanPlaybook } from '../lib/prompts/foreman-playbook.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
@@ -1140,18 +1140,19 @@ POST ${baseUrl}/api/proxy/foreman/status
 ## Dispatch Endpoints
 
 POST ${baseUrl}/api/proxy/dispatch
-  Body: { "prompt": "...", "promptName": "...", "issueId": "...", "issueIdentifier": "LIN-42", "issueTitle": "...", "issueUrl": "...", "target": "cli|web|dash", "repo": "...", "appendProxyContext": true }
+  Body: { "prompt": "...", "promptName": "...", "kind": "implementation", "issueId": "...", "issueIdentifier": "LIN-42", "issueTitle": "...", "issueUrl": "...", "target": "cli|web|dash", "repo": "...", "appendProxyContext": true }
   → Queue a prompt for the workspace's dispatch consumer (the runner). Only "prompt" is required; target defaults to "cli". ("local"/Harbour is not available to proxy consumers.)
+  → "kind" is a stable task classification (research/plan/implementation/review/etc. — the prompt-template keys, plus "custom"). Optional: when omitted it is derived from "promptName", falling back to "custom". Read it instead of inferring the task type from promptName or the prompt body.
   → By default a proxy-context block is appended to the prompt so the worker inherits Linear access for this workspace (the MCP replacement). Reporting is handled by the runner's Stop hook, not the prompt. Set "appendProxyContext": false to opt out.
-  → { "id": "...", "status": "queued", "promptName": "...", "issueIdentifier": "...", "target": "cli", "dispatchedAt": "..." }
+  → { "id": "...", "status": "queued", "promptName": "...", "kind": "implementation", "issueIdentifier": "...", "target": "cli", "dispatchedAt": "..." }
 
 GET ${baseUrl}/api/proxy/dispatch?issueIdentifier={LIN-42}&status={queued|taken|done|failed|aborted}&limit={n}
   → List your dispatch items (live queue + recent history), newest first. All query params optional. Use this to find an item's id when you only know the issue.
-  → { "items": [{ "id": "...", "status": "queued|taken|done|failed|aborted", "issueIdentifier": "...", "feedbackCount": 1, ... }], "total": N }
+  → { "items": [{ "id": "...", "status": "queued|taken|done|failed|aborted", "kind": "implementation", "issueIdentifier": "...", "feedbackCount": 1, ... }], "total": N }
 
 GET ${baseUrl}/api/proxy/dispatch/{id}
   → Watch a dispatched item: whether it is still queued or has been taken by the runner, plus any feedback posted back. Poll this after dispatching.
-  → { "id": "...", "status": "queued|taken|done|failed|aborted", "feedback": [{ "message": "...", "url": "...", "timestamp": "..." }], ... }
+  → { "id": "...", "status": "queued|taken|done|failed|aborted", "kind": "implementation", "feedback": [{ "message": "...", "url": "...", "timestamp": "..." }], ... }
   → status is terminal (done/failed/aborted) once the runner posts a "[done]"/"[failed]"/"[aborted]" feedback marker; until then it is queued or taken. Poll until status is terminal.
   → Feedback is free-form text — read it (e.g. the final recap) for the detail; status gives you the terminal signal without parsing prose.
 
@@ -2971,7 +2972,7 @@ ${readEndpoints}${writeEndpoints}
     }
 
     try {
-      const { prompt, promptName, issueId, issueIdentifier, issueTitle, issueUrl, target, repo } = req.body || {};
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo } = req.body || {};
 
       if (!prompt || typeof prompt !== 'string') {
         logEvent(req, '/api/proxy/dispatch', 400);
@@ -2980,6 +2981,11 @@ ${readEndpoints}${writeEndpoints}
       if (target !== undefined && !VALID_PROXY_DISPATCH_TARGETS.includes(target)) {
         logEvent(req, '/api/proxy/dispatch', 400);
         return res.status(400).json({ error: `target must be one of: ${VALID_PROXY_DISPATCH_TARGETS.join(', ')}` });
+      }
+      // Validate kind if provided; when omitted it is derived from promptName below.
+      if (kind !== undefined && !isValidDispatchKind(kind)) {
+        logEvent(req, '/api/proxy/dispatch', 400);
+        return res.status(400).json({ error: `kind must be one of: ${DISPATCH_KINDS.join(', ')}` });
       }
 
       if (prompt.length > MAX_PROMPT_LENGTH) {
@@ -3046,6 +3052,7 @@ ${readEndpoints}${writeEndpoints}
       const item = await dispatchQueueStore.addItem(req.proxyUrlKey, {
         prompt: finalPrompt,
         promptName: promptName || 'Prompt',
+        kind: kind || deriveDispatchKind(promptName),
         issueId: issueId || null,
         issueIdentifier: issueIdentifier || null,
         issueTitle: issueTitle || null,
@@ -3060,6 +3067,7 @@ ${readEndpoints}${writeEndpoints}
         id: item._id,
         status: 'queued',
         promptName: item.promptName,
+        kind: item.kind,
         issueIdentifier: item.issueIdentifier,
         target: item.target,
         dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt
@@ -3138,6 +3146,7 @@ ${readEndpoints}${writeEndpoints}
         id: i.id,
         status: i.status,
         promptName: i.promptName,
+        kind: i.kind || 'custom',
         issueIdentifier: i.issueIdentifier,
         issueUrl: i.issueUrl,
         target: i.target,
@@ -3191,6 +3200,7 @@ ${readEndpoints}${writeEndpoints}
         id: item.id,
         status: terminalStatus || item.status,
         promptName: item.promptName,
+        kind: item.kind || 'custom',
         issueIdentifier: item.issueIdentifier,
         issueUrl: item.issueUrl,
         target: item.target,

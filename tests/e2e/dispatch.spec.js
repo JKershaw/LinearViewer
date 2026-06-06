@@ -654,6 +654,57 @@ test.describe('Dispatch API', () => {
     expect(listData.items[0].repo).toBeNull();
   });
 
+  test('POST /api/dispatch accepts an explicit kind and surfaces it', async ({ request }) => {
+    await request.get('/test/set-session');
+
+    const response = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: { prompt: 'Plan it', promptName: 'Custom', kind: 'research' }
+    });
+    expect(response.status()).toBe(201);
+    const data = await response.json();
+    // Explicit kind wins over what promptName ('Custom') would derive.
+    expect(data.item.kind).toBe('research');
+
+    // And it round-trips through the list projection.
+    const listResponse = await request.get(`${API_PREFIX}/api/dispatch`);
+    const listData = await listResponse.json();
+    expect(listData.items[0].kind).toBe('research');
+  });
+
+  test('POST /api/dispatch derives kind from promptName when omitted', async ({ request }) => {
+    await request.get('/test/set-session');
+
+    // 'implement' is the display name of the 'implementation' template key.
+    const response = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: { prompt: 'Build it', promptName: 'implement' }
+    });
+    expect(response.status()).toBe(201);
+    const data = await response.json();
+    expect(data.item.kind).toBe('implementation');
+  });
+
+  test('POST /api/dispatch defaults kind to custom for freeform prompts', async ({ request }) => {
+    await request.get('/test/set-session');
+
+    const response = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: { prompt: 'Freeform text', promptName: 'Custom' }
+    });
+    expect(response.status()).toBe(201);
+    const data = await response.json();
+    expect(data.item.kind).toBe('custom');
+  });
+
+  test('POST /api/dispatch with invalid kind returns 400', async ({ request }) => {
+    await request.get('/test/set-session');
+
+    const response = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: { prompt: 'Test prompt', promptName: 'Test', kind: 'not-a-real-kind' }
+    });
+    expect(response.status()).toBe(400);
+    const data = await response.json();
+    expect(data.error).toContain('kind must be one of');
+  });
+
   test('GET /api/dispatch/count returns count', async ({ request }) => {
     await request.get('/test/set-session');
 

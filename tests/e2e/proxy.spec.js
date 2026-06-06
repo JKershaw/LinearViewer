@@ -807,4 +807,60 @@ test.describe('Proxy API - Dispatch', () => {
     expect(text).toContain('Dispatch Endpoints');
     expect(text).toContain('/api/proxy/dispatch');
   });
+
+  test('explicit kind round-trips through enqueue, watch, and list', async ({ request }) => {
+    const enqueue = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'plan it out', promptName: 'Custom', kind: 'research', issueIdentifier: 'LIN-319' }
+    });
+    expect(enqueue.status()).toBe(201);
+    const created = await enqueue.json();
+    // The explicit kind wins over what promptName would derive ('Custom' → 'custom').
+    expect(created.kind).toBe('research');
+
+    const watched = await (await request.get(`/api/proxy/dispatch/${created.id}`, {
+      headers: { Authorization: `Bearer ${readToken}` }
+    })).json();
+    expect(watched.kind).toBe('research');
+
+    const listed = await (await request.get('/api/proxy/dispatch?issueIdentifier=LIN-319', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    })).json();
+    expect(listed.items).toHaveLength(1);
+    expect(listed.items[0].kind).toBe('research');
+  });
+
+  test('kind defaults from promptName when omitted', async ({ request }) => {
+    // 'implement' is the display name of the 'implementation' template key.
+    const enqueue = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'do it', promptName: 'implement', issueIdentifier: 'LIN-700' }
+    });
+    const created = await enqueue.json();
+    expect(created.kind).toBe('implementation');
+
+    const watched = await (await request.get(`/api/proxy/dispatch/${created.id}`, {
+      headers: { Authorization: `Bearer ${readToken}` }
+    })).json();
+    expect(watched.kind).toBe('implementation');
+  });
+
+  test('kind falls back to custom for unrecognised promptName', async ({ request }) => {
+    const enqueue = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'freeform task', promptName: 'Custom' }
+    });
+    const created = await enqueue.json();
+    expect(created.kind).toBe('custom');
+  });
+
+  test('enqueue rejects an invalid kind (400)', async ({ request }) => {
+    const resp = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'x', kind: 'not-a-real-kind' }
+    });
+    expect(resp.status()).toBe(400);
+    const body = await resp.json();
+    expect(body.error).toContain('kind must be one of');
+  });
 });
