@@ -539,6 +539,34 @@ function restorePreservedRecap(identifier) {
   }
 }
 
+/**
+ * Preserve the overlay scroll position across poll re-renders. Polling replaces
+ * the full overlay innerHTML, recreating `.overlay-content` (the scroll
+ * container, max-height:80vh; overflow-y:auto) and resetting scrollTop to 0.
+ * Capture before the re-render, restore after. If the user was within ~60px of
+ * the bottom (matching the prompt-section.js near-bottom pattern), follow the
+ * live feed to the bottom instead of pinning the exact prior position.
+ */
+function captureOverlayScroll() {
+  const overlay = getOverlayEl();
+  if (!overlay) return null;
+  const content = overlay.querySelector('.overlay-content');
+  if (!content) return null;
+  const nearBottom =
+    content.scrollHeight - content.scrollTop - content.clientHeight < 60;
+  return { scrollTop: content.scrollTop, nearBottom };
+}
+
+function restoreOverlayScroll(saved) {
+  if (!saved) return;
+  const overlay = getOverlayEl();
+  if (!overlay) return;
+  const content = overlay.querySelector('.overlay-content');
+  if (!content) return;
+  // Near-bottom wins: follow new content to the bottom; otherwise restore exact.
+  content.scrollTop = saved.nearBottom ? content.scrollHeight : saved.scrollTop;
+}
+
 async function openLeafOverlay(identifier) {
   closeOverlay();
   _preservedRecapMount = null;
@@ -575,10 +603,14 @@ async function openLeafOverlay(identifier) {
         const updated = await r.json();
         const overlay = getOverlayEl();
         if (!overlay || overlay.classList.contains('hidden')) return;
+        const savedScroll = captureOverlayScroll();
         capturePreservedRecap();
         showOverlay(renderLeafOverlayContent(updated));
         wireOverlayControls(updated, urlKey);
         restorePreservedRecap(updated.identifier || identifier);
+        // Restore scroll last — after the recap node is swapped back in so its
+        // height is settled before we set scrollTop.
+        restoreOverlayScroll(savedScroll);
       } catch (e) { /* ignore refresh errors */ }
     }, OVERLAY_POLL_MS);
   } catch (e) {
