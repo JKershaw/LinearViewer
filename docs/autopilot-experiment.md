@@ -8,7 +8,7 @@ the question, the stages, and the success criteria were fixed in advance; the **
 section records what actually happened.
 
 **Checkpoint (2026-06-06):** the dispatch API surface is built, deployed, and exercised across
-**nine** live runs. Key result: the loop works, but completion must be judged from external evidence
+**ten** live runs. Key result: the loop works, but completion must be judged from external evidence
 (Linear/git/PR) — the feedback channel is liveness, not result. **Run 4 (clean `cli` retro)** was
 decisive: a session that completed normally **still failed to post its terminal event**, proving the
 gap is the **terminal-event delivery itself** — so the **launcher/consumer process must own the
@@ -19,9 +19,11 @@ The channel now reliably carries, on **both targets**: phase tags → recap → 
 entries (populated `url`)** → terminal `[done]`/`[failed]`, and the watch/list endpoints surface a
 derived terminal **`status`** (verified flipping `taken → done` live in Run 9). An orchestrator can
 poll a status field and read structured evidence pointers without parsing prose — invariant-2's
-evidence discipline made mechanical. **One telemetry gap remains: liveness heartbeats (#2)** during the
-work window. The loop is now complete enough to start the **Stage B orchestrator spike**. Continuation
-tracked in Linear as **LIN-318** (In Progress).
+evidence discipline made mechanical. As of **Run 10** the last telemetry gap (liveness heartbeats #2)
+is closed: 30s adaptive beats carrying tool-activity now cover the work window. **All telemetry
+punch-list items are done** (only #4, the optional `dispatchId`→foreman join for loop-reconstruction,
+remains). The loop is ready for the **Stage B orchestrator spike**. Continuation tracked in Linear as
+**LIN-318** (In Progress).
 
 ## The question we are answering
 
@@ -292,6 +294,23 @@ re-roots #1 in the **launcher**, not the session hook. The orchestrator must tre
     burst, with no intermediate entry. Didn't bite (55–57s tasks), but a long run would still look
     frozen mid-flight.
 
+- **Run 10 — read-only retro → `cli` (item `c9b5b4f6…`, 2026-06-06 11:32), heartbeat verification
+  (timer reduced 2m → 30s).** The silent work window is now covered, and the beats carry *activity*,
+  not just liveness:
+  ```
+  #5 11:32:45        [working] no tool calls in 20s · 0 total · next heartbeat in ≤30s
+  #6 11:33:16 (+32s) [working · running] 6 tools in 32s: Bash×6 · 6 total · next heartbeat in ≤1m
+  ```
+  - A beat fired ~32s into the work window (consistent with the 30s timer) — the exact gap that made
+    "working vs dead" indistinguishable in Runs 1–9 is now filled.
+  - Each beat is a **progress** signal: tool count + breakdown (`6 tools in 32s: Bash×6`) and an
+    idle/running substate (`no tool calls in 20s` vs `· running`), so an orchestrator can tell
+    *working* from *stuck*, not just *alive*.
+  - **Adaptive cadence** — `≤30s` then `≤1m`: tight early when liveness matters most, widening later so
+    a long task doesn't flood the channel. (Append entries rather than a coalesced timestamp, but the
+    backoff keeps accumulation bounded.)
+  - **This closes #2 — the last telemetry gap.**
+
 ### Dispatch-consumer punch-list (for the runner, ranked by leverage)
 
 1. **Terminal completion event** — on stop, post `[done]`/`[failed]`/`[aborted]` + final summary +
@@ -302,9 +321,10 @@ re-roots #1 in the **launcher**, not the session hook. The orchestrator must tre
    **final recap** (`(recap N/M)` entries) and, as of Run 9, **structured `[evidence]` entries +
    a primary evidence URL on `[done]`** (see #5).
 2. **Liveness heartbeats** during the work window, so a hung/asleep session is distinguishable from a
-   working one in ~1 min instead of never. ⏳ **still open (Run 9):** runs still show a silent gap
-   between `Executing task...` and the closing recap burst (~36s here; unbounded on a long task). The
-   last remaining telemetry gap.
+   working one in ~1 min instead of never. ✅ **done (Run 10):** the timer was cut 2m → 30s and the
+   beats carry activity telemetry (tool count + breakdown, idle/running substate) with an **adaptive
+   cadence** (`≤30s` widening to `≤1m`). The previously-silent work window is now covered; this was the
+   last telemetry gap.
 3. **Stop echoing the full prompt** — a short reference is enough. ✅ done in the improved runner.
 4. **Forward `dispatchId` → `/api/proxy/foreman/status`** so work joins to the exact dispatch attempt
    (foreman channel is empty today).
