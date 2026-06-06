@@ -216,7 +216,16 @@ That is exactly the altitude the light orchestrator should operate at.
 The `kind` should come from a **bounded vocabulary the system already owns** — the prompt
 templates (`lib/prompt-template-defs.js`) are already classified — plumbed through dispatch as
 a first-class field, rather than parsed out of a free-form `promptName` or, worse, the prompt
-body. (The exact field set is a build-spec decision; deferred below.)
+body.
+
+**Shipped (LIN-319).** `kind` is now a first-class field on dispatch. It is accepted on both
+dispatch verbs (`POST /api/proxy/dispatch` and the session-auth twin), validated against the
+bounded vocabulary, and surfaced on the list and watch projections (`GET /api/proxy/dispatch`
+and `…/dispatch/{id}`). The vocabulary is exactly the prompt-template keys (`research`, `plan`,
+`implementation`, `review`, …) plus a neutral `custom` fallback — the same vocabulary the
+Pipeline view uses for a Loop's `stage`. When a caller omits `kind`, it is derived from
+`promptName` (template key or display name, case-insensitive), falling back to `custom`. So a
+watcher reads `kind` directly off the list/watch response instead of inferring it.
 
 ## 7. How it relates to what exists
 
@@ -324,12 +333,12 @@ A specific focus is just the goal field, or a hand-written prompt followed by th
 
 ## What this document defers
 
-The remaining open decisions: the **`kind` / task-header field set** the orchestrator tracks
-per task (§6's context economy — the dispatch verbs shipped without a `kind`; adding it is now
-ticketed as **LIN-319**, planned and implemented locally during the B-run arc but not yet
-landed end-to-end), the exact rules and cadence
-thresholds of the orientation precedence policy, the periodical template set, the precise
-sequencing against LIN-306, and the ticket structure. A new finding from the B-runs to fold in:
+The remaining open decisions: the exact request/response shape of the dispatch verbs
+(including the **task-header field set** the orchestrator tracks per task — §6's context
+economy; the `kind` field and its source vocabulary are now resolved, see §6 "Shipped
+(LIN-319)"), the exact rules and cadence thresholds of the
+orientation precedence policy, the periodical template set, the precise sequencing against
+LIN-306, and the ticket structure. A new finding from the B-runs to fold in:
 **`/recommend` reliability** — the loop's step-choice depends on it, and it 504'd intermittently.
 A live probe (in the experiment doc) traced the timeout to the **OpenRouter generation leg, not
 Linear** (the error text misattributes it), so hardening it — fix the misleading error, then
