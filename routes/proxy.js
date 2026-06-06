@@ -215,9 +215,22 @@ const VALID_PROXY_DISPATCH_TARGETS = ['cli', 'web', 'dash'];
 // which causes downstream "stream idle timeout" errors in CLI clients like curl.
 const GRAPHQL_TIMEOUT_MS = 25_000;
 
-// Longer timeout for endpoints that make multiple sequential API calls
-// (stack fetches all issues with pagination, recommend calls Linear + OpenRouter).
+// Longer timeout for Linear endpoints that make multiple sequential GraphQL
+// calls (e.g. the projects + issues fetch behind /stack-style pagination).
+// The OpenRouter generation leg is NOT capped by this — it has its own, much
+// larger budget (LLM_TIMEOUT_MS) so a slow-but-healthy generation isn't killed.
 const MULTI_REQUEST_TIMEOUT_MS = 50_000;
+
+// Budget for the OpenRouter LLM generation leg on recommendation-style endpoints
+// (recommend/recap/brief). Generation routinely runs tens of seconds and varies
+// with provider routing and output size; the previous 50s cap surfaced as
+// intermittent 504s whose root cause was this leg, not Linear (the error text
+// misattributed it). The armed keepalive (http-keepalive.js) writes a heartbeat
+// space every 15s after its 25s flush, so the socket stays alive for an
+// arbitrarily long wait — the keepalive, not this number, is what keeps Heroku's
+// H12 at bay. This cap is therefore just a generous backstop against a genuinely
+// hung generation.
+const LLM_TIMEOUT_MS = 180_000;
 
 // Backstop for the Linear context fetch on recommendation-style endpoints
 // (recommend/recap/brief/status). These fetches run behind an armed keepalive
@@ -2228,7 +2241,7 @@ ${readEndpoints}${writeEndpoints}
             { parent, siblings, project, children, comments, focusedChild },
             { apiKey: sessionApiKey, model: selectedModel, featureFlags: {} }
           ),
-          MULTI_REQUEST_TIMEOUT_MS
+          LLM_TIMEOUT_MS
         );
 
         keepalive.stop();
@@ -2358,7 +2371,7 @@ ${readEndpoints}${writeEndpoints}
         } else {
           const result = await withTimeout(
             generateRecap(context.issue, context, { apiKey: sessionApiKey, model: selectedModel }),
-            MULTI_REQUEST_TIMEOUT_MS
+            LLM_TIMEOUT_MS
           );
           recap = result.recap;
           modelUsed = result.model;
@@ -2462,7 +2475,7 @@ ${readEndpoints}${writeEndpoints}
         } else {
           const result = await withTimeout(
             generateRecap(context.issue, context, { apiKey: sessionApiKey, model: selectedModel }),
-            MULTI_REQUEST_TIMEOUT_MS
+            LLM_TIMEOUT_MS
           );
           recap = result.recap;
           modelUsed = result.model;
@@ -2602,7 +2615,7 @@ ${readEndpoints}${writeEndpoints}
         } else {
           const result = await withTimeout(
             generateBrief(context.issue, context, { apiKey: sessionApiKey, model: selectedModel }),
-            MULTI_REQUEST_TIMEOUT_MS
+            LLM_TIMEOUT_MS
           );
           brief = result.brief;
           modelUsed = result.model;
@@ -2706,7 +2719,7 @@ ${readEndpoints}${writeEndpoints}
         } else {
           const result = await withTimeout(
             generateBrief(context.issue, context, { apiKey: sessionApiKey, model: selectedModel }),
-            MULTI_REQUEST_TIMEOUT_MS
+            LLM_TIMEOUT_MS
           );
           brief = result.brief;
           modelUsed = result.model;

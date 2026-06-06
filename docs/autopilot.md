@@ -323,9 +323,11 @@ ticketed as **LIN-319**, planned and implemented locally during the B-run arc bu
 landed end-to-end), the exact rules and cadence
 thresholds of the orientation precedence policy, the periodical template set, the precise
 sequencing against LIN-306, and the ticket structure. A new finding from the B-runs to fold in:
-**`/recommend` reliability** — the loop's step-choice depends on it, and it 504'd intermittently
-under Linear API slowness, so hardening it (or defining a *sanctioned* degraded mode, never a
-silent workaround) is now a build-spec concern too. Those are
+**`/recommend` reliability** — the loop's step-choice depends on it, and it 504'd intermittently.
+A live probe (in the experiment doc) traced the timeout to the **OpenRouter generation leg, not
+Linear** (the error text misattributes it), so hardening it — fix the misleading error, then
+add retry/cache/faster-model on the LLM call, plus a *sanctioned* degraded mode (never a silent
+workaround) — is now a build-spec concern too. Those are
 the build-spec and reconciliation steps. This document exists so they have a fixed intent
 and four invariants to answer to. *(The dispatch verbs' request/response shape — once an open
 decision here — is now settled and documented in
