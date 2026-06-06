@@ -4,9 +4,10 @@
 > [`autopilot.md`](./autopilot.md) for intent + the four invariants, and
 > [`autopilot-experiment.md`](./autopilot-experiment.md) for the dispatch-leg evidence).
 > You paste **this guide + a deterministic orientation snapshot (+ optional goal)** into a
-> fresh Claude Code session and it drives the loop. This is the Stage B draft — first
-> exercised as a read-only research spike; treat the structure as load-bearing and the exact
-> wording as still-tunable.
+> fresh Claude Code session and it drives the loop. This is the Stage B draft — exercised live
+> across runs B1–B3 (a read-only drive, a write-class attempt that halted on an infra error, and
+> a clean re-run; see the experiment doc). The **Halt conditions** section below was added as a
+> direct result of B2. Treat the structure as load-bearing and the exact wording as still-tunable.
 
 ---
 

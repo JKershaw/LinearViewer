@@ -25,6 +25,18 @@ the overlap honestly so the reconciliation step can do its job.
 > autonomous orchestrator itself (Stage B). The experiment, results, and the full
 > dispatch-consumer punch-list live in **[`autopilot-experiment.md`](./autopilot-experiment.md)**;
 > §7–§8 below are annotated with what has since shipped.
+>
+> **Update (2026-06-06) — Stage B has been spiked (runs B1–B3).** A first draft of the
+> orchestrator prompt — the guide — exists at
+> **[`autopilot-orchestrator-prompt.md`](./autopilot-orchestrator-prompt.md)** and was driven
+> live: a read-only loop end-to-end (B1), a write-class attempt that **halted on an infra
+> error** and yielded a first-class **halt-on-infra-error rule** (B2), and a clean re-run where
+> `/recommend` correctly planned-first and the plan was evidence-verified (B3). Confirmed in
+> practice: the loop is viable over today's API, evidence-discipline (invariant 2) works
+> mechanically off the runner's `[evidence]` URLs, and the orchestrator must **halt — not
+> improvise — on infra failure** (invariant 1). Still open: the **merge-to-main write path is
+> unexercised end-to-end**, `/recommend` is an **intermittently-flaky hard dependency** worth
+> hardening, and no run has been genuinely *unattended*. Details in the experiment doc.
 
 ---
 
@@ -306,10 +318,14 @@ A specific focus is just the goal field, or a hand-written prompt followed by th
 ## What this document defers
 
 The remaining open decisions: the **`kind` / task-header field set** the orchestrator tracks
-per task (§6's context economy — the dispatch verbs shipped, but they do not yet carry a
-`kind`, and the watch endpoint does not yet surface one), the exact rules and cadence
+per task (§6's context economy — the dispatch verbs shipped without a `kind`; adding it is now
+ticketed as **LIN-319**, planned and implemented locally during the B-run arc but not yet
+landed end-to-end), the exact rules and cadence
 thresholds of the orientation precedence policy, the periodical template set, the precise
-sequencing against LIN-306, and the ticket structure. Those are
+sequencing against LIN-306, and the ticket structure. A new finding from the B-runs to fold in:
+**`/recommend` reliability** — the loop's step-choice depends on it, and it 504'd intermittently
+under Linear API slowness, so hardening it (or defining a *sanctioned* degraded mode, never a
+silent workaround) is now a build-spec concern too. Those are
 the build-spec and reconciliation steps. This document exists so they have a fixed intent
 and four invariants to answer to. *(The dispatch verbs' request/response shape — once an open
 decision here — is now settled and documented in

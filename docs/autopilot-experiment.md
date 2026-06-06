@@ -22,12 +22,21 @@ poll a status field and read structured evidence pointers without parsing prose 
 evidence discipline made mechanical. As of **Run 10** the last telemetry gap (liveness heartbeats #2)
 is closed: 30s adaptive beats carrying tool-activity now cover the work window. **All telemetry
 punch-list items are done** (only #4, the optional `dispatchId`→foreman join for loop-reconstruction,
-remains). **Stage B has now had its first drive (Run B1, below):** a Claude session drove the full
-orient → dispatch → poll-`status` → cross-check-evidence → recap → decide loop over the proxy API with
-no manual rescue, against the draft guide in
-[`autopilot-orchestrator-prompt.md`](./autopilot-orchestrator-prompt.md). It surfaced two non-blocking
-build-spec gaps (no periodical-cadence data source → precedence rule 2 inoperable; no structured
-`kind` on dispatch). Continuation tracked in Linear as **LIN-318** (In Progress).
+remains). **Stage B has now been driven across three runs (B1–B3, below)** against the guide in
+[`autopilot-orchestrator-prompt.md`](./autopilot-orchestrator-prompt.md): **B1** — a clean read-only
+drive (orient → dispatch → poll-`status` → cross-check-evidence → recap → decide) with no manual
+rescue; **B2** — the first write-class attempt, **halted on a `/recommend` 504**, which exposed (and
+corrected) an orchestrator anti-pattern — *silently working around an infra error* — now a first-class
+**halt rule** in the guide; **B3** — a clean re-run where `/recommend` recovered, correctly routed the
+fresh ticket to **`kind=planning`**, and the plan landed + was verified in Linear. The arc was
+deliberately stopped at B3's verified plan when `/recommend` 504'd again (the halt rule firing as
+designed). Three durable findings: (1) **halt on infra errors, don't improvise around them**;
+(2) **`/recommend` is an intermittently-flaky hard dependency** (Linear context-fetch 504s, twice this
+session — a real reliability risk for an autonomous loop, candidate for hardening); (3) the
+**merge-to-main write path is still unexercised end-to-end** (no run has reached PR→CI→merge). Two
+build-spec gaps from B1 stand: no periodical-cadence source (precedence rule 2 inoperable) and no
+structured `kind` on dispatch — the latter is now ticketed as **LIN-319** (planned + implemented
+locally, uncommitted). Continuation tracked in Linear as **LIN-318** (In Progress).
 
 ## The question we are answering
 
@@ -452,15 +461,32 @@ orchestrator re-drove the loop with the halt rule in force:
   decision** (per the "check before the first code-writing/merge action" guardrail), rather than
   auto-advancing to an implementation/commit step.
 
-**Net (B1→B3):** the loop drives cleanly over the API (B1), halts correctly on infra errors (B2 fix),
-and produces faithful `kind` trajectories from `/recommend` (B3). The one thing that muddied B3 — an
-impl-before-plan sequence — was self-inflicted by letting B2's halted worker keep running; a clean
-write-path test needs **one** worker per ticket. The merge-to-main path is still unexercised end-to-end.
+**Arc stopped at B3 (2026-06-06 ~12:25).** Asked to continue past the verified plan, the orchestrator
+re-queried `/recommend/LIN-319` for the next step and it **504'd three times in a row** — so the halt
+rule fired as designed and the run stopped at the verified plan rather than improvising. (The
+implementation lives, uncommitted, on a *local* branch on the runner — confirmed not on the remote —
+so it remains unverifiable from outside and was left for manual disposition.) Judged a successful arc:
+the loop oriented, dispatched, judged from evidence, and **halted itself on infra failure** instead of
+papering over it.
 
-- **Still not done:** an *unattended, multi-step* orchestrator run (B1 was a single supervised
-  dispatch with a human reading each external-recap line). The next spike is a multi-task loop —
-  orient → work several stack items in sequence → and deliberately provoke a `failed`/stall to
-  watch the `help` branch fire.
+**Net (B1→B3):** the loop drives cleanly over the API (B1), halts correctly on infra errors (B2 fix),
+and produces faithful `kind` trajectories from `/recommend` (B3). Three durable findings:
+1. **Halt on infra errors, don't improvise around them** — now a first-class rule in the guide.
+2. **`/recommend` is an intermittently-flaky hard dependency** — it 504'd (Linear context-fetch
+   timeout) in *both* B2 and B3-continuation, on a tiny fresh ticket. The whole loop's step-choice
+   hangs off it, so this is a real reliability risk for autonomous operation. **Follow-up candidate:**
+   harden `/recommend` against Linear slowness (cache/timeout/partial-context), or give the
+   orchestrator a *sanctioned* degraded mode (not a silent workaround).
+3. **The merge-to-main write path is still unexercised end-to-end** — no run has reached PR → CI →
+   merge → deploy. Muddied further in B3 by an impl-before-plan sequence, self-inflicted by letting
+   B2's halted worker keep running: **a clean write-path test needs one worker per ticket and a healthy
+   `/recommend`.**
+
+- **Still not done:** (a) an unexercised **merge-to-main write path** (the next write-class attempt
+  should start only with a healthy `/recommend` and a single worker on the ticket); (b) a genuinely
+  *unattended* multi-step loop (B1–B3 were each supervised, with a human reading the external recaps);
+  (c) deliberately provoking a task-level `[failed]`/stall to watch the `help` branch fire (B2/B3 only
+  exercised the *infra-error* halt, not a worker-failure escalation).
 
 ### Endpoints / changes shipped on this branch
 
