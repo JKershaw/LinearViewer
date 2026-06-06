@@ -26,11 +26,6 @@ jobs:
   e2e:
     name: E2E shard ${{ matrix.shard }}/${{ strategy.job-total }}
     runs-on: ubuntu-latest
-    # Official Playwright image ships chromium + system deps preinstalled at
-    # a version matching the Playwright npm package. Keep this tag in sync
-    # with the "playwright" / "@playwright/test" version in package.json.
-    container:
-      image: mcr.microsoft.com/playwright:v1.57.0-noble
     strategy:
       fail-fast: false
       matrix:
@@ -48,15 +43,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Verify Playwright version matches container
-        run: |
-          EXPECTED=1.57.0
-          ACTUAL=$(node -p "require('@playwright/test/package.json').version")
-          if [ "$EXPECTED" != "$ACTUAL" ]; then
-            echo "::error::Playwright version mismatch: container has v$EXPECTED but package.json resolves to v$ACTUAL."
-            echo "Update the container image tag in .github/workflows/test.yml and the pinned version in package.json together."
-            exit 1
-          fi
+      # Install the chromium build that matches the installed @playwright/test
+      # version (no version drift possible — it resolves from node_modules) plus
+      # its system libraries. Browser binaries come from Playwright's own CDN,
+      # NOT the mcr.microsoft.com Docker registry, which has intermittently
+      # blocked GitHub-hosted runners ("The request is blocked") and previously
+      # failed this job. The config defines only the default chromium project.
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
 
       - name: Run E2E tests (shard ${{ matrix.shard }}/${{ strategy.job-total }})
         run: npx playwright test --shard=${{ matrix.shard }}/${{ strategy.job-total }}
