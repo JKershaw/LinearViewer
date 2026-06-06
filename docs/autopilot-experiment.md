@@ -490,6 +490,58 @@ and produces faithful `kind` trajectories from `/recommend` (B3). Three durable 
   (c) deliberately provoking a task-level `[failed]`/stall to watch the `help` branch fire (B2/B3 only
   exercised the *infra-error* halt, not a worker-failure escalation).
 
+**Run B4 — resumed to land the fix, caught a false-positive `[done]` (2026-06-06 ~13:10, LIN-319,
+target `cli`).** With the `LLM_TIMEOUT_MS=180s` fix deployed, the orchestrator re-drove LIN-319 to
+*land* the implementation that B2/B3 left uncommitted-then-PR'd (by B4's start the work was on a
+real PR — **#327**, head `aa1eb62`). The loop ran further than any prior run and produced two
+results worth keeping:
+
+- **`/recommend` is healthy post-deploy.** `GET /recommend/LIN-319` returned **HTTP 200 in 55.4s** —
+  a generation that would have 504'd under the old 50.5s cap. The timeout split is confirmed effective
+  in production. `kind` trajectory across the run: **planning → review → blocked**, converging.
+- **Review step, dispatched and cross-checked.** The orchestrator dispatched the recommended
+  `kind=review` prompt; the worker posted a verdict to LIN-319 (**"Implementation Approved — blocked
+  on a merge conflict in `docs/autopilot.md`"**). The orchestrator did **not** take the verdict on
+  prose — it independently confirmed `mergeable_state: "dirty"` via the GitHub API. Both signals
+  agreed: source auto-merges clean, only the doc conflicts (`main` commit `f1995d1` edited the same
+  §6 region).
+- **Orchestrator deviation (deliberate, recorded):** the `/recommend` resolution prompt told the
+  *worker* to rebase, resolve, **and merge + set Done** itself. The orchestrator moved the merge gate
+  off the worker — dispatched a resolve+verify+**push-then-stop** prompt — so the human-authorized
+  merge stays a verified orchestrator action rather than a worker self-certifying its own completion
+  (invariant 2 at the finish line). The recommended rebase/verification guidance was kept verbatim;
+  only the merge gate moved.
+
+- **The decisive finding — `[done]` is a session-end marker, not a task-completion marker, and it can
+  race ahead of the work.** The resolution dispatch posted a terminal `[done]` at **12m 28s**, but
+  external evidence **refuted** it: PR #327's head SHA was **unchanged** (`aa1eb62`, no force-push),
+  `mergeable_state` still `dirty`, and **no new LIN-319 comment**. The worker's last substantive
+  message was *"the full E2E suite is running in the background … I'll continue once it completes and
+  report."* Read together: **the worker backgrounded the 733-test suite, the launcher's terminal post
+  fired when the session ended, but the session ended before the suite finished — so the push +
+  comment never happened.** The rebase likely sits **locally on the runner, unpushed**.
+  - This is a new failure mode distinct from the Stage-A *silent freeze*: here the channel *did* post
+    a clean terminal event, but it was a **false-positive completion**. The launcher-owned `[done]`
+    (the Run-5 fix) answers "did the session stop?" — **not** "did the task succeed?" When a worker
+    offloads to a background process and exits, those two diverge.
+  - **The orchestrator caught it precisely because it refused to trust `[done]`** and verified the PR
+    SHA + Linear comment + `mergeable_state` from outside. Invariant 2 earned its keep: a terminal
+    status is still a *claim*; the external artifacts are the fact. Recommend the guide note that a
+    terminal `done` with **no corresponding evidence change** is treated as *claimed-incomplete*, not
+    done — the orchestrator must diff the evidence (a new SHA / comment / state), not just see the
+    marker.
+  - **Secondary finding — the `[stalled?]` heartbeat can't distinguish a hung agent from one blocked
+    on a long synchronous command.** The suite run surfaced as `[stalled?] no tool activity for 8m51s
+    in EXECUTING (last tool: Bash)` — benign (the operator confirmed live), but indistinguishable by
+    the signal alone from a real hang. "last tool: Bash + no new tool calls" is the signature of *one
+    long-running Bash in flight*, not death. The liveness heuristic needs a way to mark "blocked on a
+    known long command" vs. "stuck."
+- **Disposition:** flagged to the human (the runner's local working-tree state — rebased? suite
+  result? — is observable only on the operator's laptop, and re-dispatching blindly risks the B3
+  tangle of colliding with a half-applied local rebase). Paused for operator observation rather than
+  auto-advancing. Merge-to-main write path **still** not closed — but B4 got the closest: PR open,
+  reviewed, approved, one mechanical doc conflict from landing.
+
 ### `/recommend` 504 root cause (investigated 2026-06-06)
 
 The B-runs attributed the 504s to "Linear context-fetch slowness." A live probe **disproves** that
