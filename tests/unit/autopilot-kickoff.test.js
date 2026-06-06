@@ -48,14 +48,25 @@ describe('buildAutopilotKickoff (general / stack-walk)', () => {
     assert.ok(text.includes('none this run — walk the stack'));
   });
 
-  test('first act fetches the stack', () => {
+  test('first act fetches the stack digest (light orientation, not full bodies)', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
-    assert.ok(text.includes(`${BASE_URL}/api/proxy/stack?limit=5`));
+    assert.ok(text.includes(`${BASE_URL}/api/proxy/stack?limit=5&view=digest`));
   });
 
   test('a free-text goal is surfaced in the snapshot', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL, goal: 'finish the Ship view' });
     assert.ok(text.includes('finish the Ship view'));
+  });
+
+  test('orient verb list points at the digest view', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
+    assert.ok(text.includes('GET /stack?view=digest'));
+  });
+
+  test('deliverable cross-check is kept general (not a fixed code-only checklist)', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
+    assert.ok(text.includes('deliverable this task was meant to produce'));
+    assert.ok(text.includes('not a fixed checklist'));
   });
 });
 
@@ -89,6 +100,13 @@ describe('buildAutopilotKickoff (read-only mode)', () => {
     assert.ok(text.includes('READ-ONLY'));
     assert.ok(text.includes('no code changes, no PRs, no Linear state changes'));
     assert.ok(!text.includes('WRITE, merge-gated'));
+  });
+
+  test('is honest that read-only is a convention enforced via plain dispatch, not the fused verb', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, mode: 'readonly' });
+    // read-only must not lean on recommend-and-dispatch (which generates write-shaped prompts)
+    assert.ok(text.includes('plain `POST /dispatch`'));
+    assert.ok(text.includes('not a sandbox the platform enforces'));
   });
 
   test('AUTOPILOT_MODES enumerates the supported modes', () => {

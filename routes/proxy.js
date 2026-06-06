@@ -287,6 +287,23 @@ async function fetchWithTimeout(workFn, ms) {
 // Pattern to detect null bytes and dangerous control characters
 const DANGEROUS_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
 
+/** Max length of the deterministic one-line headline in the `/stack` digest view. */
+const STACK_HEADLINE_MAX = 140;
+
+/**
+ * Reduce a task description to a single deterministic headline line for the
+ * `/stack?view=digest` projection. Takes the first non-empty line and truncates
+ * it — no LLM, cheap and exact, so orientation stays light and reproducible.
+ * @param {string|null|undefined} description - Full task description
+ * @returns {string} One-line headline (possibly empty)
+ */
+function toStackHeadline(description) {
+  if (!description || typeof description !== 'string') return '';
+  const firstLine = description.split('\n').map(s => s.trim()).find(s => s.length > 0) || '';
+  if (firstLine.length <= STACK_HEADLINE_MAX) return firstLine;
+  return firstLine.slice(0, STACK_HEADLINE_MAX - 1).trimEnd() + '…';
+}
+
 /**
  * Builds the proxy-context block appended to a dispatched prompt so the worker
  * inherits Linear access for this workspace — the richer replacement for the
@@ -1062,6 +1079,15 @@ GET ${baseUrl}/api/proxy/stack?limit={n}
       "blocksIds": []
     }
   → \`parent\` and \`project\` are null when absent. \`children\` is [] when there are none.
+
+GET ${baseUrl}/api/proxy/stack?limit={n}&view=digest
+  → Compact orientation projection: same sorted stack, but each task drops the full
+    \`description\` for a deterministic one-line \`headline\`, and \`children\`/\`blocks\` are
+    counts (not arrays). Use this to orient over the whole stack cheaply, then fetch full
+    detail (\`/brief/{id}\` or the full \`/stack\`) only for the task you pick.
+  → { "tasks": [{ "identifier": "LIN-296", "title": "...", "headline": "...", "state": {...},
+      "labels": [...], "priority": 1, "section": "in-progress", "blocks": 0, "children": 2,
+      "parent": { "identifier": "LIN-295" }, "url": "..." }], "total": 98, "view": "digest" }
 
 GET ${baseUrl}/api/proxy/recommend/{identifier}
   → AI-generated prompt recommendation (requires OpenRouter on the server; >25s responses
@@ -2047,25 +2073,54 @@ ${readEndpoints}${writeEndpoints}
       // `state.name`, `parent.identifier`, `children` (not `subtasks`), so we
       // expose that shape uniformly here. Internal flat fields remain
       // available only to this handler.
-      const tasks = sortedIssues.slice(0, limit).map(issue => ({
-        id: issue.id,
-        identifier: issue.identifier,
-        title: issue.title,
-        description: issue.description,
-        priority: issue.priority,
-        url: issue.url,
-        state: { name: issue.stateName, type: issue.stateType },
-        labels: issue.labels || [],
-        project: issue.projectName ? { name: issue.projectName } : null,
-        parent: issue.parentId
-          ? { id: issue.parentId, identifier: issue.parentIdentifier || null, title: issue.parentTitle || null }
-          : null,
-        children: issue.children || [],
-        blocksIds: issue.blocksIds || []
-      }));
+      //
+      // `?view=digest` returns a compact, orientation-grade projection: it drops
+      // the (potentially large) full `description` in favour of a deterministic
+      // one-line `headline`, and replaces the `children`/`blocksIds` arrays with
+      // counts. This lets a light orchestrator (Autopilot) get a sense of the
+      // whole stack at a glance without holding every task's full body in
+      // context — then drill into one task's detail (full description / `/brief`)
+      // only for the item it picks. See docs/autopilot-kickoff.md.
+      const sliced = sortedIssues.slice(0, limit);
+      const isDigest = req.query.view === 'digest';
+      const tasks = isDigest
+        ? sliced.map(issue => ({
+            id: issue.id,
+            identifier: issue.identifier,
+            title: issue.title,
+            headline: toStackHeadline(issue.description),
+            priority: issue.priority,
+            state: { name: issue.stateName, type: issue.stateType },
+            labels: issue.labels || [],
+            section: issue.section || null,
+            assignee: issue.assignee || null,
+            project: issue.projectName ? { name: issue.projectName } : null,
+            parent: issue.parentId
+              ? { identifier: issue.parentIdentifier || null }
+              : null,
+            blocks: (issue.blocksIds || []).length,
+            children: (issue.children || []).length,
+            url: issue.url
+          }))
+        : sliced.map(issue => ({
+            id: issue.id,
+            identifier: issue.identifier,
+            title: issue.title,
+            description: issue.description,
+            priority: issue.priority,
+            url: issue.url,
+            state: { name: issue.stateName, type: issue.stateType },
+            labels: issue.labels || [],
+            project: issue.projectName ? { name: issue.projectName } : null,
+            parent: issue.parentId
+              ? { id: issue.parentId, identifier: issue.parentIdentifier || null, title: issue.parentTitle || null }
+              : null,
+            children: issue.children || [],
+            blocksIds: issue.blocksIds || []
+          }));
 
       logEvent(req, '/api/proxy/stack', 200);
-      res.json({ tasks, total: sortedIssues.length });
+      res.json({ tasks, total: sortedIssues.length, view: isDigest ? 'digest' : 'full' });
     } catch (err) {
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/stack', status);
