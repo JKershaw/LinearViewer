@@ -153,6 +153,43 @@ The guide must ask for two distinct outputs, each at a fixed altitude:
   It is *not* the foreman-status log (the durable machine record) and *not* the internal
   recitation — it is the live channel for someone sitting back.
 
+### Context economy — what the orchestrator tracks per task
+
+Invariant 4 (light orchestrator) is not only about *who does the work* — it is also about
+*how much the driver holds in context while watching it*. The orchestrator should carry the
+**minimum descriptive state needed to choose the next action**, and no more. Full task prose
+actively hurts: it bloats context, and worse, it tempts the orchestrator to re-reason about
+*how* to do the task — the worker's job — instead of *whether it is done*, which blurs the
+descriptive/normative firewall (invariant 3) and the light-orchestrator line.
+
+The test for any candidate field is: **does it change a decision, and at what granularity?**
+Applied to a dispatched task, the orchestrator holds a small **task header** —
+
+- **kind** (planning / research / implementation / review / retro / …) — a *coarse enum*, not
+  prose;
+- **state** (queued / taken / live / done-claimed / stalled);
+- **evidence pointers** (issue identifier, PR/branch URL) — the place to *look* to judge
+  completion, not the content itself;
+- **liveness** (last-event time, phase, heartbeat) — working vs. dead;
+
+— and treats the full prompt and full feedback log as **drill-down on demand**, pulled only
+when a decision actually needs them (e.g. re-grounding a stalled task before re-dispatch),
+never held in the steady-state loop.
+
+**Why `kind` specifically earns its place in the header.** The autopilot dispatches the
+*AI-recommended* prompt, and that recommendation is what chooses the next step. So the *kind*
+of each successive dispatch is the cheapest read on the work's **trajectory**: a healthy task
+walks research → planning → implementation → review and converges; a task that keeps
+re-dispatching the same kind is looping; one whose kind keeps *broadening* is expanding in
+scope. Tracking the sequence of kinds lets the orchestrator (and the watching human) see a
+task *progressing, stalling, or expanding* without holding any of the task's actual content.
+That is exactly the altitude the light orchestrator should operate at.
+
+The `kind` should come from a **bounded vocabulary the system already owns** — the prompt
+templates (`lib/prompt-template-defs.js`) are already classified — plumbed through dispatch as
+a first-class field, rather than parsed out of a free-form `promptName` or, worse, the prompt
+body. (The exact field set is a build-spec decision; deferred below.)
+
 ## 7. How it relates to what exists
 
 Honest inventory, because the main risk is parallel-building:
@@ -250,8 +287,10 @@ A specific focus is just the goal field, or a hand-written prompt followed by th
 
 ## What this document defers
 
-The remaining open decisions: the exact request/response shape of the dispatch verbs, the
-exact rules and cadence thresholds of the orientation precedence policy, the periodical
-template set, the precise sequencing against LIN-306, and the ticket structure. Those are
+The remaining open decisions: the exact request/response shape of the dispatch verbs
+(including the **task-header field set** the orchestrator tracks per task — §6's context
+economy — and where `kind` is sourced from), the exact rules and cadence thresholds of the
+orientation precedence policy, the periodical template set, the precise sequencing against
+LIN-306, and the ticket structure. Those are
 the build-spec and reconciliation steps. This document exists so they have a fixed intent
 and four invariants to answer to.

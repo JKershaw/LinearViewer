@@ -328,6 +328,36 @@ function buildProxyContextPreamble({ baseUrl, token, issueIdentifier }) {
   ].join('\n');
 }
 
+// Terminal markers the dispatch runner prefixes onto its final feedback entry.
+// The runner posts completion as free-form text (e.g. "[done] Task completed in
+// 45s" / "[failed] remote-control never connected"), and the queue's lifecycle
+// status stays 'taken' — so without this an orchestrator has to parse prose to
+// know a dispatch finished. Map the marker → a terminal status the watch/list
+// endpoints can surface as a field. Derived on read only; the stored lifecycle
+// status is untouched (so feedback the runner posts after taking still applies).
+const TERMINAL_FEEDBACK_REGEX = /^\s*\[(done|complete|failed|aborted)\]/i;
+const TERMINAL_MARKER_TO_STATUS = { done: 'done', complete: 'done', failed: 'failed', aborted: 'aborted' };
+
+/**
+ * Scans feedback entries for a terminal marker and returns the mapped status of
+ * the LAST one found (the runner posts the terminal event last), or null if none.
+ *
+ * @param {Array<{message?: string}>} feedback
+ * @returns {('done'|'failed'|'aborted')|null}
+ */
+function deriveTerminalStatus(feedback) {
+  if (!Array.isArray(feedback)) {
+    return null;
+  }
+  for (let i = feedback.length - 1; i >= 0; i--) {
+    const match = TERMINAL_FEEDBACK_REGEX.exec(feedback[i]?.message || '');
+    if (match) {
+      return TERMINAL_MARKER_TO_STATUS[match[1].toLowerCase()];
+    }
+  }
+  return null;
+}
+
 // =============================================================================
 // GraphQL Queries
 // =============================================================================
@@ -1102,14 +1132,15 @@ POST ${baseUrl}/api/proxy/dispatch
   → By default a proxy-context block is appended to the prompt so the worker inherits Linear access for this workspace (the MCP replacement). Reporting is handled by the runner's Stop hook, not the prompt. Set "appendProxyContext": false to opt out.
   → { "id": "...", "status": "queued", "promptName": "...", "issueIdentifier": "...", "target": "cli", "dispatchedAt": "..." }
 
-GET ${baseUrl}/api/proxy/dispatch?issueIdentifier={LIN-42}&status={queued|taken}&limit={n}
+GET ${baseUrl}/api/proxy/dispatch?issueIdentifier={LIN-42}&status={queued|taken|done|failed|aborted}&limit={n}
   → List your dispatch items (live queue + recent history), newest first. All query params optional. Use this to find an item's id when you only know the issue.
-  → { "items": [{ "id": "...", "status": "queued|taken|...", "issueIdentifier": "...", "feedbackCount": 1, ... }], "total": N }
+  → { "items": [{ "id": "...", "status": "queued|taken|done|failed|aborted", "issueIdentifier": "...", "feedbackCount": 1, ... }], "total": N }
 
 GET ${baseUrl}/api/proxy/dispatch/{id}
   → Watch a dispatched item: whether it is still queued or has been taken by the runner, plus any feedback posted back. Poll this after dispatching.
-  → { "id": "...", "status": "queued|taken|cancelled|expired", "feedback": [{ "message": "...", "url": "...", "timestamp": "..." }], ... }
-  → Feedback is free-form text — read it to decide the next step; there is no structured "done" flag.
+  → { "id": "...", "status": "queued|taken|done|failed|aborted", "feedback": [{ "message": "...", "url": "...", "timestamp": "..." }], ... }
+  → status is terminal (done/failed/aborted) once the runner posts a "[done]"/"[failed]"/"[aborted]" feedback marker; until then it is queued or taken. Poll until status is terminal.
+  → Feedback is free-form text — read it (e.g. the final recap) for the detail; status gives you the terminal signal without parsing prose.
 
 ## Shell Tip
 
@@ -3075,7 +3106,11 @@ ${readEndpoints}${writeEndpoints}
         ...history.items
       ];
 
-      const filtered = merged.filter(i =>
+      // Resolve each item's effective status once (terminal marker → done/failed/
+      // aborted, else the lifecycle status) so filtering and the response agree.
+      const resolved = merged.map(i => ({ ...i, status: deriveTerminalStatus(i.feedback) || i.status }));
+
+      const filtered = resolved.filter(i =>
         (!issueIdentifier || i.issueIdentifier === issueIdentifier) &&
         (!statusFilter || i.status === statusFilter)
       );
@@ -3135,9 +3170,13 @@ ${readEndpoints}${writeEndpoints}
       }
 
       logEvent(req, '/api/proxy/dispatch/:id', 200);
+      // Surface a terminal status (done/failed/aborted) derived from the runner's
+      // final feedback marker, so the orchestrator can poll a field instead of
+      // parsing prose. Falls back to the queue lifecycle status (queued/taken).
+      const terminalStatus = deriveTerminalStatus(item.feedback);
       res.json({
         id: item.id,
-        status: item.status,
+        status: terminalStatus || item.status,
         promptName: item.promptName,
         issueIdentifier: item.issueIdentifier,
         issueUrl: item.issueUrl,

@@ -7,11 +7,20 @@ Experiment plan + results for the first end-to-end spike of the Autopilot loop (
 the question, the stages, and the success criteria were fixed in advance; the **Results**
 section records what actually happened.
 
-**Checkpoint (2026-06-05):** the dispatch API surface is built, deployed, and exercised across
-three live runs. Key result: the loop works, but completion must be judged from external evidence
-(Linear/git/PR) — the feedback channel is liveness, not result. Open work is consumer telemetry
-(terminal/heartbeat/failure events; hooks surviving remote-control handoff) before an autonomous
-orchestrator can drive it. Continuation tracked in Linear as **LIN-318** (In Progress).
+**Checkpoint (2026-06-06):** the dispatch API surface is built, deployed, and exercised across
+**eight** live runs. Key result: the loop works, but completion must be judged from external evidence
+(Linear/git/PR) — the feedback channel is liveness, not result. **Run 4 (clean `cli` retro)** was
+decisive: a session that completed normally **still failed to post its terminal event**, proving the
+gap is the **terminal-event delivery itself** — so the **launcher/consumer process must own the
+terminal post**, not a Stop hook inside the session. **Runs 5–6** verified launcher-owned `[done]` on
+both `cli` and `web`; **Run 7** added the session's **final recap** (`cli`) and **explicit `[failed]`
+reporting**; **Run 8** fixed a `web` remote-control regression and verified the **recap on `web`** too.
+The channel now reliably carries, on **both targets**: phase tags → recap → terminal `[done]`/`[failed]`.
+The watch/list endpoints now also surface a derived terminal **`status`** (`done`/`failed`/`aborted`)
+from that marker, so an orchestrator polls a field, not prose. Remaining before an autonomous
+orchestrator are both **consumer-side**: **liveness heartbeats** (#2) and a **structured evidence URL**
+(#5 — Run 8's URL was in prose, not the field). The `cli` path is now clean enough to start the
+**Stage B orchestrator spike**. Continuation tracked in Linear as **LIN-318** (In Progress).
 
 ## The question we are answering
 
@@ -154,30 +163,152 @@ and we re-ran. Two more dispatches, both via the new `POST /api/proxy/dispatch`:
 - **Run 3 — read-only retro → `cli` (item `cb9917e2…`), to test the hook hypothesis on a path that
   keeps hooks alive.** It launched (`[started]` + `[working] Session launched`) and then **froze at
   launch** — operator's laptop went to sleep right after spawn. Same silent-freeze signature as a
-  stall.
+  stall. Inconclusive (laptop sleep, not a clean test).
+- **Run 4 — read-only retro → `cli` (item `df85e338…`, 2026-06-06 07:14, laptop awake), the clean
+  re-run of #3.** Launched the same way (`[started]` + `[working] Session launched`, session
+  `e629d2d7`, tty `/dev/ttys002`) and then sat at `feedbackCount=2` for ~11+ min. Operator then
+  confirmed out-of-band: **the session actually concluded and produced its findings — but the
+  terminal event never reached the feedback channel.** This is the decisive result.
 
-**Combined finding:** a stalled run, a remote-handoff that drops the tail, and a sleeping laptop all
-produce the **identical silent freeze** on the channel. Today nothing distinguishes "working" from
-"dead" without manually checking Linear/git. That makes the punch-list's **terminal event (#1),
-heartbeat (#2), and failure report (#6)** the load-bearing changes — and confirms the orchestrator
-must treat **external evidence (Linear/git/PR) as the source of truth** for completion, with the
-feedback stream as liveness only.
+**Decisive finding (Run 4):** the silent freeze is **not** unique to the `web`/remote-control
+handoff, and it is **not** "still working." A `cli` session that completed normally — the path
+where hooks were assumed to survive — **still failed to post its terminal event.** So:
+
+- The "hooks die on remote-control handoff" story (Run 2) is *a* cause but **not the whole cause** —
+  the terminal post is missing on the plain `cli` path too. The terminal-event delivery is the gap,
+  independent of the handoff.
+- This **promotes punch-list #7's second option to the answer:** the **launcher (the dispatch
+  consumer process itself) must own the terminal post**, observing the child session's completion —
+  *not* a Stop hook running inside the session, on either path. Keeping hooks alive across handoff is
+  necessary-at-most for `web` and provably insufficient for `cli`.
+- A stalled run, a dropped remote tail, a sleeping laptop, **and a cleanly-completed cli session** all
+  produce the **identical silent freeze**. Nothing on the channel distinguishes working / done / dead.
+  Here external evidence couldn't break the tie either (read-only task → Linear/git silent by design),
+  so only the operator's direct observation of the session revealed completion.
+
+This makes **terminal event (#1)**, **heartbeat (#2)**, and **failure report (#6)** load-bearing, and
+re-roots #1 in the **launcher**, not the session hook. The orchestrator must treat **external evidence
+(Linear/git/PR) as the source of truth** for completion, with the feedback stream as liveness only.
+*(Operator is debugging the dispatch consumer to add the launcher-owned terminal post.)*
+
+- **Run 5 — read-only retro → `cli` (item `d1b3ac08…`, 2026-06-06 07:42), regression after the fix.**
+  The launcher-owned terminal post landed. **First time a dispatched session has ever posted a
+  terminal event to the channel:**
+  ```
+  #1 07:42:40  [started] Summarising project… (1074 chars)
+  #2 07:42:40  [working] Session launched (session 5339070c, tty /dev/ttys003)
+  #3 07:42:53  [working] Summary complete. Executing task...
+  #4 07:43:24  [done] Task completed in 45s          ← NEW terminal event
+  ```
+  Completion detection on the feedback stream now **closes** on `cli`. Punch-list #1 (terminal event)
+  is delivered by the launcher, confirming the Run-4 diagnosis. Two refinements remain:
+  1. The `[done]` carries **duration but no final summary and no evidence URL** (`url`/`urlLabel`
+     still `null`). The orchestrator can now detect *that* it finished, but not read *what* was done
+     from the channel — for real tasks it still goes to Linear/git/PR. #1's full ask (marker +
+     summary + evidence URL) is partially met.
+  2. The item's top-level **`status` stays `taken`** — the terminal signal lives only in the feedback
+     *text* (`[done]`). An orchestrator must parse the latest `[done]`/`[failed]` marker rather than
+     rely on `status` flipping. Open question: should the watch endpoint transition `status` on a
+     terminal feedback event?
+  `web` is expected to benefit from the same launcher-owned post (the launcher observes child exit
+  regardless of path) but is **not yet re-verified**.
+
+- **Run 6 — read-only retro → `web` (item `c32bd6c0…`, 2026-06-06 08:13), the `web` re-verification.**
+  *(A first attempt, `e17e6bd6…`, surfaced a separate bug — the dispatcher logged `Sending
+  /remote-control command...` but never actually fired it, so the session never moved cli→web; that
+  run was aborted and the operator fixed the trigger.)* The retry cleared the full handoff — including
+  the exact point Run 2 went dark — and landed a terminal event:
+  ```
+  #3 08:13:25  [working] Summary complete. Connecting remote session...
+  #4 08:13:27  [working] Sending /remote-control command...
+  #5 08:13:33  [working] Remote connected. Executing task...     ← cleared the Run-2 stall point
+  #6 08:14:30  [done] Task completed in 1m 26s                   ← terminal event on web
+  ```
+  **Two fixes confirmed at once:** the remote-control trigger now actually connects (`Remote
+  connected`), and the **launcher-owned terminal post is path-independent** — `[done]` lands on `web`
+  exactly as on `cli`. Completion-detection now **closes on both targets.** The same two refinements
+  carry over (no final summary / evidence URL; `status` stays `taken`).
+
+- **Run 7 — recap forwarding + failure reporting, dispatched to both targets, 2026-06-06 ~08:38 and
+  ~09:57.** Goal: get the **session's final recap** onto the channel (refinement #1), not just a bare
+  `[done]`.
+  - **First attempt** forwarded session text but the **wrong message** — the session's *opening*
+    orientation line ("Let me look at the current branch's work…"), as a separate entry after a bare
+    `[done]`. The actual findings still weren't on the channel.
+  - **After the fix, `cli` (item `73d09670…`) is excellent.** The session's **actual final
+    retrospective** now lands as `(recap 1/2)` + `(recap 2/2)` entries immediately *before* `[done]` —
+    a real descriptive recap with *what was done*, *what stands out*, and an **Evidence** section
+    (branch, HEAD commit, latest merged PR), even flagging 55 uncommitted screenshot baselines as
+    drift. This is exactly the watchable recap refinement #1 wanted.
+  - **`web` (items `267c1710…`, `21d79ed6…`) failed both times** at the cli→web handoff:
+    `[failed] remote-control never connected (command not accepted)` — the **identical error twice**,
+    so the remote-control trigger has **regressed since Run 6** (broken, not flaky). The local half
+    works (the launcher forwarded its project-overview before failing); recap-on-`web` is therefore
+    **still unverified**.
+  - **Win regardless:** this is the first time **explicit failure reporting (#6)** appeared — a
+    terminal `[failed]` *with a reason*, instead of the silent freeze every earlier broken run
+    produced. A flaky path that fails *loudly* is safe for an autonomous orchestrator (retry/escalate)
+    in a way a silent one never is.
+  - **Note (context economy):** the full recap is two chunks of detailed prose. Great for the
+    human-watchable channel, but per §6 of `autopilot.md` the *light orchestrator* should treat it as
+    **drill-down**, not steady-state context — hold the `[done]`/`kind`/evidence-pointer header, fetch
+    the recap only when a decision needs it.
+
+- **Run 8 — read-only retro → `web` (item `8f069f45…`, 2026-06-06 10:15), the remote-control fix.**
+  Full success on `web` end-to-end:
+  ```
+  #3 10:15:27  [working] Summary complete. Executing task...   ← no "command not accepted"; handoff clean
+  #4           [launcher project-overview preamble]
+  #5 10:16:10  (recap 1/2)  ## Retrospective — LinearViewer recent activity …
+  #6 10:16:10  (recap 2/2)  …### Evidence • Latest CI on main: success — run 27042794260 …
+  #7 10:16:10  [done] Task completed in 1m 1s
+  ```
+  - **Remote-control regression (#8) resolved** — executed end-to-end. The intermediate
+    `Connecting / Sending /remote-control / Remote connected` entries are now **gone**; the handoff
+    goes straight to `Executing task...` like `cli`, so the fix also streamlined it.
+  - **Recap now verified on `web`** — full retrospective (`recap 1/2`+`2/2`) before `[done]`, so recap
+    forwarding works on **both targets**. The `web` recap was even richer than `cli`'s: it carried an
+    **evidence URL** (a real GitHub Actions link) in its Evidence section and flagged that the branch
+    is stale vs `main` with *no open PR* and ~70 uncommitted screenshot PNGs.
+  - **Caveat — evidence URL is in prose, not the field.** The link lives in the recap *text*; the
+    feedback entry's structured `url`/`urlLabel` is still `null`. So #5 (populate the structured
+    artifact field) is **not** done — an orchestrator must parse the URL out of the recap rather than
+    read a field.
 
 ### Dispatch-consumer punch-list (for the runner, ranked by leverage)
 
 1. **Terminal completion event** — on stop, post `[done]`/`[failed]`/`[aborted]` + final summary +
-   an **evidence URL** (Linear comment / PR / commit). The single highest-value change. *(Blocked on
-   the remote-control path until hooks survive handoff — see below.)*
+   an **evidence URL** (Linear comment / PR / commit). The single highest-value change. **Must be
+   owned by the launcher/consumer process, not a Stop hook inside the session** — Run 4 proved a
+   cleanly-completed `cli` session still fails to post a hook-based terminal event (see below).
+   ◐ **Mostly done (Runs 5–8):** the launcher posts `[done]` on **both `cli` and `web`**, and the
+   session's **final recap** now lands on **both targets** (Run 7 `cli`, Run 8 `web`) as
+   `(recap 1/2)`+`(recap 2/2)` entries before `[done]`. Remaining: the **structured** evidence URL is
+   still unpopulated (`url`/`urlLabel` null — Run 8's URL was in the recap *prose*, not the field); and
+   the item `status` does not transition on the terminal event (signal is feedback-text-only). Open
+   question: fold the recap into the `[done]` payload vs. keep it as adjacent `(recap N/M)` entries.
 2. **Liveness heartbeats** during the work window, so a hung/asleep session is distinguishable from a
    working one in ~1 min instead of never.
 3. **Stop echoing the full prompt** — a short reference is enough. ✅ done in the improved runner.
 4. **Forward `dispatchId` → `/api/proxy/foreman/status`** so work joins to the exact dispatch attempt
    (foreman channel is empty today).
-5. **Populate `url`/`urlLabel`** with the concrete artifact (all `null` today).
-6. **Explicit failure reporting** — stalls/disconnects/errors should be loud, not silent.
-7. **Hooks survive remote-control handoff** (newly found) — without this, #1 is impossible on `web`.
-   Either keep the Stop hook alive across the handoff, or have the launcher (not the remote session)
-   own the terminal post.
+5. **Populate `url`/`urlLabel`** with the concrete artifact (still `null` — Run 8's evidence URL was
+   in the recap *prose*, not the structured field).
+6. **Explicit failure reporting** — stalls/disconnects/errors should be loud, not silent. ✅ done
+   (Run 7): a terminal `[failed] … (reason)` now appears instead of a silent freeze.
+7. **Launcher owns the terminal post** (resolved by Run 4) — the original framing was "keep the Stop
+   hook alive across the handoff, *or* have the launcher own the terminal post." Run 4 settled it: a
+   cleanly-completed `cli` session (hooks supposedly alive) **still** didn't post, so the hook path is
+   insufficient on *both* targets. The launcher/consumer process must observe child completion and
+   post the terminal event itself. This is the prerequisite for #1.
+8. **`web` remote-control connect regression** (Run 7) — `command not accepted`, failed twice. ✅
+   **fixed (Run 8):** `web` now executes end-to-end and forwards the recap; the fix also streamlined
+   the handoff (no more intermediate connect entries).
+9. **Terminal `status` transition on the watch/list endpoints** (our side, not the runner). ✅ **done:**
+   `GET /api/proxy/dispatch/:id` and `GET /api/proxy/dispatch` now derive a terminal `status`
+   (`done`/`failed`/`aborted`) from the runner's `[done]`/`[failed]`/`[aborted]` feedback marker, so an
+   orchestrator polls a **field** instead of parsing prose. Derived on read — the stored lifecycle
+   status and the feedback stream are untouched; `?status=done` is now a valid list filter.
 
 ### Stage B — orchestrator spike
 
@@ -197,4 +328,6 @@ feedback stream as liveness only.
 - Auto-append proxy context to dispatched prompts (Linear access; reporting left to the runner's Stop
   hook). Standing readWrite token **for now**, flagged in-code as security debt. Fixed a malformed-URL
   bug for dispatches without an `issueIdentifier`.
-- All covered by E2E tests in `tests/e2e/proxy.spec.js` (11 dispatch tests).
+- Terminal-status derivation (`deriveTerminalStatus`): watch + list surface `done`/`failed`/`aborted`
+  from the runner's feedback marker, derived on read (punch-list #9).
+- All covered by E2E tests in `tests/e2e/proxy.spec.js` (13 dispatch tests).

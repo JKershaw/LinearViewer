@@ -625,6 +625,66 @@ test.describe('Proxy API - Dispatch', () => {
     expect(watched.feedback[0].url).toContain('/pull/42');
   });
 
+  test('watch surfaces a terminal status from the [done] feedback marker', async ({ request }) => {
+    const enqueue = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'run a retro', issueIdentifier: 'LIN-500' }
+    });
+    const { id } = await enqueue.json();
+    await request.post(`/api/dispatch/take/${id}`, {
+      headers: { Authorization: `Bearer ${consumerToken}` }
+    });
+
+    // Progress entry keeps the item 'taken' — only a bracketed terminal marker flips it.
+    await request.post(`/api/dispatch/feedback/${id}`, {
+      headers: { Authorization: `Bearer ${consumerToken}`, 'Content-Type': 'application/json' },
+      data: { message: '[working] Session launched' }
+    });
+    let watched = await (await request.get(`/api/proxy/dispatch/${id}`, {
+      headers: { Authorization: `Bearer ${readToken}` }
+    })).json();
+    expect(watched.status).toBe('taken');
+
+    // Runner posts the terminal event last.
+    await request.post(`/api/dispatch/feedback/${id}`, {
+      headers: { Authorization: `Bearer ${consumerToken}`, 'Content-Type': 'application/json' },
+      data: { message: '[done] Task completed in 45s' }
+    });
+    watched = await (await request.get(`/api/proxy/dispatch/${id}`, {
+      headers: { Authorization: `Bearer ${readToken}` }
+    })).json();
+    expect(watched.status).toBe('done');
+    // Feedback stream is untouched — the recap/detail is still all there.
+    expect(watched.feedback).toHaveLength(2);
+
+    // The derived status is filterable in the list endpoint too.
+    const doneList = await (await request.get('/api/proxy/dispatch?status=done', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    })).json();
+    expect(doneList.items.find(i => i.id === id)).toBeTruthy();
+    expect(doneList.items.every(i => i.status === 'done')).toBe(true);
+  });
+
+  test('watch surfaces a failed status from the [failed] feedback marker', async ({ request }) => {
+    const enqueue = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'dispatch to web' }
+    });
+    const { id } = await enqueue.json();
+    await request.post(`/api/dispatch/take/${id}`, {
+      headers: { Authorization: `Bearer ${consumerToken}` }
+    });
+    await request.post(`/api/dispatch/feedback/${id}`, {
+      headers: { Authorization: `Bearer ${consumerToken}`, 'Content-Type': 'application/json' },
+      data: { message: '[failed] remote-control never connected (command not accepted)' }
+    });
+
+    const watched = await (await request.get(`/api/proxy/dispatch/${id}`, {
+      headers: { Authorization: `Bearer ${readToken}` }
+    })).json();
+    expect(watched.status).toBe('failed');
+  });
+
   test('list finds items by issueIdentifier across queue and history', async ({ request }) => {
     // One item left queued, one taken — the list should surface both and
     // filtering by issueIdentifier should narrow to the right one.
