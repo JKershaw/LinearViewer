@@ -189,6 +189,13 @@
       gap: null
     };
 
+    // Per-task orientation bearings (LIN-300). The server emits these as one
+    // structured `orientation` event (not streamed prose); we stash them here
+    // and pass them through saveReport into the report store's orientation
+    // field for the ship view (LIN-301). Stays [] when there is no north star
+    // (the server skips the call), consistent with north-star-reading/gap.
+    var orientation = [];
+
     // Per-layer streaming bookkeeping (keyed by layer id).
     var acc = {};
     var firstToken = {};
@@ -310,6 +317,9 @@
           if (layer) finishLayer(layer, eventData.finishReason);
         } else if (type === 'layer-error') {
           if (layer) failLayer(layer, eventData.message);
+        } else if (type === 'orientation') {
+          // Structured data, not a visible layer — stash for saveReport.
+          orientation = (eventData && eventData.orientation) || [];
         }
         // 'done' needs no action — the stream ending resolves the promise.
       });
@@ -329,7 +339,7 @@
       // Persist the completed run (best-effort), then refresh the history list
       // and select the new reading. The panels already show the freshly-streamed
       // content, so selectReport just syncs the history selection state.
-      return saveReport(northStar, collected).then(function(saved) {
+      return saveReport(northStar, collected, orientation).then(function(saved) {
         return loadHistory().then(function() {
           var id = saved ? saved.id : historyState.latestId;
           if (id) selectReport(id, false);
@@ -344,7 +354,7 @@
    * entirely when no layer produced content (e.g. the first layer failed).
    * Resolves with the saved report (or null).
    */
-  function saveReport(northStar, collected) {
+  function saveReport(northStar, collected, orientation) {
     var hasContent = collected.digest || collected.technical || collected.product ||
       collected.trajectory || collected.northStarReading || collected.gap;
     if (!hasContent) return Promise.resolve(null);
@@ -352,7 +362,7 @@
     return fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/roadmap/reports', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ northStar: northStar || '', narrative: collected })
+      body: JSON.stringify({ northStar: northStar || '', narrative: collected, orientation: orientation || [] })
     })
       .then(function(r) { return r.ok ? r.json() : null; })
       .then(function(body) { return (body && body.report) || null; })

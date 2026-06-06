@@ -17,6 +17,7 @@ import { buildRoadmapTrajectoryMessages } from '../lib/prompts/roadmap-trajector
 import { buildRoadmapNorthStarMessages } from '../lib/prompts/roadmap-north-star-template.js';
 import { buildRoadmapGapMessages } from '../lib/prompts/roadmap-gap-template.js';
 import { buildRoadmapDigestMessages } from '../lib/prompts/roadmap-digest-template.js';
+import { buildRoadmapOrientationMessages, ORIENTATION_BEARINGS } from '../lib/prompts/roadmap-orientation-template.js';
 import { generatePrompt, generateCustomPrompt, hasPrompt, getAvailablePrompts } from '../lib/prompt-templates.js';
 import { WORK_ISSUE_LABELS } from '../lib/workflow-config.js';
 import { parseRepoFromDescription } from '../lib/prompt-formatters.js';
@@ -1950,6 +1951,102 @@ ${goal}`;
     return process.env.NODE_ENV === 'test' && req.workspace && req.workspace.accessToken === 'test-token';
   }
 
+  // --- Orientation (LIN-300) ------------------------------------------------
+
+  const ORIENTATION_BEARING_SET = new Set(ORIENTATION_BEARINGS);
+
+  /**
+   * Canned test-mode bearings. Deliberately exercises the normalizer end-to-end:
+   * a clean bearing, a lowercase one (clamped to upper-case), an invalid one
+   * (dropped because it is not archived), and an off-compass archived one (kept
+   * with an empty bearing). References fixture identifiers from mock-data.js.
+   */
+  const ORIENTATION_TEST_BEARINGS = [
+    { identifier: 'TEST-2', bearing: 'N', reason: 'Directly advances the stated intent.', archived: false },
+    { identifier: 'TEST-13', bearing: 'se', reason: 'Partial support with some divergence.', archived: false },
+    { identifier: 'TEST-99', bearing: 'NORTHWEST', reason: 'Invalid bearing — should be dropped.', archived: false },
+    { identifier: 'TEST-14', bearing: '', reason: 'Off-compass: does not serve the north star.', archived: true }
+  ];
+
+  /** Strip a surrounding ```json ... ``` (or bare ```) code fence, if present. */
+  function stripOrientationFences(text) {
+    const trimmed = String(text || '').trim();
+    const fenced = trimmed.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/);
+    return fenced ? fenced[1].trim() : trimmed;
+  }
+
+  /**
+   * Validate and normalize raw bearings to the 8-point vocabulary (LIN-300).
+   * The store's normalizeOrientation enforces field *shape* only; the route owns
+   * *vocabulary* enforcement so the persisted contract stays clean for LIN-301.
+   *
+   * - Drops entries with no identifier.
+   * - Clamps bearings to upper-case and matches against the 8-point set.
+   * - An un-archived task with an invalid/empty bearing is DROPPED (it cannot be
+   *   placed on the compass and was not flagged off-compass).
+   * - An archived (off-compass) task is KEPT; its bearing is the valid value if
+   *   it is one, otherwise '' — it carries no placement weight either way.
+   */
+  function normalizeBearings(raw) {
+    if (!Array.isArray(raw)) return [];
+    const out = [];
+    for (const item of raw) {
+      if (!item || typeof item !== 'object') continue;
+      const identifier = String(item.identifier || '').trim();
+      if (!identifier) continue;
+      const archived = item.archived === true;
+      const bearing = String(item.bearing || '').trim().toUpperCase();
+      const valid = ORIENTATION_BEARING_SET.has(bearing);
+      if (!valid && !archived) continue;
+      out.push({
+        identifier,
+        bearing: valid ? bearing : '',
+        reason: String(item.reason || ''),
+        archived
+      });
+    }
+    return out;
+  }
+
+  /**
+   * Generate per-task orientation bearings and emit them as ONE structured
+   * `orientation` SSE event over the shared generate connection (LIN-300).
+   *
+   * Unlike the narrative layers this does not stream prose into a panel — it
+   * accumulates the full JSON output, strips any code fence, parses, and
+   * validates against the 8-point vocabulary. Best-effort: any failure (build,
+   * stream, parse) emits `orientation: []` and is swallowed, mirroring how a
+   * skipped/failed layer leaves its field empty. Charges one free-tier unit like
+   * every other layer; an exhausted limit yields `orientation: []`.
+   */
+  async function generateOrientation(res, { roadmapModel, northStar, llm, req, testMode }) {
+    const check = await chargeRoadmapLayer(req, llm.isFreeTier);
+    if (!check.allowed) {
+      sendSSE(res, 'orientation', { orientation: [] });
+      return;
+    }
+    let parsed = [];
+    try {
+      if (testMode) {
+        parsed = ORIENTATION_TEST_BEARINGS;
+      } else {
+        const messages = buildRoadmapOrientationMessages(roadmapModel, northStar);
+        let text = '';
+        await streamChat(
+          messages,
+          { apiKey: llm.apiKey, model: llm.model, maxTokens: 2000 },
+          (type, data) => { if (type === 'token') text += (data && data.token) || ''; }
+        );
+        parsed = JSON.parse(stripOrientationFences(text));
+      }
+    } catch (error) {
+      console.error('Roadmap orientation error:', error);
+      sendSSE(res, 'orientation', { orientation: [] });
+      return;
+    }
+    sendSSE(res, 'orientation', { orientation: normalizeBearings(parsed) });
+  }
+
   /**
    * Server-orchestrated roadmap reading generation (LIN-317).
    *
@@ -2111,6 +2208,17 @@ ${goal}`;
             })
           });
         }
+      }
+
+      // Orientation (LIN-300) — per-task compass bearings adjudicated against
+      // the north star. A purely additive follow-up call (Strategy B): it does
+      // not stream prose into a panel; it emits one `orientation` event the
+      // client stashes for persistence and the ship view (LIN-301). It only
+      // needs the model and the north star — not the prose layers' output — so
+      // it runs whenever a north star is set, independent of layer outcomes.
+      // No north star ⇒ no call; the persisted orientation stays [].
+      if (hasNorthStar) {
+        await generateOrientation(res, { roadmapModel, northStar, llm, req, testMode });
       }
     } catch (error) {
       console.error('Roadmap generate stream error:', error);

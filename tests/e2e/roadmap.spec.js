@@ -239,6 +239,76 @@ test.describe('Roadmap Generate Endpoint', () => {
     expect(body).not.toContain('"layer":"north-star-reading"');
     expect(body).not.toContain('"layer":"gap"');
   });
+
+  // --- Orientation (LIN-300) -------------------------------------------------
+  // The orientation step rides the same stream as a single structured
+  // `orientation` event (not streamed prose). The route owns 8-point vocabulary
+  // normalization; the store owns field shape.
+
+  function parseOrientationEvent(body) {
+    const m = body.match(/event: orientation\ndata: (.+)/);
+    return m ? JSON.parse(m[1]).orientation : undefined;
+  }
+
+  test('emits a normalized orientation event when a north star is set', async ({ request }) => {
+    await request.get(`/test/set-session?features=${FEATURES}&openRouterConnected=true`);
+    const response = await request.post(GENERATE_URL, { data: { northStar: 'Be the simplest way to ship.' } });
+    const body = await response.text();
+
+    expect(body).toContain('event: orientation');
+    const orientation = parseOrientationEvent(body);
+    expect(Array.isArray(orientation)).toBe(true);
+
+    // Every entry has the four-field shape and a valid (or empty, if archived)
+    // 8-point bearing — the persisted contract LIN-301 depends on.
+    const VALID = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+    for (const b of orientation) {
+      expect(Object.keys(b).sort()).toEqual(['archived', 'bearing', 'identifier', 'reason']);
+      expect(b.bearing === '' ? b.archived : VALID.includes(b.bearing)).toBeTruthy();
+    }
+
+    const byId = Object.fromEntries(orientation.map(b => [b.identifier, b]));
+    // Clean bearing kept as-is.
+    expect(byId['TEST-2'].bearing).toBe('N');
+    // Lowercase bearing clamped to upper-case.
+    expect(byId['TEST-13'].bearing).toBe('SE');
+    // Invalid bearing on a non-archived task is dropped entirely.
+    expect(byId['TEST-99']).toBeUndefined();
+    // Off-compass archived task kept with an empty bearing.
+    expect(byId['TEST-14']).toEqual({
+      identifier: 'TEST-14', bearing: '', reason: expect.any(String), archived: true
+    });
+  });
+
+  test('without a north star, emits no orientation event', async ({ request }) => {
+    await request.get(`/test/set-session?features=${FEATURES}&openRouterConnected=true`);
+    const response = await request.post(GENERATE_URL, { data: { northStar: '' } });
+    const body = await response.text();
+    expect(body).not.toContain('event: orientation');
+  });
+
+  test('orientation round-trips: generate → save → fetch persists the bearings', async ({ request }) => {
+    await request.get(`/test/set-session?features=${FEATURES}&openRouterConnected=true`);
+    await request.get('/test/clear-report-history');
+
+    // 1. Generate and pull the orientation array off the stream (as the client does).
+    const gen = await request.post(GENERATE_URL, { data: { northStar: 'Be the simplest way to ship.' } });
+    const orientation = parseOrientationEvent(await gen.text());
+    expect(orientation.length).toBeGreaterThan(0);
+
+    // 2. Save the run with the orientation, exactly like saveReport's POST body.
+    const save = await request.post(`/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/reports`, {
+      data: { northStar: 'Be the simplest way to ship.', narrative: { digest: 'Mock summary' }, orientation }
+    });
+    expect(save.status()).toBe(201);
+    const { report } = await save.json();
+
+    // 3. Fetch the persisted record and confirm the bearings round-tripped intact.
+    const got = await request.get(`/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/reports/${report.id}`);
+    expect(got.status()).toBe(200);
+    const persisted = (await got.json()).report;
+    expect(persisted.orientation).toEqual(orientation);
+  });
 });
 
 // =============================================================================
