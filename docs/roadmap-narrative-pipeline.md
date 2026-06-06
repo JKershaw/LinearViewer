@@ -57,6 +57,27 @@ Two structural observations:
 > the wire, so the payload-size cliff is gone and the five per-layer fetches can
 > no longer observe inconsistent snapshots.
 
+> **Update (LIN-300): orientation — per-task compass bearings.**
+> A follow-up step rides the same server-orchestrated stream after the narrative
+> layers (only when a north star is set). It adjudicates each *not-yet-started*
+> candidate task (in-progress work stays on the ship; terminal/duplicate states
+> are already filtered by `buildExecutionQueue`) against the fixed north star,
+> producing a compass **bearing** on the 8-point set `{N, NE, E, SE, S, SW, W,
+> NW}` plus a one-sentence reason and an `archived` off-compass flag. Unlike the
+> prose layers it is **not** streamed token-by-token: the server accumulates the
+> full output, strips any code fence, `JSON.parse`s it, and validates each
+> bearing against the 8-point vocabulary (an un-archived task with an invalid
+> bearing is dropped; an archived task is kept with an empty bearing). The result
+> is emitted as one structured `orientation` SSE event the client stashes and
+> persists via `saveReport` into the report-history store's `orientation` field
+> (plumbed in LIN-299). The ship view (LIN-301) reads that field — no LLM call on
+> the ship side. The bearing vocabulary is shared three ways: the prompt emits
+> it, the generate route normalizes it, and the ship view maps bearing→angle; the
+> store's `normalizeOrientation` enforces field *shape* only, not the vocabulary.
+> Kept as a *separate* prompt (`lib/prompts/roadmap-orientation-template.js`) so
+> the five plain-text narrative layers keep their plain-text rendering contract
+> and adjudication stays cleanly isolated from narrative evaluation.
+
 ## The pipeline
 
 Five LLM calls, each producing a string (six with the digest). The context
