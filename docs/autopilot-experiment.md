@@ -479,16 +479,95 @@ and produces faithful `kind` trajectories from `/recommend` (B3). Three durable 
    OpenRouter LLM-generation leg, not Linear.** **Follow-up candidate:** fix the misattributing error
    message, then harden the LLM leg (retry/cache/faster model/relaxed budget), and give the orchestrator
    a *sanctioned* single retry-after-backoff (not a silent workaround).
-3. **The merge-to-main write path is still unexercised end-to-end** — no run has reached PR → CI →
-   merge → deploy. Muddied further in B3 by an impl-before-plan sequence, self-inflicted by letting
-   B2's halted worker keep running: **a clean write-path test needs one worker per ticket and a healthy
-   `/recommend`.**
+3. **The merge-to-main write path was still unexercised end-to-end** as of B3 — no run had reached
+   PR → CI → merge → deploy. Muddied further in B3 by an impl-before-plan sequence, self-inflicted by
+   letting B2's halted worker keep running: **a clean write-path test needs one worker per ticket and a
+   healthy `/recommend`.** *(Closed in **B4**: with both conditions met, the loop drove review → resolve
+   → merge → CI-green → deploy → ticket Done.)*
 
-- **Still not done:** (a) an unexercised **merge-to-main write path** (the next write-class attempt
-  should start only with a healthy `/recommend` and a single worker on the ticket); (b) a genuinely
-  *unattended* multi-step loop (B1–B3 were each supervised, with a human reading the external recaps);
-  (c) deliberately provoking a task-level `[failed]`/stall to watch the `help` branch fire (B2/B3 only
-  exercised the *infra-error* halt, not a worker-failure escalation).
+- **Still not done (as of B3; B4 closed the first):** (a) ~~an unexercised **merge-to-main write
+  path**~~ — **done in B4**; (b) a genuinely *unattended* multi-step loop (B1–B4 were each supervised,
+  with a human reading the external recaps — and B4 needed a human observation to break the
+  stale-channel tie); (c) deliberately provoking a task-level `[failed]`/stall to watch the `help`
+  branch fire (B2–B4 only exercised the *infra-error* halt and an evidence-contradiction flag, not a
+  worker-failure escalation).
+
+**Run B4 — resumed to land the fix, caught a false-positive `[done]` (2026-06-06 ~13:10, LIN-319,
+target `cli`).** With the `LLM_TIMEOUT_MS=180s` fix deployed, the orchestrator re-drove LIN-319 to
+*land* the implementation that B2/B3 left uncommitted-then-PR'd (by B4's start the work was on a
+real PR — **#327**, head `aa1eb62`). The loop ran further than any prior run and produced two
+results worth keeping:
+
+- **`/recommend` is healthy post-deploy.** `GET /recommend/LIN-319` returned **HTTP 200 in 55.4s** —
+  a generation that would have 504'd under the old 50.5s cap. The timeout split is confirmed effective
+  in production. `kind` trajectory across the run: **planning → review → blocked**, converging.
+- **Review step, dispatched and cross-checked.** The orchestrator dispatched the recommended
+  `kind=review` prompt; the worker posted a verdict to LIN-319 (**"Implementation Approved — blocked
+  on a merge conflict in `docs/autopilot.md`"**). The orchestrator did **not** take the verdict on
+  prose — it independently confirmed `mergeable_state: "dirty"` via the GitHub API. Both signals
+  agreed: source auto-merges clean, only the doc conflicts (`main` commit `f1995d1` edited the same
+  §6 region).
+- **Orchestrator deviation (deliberate, recorded):** the `/recommend` resolution prompt told the
+  *worker* to rebase, resolve, **and merge + set Done** itself. The orchestrator moved the merge gate
+  off the worker — dispatched a resolve+verify+**push-then-stop** prompt — so the human-authorized
+  merge stays a verified orchestrator action rather than a worker self-certifying its own completion
+  (invariant 2 at the finish line). The recommended rebase/verification guidance was kept verbatim;
+  only the merge gate moved.
+
+- **The decisive finding — `[done]` is a session-end marker, not a task-completion marker, and it can
+  race ahead of the work.** The resolution dispatch posted a terminal `[done]` at **12m 28s**, but
+  external evidence **refuted** it: PR #327's head SHA was **unchanged** (`aa1eb62`, no force-push),
+  `mergeable_state` still `dirty`, and **no new LIN-319 comment**. The worker's last substantive
+  message was *"the full E2E suite is running in the background … I'll continue once it completes and
+  report."* Read together: **the worker backgrounded the 733-test suite, the launcher's terminal post
+  fired at the session boundary, but the suite hadn't finished — so at the moment `[done]` posted, the
+  push + comment had not happened.** The work *did* land later: the worker force-pushed the rebased
+  branch (head `aa1eb62`→`e17652`) and posted its resolution comment to LIN-319 **~6 min after `[done]`
+  (13:39 vs. the 13:33-ish terminal)** — but **the dispatch feedback channel never updated** to reflect
+  it (still 16 events, last = `[done]`). So the terminal marker was not just premature; the channel
+  went terminal and stayed **permanently stale** relative to the work that completed after it.
+  - This is a new failure mode distinct from the Stage-A *silent freeze*: here the channel *did* post
+    a clean terminal event, but it was a **false-positive completion**. The launcher-owned `[done]`
+    (the Run-5 fix) answers "did the session stop?" — **not** "did the task succeed?" When a worker
+    offloads to a background process and exits, those two diverge.
+  - **The orchestrator caught it precisely because it refused to trust `[done]`** and verified the PR
+    SHA + Linear comment + `mergeable_state` from outside. Invariant 2 earned its keep: a terminal
+    status is still a *claim*; the external artifacts are the fact. Recommend the guide note that a
+    terminal `done` with **no corresponding evidence change** is treated as *claimed-incomplete*, not
+    done — the orchestrator must diff the evidence (a new SHA / comment / state), not just see the
+    marker.
+  - **Secondary finding — the `[stalled?]` heartbeat can't distinguish a hung agent from one blocked
+    on a long synchronous command.** The suite run surfaced as `[stalled?] no tool activity for 8m51s
+    in EXECUTING (last tool: Bash)` — benign (the operator confirmed live), but indistinguishable by
+    the signal alone from a real hang. "last tool: Bash + no new tool calls" is the signature of *one
+    long-running Bash in flight*, not death. The liveness heuristic needs a way to mark "blocked on a
+    known long command" vs. "stuck."
+- **Disposition — flagged, then closed.** Because the channel was stale and the runner's local
+  working-tree state (rebased? suite green?) is observable only on the operator's laptop, the
+  orchestrator **flagged to the human** rather than re-dispatching blindly (a fresh worker could
+  collide with a half-applied local rebase — the B3 tangle). The operator confirmed + pushed; the
+  orchestrator then re-verified from outside: PR #327 `mergeable_state: clean`, head `e17652`, the
+  rebase diff sound (both `docs/autopilot.md` sides preserved, no conflict markers, source/tests
+  byte-identical to the approved diff). With that gate green and the merge pre-authorized, the
+  orchestrator **took the merge itself** (squash `f5354783`), then watched the post-merge evidence:
+  **CI `Tests` #820 on `main` → success**, prod `/instructions` now documents `kind` (deploy live),
+  and **LIN-319 set to Done**.
+
+**Net (B4) — the merge-to-main write path is now CLOSED end-to-end.** First run to traverse the full
+arc: **orient → plan(prior) → implement(prior) → review → resolve conflict → merge → CI → deploy →
+ticket Done**, every transition judged from external evidence, with the human supplying exactly two
+things: the merge pre-authorization, and the out-of-band observation that broke the stale-channel tie.
+Findings to fold into the design:
+1. **A terminal `done` is a session-boundary signal, not proof of task success** — and the channel can
+   go terminal *before* the work lands and never catch up. The orchestrator must confirm completion by
+   a **change in the external artifact** (new SHA / comment / state / CI run), never by the `[done]`
+   marker alone. (Now also stated in the guide.)
+2. **The `[stalled?]` heartbeat can't tell a hung agent from one blocked on a long synchronous command**
+   (`last tool: Bash`, no new calls = one long Bash in flight). *Operator owns the fix in the dispatch
+   consumer* — distinguish "blocked on a known long-running command" from "stuck."
+3. **A clean write-path drive still wants one worker per ticket and a healthy `/recommend`** (both held
+   in B4), plus a way for the worker to report completion *after* a backgrounded command rather than at
+   the session boundary — otherwise the channel and the work diverge.
 
 ### `/recommend` 504 root cause (investigated 2026-06-06)
 

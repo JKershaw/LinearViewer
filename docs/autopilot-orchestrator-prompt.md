@@ -5,9 +5,11 @@
 > [`autopilot-experiment.md`](./autopilot-experiment.md) for the dispatch-leg evidence).
 > You paste **this guide + a deterministic orientation snapshot (+ optional goal)** into a
 > fresh Claude Code session and it drives the loop. This is the Stage B draft — exercised live
-> across runs B1–B3 (a read-only drive, a write-class attempt that halted on an infra error, and
-> a clean re-run; see the experiment doc). The **Halt conditions** section below was added as a
-> direct result of B2. Treat the structure as load-bearing and the exact wording as still-tunable.
+> across runs B1–B4 (a read-only drive; a write-class attempt that halted on an infra error; a
+> clean re-run; and a full write drive that landed a change on `main` via review → resolve →
+> merge → CI → deploy; see the experiment doc). The **Halt conditions** section was added as a
+> direct result of B2; the step-4/5 cautions about `[stalled?]` and a premature `done` came from
+> B4. Treat the structure as load-bearing and the exact wording as still-tunable.
 
 ---
 
@@ -82,13 +84,24 @@ set state = queued.
 (`queued`→`taken`→`done`/`failed`/`aborted`) — do not parse prose for it. Use heartbeats for
 liveness: a `[working]` beat = alive; a long silence past the heartbeat cadence with no
 terminal status = **stalled** → flag, consider re-dispatch or help. Do **not** treat the
-recap text as the completion signal.
+recap text as the completion signal. Two cautions from live runs: a heartbeat that reads
+`[stalled?] … (last tool: Bash)` with no new tool calls is usually **one long-running command
+in flight** (a test suite), not a dead session — confirm before re-dispatching. And a terminal
+`done` is a **session-boundary** marker (the launcher saw the session end), **not** proof the
+task finished — a worker that backgrounds a long command can post `done` *before* the work
+lands, and the channel will not update afterward. So treat `done` as "go verify," never as the
+answer.
 
 **5. Cross-check the evidence (invariant 2 — the load-bearing step).** On a terminal
 `done`, do **not** accept it on the recap alone. Take the `[evidence]` URLs (and any IDs in
 the recap), and **fetch them**: read the Linear issue/comment, look at the PR/commit/CI run.
-Confirm the claimed outcome actually exists. If evidence is absent or contradicts the claim →
-state = "claimed, unverified" → flag to the human, do not advance as if done.
+Confirm the claimed outcome actually exists **as a change in the external artifact** — a new
+commit SHA, a new comment, a state transition, a CI run — not merely that the `done` marker
+appeared. If the artifact is unchanged, or evidence is absent or contradicts the claim →
+state = "claimed, unverified/incomplete" → flag to the human, do not advance as if done. (B4:
+a resolution worker posted `done` while its push + comment were still pending; only the
+unchanged PR SHA + missing comment revealed it — the work landed minutes later, but the
+dispatch channel never reflected it.)
 
 **6. Recap + decide.** Emit the external recap line, then decide:
 - **continue** — more steps remain on this thread (loop to step 2, note the kind sequence);
