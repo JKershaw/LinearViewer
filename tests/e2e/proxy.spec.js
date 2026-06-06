@@ -864,3 +864,112 @@ test.describe('Proxy API - Dispatch', () => {
     expect(body.error).toContain('kind must be one of');
   });
 });
+
+test.describe('Proxy API - Recommend-and-Dispatch (fused verb, LIN-321)', () => {
+  let readToken;
+  let writeToken;
+
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/test/clear-proxy-tokens');
+    await page.goto('/test/clear-dispatch-queue');
+    await page.goto('/test/clear-dispatch-history');
+
+    const readResp = await page.goto('/test/create-proxy-token?scope=read&label=fused-read');
+    readToken = (await readResp.json()).token;
+
+    const writeResp = await page.goto('/test/create-proxy-token?scope=readWrite&label=fused-write');
+    writeToken = (await writeResp.json()).token;
+  });
+
+  test('read-only token cannot trigger (403)', async ({ request }) => {
+    const resp = await request.post('/api/proxy/recommend-and-dispatch', {
+      headers: { Authorization: `Bearer ${readToken}`, 'Content-Type': 'application/json' },
+      data: { issueIdentifier: 'TEST-14' }
+    });
+    expect(resp.status()).toBe(403);
+  });
+
+  test('missing issueIdentifier gets 400', async ({ request }) => {
+    const resp = await request.post('/api/proxy/recommend-and-dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { target: 'cli' }
+    });
+    expect(resp.status()).toBe(400);
+    const body = await resp.json();
+    expect(body.error).toContain('issueIdentifier');
+  });
+
+  test('invalid target gets 400', async ({ request }) => {
+    const resp = await request.post('/api/proxy/recommend-and-dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { issueIdentifier: 'TEST-14', target: 'local' }
+    });
+    expect(resp.status()).toBe(400);
+  });
+
+  test('happy path returns the task header with NO prompt body, and the item is watchable', async ({ request }) => {
+    const resp = await request.post('/api/proxy/recommend-and-dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { issueIdentifier: 'TEST-14', target: 'cli' }
+    });
+    expect(resp.status()).toBe(201);
+    const created = await resp.json();
+
+    expect(created.id).toBeTruthy();
+    expect(created.status).toBe('queued');
+    expect(created.promptName).toBeTruthy();
+    expect(created.target).toBe('cli');
+    expect(created.issueIdentifier).toBe('TEST-14');
+    // The whole point of the verb: the prompt never reaches the caller.
+    expect(created.prompt).toBeUndefined();
+
+    // The dispatched item is watchable like any other dispatch.
+    const watch = await request.get(`/api/proxy/dispatch/${created.id}`, {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(watch.status()).toBe(200);
+    const watched = await watch.json();
+    expect(watched.id).toBe(created.id);
+    expect(watched.status).toBe('queued');
+    expect(watched.issueIdentifier).toBe('TEST-14');
+  });
+
+  test('kind reflects the recommendation action (started issue → implementation)', async ({ request }) => {
+    // TEST-14 has no labels and is In Progress → mock recommendedAction 'implement'
+    // → deriveDispatchKind('implement') === 'implementation'.
+    const resp = await request.post('/api/proxy/recommend-and-dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { issueIdentifier: 'TEST-14' }
+    });
+    expect(resp.status()).toBe(201);
+    const created = await resp.json();
+    expect(created.kind).toBe('implementation');
+  });
+
+  test('kind reflects the recommendation action (bug issue → bug)', async ({ request }) => {
+    // TEST-13 carries the 'bug' label → mock recommendedAction 'bug' → kind 'bug'.
+    const resp = await request.post('/api/proxy/recommend-and-dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { issueIdentifier: 'TEST-13' }
+    });
+    expect(resp.status()).toBe(201);
+    const created = await resp.json();
+    expect(created.kind).toBe('bug');
+  });
+
+  test('nonexistent issue gets 404', async ({ request }) => {
+    const resp = await request.post('/api/proxy/recommend-and-dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { issueIdentifier: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' }
+    });
+    expect(resp.status()).toBe(404);
+  });
+
+  test('read-write instructions advertise the fused verb', async ({ request }) => {
+    const resp = await request.get('/api/proxy/instructions', {
+      headers: { Authorization: `Bearer ${writeToken}` }
+    });
+    const text = await resp.text();
+    expect(text).toContain('/api/proxy/recommend-and-dispatch');
+  });
+});

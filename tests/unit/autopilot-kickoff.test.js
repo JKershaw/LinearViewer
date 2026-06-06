@@ -68,10 +68,13 @@ describe('buildAutopilotKickoff (scoped to an issue)', () => {
     assert.ok(text.includes('precedence policy is moot'));
   });
 
-  test('first act reads the issue and calls /recommend for it', () => {
+  test('first act reads the issue and triggers recommend-and-dispatch for it', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue });
     assert.ok(text.includes('GET /issues/LIN-42'));
-    assert.ok(text.includes('GET /recommend/LIN-42'));
+    // The fused verb (LIN-321) replaces the two-step GET /recommend -> POST /dispatch:
+    // the scoped first act triggers recommend-and-dispatch with the issue identifier.
+    assert.ok(text.includes('POST /recommend-and-dispatch'));
+    assert.ok(text.includes('issueIdentifier: "LIN-42"'));
   });
 
   test('does not pull other tasks off the stack', () => {

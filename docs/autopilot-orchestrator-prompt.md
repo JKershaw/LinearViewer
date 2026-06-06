@@ -54,7 +54,7 @@ Keep only this in steady state; everything else is drill-down on demand:
 - **The proxy**: base `https://projects.jkershaw.com/api/proxy`, a Bearer token, and the
   verb catalog at `GET /instructions`. The verbs you drive:
   - Orient/choose: `GET /stack`, `GET /recap/{id}`, `GET /brief/{id}`, `GET /recommend/{id}`.
-  - Dispatch: `POST /dispatch` (enqueue) → `GET /dispatch/{id}` (watch) / `GET /dispatch?…` (list).
+  - Dispatch: `POST /recommend-and-dispatch` (the fused trigger: recommend + enqueue, prompt stays server-side) → `GET /dispatch/{id}` (watch) / `GET /dispatch?…` (list). Plain `POST /dispatch` is for a human-supplied prompt only.
   - Verify: `GET /issues/{id}`, `GET /search`, plus the artifact URLs in `[evidence]`.
 
 ## The loop
@@ -70,17 +70,19 @@ Announce the choice as an external recap line and proceed (the human can veto). 
 snapshot is missing data you need to apply the policy (e.g. no cadence state), say so — don't
 guess.
 
-**2. Get the prompt.** Use `GET /recommend/{identifier}` for the AI-recommended next-step
-prompt (this is what chooses the *step*; note its **kind**). A prompt is only "handed in"
-when the human supplies one at kickoff — **never** substitute a hand-authored prompt to
-route around a `/recommend` that erred. If `/recommend` returns a network error / timeout /
-5xx, that is a **halt** (see Halt conditions), not a fallback.
+**2. Trigger the next step.** Call `POST /recommend-and-dispatch` with
+`{ issueIdentifier, target }` (`target: "cli"` is the most-proven). The server chooses the
+next-step prompt **and** enqueues it in one call — the prompt is generated and dispatched
+server-side and **never reaches you**. You learn what was chosen from the response header
+(`{ id, kind, promptName, dispatchedAt }`), not from a prompt you read and hold: record `id`
++ `kind` + `dispatchedAt` in the task header and set state = queued. This is what makes
+context economy (invariant 4) *mechanical* — there is no prompt body to forward, so there is
+nothing to absorb. A prompt is only "handed in" when the human supplies one at kickoff (use
+plain `POST /dispatch` for that) — **never** hand-author a prompt to route around a trigger
+that erred. If the verb returns a network error / timeout / 5xx, that is a **halt** (see Halt
+conditions), not a fallback.
 
-**3. Dispatch.** `POST /dispatch` with `{ prompt, promptName, issueIdentifier?, target }`
-(`target: "cli"` is the most-proven). Record `id` + `kind` + `dispatchedAt` in the header;
-set state = queued.
-
-**4. Watch.** Poll `GET /dispatch/{id}`. Read the **`status` field** for the terminal signal
+**3. Watch.** Poll `GET /dispatch/{id}`. Read the **`status` field** for the terminal signal
 (`queued`→`taken`→`done`/`failed`/`aborted`) — do not parse prose for it. Use heartbeats for
 liveness: a `[working]` beat = alive; a long silence past the heartbeat cadence with no
 terminal status = **stalled** → flag, consider re-dispatch or help. Do **not** treat the
@@ -92,7 +94,7 @@ task finished — a worker that backgrounds a long command can post `done` *befo
 lands, and the channel will not update afterward. So treat `done` as "go verify," never as the
 answer.
 
-**5. Cross-check the evidence (invariant 2 — the load-bearing step).** On a terminal
+**4. Cross-check the evidence (invariant 2 — the load-bearing step).** On a terminal
 `done`, do **not** accept it on the recap alone. Take the `[evidence]` URLs (and any IDs in
 the recap), and **fetch them**: read the Linear issue/comment, look at the PR/commit/CI run.
 Confirm the claimed outcome actually exists **as a change in the external artifact** — a new
@@ -103,7 +105,7 @@ a resolution worker posted `done` while its push + comment were still pending; o
 unchanged PR SHA + missing comment revealed it — the work landed minutes later, but the
 dispatch channel never reflected it.)
 
-**6. Recap + decide.** Emit the external recap line, then decide:
+**5. Recap + decide.** Emit the external recap line, then decide:
 - **continue** — more steps remain on this thread (loop to step 2, note the kind sequence);
 - **complete** — evidence confirms the task is done → record, move to the next stack item;
 - **help** — anything normative, a stall you can't clear, repeated failures, or evidence that
@@ -129,8 +131,8 @@ An infrastructure error in *your own* API calls while driving the loop is a **ha
 puzzle to route around. The loop touches production; papering over a broken signal is exactly
 the silent reconciliation invariant 1 forbids. **Halt and hand back to the human** on:
 
-- a network error, timeout, or 5xx from any verb you drive (`/recommend`, `/stack`,
-  `/dispatch`, `/issues`, …) — even after a sensible retry or two;
+- a network error, timeout, or 5xx from any verb you drive (`/recommend-and-dispatch`,
+  `/stack`, `/dispatch`, `/issues`, …) — even after a sensible retry or two;
 - a malformed / unparseable response where you expected structured data;
 - an evidence source you can't reach when you need it to judge completion.
 

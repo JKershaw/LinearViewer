@@ -236,6 +236,18 @@ Pipeline view uses for a Loop's `stage`. When a caller omits `kind`, it is deriv
 `promptName` (template key or display name, case-insensitive), falling back to `custom`. So a
 watcher reads `kind` directly off the list/watch response instead of inferring it.
 
+**Shipped (LIN-321) — the fused trigger makes this mechanical.** Context economy was still
+only a *rule* the orchestrator had to honour: the two-step `GET /recommend` → `POST /dispatch`
+flow forced the recommended prompt body to pass through the driver's context every loop, and
+the only way to obtain a meaningful `kind` was to read that prompt and judge it — exactly the
+re-reasoning invariant 4 forbids. The fused verb `POST /api/proxy/recommend-and-dispatch`
+closes this: it recommends **and** dispatches server-side, returns only the task header
+(`{ id, kind, promptName, issueIdentifier, target, dispatchedAt }`), and derives `kind` from
+the recommendation's own action signal (`parseRecommendedAction` → `deriveDispatchKind`, no
+meta-prompt change). The prompt body never reaches the caller, so "don't absorb the prompt"
+stops being a discipline and becomes a property of the API. Plain `POST /dispatch` remains for
+human-supplied prompts.
+
 ## 7. How it relates to what exists
 
 Honest inventory, because the main risk is parallel-building:
@@ -250,7 +262,7 @@ Honest inventory, because the main risk is parallel-building:
 | Periodic cross-task drift supervisor | LIN-291 | specced, unbuilt |
 | Measurement spine (benchmark / fuzzy / ablation) | LIN-263 / LIN-45 / LIN-293 | unbuilt |
 | Dispatch queue + feedback | `routes/dispatch.js` | shipped (feedback free-form — intentional) |
-| **Proxy dispatch verbs** (`POST /api/proxy/dispatch` enqueue, `GET …/:id` watch, `GET …` list) | proxy API | **shipped (this branch)** — derived terminal `status`, structured `[evidence]` URLs; see experiment doc |
+| **Proxy dispatch verbs** (`POST /api/proxy/dispatch` enqueue, `POST …/recommend-and-dispatch` fused trigger, `GET …/:id` watch, `GET …` list) | proxy API | **shipped (this branch)** — derived terminal `status`, structured `[evidence]` URLs, fused recommend+dispatch (LIN-321); see experiment doc |
 | Runner: dispatch consumer running Claude Code (local CLI or web remote-control) | separate system | **shipped + telemetry-complete** — phase tags, 30s heartbeats, recap, `[evidence]`, `[done]`/`[failed]` (Runs 1–10) |
 | Harbour (local) runner | `lib/harbour-spawn.js`, LIN-259 | shipped — one such consumer |
 | API contract unification | LIN-306 / 309 / 310 / 311 | in-flight — **will move the contract Autopilot drives** |
@@ -348,6 +360,15 @@ A specific focus is just the goal field, or a hand-written prompt followed by th
    either builds on the about-to-change wire contract or front-runs it. Current lean: add it
    now in today's idiom — it is small, LIN-306 will reshape it regardless, and blocking on
    that refactor delays the thing we actually want to try.
+4. **"Blindly trigger" only works if there is nothing to read.** The same under-scope risk as
+   caveat 2 applies to the recommend→dispatch seam: a guide that says "fetch the prompt, then
+   forward it without reading it" still routes the prompt body through the orchestrator, so the
+   discipline degrades the moment the model glances at it. The realization is to make the body
+   unreachable — recommend and dispatch must be specced *together* as one server-side verb, not
+   two steps wired by the caller. ✅ *Done (LIN-321): `POST /api/proxy/recommend-and-dispatch`
+   returns only the task header; `kind` is derived server-side from the recommendation action
+   (no meta-prompt change). This is the mechanical form of invariant 4 — see §6's context-economy
+   note.*
 
 ---
 

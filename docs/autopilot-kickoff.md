@@ -77,18 +77,17 @@ is drift past the few moments that belong to the human.
          why it is deliberately omitted here rather than left in as a dead branch. -->
 
 
-2. **Get the prompt.** `GET /recommend/{identifier}` chooses the next *step* and tells you
-   its **kind** (planning / research / implementation / review / retro / …). Use its prompt
-   verbatim. If `/recommend` times out or errors, that's a **halt** (below), not a cue to
-   hand-write your own — that's how you'd paper over a broken signal.
+2. **Trigger the next step.** `POST /recommend-and-dispatch` with `{ issueIdentifier, target }`
+   chooses the next *step* and enqueues it in one call — the prompt is generated and dispatched
+   server-side and **never reaches you**. The response is the task header: note the `id` and
+   `kind` (planning / research / implementation / review / retro / …). You never read or hold the
+   prompt body — there's nothing to absorb, which is exactly what keeps you light. Watch the kind
+   sequence over a task — it's your cheapest read on health: research→plan→impl→review is a task
+   **converging** (good, expected); the same kind repeating is **looping**; the kind widening run
+   after run is **sprawling** (worth a flag). If the verb times out or errors, that's a **halt**
+   (below), not a cue to hand-write your own prompt — that's how you'd paper over a broken signal.
 
-3. **Dispatch.** `POST /dispatch` with `{ prompt, promptName, issueIdentifier, target }`.
-   Note the `id` and `kind`. Watch the kind sequence over a task — it's your cheapest read
-   on health: research→plan→impl→review is a task **converging** (good, expected); the same
-   kind repeating is **looping**; the kind widening run after run is **sprawling** (worth a
-   flag).
-
-4. **Watch.** Poll `GET /dispatch/{id}`. Read the **`status` field** for the terminal
+3. **Watch.** Poll `GET /dispatch/{id}`. Read the **`status` field** for the terminal
    signal — don't read prose for it. Heartbeats tell you it's alive. Two things have fooled
    this loop before, so stay wise to them:
    - `[stalled?] … (last tool: Bash)` with no new tool calls is *usually one long command
@@ -97,13 +96,13 @@ is drift past the few moments that belong to the human.
      background a long command, exit, and post `done` before the work lands (or never does).
      So treat `done` as "go look," never "it's finished."
 
-5. **Cross-check — the step that earns its keep.** On `done`, take the `[evidence]` URLs
+4. **Cross-check — the step that earns its keep.** On `done`, take the `[evidence]` URLs
    and any IDs and **fetch them**. Confirm the outcome shows up as a real *change* — a new
    commit SHA, a new comment, a state transition, a CI run — not just that the marker
    appeared. Unchanged artifact, missing evidence, or evidence that contradicts the claim →
    "claimed, not verified" → flag, don't advance.
 
-6. **Decide.** A short line for the human, then one of:
+5. **Decide.** A short line for the human, then one of:
    - **continue** — the arc isn't finished (plan's done, implementation's next; review
      found a blocker, resolve it and go on). This is the common case — keep the work moving.
    - **complete** — evidence confirms this task/feature is genuinely done. If you're working
