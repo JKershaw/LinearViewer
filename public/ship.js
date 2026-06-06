@@ -563,6 +563,102 @@
     };
   }
 
+  // ===========================================================================
+  // Orientation mode (LIN-301) — mirror of lib/ship-layout.js orientation path.
+  //
+  // Pure read of saved per-task bearings (window.__SHIP_DATA__.orientation) —
+  // NO network/LLM call on the ship side (see LIN-298). Builds a SECOND set of
+  // positions from the project-mode positions by overriding ONLY each card's
+  // angle; the project radius is reused verbatim, so the toggle is a pure
+  // angular swing and the readiness/priority axis is preserved.
+  // ===========================================================================
+
+  // 8-point compass bearing → canvas angle. N (bow / toward the north star) is
+  // up (270°); S (drift) is down (90°); E/W (maintenance) are starboard/port.
+  var BEARING_TO_ANGLE = {
+    N: 270, NE: 315, E: 0, SE: 45, S: 90, SW: 135, W: 180, NW: 225
+  };
+  // ±half-fan for cards sharing a bearing anchor (keeps them in their 45° slice).
+  var ORIENTATION_SPREAD = 18;
+
+  function bearingToAngle(bearing, projectSector) {
+    if (!Object.prototype.hasOwnProperty.call(BEARING_TO_ANGLE, bearing)) return null;
+    if (bearing === 'E' || bearing === 'W') {
+      if (projectSector === SECTORS.STARBOARD) return BEARING_TO_ANGLE.E;
+      if (projectSector === SECTORS.PORT) return BEARING_TO_ANGLE.W;
+    }
+    return BEARING_TO_ANGLE[bearing];
+  }
+
+  // Returns { positions: {id→point}, flags: {id→{archived}} }. Started/hub cards
+  // are absent from `positions` by construction, so they stay on the ship.
+  // archived → off-compass flag (position kept, radius invariant honoured);
+  // no/unknown bearing → keep project angle (graceful fallback).
+  function orientationLayout(cards, positions, geom, orientation) {
+    orientation = orientation || [];
+    var byIdent = {};
+    for (var o = 0; o < orientation.length; o++) {
+      var rec = orientation[o];
+      if (rec && rec.identifier) byIdent[rec.identifier] = rec;
+    }
+    var cardById = {};
+    for (var c = 0; c < cards.length; c++) cardById[cards[c].id] = cards[c];
+    var cx = geom.centerX, cy = geom.centerY;
+
+    var resolved = [];
+    for (var id in positions) {
+      var card = cardById[id];
+      if (!card) continue;
+      var pos = positions[id];
+      var radius = Math.hypot(pos.x - cx, pos.y - cy);
+      var r = byIdent[card.identifier];
+      if (r && r.archived) {
+        resolved.push({ id: id, pos: pos, radius: radius, angle: pos.angle, archived: true, swung: false });
+        continue;
+      }
+      var anchor = r ? bearingToAngle(r.bearing, pos.sector) : null;
+      if (anchor === null) {
+        resolved.push({ id: id, pos: pos, radius: radius, angle: pos.angle, archived: false, swung: false });
+        continue;
+      }
+      resolved.push({ id: id, pos: pos, radius: radius, anchor: anchor, archived: false, swung: true });
+    }
+
+    // Fan same-anchor cards across ±ORIENTATION_SPREAD (radius preserved).
+    var groups = {};
+    for (var i = 0; i < resolved.length; i++) {
+      if (!resolved[i].swung) continue;
+      var key = resolved[i].anchor;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(resolved[i]);
+    }
+    for (var k in groups) {
+      var group = groups[k];
+      group.sort(stableById);
+      var n = group.length;
+      for (var g = 0; g < n; g++) {
+        var t = n > 1 ? g / (n - 1) : 0.5;
+        var offset = (t - 0.5) * 2 * ORIENTATION_SPREAD;
+        group[g].angle = ((group[g].anchor + offset) % 360 + 360) % 360;
+      }
+    }
+
+    var outPositions = {}, flags = {};
+    for (var p = 0; p < resolved.length; p++) {
+      var rr = resolved[p];
+      var rad = rr.angle * Math.PI / 180;
+      outPositions[rr.id] = {
+        x: cx + rr.radius * Math.cos(rad),
+        y: cy + rr.radius * Math.sin(rad),
+        ring: rr.pos.ring, subRing: rr.pos.subRing,
+        angle: rr.angle, radius: rr.radius,
+        sector: rr.pos.sector, segmentId: rr.pos.segmentId || null
+      };
+      if (rr.archived) flags[rr.id] = { archived: true };
+    }
+    return { positions: outPositions, flags: flags };
+  }
+
   function computeShipDimensions(n, cardSize) {
     var rows = Math.max(1, Math.ceil(n / 2));
     var GRID_PAD = 16, LABEL_AREA = 20, GAP = 8;
@@ -651,6 +747,51 @@
       window.localStorage.setItem('ship-settings', JSON.stringify(parsed));
     } catch (e) { /* ignore */ }
   }
+
+  // Layout mode ('project' | 'orientation'), persisted alongside heading in the
+  // shared ship-settings blob. Orientation requires saved bearings; loadMode
+  // falls back to 'project' when none exist so a stale preference can't strand
+  // the user on an empty mode.
+  function hasOrientationData() {
+    var data = window.__SHIP_DATA__ || {};
+    return Array.isArray(data.orientation) && data.orientation.length > 0;
+  }
+
+  function loadMode() {
+    if (!hasOrientationData()) return 'project';
+    try {
+      var raw = window.localStorage.getItem('ship-settings');
+      if (!raw) return 'project';
+      var parsed = JSON.parse(raw);
+      return parsed && parsed.mode === 'orientation' ? 'orientation' : 'project';
+    } catch (e) {
+      return 'project';
+    }
+  }
+
+  function saveMode(mode) {
+    try {
+      var raw = window.localStorage.getItem('ship-settings');
+      var parsed = raw ? JSON.parse(raw) : {};
+      parsed.mode = mode === 'orientation' ? 'orientation' : 'project';
+      window.localStorage.setItem('ship-settings', JSON.stringify(parsed));
+    } catch (e) { /* ignore */ }
+  }
+
+  // Shared across render() and the toggle's angular tween: per orbit card its
+  // radius (constant across modes) and the two target angles, plus the geometry
+  // and segment lists needed to redraw guides/labels after a mode switch.
+  var viewState = {
+    mode: 'project',
+    geom: null,
+    ship: null,
+    canvasSize: 0,
+    segments: [],
+    orientFlags: {},
+    // id → { radius, projectAngle, orientationAngle, bearing }
+    cardAngles: {},
+    animating: false
+  };
 
   function uniqueProjects(issues) {
     var seen = {};
@@ -757,6 +898,45 @@
     geom.centerY = canvasSize / 2;
     var result = runLayout(issues, geom, CARD_PITCH, heading);
 
+    // Orientation mode (LIN-301): a parallel set of positions derived from the
+    // project positions — same radius, angle swung to each task's saved bearing.
+    // Pure read of __SHIP_DATA__.orientation; no LLM call. Empty/absent → the
+    // orientation map just equals project positions and the toggle stays inert.
+    var orientationData = (window.__SHIP_DATA__ && window.__SHIP_DATA__.orientation) || [];
+    var orient = orientationLayout(issues, result.positions, geom, orientationData);
+    var mode = loadMode();
+
+    // Stash everything the angular tween needs: per orbit card its constant
+    // radius and the two target angles, plus geometry for redrawing guides.
+    var recByIdent = {};
+    for (var oi = 0; oi < orientationData.length; oi++) {
+      if (orientationData[oi] && orientationData[oi].identifier) {
+        recByIdent[orientationData[oi].identifier] = orientationData[oi];
+      }
+    }
+    var identById = {};
+    for (var ic = 0; ic < issues.length; ic++) identById[issues[ic].id] = issues[ic].identifier;
+
+    var cardAngles = {};
+    for (var pid in result.positions) {
+      var pp = result.positions[pid];
+      var op = orient.positions[pid] || pp;
+      var rec = recByIdent[identById[pid]] || null;
+      cardAngles[pid] = {
+        radius: Math.hypot(pp.x - geom.centerX, pp.y - geom.centerY),
+        projectAngle: pp.angle,
+        orientationAngle: op.angle,
+        bearing: rec ? rec.bearing : null
+      };
+    }
+    viewState.mode = mode;
+    viewState.geom = geom;
+    viewState.ship = ship;
+    viewState.canvasSize = canvasSize;
+    viewState.segments = result.segments;
+    viewState.orientFlags = orient.flags;
+    viewState.cardAngles = cardAngles;
+
     var canvas = document.getElementById('ship-canvas');
     canvas.style.width = canvasSize + 'px';
     canvas.style.height = canvasSize + 'px';
@@ -781,14 +961,18 @@
       shipCardsEl.innerHTML = result.shipCards.map(renderCardHtml).join('');
     }
 
-    // Orbit
+    // Orbit — cards are placed at the *active* mode's position. Project-mode
+    // placement is byte-for-byte the pre-LIN-301 path (orient positions equal
+    // project positions when there are no bearings), so project mode is
+    // untouched and additive.
     var orbit = document.getElementById('ship-orbit');
     orbit.innerHTML = '';
     var fragments = [];
     for (var i = 0; i < issues.length; i++) {
       var card = issues[i];
-      var pos = result.positions[card.id];
-      if (!pos) continue;
+      var projPos = result.positions[card.id];
+      if (!projPos) continue;
+      var pos = (mode === 'orientation' && orient.positions[card.id]) || projPos;
       var el = document.createElement('div');
       el.innerHTML = renderCardHtml(card);
       var node = el.firstChild;
@@ -798,12 +982,21 @@
       node.setAttribute('data-ring', pos.ring);
       node.setAttribute('data-sub-ring', pos.subRing);
       if (pos.segmentId) node.setAttribute('data-segment', pos.segmentId);
+      applyOrientationAttrs(node, card.id, mode);
       fragments.push(node);
     }
     fragments.forEach(function (n) { orbit.appendChild(n); });
 
-    drawSegmentGuides(geom, canvasSize, ship, result.segments);
+    // LIN-291: execution-drift overlay attaches here. The same #ship-canvas
+    // carries three independent layers — the SVG guide (.ship-sector-guide,
+    // z below cards), the #ship-orbit card layer, and the absolute labels.
+    // A future drift overlay should append its own sibling layer onto
+    // #ship-canvas keyed by data-issue-id (reusing viewState.cardAngles for
+    // per-card x/y); it must not mutate orbit card positions, so it composes
+    // cleanly with the orientation tween. Not implemented here (sibling ticket).
+    drawModeGuides(mode);
     renderHeadingControl(heading, issues, geom, ship);
+    renderModeControl(mode);
 
     if (pageEl) {
       pageEl.scrollLeft = geom.centerX - viewportW / 2;
@@ -917,6 +1110,216 @@
       if (picker.contains(e.target) || chip.contains(e.target)) return;
       picker.classList.add('hidden');
       chip.setAttribute('aria-expanded', 'false');
+    });
+  }
+
+  // ===========================================================================
+  // Mode control + orientation guides + angular tween (LIN-301)
+  // ===========================================================================
+
+  // Tag an orbit node with its bearing / off-compass state. Only meaningful in
+  // orientation mode; project mode leaves these attributes off.
+  function applyOrientationAttrs(node, id, mode) {
+    if (mode !== 'orientation') return;
+    var info = viewState.cardAngles[id];
+    if (info && info.bearing) node.setAttribute('data-bearing', info.bearing);
+    if (viewState.orientFlags[id] && viewState.orientFlags[id].archived) {
+      node.setAttribute('data-overboard', 'true');
+      node.classList.add('ship-overboard');
+    }
+  }
+
+  function renderModeControl(mode) {
+    var control = document.getElementById('ship-mode-control');
+    if (!control) return;
+    var projectBtn = document.getElementById('ship-mode-project');
+    var orientBtn = document.getElementById('ship-mode-orientation');
+    var note = document.getElementById('ship-mode-note');
+    var enabled = hasOrientationData();
+
+    if (orientBtn) orientBtn.disabled = !enabled;
+    if (note) {
+      if (enabled) {
+        note.classList.add('hidden');
+        note.textContent = '';
+      } else {
+        note.textContent = 'run a roadmap report to orient';
+        note.classList.remove('hidden');
+      }
+    }
+    if (projectBtn) {
+      projectBtn.setAttribute('aria-pressed', mode === 'project' ? 'true' : 'false');
+      projectBtn.classList.toggle('active', mode === 'project');
+    }
+    if (orientBtn) {
+      orientBtn.setAttribute('aria-pressed', mode === 'orientation' ? 'true' : 'false');
+      orientBtn.classList.toggle('active', mode === 'orientation');
+    }
+  }
+
+  // Mode-aware reference layer: project mode keeps the project segment guides;
+  // orientation mode swaps in a compass rose so the bearings read.
+  function drawModeGuides(mode) {
+    if (mode === 'orientation') {
+      drawCompassGuides(viewState.geom, viewState.canvasSize, viewState.ship);
+    } else {
+      drawSegmentGuides(viewState.geom, viewState.canvasSize, viewState.ship, viewState.segments);
+    }
+  }
+
+  // Compass rose for orientation mode: concentric priority rings (shared with
+  // project mode), eight bearing spokes, and cardinal labels naming the metaphor
+  // (bow = aligned, aft = drift, port/starboard = maintenance).
+  var COMPASS_LABELS = {
+    N:  'aligned',
+    E:  'maintain',
+    S:  'drift',
+    W:  'maintain'
+  };
+  function drawCompassGuides(geom, canvasSize, ship) {
+    var existing = document.querySelector('.ship-sector-guide');
+    if (existing) existing.remove();
+    var existingLabels = document.querySelectorAll('.ship-sector-label');
+    existingLabels.forEach(function (n) { n.remove(); });
+
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'ship-sector-guide');
+    svg.setAttribute('viewBox', '0 0 ' + canvasSize + ' ' + canvasSize);
+    svg.setAttribute('width', canvasSize);
+    svg.setAttribute('height', canvasSize);
+
+    for (var r = 0; r < RING_COUNT; r++) {
+      var radius = ringRadius(r, geom);
+      var circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      circle.setAttribute('cx', geom.centerX);
+      circle.setAttribute('cy', geom.centerY);
+      circle.setAttribute('r', radius);
+      svg.appendChild(circle);
+    }
+
+    var shipBound = Math.sqrt(geom.shipHalfWidth * geom.shipHalfWidth + geom.shipHalfHeight * geom.shipHalfHeight);
+    var spokeInner = shipBound + 6;
+    var spokeOuter = ringRadius(RING_COUNT - 1, geom) + RING_SPACING * 0.9;
+    var bearings = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+    for (var b = 0; b < bearings.length; b++) {
+      var a = BEARING_TO_ANGLE[bearings[b]];
+      var rad = a * Math.PI / 180;
+      var line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', geom.centerX + spokeInner * Math.cos(rad));
+      line.setAttribute('y1', geom.centerY + spokeInner * Math.sin(rad));
+      line.setAttribute('x2', geom.centerX + spokeOuter * Math.cos(rad));
+      line.setAttribute('y2', geom.centerY + spokeOuter * Math.sin(rad));
+      // Cardinal spokes solid, diagonals faint — set via class for CSS.
+      if (bearings[b].length === 2) line.setAttribute('class', 'ship-compass-diagonal');
+      svg.appendChild(line);
+    }
+
+    document.getElementById('ship-canvas').insertBefore(svg, document.getElementById('ship-rect'));
+
+    var canvasEl = document.getElementById('ship-canvas');
+    var labelR = spokeOuter + 8;
+    var cardinals = ['N', 'E', 'S', 'W'];
+    for (var c = 0; c < cardinals.length; c++) {
+      var key = cardinals[c];
+      var ang = BEARING_TO_ANGLE[key] * Math.PI / 180;
+      var labEl = document.createElement('div');
+      labEl.className = 'ship-sector-label ship-compass-label';
+      labEl.setAttribute('data-bearing', key);
+      labEl.textContent = key + ' · ' + COMPASS_LABELS[key];
+      labEl.style.transform = 'translate(-50%, -50%)';
+      labEl.style.left = (geom.centerX + labelR * Math.cos(ang)) + 'px';
+      labEl.style.top = (geom.centerY + labelR * Math.sin(ang)) + 'px';
+      canvasEl.appendChild(labEl);
+    }
+  }
+
+  // Toggle modes with a pure angular tween: each orbit card swings along its
+  // ring (radius constant) from its current-mode angle to the target-mode
+  // angle. Hub/in-progress cards are not in the orbit, so they never move.
+  function setMode(mode, animate) {
+    if (viewState.animating) return;
+    mode = mode === 'orientation' ? 'orientation' : 'project';
+    if (!hasOrientationData()) mode = 'project';
+    var prev = viewState.mode;
+    saveMode(mode);
+    viewState.mode = mode;
+    renderModeControl(mode);
+    if (prev === mode) { drawModeGuides(mode); return; }
+
+    var geom = viewState.geom;
+    var orbit = document.getElementById('ship-orbit');
+    var nodes = orbit ? orbit.querySelectorAll('.swim-box') : [];
+    var tweens = [];
+    for (var i = 0; i < nodes.length; i++) {
+      var node = nodes[i];
+      var id = node.getAttribute('data-issue-id');
+      var info = viewState.cardAngles[id];
+      if (!info) continue;
+      var from = mode === 'orientation' ? info.projectAngle : info.orientationAngle;
+      var to = mode === 'orientation' ? info.orientationAngle : info.projectAngle;
+      var delta = ((to - from + 540) % 360) - 180; // shortest angular path
+      tweens.push({ node: node, radius: info.radius, from: from, delta: delta });
+    }
+
+    // Swap the reference layer to the target mode up front so cards swing into
+    // the right context.
+    drawModeGuides(mode);
+
+    if (!animate || tweens.length === 0) { finishMode(mode); return; }
+
+    viewState.animating = true;
+    var DURATION = 420;
+    var start = null;
+    function frame(ts) {
+      if (start === null) start = ts;
+      var t = Math.min(1, (ts - start) / DURATION);
+      var eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; // easeInOutQuad
+      for (var j = 0; j < tweens.length; j++) {
+        var tw = tweens[j];
+        var ang = (tw.from + tw.delta * eased) * Math.PI / 180;
+        tw.node.style.left = (geom.centerX + tw.radius * Math.cos(ang)) + 'px';
+        tw.node.style.top = (geom.centerY + tw.radius * Math.sin(ang)) + 'px';
+      }
+      if (t < 1) {
+        requestAnimationFrame(frame);
+      } else {
+        viewState.animating = false;
+        finishMode(mode);
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // Snap orbit cards to their exact final angle and refresh bearing/overboard
+  // attributes for the settled mode.
+  function finishMode(mode) {
+    var geom = viewState.geom;
+    var orbit = document.getElementById('ship-orbit');
+    if (!orbit) return;
+    var nodes = orbit.querySelectorAll('.swim-box');
+    for (var i = 0; i < nodes.length; i++) {
+      var node = nodes[i];
+      var id = node.getAttribute('data-issue-id');
+      var info = viewState.cardAngles[id];
+      if (!info) continue;
+      var finalAngle = mode === 'orientation' ? info.orientationAngle : info.projectAngle;
+      var ang = finalAngle * Math.PI / 180;
+      node.style.left = (geom.centerX + info.radius * Math.cos(ang)) + 'px';
+      node.style.top = (geom.centerY + info.radius * Math.sin(ang)) + 'px';
+      node.removeAttribute('data-bearing');
+      node.removeAttribute('data-overboard');
+      node.classList.remove('ship-overboard');
+      applyOrientationAttrs(node, id, mode);
+    }
+  }
+
+  function wireModeControl() {
+    var projectBtn = document.getElementById('ship-mode-project');
+    var orientBtn = document.getElementById('ship-mode-orientation');
+    if (projectBtn) projectBtn.addEventListener('click', function () { setMode('project', true); });
+    if (orientBtn) orientBtn.addEventListener('click', function () {
+      if (orientBtn.disabled) return;
+      setMode('orientation', true);
     });
   }
 
@@ -1108,5 +1511,6 @@
     render();
     wirePopover();
     wireHeadingControl();
+    wireModeControl();
   }
 })();

@@ -263,6 +263,88 @@ body:has(.ship-page) {
 }
 
 /* ==========================================================================
+   Mode control (LIN-301) — project ↔ orientation toggle.
+   Pinned to the viewport (the canvas scrolls underneath) so it's always
+   reachable. Reads in the same monospace register as the heading chip.
+   ========================================================================== */
+
+.ship-mode-control {
+  position: fixed;
+  top: 68px;
+  left: 16px;
+  z-index: 8; /* above heading control (7) */
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: #fff;
+  border: 1px solid rgba(44, 62, 80, 0.25);
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.ship-mode-btn {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(44, 62, 80, 0.6);
+  background: #fff;
+  border: none;
+  padding: 5px 11px;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.ship-mode-btn + .ship-mode-btn {
+  border-left: 1px solid rgba(44, 62, 80, 0.18);
+}
+
+.ship-mode-btn:hover:not(:disabled) {
+  color: #2c3e50;
+  background: rgba(44, 62, 80, 0.04);
+}
+
+.ship-mode-btn.active {
+  color: #fff;
+  background: #2c3e50;
+}
+
+.ship-mode-btn:disabled {
+  color: rgba(44, 62, 80, 0.3);
+  cursor: not-allowed;
+}
+
+.ship-mode-note {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: rgba(44, 62, 80, 0.5);
+  padding: 0 10px;
+  white-space: nowrap;
+}
+
+.ship-mode-note.hidden { display: none; }
+
+/* Compass rose (orientation mode) — diagonals fainter than cardinals. */
+.ship-sector-guide line.ship-compass-diagonal {
+  stroke: rgba(44, 62, 80, 0.22);
+  stroke-dasharray: 3 5;
+}
+
+.ship-compass-label {
+  letter-spacing: 0.1em;
+}
+
+/* Off-compass / overboard cards (archived bearings) — dimmed with a warning
+   accent so they read as "shouldn't be aboard" without leaving their ring. */
+.ship-orbit .swim-box.ship-overboard {
+  opacity: 0.5;
+  border-style: dashed;
+  filter: grayscale(0.6);
+}
+
+/* ==========================================================================
    Popover — reuses .swim-popover-* classes from swim.css, no new rules needed.
    ========================================================================== */
 
