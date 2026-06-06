@@ -358,6 +358,124 @@ test.describe('Pipeline Page', () => {
     });
   });
 
+  // LIN-322: the leaf overlay polls every OVERLAY_POLL_MS and re-renders by
+  // replacing .overlay-content wholesale, which used to reset scrollTop to 0
+  // every cycle. The poll callback now captures/restores scroll (and follows
+  // the live feed to the bottom when the user was already near the bottom).
+  test.describe('Overlay scroll preservation (LIN-322)', () => {
+    // A leaf task with enough loop history to overflow .overlay-content (80vh).
+    function makeTask(loopCount) {
+      const loops = [];
+      for (let i = 0; i < loopCount; i++) {
+        loops.push({
+          agentState: 'complete',
+          dispatchedAt: new Date(Date.now() - i * 60000).toISOString(),
+          stage: 'execute',
+          promptName: `prompt-${i}`,
+          foremanSummary: `Loop ${i}: did a chunk of work that takes vertical space so the overlay scrolls and we can exercise scroll preservation across a poll tick.`,
+          feedback: []
+        });
+      }
+      return {
+        identifier: 'TEST-14',
+        title: 'Scrollable task',
+        agentState: 'running',
+        currentStage: 'execute',
+        loopCount,
+        healthColor: 'green',
+        url: 'https://linear.app/test/issue/TEST-14',
+        loops
+      };
+    }
+
+    async function openScrollableOverlay(page) {
+      // Click whatever entry the hydrated queue offers; the routed task endpoint
+      // returns our fixture regardless of the clicked identifier.
+      const entry = page.locator('.queue-entry[data-identifier]:not([data-identifier=""])').first();
+      await expect(entry).toBeVisible({ timeout: 5000 });
+      await entry.click();
+      const content = page.locator('.overlay-content');
+      await expect(content).toBeVisible({ timeout: 5000 });
+      await expect(page.locator('.overlay-section-title')).toContainText('loop history', { timeout: 5000 });
+      // Confirm .overlay-content is actually the scroll container (not .pipeline-overlay).
+      const scrollable = await content.evaluate(el => el.scrollHeight > el.clientHeight);
+      expect(scrollable).toBe(true);
+      return content;
+    }
+
+    test.beforeEach(async ({ page }) => {
+      await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ pipeline: true }))}`);
+      await page.route('**/api/pipeline/state', route =>
+        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ fetchedAt: new Date().toISOString(), active: [], queue: [], recent: [] }) })
+      );
+    });
+
+    test('retains scroll position across a poll tick', async ({ page }) => {
+      let taskRequests = 0;
+      // Stable loop count → scrollHeight stable → exact scrollTop should be restored.
+      await page.route('**/api/pipeline/task/**', route => {
+        taskRequests += 1;
+        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(makeTask(50)) });
+      });
+      await page.goto(PIPELINE_URL);
+      await page.waitForLoadState('networkidle');
+
+      const content = await openScrollableOverlay(page);
+
+      // Scroll to a mid-point (well clear of the ~60px near-bottom threshold).
+      await content.evaluate(el => { el.scrollTop = 200; });
+      const before = await content.evaluate(el => el.scrollTop);
+      expect(before).toBeGreaterThan(0);
+
+      // Wait for at least one full poll cycle (OVERLAY_POLL_MS = 2000).
+      const initialRequests = taskRequests;
+      await expect.poll(() => taskRequests, { timeout: 6000 }).toBeGreaterThan(initialRequests);
+      await page.waitForTimeout(150); // let the re-render + restore settle
+
+      const after = await content.evaluate(el => el.scrollTop);
+      expect(after).not.toBe(0);
+      expect(Math.abs(after - before)).toBeLessThan(5);
+
+      // No unintended side effects: overlay still open, recap mount preserved.
+      await expect(page.locator('#pipeline-overlay')).not.toHaveClass(/hidden/);
+      await expect(page.locator('.overlay-recap-mount')).toHaveCount(1);
+    });
+
+    test('follows the live feed to the bottom when near the bottom', async ({ page }) => {
+      let taskRequests = 0;
+      // First response: 50 loops. After the first poll: 70 loops → scrollHeight grows.
+      await page.route('**/api/pipeline/task/**', route => {
+        taskRequests += 1;
+        const count = taskRequests <= 1 ? 50 : 70;
+        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(makeTask(count)) });
+      });
+      await page.goto(PIPELINE_URL);
+      await page.waitForLoadState('networkidle');
+
+      const content = await openScrollableOverlay(page);
+
+      // Scroll to the bottom so the near-bottom auto-follow kicks in.
+      await content.evaluate(el => { el.scrollTop = el.scrollHeight; });
+      const heightBefore = await content.evaluate(el => el.scrollHeight);
+
+      // Wait for the poll to deliver the larger loop set.
+      await expect.poll(() => taskRequests, { timeout: 6000 }).toBeGreaterThan(1);
+      await page.waitForTimeout(150);
+
+      const state = await content.evaluate(el => ({
+        scrollTop: el.scrollTop,
+        scrollHeight: el.scrollHeight,
+        clientHeight: el.clientHeight
+      }));
+      // New content arrived (taller) and the view followed it to the bottom.
+      expect(state.scrollHeight).toBeGreaterThan(heightBefore);
+      expect(state.scrollHeight - state.scrollTop - state.clientHeight).toBeLessThan(60);
+
+      await expect(page.locator('#pipeline-overlay')).not.toHaveClass(/hidden/);
+      await expect(page.locator('.overlay-recap-mount')).toHaveCount(1);
+    });
+  });
+
   test.describe('Accessibility', () => {
     test.beforeEach(async ({ page }) => {
       await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ pipeline: true }))}`);
