@@ -521,6 +521,15 @@ and corrects the record:
   diagnosis); then harden the LLM leg (bounded retry, brief cache à la `recap-cache.js`, faster/smaller
   model, or relaxed/streamed budget). For autopilot, a *sanctioned* single retry-after-backoff is
   justified because the failure is latency variance, not a hard error.
+- **Fix applied (this branch):** the LLM leg now has a **dedicated `LLM_TIMEOUT_MS = 180_000` (3 min)**
+  budget (`routes/proxy.js`), used at all five generation sites (recommend / recap×2 / brief×2), while
+  the Linear `fetchProjects` backstop stays at `MULTI_REQUEST_TIMEOUT_MS = 50s`. Verified the keepalive
+  carries it: `http-keepalive.js` flushes a `200` at 25s then writes a heartbeat **every 15s**, so the
+  socket survives an arbitrarily long generation (the keepalive, not the cap, is what defuses Heroku
+  H12). Tests green (9 unit + 47 proxy e2e). *Deliberately not done here (per scope):* model change /
+  speed-ups, client-facing streaming (the proxy returns buffered JSON behind the keepalive; true SSE
+  would change the consumer contract), and the error-message disambiguation (the LLM timeout still
+  reports the Linear-flavoured text) — left as the cheap follow-up.
 
 ### Endpoints / changes shipped on this branch
 
