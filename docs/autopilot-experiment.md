@@ -398,6 +398,34 @@ exists. Evidence discipline is sharper for implementation tasks (a diff/PR/CI ei
 doesn't) than for research ones (corroborate the citations; the judgment of "is this a good retro"
 stays human-adjacent). The guide should distinguish the two.
 
+**Run B2 — first write-class drive, halted on infra error (2026-06-06 12:02, LIN-319, target
+`cli`).** Plan: dogfood the gap B1 found — a deliberately thin ticket (**LIN-319**, "Dispatch
+verbs carry no structured `kind` field", no solution baked in) driven by autopilot to a merged
+fix, with merge-to-main authorized (Git makes it reversible; the post-merge deploy is the
+verification). What happened and what it taught:
+
+- **`/recommend/LIN-319` returned 504 twice** (Linear context-fetch timeout — the same 504 class
+  GitHub PR #319 addressed, here on a *tiny fresh* ticket, so likely transient infra slowness).
+- **Orchestrator mistake (corrected by the operator):** I treated the 504 as a fallback trigger and
+  hand-authored an implementation prompt to keep going. That is a **silent workaround of an infra
+  error**, which violates invariant 1 — the loop must *flag*, not paper over a broken signal. The
+  correct behavior is **halt and surface**.
+- **Policy now encoded** in [`autopilot-orchestrator-prompt.md`](./autopilot-orchestrator-prompt.md):
+  a network error / timeout / 5xx from any verb the orchestrator drives is a **halt condition**, not
+  a fallback; a handed-in prompt is *only* a human-supplied kickoff prompt, never a substitute for an
+  errored `/recommend`. (Distinct from a clean task-level `[failed]`, which stays a normal retry/escalate
+  signal.)
+- **Run halted.** The watch loop was stopped. An implementation worker had already been taken on the
+  runner (re-grounding — `Read×4`, `Bash`) and may still open a PR on its own branch; the orchestrator
+  will **not** verify or merge it. Disposition (let it finish for manual review vs. treat as void) is the
+  human's call.
+
+**Net:** B2 didn't reach a merge, but it produced the more valuable result for an *autonomous* loop —
+the first real test of the failure boundary, and a sharpened rule: **the orchestrator halts on infra
+errors rather than improvising around them.** The merge-to-main write path is still unexercised; the
+next attempt should start only once `/recommend` is healthy (or with a human-supplied kickoff prompt by
+explicit choice, not as error-recovery).
+
 - **Still not done:** an *unattended, multi-step* orchestrator run (B1 was a single supervised
   dispatch with a human reading each external-recap line). The next spike is a multi-task loop —
   orient → work several stack items in sequence → and deliberately provoke a `failed`/stall to

@@ -68,7 +68,10 @@ snapshot is missing data you need to apply the policy (e.g. no cadence state), s
 guess.
 
 **2. Get the prompt.** Use `GET /recommend/{identifier}` for the AI-recommended next-step
-prompt (this is what chooses the *step*; note its **kind**), or use a handed-in prompt.
+prompt (this is what chooses the *step*; note its **kind**). A prompt is only "handed in"
+when the human supplies one at kickoff — **never** substitute a hand-authored prompt to
+route around a `/recommend` that erred. If `/recommend` returns a network error / timeout /
+5xx, that is a **halt** (see Halt conditions), not a fallback.
 
 **3. Dispatch.** `POST /dispatch` with `{ prompt, promptName, issueIdentifier?, target }`
 (`target: "cli"` is the most-proven). Record `id` + `kind` + `dispatchedAt` in the header;
@@ -105,6 +108,23 @@ state = "claimed, unverified" → flag to the human, do not advance as if done.
 
   Not the foreman-status log (durable machine record) and not the internal recitation — this
   is the live channel for a human sitting back.
+
+## Halt conditions (stop driving, surface to the human, do not work around)
+
+An infrastructure error in *your own* API calls while driving the loop is a **halt**, not a
+puzzle to route around. The loop touches production; papering over a broken signal is exactly
+the silent reconciliation invariant 1 forbids. **Halt and hand back to the human** on:
+
+- a network error, timeout, or 5xx from any verb you drive (`/recommend`, `/stack`,
+  `/dispatch`, `/issues`, …) — even after a sensible retry or two;
+- a malformed / unparseable response where you expected structured data;
+- an evidence source you can't reach when you need it to judge completion.
+
+Halting means: stop dispatching, report what failed and the loop's current state (including
+any in-flight dispatch you can no longer safely watch), and wait. Do **not** silently
+substitute a different prompt, skip the step, or proceed on an unverified assumption. This is
+distinct from a clean task-level `[failed]` terminal status, which is a normal loop signal you
+may retry/escalate per the decide step.
 
 ## Hard stops (never cross without a human)
 
