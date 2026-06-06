@@ -53,14 +53,18 @@ Keep only this in steady state; everything else is drill-down on demand:
   stack (top-N), periodical-cadence state, and the human's instruction/goal if any.
 - **The proxy**: base `https://projects.jkershaw.com/api/proxy`, a Bearer token, and the
   verb catalog at `GET /instructions`. The verbs you drive:
-  - Orient/choose: `GET /stack`, `GET /recap/{id}`, `GET /brief/{id}`, `GET /recommend/{id}`.
+  - Orient/choose: `GET /stack?view=digest` (compact one-line headlines, no full task bodies — drill
+    into a task with `GET /brief/{id}` only once you've picked it), `GET /recap/{id}`,
+    `GET /brief/{id}`, `GET /recommend/{id}`.
   - Dispatch: `POST /recommend-and-dispatch` (the fused trigger: recommend + enqueue, prompt stays server-side) → `GET /dispatch/{id}` (watch) / `GET /dispatch?…` (list). Plain `POST /dispatch` is for a human-supplied prompt only.
   - Verify: `GET /issues/{id}`, `GET /search`, plus the artifact URLs in `[evidence]`.
 
 ## The loop
 
-**1. Orient (first act).** Read the snapshot. Apply the **precedence policy** — do not
-improvise "what's worth doing"; that's normative:
+**1. Orient (first act).** Read the snapshot — or fetch `GET /stack?view=digest` for a compact,
+one-line-per-task view of the whole stack without pulling every task's full body into context (drill
+into the one you pick with `GET /brief/{id}`). Apply the **precedence policy** — do not improvise
+"what's worth doing"; that's normative:
 
 1. an explicit human instruction/goal, else
 2. a periodical past its cadence threshold (maintenance debt), else
@@ -97,9 +101,10 @@ answer.
 **4. Cross-check the evidence (invariant 2 — the load-bearing step).** On a terminal
 `done`, do **not** accept it on the recap alone. Take the `[evidence]` URLs (and any IDs in
 the recap), and **fetch them**: read the Linear issue/comment, look at the PR/commit/CI run.
-Confirm the claimed outcome actually exists **as a change in the external artifact** — a new
-commit SHA, a new comment, a state transition, a CI run — not merely that the `done` marker
-appeared. If the artifact is unchanged, or evidence is absent or contradicts the claim →
+Confirm the **deliverable this task was meant to produce** actually exists **as a change in the
+external artifact** — and let the task's kind tell you which deliverable to expect: a plan in the
+description, a findings comment, a commit/PR, a CI run, a state transition, a doc update. Check for
+the right one, not a fixed checklist — not merely that the `done` marker appeared. If the artifact is unchanged, or evidence is absent or contradicts the claim →
 state = "claimed, unverified/incomplete" → flag to the human, do not advance as if done. (B4:
 a resolution worker posted `done` while its push + comment were still pending; only the
 unchanged PR SHA + missing comment revealed it — the work landed minutes later, but the
@@ -146,6 +151,8 @@ may retry/escalate per the decide step.
 
 - Never merge/close/auto-resolve. Never edit the north star or a task's definition of done.
 - Never accept "done" without fetching evidence. Never improvise the precedence policy.
-- In a **read-only** run: dispatch only investigation/research/retro prompts; the dispatched
-  prompt must instruct the worker to make **no code changes, no PRs, no Linear state changes**
-  — produce findings + verifiable evidence pointers only.
+- In a **read-only** run: read-only is a convention you keep in the prompts you send, not a
+  platform-enforced sandbox. The fused `POST /recommend-and-dispatch` generates write-shaped prompts
+  (and never shows you their body), so don't use it here — author the investigation/research prompt
+  yourself and send it via plain `POST /dispatch`, instructing the worker to make **no code changes,
+  no PRs, no Linear state changes** — findings + verifiable evidence pointers only.

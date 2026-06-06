@@ -97,10 +97,12 @@ is drift past the few moments that belong to the human.
      So treat `done` as "go look," never "it's finished."
 
 4. **Cross-check — the step that earns its keep.** On `done`, take the `[evidence]` URLs
-   and any IDs and **fetch them**. Confirm the outcome shows up as a real *change* — a new
-   commit SHA, a new comment, a state transition, a CI run — not just that the marker
-   appeared. Unchanged artifact, missing evidence, or evidence that contradicts the claim →
-   "claimed, not verified" → flag, don't advance.
+   and any IDs and **fetch them**. Confirm the **deliverable this task was meant to produce**
+   actually exists as a real *change* — and let the task's kind tell you what that deliverable
+   is: a plan in the description, a findings comment, a commit/PR, a green CI run, a state
+   transition, a doc update. Check for the right one, not a fixed checklist. Unchanged artifact,
+   missing evidence, or evidence that contradicts the claim → "claimed, not verified" → flag,
+   don't advance.
 
 5. **Decide.** A short line for the human, then one of:
    - **continue** — the arc isn't finished (plan's done, implementation's next; review
@@ -152,16 +154,18 @@ retry or escalate.)
 task all the way to a merge *once CI is green and the diff matches what was approved* — the
 merge is yours to take when that gate is clean and this run is authorized for it. Pause for
 the human at a review that raises a direction question, or before anything large or risky
-lands. *(For a read-only run the human swaps this to `Mode: READ-ONLY` — then every
-dispatched prompt must tell the worker: no code, no PRs, no Linear state changes, findings
-and evidence pointers only.)*
+lands. *(For a read-only run the human swaps this to `Mode: READ-ONLY` — read-only is a
+convention carried in the prompts Autopilot sends, not a platform-enforced sandbox: the fused
+`POST /recommend-and-dispatch` generates write-shaped prompts and never exposes their body, so
+a read-only run authors its own investigation prompts via plain `POST /dispatch`, telling the
+worker: no code, no PRs, no Linear state changes, findings and evidence pointers only.)*
 
 **Goal from the human:** none this run — walk the stack under the precedence policy.
 
 **Proxy:** base `https://projects.jkershaw.com/api/proxy` · Bearer token injected at
 dispatch (not shown here) · full verb catalog at `GET /instructions`.
 
-**Top of the stack** (`/stack`, top 5):
+**Top of the stack** (`/stack?view=digest`, top 5 — one-line headlines, drill into a pick with `/brief/{id}`):
 
 | # | id | type | where it stands | north-star |
 |---|------|------|-----------------|------------|

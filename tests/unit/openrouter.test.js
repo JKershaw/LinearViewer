@@ -17,6 +17,7 @@ import {
   EPIC_TITLE_PATTERN
 } from '../../lib/openrouter.js';
 import { buildMetaPromptTemplate } from '../../lib/prompts/meta-prompt-template.js';
+import { getAIRecommendationActionNames, deriveDispatchKind, DISPATCH_KIND_DEFAULT } from '../../lib/prompt-templates.js';
 
 // =============================================================================
 // stripCodeBlockMarkers Tests
@@ -544,6 +545,49 @@ describe('buildMetaPromptTemplate Surface Assessment', () => {
       result.includes('do not absorb the refactor into implementation steps'),
       'plan rule must preserve the sequencing guarantee'
     );
+  });
+});
+
+// =============================================================================
+// Action vocabulary — the meta-prompt's `→ **action**` must stay inside the
+// vocabulary deriveDispatchKind() understands, so the fused recommend-and-dispatch
+// verb lands a real `kind` (not the `custom` fallback) for every known type.
+// =============================================================================
+
+describe('action vocabulary (kind derivation seam)', () => {
+  const base = {
+    issueContext: 'ctx', identifier: 'LIN-1', hasSubtasks: false, subtaskCount: 0,
+    completedCount: 0, inProgressCount: 0, remainingCount: 0, hasComments: false,
+    commentCount: 0, aiHints: 'hints'
+  };
+
+  test('getAIRecommendationActionNames returns mappable names and excludes retro', () => {
+    const names = getAIRecommendationActionNames();
+    assert.ok(names.includes('plan'));
+    assert.ok(names.includes('implement'));
+    assert.ok(names.includes('code review'));
+    assert.ok(!names.includes('retro'), 'retro is excluded from AI recommendation');
+  });
+
+  test('every recommended action name derives to a real (non-custom) kind', () => {
+    for (const name of getAIRecommendationActionNames()) {
+      assert.notStrictEqual(
+        deriveDispatchKind(name), DISPATCH_KIND_DEFAULT,
+        `recommended action "${name}" should map to a known kind, not "${DISPATCH_KIND_DEFAULT}"`
+      );
+    }
+  });
+
+  test('meta-prompt embeds the supplied vocabulary and the verbatim-one instruction', () => {
+    const vocab = getAIRecommendationActionNames().join(', ');
+    const text = buildMetaPromptTemplate({ ...base, actionVocabulary: vocab });
+    assert.ok(text.includes(vocab), 'the action vocabulary list must appear in the meta-prompt');
+    assert.ok(text.includes('EXACTLY one action name'), 'the verbatim-one constraint must be stated');
+  });
+
+  test('falls back to an example set when no vocabulary is supplied', () => {
+    const text = buildMetaPromptTemplate({ ...base });
+    assert.ok(text.includes('plan, research, implement'), 'a sensible fallback list is present');
   });
 });
 

@@ -237,6 +237,44 @@ test.describe('Proxy API - Consumer Endpoints', () => {
     expect(text).toContain('/api/proxy/me');
     expect(text).toContain('/api/proxy/teams');
     expect(text).toContain('read');
+    // the compact orientation projection is documented
+    expect(text).toContain('view=digest');
+  });
+
+  test('GET /api/proxy/stack?view=digest returns compact rows without full descriptions', async ({ request }) => {
+    const digest = await request.get('/api/proxy/stack?limit=5&view=digest', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(digest.status()).toBe(200);
+    const data = await digest.json();
+    expect(data.view).toBe('digest');
+    expect(Array.isArray(data.tasks)).toBe(true);
+    if (data.tasks.length > 0) {
+      const t = data.tasks[0];
+      expect(t).toHaveProperty('identifier');
+      expect(t).toHaveProperty('headline');
+      expect(t).toHaveProperty('state');
+      // digest drops the heavy full description and the array fields (counts instead)
+      expect(t).not.toHaveProperty('description');
+      expect(typeof t.blocks).toBe('number');
+      expect(typeof t.children).toBe('number');
+    }
+  });
+
+  test('GET /api/proxy/stack (default/full) keeps descriptions and arrays', async ({ request }) => {
+    const full = await request.get('/api/proxy/stack?limit=5', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(full.status()).toBe(200);
+    const data = await full.json();
+    expect(data.view).toBe('full');
+    expect(Array.isArray(data.tasks)).toBe(true);
+    if (data.tasks.length > 0) {
+      const t = data.tasks[0];
+      expect(t).toHaveProperty('description');
+      expect(Array.isArray(t.children)).toBe(true);
+      expect(Array.isArray(t.blocksIds)).toBe(true);
+    }
   });
 
   test('read-write token instructions include write endpoints', async ({ request }) => {

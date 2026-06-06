@@ -323,9 +323,13 @@ A specific focus is just the goal field, or a hand-written prompt followed by th
   button on the dashboard card and swipe overlay, a "general Autopilot" load on the foreman
   and dispatch pages, and `GET /api/proxy/autopilot/kickoff` for external agents. Dispatched
   items carry a first-class `kind: 'autopilot'` (the meta-loop kind, set explicitly — never
-  derived). *Still deferred:* the **computed** orientation snapshot (periodical cadence +
-  top-of-stack baked in); for now the kickoff has Autopilot fetch `/stack` itself as its
-  first orient action. See [`autopilot-kickoff.md`](./autopilot-kickoff.md).
+  derived). *Partly deferred:* the **fully computed/baked** orientation snapshot (periodical
+  cadence + top-of-stack embedded at dispatch) is still deferred, but the orientation
+  *primitive* now exists — `GET /stack?view=digest` returns a compact, deterministic
+  one-line-per-task projection (drops full descriptions for a `headline` + counts), so
+  Autopilot's first orient action gets a sense of the whole stack without holding every task's
+  full body in context. Baking that same projection into the kickoff at dispatch is the
+  remaining (now-trivial) step. See [`autopilot-kickoff.md`](./autopilot-kickoff.md).
 - **C. Periodicals cadence.** The only stateful bit — the snapshot needs "code review last
   ran 14d ago." v1 can likely **derive** this from existing signals (`foreman/status`
   history, git log, periodical-tagged Linear search) rather than build a store; add a store
