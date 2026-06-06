@@ -26,17 +26,24 @@ the overlap honestly so the reconciliation step can do its job.
 > dispatch-consumer punch-list live in **[`autopilot-experiment.md`](./autopilot-experiment.md)**;
 > §7–§8 below are annotated with what has since shipped.
 >
-> **Update (2026-06-06) — Stage B has been spiked (runs B1–B3).** A first draft of the
+> **Update (2026-06-06) — Stage B has been spiked (runs B1–B4).** A first draft of the
 > orchestrator prompt — the guide — exists at
 > **[`autopilot-orchestrator-prompt.md`](./autopilot-orchestrator-prompt.md)** and was driven
 > live: a read-only loop end-to-end (B1), a write-class attempt that **halted on an infra
-> error** and yielded a first-class **halt-on-infra-error rule** (B2), and a clean re-run where
-> `/recommend` correctly planned-first and the plan was evidence-verified (B3). Confirmed in
-> practice: the loop is viable over today's API, evidence-discipline (invariant 2) works
-> mechanically off the runner's `[evidence]` URLs, and the orchestrator must **halt — not
-> improvise — on infra failure** (invariant 1). Still open: the **merge-to-main write path is
-> unexercised end-to-end**, `/recommend` is an **intermittently-flaky hard dependency** worth
-> hardening, and no run has been genuinely *unattended*. Details in the experiment doc.
+> error** and yielded a first-class **halt-on-infra-error rule** (B2), a clean re-run where
+> `/recommend` correctly planned-first and the plan was evidence-verified (B3), and a full
+> write drive that **landed a change on `main`** — review → resolve conflict → merge → CI-green
+> → deploy → ticket Done (B4, LIN-319: the `kind` field itself). Confirmed in practice: the loop
+> is viable over today's API, evidence-discipline (invariant 2) works mechanically off the
+> runner's `[evidence]` URLs and the PR/CI/Linear artifacts, and the orchestrator must **halt —
+> not improvise — on infra failure** (invariant 1). The **merge-to-main write path is now
+> exercised end-to-end** (B4). Still open: a genuinely *unattended* run (B1–B4 were supervised),
+> and two findings B4 surfaced — a terminal **`done` is a session-boundary marker, not proof of
+> task success** (it can post before the work lands and never catch up, so completion must be
+> confirmed by a change in the external artifact), and the **`[stalled?]` heartbeat can't
+> distinguish a hung worker from one blocked on a long synchronous command**. `/recommend`
+> remains an **intermittently-flaky hard dependency** (mitigated by the `LLM_TIMEOUT_MS=180s`
+> split, LIN-320). Details in the experiment doc.
 
 ---
 
