@@ -16,10 +16,11 @@ terminal post**, not a Stop hook inside the session. **Runs 5–6** verified lau
 both `cli` and `web`; **Run 7** added the session's **final recap** (`cli`) and **explicit `[failed]`
 reporting**; **Run 8** fixed a `web` remote-control regression and verified the **recap on `web`** too.
 The channel now reliably carries, on **both targets**: phase tags → recap → terminal `[done]`/`[failed]`.
-Remaining before an autonomous orchestrator: **liveness heartbeats** (#2), a **structured evidence
-URL** (#5 — Run 8's URL was in prose, not the field), and a top-level **`status` transition** on the
-terminal event. The `cli` path is now clean enough to start the **Stage B orchestrator spike**.
-Continuation tracked in Linear as **LIN-318** (In Progress).
+The watch/list endpoints now also surface a derived terminal **`status`** (`done`/`failed`/`aborted`)
+from that marker, so an orchestrator polls a field, not prose. Remaining before an autonomous
+orchestrator are both **consumer-side**: **liveness heartbeats** (#2) and a **structured evidence URL**
+(#5 — Run 8's URL was in prose, not the field). The `cli` path is now clean enough to start the
+**Stage B orchestrator spike**. Continuation tracked in Linear as **LIN-318** (In Progress).
 
 ## The question we are answering
 
@@ -303,6 +304,11 @@ re-roots #1 in the **launcher**, not the session hook. The orchestrator must tre
 8. **`web` remote-control connect regression** (Run 7) — `command not accepted`, failed twice. ✅
    **fixed (Run 8):** `web` now executes end-to-end and forwards the recap; the fix also streamlined
    the handoff (no more intermediate connect entries).
+9. **Terminal `status` transition on the watch/list endpoints** (our side, not the runner). ✅ **done:**
+   `GET /api/proxy/dispatch/:id` and `GET /api/proxy/dispatch` now derive a terminal `status`
+   (`done`/`failed`/`aborted`) from the runner's `[done]`/`[failed]`/`[aborted]` feedback marker, so an
+   orchestrator polls a **field** instead of parsing prose. Derived on read — the stored lifecycle
+   status and the feedback stream are untouched; `?status=done` is now a valid list filter.
 
 ### Stage B — orchestrator spike
 
@@ -322,4 +328,6 @@ re-roots #1 in the **launcher**, not the session hook. The orchestrator must tre
 - Auto-append proxy context to dispatched prompts (Linear access; reporting left to the runner's Stop
   hook). Standing readWrite token **for now**, flagged in-code as security debt. Fixed a malformed-URL
   bug for dispatches without an `issueIdentifier`.
-- All covered by E2E tests in `tests/e2e/proxy.spec.js` (11 dispatch tests).
+- Terminal-status derivation (`deriveTerminalStatus`): watch + list surface `done`/`failed`/`aborted`
+  from the runner's feedback marker, derived on read (punch-list #9).
+- All covered by E2E tests in `tests/e2e/proxy.spec.js` (13 dispatch tests).
