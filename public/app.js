@@ -1,5 +1,6 @@
 const STORAGE_KEY = 'linear-projects-state'
-const TEAM_STORAGE_KEY = 'linear-projects-selected-team'
+// TEAM_STORAGE_KEY and the team-selection helpers now live in common.js
+// (alongside initNavBar) so the workspace switcher works on every page — LIN-288.
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 // Queue badge polling state
@@ -183,32 +184,6 @@ async function loadComments(toggle, content) {
     }
   } finally {
     loadingEl?.classList.add('hidden')
-  }
-}
-
-// Safe localStorage helpers for team selection
-function getTeamSelection() {
-  try {
-    return localStorage.getItem(TEAM_STORAGE_KEY)
-  } catch (e) {
-    console.warn('Failed to read team selection:', e)
-    return null
-  }
-}
-
-function setTeamSelection(teamId) {
-  try {
-    localStorage.setItem(TEAM_STORAGE_KEY, teamId)
-  } catch (e) {
-    console.warn('Failed to save team selection:', e)
-  }
-}
-
-function clearTeamSelection() {
-  try {
-    localStorage.removeItem(TEAM_STORAGE_KEY)
-  } catch (e) {
-    console.warn('Failed to clear team selection:', e)
   }
 }
 
@@ -738,180 +713,8 @@ function init() {
   })
 }
 
-// Navigation bar interactions (workspace/team selectors)
-function initNavBar() {
-  const navBar = document.querySelector('.nav-bar')
-  if (!navBar) return
-
-  const workspaceToggle = document.getElementById('workspace-toggle')
-  const teamToggle = document.getElementById('team-toggle')
-  const workspaceOptions = document.getElementById('workspace-options')
-  const teamOptions = document.getElementById('team-options')
-
-  // Create overlay element for mobile dropdown backdrop
-  let dropdownOverlay = document.querySelector('.nav-dropdown-overlay')
-  if (!dropdownOverlay) {
-    dropdownOverlay = document.createElement('div')
-    dropdownOverlay.className = 'nav-dropdown-overlay hidden'
-    document.body.appendChild(dropdownOverlay)
-  }
-
-  // Track currently open selector
-  let openSelector = null
-
-  function closeAllSelectors() {
-    ;[workspaceToggle, teamToggle].forEach(btn => {
-      if (btn) btn.setAttribute('aria-expanded', 'false')
-    })
-    ;[workspaceOptions, teamOptions].forEach(panel => {
-      if (panel) panel.classList.add('hidden')
-    })
-    if (dropdownOverlay) dropdownOverlay.classList.add('hidden')
-    openSelector = null
-  }
-
-  function toggleSelector(toggle, options, selectorName) {
-    const isOpen = toggle.getAttribute('aria-expanded') === 'true'
-
-    if (isOpen) {
-      closeAllSelectors()
-    } else {
-      closeAllSelectors()
-      toggle.setAttribute('aria-expanded', 'true')
-      options.classList.remove('hidden')
-      if (dropdownOverlay) dropdownOverlay.classList.remove('hidden')
-      openSelector = selectorName
-    }
-  }
-
-  // Workspace toggle
-  if (workspaceToggle && workspaceOptions) {
-    workspaceToggle.addEventListener('click', (e) => {
-      e.stopPropagation()
-      toggleSelector(workspaceToggle, workspaceOptions, 'workspace')
-    })
-  }
-
-  // Team toggle
-  if (teamToggle && teamOptions) {
-    teamToggle.addEventListener('click', (e) => {
-      e.stopPropagation()
-      toggleSelector(teamToggle, teamOptions, 'team')
-    })
-  }
-
-  // Team option selection (workspace uses form submission)
-  if (teamOptions) {
-    teamOptions.addEventListener('click', (e) => {
-      const option = e.target.closest('.nav-option[data-team]')
-      if (!option) return
-
-      e.stopPropagation()
-      const teamId = option.dataset.team
-      setTeamSelection(teamId)
-      // Get workspace URL key from data attribute (workspace-prefixed URLs)
-      const urlKey = teamOptions.dataset.urlKey
-      const workspacePrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : ''
-      const url = teamId === 'all' ? `${workspacePrefix}/` : `${workspacePrefix}/?team=${teamId}`
-      window.location.href = url
-    })
-  }
-
-  // Close on outside click
-  document.addEventListener('click', () => {
-    if (openSelector) closeAllSelectors()
-  })
-
-  // Prevent clicks inside options panels from triggering "close on outside click"
-  // Links still navigate, forms still submit - we just don't hide the panel first
-  ;[workspaceOptions, teamOptions].forEach(panel => {
-    if (panel) {
-      panel.addEventListener('click', (e) => e.stopPropagation())
-    }
-  })
-
-  // Close on overlay click (mobile backdrop)
-  if (dropdownOverlay) {
-    dropdownOverlay.addEventListener('click', closeAllSelectors)
-  }
-
-  // Handle forms with confirmation dialogs (replaces inline onsubmit)
-  document.addEventListener('submit', (e) => {
-    const form = e.target.closest('form[data-confirm]')
-    if (form && !confirm(form.dataset.confirm)) {
-      e.preventDefault()
-    }
-  })
-
-  // Keyboard navigation
-  function handleKeyboard(e, toggle, options) {
-    if (!options || options.classList.contains('hidden')) return
-
-    const allOptions = [...options.querySelectorAll('.nav-option')]
-    const focusedOption = document.activeElement
-    const currentIndex = allOptions.indexOf(focusedOption)
-
-    switch (e.key) {
-      case 'Escape':
-        closeAllSelectors()
-        toggle?.focus()
-        break
-      case 'ArrowDown':
-        e.preventDefault()
-        if (currentIndex < allOptions.length - 1) {
-          allOptions[currentIndex + 1]?.focus()
-        } else {
-          allOptions[0]?.focus()
-        }
-        break
-      case 'ArrowUp':
-        e.preventDefault()
-        if (currentIndex > 0) {
-          allOptions[currentIndex - 1]?.focus()
-        } else {
-          allOptions[allOptions.length - 1]?.focus()
-        }
-        break
-    }
-  }
-
-  document.addEventListener('keydown', (e) => {
-    if (openSelector === 'workspace') {
-      handleKeyboard(e, workspaceToggle, workspaceOptions)
-    } else if (openSelector === 'team') {
-      handleKeyboard(e, teamToggle, teamOptions)
-    }
-  })
-
-  // Sync team selection with localStorage on initial load
-  if (teamToggle) {
-    const urlParams = new URLSearchParams(window.location.search)
-    const urlTeam = urlParams.get('team')
-    const savedTeam = getTeamSelection()
-
-    // Check if saved team still exists in options
-    const teamOptionsAll = document.querySelectorAll('#team-options .nav-option[data-team]')
-    const savedTeamExists = savedTeam === 'all' ||
-      [...teamOptionsAll].some(opt => opt.dataset.team === savedTeam)
-
-    // If URL has no team but localStorage does (and team still exists), redirect
-    if (!urlTeam && savedTeam && savedTeam !== 'all' && savedTeamExists) {
-      // Get workspace URL key from data attribute (workspace-prefixed URLs)
-      const urlKey = teamOptions?.dataset.urlKey
-      const workspacePrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : ''
-      window.location.href = `${workspacePrefix}/?team=${savedTeam}`
-      return
-    }
-
-    // Clear invalid saved team
-    if (savedTeam && !savedTeamExists) {
-      clearTeamSelection()
-    }
-
-    // Save current selection
-    setTeamSelection(urlTeam || 'all')
-  }
-}
+// initNavBar() (workspace/team selectors) now lives in common.js so the
+// switcher is interactive on every authenticated page — LIN-288.
 
 // ==========================================================================
 // Prompt Generation for Labels
@@ -2379,7 +2182,7 @@ function initAutopilot() {
 
 document.addEventListener('DOMContentLoaded', () => {
   init()
-  initNavBar()
+  // initNavBar() runs from common.js's DOMContentLoaded handler (LIN-288)
   initSearch()
   initPrompts()
   initMorePrompts()
