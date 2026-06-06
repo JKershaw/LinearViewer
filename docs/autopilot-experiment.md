@@ -8,19 +8,35 @@ the question, the stages, and the success criteria were fixed in advance; the **
 section records what actually happened.
 
 **Checkpoint (2026-06-06):** the dispatch API surface is built, deployed, and exercised across
-**eight** live runs. Key result: the loop works, but completion must be judged from external evidence
+**ten** live runs. Key result: the loop works, but completion must be judged from external evidence
 (Linear/git/PR) — the feedback channel is liveness, not result. **Run 4 (clean `cli` retro)** was
 decisive: a session that completed normally **still failed to post its terminal event**, proving the
 gap is the **terminal-event delivery itself** — so the **launcher/consumer process must own the
 terminal post**, not a Stop hook inside the session. **Runs 5–6** verified launcher-owned `[done]` on
 both `cli` and `web`; **Run 7** added the session's **final recap** (`cli`) and **explicit `[failed]`
 reporting**; **Run 8** fixed a `web` remote-control regression and verified the **recap on `web`** too.
-The channel now reliably carries, on **both targets**: phase tags → recap → terminal `[done]`/`[failed]`.
-The watch/list endpoints now also surface a derived terminal **`status`** (`done`/`failed`/`aborted`)
-from that marker, so an orchestrator polls a field, not prose. Remaining before an autonomous
-orchestrator are both **consumer-side**: **liveness heartbeats** (#2) and a **structured evidence URL**
-(#5 — Run 8's URL was in prose, not the field). The `cli` path is now clean enough to start the
-**Stage B orchestrator spike**. Continuation tracked in Linear as **LIN-318** (In Progress).
+The channel now reliably carries, on **both targets**: phase tags → recap → **structured `[evidence]`
+entries (populated `url`)** → terminal `[done]`/`[failed]`, and the watch/list endpoints surface a
+derived terminal **`status`** (verified flipping `taken → done` live in Run 9). An orchestrator can
+poll a status field and read structured evidence pointers without parsing prose — invariant-2's
+evidence discipline made mechanical. As of **Run 10** the last telemetry gap (liveness heartbeats #2)
+is closed: 30s adaptive beats carrying tool-activity now cover the work window. **All telemetry
+punch-list items are done** (only #4, the optional `dispatchId`→foreman join for loop-reconstruction,
+remains). **Stage B has now been driven across three runs (B1–B3, below)** against the guide in
+[`autopilot-orchestrator-prompt.md`](./autopilot-orchestrator-prompt.md): **B1** — a clean read-only
+drive (orient → dispatch → poll-`status` → cross-check-evidence → recap → decide) with no manual
+rescue; **B2** — the first write-class attempt, **halted on a `/recommend` 504**, which exposed (and
+corrected) an orchestrator anti-pattern — *silently working around an infra error* — now a first-class
+**halt rule** in the guide; **B3** — a clean re-run where `/recommend` recovered, correctly routed the
+fresh ticket to **`kind=planning`**, and the plan landed + was verified in Linear. The arc was
+deliberately stopped at B3's verified plan when `/recommend` 504'd again (the halt rule firing as
+designed). Three durable findings: (1) **halt on infra errors, don't improvise around them**;
+(2) **`/recommend` is an intermittently-flaky hard dependency** (Linear context-fetch 504s, twice this
+session — a real reliability risk for an autonomous loop, candidate for hardening); (3) the
+**merge-to-main write path is still unexercised end-to-end** (no run has reached PR→CI→merge). Two
+build-spec gaps from B1 stand: no periodical-cadence source (precedence rule 2 inoperable) and no
+structured `kind` on dispatch — the latter is now ticketed as **LIN-319** (planned + implemented
+locally, uncommitted). Continuation tracked in Linear as **LIN-318** (In Progress).
 
 ## The question we are answering
 
@@ -275,25 +291,60 @@ re-roots #1 in the **launcher**, not the session hook. The orchestrator must tre
     artifact field) is **not** done — an orchestrator must parse the URL out of the recap rather than
     read a field.
 
+- **Run 9 — read-only retro → `cli`+`web` (items `c6f0ab5e…`, `10e2d5ae…`, 2026-06-06 11:15),
+  post-deploy verification of the status-transition change + the updated consumer.** Three things
+  landed at once:
+  - **Status transition (#9) verified live on both paths.** The top-level `status` field flipped on
+    its own: `taken → done` (`cli` 11:16:46, `web` 11:17:02). The orchestrator polls a field now, not
+    prose.
+  - **Structured evidence URL (#5) done — and richer than asked.** The consumer now posts dedicated
+    `[evidence]` entries with populated `url` fields, and the `[done]` carries a primary artifact URL:
+    `cli` surfaced the Linear issues it read (`…/issue/LIN-288`, `-300`, `-301`, `-299`, `-302`);
+    `web` found git/CI artifacts (`…/pull/286`, three `…/actions/runs/…`). It extracts *every* artifact
+    mentioned in the recap, dedupes with `· N mentions` counts, and attaches a primary URL to `[done]`.
+    This is invariant-2's evidence discipline made mechanical — structured pointers to verify against.
+  - **Heartbeats (#2) still the one gap.** Both runs went `Executing task...` → ~36s silence → recap
+    burst, with no intermediate entry. Didn't bite (55–57s tasks), but a long run would still look
+    frozen mid-flight.
+
+- **Run 10 — read-only retro → `cli` (item `c9b5b4f6…`, 2026-06-06 11:32), heartbeat verification
+  (timer reduced 2m → 30s).** The silent work window is now covered, and the beats carry *activity*,
+  not just liveness:
+  ```
+  #5 11:32:45        [working] no tool calls in 20s · 0 total · next heartbeat in ≤30s
+  #6 11:33:16 (+32s) [working · running] 6 tools in 32s: Bash×6 · 6 total · next heartbeat in ≤1m
+  ```
+  - A beat fired ~32s into the work window (consistent with the 30s timer) — the exact gap that made
+    "working vs dead" indistinguishable in Runs 1–9 is now filled.
+  - Each beat is a **progress** signal: tool count + breakdown (`6 tools in 32s: Bash×6`) and an
+    idle/running substate (`no tool calls in 20s` vs `· running`), so an orchestrator can tell
+    *working* from *stuck*, not just *alive*.
+  - **Adaptive cadence** — `≤30s` then `≤1m`: tight early when liveness matters most, widening later so
+    a long task doesn't flood the channel. (Append entries rather than a coalesced timestamp, but the
+    backoff keeps accumulation bounded.)
+  - **This closes #2 — the last telemetry gap.**
+
 ### Dispatch-consumer punch-list (for the runner, ranked by leverage)
 
 1. **Terminal completion event** — on stop, post `[done]`/`[failed]`/`[aborted]` + final summary +
    an **evidence URL** (Linear comment / PR / commit). The single highest-value change. **Must be
    owned by the launcher/consumer process, not a Stop hook inside the session** — Run 4 proved a
    cleanly-completed `cli` session still fails to post a hook-based terminal event (see below).
-   ◐ **Mostly done (Runs 5–8):** the launcher posts `[done]` on **both `cli` and `web`**, and the
-   session's **final recap** now lands on **both targets** (Run 7 `cli`, Run 8 `web`) as
-   `(recap 1/2)`+`(recap 2/2)` entries before `[done]`. Remaining: the **structured** evidence URL is
-   still unpopulated (`url`/`urlLabel` null — Run 8's URL was in the recap *prose*, not the field); and
-   the item `status` does not transition on the terminal event (signal is feedback-text-only). Open
-   question: fold the recap into the `[done]` payload vs. keep it as adjacent `(recap N/M)` entries.
+   ✅ **done (Runs 5–9):** the launcher posts `[done]` on **both `cli` and `web`**, with the session's
+   **final recap** (`(recap N/M)` entries) and, as of Run 9, **structured `[evidence]` entries +
+   a primary evidence URL on `[done]`** (see #5).
 2. **Liveness heartbeats** during the work window, so a hung/asleep session is distinguishable from a
-   working one in ~1 min instead of never.
+   working one in ~1 min instead of never. ✅ **done (Run 10):** the timer was cut 2m → 30s and the
+   beats carry activity telemetry (tool count + breakdown, idle/running substate) with an **adaptive
+   cadence** (`≤30s` widening to `≤1m`). The previously-silent work window is now covered; this was the
+   last telemetry gap.
 3. **Stop echoing the full prompt** — a short reference is enough. ✅ done in the improved runner.
 4. **Forward `dispatchId` → `/api/proxy/foreman/status`** so work joins to the exact dispatch attempt
    (foreman channel is empty today).
-5. **Populate `url`/`urlLabel`** with the concrete artifact (still `null` — Run 8's evidence URL was
-   in the recap *prose*, not the structured field).
+5. **Populate `url`/`urlLabel`** with the concrete artifact. ✅ **done (Run 9):** the consumer posts
+   dedicated `[evidence]` entries with populated `url` (Linear issues on `cli`; PR + CI runs on `web`),
+   extracts *every* artifact from the recap with `· N mentions` dedup counts, and attaches a primary
+   URL to the `[done]` entry itself.
 6. **Explicit failure reporting** — stalls/disconnects/errors should be loud, not silent. ✅ done
    (Run 7): a terminal `[failed] … (reason)` now appears instead of a silent freeze.
 7. **Launcher owns the terminal post** (resolved by Run 4) — the original framing was "keep the Stop
@@ -304,22 +355,138 @@ re-roots #1 in the **launcher**, not the session hook. The orchestrator must tre
 8. **`web` remote-control connect regression** (Run 7) — `command not accepted`, failed twice. ✅
    **fixed (Run 8):** `web` now executes end-to-end and forwards the recap; the fix also streamlined
    the handoff (no more intermediate connect entries).
-9. **Terminal `status` transition on the watch/list endpoints** (our side, not the runner). ✅ **done:**
-   `GET /api/proxy/dispatch/:id` and `GET /api/proxy/dispatch` now derive a terminal `status`
-   (`done`/`failed`/`aborted`) from the runner's `[done]`/`[failed]`/`[aborted]` feedback marker, so an
-   orchestrator polls a **field** instead of parsing prose. Derived on read — the stored lifecycle
-   status and the feedback stream are untouched; `?status=done` is now a valid list filter.
+9. **Terminal `status` transition on the watch/list endpoints** (our side, not the runner). ✅ **done +
+   verified live (Run 9):** `GET /api/proxy/dispatch/:id` and `GET /api/proxy/dispatch` derive a
+   terminal `status` (`done`/`failed`/`aborted`) from the runner's `[done]`/`[failed]`/`[aborted]`
+   feedback marker, so an orchestrator polls a **field** instead of parsing prose. Derived on read —
+   the stored lifecycle status and the feedback stream are untouched; `?status=done` is a valid list
+   filter. Run 9 confirmed the field flips `taken → done` in production on both paths.
 
 ### Stage B — orchestrator spike
 
-- **Partially exercised manually:** the human-as-orchestrator loop now runs over the API —
-  `POST /api/proxy/dispatch` (with auto-appended proxy context) → `GET /api/proxy/dispatch/:id` +
-  `GET /api/proxy/dispatch?issueIdentifier=…` to watch → cross-check the outcome in Linear. That
-  round-trip works.
-- **Not yet done:** an actual Claude *orchestrator* prompt driving the loop unattended (dispatch →
-  detect completion via Linear evidence → recap → decide next). Blocked less by the API than by the
-  consumer telemetry gaps above — without a terminal/heartbeat signal, an autonomous orchestrator
-  can't reliably tell when to advance.
+**Run B1 — first end-to-end orchestrator drive (read-only research spike, 2026-06-06 11:48,
+item `cf108292…`, target `cli`).** A Claude session adopted the draft orchestrator guide
+([`autopilot-orchestrator-prompt.md`](./autopilot-orchestrator-prompt.md)) and drove the full
+loop over the proxy API alone — **orient → choose (precedence) → dispatch → poll `status` →
+cross-check evidence → recap → decide** — with no manual rescue. What each beat looked like:
+
+- **Orient** off live verbs: `GET /stack` (top = LIN-288 bug, already investigated) +
+  `GET /foreman/status` (**empty, `total:0`**). Precedence rule 1 (human instruction = "read-only
+  spike") fired and correctly *vetoed* dispatching LIN-288's recommended next step (it writes
+  code), choosing a read-only retro instead.
+- **Dispatch → watch:** enqueue returned `queued`; the `status` field transitioned
+  `queued → taken → done` **on its own** — the orchestrator polled a field, never parsed prose for
+  completion. Heartbeats (`[working · running] 6 tools in 32s: Bash×6`) gave live working-vs-stuck
+  signal through the 1m 33s work window.
+- **Cross-check (invariant 2, the load-bearing step):** the runner posted 8 structured
+  `[evidence]` PR URLs + a primary URL on `[done]`. The orchestrator did **not** accept the recap
+  prose — it independently fetched GitHub and confirmed PRs #318–325 all exist and are merged
+  (2026-06-04→06), and that **no new artifact appeared from this run** (read-only honored). Claim
+  corroborated by signal the worker can't author. ✅
+- **Decide:** evidence confirms → `complete`; no continue (one-shot), no human-help flag.
+
+**What the spike proves:** the Stage B loop is *viable over the existing API* — orient, dispatch,
+terminal-`status` detection, heartbeat liveness, and mechanical evidence cross-check all worked on
+the first drive. The telemetry shipped in Runs 1–10 is exactly what made the orchestrator able to
+*decide* without re-reading everything. Context economy held: steady-state needed only
+`{kind, status, evidence URLs, liveness}`; the 3-chunk recap was pulled as drill-down only for the
+cross-check.
+
+**Two concrete gaps it hit (next build-spec items, neither blocking):**
+1. **Precedence rule 2 is inoperable today.** `foreman/status` is empty, so "a periodical past its
+   cadence" has *no data source* — the orchestrator can only act on rules 1 and 3. This is
+   `autopilot.md` §8.C (cadence state) / punch-list #4, now confirmed to bite at the **orient** step,
+   not just loop-reconstruction.
+2. **No structured `kind` on dispatch.** The orchestrator wants `kind` in the task header (§6) to
+   read trajectory; today it must infer it from `promptName`. The dispatch verbs don't carry a
+   first-class `kind` field yet.
+
+**One design nuance surfaced:** for a *read-only/research* task the recap **is** the deliverable, so
+the evidence cross-check confirms the recap's *cited facts are real* rather than proving an *outcome*
+exists. Evidence discipline is sharper for implementation tasks (a diff/PR/CI either exists or
+doesn't) than for research ones (corroborate the citations; the judgment of "is this a good retro"
+stays human-adjacent). The guide should distinguish the two.
+
+**Run B2 — first write-class drive, halted on infra error (2026-06-06 12:02, LIN-319, target
+`cli`).** Plan: dogfood the gap B1 found — a deliberately thin ticket (**LIN-319**, "Dispatch
+verbs carry no structured `kind` field", no solution baked in) driven by autopilot to a merged
+fix, with merge-to-main authorized (Git makes it reversible; the post-merge deploy is the
+verification). What happened and what it taught:
+
+- **`/recommend/LIN-319` returned 504 twice** (Linear context-fetch timeout — the same 504 class
+  GitHub PR #319 addressed, here on a *tiny fresh* ticket, so likely transient infra slowness).
+- **Orchestrator mistake (corrected by the operator):** I treated the 504 as a fallback trigger and
+  hand-authored an implementation prompt to keep going. That is a **silent workaround of an infra
+  error**, which violates invariant 1 — the loop must *flag*, not paper over a broken signal. The
+  correct behavior is **halt and surface**.
+- **Policy now encoded** in [`autopilot-orchestrator-prompt.md`](./autopilot-orchestrator-prompt.md):
+  a network error / timeout / 5xx from any verb the orchestrator drives is a **halt condition**, not
+  a fallback; a handed-in prompt is *only* a human-supplied kickoff prompt, never a substitute for an
+  errored `/recommend`. (Distinct from a clean task-level `[failed]`, which stays a normal retry/escalate
+  signal.)
+- **Run halted.** The watch loop was stopped. An implementation worker had already been taken on the
+  runner (re-grounding — `Read×4`, `Bash`) and may still open a PR on its own branch; the orchestrator
+  will **not** verify or merge it. Disposition (let it finish for manual review vs. treat as void) is the
+  human's call.
+
+**Net:** B2 didn't reach a merge, but it produced the more valuable result for an *autonomous* loop —
+the first real test of the failure boundary, and a sharpened rule: **the orchestrator halts on infra
+errors rather than improvising around them.** The merge-to-main write path is still unexercised; the
+next attempt should start only once `/recommend` is healthy (or with a human-supplied kickoff prompt by
+explicit choice, not as error-recovery).
+
+**Run B3 — clean re-run after the halt fix (2026-06-06 12:13, LIN-319, target `cli`).** The
+orchestrator re-drove the loop with the halt rule in force:
+
+- **`/recommend` was transient** — 504 on attempt 1, **200 on attempt 2**. The halt rule was armed
+  but didn't need to fire; the retry-then-halt shape behaved correctly.
+- **The recommender routed LIN-319 → `kind=planning`, not implementation** ("no implementation plan
+  exists; Plan signals unmet"). This is the faithful trajectory — fresh ticket plans first — and a
+  quiet vindication that B2's straight-to-implementation hand-prompt was the wrong *shape*, separate
+  from B2's halt error. The orchestrator dispatched the recommended plan prompt verbatim.
+- **Plan dispatch completed `done` in 3m 40s** with full telemetry (heartbeats → `(recap 1/2)`+`(2/2)`
+  → `[evidence]` Linear URL → `[done]`).
+- **Cross-check (invariant 2):** independently fetched LIN-319 — `In Progress`, a 5.6k-char plan in
+  the description (hybrid strategy scored against 2 alternatives, 7-surface map, "fits one session"),
+  and a strategy comment posted. The **plan deliverable is verified.**
+- **The tangle the cross-check exposed:** the plan's re-grounding reported the change is **already
+  implemented and verified in the working tree** (branch `wardrox/lin-319-dispatch-kind`, 8/8 `kind`
+  tests) — i.e. the **residual B2 implementation worker's output**, which finished on the runner after
+  the orchestrator halted. So the realised `kind` sequence was **implementation(residual) → planning**,
+  *backwards*, purely an artifact of the B2 concurrency, not a converging loop.
+- **Evidence discipline reinforced:** that implementation is **uncommitted — no commit/SHA/PR/CI**, so
+  there is nothing external to verify. The orchestrator marks it **"claimed, unverified"** and does
+  **not** treat it as done; only the plan (real Linear artifacts) is accepted. To become mergeable it
+  must first be committed → pushed → PR'd so it carries a SHA + a CI result. **Paused here for a human
+  decision** (per the "check before the first code-writing/merge action" guardrail), rather than
+  auto-advancing to an implementation/commit step.
+
+**Arc stopped at B3 (2026-06-06 ~12:25).** Asked to continue past the verified plan, the orchestrator
+re-queried `/recommend/LIN-319` for the next step and it **504'd three times in a row** — so the halt
+rule fired as designed and the run stopped at the verified plan rather than improvising. (The
+implementation lives, uncommitted, on a *local* branch on the runner — confirmed not on the remote —
+so it remains unverifiable from outside and was left for manual disposition.) Judged a successful arc:
+the loop oriented, dispatched, judged from evidence, and **halted itself on infra failure** instead of
+papering over it.
+
+**Net (B1→B3):** the loop drives cleanly over the API (B1), halts correctly on infra errors (B2 fix),
+and produces faithful `kind` trajectories from `/recommend` (B3). Three durable findings:
+1. **Halt on infra errors, don't improvise around them** — now a first-class rule in the guide.
+2. **`/recommend` is an intermittently-flaky hard dependency** — it 504'd (Linear context-fetch
+   timeout) in *both* B2 and B3-continuation, on a tiny fresh ticket. The whole loop's step-choice
+   hangs off it, so this is a real reliability risk for autonomous operation. **Follow-up candidate:**
+   harden `/recommend` against Linear slowness (cache/timeout/partial-context), or give the
+   orchestrator a *sanctioned* degraded mode (not a silent workaround).
+3. **The merge-to-main write path is still unexercised end-to-end** — no run has reached PR → CI →
+   merge → deploy. Muddied further in B3 by an impl-before-plan sequence, self-inflicted by letting
+   B2's halted worker keep running: **a clean write-path test needs one worker per ticket and a healthy
+   `/recommend`.**
+
+- **Still not done:** (a) an unexercised **merge-to-main write path** (the next write-class attempt
+  should start only with a healthy `/recommend` and a single worker on the ticket); (b) a genuinely
+  *unattended* multi-step loop (B1–B3 were each supervised, with a human reading the external recaps);
+  (c) deliberately provoking a task-level `[failed]`/stall to watch the `help` branch fire (B2/B3 only
+  exercised the *infra-error* halt, not a worker-failure escalation).
 
 ### Endpoints / changes shipped on this branch
 
