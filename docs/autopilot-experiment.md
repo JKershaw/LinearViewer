@@ -22,8 +22,12 @@ poll a status field and read structured evidence pointers without parsing prose 
 evidence discipline made mechanical. As of **Run 10** the last telemetry gap (liveness heartbeats #2)
 is closed: 30s adaptive beats carrying tool-activity now cover the work window. **All telemetry
 punch-list items are done** (only #4, the optional `dispatchId`→foreman join for loop-reconstruction,
-remains). The loop is ready for the **Stage B orchestrator spike**. Continuation tracked in Linear as
-**LIN-318** (In Progress).
+remains). **Stage B has now had its first drive (Run B1, below):** a Claude session drove the full
+orient → dispatch → poll-`status` → cross-check-evidence → recap → decide loop over the proxy API with
+no manual rescue, against the draft guide in
+[`autopilot-orchestrator-prompt.md`](./autopilot-orchestrator-prompt.md). It surfaced two non-blocking
+build-spec gaps (no periodical-cadence data source → precedence rule 2 inoperable; no structured
+`kind` on dispatch). Continuation tracked in Linear as **LIN-318** (In Progress).
 
 ## The question we are answering
 
@@ -351,14 +355,53 @@ re-roots #1 in the **launcher**, not the session hook. The orchestrator must tre
 
 ### Stage B — orchestrator spike
 
-- **Partially exercised manually:** the human-as-orchestrator loop now runs over the API —
-  `POST /api/proxy/dispatch` (with auto-appended proxy context) → `GET /api/proxy/dispatch/:id` +
-  `GET /api/proxy/dispatch?issueIdentifier=…` to watch → cross-check the outcome in Linear. That
-  round-trip works.
-- **Not yet done:** an actual Claude *orchestrator* prompt driving the loop unattended (dispatch →
-  detect completion via Linear evidence → recap → decide next). Blocked less by the API than by the
-  consumer telemetry gaps above — without a terminal/heartbeat signal, an autonomous orchestrator
-  can't reliably tell when to advance.
+**Run B1 — first end-to-end orchestrator drive (read-only research spike, 2026-06-06 11:48,
+item `cf108292…`, target `cli`).** A Claude session adopted the draft orchestrator guide
+([`autopilot-orchestrator-prompt.md`](./autopilot-orchestrator-prompt.md)) and drove the full
+loop over the proxy API alone — **orient → choose (precedence) → dispatch → poll `status` →
+cross-check evidence → recap → decide** — with no manual rescue. What each beat looked like:
+
+- **Orient** off live verbs: `GET /stack` (top = LIN-288 bug, already investigated) +
+  `GET /foreman/status` (**empty, `total:0`**). Precedence rule 1 (human instruction = "read-only
+  spike") fired and correctly *vetoed* dispatching LIN-288's recommended next step (it writes
+  code), choosing a read-only retro instead.
+- **Dispatch → watch:** enqueue returned `queued`; the `status` field transitioned
+  `queued → taken → done` **on its own** — the orchestrator polled a field, never parsed prose for
+  completion. Heartbeats (`[working · running] 6 tools in 32s: Bash×6`) gave live working-vs-stuck
+  signal through the 1m 33s work window.
+- **Cross-check (invariant 2, the load-bearing step):** the runner posted 8 structured
+  `[evidence]` PR URLs + a primary URL on `[done]`. The orchestrator did **not** accept the recap
+  prose — it independently fetched GitHub and confirmed PRs #318–325 all exist and are merged
+  (2026-06-04→06), and that **no new artifact appeared from this run** (read-only honored). Claim
+  corroborated by signal the worker can't author. ✅
+- **Decide:** evidence confirms → `complete`; no continue (one-shot), no human-help flag.
+
+**What the spike proves:** the Stage B loop is *viable over the existing API* — orient, dispatch,
+terminal-`status` detection, heartbeat liveness, and mechanical evidence cross-check all worked on
+the first drive. The telemetry shipped in Runs 1–10 is exactly what made the orchestrator able to
+*decide* without re-reading everything. Context economy held: steady-state needed only
+`{kind, status, evidence URLs, liveness}`; the 3-chunk recap was pulled as drill-down only for the
+cross-check.
+
+**Two concrete gaps it hit (next build-spec items, neither blocking):**
+1. **Precedence rule 2 is inoperable today.** `foreman/status` is empty, so "a periodical past its
+   cadence" has *no data source* — the orchestrator can only act on rules 1 and 3. This is
+   `autopilot.md` §8.C (cadence state) / punch-list #4, now confirmed to bite at the **orient** step,
+   not just loop-reconstruction.
+2. **No structured `kind` on dispatch.** The orchestrator wants `kind` in the task header (§6) to
+   read trajectory; today it must infer it from `promptName`. The dispatch verbs don't carry a
+   first-class `kind` field yet.
+
+**One design nuance surfaced:** for a *read-only/research* task the recap **is** the deliverable, so
+the evidence cross-check confirms the recap's *cited facts are real* rather than proving an *outcome*
+exists. Evidence discipline is sharper for implementation tasks (a diff/PR/CI either exists or
+doesn't) than for research ones (corroborate the citations; the judgment of "is this a good retro"
+stays human-adjacent). The guide should distinguish the two.
+
+- **Still not done:** an *unattended, multi-step* orchestrator run (B1 was a single supervised
+  dispatch with a human reading each external-recap line). The next spike is a multi-task loop —
+  orient → work several stack items in sequence → and deliberately provoke a `failed`/stall to
+  watch the `help` branch fire.
 
 ### Endpoints / changes shipped on this branch
 
