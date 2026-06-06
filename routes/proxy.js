@@ -1146,6 +1146,13 @@ POST ${baseUrl}/api/proxy/dispatch
   → By default a proxy-context block is appended to the prompt so the worker inherits Linear access for this workspace (the MCP replacement). Reporting is handled by the runner's Stop hook, not the prompt. Set "appendProxyContext": false to opt out.
   → { "id": "...", "status": "queued", "promptName": "...", "kind": "implementation", "issueIdentifier": "...", "target": "cli", "dispatchedAt": "..." }
 
+POST ${baseUrl}/api/proxy/recommend-and-dispatch
+  Body: { "issueIdentifier": "LIN-42", "target": "cli|web|dash", "repo": "...", "appendProxyContext": true }
+  → Fused verb: runs /recommend and forwards the recommended prompt straight into a dispatch, server-side. "issueIdentifier" is required; target defaults to "cli".
+  → The prompt body NEVER returns to you — you only get the task header. This keeps the prompt out of your context (the point of the verb); learn what was chosen from "kind"/"promptName", then watch the item via GET /dispatch/{id}.
+  → "kind" is derived from the recommendation's own action signal (falling back to "custom") — no need to read the prompt to classify the task.
+  → { "id": "...", "status": "queued", "kind": "plan", "promptName": "plan", "issueIdentifier": "...", "target": "cli", "dispatchedAt": "..." }
+
 GET ${baseUrl}/api/proxy/dispatch?issueIdentifier={LIN-42}&status={queued|taken|done|failed|aborted}&limit={n}
   → List your dispatch items (live queue + recent history), newest first. All query params optional. Use this to find an item's id when you only know the issue.
   → { "items": [{ "id": "...", "status": "queued|taken|done|failed|aborted", "kind": "implementation", "issueIdentifier": "...", "feedbackCount": 1, ... }], "total": N }
@@ -2154,6 +2161,110 @@ ${readEndpoints}${writeEndpoints}
   });
 
   /**
+   * Shared, test-mode-aware recommendation compute used by both GET /recommend
+   * and the fused POST /recommend-and-dispatch verb. Returns
+   * { identifier, reasoning, prompt, truncated, repo, recommendedAction }.
+   *
+   * Does NOT manage keepalive — the calling handler arms it around this call
+   * (the test-mode path resolves immediately, so arming is harmless there).
+   * May throw (issue-not-found / OpenRouter / graphql); callers map the error
+   * with recommendErrorResponse(). `sessionApiKey` may be passed in to avoid a
+   * second key lookup when the caller already resolved it for its precheck.
+   */
+  async function computeRecommendation({ urlKey, createdBy, identifier, accessToken, isTestMode, sessionApiKey }) {
+    if (sessionApiKey === undefined) {
+      sessionApiKey = await getWorkspaceOpenRouterKey(urlKey, createdBy);
+    }
+
+    if (isTestMode) {
+      const mockData = await getTestMockData();
+      // Find mock issue by UUID or identifier
+      const mockIssue = mockData.issues.find(i =>
+        i.id === identifier || i.identifier === identifier
+      );
+      if (!mockIssue) {
+        throw new Error('Issue not found');
+      }
+
+      const labels = (mockIssue.labels?.nodes || []).map(l => l.name);
+      const issueIdentifier = mockIssue.identifier || mockIssue.url?.split('/').pop() || 'ISSUE';
+
+      let reasoning = 'Analyzing the task to determine the best approach.';
+      let goal = 'Understand what this task involves and plan the next steps.';
+      // recommendedAction mirrors the live meta-prompt's `→ **<name>**` signal so
+      // the fused verb's `kind` plumbing is exercised in E2E: bug→bug,
+      // blocked→blocked, started→implement, else plan.
+      let recommendedAction = 'plan';
+
+      if (labels.includes('bug')) {
+        reasoning = 'This is a bug. Investigating systematically will help find the root cause.';
+        goal = 'Identify reproduction steps, hypothesize causes, and suggest a fix.';
+        recommendedAction = 'bug';
+      } else if (labels.includes('blocked')) {
+        reasoning = 'This task is blocked. Analyzing the blocker to find a way forward.';
+        goal = 'Identify the blocker and recommend how to unblock.';
+        recommendedAction = 'blocked';
+      } else if (mockIssue.state?.type === 'started') {
+        reasoning = 'Task is in progress. Checking what work remains.';
+        goal = 'Continue implementation and update progress.';
+        recommendedAction = 'implement';
+      }
+
+      const mockProject = mockData.projects.find(p => p.id === mockIssue.project?.id);
+
+      return {
+        identifier: issueIdentifier,
+        reasoning,
+        prompt: `Help me with task ${issueIdentifier}\n\n## Context\n\n**Status:** ${mockIssue.state?.name || 'Unknown'}\n${labels.length > 0 ? `**Labels:** ${labels.join(', ')}` : ''}\n\n## Goal\n\n${goal}`,
+        truncated: false,
+        repo: parseRepoFromDescription(mockProject?.content),
+        recommendedAction
+      };
+    }
+
+    // Live path. Fetch issue context with two-tier support for parent tasks,
+    // then the AI recommendation. Uses a longer timeout since this makes a
+    // Linear API call + an OpenRouter LLM call.
+    const context = await fetchWithTimeout((signal) => fetchRecommendationContext(accessToken, identifier, { signal }), CONTEXT_FETCH_TIMEOUT_MS);
+    const { issue, parent, siblings, project, children, comments, focusedChild } = context;
+
+    const selectedModel = await resolveWorkspaceModel({ urlKey, workspacePreferencesStore });
+    const recommendation = await withTimeout(
+      getRecommendation(
+        issue,
+        { parent, siblings, project, children, comments, focusedChild },
+        { apiKey: sessionApiKey, model: selectedModel, featureFlags: {} }
+      ),
+      LLM_TIMEOUT_MS
+    );
+
+    return {
+      identifier: issue.identifier,
+      reasoning: recommendation.reasoning,
+      prompt: recommendation.prompt,
+      truncated: recommendation.truncated,
+      repo: parseRepoFromDescription(project?.description),
+      recommendedAction: recommendation.recommendedAction
+    };
+  }
+
+  /**
+   * Map a recommendation error to { status, body }. Shared by GET /recommend
+   * and POST /recommend-and-dispatch so both surfaces report issue-not-found /
+   * OpenRouter / graphql failures identically.
+   */
+  function recommendErrorResponse(err) {
+    if (err.message?.includes('not found')) {
+      return { status: 404, body: { error: 'Issue not found' } };
+    }
+    if (err.message?.includes('OpenRouter')) {
+      return { status: 503, body: { error: 'AI service temporarily unavailable', detail: err.message } };
+    }
+    console.error('Proxy /recommend error:', err.message);
+    return { status: graphqlErrorStatus(err), body: { error: 'Failed to get recommendation', detail: graphqlErrorDetail(err) } };
+  }
+
+  /**
    * GET /api/proxy/recommend/:identifier
    * Returns an AI-generated prompt recommendation for an issue.
    * Uses the token creator's OAuth key (if available) or server-side OPENROUTER_API_KEY.
@@ -2184,107 +2295,44 @@ ${readEndpoints}${writeEndpoints}
         logEvent(req, '/api/proxy/recommend', 400);
         return res.status(400).json({ error: 'Invalid identifier format' });
       }
-      if (isTestMode) {
-        const mockData = await getTestMockData();
-        // Find mock issue by UUID or identifier
-        const mockIssue = mockData.issues.find(i =>
-          i.id === identifier || i.identifier === identifier
-        );
-        if (!mockIssue) {
-          logEvent(req, '/api/proxy/recommend', 404);
-          return res.status(404).json({ error: 'Issue not found' });
-        }
-
-        const labels = (mockIssue.labels?.nodes || []).map(l => l.name);
-        const issueIdentifier = mockIssue.identifier || mockIssue.url?.split('/').pop() || 'ISSUE';
-
-        let reasoning = 'Analyzing the task to determine the best approach.';
-        let goal = 'Understand what this task involves and plan the next steps.';
-
-        if (labels.includes('bug')) {
-          reasoning = 'This is a bug. Investigating systematically will help find the root cause.';
-          goal = 'Identify reproduction steps, hypothesize causes, and suggest a fix.';
-        } else if (labels.includes('blocked')) {
-          reasoning = 'This task is blocked. Analyzing the blocker to find a way forward.';
-          goal = 'Identify the blocker and recommend how to unblock.';
-        } else if (mockIssue.state?.type === 'started') {
-          reasoning = 'Task is in progress. Checking what work remains.';
-          goal = 'Continue implementation and update progress.';
-        }
-
-        const mockProject = mockData.projects.find(p => p.id === mockIssue.project?.id);
-
-        logEvent(req, '/api/proxy/recommend', 200);
-        return res.json({
-          identifier: issueIdentifier,
-          reasoning,
-          prompt: `Help me with task ${issueIdentifier}\n\n## Context\n\n**Status:** ${mockIssue.state?.name || 'Unknown'}\n${labels.length > 0 ? `**Labels:** ${labels.join(', ')}` : ''}\n\n## Goal\n\n${goal}`,
-          truncated: false,
-          repo: parseRepoFromDescription(mockProject?.content)
-        });
-      }
 
       // Linear + OpenRouter can exceed Heroku's 30s router cap (H12). Arm a
       // delayed whitespace keepalive so the dyno can keep the connection open
       // while the LLM call completes.
       const keepalive = armKeepalive(res);
       try {
-        // Fetch issue context with two-tier support for parent tasks
-        const context = await fetchWithTimeout((signal) => fetchRecommendationContext(accessToken, identifier, { signal }), CONTEXT_FETCH_TIMEOUT_MS);
-        const { issue, parent, siblings, project, children, comments, focusedChild } = context;
-
-        // Get AI-generated recommendation (uses session OAuth key or server-side OPENROUTER_API_KEY)
-        // Uses a longer timeout since this makes a Linear API call + an OpenRouter LLM call.
-        const selectedModel = await resolveWorkspaceModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore });
-        const recommendation = await withTimeout(
-          getRecommendation(
-            issue,
-            { parent, siblings, project, children, comments, focusedChild },
-            { apiKey: sessionApiKey, model: selectedModel, featureFlags: {} }
-          ),
-          LLM_TIMEOUT_MS
-        );
+        const rec = await computeRecommendation({
+          urlKey: req.proxyUrlKey,
+          createdBy: req.proxyCreatedBy,
+          identifier,
+          accessToken,
+          isTestMode,
+          sessionApiKey
+        });
 
         keepalive.stop();
         logEvent(req, '/api/proxy/recommend', 200);
+        // recommendedAction + kind are additive (LIN-321): existing clients that
+        // read identifier/reasoning/prompt/truncated/repo are unaffected.
         keepalive.send(200, {
-          identifier: issue.identifier,
-          reasoning: recommendation.reasoning,
-          prompt: recommendation.prompt,
-          truncated: recommendation.truncated,
-          repo: parseRepoFromDescription(project?.description)
+          identifier: rec.identifier,
+          reasoning: rec.reasoning,
+          prompt: rec.prompt,
+          truncated: rec.truncated,
+          repo: rec.repo,
+          recommendedAction: rec.recommendedAction,
+          kind: deriveDispatchKind(rec.recommendedAction)
         });
       } catch (err) {
         keepalive.stop();
-        let status;
-        let body;
-        if (err.message?.includes('not found')) {
-          status = 404;
-          body = { error: 'Issue not found' };
-        } else if (err.message?.includes('OpenRouter')) {
-          status = 503;
-          body = { error: 'AI service temporarily unavailable', detail: err.message };
-        } else {
-          status = graphqlErrorStatus(err);
-          body = { error: 'Failed to get recommendation', detail: graphqlErrorDetail(err) };
-          console.error('Proxy /recommend error:', err.message);
-        }
+        const { status, body } = recommendErrorResponse(err);
         logEvent(req, '/api/proxy/recommend', status);
         keepalive.send(status, body);
       }
     } catch (err) {
-      if (err.message?.includes('not found')) {
-        logEvent(req, '/api/proxy/recommend', 404);
-        return res.status(404).json({ error: 'Issue not found' });
-      }
-      if (err.message?.includes('OpenRouter')) {
-        logEvent(req, '/api/proxy/recommend', 503);
-        return res.status(503).json({ error: 'AI service temporarily unavailable', detail: err.message });
-      }
-      const status = graphqlErrorStatus(err);
+      const { status, body } = recommendErrorResponse(err);
       logEvent(req, '/api/proxy/recommend', status);
-      console.error('Proxy /recommend error:', err.message);
-      res.status(status).json({ error: 'Failed to get recommendation', detail: graphqlErrorDetail(err) });
+      res.status(status).json(body);
     }
   });
 
@@ -3075,6 +3123,134 @@ ${readEndpoints}${writeEndpoints}
     } catch (err) {
       logEvent(req, '/api/proxy/dispatch', 500);
       console.error('Proxy dispatch error:', err.message);
+      res.status(500).json({ error: 'Failed to dispatch prompt' });
+    }
+  });
+
+  /**
+   * POST /api/proxy/recommend-and-dispatch
+   * Fused verb (LIN-321): run /recommend and forward the recommended prompt
+   * straight into a dispatch, SERVER-SIDE, returning only the task header.
+   * The prompt body never reaches the caller, so the orchestrator's context-
+   * economy rule (autopilot invariant 4) becomes mechanical instead of a rule
+   * it must remember. `kind` is derived from the recommendation's own action
+   * signal — no need to read the prompt to classify the task.
+   */
+  router.post('/api/proxy/recommend-and-dispatch', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
+    if (!dispatchQueueStore) {
+      logEvent(req, '/api/proxy/recommend-and-dispatch', 503);
+      return res.status(503).json({ error: 'Dispatch is not available' });
+    }
+
+    try {
+      const { issueIdentifier, target, repo, appendProxyContext } = req.body || {};
+
+      // Validate caller-supplied inputs. (Only the server-generated prompt skips
+      // the dangerous-char/length checks — see the dispatch step below.)
+      if (!issueIdentifier || typeof issueIdentifier !== 'string') {
+        logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
+        return res.status(400).json({ error: 'issueIdentifier is required and must be a string' });
+      }
+      if (!isValidIssueId(issueIdentifier)) {
+        logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
+        return res.status(400).json({ error: 'Invalid identifier format' });
+      }
+      if (target !== undefined && !VALID_PROXY_DISPATCH_TARGETS.includes(target)) {
+        logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
+        return res.status(400).json({ error: `target must be one of: ${VALID_PROXY_DISPATCH_TARGETS.join(', ')}` });
+      }
+      if (repo !== undefined && (typeof repo !== 'string' || repo.length > MAX_NAME_LENGTH || DANGEROUS_CHARS_REGEX.test(repo))) {
+        logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
+        return res.status(400).json({ error: 'repo is invalid' });
+      }
+
+      // Recommendation preconditions — identical to GET /recommend.
+      const accessToken = await getWorkspaceAccessToken(req.proxyUrlKey);
+      if (!accessToken) {
+        logEvent(req, '/api/proxy/recommend-and-dispatch', 503);
+        return res.status(503).json({ error: 'Workspace not available' });
+      }
+      const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
+      const sessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
+      if (!isTestMode && !isRecommendationEnabled(sessionApiKey)) {
+        logEvent(req, '/api/proxy/recommend-and-dispatch', 503);
+        return res.status(503).json({ error: 'AI recommendations not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.' });
+      }
+
+      // /recommend is slow (Linear + OpenRouter) — arm keepalive before computing.
+      const keepalive = armKeepalive(res);
+
+      let rec;
+      try {
+        rec = await computeRecommendation({
+          urlKey: req.proxyUrlKey,
+          createdBy: req.proxyCreatedBy,
+          identifier: issueIdentifier,
+          accessToken,
+          isTestMode,
+          sessionApiKey
+        });
+      } catch (err) {
+        keepalive.stop();
+        const { status, body } = recommendErrorResponse(err);
+        logEvent(req, '/api/proxy/recommend-and-dispatch', status);
+        return keepalive.send(status, body);
+      }
+
+      try {
+        // The recommended prompt is server-generated/trusted, so we forward it
+        // verbatim and intentionally SKIP the DANGEROUS_CHARS/length checks the
+        // caller-supplied POST /dispatch path runs. The prompt body is never
+        // returned to the caller — that is the whole point of this verb.
+        let finalPrompt = rec.prompt;
+        if (appendProxyContext !== false) {
+          const baseUrl = `${req.protocol}://${req.get('host')}`;
+          const bearerToken = (req.headers.authorization || '').slice(7);
+          finalPrompt = rec.prompt + buildProxyContextPreamble({
+            baseUrl,
+            token: bearerToken,
+            issueIdentifier
+          });
+        }
+
+        // kind provenance: parseRecommendedAction (in computeRecommendation) →
+        // recommendedAction → deriveDispatchKind → BOTH the stored item's kind
+        // and the response kind (same value); falls back to 'custom' when the
+        // action can't be parsed.
+        const item = await dispatchQueueStore.addItem(req.proxyUrlKey, {
+          prompt: finalPrompt,
+          promptName: rec.recommendedAction || 'Prompt',
+          kind: deriveDispatchKind(rec.recommendedAction),
+          issueId: null,
+          issueIdentifier,
+          issueTitle: null,
+          issueUrl: null,
+          dispatchedBy: req.proxyCreatedBy || null,
+          target: target || 'cli',
+          repo: repo || null
+        });
+
+        keepalive.stop();
+        logEvent(req, '/api/proxy/recommend-and-dispatch', 201);
+        // Task header ONLY — no prompt body.
+        keepalive.send(201, {
+          id: item._id,
+          status: 'queued',
+          kind: item.kind,
+          promptName: item.promptName,
+          issueIdentifier: item.issueIdentifier,
+          target: item.target,
+          dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt
+        });
+      } catch (err) {
+        keepalive.stop();
+        logEvent(req, '/api/proxy/recommend-and-dispatch', 500);
+        console.error('Proxy recommend-and-dispatch error:', err.message);
+        keepalive.send(500, { error: 'Failed to dispatch prompt' });
+      }
+    } catch (err) {
+      logEvent(req, '/api/proxy/recommend-and-dispatch', 500);
+      console.error('Proxy recommend-and-dispatch error:', err.message);
       res.status(500).json({ error: 'Failed to dispatch prompt' });
     }
   });

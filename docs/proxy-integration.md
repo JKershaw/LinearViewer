@@ -754,6 +754,33 @@ Returns `201`:
 { "id": "uuid", "status": "queued", "promptName": "...", "issueIdentifier": "LIN-42", "target": "cli", "dispatchedAt": "2026-06-06T11:32:25.111Z" }
 ```
 
+#### Recommend and Dispatch (fused)
+
+```
+POST /api/proxy/recommend-and-dispatch
+Content-Type: application/json
+
+{ "issueIdentifier": "LIN-42", "target": "cli", "repo": "...", "appendProxyContext": true }
+```
+
+Runs `/recommend` and forwards the recommended prompt straight into a dispatch — **server-side, in one call**. The prompt body never returns to you: you receive only the task header. This keeps the recommended prompt out of the orchestrator's context (autopilot invariant 4 — see `docs/autopilot.md` §8) and lets you read the task's `kind` without ever reading the prompt to classify it. Requires `readWrite`.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `issueIdentifier` | string | Yes | The issue to recommend a next step for (UUID or `LIN-123`) |
+| `target` | string | No | `cli` \| `web` \| `dash` (default `cli`). `local`/Harbour is **not** available to proxy consumers |
+| `repo` | string | No | Optional repository hint |
+| `appendProxyContext` | bool | No | Default `true`: append a proxy-context block so the worker inherits Linear access for this workspace |
+
+`kind` is derived server-side from the recommendation's own action signal, falling back to `custom` when the action can't be parsed. There is no `prompt` field to send (it is generated) and none in the response (it is withheld by design).
+
+Returns `201`:
+```json
+{ "id": "uuid", "status": "queued", "kind": "plan", "promptName": "plan", "issueIdentifier": "LIN-42", "target": "cli", "dispatchedAt": "2026-06-06T11:32:25.111Z" }
+```
+
+`/recommend` can be slow (Linear + OpenRouter); the same whitespace-keepalive behaviour as `GET /recommend` applies, so don't set a client timeout below ~60s. Watch the returned `id` with `GET /api/proxy/dispatch/{id}` exactly as for a plain dispatch.
+
 #### Watch a Dispatch
 
 ```

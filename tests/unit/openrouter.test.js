@@ -10,6 +10,7 @@ import {
   formatSubtaskOverview,
   formatIssueContext,
   isEpicShapedParent,
+  parseRecommendedAction,
   EPIC_CHILD_THRESHOLD,
   COUSIN_CAP,
   SIBLING_CAP,
@@ -543,5 +544,40 @@ describe('buildMetaPromptTemplate Surface Assessment', () => {
       result.includes('do not absorb the refactor into implementation steps'),
       'plan rule must preserve the sequencing guarantee'
     );
+  });
+});
+
+// =============================================================================
+// parseRecommendedAction Tests (LIN-321)
+// =============================================================================
+
+describe('parseRecommendedAction', () => {
+  test('extracts a well-formed lowercase action', () => {
+    const reasoning = 'Assessment...\n→ **plan**\n**Next:** ...';
+    assert.strictEqual(parseRecommendedAction(reasoning), 'plan');
+  });
+
+  test('extracts a capitalised display-name variant verbatim (trimmed)', () => {
+    const reasoning = '→ **Plan**';
+    assert.strictEqual(parseRecommendedAction(reasoning), 'Plan');
+  });
+
+  test('extracts multi-word action names', () => {
+    assert.strictEqual(parseRecommendedAction('→ **code review**'), 'code review');
+  });
+
+  test('matches the meta-prompt format with parenthetical examples after the line', () => {
+    const reasoning = '**Signal Status:** met\n→ **bug**\n**Next:** verify the fix';
+    assert.strictEqual(parseRecommendedAction(reasoning), 'bug');
+  });
+
+  test('returns null when the arrow line is absent', () => {
+    assert.strictEqual(parseRecommendedAction('Assessment without an action line'), null);
+  });
+
+  test('returns null for non-string input', () => {
+    assert.strictEqual(parseRecommendedAction(null), null);
+    assert.strictEqual(parseRecommendedAction(undefined), null);
+    assert.strictEqual(parseRecommendedAction(42), null);
   });
 });
