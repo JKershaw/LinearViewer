@@ -8,15 +8,16 @@ the question, the stages, and the success criteria were fixed in advance; the **
 section records what actually happened.
 
 **Checkpoint (2026-06-06):** the dispatch API surface is built, deployed, and exercised across
-**five** live runs. Key result: the loop works, but completion must be judged from external evidence
+**six** live runs. Key result: the loop works, but completion must be judged from external evidence
 (Linear/git/PR) — the feedback channel is liveness, not result. **Run 4 (clean `cli` retro)** was
 decisive: a session that completed normally **still failed to post its terminal event**, proving the
 gap is the **terminal-event delivery itself** — so the **launcher/consumer process must own the
-terminal post**, not a Stop hook inside the session. **Run 5 verified the fix:** a `[done]` terminal
-event now lands on the channel on `cli` (first time ever), closing completion-detection. Remaining
-consumer telemetry: the `[done]` still lacks a **final summary + evidence URL**, the item `status`
-doesn't transition on a terminal event, and **heartbeats** + **`web` re-verification** are still open
-before an autonomous orchestrator can drive it. Continuation tracked in Linear as **LIN-318** (In
+terminal post**, not a Stop hook inside the session. **Runs 5–6 verified the fix on both targets:** a
+`[done]` terminal event now lands on the channel on **`cli` and `web`** (Run 6 also fixed a separate
+bug where the dispatcher never actually fired the `/remote-control` trigger), closing
+completion-detection. Remaining consumer telemetry: the `[done]` still lacks a **final summary +
+evidence URL**, the item `status` doesn't transition on a terminal event, and **heartbeats** are still
+open before an autonomous orchestrator can drive it. Continuation tracked in Linear as **LIN-318** (In
 Progress).
 
 ## The question we are answering
@@ -210,15 +211,32 @@ re-roots #1 in the **launcher**, not the session hook. The orchestrator must tre
   `web` is expected to benefit from the same launcher-owned post (the launcher observes child exit
   regardless of path) but is **not yet re-verified**.
 
+- **Run 6 — read-only retro → `web` (item `c32bd6c0…`, 2026-06-06 08:13), the `web` re-verification.**
+  *(A first attempt, `e17e6bd6…`, surfaced a separate bug — the dispatcher logged `Sending
+  /remote-control command...` but never actually fired it, so the session never moved cli→web; that
+  run was aborted and the operator fixed the trigger.)* The retry cleared the full handoff — including
+  the exact point Run 2 went dark — and landed a terminal event:
+  ```
+  #3 08:13:25  [working] Summary complete. Connecting remote session...
+  #4 08:13:27  [working] Sending /remote-control command...
+  #5 08:13:33  [working] Remote connected. Executing task...     ← cleared the Run-2 stall point
+  #6 08:14:30  [done] Task completed in 1m 26s                   ← terminal event on web
+  ```
+  **Two fixes confirmed at once:** the remote-control trigger now actually connects (`Remote
+  connected`), and the **launcher-owned terminal post is path-independent** — `[done]` lands on `web`
+  exactly as on `cli`. Completion-detection now **closes on both targets.** The same two refinements
+  carry over (no final summary / evidence URL; `status` stays `taken`).
+
 ### Dispatch-consumer punch-list (for the runner, ranked by leverage)
 
 1. **Terminal completion event** — on stop, post `[done]`/`[failed]`/`[aborted]` + final summary +
    an **evidence URL** (Linear comment / PR / commit). The single highest-value change. **Must be
    owned by the launcher/consumer process, not a Stop hook inside the session** — Run 4 proved a
    cleanly-completed `cli` session still fails to post a hook-based terminal event (see below).
-   ◐ **Partially done (Run 5):** the launcher now posts `[done] … in 45s` on `cli`. Still missing the
-   **final summary** and **evidence URL**, and the item `status` does not transition on the terminal
-   event (signal is feedback-text-only). `web` not yet re-verified.
+   ◐ **Partially done (Runs 5–6):** the launcher now posts `[done]` on **both `cli` (45s) and `web`
+   (1m 26s)** — completion-detection closes on both targets. Still missing the **final summary** and
+   **evidence URL**, and the item `status` does not transition on the terminal event (signal is
+   feedback-text-only).
 2. **Liveness heartbeats** during the work window, so a hung/asleep session is distinguishable from a
    working one in ~1 min instead of never.
 3. **Stop echoing the full prompt** — a short reference is enough. ✅ done in the improved runner.
