@@ -7,11 +7,15 @@ Experiment plan + results for the first end-to-end spike of the Autopilot loop (
 the question, the stages, and the success criteria were fixed in advance; the **Results**
 section records what actually happened.
 
-**Checkpoint (2026-06-05):** the dispatch API surface is built, deployed, and exercised across
-three live runs. Key result: the loop works, but completion must be judged from external evidence
-(Linear/git/PR) — the feedback channel is liveness, not result. Open work is consumer telemetry
-(terminal/heartbeat/failure events; hooks surviving remote-control handoff) before an autonomous
-orchestrator can drive it. Continuation tracked in Linear as **LIN-318** (In Progress).
+**Checkpoint (2026-06-06):** the dispatch API surface is built, deployed, and exercised across
+**four** live runs. Key result: the loop works, but completion must be judged from external evidence
+(Linear/git/PR) — the feedback channel is liveness, not result. **Run 4 (clean `cli` retro)** was
+decisive: a session that completed normally **still failed to post its terminal event**, proving the
+gap is not the remote-control handoff but the **terminal-event delivery itself** — so the
+**launcher/consumer process must own the terminal post**, not a Stop hook inside the session (true on
+both `cli` and `web`). Open work is that consumer telemetry (launcher-owned terminal event +
+heartbeats + failure reporting) before an autonomous orchestrator can drive it. Operator is debugging
+the dispatch consumer now. Continuation tracked in Linear as **LIN-318** (In Progress).
 
 ## The question we are answering
 
@@ -154,20 +158,40 @@ and we re-ran. Two more dispatches, both via the new `POST /api/proxy/dispatch`:
 - **Run 3 — read-only retro → `cli` (item `cb9917e2…`), to test the hook hypothesis on a path that
   keeps hooks alive.** It launched (`[started]` + `[working] Session launched`) and then **froze at
   launch** — operator's laptop went to sleep right after spawn. Same silent-freeze signature as a
-  stall.
+  stall. Inconclusive (laptop sleep, not a clean test).
+- **Run 4 — read-only retro → `cli` (item `df85e338…`, 2026-06-06 07:14, laptop awake), the clean
+  re-run of #3.** Launched the same way (`[started]` + `[working] Session launched`, session
+  `e629d2d7`, tty `/dev/ttys002`) and then sat at `feedbackCount=2` for ~11+ min. Operator then
+  confirmed out-of-band: **the session actually concluded and produced its findings — but the
+  terminal event never reached the feedback channel.** This is the decisive result.
 
-**Combined finding:** a stalled run, a remote-handoff that drops the tail, and a sleeping laptop all
-produce the **identical silent freeze** on the channel. Today nothing distinguishes "working" from
-"dead" without manually checking Linear/git. That makes the punch-list's **terminal event (#1),
-heartbeat (#2), and failure report (#6)** the load-bearing changes — and confirms the orchestrator
-must treat **external evidence (Linear/git/PR) as the source of truth** for completion, with the
-feedback stream as liveness only.
+**Decisive finding (Run 4):** the silent freeze is **not** unique to the `web`/remote-control
+handoff, and it is **not** "still working." A `cli` session that completed normally — the path
+where hooks were assumed to survive — **still failed to post its terminal event.** So:
+
+- The "hooks die on remote-control handoff" story (Run 2) is *a* cause but **not the whole cause** —
+  the terminal post is missing on the plain `cli` path too. The terminal-event delivery is the gap,
+  independent of the handoff.
+- This **promotes punch-list #7's second option to the answer:** the **launcher (the dispatch
+  consumer process itself) must own the terminal post**, observing the child session's completion —
+  *not* a Stop hook running inside the session, on either path. Keeping hooks alive across handoff is
+  necessary-at-most for `web` and provably insufficient for `cli`.
+- A stalled run, a dropped remote tail, a sleeping laptop, **and a cleanly-completed cli session** all
+  produce the **identical silent freeze**. Nothing on the channel distinguishes working / done / dead.
+  Here external evidence couldn't break the tie either (read-only task → Linear/git silent by design),
+  so only the operator's direct observation of the session revealed completion.
+
+This makes **terminal event (#1)**, **heartbeat (#2)**, and **failure report (#6)** load-bearing, and
+re-roots #1 in the **launcher**, not the session hook. The orchestrator must treat **external evidence
+(Linear/git/PR) as the source of truth** for completion, with the feedback stream as liveness only.
+*(Operator is debugging the dispatch consumer to add the launcher-owned terminal post.)*
 
 ### Dispatch-consumer punch-list (for the runner, ranked by leverage)
 
 1. **Terminal completion event** — on stop, post `[done]`/`[failed]`/`[aborted]` + final summary +
-   an **evidence URL** (Linear comment / PR / commit). The single highest-value change. *(Blocked on
-   the remote-control path until hooks survive handoff — see below.)*
+   an **evidence URL** (Linear comment / PR / commit). The single highest-value change. **Must be
+   owned by the launcher/consumer process, not a Stop hook inside the session** — Run 4 proved a
+   cleanly-completed `cli` session still fails to post a hook-based terminal event (see below).
 2. **Liveness heartbeats** during the work window, so a hung/asleep session is distinguishable from a
    working one in ~1 min instead of never.
 3. **Stop echoing the full prompt** — a short reference is enough. ✅ done in the improved runner.
@@ -175,9 +199,11 @@ feedback stream as liveness only.
    (foreman channel is empty today).
 5. **Populate `url`/`urlLabel`** with the concrete artifact (all `null` today).
 6. **Explicit failure reporting** — stalls/disconnects/errors should be loud, not silent.
-7. **Hooks survive remote-control handoff** (newly found) — without this, #1 is impossible on `web`.
-   Either keep the Stop hook alive across the handoff, or have the launcher (not the remote session)
-   own the terminal post.
+7. **Launcher owns the terminal post** (resolved by Run 4) — the original framing was "keep the Stop
+   hook alive across the handoff, *or* have the launcher own the terminal post." Run 4 settled it: a
+   cleanly-completed `cli` session (hooks supposedly alive) **still** didn't post, so the hook path is
+   insufficient on *both* targets. The launcher/consumer process must observe child completion and
+   post the terminal event itself. This is the prerequisite for #1.
 
 ### Stage B — orchestrator spike
 
