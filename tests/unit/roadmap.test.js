@@ -1081,18 +1081,20 @@ describe('buildRoadmapModel', () => {
       createIssue({ id: 'b', completedAt: daysAgo(5), state: { name: 'Done', type: 'completed' } })
     ];
 
-    // Reproduce the old inline server.js pipeline and compare.
-    const velocity = calculateVelocity(issues, 90);
+    // Reproduce the old inline server.js pipeline and compare. Pin `now` so the
+    // inline build and buildRoadmapModel derive timestamps from one clock —
+    // otherwise their independent new Date() calls can drift by ~1ms (flaky CI).
+    const velocity = calculateVelocity(issues, 90, FIXED_NOW);
     const executionQueue = buildExecutionQueue(issues);
     const completedIssues = issues
       .filter(i => i.state?.type === 'completed')
       .map(i => issueToRoadmapCard(i));
     const milestones = groupByProject(executionQueue, projects, completedIssues);
-    const timedMilestones = projectTimeline(milestones, velocity);
+    const timedMilestones = projectTimeline(milestones, velocity, FIXED_NOW);
     const criticalPaths = findCriticalPaths(executionQueue);
     const risks = assessRisks(timedMilestones, criticalPaths, velocity);
 
-    const model = buildRoadmapModel(projects, issues);
+    const model = buildRoadmapModel(projects, issues, { now: FIXED_NOW });
 
     assert.deepStrictEqual(model.milestones, timedMilestones);
     assert.deepStrictEqual(model.executionQueue, executionQueue);
