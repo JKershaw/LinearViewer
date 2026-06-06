@@ -27,6 +27,7 @@ import { flattenTrees, sortIssuesForSwipe, applyBlockingOrder, clusterByParent }
 import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, DISPATCH_KINDS } from '../lib/prompt-templates.js';
 import { parseRepoFromDescription } from '../lib/prompt-formatters.js';
 import { buildForemanPlaybook } from '../lib/prompts/foreman-playbook.js';
+import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
 import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
 
@@ -2998,6 +2999,25 @@ ${readEndpoints}${writeEndpoints}
 
     const playbook = buildForemanPlaybook({ baseUrl });
     res.type('text/plain').send(playbook);
+  });
+
+  /**
+   * GET /api/proxy/autopilot/kickoff
+   * Returns the Autopilot kickoff prompt as plain text — the briefing that
+   * turns the receiving session into the Autopilot orchestrator (it dispatches
+   * work to a separate worker and judges completion from external evidence).
+   * General (stack-walk) by default; `?goal=` supplies a focus, `?mode=readonly`
+   * restricts to investigation/research prompts.
+   */
+  router.get('/api/proxy/autopilot/kickoff', proxyLimiter, authenticateProxyToken, async (req, res) => {
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const mode = AUTOPILOT_MODES.includes(req.query.mode) ? req.query.mode : AUTOPILOT_MODE_DEFAULT;
+    const goal = typeof req.query.goal === 'string' ? req.query.goal.slice(0, 1000) : '';
+
+    logEvent(req, '/api/proxy/autopilot/kickoff', 200);
+
+    const kickoff = buildAutopilotKickoff({ baseUrl, goal, mode });
+    res.type('text/plain').send(kickoff);
   });
 
   // ===========================================================================

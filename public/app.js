@@ -950,6 +950,12 @@ function hideIssuePromptUI(detailsContainer, issueId) {
   if (miniForemanContainer) {
     miniForemanContainer.classList.add('hidden')
   }
+
+  // Hide autopilot container
+  const autopilotContainer = detailsContainer?.querySelector(`[data-autopilot-for="${issueId}"]`)
+  if (autopilotContainer) {
+    autopilotContainer.classList.add('hidden')
+  }
 }
 
 /**
@@ -1127,8 +1133,14 @@ function initPrompts() {
     const target = dispatchBtn.dataset.target || 'cli'
     const originalLabel = dispatchBtn.textContent
 
-    // Get issue ID and workspace URL key
+    // Get issue ID and workspace URL key. Each prompt-container variant anchors
+    // its issue on a different data attribute (standard prompts use
+    // data-prompt-for; foreman/mini-foreman/autopilot each use their own), so
+    // check them all before falling back to the recommend container's wrapper.
     const issueId = promptContainer.dataset.promptFor ||
+      promptContainer.dataset.foremanFor ||
+      promptContainer.dataset.miniForemanFor ||
+      promptContainer.dataset.autopilotFor ||
       promptContainer.closest('[data-recommend-for]')?.dataset.recommendFor
     const urlKey = promptContainer.dataset.urlKey ||
       promptContainer.closest('[data-url-key]')?.dataset.urlKey
@@ -1152,6 +1164,10 @@ function initPrompts() {
 
     // Get repo from prompt/recommend container (set by prompt API response)
     const repo = promptContainer.dataset.repo || null
+    // Explicit kind for meta-loops (e.g. Autopilot) — set on the container by
+    // its fetch handler; absent for ordinary prompts, where the server derives
+    // kind from promptName.
+    const kind = promptContainer.dataset.kind || undefined
 
     try {
       dispatchBtn.textContent = 'sending...'
@@ -1162,7 +1178,8 @@ function initPrompts() {
         promptName,
         issue: { id: issueId, identifier: issueIdentifier, title: issueTitle },
         target,
-        repo: repo || undefined
+        repo: repo || undefined,
+        kind
       })
 
       dispatchBtn.textContent = 'dispatched!'
@@ -2282,6 +2299,84 @@ function initMiniForeman() {
   })
 }
 
+/**
+ * Initialize the Autopilot button. Parallel to initForeman(): fetches the
+ * task-scoped Autopilot kickoff ("run on autopilot until this task is done")
+ * and renders it in the .autopilot-container with the same copy/dispatch/+proxy
+ * affordances. The container carries data-kind="autopilot" so the shared
+ * dispatch handler tags the queued item as the autopilot meta-loop.
+ */
+function initAutopilot() {
+  let activeAutopilotFetch = null
+
+  document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.autopilot-btn')
+    if (!btn) return
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    const issueId = btn.dataset.issueId
+    const detailsContainer = btn.closest('.details')
+    const container = detailsContainer?.querySelector(`[data-autopilot-for="${issueId}"]`)
+    if (!container) return
+
+    // Toggle off when already visible
+    if (!container.classList.contains('hidden')) {
+      container.classList.add('hidden')
+      return
+    }
+
+    if (activeAutopilotFetch) activeAutopilotFetch.abort()
+    const abortController = new AbortController()
+    activeAutopilotFetch = abortController
+
+    // Dismiss sibling prompt UI for this issue
+    hideIssuePromptUI(detailsContainer, issueId)
+
+    const promptText = container.querySelector('.prompt-text')
+    promptText.textContent = 'Loading...'
+    container.classList.remove('hidden')
+    setPromptActionsDisabled(container, true)
+
+    try {
+      const urlKey = container.dataset.urlKey
+      const apiPrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : ''
+      const response = await fetch(
+        `${apiPrefix}/api/autopilot-prompt/${issueId}`,
+        { signal: abortController.signal }
+      )
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}))
+        throw new Error(error.error || 'Failed to load autopilot prompt')
+      }
+
+      const data = await response.json()
+
+      if (activeAutopilotFetch === abortController) {
+        promptText.dataset.rawPrompt = data.prompt
+        promptText.innerHTML = renderMarkdown(data.prompt)
+        if (data.repo) {
+          container.dataset.repo = data.repo
+        } else {
+          delete container.dataset.repo
+        }
+        setPromptActionsDisabled(container, false)
+      }
+    } catch (error) {
+      if (error.name === 'AbortError') return
+      setPromptActionsDisabled(container, false)
+      promptText.textContent = `Error: ${error.message}`
+      console.error('Failed to fetch autopilot prompt:', error)
+    } finally {
+      if (activeAutopilotFetch === abortController) {
+        activeAutopilotFetch = null
+      }
+    }
+  })
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   init()
   initNavBar()
@@ -2291,6 +2386,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initRecommendations()
   initForeman()
   initMiniForeman()
+  initAutopilot()
   initQueuePanel()
   initFeatureToggles()
   initFreeTierStatus()

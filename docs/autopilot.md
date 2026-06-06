@@ -26,17 +26,33 @@ the overlap honestly so the reconciliation step can do its job.
 > dispatch-consumer punch-list live in **[`autopilot-experiment.md`](./autopilot-experiment.md)**;
 > §7–§8 below are annotated with what has since shipped.
 >
-> **Update (2026-06-06) — Stage B has been spiked (runs B1–B3).** A first draft of the
+> **Update (2026-06-06) — Stage B has been spiked (runs B1–B4).** A first draft of the
 > orchestrator prompt — the guide — exists at
 > **[`autopilot-orchestrator-prompt.md`](./autopilot-orchestrator-prompt.md)** and was driven
 > live: a read-only loop end-to-end (B1), a write-class attempt that **halted on an infra
-> error** and yielded a first-class **halt-on-infra-error rule** (B2), and a clean re-run where
-> `/recommend` correctly planned-first and the plan was evidence-verified (B3). Confirmed in
-> practice: the loop is viable over today's API, evidence-discipline (invariant 2) works
-> mechanically off the runner's `[evidence]` URLs, and the orchestrator must **halt — not
-> improvise — on infra failure** (invariant 1). Still open: the **merge-to-main write path is
-> unexercised end-to-end**, `/recommend` is an **intermittently-flaky hard dependency** worth
-> hardening, and no run has been genuinely *unattended*. Details in the experiment doc.
+> error** and yielded a first-class **halt-on-infra-error rule** (B2), a clean re-run where
+> `/recommend` correctly planned-first and the plan was evidence-verified (B3), and a full
+> write drive that **landed a change on `main`** — review → resolve conflict → merge → CI-green
+> → deploy → ticket Done (B4, LIN-319: the `kind` field itself). Confirmed in practice: the loop
+> is viable over today's API, evidence-discipline (invariant 2) works mechanically off the
+> runner's `[evidence]` URLs and the PR/CI/Linear artifacts, and the orchestrator must **halt —
+> not improvise — on infra failure** (invariant 1). The **merge-to-main write path is now
+> exercised end-to-end** (B4). Still open: a genuinely *unattended* run (B1–B4 were supervised),
+> and two findings B4 surfaced — a terminal **`done` is a session-boundary marker, not proof of
+> task success** (it can post before the work lands and never catch up, so completion must be
+> confirmed by a change in the external artifact), and the **`[stalled?]` heartbeat can't
+> distinguish a hung worker from one blocked on a long synchronous command**. `/recommend`
+> remains an **intermittently-flaky hard dependency** (mitigated by the `LLM_TIMEOUT_MS=180s`
+> split, LIN-320). Details in the experiment doc.
+>
+> **Update (2026-06-06) — the kickoff is now a shipped product surface, not just a doc.**
+> `buildAutopilotKickoff()` (`lib/prompts/autopilot-kickoff.js`) generates the briefing, and
+> **Autopilot is surfaced as a first-class prompt alongside foreman/mini-foreman** — a
+> per-task **Autopilot** button (dashboard card + swipe overlay: "run on autopilot until this
+> task is done"), a "general Autopilot" load on the foreman and dispatch pages (walk the
+> stack), and `GET /api/proxy/autopilot/kickoff` for external agents. Dispatched runs carry a
+> first-class `kind: 'autopilot'`. This is §8.B (the kickoff generator) built. So the
+> paste-once-and-watch path the experiment proved by hand is now a one-click dispatch.
 
 ---
 
@@ -298,14 +314,25 @@ A specific focus is just the goal field, or a hand-written prompt followed by th
   block so the worker inherits Linear access. Verified end-to-end on `cli` and `web` across ten
   runs — see [`autopilot-experiment.md`](./autopilot-experiment.md). (Standing readWrite token in
   the auto-appended block is flagged in-code as security debt to revisit.)
-- **B. The kickoff generator.** A form (optional goal) + a builder that assembles
-  **guide + deterministic orientation snapshot + optional goal** into one pasteable prompt.
-  Mostly assembling existing pieces: `buildForemanPlaybook()` already exists; the new part is
-  a snapshot builder (periodical cadence + top-of-stack via `/stack`) and the goal slot.
+- **B. The kickoff generator.** ✅ **shipped (2026-06-06).** `buildAutopilotKickoff()`
+  (`lib/prompts/autopilot-kickoff.js`, mirroring `buildForemanPlaybook()`) assembles
+  **guide + snapshot + optional goal** into one pasteable/dispatchable prompt, in two modes
+  (scoped to a task = "run until done"; general = walk the stack) and two run modes
+  (`write` merge-gated / `readonly`). Surfaced as a first-class prompt **alongside foreman
+  and mini-foreman** everywhere prompts are shown/dispatched: the per-task **Autopilot**
+  button on the dashboard card and swipe overlay, a "general Autopilot" load on the foreman
+  and dispatch pages, and `GET /api/proxy/autopilot/kickoff` for external agents. Dispatched
+  items carry a first-class `kind: 'autopilot'` (the meta-loop kind, set explicitly — never
+  derived). *Still deferred:* the **computed** orientation snapshot (periodical cadence +
+  top-of-stack baked in); for now the kickoff has Autopilot fetch `/stack` itself as its
+  first orient action. See [`autopilot-kickoff.md`](./autopilot-kickoff.md).
 - **C. Periodicals cadence.** The only stateful bit — the snapshot needs "code review last
   ran 14d ago." v1 can likely **derive** this from existing signals (`foreman/status`
   history, git log, periodical-tagged Linear search) rather than build a store; add a store
-  later if derivation proves flaky.
+  later if derivation proves flaky. *Deliberately deferred:* the shipped kickoff (B) drops
+  periodicals entirely — precedence is just (1) explicit goal, else (2) top of stack — and
+  the kickoff carries a maintainer note on how to slot the cadence rule back in cleanly when
+  the periodicals producer lands (**LIN-315**).
 
 ### What is just guide text (no build)
 

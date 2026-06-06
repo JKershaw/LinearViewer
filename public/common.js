@@ -95,12 +95,13 @@ function initDeployTime() {
  * @param {string} [opts.promptName='Prompt']
  * @param {string} [opts.target='cli']       'cli' | 'web' | 'dash' | 'local'
  * @param {string} [opts.repo]
+ * @param {string} [opts.kind]               Explicit dispatch kind (e.g. 'autopilot'); omit to derive from promptName
  * @returns {Promise<Object>} Parsed JSON response body
  * @throws {Error} on missing required args or a non-ok response. The thrown
  *                 error carries `.status` so callers can branch (e.g. 401).
  */
 window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
-  const { urlKey, prompt, issue, issueless = false, promptName = 'Prompt', target = 'cli', repo } = opts;
+  const { urlKey, prompt, issue, issueless = false, promptName = 'Prompt', target = 'cli', repo, kind } = opts;
 
   if (!urlKey) throw new Error('dispatchPrompt: urlKey is required');
   if (!prompt) throw new Error('dispatchPrompt: prompt is required');
@@ -112,6 +113,9 @@ window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
   }
 
   const payload = { prompt, promptName, target };
+  // `kind` is normally derived server-side from promptName; pass it explicitly
+  // only for meta-loops that don't map to a prompt template (e.g. 'autopilot').
+  if (kind) payload.kind = kind;
   if (issue) {
     if (issue.id) payload.issueId = issue.id;
     if (issue.identifier) payload.issueIdentifier = issue.identifier;

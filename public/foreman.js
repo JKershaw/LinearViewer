@@ -14,6 +14,7 @@
   // DOM references
   const tokenSelect = document.getElementById('foreman-token-select');
   const generateBtn = document.getElementById('foreman-generate-btn');
+  const autopilotBtn = document.getElementById('foreman-autopilot-btn');
   const copyBtn = document.getElementById('foreman-copy-btn');
   const playbookOutput = document.getElementById('foreman-playbook-output');
   const playbookFeedback = document.getElementById('foreman-playbook-feedback');
@@ -247,7 +248,38 @@
     playbookOutput.textContent = playbook;
     playbookOutput.classList.add('has-content');
     if (copyBtn) copyBtn.disabled = false;
+    if (autopilotBtn) autopilotBtn.disabled = false;
   }
+
+  // Load the general Autopilot kickoff into the same box (copy reuses the same
+  // minted token). This is the "general autopilot" entry point on the foreman
+  // page — orient off the stack and run the loop until it needs the human.
+  async function loadAutopilot() {
+    if (!playbookOutput || !currentToken) return;
+    playbookOutput.textContent = 'Loading autopilot kickoff...';
+    playbookOutput.classList.remove('has-content');
+    if (copyBtn) copyBtn.disabled = true;
+
+    try {
+      const resp = await fetch('/api/proxy/autopilot/kickoff', {
+        headers: { Authorization: `Bearer ${currentToken}` }
+      });
+      if (!resp.ok) throw new Error(`Autopilot HTTP ${resp.status}`);
+      let kickoff = await resp.text();
+      kickoff = kickoff.replace(/YOUR_TOKEN/g, currentToken);
+
+      currentPlaybook = kickoff;
+      playbookOutput.textContent = kickoff;
+      playbookOutput.classList.add('has-content');
+      if (copyBtn) copyBtn.disabled = false;
+      showFeedback(playbookFeedback, 'Autopilot kickoff loaded ✓ — click output to copy', false);
+    } catch (err) {
+      showFeedback(playbookFeedback, `Failed: ${err.message}`, true);
+      if (copyBtn) copyBtn.disabled = false;
+    }
+  }
+
+  if (autopilotBtn) autopilotBtn.addEventListener('click', loadAutopilot);
 
   async function copyPlaybook() {
     if (!currentPlaybook) return;

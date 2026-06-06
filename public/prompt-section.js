@@ -72,7 +72,7 @@
    * Build the picker (idle state): prompt pill row.
    */
   function renderPicker(opts, state) {
-    const { hasAI, hasForeman, hasMiniForeman, defaultPromptKeys, morePromptKeys, promptMeta, customPrompts } = opts;
+    const { hasAI, hasForeman, hasMiniForeman, hasAutopilot, defaultPromptKeys, morePromptKeys, promptMeta, customPrompts } = opts;
     const moreVisible = state.moreVisible;
     let html = '<div class="swipe-prompt-header"><span class="swipe-prompt-name">prompt</span></div>';
     html += '<div class="swipe-prompt-buttons">';
@@ -84,6 +84,9 @@
     }
     if (hasMiniForeman) {
       html += `<button class="swipe-prompt-btn mini-foreman-btn" data-prompt="__mini-foreman__" title="One-step API fetch: agent pulls a fresh prompt from the proxy and runs it once">Mini-foreman</button>`;
+    }
+    if (hasAutopilot) {
+      html += `<button class="swipe-prompt-btn autopilot-btn" data-prompt="__autopilot__" title="Run on autopilot until this task is done — dispatches work to a separate worker and watches the loop">Autopilot</button>`;
     }
     for (const key of defaultPromptKeys) {
       const name = promptMeta[key] || key;
@@ -249,6 +252,8 @@
         state.activeLabelName = 'Foreman';
       } else if (label === '__mini-foreman__') {
         state.activeLabelName = 'Mini-foreman';
+      } else if (label === '__autopilot__') {
+        state.activeLabelName = 'Autopilot';
       } else {
         state.activeLabelName = opts.promptMeta[label] || label;
       }
@@ -289,6 +294,22 @@
           if (abortController !== ac || destroyed) return;
           const html = renderMarkdown(result.prompt);
           const entry = { label, name: result.promptName || 'Mini-foreman', raw: result.prompt, html };
+          promptCache.set(`${issueId}:${label}`, entry);
+          lastPromptLabel.set(issueId, label);
+          state.phase = 'fresh';
+          state.result = entry;
+          render();
+        } else if (label === '__autopilot__') {
+          const response = await fetch(`${apiPrefix}/api/autopilot-prompt/${issueId}`, { signal: ac.signal });
+          if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to load autopilot prompt');
+          }
+          const result = await response.json();
+          if (abortController !== ac || destroyed) return;
+          const html = renderMarkdown(result.prompt);
+          // Carry kind through so the dispatch tags the item as the autopilot meta-loop.
+          const entry = { label, name: result.promptName || 'Autopilot', kind: result.kind || 'autopilot', raw: result.prompt, html };
           promptCache.set(`${issueId}:${label}`, entry);
           lastPromptLabel.set(issueId, label);
           state.phase = 'fresh';
@@ -520,6 +541,7 @@
           urlKey: opts.urlKey,
           prompt,
           promptName: (state.result && state.result.name) || 'Prompt',
+          kind: (state.result && state.result.kind) || undefined,
           issue,
           target
         });

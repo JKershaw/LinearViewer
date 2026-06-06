@@ -820,6 +820,35 @@ test.describe('Foreman API - Playbook Endpoint', () => {
     const resp = await request.get('/api/proxy/foreman/playbook');
     expect(resp.status()).toBe(401);
   });
+
+  test('GET /api/proxy/autopilot/kickoff returns the kickoff text', async ({ request }) => {
+    const resp = await request.get('/api/proxy/autopilot/kickoff', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(resp.status()).toBe(200);
+
+    const text = await resp.text();
+    expect(text).toContain("You're Autopilot");
+    expect(text).toContain('/api/proxy/stack?limit=5');
+    expect(text).toContain('WRITE, merge-gated');
+    expect(text).toContain('walk the stack');
+  });
+
+  test('GET /api/proxy/autopilot/kickoff honors ?mode=readonly and ?goal=', async ({ request }) => {
+    const resp = await request.get('/api/proxy/autopilot/kickoff?mode=readonly&goal=work%20the%20Ship%20view', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(resp.status()).toBe(200);
+    const text = await resp.text();
+    expect(text).toContain('READ-ONLY');
+    expect(text).toContain('work the Ship view');
+    expect(text).not.toContain('WRITE, merge-gated');
+  });
+
+  test('GET /api/proxy/autopilot/kickoff requires authentication', async ({ request }) => {
+    const resp = await request.get('/api/proxy/autopilot/kickoff');
+    expect(resp.status()).toBe(401);
+  });
 });
 
 test.describe('Workspace API - Foreman Prompt Endpoint', () => {
@@ -940,6 +969,81 @@ test.describe('Workspace API - Mini-foreman Prompt Endpoint', () => {
     );
     expect(resp.status()).toBe(403);
   });
+
+  test('GET /workspace/:urlKey/api/autopilot-prompt/:issueId returns a scoped kickoff', async ({ page, request }) => {
+    const cookies = await page.context().cookies();
+    const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+
+    const resp = await request.get(
+      '/workspace/test-workspace/api/autopilot-prompt/66666666-6666-6666-6666-666666666666',
+      { headers: { Cookie: cookieHeader } }
+    );
+    expect(resp.status()).toBe(200);
+
+    const data = await resp.json();
+    expect(data.label).toBe('autopilot');
+    expect(data.kind).toBe('autopilot');
+    expect(data.promptName).toContain('Autopilot');
+    expect(data.prompt).toContain("You're Autopilot");
+    expect(data.prompt).toContain('run on autopilot until');
+    // Scoped runs don't walk the stack
+    expect(data.prompt).not.toContain('/api/proxy/stack?limit=5');
+  });
+
+  test('GET /workspace/:urlKey/api/autopilot-prompt (general) walks the stack', async ({ page, request }) => {
+    const cookies = await page.context().cookies();
+    const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+
+    const resp = await request.get(
+      '/workspace/test-workspace/api/autopilot-prompt',
+      { headers: { Cookie: cookieHeader } }
+    );
+    expect(resp.status()).toBe(200);
+
+    const data = await resp.json();
+    expect(data.label).toBe('autopilot');
+    expect(data.kind).toBe('autopilot');
+    expect(data.promptName).toBe('Autopilot (stack walk)');
+    expect(data.prompt).toContain('/api/proxy/stack?limit=5');
+    expect(data.prompt).toContain('walk the stack');
+  });
+
+  test('GET /workspace/:urlKey/api/autopilot-prompt honors ?mode=readonly', async ({ page, request }) => {
+    const cookies = await page.context().cookies();
+    const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+
+    const resp = await request.get(
+      '/workspace/test-workspace/api/autopilot-prompt?mode=readonly',
+      { headers: { Cookie: cookieHeader } }
+    );
+    expect(resp.status()).toBe(200);
+    const data = await resp.json();
+    expect(data.prompt).toContain('READ-ONLY');
+    expect(data.prompt).not.toContain('WRITE, merge-gated');
+  });
+
+  test('GET /workspace/:urlKey/api/autopilot-prompt rejects invalid issue ID', async ({ page, request }) => {
+    const cookies = await page.context().cookies();
+    const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+
+    const resp = await request.get(
+      '/workspace/test-workspace/api/autopilot-prompt/INVALID!!!',
+      { headers: { Cookie: cookieHeader } }
+    );
+    expect(resp.status()).toBe(400);
+  });
+
+  test('GET /workspace/:urlKey/api/autopilot-prompt returns 403 when proxy feature disabled', async ({ page, request }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: false }))}`);
+    const cookies = await page.context().cookies();
+    const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+
+    const resp = await request.get(
+      '/workspace/test-workspace/api/autopilot-prompt',
+      { headers: { Cookie: cookieHeader } }
+    );
+    expect(resp.status()).toBe(403);
+  });
 });
 
 test.describe('Mini-foreman Button - Main Projects View', () => {
@@ -980,6 +1084,47 @@ test.describe('Mini-foreman Button - Main Projects View', () => {
     const container = firstDetails.locator('.mini-foreman-container');
     await expect(container).toBeVisible();
     await expect(container.locator('.prompt-text')).toContainText('/api/proxy/recommend/', { timeout: 5000 });
+  });
+});
+
+test.describe('Autopilot Button - Main Projects View', () => {
+  test('Autopilot button renders next to the foreman buttons when proxy flag is on', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
+    await page.goto('/workspace/test-workspace/');
+    await page.waitForLoadState('networkidle');
+
+    const firstPromptsBar = page.locator('.detail-prompts').first();
+    await expect(firstPromptsBar).toBeAttached();
+    await expect(firstPromptsBar.locator('.autopilot-btn')).toHaveCount(1);
+    await expect(firstPromptsBar.locator('.autopilot-btn')).toContainText('Autopilot');
+  });
+
+  test('Autopilot button is hidden when proxy flag is off', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: false }))}`);
+    await page.goto('/workspace/test-workspace/');
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('.autopilot-btn')).toHaveCount(0);
+  });
+
+  test('Clicking Autopilot button reveals the scoped kickoff', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
+    await page.goto('/workspace/test-workspace/');
+    await page.waitForLoadState('networkidle');
+
+    const firstLine = page.locator('.line.expandable').first();
+    await firstLine.click();
+    const firstDetails = page.locator('.details').first();
+    await firstDetails.locator('.detail-toggle[data-toggle="prompts"]').click();
+
+    const btn = firstDetails.locator('.autopilot-btn');
+    await expect(btn).toBeVisible();
+    await btn.click();
+
+    const container = firstDetails.locator('.autopilot-container');
+    await expect(container).toBeVisible();
+    await expect(container).toHaveAttribute('data-kind', 'autopilot');
+    await expect(container.locator('.prompt-text')).toContainText("You're Autopilot", { timeout: 5000 });
   });
 });
 
