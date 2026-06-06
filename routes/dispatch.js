@@ -20,6 +20,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { spawnClaudeSession } from '../lib/harbour-spawn.js';
+import { isValidDispatchKind, deriveDispatchKind, DISPATCH_KINDS } from '../lib/prompt-templates.js';
 
 // Directory for Harbour dispatch prompt staging files. The OS tmp dir is
 // shared between the Node server and the Harbour terminal that reads the
@@ -193,7 +194,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const { workspace } = req;
 
     try {
-      const { prompt, promptName, issueId, issueIdentifier, issueTitle, issueUrl, target, repo } = req.body;
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo } = req.body;
 
       // Validate required fields
       if (!prompt || typeof prompt !== 'string') {
@@ -204,6 +205,11 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       const VALID_TARGETS = ['cli', 'web', 'dash', 'local'];
       if (target !== undefined && !VALID_TARGETS.includes(target)) {
         return res.status(400).json({ error: `target must be one of: ${VALID_TARGETS.join(', ')}` });
+      }
+
+      // Validate kind if provided; when omitted it is derived from promptName below.
+      if (kind !== undefined && !isValidDispatchKind(kind)) {
+        return res.status(400).json({ error: `kind must be one of: ${DISPATCH_KINDS.join(', ')}` });
       }
 
       // Reject local target from non-localhost requests
@@ -257,6 +263,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       const item = await dispatchQueueStore.addItem(workspace.urlKey, {
         prompt,
         promptName: promptName || 'Prompt',
+        kind: kind || deriveDispatchKind(promptName),
         issueId: issueId || null,
         issueIdentifier: issueIdentifier || null,
         issueTitle: issueTitle || null,
@@ -321,6 +328,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         item: {
           id: item._id,
           promptName: item.promptName,
+          kind: item.kind,
           issueIdentifier: item.issueIdentifier,
           target: item.target,
           dispatchedAt: item.dispatchedAt

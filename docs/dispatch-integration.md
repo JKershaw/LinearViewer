@@ -88,6 +88,7 @@ Authorization: Bearer <token>
       "id": "uuid",
       "prompt": "The prompt text...",
       "promptName": "blocked",
+      "kind": "blocked",
       "issueId": "linear-issue-uuid",
       "issueIdentifier": "LIN-42",
       "issueTitle": "Fix authentication bug",
@@ -119,6 +120,7 @@ Authorization: Bearer <token>
     "id": "uuid",
     "prompt": "The prompt text...",
     "promptName": "blocked",
+    "kind": "blocked",
     "issueId": "linear-issue-uuid",
     "issueIdentifier": "LIN-42",
     "issueTitle": "Fix authentication bug",
@@ -247,6 +249,7 @@ and is the recommended pattern for any consumer that posts foreman status.
 | `id` | string | Unique item ID (UUID) |
 | `prompt` | string | The prompt text (up to 100KB) |
 | `promptName` | string | Display name (e.g., "blocked") |
+| `kind` | string | Stable task classification — a prompt-template key (`research`, `plan`, `implementation`, `review`, …) or `"custom"` for freeform prompts. Read this instead of inferring the task type from `promptName`. See [Task Kind](#task-kind). |
 | `issueId` | string | Linear issue UUID (nullable) |
 | `issueIdentifier` | string | Human-readable issue ID, e.g., "LIN-42" (nullable) |
 | `issueTitle` | string | Issue title (nullable) |
@@ -281,6 +284,30 @@ const myItems = items.filter(item => item.target === 'cli'); // or 'web', 'dash'
 ```
 
 Items without a `target` field default to `"cli"` for backward compatibility.
+
+## Task Kind
+
+Each dispatch item carries a `kind` — a stable, machine-readable classification of
+*what sort of task* it is. Watchers (e.g. an orchestrator following a task across
+dispatches) read `kind` directly instead of inferring the task type from `promptName`
+(a free-form display name) or the prompt body.
+
+The vocabulary is the set of prompt-template keys the system already owns
+(`lib/prompt-template-defs.js`) plus a neutral fallback:
+
+```
+blocked, bug, plan, code-review, look-into, triage, breakdown,
+research, scoping, design, spike, context, implementation, review, custom
+```
+
+- **Optional on dispatch.** Callers may pass an explicit `kind`; it must be one of the
+  values above or the request is rejected with `400`.
+- **Derived when omitted.** If `kind` is not supplied it is derived from `promptName`
+  (matching the template key or its display name, case-insensitive) — e.g. `promptName`
+  `"implement"` → `kind` `"implementation"`, `"code review"` → `"code-review"`.
+- **Falls back to `"custom"`** for freeform prompts that don't map to a template.
+
+This is the same vocabulary the Pipeline view uses for a Loop's `stage`.
 
 ## Error Handling
 
