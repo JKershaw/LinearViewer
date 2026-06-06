@@ -14,9 +14,9 @@
 >   [`autopilot-experiment.md`](./autopilot-experiment.md) for the run-by-run evidence
 >   (B1–B4) the wording is drawn from.
 > - **The snapshot** (after the `---`) is *per-dispatch* — computed at kickoff and filled
->   in: today's stack, the periodical cadence, the goal if any, the run mode, and the proxy
->   token (injected at dispatch, never committed). The block below is a **worked example**
->   with realistic sample data; replace it with the live snapshot when you dispatch.
+>   in: today's stack, the goal if any, the run mode, and the proxy token (injected at
+>   dispatch, never committed). The block below is a **worked example** with realistic
+>   sample data; replace it with the live snapshot when you dispatch.
 
 ---
 
@@ -52,9 +52,21 @@ is drift past the few moments that belong to the human.
 ## How a loop goes
 
 1. **Orient.** Read the snapshot. Pick what's next in this order — it's a policy, not a
-   judgment call, so don't improvise it: (1) an explicit goal from the human, else (2) a
-   periodical that's overdue, else (3) the top of the stack. Say what you picked and why,
-   in a line. The human can veto.
+   judgment call, so don't improvise it: (1) an explicit goal from the human, else (2) the
+   top of the stack. Say what you picked and why, in a line. The human can veto.
+
+<!-- MAINTAINER NOTE — adding periodicals back as a precedence rule.
+     When the periodicals producer lands (LIN-315), it slots in as a new rule *between*
+     the two above: (1) explicit goal, else (2) a periodical past its cadence threshold
+     (maintenance debt), else (3) top of stack. To land it cleanly:
+       - Add the rule to the ordered list above (keep it human-authored policy, not a
+         judgment Autopilot improvises — that's invariant 1).
+       - Add a "Periodical cadence" line to the snapshot block listing each periodical and
+         when it last ran / whether it's due (e.g. "code review: 14d ago → due; security:
+         3d ago; docs: never"), sourced from the cadence store/derivation LIN-315 builds.
+       - Until then there is no cadence data source, so the rule would be inert — which is
+         why it is deliberately omitted here rather than left in as a dead branch. -->
+
 
 2. **Get the prompt.** `GET /recommend/{identifier}` chooses the next *step* and tells you
    its **kind** (planning / research / implementation / review / retro / …). Use its prompt
@@ -150,10 +162,6 @@ dispatch (not shown here) · full verb catalog at `GET /instructions`.
 | 3 | LIN-315 | feature | Periodicals (the producer) — thin stub, no cadence source yet | aligned |
 | 4 | LIN-292 | task | External-evidence weighting — specced, unbuilt (epic LIN-289) | aligned |
 | 5 | LIN-288 | bug | already investigated; awaiting a fix decision | untagged |
-
-**Periodical cadence:** no data source yet (`foreman/status` is empty), so precedence
-**rule 2 is inert this run** — you're choosing between an explicit goal (none) and the top
-of the stack. Don't infer a cadence; just say it's unavailable if it would change your pick.
 
 **Your first act:** orient against the table, announce your choice in a line, and go. The
 human is watching.
