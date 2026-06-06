@@ -21,6 +21,7 @@ import { generatePrompt, generateCustomPrompt, hasPrompt, getAvailablePrompts } 
 import { WORK_ISSUE_LABELS } from '../lib/workflow-config.js';
 import { parseRepoFromDescription } from '../lib/prompt-formatters.js';
 import { buildForemanPlaybook, buildMiniForemanStep } from '../lib/prompts/foreman-playbook.js';
+import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { isRecommendationEnabled, getRecommendation, getRecommendationStream, streamChat } from '../lib/openrouter.js';
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { generateRecap } from '../lib/recap.js';
@@ -399,6 +400,120 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         return res.status(404).json({ error: error.message })
       }
       res.status(500).json({ error: 'Failed to generate mini-foreman prompt', message: error.message })
+    }
+  })
+
+  /**
+   * Generate an Autopilot kickoff prompt scoped to a specific issue — the
+   * "run on autopilot until this task is done" instruction. Autopilot is a
+   * light orchestrator that dispatches the actual work to a separate worker;
+   * dispatching this prompt to `web` lets the user sit back and watch the loop.
+   *
+   * The general (stack-walk) kickoff is served at the issueless route below and
+   * at /api/proxy/autopilot/kickoff for external agents.
+   *
+   * Gated on the proxy feature flag (same as foreman) — the kickoff drives the
+   * proxy API exclusively. Optional `?mode=readonly` restricts the run to
+   * investigation/research prompts; default is write (merge-gated).
+   *
+   * @route GET /workspace/:urlKey/api/autopilot-prompt/:issueId
+   * @param {string} issueId - The Linear issue ID (UUID)
+   * @returns {Object} { label, promptName, kind, prompt, repo } or error
+   */
+  router.get('/workspace/:urlKey/api/autopilot-prompt/:issueId', workspaceFromUrl, async (req, res) => {
+    const workspace = req.workspace
+    const { issueId } = req.params
+
+    const featureFlags = getFeatureFlags(req.session)
+    if (featureFlags.proxy !== true) {
+      return res.status(403).json({ error: 'Proxy feature is not enabled' })
+    }
+
+    if (!isValidIssueId(issueId)) {
+      return res.status(400).json({ error: 'Invalid issue ID format' })
+    }
+
+    const mode = AUTOPILOT_MODES.includes(req.query.mode) ? req.query.mode : AUTOPILOT_MODE_DEFAULT
+    const baseUrl = `${req.protocol}://${req.get('host')}`
+
+    try {
+      // Use mock data in test mode
+      if (process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token') {
+        const mockIssue = testMockData.issues.find(i => i.id === issueId)
+        if (!mockIssue) {
+          return res.status(404).json({ error: 'Issue not found' })
+        }
+        const identifier = mockIssue.url?.split('/').pop() || ''
+        const mockProject = testMockData.projects.find(p => p.id === mockIssue.project?.id)
+        const prompt = buildAutopilotKickoff({
+          baseUrl,
+          issue: { identifier, title: mockIssue.title },
+          mode
+        })
+        return res.json({
+          label: 'autopilot',
+          promptName: `Autopilot — ${identifier}`,
+          kind: 'autopilot',
+          prompt,
+          repo: parseRepoFromDescription(mockProject?.content || null)
+        })
+      }
+
+      const { issue, project } = await fetchIssueContext(workspace.accessToken, issueId)
+      const prompt = buildAutopilotKickoff({
+        baseUrl,
+        issue: { identifier: issue.identifier, title: issue.title },
+        mode
+      })
+      res.json({
+        label: 'autopilot',
+        promptName: `Autopilot — ${issue.identifier}`,
+        kind: 'autopilot',
+        prompt,
+        repo: parseRepoFromDescription(project?.description)
+      })
+    } catch (error) {
+      console.error('Autopilot prompt error:', error)
+      if (error.response?.status === 401) {
+        return res.status(401).json({ error: 'Token expired or invalid' })
+      }
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message })
+      }
+      res.status(500).json({ error: 'Failed to generate autopilot prompt', message: error.message })
+    }
+  })
+
+  /**
+   * Generate a general (stack-walking) Autopilot kickoff — no issue scope.
+   * Autopilot orients off `GET /stack` under the precedence policy and works the
+   * backlog until it needs the human. Optional `?goal=` supplies a free-text
+   * focus; `?mode=readonly` restricts to investigation/research prompts.
+   *
+   * @route GET /workspace/:urlKey/api/autopilot-prompt
+   * @returns {Object} { label, promptName, kind, prompt } or error
+   */
+  router.get('/workspace/:urlKey/api/autopilot-prompt', workspaceFromUrl, async (req, res) => {
+    const featureFlags = getFeatureFlags(req.session)
+    if (featureFlags.proxy !== true) {
+      return res.status(403).json({ error: 'Proxy feature is not enabled' })
+    }
+
+    const mode = AUTOPILOT_MODES.includes(req.query.mode) ? req.query.mode : AUTOPILOT_MODE_DEFAULT
+    const goal = typeof req.query.goal === 'string' ? req.query.goal.slice(0, 1000) : ''
+    const baseUrl = `${req.protocol}://${req.get('host')}`
+
+    try {
+      const prompt = buildAutopilotKickoff({ baseUrl, goal, mode })
+      res.json({
+        label: 'autopilot',
+        promptName: goal.trim() ? `Autopilot — ${goal.trim().slice(0, 60)}` : 'Autopilot (stack walk)',
+        kind: 'autopilot',
+        prompt
+      })
+    } catch (error) {
+      console.error('Autopilot kickoff error:', error)
+      res.status(500).json({ error: 'Failed to generate autopilot kickoff', message: error.message })
     }
   })
 

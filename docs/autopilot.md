@@ -44,6 +44,15 @@ the overlap honestly so the reconciliation step can do its job.
 > distinguish a hung worker from one blocked on a long synchronous command**. `/recommend`
 > remains an **intermittently-flaky hard dependency** (mitigated by the `LLM_TIMEOUT_MS=180s`
 > split, LIN-320). Details in the experiment doc.
+>
+> **Update (2026-06-06) — the kickoff is now a shipped product surface, not just a doc.**
+> `buildAutopilotKickoff()` (`lib/prompts/autopilot-kickoff.js`) generates the briefing, and
+> **Autopilot is surfaced as a first-class prompt alongside foreman/mini-foreman** — a
+> per-task **Autopilot** button (dashboard card + swipe overlay: "run on autopilot until this
+> task is done"), a "general Autopilot" load on the foreman and dispatch pages (walk the
+> stack), and `GET /api/proxy/autopilot/kickoff` for external agents. Dispatched runs carry a
+> first-class `kind: 'autopilot'`. This is §8.B (the kickoff generator) built. So the
+> paste-once-and-watch path the experiment proved by hand is now a one-click dispatch.
 
 ---
 
@@ -293,14 +302,25 @@ A specific focus is just the goal field, or a hand-written prompt followed by th
   block so the worker inherits Linear access. Verified end-to-end on `cli` and `web` across ten
   runs — see [`autopilot-experiment.md`](./autopilot-experiment.md). (Standing readWrite token in
   the auto-appended block is flagged in-code as security debt to revisit.)
-- **B. The kickoff generator.** A form (optional goal) + a builder that assembles
-  **guide + deterministic orientation snapshot + optional goal** into one pasteable prompt.
-  Mostly assembling existing pieces: `buildForemanPlaybook()` already exists; the new part is
-  a snapshot builder (periodical cadence + top-of-stack via `/stack`) and the goal slot.
+- **B. The kickoff generator.** ✅ **shipped (2026-06-06).** `buildAutopilotKickoff()`
+  (`lib/prompts/autopilot-kickoff.js`, mirroring `buildForemanPlaybook()`) assembles
+  **guide + snapshot + optional goal** into one pasteable/dispatchable prompt, in two modes
+  (scoped to a task = "run until done"; general = walk the stack) and two run modes
+  (`write` merge-gated / `readonly`). Surfaced as a first-class prompt **alongside foreman
+  and mini-foreman** everywhere prompts are shown/dispatched: the per-task **Autopilot**
+  button on the dashboard card and swipe overlay, a "general Autopilot" load on the foreman
+  and dispatch pages, and `GET /api/proxy/autopilot/kickoff` for external agents. Dispatched
+  items carry a first-class `kind: 'autopilot'` (the meta-loop kind, set explicitly — never
+  derived). *Still deferred:* the **computed** orientation snapshot (periodical cadence +
+  top-of-stack baked in); for now the kickoff has Autopilot fetch `/stack` itself as its
+  first orient action. See [`autopilot-kickoff.md`](./autopilot-kickoff.md).
 - **C. Periodicals cadence.** The only stateful bit — the snapshot needs "code review last
   ran 14d ago." v1 can likely **derive** this from existing signals (`foreman/status`
   history, git log, periodical-tagged Linear search) rather than build a store; add a store
-  later if derivation proves flaky.
+  later if derivation proves flaky. *Deliberately deferred:* the shipped kickoff (B) drops
+  periodicals entirely — precedence is just (1) explicit goal, else (2) top of stack — and
+  the kickoff carries a maintainer note on how to slot the cadence rule back in cleanly when
+  the periodicals producer lands (**LIN-315**).
 
 ### What is just guide text (no build)
 

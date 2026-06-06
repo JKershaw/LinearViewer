@@ -594,6 +594,22 @@ GET /api/proxy/foreman/playbook
 
 Returns the foreman automation playbook as **plain text** (`text/plain`) — operating instructions for an agent orchestrating the stack → recommend → status loop.
 
+#### Get Autopilot Kickoff
+
+```
+GET /api/proxy/autopilot/kickoff
+GET /api/proxy/autopilot/kickoff?mode=readonly&goal=<text>
+```
+
+Returns the **Autopilot kickoff** as **plain text** (`text/plain`) — the briefing that turns the receiving session into the *Autopilot orchestrator*. Unlike the foreman playbook (which works the stack in-session), Autopilot is a light orchestrator: it picks the next task, **dispatches the work to a separate worker** via `POST /api/proxy/dispatch`, watches the feedback, judges completion from external evidence, and decides continue / complete / pause-for-human.
+
+| Query param | Default | Description |
+|-------------|---------|-------------|
+| `mode` | `write` | `write` allows implementation/review kinds and an evidence-gated merge; `readonly` restricts dispatched work to investigation/research/planning/retro (no code, PRs, or Linear writes). |
+| `goal` | _(none)_ | Optional free-text focus for the run. Omitted ⇒ walk the stack under the precedence policy. |
+
+The body embeds `YOUR_TOKEN` as a placeholder; substitute the consumer's `readWrite` token (Autopilot reuses it for the prompts it dispatches). A read-scope token can fetch the kickoff, but running it needs `readWrite` (Autopilot dispatches). The general (stack-walk) kickoff is what this endpoint serves; the in-app per-task variant ("run on autopilot until this task is done") is generated at `/workspace/:urlKey/api/autopilot-prompt/:issueId`.
+
 ### Write Endpoints
 
 All write endpoints require a `readWrite` scoped token. Read-only tokens receive `403`.

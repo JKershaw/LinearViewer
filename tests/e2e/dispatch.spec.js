@@ -671,6 +671,19 @@ test.describe('Dispatch API', () => {
     expect(listData.items[0].kind).toBe('research');
   });
 
+  test('POST /api/dispatch accepts the autopilot meta-kind', async ({ request }) => {
+    await request.get('/test/set-session');
+
+    const response = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: { prompt: "You're Autopilot…", promptName: 'Autopilot (stack walk)', kind: 'autopilot' }
+    });
+    expect(response.status()).toBe(201);
+    const data = await response.json();
+    // 'autopilot' isn't a prompt-template key, so it must be accepted explicitly
+    // (not derivable from promptName) and surfaced verbatim.
+    expect(data.item.kind).toBe('autopilot');
+  });
+
   test('POST /api/dispatch derives kind from promptName when omitted', async ({ request }) => {
     await request.get('/test/set-session');
 

@@ -69,7 +69,7 @@ async function renderDispatchRecentPrompts(container, urlKey) {
 /**
  * Dispatch a custom prompt and update UI feedback
  */
-async function dispatchPageCustomPrompt({ urlKey, prompt, target, repo, btn, textarea, feedbackEl, recentsContainer }) {
+async function dispatchPageCustomPrompt({ urlKey, prompt, target, repo, kind, promptName, btn, textarea, feedbackEl, recentsContainer }) {
   const originalText = btn.textContent
   btn.textContent = 'sending...'
   btn.disabled = true
@@ -81,11 +81,13 @@ async function dispatchPageCustomPrompt({ urlKey, prompt, target, repo, btn, tex
 
   try {
     // Custom prompts are not anchored to a Linear issue — opt out of the
-    // issue-link contract explicitly.
+    // issue-link contract explicitly. A loaded Autopilot kickoff carries an
+    // explicit kind ('autopilot') and name so it's tagged as the meta-loop.
     await dispatchPrompt({
       urlKey,
       prompt: finalPrompt,
-      promptName: 'Custom',
+      promptName: promptName || 'Custom',
+      kind: kind || undefined,
       target,
       repo: repo || undefined,
       issueless: true
@@ -159,11 +161,53 @@ function initDispatchPagePrompt() {
   // Load recent prompts
   renderDispatchRecentPrompts(recentsContainer, urlKey)
 
+  // A loaded Autopilot kickoff tags the next dispatch as kind='autopilot'. Any
+  // hand-typing afterwards reverts it to a plain custom prompt — the kind is a
+  // property of "this is the generated kickoff", not of edited freeform text.
+  textarea.addEventListener('input', () => {
+    delete textarea.dataset.kind
+    delete textarea.dataset.promptName
+  })
+
   // Single delegated handler on the dispatch section
   section.addEventListener('click', async (e) => {
     // Handle proxy toggle clicks (initProxyToggle in app.js handles these via document delegation,
     // but we also need to stop propagation to avoid triggering other handlers)
     if (e.target.closest('.prompt-proxy-toggle')) return
+
+    // Handle "load Autopilot" clicks: fetch the general (stack-walk) kickoff and
+    // drop it into the textarea, tagged so the next dispatch carries kind=autopilot.
+    const loadBtn = e.target.closest('.dispatch-load-autopilot')
+    if (loadBtn) {
+      e.preventDefault()
+      const original = loadBtn.textContent
+      loadBtn.disabled = true
+      loadBtn.textContent = 'loading...'
+      try {
+        const resp = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/autopilot-prompt`)
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}))
+          throw new Error(err.error || `HTTP ${resp.status}`)
+        }
+        const data = await resp.json()
+        textarea.value = data.prompt
+        textarea.dataset.kind = data.kind || 'autopilot'
+        textarea.dataset.promptName = data.promptName || 'Autopilot (stack walk)'
+        textarea.focus()
+        loadBtn.textContent = 'loaded ✓'
+      } catch (err) {
+        loadBtn.textContent = 'failed'
+        if (feedbackEl) {
+          feedbackEl.textContent = `autopilot load failed: ${err.message}`
+          feedbackEl.className = 'dispatch-prompt-feedback error'
+        }
+      } finally {
+        setTimeout(() => {
+          if (loadBtn.isConnected) { loadBtn.textContent = original; loadBtn.disabled = false }
+        }, 1500)
+      }
+      return
+    }
 
     // Handle dispatch button clicks
     const btn = e.target.closest('.dispatch-prompt-send')
@@ -182,7 +226,10 @@ function initDispatchPagePrompt() {
 
       const target = btn.dataset.target || 'cli'
       const repo = repoSelect ? repoSelect.value : ''
-      await dispatchPageCustomPrompt({ urlKey, prompt, target, repo, btn, textarea, feedbackEl, recentsContainer })
+      // A loaded Autopilot kickoff sets these; hand-typed prompts leave them undefined.
+      const kind = textarea.dataset.kind || undefined
+      const promptName = textarea.dataset.promptName || undefined
+      await dispatchPageCustomPrompt({ urlKey, prompt, target, repo, kind, promptName, btn, textarea, feedbackEl, recentsContainer })
       return
     }
 
