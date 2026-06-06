@@ -426,6 +426,37 @@ errors rather than improvising around them.** The merge-to-main write path is st
 next attempt should start only once `/recommend` is healthy (or with a human-supplied kickoff prompt by
 explicit choice, not as error-recovery).
 
+**Run B3 — clean re-run after the halt fix (2026-06-06 12:13, LIN-319, target `cli`).** The
+orchestrator re-drove the loop with the halt rule in force:
+
+- **`/recommend` was transient** — 504 on attempt 1, **200 on attempt 2**. The halt rule was armed
+  but didn't need to fire; the retry-then-halt shape behaved correctly.
+- **The recommender routed LIN-319 → `kind=planning`, not implementation** ("no implementation plan
+  exists; Plan signals unmet"). This is the faithful trajectory — fresh ticket plans first — and a
+  quiet vindication that B2's straight-to-implementation hand-prompt was the wrong *shape*, separate
+  from B2's halt error. The orchestrator dispatched the recommended plan prompt verbatim.
+- **Plan dispatch completed `done` in 3m 40s** with full telemetry (heartbeats → `(recap 1/2)`+`(2/2)`
+  → `[evidence]` Linear URL → `[done]`).
+- **Cross-check (invariant 2):** independently fetched LIN-319 — `In Progress`, a 5.6k-char plan in
+  the description (hybrid strategy scored against 2 alternatives, 7-surface map, "fits one session"),
+  and a strategy comment posted. The **plan deliverable is verified.**
+- **The tangle the cross-check exposed:** the plan's re-grounding reported the change is **already
+  implemented and verified in the working tree** (branch `wardrox/lin-319-dispatch-kind`, 8/8 `kind`
+  tests) — i.e. the **residual B2 implementation worker's output**, which finished on the runner after
+  the orchestrator halted. So the realised `kind` sequence was **implementation(residual) → planning**,
+  *backwards*, purely an artifact of the B2 concurrency, not a converging loop.
+- **Evidence discipline reinforced:** that implementation is **uncommitted — no commit/SHA/PR/CI**, so
+  there is nothing external to verify. The orchestrator marks it **"claimed, unverified"** and does
+  **not** treat it as done; only the plan (real Linear artifacts) is accepted. To become mergeable it
+  must first be committed → pushed → PR'd so it carries a SHA + a CI result. **Paused here for a human
+  decision** (per the "check before the first code-writing/merge action" guardrail), rather than
+  auto-advancing to an implementation/commit step.
+
+**Net (B1→B3):** the loop drives cleanly over the API (B1), halts correctly on infra errors (B2 fix),
+and produces faithful `kind` trajectories from `/recommend` (B3). The one thing that muddied B3 — an
+impl-before-plan sequence — was self-inflicted by letting B2's halted worker keep running; a clean
+write-path test needs **one** worker per ticket. The merge-to-main path is still unexercised end-to-end.
+
 - **Still not done:** an *unattended, multi-step* orchestrator run (B1 was a single supervised
   dispatch with a human reading each external-recap line). The next spike is a multi-task loop —
   orient → work several stack items in sequence → and deliberately provoke a `failed`/stall to
