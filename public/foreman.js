@@ -65,6 +65,10 @@
   // Visual helpers — adapted from public/swipe.js for consistency
   // =========================================================================
 
+  // NOTE: Canonical source of truth for state display is lib/providers/state-map.js
+  // (getStateDisplay). This browser copy is duplicated because the no-build-step
+  // constraint (CLAUDE.md) prevents importing from lib/. Keep in sync; unifying
+  // client+server is a candidate follow-up under LIN-174.
   function getStateInfo(stateType) {
     switch (stateType) {
       case 'completed':
