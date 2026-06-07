@@ -333,3 +333,155 @@ workflow legible, so the model scales and translates to the *task* instead of to
 hardest for the plan step — is that the upper bound needs a real structural cut at
 the hand-off, because a directive alone can't hold against the pull of a full
 context window.
+
+---
+
+## Measurement & eval plan (how we prove the changes work)
+
+> Spike outcome. Goal: turn the three candidate seams into **specific, separately
+> proven directives**, each backed by an offline A/B number on a cheap-but-capable
+> model. We do not ship a directive until the eval shows a lift on its target metric
+> without regressing a guard metric — the same discipline the routing eval already
+> uses (recall↑ without over-fire↑). **Plan only — no eval code or `lib/` changes
+> land from this section yet.**
+
+### What already exists (reuse, don't rebuild)
+
+A mature three-layer prompt-measurement stack is already in the repo:
+
+| Layer | Tool | Proves | Cost |
+|---|---|---|---|
+| Structural | `tests/unit/prompt-templates.test.js`, `tests/unit/openrouter.test.js` | the directive's words are present & ordered in **both** paths | free |
+| Behavioral A/B (judge) | `scripts/eval-completeness-check.mjs` | a directive changes model behavior (LLM judge, YES/NO rubric, Δ vs a stripped arm) | cheap model |
+| Behavioral A/B (deterministic) | `scripts/eval-research-routing.mjs` + `scripts/eval/{baseline,candidate}.txt` | a wording change shifts a **parseable** decision; `regen-baseline.mjs` proves the port by diff | cheapest |
+| Inspection | `scripts/audit-prompts.js` | eyeball rendered prompts for all templates | free |
+| Methodology | `docs/prompt-change-validation.md` | the discipline (both-paths, don't pre-solve evidence, gold case, constant judge, k×, two models, lower-bound honesty, price) | — |
+
+Two arm shapes are available: *strip-a-paragraph* (generate the real prompt from
+`lib/`, arm A = directive regex-stripped, arm B = live) and *plain-text candidate*
+(`baseline.txt` snapshot vs hand-edited `candidate.txt`, iterate in isolation, port
+one edit, prove the port by diff). `OPENROUTER_API_KEY` is available in the web
+session env, so evals can run there.
+
+### The key adaptation: scaling needs 3 metrics, and 2 are deterministic
+
+The existing evals each measure one near-binary directive. Scaling has **three
+independent behaviors**, and — usefully — the two that map to John's actual
+complaint are measurable by **output length** (deterministic, nearly free), not a
+judge:
+
+| Behavior (the change) | Metric | Judge? | Arm A → B |
+|---|---|---|---|
+| **Lower bound** — small task → light prompt/output | output length in a scale-appropriate band | No + thin quality-floor judge | full scaffold → `scale('small')` scaffold |
+| **Upper bound 1** — depth doesn't propagate | **inflation ratio** = len(out \| deep upstream) / len(out \| thin upstream), same task | No | raw-comments context → distilled hand-off |
+| **Upper bound 2** — prompt doesn't do next agent's job | **lane-bleed rate** (judge: "contains implementation-level steps / a written-out plan that is the next phase's job?") | Yes | strip lane-boundary block → live |
+
+**Do not bundle them into one arm** — strip/vary one change at a time so effects
+aren't confounded, then measure them together at the end.
+
+### Metric suite (mirrors routing's accuracy/recall/over-fire/off-vocab)
+
+Per arm, over the corpus: **right-sizing** (length lands in the expected band for the
+case's *true* scale) · **quality floor** (judge: essential content retained — names
+file + change + test approach) · **lane-discipline** (judge: did NOT write the next
+phase's artifact) · **inflation ratio** (drops in B for the same task under deep vs
+thin upstream) · **over-trim** (the guard, = routing's over-fire analog: on
+*deceptively-small* cases the quality floor must hold).
+`right-sizing↑ quality-floor↑ lane-discipline↑ inflation↓ over-trim↓` is better.
+
+### Case corpus (real + synthetic, edges built in)
+
+Most fixtures already exist in `eval-research-routing.mjs`:
+
+- **Genuinely small** (light expected): `SYN-7` typo, `SYN-9` mirror-a-validation,
+  `SYN-8` fits-one-session-plan-exists → B must shrink.
+- **Genuinely large** (full depth warranted): `SYN-12` Mango→Mongo migration, `SYN-5`
+  pagination → B must NOT shrink (proves we didn't just globally truncate).
+- **Real gold for propagation**: `LIN-325` (John's actual deep-research→inflated-plan
+  case) + **real comment-heavy tickets pulled from the workspace via the proxy**, so
+  propagation is tested on real artifacts, not only synthetic.
+- **Edges to find iteratively (the guard/over-trim cases — the point of "find the
+  edges"):**
+  - *Deceptively small*: terse one-line description, actually multi-surface (e.g.
+    "rename X" with 4 call sites) → B must stay full. Catches scaling on the wrong
+    signal.
+  - *Deceptively large*: verbose, comment-heavy ticket, trivial actual change → B
+    must go light despite the wall of context. Catches context-gravity.
+  - *Load-bearing constraint buried in deep research*: distilled hand-off must still
+    carry the one constraint that matters. Catches distillation dropping nuance.
+
+### Model selection (part of the plan, not an afterthought)
+
+We want one **cheap-but-reasonably-powerful generator** (the thing under iteration),
+one **constant cheap judge**, and one **frontier crutch-check**. The gating
+criterion for the generator is **format-compliance, not benchmark score**: the eval
+only works if the model reliably follows the meta-prompt structure (emits the
+`→ **action**` line, produces a realistically-shaped plan/research output) — a model
+that ignores structure makes the length/lane metrics noise. So:
+
+- **Phase-0 model calibration** (small budget): take 2–3 candidate cheap models and
+  run the *current* prompt on ~3 cases, `K=1`. Keep the cheapest one whose output is
+  **structurally faithful** (right sections, parseable action line, no schema drift).
+  Candidates to weigh (confirm exact IDs + live price against OpenRouter's `/models`
+  at calibration time — pricing moves): `anthropic/claude-haiku-4.5` (already the
+  harness default, proven format-faithful — the safe baseline), and one cheaper
+  flash/mini-tier challenger (e.g. a Gemini-flash / GPT-mini / DeepSeek-class model)
+  *only if* it passes the faithfulness bar.
+- **Constant judge**: hold on `anthropic/claude-haiku-4.5` (cheap; the validation doc
+  mandates a fixed judge so cross-model numbers compare). For the subtler
+  lane-discipline rubric, sanity-check the judge against ~5 hand-labeled outputs
+  before trusting its rate.
+- **Frontier crutch-check**: re-run the *decisive* case only, low `K`, on a frontier
+  model (`claude-opus-4.8` / `claude-sonnet-4.6`). A change that only helps the weak
+  model is a crutch; one that lifts both is real (this is exactly how the
+  completeness-check result was read: +43 pts haiku, +50 pts opus).
+
+### Iterative loop (eval as build-de-risker, not just regression gate)
+
+The decoupled candidate-txt pattern lets us **prove the wording/shape on cheap models
+with hand-authored arms BEFORE building `resolveTaskScale`** — e.g. hand-write a
+"small" plan scaffold, show length↓ + quality-floor held, *then* build the resolver
+knowing the target works. Per change: edit candidate / add strip-regex → AB on the
+decisive case, `K=1`, cheap → widen to full corpus + `K`, two models → ship one edit
+to **both** `lib/` paths → add structural test → `regen-baseline.mjs` diff proves the
+port → re-measure.
+
+### Phased plan
+
+- **Phase 0 — Harness + model calibration.** Fork `eval-completeness-check.mjs` into
+  `scripts/eval-prompt-scaling.mjs` (length-band metric, the quality-floor &
+  lane-discipline rubrics, the inflation-ratio runner = same task × thin/deep
+  upstream, the corpus). Run the model-calibration above and lock the generator +
+  judge. No `lib/` changes.
+- **Phase 1 — Baseline the problem (deterministic, cheap).** Run the corpus through
+  the **current** prompts and quantify the status quo: plan length `SYN-7` vs
+  `SYN-12` (is it really uniform?), inflation ratio on `LIN-325` thin-vs-deep. This
+  *measures John's complaint as a number* and gives every later change a Δ to beat.
+- **Phase 2 — Lane-boundary (highest-value, additive, strip-testable).** Most
+  pure-prompt of the three; directly targets "writes the plan itself." Author the
+  universal block + 2 sharpened lines; A/B with the strip pattern; target lane-bleed↓
+  on the deep cases without quality-floor loss on small ones.
+- **Phase 3 — Scale-down (lower bound).** Hand-author a `small` scaffold candidate;
+  prove length↓ + quality-floor held on small cases AND unchanged on
+  large/deceptive cases (over-trim guard). Only then build `resolveTaskScale` +
+  parameterized `generate(…, scale)`.
+- **Phase 4 — Distillation (upper bound, structural).** Vary context (raw vs
+  `/brief`-distilled hand-off) on the propagation cases; target inflation↓ while the
+  load-bearing-constraint case keeps its quality floor. Last, because it needs the
+  structural seam.
+
+**Gate at each phase:** ship to `lib/` (both paths) + add a structural test only when
+the eval shows a lift on the target metric *without* regressing the guard metric.
+
+**Deliverable:** three specific, separately-proven directives/seams, each with an A/B
+number on two models, plus a reusable `scripts/eval-prompt-scaling.mjs` that becomes
+the standing regression gate.
+
+### Honest limits (carried from the methodology)
+
+A single API call can't use tools, so length/lane metrics are a **lower bound** on
+real agent behavior (a real planner can grep, distill, restrain itself better than a
+one-shot call). Numbers are **model- and sample-dependent** and usually **small-n** —
+directional evidence, not precise estimates. Judge rates on the subtler lane rubric
+need a human spot-check. And length is a *proxy* for right-sizing: always pair it
+with the quality-floor judge so "shorter" can never win by dropping substance.
