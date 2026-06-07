@@ -153,3 +153,39 @@ heavy framing machinery — not tail-appended, since scale-down is subtractive).
 tests added to both unit suites; routing-eval baseline snapshot regenerated. This is the
 first directive to clear the ship gate.
 
+## Phase 4 — distillation hand-off (upper bound, structural) — MECHANISM PROVEN, BUILD DEFERRED
+
+The upper-bound fix the directive (Phase 2) couldn't deliver. Mechanism probe
+(`scripts/eval/phase4-distillation-probe.mjs`): generate the INF-1 plan prompt under three
+upstream conditions and measure inflation + a load-bearing-constraint-recall judge. The
+distilled hand-off is a hand-authored brief-style summary (Current / Recommended /
+**Constraint** / Surface Assessment) of the same raw research artifact. qwen3.7-plus, K=3:
+
+```
+upstream          words   inflation(vs thin)   constraint-recall
+thin                400         1.00x              (n/a)
+raw-deep            661         1.65x              0.67
+distilled-deep      571         1.43x              1.00
+```
+
+**Both target metrics move the right way:**
+- **Inflation ↓** 1.65× → 1.43× (~13% of the leak removed). Modest, not all the way to 1.0 —
+  because some inflation is *correct*: the plan legitimately absorbs the distilled findings.
+  Distillation trims the verbatim-depth/style mirroring while keeping the substance.
+- **Constraint-recall ↑** 0.67 → 1.00 (the guard, and the nicer result). In the raw dump the
+  load-bearing constraint ("existing in-flight items keep their old expiry") is buried and the
+  plan drops it 1-in-3; the distilled hand-off *foregrounds* it, so the plan keeps it every
+  time. Distillation isn't just shorter — it's higher-signal.
+
+**Why the build is deferred (a real decision, not a slam dunk):** unlike Phases 2–3 (prompt
+text), this needs a **semantic summary of upstream comments — an LLM call inside the
+context-builder**, on the recommendation hot path. A deterministic cap won't substitute: it
+would drop the buried constraint and fail the very guard distillation just improved. So the
+seam adds latency + cost + a failure mode to every recommend that carries deep comments, and
+must be **opt-in per consumer** (phase prompts distil; recap/brief keep the raw dump they
+depend on). The mechanism is proven; whether the modest inflation cut + constraint-retention
+gain is worth that architectural cost is the user's call. Spec for the seam: a
+`distillHandoff(comments)` (reusing the `/brief` primitive) invoked in
+`getRecommendation`/`getRecommendationStream` before `buildMetaPrompt`, gated to
+phase-generation callers, replacing `context.comments` with the distilled summary.
+

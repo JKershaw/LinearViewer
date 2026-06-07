@@ -500,3 +500,34 @@ one-shot call). Numbers are **model- and sample-dependent** and usually **small-
 directional evidence, not precise estimates. Judge rates on the subtler lane rubric
 need a human spot-check. And length is a *proxy* for right-sizing: always pair it
 with the quality-floor judge so "shorter" can never win by dropping substance.
+
+---
+
+## Outcomes (the plan, executed)
+
+The harness (`scripts/eval-prompt-scaling.mjs`) and the four phases were run.
+Full numbers in **[scripts/eval/lin-260-results.md](../scripts/eval/lin-260-results.md)**.
+Headline results, generator `qwen3.7-plus`, judge `claude-haiku-4.5`:
+
+- **Phase 1 — baseline quantifies the complaint.** Sizing is *inverted*: a trivial
+  validation (SYN-9) generated a **562-word plan** vs **392 words** for a multi-session
+  migration (SYN-12). A one-line task inflated **1.46×** purely from deep upstream comments.
+- **Phase 2 — lane-boundary directive: REVERTED.** K=3 A/B showed no lift (lane Δ=−0.04);
+  judge calibration showed the lane judge can't separate "instructs a thorough plan" from
+  "pre-writes the plan" in the messy middle. This **empirically confirmed** the doc's thesis
+  that the upper bound is not directive-tractable — the directive is a backstop, not the fix.
+- **Phase 3 — scale-down directive: SHIPPED (both paths).** The lower-bound lever the doc
+  predicted would work. Genuine small tasks shrink ~10–20% with the quality floor held; a v1
+  over-trim on a terse-but-multi-surface "rename everywhere" case (−196 words) was fixed by a
+  deceptive-small guard (don't infer "small" from a terse description), restoring it to +19.
+  Structural tests in both unit suites; routing-eval baseline regenerated.
+- **Phase 4 — distillation hand-off: MECHANISM PROVEN, build deferred.** A distilled
+  upstream hand-off cuts inflation (1.65× → 1.43×) **and** raises load-bearing-constraint
+  retention (0.67 → 1.0). But it requires an LLM-in-the-context-builder on the recommendation
+  hot path (a deterministic cap would drop the constraint and fail the guard), so the
+  build is an architectural cost/benefit decision left to the user. Spec recorded in the
+  results doc; `scripts/eval/phase4-distillation-probe.mjs` is the reusable probe.
+
+**Net:** the complaint is now measured fact; the lower bound has a shipped, eval-proven fix
+in both paths; the upper bound has a proven structural mechanism awaiting a build decision;
+and the directive-only upper-bound fix was tried, measured, and correctly rejected.
