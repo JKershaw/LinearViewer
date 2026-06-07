@@ -419,22 +419,37 @@ only works if the model reliably follows the meta-prompt structure (emits the
 `→ **action**` line, produces a realistically-shaped plan/research output) — a model
 that ignores structure makes the length/lane metrics noise. So:
 
-- **Phase-0 model calibration** (small budget): take 2–3 candidate cheap models and
-  run the *current* prompt on ~3 cases, `K=1`. Keep the cheapest one whose output is
-  **structurally faithful** (right sections, parseable action line, no schema drift).
-  Candidates to weigh (confirm exact IDs + live price against OpenRouter's `/models`
-  at calibration time — pricing moves): `anthropic/claude-haiku-4.5` (already the
-  harness default, proven format-faithful — the safe baseline), and one cheaper
-  flash/mini-tier challenger (e.g. a Gemini-flash / GPT-mini / DeepSeek-class model)
-  *only if* it passes the faithfulness bar.
-- **Constant judge**: hold on `anthropic/claude-haiku-4.5` (cheap; the validation doc
-  mandates a fixed judge so cross-model numbers compare). For the subtler
-  lane-discipline rubric, sanity-check the judge against ~5 hand-labeled outputs
-  before trusting its rate.
-- **Frontier crutch-check**: re-run the *decisive* case only, low `K`, on a frontier
-  model (`claude-opus-4.8` / `claude-sonnet-4.6`). A change that only helps the weak
-  model is a crutch; one that lifts both is real (this is exactly how the
-  completeness-check result was read: +43 pts haiku, +50 pts opus).
+- **Decision (Qwen line, priced live off OpenRouter `/models` on 2026-06-07):** a
+  format-faithfulness probe (the gating criterion — does it follow the meta-prompt
+  structure and emit a parseable, in-vocab `→ **action**` line) was run on the
+  latest Qwen candidates with the real action-line wording, K=3:
+
+  | Model | $/M in→out | ctx | faithful / routing | speed |
+  |---|---|---|---|---|
+  | `qwen/qwen3.7-plus` | $0.40 → $1.60 | 1M | 3/3 in-vocab, 3/3 correct | ~23s |
+  | `qwen/qwen3.5-flash-02-23` | $0.07 → $0.26 | 1M | 3/3 in-vocab, 3/3 correct | ~17s |
+  | `qwen/qwen3.6-flash` | $0.19 → $1.12 | 1M | 3/3 in-vocab, 2/3 correct | ~13s |
+  | `qwen/qwen3-235b-a22b-2507` | $0.09 → $0.10 | 262k | 3/3 in-vocab, 1/3 correct | ~16s |
+
+  - **Primary generator (latest, most suitable): `qwen/qwen3.7-plus`** — newest
+    generation, 1M context (needed for the deep-upstream inflation cases), perfect on
+    the probe. ~$0.40/$1.60 per M.
+  - **Cheaper challenger for high-K iteration: `qwen/qwen3.5-flash-02-23`** — ~5–6×
+    cheaper ($0.07/$0.26), also 1M context and 3/3-correct on the probe. Use this for
+    cheap directional reads; confirm the winning Δ on `qwen3.7-plus`.
+  - **Exclude `:thinking` variants** — they emit reasoning tokens that pollute the
+    length metric (which is half our measurement). Instruct-only generators.
+  - Phase-0 calibration still runs the *current* prompt over ~3 real cases to confirm
+    these hold at the full ~5k-token meta-prompt before locking.
+- **Constant judge (held fixed, different family to avoid self-judging bias):**
+  `anthropic/claude-haiku-4.5` (cheap; the validation doc mandates a fixed judge so
+  cross-model numbers compare — and a non-Qwen judge avoids a model grading its own
+  family's output). Sanity-check the subtler lane-discipline rubric against ~5
+  hand-labeled outputs before trusting its rate.
+- **Frontier crutch-check**: re-run the *decisive* case only, low `K`, on a stronger
+  model (`qwen/qwen3.7-max` or `claude-opus-4.8`). A change that only helps the cheap
+  model is a crutch; one that lifts both is real (cf. the completeness-check read:
+  +43 pts haiku, +50 pts opus).
 
 ### Iterative loop (eval as build-de-risker, not just regression gate)
 
