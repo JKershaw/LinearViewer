@@ -108,6 +108,17 @@
     if (status) status.textContent = statusText || '';
   }
 
+  // LIN-324: the non-blocking orientation note beside the generate button.
+  // Empty text hides it; any text shows it. Used to surface a generation-time
+  // orientation failure or a safety-cap tail-drop (Strategy C) — transient UI
+  // only, never persisted.
+  function setOrientationNote(text) {
+    var note = document.getElementById('roadmap-orientation-note');
+    if (!note) return;
+    note.textContent = text || '';
+    note.hidden = !text;
+  }
+
   function resetLayer(layerId) {
     var section = layerSection(layerId);
     if (!section) return;
@@ -201,6 +212,7 @@
     var firstToken = {};
 
     LAYER_IDS.forEach(resetLayer);
+    setOrientationNote('');
     if (generateBtn) {
       generateBtn.disabled = true;
       generateBtn.textContent = 'Generating…';
@@ -320,6 +332,11 @@
         } else if (type === 'orientation') {
           // Structured data, not a visible layer — stash for saveReport.
           orientation = (eventData && eventData.orientation) || [];
+          // LIN-324: a generation-time orientation failure or a safety-cap
+          // tail-drop arrives as a transient `notice` on this event. Surface it
+          // as a non-blocking note so a disabled ship toggle is explained. The
+          // notice is NOT part of `orientation` and is never persisted.
+          if (eventData && eventData.notice) setOrientationNote(eventData.notice);
         }
         // 'done' needs no action — the stream ending resolves the promise.
       });
