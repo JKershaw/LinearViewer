@@ -1086,3 +1086,37 @@ describe('Surface Assessment (handwritten path)', () => {
     );
   });
 });
+
+// Scale-to-task (lower bound, LIN-260). The heavy generative phases must tell the
+// agent to size output to the task — proven on the meta-prompt path via
+// scripts/eval-prompt-scaling.mjs and mirrored here per CLAUDE.md's both-paths rule.
+describe('Scale to the task (handwritten path)', () => {
+  const mockIssue = {
+    id: 'issue-st', identifier: 'TEST-ST1', title: 'Add a thing',
+    description: 'Add a thing', url: 'https://linear.app/test/issue/TEST-ST1',
+    state: { name: 'Todo', type: 'unstarted' }, labels: []
+  };
+  const mockContext = { parent: null, siblings: [], project: null, children: [], comments: [] };
+
+  test('plan and research templates scale output to the task', () => {
+    for (const phase of ['plan', 'research']) {
+      const result = generatePrompt(phase, mockIssue, mockContext);
+      assert.ok(result.prompt.includes('Scale this to the task'), `${phase} must include the scale-to-task directive`);
+    }
+  });
+
+  test('scale directive carries the deceptive-small over-trim guard', () => {
+    const result = generatePrompt('plan', mockIssue, mockContext);
+    assert.ok(
+      result.prompt.includes('across the codebase') && result.prompt.includes('one sentence'),
+      'must warn that a terse description does not imply a small task (the over-trim guard)'
+    );
+  });
+
+  test('terminal phases do NOT carry the scale directive', () => {
+    for (const phase of ['implementation', 'review']) {
+      const result = generatePrompt(phase, mockIssue, mockContext);
+      assert.ok(!result.prompt.includes('Scale this to the task'), `${phase} should not carry the scale-to-task directive`);
+    }
+  });
+});

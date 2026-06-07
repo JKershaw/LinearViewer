@@ -585,6 +585,42 @@ describe('buildMetaPromptTemplate Surface Assessment', () => {
 });
 
 // =============================================================================
+// Scale to the task (lower bound, LIN-260) — the meta-prompt must size the
+// generated prompt to the task, with the deceptive-small over-trim guard.
+// Proven via scripts/eval-prompt-scaling.mjs; mirrored in the handwritten path
+// (tests/unit/prompt-templates.test.js) per CLAUDE.md's both-paths rule.
+// =============================================================================
+
+describe('buildMetaPromptTemplate scale to the task', () => {
+  function build() {
+    return buildMetaPromptTemplate({
+      issueContext: 'Test context', identifier: 'LIN-1', hasSubtasks: false,
+      subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
+      hasComments: false, commentCount: 0, aiHints: 'hints'
+    });
+  }
+
+  test('meta-prompt includes the Scale To The Task rule', () => {
+    assert.ok(build().includes('## Scale To The Task'), 'meta-prompt must size output to the task');
+  });
+
+  test('scale rule licenses a short prompt for a small task', () => {
+    assert.ok(
+      build().includes('A short prompt for a small task is correct'),
+      'must license brevity so small tasks are not padded to fill the scaffold'
+    );
+  });
+
+  test('scale rule carries the deceptive-small over-trim guard', () => {
+    const result = build();
+    assert.ok(
+      result.includes('across the codebase') && result.includes('Do NOT infer "small" from a terse description'),
+      'must warn that a terse description does not imply a small task'
+    );
+  });
+});
+
+// =============================================================================
 // Action vocabulary — the meta-prompt's `→ **action**` must stay inside the
 // vocabulary deriveDispatchKind() understands, so the fused recommend-and-dispatch
 // verb lands a real `kind` (not the `custom` fallback) for every known type.

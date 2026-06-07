@@ -789,6 +789,8 @@ test.describe('Proxy API - Dispatch', () => {
     expect(item.prompt).toContain('fix the bug');
     expect(item.prompt).toContain('Linear access');
     expect(item.prompt).toContain('/api/proxy/instructions');
+    // Starting context is the distilled brief, not the raw issue dump (LIN-260).
+    expect(item.prompt).toContain('/api/proxy/brief/LIN-288');
     // The embedded token lets the worker authenticate back to the proxy.
     expect(item.prompt).toContain(`Bearer ${writeToken}`);
     // Reporting is the runner's Stop hook, not the prompt — but the evidence

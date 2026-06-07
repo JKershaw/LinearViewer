@@ -104,7 +104,10 @@ describe('buildAutopilotKickoff (scoped to an issue)', () => {
 
   test('first act reads the issue and triggers recommend-and-dispatch for it', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue });
-    assert.ok(text.includes('GET /issues/LIN-42'));
+    // Lead with the distilled brief as starting context (LIN-260); the raw /issues
+    // read stays available for full detail the brief doesn't carry.
+    assert.ok(text.includes('GET /brief/LIN-42'), 'scoped first act should start from the distilled brief');
+    assert.ok(text.includes('GET /issues/LIN-42'), 'raw issue detail stays available');
     // The fused verb (LIN-321) replaces the two-step GET /recommend -> POST /dispatch:
     // the scoped first act triggers recommend-and-dispatch with the issue identifier.
     assert.ok(text.includes('POST /recommend-and-dispatch'));
