@@ -74,12 +74,14 @@ async function dispatchPageCustomPrompt({ urlKey, prompt, target, repo, kind, pr
   btn.textContent = 'sending...'
   btn.disabled = true
 
-  // Append proxy block if toggle is active (maybeAppendProxyBlock provided by app.js)
-  const finalPrompt = typeof maybeAppendProxyBlock === 'function'
-    ? await maybeAppendProxyBlock(prompt, urlKey)
-    : prompt
-
   try {
+    // Append proxy block if +proxy is on (maybeAppendProxyBlock provided by
+    // app.js). Inside the try so a failed token mint surfaces as "failed"
+    // instead of dispatching a bare prompt while the toggle still shows active.
+    const finalPrompt = typeof maybeAppendProxyBlock === 'function'
+      ? await maybeAppendProxyBlock(prompt, urlKey)
+      : prompt
+
     // Custom prompts are not anchored to a Linear issue — opt out of the
     // issue-link contract explicitly. A loaded Autopilot kickoff carries an
     // explicit kind ('autopilot') and name so it's tagged as the meta-loop.

@@ -61,10 +61,16 @@
     return `\n\n## Linear API Proxy\n\nYou have access to a Linear API proxy. Use it to read and modify Linear issues, projects, and more.\n\nTo get started, fetch the full API documentation:\n\n  curl -H "Authorization: Bearer ${token}" ${baseUrl}/api/proxy/instructions\n\nThis will return all available endpoints with examples. Your token scope is: readWrite.`;
   }
 
+  // When the +proxy toggle is off this is a no-op. When it is on but the block
+  // cannot be produced (no workspace context, or the token mint fails /
+  // rate-limits) this THROWS, so handleCopy/handleDispatch surface the failure
+  // instead of silently copying or dispatching a bare prompt while the toggle
+  // still shows active (the +proxy silent-drop bug).
   async function maybeAppendProxy(text, urlKey) {
     if (!isProxyActive()) return text;
+    if (!urlKey) throw new Error('Proxy is enabled but no workspace context was found for this prompt.');
     const token = await getOrCreateProxyToken(urlKey);
-    if (!token) return text;
+    if (!token) throw new Error('Proxy is enabled but a proxy token could not be created — you may have hit the token rate limit; wait a minute and try again.');
     return text + buildProxyBlock(token);
   }
 
@@ -510,8 +516,10 @@
     async function handleCopy(btn) {
       const raw = state.result && state.result.raw;
       if (!raw) return;
-      const text = await maybeAppendProxy(raw, opts.urlKey);
       try {
+        // Append the proxy block (if +proxy is on) inside the try so a failed
+        // token mint surfaces as "failed" instead of copying a bare prompt.
+        const text = await maybeAppendProxy(raw, opts.urlKey);
         await navigator.clipboard.writeText(text);
         btn.textContent = 'copied!';
         btn.classList.add('copied');
@@ -531,10 +539,12 @@
       const raw = state.result && state.result.raw;
       if (!raw) return;
       const target = btn.dataset.target;
-      const prompt = await maybeAppendProxy(raw, opts.urlKey);
       btn.disabled = true;
       const originalText = btn.textContent;
       try {
+        // Append the proxy block (if +proxy is on) inside the try so a failed
+        // token mint surfaces as "err" instead of dispatching a bare prompt.
+        const prompt = await maybeAppendProxy(raw, opts.urlKey);
         // `issue` is the full card object (id/identifier/title/url) \u2014 passing it
         // through is what ties Swipe-dispatched sessions back to their task.
         await window.dispatchPrompt({

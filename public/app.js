@@ -53,15 +53,21 @@ function buildProxyBlock(token) {
 }
 
 /**
- * If proxy toggle is active, append proxy instructions to prompt text.
+ * If the +proxy toggle is active, append proxy instructions to the prompt.
+ * When the toggle is off this is a no-op. When it is on but the block cannot be
+ * produced (no workspace context, or the token mint fails / rate-limits) this
+ * THROWS, so callers surface the failure instead of silently copying or
+ * dispatching a bare prompt while the toggle still shows active.
  * @param {string} prompt - Original prompt text
  * @param {string} urlKey - Workspace URL key
- * @returns {Promise<string>} Prompt with proxy block appended (or unchanged)
+ * @returns {Promise<string>} Prompt with proxy block appended (unchanged if toggle off)
+ * @throws {Error} If proxy is enabled but the block cannot be appended
  */
 async function maybeAppendProxyBlock(prompt, urlKey) {
-  if (!isProxyToggleActive() || !urlKey) return prompt
+  if (!isProxyToggleActive()) return prompt
+  if (!urlKey) throw new Error('Proxy is enabled but no workspace context was found for this prompt.')
   const token = await getOrCreateProxyToken(urlKey)
-  if (!token) return prompt
+  if (!token) throw new Error('Proxy is enabled but a proxy token could not be created — you may have hit the token rate limit; wait a minute and try again.')
   return prompt + buildProxyBlock(token)
 }
 
@@ -891,12 +897,12 @@ function initPrompts() {
     // Use raw markdown from data attribute, fall back to textContent
     // Strip any backtick code fences the AI may have wrapped the prompt in
     let textToCopy = stripCodeBlockFences(promptText.dataset.rawPrompt || promptText.textContent)
-
-    // Append proxy block if toggle is active
     const urlKey = promptContainer.dataset.urlKey || promptContainer.closest('[data-url-key]')?.dataset.urlKey
-    textToCopy = await maybeAppendProxyBlock(textToCopy, urlKey)
 
     try {
+      // Append the proxy block (if +proxy is on) inside the try so a failed
+      // token mint surfaces as "failed" instead of silently copying a bare prompt.
+      textToCopy = await maybeAppendProxyBlock(textToCopy, urlKey)
       await navigator.clipboard.writeText(textToCopy)
       const originalText = copyBtn.textContent
       copyBtn.textContent = 'copied!'
@@ -955,9 +961,6 @@ function initPrompts() {
       return
     }
 
-    // Append proxy block if toggle is active
-    prompt = await maybeAppendProxyBlock(prompt, urlKey)
-
     // Get issue context from the DOM. The .line carries data-id and
     // data-identifier; the surrounding .node wrapper shares data-id, so query
     // the line specifically to read the identifier (the pipeline-loops join key).
@@ -974,6 +977,10 @@ function initPrompts() {
 
     try {
       dispatchBtn.textContent = 'sending...'
+
+      // Append the proxy block (if +proxy is on) inside the try so a failed
+      // token mint surfaces as "failed" instead of dispatching a bare prompt.
+      prompt = await maybeAppendProxyBlock(prompt, urlKey)
 
       await dispatchPrompt({
         urlKey,
