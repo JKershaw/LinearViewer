@@ -278,6 +278,28 @@ test.describe('Prompt API', () => {
     expect(body.error).toBe('Not authenticated');
   });
 
+  test('recommend stream descends a parent, streaming the breadcrumb then the leaf (LIN-327)', async ({ page }) => {
+    // issue-1 (TEST-1) is a parent; its actionable child is issue-2 (TEST-2). The
+    // stream should route through the container — emitting a live breadcrumb into the
+    // reasoning section — then deliver the terminal child's prompt, with the descent
+    // path in the done event.
+    const response = await page.request.get(`${API_PREFIX}/api/recommend/issue-1/stream`);
+    expect(response.status()).toBe(200);
+    expect(response.headers()['content-type']).toContain('text/event-stream');
+
+    const body = await response.text();
+    // The descent is streamed live as a reasoning delta (not a frozen "fetching" state).
+    expect(body).toContain('event: delta');
+    expect(body).toContain('TEST-1 is a container → routing to TEST-2');
+    // The prompt section is delivered (the terminal child's), and the stream closes.
+    expect(body).toContain('"section":"prompt"');
+    expect(body).toContain('event: done');
+    // The done event carries the terminal identifier and the auditable descent path.
+    expect(body).toContain('"identifier":"TEST-2"');
+    expect(body).toContain('"deferredVia":["TEST-1","TEST-2"]');
+    expect(body).toContain('"deferTruncated":false');
+  });
+
   test('returns 404 for unknown label', async ({ page }) => {
     // Use valid UUID format so we get to the label check
     const response = await page.request.get(`${API_PREFIX}/api/prompt/${BLOCKED_ISSUE_ID}/unknown-label`);

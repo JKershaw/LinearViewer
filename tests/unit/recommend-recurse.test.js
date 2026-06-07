@@ -115,6 +115,22 @@ describe('resolveRecommendation', () => {
     );
   });
 
+  test('onHop fires once per hop with the deferring flag (lets callers stream the descent)', async () => {
+    const computeOne = fakeComputeOne({
+      'LIN-318': { recommendedAction: 'defer', prompt: null, deferTo: 'LIN-297' },
+      'LIN-297': { recommendedAction: 'research', prompt: 'investigate', deferTo: null }
+    });
+    const hops = [];
+    await resolveRecommendation({
+      computeOne, startIdentifier: 'LIN-318',
+      onHop: (rec, info) => hops.push({ id: rec.identifier, deferring: info.deferring, depth: info.depth })
+    });
+    assert.deepStrictEqual(hops, [
+      { id: 'LIN-318', deferring: true, depth: 0 },
+      { id: 'LIN-297', deferring: false, depth: 1 }
+    ]);
+  });
+
   test('shared deadline stops the descent before the next hop with a timeout flag', async () => {
     let clock = 1000;
     const now = () => clock;

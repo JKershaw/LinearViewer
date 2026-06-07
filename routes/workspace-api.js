@@ -873,6 +873,51 @@ ${goal}`;
         }
       }
 
+      const idOf = (iss) => iss.url?.split('/').pop() || iss.identifier;
+      const incompleteChild = (iss) => testMockData.issues.find(
+        i => i.parent?.id === iss.id && i.state?.type !== 'completed' && i.state?.type !== 'canceled'
+      );
+
+      // Node-shaped mock issue (LIN-327): mirror the live node path — stream a
+      // descent breadcrumb for each container, then the terminal child's mock
+      // recommendation. Keeps the descent-streaming behaviour E2E-covered.
+      if (incompleteChild(mockIssue)) {
+        res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' });
+        res.flushHeaders();
+        sendSSE(res, 'phase', { phase: 'reasoning' });
+
+        const path = [];
+        const seen = new Set();
+        let node = mockIssue;
+        while (node && !seen.has(node.id) && path.length < 10) {
+          seen.add(node.id);
+          path.push(node);
+          node = incompleteChild(node);
+        }
+        const terminal = path[path.length - 1];
+        const deferredVia = path.map(idOf);
+        for (let k = 0; k < path.length - 1; k++) {
+          sendSSE(res, 'delta', { section: 'reasoning', content: `↳ ${idOf(path[k])} is a container → routing to ${idOf(path[k + 1])}\n` });
+        }
+        const term = generateMockRecommendation(terminal);
+        const termProject = testMockData.projects.find(p => p.id === terminal.project?.id);
+        sendSSE(res, 'delta', { section: 'reasoning', content: `\n${term.reasoning}` });
+        sendSSE(res, 'phase', { phase: 'prompt' });
+        sendSSE(res, 'delta', { section: 'prompt', content: term.prompt });
+        const doneData = {
+          truncated: false, completionTokens: null,
+          issueUrl: terminal.url, repo: parseRepoFromDescription(termProject?.content),
+          identifier: idOf(terminal), deferredVia, deferTruncated: false
+        };
+        if (testIsFreeTier) {
+          const usage = await freeTierStore.getUsage(workspace.urlKey);
+          doneData.freeTier = { used: true, remaining: usage.remaining, limit: usage.limit, resetsAt: usage.resetsAt };
+        }
+        sendSSE(res, 'done', doneData);
+        res.end();
+        return;
+      }
+
       const { reasoning, prompt } = generateMockRecommendation(mockIssue);
       const mockProject = testMockData.projects.find(p => p.id === mockIssue.project?.id);
 
@@ -951,14 +996,23 @@ ${goal}`;
       const apiKeyToUse = sessionApiKey || (isFreeTier ? freeTierKey : undefined);
 
       // Node-shaped tasks (LIN-327): the first hop is a `defer` with no prompt body,
-      // which can't be token-streamed. Resolve the descent non-streamed to the
-      // terminal actionable node and deliver ITS recommendation over SSE (the defer
-      // hops generate no prompt, so only the terminal hop has one to send). Leaf
-      // tasks fall through to true token streaming below — the common path is unchanged.
+      // which can't be token-streamed. We resolve the descent and surface it LIVE —
+      // each defer hop streams a breadcrumb into the reasoning section as it routes,
+      // so the UI shows progress instead of sitting on "fetching" — then the terminal
+      // node's reasoning and prompt are delivered (only the terminal hop has a prompt).
+      // Leaf tasks fall through to true token streaming below — the common path is unchanged.
       if (children?.length > 0) {
+        // Unhide the reasoning section up front so the descent breadcrumbs render live.
+        sendSSE(res, 'phase', { phase: 'reasoning' });
+
         const { recommendation: rec, deferredVia, deferTruncated, deferStopReason } = await resolveRecommendation({
           startIdentifier: issueId,
           deadline: Date.now() + RECOMMEND_DESCENT_BUDGET_MS,
+          onHop: (hop) => {
+            // Stream a breadcrumb for each container we route through.
+            if (closed || !(hop.recommendedAction === 'defer' && hop.deferTo)) return;
+            sendSSE(res, 'delta', { section: 'reasoning', content: `↳ ${hop.identifier} is a container → routing to ${hop.deferTo}\n` });
+          },
           computeOne: async (id) => {
             const ctx = await fetchRecommendationContext(workspace.accessToken, id);
             const r = await getRecommendation(
@@ -986,8 +1040,8 @@ ${goal}`;
           // Abnormal stop (depth/cycle/unresolved/timeout) — surface, don't ship a defer.
           sendSSE(res, 'error', { error: 'Recommendation did not resolve to an actionable task', deferredVia, deferTruncated, deferStopReason });
         } else {
-          sendSSE(res, 'phase', { phase: 'reasoning' });
-          if (rec.reasoning) sendSSE(res, 'delta', { section: 'reasoning', content: rec.reasoning });
+          // Terminal node's reasoning appended after the breadcrumbs, then its prompt.
+          if (rec.reasoning) sendSSE(res, 'delta', { section: 'reasoning', content: `\n${rec.reasoning}` });
           sendSSE(res, 'phase', { phase: 'prompt' });
           sendSSE(res, 'delta', { section: 'prompt', content: rec.prompt });
           sendSSE(res, 'done', { truncated: rec.truncated, completionTokens: rec.completionTokens, ...metadata });
