@@ -11,7 +11,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { hasPrompt, getPromptLabels, generatePrompt, getAvailablePrompts, getPromptDescriptionsForAI, PROMPT_TEMPLATES, PROMPT_CATEGORIES, formatAIHintsForMetaPrompt } from '../../lib/prompt-templates.js';
+import { hasPrompt, getPromptLabels, generatePrompt, getAvailablePrompts, getPromptDescriptionsForAI, PROMPT_TEMPLATES, PROMPT_CATEGORIES, formatAIHintsForMetaPrompt, RECOMMEND_META_ACTIONS, DISPATCH_KINDS, isValidDispatchKind, deriveDispatchKind } from '../../lib/prompt-templates.js';
 import { WORK_ISSUE_LABELS } from '../../lib/workflow-config.js';
 import { COMPLETION_SIGNALS } from '../../lib/completion-signals.js';
 
@@ -102,6 +102,30 @@ describe('getPromptLabels', () => {
   test('has exactly 15 templates', () => {
     const labels = getPromptLabels();
     assert.strictEqual(labels.length, 15);
+  });
+});
+
+// =============================================================================
+// Recommend-meta actions: `defer` (LIN-327)
+// =============================================================================
+
+describe('defer recommend-meta action', () => {
+  test('defer is NOT a prompt template (no generate() body)', () => {
+    // The no-body cost contract is structural: defer has no PROMPT_TEMPLATES entry,
+    // so it cannot produce a prompt and cannot inflate the template count.
+    assert.ok(!('defer' in PROMPT_TEMPLATES), 'defer must not be a prompt template');
+    assert.strictEqual(getPromptLabels().length, 15, 'defer must not change the template count');
+  });
+
+  test('defer is registered in RECOMMEND_META_ACTIONS and the dispatch vocabulary', () => {
+    assert.ok(RECOMMEND_META_ACTIONS.includes('defer'));
+    assert.ok(DISPATCH_KINDS.includes('defer'), 'defer must be a valid dispatch kind');
+    assert.strictEqual(isValidDispatchKind('defer'), true);
+  });
+
+  test('deriveDispatchKind resolves defer to itself, not the custom fallback', () => {
+    assert.strictEqual(deriveDispatchKind('defer'), 'defer');
+    assert.strictEqual(deriveDispatchKind('DEFER'), 'defer');
   });
 });
 

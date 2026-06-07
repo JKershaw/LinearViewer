@@ -995,6 +995,40 @@ test.describe('Proxy API - Recommend-and-Dispatch (fused verb, LIN-321)', () => 
     expect(created.kind).toBe('bug');
   });
 
+  test('descends a container to its actionable child (LIN-327)', async ({ request }) => {
+    // TEST-1 is an in-progress parent whose child TEST-2 is the actionable work.
+    // The recommender defers TEST-1 → TEST-2; the recursion resolves it server-side
+    // and dispatches the TERMINAL node's prompt, never a `defer`.
+    const resp = await request.post('/api/proxy/recommend-and-dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { issueIdentifier: 'TEST-1' }
+    });
+    expect(resp.status()).toBe(201);
+    const created = await resp.json();
+
+    // The dispatched item references the terminal node, not the parent the caller named.
+    expect(created.issueIdentifier).toBe('TEST-2');
+    expect(created.kind).not.toBe('defer'); // defer never reaches dispatch
+    // The descent breadcrumb is auditable from the structured header.
+    expect(created.deferredVia).toEqual(['TEST-1', 'TEST-2']);
+    expect(created.deferTruncated).toBe(false);
+    expect(created.descent).toContain('descended to TEST-2');
+    // Still no prompt body — the verb's whole point.
+    expect(created.prompt).toBeUndefined();
+  });
+
+  test('GET /recommend returns the terminal node and the descent path (LIN-327)', async ({ request }) => {
+    const resp = await request.get('/api/proxy/recommend/TEST-1', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(resp.status()).toBe(200);
+    const rec = await resp.json();
+    expect(rec.identifier).toBe('TEST-2');               // terminal, not the parent
+    expect(rec.recommendedAction).not.toBe('defer');     // resolved to real work
+    expect(rec.deferredVia).toEqual(['TEST-1', 'TEST-2']);
+    expect(rec.prompt).toBeTruthy();                     // terminal node carries a prompt
+  });
+
   test('nonexistent issue gets 404', async ({ request }) => {
     const resp = await request.post('/api/proxy/recommend-and-dispatch', {
       headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },

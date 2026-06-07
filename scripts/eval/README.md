@@ -17,6 +17,14 @@ Both use placeholders `{{ISSUE_CONTEXT}}` / `{{IDENTIFIER}}`, filled per case. T
 snapshot is for a leaf task (no subtasks/comments), `featureFlags:{}` — exactly
 what the proxy sends — so cases must likewise be leaf tasks to stay faithful.
 
+> **Scope (LIN-327).** This harness grades the **leaf** routing decision only. The
+> `defer` action and its node-shaped "descend vs. node-work" routing are emitted on
+> *node* prompts (`hasSubtasks:true`), which this leaf snapshot does not cover. The
+> end-to-end defer regression — a parent with a research-needing leaf resolving to
+> `research` at the leaf (not `implement` at the parent) — is exercised by the
+> recommend-recursion eval/unit tests in **LIN-329**, where the traversal that makes
+> that resolution observable actually lives.
+
 ## Workflow
 
 1. **Edit `meta-prompt.candidate.txt`** — change the wording you want to test.
