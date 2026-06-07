@@ -11,13 +11,15 @@ import {
   formatIssueContext,
   isEpicShapedParent,
   parseRecommendedAction,
+  parseDeferTo,
+  parseRecommendationResponse,
   EPIC_CHILD_THRESHOLD,
   COUSIN_CAP,
   SIBLING_CAP,
   EPIC_TITLE_PATTERN
 } from '../../lib/openrouter.js';
 import { buildMetaPromptTemplate } from '../../lib/prompts/meta-prompt-template.js';
-import { getAIRecommendationActionNames, deriveDispatchKind, DISPATCH_KIND_DEFAULT } from '../../lib/prompt-templates.js';
+import { getAIRecommendationActionNames, deriveDispatchKind, isValidDispatchKind, DISPATCH_KIND_DEFAULT } from '../../lib/prompt-templates.js';
 
 // =============================================================================
 // stripCodeBlockMarkers Tests
@@ -463,6 +465,40 @@ describe('formatIssueContext cousins', () => {
 // Meta-prompt: Plan completeness check (mirrors handwritten path)
 // =============================================================================
 
+describe('buildMetaPromptTemplate defer routing (LIN-327)', () => {
+  function build(overrides = {}) {
+    return buildMetaPromptTemplate({
+      issueContext: 'Test context', identifier: 'LIN-1', hasSubtasks: false,
+      subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
+      hasComments: false, commentCount: 0, aiHints: 'hints',
+      actionVocabulary: getAIRecommendationActionNames().join(', '), ...overrides
+    });
+  }
+
+  test('node-shaped tasks get the defer-vs-node-work decision step', () => {
+    const text = build({ hasSubtasks: true, subtaskCount: 3, remainingCount: 2 });
+    assert.ok(text.includes('defer'), 'defer must appear in a node-shaped meta-prompt');
+    assert.ok(/defer.*vs.*node-work/i.test(text), 'the node-work-vs-defer decision must be present');
+  });
+
+  test('leaf tasks do NOT get the defer decision step (no child to defer to)', () => {
+    const text = build({ hasSubtasks: false });
+    assert.ok(!text.includes('vs. node-work'), 'leaf tasks must not see the defer decision step');
+  });
+
+  test('output contract documents the DeferTo line and the empty-prompt-on-defer rule', () => {
+    const text = build({ hasSubtasks: true, subtaskCount: 2, remainingCount: 2 });
+    assert.ok(text.includes('DeferTo:'), 'the structured DeferTo contract line must be documented');
+    assert.ok(/do NOT generate a prompt body/i.test(text) || /leave the Prompt section empty/i.test(text),
+      'the no-prompt-body rule for defer must be stated');
+  });
+
+  test('defer appears in the emittable action vocabulary list', () => {
+    const text = build({ hasSubtasks: true });
+    assert.ok(text.includes('defer'), 'defer must be in the action vocabulary the meta-prompt prints');
+  });
+});
+
 describe('buildMetaPromptTemplate plan completeness check', () => {
   function build() {
     return buildMetaPromptTemplate({
@@ -588,6 +624,94 @@ describe('action vocabulary (kind derivation seam)', () => {
   test('falls back to an example set when no vocabulary is supplied', () => {
     const text = buildMetaPromptTemplate({ ...base });
     assert.ok(text.includes('plan, research, implement'), 'a sensible fallback list is present');
+  });
+
+  // LIN-327: `defer` is a recommend-meta action — emittable by the recommender,
+  // a valid kind, and self-deriving (NOT the custom fallback), despite having no
+  // PROMPT_TEMPLATES entry / no prompt body.
+  test('defer is in the AI recommendation vocabulary', () => {
+    assert.ok(getAIRecommendationActionNames().includes('defer'),
+      'defer must be offered to the meta-prompt as an emittable action');
+  });
+
+  test('defer is a valid dispatch kind and derives to itself (not custom)', () => {
+    assert.strictEqual(isValidDispatchKind('defer'), true);
+    assert.strictEqual(deriveDispatchKind('defer'), 'defer');
+    assert.notStrictEqual(deriveDispatchKind('defer'), DISPATCH_KIND_DEFAULT);
+  });
+});
+
+// =============================================================================
+// parseDeferTo Tests (LIN-327)
+// =============================================================================
+
+describe('parseDeferTo', () => {
+  test('extracts the target identifier from the DeferTo contract line', () => {
+    const reasoning = '→ **defer**\n**Next:** descend\n**DeferTo:** LIN-297';
+    assert.strictEqual(parseDeferTo(reasoning), 'LIN-297');
+  });
+
+  test('tolerates missing markdown bold around the value', () => {
+    assert.strictEqual(parseDeferTo('DeferTo: ABC-12'), 'ABC-12');
+  });
+
+  test('extracts a UUID target', () => {
+    const uuid = '663837bb-e936-4e01-a13c-eb62fc37b3d6';
+    assert.strictEqual(parseDeferTo(`**DeferTo:** ${uuid}`), uuid);
+  });
+
+  test('returns null when the DeferTo line is absent', () => {
+    assert.strictEqual(parseDeferTo('→ **research**\n**Next:** investigate'), null);
+  });
+
+  test('returns null for non-string input', () => {
+    assert.strictEqual(parseDeferTo(null), null);
+    assert.strictEqual(parseDeferTo(undefined), null);
+  });
+});
+
+// =============================================================================
+// parseRecommendationResponse Tests (LIN-327 — defer no-body cost contract)
+// =============================================================================
+
+describe('parseRecommendationResponse', () => {
+  test('a normal action carries its prompt body and a null deferTo', () => {
+    const content = '## Reasoning\n→ **research**\n**Next:** investigate\n\n## Prompt\nGo research the thing.';
+    const result = parseRecommendationResponse(content, 'stop', 120);
+    assert.strictEqual(result.recommendedAction, 'research');
+    assert.strictEqual(result.prompt, 'Go research the thing.');
+    assert.strictEqual(result.deferTo, null);
+  });
+
+  test('a defer reply carries NO prompt body and a deferTo target', () => {
+    const content = '## Reasoning\n→ **defer**\n**Next:** descend to the child\n**DeferTo:** LIN-297\n\n## Prompt\n';
+    const result = parseRecommendationResponse(content, 'stop', 30);
+    assert.strictEqual(result.recommendedAction, 'defer');
+    assert.strictEqual(result.deferTo, 'LIN-297');
+    assert.strictEqual(result.prompt, null, 'defer must not carry a prompt body (cost contract)');
+  });
+
+  test('a defer reply that emits a prompt body still drops it (no body ever survives)', () => {
+    const content = '## Reasoning\n→ **defer**\n**DeferTo:** LIN-300\n\n## Prompt\nStray body the model should not have written.';
+    const result = parseRecommendationResponse(content, 'stop', 40);
+    assert.strictEqual(result.recommendedAction, 'defer');
+    assert.strictEqual(result.deferTo, 'LIN-300');
+    assert.strictEqual(result.prompt, null, 'a defer prompt body is discarded, not returned');
+  });
+
+  test('a defer reply missing its DeferTo target throws', () => {
+    const content = '## Reasoning\n→ **defer**\n**Next:** descend\n\n## Prompt\n';
+    assert.throws(() => parseRecommendationResponse(content, 'stop', 10), /DeferTo target/);
+  });
+
+  test('a non-defer reply missing its prompt body throws', () => {
+    const content = '## Reasoning\n→ **plan**\n**Next:** plan it\n\n## Prompt\n';
+    assert.throws(() => parseRecommendationResponse(content, 'stop', 10), /missing ## Reasoning or ## Prompt/);
+  });
+
+  test('marks truncated when finish_reason is length', () => {
+    const content = '## Reasoning\n→ **plan**\n\n## Prompt\nPlan body.';
+    assert.strictEqual(parseRecommendationResponse(content, 'length', 8000).truncated, true);
   });
 });
 
