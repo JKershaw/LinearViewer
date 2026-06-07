@@ -87,7 +87,9 @@ that erred. If the verb returns a network error / timeout / 5xx, that is a **hal
 conditions), not a fallback.
 
 **3. Watch.** Poll `GET /dispatch/{id}`. Read the **`status` field** for the terminal signal
-(`queued`→`taken`→`done`/`failed`/`aborted`) — do not parse prose for it. Use heartbeats for
+(`queued`→`taken`→`done`/`failed`/`aborted`) — do not parse prose for it. (If you poll in a
+shell loop, don't name the variable `status`: zsh reserves it as a read-only alias for `$?` and
+the assignment aborts. Use `dispatch_status`, or run the loop under `bash`.) Use heartbeats for
 liveness: a `[working]` beat = alive; a long silence past the heartbeat cadence with no
 terminal status = **stalled** → flag, consider re-dispatch or help. Do **not** treat the
 recap text as the completion signal. Two cautions from live runs: a heartbeat that reads
