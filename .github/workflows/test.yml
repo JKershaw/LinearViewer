@@ -3,6 +3,8 @@ name: Tests
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
   unit:
@@ -70,3 +72,22 @@ jobs:
           name: playwright-report-shard-${{ matrix.shard }}
           path: test-results/
           retention-days: 7
+
+  # Single stable check that aggregates all test jobs above. The e2e job names
+  # are dynamic (they embed the shard index), which makes them awkward to pin
+  # as required status checks. Require this job instead: it's one fixed name
+  # that only passes when every unit and e2e job passes, so it's the right
+  # gate for branch protection / automated merges.
+  ci-success:
+    name: CI success
+    if: always()
+    needs: [unit, e2e]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify all test jobs passed
+        run: |
+          if [ "${{ needs.unit.result }}" != "success" ] || [ "${{ needs.e2e.result }}" != "success" ]; then
+            echo "::error::One or more test jobs failed (unit=${{ needs.unit.result }}, e2e=${{ needs.e2e.result }})."
+            exit 1
+          fi
+          echo "All test jobs passed."

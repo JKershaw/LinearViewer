@@ -453,4 +453,4 @@ sleep 30 && curl -s "https://api.github.com/repos/JKershaw/LinearViewer/actions/
 | `status` | `queued`, `in_progress`, `completed` |
 | `conclusion` | `success`, `failure`, `cancelled`, `skipped` (only when completed) |
 
-**Note**: CI runs only on pushes to `main` (i.e. after a PR merges). Pull requests and feature branches don't trigger CI — local pre-commit/pre-push tests cover those.
+**Note**: CI runs on pull requests targeting `main` and on pushes to `main` (i.e. after a PR merges). The `ci-success` job aggregates the unit and e2e jobs into a single stable check — require it as a branch-protection status check so automated agents can confirm CI is green before merging.
