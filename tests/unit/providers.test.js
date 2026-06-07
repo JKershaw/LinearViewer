@@ -67,6 +67,11 @@ describe('ProviderInterface', () => {
     assert.throws(() => base.getAuthRouter(), NotImplementedError);
   });
 
+  test('getCreateTaskUrl is declared and throws NotImplementedError on the base', () => {
+    const base = new ProviderInterface();
+    assert.throws(() => base.getCreateTaskUrl(), NotImplementedError);
+  });
+
   test('capability descriptor reports nothing implemented on the bare base', () => {
     const base = new ProviderInterface();
     const caps = base.capabilities;
@@ -167,9 +172,26 @@ describe('Linear provider through lib/linear.js shim', () => {
     }
   });
 
-  test('getAuthRouter is NOT implemented this phase (deferred to LIN-331)', () => {
-    assert.strictEqual(linearProvider.supports('getAuthRouter'), false);
-    assert.throws(() => linearProvider.getAuthRouter(), NotImplementedError);
+  test('getAuthRouter is implemented (LIN-331): returns the Linear OAuth router', () => {
+    const router = linearProvider.getAuthRouter({
+      sessionStore: { cleanup: async () => {} },
+      userPreferencesStore: null
+    });
+    // An Express router is a callable function exposing .use/.get.
+    assert.strictEqual(typeof router, 'function');
+    assert.strictEqual(typeof router.get, 'function');
+  });
+
+  test('getCreateTaskUrl is implemented (LIN-331): byte-identical Linear deep link', () => {
+    assert.strictEqual(
+      linearProvider.getCreateTaskUrl('acme', 'proj_123'),
+      'https://linear.app/acme/new?project=proj_123'
+    );
+    // Components are URL-encoded, matching render.js's prior inline form.
+    assert.strictEqual(
+      linearProvider.getCreateTaskUrl('a/b', 'p?x'),
+      'https://linear.app/a%2Fb/new?project=p%3Fx'
+    );
   });
 
   test('provider inherits mapState delegation', () => {

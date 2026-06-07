@@ -9,7 +9,8 @@
  * - Images: Proxy Linear-hosted images with auth
  */
 import { Router } from 'express';
-import { fetchIssueContext, fetchRecommendationContext, fetchIssueComments, fetchProjects } from '../lib/linear.js';
+import { getProvider } from '../lib/providers/registry.js';
+import '../lib/providers/linear/index.js'; // side effect: self-registers the Linear provider into the registry
 import { buildRoadmapModel } from '../lib/roadmap.js';
 import { buildRoadmapNarrativeMessages } from '../lib/prompts/roadmap-narrative-template.js';
 import { buildRoadmapProductMessages } from '../lib/prompts/roadmap-product-template.js';
@@ -215,7 +216,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       }
 
       // Fetch issue context from Linear
-      const { issue, parent, siblings, project, children, comments } = await fetchIssueContext(workspace.accessToken, issueId)
+      const { issue, parent, siblings, project, children, comments } = await getProvider('linear').fetchIssueContext(workspace.accessToken, issueId)
 
       // Generate the prompt
       let result;
@@ -312,7 +313,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         })
       }
 
-      const { issue, project } = await fetchIssueContext(workspace.accessToken, issueId)
+      const { issue, project } = await getProvider('linear').fetchIssueContext(workspace.accessToken, issueId)
       const prompt = buildForemanPlaybook({
         baseUrl,
         issue: { identifier: issue.identifier, title: issue.title },
@@ -387,7 +388,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         })
       }
 
-      const { issue, project } = await fetchIssueContext(workspace.accessToken, issueId)
+      const { issue, project } = await getProvider('linear').fetchIssueContext(workspace.accessToken, issueId)
       const prompt = buildMiniForemanStep({
         baseUrl,
         issue: { identifier: issue.identifier, title: issue.title }
@@ -466,7 +467,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         })
       }
 
-      const { issue, project } = await fetchIssueContext(workspace.accessToken, issueId)
+      const { issue, project } = await getProvider('linear').fetchIssueContext(workspace.accessToken, issueId)
       const prompt = buildAutopilotKickoff({
         baseUrl,
         issue: { identifier: issue.identifier, title: issue.title },
@@ -698,7 +699,7 @@ ${goal}`
         deadline: Date.now() + RECOMMEND_DESCENT_BUDGET_MS,
         computeOne: async (id) => {
           // Two-tier context for parent tasks; the focused child seeds the defer choice.
-          const ctx = await fetchRecommendationContext(workspace.accessToken, id)
+          const ctx = await getProvider('linear').fetchRecommendationContext(workspace.accessToken, id)
           const r = await getRecommendation(
             ctx.issue,
             { parent: ctx.parent, siblings: ctx.siblings, project: ctx.project, children: ctx.children, comments: ctx.comments, focusedChild: ctx.focusedChild },
@@ -987,7 +988,7 @@ ${goal}`;
     try {
       // Phase 1: Fetch context from Linear
       sendSSE(res, 'phase', { phase: 'fetching_context' });
-      const context = await fetchRecommendationContext(workspace.accessToken, issueId);
+      const context = await getProvider('linear').fetchRecommendationContext(workspace.accessToken, issueId);
       const { issue, parent, siblings, project, children, comments, focusedChild } = context;
 
       if (closed) return;
@@ -1014,7 +1015,7 @@ ${goal}`;
             sendSSE(res, 'delta', { section: 'reasoning', content: `↳ ${hop.identifier} is a container → routing to ${hop.deferTo}\n` });
           },
           computeOne: async (id) => {
-            const ctx = await fetchRecommendationContext(workspace.accessToken, id);
+            const ctx = await getProvider('linear').fetchRecommendationContext(workspace.accessToken, id);
             const r = await getRecommendation(
               ctx.issue,
               { parent: ctx.parent, siblings: ctx.siblings, project: ctx.project, children: ctx.children, comments: ctx.comments, focusedChild: ctx.focusedChild },
@@ -1133,7 +1134,7 @@ ${goal}`;
         })
       }
 
-      const comments = await fetchIssueComments(workspace.accessToken, issueId)
+      const comments = await getProvider('linear').fetchIssueComments(workspace.accessToken, issueId)
       res.json({ comments })
     } catch (error) {
       console.error('Comments fetch error:', error)
@@ -1218,7 +1219,7 @@ ${goal}`;
         context = await buildMockRecapContext(issueId);
         if (!context) return res.status(404).json({ error: 'Issue not found' });
       } else {
-        context = await fetchRecommendationContext(workspace.accessToken, issueId);
+        context = await getProvider('linear').fetchRecommendationContext(workspace.accessToken, issueId);
       }
 
       const canonicalId = context.issue?.id || issueId;
@@ -1306,7 +1307,7 @@ ${goal}`;
           return keepalive.send(404, { error: 'Issue not found' });
         }
       } else {
-        context = await fetchRecommendationContext(workspace.accessToken, issueId);
+        context = await getProvider('linear').fetchRecommendationContext(workspace.accessToken, issueId);
       }
 
       const canonicalId = context.issue?.id || issueId;
@@ -1388,7 +1389,7 @@ ${goal}`;
         context = await buildMockRecapContext(issueId);
         if (!context) return res.status(404).json({ error: 'Issue not found' });
       } else {
-        context = await fetchRecommendationContext(workspace.accessToken, issueId);
+        context = await getProvider('linear').fetchRecommendationContext(workspace.accessToken, issueId);
       }
 
       const canonicalId = context.issue?.id || issueId;
@@ -1476,7 +1477,7 @@ ${goal}`;
           return keepalive.send(404, { error: 'Issue not found' });
         }
       } else {
-        context = await fetchRecommendationContext(workspace.accessToken, issueId);
+        context = await getProvider('linear').fetchRecommendationContext(workspace.accessToken, issueId);
       }
 
       const canonicalId = context.issue?.id || issueId;
@@ -2289,7 +2290,7 @@ ${goal}`;
     try {
       const { projects, issues } = testMode
         ? testMockData
-        : await fetchProjects(req.workspace.accessToken, teamId);
+        : await getProvider('linear').fetchProjects(req.workspace.accessToken, teamId);
       roadmapModel = buildRoadmapModel(projects, issues);
     } catch (error) {
       console.error('Roadmap generate fetch error:', error);
