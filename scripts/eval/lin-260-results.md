@@ -44,3 +44,32 @@ GRD-deceptive-large           small     ?             380     -      1     0.96x
 
 Targets for the change phases: lane↑ on the plan cases, inflation→~1.0 on INF-1,
 words↓ on the small cases — each without qual dropping below baseline on the guards.
+
+## Phase 2 — lane-boundary directive (A/B: strip block vs live)
+
+Directive landed in BOTH paths: meta-prompt `## Stay In Your Lane`, handwritten
+`formatLaneBoundary()`. `MODE=ab STRIP=lane`, K=1, qwen3.7-plus.
+
+```
+case                          scale     A.words  B.words   ΔW    A.lane B.lane   A.qual B.qual
+SYN-7 typo                    small        342     330    -12      -     -         1     1
+SYN-9 mirror-a-validation     small        368     421     53      -     -         1     1
+SYN-8 plan-exists fits-one-session small   388     449     61      -     -         1     1
+SYN-12 migration multi-session  large      377     401     24       0     1        1     1
+SYN-5 pagination multi-surface  standard   534     574     40       0     0        0     1
+INF-1 ttl-bump plan           small        692     704     12       0     0        1     1
+GRD-deceptive-small           large        473     582    109       0     0        1     1
+GRD-deceptive-large           small        350     364     14      -     -         1     1
+
+lane-discipline  A=0.00  B=0.25  Δ=+0.25   quality: no regressions
+```
+
+**Read (honest): weak/noisy positive, NOT yet a clear win.** lane Δ=+0.25 is driven by
+a single case (SYN-12: 0→1); SYN-5/INF-1/guard stayed 0→0. Two limitations the run
+exposed: (1) **lane is only scored on non-terminal routes**, and routing flips run-to-run
+at K=1, so only ~2–4 usable data points per run — needs K≥3 on the cases that reliably
+route plan/breakdown for a trustworthy number; (2) the block slightly *raises* words
+(it adds "don't do X" framing) — length is Phase 3's lever, not this one. Quality held
+everywhere, so the change is safe; it just hasn't cleared the ship gate yet. **Pending:
+higher-K confirm before this is called proven.**
+
