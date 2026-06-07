@@ -24,6 +24,12 @@ import { parseRepoFromDescription } from '../lib/prompt-formatters.js';
 import { buildForemanPlaybook, buildMiniForemanStep } from '../lib/prompts/foreman-playbook.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { isRecommendationEnabled, getRecommendation, getRecommendationStream, streamChat } from '../lib/openrouter.js';
+import { resolveRecommendation } from '../lib/recommend-recurse.js';
+
+// Shared cross-hop budget for the recommend recursion (LIN-329) on the human UI
+// path. Matches the proxy's budget; defer hops are cheap (no prompt body) so a deep
+// descent stays well inside it. Checked between hops by resolveRecommendation.
+const RECOMMEND_DESCENT_BUDGET_MS = 180_000;
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
@@ -680,22 +686,50 @@ ${goal}`
         return keepalive.send(200, result)
       }
 
-      // Fetch issue context from Linear (uses two-tier context for parent tasks)
-      const context = await fetchRecommendationContext(workspace.accessToken, issueId)
-      const { issue, parent, siblings, project, children, comments, focusedChild } = context
-
-      // Get AI-generated prompt (pass session API key, free tier key, and model if available)
+      // Get AI-generated prompt, following any `defer` decisions to a terminal
+      // actionable node (LIN-329). A leaf resolves in one hop; a parent the human
+      // pinned is transparently resolved to its actionable descendant, with the
+      // descent breadcrumb returned. Free-tier usage is charged once per request
+      // (above, before this point), not per hop.
       const selectedModel = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore })
       const apiKeyToUse = sessionApiKey || (isFreeTier ? freeTierKey : undefined)
-      const recommendation = await getRecommendation(issue, { parent, siblings, project, children, comments, focusedChild }, { apiKey: apiKeyToUse, model: selectedModel, featureFlags: getFeatureFlags(req.session) })
+      const { recommendation: rec, deferredVia, deferTruncated, deferStopReason } = await resolveRecommendation({
+        startIdentifier: issueId,
+        deadline: Date.now() + RECOMMEND_DESCENT_BUDGET_MS,
+        computeOne: async (id) => {
+          // Two-tier context for parent tasks; the focused child seeds the defer choice.
+          const ctx = await fetchRecommendationContext(workspace.accessToken, id)
+          const r = await getRecommendation(
+            ctx.issue,
+            { parent: ctx.parent, siblings: ctx.siblings, project: ctx.project, children: ctx.children, comments: ctx.comments, focusedChild: ctx.focusedChild },
+            { apiKey: apiKeyToUse, model: selectedModel, featureFlags: getFeatureFlags(req.session) }
+          )
+          return {
+            identifier: ctx.issue.identifier,
+            reasoning: r.reasoning,
+            prompt: r.prompt,
+            truncated: r.truncated,
+            completionTokens: r.completionTokens,
+            recommendedAction: r.recommendedAction,
+            deferTo: r.deferTo,
+            issueUrl: ctx.issue.url,
+            repo: parseRepoFromDescription(ctx.project?.description)
+          }
+        }
+      })
 
       const result = {
-        reasoning: recommendation.reasoning,
-        prompt: recommendation.prompt,
-        truncated: recommendation.truncated,
-        completionTokens: recommendation.completionTokens,
-        issueUrl: issue.url,
-        repo: parseRepoFromDescription(project?.description)
+        reasoning: rec.reasoning,
+        prompt: rec.prompt,
+        truncated: rec.truncated,
+        completionTokens: rec.completionTokens,
+        issueUrl: rec.issueUrl,
+        repo: rec.repo,
+        // Terminal identifier + descent breadcrumb (LIN-327, additive).
+        identifier: rec.identifier,
+        deferredVia,
+        deferTruncated,
+        deferStopReason
       }
 
       // Include free tier metadata
@@ -913,9 +947,56 @@ ${goal}`;
 
       if (closed) return;
 
-      // Phase 2: Stream AI recommendation
       const selectedModel = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore });
       const apiKeyToUse = sessionApiKey || (isFreeTier ? freeTierKey : undefined);
+
+      // Node-shaped tasks (LIN-327): the first hop is a `defer` with no prompt body,
+      // which can't be token-streamed. Resolve the descent non-streamed to the
+      // terminal actionable node and deliver ITS recommendation over SSE (the defer
+      // hops generate no prompt, so only the terminal hop has one to send). Leaf
+      // tasks fall through to true token streaming below — the common path is unchanged.
+      if (children?.length > 0) {
+        const { recommendation: rec, deferredVia, deferTruncated, deferStopReason } = await resolveRecommendation({
+          startIdentifier: issueId,
+          deadline: Date.now() + RECOMMEND_DESCENT_BUDGET_MS,
+          computeOne: async (id) => {
+            const ctx = await fetchRecommendationContext(workspace.accessToken, id);
+            const r = await getRecommendation(
+              ctx.issue,
+              { parent: ctx.parent, siblings: ctx.siblings, project: ctx.project, children: ctx.children, comments: ctx.comments, focusedChild: ctx.focusedChild },
+              { apiKey: apiKeyToUse, model: selectedModel, featureFlags: getFeatureFlags(req.session), signal: abortController.signal }
+            );
+            return {
+              identifier: ctx.issue.identifier, reasoning: r.reasoning, prompt: r.prompt,
+              truncated: r.truncated, completionTokens: r.completionTokens,
+              recommendedAction: r.recommendedAction, deferTo: r.deferTo,
+              issueUrl: ctx.issue.url, repo: parseRepoFromDescription(ctx.project?.description)
+            };
+          }
+        });
+        if (closed) return;
+
+        const metadata = { issueUrl: rec.issueUrl, repo: rec.repo, identifier: rec.identifier, deferredVia, deferTruncated, deferStopReason };
+        if (isFreeTier) {
+          const usage = await freeTierStore.getUsage(workspace.urlKey);
+          metadata.freeTier = { used: true, remaining: usage.remaining, limit: usage.limit, resetsAt: usage.resetsAt };
+        }
+
+        if (rec.recommendedAction === 'defer' || !rec.prompt) {
+          // Abnormal stop (depth/cycle/unresolved/timeout) — surface, don't ship a defer.
+          sendSSE(res, 'error', { error: 'Recommendation did not resolve to an actionable task', deferredVia, deferTruncated, deferStopReason });
+        } else {
+          sendSSE(res, 'phase', { phase: 'reasoning' });
+          if (rec.reasoning) sendSSE(res, 'delta', { section: 'reasoning', content: rec.reasoning });
+          sendSSE(res, 'phase', { phase: 'prompt' });
+          sendSSE(res, 'delta', { section: 'prompt', content: rec.prompt });
+          sendSSE(res, 'done', { truncated: rec.truncated, completionTokens: rec.completionTokens, ...metadata });
+        }
+        res.end();
+        return;
+      }
+
+      // Phase 2: Stream AI recommendation (leaf task — true token streaming)
 
       // Build metadata to merge into the done event
       const metadata = {

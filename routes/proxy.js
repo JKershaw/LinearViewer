@@ -18,6 +18,7 @@ import rateLimit from 'express-rate-limit';
 import { createProxyFetch } from '../lib/proxy-fetch.js';
 import { fetchProjects, fetchIssueContext, fetchRecommendationContext } from '../lib/linear.js';
 import { isRecommendationEnabled, getRecommendation } from '../lib/openrouter.js';
+import { resolveRecommendation, describeDescent } from '../lib/recommend-recurse.js';
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
@@ -243,6 +244,15 @@ const LLM_TIMEOUT_MS = 180_000;
 // as a backstop for a genuinely hung Linear while letting normal large epics
 // finish. Paired with an AbortSignal so a trip actually cancels the request.
 const CONTEXT_FETCH_TIMEOUT_MS = 45_000;
+
+// Shared cross-hop budget for the recommend recursion (LIN-329). Each defer hop is
+// a Linear fetch + an LLM routing reply, but a deferring reply emits NO prompt body
+// (the cost contract), so it is far cheaper than the single terminal prompt. A
+// ~10-deep descent is therefore ≈ 10 short replies + 1 full prompt — comfortably
+// inside this budget. resolveRecommendation checks it BETWEEN hops (a shared
+// deadline, not per-call); each individual hop is still bounded by the per-call
+// CONTEXT_FETCH/LLM caps above, and the armed keepalive holds the socket open.
+const RECOMMEND_DESCENT_BUDGET_MS = LLM_TIMEOUT_MS;
 
 /**
  * Race a promise against a timeout. Throws a TimeoutError if the promise
@@ -2257,6 +2267,13 @@ ${readEndpoints}${writeEndpoints}
       // blocked→blocked, started→implement, else plan.
       let recommendedAction = 'plan';
 
+      // A node with an incomplete child defers to it (LIN-327), so the recommend
+      // recursion (resolveRecommendation) is exercised end-to-end in E2E: a parent
+      // resolves to its actionable descendant, not a parent-framed prompt. Labels
+      // (bug/blocked) still take precedence so the existing routes stay covered.
+      const mockChildren = mockData.issues.filter(i => i.parent?.id === mockIssue.id);
+      const focusChild = mockChildren.find(c => c.state?.type !== 'completed' && c.state?.type !== 'canceled');
+
       if (labels.includes('bug')) {
         reasoning = 'This is a bug. Investigating systematically will help find the root cause.';
         goal = 'Identify reproduction steps, hypothesize causes, and suggest a fix.';
@@ -2265,6 +2282,17 @@ ${readEndpoints}${writeEndpoints}
         reasoning = 'This task is blocked. Analyzing the blocker to find a way forward.';
         goal = 'Identify the blocker and recommend how to unblock.';
         recommendedAction = 'blocked';
+      } else if (focusChild) {
+        // No prompt body on defer — the cost contract (mirrors getRecommendation).
+        return {
+          identifier: issueIdentifier,
+          reasoning: `${issueIdentifier} is a container; the actionable work lives in ${focusChild.identifier}.`,
+          prompt: null,
+          truncated: false,
+          repo: parseRepoFromDescription(mockData.projects.find(p => p.id === mockIssue.project?.id)?.content),
+          recommendedAction: 'defer',
+          deferTo: focusChild.identifier
+        };
       } else if (mockIssue.state?.type === 'started') {
         reasoning = 'Task is in progress. Checking what work remains.';
         goal = 'Continue implementation and update progress.';
@@ -2279,7 +2307,8 @@ ${readEndpoints}${writeEndpoints}
         prompt: `Help me with task ${issueIdentifier}\n\n## Context\n\n**Status:** ${mockIssue.state?.name || 'Unknown'}\n${labels.length > 0 ? `**Labels:** ${labels.join(', ')}` : ''}\n\n## Goal\n\n${goal}`,
         truncated: false,
         repo: parseRepoFromDescription(mockProject?.content),
-        recommendedAction
+        recommendedAction,
+        deferTo: null
       };
     }
 
@@ -2305,7 +2334,9 @@ ${readEndpoints}${writeEndpoints}
       prompt: recommendation.prompt,
       truncated: recommendation.truncated,
       repo: parseRepoFromDescription(project?.description),
-      recommendedAction: recommendation.recommendedAction
+      recommendedAction: recommendation.recommendedAction,
+      // deferTo (LIN-327) drives the recommend recursion (resolveRecommendation).
+      deferTo: recommendation.deferTo || null
     };
   }
 
@@ -2362,19 +2393,26 @@ ${readEndpoints}${writeEndpoints}
       // while the LLM call completes.
       const keepalive = armKeepalive(res);
       try {
-        const rec = await computeRecommendation({
-          urlKey: req.proxyUrlKey,
-          createdBy: req.proxyCreatedBy,
-          identifier,
-          accessToken,
-          isTestMode,
-          sessionApiKey
+        // Follow any `defer` decisions to a terminal actionable node (LIN-329).
+        // A leaf resolves in one hop; a container descends to its real work.
+        const { recommendation: rec, deferredVia, deferTruncated, deferStopReason } = await resolveRecommendation({
+          startIdentifier: identifier,
+          deadline: Date.now() + RECOMMEND_DESCENT_BUDGET_MS,
+          computeOne: (id) => computeRecommendation({
+            urlKey: req.proxyUrlKey,
+            createdBy: req.proxyCreatedBy,
+            identifier: id,
+            accessToken,
+            isTestMode,
+            sessionApiKey
+          })
         });
 
         keepalive.stop();
         logEvent(req, '/api/proxy/recommend', 200);
-        // recommendedAction + kind are additive (LIN-321): existing clients that
-        // read identifier/reasoning/prompt/truncated/repo are unaffected.
+        // recommendedAction + kind are additive (LIN-321); deferredVia + the terminal
+        // identifier are additive (LIN-327): existing clients that read
+        // identifier/reasoning/prompt/truncated/repo are unaffected.
         keepalive.send(200, {
           identifier: rec.identifier,
           reasoning: rec.reasoning,
@@ -2382,7 +2420,10 @@ ${readEndpoints}${writeEndpoints}
           truncated: rec.truncated,
           repo: rec.repo,
           recommendedAction: rec.recommendedAction,
-          kind: deriveDispatchKind(rec.recommendedAction)
+          kind: deriveDispatchKind(rec.recommendedAction),
+          deferredVia,
+          deferTruncated,
+          deferStopReason
         });
       } catch (err) {
         keepalive.stop();
@@ -3272,16 +3313,23 @@ ${readEndpoints}${writeEndpoints}
       // /recommend is slow (Linear + OpenRouter) — arm keepalive before computing.
       const keepalive = armKeepalive(res);
 
-      let rec;
+      let rec, deferredVia, deferTruncated, deferStopReason;
       try {
-        rec = await computeRecommendation({
-          urlKey: req.proxyUrlKey,
-          createdBy: req.proxyCreatedBy,
-          identifier: issueIdentifier,
-          accessToken,
-          isTestMode,
-          sessionApiKey
-        });
+        // Resolve `defer` to a terminal actionable node server-side (LIN-329) so
+        // Autopilot can fire this verb on ANY task — node or leaf — and get the
+        // actionable descendant's prompt + kind, never a `defer` to act on.
+        ({ recommendation: rec, deferredVia, deferTruncated, deferStopReason } = await resolveRecommendation({
+          startIdentifier: issueIdentifier,
+          deadline: Date.now() + RECOMMEND_DESCENT_BUDGET_MS,
+          computeOne: (id) => computeRecommendation({
+            urlKey: req.proxyUrlKey,
+            createdBy: req.proxyCreatedBy,
+            identifier: id,
+            accessToken,
+            isTestMode,
+            sessionApiKey
+          })
+        }));
       } catch (err) {
         keepalive.stop();
         const { status, body } = recommendErrorResponse(err);
@@ -3289,11 +3337,30 @@ ${readEndpoints}${writeEndpoints}
         return keepalive.send(status, body);
       }
 
+      // The descent should always terminate on a real action carrying a prompt.
+      // If it stopped abnormally (depth cap / cycle / unresolved child / timeout)
+      // it may have halted on a `defer` with no prompt — surface that anomaly
+      // rather than dispatching an empty prompt. `defer` must never reach dispatch.
+      if (rec.recommendedAction === 'defer' || !rec.prompt) {
+        keepalive.stop();
+        logEvent(req, '/api/proxy/recommend-and-dispatch', 422);
+        return keepalive.send(422, {
+          error: 'Recommendation did not resolve to an actionable task',
+          deferredVia,
+          deferTruncated,
+          deferStopReason
+        });
+      }
+
       try {
         // The recommended prompt is server-generated/trusted, so we forward it
         // verbatim and intentionally SKIP the DANGEROUS_CHARS/length checks the
         // caller-supplied POST /dispatch path runs. The prompt body is never
         // returned to the caller — that is the whole point of this verb.
+        // The dispatched item references the TERMINAL actionable node (rec.identifier),
+        // not the parent the caller named — the worker should inherit context for the
+        // task it is actually working on (LIN-327). For a leaf these are identical.
+        const terminalIdentifier = rec.identifier || issueIdentifier;
         let finalPrompt = rec.prompt;
         if (appendProxyContext !== false) {
           const baseUrl = `${req.protocol}://${req.get('host')}`;
@@ -3301,7 +3368,7 @@ ${readEndpoints}${writeEndpoints}
           finalPrompt = rec.prompt + buildProxyContextPreamble({
             baseUrl,
             token: bearerToken,
-            issueIdentifier
+            issueIdentifier: terminalIdentifier
           });
         }
 
@@ -3314,7 +3381,7 @@ ${readEndpoints}${writeEndpoints}
           promptName: rec.recommendedAction || 'Prompt',
           kind: deriveDispatchKind(rec.recommendedAction),
           issueId: null,
-          issueIdentifier,
+          issueIdentifier: terminalIdentifier,
           issueTitle: null,
           issueUrl: null,
           dispatchedBy: req.proxyCreatedBy || null,
@@ -3324,7 +3391,10 @@ ${readEndpoints}${writeEndpoints}
 
         keepalive.stop();
         logEvent(req, '/api/proxy/recommend-and-dispatch', 201);
-        // Task header ONLY — no prompt body.
+        // Task header ONLY — no prompt body. deferredVia + descent are additive
+        // (LIN-327): they let Autopilot read the descent ("LIN-318 → LIN-297
+        // (research) · dispatched") from the structured header, never a prompt body.
+        const descent = describeDescent(deferredVia, rec);
         keepalive.send(201, {
           id: item._id,
           status: 'queued',
@@ -3332,7 +3402,10 @@ ${readEndpoints}${writeEndpoints}
           promptName: item.promptName,
           issueIdentifier: item.issueIdentifier,
           target: item.target,
-          dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt
+          dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt,
+          deferredVia,
+          deferTruncated,
+          ...(descent ? { descent: `${descent} · dispatched` } : {})
         });
       } catch (err) {
         keepalive.stop();
