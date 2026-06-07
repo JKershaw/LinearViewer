@@ -333,11 +333,14 @@ function buildProxyContextPreamble({ baseUrl, token, issueIdentifier }) {
   // malformed ".../issues/your task" with a literal space).
   const contextLines = issueIdentifier
     ? [
-        `Use it to pull context (e.g. GET ${baseUrl}/api/proxy/issues/${issueIdentifier},`,
-        `/relations/${issueIdentifier}) and to update Linear as you work (status, comments, labels).`
+        `Start from the distilled brief: GET ${baseUrl}/api/proxy/brief/${issueIdentifier}`,
+        `(present-state — folds in comments, supersedes stale wording; read it before the raw`,
+        `description). Use GET ${baseUrl}/api/proxy/issues/${issueIdentifier} for full raw detail`,
+        `and /relations/${issueIdentifier}, and update Linear as you work (status, comments, labels).`
       ]
     : [
-        `Use it to pull context (e.g. GET ${baseUrl}/api/proxy/stack, /search?q=…,`,
+        `Once you pick a task, start from its distilled brief (GET ${baseUrl}/api/proxy/brief/{id}).`,
+        `Use the proxy to pull context (e.g. GET ${baseUrl}/api/proxy/stack, /search?q=…,`,
         `/issues/LIN-123) and to update Linear as you work (status, comments, labels).`
       ];
   return [

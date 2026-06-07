@@ -521,13 +521,21 @@ Headline results, generator `qwen3.7-plus`, judge `claude-haiku-4.5`:
   over-trim on a terse-but-multi-surface "rename everywhere" case (−196 words) was fixed by a
   deceptive-small guard (don't infer "small" from a terse description), restoring it to +19.
   Structural tests in both unit suites; routing-eval baseline regenerated.
-- **Phase 4 — distillation hand-off: MECHANISM PROVEN, build deferred.** A distilled
+- **Phase 4 — distillation hand-off: PROVEN, then realized the light way.** A distilled
   upstream hand-off cuts inflation (1.65× → 1.43×) **and** raises load-bearing-constraint
-  retention (0.67 → 1.0). But it requires an LLM-in-the-context-builder on the recommendation
-  hot path (a deterministic cap would drop the constraint and fail the guard), so the
-  build is an architectural cost/benefit decision left to the user. Spec recorded in the
-  results doc; `scripts/eval/phase4-distillation-probe.mjs` is the reusable probe.
+  retention (0.67 → 1.0) (`scripts/eval/phase4-distillation-probe.mjs`). Crucially, the
+  distiller already exists and is **already in the proxy** as the cached `/brief/{id}`
+  endpoint (Current/Constraints/Open-questions/Changelog; folds in comments, supersedes
+  stale wording, regenerates only when stale). So the upper bound does **not** need a
+  hot-path distiller in generation, and the raw history is deliberately **kept** (it's a
+  rich record). The fix is consumption-side: **signpost `/brief` as the default
+  starting-context read** in the places the autopilot tells an agent to read its task —
+  the dispatched-worker proxy preamble (`buildProxyContextPreamble`), the scoped first-act
+  in `autopilot-kickoff.js`, and the foreman playbook's read step — which previously pointed
+  at the raw `/issues/{id}` dump. Three prompt-string edits, no new code, no history loss;
+  the agent starts from the summary and drops to raw detail only when needed.
 
-**Net:** the complaint is now measured fact; the lower bound has a shipped, eval-proven fix
-in both paths; the upper bound has a proven structural mechanism awaiting a build decision;
+**Net:** the complaint is now measured fact; the lower bound has a shipped, eval-proven
+generation-time fix in both paths; the upper bound is handled at the hand-off by pointing
+the autopilot at the cached `/brief` it already had (keep the history, summarise on read);
 and the directive-only upper-bound fix was tried, measured, and correctly rejected.
