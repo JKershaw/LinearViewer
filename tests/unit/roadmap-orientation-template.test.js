@@ -5,8 +5,11 @@
  *   - Enumerates the not-yet-started candidate queue (in-progress excluded;
  *     terminal states — completed/canceled/duplicate — already excluded by
  *     buildExecutionQueue and inherited here).
- *   - Instructs the model to return JSON only (an array of
- *     { identifier, bearing, reason, archived }).
+ *   - Instructs the model to emit the LINE format only — one line per candidate,
+ *     `IDENTIFIER | BEARING | reason` (LIN-324; JSON was dropped because a
+ *     truncated array failed the whole parse silently).
+ *   - parseOrientationLines parses ONLY that one format, resiliently (recovery,
+ *     not multi-format permissiveness).
  *   - Carries the drift-as-rationalization guard (north star is fixed) and the
  *     delivery-not-projections discipline, mirroring the north-star template.
  *
@@ -19,6 +22,7 @@ import {
   buildRoadmapOrientationPrompt,
   serializeOrientationCandidates,
   countOrientationCandidates,
+  parseOrientationLines,
   ORIENTATION_BEARINGS,
   ORIENTATION_CANDIDATE_CAP
 } from '../../lib/prompts/roadmap-orientation-template.js';
@@ -134,13 +138,18 @@ describe('buildRoadmapOrientationMessages', () => {
     assert.ok(user.includes(northStar), 'north star included verbatim');
   });
 
-  test('instructs JSON-only output with the four-field shape', () => {
+  test('instructs the pipe-delimited line format and forbids JSON (LIN-324)', () => {
     const prompt = buildRoadmapOrientationPrompt(model, northStar);
-    assert.ok(/JSON ONLY/i.test(prompt), 'demands JSON only');
-    assert.ok(/no code fences/i.test(prompt), 'forbids code fences');
-    for (const key of ['identifier', 'bearing', 'reason', 'archived']) {
-      assert.ok(prompt.includes(`"${key}"`), `mentions the ${key} field`);
-    }
+    // The three-field line shape is shown literally.
+    assert.ok(prompt.includes('IDENTIFIER | BEARING | reason'), 'shows the line shape');
+    assert.ok(/one line per candidate/i.test(prompt), 'one line per candidate');
+    // JSON (and its decorations) are explicitly ruled out.
+    assert.ok(/not JSON|do not output JSON/i.test(prompt), 'forbids JSON');
+    assert.ok(/code fences/i.test(prompt), 'forbids code fences');
+    // OFF is the off-compass token; full-word bearings are disallowed.
+    assert.ok(/\bOFF\b/.test(prompt), 'documents the OFF token');
+    assert.ok(/NORTH/i.test(prompt) && /write N, not NORTH/i.test(prompt),
+      'forbids full-word bearings');
   });
 
   test('emits the 8-point compass vocabulary', () => {
@@ -165,5 +174,80 @@ describe('buildRoadmapOrientationMessages', () => {
   test('renders a placeholder when there are no candidates', () => {
     const user = buildRoadmapOrientationMessages(modelWithQueue([]), northStar)[1].content;
     assert.ok(/no not-yet-started candidate/i.test(user));
+  });
+});
+
+// LIN-324: the single-format, recovery-oriented parser. It parses ONLY the line
+// shape — no JSON, no wrapper objects, no full-word/marker coercion. "Forgiving"
+// means it recovers from truncation/whitespace/stray lines, never that it accepts
+// shapes we did not ask for. Vocabulary validation is normalizeBearings' job, so
+// the parser passes bearing tokens through verbatim (upper-cased).
+describe('parseOrientationLines', () => {
+  test('parses a clean IDENTIFIER | BEARING | reason line', () => {
+    assert.deepStrictEqual(
+      parseOrientationLines('LIN-1 | N | Serves the stated intent.'),
+      [{ identifier: 'LIN-1', bearing: 'N', reason: 'Serves the stated intent.', archived: false }]
+    );
+  });
+
+  test('upper-cases the bearing token and trims fields', () => {
+    const [c] = parseOrientationLines('  LIN-2  |  se  |  Partial support.  ');
+    assert.deepStrictEqual(c, { identifier: 'LIN-2', bearing: 'SE', reason: 'Partial support.', archived: false });
+  });
+
+  test('maps OFF to an archived off-compass record with an empty bearing', () => {
+    assert.deepStrictEqual(
+      parseOrientationLines('LIN-3 | OFF | Neither serves nor maintains.'),
+      [{ identifier: 'LIN-3', bearing: '', reason: 'Neither serves nor maintains.', archived: true }]
+    );
+  });
+
+  test('passes an unknown bearing token through verbatim (vocabulary is the route\'s job)', () => {
+    // NORTHWEST is NOT coerced to NW here — normalizeBearings drops it later.
+    const [c] = parseOrientationLines('LIN-4 | NORTHWEST | drift');
+    assert.strictEqual(c.bearing, 'NORTHWEST');
+    assert.strictEqual(c.archived, false);
+  });
+
+  test('keeps pipes that appear inside the reason (splits on the first two only)', () => {
+    const [c] = parseOrientationLines('LIN-5 | N | a | b | c');
+    assert.strictEqual(c.reason, 'a | b | c');
+  });
+
+  test('a one-pipe line keeps the bearing with an empty reason', () => {
+    assert.deepStrictEqual(
+      parseOrientationLines('LIN-6 | N'),
+      [{ identifier: 'LIN-6', bearing: 'N', reason: '', archived: false }]
+    );
+  });
+
+  test('skips blank lines and lines with no pipe — never fatal', () => {
+    const out = parseOrientationLines('\nnot a bearing line\nLIN-7 | E | maintenance\n   \n');
+    assert.deepStrictEqual(out.map(c => c.identifier), ['LIN-7']);
+  });
+
+  test('skips a line with an empty identifier', () => {
+    assert.deepStrictEqual(parseOrientationLines(' | N | orphaned'), []);
+  });
+
+  test('recovers complete lines when the final line is truncated (the JSON failure it replaces)', () => {
+    const full = Array.from({ length: 5 }, (_, i) => `LIN-${i} | N | Serves the stated intent.`).join('\n');
+    // Cut deep into the last line, as a token-cap overrun would.
+    const truncated = full.slice(0, full.length - 18);
+    const out = parseOrientationLines(truncated);
+    // The four complete lines above the cut all survive — truncation costs at
+    // most the final line, not the whole response.
+    assert.ok(out.length >= 4, 'complete lines above the truncation are preserved');
+    assert.strictEqual(out[0].identifier, 'LIN-0');
+  });
+
+  test('JSON drift parses to nothing usable (single-format, not multi-format)', () => {
+    const json = JSON.stringify([{ identifier: 'LIN-8', bearing: 'N', reason: 'x', archived: false }]);
+    assert.deepStrictEqual(parseOrientationLines(json), []);
+  });
+
+  test('null / empty input yields no records', () => {
+    assert.deepStrictEqual(parseOrientationLines(null), []);
+    assert.deepStrictEqual(parseOrientationLines(''), []);
   });
 });

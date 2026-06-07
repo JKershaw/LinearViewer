@@ -280,23 +280,25 @@ test.describe('Roadmap Generate Endpoint', () => {
     });
   });
 
-  // LIN-324 / Strategy E: drive the un-mocked serialize→strip→parse→normalize→
-  // emit chain at a realistic candidate count. The ORIENTATION_TEST_BEARINGS
-  // short-circuit returns pre-parsed objects, so it never exercises the parse
-  // path that truncation broke; the test-only `__testOrientationRaw` seam injects
-  // the raw streamed text instead (honoured only in roadmap test mode).
+  // LIN-324 / Strategy E: drive the un-mocked serialize→parse→normalize→emit
+  // chain at a realistic candidate count, in the line format that replaced JSON.
+  // The ORIENTATION_TEST_BEARINGS short-circuit returns pre-parsed objects, so it
+  // never exercises the parse path; the test-only `__testOrientationRaw` seam
+  // injects the raw streamed text instead (honoured only in roadmap test mode).
   function parseOrientationEventFull(body) {
     const m = body.match(/event: orientation\ndata: (.+)/);
     return m ? JSON.parse(m[1]) : undefined;
   }
 
-  test('realistic-size COMPLETE payload normalizes to a non-empty array', async ({ request }) => {
+  // Build N candidates in the wire line format: IDENTIFIER | BEARING | reason.
+  function orientationLines(n) {
+    return Array.from({ length: n }, (_, i) => `BIG-${i} | N | Serves the stated intent.`).join('\n');
+  }
+
+  test('realistic-size COMPLETE line payload normalizes to a non-empty array', async ({ request }) => {
     await request.get(`/test/set-session?features=${FEATURES}&openRouterConnected=true`);
-    const full = Array.from({ length: 44 }, (_, i) => ({
-      identifier: `BIG-${i}`, bearing: 'N', reason: 'Serves the stated intent.', archived: false
-    }));
     const response = await request.post(GENERATE_URL, {
-      data: { northStar: 'Be the simplest way to ship.', __testOrientationRaw: JSON.stringify(full) }
+      data: { northStar: 'Be the simplest way to ship.', __testOrientationRaw: orientationLines(44) }
     });
     const event = parseOrientationEventFull(await response.text());
     expect(event.orientation.length).toBe(44);          // nothing dropped, nothing swallowed
@@ -306,15 +308,31 @@ test.describe('Roadmap Generate Endpoint', () => {
     });
   });
 
-  test('realistic-size TRUNCATED payload surfaces a failure note (not a silent [])', async ({ request }) => {
+  test('realistic-size TRUNCATED line payload RECOVERS the complete lines (no silent loss)', async ({ request }) => {
     await request.get(`/test/set-session?features=${FEATURES}&openRouterConnected=true`);
-    const full = Array.from({ length: 44 }, (_, i) => ({
-      identifier: `BIG-${i}`, bearing: 'N', reason: 'Serves the stated intent.', archived: false
-    }));
-    const raw = JSON.stringify(full);
-    const truncated = raw.slice(0, raw.length - 60); // cut mid-array, as a token-cap overrun would
+    const full = orientationLines(44);
+    // Cut deep into the final line, as a token-cap overrun would. Unlike the old
+    // JSON contract — where this discarded every bearing — the line format keeps
+    // every complete line above the cut.
+    const truncated = full.slice(0, full.length - 25);
     const response = await request.post(GENERATE_URL, {
       data: { northStar: 'Be the simplest way to ship.', __testOrientationRaw: truncated }
+    });
+    const event = parseOrientationEventFull(await response.text());
+    expect(event.orientation.length).toBeGreaterThanOrEqual(43); // complete lines survive truncation
+    expect(event.notice).toBeUndefined();                         // recovery succeeded — no failure note
+    expect(event.orientation.every(b => b.bearing === 'N')).toBe(true);
+  });
+
+  test('format drift (JSON instead of lines) surfaces a failure note (not a silent [])', async ({ request }) => {
+    await request.get(`/test/set-session?features=${FEATURES}&openRouterConnected=true`);
+    // The parser commits to ONE format; a model that ignores it and emits JSON
+    // parses to nothing usable. That drift must be SURFACED, not swallowed.
+    const drift = JSON.stringify(Array.from({ length: 5 }, (_, i) => ({
+      identifier: `BIG-${i}`, bearing: 'N', reason: 'x', archived: false
+    })));
+    const response = await request.post(GENERATE_URL, {
+      data: { northStar: 'Be the simplest way to ship.', __testOrientationRaw: drift }
     });
     const event = parseOrientationEventFull(await response.text());
     expect(event.orientation).toEqual([]);              // gate stays correct (toggle stays off)
@@ -322,11 +340,17 @@ test.describe('Roadmap Generate Endpoint', () => {
     expect(event.notice).toMatch(/could not be generated|could not be parsed/i);
   });
 
-  test('without a north star, emits no orientation event', async ({ request }) => {
+  test('without a north star, emits an orientation notice (no bearings)', async ({ request }) => {
     await request.get(`/test/set-session?features=${FEATURES}&openRouterConnected=true`);
     const response = await request.post(GENERATE_URL, { data: { northStar: '' } });
     const body = await response.text();
-    expect(body).not.toContain('event: orientation');
+    // D2: rather than emitting nothing (a silently-inert ship toggle), the route
+    // now surfaces WHY orientation is unavailable.
+    expect(body).toContain('event: orientation');
+    const event = parseOrientationEventFull(body);
+    expect(event.orientation).toEqual([]);
+    expect(event.notice).toBeTruthy();
+    expect(event.notice).toMatch(/north star/i);
   });
 
   test('orientation round-trips: generate → save → fetch persists the bearings', async ({ request }) => {
@@ -819,6 +843,41 @@ test.describe('Roadmap Report History — reload rehydration (UI)', () => {
     await expect(page.locator('[data-layer="technical"]')).toHaveAttribute('data-state', 'done');
     // Button reflects that a prior reading exists.
     await expect(page.locator('.roadmap-generate-reading-btn')).toContainText(/regenerate/i);
+  });
+
+  test('orientation bearings render on the page and rehydrate after reload (LIN-324/D)', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${FEATURES}&openRouterConnected=true`);
+    const pageRequest = page.context().request;
+    await pageRequest.get('/test/clear-report-history');
+    // A north star is required for orientation to run.
+    await pageRequest.put(`/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/north-star`, {
+      data: { northStar: 'Be the simplest way to ship.' }
+    });
+
+    await page.goto(ROADMAP_URL);
+    await page.waitForLoadState('networkidle');
+
+    await page.locator('.roadmap-generate-reading-btn').click();
+    await expect(page.locator('[data-layer="gap"]')).toHaveAttribute('data-state', 'done', { timeout: 10000 });
+
+    // Visible result = the operator's own check that orientation generation
+    // worked end-to-end. The mock bearings place TEST-2 (N) and TEST-13 (SE),
+    // and flag TEST-14 off-compass (overboard); TEST-99's invalid bearing was
+    // dropped server-side, so three rows render.
+    const result = page.locator('#roadmap-orientation-result');
+    await expect(result).toBeVisible({ timeout: 10000 });
+    await expect(result.locator('.roadmap-orientation-row')).toHaveCount(3);
+    await result.locator('summary').click(); // expand the collapsed details
+    await expect(result.locator('[data-bearing="N"]').first()).toBeVisible();
+    await expect(result.locator('[data-overboard="true"]').first()).toBeVisible();
+
+    // Let the best-effort save land, then reload: the saved bearings rehydrate
+    // through applyReport without regenerating.
+    await page.waitForTimeout(800);
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('#roadmap-orientation-result')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('#roadmap-orientation-result .roadmap-orientation-row')).toHaveCount(3);
   });
 
   test('history lists past readings; selecting an older one shows a viewing banner', async ({ page }) => {

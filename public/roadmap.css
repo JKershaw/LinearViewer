@@ -476,6 +476,69 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
   padding-left: 0.6em;
 }
 
+/* Visible orientation result (LIN-324 / D): the per-task compass bearings
+   rendered on the roadmap page so the operator can confirm orientation
+   generation worked end-to-end — the same data that gates the ship-view toggle.
+   Collapsible so it never crowds the narrative reading below it. */
+.roadmap-orientation-result {
+  margin: 0.75em 0 1.25em;
+  border: 1px solid var(--fg-vdim);
+  border-radius: 2px;
+}
+
+.roadmap-orientation-result-heading {
+  font-family: var(--font-structural);
+  font-size: 0.85em;
+  padding: 0.4em 0.6em;
+  cursor: pointer;
+  color: var(--fg-dim);
+}
+
+.roadmap-orientation-result-heading:hover {
+  background: var(--fg-vdim);
+}
+
+.roadmap-orientation-result-body {
+  padding: 0.3em 0.6em 0.6em;
+}
+
+.roadmap-orientation-row {
+  display: grid;
+  grid-template-columns: minmax(4.5em, auto) 3em 1fr;
+  gap: 0.6em;
+  align-items: baseline;
+  font-size: 0.8em;
+  padding: 0.2em 0;
+  border-top: 1px solid var(--fg-vdim);
+}
+
+.roadmap-orientation-row:first-child {
+  border-top: none;
+}
+
+.roadmap-orientation-id {
+  font-family: var(--font-structural);
+  color: var(--fg);
+}
+
+.roadmap-orientation-bearing {
+  font-family: var(--font-structural);
+  color: var(--fg-dim);
+}
+
+.roadmap-orientation-reason {
+  color: var(--fg-dim);
+}
+
+/* Off-compass (archived) task: flagged overboard, dimmed. */
+.roadmap-orientation-row[data-overboard="true"] {
+  opacity: 0.65;
+}
+
+.roadmap-orientation-row[data-overboard="true"] .roadmap-orientation-bearing {
+  font-style: italic;
+}
+
 .roadmap-layer {
   margin: 1em 0;
 }

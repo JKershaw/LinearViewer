@@ -63,20 +63,35 @@ Two structural observations:
 > candidate task (in-progress work stays on the ship; terminal/duplicate states
 > are already filtered by `buildExecutionQueue`) against the fixed north star,
 > producing a compass **bearing** on the 8-point set `{N, NE, E, SE, S, SW, W,
-> NW}` plus a one-sentence reason and an `archived` off-compass flag. Unlike the
+> NW}` plus a one-sentence reason and an off-compass flag. Unlike the
 > prose layers it is **not** streamed token-by-token: the server accumulates the
-> full output, strips any code fence, `JSON.parse`s it, and validates each
+> full output, parses it with `parseOrientationLines`, and validates each
 > bearing against the 8-point vocabulary (an un-archived task with an invalid
 > bearing is dropped; an archived task is kept with an empty bearing). The result
 > is emitted as one structured `orientation` SSE event the client stashes and
 > persists via `saveReport` into the report-history store's `orientation` field
-> (plumbed in LIN-299). The ship view (LIN-301) reads that field — no LLM call on
-> the ship side. The bearing vocabulary is shared three ways: the prompt emits
-> it, the generate route normalizes it, and the ship view maps bearing→angle; the
-> store's `normalizeOrientation` enforces field *shape* only, not the vocabulary.
+> (plumbed in LIN-299), and also renders on the roadmap page as a visible result
+> (LIN-324/D) so the operator can confirm generation worked. The ship view
+> (LIN-301) reads that field — no LLM call on the ship side. The bearing
+> vocabulary is shared three ways: the prompt emits it, the generate route
+> normalizes it, and the ship view maps bearing→angle; the store's
+> `normalizeOrientation` enforces field *shape* only, not the vocabulary.
 > Kept as a *separate* prompt (`lib/prompts/roadmap-orientation-template.js`) so
 > the five plain-text narrative layers keep their plain-text rendering contract
 > and adjudication stays cleanly isolated from narrative evaluation.
+>
+> **Update (LIN-324): line format, not JSON.** The orientation output is a flat
+> line format — one line per candidate, `IDENTIFIER | BEARING | reason`, with
+> `OFF` marking an off-compass (archived) task — *not* JSON. The JSON contract
+> failed silently on real-sized workspaces: a token-cap overrun truncated the
+> array mid-element and `JSON.parse` then threw on the whole response, discarding
+> every bearing already produced. `parseOrientationLines` commits to this one
+> format and recovers gracefully — a truncated trailing line costs at most that
+> one line — but it does **not** accept other shapes (JSON, wrapper objects,
+> full-word bearings, markdown). Genuine format drift therefore parses to nothing
+> usable, and the route surfaces that as a `notice` on the orientation event
+> (the same surfacing covers a missing north star and a safety-cap tail-drop)
+> rather than emitting a silent `[]`.
 
 ## The pipeline
 
