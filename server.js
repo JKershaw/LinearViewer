@@ -26,14 +26,14 @@ import { FreeTierStore } from './lib/free-tier-store.js'
 import { RecapCacheStore } from './lib/recap-cache.js'
 import { BriefCacheStore } from './lib/brief-cache.js'
 import { ReportHistoryStore } from './lib/report-history-store.js'
-import { fetchProjects, fetchProjectsList, fetchTeams, fetchOrganization, fetchViewer } from './lib/linear.js'
+import { getProvider } from './lib/providers/registry.js'
+import './lib/providers/linear/index.js' // side effect: self-registers the Linear provider into the registry
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID } from './lib/tree.js'
 import { parseRepoFromDescription } from './lib/prompt-formatters.js'
 import { renderPage, renderErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken } from './lib/token-refresh.js'
 import { UUID_REGEX, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, updateWorkspaceTokens } from './lib/workspace.js'
-import { createAuthRoutes } from './routes/auth.js'
 import { createWorkspaceRoutes } from './routes/workspace.js'
 import { createOpenRouterAuthRoutes } from './routes/openrouter-auth.js'
 import { createDispatchRoutes } from './routes/dispatch.js'
@@ -313,9 +313,10 @@ async function ensurePATSession(req, res, next) {
   }
 
   try {
+    const provider = getProvider('linear');
     const [org, viewer] = await Promise.all([
-      fetchOrganization(pat),
-      fetchViewer(pat)
+      provider.fetchOrganization(pat),
+      provider.fetchViewer(pat)
     ]);
 
     const workspace = {
@@ -404,7 +405,7 @@ app.use((req, res, next) => {
 // Route Mounting
 // =============================================================================
 // Mount extracted route modules
-app.use(createAuthRoutes({ sessionStore, userPreferencesStore }))
+app.use(getProvider('linear').getAuthRouter({ sessionStore, userPreferencesStore }))
 app.use(createWorkspaceRoutes())
 app.use(createOpenRouterAuthRoutes())
 // Note: Dispatch routes mounted after workspaceFromUrl middleware is defined
@@ -428,12 +429,12 @@ async function fetchAndPrepareProjects(accessToken, teamId = null, mockOverride 
   // Fetch teams
   const teams = isTestMode
     ? testMockTeams
-    : await fetchTeams(accessToken);
+    : await getProvider('linear').fetchTeams(accessToken);
 
   // Fetch projects and issues (filtered by team if specified)
   let { organizationName, projects, issues } = isTestMode
     ? (mockOverride || testMockData)
-    : await fetchProjects(accessToken, teamId);
+    : await getProvider('linear').fetchProjects(accessToken, teamId);
 
   // In test mode, manually filter issues by team
   if (isTestMode && teamId) {
@@ -1053,7 +1054,7 @@ app.get('/workspace/:urlKey/roadmap', workspaceFromUrl, async (req, res) => {
     const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
     const { organizationName, projects, issues } = isTestMode
       ? testMockData
-      : await fetchProjects(workspace.accessToken, teamId);
+      : await getProvider('linear').fetchProjects(workspace.accessToken, teamId);
 
     // Build roadmap model from deterministic layer
     const roadmapModel = buildRoadmapModel(projects, issues);
@@ -1200,7 +1201,7 @@ app.get('/workspace/:urlKey/dispatch', workspaceFromUrl, async (req, res) => {
   let projectRepos = [];
   try {
     const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
-    const projects = isTestMode ? testMockData.projects : await fetchProjectsList(workspace.accessToken);
+    const projects = isTestMode ? testMockData.projects : await getProvider('linear').fetchProjectsList(workspace.accessToken);
     projectRepos = projects
       .map(p => ({ name: p.name, repo: parseRepoFromDescription(p.content) }))
       .filter(p => p.repo);

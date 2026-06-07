@@ -7,7 +7,7 @@
  */
 import crypto from 'crypto'
 import { Router } from 'express'
-import { fetchOrganization, fetchViewer } from '../lib/linear.js'
+import { getProvider } from '../lib/providers/registry.js'
 import { renderErrorPage } from '../lib/render.js'
 import { upsertWorkspace, saveSession, updateWorkspaceTokens } from '../lib/workspace.js'
 
@@ -138,9 +138,10 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore }) {
       // Fetch organization info and current user in parallel
       let org, viewer
       try {
+        const provider = getProvider('linear');
         [org, viewer] = await Promise.all([
-          fetchOrganization(data.access_token),
-          fetchViewer(data.access_token)
+          provider.fetchOrganization(data.access_token),
+          provider.fetchViewer(data.access_token)
         ])
       } catch (fetchError) {
         console.error('Failed to fetch from Linear:', fetchError)
