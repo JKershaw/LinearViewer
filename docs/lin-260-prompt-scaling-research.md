@@ -163,6 +163,98 @@ lands in one resolver + one shared block + a handful of one-line lane boundaries
 
 ---
 
+## Universal section vs. individualized? (how prompts get made here)
+
+Question: should the scaling/lane-boundary guidance be one universal section added
+to all prompts, or individualized per phase? Answer: **layered — and the machinery
+forces the split.** A decisive technical constraint settles it.
+
+### The full inventory of prompt-construction surfaces
+
+There are 8+ distinct surfaces, in four families:
+
+| Family | Surfaces | Chained? (one phase feeds the next) |
+|---|---|---|
+| **Task-execution phase prompts** | handwritten templates (`generatePrompt`, `lib/prompt-templates.js`), meta-prompt (`buildMetaPromptTemplate`, `lib/prompts/meta-prompt-template.js`) | **Yes** — research→plan→breakdown→impl→review |
+| **Extraction prompts** | recap (`lib/recap.js` `buildRecapMessages`), brief (`lib/brief.js` `buildBriefMessages`) | No — fixed JSON / Markdown schema, summarize-in-place |
+| **Orchestrator prompts** | autopilot kickoff (`lib/prompts/autopilot-kickoff.js`), foreman playbook (`lib/prompts/foreman-playbook.js`) | They *drive* the loop; explicitly don't do the work |
+| **User + narrative** | custom templates (`generateCustomPrompt`, `lib/prompt-templates.js:80`), roadmap pipeline (5 chained layers, `lib/prompts/roadmap-*.js`) | custom: no; roadmap: yes |
+
+Two append patterns already coexist in the chained family — the two precedents:
+
+- **Universal append:** `formatStalenessCheck(issue)` is `+=`'d onto *every*
+  handwritten prompt (`prompt-templates.js:212`) and mirrored as a shared directive
+  in the meta-prompt body. One block, all phases.
+- **Per-phase individualized:** the meta-prompt's "Quality rules" give research /
+  plan / implementation / review each a *distinct* rule; git-workflow appends only
+  for READY category, code-review only for implementation.
+
+### The decisive constraint: you can't un-write by appending
+
+The universal mechanism (`formatStalenessCheck`) is a **tail-append** — it adds a
+section after the body. That works for additive guidance but not subtractive:
+
+- **Lane-boundary ("don't do the next phase's job")** is *additive* → appendable →
+  universal-append-friendly.
+- **Scale-down (small task → short prompt)** is *subtractive*: to make a one-line
+  task get a short plan prompt you must **not emit** the 80-line scaffold. A trailing
+  "…but keep it brief" just loses to the context gravity of the 80 lines above it.
+  So scale-down must be woven *into* each template's `generate()` — per-phase by
+  construction.
+
+That single fact decides each piece:
+
+### Verdict, piece by piece
+
+1. **Scale resolution → universal. Scale application → per-phase.** The *decision*
+   (`resolveTaskScale(issue, context) → small|standard|large`) is one shared
+   function, computed once, like `formatStalenessCheck`'s signature. What it *does* —
+   which sections to drop — lives inside each template because every scaffold
+   differs. **Universal decision, individualized application** (a `scale` parameter
+   threaded into each `generate(…, scale)`), not a tail-append.
+
+2. **Lane-boundary → hybrid.** A generic version *can* be a universal append:
+   "produce only this phase's artifact; do not perform the downstream phase's work."
+   Cheap, covers every phase. But generic is fuzzy, so the two places John's examples
+   actually bleed — **research→plan** and **plan→implementation** — get *sharpened*
+   per-phase lines on top. Universal floor + two authored specifics. Note: this
+   "stay in your lane" principle already exists one layer up (the autopilot handbook
+   is built on *"you drop — diving down to fix something that was the worker's to
+   fix"*); the phase-prompt layer is exactly where it's missing, so this promotes an
+   existing concept down a level rather than inventing one.
+
+3. **Propagation cap (distillation) → structural, shared, but opt-in.** Lives in the
+   context builder. `formatIssueContext` is reused by the meta-prompt **and** recap
+   (`recap.js:37`) **and** brief (`brief.js:57`) — but recap/brief are summarizers
+   that *want* the full comment dump, so the seam must be **opt-in per consumer**, not
+   a global swap. Phase prompts route through distilled hand-off; recap/brief keep raw.
+
+### Where it must NOT go (carve-outs the map exposes)
+
+- **Custom prompts** (`generateCustomPrompt`) already receive *zero* universal
+  appends by design (user-authored) — the existing universal-append in
+  `generatePrompt` doesn't reach them. "Add to all prompts" already has a built-in
+  boundary. Leave them out.
+- **Recap / brief** have no phase and no next agent — scaling and lane-boundary are
+  meaningless there. Out.
+- **Roadmap pipeline** chains like the dev phases and already individualizes per
+  layer — and already has *output-shape contracts* (orientation line-format, digest's
+  four slots), a third existing precedent for output-shaping. A model to learn from,
+  not a target to modify here.
+
+### Bottom line
+
+Not one universal section. The honest shape is: **one shared decision**
+(`resolveTaskScale`, universal like `formatStalenessCheck`) · **one universal
+lane-boundary block** on chained phase prompts (both paths) **+ two sharpened
+per-phase lines** for the worst bleeds · **per-phase scaffold trimming** inside each
+`generate()` (cannot be universal, by the tail-append constraint) · **one opt-in
+distillation seam** in `formatIssueContext` (shared mechanism, per-consumer gate).
+Mechanically it follows the `formatStalenessCheck` precedent exactly, so it lands on
+rails the codebase already has.
+
+---
+
 ## Discussion: what kind of change is this? (prompt tuning vs. structure)
 
 Framing question: *is this pure, careful prompt tuning — making explicit the shape
