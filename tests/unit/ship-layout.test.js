@@ -22,7 +22,12 @@ import {
   layout,
   orderByDependency,
   clusterSubtaskSiblings,
-  resolveCollisions
+  resolveCollisions,
+  BEARING_TO_ANGLE,
+  BEARINGS,
+  bearingToAngle,
+  orientationLayout,
+  ORIENTATION_SPREAD
 } from '../../lib/ship-layout.js';
 
 // =============================================================================
@@ -1165,5 +1170,166 @@ describe('hash32 / hashFloat', () => {
     const a = hashFloat('id', 'angle');
     const b = hashFloat('id', 'radius');
     assert.notStrictEqual(a, b);
+  });
+});
+
+// =============================================================================
+// Orientation mode (LIN-301) — bearing → angle, parallel layout path
+// =============================================================================
+
+// Helper: radius of a position relative to GEOMETRY centre.
+function radiusOf(pos) {
+  return Math.hypot(pos.x - GEOMETRY.centerX, pos.y - GEOMETRY.centerY);
+}
+
+describe('bearingToAngle', () => {
+  test('maps the 8-point compass with N at the bow (270° up)', () => {
+    assert.strictEqual(bearingToAngle('N'), 270);
+    assert.strictEqual(bearingToAngle('NE'), 315);
+    assert.strictEqual(bearingToAngle('E'), 0);
+    assert.strictEqual(bearingToAngle('SE'), 45);
+    assert.strictEqual(bearingToAngle('S'), 90);
+    assert.strictEqual(bearingToAngle('SW'), 135);
+    assert.strictEqual(bearingToAngle('W'), 180);
+    assert.strictEqual(bearingToAngle('NW'), 225);
+  });
+
+  test('BEARING_TO_ANGLE and BEARINGS stay in sync', () => {
+    assert.deepStrictEqual(BEARINGS.slice().sort(), Object.keys(BEARING_TO_ANGLE).sort());
+  });
+
+  test('unknown bearing → null (graceful, no throw)', () => {
+    assert.strictEqual(bearingToAngle('X'), null);
+    assert.strictEqual(bearingToAngle(''), null);
+    assert.strictEqual(bearingToAngle(undefined), null);
+  });
+
+  test('E/W maintenance tie broken by project sector', () => {
+    // Starboard project → east (0°); port project → west (180°).
+    assert.strictEqual(bearingToAngle('E', SECTORS.STARBOARD), 0);
+    assert.strictEqual(bearingToAngle('E', SECTORS.PORT), 180);
+    assert.strictEqual(bearingToAngle('W', SECTORS.STARBOARD), 0);
+    assert.strictEqual(bearingToAngle('W', SECTORS.PORT), 180);
+  });
+
+  test('E/W without a side falls back to the literal bearing', () => {
+    assert.strictEqual(bearingToAngle('E', SECTORS.DRIFT), 0);
+    assert.strictEqual(bearingToAngle('W', SECTORS.AFT), 180);
+  });
+
+  test('N/S ignore project sector (only E/W are tie-broken)', () => {
+    assert.strictEqual(bearingToAngle('N', SECTORS.STARBOARD), 270);
+    assert.strictEqual(bearingToAngle('S', SECTORS.PORT), 90);
+  });
+});
+
+describe('orientationLayout', () => {
+  function projectAndOrient(cards, orientation) {
+    const result = layout(cards, GEOMETRY, {});
+    const orient = orientationLayout(cards, result.positions, GEOMETRY, { orientation });
+    return { result, orient };
+  }
+
+  test('hub-first invariant: started cards never enter orientation positions', () => {
+    const started = card({ stateType: 'started' });
+    const todo = card({ stateType: 'unstarted', identifier: 'LIN-1' });
+    const { orient } = projectAndOrient([started, todo], [
+      { identifier: 'LIN-1', bearing: 'N', reason: 'x', archived: false }
+    ]);
+    assert.ok(!(started.id in orient.positions) && !orient.positions.has?.(started.id),
+      'started card must be absent from orientation positions');
+    assert.ok(orient.positions.has(todo.id), 'orbit card present');
+  });
+
+  test('radius is unchanged — orientation only swings the angle', () => {
+    const cards = [
+      card({ stateType: 'unstarted', identifier: 'LIN-1', priority: 1 }),
+      card({ stateType: 'unstarted', identifier: 'LIN-2', priority: 3 }),
+      card({ stateType: 'unstarted', identifier: 'LIN-3', priority: 0 })
+    ];
+    const orientation = [
+      { identifier: 'LIN-1', bearing: 'N', reason: 'x', archived: false },
+      { identifier: 'LIN-2', bearing: 'S', reason: 'x', archived: false },
+      { identifier: 'LIN-3', bearing: 'NE', reason: 'x', archived: false }
+    ];
+    const { result, orient } = projectAndOrient(cards, orientation);
+    for (const c of cards) {
+      const pr = radiusOf(result.positions.get(c.id));
+      const orr = radiusOf(orient.positions.get(c.id));
+      assert.ok(Math.abs(pr - orr) < 1e-6, `radius changed for ${c.identifier}: ${pr} → ${orr}`);
+    }
+  });
+
+  test('bearing controls the angle (N → 270, S → 90)', () => {
+    const north = card({ stateType: 'unstarted', identifier: 'LIN-1' });
+    const south = card({ stateType: 'unstarted', identifier: 'LIN-2' });
+    const { orient } = projectAndOrient([north, south], [
+      { identifier: 'LIN-1', bearing: 'N', reason: 'x', archived: false },
+      { identifier: 'LIN-2', bearing: 'S', reason: 'x', archived: false }
+    ]);
+    // Single card per anchor → exactly the anchor (no fan).
+    assert.strictEqual(orient.positions.get(north.id).angle, 270);
+    assert.strictEqual(orient.positions.get(south.id).angle, 90);
+  });
+
+  test('archived → off-compass flag, position kept (radius + angle unchanged)', () => {
+    const c = card({ stateType: 'unstarted', identifier: 'LIN-1' });
+    const { result, orient } = projectAndOrient([c], [
+      { identifier: 'LIN-1', bearing: 'S', reason: 'x', archived: true }
+    ]);
+    assert.deepStrictEqual(orient.flags.get(c.id), { archived: true });
+    // Position is the project position — archived doesn't swing to its bearing.
+    assert.strictEqual(orient.positions.get(c.id).angle, result.positions.get(c.id).angle);
+  });
+
+  test('no orientation data for a card → keeps its project angle (fallback)', () => {
+    const covered = card({ stateType: 'unstarted', identifier: 'LIN-1' });
+    const uncovered = card({ stateType: 'unstarted', identifier: 'LIN-2' });
+    const { result, orient } = projectAndOrient([covered, uncovered], [
+      { identifier: 'LIN-1', bearing: 'N', reason: 'x', archived: false }
+    ]);
+    assert.strictEqual(
+      orient.positions.get(uncovered.id).angle,
+      result.positions.get(uncovered.id).angle
+    );
+    assert.ok(!orient.flags.has(uncovered.id));
+  });
+
+  test('empty orientation → every card keeps its project position (additive no-op)', () => {
+    const cards = [
+      card({ stateType: 'unstarted', identifier: 'LIN-1' }),
+      card({ stateType: 'unstarted', identifier: 'LIN-2' })
+    ];
+    const { result, orient } = projectAndOrient(cards, []);
+    for (const c of cards) {
+      assert.strictEqual(orient.positions.get(c.id).angle, result.positions.get(c.id).angle);
+    }
+  });
+
+  test('same-bearing cards fan within ±ORIENTATION_SPREAD of the anchor', () => {
+    const cards = [];
+    const orientation = [];
+    for (let i = 1; i <= 5; i++) {
+      const id = `LIN-${i}`;
+      cards.push(card({ stateType: 'unstarted', identifier: id, priority: 0 }));
+      orientation.push({ identifier: id, bearing: 'N', reason: 'x', archived: false });
+    }
+    const { orient } = projectAndOrient(cards, orientation);
+    for (const c of cards) {
+      const ang = orient.positions.get(c.id).angle;
+      // All within the N anchor's ±spread window (270 ± 18).
+      const delta = Math.abs(((ang - 270 + 540) % 360) - 180);
+      assert.ok(delta <= ORIENTATION_SPREAD + 1e-6, `${c.identifier} angle ${ang} outside fan`);
+    }
+  });
+
+  test('does not mutate the input project positions', () => {
+    const c = card({ stateType: 'unstarted', identifier: 'LIN-1' });
+    const result = layout([c], GEOMETRY, {});
+    const before = { ...result.positions.get(c.id) };
+    orientationLayout([c], result.positions, GEOMETRY, {
+      orientation: [{ identifier: 'LIN-1', bearing: 'S', reason: 'x', archived: false }]
+    });
+    assert.deepStrictEqual(result.positions.get(c.id), before);
   });
 });

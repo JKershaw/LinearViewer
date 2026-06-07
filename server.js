@@ -995,6 +995,12 @@ app.get('/workspace/:urlKey/ship', workspaceFromUrl, async (req, res) => {
       : null;
     const { trees, inProgressTrees, recentActivityTrees, organizationName } =
       await fetchAndPrepareProjects(workspace.accessToken, teamId, mockOverride);
+
+    // Orientation mode (LIN-301): a pure read of the latest saved roadmap report
+    // — no LLM call on the ship side (see LIN-298). The client maps these saved
+    // bearings to angles; absence (no report yet) just leaves the toggle inert.
+    const latestReport = await reportHistoryStore.getLatest(workspace.urlKey);
+
     const html = renderShipPage(
       { projectTrees: trees, inProgressTrees, recentActivityTrees, organizationName },
       {
@@ -1002,7 +1008,11 @@ app.get('/workspace/:urlKey/ship', workspaceFromUrl, async (req, res) => {
         urlKey: workspace.urlKey,
         openRouterSource,
         workspaces: req.session.workspaces,
-        featureFlags: getFeatureFlags(req.session)
+        featureFlags: getFeatureFlags(req.session),
+        orientation: latestReport?.orientation || [],
+        orientationMeta: latestReport
+          ? { generatedAt: latestReport.generatedAt, northStar: latestReport.northStar, model: latestReport.model }
+          : null
       }
     );
     res.send(html);

@@ -169,6 +169,38 @@ describe('ReportHistoryStore.get', () => {
   });
 });
 
+describe('ReportHistoryStore.getLatest', () => {
+  let store;
+  beforeEach(() => { store = new ReportHistoryStore({ collection: createMockCollection() }); });
+
+  test('returns the newest full record (with orientation bearings)', async () => {
+    const a = await store.save('ws-1', {
+      model: 'm', northStar: 'old', narrative: sampleNarrative('a'),
+      orientation: [{ identifier: 'LIN-1', bearing: 'S', reason: 'r', archived: false }]
+    });
+    store.collection._docs.find(d => d._id === a.id).generatedAt = new Date(Date.now() - 10000);
+    const b = await store.save('ws-1', {
+      model: 'm', northStar: 'new', narrative: sampleNarrative('b'),
+      orientation: [{ identifier: 'LIN-2', bearing: 'N', reason: 'r', archived: false }]
+    });
+
+    const latest = await store.getLatest('ws-1');
+    assert.strictEqual(latest.id, b.id);
+    assert.strictEqual(latest.northStar, 'new');
+    assert.strictEqual(latest.orientation[0].identifier, 'LIN-2');
+    assert.strictEqual(latest.narrative.gap, 'gap b');
+  });
+
+  test('returns null when the workspace has no reports', async () => {
+    assert.strictEqual(await store.getLatest('ws-empty'), null);
+  });
+
+  test('scopes by workspace', async () => {
+    await store.save('ws-1', { model: 'm', narrative: sampleNarrative() });
+    assert.strictEqual(await store.getLatest('ws-2'), null);
+  });
+});
+
 describe('ReportHistoryStore capacity cap', () => {
   test('prunes to the newest N when the cap is exceeded', async () => {
     const store = new ReportHistoryStore({ collection: createMockCollection(), maxReports: 3 });
