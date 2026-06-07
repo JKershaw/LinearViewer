@@ -823,7 +823,7 @@ Poll this after enqueuing. `status` is terminal (`done`/`failed`/`aborted`) once
 }
 ```
 
-Feedback is free-form text — read it (the recap, heartbeats) for detail; `status` gives the terminal signal and `[evidence]` entries give the artifact URLs to verify against. Poll until `status` is terminal.
+Feedback is free-form text — read it (the recap, heartbeats) for detail; `status` gives the terminal signal and `[evidence]` entries give the artifact URLs to verify against. Poll until `status` is terminal. (If you poll in a shell loop, don't name the variable `status`: zsh reserves it as a read-only alias for `$?` and the assignment aborts. Use `dispatch_status`, or run the loop under `bash`.)
 
 #### List Dispatches
 
