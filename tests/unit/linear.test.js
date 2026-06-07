@@ -5,7 +5,9 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { selectFocusSubtask, isBlocked } from '../../lib/linear.js';
+// isBlocked / selectFocusSubtask relocated to lib/tree.js (LIN-330) — they are
+// canonical-state/tree-shape helpers, not Linear-transport-specific.
+import { selectFocusSubtask, isBlocked } from '../../lib/tree.js';
 
 // =============================================================================
 // selectFocusSubtask Tests

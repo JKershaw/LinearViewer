@@ -28,7 +28,10 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const linearSource = readFileSync(join(__dirname, '../../lib/linear.js'), 'utf8');
+// LIN-330: the Linear fetchers + FOCUSED_CHILD_QUERY moved out of lib/linear.js
+// (now a thin shim) into the Linear provider. The LIN-300 leanness guardrails
+// pinned here now live at their new home, so we read the provider source.
+const linearSource = readFileSync(join(__dirname, '../../lib/providers/linear/index.js'), 'utf8');
 const proxySource = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8');
 
 // Pull a named gql`...` template literal out of a source file by its const name.
@@ -44,7 +47,7 @@ function extractQuery(source, name) {
 describe('focused-child fetch is lean (no redundant subtree)', () => {
   test('FOCUSED_CHILD_QUERY exists', () => {
     assert.ok(linearSource.includes('const FOCUSED_CHILD_QUERY = gql`'),
-      'FOCUSED_CHILD_QUERY must exist in lib/linear.js');
+      'FOCUSED_CHILD_QUERY must exist in the Linear provider');
   });
 
   test('FOCUSED_CHILD_QUERY does not re-traverse the parent epic', () => {
