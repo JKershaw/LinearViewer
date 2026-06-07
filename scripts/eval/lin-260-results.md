@@ -100,7 +100,56 @@ calibration + output inspection):
 
 **Conclusion:** the upper-bound failure is best measured by the **deterministic inflation
 ratio** (no judge), and its real fix is the **structural distillation cut (Phase 4)**, not a
-directive. The lane judge is demoted from a ship gate to at most a coarse sanity check. The
-Phase 2 directive is safe (quality held) but **unproven and not retained on its own merits**;
-its disposition is a decision flagged to the user.
+directive. The lane judge is demoted from a ship gate to at most a coarse sanity check.
+
+**Disposition: REVERTED.** Per the ship gate, an unproven prompt change is not retained.
+The lane directive was removed from both paths (full e2e suite green). The harness's
+`STRIP=lane` arm is retained for future use but is inert until/unless a lane directive returns.
+
+## Phase 3 — scale-down (lower bound, deterministic length)
+
+A `## Scale To The Task` rule added to the meta-prompt (and mirrored as `formatScaleToTask()`
+in the handwritten plan/research templates). Measured by word count — no judge in the loop.
+`MODE=ab STRIP=scale`, K=3, qwen3.7-plus. **Arm A = stripped (status quo), Arm B = live.**
+
+### v1 — clean win on genuine smalls, but the over-trim guard tripped
+
+```
+case                          scale     A.words  B.words   ΔW    qual A→B
+SYN-7 typo                    small        345     276    -69     1 → 1
+SYN-9 mirror-a-validation     small        398     364    -34     1 → 1
+SYN-8 plan-exists fits-one-session  small  436     383    -53     1 → 1
+INF-1 ttl-bump plan           small        702     586   -116     1 → 1
+GRD-deceptive-large           small        349     328    -21     1 → 1   (wall of context, still shrank — good)
+SYN-12 migration multi-session  large      358     366     +8     1 → 0.67 (held full — guard OK)
+SYN-5 pagination multi-surface  standard   596     525    -71  0.33 → 1   (shrank, but quality IMPROVED)
+GRD-deceptive-small           large        505     309   -196     1 → 1   ← OVER-TRIM: terse "rename everywhere" read as small
+```
+
+Genuine small tasks shrank 34–116 words (~10–20%) with the quality floor held — the lower
+bound IS directive-tractable, as the research doc predicted (no context-gravity fighting it).
+But `GRD-deceptive-small` ("rename `urlKey` everywhere" — terse description, actually
+multi-surface) was trimmed −196 words: the directive inferred "small" from the one-line
+description. The over-trim guard caught exactly the failure the corpus was built to catch.
+
+### v2 — added the deceptive-small guard; over-trim fixed, win preserved
+
+Refined the rule: *do NOT infer "small" from a terse description; rename/refactor/migrate
+"across the codebase" or shared-identifier changes fan out to many surfaces even in one
+sentence.* Re-measured (guard cases K=4, smalls K=3):
+
+```
+GRD-deceptive-small           large        491     510    +19     0.75 → 1   ← FIXED (was -196), now holds full
+GRD-deceptive-large           small        377     336    -41        1 → 1   (still shrinks correctly)
+SYN-7 typo                    small        344     276    -68        1 → 1
+SYN-9 mirror-a-validation     small        420     364    -56     0.67 → 1
+SYN-8 plan-exists fits-one-session  small  376     377     +1        1 → 1   (already lean)
+```
+
+**Gate met.** Genuine smalls shrink (−56 to −68) with quality held/improved; the
+deceptive-small over-trim is gone (−196 → +19); deceptive-large still shrinks. Shipped to
+**both paths** (meta-prompt rule + `formatScaleToTask()` woven into plan/research, before the
+heavy framing machinery — not tail-appended, since scale-down is subtractive). Structural
+tests added to both unit suites; routing-eval baseline snapshot regenerated. This is the
+first directive to clear the ship gate.
 
