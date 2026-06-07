@@ -3,8 +3,9 @@
 > Research/scratch for **LIN-325** ("Write the autopilot operating manual"). This is the
 > track-record material the manual is built from — the named failure episodes, their mapping
 > to the seven known-issue categories, a recommended structure, and the wiring approach.
-> It is *not* the manual; drafting the prose is the implementation step. The manual target is
-> `docs/autopilot-operating-manual.md` (does not exist yet).
+> It is *not* the manual; drafting the prose was the implementation step. The manual now lives at
+> `docs/autopilot-operating-manual.md` and is composed inline into the kickoff via
+> `buildAutopilotManual()` (also served at `GET /api/proxy/autopilot/manual`).
 
 ## Staleness check (re-grounded at HEAD, 2026-06-07)
 
