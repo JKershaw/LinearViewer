@@ -17,7 +17,7 @@ import { buildRoadmapTrajectoryMessages } from '../lib/prompts/roadmap-trajector
 import { buildRoadmapNorthStarMessages } from '../lib/prompts/roadmap-north-star-template.js';
 import { buildRoadmapGapMessages } from '../lib/prompts/roadmap-gap-template.js';
 import { buildRoadmapDigestMessages } from '../lib/prompts/roadmap-digest-template.js';
-import { buildRoadmapOrientationMessages, serializeOrientationCandidates, countOrientationCandidates, ORIENTATION_BEARINGS } from '../lib/prompts/roadmap-orientation-template.js';
+import { buildRoadmapOrientationMessages, serializeOrientationCandidates, countOrientationCandidates, parseOrientationLines, ORIENTATION_BEARINGS } from '../lib/prompts/roadmap-orientation-template.js';
 import { generatePrompt, generateCustomPrompt, hasPrompt, getAvailablePrompts } from '../lib/prompt-templates.js';
 import { WORK_ISSUE_LABELS } from '../lib/workflow-config.js';
 import { parseRepoFromDescription } from '../lib/prompt-formatters.js';
@@ -1968,12 +1968,15 @@ ${goal}`;
     { identifier: 'TEST-14', bearing: '', reason: 'Off-compass: does not serve the north star.', archived: true }
   ];
 
-  /** Strip a surrounding ```json ... ``` (or bare ```) code fence, if present. */
-  function stripOrientationFences(text) {
-    const trimmed = String(text || '').trim();
-    const fenced = trimmed.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/);
-    return fenced ? fenced[1].trim() : trimmed;
-  }
+  /**
+   * Shared failure-notice copy for the orientation event (LIN-324). Used both
+   * when the stream/parse throws and when the response parses to nothing usable
+   * despite there being candidates to score — the two ways a reading can fail to
+   * yield bearings. Either way the ship-view toggle stays off, but the operator
+   * is told why instead of facing a silent, mysteriously-disabled control.
+   */
+  const ORIENTATION_FAILURE_NOTICE =
+    'Orientation bearings could not be generated — the model response was incomplete or could not be parsed. The ship-view orientation toggle stays unavailable for this reading.';
 
   /**
    * Validate and normalize raw bearings to the 8-point vocabulary (LIN-300).
@@ -2024,15 +2027,20 @@ ${goal}`;
    * `orientation` SSE event over the shared generate connection (LIN-300).
    *
    * Unlike the narrative layers this does not stream prose into a panel — it
-   * accumulates the full JSON output, strips any code fence, parses, and
-   * validates against the 8-point vocabulary.
+   * accumulates the full line-format output, parses it with parseOrientationLines
+   * (Strategy B / LIN-324), and validates against the 8-point vocabulary.
    *
    * LIN-324: failures are no longer silent. The token allowance scales to the
-   * candidate count (Strategy A) so a real-sized queue no longer truncates, and
-   * a `notice` field on the orientation event surfaces the two remaining
-   * failure-like conditions to the operator at generation time (Strategy C):
-   *   - a parse/stream failure (the catch) emits `orientation: []` PLUS a notice
+   * candidate count (Strategy A) so a real-sized queue no longer truncates, the
+   * line format degrades gracefully (a truncated trailing line costs one line,
+   * not the whole response), and a `notice` field on the orientation event
+   * surfaces the remaining failure-like conditions at generation time (Strategy
+   * C / D2):
+   *   - a stream/parse failure (the catch) emits `orientation: []` PLUS a notice
    *     so the disabled ship toggle is explained rather than mysterious;
+   *   - a parse that yields NOTHING usable despite having candidates (genuine
+   *     format drift — e.g. the model emits JSON instead of lines) likewise emits
+   *     `orientation: []` PLUS the same notice, rather than a silent empty array;
    *   - a safety-cap tail-drop emits the (non-empty) bearings PLUS a notice
    *     naming how many lowest-priority candidates were omitted.
    * The notice is transient (SSE + a DOM note on the roadmap page) — it is NOT
@@ -2066,7 +2074,7 @@ ${goal}`;
     let parsed = [];
     try {
       if (injectedRaw != null) {
-        parsed = JSON.parse(stripOrientationFences(injectedRaw));
+        parsed = parseOrientationLines(injectedRaw);
       } else if (testMode) {
         parsed = ORIENTATION_TEST_BEARINGS;
       } else {
@@ -2077,18 +2085,25 @@ ${goal}`;
           { apiKey: llm.apiKey, model: llm.model, maxTokens: orientationMaxTokens(candidates.length) },
           (type, data) => { if (type === 'token') text += (data && data.token) || ''; }
         );
-        parsed = JSON.parse(stripOrientationFences(text));
+        parsed = parseOrientationLines(text);
       }
     } catch (error) {
       console.error('Roadmap orientation error:', error);
-      sendSSE(res, 'orientation', {
-        orientation: [],
-        notice: 'Orientation bearings could not be generated — the model response was incomplete or could not be parsed. The ship-view orientation toggle stays unavailable for this reading.'
-      });
+      sendSSE(res, 'orientation', { orientation: [], notice: ORIENTATION_FAILURE_NOTICE });
       return;
     }
 
-    const payload = { orientation: normalizeBearings(parsed) };
+    const orientation = normalizeBearings(parsed);
+
+    // Parsed to nothing usable while candidates existed ⇒ genuine format drift
+    // (e.g. the model ignored the line contract). Surface it, don't swallow it
+    // (D2). An empty result with NO candidates is legitimately empty — no notice.
+    if (orientation.length === 0 && candidates.length > 0) {
+      sendSSE(res, 'orientation', { orientation: [], notice: ORIENTATION_FAILURE_NOTICE });
+      return;
+    }
+
+    const payload = { orientation };
     if (capNotice) payload.notice = capNotice;
     sendSSE(res, 'orientation', payload);
   }
@@ -2262,17 +2277,26 @@ ${goal}`;
       // client stashes for persistence and the ship view (LIN-301). It only
       // needs the model and the north star — not the prose layers' output — so
       // it runs whenever a north star is set, independent of layer outcomes.
-      // No north star ⇒ no call; the persisted orientation stays [].
       if (hasNorthStar) {
         // Test-only seam (LIN-324 / Strategy E): in roadmap test mode a body
         // field can inject the raw streamed text so a test drives the real
-        // serialize→strip→parse→normalize→emit chain (which the
+        // serialize→parse→normalize→emit chain (which the
         // ORIENTATION_TEST_BEARINGS short-circuit otherwise skips). Ignored
         // entirely outside test mode.
         const injectedRaw = testMode && typeof req.body?.__testOrientationRaw === 'string'
           ? req.body.__testOrientationRaw
           : null;
         await generateOrientation(res, { roadmapModel, northStar, llm, req, testMode, injectedRaw });
+      } else {
+        // No north star ⇒ orientation cannot be adjudicated (it scores work
+        // AGAINST the stated intent). Emit an explicit orientation event with a
+        // notice rather than nothing, so the roadmap page can explain why the
+        // ship-view toggle stays inert instead of leaving it silently disabled
+        // (LIN-324 / D2). The persisted orientation stays [].
+        sendSSE(res, 'orientation', {
+          orientation: [],
+          notice: 'Orientation needs a north star — set one above to generate per-task bearings. The ship-view orientation toggle stays unavailable until then.'
+        });
       }
     } catch (error) {
       console.error('Roadmap generate stream error:', error);

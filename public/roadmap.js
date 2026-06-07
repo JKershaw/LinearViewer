@@ -119,6 +119,49 @@
     note.hidden = !text;
   }
 
+  // LIN-324 / D: render the per-task compass bearings as a visible result on the
+  // roadmap page. Visible output is the operator's own check that orientation
+  // generation worked end-to-end (the ship view only enables its toggle when
+  // this same data is present). An empty array hides the block. Shared by the
+  // live `orientation` SSE event and the report-rehydration path (applyReport),
+  // so a reload or a history selection shows the saved bearings too.
+  function renderOrientationResult(orientation) {
+    var box = document.getElementById('roadmap-orientation-result');
+    if (!box) return;
+    var body = box.querySelector('.roadmap-orientation-result-body');
+    var list = Array.isArray(orientation) ? orientation : [];
+    if (body) body.textContent = '';
+    if (!list.length) {
+      box.hidden = true;
+      return;
+    }
+    list.forEach(function(b) {
+      var bearing = b && b.archived ? 'OFF' : (b && b.bearing) || '?';
+      var row = document.createElement('div');
+      row.className = 'roadmap-orientation-row';
+      row.setAttribute('data-bearing', bearing);
+      if (b && b.archived) row.setAttribute('data-overboard', 'true');
+
+      var idEl = document.createElement('span');
+      idEl.className = 'roadmap-orientation-id';
+      idEl.textContent = (b && b.identifier) || '';
+
+      var bearingEl = document.createElement('span');
+      bearingEl.className = 'roadmap-orientation-bearing';
+      bearingEl.textContent = bearing;
+
+      var reasonEl = document.createElement('span');
+      reasonEl.className = 'roadmap-orientation-reason';
+      reasonEl.textContent = (b && b.reason) || '';
+
+      row.appendChild(idEl);
+      row.appendChild(bearingEl);
+      row.appendChild(reasonEl);
+      body.appendChild(row);
+    });
+    box.hidden = false;
+  }
+
   function resetLayer(layerId) {
     var section = layerSection(layerId);
     if (!section) return;
@@ -213,6 +256,7 @@
 
     LAYER_IDS.forEach(resetLayer);
     setOrientationNote('');
+    renderOrientationResult([]);
     if (generateBtn) {
       generateBtn.disabled = true;
       generateBtn.textContent = 'Generating…';
@@ -332,6 +376,10 @@
         } else if (type === 'orientation') {
           // Structured data, not a visible layer — stash for saveReport.
           orientation = (eventData && eventData.orientation) || [];
+          // LIN-324 / D: render the bearings as a visible result so the operator
+          // can confirm orientation generation worked (the same data gates the
+          // ship-view toggle). Empty arrays hide the block.
+          renderOrientationResult(orientation);
           // LIN-324: a generation-time orientation failure or a safety-cap
           // tail-drop arrives as a transient `notice` on this event. Surface it
           // as a non-blocking note so a disabled ship toggle is explained. The
@@ -593,6 +641,12 @@
         section.setAttribute('data-state', 'idle');
       }
     });
+
+    // Rehydrate the visible orientation result from the saved report (LIN-324/D).
+    // This is the single seam covering both a page reload (latest report applied
+    // on load) and selecting a past reading from history; an empty/absent
+    // orientation hides the block, so switching readings never leaves stale rows.
+    renderOrientationResult((report && report.orientation) || []);
   }
 
   // =========================================================================
