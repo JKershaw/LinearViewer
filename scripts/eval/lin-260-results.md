@@ -64,12 +64,43 @@ GRD-deceptive-large           small        350     364     14      -     -      
 lane-discipline  A=0.00  B=0.25  Δ=+0.25   quality: no regressions
 ```
 
-**Read (honest): weak/noisy positive, NOT yet a clear win.** lane Δ=+0.25 is driven by
+**Read (honest): weak/noisy positive at K=1, NOT yet a clear win.** lane Δ=+0.25 is driven by
 a single case (SYN-12: 0→1); SYN-5/INF-1/guard stayed 0→0. Two limitations the run
 exposed: (1) **lane is only scored on non-terminal routes**, and routing flips run-to-run
-at K=1, so only ~2–4 usable data points per run — needs K≥3 on the cases that reliably
-route plan/breakdown for a trustworthy number; (2) the block slightly *raises* words
-(it adds "don't do X" framing) — length is Phase 3's lever, not this one. Quality held
-everywhere, so the change is safe; it just hasn't cleared the ship gate yet. **Pending:
-higher-K confirm before this is called proven.**
+at K=1, so only ~2–4 usable data points per run; (2) the block slightly *raises* words
+(it adds "don't do X" framing) — length is Phase 3's lever, not this one.
+
+### Phase 2 confirm (K=3) — the directive FAILS the gate, and the lane judge is unreliable
+
+```
+case                          A.lane B.lane   A.qual B.qual
+SYN-9 mirror-a-validation       0      0        1     1
+SYN-12 migration multi-session  0.33   0.5      0.67  1
+SYN-5 pagination multi-surface  0.33   0        1     1
+INF-1 ttl-bump plan             0      0        1     1
+GRD-deceptive-small             -      0        1     0.67
+lane-discipline  A=0.17  B=0.13  Δ=-0.04
+```
+
+The K=1 +0.25 was noise; at K=3 the directive shows **no lift (Δ=-0.04)**. Diagnosis (judge
+calibration + output inspection):
+
+1. **The lane judge is reliable on clean extremes but not in the messy middle.** A
+   hand-labeled in-lane research prompt scores 4/4 YES and a hand-labeled code-dump scores
+   0/4 — perfect separation. But the REAL generated plan prompts (dense with Strategy
+   Framing / completeness-check / cross-cutting instructions) get judged `NO` even though
+   they only *instruct* the consumer to make a thorough plan — they do not pre-write THIS
+   ticket's plan. The judge conflates "a prompt that heavily specifies plan structure" with
+   "a prompt that contains the plan." Both arms therefore floor at ~0.15 and the directive's
+   effect is undetectable.
+2. **The directive is a weak lever** — exactly the research doc's thesis: you cannot reliably
+   instruct a model to un-see context; *"the lane-boundary directive is the backstop, not
+   the primary fix; the real lever is the structural cut."* The eval now **empirically
+   confirms** that the upper bound is not directive-tractable.
+
+**Conclusion:** the upper-bound failure is best measured by the **deterministic inflation
+ratio** (no judge), and its real fix is the **structural distillation cut (Phase 4)**, not a
+directive. The lane judge is demoted from a ship gate to at most a coarse sanity check. The
+Phase 2 directive is safe (quality held) but **unproven and not retained on its own merits**;
+its disposition is a decision flagged to the user.
 
