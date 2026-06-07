@@ -42,6 +42,29 @@ describe('buildAutopilotKickoff (shared guide)', () => {
   });
 });
 
+describe('buildAutopilotKickoff (inline handbook / disposition layer)', () => {
+  // Anchor on structural facts (the handbook H1, the kickoff-owned lens transition,
+  // ordering, the endpoint pointer) — never on handbook prose, which stays freely
+  // editable in docs/autopilot-operating-manual.md.
+  test('composes the handbook inline', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
+    assert.ok(text.includes('# The Autopilot Handbook'));
+  });
+
+  test('the handbook is the lens — it precedes the mechanism (the four lines)', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
+    const handbookAt = text.indexOf('# The Autopilot Handbook');
+    const fourLinesAt = text.indexOf('The four lines that are the human');
+    assert.ok(handbookAt > -1 && fourLinesAt > -1);
+    assert.ok(handbookAt < fourLinesAt, 'handbook should come before the four lines');
+  });
+
+  test('points at the manual endpoint for mid-run re-reference', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
+    assert.ok(text.includes(`${BASE_URL}/api/proxy/autopilot/manual`));
+  });
+});
+
 describe('buildAutopilotKickoff (general / stack-walk)', () => {
   test('no goal → walks the stack under the precedence policy', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL });

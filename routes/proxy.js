@@ -28,6 +28,7 @@ import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, DIS
 import { parseRepoFromDescription } from '../lib/prompt-formatters.js';
 import { buildForemanPlaybook } from '../lib/prompts/foreman-playbook.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
+import { buildAutopilotManual } from '../lib/prompts/autopilot-manual.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
 import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
 
@@ -1126,7 +1127,11 @@ GET ${baseUrl}/api/proxy/foreman/status
                    "status": "completed", "summary": "...", "timestamp": "..." }], "total": 7 }
 
 GET ${baseUrl}/api/proxy/foreman/playbook
-  → Foreman playbook (plain text, not JSON)`;
+  → Foreman playbook (plain text, not JSON)
+
+GET ${baseUrl}/api/proxy/autopilot/manual
+  → Autopilot operating manual / handbook (plain text, not JSON) — the disposition
+    behind the loop. Composed inline into the kickoff; fetch here to re-read a part.`;
 
     const writeEndpoints = scope === 'readWrite' ? `
 
@@ -1225,7 +1230,7 @@ ${readEndpoints}${writeEndpoints}
 
 ## Notes
 
-- All responses are JSON (except \`/api/proxy/foreman/playbook\` and \`/api/proxy/instructions\`, which are plain text).
+- All responses are JSON (except \`/api/proxy/foreman/playbook\`, \`/api/proxy/autopilot/manual\`, and \`/api/proxy/instructions\`, which are plain text).
 - Issue IDs can be UUIDs or identifiers (e.g., "LIN-123").
 - Dates are ISO 8601 format.
 - Rate limit: 60 requests per minute.
@@ -3073,6 +3078,18 @@ ${readEndpoints}${writeEndpoints}
 
     const kickoff = buildAutopilotKickoff({ baseUrl, goal, mode });
     res.type('text/plain').send(kickoff);
+  });
+
+  /**
+   * GET /api/proxy/autopilot/manual
+   * Returns the Autopilot operating manual (the "handbook") as plain text — the
+   * portable senior-lead disposition that sits beside the kickoff's mechanics.
+   * The kickoff composes this same text inline, so this endpoint is for re-reading
+   * a part mid-run (and for humans / other consumers).
+   */
+  router.get('/api/proxy/autopilot/manual', proxyLimiter, authenticateProxyToken, async (req, res) => {
+    logEvent(req, '/api/proxy/autopilot/manual', 200);
+    res.type('text/plain').send(buildAutopilotManual());
   });
 
   // ===========================================================================
