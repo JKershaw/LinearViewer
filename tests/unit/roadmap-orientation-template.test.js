@@ -18,7 +18,9 @@ import {
   buildRoadmapOrientationMessages,
   buildRoadmapOrientationPrompt,
   serializeOrientationCandidates,
-  ORIENTATION_BEARINGS
+  countOrientationCandidates,
+  ORIENTATION_BEARINGS,
+  ORIENTATION_CANDIDATE_CAP
 } from '../../lib/prompts/roadmap-orientation-template.js';
 import { buildRoadmapModel } from '../../lib/roadmap.js';
 
@@ -58,6 +60,41 @@ describe('serializeOrientationCandidates', () => {
     assert.deepStrictEqual(serializeOrientationCandidates(modelWithQueue([])), []);
     assert.deepStrictEqual(serializeOrientationCandidates({}), []);
     assert.deepStrictEqual(serializeOrientationCandidates(null), []);
+  });
+
+  // LIN-324: safety cap + uncapped count.
+  test('caps the candidate list at the high safety ceiling (priority tail dropped)', () => {
+    const queue = Array.from({ length: ORIENTATION_CANDIDATE_CAP + 25 }, (_, i) => ({
+      identifier: 'Q-' + i, title: 'Task ' + i, projectName: 'Alpha', stateType: 'unstarted'
+    }));
+    const candidates = serializeOrientationCandidates(modelWithQueue(queue));
+    assert.strictEqual(candidates.length, ORIENTATION_CANDIDATE_CAP, 'cap bites only past the ceiling');
+    // Priority order preserved — the kept slice is the highest-priority head.
+    assert.strictEqual(candidates[0].identifier, 'Q-0');
+    assert.strictEqual(candidates[candidates.length - 1].identifier, 'Q-' + (ORIENTATION_CANDIDATE_CAP - 1));
+  });
+
+  test('cap is configurable (tests can disable it) but realistic sizes are untouched', () => {
+    const queue = Array.from({ length: 44 }, (_, i) => ({
+      identifier: 'Q-' + i, title: 'Task ' + i, projectName: 'Alpha', stateType: 'unstarted'
+    }));
+    // A real-sized queue (44) sits well under the cap — nothing dropped.
+    assert.strictEqual(serializeOrientationCandidates(modelWithQueue(queue)).length, 44);
+    // Explicit small cap drops the tail; cap <= 0 disables capping.
+    assert.strictEqual(serializeOrientationCandidates(modelWithQueue(queue), { cap: 10 }).length, 10);
+    assert.strictEqual(serializeOrientationCandidates(modelWithQueue(queue), { cap: 0 }).length, 44);
+  });
+
+  test('countOrientationCandidates returns the uncapped total (drives token scaling + drop detection)', () => {
+    const queue = Array.from({ length: ORIENTATION_CANDIDATE_CAP + 7 }, (_, i) => ({
+      identifier: 'Q-' + i, title: 'Task ' + i, projectName: 'Alpha', stateType: 'unstarted'
+    }));
+    // in-progress work is still excluded from the count, mirroring serialize.
+    queue.push({ identifier: 'WIP', title: 'Running', projectName: 'Alpha', stateType: 'started' });
+    assert.strictEqual(countOrientationCandidates(modelWithQueue(queue)), ORIENTATION_CANDIDATE_CAP + 7);
+    const dropped = countOrientationCandidates(modelWithQueue(queue))
+      - serializeOrientationCandidates(modelWithQueue(queue)).length;
+    assert.strictEqual(dropped, 7, 'count - capped length = the surfaced tail-drop');
   });
 
   test('inherits buildExecutionQueue terminal filtering — duplicates excluded', () => {

@@ -463,6 +463,19 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
   cursor: default;
 }
 
+/* Non-blocking orientation note (LIN-324): surfaces a generation-time
+   orientation failure or a safety-cap tail-drop next to the generate button.
+   The reading itself still completes — this only explains why the ship-view
+   orientation toggle may be unavailable. */
+.roadmap-orientation-note {
+  font-family: var(--font-structural);
+  font-size: 0.75em;
+  color: var(--fg-dim);
+  margin: 0.5em 0 0;
+  border-left: 2px solid var(--fg-dim);
+  padding-left: 0.6em;
+}
+
 .roadmap-layer {
   margin: 1em 0;
 }

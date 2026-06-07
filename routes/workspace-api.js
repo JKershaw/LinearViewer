@@ -17,7 +17,7 @@ import { buildRoadmapTrajectoryMessages } from '../lib/prompts/roadmap-trajector
 import { buildRoadmapNorthStarMessages } from '../lib/prompts/roadmap-north-star-template.js';
 import { buildRoadmapGapMessages } from '../lib/prompts/roadmap-gap-template.js';
 import { buildRoadmapDigestMessages } from '../lib/prompts/roadmap-digest-template.js';
-import { buildRoadmapOrientationMessages, ORIENTATION_BEARINGS } from '../lib/prompts/roadmap-orientation-template.js';
+import { buildRoadmapOrientationMessages, serializeOrientationCandidates, countOrientationCandidates, ORIENTATION_BEARINGS } from '../lib/prompts/roadmap-orientation-template.js';
 import { generatePrompt, generateCustomPrompt, hasPrompt, getAvailablePrompts } from '../lib/prompt-templates.js';
 import { WORK_ISSUE_LABELS } from '../lib/workflow-config.js';
 import { parseRepoFromDescription } from '../lib/prompt-formatters.js';
@@ -2009,42 +2009,88 @@ ${goal}`;
   }
 
   /**
+   * Token allowance for one orientation call, scaled to the candidate count
+   * (LIN-324). The model must score EVERY candidate exactly once, so the JSON
+   * grows linearly with the queue; a fixed ceiling truncates large workspaces
+   * mid-array and the parse then fails. ~40-50 tok/entry plus headroom, floored
+   * at the old 2000 and clamped to a generous ceiling.
+   */
+  function orientationMaxTokens(candidateCount) {
+    return Math.min(16000, Math.max(2000, 1500 + candidateCount * 60));
+  }
+
+  /**
    * Generate per-task orientation bearings and emit them as ONE structured
    * `orientation` SSE event over the shared generate connection (LIN-300).
    *
    * Unlike the narrative layers this does not stream prose into a panel — it
    * accumulates the full JSON output, strips any code fence, parses, and
-   * validates against the 8-point vocabulary. Best-effort: any failure (build,
-   * stream, parse) emits `orientation: []` and is swallowed, mirroring how a
-   * skipped/failed layer leaves its field empty. Charges one free-tier unit like
-   * every other layer; an exhausted limit yields `orientation: []`.
+   * validates against the 8-point vocabulary.
+   *
+   * LIN-324: failures are no longer silent. The token allowance scales to the
+   * candidate count (Strategy A) so a real-sized queue no longer truncates, and
+   * a `notice` field on the orientation event surfaces the two remaining
+   * failure-like conditions to the operator at generation time (Strategy C):
+   *   - a parse/stream failure (the catch) emits `orientation: []` PLUS a notice
+   *     so the disabled ship toggle is explained rather than mysterious;
+   *   - a safety-cap tail-drop emits the (non-empty) bearings PLUS a notice
+   *     naming how many lowest-priority candidates were omitted.
+   * The notice is transient (SSE + a DOM note on the roadmap page) — it is NOT
+   * persisted. The saved `orientation` value stays a plain array, keeping the
+   * report-history store contract and the ship gate (`hasOrientationData`)
+   * untouched. Charges one free-tier unit like every other layer.
+   *
+   * @param {?string} injectedRaw - Test-only raw streamed text (gated on
+   *   testMode by the caller) that drives the real strip→parse→normalize chain
+   *   without an LLM call, so a test can exercise the truncation path the
+   *   ORIENTATION_TEST_BEARINGS short-circuit skips (Strategy E / LIN-324).
    */
-  async function generateOrientation(res, { roadmapModel, northStar, llm, req, testMode }) {
+  async function generateOrientation(res, { roadmapModel, northStar, llm, req, testMode, injectedRaw }) {
     const check = await chargeRoadmapLayer(req, llm.isFreeTier);
     if (!check.allowed) {
-      sendSSE(res, 'orientation', { orientation: [] });
+      sendSSE(res, 'orientation', {
+        orientation: [],
+        notice: 'Orientation skipped — the free-tier limit was reached. The ship-view orientation toggle stays unavailable for this reading.'
+      });
       return;
     }
+
+    // Post-cap candidate list and the pre-cap total share one filter, so the
+    // prompt's candidates and the token-scaling count can never diverge.
+    const candidates = serializeOrientationCandidates(roadmapModel);
+    const dropped = countOrientationCandidates(roadmapModel) - candidates.length;
+    const capNotice = dropped > 0
+      ? `Orientation scored the top ${candidates.length} candidates; ${dropped} lower-priority task${dropped === 1 ? ' was' : 's were'} omitted to fit a single request.`
+      : null;
+
     let parsed = [];
     try {
-      if (testMode) {
+      if (injectedRaw != null) {
+        parsed = JSON.parse(stripOrientationFences(injectedRaw));
+      } else if (testMode) {
         parsed = ORIENTATION_TEST_BEARINGS;
       } else {
         const messages = buildRoadmapOrientationMessages(roadmapModel, northStar);
         let text = '';
         await streamChat(
           messages,
-          { apiKey: llm.apiKey, model: llm.model, maxTokens: 2000 },
+          { apiKey: llm.apiKey, model: llm.model, maxTokens: orientationMaxTokens(candidates.length) },
           (type, data) => { if (type === 'token') text += (data && data.token) || ''; }
         );
         parsed = JSON.parse(stripOrientationFences(text));
       }
     } catch (error) {
       console.error('Roadmap orientation error:', error);
-      sendSSE(res, 'orientation', { orientation: [] });
+      sendSSE(res, 'orientation', {
+        orientation: [],
+        notice: 'Orientation bearings could not be generated — the model response was incomplete or could not be parsed. The ship-view orientation toggle stays unavailable for this reading.'
+      });
       return;
     }
-    sendSSE(res, 'orientation', { orientation: normalizeBearings(parsed) });
+
+    const payload = { orientation: normalizeBearings(parsed) };
+    if (capNotice) payload.notice = capNotice;
+    sendSSE(res, 'orientation', payload);
   }
 
   /**
@@ -2218,7 +2264,15 @@ ${goal}`;
       // it runs whenever a north star is set, independent of layer outcomes.
       // No north star ⇒ no call; the persisted orientation stays [].
       if (hasNorthStar) {
-        await generateOrientation(res, { roadmapModel, northStar, llm, req, testMode });
+        // Test-only seam (LIN-324 / Strategy E): in roadmap test mode a body
+        // field can inject the raw streamed text so a test drives the real
+        // serialize→strip→parse→normalize→emit chain (which the
+        // ORIENTATION_TEST_BEARINGS short-circuit otherwise skips). Ignored
+        // entirely outside test mode.
+        const injectedRaw = testMode && typeof req.body?.__testOrientationRaw === 'string'
+          ? req.body.__testOrientationRaw
+          : null;
+        await generateOrientation(res, { roadmapModel, northStar, llm, req, testMode, injectedRaw });
       }
     } catch (error) {
       console.error('Roadmap generate stream error:', error);

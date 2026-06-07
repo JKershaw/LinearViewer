@@ -280,6 +280,48 @@ test.describe('Roadmap Generate Endpoint', () => {
     });
   });
 
+  // LIN-324 / Strategy E: drive the un-mocked serialize→strip→parse→normalize→
+  // emit chain at a realistic candidate count. The ORIENTATION_TEST_BEARINGS
+  // short-circuit returns pre-parsed objects, so it never exercises the parse
+  // path that truncation broke; the test-only `__testOrientationRaw` seam injects
+  // the raw streamed text instead (honoured only in roadmap test mode).
+  function parseOrientationEventFull(body) {
+    const m = body.match(/event: orientation\ndata: (.+)/);
+    return m ? JSON.parse(m[1]) : undefined;
+  }
+
+  test('realistic-size COMPLETE payload normalizes to a non-empty array', async ({ request }) => {
+    await request.get(`/test/set-session?features=${FEATURES}&openRouterConnected=true`);
+    const full = Array.from({ length: 44 }, (_, i) => ({
+      identifier: `BIG-${i}`, bearing: 'N', reason: 'Serves the stated intent.', archived: false
+    }));
+    const response = await request.post(GENERATE_URL, {
+      data: { northStar: 'Be the simplest way to ship.', __testOrientationRaw: JSON.stringify(full) }
+    });
+    const event = parseOrientationEventFull(await response.text());
+    expect(event.orientation.length).toBe(44);          // nothing dropped, nothing swallowed
+    expect(event.notice).toBeUndefined();               // clean success carries no note
+    expect(event.orientation[0]).toEqual({
+      identifier: 'BIG-0', bearing: 'N', reason: 'Serves the stated intent.', archived: false
+    });
+  });
+
+  test('realistic-size TRUNCATED payload surfaces a failure note (not a silent [])', async ({ request }) => {
+    await request.get(`/test/set-session?features=${FEATURES}&openRouterConnected=true`);
+    const full = Array.from({ length: 44 }, (_, i) => ({
+      identifier: `BIG-${i}`, bearing: 'N', reason: 'Serves the stated intent.', archived: false
+    }));
+    const raw = JSON.stringify(full);
+    const truncated = raw.slice(0, raw.length - 60); // cut mid-array, as a token-cap overrun would
+    const response = await request.post(GENERATE_URL, {
+      data: { northStar: 'Be the simplest way to ship.', __testOrientationRaw: truncated }
+    });
+    const event = parseOrientationEventFull(await response.text());
+    expect(event.orientation).toEqual([]);              // gate stays correct (toggle stays off)
+    expect(event.notice).toBeTruthy();                  // but the failure is SURFACED, not swallowed
+    expect(event.notice).toMatch(/could not be generated|could not be parsed/i);
+  });
+
   test('without a north star, emits no orientation event', async ({ request }) => {
     await request.get(`/test/set-session?features=${FEATURES}&openRouterConnected=true`);
     const response = await request.post(GENERATE_URL, { data: { northStar: '' } });
