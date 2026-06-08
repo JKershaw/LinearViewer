@@ -10,6 +10,7 @@ import {
   upsertWorkspace,
   removeWorkspace,
   updateWorkspaceTokens,
+  getWorkspaceToken,
   saveSession,
   MAX_WORKSPACES
 } from '../../lib/workspace.js';
@@ -108,6 +109,109 @@ describe('updateWorkspaceTokens', () => {
 
     const expectedExpiry = Date.now() + 86400 * 30 * 1000;
     assert.ok(Math.abs(workspace.tokenExpiresAt - expectedExpiry) < 1000);
+  });
+});
+
+// =============================================================================
+// getWorkspaceToken Tests (dual-read accessor — LIN-333)
+// =============================================================================
+
+describe('getWorkspaceToken', () => {
+  test('returns credentials.token for new-shape workspace', () => {
+    const workspace = {
+      id: 'ws-1',
+      provider: 'linear',
+      credentials: { token: 'new-token' }
+    };
+    assert.strictEqual(getWorkspaceToken(workspace), 'new-token');
+  });
+
+  test('falls back to legacy accessToken when no credentials', () => {
+    const workspace = {
+      id: 'ws-1',
+      accessToken: 'legacy-token'
+    };
+    assert.strictEqual(getWorkspaceToken(workspace), 'legacy-token');
+  });
+
+  test('prefers credentials.token over legacy accessToken when both present', () => {
+    const workspace = {
+      id: 'ws-1',
+      provider: 'linear',
+      credentials: { token: 'new-token' },
+      accessToken: 'legacy-token'
+    };
+    assert.strictEqual(getWorkspaceToken(workspace), 'new-token');
+  });
+
+  test('returns undefined when neither credentials nor accessToken present', () => {
+    assert.strictEqual(getWorkspaceToken({ id: 'ws-1' }), undefined);
+  });
+
+  test('handles null/undefined workspace without throwing', () => {
+    assert.strictEqual(getWorkspaceToken(null), undefined);
+    assert.strictEqual(getWorkspaceToken(undefined), undefined);
+  });
+
+  test('falls back to accessToken when credentials present but token missing', () => {
+    const workspace = {
+      id: 'ws-1',
+      credentials: {},
+      accessToken: 'legacy-token'
+    };
+    assert.strictEqual(getWorkspaceToken(workspace), 'legacy-token');
+  });
+
+  test('round-trips new {provider, credentials} shape through upsert + read', () => {
+    const session = {};
+    upsertWorkspace(session, {
+      id: 'ws-1',
+      name: 'New Shape',
+      urlKey: 'new-shape',
+      provider: 'linear',
+      credentials: { token: 'round-trip-token' }
+    });
+
+    const stored = getActiveWorkspace({ ...session, activeWorkspaceId: 'ws-1' });
+    assert.strictEqual(stored.provider, 'linear');
+    assert.deepStrictEqual(stored.credentials, { token: 'round-trip-token' });
+    assert.strictEqual(getWorkspaceToken(stored), 'round-trip-token');
+  });
+
+  test('round-trips legacy accessToken-shaped workspace through upsert + read', () => {
+    const session = {};
+    upsertWorkspace(session, {
+      id: 'ws-legacy',
+      name: 'Legacy',
+      urlKey: 'legacy',
+      accessToken: 'legacy-round-trip'
+    });
+
+    const stored = getActiveWorkspace({ ...session, activeWorkspaceId: 'ws-legacy' });
+    assert.strictEqual(stored.provider, undefined);
+    assert.strictEqual(stored.credentials, undefined);
+    assert.strictEqual(getWorkspaceToken(stored), 'legacy-round-trip');
+  });
+
+  test('upsert merge does not drop new credential fields or inject defaults', () => {
+    // Legacy workspace already in session; re-auth upserts the new shape on top.
+    const session = {
+      workspaces: [{ id: 'ws-1', name: 'Test', accessToken: 'legacy-token' }]
+    };
+    upsertWorkspace(session, {
+      id: 'ws-1',
+      provider: 'linear',
+      credentials: { token: 'upgraded-token' }
+    });
+
+    const stored = session.workspaces[0];
+    // Spread merge keeps untouched legacy fields and adds the new ones.
+    assert.strictEqual(stored.name, 'Test');
+    assert.strictEqual(stored.accessToken, 'legacy-token');
+    assert.strictEqual(stored.provider, 'linear');
+    assert.deepStrictEqual(stored.credentials, { token: 'upgraded-token' });
+    // New credentials.token wins over the retained legacy accessToken.
+    assert.strictEqual(getWorkspaceToken(stored), 'upgraded-token');
   });
 });
 
