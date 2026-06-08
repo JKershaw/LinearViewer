@@ -32,6 +32,7 @@ import { getStateDisplay, getStateOrder } from '../../lib/providers/state-map.js
 import { LinearProvider, linearProvider } from '../../lib/providers/linear/index.js';
 import * as shim from '../../lib/linear.js';
 import * as provider from '../../lib/providers/linear/index.js';
+import { makeStubProvider } from '../fixtures/stub-provider.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -235,5 +236,90 @@ describe('LIN-330 move preserves prior guardrails', () => {
     assert.match(providerSource, /issue\.labels\?\.nodes/);
     assert.match(providerSource, /issue\.comments\?\.nodes/);
     assert.match(providerSource, /parent\?\.children\?\.nodes/);
+  });
+});
+
+// =============================================================================
+// UI/prompt capability surface (LIN-332, S0 of LIN-177 Phase 3)
+// =============================================================================
+//
+// `provider.ui` is the single read path for capability-aware render (S3),
+// prompt-formatters (S4), and prompt-templates (S5). It is ABSTRACT and additive
+// — deliberately decoupled from the method-keyed `capabilities`/`supports()`.
+
+describe('provider.ui surface (LIN-332)', () => {
+  test('base ProviderInterface ui: all flags false, displayName falls back to name', () => {
+    const base = new ProviderInterface();
+    assert.deepStrictEqual(base.ui, {
+      write: false,
+      comments: false,
+      estimates: false,
+      subtasks: false,
+      displayName: base.name, // 'base' — the machine name, never undefined
+    });
+    assert.strictEqual(base.ui.displayName, 'base');
+  });
+
+  test('linearProvider.ui has the locked shape (write/comments auto-derive)', () => {
+    assert.deepStrictEqual(linearProvider.ui, {
+      write: true,      // getCreateTaskUrl is overridden
+      comments: true,   // fetchIssueComments is implemented
+      estimates: true,  // estimate is in ISSUE_FIELDS_FRAGMENT
+      subtasks: true,   // children/parent are fetched
+      displayName: 'Linear',
+    });
+  });
+
+  test('displayName (human) is distinct from name (machine)', () => {
+    assert.strictEqual(linearProvider.name, 'linear');
+    assert.strictEqual(linearProvider.ui.displayName, 'Linear');
+    assert.notStrictEqual(linearProvider.ui.displayName, linearProvider.name);
+  });
+
+  test('regression guard: ui.write is decoupled from supports("createIssue")', () => {
+    // The entire reason this surface exists: supports('createIssue') is
+    // intentionally false this phase, yet "+ Add task" (ui.write) must stay on
+    // for Linear. Gating ui.write on supports('createIssue') would regress S3.
+    assert.strictEqual(linearProvider.supports('createIssue'), false);
+    assert.strictEqual(linearProvider.ui.write, true);
+  });
+
+  test('makeStubProvider toggles each flag independently', () => {
+    // Defaults: everything off, displayName defaults to name.
+    assert.deepStrictEqual(makeStubProvider().ui, {
+      write: false, comments: false, estimates: false, subtasks: false,
+      displayName: 'stub',
+    });
+
+    // Each flag flips in isolation without disturbing the others.
+    assert.strictEqual(makeStubProvider({ write: true }).ui.write, true);
+    assert.strictEqual(makeStubProvider({ write: true }).ui.comments, false);
+    assert.strictEqual(makeStubProvider({ comments: true }).ui.comments, true);
+    assert.strictEqual(makeStubProvider({ estimates: true }).ui.estimates, true);
+    assert.strictEqual(makeStubProvider({ subtasks: true }).ui.subtasks, true);
+
+    // displayName can be set explicitly or defaults to name.
+    assert.strictEqual(makeStubProvider({ name: 'jira' }).ui.displayName, 'jira');
+    assert.strictEqual(
+      makeStubProvider({ name: 'jira', displayName: 'Jira' }).ui.displayName,
+      'Jira'
+    );
+
+    // A fully-on permutation, proving flags are independent end-to-end.
+    assert.deepStrictEqual(
+      makeStubProvider({
+        name: 'gh', write: true, comments: true, estimates: true,
+        subtasks: true, displayName: 'GitHub',
+      }).ui,
+      { write: true, comments: true, estimates: true, subtasks: true, displayName: 'GitHub' }
+    );
+  });
+
+  test('stub independence: building stubs never mutates the Linear singleton', () => {
+    makeStubProvider({ write: true, displayName: 'Other' });
+    // linearProvider.ui is unaffected by stub construction.
+    assert.deepStrictEqual(linearProvider.ui, {
+      write: true, comments: true, estimates: true, subtasks: true, displayName: 'Linear',
+    });
   });
 });
