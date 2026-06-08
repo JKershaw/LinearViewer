@@ -1,7 +1,8 @@
 import { test, expect } from '../fixtures/test-base.js';
 
 // Periodicals feature (LIN-341): a synthetic, workspace-flag-gated group on the
-// main workspace view containing the Documentation Review template row.
+// main workspace view containing the corrective periodical template rows
+// (Documentation Review, Test Coverage Gap Review — LIN-351).
 
 const TEST_WORKSPACE_URL_KEY = 'test-workspace';
 const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;
@@ -53,10 +54,12 @@ test.describe('Periodicals group', () => {
     // --purple: #7c3aed → rgb(124, 58, 237)
     expect(headerColor).toBe('rgb(124, 58, 237)');
 
-    // Row is dispatchable: expand it and confirm the dispatch container is tagged
-    // kind=periodical (no Linear add-task link inside the synthetic group).
+    // Row is dispatchable: expand it and confirm its dispatch container is tagged
+    // kind=periodical (no Linear add-task link inside the synthetic group). Scope
+    // the count to this row's node — the group now holds more than one periodical.
     await row.click();
-    await expect(group.locator('[data-kind="periodical"]')).toHaveCount(1);
+    const docNode = group.locator('.node', { has: page.locator('.line:has-text("Documentation Review")') });
+    await expect(docNode.locator('[data-kind="periodical"]')).toHaveCount(1);
     await expect(group.locator('[data-action="create-task"]')).toHaveCount(0);
   });
 
@@ -73,12 +76,15 @@ test.describe('Periodicals group', () => {
     await page.waitForLoadState('networkidle');
 
     const group = page.locator('[data-project-type="periodicals"]');
-    const row = group.locator('.line:has-text("Documentation Review")');
+    // Scope to this row's node — the group now holds more than one periodical,
+    // so group-wide locators for the disclosure/dispatch button are ambiguous.
+    const docNode = group.locator('.node', { has: page.locator('.line:has-text("Documentation Review")') });
+    const row = docNode.locator('.line:has-text("Documentation Review")');
     await row.click();
 
     // Open the dispatch disclosure, then dispatch to the cli target.
-    await group.locator('.dispatch-disclosure').click();
-    const dispatchBtn = group.locator('.prompt-dispatch[data-target="cli"]');
+    await docNode.locator('.dispatch-disclosure').click();
+    const dispatchBtn = docNode.locator('.prompt-dispatch[data-target="cli"]');
     await dispatchBtn.click();
 
     // The button reaches the success state (it showed "failed" before the fix).

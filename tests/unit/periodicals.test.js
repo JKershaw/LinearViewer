@@ -9,17 +9,26 @@ import { PERIODICALS, getPeriodicals, buildPeriodicalNodes } from '../../lib/per
 import { PERIODICALS_PROJECT_ID } from '../../lib/tree.js';
 
 describe('periodicals registry', () => {
-  test('seeds exactly one template in v1', () => {
-    assert.strictEqual(PERIODICALS.length, 1);
+  test('seeds the corrective templates broken out under LIN-344', () => {
+    assert.strictEqual(PERIODICALS.length, 2);
     assert.strictEqual(getPeriodicals(), PERIODICALS);
   });
 
-  test('the single entry is Documentation Review (corrective)', () => {
-    const doc = PERIODICALS[0];
-    assert.strictEqual(doc.id, 'documentation-review');
+  test('contains Documentation Review and Test Coverage Gap Review (both corrective)', () => {
+    // Assert by id/title/mode rather than position so the registry can grow.
+    const byId = Object.fromEntries(PERIODICALS.map(t => [t.id, t]));
+
+    const doc = byId['documentation-review'];
+    assert.ok(doc, 'has Documentation Review entry');
     assert.strictEqual(doc.title, 'Documentation Review');
     assert.strictEqual(doc.mode, 'corrective');
     assert.strictEqual(typeof doc.generatePrompt, 'function');
+
+    const cov = byId['test-coverage-gap'];
+    assert.ok(cov, 'has Test Coverage Gap Review entry');
+    assert.strictEqual(cov.title, 'Test Coverage Gap Review');
+    assert.strictEqual(cov.mode, 'corrective');
+    assert.strictEqual(typeof cov.generatePrompt, 'function');
   });
 
   test('every template carries the full shape, incl. mode/cadence/lastRunAt', () => {
@@ -61,6 +70,43 @@ describe('Documentation Review generatePrompt()', () => {
     assert.doesNotMatch(prompt, /formatStalenessCheck/);
     assert.doesNotMatch(prompt, /llms\.txt/);
     assert.doesNotMatch(prompt, /CLAUDE\.md/);
+  });
+});
+
+describe('Test Coverage Gap Review generatePrompt()', () => {
+  const prompt = PERIODICALS.find(t => t.id === 'test-coverage-gap').generatePrompt();
+
+  test('returns a non-trivial string', () => {
+    assert.strictEqual(typeof prompt, 'string');
+    assert.ok(prompt.length > 200);
+  });
+
+  test('is a task-generation prompt: create a task, then stop (does not write the tests)', () => {
+    // Names the periodical and its domain.
+    assert.match(prompt, /Test Coverage Gap Review/);
+    assert.match(prompt, /coverage/i);
+    // Grounds against the objective native coverage source (no new dependency).
+    assert.match(prompt, /--experimental-test-coverage/);
+    // Instructs to mint one Linear task and hand off rather than do the work here.
+    assert.match(prompt, /Linear task/i);
+    assert.match(prompt, /then stop|do not write the tests/i);
+    // Carries the anti-coverage-theater quality bar (behavioral over structural).
+    assert.match(prompt, /behavioral/i);
+    assert.match(prompt, /theater/i);
+  });
+
+  test('stays general: no hard-coded proxy mechanics or specific module surfaces', () => {
+    // Proxy mechanics live in the appended +proxy guide, not the template.
+    assert.doesNotMatch(prompt, /POST \/api\/proxy/);
+    assert.doesNotMatch(prompt, /GET \/api\/proxy/);
+    assert.doesNotMatch(prompt, /projectId/);
+    // The gap is discovered from the live coverage report, not baked in here:
+    // no concrete module/file surfaces leak into the template.
+    assert.doesNotMatch(prompt, /proxy-tokens/);
+    assert.doesNotMatch(prompt, /token-refresh/);
+    assert.doesNotMatch(prompt, /free-tier-store/);
+    assert.doesNotMatch(prompt, /openrouter/);
+    assert.doesNotMatch(prompt, /\.js\b/);
   });
 });
 
