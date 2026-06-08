@@ -1,0 +1,358 @@
+{
+  "reference": "anthropic/claude-opus-4.8",
+  "ranAt": "2026-06-08T17:16:42.511Z",
+  "models": [
+    "anthropic/claude-opus-4.8",
+    "anthropic/claude-sonnet-4.6",
+    "anthropic/claude-haiku-4.5",
+    "google/gemini-3.5-flash",
+    "qwen/qwen3.7-plus",
+    "deepseek/deepseek-v4-flash",
+    "openai/gpt-5.4-mini"
+  ],
+  "grid": {
+    "SYN-7-typo": {
+      "anthropic/claude-opus-4.8": {
+        "action": "implement",
+        "hit": true,
+        "words": 325,
+        "ms": 13251,
+        "cost": 0.064605
+      },
+      "anthropic/claude-sonnet-4.6": {
+        "action": "implement",
+        "hit": true,
+        "words": 240,
+        "ms": 13580,
+        "cost": 0.02565
+      },
+      "anthropic/claude-haiku-4.5": {
+        "action": "implement",
+        "hit": true,
+        "words": 247,
+        "ms": 7509,
+        "cost": 0.008895
+      },
+      "google/gemini-3.5-flash": {
+        "action": "implement",
+        "hit": true,
+        "words": 247,
+        "ms": 11566,
+        "cost": 0.0269115
+      },
+      "qwen/qwen3.7-plus": {
+        "action": "(none)",
+        "hit": false,
+        "words": 274,
+        "ms": 55257,
+        "cost": 0.006872
+      },
+      "deepseek/deepseek-v4-flash": {
+        "action": "implement",
+        "hit": true,
+        "words": 205,
+        "ms": 11013,
+        "cost": 0.000889238
+      },
+      "openai/gpt-5.4-mini": {
+        "action": "implement",
+        "hit": true,
+        "words": 256,
+        "ms": 3932,
+        "cost": 0.00297705
+      }
+    },
+    "SYN-9-validation": {
+      "anthropic/claude-opus-4.8": {
+        "action": "implement",
+        "hit": true,
+        "words": 571,
+        "ms": 21667,
+        "cost": 0.081195
+      },
+      "anthropic/claude-sonnet-4.6": {
+        "action": "implement",
+        "hit": true,
+        "words": 485,
+        "ms": 22202,
+        "cost": 0.030612
+      },
+      "anthropic/claude-haiku-4.5": {
+        "action": "plan",
+        "hit": true,
+        "words": 796,
+        "ms": 17419,
+        "cost": 0.013294
+      },
+      "google/gemini-3.5-flash": {
+        "action": "implement",
+        "hit": true,
+        "words": 357,
+        "ms": 16037,
+        "cost": 0.036516
+      },
+      "qwen/qwen3.7-plus": {
+        "action": "(none)",
+        "hit": false,
+        "words": 355,
+        "ms": 53966,
+        "cost": 0.006794
+      },
+      "deepseek/deepseek-v4-flash": {
+        "action": "implement",
+        "hit": true,
+        "words": 330,
+        "ms": 27017,
+        "cost": 0.0006136104
+      },
+      "openai/gpt-5.4-mini": {
+        "action": "plan",
+        "hit": true,
+        "words": 385,
+        "ms": 4547,
+        "cost": 0.00365505
+      }
+    },
+    "SYN-5-pagination": {
+      "anthropic/claude-opus-4.8": {
+        "action": "research",
+        "hit": false,
+        "words": 648,
+        "ms": 23682,
+        "cost": 0.081315
+      },
+      "anthropic/claude-sonnet-4.6": {
+        "action": "plan",
+        "hit": true,
+        "words": 1223,
+        "ms": 50878,
+        "cost": 0.048129
+      },
+      "anthropic/claude-haiku-4.5": {
+        "action": "research",
+        "hit": false,
+        "words": 629,
+        "ms": 15133,
+        "cost": 0.011963
+      },
+      "google/gemini-3.5-flash": {
+        "action": "plan",
+        "hit": true,
+        "words": 621,
+        "ms": 17245,
+        "cost": 0.0354015
+      },
+      "qwen/qwen3.7-plus": {
+        "action": "plan",
+        "hit": true,
+        "words": 562,
+        "ms": 62209,
+        "cost": 0.0075256
+      },
+      "deepseek/deepseek-v4-flash": {
+        "action": "research",
+        "hit": false,
+        "words": 697,
+        "ms": 26207,
+        "cost": 0.00120907
+      },
+      "openai/gpt-5.4-mini": {
+        "action": "plan",
+        "hit": true,
+        "words": 370,
+        "ms": 4021,
+        "cost": 0.00370005
+      }
+    },
+    "INF-1-ttl-deep": {
+      "anthropic/claude-opus-4.8": {
+        "action": "plan",
+        "hit": true,
+        "words": 1056,
+        "ms": 38511,
+        "cost": 0.11453
+      },
+      "anthropic/claude-sonnet-4.6": {
+        "action": "plan",
+        "hit": true,
+        "words": 897,
+        "ms": 41206,
+        "cost": 0.043353
+      },
+      "anthropic/claude-haiku-4.5": {
+        "action": "implement",
+        "hit": true,
+        "words": 985,
+        "ms": 20166,
+        "cost": 0.016011
+      },
+      "google/gemini-3.5-flash": {
+        "action": "plan",
+        "hit": true,
+        "words": 524,
+        "ms": 14994,
+        "cost": 0.036384
+      },
+      "qwen/qwen3.7-plus": {
+        "action": "implement",
+        "hit": true,
+        "words": 436,
+        "ms": 89846,
+        "cost": 0.00940448
+      },
+      "deepseek/deepseek-v4-flash": {
+        "action": "implement",
+        "hit": true,
+        "words": 617,
+        "ms": 25831,
+        "cost": 0.00136766
+      },
+      "openai/gpt-5.4-mini": {
+        "action": "implement",
+        "hit": true,
+        "words": 370,
+        "ms": 5614,
+        "cost": 0.00751725
+      }
+    },
+    "SYN-12-migration": {
+      "anthropic/claude-opus-4.8": {
+        "action": "breakdown",
+        "hit": true,
+        "words": 656,
+        "ms": 25604,
+        "cost": 0.08799
+      },
+      "anthropic/claude-sonnet-4.6": {
+        "action": "breakdown",
+        "hit": true,
+        "words": 570,
+        "ms": 27375,
+        "cost": 0.034035
+      },
+      "anthropic/claude-haiku-4.5": {
+        "action": "research",
+        "hit": false,
+        "words": 1020,
+        "ms": 22431,
+        "cost": 0.01563
+      },
+      "google/gemini-3.5-flash": {
+        "action": "breakdown",
+        "hit": true,
+        "words": 435,
+        "ms": 14796,
+        "cost": 0.035448
+      },
+      "qwen/qwen3.7-plus": {
+        "action": "breakdown",
+        "hit": true,
+        "words": 306,
+        "ms": 48455,
+        "cost": 0.0062924
+      },
+      "deepseek/deepseek-v4-flash": {
+        "action": "breakdown",
+        "hit": true,
+        "words": 492,
+        "ms": 25819,
+        "cost": 0.001481102
+      },
+      "openai/gpt-5.4-mini": {
+        "action": "breakdown",
+        "hit": true,
+        "words": 333,
+        "ms": 4770,
+        "cost": 0.0069795
+      }
+    },
+    "LIN-325-research": {
+      "anthropic/claude-opus-4.8": {
+        "action": "research",
+        "hit": true,
+        "words": 696,
+        "ms": 27756,
+        "cost": 0.09364
+      },
+      "anthropic/claude-sonnet-4.6": {
+        "action": "research",
+        "hit": true,
+        "words": 766,
+        "ms": 39671,
+        "cost": 0.040707
+      },
+      "anthropic/claude-haiku-4.5": {
+        "action": "research",
+        "hit": true,
+        "words": 1024,
+        "ms": 22553,
+        "cost": 0.016084
+      },
+      "google/gemini-3.5-flash": {
+        "action": "research",
+        "hit": true,
+        "words": 513,
+        "ms": 18458,
+        "cost": 0.045333
+      },
+      "qwen/qwen3.7-plus": {
+        "action": "research",
+        "hit": true,
+        "words": 409,
+        "ms": 40993,
+        "cost": 0.0057712
+      },
+      "deepseek/deepseek-v4-flash": {
+        "action": "research",
+        "hit": true,
+        "words": 767,
+        "ms": 22309,
+        "cost": 0.001174523
+      },
+      "openai/gpt-5.4-mini": {
+        "action": "research",
+        "hit": true,
+        "words": 390,
+        "ms": 5390,
+        "cost": 0.0076455
+      }
+    }
+  },
+  "totals": {
+    "anthropic/claude-opus-4.8": {
+      "ms": 150471,
+      "cost": 0.5232749999999999,
+      "hits": 5
+    },
+    "anthropic/claude-sonnet-4.6": {
+      "ms": 194912,
+      "cost": 0.222486,
+      "hits": 6
+    },
+    "anthropic/claude-haiku-4.5": {
+      "ms": 105211,
+      "cost": 0.081877,
+      "hits": 4
+    },
+    "google/gemini-3.5-flash": {
+      "ms": 93096,
+      "cost": 0.21599400000000002,
+      "hits": 6
+    },
+    "qwen/qwen3.7-plus": {
+      "ms": 350726,
+      "cost": 0.04265968,
+      "hits": 4
+    },
+    "deepseek/deepseek-v4-flash": {
+      "ms": 138196,
+      "cost": 0.0067352034,
+      "hits": 5
+    },
+    "openai/gpt-5.4-mini": {
+      "ms": 28274,
+      "cost": 0.0324744,
+      "hits": 6
+    }
+  }
+}
