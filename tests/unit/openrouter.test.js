@@ -3,7 +3,7 @@
  *
  * Run with: node --test tests/unit/openrouter.test.js
  */
-import { test, describe } from 'node:test';
+import { test, describe, beforeEach, afterEach, mock } from 'node:test';
 import assert from 'node:assert';
 import {
   stripCodeBlockMarkers,
@@ -13,6 +13,8 @@ import {
   parseRecommendedAction,
   parseDeferTo,
   parseRecommendationResponse,
+  getRecommendationStream,
+  getRecommendation,
   EPIC_CHILD_THRESHOLD,
   COUSIN_CAP,
   SIBLING_CAP,
@@ -783,5 +785,165 @@ describe('parseRecommendedAction', () => {
     assert.strictEqual(parseRecommendedAction(null), null);
     assert.strictEqual(parseRecommendedAction(undefined), null);
     assert.strictEqual(parseRecommendedAction(42), null);
+  });
+});
+
+// =============================================================================
+// getRecommendationStream — streaming return + delta emission (LIN-346)
+// =============================================================================
+
+describe('getRecommendationStream (LIN-346)', () => {
+  let originalFetch;
+  let savedProxyEnv;
+
+  // A minimal issue/context that buildMetaPrompt can format without throwing.
+  const ISSUE = {
+    identifier: 'LIN-1',
+    title: 'A leaf task',
+    description: 'Do the thing.',
+    url: 'https://linear.app/test/issue/LIN-1',
+    state: { name: 'In Progress', type: 'started' }
+  };
+  const CONTEXT = { parent: null, siblings: [], project: { description: '' }, children: [], comments: [], focusedChild: null };
+
+  beforeEach(() => {
+    originalFetch = global.fetch;
+    // getRecommendationStream only streams when no HTTP(S) proxy is configured.
+    savedProxyEnv = {
+      HTTPS_PROXY: process.env.HTTPS_PROXY, HTTP_PROXY: process.env.HTTP_PROXY,
+      https_proxy: process.env.https_proxy, http_proxy: process.env.http_proxy
+    };
+    delete process.env.HTTPS_PROXY; delete process.env.HTTP_PROXY;
+    delete process.env.https_proxy; delete process.env.http_proxy;
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    for (const [k, v] of Object.entries(savedProxyEnv)) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+  });
+
+  // Build a mock OpenRouter SSE streaming response from raw markdown, split into
+  // pieces so the section parser and the raw accumulator both see chunk boundaries.
+  function mockStreamResponse(pieces, { finishReason = 'stop', completionTokens = 42 } = {}) {
+    const enc = new TextEncoder();
+    const blocks = pieces.map(p => `data: ${JSON.stringify({ choices: [{ delta: { content: p }, finish_reason: null }] })}\n\n`);
+    blocks.push(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: finishReason }], usage: { completion_tokens: completionTokens } })}\n\n`);
+    blocks.push('data: [DONE]\n\n');
+    return {
+      ok: true,
+      body: (async function* () { for (const b of blocks) yield enc.encode(b); })()
+    };
+  }
+
+  test('emits deltas AND returns the structured object equal to parseRecommendationResponse', async () => {
+    const raw = '## Reasoning\n→ **research**\nLook into it.\n## Prompt\nGo research the thing.';
+    // Split mid-section to exercise chunk-boundary buffering.
+    const pieces = ['## Reasoning\n→ **research**\nLook ', 'into it.\n## Prompt\nGo research ', 'the thing.'];
+    global.fetch = mock.fn(async () => mockStreamResponse(pieces, { completionTokens: 17 }));
+
+    const events = [];
+    const result = await getRecommendationStream(ISSUE, CONTEXT, { apiKey: 'test-key' }, (type, data) => events.push({ type, data }));
+
+    // (a) emits deltas for both sections
+    const reasoningDeltas = events.filter(e => e.type === 'delta' && e.data.section === 'reasoning');
+    const promptDeltas = events.filter(e => e.type === 'delta' && e.data.section === 'prompt');
+    assert.ok(reasoningDeltas.length > 0, 'streamed reasoning deltas');
+    assert.ok(promptDeltas.length > 0, 'streamed prompt deltas');
+    assert.strictEqual(reasoningDeltas.map(e => e.data.content).join(''), '→ **research**\nLook into it.');
+    assert.strictEqual(promptDeltas.map(e => e.data.content).join(''), 'Go research the thing.');
+
+    // emits a terminal done
+    assert.strictEqual(events.filter(e => e.type === 'done').length, 1);
+
+    // (b) returns a structured object byte-identical to the buffered parse of the same raw
+    assert.deepStrictEqual(result, parseRecommendationResponse(raw, 'stop', 17));
+    assert.strictEqual(result.recommendedAction, 'research');
+    assert.strictEqual(result.prompt, 'Go research the thing.');
+    assert.strictEqual(result.truncated, false);
+    assert.strictEqual(result.completionTokens, 17);
+  });
+
+  test('defer-shaped stream returns recommendedAction:defer, deferTo set, prompt:null', async () => {
+    const raw = '## Reasoning\n→ **defer**\nThe real work is in the child.\nDeferTo: LIN-297';
+    const pieces = ['## Reasoning\n→ **defer**\nThe real work ', 'is in the child.\nDeferTo: LIN-297'];
+    global.fetch = mock.fn(async () => mockStreamResponse(pieces, { completionTokens: 9 }));
+
+    const events = [];
+    const result = await getRecommendationStream(ISSUE, CONTEXT, { apiKey: 'test-key' }, (type, data) => events.push({ type, data }));
+
+    // Defer hops stream only reasoning — never a prompt phase (keeps the socket warm
+    // without emitting a phantom prompt section).
+    assert.ok(events.some(e => e.type === 'delta' && e.data.section === 'reasoning'), 'streamed reasoning');
+    assert.ok(!events.some(e => e.type === 'phase' && e.data.phase === 'prompt'), 'no prompt phase on a defer');
+
+    assert.deepStrictEqual(result, parseRecommendationResponse(raw, 'stop', 9));
+    assert.strictEqual(result.recommendedAction, 'defer');
+    assert.strictEqual(result.deferTo, 'LIN-297');
+    assert.strictEqual(result.prompt, null);
+  });
+
+  test('surfaces truncated:true when finish_reason is length (13ecc22 preserved)', async () => {
+    const pieces = ['## Reasoning\n→ **implement**\nBuild it.\n## Prompt\nDo the build'];
+    global.fetch = mock.fn(async () => mockStreamResponse(pieces, { finishReason: 'length', completionTokens: 8000 }));
+
+    const events = [];
+    const result = await getRecommendationStream(ISSUE, CONTEXT, { apiKey: 'test-key' }, (type, data) => events.push({ type, data }));
+
+    assert.strictEqual(result.truncated, true, 'structured return carries truncated');
+    const done = events.find(e => e.type === 'done');
+    assert.strictEqual(done.data.truncated, true, 'done event carries truncated');
+  });
+});
+
+// =============================================================================
+// getRecommendation — external abort signal (gap #2, LIN-346)
+// =============================================================================
+
+describe('getRecommendation abort (LIN-346 gap #2)', () => {
+  let originalFetch;
+  const ISSUE = {
+    identifier: 'LIN-1', title: 'A leaf task', description: 'Do the thing.',
+    url: 'https://linear.app/test/issue/LIN-1', state: { name: 'In Progress', type: 'started' }
+  };
+  const CONTEXT = { parent: null, siblings: [], project: { description: '' }, children: [], comments: [], focusedChild: null };
+
+  beforeEach(() => { originalFetch = global.fetch; });
+  afterEach(() => { global.fetch = originalFetch; });
+
+  test('rejects when options.signal fires mid-flight', async () => {
+    const ac = new AbortController();
+    // A fetch that hangs until its signal aborts, then throws AbortError like real fetch.
+    global.fetch = mock.fn((url, opts) => new Promise((_, reject) => {
+      opts.signal.addEventListener('abort', () => {
+        const err = new Error('The operation was aborted');
+        err.name = 'AbortError';
+        reject(err);
+      });
+    }));
+
+    const pending = getRecommendation(ISSUE, CONTEXT, { apiKey: 'test-key', signal: ac.signal });
+    ac.abort();
+    // External abort maps to the existing timeout message (mapping unchanged).
+    await assert.rejects(pending, /OpenRouter request timed out/);
+  });
+
+  test('rejects immediately when options.signal is already aborted', async () => {
+    const ac = new AbortController();
+    ac.abort();
+    global.fetch = mock.fn((url, opts) => new Promise((resolve, reject) => {
+      if (opts.signal.aborted) {
+        const err = new Error('The operation was aborted');
+        err.name = 'AbortError';
+        return reject(err);
+      }
+      resolve({ ok: true, json: async () => ({ choices: [{ message: { content: '## Reasoning\nx\n## Prompt\ny' } }] }) });
+    }));
+
+    await assert.rejects(
+      getRecommendation(ISSUE, CONTEXT, { apiKey: 'test-key', signal: ac.signal }),
+      /OpenRouter request timed out/
+    );
   });
 });
