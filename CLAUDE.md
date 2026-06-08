@@ -8,10 +8,15 @@ A minimal, CLI-aesthetic web app that displays Linear projects and issues as a c
 - `npm install` - Install dependencies
 - `npx playwright install` - Install Playwright browsers (first-time setup)
 - `npm start` - Start the server (runs on PORT from .env, default 3000)
-- `npm test` - Run Playwright E2E tests
-- `npm test:ui` - Run tests with Playwright UI
+- `npm test` - Run all tests (unit via `node --test tests/unit/*.test.js`, then Playwright E2E)
+- `npm run test:unit` - Run unit tests only (`node --test tests/unit/*.test.js`)
+- `npm run test:ui` - Run Playwright tests with the Playwright UI
 
 ## Architecture
+
+This is a curated map of the most important files, not an exhaustive listing —
+`lib/`, `public/`, and `tests/` contain additional modules (newer feature surfaces
+in particular) that are not shown here.
 
 ```
 server.js              Express server, main entry point, dashboard routes
@@ -72,20 +77,18 @@ public/
   dispatch.js          Dispatch page client-side logic (prompt, queue, tokens, history)
   audit.js             Operator dashboard client-side logic
   llms.txt             AI agent guidance (DOM selectors, navigation patterns)
-tests/e2e/
-  landing.spec.js      Landing page tests
-  dashboard.spec.js    Authenticated dashboard tests
-  interactions.spec.js Collapse/expand interaction tests
-  openrouter-auth.spec.js  OpenRouter OAuth tests
-  dispatch.spec.js     Dispatch queue and consumer API tests
-  dispatch-page.spec.js  Dispatch page UI tests
-  free-tier.spec.js    Free tier rate limiting tests
-  feature-toggles.spec.js  Feature toggle settings tests
-  pat-auth.spec.js     PAT (personal access token) auth mode tests
-  proxy.spec.js        Proxy API tests (tokens, cycles, labels, auth)
+tests/
+  unit/                Node test runner unit tests (lib modules, renderers, stores)
+  e2e/                 Playwright E2E specs (landing, dashboard, auth, dispatch, proxy, …)
+  fixtures/            Shared mock data and test helpers
+  screenshots/         Reference images for visual specs
+  visual/              Playwright visual-regression specs
 docs/
-  dispatch-integration.md  Consumer integration guide
+  dispatch-integration.md      Dispatch consumer integration guide
+  proxy-integration.md         Linear API proxy consumer integration guide
+  prompt-change-validation.md  Prompt-behavior change validation process
 playwright.config.js   Playwright test configuration
+playwright.visual.config.js  Playwright config for visual-regression specs
 ```
 
 ### Prompt System (two independent paths)
