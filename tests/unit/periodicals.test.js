@@ -10,11 +10,11 @@ import { PERIODICALS_PROJECT_ID } from '../../lib/tree.js';
 
 describe('periodicals registry', () => {
   test('seeds the corrective templates broken out under LIN-344', () => {
-    assert.strictEqual(PERIODICALS.length, 3);
+    assert.strictEqual(PERIODICALS.length, 4);
     assert.strictEqual(getPeriodicals(), PERIODICALS);
   });
 
-  test('contains Documentation Review, Test Coverage Gap, and Secrets & Credential Scan (all corrective)', () => {
+  test('contains Documentation Review, Test Coverage Gap, Secrets & Credential Scan, and Prompt-Injection Surface Review (all corrective)', () => {
     // Assert by id/title/mode rather than position so the registry can grow.
     const byId = Object.fromEntries(PERIODICALS.map(t => [t.id, t]));
 
@@ -35,6 +35,12 @@ describe('periodicals registry', () => {
     assert.strictEqual(sec.title, 'Secrets & Credential Scan');
     assert.strictEqual(sec.mode, 'corrective');
     assert.strictEqual(typeof sec.generatePrompt, 'function');
+
+    const inj = byId['prompt-injection-review'];
+    assert.ok(inj, 'has Prompt-Injection Surface Review entry');
+    assert.strictEqual(inj.title, 'Prompt-Injection Surface Review');
+    assert.strictEqual(inj.mode, 'corrective');
+    assert.strictEqual(typeof inj.generatePrompt, 'function');
   });
 
   test('every template carries the full shape, incl. mode/cadence/lastRunAt', () => {
@@ -163,6 +169,51 @@ describe('Secrets & Credential Scan generatePrompt()', () => {
     assert.doesNotMatch(prompt, /AKIA/);
     // No concrete module/file surfaces leak in.
     assert.doesNotMatch(prompt, /\.js\b/);
+  });
+});
+
+describe('Prompt-Injection Surface Review generatePrompt()', () => {
+  const prompt = PERIODICALS.find(t => t.id === 'prompt-injection-review').generatePrompt();
+
+  test('returns a non-trivial string', () => {
+    assert.strictEqual(typeof prompt, 'string');
+    assert.ok(prompt.length > 200);
+  });
+
+  test('is a task-generation prompt: mint one task, then stop (does not build the mitigation)', () => {
+    // Names the periodical and its domain.
+    assert.match(prompt, /Prompt-Injection Surface Review/);
+    assert.match(prompt, /injection/i);
+    // Instructs to mint one Linear task and hand off rather than do the work here.
+    assert.match(prompt, /Linear task/i);
+    assert.match(prompt, /mint one/i);
+    assert.match(prompt, /then stop/i);
+  });
+
+  test('frames the gap as a data/code boundary and forbids a model-instruction-only fix', () => {
+    // The threat: attacker-influenceable ticket content reaching worker prompts.
+    assert.match(prompt, /attacker-influenceable/i);
+    assert.match(prompt, /untrusted/i);
+    // The mitigation bar: a real data/code boundary, not a stronger instruction.
+    assert.match(prompt, /data\/code/i);
+    assert.match(prompt, /data, not instructions/i);
+    // A model instruction alone is explicitly not an acceptable resolution.
+    assert.match(prompt, /not.*(acceptable|a guarantee|count as)|instruction alone/i);
+    // Anchors against the shell boundary that already exists as the reference.
+    assert.match(prompt, /shell/i);
+  });
+
+  test('stays general: no hard-coded proxy mechanics, file paths, or cited symbols', () => {
+    // Proxy mechanics live in the appended +proxy guide, not the template.
+    assert.doesNotMatch(prompt, /POST \/api\/proxy/);
+    assert.doesNotMatch(prompt, /GET \/api\/proxy/);
+    assert.doesNotMatch(prompt, /projectId/);
+    // The seam is traced from the live code at dispatch time, not baked in here:
+    // no concrete file/module surfaces or cited symbol names leak into the template.
+    assert.doesNotMatch(prompt, /\.js\b/);
+    assert.doesNotMatch(prompt, /formatIssueContext/);
+    assert.doesNotMatch(prompt, /formatCommentsForPrompt/);
+    assert.doesNotMatch(prompt, /meta-prompt-template/);
   });
 });
 
