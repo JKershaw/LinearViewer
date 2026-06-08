@@ -43,22 +43,24 @@ describe('Documentation Review generatePrompt()', () => {
     assert.ok(prompt.length > 200);
   });
 
-  test('first step self-creates the task via POST /api/proxy/issues (projectId UUID-gated)', () => {
-    assert.match(prompt, /POST \/api\/proxy\/issues/);
-    // Must instruct NOT to pass projectId for the synthetic group.
-    assert.match(prompt, /projectId/);
+  test('is a task-generation prompt: create a task, then stop (does not do the review)', () => {
+    // Names the periodical and its domain.
+    assert.match(prompt, /Documentation Review/);
+    assert.match(prompt, /documentation/i);
+    // Instructs to create a Linear task and hand off rather than do the work here.
+    assert.match(prompt, /Linear task/i);
+    assert.match(prompt, /then stop|do not do the review/i);
   });
 
-  test('covers the three documented drift surfaces', () => {
-    // 1. llms.txt selectors vs render.js markup
-    assert.match(prompt, /llms\.txt/);
-    assert.match(prompt, /render\.js/);
-    // 2. both-paths rule: formatStalenessCheck vs meta-prompt re-ground block
-    assert.match(prompt, /formatStalenessCheck/);
-    assert.match(prompt, /meta-prompt/i);
-    // 3. CLAUDE.md architecture list vs real lib/
-    assert.match(prompt, /CLAUDE\.md/);
-    assert.match(prompt, /lib\//);
+  test('stays general: no hard-coded proxy mechanics or doc-surface specifics', () => {
+    // Proxy mechanics live in the appended +proxy guide, not the template.
+    assert.doesNotMatch(prompt, /POST \/api\/proxy/);
+    assert.doesNotMatch(prompt, /projectId/);
+    assert.doesNotMatch(prompt, /GET \/api\/proxy/);
+    // Doc surfaces are discovered by grounding at run time, not baked in here.
+    assert.doesNotMatch(prompt, /formatStalenessCheck/);
+    assert.doesNotMatch(prompt, /llms\.txt/);
+    assert.doesNotMatch(prompt, /CLAUDE\.md/);
   });
 });
 
