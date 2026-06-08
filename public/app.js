@@ -975,6 +975,14 @@ function initPrompts() {
     // kind from promptName.
     const kind = promptContainer.dataset.kind || undefined
 
+    // LIN-345: some rows that share this handler are issue-less by design — the
+    // synthetic Periodicals group (kind=periodical) dispatches a template prompt
+    // with no Linear issue behind it, so no data-prompt-for / data-identifier is
+    // present and issueId resolves to undefined. Opt out of the issue-link
+    // contract explicitly (mirroring the custom-prompt page) rather than passing
+    // an `issue` object full of null fields, which dispatchPrompt rejects.
+    const issueless = !issueId
+
     try {
       dispatchBtn.textContent = 'sending...'
 
@@ -986,7 +994,9 @@ function initPrompts() {
         urlKey,
         prompt,
         promptName,
-        issue: { id: issueId, identifier: issueIdentifier, title: issueTitle },
+        ...(issueless
+          ? { issueless: true }
+          : { issue: { id: issueId, identifier: issueIdentifier, title: issueTitle } }),
         target,
         repo: repo || undefined,
         kind
