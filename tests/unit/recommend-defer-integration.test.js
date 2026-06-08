@@ -58,6 +58,19 @@ function llmBackedComputeOne(completions) {
   };
 }
 
+// Same, but also attaches each node's own `state` and its `children` (with state) —
+// the fields the terminal-state descent guard (LIN-353) reads. Faithful to the real
+// computeOne shapes, which now surface ctx.issue.state + ctx.children per hop.
+function llmBackedComputeOneWithTree(completions, trees) {
+  return async (identifier) => {
+    const text = completions[identifier];
+    if (!text) throw new Error(`Issue not found: ${identifier}`);
+    const rec = parseRecommendationResponse(text, 'stop', 100);
+    const node = trees[identifier] || {};
+    return { identifier, ...rec, state: node.state, children: node.children };
+  };
+}
+
 describe('mock-LLM → parse → recurse (defer end-to-end)', () => {
   test('a container LLM-deferral resolves to the actionable leaf', async () => {
     const computeOne = llmBackedComputeOne({
@@ -118,5 +131,61 @@ describe('mock-LLM → parse → recurse (defer end-to-end)', () => {
     assert.strictEqual(out.deferStopReason, 'unresolved');
     assert.strictEqual(out.recommendation.recommendedAction, 'defer');
     assert.strictEqual(out.recommendation.deferTo, 'GHOST-999');
+  });
+});
+
+describe('container-descent bug reproduction (LIN-353)', () => {
+  // The reported loop: triggering container HAR-589 twice re-descended into the
+  // already-Done HAR-591 and dispatched no-op look-intos, never advancing to the
+  // ready crux. With the edge guard, both consecutive triggers reach the ready child.
+  test('a container that LLM-defers into a Done child redirects to the ready crux — twice in a row', async () => {
+    const completions = {
+      'HAR-589': deferReply('HAR-591'), // LLM (wrongly) names the Done child
+      'HAR-590': actionReply('implement', '# Implement HAR-590\n\nBuild the ready crux.'),
+      'HAR-591': actionReply('look-into', '# Look into HAR-591\n\nNo-op against finished work.')
+    };
+    const trees = {
+      'HAR-589': {
+        state: { type: 'started' },
+        children: [
+          { identifier: 'HAR-591', state: { type: 'completed' } },
+          { identifier: 'HAR-590', state: { type: 'unstarted' } }
+        ]
+      },
+      'HAR-590': { state: { type: 'unstarted' }, children: [] },
+      'HAR-591': { state: { type: 'completed' }, children: [] }
+    };
+    const computeOne = llmBackedComputeOneWithTree(completions, trees);
+
+    // Run twice — the original loop reproduced every time the container was triggered.
+    for (const pass of [1, 2]) {
+      const out = await resolveRecommendation({ computeOne, startIdentifier: 'HAR-589' });
+      assert.strictEqual(out.recommendation.identifier, 'HAR-590', `pass ${pass}: reaches the READY crux, not the Done child`);
+      assert.strictEqual(out.recommendation.recommendedAction, 'implement', `pass ${pass}: dispatches real work`);
+      assert.ok(!out.recommendation.prompt.includes('No-op'), `pass ${pass}: the Done-child no-op never dispatches`);
+      assert.deepStrictEqual(out.deferredVia, ['HAR-589', 'HAR-590'], `pass ${pass}: breadcrumb shows the redirect`);
+      assert.strictEqual(out.deferTruncated, false, `pass ${pass}: clean resolution, not a truncation`);
+    }
+  });
+
+  test('container whose only remaining children are all Done stops with deferStopReason=terminal (no no-op dispatch)', async () => {
+    const completions = {
+      'HAR-589': deferReply('HAR-591'),
+      'HAR-591': actionReply('look-into', '# Look into HAR-591\n\nNo-op.')
+    };
+    const trees = {
+      'HAR-589': {
+        state: { type: 'started' },
+        children: [{ identifier: 'HAR-591', state: { type: 'completed' } }]
+      }
+    };
+    const computeOne = llmBackedComputeOneWithTree(completions, trees);
+    const out = await resolveRecommendation({ computeOne, startIdentifier: 'HAR-589' });
+    assert.strictEqual(out.deferTruncated, true);
+    assert.strictEqual(out.deferStopReason, 'terminal');
+    // Stops on the deferring container (a defer, no prompt) → the route's 422 guard,
+    // never the Done child's no-op look-into.
+    assert.strictEqual(out.recommendation.identifier, 'HAR-589');
+    assert.strictEqual(out.recommendation.recommendedAction, 'defer');
   });
 });
