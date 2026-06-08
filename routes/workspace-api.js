@@ -720,7 +720,11 @@ ${goal}`
             recommendedAction: r.recommendedAction,
             deferTo: r.deferTo,
             issueUrl: ctx.issue.url,
-            repo: parseRepoFromDescription(ctx.project?.description)
+            repo: parseRepoFromDescription(ctx.project?.description),
+            // Node state + children (with state) feed the resolver's terminal-state
+            // descent guard (LIN-353) — already fetched in ctx, no extra round-trip.
+            state: ctx.issue.state,
+            children: ctx.children
           }
         }
       })
@@ -1062,7 +1066,10 @@ ${goal}`;
                 identifier: ctx.issue.identifier, reasoning: r.reasoning, prompt: r.prompt,
                 truncated: r.truncated, completionTokens: r.completionTokens,
                 recommendedAction: r.recommendedAction, deferTo: r.deferTo,
-                issueUrl: ctx.issue.url, repo: parseRepoFromDescription(ctx.project?.description)
+                issueUrl: ctx.issue.url, repo: parseRepoFromDescription(ctx.project?.description),
+                // Node state + children (with state) feed the resolver's terminal-state
+                // descent guard (LIN-353) — already in ctx, no extra round-trip.
+                state: ctx.issue.state, children: ctx.children
               };
             } finally {
               hop.release();
