@@ -5,7 +5,9 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { resolveRecommendation, describeDescent, DEFAULT_DEFER_MAX_DEPTH } from '../../lib/recommend-recurse.js';
+import { resolveRecommendation, describeDescent, armHopSignal, DEFAULT_DEFER_MAX_DEPTH } from '../../lib/recommend-recurse.js';
+
+const delay = (ms) => new Promise(r => setTimeout(r, ms));
 
 // A tiny fake recommender: a map of identifier -> recommendation. `defer` entries
 // carry a deferTo; everything else is terminal. computeOne throws "not found" for
@@ -131,6 +133,35 @@ describe('resolveRecommendation', () => {
     ]);
   });
 
+  test('a delta-forwarding computeOne resolves identically to a plain one (resolver is transport-agnostic)', async () => {
+    // Under Option B (LIN-346) the workspace-api computeOne streams each hop's deltas
+    // to the client as a side effect, then returns the same structured rec. The
+    // resolver must not care: same graph in, same descent out, regardless of streaming.
+    const graph = {
+      'LIN-318': { recommendedAction: 'defer', prompt: null, deferTo: 'LIN-297' },
+      'LIN-297': { recommendedAction: 'research', prompt: 'investigate', deferTo: null }
+    };
+    const plain = await resolveRecommendation({ computeOne: fakeComputeOne(graph), startIdentifier: 'LIN-318' });
+
+    const streamed = [];
+    const forwardingComputeOne = async (id) => {
+      const rec = { identifier: id, ...graph[id] };
+      // Emit live deltas as a pure side effect (the real path calls sendSSE here).
+      streamed.push({ section: 'reasoning', content: `reasoning for ${id}` });
+      if (rec.prompt) streamed.push({ section: 'prompt', content: rec.prompt });
+      return rec;
+    };
+    const out = await resolveRecommendation({ computeOne: forwardingComputeOne, startIdentifier: 'LIN-318' });
+
+    assert.deepStrictEqual(out, plain, 'streaming side effects do not change the resolved result');
+    // And the side-effect deltas covered every hop (reasoning for both, prompt for the terminal).
+    assert.deepStrictEqual(streamed, [
+      { section: 'reasoning', content: 'reasoning for LIN-318' },
+      { section: 'reasoning', content: 'reasoning for LIN-297' },
+      { section: 'prompt', content: 'investigate' }
+    ]);
+  });
+
   test('shared deadline stops the descent before the next hop with a timeout flag', async () => {
     let clock = 1000;
     const now = () => clock;
@@ -146,6 +177,55 @@ describe('resolveRecommendation', () => {
     // hops run at start-clock 1000 and 1100 (both < 1250); the third is blocked at 1200<1250?
     // 1000→hop(→1100), 1100→hop(→1200), 1200<1250 so another hop(→1300), 1300>=1250 stop.
     assert.ok(out.deferredVia.length >= 1);
+  });
+});
+
+describe('armHopSignal (LIN-346 gap #3)', () => {
+  test('composed signal aborts when the client signal aborts (propagates to the in-flight hop)', () => {
+    const client = new AbortController();
+    const { signal, release } = armHopSignal({ clientSignal: client.signal });
+    assert.strictEqual(signal.aborted, false);
+    client.abort();
+    assert.strictEqual(signal.aborted, true, 'client disconnect aborts the per-hop signal synchronously');
+    release();
+  });
+
+  test('honors an already-aborted client signal', () => {
+    const client = new AbortController();
+    client.abort();
+    const { signal, release } = armHopSignal({ clientSignal: client.signal });
+    assert.strictEqual(signal.aborted, true);
+    release();
+  });
+
+  test('composed signal aborts when the descent deadline elapses', async () => {
+    const { signal, release } = armHopSignal({ deadline: Date.now() + 20 });
+    assert.strictEqual(signal.aborted, false);
+    await delay(45);
+    assert.strictEqual(signal.aborted, true, 'a stalled hop is interrupted, not just checked between hops');
+    release();
+  });
+
+  test('uses the REMAINING budget, not a fresh window (deadline - now)', async () => {
+    let clock = 1000;
+    // deadline already reached → remaining 0 → aborts on the next tick.
+    const { signal } = armHopSignal({ deadline: 1000, now: () => clock });
+    await delay(5);
+    assert.strictEqual(signal.aborted, true);
+  });
+
+  test('release() clears the per-hop timer so it cannot leak across hops', async () => {
+    const { signal, release } = armHopSignal({ deadline: Date.now() + 20 });
+    release(); // hop settled before the deadline
+    await delay(45);
+    assert.strictEqual(signal.aborted, false, 'a released timer never fires');
+  });
+
+  test('with neither a client signal nor a deadline, the signal never fires', async () => {
+    const { signal, release } = armHopSignal({});
+    await delay(10);
+    assert.strictEqual(signal.aborted, false);
+    release();
   });
 });
 

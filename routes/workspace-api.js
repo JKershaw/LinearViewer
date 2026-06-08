@@ -25,12 +25,18 @@ import { parseRepoFromDescription } from '../lib/prompt-formatters.js';
 import { buildForemanPlaybook, buildMiniForemanStep } from '../lib/prompts/foreman-playbook.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { isRecommendationEnabled, getRecommendation, getRecommendationStream, streamChat } from '../lib/openrouter.js';
-import { resolveRecommendation } from '../lib/recommend-recurse.js';
+import { resolveRecommendation, armHopSignal } from '../lib/recommend-recurse.js';
 
 // Shared cross-hop budget for the recommend recursion (LIN-329) on the human UI
 // path. Matches the proxy's budget; defer hops are cheap (no prompt body) so a deep
-// descent stays well inside it. Checked between hops by resolveRecommendation.
+// descent stays well inside it. Checked between hops by resolveRecommendation, and
+// enforced in-flight per hop via armHopSignal (gap #3, LIN-346).
 const RECOMMEND_DESCENT_BUDGET_MS = 180_000;
+
+// Per-fetch bound for a single Linear context fetch. Composes (via AbortSignal.any)
+// with the client-disconnect signal and the shared descent budget so a stalled Linear
+// call can't hold the SSE socket open until Heroku's H15 fires (LIN-346, gap #1).
+const CONTEXT_FETCH_TIMEOUT_MS = 45_000;
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
@@ -988,7 +994,13 @@ ${goal}`;
     try {
       // Phase 1: Fetch context from Linear
       sendSSE(res, 'phase', { phase: 'fetching_context' });
-      const context = await getProvider('linear').fetchRecommendationContext(workspace.accessToken, issueId);
+      // Gap #1 (LIN-346): bound this fetch by the client-disconnect signal ∪ a
+      // per-fetch timeout so a stalled Linear call can't silently idle the socket.
+      const context = await getProvider('linear').fetchRecommendationContext(
+        workspace.accessToken,
+        issueId,
+        { signal: AbortSignal.any([abortController.signal, AbortSignal.timeout(CONTEXT_FETCH_TIMEOUT_MS)]) }
+      );
       const { issue, parent, siblings, project, children, comments, focusedChild } = context;
 
       if (closed) return;
@@ -1006,27 +1018,55 @@ ${goal}`;
         // Unhide the reasoning section up front so the descent breadcrumbs render live.
         sendSSE(res, 'phase', { phase: 'reasoning' });
 
+        // Option B (LIN-346): stream EVERY hop — including the terminal one — instead
+        // of buffering the terminal getRecommendation() and only writing its reasoning
+        // and prompt after up to 8000 tokens. Each hop's getRecommendationStream emits
+        // phase/delta events that we forward straight to the client, so the socket stays
+        // warm on every hop and Heroku H15 can't fire on an all-complete parent that
+        // recommends real work at hop 0. The streaming fn's structured return drives the
+        // descent (defer parsing stays byte-identical — it routes through the same
+        // parseRecommendationResponse as the buffered path).
+        const deadline = Date.now() + RECOMMEND_DESCENT_BUDGET_MS;
         const { recommendation: rec, deferredVia, deferTruncated, deferStopReason } = await resolveRecommendation({
           startIdentifier: issueId,
-          deadline: Date.now() + RECOMMEND_DESCENT_BUDGET_MS,
+          deadline,
           onHop: (hop) => {
-            // Stream a breadcrumb for each container we route through.
+            // Stream a breadcrumb for each container we route through (LIN-329).
             if (closed || !(hop.recommendedAction === 'defer' && hop.deferTo)) return;
             sendSSE(res, 'delta', { section: 'reasoning', content: `↳ ${hop.identifier} is a container → routing to ${hop.deferTo}\n` });
           },
           computeOne: async (id) => {
-            const ctx = await getProvider('linear').fetchRecommendationContext(workspace.accessToken, id);
-            const r = await getRecommendation(
-              ctx.issue,
-              { parent: ctx.parent, siblings: ctx.siblings, project: ctx.project, children: ctx.children, comments: ctx.comments, focusedChild: ctx.focusedChild },
-              { apiKey: apiKeyToUse, model: selectedModel, featureFlags: getFeatureFlags(req.session), signal: abortController.signal }
-            );
-            return {
-              identifier: ctx.issue.identifier, reasoning: r.reasoning, prompt: r.prompt,
-              truncated: r.truncated, completionTokens: r.completionTokens,
-              recommendedAction: r.recommendedAction, deferTo: r.deferTo,
-              issueUrl: ctx.issue.url, repo: parseRepoFromDescription(ctx.project?.description)
-            };
+            // Per-hop in-flight guard (gap #3): client-disconnect ∪ remaining descent
+            // budget. Released on settle so its timer can't leak into the next hop.
+            const hop = armHopSignal({ clientSignal: abortController.signal, deadline });
+            try {
+              // Gap #1: bound the per-hop Linear fetch by the hop signal ∪ a per-fetch timeout.
+              const ctx = await getProvider('linear').fetchRecommendationContext(
+                workspace.accessToken,
+                id,
+                { signal: AbortSignal.any([hop.signal, AbortSignal.timeout(CONTEXT_FETCH_TIMEOUT_MS)]) }
+              );
+              const r = await getRecommendationStream(
+                ctx.issue,
+                { parent: ctx.parent, siblings: ctx.siblings, project: ctx.project, children: ctx.children, comments: ctx.comments, focusedChild: ctx.focusedChild },
+                { apiKey: apiKeyToUse, model: selectedModel, featureFlags: getFeatureFlags(req.session), signal: hop.signal },
+                (type, data) => {
+                  if (closed) return;
+                  // Forward phase + delta live; swallow the per-hop done — the handler
+                  // emits the single final done with descent metadata after the descent.
+                  if (type === 'done') return;
+                  sendSSE(res, type, data);
+                }
+              );
+              return {
+                identifier: ctx.issue.identifier, reasoning: r.reasoning, prompt: r.prompt,
+                truncated: r.truncated, completionTokens: r.completionTokens,
+                recommendedAction: r.recommendedAction, deferTo: r.deferTo,
+                issueUrl: ctx.issue.url, repo: parseRepoFromDescription(ctx.project?.description)
+              };
+            } finally {
+              hop.release();
+            }
           }
         });
         if (closed) return;
@@ -1039,12 +1079,11 @@ ${goal}`;
 
         if (rec.recommendedAction === 'defer' || !rec.prompt) {
           // Abnormal stop (depth/cycle/unresolved/timeout) — surface, don't ship a defer.
+          // The terminal hop's reasoning already streamed live before we got here.
           sendSSE(res, 'error', { error: 'Recommendation did not resolve to an actionable task', deferredVia, deferTruncated, deferStopReason });
         } else {
-          // Terminal node's reasoning appended after the breadcrumbs, then its prompt.
-          if (rec.reasoning) sendSSE(res, 'delta', { section: 'reasoning', content: `\n${rec.reasoning}` });
-          sendSSE(res, 'phase', { phase: 'prompt' });
-          sendSSE(res, 'delta', { section: 'prompt', content: rec.prompt });
+          // Reasoning and prompt already streamed live per hop above; just close out
+          // with the single final done carrying descent + truncation metadata.
           sendSSE(res, 'done', { truncated: rec.truncated, completionTokens: rec.completionTokens, ...metadata });
         }
         res.end();

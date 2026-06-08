@@ -18,7 +18,7 @@ import rateLimit from 'express-rate-limit';
 import { createProxyFetch } from '../lib/proxy-fetch.js';
 import { fetchProjects, fetchIssueContext, fetchRecommendationContext } from '../lib/linear.js';
 import { isRecommendationEnabled, getRecommendation } from '../lib/openrouter.js';
-import { resolveRecommendation, describeDescent } from '../lib/recommend-recurse.js';
+import { resolveRecommendation, describeDescent, armHopSignal } from '../lib/recommend-recurse.js';
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
@@ -2245,7 +2245,7 @@ ${readEndpoints}${writeEndpoints}
    * with recommendErrorResponse(). `sessionApiKey` may be passed in to avoid a
    * second key lookup when the caller already resolved it for its precheck.
    */
-  async function computeRecommendation({ urlKey, createdBy, identifier, accessToken, isTestMode, sessionApiKey }) {
+  async function computeRecommendation({ urlKey, createdBy, identifier, accessToken, isTestMode, sessionApiKey, deadline }) {
     if (sessionApiKey === undefined) {
       sessionApiKey = await getWorkspaceOpenRouterKey(urlKey, createdBy);
     }
@@ -2322,14 +2322,30 @@ ${readEndpoints}${writeEndpoints}
     const { issue, parent, siblings, project, children, comments, focusedChild } = context;
 
     const selectedModel = await resolveWorkspaceModel({ urlKey, workspacePreferencesStore });
-    const recommendation = await withTimeout(
-      getRecommendation(
-        issue,
-        { parent, siblings, project, children, comments, focusedChild },
-        { apiKey: sessionApiKey, model: selectedModel, featureFlags: {} }
-      ),
-      LLM_TIMEOUT_MS
-    );
+    // Cancel the in-flight LLM call when its deadline trips instead of racing and
+    // leaving it running orphaned (fetchWithTimeout vs withTimeout, LIN-346 surface 5).
+    // getRecommendation now honors options.signal (gap #2). The per-hop deadline guard
+    // (gap #3) bounds each hop by the REMAINING shared descent budget so a stalled hop
+    // can't overrun it — released on settle so the timer can't leak across hops.
+    const hop = armHopSignal({ deadline });
+    let recommendation;
+    try {
+      recommendation = await fetchWithTimeout(
+        (signal) => getRecommendation(
+          issue,
+          { parent, siblings, project, children, comments, focusedChild },
+          {
+            apiKey: sessionApiKey,
+            model: selectedModel,
+            featureFlags: {},
+            signal: AbortSignal.any([signal, hop.signal])
+          }
+        ),
+        LLM_TIMEOUT_MS
+      );
+    } finally {
+      hop.release();
+    }
 
     return {
       identifier: issue.identifier,
@@ -2398,16 +2414,18 @@ ${readEndpoints}${writeEndpoints}
       try {
         // Follow any `defer` decisions to a terminal actionable node (LIN-329).
         // A leaf resolves in one hop; a container descends to its real work.
+        const recommendDeadline = Date.now() + RECOMMEND_DESCENT_BUDGET_MS;
         const { recommendation: rec, deferredVia, deferTruncated, deferStopReason } = await resolveRecommendation({
           startIdentifier: identifier,
-          deadline: Date.now() + RECOMMEND_DESCENT_BUDGET_MS,
+          deadline: recommendDeadline,
           computeOne: (id) => computeRecommendation({
             urlKey: req.proxyUrlKey,
             createdBy: req.proxyCreatedBy,
             identifier: id,
             accessToken,
             isTestMode,
-            sessionApiKey
+            sessionApiKey,
+            deadline: recommendDeadline
           })
         });
 
@@ -3321,16 +3339,18 @@ ${readEndpoints}${writeEndpoints}
         // Resolve `defer` to a terminal actionable node server-side (LIN-329) so
         // Autopilot can fire this verb on ANY task — node or leaf — and get the
         // actionable descendant's prompt + kind, never a `defer` to act on.
+        const recommendDeadline = Date.now() + RECOMMEND_DESCENT_BUDGET_MS;
         ({ recommendation: rec, deferredVia, deferTruncated, deferStopReason } = await resolveRecommendation({
           startIdentifier: issueIdentifier,
-          deadline: Date.now() + RECOMMEND_DESCENT_BUDGET_MS,
+          deadline: recommendDeadline,
           computeOne: (id) => computeRecommendation({
             urlKey: req.proxyUrlKey,
             createdBy: req.proxyCreatedBy,
             identifier: id,
             accessToken,
             isTestMode,
-            sessionApiKey
+            sessionApiKey,
+            deadline: recommendDeadline
           })
         }));
       } catch (err) {

@@ -11,6 +11,9 @@ import { test, expect } from '../fixtures/test-base.js';
 const WORKSPACE_URL = '/workspace/test-workspace';
 const API_PREFIX = '/workspace/test-workspace';
 const BLOCKED_ISSUE_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+// A parent (container) task: TEST-1 has an incomplete child TEST-2, so the stream
+// takes the node/descent path rather than the leaf path (LIN-327/LIN-346).
+const PARENT_ISSUE_ID = 'issue-1';
 
 /**
  * Parse SSE text into an array of event objects.
@@ -180,6 +183,42 @@ test.describe('Streaming AI Recommendations - API', () => {
     // Content should match
     expect(reasoningText).toBe(jsonData.reasoning);
     expect(promptText).toBe(jsonData.prompt);
+  });
+
+  // LIN-346: the parent (container) path must STREAM every hop — including the
+  // terminal one — not just emit the two `phase` events and buffer the body. Proving
+  // it emits `delta` events for both the reasoning and prompt sections, in phase order,
+  // is the contract that keeps the socket warm and stops Heroku H15 from firing.
+  test('parent path streams delta events for both reasoning and prompt (not just phases)', async ({ page }) => {
+    const response = await page.request.get(
+      `${API_PREFIX}/api/recommend/${PARENT_ISSUE_ID}/stream`
+    );
+    expect(response.status()).toBe(200);
+    const text = await response.text();
+    const events = parseSSE(text);
+
+    const reasoningDeltas = events.filter(e => e.type === 'delta' && e.data.section === 'reasoning');
+    const promptDeltas = events.filter(e => e.type === 'delta' && e.data.section === 'prompt');
+
+    // Streaming, not buffering: real delta payloads for BOTH sections.
+    expect(reasoningDeltas.length).toBeGreaterThan(0);
+    expect(promptDeltas.length).toBeGreaterThan(0);
+
+    // The descent breadcrumb (LIN-329) must still be present in the reasoning stream.
+    const reasoningText = reasoningDeltas.map(e => e.data.content).join('');
+    expect(reasoningText).toContain('is a container → routing to');
+
+    // Phase order: reasoning section streams before the prompt section.
+    const firstReasoningIdx = events.findIndex(e => e.type === 'delta' && e.data.section === 'reasoning');
+    const firstPromptIdx = events.findIndex(e => e.type === 'delta' && e.data.section === 'prompt');
+    expect(firstReasoningIdx).toBeGreaterThanOrEqual(0);
+    expect(firstPromptIdx).toBeGreaterThan(firstReasoningIdx);
+
+    // A single terminal done, carrying the descent metadata, is the last event.
+    const doneEvents = events.filter(e => e.type === 'done');
+    expect(doneEvents).toHaveLength(1);
+    expect(doneEvents[0].data.deferredVia).toBeDefined();
+    expect(events[events.length - 1].type).toBe('done');
   });
 });
 
