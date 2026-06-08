@@ -636,6 +636,54 @@ describe('code-review template', () => {
 });
 
 // =============================================================================
+// Terminal-state note — handwritten path (LIN-353, both-paths mirror)
+// =============================================================================
+
+describe('generatePrompt terminal-state note (LIN-353)', () => {
+  const baseIssue = {
+    id: 'issue-done', identifier: 'TEST-DONE', title: 'Finished work',
+    description: 'Some work', url: 'https://linear.app/test/issue/TEST-DONE',
+    labels: [], createdAt: '2026-01-01T00:00:00.000Z'
+  };
+  const baseContext = { parent: null, siblings: [], project: { name: 'P' }, children: [], comments: [] };
+
+  test('a Done leaf (no open children) gets the "Task Already Complete" note steering to review/close', () => {
+    const issue = { ...baseIssue, state: { name: 'Done', type: 'completed' } };
+    const result = generatePrompt('review', issue, baseContext);
+    assert.ok(/Task Already Complete/i.test(result.prompt), 'the terminal note must be present');
+    assert.ok(/review\/verification pass|verify the finished work|holds up/i.test(result.prompt),
+      'it must steer toward verify/close, not redo');
+  });
+
+  test('canceled and duplicate leaves also get the note (all terminal states)', () => {
+    for (const [name, type] of [['Canceled', 'canceled'], ['Duplicate', 'duplicate']]) {
+      const issue = { ...baseIssue, state: { name, type } };
+      const result = generatePrompt('review', issue, baseContext);
+      assert.ok(/Task Already Complete/i.test(result.prompt), `terminal note must be present for ${type}`);
+    }
+  });
+
+  test('a Done parent WITH an open child does NOT get the note (Scenario J — live work remains)', () => {
+    const issue = { ...baseIssue, state: { name: 'Done', type: 'completed' } };
+    const context = {
+      ...baseContext,
+      children: [
+        { identifier: 'TEST-C1', state: { name: 'Done', type: 'completed' } },
+        { identifier: 'TEST-C2', state: { name: 'Todo', type: 'unstarted' } }
+      ]
+    };
+    const result = generatePrompt('review', issue, context);
+    assert.ok(!/Task Already Complete/i.test(result.prompt), 'a terminal parent with open children is not short-circuited');
+  });
+
+  test('a non-terminal task does NOT get the note', () => {
+    const issue = { ...baseIssue, state: { name: 'In Progress', type: 'started' } };
+    const result = generatePrompt('review', issue, baseContext);
+    assert.ok(!/Task Already Complete/i.test(result.prompt), 'open tasks must not see the terminal note');
+  });
+});
+
+// =============================================================================
 // look-into Template Tests
 // =============================================================================
 
@@ -962,14 +1010,24 @@ describe('getAvailablePrompts', () => {
     assert.ok(available.includes('triage'), 'Should include triage');
   });
 
-  test('does not return plan or code-review for completed issue', () => {
+  test('returns plan and code-review for completed issue (state as signal, not gate — LIN-353)', () => {
     const issue = {
       state: { type: 'completed' },
       labels: { nodes: [] }
     };
     const available = getAvailablePrompts(issue);
-    assert.ok(!available.includes('plan'), 'Should not include plan');
-    assert.ok(!available.includes('code-review'), 'Should not include code-review');
+    // Terminal state no longer hard-excludes review/plan; it shapes the recommendation
+    // (formatTerminalStateNote / meta-prompt Step 0) rather than removing the option.
+    assert.ok(available.includes('code-review'), 'Should include code-review on a Done ticket');
+    assert.ok(available.includes('plan'), 'Should include plan on a Done ticket');
+  });
+
+  test('returns plan and code-review for canceled and duplicate issues (all terminal states — LIN-353)', () => {
+    for (const type of ['canceled', 'duplicate']) {
+      const available = getAvailablePrompts({ state: { type }, labels: { nodes: [] } });
+      assert.ok(available.includes('code-review'), `Should include code-review for ${type}`);
+      assert.ok(available.includes('plan'), `Should include plan for ${type}`);
+    }
   });
 
   test('returns plan and code-review regardless of labels (no preparing gating)', () => {

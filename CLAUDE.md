@@ -153,6 +153,8 @@ Changes to prompt behavior (feature flags, workflow instructions, context format
 
 The ticket staleness check (re-ground against current code: list referenced files/symbols, `git log --since=<createdAt>`, re-read source at HEAD before trusting the ticket) lives in BOTH paths — `formatStalenessCheck()` in the handwritten path and the "Re-ground the Ticket" structure block + quality rule in the meta-prompt.
 
+The terminal-state branch (LIN-353 — a Done/Canceled/Duplicate task with no open children is steered to review/close, never a no-op `look-into`) likewise lives in BOTH paths — `formatTerminalStateNote()` in the handwritten path and the "Step 0" decision branch in the meta-prompt. (The deterministic descent guard that refuses defers into terminal nodes is separate, in `lib/recommend-recurse.js`.)
+
 When changing prompt behavior, see **[docs/prompt-change-validation.md](docs/prompt-change-validation.md)** for the repeatable process (both-paths rule, overfitting guards, structural tests, and the offline A/B eval harness `scripts/eval-completeness-check.mjs`).
 
 ## Code Style

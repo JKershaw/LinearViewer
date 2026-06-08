@@ -180,6 +180,144 @@ describe('resolveRecommendation', () => {
   });
 });
 
+describe('resolveRecommendation — terminal-state descent guard (LIN-353)', () => {
+  // The guard activates only when a hop surfaces its `children` (each carrying
+  // `state`) plus the node's own `state`. The graph entries below include those.
+
+  test('defer → terminal child: refuses the descent and redirects to the ready sibling', async () => {
+    const computeOne = fakeComputeOne({
+      'CONTAINER': {
+        recommendedAction: 'defer', prompt: null, deferTo: 'DONE',
+        state: { type: 'started' },
+        children: [
+          { identifier: 'DONE', state: { type: 'completed' } },
+          { identifier: 'READY', state: { type: 'unstarted' } }
+        ]
+      },
+      'READY': { recommendedAction: 'implement', prompt: 'build it', deferTo: null, state: { type: 'unstarted' } }
+    });
+    const out = await resolveRecommendation({ computeOne, startIdentifier: 'CONTAINER' });
+    assert.strictEqual(out.recommendation.identifier, 'READY', 'lands on the ready child, NOT the Done one');
+    assert.strictEqual(out.recommendation.recommendedAction, 'implement');
+    assert.strictEqual(out.recommendation.prompt, 'build it');
+    assert.deepStrictEqual(out.deferredVia, ['CONTAINER', 'READY'], 'breadcrumb shows the redirect target');
+    assert.strictEqual(out.deferTruncated, false, 'a successful redirect is not a truncation');
+    assert.strictEqual(out.deferStopReason, null);
+  });
+
+  test('defer → terminal child with NO non-terminal sibling: stops with deferStopReason=terminal, no dispatch', async () => {
+    const computeOne = fakeComputeOne({
+      'ALLDONE': {
+        recommendedAction: 'defer', prompt: null, deferTo: 'D1',
+        state: { type: 'started' },
+        children: [
+          { identifier: 'D1', state: { type: 'completed' } },
+          { identifier: 'D2', state: { type: 'canceled' } }
+        ]
+      }
+    });
+    const out = await resolveRecommendation({ computeOne, startIdentifier: 'ALLDONE' });
+    assert.strictEqual(out.deferTruncated, true);
+    assert.strictEqual(out.deferStopReason, 'terminal');
+    // Stays on the deferring node — a `defer` with no prompt → the route's 422 guard.
+    assert.strictEqual(out.recommendation.identifier, 'ALLDONE');
+    assert.strictEqual(out.recommendation.recommendedAction, 'defer');
+    assert.deepStrictEqual(out.deferredVia, ['ALLDONE']);
+  });
+
+  test('defer → non-child identifier: rejected as a hallucinated target (deferStopReason=non-child)', async () => {
+    const computeOne = fakeComputeOne({
+      'NODE': {
+        recommendedAction: 'defer', prompt: null, deferTo: 'LIN-9999',
+        state: { type: 'started' },
+        children: [{ identifier: 'REAL-KID', state: { type: 'unstarted' } }]
+      },
+      'LIN-9999': { recommendedAction: 'implement', prompt: 'should never reach', deferTo: null }
+    });
+    const out = await resolveRecommendation({ computeOne, startIdentifier: 'NODE' });
+    assert.strictEqual(out.deferTruncated, true);
+    assert.strictEqual(out.deferStopReason, 'non-child');
+    assert.strictEqual(out.recommendation.identifier, 'NODE', 'never fetched the phantom target');
+    assert.deepStrictEqual(out.deferredVia, ['NODE']);
+  });
+
+  test('descent LANDS on a terminal node at depth>0: non-actionable stop (no dispatch)', async () => {
+    // Child was non-terminal in the parent's snapshot (so the edge guard let the
+    // descent through) but resolves Done at its own hop — caught by the landed net.
+    const computeOne = fakeComputeOne({
+      'PARENT': {
+        recommendedAction: 'defer', prompt: null, deferTo: 'CHILD',
+        state: { type: 'started' },
+        children: [{ identifier: 'CHILD', state: { type: 'started' } }]
+      },
+      'CHILD': { recommendedAction: 'implement', prompt: 'stale work', deferTo: null, state: { type: 'completed' } }
+    });
+    const out = await resolveRecommendation({ computeOne, startIdentifier: 'PARENT' });
+    assert.strictEqual(out.deferTruncated, true);
+    assert.strictEqual(out.deferStopReason, 'terminal');
+    assert.strictEqual(out.recommendation.identifier, 'CHILD', 'reached it, but flags it as non-actionable');
+    assert.deepStrictEqual(out.deferredVia, ['PARENT', 'CHILD']);
+  });
+
+  test('start node itself terminal at depth 0: HONORED (not blocked) — direct review of a Done ticket', async () => {
+    const computeOne = fakeComputeOne({
+      'DONE-LEAF': { recommendedAction: 'review', prompt: 'verify and close out', deferTo: null, state: { type: 'completed' }, children: [] }
+    });
+    const out = await resolveRecommendation({ computeOne, startIdentifier: 'DONE-LEAF' });
+    assert.strictEqual(out.deferTruncated, false, 'the start node is always honored, whatever its state');
+    assert.strictEqual(out.deferStopReason, null);
+    assert.strictEqual(out.recommendation.recommendedAction, 'review');
+    assert.strictEqual(out.recommendation.prompt, 'verify and close out');
+    assert.deepStrictEqual(out.deferredVia, ['DONE-LEAF']);
+  });
+
+  test('a valid non-terminal deferTo still descends normally (guard does not over-fire)', async () => {
+    const computeOne = fakeComputeOne({
+      'HEALTHY': {
+        recommendedAction: 'defer', prompt: null, deferTo: 'OPEN',
+        state: { type: 'started' },
+        children: [
+          { identifier: 'OPEN', state: { type: 'unstarted' } },
+          { identifier: 'OLD', state: { type: 'completed' } }
+        ]
+      },
+      'OPEN': { recommendedAction: 'implement', prompt: 'do it', deferTo: null, state: { type: 'unstarted' } }
+    });
+    const out = await resolveRecommendation({ computeOne, startIdentifier: 'HEALTHY' });
+    assert.strictEqual(out.recommendation.identifier, 'OPEN');
+    assert.deepStrictEqual(out.deferredVia, ['HEALTHY', 'OPEN']);
+    assert.strictEqual(out.deferTruncated, false);
+  });
+
+  test('terminal predicate covers duplicate (not just completed): defer → duplicate child redirects', async () => {
+    const computeOne = fakeComputeOne({
+      'C': {
+        recommendedAction: 'defer', prompt: null, deferTo: 'DUP',
+        state: { type: 'started' },
+        children: [
+          { identifier: 'DUP', state: { type: 'duplicate' } },
+          { identifier: 'GO', state: { type: 'backlog' } }
+        ]
+      },
+      'GO': { recommendedAction: 'implement', prompt: 'go', deferTo: null, state: { type: 'backlog' } }
+    });
+    const out = await resolveRecommendation({ computeOne, startIdentifier: 'C' });
+    assert.strictEqual(out.recommendation.identifier, 'GO', 'duplicate is terminal → redirected past it');
+  });
+
+  test('guard is inert when a hop omits children (back-compat with leaner computeOne shapes)', async () => {
+    // No `children`/`state` on the entries → the historical permissive descent.
+    const computeOne = fakeComputeOne({
+      'A': { recommendedAction: 'defer', prompt: null, deferTo: 'B' },
+      'B': { recommendedAction: 'implement', prompt: 'build', deferTo: null }
+    });
+    const out = await resolveRecommendation({ computeOne, startIdentifier: 'A' });
+    assert.strictEqual(out.recommendation.identifier, 'B');
+    assert.strictEqual(out.deferTruncated, false);
+    assert.deepStrictEqual(out.deferredVia, ['A', 'B']);
+  });
+});
+
 describe('armHopSignal (LIN-346 gap #3)', () => {
   test('composed signal aborts when the client signal aborts (propagates to the in-flight hop)', () => {
     const client = new AbortController();

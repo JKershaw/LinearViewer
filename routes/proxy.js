@@ -2355,7 +2355,12 @@ ${readEndpoints}${writeEndpoints}
       repo: parseRepoFromDescription(project?.description),
       recommendedAction: recommendation.recommendedAction,
       // deferTo (LIN-327) drives the recommend recursion (resolveRecommendation).
-      deferTo: recommendation.deferTo || null
+      deferTo: recommendation.deferTo || null,
+      // This node's own state + its children (with state) let the resolver guard
+      // the descent against terminal nodes (LIN-353) without an extra fetch — both
+      // are already in hand from the context fetched for this hop.
+      state: issue.state,
+      children
     };
   }
 

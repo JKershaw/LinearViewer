@@ -501,6 +501,36 @@ describe('buildMetaPromptTemplate defer routing (LIN-327)', () => {
   });
 });
 
+describe('buildMetaPromptTemplate terminal-state branch (LIN-353)', () => {
+  function build(overrides = {}) {
+    return buildMetaPromptTemplate({
+      issueContext: 'Test context', identifier: 'LIN-1', hasSubtasks: false,
+      subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
+      hasComments: false, commentCount: 0, aiHints: 'hints',
+      actionVocabulary: getAIRecommendationActionNames().join(', '), ...overrides
+    });
+  }
+
+  test('a terminal leaf (no open children) gets a Done branch steering to review/close, not look-into', () => {
+    const text = build({ isTerminal: true, hasOpenChildren: false });
+    assert.ok(/terminal state/i.test(text), 'the Done branch must be present');
+    assert.ok(/\breview\b/.test(text), 'a terminal leaf must be steered toward review/close');
+    assert.ok(/do NOT recommend .*look-into/i.test(text) || /never to redo/i.test(text),
+      'the Done branch must forbid no-op look-into/busywork');
+  });
+
+  test('a non-terminal task does NOT get the Done branch', () => {
+    const text = build({ isTerminal: false, hasOpenChildren: false });
+    assert.ok(!/### Step 0:/.test(text), 'open tasks must not see the terminal Step 0');
+  });
+
+  test('a terminal task WITH open children is told to descend, not close (Scenario J)', () => {
+    const text = build({ isTerminal: true, hasOpenChildren: true, hasSubtasks: true, subtaskCount: 2, remainingCount: 1 });
+    assert.ok(/still has open children/i.test(text), 'the open-children terminal branch must be present');
+    assert.ok(/descend|route to the open child/i.test(text), 'it must steer toward the open child, not close');
+  });
+});
+
 describe('buildMetaPromptTemplate plan completeness check', () => {
   function build() {
     return buildMetaPromptTemplate({
