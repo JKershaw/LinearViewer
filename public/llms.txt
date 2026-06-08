@@ -83,6 +83,7 @@ Both In Progress and Projects sections use the same nested structure:
 - `.project-header` - clickable project header
 - `[data-completed-for="{project-id}"]` - completed tasks section
 - `[data-action="create-task"]` - "Add +" link (project level, authenticated only)
+- `.project[data-project-type="periodicals"]` - synthetic Periodicals group (recurring maintenance templates, not Linear issues; workspace-flag gated). Its rows expand to a dispatchable prompt; they have no Linear URL and no "Add task" link.
 
 ### Search Selectors
 - `.search-toggle` - opens/closes search panel (in nav bar)

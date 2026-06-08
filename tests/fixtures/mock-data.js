@@ -46,3 +46,29 @@ export const testMockData = {
     { id: 'ship-8', identifier: 'TEST-27', title: 'Replace deprecated SDK', description: '', estimate: 4, priority: 2, sortOrder: 27, createdAt: daysAgo(40), dueDate: null, completedAt: daysAgo(28), url: 'https://linear.app/test/issue/TEST-27', parent: null, project: { id: 'proj-beta', name: 'Project Beta' }, state: { name: 'Done', type: 'completed' }, assignee: { name: 'Alice' }, labels: { nodes: [] }, team: { id: 'dddddddd-dddd-dddd-dddd-dddddddddddd' } }
   ]
 }
+
+// =============================================================================
+// Periodicals fixture (LIN-341)
+//
+// A ready-to-render `trees`-entry for the synthetic Periodicals group. Mirrors
+// what fetchAndPrepareProjects assembles when the `periodicals` workspace flag
+// is on: a synthetic project + the periodical template rows from
+// lib/periodicals.js. Use this to render the Periodicals group in unit tests
+// (e.g. renderPage([testMockPeriodicalsTree], ...)) without standing up the full
+// server assembly path.
+// =============================================================================
+import { PERIODICALS_PROJECT_ID } from '../../lib/tree.js';
+import { buildPeriodicalNodes } from '../../lib/periodicals.js';
+
+export const testMockPeriodicalsTree = {
+  project: {
+    id: PERIODICALS_PROJECT_ID,
+    name: 'Periodicals',
+    content: null,
+    url: null,
+    sortOrder: Number.MAX_SAFE_INTEGER
+  },
+  incomplete: buildPeriodicalNodes(),
+  completed: [],
+  completedCount: 0
+};

@@ -11,6 +11,11 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { renderLabels, renderDisplayLabels, renderPage } from '../../lib/render.js';
+import { PERIODICALS_PROJECT_ID, NO_PROJECT_ID } from '../../lib/tree.js';
+import { testMockPeriodicalsTree } from '../fixtures/mock-data.js';
+// Side-effect import: the Linear provider self-registers on load, so getProvider
+// ('linear') (used by the add-task link) resolves in this unit-test context.
+import '../../lib/providers/linear/index.js';
 
 // =============================================================================
 // renderLabels Tests
@@ -305,5 +310,84 @@ describe('renderPage description rendering', () => {
                 !result.includes('Setup Prompt'),
                 'Should not render --- content as Setup Prompt');
     });
+  });
+});
+
+// =============================================================================
+// Add-task link guard for synthetic project ids (LIN-341)
+// =============================================================================
+
+describe('add-task link guard (LIN-341)', () => {
+  function projectTreeWithId(id, name) {
+    return {
+      project: { id, name, content: null, url: null },
+      incomplete: [{
+        issue: { id: `${id}-issue`, title: 'A task', state: { type: 'started' }, labels: { nodes: [] } },
+        children: [],
+        depth: 0
+      }],
+      completed: [],
+      completedCount: 0
+    };
+  }
+
+  test('real project id renders the "+ Add task" link', () => {
+    const result = renderPage([projectTreeWithId('real-project', 'Real')], [], [], 'Test', {
+      isLanding: false,
+      urlKey: 'test-workspace'
+    });
+    assert.ok(result.includes('data-action="create-task"'), 'real project should have add-task link');
+  });
+
+  test('__no_project__ suppresses the add-task link (latent bug fixed)', () => {
+    const result = renderPage([projectTreeWithId(NO_PROJECT_ID, 'No Project')], [], [], 'Test', {
+      isLanding: false,
+      urlKey: 'test-workspace'
+    });
+    assert.ok(!result.includes('data-action="create-task"'), 'no-project should NOT have add-task link');
+  });
+
+  test('__periodicals__ suppresses the add-task link', () => {
+    const result = renderPage([testMockPeriodicalsTree], [], [], 'Test', {
+      isLanding: false,
+      urlKey: 'test-workspace'
+    });
+    assert.ok(!result.includes('data-action="create-task"'), 'periodicals should NOT have add-task link');
+  });
+});
+
+// =============================================================================
+// Periodicals group rendering (LIN-341)
+// =============================================================================
+
+describe('Periodicals group rendering (LIN-341)', () => {
+  test('renders the synthetic group with the periodicals colour hook', () => {
+    const result = renderPage([testMockPeriodicalsTree], [], [], 'Test', {
+      isLanding: false,
+      urlKey: 'test-workspace'
+    });
+    assert.ok(result.includes('data-project-type="periodicals"'), 'has data-project-type hook');
+    assert.ok(result.includes(`data-id="${PERIODICALS_PROJECT_ID}"`), 'has synthetic project id');
+    assert.ok(result.includes('Documentation Review'), 'shows the Documentation Review row');
+  });
+
+  test('the row is dispatchable with kind=periodical and no Linear link', () => {
+    const result = renderPage([testMockPeriodicalsTree], [], [], 'Test', {
+      isLanding: false,
+      urlKey: 'test-workspace'
+    });
+    assert.ok(result.includes('data-kind="periodical"'), 'dispatch container tagged kind=periodical');
+    assert.ok(result.includes('prompt-dispatch'), 'has a dispatch button');
+    // Synthetic rows are not Linear issues: no "View in Linear" link.
+    assert.ok(!result.includes('View in Linear'), 'no View in Linear link for periodicals');
+  });
+
+  test('flag-off parity: omitting the group yields no periodicals markup', () => {
+    const result = renderPage([], [], [], 'Test', {
+      isLanding: false,
+      urlKey: 'test-workspace'
+    });
+    assert.ok(!result.includes('data-project-type="periodicals"'), 'no periodicals hook when group absent');
+    assert.ok(!result.includes('data-kind="periodical"'), 'no periodical dispatch when group absent');
   });
 });

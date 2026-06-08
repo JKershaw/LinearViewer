@@ -23,6 +23,7 @@
   --green: #16a085;    /* Completed status */
   --yellow: #d4a600;   /* In-progress status */
   --blue: #2563eb;     /* Links and project headers */
+  --purple: #7c3aed;   /* Periodicals (synthetic maintenance group) */
   --red: #cc0000;      /* Danger actions (remove) */
   --red-hover: #990000;
 
@@ -495,6 +496,28 @@ h1 {
   cursor: pointer;
   padding: 0.5rem 0;
   font-family: var(--font-content);
+}
+
+/* Periodicals synthetic group (LIN-341) — distinct purple accent so the
+   maintenance group reads as visually separate from real Linear projects. */
+.project[data-project-type="periodicals"] {
+  border-left: 3px solid var(--purple);
+  padding-left: 1ch;
+}
+
+.project[data-project-type="periodicals"] .project-header {
+  color: var(--purple);
+}
+
+.project[data-project-type="periodicals"] .periodical-state {
+  color: var(--purple);
+}
+
+.project[data-project-type="periodicals"] .periodical-mode {
+  color: var(--fg-dim);
+  font-family: var(--font-structural);
+  font-size: 0.85em;
+  margin-left: 0.75ch;
 }
 
 .project-description {

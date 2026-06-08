@@ -28,7 +28,8 @@ import { BriefCacheStore } from './lib/brief-cache.js'
 import { ReportHistoryStore } from './lib/report-history-store.js'
 import { getProvider } from './lib/providers/registry.js'
 import './lib/providers/linear/index.js' // side effect: self-registers the Linear provider into the registry
-import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID } from './lib/tree.js'
+import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID, PERIODICALS_PROJECT_ID } from './lib/tree.js'
+import { buildPeriodicalNodes } from './lib/periodicals.js'
 import { parseRepoFromDescription } from './lib/prompt-formatters.js'
 import { renderPage, renderErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
 import { parseLandingPage } from './lib/parse-landing.js'
@@ -444,6 +445,20 @@ async function fetchAndPrepareProjects(accessToken, teamId = null, mockOverride 
   // Build issue tree structure (parent-child relationships)
   const forest = buildForest(issues);
 
+  // Resolve the workspace-scoped `periodicals` flag (mechanism: LIN-340;
+  // consumer: LIN-341). The read site was wired in by LIN-340 — this is where
+  // LIN-341 actually consumes it to gate the synthetic group below. Off (and a
+  // no-op) whenever urlKey is absent, which keeps the prototype swipe/swim/ship
+  // views — and the unauthenticated/landing paths — on unchanged behaviour.
+  let periodicalsEnabled = false;
+  if (urlKey) {
+    periodicalsEnabled = await isWorkspaceFeatureEnabled({
+      urlKey,
+      featureKey: WORKSPACE_FEATURES.PERIODICALS,
+      store: workspacePreferencesStore
+    });
+  }
+
   // Add virtual "No Project" if there are issues without a project
   if (forest.has(NO_PROJECT_ID)) {
     projects.push({
@@ -453,6 +468,21 @@ async function fetchAndPrepareProjects(accessToken, teamId = null, mockOverride 
       url: null,
       sortOrder: Number.MAX_SAFE_INTEGER // Always sort last
     });
+  }
+
+  // LIN-341: inject the synthetic Periodicals group behind the workspace flag.
+  // Mirrors the "No Project" virtual-project pattern: a synthetic project entry
+  // (so the trees mapping renders it) plus a forest entry holding the periodical
+  // template rows. Templates are app-only and never written to Linear.
+  if (periodicalsEnabled) {
+    projects.push({
+      id: PERIODICALS_PROJECT_ID,
+      name: 'Periodicals',
+      content: null,
+      url: null,
+      sortOrder: Number.MAX_SAFE_INTEGER // Sort last, alongside "No Project"
+    });
+    forest.set(PERIODICALS_PROJECT_ID, { roots: buildPeriodicalNodes() });
   }
 
   // Build in-progress tree with ancestor chains for context
@@ -469,19 +499,6 @@ async function fetchAndPrepareProjects(accessToken, teamId = null, mockOverride 
       const { incomplete, completed, completedCount } = partitionCompleted(roots);
       return { project, incomplete, completed, completedCount };
     });
-
-  // Workspace feature read site (LIN-340). Exercises the workspace-scoped
-  // feature reader on the dashboard assembly path so the mechanism is wired in
-  // and observable. The value is intentionally NOT used to gate any rendering
-  // here — gating the __periodicals__ synthetic group/route is LIN-341's job.
-  let periodicalsEnabled = false;
-  if (urlKey) {
-    periodicalsEnabled = await isWorkspaceFeatureEnabled({
-      urlKey,
-      featureKey: WORKSPACE_FEATURES.PERIODICALS,
-      store: workspacePreferencesStore
-    });
-  }
 
   return { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId: teamId, periodicalsEnabled };
 }
@@ -526,7 +543,9 @@ async function handleTokenRefreshAndRetry(workspace, session, teamId, openRouter
   } catch (e) { /* non-fatal */ }
 
   const deployInfo = getDeployInfo()
-  const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace.accessToken, teamId);
+  // Pass urlKey so the periodicals group renders consistently after a token
+  // refresh, matching the primary dashboard route (LIN-341).
+  const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace.accessToken, teamId, null, workspace.urlKey);
   const html = renderPage(trees, inProgressTrees, recentActivityTrees, organizationName, {
     teams,
     selectedTeamId,
