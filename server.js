@@ -61,8 +61,8 @@ import { buildRoadmapModel } from './lib/roadmap.js'
 import { renderProxyPage } from './lib/render-proxy.js'
 import { renderForemanPage } from './lib/render-foreman.js'
 import { AVAILABLE_MODELS } from './lib/openrouter.js'
-import { resolveWorkspaceModel } from './lib/workspace-preferences.js'
-import { getFeatureFlags, isValidFeatureKey } from './lib/feature-defaults.js'
+import { resolveWorkspaceModel, getWorkspaceFeatures, isWorkspaceFeatureEnabled, setWorkspaceFeature } from './lib/workspace-preferences.js'
+import { getFeatureFlags, isValidFeatureKey, isValidWorkspaceFeatureKey, WORKSPACE_FEATURES } from './lib/feature-defaults.js'
 
 // =============================================================================
 // Environment Variable Validation
@@ -422,7 +422,7 @@ app.use(createOpenRouterAuthRoutes())
  * @param {string|null} teamId - Optional team ID to filter issues by
  * @returns {Promise<{trees, inProgressTrees, organizationName, teams, selectedTeamId}>} Prepared data for rendering
  */
-async function fetchAndPrepareProjects(accessToken, teamId = null, mockOverride = null) {
+async function fetchAndPrepareProjects(accessToken, teamId = null, mockOverride = null, urlKey = null) {
   // Use mock data in test mode to avoid hitting Linear API
   const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
 
@@ -470,7 +470,20 @@ async function fetchAndPrepareProjects(accessToken, teamId = null, mockOverride 
       return { project, incomplete, completed, completedCount };
     });
 
-  return { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId: teamId };
+  // Workspace feature read site (LIN-340). Exercises the workspace-scoped
+  // feature reader on the dashboard assembly path so the mechanism is wired in
+  // and observable. The value is intentionally NOT used to gate any rendering
+  // here — gating the __periodicals__ synthetic group/route is LIN-341's job.
+  let periodicalsEnabled = false;
+  if (urlKey) {
+    periodicalsEnabled = await isWorkspaceFeatureEnabled({
+      urlKey,
+      featureKey: WORKSPACE_FEATURES.PERIODICALS,
+      store: workspacePreferencesStore
+    });
+  }
+
+  return { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId: teamId, periodicalsEnabled };
 }
 
 /**
@@ -838,7 +851,7 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
       customPrompts = (await customPromptsStore.list(workspace.urlKey)).map(p => ({ id: p.id, name: p.name }));
     } catch (e) { /* non-fatal */ }
 
-    const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace.accessToken, teamId);
+    const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace.accessToken, teamId, null, workspace.urlKey);
     const isLocalhost = ['localhost', '127.0.0.1'].some(h => req.get('host')?.startsWith(h));
     const html = renderPage(trees, inProgressTrees, recentActivityTrees, organizationName, {
       teams,
@@ -1118,6 +1131,11 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
   // Get current workspace model selection (helper handles default)
   const currentModel = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore });
 
+  // Get current workspace-scoped feature flags (helper handles defaults).
+  // Read from WorkspacePreferencesStore, NOT from session — these are
+  // workspace-scoped, not per-user.
+  const workspaceFeatures = await getWorkspaceFeatures({ urlKey: workspace.urlKey, store: workspacePreferencesStore });
+
   // Check for model validation error from redirect
   const modelError = req.query.error;
 
@@ -1130,7 +1148,8 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
     modelError,
     urlKey: workspace.urlKey,
     workspaces: req.session.workspaces,
-    featureFlags: getFeatureFlags(req.session)
+    featureFlags: getFeatureFlags(req.session),
+    workspaceFeatures
   });
   res.send(html);
 });
@@ -1330,6 +1349,56 @@ app.post('/workspace/:urlKey/settings/model', workspaceFromUrl, async (req, res)
   }
 
   res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
+});
+
+/**
+ * Toggle a workspace-scoped feature flag on or off (LIN-340).
+ * Accepts { feature, enabled } in body.
+ *
+ * Mirrors the model handler above: persists to the workspace preferences store
+ * (shared across all users of the org), then redirects back to settings. It
+ * deliberately does NOT touch session.features, getFeatureFlags(session), or the
+ * per-user UserPreferencesStore — workspace features are a separate contract.
+ */
+app.post('/workspace/:urlKey/settings/workspace-features', workspaceFromUrl, async (req, res) => {
+  const workspace = req.workspace;
+  const { feature, enabled } = req.body;
+
+  // Validate workspace feature key
+  if (!feature || !isValidWorkspaceFeatureKey(feature)) {
+    return res.status(400).json({ error: 'Invalid workspace feature key' });
+  }
+
+  const isEnabled = enabled === 'true' || enabled === true;
+
+  // Persist to the workspace preferences store. setWorkspaceFeature preserves
+  // every other workspace preference key (e.g. modelId) and every other
+  // workspace feature flag while flipping just this one.
+  try {
+    const ok = await setWorkspaceFeature({
+      urlKey: workspace.urlKey,
+      featureKey: feature,
+      enabled: isEnabled,
+      store: workspacePreferencesStore
+    });
+    if (!ok) throw new Error('setWorkspaceFeature returned false');
+  } catch (err) {
+    console.error('Failed to save workspace feature toggle:', err);
+    return res.status(500).send(renderErrorPage('Settings Error', 'Failed to save workspace feature. Please try again.', {
+      action: 'Back to settings',
+      actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/settings`
+    }));
+  }
+
+  // AJAX requests get JSON; regular form submissions get redirect. This is only
+  // the response shape the settings-page toggle client (app.js) expects for ALL
+  // settings toggles — persistence above is exclusively to workspacePreferencesStore,
+  // never to session.features or the per-user store.
+  if (req.headers['x-requested-with'] === 'XMLHttpRequest') {
+    res.json({ ok: true, feature, enabled: isEnabled });
+  } else {
+    res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
+  }
 });
 
 /**
