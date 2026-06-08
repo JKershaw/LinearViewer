@@ -442,6 +442,13 @@ async function fetchAndPrepareProjects(accessToken, teamId = null, mockOverride 
     issues = issues.filter(i => i.team?.id === teamId);
   }
 
+  // Defensive copy before the synthetic-group injections below (No Project,
+  // Periodicals) push onto `projects`. In production `fetchProjects` returns a
+  // fresh array each call, but in test mode `projects` is the shared
+  // `testMockData.projects` const — mutating it in place leaks a duplicate
+  // Periodicals/No-Project entry into every later request (LIN-345).
+  projects = [...projects];
+
   // Build issue tree structure (parent-child relationships)
   const forest = buildForest(issues);
 

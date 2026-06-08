@@ -59,4 +59,37 @@ test.describe('Periodicals group', () => {
     await expect(group.locator('[data-kind="periodical"]')).toHaveCount(1);
     await expect(group.locator('[data-action="create-task"]')).toHaveCount(0);
   });
+
+  // LIN-345: the periodical row is issueless (no Linear issue backing it), so the
+  // shared dispatch handler must opt out of the issue-link contract. Before the
+  // fix, clicking dispatch threw `dispatchPrompt: issue with id and identifier is
+  // required` (common.js) because the handler always built an `issue` object with
+  // null fields and never passed `issueless: true`. The earlier test only asserts
+  // the row *renders* a dispatch container — it never clicks dispatch, which is
+  // why this regression slipped through. This test drives the real click path.
+  test('flag ON: clicking dispatch on a Periodical actually queues it', async ({ page }) => {
+    await setPeriodicalsFlag(page, true);
+    await page.goto(WORKSPACE_URL);
+    await page.waitForLoadState('networkidle');
+
+    const group = page.locator('[data-project-type="periodicals"]');
+    const row = group.locator('.line:has-text("Documentation Review")');
+    await row.click();
+
+    // Open the dispatch disclosure, then dispatch to the cli target.
+    await group.locator('.dispatch-disclosure').click();
+    const dispatchBtn = group.locator('.prompt-dispatch[data-target="cli"]');
+    await dispatchBtn.click();
+
+    // The button reaches the success state (it showed "failed" before the fix).
+    await expect(dispatchBtn).toHaveText('dispatched!');
+
+    // The item lands on the workspace queue, issueless, tagged kind=periodical.
+    const listResponse = await page.request.get(`${WORKSPACE_URL}api/dispatch`);
+    const { items } = await listResponse.json();
+    const periodicalItem = items.find(i => i.kind === 'periodical');
+    expect(periodicalItem).toBeDefined();
+    expect(periodicalItem.promptName).toBe('Documentation Review');
+    expect(periodicalItem.issueIdentifier ?? null).toBeNull();
+  });
 });
