@@ -1,17 +1,36 @@
-# LIN-263 — Model benchmark: consolidated findings (so far)
+# LIN-263 — Model benchmark: consolidated findings
 
-Rolls up the planning note + three manual spikes into one place. Total spend across all
-runs: **~$2.09**. Detail lives in `lin-263-model-benchmark-plan.md`,
-`lin-263-spike-results.md`, `lin-263-spike2-results.md`, and `lin-263-spike3-results.md`;
-this is the synthesis.
+Rolls up the planning note + four manual spikes into one place. Total spend across all
+runs: **~$2.8**. Detail lives in `lin-263-model-benchmark-plan.md`,
+`lin-263-spike-results.md`, `lin-263-spike2-results.md`, `lin-263-spike3-results.md`, and
+`lin-263-spike4-results.md`; this is the synthesis.
 
-> **Bottom line (updated after the K=3 confirmation):** For the next-prompt generator,
-> Opus is **not** necessary. **GPT-5.4-Mini** matched or beat Opus 4.8 across synthetic,
-> real, node/`defer`, and dense-leaf cases at K=3, at ~1/6 the cost and several× the
-> speed. Do **not** default to Haiku or DeepSeek-V4-Flash — both repeatably fail the
-> dense-embedded-plan leaf. The one remaining gate is operational: the workspace model is
-> a single global dial (covers `brief`/`recap` too), so flip the recommend default only
-> after validating those or adding a per-endpoint override.
+## 🏁 Scorecard
+
+Quality gate: a model must score **100% with no issues** on a call to pass it. **Overall
+PASS** = passes every call we tested it on. Price = OpenRouter $/Mtok (input / output);
+"per call" = observed cost on the ~5–6k-token task prompts in these spikes.
+
+| Model | recommend | brief | recap | **Overall** | Price (in / out) | ~/call | Note |
+|-------|:--:|:--:|:--:|:--:|---|--:|------|
+| **GPT-5.4-Mini** ⭐ | ✅ | ✅ | ✅ | **PASS** | $0.75 / $4.50 | ~$0.005–0.015 | **new default** — only cheap model to pass all three |
+| Claude Opus 4.8 | ✅¹ | ✅ | ✅ | PASS | $5 / $25 | ~$0.08–0.11 | reference; safe but ~6–15× costlier |
+| Claude Sonnet 4.6 | ✅ | —² | —² | safe | $3 / $15 | ~$0.03–0.05 | recommend-validated; kept as safe fallback |
+| Gemini 3.5 Flash | ✅ | ✅ | ❌ 0/3 | **FAIL** | $1.50 / $9 | ~$0.03–0.10 | thinks out loud before recap JSON → empty recap |
+| Claude Haiku 4.5 | ❌ 0/3 | ✅ | ⚠️ 2/3 | **FAIL** | $1 / $5 | ~$0.01–0.04 | prior default; mis-reads dense tickets |
+| DeepSeek V4-Flash | ❌ 1/3 | —² | —² | **FAIL** | $0.10 / $0.20 | ~$0.001–0.003 | cheapest, but shares the dense-leaf cliff |
+| Qwen3.7-Plus | ❌ | —² | —² | **FAIL** | $0.40 / $1.60 | ~$0.006 | unparseable action line + 40–90s latency |
+
+¹ Opus passed recommend but on the node case deferred to a *done* child once (K=1 noise) —
+the cheap models picked the correct child. ² not tested on this call (eliminated earlier,
+or kept only as a by-size-safe fallback).
+
+> **Bottom line:** For the per-task LLM calls (recommend, brief, recap), **Opus is not
+> necessary.** GPT-5.4-Mini is the only cheap model that passes all three; it is now the
+> `DEFAULT_MODEL`, and the settings dropdown is curated to it + two safe higher-cost
+> fallbacks (Sonnet 4.6, Opus 4.8). Haiku (prior default), Gemini 3.5 Flash, and
+> DeepSeek V4-Flash each fail at least one call and were dropped from the list.
+> Still untested: the roadmap narrative pipeline (separate multi-call path).
 
 ## Scope of what we actually tested
 
@@ -79,33 +98,34 @@ dense-leaf cliff case, at ~1/6 the cost and several× the speed.
   failed it 3/3, DeepSeek-V4-Flash 2/3**, while **GPT-5.4-Mini and Gemini 3.5 Flash were
   3/3**. So "it works on the most complex (node) case, therefore it's fine" is **not** a
   safe inference — the node case is the easy one.
-- **The pick: GPT-5.4-Mini.** Robust everywhere, cheapest-fast. **Gemini 3.5 Flash** is
-  the robust backup (pricier — it's $1.50/$9 — and slower). **Avoid Haiku and
-  DeepSeek-V4-Flash as the default** despite their price: both repeatably fail the
-  dense-leaf case.
-- **Scope limit:** verdict covers the **next-prompt generator only**. `brief`, `recap`,
-  roadmap narratives are **untested**.
+- **The pick: GPT-5.4-Mini.** Robust everywhere, cheapest-fast. It was then confirmed on
+  the *other* per-task calls too (spike 4): **brief 3/3, recap 3/3** — the only non-Opus
+  model to pass recap. **Avoid Haiku, DeepSeek-V4-Flash, and Gemini 3.5 Flash as the
+  default**: Haiku/DeepSeek fail the dense-leaf route, Gemini fails recap (chain-of-thought
+  before the JSON → empty parse).
+- **Scope limit:** verdict covers the **per-task calls** (recommend, brief, recap). The
+  roadmap narrative pipeline (separate multi-call path) is **untested**.
 
-## The one remaining gate is operational, not quality
+## The operational gate — resolved
 
-The settings UI states the workspace model *"is used for all LLM calls in this workspace,
-including agent/proxy traffic"* — it's a **single global dial**, not per-endpoint. So a
-default flip to GPT-5.4-Mini would also move `brief`/`recap`/roadmap, which we haven't
-benchmarked. Two clean ways forward:
+The workspace model is a **single global dial** (the settings UI: *"used for all LLM calls
+in this workspace, including agent/proxy traffic"*). Because GPT-5.4-Mini passed all three
+per-task calls, the global flip is safe without a per-endpoint override — so we took the
+simpler path:
 
-- **(a)** Validate `brief` + `recap` on cheap models first (same lean spike), then flip
-  the global workspace default; **or**
-- **(b)** Add a small per-endpoint model override (the recommend path already accepts
-  `options.model` — the seam exists) and flip just the recommend endpoint now.
+- **`DEFAULT_MODEL` → `openai/gpt-5.4-mini`** (was Haiku 4.5). The `e2e/workspace-model`
+  default-fallback assertion was updated to match; unit suite green (1246).
+- **`AVAILABLE_MODELS` curated to 3:** GPT-5.4-Mini (default) + Sonnet 4.6 + Opus 4.8 (safe
+  higher-cost fallbacks). Haiku, Gemini 3.5 Flash, DeepSeek V4-Flash, and the rest were
+  dropped because each fails a call. The free-text custom-model input remains for power users.
 
-## Recommended next steps (cost-conscious)
+## Done / remaining
 
-1. **(done) Refresh `AVAILABLE_MODELS`** — landed in this branch (11 current models,
-   verified live; settings dropdown re-rendered and confirmed).
-2. **(done) K=3 confirmation** — GPT-5.4-Mini validated as the recommend-endpoint pick.
-3. **Decide the flip mechanism** — global default (needs step 4 first) vs per-endpoint
-   override (ship now). Recommend **(b)** for the recommend endpoint: lowest blast radius.
-4. **Widen to `brief` + `recap`** with the same lean spike before any *global* default
-   change.
-5. **Build a scored harness only if** the cheap tier ever gets too close to separate by
-   eye. We are not there — manual reads were decisive throughout.
+1. ✅ Refreshed `AVAILABLE_MODELS` to live OpenRouter IDs, then **curated** to validated +
+   safe-by-size.
+2. ✅ K=3 confirmation on hard/real cases — GPT-5.4-Mini validated for recommend.
+3. ✅ Validated `brief` + `recap` (spike 4) — GPT-5.4-Mini passes both; Gemini disqualified.
+4. ✅ Flipped `DEFAULT_MODEL` to GPT-5.4-Mini (global dial; safe because all per-task calls pass).
+5. ▶ **Remaining:** spot-check the **roadmap narrative pipeline** under the new default
+   before considering it fully covered. Build a scored LLM-judge harness only if the cheap
+   tier ever gets too close to separate by eye — not needed so far; manual reads were decisive.

@@ -8,7 +8,7 @@ import { test, expect } from '../fixtures/test-base.js';
 
 const URL_KEY = 'test-workspace';
 const NON_DEFAULT_MODEL = 'anthropic/claude-sonnet-4';
-const DEFAULT_MODEL = 'anthropic/claude-haiku-4.5';
+const DEFAULT_MODEL = 'openai/gpt-5.4-mini';
 const ISSUE_ID = '66666666-6666-6666-6666-666666666666';
 
 test.describe('Workspace AI model selection', () => {
