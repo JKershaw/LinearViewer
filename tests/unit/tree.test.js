@@ -5,7 +5,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { buildForest, buildInProgressForest, NO_PROJECT_ID, isTerminalState, isCompleted, TERMINAL_STATE_TYPES } from '../../lib/tree.js';
+import { buildForest, buildInProgressForest, NO_PROJECT_ID, PERIODICALS_PROJECT_ID, isTerminalState, isCompleted, TERMINAL_STATE_TYPES } from '../../lib/tree.js';
 
 // =============================================================================
 // Test Helpers
@@ -216,6 +216,64 @@ describe('buildInProgressForest', () => {
       assert.strictEqual(result.length, 2);
       const projIds = result.map(r => r.projectId).sort();
       assert.deepStrictEqual(projIds, ['proj-1', 'proj-2']);
+    });
+  });
+
+  // LIN-341: the two NO_PROJECT_ID special-cases (display-name + sort-last) were
+  // extended to also recognise the synthetic __periodicals__ id.
+  describe('__periodicals__ special-cases (LIN-341)', () => {
+    test('display-name branch names the group "Periodicals"', () => {
+      const issue = createIssue({
+        id: 'p1',
+        title: 'Under periodicals',
+        project: { id: PERIODICALS_PROJECT_ID },
+        state: { name: 'In Progress', type: 'started' }
+      });
+
+      const result = buildInProgressForest([issue], projects);
+      const group = result.find(r => r.projectId === PERIODICALS_PROJECT_ID);
+      assert.ok(group, 'group present');
+      assert.strictEqual(group.projectName, 'Periodicals');
+    });
+
+    test('sort-last branch keeps __periodicals__ after real projects', () => {
+      const real = createIssue({
+        id: 'r1',
+        title: 'Real project task',
+        project: { id: 'proj-1' },
+        state: { name: 'In Progress', type: 'started' }
+      });
+      const periodical = createIssue({
+        id: 'p1',
+        title: 'Under periodicals',
+        project: { id: PERIODICALS_PROJECT_ID },
+        state: { name: 'In Progress', type: 'started' }
+      });
+
+      const result = buildInProgressForest([periodical, real], projects);
+      // Real project sorts before the synthetic periodicals group.
+      assert.strictEqual(result[result.length - 1].projectId, PERIODICALS_PROJECT_ID);
+      assert.strictEqual(result[0].projectId, 'proj-1');
+    });
+
+    test('NO_PROJECT_ID still sorts last too (not regressed)', () => {
+      const real = createIssue({
+        id: 'r1',
+        title: 'Real',
+        project: { id: 'proj-1' },
+        state: { name: 'In Progress', type: 'started' }
+      });
+      const orphan = createIssue({
+        id: 'o1',
+        title: 'Orphan',
+        project: null,
+        state: { name: 'In Progress', type: 'started' }
+      });
+
+      const result = buildInProgressForest([orphan, real], projects);
+      assert.strictEqual(result[result.length - 1].projectId, NO_PROJECT_ID);
+      const group = result.find(r => r.projectId === NO_PROJECT_ID);
+      assert.strictEqual(group.projectName, 'No Project');
     });
   });
 });

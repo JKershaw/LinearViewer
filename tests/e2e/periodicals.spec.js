@@ -1,0 +1,62 @@
+import { test, expect } from '../fixtures/test-base.js';
+
+// Periodicals feature (LIN-341): a synthetic, workspace-flag-gated group on the
+// main workspace view containing the Documentation Review template row.
+
+const TEST_WORKSPACE_URL_KEY = 'test-workspace';
+const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;
+
+async function setPeriodicalsFlag(page, enabled) {
+  const res = await page.goto(`/test/set-workspace-feature?key=periodicals&value=${enabled}`);
+  expect(res.ok()).toBeTruthy();
+}
+
+test.describe('Periodicals group', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/test/set-session');
+  });
+
+  test.afterEach(async ({ page }) => {
+    // Reset so the flag never leaks into other specs sharing the store.
+    await setPeriodicalsFlag(page, false);
+  });
+
+  test('flag OFF: no Periodicals group, behaviour unchanged', async ({ page }) => {
+    await setPeriodicalsFlag(page, false);
+    await page.goto(WORKSPACE_URL);
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('[data-project-type="periodicals"]')).toHaveCount(0);
+    await expect(page.locator('.line:has-text("Documentation Review")')).toHaveCount(0);
+
+    // Real projects still render (sanity: unchanged behaviour).
+    await expect(page.locator('.project-header:has-text("Project Alpha")')).toBeVisible();
+  });
+
+  test('flag ON: distinct Periodicals group with a dispatchable Documentation Review row', async ({ page }) => {
+    await setPeriodicalsFlag(page, true);
+    await page.goto(WORKSPACE_URL);
+    await page.waitForLoadState('networkidle');
+
+    const group = page.locator('[data-project-type="periodicals"]');
+    await expect(group).toBeVisible();
+    await expect(group.locator('.project-header:has-text("Periodicals")')).toBeVisible();
+
+    // The single Documentation Review row.
+    const row = group.locator('.line:has-text("Documentation Review")');
+    await expect(row).toHaveCount(1);
+
+    // Distinct colour hook resolves to the purple accent.
+    const headerColor = await group.locator('.project-header').evaluate(
+      el => getComputedStyle(el).color
+    );
+    // --purple: #7c3aed → rgb(124, 58, 237)
+    expect(headerColor).toBe('rgb(124, 58, 237)');
+
+    // Row is dispatchable: expand it and confirm the dispatch container is tagged
+    // kind=periodical (no Linear add-task link inside the synthetic group).
+    await row.click();
+    await expect(group.locator('[data-kind="periodical"]')).toHaveCount(1);
+    await expect(group.locator('[data-action="create-task"]')).toHaveCount(0);
+  });
+});

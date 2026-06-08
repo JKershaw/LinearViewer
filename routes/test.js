@@ -5,7 +5,8 @@
  * Only mounted when NODE_ENV === 'test'.
  */
 import { Router } from 'express';
-import { isValidFeatureKey } from '../lib/feature-defaults.js';
+import { isValidFeatureKey, isValidWorkspaceFeatureKey } from '../lib/feature-defaults.js';
+import { setWorkspaceFeature } from '../lib/workspace-preferences.js';
 
 /**
  * Create test routes with required dependencies.
@@ -332,6 +333,23 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       } else {
         await workspacePreferencesStore.deleteWorkspacePreferences(urlKey);
       }
+      res.send('ok');
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Endpoint to toggle a workspace feature flag for tests (LIN-341).
+  // Query params: ?key=periodicals&value=true|false  (urlKey defaults to test-workspace)
+  router.get('/test/set-workspace-feature', async (req, res) => {
+    try {
+      const urlKey = req.query.urlKey || 'test-workspace';
+      const featureKey = req.query.key;
+      if (!isValidWorkspaceFeatureKey(featureKey)) {
+        return res.status(400).json({ error: `invalid workspace feature key: ${featureKey}` });
+      }
+      const enabled = req.query.value === 'true';
+      await setWorkspaceFeature({ urlKey, featureKey, enabled, store: workspacePreferencesStore });
       res.send('ok');
     } catch (err) {
       res.status(500).json({ error: err.message });
