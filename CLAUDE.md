@@ -14,9 +14,8 @@ A minimal, CLI-aesthetic web app that displays Linear projects and issues as a c
 
 ## Architecture
 
-This is a curated map of the most important files, not an exhaustive listing —
-`lib/`, `public/`, and `tests/` contain additional modules (newer feature surfaces
-in particular) that are not shown here.
+Map of the source tree. Per-page assets and feature modules are grouped by the
+surface they serve; a handful of small helpers may not be listed individually.
 
 ```
 server.js              Express server, main entry point, dashboard routes
@@ -34,33 +33,77 @@ lib/
   linear.js            GraphQL client for Linear API
   linear-cli.js        CLI tool for AI agents to query/modify Linear
   bash-tool.js         Safe bash executor with data/code separation (stdin + argv modes)
-  openrouter.js        OpenRouter API client for AI recommendations
-  free-tier-store.js   Free tier usage tracking and rate limiting
   tree.js              Transforms flat issues → nested tree structure
+  openrouter.js        OpenRouter API client for AI recommendations
+  providers/           Provider abstraction (decouples views from Linear specifics)
+    interface.js       Provider interface contract
+    registry.js        Provider registry
+    models.js          Canonical state model
+    state-map.js       Maps provider states → canonical model
+    linear/index.js    Linear provider adapter
   render.js            Dashboard page renderer (tree view, sections)
   render-pages.js      Standalone page renderers (login, error, workspace-not-found)
   render-audit.js      Operator dashboard page renderer
   render-settings.js   Settings page renderer
   render-prompts.js    Prompts catalog page renderer
+  render-custom-prompts.js  Custom prompts page (/prompts/custom) renderer
   render-dispatch.js   Dispatch page renderer (prompt, queue, tokens, history)
   render-pipeline.js   Pipeline page renderer (floor view shell)
+  render-foreman.js    Foreman page renderer (live observation view)
+  render-roadmap.js    Roadmap page renderer (delivery-focused)
+  render-ship.js       Ship page renderer (radial view shell)
+  render-swim.js       Swim lanes page renderer
+  render-swipe.js      Swipe page renderer (mobile-first task swipe)
+  render-proxy.js      Proxy token management UI
+  render-legal.js      Privacy Policy / Terms of Service renderers
   pipeline-state.js    Pipeline state builder (snapshot assembly)
   pipeline-loops.js    Pipeline loop reconstruction library
-  feature-defaults.js  Feature toggle keys, defaults, and helpers
-  user-preferences.js  Cross-device preference storage (MongoDB)
-  session-store.js     MongoDB/MangoDB session store
-  parse-landing.js     Parses markdown content for landing page
+  sessions-view.js     Adapts pipeline Loop records into the sessions view
+  roadmap.js           Roadmap deterministic layer (velocity, execution order, milestones)
+  ship-layout.js       Ship view layout primitives (pure)
+  swim-lanes.js        Swim lane assignment algorithm
+  swim-graph.js        Swim dependency-graph model (flow / side-rail view)
   prompt-templates.js  Prompt template query functions and main entry point
   prompt-formatters.js Shared formatting helpers for prompt templates
   prompt-template-defs.js  Prompt template definitions (15 templates)
+  completion-signals.js  Completion signals for prompt assessment
+  custom-prompts-store.js  Custom prompt template storage (per workspace)
   prompts/
     meta-prompt-template.js  Meta-prompt for AI recommendation generation
+    autopilot-kickoff.js     Autopilot kickoff briefing template
+    autopilot-manual.js      Autopilot operating manual ("handbook")
+    foreman-playbook.js      Foreman playbook template
+    roadmap-*.js             Roadmap narrative-pipeline templates (orientation,
+                             trajectory, north-star, product, gap, narrative, digest, chat)
+  recap.js             Task recap prompt + response handling
+  recap-cache.js       Hash-based cache for AI recaps
+  brief.js             Current-state task brief prompt + handling
+  brief-cache.js       Hash-based cache for AI briefs
+  recommend-recurse.js Server-side recommendation recursion (defer routing)
+  session-store.js     MongoDB/MangoDB session store
+  user-preferences.js  Cross-device preference storage (MongoDB)
+  workspace-preferences.js  Workspace-level preference storage
+  workspace.js         Multi-workspace session management helpers
   dispatch-store.js    Dispatch queue storage
   dispatch-tokens.js   Consumer API token management
+  foreman-store.js     Foreman status append-only log storage
+  report-history-store.js  Durable per-workspace roadmap report runs
+  free-tier-store.js   Free tier usage tracking and rate limiting
   proxy-tokens.js      Proxy token hashing and validation
   proxy-events.js      Proxy event audit logging
   proxy-fetch.js       Proxy-aware fetch for HTTP_PROXY environments
-  render-proxy.js      Proxy token management UI
+  periodicals.js       Periodicals registry (scheduled task generation)
+  queue-config.js      Maps internal queue model → Linear states/labels
+  workflow-config.js   Centralized workflow label configuration
+  harbour-spawn.js     Spawns Claude Code sessions in Harbour OS (OSC escapes)
+  harbour-feedback-tokens.js  Short-lived single-use feedback tokens for repo agents
+  audit.js             Workspace audit module (computes audit report from Linear)
+  feature-defaults.js  Feature toggle keys, defaults, and helpers
+  token-refresh.js     Linear OAuth token refresh
+  http-keepalive.js    Defuses Heroku H12 30s router timeout on long handlers
+  errors.js            Error response helpers
+  parse-landing.js     Parses markdown content for landing page
+  utils/html.js        HTML utility functions
   components/
     navbar.js          Nav bar with workspace/team selectors, queue badge
     footer.js          Footer with deploy info, AI status
@@ -68,15 +111,25 @@ content/
   landing.md           Static projects preview for unauthenticated users
 public/
   style.css            Light theme, mobile-responsive
-  audit.css            Operator dashboard styles
-  settings.css         Settings page styles
-  dispatch.css         Dispatch page styles
-  pipeline.css         Pipeline page styles (floor view, cells, overlay)
-  pipeline.js          Pipeline page client-side logic (polling, diffing, overlays)
   app.js               Client-side collapse/expand, localStorage persistence
-  dispatch.js          Dispatch page client-side logic (prompt, queue, tokens, history)
-  audit.js             Operator dashboard client-side logic
+  common.js            Shared client utilities
+  common-actions.css   Shared action/button styles
   llms.txt             AI agent guidance (DOM selectors, navigation patterns)
+  marked.min.js        Vendored Markdown renderer
+  purify.min.js        Vendored DOMPurify (HTML sanitizer)
+  audit.css / audit.js          Operator dashboard
+  settings.css                  Settings page
+  prompts.css                   Prompts catalog page
+  custom-prompts.css / .js      Custom prompts page
+  dispatch.css / dispatch.js    Dispatch page (prompt, queue, tokens, history)
+  pipeline.css / pipeline.js    Pipeline floor view (polling, diffing, overlays)
+  foreman.css / foreman.js      Foreman observation page
+  roadmap.css / roadmap.js      Roadmap page
+  ship.css / ship.js            Ship radial view
+  swim.css / swim.js            Swim lanes view
+  swipe.css / swipe.js          Swipe (mobile) view
+  proxy.css / proxy.js          Proxy token management page
+  prompt-section.js, brief.js, recap.js, sessions.js  Shared client section renderers
 tests/
   unit/                Node test runner unit tests (lib modules, renderers, stores)
   e2e/                 Playwright E2E specs (landing, dashboard, auth, dispatch, proxy, …)
