@@ -1,17 +1,26 @@
 # LIN-263 — Model benchmark: consolidated findings (so far)
 
-Rolls up the planning note + two manual spikes into one place. Total spend across all
-runs: **~$1.32**. Detail lives in `lin-263-model-benchmark-plan.md`,
-`lin-263-spike-results.md`, and `lin-263-spike2-results.md`; this is the synthesis.
+Rolls up the planning note + three manual spikes into one place. Total spend across all
+runs: **~$2.09**. Detail lives in `lin-263-model-benchmark-plan.md`,
+`lin-263-spike-results.md`, `lin-263-spike2-results.md`, and `lin-263-spike3-results.md`;
+this is the synthesis.
+
+> **Bottom line (updated after the K=3 confirmation):** For the next-prompt generator,
+> Opus is **not** necessary. **GPT-5.4-Mini** matched or beat Opus 4.8 across synthetic,
+> real, node/`defer`, and dense-leaf cases at K=3, at ~1/6 the cost and several× the
+> speed. Do **not** default to Haiku or DeepSeek-V4-Flash — both repeatably fail the
+> dense-embedded-plan leaf. The one remaining gate is operational: the workspace model is
+> a single global dial (covers `brief`/`recap` too), so flip the recommend default only
+> after validating those or adding a per-endpoint override.
 
 ## Scope of what we actually tested
 
 | Dimension | Covered | NOT covered |
 |---|---|---|
 | **Endpoint** | The **AI-generated next-prompt** only — `getRecommendation()` / `GET /api/proxy/recommend` (the "AI Generated prompt" / meta-prompt generator) | `brief`, `recap`, roadmap narrative, audit, periodicals — every *other* LLM call |
-| **Task shapes** | Leaf tickets across a complexity gradient: trivial→simple→medium→inflation-trap→multi-session→research-gold. Mostly synthetic `SYN-*` fixtures + one **real** dense ticket (`LIN-325`) | **Node/epic shapes** (parent + focusedChild → `defer` routing), very long comment threads, the epic cousins/siblings context path |
+| **Task shapes** | A complexity gradient of leaves (trivial→research-gold), a synthetic dense embedded-plan leaf, **a real epic as a NODE** (`LIN-177`, `defer` path), and **a real large dense leaf** (`LIN-344`). Synthetic `SYN-*` + real `LIN-325`/`LIN-177`/`LIN-344` | Very long comment threads beyond ~5 comments, the epic cousins/siblings context path |
 | **Models** | 8 distinct, current (Opus 4.8 / Sonnet 4.6 / Haiku 4.5 / Gemini 3.5 Flash / Qwen3.7-Plus / DeepSeek V4-Flash / GPT-5.4-Mini, + spike-1's set) | Gemini Pro tier, GPT-5.5 frontier, the `:free` tier |
-| **Rigour** | K=1, temp 0, routing auto-scored + manual body reads, Opus-as-reference | K≥3 repeats, blind LLM judge, body-quality scoring |
+| **Rigour** | spikes 1–2 at K=1; **spike 3 at K=3** on the hard cases. temp 0, routing auto-scored + manual body reads, Opus-as-reference | blind LLM judge, body-quality scoring at scale |
 
 **Read everything below as directional (single-sample), high-signal but not yet decisive.**
 
@@ -54,32 +63,49 @@ Two spikes:
 
 ## Is Opus necessary? Can we recommend a cheap model for the meta-prompt generator?
 
-**For the next-prompt generator, on everything we've tested: no, Opus is not necessary —
-and yes, we can recommend a fast, cheap model — with one caveat and one confirmation step.**
+**No, Opus is not necessary for the next-prompt generator — and yes, we can recommend a
+fast, cheap model. The K=3 confirmation (spike 3) settled it.** GPT-5.4-Mini matched or
+beat Opus 4.8 across synthetic, **real** (`LIN-344`), node/`defer` (`LIN-177`), and the
+dense-leaf cliff case, at ~1/6 the cost and several× the speed.
 
-- **The honest "real large task" answer:** the most realistic case we ran (`LIN-325`, a
-  genuine dense in-progress ticket) was handled well by cheap models. But we have **not**
-  yet stress-tested the *hardest real shapes* — epic/`defer` node routing and very long
-  comment threads — where density is highest and where Haiku's cliff suggests cheap
-  models are most at risk. So we can recommend a cheap default **for this endpoint** with
-  confidence on leaf tasks, and should confirm on a couple of node/epic cases before
-  calling it system-wide.
-- **The caveat:** **don't pick Haiku** as the cheap default despite its Anthropic
-  pedigree — it's the one cheap model with a reproducible density cliff. Pick
-  **GPT-5.4-Mini** (front-runner: 6/6, cheapest-fast) or **Gemini 3.5 Flash**.
-- **Scope limit:** this verdict covers the **next-prompt generator only**. `brief`,
-  `recap`, and the roadmap narratives are **untested** — each is a follow-up (the ticket
-  anticipated this). Don't generalize "cheap is fine" to them yet.
+- **The "real large task" answer is now tested, not assumed.** We ran a real 6-child epic
+  through the **node/`defer` path** (the most complex meta-prompt, 6.5k words) and a real
+  7.4k-char dense leaf. Cheap models handled both — and on the node case *every* cheap
+  model picked the correct next child (`LIN-334`) while Opus's single run deferred to a
+  *done* child (`LIN-332`). The hardest *path* (node) turned out to be the *easy* case for
+  all models.
+- **The real failure axis is dense-leaf reading, not size/complexity.** The one place
+  cheap models split is a leaf whose body already contains a structured plan: **Haiku
+  failed it 3/3, DeepSeek-V4-Flash 2/3**, while **GPT-5.4-Mini and Gemini 3.5 Flash were
+  3/3**. So "it works on the most complex (node) case, therefore it's fine" is **not** a
+  safe inference — the node case is the easy one.
+- **The pick: GPT-5.4-Mini.** Robust everywhere, cheapest-fast. **Gemini 3.5 Flash** is
+  the robust backup (pricier — it's $1.50/$9 — and slower). **Avoid Haiku and
+  DeepSeek-V4-Flash as the default** despite their price: both repeatably fail the
+  dense-leaf case.
+- **Scope limit:** verdict covers the **next-prompt generator only**. `brief`, `recap`,
+  roadmap narratives are **untested**.
+
+## The one remaining gate is operational, not quality
+
+The settings UI states the workspace model *"is used for all LLM calls in this workspace,
+including agent/proxy traffic"* — it's a **single global dial**, not per-endpoint. So a
+default flip to GPT-5.4-Mini would also move `brief`/`recap`/roadmap, which we haven't
+benchmarked. Two clean ways forward:
+
+- **(a)** Validate `brief` + `recap` on cheap models first (same lean spike), then flip
+  the global workspace default; **or**
+- **(b)** Add a small per-endpoint model override (the recommend path already accepts
+  `options.model` — the seam exists) and flip just the recommend endpoint now.
 
 ## Recommended next steps (cost-conscious)
 
-1. **(done) Refresh `AVAILABLE_MODELS`** — landed in this branch.
-2. **Confirmation pass (~$1):** 2–3 more *dense / real* tickets (incl. one epic/`defer`
-   node shape) at **K=3**, scoring GPT-5.4-Mini · Gemini 3.5 Flash · DeepSeek V4-Flash ·
-   Haiku 4.5 against Opus 4.8. If the non-Haiku cheap models hold, **propose flipping the
-   operator default for the recommend endpoint to GPT-5.4-Mini** (and reconsider whether
-   `DEFAULT_MODEL` Haiku is the right cheap floor given its cliff).
-3. **Then, and only then, widen:** repeat the same lean spike on `brief` and `recap`.
-4. **Build a scored harness only if** the cheap tier gets close enough that eyeballing
-   can't separate candidates — that's the point where an LLM judge + price table earns
-   its cost. We are not there yet; manual reads are still decisive.
+1. **(done) Refresh `AVAILABLE_MODELS`** — landed in this branch (11 current models,
+   verified live; settings dropdown re-rendered and confirmed).
+2. **(done) K=3 confirmation** — GPT-5.4-Mini validated as the recommend-endpoint pick.
+3. **Decide the flip mechanism** — global default (needs step 4 first) vs per-endpoint
+   override (ship now). Recommend **(b)** for the recommend endpoint: lowest blast radius.
+4. **Widen to `brief` + `recap`** with the same lean spike before any *global* default
+   change.
+5. **Build a scored harness only if** the cheap tier ever gets too close to separate by
+   eye. We are not there — manual reads were decisive throughout.
