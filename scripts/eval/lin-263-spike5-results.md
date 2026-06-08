@@ -29,29 +29,35 @@ Secondary findings:
 - Opus 4.8: 100% reliable (reference).
 - Cost/latency scale gently with context for mini (40c≈$0.04/9s; 120c≈$0.15/10s).
 
-## Interpretation (honest)
+## Interpretation (corrected)
 
-The failure is real but our offline harness doesn't trigger it. The trigger is therefore
-something these fixtures don't capture. Prime untested suspects:
+This eval measured the WRONG axis. **Field reality (per John): the failing calls were
+*fast, but wrong*** — well-formed output with incorrect content. That rules out
+timeout/truncation/transport entirely.
 
-1. **Transport / timeout truncation.** Production runs through Heroku; the recommend
-   endpoint has a documented H12/H15 timeout history. A slow call on a huge real epic cut
-   mid-stream looks exactly like "incomplete," and a faster rerun completing matches
-   "rerun fixes it." This is the leading hypothesis.
-2. **Real-content shapes** we didn't model: images/attachments, very long single comments,
-   the full epic/node context (siblings/cousins/children at scale), or the appended
-   proxy-context block.
-3. **Sub-1% nondeterminism** — below what ~79 runs can detect.
+The flaw: spike 5's pass/fail gate only checked **format validity** (parseable + has an
+action line + non-empty prompt + not `finish_reason: length`). **A confidently-wrong but
+well-formed recommendation passes that gate.** So "~79 runs, 0 failures" never tested
+*correctness* — and it used synthetic, not real, context. Both gaps are why the failure
+didn't show here.
 
-## Recommendation (make it reliable without pinning the exact trigger first)
+What this baseline DID establish (still useful): mini holds format/completeness robustly
+to ~14k synthetic tokens in both parsers, and GPT-5.5/Opus are 100% reliable on format
+too. The open question — *is the content correct on real large tasks?* — moves to
+**LIN-355**, which judges correctness (against a reference) on real ticket context, not
+formatting on synthetic context.
 
-1. **Retry-on-parse-failure** in `getRecommendation` / `getRecommendationStream`: if the
-   parse throws or `finish_reason === 'length'`, retry once — optionally **escalating** to
-   GPT-5.5 or Opus 4.8 on the retry. This operationalizes "a rerun fixes it" and is the
-   cheapest durable win. (Both parsers already expose the failure cleanly.)
-2. **Instrument real failures**: when a recommendation fails to parse or truncates in
-   prod, log the meta-prompt + raw output + `finish_reason` + token counts + model. One
-   week of *real* failing inputs will pin the trigger faster than more synthetic spikes.
+## Next (→ LIN-355)
+
+The right test judges **correctness on real large tasks**, not format on synthetic ones:
+
+1. Run mini on real large ticket contexts and **judge the content** (right action?
+   grounded, complete prompt? key constraints kept?) against an Opus/GPT-5.5 reference —
+   the axis this spike skipped.
+2. **Instrument prod**: capture the meta-prompt + output + model for real recommendations
+   so we can inspect the actual large-context inputs that produced wrong output.
+3. Likely fix to validate: **escalate to a stronger model for large/complex tasks**
+   (threshold or retry-on-low-confidence), not a global default change.
 
 Harnesses (`lin-263-spike5{,b,c}.mjs`) are parameterized (`SIZES`, `K`, `CONTENT`,
-`MODELS`) so this is re-runnable once we have a real failing case to seed from.
+`MODELS`) and re-usable — but a correctness judge + real-task corpus must be added (LIN-355).
