@@ -2,7 +2,8 @@ import { test, expect } from '../fixtures/test-base.js';
 
 // Periodicals feature (LIN-341): a synthetic, workspace-flag-gated group on the
 // main workspace view containing the corrective periodical template rows
-// (Documentation Review, Test Coverage Gap Review — LIN-351).
+// (Documentation Review, Test Coverage Gap Review — LIN-351, Secrets &
+// Credential Scan — LIN-352).
 
 const TEST_WORKSPACE_URL_KEY = 'test-workspace';
 const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;

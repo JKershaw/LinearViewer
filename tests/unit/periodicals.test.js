@@ -10,11 +10,11 @@ import { PERIODICALS_PROJECT_ID } from '../../lib/tree.js';
 
 describe('periodicals registry', () => {
   test('seeds the corrective templates broken out under LIN-344', () => {
-    assert.strictEqual(PERIODICALS.length, 2);
+    assert.strictEqual(PERIODICALS.length, 3);
     assert.strictEqual(getPeriodicals(), PERIODICALS);
   });
 
-  test('contains Documentation Review and Test Coverage Gap Review (both corrective)', () => {
+  test('contains Documentation Review, Test Coverage Gap, and Secrets & Credential Scan (all corrective)', () => {
     // Assert by id/title/mode rather than position so the registry can grow.
     const byId = Object.fromEntries(PERIODICALS.map(t => [t.id, t]));
 
@@ -29,6 +29,12 @@ describe('periodicals registry', () => {
     assert.strictEqual(cov.title, 'Test Coverage Gap Review');
     assert.strictEqual(cov.mode, 'corrective');
     assert.strictEqual(typeof cov.generatePrompt, 'function');
+
+    const sec = byId['secrets-scan'];
+    assert.ok(sec, 'has Secrets & Credential Scan entry');
+    assert.strictEqual(sec.title, 'Secrets & Credential Scan');
+    assert.strictEqual(sec.mode, 'corrective');
+    assert.strictEqual(typeof sec.generatePrompt, 'function');
   });
 
   test('every template carries the full shape, incl. mode/cadence/lastRunAt', () => {
@@ -106,6 +112,56 @@ describe('Test Coverage Gap Review generatePrompt()', () => {
     assert.doesNotMatch(prompt, /token-refresh/);
     assert.doesNotMatch(prompt, /free-tier-store/);
     assert.doesNotMatch(prompt, /openrouter/);
+    assert.doesNotMatch(prompt, /\.js\b/);
+  });
+});
+
+describe('Secrets & Credential Scan generatePrompt()', () => {
+  const prompt = PERIODICALS.find(t => t.id === 'secrets-scan').generatePrompt();
+
+  test('returns a non-trivial string', () => {
+    assert.strictEqual(typeof prompt, 'string');
+    assert.ok(prompt.length > 200);
+  });
+
+  test('is a task-generation prompt: mint one task, then stop (does not remediate)', () => {
+    // Names the periodical and its domain.
+    assert.match(prompt, /Secrets & Credential Scan/);
+    assert.match(prompt, /credential/i);
+    // Grounds against the objective, git-based reference over tree + history (no new dependency).
+    assert.match(prompt, /git grep/);
+    assert.match(prompt, /git log -p/);
+    assert.match(prompt, /history/i);
+    // Instructs to mint one Linear task and hand off rather than do the work here.
+    assert.match(prompt, /Linear task/i);
+    assert.match(prompt, /mint one/i);
+    assert.match(prompt, /then stop/i);
+  });
+
+  test('carries the anti-report-cleaning-theater remediation bar (remove + rotate, not suppress)', () => {
+    // Names the defeat-theater failure mode for this periodical.
+    assert.match(prompt, /theater/i);
+    // Forbids making the finding disappear instead of neutralising it.
+    assert.match(prompt, /suppress|allowlist|ignore-list/i);
+    // The only valid resolution is remove-from-tracked-content AND rotate/revoke at source.
+    assert.match(prompt, /remove/i);
+    assert.match(prompt, /rotate|revoke/i);
+    // History-aware: flags history-rewrite / secret-purge as a human-decision item.
+    assert.match(prompt, /human-decision|human decision/i);
+  });
+
+  test('stays general: no hard-coded scanner, pattern set, or leaked secret/file literals', () => {
+    // Proxy mechanics live in the appended +proxy guide, not the template.
+    assert.doesNotMatch(prompt, /POST \/api\/proxy/);
+    assert.doesNotMatch(prompt, /GET \/api\/proxy/);
+    assert.doesNotMatch(prompt, /projectId/);
+    // No third-party scanner is named (would add a dependency).
+    assert.doesNotMatch(prompt, /gitleaks|trufflehog/i);
+    // The pattern set is derived at run time, not baked in: no repo-specific
+    // provider prefixes or concrete cloud literals leak into the template.
+    assert.doesNotMatch(prompt, /lin_api_|lin_oauth_/);
+    assert.doesNotMatch(prompt, /AKIA/);
+    // No concrete module/file surfaces leak in.
     assert.doesNotMatch(prompt, /\.js\b/);
   });
 });
