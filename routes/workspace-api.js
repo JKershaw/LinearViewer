@@ -9,7 +9,7 @@
  * - Images: Proxy Linear-hosted images with auth
  */
 import { Router } from 'express';
-import { getProvider } from '../lib/providers/registry.js';
+import { getProvider, getProviderForWorkspace } from '../lib/providers/registry.js';
 import '../lib/providers/linear/index.js'; // side effect: self-registers the Linear provider into the registry
 import { buildRoadmapModel } from '../lib/roadmap.js';
 import { buildRoadmapNarrativeMessages } from '../lib/prompts/roadmap-narrative-template.js';
@@ -164,6 +164,12 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       return res.status(404).json({ error: `No prompt template for label: ${labelName}` })
     }
 
+    // Capability-aware prompt generation (LIN-177 S4/S5): thread the active
+    // provider's UI surface into prompt generation. Resolved from the workspace
+    // (source isn't populated on canonical issues); falls back to Linear for
+    // legacy workspaces. For Linear this is a no-op — output stays byte-identical.
+    const providerUi = getProviderForWorkspace(workspace)?.ui || null
+
     try {
       // Use mock data in test mode
       if (process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token') {
@@ -230,9 +236,9 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
           if (!customPromptDef) {
             return res.status(404).json({ error: 'Custom prompt not found' });
           }
-          result = generateCustomPrompt(customPromptDef, issueObj, mockContext, getFeatureFlags(req.session));
+          result = generateCustomPrompt(customPromptDef, issueObj, mockContext, getFeatureFlags(req.session), providerUi);
         } else {
-          result = generatePrompt(labelName, issueObj, mockContext, getFeatureFlags(req.session));
+          result = generatePrompt(labelName, issueObj, mockContext, getFeatureFlags(req.session), providerUi);
         }
 
         const mockProjectDescription = mockProject?.content || null
@@ -260,9 +266,9 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         if (!customPromptDef) {
           return res.status(404).json({ error: 'Custom prompt not found' });
         }
-        result = generateCustomPrompt(customPromptDef, issue, { parent, siblings, project, children, comments }, getFeatureFlags(req.session));
+        result = generateCustomPrompt(customPromptDef, issue, { parent, siblings, project, children, comments }, getFeatureFlags(req.session), providerUi);
       } else {
-        result = generatePrompt(labelName, issue, { parent, siblings, project, children, comments }, getFeatureFlags(req.session));
+        result = generatePrompt(labelName, issue, { parent, siblings, project, children, comments }, getFeatureFlags(req.session), providerUi);
       }
 
       if (!result) {
@@ -781,7 +787,7 @@ ${goal}`
           const r = await getRecommendation(
             ctx.issue,
             { parent: ctx.parent, siblings: ctx.siblings, project: ctx.project, children: ctx.children, comments: ctx.comments, focusedChild: ctx.focusedChild },
-            { apiKey: apiKeyToUse, model: selectedModel, featureFlags: getFeatureFlags(req.session) }
+            { apiKey: apiKeyToUse, model: selectedModel, featureFlags: getFeatureFlags(req.session), providerUi: getProviderForWorkspace(workspace)?.ui || null }
           )
           return {
             identifier: ctx.issue.identifier,
@@ -1128,7 +1134,7 @@ ${goal}`;
               const r = await getRecommendationStream(
                 ctx.issue,
                 { parent: ctx.parent, siblings: ctx.siblings, project: ctx.project, children: ctx.children, comments: ctx.comments, focusedChild: ctx.focusedChild },
-                { apiKey: apiKeyToUse, model: selectedModel, featureFlags: getFeatureFlags(req.session), signal: hop.signal },
+                { apiKey: apiKeyToUse, model: selectedModel, featureFlags: getFeatureFlags(req.session), providerUi: getProviderForWorkspace(workspace)?.ui || null, signal: hop.signal },
                 (type, data) => {
                   if (closed) return;
                   // Forward phase + delta live; swallow the per-hop done — the handler
@@ -1197,6 +1203,7 @@ ${goal}`;
           apiKey: apiKeyToUse,
           model: selectedModel,
           featureFlags: getFeatureFlags(req.session),
+          providerUi: getProviderForWorkspace(workspace)?.ui || null,
           signal: abortController.signal
         },
         (type, data) => {
