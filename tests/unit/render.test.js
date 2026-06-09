@@ -16,6 +16,7 @@ import { testMockPeriodicalsTree } from '../fixtures/mock-data.js';
 // Side-effect import: the Linear provider self-registers on load, so getProvider
 // ('linear') (used by the add-task link) resolves in this unit-test context.
 import '../../lib/providers/linear/index.js';
+import { registerProvider } from '../../lib/providers/registry.js';
 
 // =============================================================================
 // renderLabels Tests
@@ -389,5 +390,99 @@ describe('Periodicals group rendering (LIN-341)', () => {
     });
     assert.ok(!result.includes('data-project-type="periodicals"'), 'no periodicals hook when group absent');
     assert.ok(!result.includes('data-kind="periodical"'), 'no periodical dispatch when group absent');
+  });
+});
+
+// =============================================================================
+// Capability-aware rendering (LIN-177 S3)
+//
+// Rendering reads the active workspace's provider `ui` capability surface
+// (write/comments/estimates/displayName) instead of hard-coding Linear. These
+// permutations register a stub provider and assert each gate independently.
+// =============================================================================
+
+describe('capability-aware rendering (LIN-177 S3)', () => {
+  // A project + one issue carrying every detail the gates touch: a url (View-in
+  // link), an estimate (estimates gate), state (so it renders details).
+  function stubTree() {
+    return {
+      project: { id: 'p1', name: 'Proj', content: null, url: 'https://stub.example/projects/p1' },
+      incomplete: [{
+        issue: {
+          id: 'i1',
+          identifier: 'STB-1',
+          title: 'A task',
+          state: { type: 'started' },
+          url: 'https://stub.example/issue/STB-1',
+          estimate: 3,
+          labels: { nodes: [] }
+        },
+        children: [],
+        depth: 0
+      }],
+      completed: [],
+      completedCount: 0
+    };
+  }
+
+  // Register a stub provider with a fully controllable `ui` surface. Each call
+  // uses a fresh name so permutations don't clobber one another (the registry
+  // is module-global and last-write-wins).
+  let stubSeq = 0;
+  function renderWithProviderUi(ui) {
+    const name = `stub-${stubSeq++}`;
+    registerProvider({
+      name,
+      ui: { write: true, comments: true, estimates: true, subtasks: true, displayName: 'Stub Tracker', ...ui },
+      getCreateTaskUrl: (urlKey, projectId) => `https://stub.example/${urlKey}/new?project=${projectId}`
+    });
+    return renderPage([stubTree()], [], [], 'Test', {
+      isLanding: false,
+      urlKey: 'ws',
+      workspaces: [{ id: 'w1', name: 'WS', urlKey: 'ws', provider: name }]
+    });
+  }
+
+  test('displayName drives "View in {provider}" links, never hard-codes Linear', () => {
+    const result = renderWithProviderUi({ displayName: 'Stub Tracker' });
+    assert.ok(result.includes('View in Stub Tracker →'), 'uses provider displayName');
+    assert.ok(!result.includes('View in Linear'), 'no hard-coded Linear text');
+  });
+
+  test('write=true shows "+ Add task" with the provider-resolved create URL', () => {
+    const result = renderWithProviderUi({ write: true });
+    assert.ok(result.includes('data-action="create-task"'), 'add-task link present');
+    assert.ok(result.includes('https://stub.example/ws/new?project=p1'), 'create URL comes from the active provider, not a pinned Linear lookup');
+    assert.ok(!result.includes('linear.app/'), 'does not fall back to a Linear URL');
+  });
+
+  test('write=false hides "+ Add task"', () => {
+    const result = renderWithProviderUi({ write: false });
+    assert.ok(!result.includes('data-action="create-task"'), 'add-task link suppressed when write is unavailable');
+  });
+
+  test('comments=true shows the Comments toggle; comments=false hides it', () => {
+    assert.ok(renderWithProviderUi({ comments: true }).includes('data-toggle="comments"'), 'comments toggle shown');
+    assert.ok(!renderWithProviderUi({ comments: false }).includes('data-toggle="comments"'), 'comments toggle hidden');
+  });
+
+  test('estimates=true shows "N pts"; estimates=false hides it', () => {
+    assert.ok(renderWithProviderUi({ estimates: true }).includes('3 pts'), 'estimate shown');
+    assert.ok(!renderWithProviderUi({ estimates: false }).includes('3 pts'), 'estimate hidden');
+  });
+
+  test('legacy/Linear workspace renders byte-identically (back-compat)', () => {
+    // No `provider` field on the workspace → resolves the Linear provider, whose
+    // ui keeps all affordances on and displayName 'Linear'.
+    const result = renderPage([stubTree()], [], [], 'Test', {
+      isLanding: false,
+      urlKey: 'ws',
+      workspaces: [{ id: 'w1', name: 'WS', urlKey: 'ws' }]
+    });
+    assert.ok(result.includes('View in Linear →'), 'Linear display name preserved');
+    assert.ok(result.includes('data-action="create-task"'), 'add-task present for Linear');
+    assert.ok(result.includes('linear.app/'), 'Linear create URL preserved');
+    assert.ok(result.includes('data-toggle="comments"'), 'comments toggle present for Linear');
+    assert.ok(result.includes('3 pts'), 'estimate present for Linear');
   });
 });

@@ -44,6 +44,10 @@
 
   const apiBase = `/workspace/${encodeURIComponent(urlKey)}/api/proxy`;
 
+  // Provider-aware display name for "Open {id} in {provider}" link titles
+  // (LIN-177 S3). Injected on <body> by render-foreman.js; falls back to Linear.
+  const providerName = document.body?.dataset?.providerName || 'Linear';
+
   // State — kept in-memory so polling reuses a single token per page load.
   let currentPlaybook = '';
   let currentToken = '';
@@ -389,7 +393,7 @@
 
     const identifier = activeEntry.taskIdentifier;
     const identifierHtml = task?.url
-      ? `<a class="foreman-now-identifier" href="${escapeHtml(task.url)}" target="_blank" rel="noopener noreferrer" title="Open ${escapeHtml(identifier)} in Linear">${escapeHtml(identifier)}</a>`
+      ? `<a class="foreman-now-identifier" href="${escapeHtml(task.url)}" target="_blank" rel="noopener noreferrer" title="Open ${escapeHtml(identifier)} in ${escapeHtml(providerName)}">${escapeHtml(identifier)}</a>`
       : `<span class="foreman-now-identifier">${escapeHtml(identifier)}</span>`;
 
     const summaryHtml = activeEntry.summary
@@ -472,9 +476,9 @@
       const task = stackByIdentifier.get(item.taskIdentifier);
       const id = escapeHtml(item.taskIdentifier);
       const linkHtml = task?.url
-        ? `<a class="foreman-timeline-identifier-link" href="${escapeHtml(task.url)}" target="_blank" rel="noopener noreferrer" title="Open ${id} in Linear">\u2197</a>`
+        ? `<a class="foreman-timeline-identifier-link" href="${escapeHtml(task.url)}" target="_blank" rel="noopener noreferrer" title="Open ${id} in ${escapeHtml(providerName)}">\u2197</a>`
         : '';
-      // The identifier is a filter-setting button; the arrow next to it opens Linear.
+      // The identifier is a filter-setting button; the arrow next to it opens the provider.
       const identifierHtml = `<button class="foreman-timeline-identifier" type="button" data-filter-task="${id}" title="Filter timeline to ${id}">${id}</button>${linkHtml}`;
       const sessionBadge = item.tokenLabel
         ? `<span class="foreman-timeline-session" title="Session token: ${escapeHtml(item.tokenLabel)}">${escapeHtml(item.tokenLabel)}</span>`
@@ -561,7 +565,7 @@
         : '';
 
       const linkOpen = task.url
-        ? `<a class="foreman-stack-card foreman-stack-card-link" href="${escapeHtml(task.url)}" target="_blank" rel="noopener noreferrer" title="Open ${escapeHtml(identifier)} in Linear">`
+        ? `<a class="foreman-stack-card foreman-stack-card-link" href="${escapeHtml(task.url)}" target="_blank" rel="noopener noreferrer" title="Open ${escapeHtml(identifier)} in ${escapeHtml(providerName)}">`
         : `<div class="foreman-stack-card">`;
       const linkClose = task.url ? `</a>` : `</div>`;
 

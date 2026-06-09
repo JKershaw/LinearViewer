@@ -419,9 +419,10 @@ function renderCard(direction) {
   </div>`;
   }
 
-  // Linear link
+  // Provider-aware "View in {provider}" link (LIN-177 S3)
+  const providerName = data.providerDisplayName || 'Linear';
   const linkHtml = issue.url
-    ? `<div class="swipe-card-link"><a href="${_esc(issue.url)}" target="_blank">View in Linear \u2192</a></div>`
+    ? `<div class="swipe-card-link"><a href="${_esc(issue.url)}" target="_blank">View in ${_esc(providerName)} \u2192</a></div>`
     : '';
 
   const html = `
