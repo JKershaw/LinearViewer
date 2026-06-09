@@ -1,5 +1,5 @@
 /**
- * Unit tests for lib/periodicals.js (LIN-341)
+ * Unit tests for lib/periodicals.js (LIN-341 / LIN-344 / LIN-354)
  *
  * Run with: node --test tests/unit/periodicals.test.js
  */
@@ -9,38 +9,38 @@ import { PERIODICALS, getPeriodicals, buildPeriodicalNodes } from '../../lib/per
 import { PERIODICALS_PROJECT_ID } from '../../lib/tree.js';
 
 describe('periodicals registry', () => {
-  test('seeds the corrective templates broken out under LIN-344', () => {
-    assert.strictEqual(PERIODICALS.length, 4);
+  test('seeds the LIN-354 review set (5 templates)', () => {
+    assert.strictEqual(PERIODICALS.length, 5);
     assert.strictEqual(getPeriodicals(), PERIODICALS);
   });
 
-  test('contains Documentation Review, Test Coverage Gap, Secrets & Credential Scan, and Prompt-Injection Surface Review (all corrective)', () => {
+  test('contains Documentation, Test Coverage, Security, API Quality, and Code Quality reviews', () => {
     // Assert by id/title/mode rather than position so the registry can grow.
     const byId = Object.fromEntries(PERIODICALS.map(t => [t.id, t]));
 
-    const doc = byId['documentation-review'];
-    assert.ok(doc, 'has Documentation Review entry');
-    assert.strictEqual(doc.title, 'Documentation Review');
-    assert.strictEqual(doc.mode, 'corrective');
-    assert.strictEqual(typeof doc.generatePrompt, 'function');
+    const expected = {
+      'documentation-review': 'Documentation Review',
+      'test-coverage-gap': 'Test Coverage Gap Review',
+      'security-review': 'Security Review',
+      'api-quality': 'API Quality Review',
+      'code-quality': 'Code Quality Review'
+    };
 
-    const cov = byId['test-coverage-gap'];
-    assert.ok(cov, 'has Test Coverage Gap Review entry');
-    assert.strictEqual(cov.title, 'Test Coverage Gap Review');
-    assert.strictEqual(cov.mode, 'corrective');
-    assert.strictEqual(typeof cov.generatePrompt, 'function');
+    for (const [id, title] of Object.entries(expected)) {
+      const t = byId[id];
+      assert.ok(t, `has ${id} entry`);
+      assert.strictEqual(t.title, title);
+      assert.strictEqual(t.mode, 'corrective');
+      assert.strictEqual(typeof t.generatePrompt, 'function');
+    }
+  });
 
-    const sec = byId['secrets-scan'];
-    assert.ok(sec, 'has Secrets & Credential Scan entry');
-    assert.strictEqual(sec.title, 'Secrets & Credential Scan');
-    assert.strictEqual(sec.mode, 'corrective');
-    assert.strictEqual(typeof sec.generatePrompt, 'function');
-
-    const inj = byId['prompt-injection-review'];
-    assert.ok(inj, 'has Prompt-Injection Surface Review entry');
-    assert.strictEqual(inj.title, 'Prompt-Injection Surface Review');
-    assert.strictEqual(inj.mode, 'corrective');
-    assert.strictEqual(typeof inj.generatePrompt, 'function');
+  test('consolidated the standalone secrets-scan and prompt-injection periodicals (LIN-354)', () => {
+    // The broad Security Review absorbed both; they no longer exist as their
+    // own registry entries.
+    const ids = new Set(PERIODICALS.map(t => t.id));
+    assert.ok(!ids.has('secrets-scan'), 'secrets-scan folded into security-review');
+    assert.ok(!ids.has('prompt-injection-review'), 'prompt-injection-review folded into security-review');
   });
 
   test('every template carries the full shape, incl. mode/cadence/lastRunAt', () => {
@@ -48,7 +48,7 @@ describe('periodicals registry', () => {
       assert.ok(typeof t.id === 'string' && t.id.length > 0);
       assert.ok(typeof t.title === 'string' && t.title.length > 0);
       assert.ok(['corrective', 'advisory'].includes(t.mode));
-      // Carried even though nothing consumes them yet (v1).
+      // Carried even though nothing consumes them yet.
       assert.ok('cadence' in t);
       assert.ok('lastRunAt' in t);
       assert.strictEqual(typeof t.generatePrompt, 'function');
@@ -56,164 +56,165 @@ describe('periodicals registry', () => {
   });
 });
 
-describe('Documentation Review generatePrompt()', () => {
-  const prompt = PERIODICALS[0].generatePrompt();
+// The shared two-stage "meta" contract (LIN-354): Stage 1 (the periodical
+// prompt itself) is a *task-generation* step — research the repo and mint ONE
+// project-specific review task, then stop. The minted task's description, which
+// the prompt dictates, carries the Stage-2 review contract: read prior runs,
+// produce an uncapped severity-ranked report, propose-but-don't-create follow-up
+// tickets, and leave the task In Progress for triage. Asserting this over the
+// whole registry locks the contract for new periodicals too.
+describe('shared two-stage contract (all periodicals)', () => {
+  for (const template of PERIODICALS) {
+    describe(template.title, () => {
+      const prompt = template.generatePrompt();
 
-  test('returns a non-trivial string', () => {
-    assert.strictEqual(typeof prompt, 'string');
-    assert.ok(prompt.length > 200);
-  });
+      test('returns a non-trivial string naming the periodical', () => {
+        assert.strictEqual(typeof prompt, 'string');
+        assert.ok(prompt.length > 200);
+        assert.ok(prompt.includes(template.title), 'names its own title');
+      });
 
-  test('is a task-generation prompt: create a task, then stop (does not do the review)', () => {
-    // Names the periodical and its domain.
-    assert.match(prompt, /Documentation Review/);
+      test('Stage 1: mints one review task and stops (the task is the deliverable)', () => {
+        assert.match(prompt, /Linear task/i);
+        assert.match(prompt, /mint \*\*one\*\*|mint one/i);
+        assert.match(prompt, /then stop/i);
+        // The periodical does not do the review itself.
+        assert.match(prompt, /deliverable is that task/i);
+      });
+
+      test('minted task contract: read prior runs, uncapped report', () => {
+        assert.match(prompt, /\breport\b/i);
+        assert.match(prompt, /previous run|prior run|earlier report/i);
+        // No forced single finding / no make-work.
+        assert.match(prompt, /nothing, one thing, or several|no fixed number/i);
+        assert.match(prompt, /make-work/i);
+      });
+
+      test('minted task contract: propose-don\'t-create, leave In Progress, review-only', () => {
+        assert.match(prompt, /follow-up ticket/i);
+        assert.match(prompt, /don't create them|do not create/i);
+        assert.match(prompt, /triage/i);
+        // The report run holds the task In Progress for the triage step.
+        assert.match(prompt, /In Progress/);
+        assert.match(prompt, /do not close|don't close/i);
+        assert.match(prompt, /review-only/i);
+      });
+
+      test('stays general: no proxy mechanics, file literals, or baked-in report location', () => {
+        // Proxy mechanics live in the appended +proxy guide, not the template.
+        assert.doesNotMatch(prompt, /POST \/api\/proxy/);
+        assert.doesNotMatch(prompt, /GET \/api\/proxy/);
+        assert.doesNotMatch(prompt, /projectId/);
+        // No concrete source-file surfaces leak in.
+        assert.doesNotMatch(prompt, /\.js\b/);
+        // The report location is discovered at run time, never hard-coded.
+        assert.doesNotMatch(prompt, /save_comment|home issue/i);
+      });
+    });
+  }
+});
+
+describe('Documentation Review specifics', () => {
+  const prompt = PERIODICALS.find(t => t.id === 'documentation-review').generatePrompt();
+
+  test('covers drift plus the broadened README / inline-comment / API-doc scope', () => {
     assert.match(prompt, /documentation/i);
-    // Instructs to create a Linear task and hand off rather than do the work here.
-    assert.match(prompt, /Linear task/i);
-    assert.match(prompt, /then stop|do not do the review/i);
+    assert.match(prompt, /drift/i);
+    assert.match(prompt, /README/);
+    assert.match(prompt, /inline comment/i);
+    // Subtractive-quality discipline against doc inflation.
+    assert.match(prompt, /subtractive/i);
+    assert.match(prompt, /inflation/i);
   });
 
-  test('stays general: no hard-coded proxy mechanics or doc-surface specifics', () => {
-    // Proxy mechanics live in the appended +proxy guide, not the template.
-    assert.doesNotMatch(prompt, /POST \/api\/proxy/);
-    assert.doesNotMatch(prompt, /projectId/);
-    assert.doesNotMatch(prompt, /GET \/api\/proxy/);
-    // Doc surfaces are discovered by grounding at run time, not baked in here.
-    assert.doesNotMatch(prompt, /formatStalenessCheck/);
+  test('stays general: no doc-surface specifics baked in', () => {
     assert.doesNotMatch(prompt, /llms\.txt/);
     assert.doesNotMatch(prompt, /CLAUDE\.md/);
+    assert.doesNotMatch(prompt, /formatStalenessCheck/);
   });
 });
 
-describe('Test Coverage Gap Review generatePrompt()', () => {
+describe('Test Coverage Gap Review specifics', () => {
   const prompt = PERIODICALS.find(t => t.id === 'test-coverage-gap').generatePrompt();
 
-  test('returns a non-trivial string', () => {
-    assert.strictEqual(typeof prompt, 'string');
-    assert.ok(prompt.length > 200);
-  });
-
-  test('is a task-generation prompt: create a task, then stop (does not write the tests)', () => {
-    // Names the periodical and its domain.
-    assert.match(prompt, /Test Coverage Gap Review/);
+  test('grounds in native coverage and carries the anti-theater bar', () => {
     assert.match(prompt, /coverage/i);
-    // Grounds against the objective native coverage source (no new dependency).
     assert.match(prompt, /--experimental-test-coverage/);
-    // Instructs to mint one Linear task and hand off rather than do the work here.
-    assert.match(prompt, /Linear task/i);
-    assert.match(prompt, /then stop|do not write the tests/i);
-    // Carries the anti-coverage-theater quality bar (behavioral over structural).
     assert.match(prompt, /behavioral/i);
     assert.match(prompt, /theater/i);
   });
 
-  test('stays general: no hard-coded proxy mechanics or specific module surfaces', () => {
-    // Proxy mechanics live in the appended +proxy guide, not the template.
-    assert.doesNotMatch(prompt, /POST \/api\/proxy/);
-    assert.doesNotMatch(prompt, /GET \/api\/proxy/);
-    assert.doesNotMatch(prompt, /projectId/);
-    // The gap is discovered from the live coverage report, not baked in here:
-    // no concrete module/file surfaces leak into the template.
+  test('stays general: no specific module surfaces leak in', () => {
     assert.doesNotMatch(prompt, /proxy-tokens/);
-    assert.doesNotMatch(prompt, /token-refresh/);
     assert.doesNotMatch(prompt, /free-tier-store/);
-    assert.doesNotMatch(prompt, /openrouter/);
-    assert.doesNotMatch(prompt, /\.js\b/);
+    assert.doesNotMatch(prompt, /openrouter/i);
   });
 });
 
-describe('Secrets & Credential Scan generatePrompt()', () => {
-  const prompt = PERIODICALS.find(t => t.id === 'secrets-scan').generatePrompt();
+describe('Security Review specifics', () => {
+  const prompt = PERIODICALS.find(t => t.id === 'security-review').generatePrompt();
 
-  test('returns a non-trivial string', () => {
-    assert.strictEqual(typeof prompt, 'string');
-    assert.ok(prompt.length > 200);
-  });
-
-  test('is a task-generation prompt: mint one task, then stop (does not remediate)', () => {
-    // Names the periodical and its domain.
-    assert.match(prompt, /Secrets & Credential Scan/);
+  test('absorbs the secrets scan: git tree + history, remove-and-rotate, no scanner dep', () => {
     assert.match(prompt, /credential/i);
-    // Grounds against the objective, git-based reference over tree + history (no new dependency).
     assert.match(prompt, /git grep/);
     assert.match(prompt, /git log -p/);
     assert.match(prompt, /history/i);
-    // Instructs to mint one Linear task and hand off rather than do the work here.
-    assert.match(prompt, /Linear task/i);
-    assert.match(prompt, /mint one/i);
-    assert.match(prompt, /then stop/i);
+    assert.match(prompt, /rotat|revok/i);
   });
 
-  test('carries the anti-report-cleaning-theater remediation bar (remove + rotate, not suppress)', () => {
-    // Names the defeat-theater failure mode for this periodical.
-    assert.match(prompt, /theater/i);
-    // Forbids making the finding disappear instead of neutralising it.
-    assert.match(prompt, /suppress|allowlist|ignore-list/i);
-    // The only valid resolution is remove-from-tracked-content AND rotate/revoke at source.
-    assert.match(prompt, /remove/i);
-    assert.match(prompt, /rotate|revoke/i);
-    // History-aware: flags history-rewrite / secret-purge as a human-decision item.
-    assert.match(prompt, /human-decision|human decision/i);
+  test('absorbs the prompt-injection review: trust boundary, not a mere instruction', () => {
+    assert.match(prompt, /injection/i);
+    assert.match(prompt, /trust boundar/i);
+    // The data/code boundary framing: input carried as data vs interpolated as code.
+    assert.match(prompt, /as \*\*data\*\*/i);
+    assert.match(prompt, /interpolates it as code/i);
+    assert.match(prompt, /aspirational guard/i);
   });
 
-  test('stays general: no hard-coded scanner, pattern set, or leaked secret/file literals', () => {
-    // Proxy mechanics live in the appended +proxy guide, not the template.
-    assert.doesNotMatch(prompt, /POST \/api\/proxy/);
-    assert.doesNotMatch(prompt, /GET \/api\/proxy/);
-    assert.doesNotMatch(prompt, /projectId/);
-    // No third-party scanner is named (would add a dependency).
+  test('covers the broad OWASP-style classes', () => {
+    assert.match(prompt, /access control/i);
+    assert.match(prompt, /isolation/i);
+    assert.match(prompt, /blast radius/i);
+  });
+
+  test('stays general: no scanner named, no leaked secret/symbol literals', () => {
     assert.doesNotMatch(prompt, /gitleaks|trufflehog/i);
-    // The pattern set is derived at run time, not baked in: no repo-specific
-    // provider prefixes or concrete cloud literals leak into the template.
     assert.doesNotMatch(prompt, /lin_api_|lin_oauth_/);
     assert.doesNotMatch(prompt, /AKIA/);
-    // No concrete module/file surfaces leak in.
-    assert.doesNotMatch(prompt, /\.js\b/);
+    assert.doesNotMatch(prompt, /formatIssueContext/);
   });
 });
 
-describe('Prompt-Injection Surface Review generatePrompt()', () => {
-  const prompt = PERIODICALS.find(t => t.id === 'prompt-injection-review').generatePrompt();
+describe('API Quality Review specifics', () => {
+  const prompt = PERIODICALS.find(t => t.id === 'api-quality').generatePrompt();
 
-  test('returns a non-trivial string', () => {
-    assert.strictEqual(typeof prompt, 'string');
-    assert.ok(prompt.length > 200);
+  test('covers design consistency, validation, and error handling', () => {
+    assert.match(prompt, /API/);
+    assert.match(prompt, /consisten/i);
+    assert.match(prompt, /validat/i);
+    assert.match(prompt, /error handling/i);
+    assert.match(prompt, /status code/i);
   });
 
-  test('is a task-generation prompt: mint one task, then stop (does not build the mitigation)', () => {
-    // Names the periodical and its domain.
-    assert.match(prompt, /Prompt-Injection Surface Review/);
-    assert.match(prompt, /injection/i);
-    // Instructs to mint one Linear task and hand off rather than do the work here.
-    assert.match(prompt, /Linear task/i);
-    assert.match(prompt, /mint one/i);
-    assert.match(prompt, /then stop/i);
+  test("uses the repo's own convention as the reference, not an imported ideal", () => {
+    assert.match(prompt, /own dominant convention|established pattern/i);
+  });
+});
+
+describe('Code Quality Review specifics', () => {
+  const prompt = PERIODICALS.find(t => t.id === 'code-quality').generatePrompt();
+
+  test('covers complexity, duplication, and maintainability with no new tooling', () => {
+    assert.match(prompt, /complexity/i);
+    assert.match(prompt, /duplicat/i);
+    assert.match(prompt, /maintainab/i);
+    assert.match(prompt, /no new tooling|introduce no new/i);
+    assert.match(prompt, /risk . churn|risk × churn|critical path/i);
   });
 
-  test('frames the gap as a data/code boundary and forbids a model-instruction-only fix', () => {
-    // The threat: attacker-influenceable ticket content reaching worker prompts.
-    assert.match(prompt, /attacker-influenceable/i);
-    assert.match(prompt, /untrusted/i);
-    // The mitigation bar: a real data/code boundary, not a stronger instruction.
-    assert.match(prompt, /data\/code/i);
-    assert.match(prompt, /data, not instructions/i);
-    // A model instruction alone is explicitly not an acceptable resolution.
-    assert.match(prompt, /not.*(acceptable|a guarantee|count as)|instruction alone/i);
-    // Anchors against the shell boundary that already exists as the reference.
-    assert.match(prompt, /shell/i);
-  });
-
-  test('stays general: no hard-coded proxy mechanics, file paths, or cited symbols', () => {
-    // Proxy mechanics live in the appended +proxy guide, not the template.
-    assert.doesNotMatch(prompt, /POST \/api\/proxy/);
-    assert.doesNotMatch(prompt, /GET \/api\/proxy/);
-    assert.doesNotMatch(prompt, /projectId/);
-    // The seam is traced from the live code at dispatch time, not baked in here:
-    // no concrete file/module surfaces or cited symbol names leak into the template.
-    assert.doesNotMatch(prompt, /\.js\b/);
-    assert.doesNotMatch(prompt, /formatIssueContext/);
-    assert.doesNotMatch(prompt, /formatCommentsForPrompt/);
-    assert.doesNotMatch(prompt, /meta-prompt-template/);
+  test('guards against cosmetic-churn theater', () => {
+    assert.match(prompt, /theater/i);
+    assert.match(prompt, /cosmetic/i);
   });
 });
 
