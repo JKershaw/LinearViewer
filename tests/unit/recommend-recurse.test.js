@@ -56,6 +56,35 @@ describe('resolveRecommendation', () => {
     assert.deepStrictEqual(out.deferredVia, ['A', 'B', 'C']);
   });
 
+  test('noDescend resolves the start node in one hop and never follows a defer (LIN-365)', async () => {
+    // A parent that would normally defer into its open child. With noDescend the
+    // resolver must stop at the parent — the child is never fetched or dispatched.
+    let childFetched = false;
+    const computeOne = async (id) => {
+      if (id === 'CHILD') { childFetched = true; return { identifier: id, recommendedAction: 'research', prompt: 'child work', deferTo: null }; }
+      return { identifier: 'PARENT', recommendedAction: 'defer', prompt: null, deferTo: 'CHILD' };
+    };
+    const out = await resolveRecommendation({ computeOne, startIdentifier: 'PARENT', noDescend: true });
+    assert.strictEqual(out.recommendation.identifier, 'PARENT', 'stays on the node the caller named');
+    assert.deepStrictEqual(out.deferredVia, ['PARENT'], 'no descent happened');
+    assert.strictEqual(out.deferTruncated, false, 'a deliberate non-descent is not a truncation');
+    assert.strictEqual(out.deferStopReason, null);
+    assert.strictEqual(childFetched, false, 'the child is never fetched under noDescend');
+  });
+
+  test('noDescend on a real-work start node behaves like a normal single hop', async () => {
+    // The realistic case: with focusedChild suppressed upstream, the parent recommends
+    // its OWN work (a non-defer action). noDescend must not perturb that path.
+    const computeOne = fakeComputeOne({
+      'PARENT': { recommendedAction: 'implement', prompt: 'do the parent work', deferTo: null }
+    });
+    const out = await resolveRecommendation({ computeOne, startIdentifier: 'PARENT', noDescend: true });
+    assert.strictEqual(out.recommendation.recommendedAction, 'implement');
+    assert.strictEqual(out.recommendation.prompt, 'do the parent work');
+    assert.deepStrictEqual(out.deferredVia, ['PARENT']);
+    assert.strictEqual(out.deferTruncated, false);
+  });
+
   test('node-work terminus: a node that needs breakdown is NOT descended past', async () => {
     const computeOne = fakeComputeOne({
       'EPIC': { recommendedAction: 'breakdown', prompt: 'decompose it', deferTo: null }

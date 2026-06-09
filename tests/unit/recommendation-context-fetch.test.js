@@ -93,8 +93,10 @@ describe('recommendation context fetch stops fighting the keepalive', () => {
   });
 
   test('context fetch is abortable (signal threaded) under the backstop budget', () => {
+    // The recommend site additionally threads `noDescend` (LIN-365) into the options
+    // bag; the abortable backstop contract still holds, so allow that optional arg.
     const calls = proxySource.match(
-      /fetchWithTimeout\(\s*\(signal\)\s*=>\s*fetchRecommendationContext\(accessToken,\s*identifier,\s*\{\s*signal\s*\}\),\s*CONTEXT_FETCH_TIMEOUT_MS\)/g
+      /fetchWithTimeout\(\s*\(signal\)\s*=>\s*fetchRecommendationContext\(accessToken,\s*identifier,\s*\{\s*signal(?:,\s*noDescend)?\s*\}\),\s*CONTEXT_FETCH_TIMEOUT_MS\)/g
     ) || [];
     // recommend + recap + brief (x2) + status = 5 sites
     assert.strictEqual(calls.length, 5,

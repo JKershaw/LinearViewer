@@ -239,7 +239,9 @@ describe('LIN-330 move preserves prior guardrails', () => {
     // The three abortable fetchers must still accept { signal } and pass it to
     // client.request (LIN-300 keepalive backstop).
     for (const fn of ['fetchIssueContext', 'fetchFocusedChild', 'fetchRecommendationContext']) {
-      const re = new RegExp(`export async function ${fn}\\(apiKey, issueId, \\{ signal \\} = \\{\\}\\)`);
+      // fetchRecommendationContext also accepts the LIN-365 noDescend lever after
+      // signal; the abort-signal threading contract pinned here is unchanged.
+      const re = new RegExp(`export async function ${fn}\\(apiKey, issueId, \\{ signal(?:, [^}]+)? \\} = \\{\\}\\)`);
       assert.match(providerSource, re, `${fn} must accept { signal }`);
     }
     assert.match(providerSource, /document: ISSUE_DETAIL_QUERY, variables: \{ id: issueId \}, signal/);

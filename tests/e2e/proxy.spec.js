@@ -1019,6 +1019,46 @@ test.describe('Proxy API - Recommend-and-Dispatch (fused verb, LIN-321)', () => 
     expect(created.prompt).toBeUndefined();
   });
 
+  test('noDescend recommends and dispatches the parent itself, not its open child (LIN-365)', async ({ request }) => {
+    // TEST-1 is an in-progress parent whose only open child (TEST-2) would normally be
+    // descended into. With noDescend the verb must recommend TEST-1's OWN work and
+    // dispatch against TEST-1 — making a parent's own work reachable while a child stays open.
+    const resp = await request.post('/api/proxy/recommend-and-dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { issueIdentifier: 'TEST-1', noDescend: true }
+    });
+    expect(resp.status()).toBe(201);
+    const created = await resp.json();
+
+    // Dispatched against the PARENT the caller named — no descent into TEST-2.
+    expect(created.issueIdentifier).toBe('TEST-1');
+    expect(created.kind).not.toBe('defer');
+    expect(created.deferredVia).toEqual(['TEST-1']);   // single node ⇒ no descent
+    expect(created.deferTruncated).toBe(false);
+    expect(created.descent).toBeUndefined();           // no descent breadcrumb
+    expect(created.prompt).toBeUndefined();
+  });
+
+  test('GET /recommend?noDescend=1 returns the named node, not its child (LIN-365)', async ({ request }) => {
+    const resp = await request.get('/api/proxy/recommend/TEST-1?noDescend=1', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(resp.status()).toBe(200);
+    const rec = await resp.json();
+    expect(rec.identifier).toBe('TEST-1');             // the parent, not TEST-2
+    expect(rec.recommendedAction).not.toBe('defer');   // resolved to the parent's own work
+    expect(rec.deferredVia).toEqual(['TEST-1']);        // no descent
+    expect(rec.prompt).toBeTruthy();                    // the parent carries a real prompt
+  });
+
+  test('recommend-and-dispatch rejects a non-boolean noDescend (LIN-365)', async ({ request }) => {
+    const resp = await request.post('/api/proxy/recommend-and-dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { issueIdentifier: 'TEST-1', noDescend: 'yes' }
+    });
+    expect(resp.status()).toBe(400);
+  });
+
   test('GET /recommend returns the terminal node and the descent path (LIN-327)', async ({ request }) => {
     const resp = await request.get('/api/proxy/recommend/TEST-1', {
       headers: { Authorization: `Bearer ${readToken}` }
