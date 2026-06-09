@@ -1327,7 +1327,8 @@ h1 {
   color: var(--fg);
 }
 
-.prompt-copy {
+.prompt-copy,
+.prompt-download {
   background: none;
   border: 1px solid var(--fg-vdim);
   padding: 0.25rem 0.5rem;
@@ -1338,7 +1339,8 @@ h1 {
   border-radius: 3px;
 }
 
-.prompt-copy:hover {
+.prompt-copy:hover,
+.prompt-download:hover {
   border-color: var(--fg-dim);
   color: var(--fg);
 }

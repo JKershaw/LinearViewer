@@ -21,7 +21,7 @@ import { buildRoadmapDigestMessages } from '../lib/prompts/roadmap-digest-templa
 import { buildRoadmapOrientationMessages, serializeOrientationCandidates, countOrientationCandidates, parseOrientationLines, ORIENTATION_BEARINGS } from '../lib/prompts/roadmap-orientation-template.js';
 import { generatePrompt, generateCustomPrompt, hasPrompt, getAvailablePrompts } from '../lib/prompt-templates.js';
 import { WORK_ISSUE_LABELS } from '../lib/workflow-config.js';
-import { parseRepoFromDescription } from '../lib/prompt-formatters.js';
+import { parseRepoFromDescription, buildPromptFilename } from '../lib/prompt-formatters.js';
 import { buildForemanPlaybook, buildMiniForemanStep } from '../lib/prompts/foreman-playbook.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { isRecommendationEnabled, getRecommendation, getRecommendationStream, streamChat, getModelDisplayName } from '../lib/openrouter.js';
@@ -49,6 +49,29 @@ import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
 import { isTerminalState } from '../lib/tree.js';
 import { testMockTeams, testMockData } from '../tests/fixtures/mock-data.js';
+
+/**
+ * Send a generated prompt as JSON (default) or as a downloadable markdown
+ * file when `?format=md` is set. The markdown branch serves the bare prompt
+ * string with attachment headers (Content-Disposition); the in-app `+proxy`
+ * block is appended client-side, so it intentionally never appears here.
+ * Default JSON behaviour is unchanged for every existing consumer.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {Object} opts
+ * @param {Object} opts.json - JSON body returned when not downloading
+ * @param {string} opts.prompt - Raw prompt string for the markdown download
+ * @param {string} opts.identifier - Issue identifier for the filename (may be empty)
+ * @param {string} opts.downloadName - Prompt name slug for the filename
+ */
+function sendPromptResult(req, res, { json, prompt, identifier, downloadName }) {
+  if (req.query.format === 'md') {
+    res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${buildPromptFilename(identifier, downloadName)}"`);
+    return res.send(prompt);
+  }
+  return res.json(json);
+}
 
 /**
  * Create workspace API routes with required dependencies.
@@ -213,11 +236,16 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         }
 
         const mockProjectDescription = mockProject?.content || null
-        return res.json({
-          label: labelName,
-          promptName: result.name,
+        return sendPromptResult(req, res, {
+          identifier,
+          downloadName: result.name,
           prompt: result.prompt,
-          repo: parseRepoFromDescription(mockProjectDescription)
+          json: {
+            label: labelName,
+            promptName: result.name,
+            prompt: result.prompt,
+            repo: parseRepoFromDescription(mockProjectDescription)
+          }
         })
       }
 
@@ -241,11 +269,16 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         return res.status(500).json({ error: 'Failed to generate prompt' })
       }
 
-      res.json({
-        label: labelName,
-        promptName: result.name,
+      sendPromptResult(req, res, {
+        identifier: issue.identifier,
+        downloadName: result.name,
         prompt: result.prompt,
-        repo: parseRepoFromDescription(project?.description)
+        json: {
+          label: labelName,
+          promptName: result.name,
+          prompt: result.prompt,
+          repo: parseRepoFromDescription(project?.description)
+        }
       })
     } catch (error) {
       console.error('Prompt generation error:', error)
@@ -311,11 +344,16 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
           issue: { identifier, title: mockIssue.title },
           features: { linearMcp: featureFlags.linearMcp === true }
         })
-        return res.json({
-          label: 'foreman',
-          promptName: `Foreman run — ${identifier}`,
+        return sendPromptResult(req, res, {
+          identifier,
+          downloadName: 'foreman',
           prompt,
-          repo: parseRepoFromDescription(mockProject?.content || null)
+          json: {
+            label: 'foreman',
+            promptName: `Foreman run — ${identifier}`,
+            prompt,
+            repo: parseRepoFromDescription(mockProject?.content || null)
+          }
         })
       }
 
@@ -325,11 +363,16 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         issue: { identifier: issue.identifier, title: issue.title },
         features: { linearMcp: featureFlags.linearMcp === true }
       })
-      res.json({
-        label: 'foreman',
-        promptName: `Foreman run — ${issue.identifier}`,
+      sendPromptResult(req, res, {
+        identifier: issue.identifier,
+        downloadName: 'foreman',
         prompt,
-        repo: parseRepoFromDescription(project?.description)
+        json: {
+          label: 'foreman',
+          promptName: `Foreman run — ${issue.identifier}`,
+          prompt,
+          repo: parseRepoFromDescription(project?.description)
+        }
       })
     } catch (error) {
       console.error('Foreman prompt error:', error)
@@ -386,11 +429,16 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
           baseUrl,
           issue: { identifier, title: mockIssue.title }
         })
-        return res.json({
-          label: 'mini-foreman',
-          promptName: `Mini-foreman — ${identifier}`,
+        return sendPromptResult(req, res, {
+          identifier,
+          downloadName: 'mini-foreman',
           prompt,
-          repo: parseRepoFromDescription(mockProject?.content || null)
+          json: {
+            label: 'mini-foreman',
+            promptName: `Mini-foreman — ${identifier}`,
+            prompt,
+            repo: parseRepoFromDescription(mockProject?.content || null)
+          }
         })
       }
 
@@ -399,11 +447,16 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         baseUrl,
         issue: { identifier: issue.identifier, title: issue.title }
       })
-      res.json({
-        label: 'mini-foreman',
-        promptName: `Mini-foreman — ${issue.identifier}`,
+      sendPromptResult(req, res, {
+        identifier: issue.identifier,
+        downloadName: 'mini-foreman',
         prompt,
-        repo: parseRepoFromDescription(project?.description)
+        json: {
+          label: 'mini-foreman',
+          promptName: `Mini-foreman — ${issue.identifier}`,
+          prompt,
+          repo: parseRepoFromDescription(project?.description)
+        }
       })
     } catch (error) {
       console.error('Mini-foreman prompt error:', error)
@@ -464,12 +517,17 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
           issue: { identifier, title: mockIssue.title },
           mode
         })
-        return res.json({
-          label: 'autopilot',
-          promptName: `Autopilot — ${identifier}`,
-          kind: 'autopilot',
+        return sendPromptResult(req, res, {
+          identifier,
+          downloadName: 'autopilot',
           prompt,
-          repo: parseRepoFromDescription(mockProject?.content || null)
+          json: {
+            label: 'autopilot',
+            promptName: `Autopilot — ${identifier}`,
+            kind: 'autopilot',
+            prompt,
+            repo: parseRepoFromDescription(mockProject?.content || null)
+          }
         })
       }
 
@@ -479,12 +537,17 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         issue: { identifier: issue.identifier, title: issue.title },
         mode
       })
-      res.json({
-        label: 'autopilot',
-        promptName: `Autopilot — ${issue.identifier}`,
-        kind: 'autopilot',
+      sendPromptResult(req, res, {
+        identifier: issue.identifier,
+        downloadName: 'autopilot',
         prompt,
-        repo: parseRepoFromDescription(project?.description)
+        json: {
+          label: 'autopilot',
+          promptName: `Autopilot — ${issue.identifier}`,
+          kind: 'autopilot',
+          prompt,
+          repo: parseRepoFromDescription(project?.description)
+        }
       })
     } catch (error) {
       console.error('Autopilot prompt error:', error)
@@ -519,11 +582,16 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
 
     try {
       const prompt = buildAutopilotKickoff({ baseUrl, goal, mode })
-      res.json({
-        label: 'autopilot',
-        promptName: goal.trim() ? `Autopilot — ${goal.trim().slice(0, 60)}` : 'Autopilot (stack walk)',
-        kind: 'autopilot',
-        prompt
+      sendPromptResult(req, res, {
+        identifier: '',
+        downloadName: 'autopilot',
+        prompt,
+        json: {
+          label: 'autopilot',
+          promptName: goal.trim() ? `Autopilot — ${goal.trim().slice(0, 60)}` : 'Autopilot (stack walk)',
+          kind: 'autopilot',
+          prompt
+        }
       })
     } catch (error) {
       console.error('Autopilot kickoff error:', error)

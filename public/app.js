@@ -82,6 +82,52 @@ function stripCodeBlockFences(text) {
   return text.replace(/^```[^\n]*\n?/, '').replace(/\n?```\s*$/, '').trim()
 }
 
+/**
+ * Slugify a value into a filesystem-safe token for a download filename.
+ * Mirrors slugifyForFilename in lib/prompt-formatters.js.
+ * @param {string} value
+ * @returns {string} Lower-cased, dash-separated slug
+ */
+function slugifyForFilename(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9.-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^[-.]+|[-.]+$/g, '')
+}
+
+/**
+ * Build a `<identifier>-<promptName>.md` filename for a downloaded prompt.
+ * @param {string} identifier - Issue identifier (e.g. LIN-316), may be empty
+ * @param {string} promptName - Prompt name (e.g. "Retro")
+ * @returns {string} Safe filename ending in `.md`
+ */
+function buildPromptFilename(identifier, promptName) {
+  const id = slugifyForFilename(identifier)
+  const name = slugifyForFilename(promptName) || 'prompt'
+  const base = id ? `${id}-${name}` : name
+  return `${base}.md`
+}
+
+/**
+ * Trigger a client-side markdown download of the given text.
+ * @param {string} text - File contents
+ * @param {string} filename - Download filename
+ */
+function downloadMarkdown(text, filename) {
+  const blob = new Blob([text], { type: 'text/markdown' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  // Release the object URL on the next tick so the download can start first.
+  setTimeout(() => URL.revokeObjectURL(url), 0)
+}
+
 // ==========================================================================
 // Markdown Rendering (using marked.js library)
 // ==========================================================================
@@ -768,7 +814,7 @@ function hideIssuePromptUI(detailsContainer, issueId) {
 }
 
 /**
- * Toggle disabled state on prompt action buttons (dispatch + copy) within a container.
+ * Toggle disabled state on prompt action buttons (dispatch + copy + download) within a container.
  * LIN-191: Prevents interaction while prompts are loading or streaming.
  * @param {Element} container - Parent element containing .prompt-actions buttons
  * @param {boolean} disabled - Whether buttons should be disabled
@@ -914,6 +960,48 @@ function initPrompts() {
       copyBtn.textContent = 'failed'
       setTimeout(() => {
         copyBtn.textContent = 'copy'
+      }, 1500)
+    }
+  })
+
+  // Handle download button clicks — mirrors copy, but writes the prompt to a
+  // .md file instead of the clipboard (LIN-316). Retro/epic prompts can exceed
+  // clipboard practicality, so a download is the escape hatch. The file MUST
+  // byte-match what copy yields, so we apply the same fence-strip + +proxy block.
+  document.addEventListener('click', async (e) => {
+    const downloadBtn = e.target.closest('.prompt-download')
+    if (!downloadBtn) return
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    if (downloadBtn.disabled) return
+
+    const promptContainer = downloadBtn.closest('.prompt-container, .recommend-prompt')
+    const promptText = promptContainer?.querySelector('.prompt-text')
+    if (!promptText) return
+
+    let textToDownload = stripCodeBlockFences(promptText.dataset.rawPrompt || promptText.textContent)
+    const urlKey = promptContainer.dataset.urlKey || promptContainer.closest('[data-url-key]')?.dataset.urlKey
+    const promptName = promptContainer.querySelector('.prompt-name')?.textContent || 'prompt'
+    // Identifier lives on the issue's tree line, not the prompt container.
+    const identifier = promptContainer.closest('.node')?.querySelector('.line')?.dataset.identifier || ''
+
+    try {
+      // Append the proxy block (if +proxy is on) inside the try so a failed
+      // token mint surfaces as "failed" instead of silently saving a bare prompt.
+      textToDownload = await maybeAppendProxyBlock(textToDownload, urlKey)
+      downloadMarkdown(textToDownload, buildPromptFilename(identifier, promptName))
+      const originalText = downloadBtn.textContent
+      downloadBtn.textContent = 'saved!'
+      setTimeout(() => {
+        downloadBtn.textContent = originalText
+      }, 1500)
+    } catch (error) {
+      console.error('Failed to download:', error)
+      downloadBtn.textContent = 'failed'
+      setTimeout(() => {
+        downloadBtn.textContent = 'download'
       }, 1500)
     }
   })

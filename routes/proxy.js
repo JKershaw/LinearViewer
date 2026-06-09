@@ -26,7 +26,7 @@ import { hashContext } from '../lib/recap-cache.js';
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, isTerminalState, NO_PROJECT_ID } from '../lib/tree.js';
 import { flattenTrees, sortIssuesForSwipe, applyBlockingOrder, clusterByParent } from '../lib/render-swipe.js';
 import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, DISPATCH_KINDS } from '../lib/prompt-templates.js';
-import { parseRepoFromDescription } from '../lib/prompt-formatters.js';
+import { parseRepoFromDescription, buildPromptFilename } from '../lib/prompt-formatters.js';
 import { buildForemanPlaybook } from '../lib/prompts/foreman-playbook.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { buildAutopilotManual } from '../lib/prompts/autopilot-manual.js';
@@ -1107,6 +1107,10 @@ GET ${baseUrl}/api/proxy/recommend/{identifier}
   → AI-generated prompt recommendation (requires OpenRouter on the server; >25s responses
     stream whitespace-keepalive bytes inside a single 200 response, which JSON.parse ignores)
   → { "identifier": "LIN-123", "reasoning": "...", "prompt": "...", "truncated": false, "repo": "owner/name" }
+  → Add ?format=md to download the bare prompt as a markdown file instead of JSON
+    (Content-Type: text/markdown, Content-Disposition: attachment). Useful when the
+    prompt is too large to paste — save it straight to a .md file:
+      curl -H "Authorization: Bearer YOUR_TOKEN" "${baseUrl}/api/proxy/recommend/LIN-123?format=md" -o LIN-123-recommend.md
 
 GET ${baseUrl}/api/proxy/recap/{identifier}
   → Cached AI recap; auto-regenerates when stale. Pass \`?noRefresh=1\` to skip regeneration.
@@ -2436,6 +2440,18 @@ ${readEndpoints}${writeEndpoints}
 
         keepalive.stop();
         logEvent(req, '/api/proxy/recommend', 200);
+        // ?format=md serves the bare recommended prompt as a downloadable
+        // markdown file for external consumers (LIN-316). When the keepalive
+        // already flushed JSON headers (>25s runs) we can no longer set the
+        // attachment headers, so we just stream the prompt bytes — a curl
+        // consumer redirecting to a file still gets the right content.
+        if (req.query.format === 'md') {
+          if (!keepalive.flushed) {
+            res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+            res.setHeader('Content-Disposition', `attachment; filename="${buildPromptFilename(rec.identifier, 'recommend')}"`);
+          }
+          return res.end(rec.prompt || '');
+        }
         // recommendedAction + kind are additive (LIN-321); deferredVia + the terminal
         // identifier are additive (LIN-327): existing clients that read
         // identifier/reasoning/prompt/truncated/repo are unaffected.

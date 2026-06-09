@@ -1031,6 +1031,30 @@ test.describe('Proxy API - Recommend-and-Dispatch (fused verb, LIN-321)', () => 
     expect(rec.prompt).toBeTruthy();                     // terminal node carries a prompt
   });
 
+  test('LIN-316: GET /recommend?format=md returns the bare prompt as a markdown download', async ({ request }) => {
+    const resp = await request.get('/api/proxy/recommend/TEST-1?format=md', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(resp.status()).toBe(200);
+    expect(resp.headers()['content-type']).toContain('text/markdown');
+    // Filename keys off the terminal identifier the descent resolves to (TEST-2).
+    expect(resp.headers()['content-disposition']).toContain('attachment');
+    expect(resp.headers()['content-disposition']).toContain('test-2-recommend.md');
+    const body = await resp.text();
+    expect(body.length).toBeGreaterThan(0);
+    expect(body.trimStart().startsWith('{')).toBe(false); // not a JSON envelope
+  });
+
+  test('LIN-316: GET /recommend without ?format=md still returns JSON', async ({ request }) => {
+    const resp = await request.get('/api/proxy/recommend/TEST-1', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(resp.status()).toBe(200);
+    expect(resp.headers()['content-type']).toContain('application/json');
+    const rec = await resp.json();
+    expect(rec.prompt).toBeTruthy();
+  });
+
   test('nonexistent issue gets 404', async ({ request }) => {
     const resp = await request.post('/api/proxy/recommend-and-dispatch', {
       headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },

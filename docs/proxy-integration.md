@@ -487,6 +487,21 @@ Returns an AI-generated prompt recommendation. Requires an OpenRouter key (the t
 }
 ```
 
+**Download as markdown** — add `?format=md` to get the bare prompt as a
+downloadable markdown file instead of JSON (`Content-Type: text/markdown`,
+`Content-Disposition: attachment; filename="<identifier>-recommend.md"`). This is
+the escape hatch for prompts too large to paste — save straight to a `.md` file:
+
+```bash
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+  "https://your-host/api/proxy/recommend/ENG-42?format=md" -o ENG-42-recommend.md
+```
+
+The markdown body is just the `prompt` string (no `reasoning`/`repo` envelope). On
+the rare run that exceeds ~25s, keepalive whitespace may already have committed the
+response as `application/json`; the body is still the prompt bytes, so a redirect to
+a file (`-o`) saves correctly regardless.
+
 #### Record Foreman Status
 
 ```
