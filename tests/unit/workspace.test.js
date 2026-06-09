@@ -110,6 +110,50 @@ describe('updateWorkspaceTokens', () => {
     const expectedExpiry = Date.now() + 86400 * 30 * 1000;
     assert.ok(Math.abs(workspace.tokenExpiresAt - expectedExpiry) < 1000);
   });
+
+  // Provider-aware write shape (LIN-334 / S2)
+  test('writes generalized {provider, credentials} shape', () => {
+    const workspace = { id: 'ws-1', name: 'Test Workspace' };
+    updateWorkspaceTokens(workspace, {
+      access_token: 'new-access-token',
+      refresh_token: 'new-refresh-token',
+      expires_in: 3600
+    });
+
+    assert.strictEqual(workspace.provider, 'linear');
+    assert.deepStrictEqual(workspace.credentials, { token: 'new-access-token' });
+  });
+
+  test('written shape reads back through getWorkspaceToken (dual-read round-trip)', () => {
+    const workspace = { id: 'ws-1' };
+    updateWorkspaceTokens(workspace, {
+      access_token: 'round-trip-token',
+      refresh_token: 'r',
+      expires_in: 3600
+    });
+
+    // New canonical seam resolves to credentials.token.
+    assert.strictEqual(getWorkspaceToken(workspace), 'round-trip-token');
+    // Legacy field is still populated for un-migrated read sites (S3+).
+    assert.strictEqual(workspace.accessToken, 'round-trip-token');
+  });
+
+  test('refresh rotates credentials.token and preserves other credential fields', () => {
+    const workspace = {
+      id: 'ws-1',
+      provider: 'linear',
+      credentials: { token: 'old-token', scope: 'read,write' }
+    };
+    updateWorkspaceTokens(workspace, {
+      access_token: 'rotated-token',
+      refresh_token: 'r2',
+      expires_in: 3600
+    });
+
+    assert.strictEqual(workspace.credentials.token, 'rotated-token');
+    assert.strictEqual(workspace.credentials.scope, 'read,write');
+    assert.strictEqual(getWorkspaceToken(workspace), 'rotated-token');
+  });
 });
 
 // =============================================================================
