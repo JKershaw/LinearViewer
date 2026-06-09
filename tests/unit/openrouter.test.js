@@ -111,13 +111,15 @@ describe('formatSubtaskOverview', () => {
     assert.ok(result.includes('✓ Done: LIN-1, LIN-2'));
   });
 
-  test('shows remaining subtasks with circle', () => {
+  test('shows remaining subtasks with circle, one per line', () => {
     const children = [
       { id: '1', identifier: 'LIN-1', state: { type: 'unstarted' } },
       { id: '2', identifier: 'LIN-2', state: { type: 'backlog' } }
     ];
     const result = formatSubtaskOverview(children, null);
-    assert.ok(result.includes('○ Remaining: LIN-1, LIN-2'));
+    assert.ok(result.includes('○ Remaining:'));
+    assert.ok(result.includes('LIN-1'));
+    assert.ok(result.includes('LIN-2'));
   });
 
   test('marks focused subtask with arrow', () => {
@@ -146,11 +148,10 @@ describe('formatSubtaskOverview', () => {
     ];
     const result = formatSubtaskOverview(children, '2');
     const lines = result.split('\n');
-    assert.strictEqual(lines.length, 2);
     assert.ok(lines[0].includes('✓ Done: LIN-1'));
     assert.ok(lines[1].includes('○ Remaining:'));
-    assert.ok(lines[1].includes('→ LIN-2'));
-    assert.ok(lines[1].includes('LIN-3 (in progress)'));
+    assert.ok(result.includes('→ LIN-2'));
+    assert.ok(result.includes('LIN-3 (in progress)'));
   });
 
   test('handles only completed subtasks', () => {
@@ -168,7 +169,55 @@ describe('formatSubtaskOverview', () => {
     ];
     const result = formatSubtaskOverview(children, null);
     assert.ok(!result.includes('✓ Done'));
-    assert.ok(result.includes('○ Remaining: LIN-1'));
+    assert.ok(result.includes('○ Remaining:'));
+    assert.ok(result.includes('LIN-1'));
+  });
+
+  test('shows remaining subtask titles so the recommender can choose', () => {
+    const children = [
+      { id: '1', identifier: 'LIN-1', title: 'Wire the auth route', state: { type: 'backlog' } },
+      { id: '2', identifier: 'LIN-2', title: 'Capability-aware rendering', state: { type: 'backlog' } }
+    ];
+    const result = formatSubtaskOverview(children, null);
+    assert.ok(result.includes('Wire the auth route'));
+    assert.ok(result.includes('Capability-aware rendering'));
+  });
+
+  test('annotates a child that itself has subtasks with a count', () => {
+    const children = [
+      {
+        id: '1', identifier: 'LIN-1', title: 'A node', state: { type: 'backlog' },
+        children: { nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }] }
+      },
+      { id: '2', identifier: 'LIN-2', title: 'A leaf', state: { type: 'backlog' } }
+    ];
+    const result = formatSubtaskOverview(children, null);
+    assert.ok(result.includes('LIN-1 A node [3 subtasks]'), 'plural count for a node child');
+    assert.ok(!result.includes('LIN-2 A leaf ['), 'no count annotation for a leaf child');
+  });
+
+  test('singular subtask label for exactly one nested child', () => {
+    const children = [
+      {
+        id: '1', identifier: 'LIN-1', title: 'A node', state: { type: 'backlog' },
+        children: { nodes: [{ id: 'a' }] }
+      }
+    ];
+    assert.ok(formatSubtaskOverview(children, null).includes('[1 subtask]'));
+  });
+
+  // Display order must match the focus picker (lowest identifier first), even when
+  // the input arrives in Linear's newest-first connection order (LIN-177 shape).
+  test('orders remaining by identifier regardless of input order', () => {
+    const children = [
+      { id: '5', identifier: 'LIN-337', title: 'S5', state: { type: 'backlog' } },
+      { id: '4', identifier: 'LIN-336', title: 'S4', state: { type: 'backlog' } },
+      { id: '2', identifier: 'LIN-334', title: 'S2', state: { type: 'backlog' } }
+    ];
+    const result = formatSubtaskOverview(children, null);
+    const remainingLines = result.split('\n').filter(l => /LIN-33\d/.test(l));
+    assert.ok(remainingLines[0].includes('LIN-334'), 'lowest identifier listed first');
+    assert.ok(remainingLines[2].includes('LIN-337'), 'highest identifier listed last');
   });
 });
 
