@@ -110,6 +110,7 @@ Both In Progress and Projects sections use the same nested structure:
 - `.footer-ai-status` - AI connection status indicator
 - `.footer-ai-status.free` - free tier status (yellow, shows "ai: ● free (N/5)")
 - `[data-ai-source]` - AI source attribute on footer status (`oauth`, `env`, `free`)
+- `.footer-ai-model` / `[data-ai-model]` - workspace LLM model name, filled client-side from `/api/recommend/status`
 
 ### Interactive Elements
 - `.toggle` - expand/collapse arrow for child tasks (▶/▼)

@@ -1840,6 +1840,16 @@ h1 {
   color: var(--blue);
 }
 
+/* Workspace model indicator, populated client-side next to the AI status. */
+.footer-ai-model {
+  color: var(--fg-dim);
+}
+
+.footer-ai-model:not(:empty)::before {
+  content: " · ";
+  color: var(--fg-dim);
+}
+
 /* Mobile adjustments for footer */
 @media (max-width: 640px) {
   .page-footer {
