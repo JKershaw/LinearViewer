@@ -80,7 +80,7 @@ Only recommend implementation if:
 
 
 ## Prompt Structure
-Generate a prompt following this structure:
+Generate a prompt following this structure. The prompt is an INSTRUCTION that references the task, not a copy of it — do NOT restate the task's description or comment thread (see the Context section below for what to include instead).
 
 ```
 # [Action verb] {{IDENTIFIER}}: [Task title]
@@ -100,8 +100,7 @@ Treat this ticket as a hypothesis about the codebase, not ground truth — its d
 3. If any have changed, re-read that source at HEAD (not your own notes or the ticket prose) and reconcile any discrepancies before trusting the ticket's description of the codebase.
 
 ## Context
-[Include relevant context - project, parent, siblings, and discussion history if useful]
-
+Reference the task rather than restating it. Do NOT copy {{IDENTIFIER}}'s description or comment thread into the prompt — the consumer reads the live task (its brief, or Linear) directly, so a baked-in copy only bloats the prompt and risks going stale. Include only: (a) the lightweight relational pointers that orient the work — project, parent, siblings — as one line each; and (b) any task-specific fact the consumer genuinely needs to act on that is NOT already obvious from the ticket, and only when it is present in the Task Context above.
 
 ## Goal
 **Role**: [Appropriate role for this action type - e.g., "technical researcher", "implementation engineer", "analyst"]
