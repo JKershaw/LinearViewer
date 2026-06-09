@@ -225,7 +225,7 @@ describe('generatePrompt', () => {
     assert.ok(result.prompt.includes('My Project'));
   });
 
-  test('includes comments when present', () => {
+  test('references discussion by pointer instead of embedding comment bodies', () => {
     const contextWithComments = {
       ...mockContext,
       comments: [
@@ -235,8 +235,16 @@ describe('generatePrompt', () => {
     };
 
     const result = generatePrompt('blocked', mockIssue, contextWithComments);
-    assert.ok(result.prompt.includes('Alice'));
-    assert.ok(result.prompt.includes('First comment with research findings'));
+    // Pass-by-reference: the prompt points at the task's discussion rather than
+    // baking the comment thread in verbatim (keeps prompts short for long-lived
+    // tasks; the agent reads live content). So the comment bodies/authors must
+    // NOT appear, and the reference directive must.
+    assert.ok(!result.prompt.includes('First comment with research findings'),
+      'comment bodies must not be embedded verbatim');
+    assert.ok(!result.prompt.includes('Alice'),
+      'comment authors must not be embedded verbatim');
+    assert.ok(result.prompt.includes('read the current description and comment thread'),
+      'prompt must reference the task discussion instead of embedding it');
   });
 });
 
