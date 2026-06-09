@@ -1111,6 +1111,9 @@ GET ${baseUrl}/api/proxy/recommend/{identifier}
     (Content-Type: text/markdown, Content-Disposition: attachment). Useful when the
     prompt is too large to paste — save it straight to a .md file:
       curl -H "Authorization: Bearer YOUR_TOKEN" "${baseUrl}/api/proxy/recommend/LIN-123?format=md" -o LIN-123-recommend.md
+  → Add ?noDescend=1 to recommend the named issue's OWN next step WITHOUT descending into an
+    open child. Use it to drive a parent whose work lives in its own description/checklist while
+    a child stays open or is separately tracked (otherwise the engine routes into that child).
 
 GET ${baseUrl}/api/proxy/recap/{identifier}
   → Cached AI recap; auto-regenerates when stale. Pass \`?noRefresh=1\` to skip regeneration.
@@ -1196,10 +1199,11 @@ POST ${baseUrl}/api/proxy/dispatch
   → { "id": "...", "status": "queued", "promptName": "...", "kind": "implementation", "issueIdentifier": "...", "target": "cli", "dispatchedAt": "..." }
 
 POST ${baseUrl}/api/proxy/recommend-and-dispatch
-  Body: { "issueIdentifier": "LIN-42", "target": "cli|web|dash", "repo": "...", "appendProxyContext": true }
+  Body: { "issueIdentifier": "LIN-42", "target": "cli|web|dash", "repo": "...", "appendProxyContext": true, "noDescend": false }
   → Fused verb: runs /recommend and forwards the recommended prompt straight into a dispatch, server-side. "issueIdentifier" is required; target defaults to "cli".
   → The prompt body NEVER returns to you — you only get the task header. This keeps the prompt out of your context (the point of the verb); learn what was chosen from "kind"/"promptName", then watch the item via GET /dispatch/{id}.
   → "kind" is derived from the recommendation's own action signal (falling back to "custom") — no need to read the prompt to classify the task.
+  → Set "noDescend": true to dispatch the named issue's OWN next step and NOT descend into an open child (deterministic). Use it to drive a parent whose deliverables live in its own description while a child is out of scope / separately tracked; the dispatched item then references the parent, and "deferredVia" is just [parent].
   → { "id": "...", "status": "queued", "kind": "plan", "promptName": "plan", "issueIdentifier": "...", "target": "cli", "dispatchedAt": "..." }
 
 GET ${baseUrl}/api/proxy/dispatch?issueIdentifier={LIN-42}&status={queued|taken|done|failed|aborted}&limit={n}
@@ -2249,7 +2253,7 @@ ${readEndpoints}${writeEndpoints}
    * with recommendErrorResponse(). `sessionApiKey` may be passed in to avoid a
    * second key lookup when the caller already resolved it for its precheck.
    */
-  async function computeRecommendation({ urlKey, createdBy, identifier, accessToken, isTestMode, sessionApiKey, deadline }) {
+  async function computeRecommendation({ urlKey, createdBy, identifier, accessToken, isTestMode, sessionApiKey, deadline, noDescend = false }) {
     if (sessionApiKey === undefined) {
       sessionApiKey = await getWorkspaceOpenRouterKey(urlKey, createdBy);
     }
@@ -2289,8 +2293,10 @@ ${readEndpoints}${writeEndpoints}
         reasoning = 'This task is blocked. Analyzing the blocker to find a way forward.';
         goal = 'Identify the blocker and recommend how to unblock.';
         recommendedAction = 'blocked';
-      } else if (focusChild) {
+      } else if (!noDescend && focusChild) {
         // No prompt body on defer — the cost contract (mirrors getRecommendation).
+        // noDescend (LIN-365) skips this container branch so the parent's own work is
+        // recommended even with an open child (mirrors the live focusedChild suppression).
         return {
           identifier: issueIdentifier,
           reasoning: `${issueIdentifier} is a container; the actionable work lives in ${focusChild.identifier}.`,
@@ -2322,7 +2328,7 @@ ${readEndpoints}${writeEndpoints}
     // Live path. Fetch issue context with two-tier support for parent tasks,
     // then the AI recommendation. Uses a longer timeout since this makes a
     // Linear API call + an OpenRouter LLM call.
-    const context = await fetchWithTimeout((signal) => fetchRecommendationContext(accessToken, identifier, { signal }), CONTEXT_FETCH_TIMEOUT_MS);
+    const context = await fetchWithTimeout((signal) => fetchRecommendationContext(accessToken, identifier, { signal, noDescend }), CONTEXT_FETCH_TIMEOUT_MS);
     const { issue, parent, siblings, project, children, comments, focusedChild } = context;
 
     const selectedModel = await resolveWorkspaceModel({ urlKey, workspacePreferencesStore });
@@ -2416,6 +2422,11 @@ ${readEndpoints}${writeEndpoints}
         return res.status(400).json({ error: 'Invalid identifier format' });
       }
 
+      // noDescend (LIN-365): recommend the named node's OWN work, never descend into
+      // an open child. Deterministic leaf-target lever for parents whose children are
+      // out of scope / separately tracked.
+      const noDescend = req.query.noDescend === '1' || req.query.noDescend === 'true';
+
       // Linear + OpenRouter can exceed Heroku's 30s router cap (H12). Arm a
       // delayed whitespace keepalive so the dyno can keep the connection open
       // while the LLM call completes.
@@ -2427,6 +2438,7 @@ ${readEndpoints}${writeEndpoints}
         const { recommendation: rec, deferredVia, deferTruncated, deferStopReason } = await resolveRecommendation({
           startIdentifier: identifier,
           deadline: recommendDeadline,
+          noDescend,
           computeOne: (id) => computeRecommendation({
             urlKey: req.proxyUrlKey,
             createdBy: req.proxyCreatedBy,
@@ -2434,7 +2446,8 @@ ${readEndpoints}${writeEndpoints}
             accessToken,
             isTestMode,
             sessionApiKey,
-            deadline: recommendDeadline
+            deadline: recommendDeadline,
+            noDescend
           })
         });
 
@@ -3318,7 +3331,7 @@ ${readEndpoints}${writeEndpoints}
     }
 
     try {
-      const { issueIdentifier, target, repo, appendProxyContext } = req.body || {};
+      const { issueIdentifier, target, repo, appendProxyContext, noDescend } = req.body || {};
 
       // Validate caller-supplied inputs. (Only the server-generated prompt skips
       // the dangerous-char/length checks — see the dispatch step below.)
@@ -3333,6 +3346,10 @@ ${readEndpoints}${writeEndpoints}
       if (target !== undefined && !VALID_PROXY_DISPATCH_TARGETS.includes(target)) {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
         return res.status(400).json({ error: `target must be one of: ${VALID_PROXY_DISPATCH_TARGETS.join(', ')}` });
+      }
+      if (noDescend !== undefined && typeof noDescend !== 'boolean') {
+        logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
+        return res.status(400).json({ error: 'noDescend must be a boolean' });
       }
       if (repo !== undefined && (typeof repo !== 'string' || repo.length > MAX_NAME_LENGTH || DANGEROUS_CHARS_REGEX.test(repo))) {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
@@ -3364,6 +3381,8 @@ ${readEndpoints}${writeEndpoints}
         ({ recommendation: rec, deferredVia, deferTruncated, deferStopReason } = await resolveRecommendation({
           startIdentifier: issueIdentifier,
           deadline: recommendDeadline,
+          // noDescend (LIN-365): dispatch the named node's OWN work, never an open child.
+          noDescend: noDescend === true,
           computeOne: (id) => computeRecommendation({
             urlKey: req.proxyUrlKey,
             createdBy: req.proxyCreatedBy,
@@ -3371,7 +3390,8 @@ ${readEndpoints}${writeEndpoints}
             accessToken,
             isTestMode,
             sessionApiKey,
-            deadline: recommendDeadline
+            deadline: recommendDeadline,
+            noDescend: noDescend === true
           })
         }));
       } catch (err) {

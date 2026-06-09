@@ -502,6 +502,22 @@ the rare run that exceeds ~25s, keepalive whitespace may already have committed 
 response as `application/json`; the body is still the prompt bytes, so a redirect to
 a file (`-o`) saves correctly regardless.
 
+**Recommend the parent's own work (`?noDescend=1`)** — by default, when the named
+issue is a container (has an open child), the engine descends and recommends the
+child's work. Add `?noDescend=1` (or `?noDescend=true`) to recommend the **named
+issue's own next step instead**, without ever following into a child:
+
+```bash
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+  "https://your-host/api/proxy/recommend/ENG-42?noDescend=1"
+```
+
+Use this when a parent's actual deliverables live in its own description/checklist
+while a sub-issue is out of scope or separately tracked — otherwise the recommend
+engine routes into that child and the parent's work is unreachable through the verb.
+The non-descent is deterministic (the child is never fetched), so `identifier`
+returns the node you named and `deferredVia` is just `["ENG-42"]`.
+
 #### Record Foreman Status
 
 ```
@@ -802,8 +818,20 @@ Runs `/recommend` and forwards the recommended prompt straight into a dispatch �
 | `target` | string | No | `cli` \| `web` \| `dash` (default `cli`). `local`/Harbour is **not** available to proxy consumers |
 | `repo` | string | No | Optional repository hint |
 | `appendProxyContext` | bool | No | Default `true`: append a proxy-context block so the worker inherits Linear access for this workspace |
+| `noDescend` | bool | No | Default `false`. When `true`, recommend and dispatch the **named issue's own** next step and never descend into an open child (see below) |
 
 `kind` is derived server-side from the recommendation's own action signal, falling back to `custom` when the action can't be parsed. There is no `prompt` field to send (it is generated) and none in the response (it is withheld by design).
+
+**`noDescend` — dispatch the parent's own work.** By default this verb descends a
+container to its actionable child and dispatches *that* child (so the returned
+`issueIdentifier` and `deferredVia` reflect the descent). Set `noDescend: true` to
+suppress the descent: the engine frames the named issue as a leaf, recommends its
+**own** next step, and dispatches against the issue you named. The dispatched item's
+`issueIdentifier` is then the parent and `deferredVia` is `[parent]`. Use it to drive
+a parent whose deliverables live in its own description while a sub-issue is out of
+scope or separately tracked — the lever is deterministic (the child is never fetched
+or dispatched), so it is the reliable way to make a parent's own work reachable
+through the verb.
 
 Returns `201`:
 ```json
