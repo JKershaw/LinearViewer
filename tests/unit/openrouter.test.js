@@ -694,6 +694,32 @@ describe('action vocabulary (kind derivation seam)', () => {
     assert.ok(text.includes('plan, research, implement'), 'a sensible fallback list is present');
   });
 
+  // The emitted skeleton must keep directives OFF the fill-in lines, so a literal
+  // model fills the slot instead of transcribing the guidance (the leak we saw on
+  // gpt-5.4-mini: "→ implement — use EXACTLY one action name, verbatim, from …").
+  test('the response skeleton presents a clean action line and never inlines the directive', () => {
+    const text = buildMetaPromptTemplate({ ...base });
+    assert.ok(text.includes('→ **<action>**'), 'the skeleton action line is a bare fill-in slot');
+    assert.ok(!text.includes('→ **[action]** —'), 'no directive prose is appended to the emitted action line');
+    assert.ok(text.includes('Keep the surrounding `**` bold markers'),
+      'the skeleton reminds the model to keep the bold markers the parser requires');
+    assert.ok(/do NOT copy these field descriptions/i.test(text),
+      'the model is told not to transcribe the field descriptions into its answer');
+  });
+
+  // DeferTo must NOT appear in the default skeleton — only as a conditional rule —
+  // so a non-defer reply that mirrors the skeleton omits it (no bare "DeferTo:").
+  test('DeferTo is a conditional rule, absent from the default skeleton', () => {
+    const text = buildMetaPromptTemplate({ ...base });
+    const skeletonStart = text.indexOf('## Reasoning');
+    const promptSlot = text.indexOf('<the complete prompt text');
+    const skeleton = text.slice(skeletonStart, promptSlot);
+    assert.ok(!skeleton.includes('DeferTo'),
+      'the default (non-defer) skeleton must not contain a DeferTo line');
+    assert.ok(/ONLY when the action is `defer`/.test(text),
+      'DeferTo is stated as a conditional rule below the skeleton');
+  });
+
   // LIN-327: `defer` is a recommend-meta action — emittable by the recommender,
   // a valid kind, and self-deriving (NOT the custom fallback), despite having no
   // PROMPT_TEMPLATES entry / no prompt body.
