@@ -603,6 +603,57 @@ describe('buildMetaPromptTemplate terminal-state branch (LIN-353)', () => {
   });
 });
 
+// =============================================================================
+// Single-action boundary (LIN-358) — the generated prompt body must stay within
+// the one recommended action and hand off by naming the follow-up, rather than
+// carrying the work into the next phase. The reported symptom was an "unblock"
+// prompt that, once unblocked, proceeded to implement; the fix is the general
+// boundary rule plus removing the "proceed to the next phase" trigger in Step 2.
+// =============================================================================
+
+describe('buildMetaPromptTemplate single-action boundary (LIN-358)', () => {
+  function build(overrides = {}) {
+    return buildMetaPromptTemplate({
+      issueContext: 'Test context', identifier: 'LIN-1', hasSubtasks: false,
+      subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
+      hasComments: false, commentCount: 0, aiHints: 'hints',
+      actionVocabulary: getAIRecommendationActionNames().join(', '), ...overrides
+    });
+  }
+
+  test('the prompt body is constrained to the single recommended action', () => {
+    const text = build();
+    assert.ok(
+      /Keep the generated prompt inside the single action you recommended/.test(text),
+      'the single-action boundary rule must be present'
+    );
+  });
+
+  test('the boundary rule routes the next phase through a handoff, not continuation', () => {
+    const text = build();
+    assert.ok(
+      /its final step names the follow-up action/.test(text),
+      'the rule must instruct the prompt to name the follow-up action'
+    );
+    assert.ok(
+      /each action gets its own prompt, generated fresh when it starts/.test(text),
+      'the rule must state each action gets its own prompt'
+    );
+  });
+
+  test('the blocked branch hands off rather than proceeding into the next phase', () => {
+    const text = build();
+    assert.ok(
+      /confirm unblocked, remove label, and recommend the next action/.test(text),
+      'the resolved-blocker shortcut must recommend the next action'
+    );
+    assert.ok(
+      !/proceed to the next phase/.test(text),
+      'the "proceed to the next phase" wording that licensed implementation drift must be gone'
+    );
+  });
+});
+
 describe('buildMetaPromptTemplate plan completeness check', () => {
   function build() {
     return buildMetaPromptTemplate({
