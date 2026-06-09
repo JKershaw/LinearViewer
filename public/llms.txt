@@ -158,6 +158,7 @@ Tasks use 2 workflow labels:
 - `.prompt-container[data-prompt-for="{id}"]` - container for generated prompt
 - `.prompt-text` - the prompt text (inside container)
 - `.prompt-copy` - copy button (inside container)
+- `.prompt-download` - download button (inside container); saves the prompt as a `.md` file. Use this instead of copy for very large prompts (e.g. retro on an epic) that exceed clipboard limits. The file matches what copy yields, including the `+proxy` block when that toggle is on. Filename: `<identifier>-<promptName>.md`.
 
 ### Available Prompt Templates (14 total)
 

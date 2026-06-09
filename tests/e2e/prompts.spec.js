@@ -205,6 +205,41 @@ test.describe('Promptable Labels', () => {
     await expect(copyButton).toHaveText('copy', { timeout: 3000 });
   });
 
+  test('LIN-316: download button saves prompt as a .md file', async ({ page }) => {
+    // Find and expand the task
+    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
+    await taskLine.click();
+
+    // Expand Prompts section
+    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
+    // Reveal hidden prompts (blocked is behind "more")
+    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+
+    // Click the promptable label
+    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
+    await labelLink.click();
+
+    // Wait for prompt to load
+    const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
+    await expect(promptContainer).toBeVisible();
+    await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
+
+    // Click download and capture the triggered download
+    const downloadButton = promptContainer.locator('.prompt-download');
+    await expect(downloadButton).toBeVisible();
+    const downloadPromise = page.waitForEvent('download');
+    await downloadButton.click();
+    const download = await downloadPromise;
+
+    // Filename is <identifier>-<promptName>.md (TEST-11 / blocked)
+    expect(download.suggestedFilename()).toBe('test-11-blocked.md');
+
+    // Button gives "saved!" feedback then reverts
+    await expect(downloadButton).toHaveText('saved!');
+    await expect(downloadButton).toHaveText('download', { timeout: 3000 });
+  });
+
   test('LIN-191: copy button enabled only after prompt loads', async ({ page }) => {
     // Find and expand the task with blocked label
     const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
@@ -332,6 +367,31 @@ test.describe('Prompt API', () => {
     expect(body.promptName).toBe('blocked');
     expect(body.prompt).toContain('# Unblock TEST-');
     expect(body.prompt).toContain('## Goal');
+  });
+
+  test('LIN-316: ?format=md returns prompt as a downloadable markdown file', async ({ page }) => {
+    const response = await page.request.get(`${API_PREFIX}/api/prompt/${BLOCKED_ISSUE_ID}/blocked?format=md`);
+    expect(response.status()).toBe(200);
+
+    // Markdown content type + attachment headers
+    expect(response.headers()['content-type']).toContain('text/markdown');
+    expect(response.headers()['content-disposition']).toContain('attachment');
+    expect(response.headers()['content-disposition']).toContain('test-11-blocked.md');
+
+    // Body is the bare prompt string (not a JSON envelope)
+    const body = await response.text();
+    expect(body).toContain('# Unblock TEST-');
+    expect(body).toContain('## Goal');
+    expect(body.trimStart().startsWith('{')).toBe(false);
+  });
+
+  test('LIN-316: prompt route still returns JSON without ?format=md', async ({ page }) => {
+    const response = await page.request.get(`${API_PREFIX}/api/prompt/${BLOCKED_ISSUE_ID}/blocked`);
+    expect(response.status()).toBe(200);
+    expect(response.headers()['content-type']).toContain('application/json');
+    const body = await response.json();
+    expect(body.label).toBe('blocked');
+    expect(body.prompt).toContain('# Unblock TEST-');
   });
 
   test('returns bug prompt', async ({ page }) => {

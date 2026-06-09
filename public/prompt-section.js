@@ -84,6 +84,36 @@
     return text + buildProxyBlock(token);
   }
 
+  // Slugify + filename helpers mirror lib/prompt-formatters.js (and app.js) so a
+  // downloaded prompt file is named consistently across every surface.
+  function slugifyForFilename(value) {
+    return String(value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9.-]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^[-.]+|[-.]+$/g, '');
+  }
+
+  function buildPromptFilename(identifier, promptName) {
+    const id = slugifyForFilename(identifier);
+    const name = slugifyForFilename(promptName) || 'prompt';
+    const base = id ? `${id}-${name}` : name;
+    return `${base}.md`;
+  }
+
+  function downloadMarkdown(text, filename) {
+    const blob = new Blob([text], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
   /**
    * Build the picker (idle state): prompt pill row.
    */
@@ -132,6 +162,7 @@
     const { dispatchEnabled, proxyEnabled, isLocalhost } = opts;
     let html = '';
     html += '<button class="swipe-prompt-copy" data-action="copy">copy</button>';
+    html += '<button class="swipe-prompt-download" data-action="download" title="Download prompt as a .md file">download</button>';
     if (proxyEnabled) {
       const active = isProxyActive() ? ' active' : '';
       html += `<button class="prompt-proxy-toggle${active}" data-action="proxy-toggle" title="Append proxy API instructions to prompt">+proxy</button>`;
@@ -510,6 +541,11 @@
         return;
       }
 
+      if (action === 'download') {
+        handleDownload(btn);
+        return;
+      }
+
       if (action === 'dispatch') {
         handleDispatch(btn);
         return;
@@ -541,6 +577,29 @@
       } catch {
         btn.textContent = 'failed';
         setTimeout(() => { if (!destroyed) btn.textContent = 'copy'; }, 2000);
+      }
+    }
+
+    // Mirrors handleCopy, but saves the prompt to a .md file instead of the
+    // clipboard (LIN-316). The file must byte-match what copy yields, so it
+    // applies the same +proxy block via maybeAppendProxy.
+    async function handleDownload(btn) {
+      const raw = state.result && state.result.raw;
+      if (!raw) return;
+      try {
+        const text = await maybeAppendProxy(raw, opts.urlKey);
+        const filename = buildPromptFilename(issue.identifier, (state.result && state.result.name) || 'prompt');
+        downloadMarkdown(text, filename);
+        btn.textContent = 'saved!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          if (destroyed) return;
+          btn.textContent = 'download';
+          btn.classList.remove('copied');
+        }, 2000);
+      } catch {
+        btn.textContent = 'failed';
+        setTimeout(() => { if (!destroyed) btn.textContent = 'download'; }, 2000);
       }
     }
 

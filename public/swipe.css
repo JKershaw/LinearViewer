@@ -730,8 +730,9 @@ a.swipe-relation-issue:hover {
   padding: 0;
 }
 
-/* Copy feedback */
-.swipe-prompt-copy.copied {
+/* Copy / download feedback */
+.swipe-prompt-copy.copied,
+.swipe-prompt-download.copied {
   color: #16a085;
   border-color: #16a085;
 }
