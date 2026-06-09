@@ -1,9 +1,11 @@
 import { test, expect } from '../fixtures/test-base.js';
 
 // Periodicals feature (LIN-341): a synthetic, workspace-flag-gated group on the
-// main workspace view containing the corrective periodical template rows
-// (Documentation Review, Test Coverage Gap Review — LIN-351, Secrets &
-// Credential Scan — LIN-352).
+// main workspace view containing the periodical template rows. The LIN-354 set
+// is Documentation Review, Test Coverage Gap Review, Security Review, API
+// Quality Review, and Code Quality Review. This spec keys only on the
+// Documentation Review row and never asserts a total row count, so it is
+// agnostic to the rest of the registry.
 
 const TEST_WORKSPACE_URL_KEY = 'test-workspace';
 const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;
