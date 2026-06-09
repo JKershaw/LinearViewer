@@ -27,6 +27,7 @@ import {
   registerProvider,
   getProvider,
   getAllProviders,
+  getProviderForWorkspace,
 } from '../../lib/providers/registry.js';
 import { getStateDisplay, getStateOrder } from '../../lib/providers/state-map.js';
 import { LinearProvider, linearProvider } from '../../lib/providers/linear/index.js';
@@ -122,6 +123,27 @@ describe('provider registry', () => {
     assert.ok(lp, 'linear provider must be registered');
     assert.strictEqual(lp, linearProvider);
     assert.ok(lp instanceof LinearProvider);
+  });
+
+  describe('getProviderForWorkspace (LIN-177 S3)', () => {
+    test('resolves a workspace.provider when registered', () => {
+      const stub = { name: 'gpfw-stub', ui: {} };
+      registerProvider(stub);
+      assert.strictEqual(getProviderForWorkspace({ provider: 'gpfw-stub' }), stub);
+    });
+
+    test('falls back to the Linear provider for legacy workspaces (no provider field)', () => {
+      assert.strictEqual(getProviderForWorkspace({ urlKey: 'x' }), linearProvider);
+    });
+
+    test('falls back to Linear for undefined/null (landing page, no workspace)', () => {
+      assert.strictEqual(getProviderForWorkspace(undefined), linearProvider);
+      assert.strictEqual(getProviderForWorkspace(null), linearProvider);
+    });
+
+    test('falls back to Linear when workspace.provider names an unknown provider', () => {
+      assert.strictEqual(getProviderForWorkspace({ provider: 'no-such-provider' }), linearProvider);
+    });
   });
 });
 
