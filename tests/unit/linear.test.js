@@ -26,6 +26,50 @@ describe('selectFocusSubtask', () => {
     assert.strictEqual(selectFocusSubtask([]), null);
   });
 
+  // Deterministic tie-break: among equally-eligible candidates, pick the lowest
+  // identifier (natural order) regardless of input array order. Linear returns
+  // children newest-first, so without this the pick is the most-recently-created
+  // subtask — the LIN-177 S5-instead-of-S2 surprise.
+  describe('tie-break by identifier (LIN-177)', () => {
+    test('picks lowest-identifier todo when input is newest-first', () => {
+      const children = [
+        { id: '5', identifier: 'LIN-337', state: { type: 'backlog' } },
+        { id: '4', identifier: 'LIN-336', state: { type: 'backlog' } },
+        { id: '3', identifier: 'LIN-335', state: { type: 'backlog' } },
+        { id: '2', identifier: 'LIN-334', state: { type: 'backlog' } },
+        { id: 'd1', identifier: 'LIN-333', state: { type: 'completed' } },
+        { id: 'd0', identifier: 'LIN-332', state: { type: 'completed' } }
+      ];
+      // All four backlog children are unblocked → earliest remaining (LIN-334) wins.
+      assert.strictEqual(selectFocusSubtask(children).identifier, 'LIN-334');
+    });
+
+    test('compares numerically, not as strings (LIN-9 before LIN-10)', () => {
+      const children = [
+        { id: 'b', identifier: 'LIN-10', state: { type: 'unstarted' } },
+        { id: 'a', identifier: 'LIN-9', state: { type: 'unstarted' } }
+      ];
+      assert.strictEqual(selectFocusSubtask(children).identifier, 'LIN-9');
+    });
+
+    test('in-progress tie-break also picks lowest identifier', () => {
+      const children = [
+        { id: 'y', identifier: 'LIN-20', state: { type: 'started' } },
+        { id: 'x', identifier: 'LIN-2', state: { type: 'started' } }
+      ];
+      assert.strictEqual(selectFocusSubtask(children).identifier, 'LIN-2');
+    });
+
+    test('fallback tie-break (all blocked) also picks lowest identifier', () => {
+      const blocked = { nodes: [{ name: 'blocked' }] };
+      const children = [
+        { id: 'b', identifier: 'LIN-30', state: { type: 'unstarted' }, labels: blocked },
+        { id: 'a', identifier: 'LIN-3', state: { type: 'unstarted' }, labels: blocked }
+      ];
+      assert.strictEqual(selectFocusSubtask(children).identifier, 'LIN-3');
+    });
+  });
+
   // Priority 1: In-progress tasks
   describe('priority 1: in-progress tasks', () => {
     test('selects in-progress task first', () => {
