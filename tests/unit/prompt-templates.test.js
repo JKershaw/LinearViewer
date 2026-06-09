@@ -1186,3 +1186,149 @@ describe('Scale to the task (handwritten path)', () => {
     }
   });
 });
+
+// =============================================================================
+// LIN-177 S4/S5: Capability-aware prompts (provider.ui threaded into both paths)
+// =============================================================================
+import { generateCustomPrompt } from '../../lib/prompt-templates.js';
+import { resolvePromptUi, applyPromptCapabilities, DEFAULT_PROMPT_UI } from '../../lib/prompt-formatters.js';
+import { buildMetaPromptTemplate } from '../../lib/prompts/meta-prompt-template.js';
+
+describe('resolvePromptUi (LIN-177 S4)', () => {
+  test('no provider → Linear floor (every capability on, displayName Linear)', () => {
+    assert.deepStrictEqual(resolvePromptUi({}, null), {
+      displayName: 'Linear', write: true, subtasks: true, comments: true, includeTracker: true
+    });
+  });
+
+  test('write is the hard floor: a read-only provider drops tracker refs regardless of flag', () => {
+    const caps = resolvePromptUi({ linearMcp: true }, { write: false, displayName: 'Docs' });
+    assert.strictEqual(caps.write, false);
+    assert.strictEqual(caps.includeTracker, false, 'no tracker refs when provider cannot write');
+    assert.strictEqual(caps.displayName, 'Docs');
+  });
+
+  test('linearMcp flag is the soft preference within a writable provider', () => {
+    const caps = resolvePromptUi({ linearMcp: false }, { write: true, displayName: 'Local' });
+    assert.strictEqual(caps.write, true);
+    assert.strictEqual(caps.includeTracker, false, 'flag off suppresses the suffix even when writable');
+  });
+
+  test('displayName falls back to Linear when the provider ui omits it', () => {
+    assert.strictEqual(resolvePromptUi({}, { write: true }).displayName, 'Linear');
+  });
+});
+
+describe('capability-aware prompts: Linear byte-parity (LIN-177 S4/S5)', () => {
+  const issue = {
+    identifier: 'LIN-900', title: 'Sample', description: 'd',
+    state: { name: 'Todo', type: 'unstarted' }, createdAt: '2026-01-01T00:00:00.000Z',
+    priority: 2, assignee: { name: 'Dev' }, labels: []
+  };
+  const context = {
+    project: { name: 'Proj' },
+    parent: { identifier: 'LIN-1', title: 'Parent', state: { name: 'In Progress' } },
+    siblings: [{ identifier: 'LIN-2', title: 'Sib', state: { name: 'Todo' } }],
+    children: [{ identifier: 'LIN-3', title: 'Child', state: { name: 'Todo', type: 'unstarted' } }],
+    comments: [{ body: 'hi', user: 'Dev', createdAt: '2026-01-02T00:00:00.000Z' }]
+  };
+  const LINEAR_UI = { ...DEFAULT_PROMPT_UI };
+
+  test('threading an explicit Linear ui is a no-op vs. no provider, for every template + flag state', () => {
+    for (const key of getPromptLabels()) {
+      const i = { ...issue, labels: [key] };
+      for (const flags of [{}, { linearMcp: false }]) {
+        const base = generatePrompt(key, i, context, flags).prompt;
+        const withUi = generatePrompt(key, i, context, flags, LINEAR_UI).prompt;
+        assert.strictEqual(withUi, base, `${key} (flags=${JSON.stringify(flags)}) must be byte-identical for Linear`);
+      }
+    }
+  });
+
+  test('meta-prompt: explicit Linear ui is a no-op vs. no provider', () => {
+    const args = {
+      issueContext: 'CTX', identifier: 'LIN-900', hasSubtasks: true, subtaskCount: 1,
+      completedCount: 0, inProgressCount: 0, remainingCount: 1, hasComments: true, commentCount: 1,
+      aiHints: 'H', actionVocabulary: 'plan, implement', completionSignals: 'S',
+      isTerminal: false, hasOpenChildren: true
+    };
+    const base = buildMetaPromptTemplate(args);
+    const withUi = buildMetaPromptTemplate({ ...args, providerUi: LINEAR_UI });
+    assert.strictEqual(withUi, base);
+  });
+});
+
+describe('capability-aware prompts: non-Linear providers (LIN-177 S4/S5)', () => {
+  const issue = {
+    identifier: 'GH-7', title: 'Sample', description: 'd',
+    state: { name: 'Todo', type: 'unstarted' }, createdAt: '2026-01-01T00:00:00.000Z', labels: []
+  };
+  const context = {
+    project: { name: 'P' }, parent: null, siblings: [],
+    children: [{ identifier: 'GH-8', title: 'Child', state: { name: 'Todo', type: 'unstarted' } }],
+    comments: []
+  };
+
+  test('writable non-Linear provider: tracker renamed to displayName, write steps kept', () => {
+    const ui = { write: true, comments: true, estimates: true, subtasks: true, displayName: 'Local' };
+    const p = generatePrompt('implementation', { ...issue, labels: ['implementation'] }, context, {}, ui).prompt;
+    assert.ok(!p.includes('Linear'), 'no hardcoded Linear');
+    assert.ok(p.includes('in Local'), 'tracker renamed to displayName');
+    assert.ok(/Set GH-7 status to "In Progress"/.test(p), 'status-change step kept for a writable provider');
+  });
+
+  test('read-only provider: no Linear, no status-change steps, no subtask sections', () => {
+    const ui = { write: false, comments: false, estimates: false, subtasks: false, displayName: 'Docs' };
+    const p = generatePrompt('plan', { ...issue, labels: ['plan'] }, context, {}, ui).prompt;
+    assert.ok(!p.includes('Linear'), 'no hardcoded Linear');
+    assert.ok(!/Set [^\n]*status to/.test(p), 'no status-change directive for a read-only provider');
+    assert.ok(!/^\*\*(Existing Subtasks|Subtasks):\*\*/m.test(p), 'no subtask section for a provider without subtasks');
+    // Workflow steps renumber cleanly after write-steps are dropped (no gap/duplicate).
+    const wf = p.split('## Workflow')[1].split('##')[0];
+    const nums = (wf.match(/^\d+\. /gm) || []).map(s => parseInt(s, 10));
+    assert.deepStrictEqual(nums, nums.map((_, idx) => idx + 1), 'workflow steps renumbered 1..n');
+  });
+
+  test('subtasks gate is independent of write: a writable, no-subtasks provider keeps writes but drops subtask sections', () => {
+    const ui = { write: true, comments: true, estimates: true, subtasks: false, displayName: 'Jira' };
+    const p = generatePrompt('breakdown', { ...issue, labels: ['breakdown'] }, context, {}, ui).prompt;
+    assert.ok(/Set GH-7 status to "In Progress"/.test(p), 'status step kept (writable)');
+    assert.ok(!/^\*\*Existing Subtasks:\*\*/m.test(p), 'subtask section dropped');
+  });
+
+  test('meta-prompt read-only provider: renamed tracker + read-only workflow note', () => {
+    const meta = buildMetaPromptTemplate({
+      issueContext: 'CTX', identifier: 'GH-7', hasSubtasks: false, subtaskCount: 0,
+      completedCount: 0, inProgressCount: 0, remainingCount: 0, hasComments: false, commentCount: 0,
+      aiHints: 'H', actionVocabulary: 'plan, implement', completionSignals: 'S',
+      providerUi: { write: false, comments: false, estimates: false, subtasks: false, displayName: 'Docs' }
+    });
+    assert.ok(!meta.includes('Linear'), 'no hardcoded Linear in the meta-prompt');
+    assert.ok(meta.includes('Docs task'), 'tracker renamed to displayName');
+    assert.ok(meta.includes('read-only'), 'read-only workflow note present');
+  });
+});
+
+describe('generateCustomPrompt capability awareness (LIN-177 S4)', () => {
+  const issue = { identifier: 'GH-9', title: 'T', description: 'd', state: { name: 'Todo' }, labels: [] };
+  const ctx = { project: { name: 'P' }, children: [], comments: [] };
+
+  test('renames the tracker for a non-Linear provider', () => {
+    const custom = { id: 'c1', name: 'Custom', template: 'Do the thing and update it in Linear.' };
+    const out = generateCustomPrompt(custom, issue, ctx, {}, { write: true, displayName: 'Local' });
+    assert.ok(out.prompt.includes('in Local') && !out.prompt.includes('Linear'));
+  });
+
+  test('strips tracker references for a read-only provider', () => {
+    const custom = { id: 'c1', name: 'Custom', template: 'Update the status in Linear when done.' };
+    const out = generateCustomPrompt(custom, issue, ctx, {}, { write: false, displayName: 'Docs' });
+    assert.ok(!/ in Docs/.test(out.prompt) && !out.prompt.includes('Linear'));
+  });
+});
+
+describe('applyPromptCapabilities is a no-op for the Linear floor (LIN-177 S4)', () => {
+  test('Linear caps leave text untouched', () => {
+    const txt = '## Workflow\n\n1. **Start**: Set X status to "In Progress" in Linear\n2. **Fetch details**: in Linear\n\n**Subtasks:** 1/2 done';
+    assert.strictEqual(applyPromptCapabilities(txt, resolvePromptUi({}, null)), txt);
+  });
+});
