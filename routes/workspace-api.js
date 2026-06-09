@@ -908,11 +908,11 @@ ${goal}`;
         const terminal = path[path.length - 1];
         const deferredVia = path.map(idOf);
         for (let k = 0; k < path.length - 1; k++) {
-          sendSSE(res, 'delta', { section: 'reasoning', content: `↳ ${idOf(path[k])} is a container → routing to ${idOf(path[k + 1])}\n` });
+          sendSSE(res, 'delta', { section: 'reasoning', content: `\n\n↳ ${idOf(path[k])} is a container → routing to ${idOf(path[k + 1])}\n\n` });
         }
         const term = generateMockRecommendation(terminal);
         const termProject = testMockData.projects.find(p => p.id === terminal.project?.id);
-        sendSSE(res, 'delta', { section: 'reasoning', content: `\n${term.reasoning}` });
+        sendSSE(res, 'delta', { section: 'reasoning', content: term.reasoning });
         sendSSE(res, 'phase', { phase: 'prompt' });
         sendSSE(res, 'delta', { section: 'prompt', content: term.prompt });
         const doneData = {
@@ -1037,7 +1037,10 @@ ${goal}`;
           onHop: (hop) => {
             // Stream a breadcrumb for each container we route through (LIN-329).
             if (closed || !(hop.recommendedAction === 'defer' && hop.deferTo)) return;
-            sendSSE(res, 'delta', { section: 'reasoning', content: `↳ ${hop.identifier} is a container → routing to ${hop.deferTo}\n` });
+            // Wrap the breadcrumb in blank lines so it renders as its own paragraph
+            // between the deferring hop's reasoning and the next hop's — otherwise the
+            // descent runs on into the surrounding reasoning text.
+            sendSSE(res, 'delta', { section: 'reasoning', content: `\n\n↳ ${hop.identifier} is a container → routing to ${hop.deferTo}\n\n` });
           },
           computeOne: async (id) => {
             // Per-hop in-flight guard (gap #3): client-disconnect ∪ remaining descent

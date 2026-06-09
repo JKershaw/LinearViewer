@@ -29,11 +29,21 @@
     return m ? m[1] : text;
   }
 
-  function renderMarkdown(text) {
+  function renderMarkdown(text, opts) {
     if (!text) return '';
     const cleaned = stripCodeBlockWrapper(text);
-    const html = typeof marked !== 'undefined' ? marked.parse(cleaned) : esc(cleaned);
+    const html = typeof marked !== 'undefined' ? marked.parse(cleaned, opts) : esc(cleaned);
     return typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(html) : html;
+  }
+
+  // The reasoning section is line-oriented (assessment bullets, the → action line,
+  // Next/DeferTo, and the ↳ descent breadcrumbs). Default GFM collapses single
+  // newlines into spaces, which runs those lines together — most visibly on defer
+  // descents. Render reasoning with breaks:true so each line stays on its own line.
+  // Prompt bodies keep default rendering (they are real markdown documents where
+  // soft-break-to-<br> would be wrong).
+  function renderReasoning(text) {
+    return renderMarkdown(text, { breaks: true });
   }
 
   function isProxyActive() {
@@ -153,7 +163,7 @@
     const actions = renderActionCluster(opts);
     const reasoningToggle = reasoning
       ? `<div class="swipe-reasoning-toggle" data-action="reasoning-toggle">\u25B8 reasoning</div>
-         <div class="swipe-reasoning-content hidden">${renderMarkdown(reasoning)}</div>`
+         <div class="swipe-reasoning-content hidden">${renderReasoning(reasoning)}</div>`
       : '';
     const warningBanner = warning
       ? `<div class="swipe-prompt-warning">\u26A0 ${esc(warning)}</div>`
@@ -374,7 +384,7 @@
           if (!body) return;
           if (currentField === 'reasoning') {
             if (nameEl) nameEl.textContent = 'AI thinking\u2026';
-            body.innerHTML = renderMarkdown(reasoningRaw);
+            body.innerHTML = renderReasoning(reasoningRaw);
           } else {
             if (nameEl) nameEl.textContent = 'AI Recommendation';
             body.innerHTML = renderMarkdown(promptRaw || reasoningRaw);
