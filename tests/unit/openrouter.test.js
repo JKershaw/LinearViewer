@@ -15,6 +15,8 @@ import {
   parseRecommendationResponse,
   getRecommendationStream,
   getRecommendation,
+  getModelDisplayName,
+  DEFAULT_MODEL,
   EPIC_CHILD_THRESHOLD,
   COUSIN_CAP,
   SIBLING_CAP,
@@ -224,6 +226,27 @@ describe('formatSubtaskOverview', () => {
 // =============================================================================
 // LIN-279: Strategy Framing context — isEpicShapedParent + cousin rendering
 // =============================================================================
+
+describe('getModelDisplayName', () => {
+  test('returns the curated name for a known model id', () => {
+    assert.strictEqual(getModelDisplayName('openai/gpt-5.4-mini'), 'GPT-5.4 Mini');
+    assert.strictEqual(getModelDisplayName('anthropic/claude-opus-4.8'), 'Claude Opus 4.8');
+  });
+
+  test('falls back to the provider-stripped slug for an uncurated id', () => {
+    assert.strictEqual(getModelDisplayName('some-provider/custom-model-v2'), 'custom-model-v2');
+  });
+
+  test('returns the id unchanged when there is no provider prefix', () => {
+    assert.strictEqual(getModelDisplayName('bare-model'), 'bare-model');
+  });
+
+  test('defaults to the default model name when id is falsy', () => {
+    assert.strictEqual(getModelDisplayName(''), getModelDisplayName(DEFAULT_MODEL));
+    assert.strictEqual(getModelDisplayName(null), getModelDisplayName(DEFAULT_MODEL));
+    assert.strictEqual(getModelDisplayName(undefined), getModelDisplayName(DEFAULT_MODEL));
+  });
+});
 
 describe('isEpicShapedParent', () => {
   test('returns true when parentChildCount >= EPIC_CHILD_THRESHOLD', () => {

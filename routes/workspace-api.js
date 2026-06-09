@@ -24,7 +24,7 @@ import { WORK_ISSUE_LABELS } from '../lib/workflow-config.js';
 import { parseRepoFromDescription } from '../lib/prompt-formatters.js';
 import { buildForemanPlaybook, buildMiniForemanStep } from '../lib/prompts/foreman-playbook.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
-import { isRecommendationEnabled, getRecommendation, getRecommendationStream, streamChat } from '../lib/openrouter.js';
+import { isRecommendationEnabled, getRecommendation, getRecommendationStream, streamChat, getModelDisplayName } from '../lib/openrouter.js';
 import { resolveRecommendation, armHopSignal } from '../lib/recommend-recurse.js';
 
 // Shared cross-hop budget for the recommend recursion (LIN-329) on the human UI
@@ -552,7 +552,11 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
 
     const enabled = isTestMode || isRecommendationEnabled(sessionApiKey) || source === 'free'
 
-    const result = { enabled, source }
+    // Resolve the workspace's configured LLM model so the footer can surface it.
+    // Same single-source-of-truth helper every LLM call site uses.
+    const model = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore })
+
+    const result = { enabled, source, model, modelName: getModelDisplayName(model) }
 
     // Include free tier usage info when applicable
     if (source === 'free') {

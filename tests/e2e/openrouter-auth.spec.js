@@ -161,6 +161,19 @@ test.describe('OpenRouter OAuth Flow', () => {
     await expect(statusLink).toHaveText('ai: ●');
   });
 
+  test('main page footer lists the workspace LLM model', async ({ page }) => {
+    await setupSession(page);
+    await page.goto(WORKSPACE_URL);
+
+    // The model name is filled client-side from /api/recommend/status.
+    // With no saved preference the workspace falls back to the default model.
+    const modelEl = page.locator('[data-ai-model]');
+    await expect(modelEl).toHaveText('GPT-5.4 Mini');
+
+    // The AI status anchor text stays exactly "ai: ●"/"ai: ○" (model is a sibling).
+    await expect(page.locator('.footer-ai-status')).toHaveText('ai: ○');
+  });
+
   test('ai status links to settings page', async ({ page }) => {
     // Set up authenticated session
     await setupSession(page);

@@ -1424,6 +1424,17 @@ function updateFooterFreeTier(freeTier) {
 }
 
 /**
+ * Fill the footer model indicator with the workspace's configured LLM model.
+ * @param {string} modelName - Friendly model name (e.g. 'GPT-5.4 Mini')
+ */
+function updateFooterModel(modelName) {
+  const el = document.querySelector('[data-ai-model]')
+  if (!el || !modelName) return
+  el.textContent = modelName
+  el.title = `Workspace model: ${modelName}`
+}
+
+/**
  * Phase labels for streaming UI
  */
 const PHASE_LABELS = {
@@ -1898,17 +1909,19 @@ function getUrlKeyFromFooter() {
 }
 
 /**
- * Initialize free tier footer status on page load.
- * Fetches current usage from the recommend/status endpoint and updates the footer.
+ * Initialize footer AI status on page load.
+ * Fetches the recommend/status endpoint and updates the footer: the free tier
+ * remaining count (when applicable) and the workspace's configured model name.
  * Also populates the settings page free tier usage display.
  */
 async function initFreeTierStatus() {
-  // Check both footer and settings page for free tier elements
+  // Check for any element the status fetch can populate
   const footerStatus = document.querySelector('.footer-ai-status[data-ai-source="free"]')
   const settingsUsage = document.querySelector('[data-free-tier-usage]')
-  if (!footerStatus && !settingsUsage) return
+  const modelEl = document.querySelector('[data-ai-model]')
+  if (!footerStatus && !settingsUsage && !modelEl) return
 
-  // Get urlKey from footer link or settings page URL
+  // Get urlKey from footer link or current page URL
   let urlKey = getUrlKeyFromFooter()
   if (!urlKey) {
     const pathMatch = window.location.pathname.match(/\/workspace\/([^/]+)/)
@@ -1921,6 +1934,7 @@ async function initFreeTierStatus() {
     if (!response.ok) return
 
     const data = await response.json()
+    if (data.modelName) updateFooterModel(data.modelName)
     if (data.freeTier) {
       if (footerStatus) updateFooterFreeTier(data.freeTier)
       if (settingsUsage) {
