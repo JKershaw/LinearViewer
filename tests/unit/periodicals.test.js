@@ -1,5 +1,5 @@
 /**
- * Unit tests for lib/periodicals.js (LIN-341 / LIN-344 / LIN-354)
+ * Unit tests for lib/periodicals.js (LIN-341 / LIN-344 / LIN-354 / LIN-369)
  *
  * Run with: node --test tests/unit/periodicals.test.js
  */
@@ -9,12 +9,12 @@ import { PERIODICALS, getPeriodicals, buildPeriodicalNodes } from '../../lib/per
 import { PERIODICALS_PROJECT_ID } from '../../lib/tree.js';
 
 describe('periodicals registry', () => {
-  test('seeds the LIN-354 review set (5 templates)', () => {
-    assert.strictEqual(PERIODICALS.length, 5);
+  test('seeds the LIN-354 review set plus Drift & Coherence (6 templates)', () => {
+    assert.strictEqual(PERIODICALS.length, 6);
     assert.strictEqual(getPeriodicals(), PERIODICALS);
   });
 
-  test('contains Documentation, Test Coverage, Security, API Quality, and Code Quality reviews', () => {
+  test('contains Documentation, Test Coverage, Security, API Quality, Code Quality, and Drift & Coherence reviews', () => {
     // Assert by id/title/mode rather than position so the registry can grow.
     const byId = Object.fromEntries(PERIODICALS.map(t => [t.id, t]));
 
@@ -23,7 +23,8 @@ describe('periodicals registry', () => {
       'test-coverage-gap': 'Test Coverage Gap Review',
       'security-review': 'Security Review',
       'api-quality': 'API Quality Review',
-      'code-quality': 'Code Quality Review'
+      'code-quality': 'Code Quality Review',
+      'drift-coherence': 'Drift & Coherence Review'
     };
 
     for (const [id, title] of Object.entries(expected)) {
@@ -215,6 +216,49 @@ describe('Code Quality Review specifics', () => {
   test('guards against cosmetic-churn theater', () => {
     assert.match(prompt, /theater/i);
     assert.match(prompt, /cosmetic/i);
+  });
+});
+
+describe('Drift & Coherence Review specifics (LIN-369)', () => {
+  const prompt = PERIODICALS.find(t => t.id === 'drift-coherence').generatePrompt();
+
+  test('covers duplication, convention fragmentation, and dependency direction', () => {
+    assert.match(prompt, /duplicat/i);
+    assert.match(prompt, /convention fragmentation/i);
+    assert.match(prompt, /dependency direction/i);
+    assert.match(prompt, /layer/i);
+    assert.match(prompt, /introducing no new tooling|no new tooling/i);
+  });
+
+  test('trend contract: delta framing, first-run baseline, trend ledger', () => {
+    assert.match(prompt, /trend-aware/i);
+    // Findings are deltas vs the prior run, never a snapshot.
+    assert.match(prompt, /new, unchanged, improved, worsened, or resolved/i);
+    assert.match(prompt, /point-in-time snapshot/i);
+    // First run states it is the baseline.
+    assert.match(prompt, /baseline/i);
+    // Report-format anchor for the next run's comparison.
+    assert.match(prompt, /trend ledger/i);
+  });
+
+  test('names the altitude difference from the Code Quality Review (no double-flagging)', () => {
+    assert.match(prompt, /cross-cutting/i);
+    assert.match(prompt, /Code Quality Review/);
+    assert.match(prompt, /do not re-flag/i);
+  });
+
+  test('severity bar is a concrete cost, with the anti-churn guard', () => {
+    assert.match(prompt, /concrete cost/i);
+    assert.match(prompt, /not a style preference/i);
+    assert.match(prompt, /cosmetic churn/i);
+  });
+
+  test('stays implementation-agnostic: no prescribed location for prior reports', () => {
+    // Prior runs are discovered, not looked up at a hard-coded place.
+    assert.match(prompt, /discover where they are recorded/i);
+    assert.doesNotMatch(prompt, /search Linear by|comments on the minted task/i);
+    // No repo-specific symbols leak in.
+    assert.doesNotMatch(prompt, /escapeHtml|workspace-api|jsonError/);
   });
 });
 
