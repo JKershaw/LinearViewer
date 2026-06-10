@@ -645,6 +645,8 @@ The body embeds `YOUR_TOKEN` as a placeholder; substitute the consumer's `readWr
 
 All write endpoints require a `readWrite` scoped token. Read-only tokens receive `403`.
 
+Success responses wrap the affected entity (e.g. `{ "success": true, "issue": {...} }`) — read the documented shape rather than assuming the entity comes back top-level. Creates (issues, comments, relations) are **not idempotent** and there is no idempotency key: a `2xx` with `"success": true` means the write landed even if your client-side parse came up empty, so inspect the raw response (or search) before retrying — a blind retry mints a duplicate.
+
 #### Create Issue
 
 ```
@@ -676,6 +678,20 @@ Content-Type: application/json
 | `cycleId` | UUID | No | Assign to cycle |
 | `priority` | int | No | Priority 0 (none) to 4 (urgent) |
 
+Returns `201`:
+```json
+{
+  "success": true,
+  "issue": {
+    "id": "uuid",
+    "identifier": "LIN-123",
+    "title": "Fix authentication bug",
+    "url": "https://linear.app/...",
+    "state": { "name": "Backlog", "type": "backlog" }
+  }
+}
+```
+
 #### Update Issue
 
 ```
@@ -702,6 +718,20 @@ At least one field must be provided.
 | `cycleId` | UUID | Assign to cycle |
 | `priority` | int | Priority 0 (none) to 4 (urgent) |
 
+Response:
+```json
+{
+  "success": true,
+  "issue": {
+    "id": "uuid",
+    "identifier": "LIN-123",
+    "title": "Updated title",
+    "url": "https://linear.app/...",
+    "state": { "name": "In Progress", "type": "started" }
+  }
+}
+```
+
 #### Add Comment
 
 ```
@@ -714,6 +744,19 @@ Content-Type: application/json
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `body` | string | Yes | Comment body in Markdown (max 50K chars) |
+
+Returns `201`:
+```json
+{
+  "success": true,
+  "comment": {
+    "id": "uuid",
+    "body": "Investigation complete. Root cause identified.",
+    "createdAt": "2026-06-10T12:00:00.000Z",
+    "user": { "name": "Jane Doe" }
+  }
+}
+```
 
 #### Create Relation
 
@@ -730,6 +773,18 @@ Content-Type: application/json
 | `relatedIssueId` | UUID/identifier | Yes | The related issue |
 
 Note: `blocked-by` is a convenience type — internally it creates a `blocks` relation with swapped issue IDs.
+
+Returns `201`:
+```json
+{
+  "success": true,
+  "issueRelation": {
+    "type": "blocks",
+    "issue": { "id": "uuid", "identifier": "LIN-7" },
+    "relatedIssue": { "id": "uuid", "identifier": "LIN-9" }
+  }
+}
+```
 
 #### Delete Relation
 
@@ -762,6 +817,20 @@ Uses the label UUID (get from `GET /api/proxy/labels`). Idempotent — returns s
 
 Note: Uses Read-Modify-Write internally. Concurrent label modifications may overwrite each other (Linear API limitation).
 
+Response:
+```json
+{
+  "success": true,
+  "issue": {
+    "id": "uuid",
+    "identifier": "LIN-123",
+    "labels": { "nodes": [{ "id": "uuid", "name": "bug" }] }
+  }
+}
+```
+
+When the label is already present: `{ "success": true, "message": "Label already present" }`.
+
 #### Remove Label
 
 ```
@@ -769,6 +838,8 @@ DELETE /api/proxy/issues/{issueId}/labels/{labelId}
 ```
 
 Idempotent — returns success if label was not present.
+
+Response: same shape as Add Label (the issue with its remaining `labels.nodes`). When the label was not present: `{ "success": true, "message": "Label not present" }`.
 
 ### Dispatch Endpoints
 
