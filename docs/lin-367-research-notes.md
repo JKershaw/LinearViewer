@@ -51,6 +51,48 @@ that passes them; and the auto-appended dispatch context carries a **standing re
 token** into every worker sandbox (already flagged in-code as security debt — the research's
 credential-containment principle says this is the first thing to fix).
 
+## Addendum: full prompt-system review
+
+The first pass sampled the prompt surface; a full read (all 15 task templates, the meta-prompt,
+foreman playbook, autopilot kickoff + handbook, recap/brief system prompts, the roadmap
+narrative pipeline) materially revises two findings.
+
+**1. Far more of the research's task- and run-level control catalog is already implemented —
+as prompt machinery.** Mapping the research's catalog onto the prompts:
+
+| Research control | Where it already lives |
+|---|---|
+| Clear specs, plan-before-code, scoped task size | The recommender's decision tree (research → plan → implementation/breakdown); the plan template's session-fit answer routes oversized work to `breakdown` — task size is bounded by design |
+| "Show evidence, don't assert success" | Foreman step 4: re-fetch the issue and confirm claimed Linear writes landed ("worker claims are hypotheses, not ground truth"); recap schema requires `evidence` per done-item; brief prompt: "never assert completion the source does not support" |
+| Independent verifier, fresh context | Foreman delegates `review` prompts to a fresh-context Review sub-agent ("fresh context is exactly the point"); autopilot orchestrator is a separate session judging workers on artifacts |
+| Anti-Goodhart / checks the agent can't see | Fused `recommend-and-dispatch` makes the prompt body structurally unreachable; review template's test-*level* check is explicitly anti-coverage-theater; periodicals forbid padding, "coverage-theater", "mass cosmetic churn", doc inflation |
+| Compounding-error / loop detection | Foreman 3-strikes counters (same-prompt resumes, same-kind recommends); autopilot reads the `kind` sequence as converging / looping / sprawling |
+| Auto-halt on instrument failure | Both foreman and kickoff: halt-don't-improvise on any non-2xx from the agent's own verbs |
+| Comprehension / history controls | High-churn `git log` reading in plan/bug/review; regression check (don't re-introduce fixed bugs or re-apply reverts); staleness re-grounding in both prompt paths |
+| Intent-translation guards | Grounding rule (meta-prompt may not invent details absent from the ticket); strategy framing names the routed-around contract gap by ticket identifier |
+| Cross-task drift reading | The roadmap pipeline: deterministic model + layered readings, with the north-star reading deliberately *not* chained from empirical layers (anti-anchoring), and the gap layer advisor-only (human adjudicates) |
+
+**2. The system is already self-aware about which controls are prose proxies.** The foreman
+playbook's maintainer note calls the recitation "a prompt-level proxy for gating that will
+eventually be hook-enforced"; the kickoff's note insists read-only mode be described honestly
+as "a convention … not a platform-enforced sandbox — don't claim an enforcement the API doesn't
+provide." So the research doc's real contribution is not discovering that controls are soft —
+the codebase annotates that itself — but supplying the prioritized list of *which prompt-level
+proxies to harden into mechanical enforcement first* (control-plane paths before everything
+else) and the empirical case for why.
+
+**Remaining genuine gaps after the full read** (unchanged or sharpened): no trend instrument
+(periodical reports and roadmap runs are point-in-time; `report-history-store` gives the
+substrate); no test-modified-with-code trigger anywhere in the review templates; the
+independent verifier is same-model and prompt-instructed; budgets still absent.
+
+**New periodicals this research naturally mints** (each fits the existing two-stage
+mint-a-task contract as-is): drift/coherence review (duplication, convention fragmentation,
+import direction — trend-aware against prior reports), dependency/supply-chain review (CVE,
+lockfile, registry-age/slopsquatting), comprehension-debt review (modules lacking human-legible
+rationale), control-plane integrity review (which checks changed, who approved), and a
+rollback-rehearsal exercise.
+
 ## Recommended approach for the next phase
 
 Do **not** adopt the five-stage roadmap wholesale; both documents self-describe as hypotheses,
