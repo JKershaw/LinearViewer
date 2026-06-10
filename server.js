@@ -419,7 +419,7 @@ app.use((req, res, next) => {
 // =============================================================================
 // Mount extracted route modules
 app.use(getProvider('linear').getAuthRouter({ sessionStore, userPreferencesStore }))
-app.use(createWorkspaceRoutes())
+app.use(createWorkspaceRoutes({ localStore }))
 app.use(createOpenRouterAuthRoutes())
 // Note: Dispatch routes mounted after workspaceFromUrl middleware is defined
 
