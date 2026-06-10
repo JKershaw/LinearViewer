@@ -26,7 +26,7 @@ import { FreeTierStore } from './lib/free-tier-store.js'
 import { RecapCacheStore } from './lib/recap-cache.js'
 import { BriefCacheStore } from './lib/brief-cache.js'
 import { ReportHistoryStore } from './lib/report-history-store.js'
-import { getProvider } from './lib/providers/registry.js'
+import { getProvider, getProviderForWorkspace } from './lib/providers/registry.js'
 import './lib/providers/linear/index.js' // side effect: self-registers the Linear provider into the registry
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID, PERIODICALS_PROJECT_ID } from './lib/tree.js'
 import { buildPeriodicalNodes } from './lib/periodicals.js'
@@ -34,7 +34,7 @@ import { parseRepoFromDescription } from './lib/prompt-formatters.js'
 import { renderPage, renderErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken } from './lib/token-refresh.js'
-import { UUID_REGEX, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, updateWorkspaceTokens } from './lib/workspace.js'
+import { UUID_REGEX, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, updateWorkspaceTokens, getWorkspaceToken } from './lib/workspace.js'
 import { createWorkspaceRoutes } from './routes/workspace.js'
 import { createOpenRouterAuthRoutes } from './routes/openrouter-auth.js'
 import { createDispatchRoutes } from './routes/dispatch.js'
@@ -419,23 +419,31 @@ app.use(createOpenRouterAuthRoutes())
  * Helper function to fetch and prepare project data for rendering.
  * Handles both test mode and real API calls.
  *
- * @param {string} accessToken - The access token for Linear API
+ * Resolves the provider and credential token from the workspace (LIN-356), so a
+ * non-Linear workspace's dashboard reads route through its own provider rather
+ * than being hardcoded to Linear. The test-mode mock short-circuit is preserved:
+ * `getWorkspaceToken` returns the legacy `accessToken` ('test-token') for the
+ * E2E mock workspaces, and resolves to `false` for any non-Linear workspace.
+ *
+ * @param {import('./lib/workspace.js').Workspace} workspace - The workspace whose provider/token serve the reads
  * @param {string|null} teamId - Optional team ID to filter issues by
  * @returns {Promise<{trees, inProgressTrees, organizationName, teams, selectedTeamId}>} Prepared data for rendering
  */
-async function fetchAndPrepareProjects(accessToken, teamId = null, mockOverride = null, urlKey = null) {
-  // Use mock data in test mode to avoid hitting Linear API
+async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = null, urlKey = null) {
+  const provider = getProviderForWorkspace(workspace);
+  const accessToken = getWorkspaceToken(workspace);
+  // Use mock data in test mode to avoid hitting the provider API
   const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
 
   // Fetch teams
   const teams = isTestMode
     ? testMockTeams
-    : await getProvider('linear').fetchTeams(accessToken);
+    : await provider.fetchTeams(accessToken);
 
   // Fetch projects and issues (filtered by team if specified)
   let { organizationName, projects, issues } = isTestMode
     ? (mockOverride || testMockData)
-    : await getProvider('linear').fetchProjects(accessToken, teamId);
+    : await provider.fetchProjects(accessToken, teamId);
 
   // In test mode, manually filter issues by team
   if (isTestMode && teamId) {
@@ -552,7 +560,7 @@ async function handleTokenRefreshAndRetry(workspace, session, teamId, openRouter
   const deployInfo = getDeployInfo()
   // Pass urlKey so the periodicals group renders consistently after a token
   // refresh, matching the primary dashboard route (LIN-341).
-  const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace.accessToken, teamId, null, workspace.urlKey);
+  const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey);
   const html = renderPage(trees, inProgressTrees, recentActivityTrees, organizationName, {
     teams,
     selectedTeamId,
@@ -877,7 +885,7 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
       customPrompts = (await customPromptsStore.list(workspace.urlKey)).map(p => ({ id: p.id, name: p.name }));
     } catch (e) { /* non-fatal */ }
 
-    const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace.accessToken, teamId, null, workspace.urlKey);
+    const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey);
     const isLocalhost = ['localhost', '127.0.0.1'].some(h => req.get('host')?.startsWith(h));
     const html = renderPage(trees, inProgressTrees, recentActivityTrees, organizationName, {
       teams,
@@ -938,7 +946,7 @@ app.get('/workspace/:urlKey/swipe/:identifier?', workspaceFromUrl, async (req, r
     // are non-critical — a store hiccup must never break the page, so fall back
     // to an empty map.
     const [{ trees, inProgressTrees, recentActivityTrees, organizationName }, allLoops] = await Promise.all([
-      fetchAndPrepareProjects(workspace.accessToken, teamId),
+      fetchAndPrepareProjects(workspace, teamId),
       getLoopsForWorkspace(workspace.urlKey, { dispatchStore: dispatchQueueStore, foremanStore }).catch(() => [])
     ]);
     const sessionCounts = buildSessionCounts(allLoops);
@@ -988,7 +996,7 @@ app.get('/workspace/:urlKey/swim', workspaceFromUrl, async (req, res) => {
   try {
     // Use swim sample data if session flag is set (for E2E tests/screenshots)
     const mockOverride = req.session.swimSample ? swimSampleData : null;
-    const { trees, inProgressTrees, recentActivityTrees, organizationName } = await fetchAndPrepareProjects(workspace.accessToken, teamId, mockOverride);
+    const { trees, inProgressTrees, recentActivityTrees, organizationName } = await fetchAndPrepareProjects(workspace, teamId, mockOverride);
     const html = renderSwimPage(
       { projectTrees: trees, inProgressTrees, recentActivityTrees, organizationName },
       {
@@ -1034,7 +1042,7 @@ app.get('/workspace/:urlKey/ship', workspaceFromUrl, async (req, res) => {
       : req.session.swimSample ? swimSampleData
       : null;
     const { trees, inProgressTrees, recentActivityTrees, organizationName } =
-      await fetchAndPrepareProjects(workspace.accessToken, teamId, mockOverride);
+      await fetchAndPrepareProjects(workspace, teamId, mockOverride);
 
     // Orientation mode (LIN-301): a pure read of the latest saved roadmap report
     // — no LLM call on the ship side (see LIN-298). The client maps these saved
@@ -1093,7 +1101,7 @@ app.get('/workspace/:urlKey/roadmap', workspaceFromUrl, async (req, res) => {
     const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
     const { organizationName, projects, issues } = isTestMode
       ? testMockData
-      : await getProvider('linear').fetchProjects(workspace.accessToken, teamId);
+      : await getProviderForWorkspace(workspace).fetchProjects(getWorkspaceToken(workspace), teamId);
 
     // Build roadmap model from deterministic layer
     const roadmapModel = buildRoadmapModel(projects, issues);
@@ -1246,7 +1254,7 @@ app.get('/workspace/:urlKey/dispatch', workspaceFromUrl, async (req, res) => {
   let projectRepos = [];
   try {
     const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
-    const projects = isTestMode ? testMockData.projects : await getProvider('linear').fetchProjectsList(workspace.accessToken);
+    const projects = isTestMode ? testMockData.projects : await getProviderForWorkspace(workspace).fetchProjectsList(getWorkspaceToken(workspace));
     projectRepos = projects
       .map(p => ({ name: p.name, repo: parseRepoFromDescription(p.content) }))
       .filter(p => p.repo);
