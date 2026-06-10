@@ -111,11 +111,36 @@
 }
 
 @media (max-width: 640px) {
+  .kpis-content {
+    padding: 0.75rem;
+  }
+
   .kpi-chart-grid {
     grid-template-columns: 1fr;
   }
 
   .kpi-cards {
     grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+  }
+
+  .kpi-card {
+    padding: 0.6rem 0.7rem;
+  }
+
+  .kpi-card-value {
+    font-size: 1.25rem;
+  }
+
+  .kpi-chart-canvas {
+    height: 200px;
+  }
+
+  .kpi-chart-wide .kpi-chart-canvas {
+    height: 220px;
+  }
+
+  .kpi-vanity {
+    line-height: 1.7;
   }
 }

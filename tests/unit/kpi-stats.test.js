@@ -9,7 +9,10 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { collectKpiStats, ACTIVITY_WINDOW_DAYS, FREE_TIER_WINDOW_DAYS } from '../../lib/kpi-stats.js';
+import {
+  collectKpiStats, categorizeProxyEvent, PROXY_PHASES,
+  ACTIVITY_WINDOW_DAYS, FREE_TIER_WINDOW_DAYS, WEEKLY_WINDOW_WEEKS
+} from '../../lib/kpi-stats.js';
 
 // Minimal in-memory mock of the collection surface kpi-stats uses:
 // find({}).toArray() and countDocuments({} | simple equality filter).
@@ -54,6 +57,31 @@ function buildCollections(overrides = {}) {
   };
 }
 
+describe('categorizeProxyEvent', () => {
+  test('maps endpoints to agent-loop phases', () => {
+    assert.strictEqual(categorizeProxyEvent('GET', '/api/proxy/stack'), 'orienting');
+    assert.strictEqual(categorizeProxyEvent('GET', '/api/proxy/brief/:id'), 'orienting');
+    assert.strictEqual(categorizeProxyEvent('GET', '/api/proxy/issues/:id'), 'orienting');
+    assert.strictEqual(categorizeProxyEvent('POST', '/api/proxy/recommend-and-dispatch'), 'deciding');
+    assert.strictEqual(categorizeProxyEvent('GET', '/api/proxy/autopilot/kickoff'), 'deciding');
+    assert.strictEqual(categorizeProxyEvent('GET', '/api/proxy/foreman/playbook'), 'deciding');
+    assert.strictEqual(categorizeProxyEvent('POST', '/api/proxy/dispatch'), 'deciding');
+    assert.strictEqual(categorizeProxyEvent('GET', '/api/proxy/dispatch/:id'), 'watching');
+    assert.strictEqual(categorizeProxyEvent('GET', '/api/proxy/foreman/sessions'), 'watching');
+    assert.strictEqual(categorizeProxyEvent('GET', '/api/proxy/foreman/status'), 'watching');
+    assert.strictEqual(categorizeProxyEvent('POST', '/api/proxy/foreman/status'), 'reporting');
+    assert.strictEqual(categorizeProxyEvent('POST', '/api/proxy/issues'), 'acting');
+    assert.strictEqual(categorizeProxyEvent('PATCH', '/api/proxy/issues/:id'), 'acting');
+    assert.strictEqual(categorizeProxyEvent('POST', '/api/proxy/issues/comments'), 'acting');
+  });
+
+  test('unknown endpoints degrade by method: reads orient, writes act', () => {
+    assert.strictEqual(categorizeProxyEvent('GET', '/api/proxy/some-future-endpoint'), 'orienting');
+    assert.strictEqual(categorizeProxyEvent('POST', '/api/proxy/some-future-endpoint'), 'acting');
+    assert.strictEqual(categorizeProxyEvent(undefined, undefined), 'orienting');
+  });
+});
+
 describe('collectKpiStats', () => {
   test('returns all-zero stats for an empty instance', async () => {
     const stats = await collectKpiStats(buildCollections(), { now: NOW });
@@ -66,18 +94,26 @@ describe('collectKpiStats', () => {
     assert.strictEqual(stats.totals.autopilotRuns, 0);
     assert.strictEqual(stats.totals.aiSummaries, 0);
     assert.strictEqual(stats.totals.activeTokens, 0);
-    assert.strictEqual(stats.activity.days.length, ACTIVITY_WINDOW_DAYS);
-    assert.ok(stats.activity.proxy.every(count => count === 0));
-    assert.strictEqual(stats.vanity.busiestDay, null);
-    assert.deepStrictEqual(stats.dispatchOutcomes, { queued: 0, taken: 0, expired: 0, cancelled: 0 });
+    assert.strictEqual(stats.proxyCategories.days.length, ACTIVITY_WINDOW_DAYS);
+    for (const phase of PROXY_PHASES) {
+      assert.ok(stats.proxyCategories[phase].every(count => count === 0), `${phase} not all zero`);
+    }
+    assert.strictEqual(stats.dispatchByWeek.weeks.length, WEEKLY_WINDOW_WEEKS);
+    assert.deepStrictEqual(stats.dispatchByWeek.kinds, []);
+    assert.deepStrictEqual(stats.funnel, { dispatched: 0, taken: 0, reported: 0, completed: 0 });
     assert.deepStrictEqual(stats.stepOutcomes, { completed: 0, failed: 0, blocked: 0, other: 0 });
     assert.deepStrictEqual(stats.dispatchKinds, []);
+    assert.strictEqual(stats.hourOfDay.length, 24);
+    assert.ok(stats.hourOfDay.every(count => count === 0));
+    assert.strictEqual(stats.vanity.busiestDay, null);
+    assert.strictEqual(stats.vanity.readsPerWrite, null);
+    assert.strictEqual(stats.vanity.medianMinutesToResolve, null);
   });
 
   test('counts workspaces as the union of keys across collections', async () => {
     const collections = buildCollections({
       workspacePreferences: createMockCollection([{ _id: 'acme' }, { _id: 'globex' }]),
-      proxyEvents: createMockCollection([{ urlKey: 'acme', endpoint: '/api/proxy/me', status: 200, timestamp: daysAgo(1) }]),
+      proxyEvents: createMockCollection([{ urlKey: 'acme', endpoint: '/api/proxy/me', method: 'GET', status: 200, timestamp: daysAgo(1) }]),
       foremanStatus: createMockCollection([{ urlKey: 'initech', action: 'review', timestamp: daysAgo(2) }]),
       freeTier: createMockCollection([
         { urlKey: 'hooli', date: '2026-06-09', count: 3 },
@@ -102,61 +138,159 @@ describe('collectKpiStats', () => {
     assert.strictEqual(stats.totals.activeSessions, 2);
   });
 
-  test('buckets activity per UTC day, ignoring out-of-window docs', async () => {
+  test('buckets proxy calls per phase per UTC day and tracks read:write ratio', async () => {
+    const event = (method, endpoint, days) => ({ method, endpoint, status: 200, timestamp: daysAgo(days) });
     const collections = buildCollections({
       proxyEvents: createMockCollection([
-        { endpoint: '/api/proxy/me', status: 200, timestamp: daysAgo(0) },
-        { endpoint: '/api/proxy/me', status: 200, timestamp: daysAgo(0) },
-        { endpoint: '/api/proxy/teams', status: 200, timestamp: daysAgo(3) },
-        { endpoint: '/api/proxy/teams', status: 200, timestamp: daysAgo(45) } // outside window
-      ]),
-      foremanStatus: createMockCollection([
-        { action: 'implementation', timestamp: daysAgo(3) }
-      ]),
-      dispatchQueue: createMockCollection([
-        { prompt: 'secret prompt', dispatchedAt: daysAgo(0) }
-      ]),
-      dispatchHistory: createMockCollection([
-        { prompt: 'older prompt', status: 'taken', dispatchedAt: daysAgo(3), feedback: [{}, {}] }
+        event('GET', '/api/proxy/stack', 0),
+        event('GET', '/api/proxy/issues/:id', 0),
+        event('POST', '/api/proxy/recommend-and-dispatch', 0),
+        event('GET', '/api/proxy/dispatch/:id', 0),
+        event('POST', '/api/proxy/foreman/status', 3),
+        event('PATCH', '/api/proxy/issues/:id', 3),
+        event('GET', '/api/proxy/me', 45) // outside window: counts toward totals, not buckets
       ])
     });
 
     const stats = await collectKpiStats(collections, { now: NOW });
     const last = ACTIVITY_WINDOW_DAYS - 1;
 
-    assert.strictEqual(stats.activity.proxy[last], 2);
-    assert.strictEqual(stats.activity.proxy[last - 3], 1);
-    assert.strictEqual(stats.activity.steps[last - 3], 1);
-    assert.strictEqual(stats.activity.dispatch[last], 1);
-    assert.strictEqual(stats.activity.dispatch[last - 3], 1);
-    // Out-of-window doc still counts toward the total, just not the series
-    assert.strictEqual(stats.totals.agentActions, 5);
-    assert.strictEqual(stats.totals.dispatches, 2);
-    assert.strictEqual(stats.totals.feedbackNotes, 2);
-
-    // Busiest day: today has 2 proxy + 1 dispatch = 3 vs 3 on day -3 — first max wins
+    assert.strictEqual(stats.proxyCategories.orienting[last], 2);
+    assert.strictEqual(stats.proxyCategories.deciding[last], 1);
+    assert.strictEqual(stats.proxyCategories.watching[last], 1);
+    assert.strictEqual(stats.proxyCategories.reporting[last - 3], 1);
+    assert.strictEqual(stats.proxyCategories.acting[last - 3], 1);
+    assert.strictEqual(stats.totals.agentActions, 7);
+    // 4 GET reads vs 3 writes → 1.3 reads per write
+    assert.strictEqual(stats.vanity.readsPerWrite, 1.3);
+    // Busiest day is today: 4 events vs 2 on day -3
     assert.ok(stats.vanity.busiestDay);
-    assert.strictEqual(stats.vanity.busiestDay.count, 3);
+    assert.strictEqual(stats.vanity.busiestDay.count, 4);
   });
 
-  test('aggregates dispatch outcomes from queue and history', async () => {
+  test('counts autopilot runs and ranks dispatch kinds across queue and history', async () => {
     const collections = buildCollections({
-      dispatchQueue: createMockCollection([{ dispatchedAt: daysAgo(0) }]),
+      dispatchQueue: createMockCollection([
+        { _id: 'q1', kind: 'autopilot', dispatchedAt: daysAgo(0) },
+        { _id: 'q2', kind: 'research', dispatchedAt: daysAgo(0) }
+      ]),
       dispatchHistory: createMockCollection([
-        { status: 'taken', dispatchedAt: daysAgo(1) },
-        { status: 'taken', dispatchedAt: daysAgo(2) },
-        { status: 'expired', dispatchedAt: daysAgo(2) },
-        { status: 'cancelled', dispatchedAt: daysAgo(3) },
-        { status: 'unknown-status', dispatchedAt: daysAgo(3) } // ignored, not an own bucket
+        { _id: 'h1', kind: 'autopilot', status: 'taken', dispatchedAt: daysAgo(2) },
+        { _id: 'h2', kind: 'implementation', status: 'taken', dispatchedAt: daysAgo(1) },
+        { _id: 'h3', kind: 'implementation', status: 'taken', dispatchedAt: daysAgo(2) },
+        { _id: 'h4', kind: 'review', status: 'expired', dispatchedAt: daysAgo(3) }
       ])
     });
 
     const stats = await collectKpiStats(collections, { now: NOW });
-    assert.deepStrictEqual(stats.dispatchOutcomes, { queued: 1, taken: 2, expired: 1, cancelled: 1 });
+    assert.strictEqual(stats.totals.autopilotRuns, 2);
+    assert.deepStrictEqual(stats.dispatchKinds[0], { label: 'autopilot', count: 2 });
+    assert.deepStrictEqual(stats.dispatchKinds[1], { label: 'implementation', count: 2 });
+    assert.strictEqual(stats.dispatchKinds.length, 4);
+  });
+
+  test('buckets dispatched work by kind into weekly windows', async () => {
+    const collections = buildCollections({
+      dispatchHistory: createMockCollection([
+        { _id: 'h1', kind: 'autopilot', status: 'taken', dispatchedAt: daysAgo(1) },   // newest week
+        { _id: 'h2', kind: 'research', status: 'taken', dispatchedAt: daysAgo(2) },    // newest week
+        { _id: 'h3', kind: 'research', status: 'taken', dispatchedAt: daysAgo(10) },   // 2 weeks back
+        { _id: 'h4', kind: 'research', status: 'taken', dispatchedAt: daysAgo(40) }    // outside windows
+      ])
+    });
+
+    const stats = await collectKpiStats(collections, { now: NOW });
+    assert.strictEqual(stats.dispatchByWeek.weeks.length, WEEKLY_WINDOW_WEEKS);
+
+    const research = stats.dispatchByWeek.kinds.find(k => k.label === 'research');
+    const autopilot = stats.dispatchByWeek.kinds.find(k => k.label === 'autopilot');
+    const lastWeek = WEEKLY_WINDOW_WEEKS - 1;
+    assert.strictEqual(research.counts[lastWeek], 1);
+    assert.strictEqual(research.counts[lastWeek - 1], 1);
+    assert.strictEqual(autopilot.counts[lastWeek], 1);
+    // Out-of-window doc contributes to no week
+    assert.strictEqual(research.counts.reduce((a, b) => a + b, 0), 2);
+  });
+
+  test('folds long-tail kinds into other in the weekly view', async () => {
+    const docs = ['a', 'b', 'c', 'd', 'e', 'f', 'g'].map((kind, i) => (
+      { _id: `h${i}`, kind, status: 'taken', dispatchedAt: daysAgo(1) }
+    ));
+    // Make 'a' dominant so the top-5 cut is deterministic
+    docs.push({ _id: 'h-extra', kind: 'a', status: 'taken', dispatchedAt: daysAgo(1) });
+
+    const collections = buildCollections({ dispatchHistory: createMockCollection(docs) });
+    const stats = await collectKpiStats(collections, { now: NOW });
+
+    const labels = stats.dispatchByWeek.kinds.map(k => k.label);
+    assert.strictEqual(labels.length, 6); // top 5 + other
+    assert.ok(labels.includes('other'));
+    const other = stats.dispatchByWeek.kinds.find(k => k.label === 'other');
+    assert.strictEqual(other.counts[WEEKLY_WINDOW_WEEKS - 1], 2); // f, g
+  });
+
+  test('builds the work funnel from dispatch status, feedback, and linked steps', async () => {
+    const collections = buildCollections({
+      dispatchQueue: createMockCollection([
+        { _id: 'q1', kind: 'research', dispatchedAt: daysAgo(0) } // dispatched only
+      ]),
+      dispatchHistory: createMockCollection([
+        // taken + feedback + completed step
+        { _id: 'h1', kind: 'implementation', status: 'taken', dispatchedAt: daysAgo(2), resolvedAt: daysAgo(1), feedback: [{}] },
+        // taken, no feedback, step posted but failed
+        { _id: 'h2', kind: 'review', status: 'taken', dispatchedAt: daysAgo(3), resolvedAt: daysAgo(2), feedback: [] },
+        // taken, silent (no feedback, no step)
+        { _id: 'h3', kind: 'research', status: 'taken', dispatchedAt: daysAgo(4), resolvedAt: daysAgo(3) },
+        // expired, never taken
+        { _id: 'h4', kind: 'planning', status: 'expired', dispatchedAt: daysAgo(5) }
+      ]),
+      foremanStatus: createMockCollection([
+        { dispatchId: 'h1', action: 'implementation', status: 'completed', timestamp: daysAgo(1) },
+        { dispatchId: 'h2', action: 'review', status: 'failed', timestamp: daysAgo(2) },
+        { dispatchId: 'unknown-dispatch', action: 'review', status: 'completed', timestamp: daysAgo(2) }, // no matching dispatch → ignored
+        { action: 'triage', status: 'completed', timestamp: daysAgo(2) } // no dispatchId → not part of the funnel
+      ])
+    });
+
+    const stats = await collectKpiStats(collections, { now: NOW });
+    assert.deepStrictEqual(stats.funnel, { dispatched: 5, taken: 3, reported: 2, completed: 1 });
+  });
+
+  test('computes median dispatch→resolution minutes for taken items', async () => {
+    const minutes = (n) => new Date(NOW.getTime() - n * 60000);
+    const collections = buildCollections({
+      dispatchHistory: createMockCollection([
+        { _id: 'h1', status: 'taken', dispatchedAt: minutes(100), resolvedAt: minutes(90) },  // 10m
+        { _id: 'h2', status: 'taken', dispatchedAt: minutes(80), resolvedAt: minutes(50) },   // 30m
+        { _id: 'h3', status: 'taken', dispatchedAt: minutes(70), resolvedAt: minutes(20) },   // 50m
+        { _id: 'h4', status: 'expired', dispatchedAt: minutes(60), resolvedAt: minutes(10) }, // not taken → excluded
+        { _id: 'h5', status: 'taken', dispatchedAt: minutes(5) }                              // no resolvedAt → excluded
+      ])
+    });
+
+    const stats = await collectKpiStats(collections, { now: NOW });
+    assert.strictEqual(stats.vanity.medianMinutesToResolve, 30);
+  });
+
+  test('buckets step outcomes from foreman-status, defaulting to other', async () => {
+    const entry = (status) => ({ action: 'research', status, timestamp: daysAgo(1) });
+    const collections = buildCollections({
+      foremanStatus: createMockCollection([
+        entry('completed'),
+        entry('Completed'),   // case-insensitive
+        entry('failed'),
+        entry('blocked'),
+        entry('in-progress'), // unconventional → other
+        entry(null)           // missing → other
+      ])
+    });
+
+    const stats = await collectKpiStats(collections, { now: NOW });
+    assert.deepStrictEqual(stats.stepOutcomes, { completed: 2, failed: 1, blocked: 1, other: 2 });
   });
 
   test('classifies proxy responses and ranks top endpoints', async () => {
-    const event = (endpoint, status) => ({ endpoint, status, timestamp: daysAgo(1) });
+    const event = (endpoint, status) => ({ endpoint, method: 'GET', status, timestamp: daysAgo(1) });
     const collections = buildCollections({
       proxyEvents: createMockCollection([
         event('/api/proxy/me', 200),
@@ -175,42 +309,25 @@ describe('collectKpiStats', () => {
     assert.deepStrictEqual(stats.topEndpoints[2], { label: '/api/proxy/recommend', count: 1 });
   });
 
-  test('counts autopilot runs and ranks dispatch kinds across queue and history', async () => {
+  test('histograms all agent actions by UTC hour', async () => {
+    const at = (iso) => new Date(iso);
     const collections = buildCollections({
-      dispatchQueue: createMockCollection([
-        { kind: 'autopilot', dispatchedAt: daysAgo(0) },
-        { kind: 'research', dispatchedAt: daysAgo(0) }
+      proxyEvents: createMockCollection([
+        { method: 'GET', endpoint: '/api/proxy/me', status: 200, timestamp: at('2026-06-10T03:15:00Z') },
+        { method: 'GET', endpoint: '/api/proxy/me', status: 200, timestamp: at('2026-06-09T03:45:00Z') }
       ]),
-      dispatchHistory: createMockCollection([
-        { kind: 'autopilot', status: 'taken', dispatchedAt: daysAgo(2) },
-        { kind: 'implementation', status: 'taken', dispatchedAt: daysAgo(1) },
-        { kind: 'implementation', status: 'taken', dispatchedAt: daysAgo(2) },
-        { kind: 'review', status: 'expired', dispatchedAt: daysAgo(3) }
-      ])
-    });
-
-    const stats = await collectKpiStats(collections, { now: NOW });
-    assert.strictEqual(stats.totals.autopilotRuns, 2);
-    assert.deepStrictEqual(stats.dispatchKinds[0], { label: 'autopilot', count: 2 });
-    assert.deepStrictEqual(stats.dispatchKinds[1], { label: 'implementation', count: 2 });
-    assert.strictEqual(stats.dispatchKinds.length, 4);
-  });
-
-  test('buckets step outcomes from foreman-status, defaulting to other', async () => {
-    const entry = (status) => ({ action: 'research', status, timestamp: daysAgo(1) });
-    const collections = buildCollections({
       foremanStatus: createMockCollection([
-        entry('completed'),
-        entry('Completed'),   // case-insensitive
-        entry('failed'),
-        entry('blocked'),
-        entry('in-progress'), // unconventional → other
-        entry(null)           // missing → other
+        { action: 'review', status: 'completed', timestamp: at('2026-06-10T11:00:00Z') }
+      ]),
+      dispatchQueue: createMockCollection([
+        { _id: 'q1', kind: 'research', dispatchedAt: at('2026-06-10T03:59:00Z') }
       ])
     });
 
     const stats = await collectKpiStats(collections, { now: NOW });
-    assert.deepStrictEqual(stats.stepOutcomes, { completed: 2, failed: 1, blocked: 1, other: 2 });
+    assert.strictEqual(stats.hourOfDay[3], 3);
+    assert.strictEqual(stats.hourOfDay[11], 1);
+    assert.strictEqual(stats.hourOfDay.reduce((a, b) => a + b, 0), 4);
   });
 
   test('sums free tier usage per day, excluding global hourly records', async () => {
@@ -254,6 +371,7 @@ describe('collectKpiStats', () => {
     const collections = buildCollections({
       workspacePreferences: createMockCollection([{ _id: 'secret-workspace', preferences: { modelId: 'some/model' } }]),
       dispatchQueue: createMockCollection([{
+        _id: 'q1',
         urlKey: 'secret-workspace',
         prompt: 'TOP-SECRET-PROMPT-TEXT',
         issueTitle: 'Confidential issue title',
