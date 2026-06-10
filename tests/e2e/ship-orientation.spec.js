@@ -1,6 +1,10 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { seedLocalWorkspace, swimLocalSeed, LOCAL_WORKSPACE_URL_KEY } from '../fixtures/local-harness.js';
 
-const TEST_WORKSPACE_URL_KEY = 'test-workspace';
+// LIN-378: rides a seeded local workspace (no `test-token` mock) — the swim
+// sample fixture converted to local shape, so the orientation identifiers
+// (AUTH-3, API-4, …) still resolve.
+const TEST_WORKSPACE_URL_KEY = LOCAL_WORKSPACE_URL_KEY;
 const SHIP_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/ship`;
 
 // Orientation mode (LIN-301): the Ship view reads saved per-task compass
@@ -11,7 +15,7 @@ const SHIP_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/ship`;
 test.describe('Ship orientation mode (LIN-301)', () => {
   test('mode control renders; orientation is disabled without a saved report', async ({ page }) => {
     await page.goto(`/test/clear-report-history?urlKey=${TEST_WORKSPACE_URL_KEY}`);
-    await page.goto('/test/set-session?swimSample=true');
+    await seedLocalWorkspace(page, swimLocalSeed);
     await page.goto(SHIP_URL);
     await page.waitForLoadState('networkidle');
 
@@ -31,8 +35,7 @@ test.describe('Ship orientation mode (LIN-301)', () => {
   });
 
   test('with a saved report, toggling to orientation maps tasks to bearings', async ({ page }) => {
-    const features = encodeURIComponent(JSON.stringify({ roadmap: true }));
-    await page.goto(`/test/set-session?swimSample=true&features=${features}`);
+    await seedLocalWorkspace(page, swimLocalSeed, { features: { roadmap: true } });
 
     // Seed a report whose orientation covers swim-sample non-started tasks.
     const orientation = [
@@ -72,8 +75,7 @@ test.describe('Ship orientation mode (LIN-301)', () => {
   });
 
   test('orientation preference persists across reloads', async ({ page }) => {
-    const features = encodeURIComponent(JSON.stringify({ roadmap: true }));
-    await page.goto(`/test/set-session?swimSample=true&features=${features}`);
+    await seedLocalWorkspace(page, swimLocalSeed, { features: { roadmap: true } });
     await page.request.post(`/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/reports`, {
       data: {
         northStar: 'star',

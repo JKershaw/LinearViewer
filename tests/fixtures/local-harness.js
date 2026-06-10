@@ -19,8 +19,15 @@
  *   - OAuth / PAT auth bootstrap        (auth.spec, pat-auth.spec, openrouter-auth.spec)
  *   - the Linear API proxy contract     (proxy.spec, proxy-toggle-copy.spec)
  *   - cycles / teams / estimate-driven surfaces (the provider declares these off)
+ *   - visual-regression specs (tests/visual/*) — pinned to the mock fixtures so
+ *     the committed reference screenshots stay byte-stable
  * Migrate a spec onto this harness only when the local provider fully backs the
- * surface under test (tree/dashboard/swim/ship/detail rendering, reads, writes).
+ * surface under test. Migrated so far: dashboard, swim (lanes/flow/vertical),
+ * ship (+ orientation mode), interactions/detail. The remaining `testMockData`
+ * branches (server.js, routes/pipeline.js, routes/proxy.js,
+ * routes/workspace-api.js) still serve the roadmap / recap / brief / recommend /
+ * proxy / foreman / audit / pipeline / settings specs and stay until those
+ * surfaces migrate.
  */
 import { LocalStore } from '../../lib/local-store.js';
 import { LocalProvider } from '../../lib/providers/local/index.js';
@@ -153,10 +160,12 @@ export function createLocalProvider() {
  *
  * @param {import('@playwright/test').Page} page
  * @param {{projects?: Array, issues?: Array}} [seed] - defaults to defaultLocalSeed
+ * @param {{features?: Object}} [options] - session feature flags (whitelist-validated server-side)
  * @returns {Promise<{urlKey: string, dashboard: string}>}
  */
-export async function seedLocalWorkspace(page, seed = defaultLocalSeed) {
-  const resp = await page.request.post('/test/set-local-session', { data: seed });
+export async function seedLocalWorkspace(page, seed = defaultLocalSeed, { features } = {}) {
+  const data = features ? { ...seed, features } : seed;
+  const resp = await page.request.post('/test/set-local-session', { data });
   if (!resp.ok()) {
     throw new Error(`seedLocalWorkspace failed: ${resp.status()} ${await resp.text()}`);
   }
