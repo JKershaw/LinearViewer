@@ -46,6 +46,8 @@ export function localDashboardUrl(urlKey = LOCAL_WORKSPACE_URL_KEY) {
  *   .state.todo        = 2   (the child, in both sections)
  *   .state.done        = 1   (issue-3, in the completed section)
  *   In Progress lines  = 3   (issue-1, its child issue-2, issue-4)
+ * issue-1 carries two comments (Alice, Bob) so the detail surface's comments
+ * toggle has something to load through fetchIssueComments.
  *
  * Project names are kept substring-distinct ("Local Project" vs "Local Beta") so
  * `:has-text("Local Project")` matches a single header (no strict-mode clash).
@@ -56,7 +58,10 @@ export const defaultLocalSeed = {
     { id: 'local-proj-2', name: 'Local Beta', content: 'A second local project', sortOrder: 2 },
   ],
   issues: [
-    { id: 'local-issue-1', identifier: 'LOCAL-1', title: 'Local parent task', description: 'Seeded parent', projectId: 'local-proj-1', sortOrder: 1, state: { name: 'In Progress', type: 'started' }, labels: ['local-label'], url: `/workspace/${LOCAL_WORKSPACE_URL_KEY}/issue/local-issue-1` },
+    { id: 'local-issue-1', identifier: 'LOCAL-1', title: 'Local parent task', description: 'Seeded parent', projectId: 'local-proj-1', sortOrder: 1, state: { name: 'In Progress', type: 'started' }, labels: ['local-label'], url: `/workspace/${LOCAL_WORKSPACE_URL_KEY}/issue/local-issue-1`, comments: [
+      { id: 'local-comment-1', body: 'This is a test comment with **markdown**.', createdAt: '2024-01-15T10:00:00Z', user: 'Alice' },
+      { id: 'local-comment-2', body: 'Second comment with `code`.', createdAt: '2024-01-16T14:30:00Z', user: 'Bob' },
+    ] },
     { id: 'local-issue-2', identifier: 'LOCAL-2', title: 'Local child task', description: 'Seeded child', projectId: 'local-proj-1', parentId: 'local-issue-1', sortOrder: 2, state: { name: 'Todo', type: 'unstarted' }, url: `/workspace/${LOCAL_WORKSPACE_URL_KEY}/issue/local-issue-2` },
     { id: 'local-issue-3', identifier: 'LOCAL-3', title: 'Local done task', description: 'Seeded done', projectId: 'local-proj-1', sortOrder: 3, state: { name: 'Done', type: 'completed' }, completedAt: '2024-01-10T00:00:00Z', url: `/workspace/${LOCAL_WORKSPACE_URL_KEY}/issue/local-issue-3` },
     { id: 'local-issue-4', identifier: 'LOCAL-4', title: 'Second project task', description: 'Seeded second-project task', projectId: 'local-proj-2', sortOrder: 1, state: { name: 'In Progress', type: 'started' }, url: `/workspace/${LOCAL_WORKSPACE_URL_KEY}/issue/local-issue-4` },
