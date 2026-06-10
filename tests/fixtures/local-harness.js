@@ -25,6 +25,7 @@
 import { LocalStore } from '../../lib/local-store.js';
 import { LocalProvider } from '../../lib/providers/local/index.js';
 import { createMockCollection } from './mock-collection.js';
+import { swimSampleProjects, swimSampleIssues } from './swim-sample-data.js';
 
 /** urlKey of the seeded local workspace; doubles as its store partition key. */
 export const LOCAL_WORKSPACE_URL_KEY = 'local-workspace';
@@ -61,6 +62,58 @@ export const defaultLocalSeed = {
     { id: 'local-issue-4', identifier: 'LOCAL-4', title: 'Second project task', description: 'Seeded second-project task', projectId: 'local-proj-2', sortOrder: 1, state: { name: 'In Progress', type: 'started' }, url: `/workspace/${LOCAL_WORKSPACE_URL_KEY}/issue/local-issue-4` },
   ],
 };
+
+/**
+ * Convert a Linear-shaped fixture (`{ projects, issues }` as mock-data.js /
+ * swim-sample-data.js export them) into the LocalStore seed shape:
+ * `parent/project` objects flatten to `parentId/projectId`, `labels.nodes`
+ * flattens to a name array, `relations.nodes` flattens to
+ * `[{ type, relatedIssueId }]`, and team is dropped (the local provider has no
+ * teams). URLs are rewritten to local workspace paths — the local provider owns
+ * its own links, so seeded data must not point at linear.app.
+ */
+export function localSeedFromLinearFixture({ projects, issues }, urlKey = LOCAL_WORKSPACE_URL_KEY) {
+  return {
+    projects: projects.map(p => ({
+      id: p.id,
+      name: p.name,
+      content: p.content ?? null,
+      sortOrder: p.sortOrder ?? 0,
+    })),
+    issues: issues.map(i => ({
+      id: i.id,
+      identifier: i.identifier,
+      title: i.title,
+      description: i.description ?? '',
+      estimate: i.estimate ?? null,
+      priority: i.priority ?? 0,
+      sortOrder: i.sortOrder ?? 0,
+      createdAt: i.createdAt,
+      dueDate: i.dueDate ?? null,
+      completedAt: i.completedAt ?? null,
+      parentId: i.parent?.id ?? null,
+      projectId: i.project?.id ?? null,
+      state: i.state,
+      assignee: i.assignee ?? null,
+      labels: (i.labels?.nodes || []).map(l => l.name),
+      relations: (i.relations?.nodes || [])
+        .map(r => ({ type: r.type, relatedIssueId: r.relatedIssue?.id }))
+        .filter(r => r.relatedIssueId),
+      url: `/workspace/${urlKey}/issue/${i.id}`,
+    })),
+  };
+}
+
+/**
+ * The swim/ship sample fixture as a local seed: 4 projects, ~20 issues with
+ * deep blocking chains, nested subtask groups, and labels — everything the
+ * dependency-driven views (swim lanes/flow, ship sectors) need. Backed by the
+ * relations surfaced through LocalProvider._toCanonicalIssue (LIN-378).
+ */
+export const swimLocalSeed = localSeedFromLinearFixture({
+  projects: swimSampleProjects,
+  issues: swimSampleIssues,
+});
 
 // ---------------------------------------------------------------------------
 // Unit-side helpers — in-memory collection + LocalStore (no server/session).

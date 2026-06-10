@@ -1,11 +1,15 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { seedLocalWorkspace, swimLocalSeed, LOCAL_WORKSPACE_URL_KEY } from '../fixtures/local-harness.js';
 
-const TEST_WORKSPACE_URL_KEY = 'test-workspace';
-const SHIP_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/ship`;
+// LIN-378: the ship surface is fully modeled by the local provider, so this spec
+// rides a seeded local workspace (no `test-token` mock). The seed is the swim
+// sample fixture converted to local shape — same projects, blocking chains, and
+// labels the assertions below were written against.
+const SHIP_URL = `/workspace/${LOCAL_WORKSPACE_URL_KEY}/ship`;
 
 test.describe('Ship Page', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/test/set-session?swimSample=true');
+    await seedLocalWorkspace(page, swimLocalSeed);
     await page.goto(SHIP_URL);
     await page.waitForLoadState('networkidle');
   });
