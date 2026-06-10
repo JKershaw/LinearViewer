@@ -9,7 +9,7 @@ test.describe('PAT Authentication Mode', () => {
     await page.goto('/test/set-session?patMode=true')
   })
 
-  test('PAT workspace hides +add button in workspace dropdown', async ({ page }) => {
+  test('PAT workspace hides Linear +add but shows local-create in workspace dropdown', async ({ page }) => {
     await page.goto(WORKSPACE_URL)
     await page.waitForLoadState('networkidle')
 
@@ -17,8 +17,12 @@ test.describe('PAT Authentication Mode', () => {
     const workspaceToggle = page.locator('#workspace-toggle')
     await workspaceToggle.click()
 
-    // The +add link should not be present
+    // The Linear +add link should not be present (OAuth may not be configured)
     await expect(page.locator('.nav-option-add')).toHaveCount(0)
+
+    // But local-workspace onboarding is auth-independent (LIN-377): it stays
+    // available even in PAT mode.
+    await expect(page.locator('.nav-option-add-local')).toContainText('+local workspace')
   })
 
   test('PAT workspace hides remove button in workspace dropdown', async ({ page }) => {

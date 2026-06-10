@@ -20,9 +20,11 @@ test.describe('Workspace Selector', () => {
     const workspaceOptions = page.locator('#workspace-options');
     await expect(workspaceOptions).toBeVisible();
 
-    // Should show workspace rows (1 workspace + 1 add row)
-    await expect(workspaceOptions.locator('.nav-options-row')).toHaveCount(2);
+    // Should show workspace rows (1 workspace + Linear +add + local +add row).
+    // The local-create row is always present (LIN-377), independent of OAuth/PAT.
+    await expect(workspaceOptions.locator('.nav-options-row')).toHaveCount(3);
     await expect(workspaceOptions.locator('.nav-option-add')).toContainText('+add');
+    await expect(workspaceOptions.locator('.nav-option-add-local')).toContainText('+local workspace');
   });
 
   test('multiple workspaces show in selector', async ({ page }) => {
@@ -35,9 +37,9 @@ test.describe('Workspace Selector', () => {
     const workspaceOptions = page.locator('#workspace-options');
     await expect(workspaceOptions).toBeVisible();
 
-    // Should show 2 workspaces + add option
+    // Should show 2 workspaces + Linear +add + local +add option
     const options = workspaceOptions.locator('.nav-options-row');
-    await expect(options).toHaveCount(3); // 2 workspaces + 1 add
+    await expect(options).toHaveCount(4); // 2 workspaces + Linear +add + local +add
 
     // First workspace should be selected (has ● marker)
     await expect(workspaceOptions.locator('.nav-option.selected')).toContainText('Test Workspace');
@@ -170,8 +172,8 @@ test.describe('Workspace Limit', () => {
     const workspaceOptions = page.locator('#workspace-options');
     await expect(workspaceOptions).toBeVisible();
 
-    // Should show 10 workspaces + add option = 11 rows
+    // Should show 10 workspaces + Linear +add + local +add = 12 rows
     const options = workspaceOptions.locator('.nav-options-row');
-    await expect(options).toHaveCount(11);
+    await expect(options).toHaveCount(12);
   });
 });

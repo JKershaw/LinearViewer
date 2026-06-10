@@ -360,7 +360,8 @@ button.nav-action {
   width: 1.1ch;  /* Same width as marker */
 }
 
-.nav-option-add {
+.nav-option-add,
+.nav-option-add-local {
   color: var(--fg-dim);
 }
 
