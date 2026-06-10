@@ -52,7 +52,7 @@
 
   // --- Activity line chart (hero) ---
   const activity = data.activity;
-  const activityTotal = sum(activity.proxy) + sum(activity.foreman) + sum(activity.dispatch);
+  const activityTotal = sum(activity.proxy) + sum(activity.steps) + sum(activity.dispatch);
   if (!emptyUnless('chart-activity', activityTotal)) {
     new Chart(document.getElementById('chart-activity'), {
       type: 'line',
@@ -60,7 +60,7 @@
         labels: activity.days.map(shortDay),
         datasets: [
           { label: 'proxy api calls', data: activity.proxy, borderColor: COLORS.blue, backgroundColor: COLORS.blue, tension: 0.3, pointRadius: 0, borderWidth: 2 },
-          { label: 'foreman updates', data: activity.foreman, borderColor: COLORS.green, backgroundColor: COLORS.green, tension: 0.3, pointRadius: 0, borderWidth: 2 },
+          { label: 'step updates', data: activity.steps, borderColor: COLORS.green, backgroundColor: COLORS.green, tension: 0.3, pointRadius: 0, borderWidth: 2 },
           { label: 'dispatches', data: activity.dispatch, borderColor: COLORS.yellow, backgroundColor: COLORS.yellow, tension: 0.3, pointRadius: 0, borderWidth: 2 }
         ]
       },
@@ -141,16 +141,19 @@
     });
   }
 
-  // --- Foreman actions horizontal bar ---
-  const actions = data.foremanActions || [];
-  if (!emptyUnless('chart-foreman-actions', actions.length)) {
-    new Chart(document.getElementById('chart-foreman-actions'), {
+  // --- Dispatch kinds horizontal bar ---
+  // The work mix flowing through dispatch: autopilot kickoffs (highlighted)
+  // plus the worker step kinds an orchestrator or user dispatches.
+  const kinds = data.dispatchKinds || [];
+  if (!emptyUnless('chart-dispatch-kinds', kinds.length)) {
+    new Chart(document.getElementById('chart-dispatch-kinds'), {
       type: 'bar',
       data: {
-        // Labels are agent-supplied strings; Chart.js renders them as canvas
-        // text (no HTML injection surface), but truncate for layout.
-        labels: actions.map(function (e) { return e.label.length > 24 ? e.label.slice(0, 23) + '…' : e.label; }),
-        datasets: [{ data: actions.map(function (e) { return e.count; }), backgroundColor: COLORS.green }]
+        labels: kinds.map(function (e) { return e.label.length > 24 ? e.label.slice(0, 23) + '…' : e.label; }),
+        datasets: [{
+          data: kinds.map(function (e) { return e.count; }),
+          backgroundColor: kinds.map(function (e) { return e.label === 'autopilot' ? COLORS.purple : COLORS.blue; })
+        }]
       },
       options: {
         indexAxis: 'y',
@@ -160,6 +163,30 @@
           y: { grid: { display: false } }
         }
       }
+    });
+  }
+
+  // --- Step outcomes doughnut ---
+  // Per-step results agents report to the foreman-status log.
+  const stepOutcomes = data.stepOutcomes;
+  const stepEntries = [
+    ['completed', stepOutcomes.completed, COLORS.green],
+    ['failed', stepOutcomes.failed, COLORS.red],
+    ['blocked', stepOutcomes.blocked, COLORS.yellow],
+    ['other', stepOutcomes.other, COLORS.dim]
+  ];
+  if (!emptyUnless('chart-step-outcomes', sum(stepEntries.map(function (e) { return e[1]; })))) {
+    new Chart(document.getElementById('chart-step-outcomes'), {
+      type: 'doughnut',
+      data: {
+        labels: stepEntries.map(function (e) { return e[0]; }),
+        datasets: [{
+          data: stepEntries.map(function (e) { return e[1]; }),
+          backgroundColor: stepEntries.map(function (e) { return e[2]; }),
+          borderWidth: 0
+        }]
+      },
+      options: { cutout: '60%' }
     });
   }
 

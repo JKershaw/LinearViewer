@@ -12,8 +12,9 @@ test.describe('KPIs page', () => {
     await page.goto('/kpis');
 
     await expect(page.locator('h2')).toHaveText('instance kpis');
-    await expect(page.locator('.kpi-cards .kpi-card')).toHaveCount(10);
+    await expect(page.locator('.kpi-cards .kpi-card')).toHaveCount(11);
     await expect(page.locator('.kpi-card-label').first()).toHaveText('workspaces');
+    await expect(page.locator('.kpi-card-label', { hasText: 'autopilot runs' })).toBeVisible();
   });
 
   test('loads Chart.js and the embedded data payload', async ({ page }) => {
@@ -35,7 +36,7 @@ test.describe('KPIs page', () => {
     // Each chart box ends up with either a live canvas or a "no data yet"
     // note — never an empty hole.
     const boxes = page.locator('.kpi-chart-box');
-    await expect(boxes).toHaveCount(6);
+    await expect(boxes).toHaveCount(7);
     const count = await boxes.count();
     for (let i = 0; i < count; i++) {
       const box = boxes.nth(i);

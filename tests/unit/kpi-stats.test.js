@@ -63,12 +63,15 @@ describe('collectKpiStats', () => {
     assert.strictEqual(stats.totals.activeSessions, 0);
     assert.strictEqual(stats.totals.agentActions, 0);
     assert.strictEqual(stats.totals.dispatches, 0);
+    assert.strictEqual(stats.totals.autopilotRuns, 0);
     assert.strictEqual(stats.totals.aiSummaries, 0);
     assert.strictEqual(stats.totals.activeTokens, 0);
     assert.strictEqual(stats.activity.days.length, ACTIVITY_WINDOW_DAYS);
     assert.ok(stats.activity.proxy.every(count => count === 0));
     assert.strictEqual(stats.vanity.busiestDay, null);
     assert.deepStrictEqual(stats.dispatchOutcomes, { queued: 0, taken: 0, expired: 0, cancelled: 0 });
+    assert.deepStrictEqual(stats.stepOutcomes, { completed: 0, failed: 0, blocked: 0, other: 0 });
+    assert.deepStrictEqual(stats.dispatchKinds, []);
   });
 
   test('counts workspaces as the union of keys across collections', async () => {
@@ -123,7 +126,7 @@ describe('collectKpiStats', () => {
 
     assert.strictEqual(stats.activity.proxy[last], 2);
     assert.strictEqual(stats.activity.proxy[last - 3], 1);
-    assert.strictEqual(stats.activity.foreman[last - 3], 1);
+    assert.strictEqual(stats.activity.steps[last - 3], 1);
     assert.strictEqual(stats.activity.dispatch[last], 1);
     assert.strictEqual(stats.activity.dispatch[last - 3], 1);
     // Out-of-window doc still counts toward the total, just not the series
@@ -170,6 +173,44 @@ describe('collectKpiStats', () => {
     assert.deepStrictEqual(stats.topEndpoints[0], { label: '/api/proxy/issues/:id', count: 2 });
     assert.deepStrictEqual(stats.topEndpoints[1], { label: '/api/proxy/me', count: 2 });
     assert.deepStrictEqual(stats.topEndpoints[2], { label: '/api/proxy/recommend', count: 1 });
+  });
+
+  test('counts autopilot runs and ranks dispatch kinds across queue and history', async () => {
+    const collections = buildCollections({
+      dispatchQueue: createMockCollection([
+        { kind: 'autopilot', dispatchedAt: daysAgo(0) },
+        { kind: 'research', dispatchedAt: daysAgo(0) }
+      ]),
+      dispatchHistory: createMockCollection([
+        { kind: 'autopilot', status: 'taken', dispatchedAt: daysAgo(2) },
+        { kind: 'implementation', status: 'taken', dispatchedAt: daysAgo(1) },
+        { kind: 'implementation', status: 'taken', dispatchedAt: daysAgo(2) },
+        { kind: 'review', status: 'expired', dispatchedAt: daysAgo(3) }
+      ])
+    });
+
+    const stats = await collectKpiStats(collections, { now: NOW });
+    assert.strictEqual(stats.totals.autopilotRuns, 2);
+    assert.deepStrictEqual(stats.dispatchKinds[0], { label: 'autopilot', count: 2 });
+    assert.deepStrictEqual(stats.dispatchKinds[1], { label: 'implementation', count: 2 });
+    assert.strictEqual(stats.dispatchKinds.length, 4);
+  });
+
+  test('buckets step outcomes from foreman-status, defaulting to other', async () => {
+    const entry = (status) => ({ action: 'research', status, timestamp: daysAgo(1) });
+    const collections = buildCollections({
+      foremanStatus: createMockCollection([
+        entry('completed'),
+        entry('Completed'),   // case-insensitive
+        entry('failed'),
+        entry('blocked'),
+        entry('in-progress'), // unconventional → other
+        entry(null)           // missing → other
+      ])
+    });
+
+    const stats = await collectKpiStats(collections, { now: NOW });
+    assert.deepStrictEqual(stats.stepOutcomes, { completed: 2, failed: 1, blocked: 1, other: 2 });
   });
 
   test('sums free tier usage per day, excluding global hourly records', async () => {

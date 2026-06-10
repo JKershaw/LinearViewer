@@ -16,6 +16,7 @@ function buildStats(overrides = {}) {
       activeSessions: 3,
       agentActions: 1234,
       dispatches: 56,
+      autopilotRuns: 8,
       feedbackNotes: 7,
       aiSummaries: 89,
       roadmapReports: 10,
@@ -27,13 +28,14 @@ function buildStats(overrides = {}) {
     activity: {
       days: ['2026-06-09', '2026-06-10'],
       proxy: [10, 20],
-      foreman: [1, 2],
+      steps: [1, 2],
       dispatch: [3, 4]
     },
     dispatchOutcomes: { queued: 1, taken: 2, expired: 3, cancelled: 0 },
+    dispatchKinds: [{ label: 'autopilot', count: 4 }, { label: 'research', count: 3 }],
+    stepOutcomes: { completed: 5, failed: 1, blocked: 0, other: 2 },
     proxyStatus: { ok: 30, clientError: 2, serverError: 1 },
     topEndpoints: [{ label: '/api/proxy/me', count: 9 }],
-    foremanActions: [{ label: 'implementation', count: 5 }],
     freeTier: { days: ['2026-06-09', '2026-06-10'], counts: [4, 6] },
     vanity: { busiestDay: { day: '2026-06-10', count: 26 }, dbBackend: 'mangodb' },
     ...overrides
@@ -47,6 +49,7 @@ describe('renderKpisPage', () => {
     assert.ok(html.includes('instance kpis'));
     assert.ok(html.includes('1,234'), 'agent actions formatted with separator');
     assert.ok(html.includes('workspaces'));
+    assert.ok(html.includes('autopilot runs · 30d'));
     assert.ok(html.includes('prompts dispatched · 30d'));
     assert.ok(html.includes('data-section="kpi-cards"'));
   });
@@ -55,8 +58,9 @@ describe('renderKpisPage', () => {
     const html = renderKpisPage(buildStats());
 
     for (const id of [
-      'chart-activity', 'chart-dispatch-outcomes', 'chart-proxy-status',
-      'chart-top-endpoints', 'chart-foreman-actions', 'chart-free-tier'
+      'chart-activity', 'chart-dispatch-kinds', 'chart-step-outcomes',
+      'chart-dispatch-outcomes', 'chart-proxy-status',
+      'chart-top-endpoints', 'chart-free-tier'
     ]) {
       assert.ok(html.includes(`id="${id}"`), `missing canvas ${id}`);
     }
@@ -73,7 +77,7 @@ describe('renderKpisPage', () => {
 
   test('escapes < in the embedded payload so it cannot close the script tag', () => {
     const stats = buildStats({
-      foremanActions: [{ label: '</script><script>alert(1)', count: 1 }]
+      dispatchKinds: [{ label: '</script><script>alert(1)', count: 1 }]
     });
     const html = renderKpisPage(stats);
     assert.ok(!html.includes('</script><script>alert(1)'));
