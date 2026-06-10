@@ -1157,21 +1157,32 @@ GET ${baseUrl}/api/proxy/autopilot/manual
 
 ## Write Endpoints
 
+Success responses wrap the affected entity (e.g. { "success": true, "issue": {...} }) —
+read the documented shape rather than assuming the entity comes back top-level. Creates
+(issues, comments, relations) are NOT idempotent and there is no idempotency key: a 2xx
+with "success": true means the write landed even if your client-side parse came up
+empty, so inspect the raw response (or search) before retrying — a blind retry mints a
+duplicate.
+
 POST ${baseUrl}/api/proxy/issues
   Body: { "teamId": "...", "title": "...", "description": "...", "projectId": "...", "stateId": "...", "assigneeId": "...", "priority": 0-4, "cycleId": "...", "parentId": "..." }
-  → Create a new issue; set parentId (UUID) to create as a sub-issue
+  → Create a new issue; set parentId (UUID) to create as a sub-issue. Returns 201:
+  → { "success": true, "issue": { "id": "...", "identifier": "LIN-123", "title": "...", "url": "...", "state": { "name": "Backlog", "type": "backlog" } } }
 
 PATCH ${baseUrl}/api/proxy/issues/{issueId}
   Body: { "title": "...", "description": "...", "stateId": "...", "assigneeId": "...", "priority": 0-4, "cycleId": "...", "parentId": "...|null" }
   → Update an existing issue; set cycleId to assign/move to a cycle; set parentId to a UUID to re-parent, or null to promote to top-level
+  → { "success": true, "issue": { "id": "...", "identifier": "LIN-123", "title": "...", "url": "...", "state": { "name": "In Progress", "type": "started" } } }
 
 POST ${baseUrl}/api/proxy/issues/{issueId}/comments
   Body: { "body": "..." }
-  → Add a comment to an issue
+  → Add a comment to an issue. Returns 201:
+  → { "success": true, "comment": { "id": "...", "body": "...", "createdAt": "...", "user": { "name": "..." } } }
 
 POST ${baseUrl}/api/proxy/issues/{issueId}/relations
   Body: { "type": "blocks|related|duplicate", "relatedIssueId": "..." }
-  → Create a relation between issues
+  → Create a relation between issues. Returns 201:
+  → { "success": true, "issueRelation": { "type": "blocks", "issue": { "id": "...", "identifier": "LIN-7" }, "relatedIssue": { "id": "...", "identifier": "LIN-9" } } }
 
 DELETE ${baseUrl}/api/proxy/issues/{issueId}/relations/{relationId}
   → Remove a relation. relationId is the relation's own id (the \`id\` field on
@@ -1180,14 +1191,19 @@ DELETE ${baseUrl}/api/proxy/issues/{issueId}/relations/{relationId}
 
 POST ${baseUrl}/api/proxy/issues/{issueId}/labels
   Body: { "labelId": "..." }
-  → Add a label to an issue
+  → Add a label to an issue (idempotent)
+  → { "success": true, "issue": { "id": "...", "identifier": "LIN-123", "labels": { "nodes": [{ "id": "...", "name": "bug" }] } } }
+  → When the label is already present: { "success": true, "message": "Label already present" }
 
 DELETE ${baseUrl}/api/proxy/issues/{issueId}/labels/{labelId}
-  → Remove a label from an issue
+  → Remove a label from an issue (idempotent)
+  → { "success": true, "issue": { "id": "...", "identifier": "LIN-123", "labels": { "nodes": [...] } } }
+  → When the label is not present: { "success": true, "message": "Label not present" }
 
 POST ${baseUrl}/api/proxy/foreman/status
   Body: { "taskIdentifier": "LIN-42", "action": "research", "status": "completed", "summary": "...", "dispatchId": "..." }
-  → Record a foreman status update (dispatchId optional: pass the dispatch-history item ID from /api/dispatch/take to enable exact loop-reconstruction join)
+  → Record a foreman status update (dispatchId optional: pass the dispatch-history item ID from /api/dispatch/take to enable exact loop-reconstruction join). Returns 201:
+  → { "success": true }
 
 ## Dispatch Endpoints
 
