@@ -9,8 +9,7 @@
  */
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert';
-import { LocalStore } from '../../lib/local-store.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createLocalStore } from '../fixtures/local-harness.js';
 
 const SCOPE = 'ws-1';
 
@@ -18,7 +17,7 @@ describe('LocalStore', () => {
   let store;
 
   beforeEach(() => {
-    store = new LocalStore({ collection: createMockCollection() });
+    ({ store } = createLocalStore());
   });
 
   test('creates an issue with a generated identifier and canonical defaults', async () => {
