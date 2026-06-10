@@ -93,6 +93,23 @@ describe('LocalProvider reads', () => {
     assert.deepEqual(await provider.fetchTeams(SCOPE), []);
   });
 
+  test('surfaces stored relations in canonical {nodes:[{type, relatedIssue}]} shape (LIN-378)', async () => {
+    // The swim/ship dependency views derive blocksIds from
+    // issue.relations.nodes — same shape the Linear provider's query returns.
+    await store.clear(SCOPE);
+    await store.seed(SCOPE, {
+      projects: [{ id: 'p1', name: 'Alpha', sortOrder: 1 }],
+      issues: [
+        { id: 'i1', identifier: 'LOCAL-1', title: 'Blocker', projectId: 'p1', relations: [{ type: 'blocks', relatedIssueId: 'i2' }] },
+        { id: 'i2', identifier: 'LOCAL-2', title: 'Blocked', projectId: 'p1' },
+      ],
+    });
+    const { issues } = await provider.fetchProjects(SCOPE);
+    assert.deepEqual(issues.find(i => i.id === 'i1').relations,
+      { nodes: [{ type: 'blocks', relatedIssue: { id: 'i2' } }] });
+    assert.deepEqual(issues.find(i => i.id === 'i2').relations, { nodes: [] });
+  });
+
   test('fetchIssueContext returns issue + parent + children + project', async () => {
     const ctx = await provider.fetchIssueContext(SCOPE, 'LOCAL-1');
     assert.equal(ctx.issue.identifier, 'LOCAL-1');

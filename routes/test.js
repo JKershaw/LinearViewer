@@ -387,6 +387,8 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   // POST → seeds a custom `{ projects, issues }` body, letting specs seed
   //        exactly the data they assert on (LIN-378 reusable harness). Falls
   //        back to defaultLocalSeed when the body carries no projects/issues.
+  //        An optional `features` object sets session feature flags, validated
+  //        against the same whitelist as /test/set-session.
   const setLocalSession = async (req, res) => {
     try {
       if (!localStore) throw new Error('localStore not wired into test routes');
@@ -395,6 +397,14 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       const seed = (Array.isArray(body.projects) || Array.isArray(body.issues))
         ? { projects: body.projects || [], issues: body.issues || [] }
         : defaultLocalSeed;
+
+      if (body.features && typeof body.features === 'object') {
+        const validated = {}
+        for (const [key, value] of Object.entries(body.features)) {
+          if (isValidFeatureKey(key)) validated[key] = value
+        }
+        req.session.features = validated
+      }
 
       await localStore.clear(LOCAL_WS_URL_KEY);
       await localStore.seed(LOCAL_WS_URL_KEY, seed);

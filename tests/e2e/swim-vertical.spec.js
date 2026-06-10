@@ -6,13 +6,17 @@
  * variant.
  */
 import { test, expect } from '../fixtures/test-base.js';
+import { seedLocalWorkspace, swimLocalSeed, LOCAL_WORKSPACE_URL_KEY } from '../fixtures/local-harness.js';
 
-const TEST_WORKSPACE_URL_KEY = 'test-workspace';
+// LIN-378: rides a seeded local workspace (no `test-token` mock) — same swim
+// sample fixture, converted to local shape.
+const TEST_WORKSPACE_URL_KEY = LOCAL_WORKSPACE_URL_KEY;
 const SWIM_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/swim`;
 
 test.describe('Swim Page — Vertical Orientation', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/test/set-session?swimSample=true');
+    await seedLocalWorkspace(page, swimLocalSeed);
+    await page.goto(SWIM_URL);
     await page.evaluate(() => localStorage.removeItem('swim-settings'));
     await page.goto(SWIM_URL);
     await page.waitForLoadState('networkidle');
