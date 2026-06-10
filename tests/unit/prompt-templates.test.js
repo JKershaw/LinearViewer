@@ -691,6 +691,73 @@ describe('generatePrompt terminal-state note (LIN-353)', () => {
   });
 });
 
+describe('generatePrompt all-subtasks-complete note (LIN-364)', () => {
+  const baseIssue = {
+    id: 'issue-open', identifier: 'TEST-OPEN', title: 'Open parent',
+    description: 'Parent work', url: 'https://linear.app/test/issue/TEST-OPEN',
+    labels: [], createdAt: '2026-01-01T00:00:00.000Z'
+  };
+  const baseContext = { parent: null, siblings: [], project: { name: 'P' }, comments: [] };
+
+  test('an OPEN parent whose every child is terminal gets the "All Subtasks Complete" note steering to review/close', () => {
+    const issue = { ...baseIssue, state: { name: 'In Progress', type: 'started' } };
+    const context = {
+      ...baseContext,
+      children: [
+        { identifier: 'TEST-C1', state: { name: 'Done', type: 'completed' } },
+        { identifier: 'TEST-C2', state: { name: 'Done', type: 'completed' } }
+      ]
+    };
+    const result = generatePrompt('review', issue, context);
+    assert.ok(/All Subtasks Complete/i.test(result.prompt), 'the all-complete note must be present');
+    assert.ok(/review\/verification pass|close it out|add up to this task/i.test(result.prompt),
+      'it must steer toward review/close, not defer');
+  });
+
+  test('canceled and duplicate children also count as complete (all terminal states)', () => {
+    const issue = { ...baseIssue, state: { name: 'Todo', type: 'unstarted' } };
+    const context = {
+      ...baseContext,
+      children: [
+        { identifier: 'TEST-C1', state: { name: 'Canceled', type: 'canceled' } },
+        { identifier: 'TEST-C2', state: { name: 'Duplicate', type: 'duplicate' } }
+      ]
+    };
+    const result = generatePrompt('review', issue, context);
+    assert.ok(/All Subtasks Complete/i.test(result.prompt), 'mixed terminal children still trigger the note');
+  });
+
+  test('an open parent with at least one open child does NOT get the note (live work remains)', () => {
+    const issue = { ...baseIssue, state: { name: 'In Progress', type: 'started' } };
+    const context = {
+      ...baseContext,
+      children: [
+        { identifier: 'TEST-C1', state: { name: 'Done', type: 'completed' } },
+        { identifier: 'TEST-C2', state: { name: 'Todo', type: 'unstarted' } }
+      ]
+    };
+    const result = generatePrompt('review', issue, context);
+    assert.ok(!/All Subtasks Complete/i.test(result.prompt), 'a parent with an open child must not be short-circuited');
+  });
+
+  test('an open LEAF (no children) does NOT get the note', () => {
+    const issue = { ...baseIssue, state: { name: 'In Progress', type: 'started' } };
+    const result = generatePrompt('review', issue, { ...baseContext, children: [] });
+    assert.ok(!/All Subtasks Complete/i.test(result.prompt), 'a leaf has no subtasks to be complete');
+  });
+
+  test('a TERMINAL parent with all children done gets the terminal note, NOT the all-complete note (mutually exclusive)', () => {
+    const issue = { ...baseIssue, state: { name: 'Done', type: 'completed' } };
+    const context = {
+      ...baseContext,
+      children: [{ identifier: 'TEST-C1', state: { name: 'Done', type: 'completed' } }]
+    };
+    const result = generatePrompt('review', issue, context);
+    assert.ok(/Task Already Complete/i.test(result.prompt), 'a terminal parent gets the terminal note');
+    assert.ok(!/All Subtasks Complete/i.test(result.prompt), 'and NOT the non-terminal all-complete note');
+  });
+});
+
 // =============================================================================
 // look-into Template Tests
 // =============================================================================
@@ -1255,6 +1322,42 @@ describe('capability-aware prompts: Linear byte-parity (LIN-177 S4/S5)', () => {
     const base = buildMetaPromptTemplate(args);
     const withUi = buildMetaPromptTemplate({ ...args, providerUi: LINEAR_UI });
     assert.strictEqual(withUi, base);
+  });
+});
+
+describe('meta-prompt Step 0: open parent, all subtasks complete (LIN-364)', () => {
+  const baseArgs = {
+    issueContext: 'CTX', identifier: 'LIN-900',
+    hasSubtasks: true, subtaskCount: 2, completedCount: 2, inProgressCount: 0, remainingCount: 0,
+    hasComments: false, commentCount: 0, aiHints: 'H', actionVocabulary: 'plan, review, implement',
+    completionSignals: 'S', focusedSubtaskId: null
+  };
+
+  test('open parent with all subtasks complete gets the review/close branch forbidding defer', () => {
+    const p = buildMetaPromptTemplate({ ...baseArgs, isTerminal: false, hasOpenChildren: false });
+    assert.ok(/open but every subtask is already complete/i.test(p), 'the all-complete Step 0 branch must be present');
+    assert.ok(/Do NOT `?defer`?/i.test(p), 'it must explicitly forbid defer');
+    assert.ok(/recommend `?review`?/i.test(p), 'it must steer toward review/close');
+  });
+
+  test('open parent with an open child does NOT get the branch (descent still applies)', () => {
+    const p = buildMetaPromptTemplate({
+      ...baseArgs, completedCount: 1, remainingCount: 1, isTerminal: false, hasOpenChildren: true
+    });
+    assert.ok(!/open but every subtask is already complete/i.test(p), 'a parent with an open child is not short-circuited');
+  });
+
+  test('a leaf (no subtasks) does NOT get the branch', () => {
+    const p = buildMetaPromptTemplate({
+      ...baseArgs, hasSubtasks: false, subtaskCount: 0, completedCount: 0, isTerminal: false, hasOpenChildren: false
+    });
+    assert.ok(!/open but every subtask is already complete/i.test(p), 'a leaf has no subtasks to be complete');
+  });
+
+  test('a terminal parent gets the terminal Step 0, NOT the open-parent branch (mutually exclusive)', () => {
+    const p = buildMetaPromptTemplate({ ...baseArgs, isTerminal: true, hasOpenChildren: false });
+    assert.ok(/already in a terminal state/i.test(p), 'terminal task gets the terminal Step 0');
+    assert.ok(!/open but every subtask is already complete/i.test(p), 'and NOT the non-terminal all-complete branch');
   });
 });
 
