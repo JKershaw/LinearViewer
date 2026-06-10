@@ -57,6 +57,8 @@ lib/
   render-swipe.js      Swipe page renderer (mobile-first task swipe)
   render-proxy.js      Proxy token management UI
   render-legal.js      Privacy Policy / Terms of Service renderers
+  render-kpis.js       Public /kpis instance stats page renderer
+  kpi-stats.js         Instance KPI aggregation (privacy boundary for public /kpis)
   pipeline-state.js    Pipeline state builder (snapshot assembly)
   pipeline-loops.js    Pipeline loop reconstruction library
   sessions-view.js     Adapts pipeline Loop records into the sessions view
@@ -119,7 +121,9 @@ public/
   llms.txt             AI agent guidance (DOM selectors, navigation patterns)
   marked.min.js        Vendored Markdown renderer
   purify.min.js        Vendored DOMPurify (HTML sanitizer)
+  chart.umd.min.js     Vendored Chart.js (used by /kpis)
   audit.css / audit.js          Operator dashboard
+  kpis.css / kpis.js            Public /kpis instance stats page
   settings.css                  Settings page
   prompts.css                   Prompts catalog page
   custom-prompts.css / .js      Custom prompts page
@@ -268,6 +272,7 @@ OPENROUTER_FREE_TIER_KEY Server-side API key for free tier users (optional, enab
 - Collapse state persisted in localStorage
 - 401 errors clear session and redirect to landing page
 - Free tier users see daily prompt quota in footer and settings; 429 on limit exceeded
+- `/kpis` is a public, intentionally unlinked page of instance-wide aggregate stats (Chart.js charts, 60s server cache). `lib/kpi-stats.js` is the privacy boundary: only counts and app-defined labels, never workspace keys or content
 
 ## AI Agent Support
 

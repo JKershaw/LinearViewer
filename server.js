@@ -49,6 +49,8 @@ import { swimSampleData } from './tests/fixtures/swim-sample-data.js'
 import { shipDenseSampleData } from './tests/fixtures/ship-dense-sample-data.js'
 import { renderAuditPage } from './lib/render-audit.js'
 import { renderPrivacyPolicy, renderTermsOfService } from './lib/render-legal.js'
+import { renderKpisPage } from './lib/render-kpis.js'
+import { collectKpiStats } from './lib/kpi-stats.js'
 import { renderSettingsPage } from './lib/render-settings.js'
 import { renderPromptsPage } from './lib/render-prompts.js'
 import { renderCustomPromptsPage } from './lib/render-custom-prompts.js'
@@ -408,7 +410,7 @@ async function ensureValidToken(req, res, next) {
 // Apply middleware to all routes except auth and logout
 // Note: workspace routes need token refresh too (they access Linear API)
 app.use((req, res, next) => {
-  if (req.path.startsWith('/auth/') || req.path === '/logout' || req.path === '/privacy' || req.path === '/terms') {
+  if (req.path.startsWith('/auth/') || req.path === '/logout' || req.path === '/privacy' || req.path === '/terms' || req.path === '/kpis') {
     return next();
   }
   ensureValidToken(req, res, next);
@@ -714,6 +716,44 @@ app.get('/privacy', (req, res) => {
 
 app.get('/terms', (req, res) => {
   res.send(renderTermsOfService({ deployInfo: getDeployInfo() }))
+})
+
+// =============================================================================
+// KPIs Page (public, no auth required, intentionally unlinked)
+// =============================================================================
+// Instance-wide aggregate stats. collectKpiStats() is the privacy boundary —
+// it returns only counts and app-defined labels, never workspace data. The
+// 60-second cache keeps the public route from hammering the DB.
+const KPI_CACHE_MS = 60 * 1000
+let kpiCache = { at: 0, stats: null }
+
+app.get('/kpis', async (req, res) => {
+  try {
+    if (!kpiCache.stats || Date.now() - kpiCache.at > KPI_CACHE_MS) {
+      const stats = await collectKpiStats({
+        sessions: sessionsCollection,
+        userPreferences: userPreferencesCollection,
+        workspacePreferences: workspacePreferencesCollection,
+        customPrompts: customPromptsCollection,
+        localIssues: localIssuesCollection,
+        dispatchQueue: dispatchQueueCollection,
+        dispatchHistory: dispatchHistoryCollection,
+        dispatchTokens: dispatchTokensCollection,
+        proxyTokens: proxyTokensCollection,
+        proxyEvents: proxyEventsCollection,
+        foremanStatus: foremanStatusCollection,
+        freeTier: freeTierCollection,
+        recapCache: recapCacheCollection,
+        briefCache: briefCacheCollection,
+        reportHistory: reportHistoryCollection
+      }, { dbBackend: process.env.MONGODB_URI ? 'mongodb' : 'mangodb' })
+      kpiCache = { at: Date.now(), stats }
+    }
+    res.send(renderKpisPage(kpiCache.stats, { deployInfo: getDeployInfo() }))
+  } catch (error) {
+    console.error('Failed to render KPIs page:', error)
+    res.status(500).send(renderErrorPage('Error', 'Could not load instance KPIs. Please try again.'))
+  }
 })
 
 // =============================================================================
