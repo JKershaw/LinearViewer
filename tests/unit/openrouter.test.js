@@ -695,6 +695,75 @@ describe('buildMetaPromptTemplate plan completeness check', () => {
   });
 });
 
+// Class check (LIN-313) — bug and review prompts ask "isolated, or one of a
+// class?" so a narrowly-worded task doesn't clear while its siblings wait to
+// surprise the parent. Mirrors the handwritten path per CLAUDE.md's both-paths
+// rule (bug template step 4 / review "Isolated, or One of a Class?" section).
+describe('buildMetaPromptTemplate class check (LIN-313)', () => {
+  function build() {
+    return buildMetaPromptTemplate({
+      issueContext: 'Test context',
+      identifier: 'LIN-1',
+      hasSubtasks: false,
+      subtaskCount: 0,
+      completedCount: 0,
+      inProgressCount: 0,
+      remainingCount: 0,
+      hasComments: false,
+      commentCount: 0,
+      aiHints: 'hints'
+    });
+  }
+
+  test('Bug-prompts rule requires a class check once the root cause is in hand', () => {
+    const result = build();
+    assert.ok(
+      result.includes("widen the model, don't patch the witness"),
+      'the bug rule must carry the widen-the-model directive'
+    );
+    assert.ok(
+      result.includes('whether the same pattern produces siblings'),
+      'the bug rule must ask for pattern siblings, not only the cited symptom'
+    );
+  });
+
+  test('Bug class check keeps the fix minimal and records the class instead', () => {
+    const result = build();
+    assert.ok(
+      result.includes('the fix stays minimal'),
+      'a found class must not silently widen the fix'
+    );
+    assert.ok(
+      result.includes('record the unhandled instances as a comment'),
+      'unhandled instances must be recorded for follow-up scoping'
+    );
+  });
+
+  test('Review-prompts rule includes a class check before approving the close', () => {
+    const result = build();
+    assert.ok(
+      result.includes('class check before approving the close'),
+      'the review rule must include the close-out class check'
+    );
+    assert.ok(
+      result.includes('record the instances as a review finding rather than expanding the task'),
+      'siblings become a finding, not new scope'
+    );
+  });
+
+  test('class check guards against manufactured work in both rules', () => {
+    const result = build();
+    assert.ok(
+      result.includes('genuinely isolated issue is a valid answer'),
+      'the bug rule must allow an isolated result'
+    );
+    assert.ok(
+      result.includes('genuinely isolated change is a valid result'),
+      'the review rule must allow an isolated result'
+    );
+  });
+});
+
 // =============================================================================
 // Surface Assessment (refactoring recommendations) — AI path
 //
