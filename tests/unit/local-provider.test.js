@@ -1,0 +1,179 @@
+/**
+ * Unit tests for lib/providers/local/index.js (LIN-356).
+ *
+ * Run with: node --test tests/unit/local-provider.test.js
+ *
+ * Covers:
+ *   - the capability profile (method capabilities + the 5-flag ui surface);
+ *   - module-load self-registration under 'local';
+ *   - reads returning the canonical shape the dashboard/tree consume;
+ *   - the A⇄D interaction (fetchTeams → [] rather than a throw);
+ *   - the write path round-tripping through the store.
+ */
+import { test, describe, beforeEach } from 'node:test';
+import assert from 'node:assert';
+import { LocalProvider, localProvider } from '../../lib/providers/local/index.js';
+import { getProvider } from '../../lib/providers/registry.js';
+import { NotImplementedError } from '../../lib/providers/interface.js';
+import { LocalStore } from '../../lib/local-store.js';
+import { createMockCollection } from '../fixtures/mock-collection.js';
+
+const SCOPE = 'ws-1'; // token == store partition key for the local provider
+
+function makeProvider() {
+  const store = new LocalStore({ collection: createMockCollection() });
+  return { provider: new LocalProvider({ store }), store };
+}
+
+describe('LocalProvider capability profile (LIN-356 step D)', () => {
+  const { provider } = makeProvider();
+
+  test('ui surface has the declared profile', () => {
+    assert.deepEqual(provider.ui, {
+      write: true,        // getCreateTaskUrl overridden
+      comments: true,     // fetchIssueComments implemented
+      estimates: false,
+      subtasks: true,
+      displayName: 'Local',
+    });
+  });
+
+  test('implements the required writes + reads', () => {
+    for (const m of ['createIssue', 'updateIssue', 'createComment', 'createRelation',
+      'addLabel', 'removeLabel', 'fetchIssueComments', 'search', 'states', 'labels',
+      'fetchProjects', 'fetchProjectsList', 'fetchTeams']) {
+      assert.equal(provider.supports(m), true, `expected supports('${m}')`);
+    }
+  });
+
+  test('leaves cycles/cycleDetail declined (cycles:false)', () => {
+    assert.equal(provider.supports('cycles'), false);
+    assert.equal(provider.supports('cycleDetail'), false);
+    assert.throws(() => provider.cycles(), NotImplementedError);
+  });
+
+  test('getCreateTaskUrl returns a local deep link', () => {
+    assert.equal(provider.getCreateTaskUrl('my ws', 'p1'),
+      '/workspace/my%20ws/new?project=p1');
+  });
+});
+
+describe('LocalProvider registry', () => {
+  test('self-registers under "local" on import', () => {
+    assert.equal(getProvider('local'), localProvider);
+    assert.equal(localProvider.name, 'local');
+  });
+});
+
+describe('LocalProvider reads', () => {
+  let provider, store;
+  beforeEach(async () => {
+    ({ provider, store } = makeProvider());
+    await store.seed(SCOPE, {
+      projects: [{ id: 'p1', name: 'Alpha', content: 'a', sortOrder: 1 }],
+      issues: [
+        { id: 'i1', identifier: 'LOCAL-1', title: 'Parent', projectId: 'p1', state: { name: 'In Progress', type: 'started' }, labels: ['bug'] },
+        { id: 'i2', identifier: 'LOCAL-2', title: 'Child', projectId: 'p1', parentId: 'i1', state: { name: 'Todo', type: 'unstarted' } },
+      ],
+    });
+  });
+
+  test('fetchProjects returns canonical {organizationName, projects, issues}', async () => {
+    const { organizationName, projects, issues } = await provider.fetchProjects(SCOPE);
+    assert.equal(organizationName, 'Local');
+    assert.equal(projects.length, 1);
+    assert.deepEqual(projects[0], { id: 'p1', name: 'Alpha', content: 'a', url: null, sortOrder: 1 });
+    assert.equal(issues.length, 2);
+    const parent = issues.find(i => i.id === 'i1');
+    assert.equal(parent.project.name, 'Alpha');
+    assert.deepEqual(parent.labels, { nodes: [{ name: 'bug' }] });
+    assert.equal(parent.parent, null);
+    assert.deepEqual(issues.find(i => i.id === 'i2').parent, { id: 'i1' });
+  });
+
+  test('fetchTeams returns [] (projects-only — A⇄D interaction, not a throw)', async () => {
+    assert.deepEqual(await provider.fetchTeams(SCOPE), []);
+  });
+
+  test('fetchIssueContext returns issue + parent + children + project', async () => {
+    const ctx = await provider.fetchIssueContext(SCOPE, 'LOCAL-1');
+    assert.equal(ctx.issue.identifier, 'LOCAL-1');
+    assert.equal(ctx.project.name, 'Alpha');
+    assert.equal(ctx.children.length, 1);
+    assert.equal(ctx.children[0].id, 'i2');
+    assert.equal(ctx.parent, null);
+
+    const childCtx = await provider.fetchIssueContext(SCOPE, 'i2');
+    assert.equal(childCtx.parent.id, 'i1');
+    assert.equal(childCtx.parentChildCount, 1);
+  });
+
+  test('fetchIssueContext throws for a missing issue', async () => {
+    await assert.rejects(() => provider.fetchIssueContext(SCOPE, 'nope'), /Issue not found/);
+  });
+
+  test('search / states / labels', async () => {
+    assert.equal((await provider.search(SCOPE, 'parent')).length, 1);
+    const states = await provider.states(SCOPE);
+    assert.deepEqual(states.map(s => s.type),
+      ['backlog', 'unstarted', 'started', 'completed', 'canceled']);
+    assert.deepEqual(await provider.labels(SCOPE), [{ id: 'bug', name: 'bug', color: null }]);
+  });
+});
+
+describe('LocalProvider writes', () => {
+  let provider, store;
+  beforeEach(() => { ({ provider, store } = makeProvider()); });
+
+  test('createIssue persists and returns canonical shape', async () => {
+    const created = await provider.createIssue(SCOPE, { title: 'New', projectId: null });
+    assert.equal(created.identifier, 'LOCAL-1');
+    assert.equal(created.title, 'New');
+    assert.deepEqual(created.labels, { nodes: [] });
+    assert.equal((await store.listIssues(SCOPE)).length, 1);
+  });
+
+  test('updateIssue round-trips through fetchIssueContext', async () => {
+    const created = await provider.createIssue(SCOPE, { title: 'Old' });
+    const updated = await provider.updateIssue(SCOPE, created.id, {
+      title: 'Renamed', state: { name: 'Done', type: 'completed' },
+    });
+    assert.equal(updated.title, 'Renamed');
+    assert.equal(updated.state.type, 'completed');
+    assert.equal((await provider.fetchIssueContext(SCOPE, created.id)).issue.title, 'Renamed');
+    assert.equal(await provider.updateIssue(SCOPE, 'missing', { title: 'x' }), null);
+  });
+
+  test('createComment then fetchIssueComments', async () => {
+    const created = await provider.createIssue(SCOPE, { title: 'C' });
+    const comment = await provider.createComment(SCOPE, created.id, 'hello');
+    assert.equal(comment.body, 'hello');
+    const comments = await provider.fetchIssueComments(SCOPE, created.id);
+    assert.equal(comments.length, 1);
+    assert.equal(comments[0].user, 'Local');
+    await assert.rejects(() => provider.createComment(SCOPE, 'missing', 'x'), /Issue not found/);
+  });
+
+  test('addLabel / removeLabel', async () => {
+    const created = await provider.createIssue(SCOPE, { title: 'L' });
+    assert.equal(await provider.addLabel(SCOPE, created.id, 'bug'), true);
+    let ctx = await provider.fetchIssueContext(SCOPE, created.id);
+    assert.deepEqual(ctx.issue.labels, { nodes: [{ name: 'bug' }] });
+    await provider.removeLabel(SCOPE, created.id, 'bug');
+    ctx = await provider.fetchIssueContext(SCOPE, created.id);
+    assert.deepEqual(ctx.issue.labels, { nodes: [] });
+  });
+
+  test('createRelation persists', async () => {
+    const a = await provider.createIssue(SCOPE, { title: 'A' });
+    const b = await provider.createIssue(SCOPE, { title: 'B' });
+    const rel = await provider.createRelation(SCOPE, a.id, { type: 'blocks', relatedIssueId: b.id });
+    assert.equal(rel.type, 'blocks');
+    assert.equal(rel.relatedIssueId, b.id);
+  });
+
+  test('unconfigured provider throws a clear error', async () => {
+    const bare = new LocalProvider();
+    await assert.rejects(() => bare.fetchProjects(SCOPE), /store not configured/);
+  });
+});
