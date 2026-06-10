@@ -1,13 +1,17 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { seedLocalWorkspace, LOCAL_WORKSPACE_URL_KEY } from '../fixtures/local-harness.js';
 
-// Workspace URL key used in test session
-const TEST_WORKSPACE_URL_KEY = 'test-workspace';
+// LIN-378: the dashboard surface is fully modeled by the local provider, so this
+// spec rides the seeded local workspace (no `test-token` mock). Assertions are
+// derived from defaultLocalSeed (2 projects; an in-progress parent + todo child +
+// completed issue in "Local Project"; a second in-progress task in "Local Beta").
+const TEST_WORKSPACE_URL_KEY = LOCAL_WORKSPACE_URL_KEY;
 const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;
 
 test.describe('Authenticated Dashboard', () => {
   test.beforeEach(async ({ page }) => {
-    // Set up test session (server will use mock data in test mode)
-    await page.goto('/test/set-session');
+    // Seed a real local-provider workspace and establish its session.
+    await seedLocalWorkspace(page);
 
     // Navigate to workspace page (authenticated users are redirected here)
     await page.goto(WORKSPACE_URL);
@@ -17,9 +21,9 @@ test.describe('Authenticated Dashboard', () => {
     // Wait for page to fully load
     await page.waitForLoadState('networkidle');
 
-    // Should show both projects from mock data
-    await expect(page.locator('.project-header:has-text("Project Alpha")')).toBeVisible();
-    await expect(page.locator('.project-header:has-text("Project Beta")')).toBeVisible();
+    // Should show both seeded projects (names are substring-distinct)
+    await expect(page.locator('.project-header:has-text("Local Project")')).toBeVisible();
+    await expect(page.locator('.project-header:has-text("Local Beta")')).toBeVisible();
   });
 
   test('shows In Progress section with active issues', async ({ page }) => {
@@ -28,40 +32,32 @@ test.describe('Authenticated Dashboard', () => {
     await expect(inProgressHeader).toBeVisible();
     await expect(inProgressHeader).toContainText('In Progress');
 
-    // Should show in-progress issues as tree with their descendants
-    // issue-1 (in-progress) + issue-2 (child of issue-1, hidden) + issue-4 (in-progress) + issue-11 (blocked, in-progress) + issue-14 (in-progress) + issue-15 (code-review, in-review) = 6 lines total
-    await expect(page.locator('.in-progress-items .line')).toHaveCount(6);
+    // In-progress trees: local-issue-1 (started) + its child local-issue-2 (todo,
+    // hidden) + local-issue-4 (started) = 3 lines total.
+    await expect(page.locator('.in-progress-items .line')).toHaveCount(3);
 
-    // Top-level items are visible
-    await expect(page.locator('.in-progress-items .line:has-text("Parent task in progress")')).toBeVisible();
-    await expect(page.locator('.in-progress-items .line:has-text("Beta task in progress")')).toBeVisible();
+    // Top-level started items are visible
+    await expect(page.locator('.in-progress-items .line:has-text("Local parent task")')).toBeVisible();
+    await expect(page.locator('.in-progress-items .line:has-text("Second project task")')).toBeVisible();
 
-    // Child task exists but is hidden (depth > 0) until parent is expanded
-    // Note: hidden class is now on .node wrapper, not .line
-    const childTask = page.locator('.in-progress-items .line:has-text("Child task todo")');
+    // Child task exists but is hidden (depth > 0) until parent is expanded.
+    // Note: hidden class is on the .node wrapper, not the .line.
+    const childTask = page.locator('.in-progress-items .line:has-text("Local child task")');
     await expect(childTask).toHaveCount(1);
-    // Use data-id to get the specific node wrapper
-    const childNode = page.locator('.in-progress-items .node[data-id="issue-2"]');
+    const childNode = page.locator('.in-progress-items .node[data-id="local-issue-2"]');
     await expect(childNode).toHaveClass(/hidden/);
   });
 
   test('displays correct state indicators', async ({ page }) => {
-    // Mock data defines 10 issues with various states and labels
-    // In-progress issues (type: 'started'): issue-1, issue-4, issue-11, issue-14, issue-15
-    // Each in-progress appears 2x (In Progress section + project section)
-    // In-progress count: 5 issues x 2 = 10
-    const inProgressStates = page.locator('.state.in-progress');
-    await expect(inProgressStates).toHaveCount(10);
+    // Started issues (local-issue-1, local-issue-4) each appear 2x: once in the
+    // In Progress section and once in their project section → 2 x 2 = 4.
+    await expect(page.locator('.state.in-progress')).toHaveCount(4);
 
-    // Todo issues (type: 'unstarted'): issue-2, issue-13
-    // issue-2 appears 2x (child of in-progress parent), issue-13 appears 1x
-    // Todo count: 2 + 1 = 3
-    await expect(page.locator('.state.todo')).toHaveCount(3);
+    // Todo issue (local-issue-2) appears 2x: In Progress subtree + project tree.
+    await expect(page.locator('.state.todo')).toHaveCount(2);
 
-    // Backlog issues (type: 'backlog'): issue-5, preparing issue
-    // Each appears 1x in project section only
-    // Backlog count: 1 + 1 = 2
-    await expect(page.locator('.state.backlog')).toHaveCount(2);
+    // Completed issue (local-issue-3) renders once in the completed section.
+    await expect(page.locator('.state.done')).toHaveCount(1);
   });
 
   test('shows text-based navigation bar', async ({ page }) => {
@@ -95,12 +91,11 @@ test.describe('Authenticated Dashboard', () => {
     await expect(page.locator('.footer-link')).toBeVisible();
   });
 
-  test('shows organization name from mock data', async ({ page }) => {
-    // The h1 should contain the organization name from mock data
-    // (not the landing page title "Linear Projects Viewer")
+  test('shows organization name from the local provider', async ({ page }) => {
+    // The h1 should contain the provider's organization name (the local provider
+    // reports "Local"), not the landing page title "Linear Projects Viewer".
     const h1 = page.locator('h1');
     await expect(h1).toBeVisible();
-    // Check it's not the landing page
     await expect(h1).not.toContainText('Linear Projects Viewer');
   });
 

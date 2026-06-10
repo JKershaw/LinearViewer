@@ -1,21 +1,22 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { seedLocalWorkspace, LOCAL_WORKSPACE_URL_KEY, localDashboardUrl } from '../fixtures/local-harness.js';
 
-// LIN-356 (F): provider-agnostic E2E against a GENUINE second provider.
+// LIN-356 (F) / LIN-378: provider-agnostic E2E against a GENUINE second provider.
 //
-// Unlike every other E2E spec, this one rides NO `test-token` mock
-// short-circuit. The `/test/set-local-session` route seeds a real LocalStore
-// and establishes a `provider: 'local'` workspace whose token is its own urlKey
-// (the store partition key). The dashboard therefore renders from the seeded
-// store via the real getProviderForWorkspace + getWorkspaceToken read seam
-// (#382) — proving the abstraction serves a backend that is not Linear, with no
-// mock and no third-party dependency.
+// Unlike the `test-token` specs, this one rides NO mock short-circuit. The
+// seedLocalWorkspace() harness (LIN-378) seeds a real LocalStore and establishes
+// a `provider: 'local'` workspace whose token is its own urlKey (the store
+// partition key). The dashboard therefore renders from the seeded store via the
+// real getProviderForWorkspace + getWorkspaceToken read seam (#382) — proving the
+// abstraction serves a backend that is not Linear, with no mock and no
+// third-party dependency.
 
-const LOCAL_URL_KEY = 'local-workspace';
-const DASHBOARD = `/workspace/${LOCAL_URL_KEY}/`;
+const LOCAL_URL_KEY = LOCAL_WORKSPACE_URL_KEY;
+const DASHBOARD = localDashboardUrl(LOCAL_URL_KEY);
 
 test.describe('Local provider (no test-token mock)', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/test/set-local-session');
+    await seedLocalWorkspace(page);
     await page.goto(DASHBOARD);
     await page.waitForLoadState('networkidle');
   });

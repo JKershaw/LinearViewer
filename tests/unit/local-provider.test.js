@@ -15,14 +15,12 @@ import assert from 'node:assert';
 import { LocalProvider, localProvider } from '../../lib/providers/local/index.js';
 import { getProvider } from '../../lib/providers/registry.js';
 import { NotImplementedError } from '../../lib/providers/interface.js';
-import { LocalStore } from '../../lib/local-store.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createLocalProvider } from '../fixtures/local-harness.js';
 
 const SCOPE = 'ws-1'; // token == store partition key for the local provider
 
 function makeProvider() {
-  const store = new LocalStore({ collection: createMockCollection() });
-  return { provider: new LocalProvider({ store }), store };
+  return createLocalProvider(); // { provider, store, collection }
 }
 
 describe('LocalProvider capability profile (LIN-356 step D)', () => {

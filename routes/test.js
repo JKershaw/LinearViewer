@@ -8,6 +8,7 @@ import { Router } from 'express';
 import { isValidFeatureKey, isValidWorkspaceFeatureKey } from '../lib/feature-defaults.js';
 import { setWorkspaceFeature } from '../lib/workspace-preferences.js';
 import { getProvider } from '../lib/providers/registry.js';
+import { defaultLocalSeed, LOCAL_WORKSPACE_URL_KEY } from '../tests/fixtures/local-harness.js';
 
 /**
  * Create test routes with required dependencies.
@@ -377,24 +378,26 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   // false everywhere and the dashboard renders from the seeded LocalStore via
   // the real getProviderForWorkspace + getWorkspaceToken read seam (#382).
   // ---------------------------------------------------------------------------
-  const LOCAL_WS_URL_KEY = 'local-workspace';
+  const LOCAL_WS_URL_KEY = LOCAL_WORKSPACE_URL_KEY;
   const LOCAL_WS_UUID = '33333333-3333-3333-3333-333333333333';
 
   // Seed the local store and establish a `provider: 'local'` session.
-  router.get('/test/set-local-session', async (req, res) => {
+  //
+  // GET  → seeds the shared defaultLocalSeed (back-compat / no body).
+  // POST → seeds a custom `{ projects, issues }` body, letting specs seed
+  //        exactly the data they assert on (LIN-378 reusable harness). Falls
+  //        back to defaultLocalSeed when the body carries no projects/issues.
+  const setLocalSession = async (req, res) => {
     try {
       if (!localStore) throw new Error('localStore not wired into test routes');
 
+      const body = req.body || {};
+      const seed = (Array.isArray(body.projects) || Array.isArray(body.issues))
+        ? { projects: body.projects || [], issues: body.issues || [] }
+        : defaultLocalSeed;
+
       await localStore.clear(LOCAL_WS_URL_KEY);
-      await localStore.seed(LOCAL_WS_URL_KEY, {
-        projects: [
-          { id: 'local-proj-1', name: 'Local Project', content: 'A local backend project', sortOrder: 1 },
-        ],
-        issues: [
-          { id: 'local-issue-1', identifier: 'LOCAL-1', title: 'Local parent task', description: 'Seeded parent', projectId: 'local-proj-1', sortOrder: 1, state: { name: 'In Progress', type: 'started' }, labels: ['local-label'], url: `/workspace/${LOCAL_WS_URL_KEY}/issue/local-issue-1` },
-          { id: 'local-issue-2', identifier: 'LOCAL-2', title: 'Local child task', description: 'Seeded child', projectId: 'local-proj-1', parentId: 'local-issue-1', sortOrder: 2, state: { name: 'Todo', type: 'unstarted' }, url: `/workspace/${LOCAL_WS_URL_KEY}/issue/local-issue-2` },
-        ],
-      });
+      await localStore.seed(LOCAL_WS_URL_KEY, seed);
 
       // Token === urlKey: carries no auth, only selects the store partition.
       // No `accessToken: 'test-token'`, so the mock short-circuit never fires.
@@ -415,7 +418,9 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
-  })
+  };
+  router.get('/test/set-local-session', setLocalSession);
+  router.post('/test/set-local-session', setLocalSession);
 
   // Exercise the provider WRITE path directly (the gap this provider exists to
   // close): create an issue through the registered Local provider — not the
