@@ -758,6 +758,38 @@ describe('generatePrompt all-subtasks-complete note (LIN-364)', () => {
   });
 });
 
+describe('generatePrompt bug-already-investigated note (LIN-366)', () => {
+  const baseIssue = {
+    id: 'issue-bug', identifier: 'TEST-BUG', title: 'Flaky thing',
+    description: 'Something misbehaves', url: 'https://linear.app/test/issue/TEST-BUG',
+    state: { name: 'In Progress', type: 'started' }, createdAt: '2026-01-01T00:00:00.000Z',
+    labels: ['bug']
+  };
+  const withComments = {
+    parent: null, siblings: [], project: { name: 'P' }, children: [],
+    comments: [{ body: '## Investigation findings: root cause is X, fix is Y', user: 'Dev', createdAt: '2026-01-02T00:00:00.000Z' }]
+  };
+  const noComments = { parent: null, siblings: [], project: { name: 'P' }, children: [], comments: [] };
+
+  test('a bug issue WITH prior comments gets the "Don\'t Loop" note steering to the fix', () => {
+    const result = generatePrompt('bug', baseIssue, withComments);
+    assert.ok(/Prior Investigation On Record/i.test(result.prompt), 'the bug-investigated note must be present');
+    assert.ok(/do NOT.*investigate again|investigation is DONE|move to implementing the fix/i.test(result.prompt),
+      'it must steer toward the fix, not re-investigation');
+  });
+
+  test('a bug issue with NO comments does NOT get the note (nothing investigated yet)', () => {
+    const result = generatePrompt('bug', baseIssue, noComments);
+    assert.ok(!/Prior Investigation On Record/i.test(result.prompt), 'a fresh bug has no prior investigation to skip');
+  });
+
+  test('a non-bug issue with comments does NOT get the note (label is the trigger)', () => {
+    const issue = { ...baseIssue, labels: [] };
+    const result = generatePrompt('look-into', issue, withComments);
+    assert.ok(!/Prior Investigation On Record/i.test(result.prompt), 'only bug-labelled tasks get the note');
+  });
+});
+
 // =============================================================================
 // look-into Template Tests
 // =============================================================================
@@ -1358,6 +1390,34 @@ describe('meta-prompt Step 0: open parent, all subtasks complete (LIN-364)', () 
     const p = buildMetaPromptTemplate({ ...baseArgs, isTerminal: true, hasOpenChildren: false });
     assert.ok(/already in a terminal state/i.test(p), 'terminal task gets the terminal Step 0');
     assert.ok(!/open but every subtask is already complete/i.test(p), 'and NOT the non-terminal all-complete branch');
+  });
+});
+
+describe('meta-prompt Step 2: bug already investigated (LIN-366)', () => {
+  const baseArgs = {
+    issueContext: 'CTX', identifier: 'LIN-900',
+    hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
+    hasComments: true, commentCount: 2, aiHints: 'H', actionVocabulary: 'plan, implementation, review, bug',
+    completionSignals: 'S', focusedSubtaskId: null, isTerminal: false, hasOpenChildren: false
+  };
+
+  test('Step 2 carries the "already investigated → advance to the fix" escape hatch', () => {
+    const p = buildMetaPromptTemplate(baseArgs);
+    assert.ok(/already been investigated/i.test(p), 'the bug-investigated escape hatch must be present');
+    assert.ok(/do NOT loop research/i.test(p), 'it must explicitly forbid looping research');
+    assert.ok(/Recommend `?implementation`?/i.test(p), 'it must route a done investigation to implementation');
+  });
+
+  test('it ties the decision to the bug completion signal, not just the label', () => {
+    const p = buildMetaPromptTemplate(baseArgs);
+    assert.ok(/completion signal/i.test(p), 'the escape hatch references the bug completion signal');
+    assert.ok(/label.*(alone|mere presence) is NOT a reason/i.test(p),
+      'the label alone must not be treated as a reason to re-investigate');
+  });
+
+  test('with comments present, it directs the model to read them', () => {
+    const p = buildMetaPromptTemplate({ ...baseArgs, hasComments: true, commentCount: 3 });
+    assert.ok(/There are 3 comment\(s\) — read them/i.test(p), 'comment-count phrasing must surface when comments exist');
   });
 });
 
