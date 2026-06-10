@@ -41,6 +41,7 @@ lib/
     models.js          Canonical state model
     state-map.js       Maps provider states → canonical model
     linear/index.js    Linear provider adapter
+    local/index.js     Local provider adapter (writable, Mongo/Mango-backed; LIN-356)
   render.js            Dashboard page renderer (tree view, sections)
   render-pages.js      Standalone page renderers (login, error, workspace-not-found)
   render-audit.js      Operator dashboard page renderer
@@ -84,6 +85,7 @@ lib/
   user-preferences.js  Cross-device preference storage (MongoDB)
   workspace-preferences.js  Workspace-level preference storage
   workspace.js         Multi-workspace session management helpers
+  local-store.js       Local provider's issue/project store (scope-partitioned collection)
   dispatch-store.js    Dispatch queue storage
   dispatch-tokens.js   Consumer API token management
   foreman-store.js     Foreman status append-only log storage

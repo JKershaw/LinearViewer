@@ -28,6 +28,8 @@ import { BriefCacheStore } from './lib/brief-cache.js'
 import { ReportHistoryStore } from './lib/report-history-store.js'
 import { getProvider, getProviderForWorkspace } from './lib/providers/registry.js'
 import './lib/providers/linear/index.js' // side effect: self-registers the Linear provider into the registry
+import { localProvider } from './lib/providers/local/index.js' // side effect: self-registers the Local provider; store injected below
+import { LocalStore } from './lib/local-store.js'
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID, PERIODICALS_PROJECT_ID } from './lib/tree.js'
 import { buildPeriodicalNodes } from './lib/periodicals.js'
 import { parseRepoFromDescription } from './lib/prompt-formatters.js'
@@ -164,6 +166,16 @@ const customPromptsStore = new CustomPromptsStore({
   collection: customPromptsCollection
 })
 
+// Local provider backing store (LIN-356). One scope-partitioned collection
+// holds projects + issues for `provider: 'local'` workspaces. Injecting it here
+// keeps registration import-driven (the import above self-registers the
+// provider) while the store/collection is wired at boot like every other store.
+// No-op for Linear/legacy workspaces — getProviderForWorkspace only resolves
+// 'local' for a workspace that opts in via its provider field.
+const localIssuesCollection = db.collection('local-issues')
+const localStore = new LocalStore({ collection: localIssuesCollection })
+localProvider.configure({ store: localStore })
+
 // Dispatch queue collections
 const dispatchQueueCollection = db.collection('dispatch-queue')
 const dispatchTokensCollection = db.collection('dispatch-tokens')
@@ -275,7 +287,7 @@ app.use(session({
 // Test Mode Setup
 // =============================================================================
 if (process.env.NODE_ENV === 'test') {
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, reportHistoryStore, getWorkspaceAccessToken }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, reportHistoryStore, localStore, getWorkspaceAccessToken }))
 }
 
 // =============================================================================

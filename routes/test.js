@@ -7,6 +7,7 @@
 import { Router } from 'express';
 import { isValidFeatureKey, isValidWorkspaceFeatureKey } from '../lib/feature-defaults.js';
 import { setWorkspaceFeature } from '../lib/workspace-preferences.js';
+import { getProvider } from '../lib/providers/registry.js';
 
 /**
  * Create test routes with required dependencies.
@@ -18,10 +19,11 @@ import { setWorkspaceFeature } from '../lib/workspace-preferences.js';
  * @param {Object} options.proxyTokenStore - Proxy token store
  * @param {Object} options.proxyEventStore - Proxy event store
  * @param {Object} options.foremanStore - Foreman status store
+ * @param {Object} options.localStore - Local provider's issue/project store (LIN-356)
  * @param {Function} options.getWorkspaceAccessToken - Function to look up workspace access token
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, reportHistoryStore, getWorkspaceAccessToken }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, reportHistoryStore, localStore, getWorkspaceAccessToken }) {
   const router = Router();
 
   // Endpoint to set a test session without going through OAuth flow
@@ -363,6 +365,81 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     try {
       const token = await getWorkspaceAccessToken(req.params.urlKey);
       res.json({ found: !!token });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  })
+
+  // ---------------------------------------------------------------------------
+  // Local provider harness (LIN-356) — a GENUINE second provider with no
+  // `test-token` mock short-circuit. The local workspace's token is its own
+  // urlKey (the store partition key), so `accessToken === 'test-token'` is
+  // false everywhere and the dashboard renders from the seeded LocalStore via
+  // the real getProviderForWorkspace + getWorkspaceToken read seam (#382).
+  // ---------------------------------------------------------------------------
+  const LOCAL_WS_URL_KEY = 'local-workspace';
+  const LOCAL_WS_UUID = '33333333-3333-3333-3333-333333333333';
+
+  // Seed the local store and establish a `provider: 'local'` session.
+  router.get('/test/set-local-session', async (req, res) => {
+    try {
+      if (!localStore) throw new Error('localStore not wired into test routes');
+
+      await localStore.clear(LOCAL_WS_URL_KEY);
+      await localStore.seed(LOCAL_WS_URL_KEY, {
+        projects: [
+          { id: 'local-proj-1', name: 'Local Project', content: 'A local backend project', sortOrder: 1 },
+        ],
+        issues: [
+          { id: 'local-issue-1', identifier: 'LOCAL-1', title: 'Local parent task', description: 'Seeded parent', projectId: 'local-proj-1', sortOrder: 1, state: { name: 'In Progress', type: 'started' }, labels: ['local-label'], url: `/workspace/${LOCAL_WS_URL_KEY}/issue/local-issue-1` },
+          { id: 'local-issue-2', identifier: 'LOCAL-2', title: 'Local child task', description: 'Seeded child', projectId: 'local-proj-1', parentId: 'local-issue-1', sortOrder: 2, state: { name: 'Todo', type: 'unstarted' }, url: `/workspace/${LOCAL_WS_URL_KEY}/issue/local-issue-2` },
+        ],
+      });
+
+      // Token === urlKey: carries no auth, only selects the store partition.
+      // No `accessToken: 'test-token'`, so the mock short-circuit never fires.
+      req.session.workspaces = [{
+        id: LOCAL_WS_UUID,
+        name: 'Local Workspace',
+        urlKey: LOCAL_WS_URL_KEY,
+        provider: 'local',
+        credentials: { token: LOCAL_WS_URL_KEY },
+        accessToken: LOCAL_WS_URL_KEY,
+        tokenExpiresAt: Number.MAX_SAFE_INTEGER,
+        addedAt: Date.now(),
+      }];
+      req.session.activeWorkspaceId = LOCAL_WS_UUID;
+      req.session.linearUserId = 'test-local-user-id';
+
+      req.session.save(() => res.json({ ok: true, urlKey: LOCAL_WS_URL_KEY }));
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  })
+
+  // Exercise the provider WRITE path directly (the gap this provider exists to
+  // close): create an issue through the registered Local provider — not the
+  // proxy — so a subsequent dashboard load proves the no-proxy write round-trip.
+  router.get('/test/local-create-issue', async (req, res) => {
+    try {
+      const provider = getProvider('local');
+      if (!provider) throw new Error('local provider not registered');
+      const created = await provider.createIssue(LOCAL_WS_URL_KEY, {
+        title: req.query.title || 'Created via provider',
+        projectId: 'local-proj-1',
+        state: { name: 'Todo', type: 'unstarted' },
+      });
+      res.json({ ok: true, issue: { id: created.id, identifier: created.identifier, title: created.title } });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  })
+
+  // Clear the local store partition (test teardown / isolation).
+  router.get('/test/clear-local-store', async (req, res) => {
+    try {
+      const removed = localStore ? await localStore.clear(LOCAL_WS_URL_KEY) : 0;
+      res.json({ ok: true, removed });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }

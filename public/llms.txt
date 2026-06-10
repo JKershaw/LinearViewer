@@ -40,7 +40,7 @@ Issues are wrapped in nested `.node` containers:
     .detail-content[data-content="details"] - description + metadata (hidden)
     .detail-toggle[data-toggle="prompts"]  - "Prompts ▶" toggle (auth only)
     .detail-content[data-content="prompts"] - prompt buttons (hidden)
-    .detail-link                - "View in Linear →" link
+    .detail-link                - "View in {provider} →" link (provider name is dynamic, e.g. "View in Linear")
   .children                     - container for nested child nodes
     .node[data-id="{child-id}"] - child node (same structure)
 ```
@@ -49,7 +49,7 @@ Issues are wrapped in nested `.node` containers:
 When a task is expanded, its details contain toggleable sections:
 - **Details ▶**: Description and metadata (assignee, dates, labels)
 - **Prompts ▶**: Prompt buttons and AI features (authenticated users only)
-- **View in Linear →**: Navigation link (always visible)
+- **View in {provider} →**: Navigation link (always visible; provider name is dynamic, e.g. "View in Linear"). Same provider-aware text on the swim/ship popovers.
 
 Toggle behavior:
 - Both sections start collapsed (▶ arrow)
@@ -271,7 +271,7 @@ main.pipeline-page[data-url-key]       - page container
 3. **Expand subtasks**: Click parent task or ▶ arrow to show child tasks (works in both sections)
 4. **Filter by team**: Use team selector in nav bar
 5. **Search for issues**: Click "search" in nav bar (or press "/"), type keywords to filter issues across all sections
-6. **Open in Linear**: Expand task, click "View in Linear →" link
+6. **Open in provider**: Expand task, click the "View in {provider} →" link (text is dynamic, e.g. "View in Linear")
 7. **View task details**: Expand task, click "Details ▶" to show description and metadata
 8. **Generate prompt for task**: Expand task, click "Prompts ▶" to reveal prompt buttons, click a prompt button, copy the generated prompt
 9. **Get AI recommendation**: Expand task, click "Prompts ▶", click "AI suggest" button (free tier: 5/day per workspace)
