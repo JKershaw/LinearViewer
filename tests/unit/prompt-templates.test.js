@@ -416,8 +416,9 @@ describe('bug template', () => {
       '   - Check `git log --all --grep="<keyword from bug description>"` to see if this was fixed before (if no results, widen the keyword or skip — absence of results doesn\'t mean no prior fix)',
       '   - Examine the affected code paths for tight coupling or unusual patterns',
       '3. Debug systematically (add logging, trace execution)',
-      '4. Propose fix with minimal scope',
-      '5. Verify fix doesn\'t introduce regressions',
+      '4. Widen the model — isolated, or one of a class? Once the root cause is in hand, check whether the same pattern produces siblings: search for the pattern itself (the failure mode, a shared helper, a parallel code path), not only the symptom the ticket cites. A genuinely isolated issue is a valid answer — state it explicitly.',
+      '5. Propose fix with minimal scope. If step 4 found a class, the fix stays minimal — name the class and list the unhandled instances in your findings comment instead of silently widening the fix.',
+      '6. Verify fix doesn\'t introduce regressions',
       '**When fixed**: Remove the `bug` label in Linear'
     ].join('\n');
     assert.ok(
@@ -787,6 +788,62 @@ describe('generatePrompt bug-already-investigated note (LIN-366)', () => {
     const issue = { ...baseIssue, labels: [] };
     const result = generatePrompt('look-into', issue, withComments);
     assert.ok(!/Prior Investigation On Record/i.test(result.prompt), 'only bug-labelled tasks get the note');
+  });
+});
+
+// =============================================================================
+// Class check — widen the model, don't patch the witness (LIN-313)
+// =============================================================================
+// A narrowly-worded task gets diligently completed in isolation, then the parent
+// hits the next instance of the same class. Bug and review prompts must ask the
+// class question (isolated, or one of a class?) without expanding their own scope
+// — instances are named and recorded, not silently fixed.
+
+describe('class check — isolated or one of a class (LIN-313)', () => {
+  const bugIssue = {
+    id: 'issue-bug-class', identifier: 'TEST-BC1', title: 'process.foo missing',
+    description: 'Runtime crashes on process.foo', url: 'https://linear.app/test/issue/TEST-BC1',
+    state: { name: 'In Progress', type: 'started' }, createdAt: '2026-01-01T00:00:00.000Z',
+    labels: ['bug']
+  };
+  const reviewIssue = {
+    id: 'issue-rev-class', identifier: 'TEST-RC1', title: 'Verify fix',
+    description: 'Review the landed fix', url: 'https://linear.app/test/issue/TEST-RC1',
+    state: { name: 'In Progress', type: 'started' }, createdAt: '2026-01-01T00:00:00.000Z',
+    labels: []
+  };
+  const ctx = { parent: null, siblings: [], project: { name: 'P' }, children: [], comments: [] };
+
+  test('bug template asks the class question after root cause is in hand', () => {
+    const result = generatePrompt('bug', bugIssue, ctx);
+    assert.ok(/isolated, or one of a class/i.test(result.prompt), 'bug prompt must ask isolated-or-class');
+    assert.ok(/search for the pattern itself/i.test(result.prompt), 'must search the pattern, not only the cited symptom');
+  });
+
+  test('bug class check keeps the fix minimal — instances recorded, not silently fixed', () => {
+    const result = generatePrompt('bug', bugIssue, ctx);
+    assert.ok(/the fix stays minimal/i.test(result.prompt), 'a found class must not widen the fix');
+    assert.ok(/list the unhandled instances/i.test(result.prompt), 'unhandled instances must be recorded');
+  });
+
+  test('bug class check guards against manufactured work (isolated is a valid answer)', () => {
+    const result = generatePrompt('bug', bugIssue, ctx);
+    assert.ok(/genuinely isolated issue is a valid answer/i.test(result.prompt),
+      'an isolated result must be explicitly valid');
+  });
+
+  test('review template includes the class-check section before close-out', () => {
+    const result = generatePrompt('review', reviewIssue, ctx);
+    assert.ok(/### Isolated, or One of a Class\?/.test(result.prompt), 'review prompt must carry the class-check section');
+    assert.ok(/do not expand this task to fix them/i.test(result.prompt), 'siblings become a finding, not new scope');
+    assert.ok(/genuinely isolated change is a valid result/i.test(result.prompt),
+      'an isolated result must be explicitly valid');
+  });
+
+  test('review checklist carries the class-check item', () => {
+    const result = generatePrompt('review', reviewIssue, ctx);
+    assert.ok(result.prompt.includes('- [ ] Class check answered: isolated, or class named with unhandled instances listed'),
+      'checklist must include the class-check line');
   });
 });
 
