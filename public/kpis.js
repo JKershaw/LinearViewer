@@ -50,50 +50,94 @@
     return dayKey.slice(5); // 'YYYY-MM-DD' → 'MM-DD'
   }
 
-  // --- Activity line chart (hero) ---
-  const activity = data.activity;
-  const activityTotal = sum(activity.proxy) + sum(activity.steps) + sum(activity.dispatch);
-  if (!emptyUnless('chart-activity', activityTotal)) {
-    new Chart(document.getElementById('chart-activity'), {
-      type: 'line',
+  // --- Proxy calls by phase (hero): stacked bars per day ---
+  // Composition over volume: what agents do, not how much. Phases are the
+  // agent loop — orient, decide, act, watch, report.
+  const phases = data.proxyCategories;
+  const phaseEntries = [
+    ['orienting', phases.orienting, COLORS.blue],
+    ['deciding', phases.deciding, COLORS.purple],
+    ['acting', phases.acting, COLORS.green],
+    ['watching', phases.watching, COLORS.dim],
+    ['reporting', phases.reporting, COLORS.yellow]
+  ];
+  const phasesTotal = sum(phaseEntries.map(function (e) { return sum(e[1]); }));
+  if (!emptyUnless('chart-proxy-phases', phasesTotal)) {
+    new Chart(document.getElementById('chart-proxy-phases'), {
+      type: 'bar',
       data: {
-        labels: activity.days.map(shortDay),
-        datasets: [
-          { label: 'proxy api calls', data: activity.proxy, borderColor: COLORS.blue, backgroundColor: COLORS.blue, tension: 0.3, pointRadius: 0, borderWidth: 2 },
-          { label: 'step updates', data: activity.steps, borderColor: COLORS.green, backgroundColor: COLORS.green, tension: 0.3, pointRadius: 0, borderWidth: 2 },
-          { label: 'dispatches', data: activity.dispatch, borderColor: COLORS.yellow, backgroundColor: COLORS.yellow, tension: 0.3, pointRadius: 0, borderWidth: 2 }
-        ]
+        labels: phases.days.map(shortDay),
+        datasets: phaseEntries.map(function (e) {
+          return { label: e[0], data: e[1], backgroundColor: e[2] };
+        })
       },
       options: {
         interaction: { mode: 'index', intersect: false },
         scales: {
-          x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } },
-          y: { beginAtZero: true, grid: { color: COLORS.grid }, ticks: { precision: 0 } }
+          x: { stacked: true, grid: { display: false }, ticks: { maxTicksLimit: 10 } },
+          y: { stacked: true, beginAtZero: true, grid: { color: COLORS.grid }, ticks: { precision: 0 } }
         }
       }
     });
   }
 
-  // --- Dispatch outcomes doughnut ---
-  const outcomes = data.dispatchOutcomes;
-  const outcomeEntries = [
-    ['queued', outcomes.queued, COLORS.yellow],
-    ['taken', outcomes.taken, COLORS.green],
-    ['expired', outcomes.expired, COLORS.dim],
-    ['cancelled', outcomes.cancelled, COLORS.red]
-  ];
-  if (!emptyUnless('chart-dispatch-outcomes', sum(outcomeEntries.map(function (e) { return e[1]; })))) {
-    new Chart(document.getElementById('chart-dispatch-outcomes'), {
-      type: 'doughnut',
+  // --- Dispatched work by kind, weekly stacked bars ---
+  const weekly = data.dispatchByWeek;
+  const kindPalette = [COLORS.blue, COLORS.green, COLORS.yellow, COLORS.red, COLORS.dim];
+  let paletteIndex = 0;
+  const weeklyTotal = sum(weekly.kinds.map(function (k) { return sum(k.counts); }));
+  if (!emptyUnless('chart-dispatch-weekly', weeklyTotal)) {
+    new Chart(document.getElementById('chart-dispatch-weekly'), {
+      type: 'bar',
       data: {
-        labels: outcomeEntries.map(function (e) { return e[0]; }),
+        labels: weekly.weeks.map(function (w) { return 'wk ' + shortDay(w); }),
+        datasets: weekly.kinds.map(function (k) {
+          const color = k.label === 'autopilot'
+            ? COLORS.purple
+            : kindPalette[paletteIndex++ % kindPalette.length];
+          return { label: k.label, data: k.counts, backgroundColor: color };
+        })
+      },
+      options: {
+        scales: {
+          x: { stacked: true, grid: { display: false } },
+          y: { stacked: true, beginAtZero: true, grid: { color: COLORS.grid }, ticks: { precision: 0 } }
+        }
+      }
+    });
+  }
+
+  // --- Work funnel: dispatched → taken → reported → completed ---
+  const funnel = data.funnel;
+  const funnelEntries = [
+    ['dispatched', funnel.dispatched],
+    ['taken', funnel.taken],
+    ['reported', funnel.reported],
+    ['completed', funnel.completed]
+  ];
+  if (!emptyUnless('chart-funnel', funnel.dispatched)) {
+    // Same hue fading toward completion; hex alpha suffixes on the 6-digit
+    // theme color (falls back gracefully if the var isn't a hex color).
+    const funnelColors = ['FF', 'C0', '90', '60'].map(function (alpha) {
+      return COLORS.blue.length === 7 ? COLORS.blue + alpha : COLORS.blue;
+    });
+    new Chart(document.getElementById('chart-funnel'), {
+      type: 'bar',
+      data: {
+        labels: funnelEntries.map(function (e) { return e[0]; }),
         datasets: [{
-          data: outcomeEntries.map(function (e) { return e[1]; }),
-          backgroundColor: outcomeEntries.map(function (e) { return e[2]; }),
-          borderWidth: 0
+          data: funnelEntries.map(function (e) { return e[1]; }),
+          backgroundColor: funnelColors
         }]
       },
-      options: { cutout: '60%' }
+      options: {
+        indexAxis: 'y',
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { beginAtZero: true, grid: { color: COLORS.grid }, ticks: { precision: 0 } },
+          y: { grid: { display: false } }
+        }
+      }
     });
   }
 
@@ -187,6 +231,25 @@
         }]
       },
       options: { cutout: '60%' }
+    });
+  }
+
+  // --- Work by hour of day (UTC) ---
+  const hours = data.hourOfDay || [];
+  if (!emptyUnless('chart-hour-of-day', sum(hours))) {
+    new Chart(document.getElementById('chart-hour-of-day'), {
+      type: 'bar',
+      data: {
+        labels: hours.map(function (_, h) { return (h < 10 ? '0' : '') + h; }),
+        datasets: [{ data: hours, backgroundColor: COLORS.green }]
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { maxTicksLimit: 12 } },
+          y: { beginAtZero: true, grid: { color: COLORS.grid }, ticks: { precision: 0 } }
+        }
+      }
     });
   }
 

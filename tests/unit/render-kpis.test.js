@@ -25,19 +25,34 @@ function buildStats(overrides = {}) {
       localProjects: 1,
       activeTokens: 6
     },
-    activity: {
+    proxyCategories: {
       days: ['2026-06-09', '2026-06-10'],
-      proxy: [10, 20],
-      steps: [1, 2],
-      dispatch: [3, 4]
+      orienting: [10, 20],
+      deciding: [2, 3],
+      acting: [1, 1],
+      watching: [4, 5],
+      reporting: [2, 2]
     },
-    dispatchOutcomes: { queued: 1, taken: 2, expired: 3, cancelled: 0 },
+    dispatchByWeek: {
+      weeks: ['2026-05-06', '2026-05-13', '2026-05-20', '2026-05-27', '2026-06-03'],
+      kinds: [
+        { label: 'autopilot', counts: [0, 1, 1, 2, 3] },
+        { label: 'research', counts: [1, 0, 2, 1, 1] }
+      ]
+    },
+    funnel: { dispatched: 20, taken: 15, reported: 12, completed: 9 },
     dispatchKinds: [{ label: 'autopilot', count: 4 }, { label: 'research', count: 3 }],
     stepOutcomes: { completed: 5, failed: 1, blocked: 0, other: 2 },
     proxyStatus: { ok: 30, clientError: 2, serverError: 1 },
     topEndpoints: [{ label: '/api/proxy/me', count: 9 }],
+    hourOfDay: Array.from({ length: 24 }, (_, h) => h),
     freeTier: { days: ['2026-06-09', '2026-06-10'], counts: [4, 6] },
-    vanity: { busiestDay: { day: '2026-06-10', count: 26 }, dbBackend: 'mangodb' },
+    vanity: {
+      busiestDay: { day: '2026-06-10', count: 26 },
+      readsPerWrite: 12.4,
+      medianMinutesToResolve: 11,
+      dbBackend: 'mangodb'
+    },
     ...overrides
   };
 }
@@ -58,9 +73,9 @@ describe('renderKpisPage', () => {
     const html = renderKpisPage(buildStats());
 
     for (const id of [
-      'chart-activity', 'chart-dispatch-kinds', 'chart-step-outcomes',
-      'chart-dispatch-outcomes', 'chart-proxy-status',
-      'chart-top-endpoints', 'chart-free-tier'
+      'chart-proxy-phases', 'chart-dispatch-weekly', 'chart-dispatch-kinds',
+      'chart-funnel', 'chart-step-outcomes', 'chart-proxy-status',
+      'chart-top-endpoints', 'chart-hour-of-day', 'chart-free-tier'
     ]) {
       assert.ok(html.includes(`id="${id}"`), `missing canvas ${id}`);
     }
@@ -87,13 +102,26 @@ describe('renderKpisPage', () => {
   test('renders vanity strip and noindex meta', () => {
     const html = renderKpisPage(buildStats());
     assert.ok(html.includes('busiest day'));
+    assert.ok(html.includes('reads per write: <strong>12.4:1</strong>'));
+    assert.ok(html.includes('median dispatch→done: <strong>11m</strong>'));
     assert.ok(html.includes('mangodb'));
     assert.ok(html.includes('<meta name="robots" content="noindex">'));
   });
 
-  test('omits busiest day when there is no activity', () => {
-    const html = renderKpisPage(buildStats({ vanity: { busiestDay: null, dbBackend: null } }));
+  test('formats long median resolution times in hours', () => {
+    const html = renderKpisPage(buildStats({
+      vanity: { busiestDay: null, readsPerWrite: null, medianMinutesToResolve: 150, dbBackend: null }
+    }));
+    assert.ok(html.includes('median dispatch→done: <strong>2.5h</strong>'));
+  });
+
+  test('omits empty vanity stats when there is no activity', () => {
+    const html = renderKpisPage(buildStats({
+      vanity: { busiestDay: null, readsPerWrite: null, medianMinutesToResolve: null, dbBackend: null }
+    }));
     assert.ok(!html.includes('busiest day'));
+    assert.ok(!html.includes('reads per write'));
+    assert.ok(!html.includes('median dispatch→done'));
     assert.ok(html.includes('generated:'));
   });
 });

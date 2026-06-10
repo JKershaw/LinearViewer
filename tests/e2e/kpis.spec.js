@@ -26,8 +26,11 @@ test.describe('KPIs page', () => {
     const data = await page.evaluate(() => window.__KPI_DATA__);
     expect(data).toBeTruthy();
     expect(data.totals).toBeTruthy();
-    expect(Array.isArray(data.activity.days)).toBe(true);
-    expect(data.activity.days.length).toBe(30);
+    expect(Array.isArray(data.proxyCategories.days)).toBe(true);
+    expect(data.proxyCategories.days.length).toBe(30);
+    expect(data.dispatchByWeek.weeks.length).toBe(5);
+    expect(data.funnel).toBeTruthy();
+    expect(data.hourOfDay.length).toBe(24);
   });
 
   test('chart areas render (chart or empty-state note) for each section', async ({ page }) => {
@@ -36,13 +39,27 @@ test.describe('KPIs page', () => {
     // Each chart box ends up with either a live canvas or a "no data yet"
     // note — never an empty hole.
     const boxes = page.locator('.kpi-chart-box');
-    await expect(boxes).toHaveCount(7);
+    await expect(boxes).toHaveCount(9);
     const count = await boxes.count();
     for (let i = 0; i < count; i++) {
       const box = boxes.nth(i);
       const hasContent = await box.locator('canvas, .kpi-chart-empty').count();
       expect(hasContent).toBeGreaterThan(0);
     }
+  });
+
+  test('renders without horizontal overflow on mobile', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/kpis');
+    await page.waitForTimeout(300); // let charts lay out
+
+    const overflow = await page.evaluate(() =>
+      document.documentElement.scrollWidth - document.documentElement.clientWidth
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+
+    // Cards collapse to two columns and stay visible
+    await expect(page.locator('.kpi-cards .kpi-card').first()).toBeVisible();
   });
 
   test('shows footer with legal links and is not linked from the landing page', async ({ page }) => {
