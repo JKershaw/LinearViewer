@@ -16,6 +16,7 @@ import { Router } from 'express';
 import { GraphQLClient, gql } from 'graphql-request';
 import rateLimit from 'express-rate-limit';
 import { createProxyFetch } from '../lib/proxy-fetch.js';
+import { createDedupeCache, dedupeKey } from '../lib/proxy-dedupe.js';
 import { fetchProjects, fetchIssueContext, fetchRecommendationContext } from '../lib/linear.js';
 import { isRecommendationEnabled, getRecommendation } from '../lib/openrouter.js';
 import { resolveRecommendation, describeDescent, armHopSignal } from '../lib/recommend-recurse.js';
@@ -176,6 +177,12 @@ const LINEAR_API_ENDPOINT = 'https://api.linear.app/graphql';
 // Proxy-aware fetch for environments behind an HTTP proxy (e.g. corporate networks).
 // graphql-request's default fetch doesn't respect HTTP_PROXY/HTTPS_PROXY env vars.
 const proxyFetch = await createProxyFetch();
+
+// Short-window dedupe for non-idempotent comment creates (LIN-399). An
+// identical (workspace + issue + body) create arriving within the window
+// collapses to the first comment instead of minting a duplicate, so a
+// consumer that retries after a lost response gets the original back.
+const commentDedupe = createDedupeCache();
 
 // Rate limiters
 // Note: proxyLimiter is applied before authenticateProxyToken on consumer
@@ -1230,11 +1237,13 @@ GET ${baseUrl}/api/proxy/autopilot/manual
 ## Write Endpoints
 
 Success responses wrap the affected entity (e.g. { "success": true, "issue": {...} }) —
-read the documented shape rather than assuming the entity comes back top-level. Creates
-(issues, comments, relations) are NOT idempotent and there is no idempotency key: a 2xx
-with "success": true means the write landed even if your client-side parse came up
-empty, so inspect the raw response (or search) before retrying — a blind retry mints a
-duplicate.
+read the documented shape rather than assuming the entity comes back top-level. The
+response is authoritative: a 2xx with "success": true means the write landed; a non-2xx
+(or "success": false) means it did not. Do NOT blind-retry a create on a lost/empty
+response — if you got no clean response, re-read (search or GET the issue) to confirm
+before retrying. Identical comment creates are additionally deduped server-side within a
+short window: a repeat of the same (issue + body) returns the original comment with
+"deduped": true (HTTP 200) instead of minting a duplicate, so a confirming retry is safe.
 
 POST ${baseUrl}/api/proxy/issues
   Body: { "teamId": "...", "title": "...", "description": "...", "projectId": "...", "stateId": "...", "assigneeId": "...", "priority": 0-4, "cycleId": "...", "parentId": "..." }
@@ -1250,6 +1259,8 @@ POST ${baseUrl}/api/proxy/issues/{issueId}/comments
   Body: { "body": "..." }
   → Add a comment to an issue. Returns 201:
   → { "success": true, "comment": { "id": "...", "body": "...", "createdAt": "...", "user": { "name": "..." } } }
+  → Deduped within a short window: a repeat of the same (issue + body) returns the
+    original comment with "deduped": true and HTTP 200 (not 201) — no duplicate is created.
 
 POST ${baseUrl}/api/proxy/issues/{issueId}/relations
   Body: { "type": "blocks|related|duplicate", "relatedIssueId": "..." }
@@ -1349,8 +1360,13 @@ ${readEndpoints}${writeEndpoints}
 
 - **Validate Content-Type before parsing.** If the body is empty or
   \`Content-Type\` isn't \`application/json\`, it's almost always transient
-  client-side network flakiness, not a proxy error. Retry once before
-  surfacing the failure.
+  client-side network flakiness, not a proxy error. Safe to retry once for
+  reads (GET). For a create (POST issues/comments/relations), do NOT
+  blind-retry on an empty/lost response — the write may have already landed.
+  Re-read (search or GET the issue) to confirm first. Identical comment
+  creates are deduped server-side within a short window, so a confirming
+  retry of the same body returns the original (\`"deduped": true\`) rather
+  than a duplicate.
 - **\`/api/proxy/recommend\` can exceed 25s.** The server emits whitespace
   heartbeats inside a single 200 response to stay inside Heroku's router
   cap. \`JSON.parse\` ignores interior whitespace, so a plain
@@ -1882,9 +1898,27 @@ ${readEndpoints}${writeEndpoints}
         return res.status(400).json({ error: 'body contains invalid characters' });
       }
 
+      // Deterministic dedupe (LIN-399): if an identical comment was just
+      // created for this issue, return that one instead of minting a duplicate.
+      const key = dedupeKey(req.proxyUrlKey, issueId, body);
+      const prior = commentDedupe.get(key);
+      if (prior) {
+        logEvent(req, '/api/proxy/issues/comments', 200);
+        return res.status(200).json({ ...prior, deduped: true });
+      }
+
       const data = await client.request(CREATE_COMMENT_MUTATION, {
         input: { issueId, body }
       });
+
+      // Surface a clear failure instead of a misleading 201 when Linear
+      // reports the write did not land.
+      if (!data.commentCreate || data.commentCreate.success !== true) {
+        logEvent(req, '/api/proxy/issues/comments', 502);
+        return res.status(502).json({ error: 'Comment was not created', detail: data.commentCreate || null });
+      }
+
+      commentDedupe.set(key, data.commentCreate);
       logEvent(req, '/api/proxy/issues/comments', 201);
       res.status(201).json(data.commentCreate);
     } catch (err) {

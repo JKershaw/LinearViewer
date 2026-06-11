@@ -645,7 +645,7 @@ The body embeds `YOUR_TOKEN` as a placeholder; substitute the consumer's `readWr
 
 All write endpoints require a `readWrite` scoped token. Read-only tokens receive `403`.
 
-Success responses wrap the affected entity (e.g. `{ "success": true, "issue": {...} }`) — read the documented shape rather than assuming the entity comes back top-level. Creates (issues, comments, relations) are **not idempotent** and there is no idempotency key: a `2xx` with `"success": true` means the write landed even if your client-side parse came up empty, so inspect the raw response (or search) before retrying — a blind retry mints a duplicate.
+Success responses wrap the affected entity (e.g. `{ "success": true, "issue": {...} }`) — read the documented shape rather than assuming the entity comes back top-level. **The response is authoritative:** a `2xx` with `"success": true` means the write landed; a non-`2xx` (or `"success": false`) means it did not. Creates are non-idempotent, so do **not** blind-retry a create on a lost/empty response — re-read (search or GET the issue) to confirm before retrying. As an extra guard, identical **comment** creates are deduped server-side within a short window: a repeat of the same `(issue + body)` returns the original comment with `"deduped": true` and HTTP `200` (not `201`) instead of minting a duplicate, so a confirming retry of the same body is safe.
 
 #### Create Issue
 
@@ -757,6 +757,8 @@ Returns `201`:
   }
 }
 ```
+
+Posting the same `(issue + body)` again within a short window does not create a second comment — the original is returned with `"deduped": true` and HTTP `200` (not `201`). This makes a confirming retry after a lost response safe.
 
 #### Create Relation
 
