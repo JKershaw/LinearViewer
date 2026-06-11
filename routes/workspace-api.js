@@ -104,7 +104,9 @@ function sendPromptResult(req, res, { json, prompt, identifier, downloadName }) 
  * Shared by the streaming and non-streaming recommend endpoints. Kept
  * SHAPE-TOLERANT so it serves BOTH the canonical provider issue (local
  * sessions, post-LIN-405) and the Linear-shaped `testMockData` issue still
- * passed by the soon-orphaned `isTestMode` stream block (deleted by LIN-413):
+ * passed by the `isTestMode` stream / GET blocks. (LIN-413 verdict: those
+ * blocks are RETAINED — free-tier.spec still drives the stream on the
+ * test-token path and the recommend GET directly, so they are not orphaned.):
  *   - labels arrive either as a plain `['blocked']` array or as `{ nodes: [...] }`;
  *   - the identifier is read from `issue.identifier` (canonical urls end in a
  *     UUID, so the historic `url.split('/').pop()` is only a last-ditch fallback).
@@ -1396,22 +1398,10 @@ ${goal}`
     }
 
     try {
-      // Use mock data in test mode
-      const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token'
-      if (isTestMode) {
-        const mockIssue = testMockData.issues.find(i => i.id === issueId)
-        if (!mockIssue) {
-          return res.status(404).json({ error: 'Issue not found' })
-        }
-        // Return mock comments for test mode
-        return res.json({
-          comments: [
-            { id: 'comment-1', body: 'This is a test comment with **markdown**.', createdAt: '2024-01-15T10:00:00Z', user: 'Alice' },
-            { id: 'comment-2', body: 'Second comment with `code`.', createdAt: '2024-01-16T14:30:00Z', user: 'Bob' }
-          ]
-        })
-      }
-
+      // The detail-surface comments path is fully provider-backed: the dashboard
+      // (interactions.spec) reads comments through the local provider and no
+      // test-token spec reaches this endpoint, so the old `testMockData` data-mock
+      // branch was orphaned and removed (LIN-413). Linear + local both serve here.
       const comments = await getProviderForWorkspace(workspace).fetchIssueComments(getWorkspaceToken(workspace), issueId)
       res.json({ comments })
     } catch (error) {
