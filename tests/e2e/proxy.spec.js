@@ -396,6 +396,52 @@ test.describe('Proxy API - Consumer Endpoints', () => {
     expect(data.error).toContain('body');
   });
 
+  test('description/append requires write scope', async ({ request }) => {
+    const resp = await request.post('/api/proxy/issues/11111111-1111-1111-1111-111111111111/description/append', {
+      headers: { Authorization: `Bearer ${readToken}`, 'Content-Type': 'application/json' },
+      data: { block: 'note' }
+    });
+    expect(resp.status()).toBe(403);
+    const data = await resp.json();
+    expect(data.error).toContain('read-write');
+  });
+
+  test('description/append validates block', async ({ request }) => {
+    const resp = await request.post('/api/proxy/issues/11111111-1111-1111-1111-111111111111/description/append', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: {}
+    });
+    expect(resp.status()).toBe(400);
+    const data = await resp.json();
+    expect(data.error).toContain('block');
+  });
+
+  test('description/replace requires write scope', async ({ request }) => {
+    const resp = await request.post('/api/proxy/issues/11111111-1111-1111-1111-111111111111/description/replace', {
+      headers: { Authorization: `Bearer ${readToken}`, 'Content-Type': 'application/json' },
+      data: { oldString: 'a', newString: 'b' }
+    });
+    expect(resp.status()).toBe(403);
+    const data = await resp.json();
+    expect(data.error).toContain('read-write');
+  });
+
+  test('description/replace validates oldString and newString', async ({ request }) => {
+    const missingOld = await request.post('/api/proxy/issues/11111111-1111-1111-1111-111111111111/description/replace', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { newString: 'b' }
+    });
+    expect(missingOld.status()).toBe(400);
+    expect((await missingOld.json()).error).toContain('oldString');
+
+    const missingNew = await request.post('/api/proxy/issues/11111111-1111-1111-1111-111111111111/description/replace', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { oldString: 'a' }
+    });
+    expect(missingNew.status()).toBe(400);
+    expect((await missingNew.json()).error).toContain('newString');
+  });
+
   test('relation endpoint validates type', async ({ request }) => {
     const resp = await request.post('/api/proxy/issues/11111111-1111-1111-1111-111111111111/relations', {
       headers: {
