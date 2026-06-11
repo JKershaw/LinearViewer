@@ -73,6 +73,37 @@
   font-weight: 600;
   color: var(--fg-dim);
   margin-bottom: 0.5rem;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+/* Range toggle (e.g. 30d / 24h on the hero chart) */
+.kpi-range-toggle {
+  display: inline-flex;
+  gap: 0.25rem;
+}
+
+.kpi-range-btn {
+  font-family: var(--font-structural);
+  font-size: 0.7rem;
+  color: var(--fg-dim);
+  background: none;
+  border: 1px solid var(--fg-vdim);
+  border-radius: 3px;
+  padding: 0.05rem 0.45rem;
+  cursor: pointer;
+}
+
+.kpi-range-btn:hover {
+  color: var(--fg);
+}
+
+.kpi-range-btn.is-active {
+  color: var(--fg);
+  border-color: var(--fg-dim);
+  background: var(--bg-muted);
 }
 
 .kpi-tree-glyph {

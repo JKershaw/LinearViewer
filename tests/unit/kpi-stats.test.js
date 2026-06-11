@@ -11,7 +11,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import {
   collectKpiStats, categorizeProxyEvent, PROXY_PHASES,
-  ACTIVITY_WINDOW_DAYS, FREE_TIER_WINDOW_DAYS, WEEKLY_WINDOW_WEEKS
+  ACTIVITY_WINDOW_DAYS, HOURLY_WINDOW_HOURS, FREE_TIER_WINDOW_DAYS, WEEKLY_WINDOW_WEEKS
 } from '../../lib/kpi-stats.js';
 
 // Minimal in-memory mock of the collection surface kpi-stats uses:
@@ -95,8 +95,10 @@ describe('collectKpiStats', () => {
     assert.strictEqual(stats.totals.aiSummaries, 0);
     assert.strictEqual(stats.totals.activeTokens, 0);
     assert.strictEqual(stats.proxyCategories.days.length, ACTIVITY_WINDOW_DAYS);
+    assert.strictEqual(stats.proxyCategoriesHourly.hours.length, HOURLY_WINDOW_HOURS);
     for (const phase of PROXY_PHASES) {
       assert.ok(stats.proxyCategories[phase].every(count => count === 0), `${phase} not all zero`);
+      assert.ok(stats.proxyCategoriesHourly[phase].every(count => count === 0), `hourly ${phase} not all zero`);
     }
     assert.strictEqual(stats.dispatchByWeek.weeks.length, WEEKLY_WINDOW_WEEKS);
     assert.deepStrictEqual(stats.dispatchByWeek.kinds, []);
@@ -166,6 +168,33 @@ describe('collectKpiStats', () => {
     // Busiest day is today: 4 events vs 2 on day -3
     assert.ok(stats.vanity.busiestDay);
     assert.strictEqual(stats.vanity.busiestDay.count, 4);
+  });
+
+  test('buckets proxy calls per phase per UTC hour for the 24h view', async () => {
+    const hoursAgo = (n) => new Date(NOW.getTime() - n * 60 * 60 * 1000);
+    const event = (method, endpoint, hours) => ({ method, endpoint, status: 200, timestamp: hoursAgo(hours) });
+    const collections = buildCollections({
+      proxyEvents: createMockCollection([
+        event('GET', '/api/proxy/stack', 0),
+        event('GET', '/api/proxy/issues/:id', 0),
+        event('POST', '/api/proxy/foreman/status', 5),
+        event('PATCH', '/api/proxy/issues/:id', 30) // outside 24h window: daily buckets only
+      ])
+    });
+
+    const stats = await collectKpiStats(collections, { now: NOW });
+    const lastHour = HOURLY_WINDOW_HOURS - 1;
+
+    assert.strictEqual(stats.proxyCategoriesHourly.orienting[lastHour], 2);
+    assert.strictEqual(stats.proxyCategoriesHourly.reporting[lastHour - 5], 1);
+    const hourlyTotal = PROXY_PHASES.reduce(
+      (sum, phase) => sum + stats.proxyCategoriesHourly[phase].reduce((a, b) => a + b, 0), 0
+    );
+    assert.strictEqual(hourlyTotal, 3); // the 30h-old event is excluded
+    // ...but it still lands in the daily buckets
+    assert.strictEqual(stats.proxyCategories.acting[ACTIVITY_WINDOW_DAYS - 2], 1);
+    // Hour keys are UTC 'YYYY-MM-DDTHH', ending at now
+    assert.strictEqual(stats.proxyCategoriesHourly.hours[lastHour], '2026-06-10T12');
   });
 
   test('counts autopilot runs and ranks dispatch kinds across queue and history', async () => {

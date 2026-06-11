@@ -33,6 +33,14 @@ function buildStats(overrides = {}) {
       watching: [4, 5],
       reporting: [2, 2]
     },
+    proxyCategoriesHourly: {
+      hours: ['2026-06-10T11', '2026-06-10T12'],
+      orienting: [3, 7],
+      deciding: [1, 1],
+      acting: [0, 1],
+      watching: [2, 2],
+      reporting: [1, 0]
+    },
     dispatchByWeek: {
       weeks: ['2026-05-06', '2026-05-13', '2026-05-20', '2026-05-27', '2026-06-03'],
       kinds: [
@@ -82,6 +90,16 @@ describe('renderKpisPage', () => {
     assert.ok(html.includes('src="/chart.umd.min.js"'));
     assert.ok(html.includes('src="/kpis.js"'));
     assert.ok(html.includes('href="/kpis.css"'));
+  });
+
+  test('renders a 30d/24h range toggle on the proxy-phases chart, defaulting to 30d', () => {
+    const html = renderKpisPage(buildStats());
+
+    assert.ok(html.includes('class="kpi-range-toggle" data-chart="chart-proxy-phases"'));
+    assert.ok(html.includes('class="kpi-range-btn is-active" data-range="30d"'));
+    assert.ok(html.includes('class="kpi-range-btn" data-range="24h"'));
+    // Only the hero chart gets a toggle
+    assert.strictEqual(html.match(/kpi-range-toggle/g).length, 1);
   });
 
   test('embeds the stats payload for the client script', () => {
