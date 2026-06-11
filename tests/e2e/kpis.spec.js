@@ -28,6 +28,7 @@ test.describe('KPIs page', () => {
     expect(data.totals).toBeTruthy();
     expect(Array.isArray(data.proxyCategories.days)).toBe(true);
     expect(data.proxyCategories.days.length).toBe(30);
+    expect(data.proxyCategoriesHourly.hours.length).toBe(24);
     expect(data.dispatchByWeek.weeks.length).toBe(5);
     expect(data.funnel).toBeTruthy();
     expect(data.hourOfDay.length).toBe(24);
@@ -46,6 +47,16 @@ test.describe('KPIs page', () => {
       const hasContent = await box.locator('canvas, .kpi-chart-empty').count();
       expect(hasContent).toBeGreaterThan(0);
     }
+  });
+
+  test('hero chart has a 30d/24h range toggle defaulting to 30d', async ({ page }) => {
+    await page.goto('/kpis');
+
+    const toggle = page.locator('.kpi-range-toggle[data-chart="chart-proxy-phases"]');
+    await expect(toggle).toBeVisible();
+    await expect(toggle.locator('.kpi-range-btn')).toHaveCount(2);
+    await expect(toggle.locator('.kpi-range-btn.is-active')).toHaveText('30d');
+    await expect(toggle.locator('[data-range="24h"]')).toBeVisible();
   });
 
   test('renders without horizontal overflow on mobile', async ({ page }) => {

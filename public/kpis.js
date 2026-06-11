@@ -50,26 +50,43 @@
     return dayKey.slice(5); // 'YYYY-MM-DD' → 'MM-DD'
   }
 
-  // --- Proxy calls by phase (hero): stacked bars per day ---
+  // --- Proxy calls by phase (hero): stacked bars per day or per hour ---
   // Composition over volume: what agents do, not how much. Phases are the
-  // agent loop — orient, decide, act, watch, report.
-  const phases = data.proxyCategories;
-  const phaseEntries = [
-    ['orienting', phases.orienting, COLORS.blue],
-    ['deciding', phases.deciding, COLORS.purple],
-    ['acting', phases.acting, COLORS.green],
-    ['watching', phases.watching, COLORS.dim],
-    ['reporting', phases.reporting, COLORS.yellow]
+  // agent loop — orient, decide, act, watch, report. A 30d/24h toggle
+  // switches between the daily and hourly buckets.
+  const PHASE_STYLES = [
+    ['orienting', COLORS.blue],
+    ['deciding', COLORS.purple],
+    ['acting', COLORS.green],
+    ['watching', COLORS.dim],
+    ['reporting', COLORS.yellow]
   ];
-  const phasesTotal = sum(phaseEntries.map(function (e) { return sum(e[1]); }));
+  const phaseViews = {
+    '30d': {
+      source: data.proxyCategories,
+      labels: data.proxyCategories.days.map(shortDay)
+    }
+  };
+  if (data.proxyCategoriesHourly) {
+    phaseViews['24h'] = {
+      source: data.proxyCategoriesHourly,
+      labels: data.proxyCategoriesHourly.hours.map(function (h) {
+        return h.slice(11) + ':00'; // 'YYYY-MM-DDTHH' → 'HH:00'
+      })
+    };
+  }
+  function phaseDatasets(source) {
+    return PHASE_STYLES.map(function (s) {
+      return { label: s[0], data: source[s[0]], backgroundColor: s[1] };
+    });
+  }
+  const phasesTotal = sum(PHASE_STYLES.map(function (s) { return sum(data.proxyCategories[s[0]]); }));
   if (!emptyUnless('chart-proxy-phases', phasesTotal)) {
-    new Chart(document.getElementById('chart-proxy-phases'), {
+    const phasesChart = new Chart(document.getElementById('chart-proxy-phases'), {
       type: 'bar',
       data: {
-        labels: phases.days.map(shortDay),
-        datasets: phaseEntries.map(function (e) {
-          return { label: e[0], data: e[1], backgroundColor: e[2] };
-        })
+        labels: phaseViews['30d'].labels,
+        datasets: phaseDatasets(phaseViews['30d'].source)
       },
       options: {
         interaction: { mode: 'index', intersect: false },
@@ -79,6 +96,23 @@
         }
       }
     });
+
+    const phasesToggle = document.querySelector('.kpi-range-toggle[data-chart="chart-proxy-phases"]');
+    if (phasesToggle) {
+      phasesToggle.addEventListener('click', function (event) {
+        const button = event.target.closest('button[data-range]');
+        const view = button && phaseViews[button.dataset.range];
+        if (!view || button.classList.contains('is-active')) return;
+        phasesToggle.querySelectorAll('.kpi-range-btn').forEach(function (b) {
+          b.classList.toggle('is-active', b === button);
+        });
+        phasesChart.data.labels = view.labels;
+        phasesChart.data.datasets.forEach(function (dataset, i) {
+          dataset.data = view.source[PHASE_STYLES[i][0]];
+        });
+        phasesChart.update();
+      });
+    }
   }
 
   // --- Dispatched work by kind, weekly stacked bars ---
