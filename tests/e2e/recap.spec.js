@@ -1,20 +1,39 @@
 /**
- * E2E tests for the recap API + UI (LIN-261).
+ * E2E tests for the recap API (LIN-261; migrated to the local provider in LIN-403).
+ *
+ * The Recap API block rides a GENUINE `provider: 'local'` session seeded from
+ * `workspaceApiLocalSeed` (the shared pipeline/workspace-api fixture), not the
+ * `test-token` + `testMockData` mock short-circuit. The AI mock (buildMockRecap)
+ * still fires because `shouldMockAi` re-gates it onto local sessions (#399).
+ *
+ * The former `Recap UI — Swipe` block lived here too; it exercises the swipe
+ * surface (not yet migrated) and was relocated unchanged into swipe.spec.js so
+ * this spec is fully testMockData-free (unblocks LIN-413).
  */
 import { test, expect } from '../fixtures/test-base.js';
+import {
+  seedLocalWorkspace,
+  workspaceApiLocalSeed,
+  LOCAL_WORKSPACE_URL_KEY,
+} from '../fixtures/local-harness.js';
 
-const URL_KEY = 'test-workspace';
+const URL_KEY = LOCAL_WORKSPACE_URL_KEY;
 const ISSUE_ID = '66666666-6666-6666-6666-666666666666';
 const ISSUE_IDENTIFIER = 'TEST-6';
 
 test.describe('Recap API', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/test/set-session');
+    await seedLocalWorkspace(page, workspaceApiLocalSeed);
   });
 
   test('GET returns status=missing for never-generated issue', async ({ page }) => {
-    // Use a different UUID to keep this test independent of state from others
-    const res = await page.request.get(`/workspace/${URL_KEY}/api/recap/eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeef`);
+    // Use a different UUID to keep this test independent of state from others.
+    // The recap cache is keyed (urlKey, canonicalId) and persists per worker, so
+    // clear this id at the local workspace first to guarantee a missing read
+    // (the route defaults urlKey=test-workspace and 400s without issueId).
+    const MISSING_ID = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeef';
+    await page.request.get(`/test/clear-recap-cache?urlKey=${URL_KEY}&issueId=${MISSING_ID}`);
+    const res = await page.request.get(`/workspace/${URL_KEY}/api/recap/${MISSING_ID}`);
     expect(res.status()).toBe(200);
     const body = await res.json();
     expect(['missing', 'fresh', 'stale']).toContain(body.status);
@@ -56,51 +75,5 @@ test.describe('Recap API', () => {
   test('returns 404 for unknown issue', async ({ page }) => {
     const res = await page.request.get(`/workspace/${URL_KEY}/api/recap/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa`);
     expect(res.status()).toBe(404);
-  });
-});
-
-test.describe('Recap UI — Swipe', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/test/set-session');
-    await page.goto(`/workspace/${URL_KEY}/swipe`);
-    await page.waitForLoadState('networkidle');
-  });
-
-  test('swipe card renders recap accordion', async ({ page }) => {
-    const recapAccordion = page.locator('.swipe-accordion-header[data-accordion="recap"]').first();
-    await expect(recapAccordion).toBeVisible();
-    await expect(recapAccordion).toContainText(/Recap/i);
-  });
-
-  test('opening recap accordion initialises the section', async ({ page }) => {
-    const recapAccordion = page.locator('.swipe-accordion-header[data-accordion="recap"]').first();
-    await recapAccordion.click();
-
-    const body = page.locator('.swipe-accordion-body[data-accordion-body="recap"]').first();
-    await expect(body).toHaveClass(/open/);
-
-    // The shared renderer attaches data-state attribute
-    const section = body.locator('.recap-section').first();
-    await expect(section).toHaveAttribute('data-state', /missing|fresh|stale|generating|loading/);
-  });
-
-  test('refresh button triggers POST and shows fresh content', async ({ page }) => {
-    const recapAccordion = page.locator('.swipe-accordion-header[data-accordion="recap"]').first();
-    await recapAccordion.click();
-
-    const section = page.locator('.swipe-accordion-body[data-accordion-body="recap"] .recap-section').first();
-    // Wait for the initial GET to resolve
-    await expect(section).not.toHaveAttribute('data-state', 'loading', { timeout: 5000 });
-
-    const refreshBtn = section.locator('[data-recap-refresh]');
-    await expect(refreshBtn).toBeVisible();
-    await refreshBtn.click();
-
-    // Should land on fresh with recap content
-    await expect(section).toHaveAttribute('data-state', 'fresh', { timeout: 5000 });
-    // Fresh content renders at least one item or an empty placeholder
-    const hasList = await section.locator('.recap-list').count();
-    const hasEmpty = await section.locator('.recap-empty').count();
-    expect(hasList + hasEmpty).toBeGreaterThan(0);
   });
 });

@@ -446,3 +446,56 @@ test.describe('Swipe Dispatched Sessions', () => {
     await expect(sessionsAccordion(page)).toHaveCount(0);
   });
 });
+
+// ============================================================================
+// Recap accordion on the swipe card.
+// Relocated unchanged from recap.spec.js (LIN-403): this exercises the swipe
+// surface, which is NOT yet migrated to the local provider, so it stays on the
+// test-token (`/test/set-session`) path here rather than being rewritten.
+// ============================================================================
+
+test.describe('Recap UI — Swipe', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/test/set-session');
+    await page.goto(SWIPE_URL);
+    await page.waitForLoadState('networkidle');
+  });
+
+  test('swipe card renders recap accordion', async ({ page }) => {
+    const recapAccordion = page.locator('.swipe-accordion-header[data-accordion="recap"]').first();
+    await expect(recapAccordion).toBeVisible();
+    await expect(recapAccordion).toContainText(/Recap/i);
+  });
+
+  test('opening recap accordion initialises the section', async ({ page }) => {
+    const recapAccordion = page.locator('.swipe-accordion-header[data-accordion="recap"]').first();
+    await recapAccordion.click();
+
+    const body = page.locator('.swipe-accordion-body[data-accordion-body="recap"]').first();
+    await expect(body).toHaveClass(/open/);
+
+    // The shared renderer attaches data-state attribute
+    const section = body.locator('.recap-section').first();
+    await expect(section).toHaveAttribute('data-state', /missing|fresh|stale|generating|loading/);
+  });
+
+  test('refresh button triggers POST and shows fresh content', async ({ page }) => {
+    const recapAccordion = page.locator('.swipe-accordion-header[data-accordion="recap"]').first();
+    await recapAccordion.click();
+
+    const section = page.locator('.swipe-accordion-body[data-accordion-body="recap"] .recap-section').first();
+    // Wait for the initial GET to resolve
+    await expect(section).not.toHaveAttribute('data-state', 'loading', { timeout: 5000 });
+
+    const refreshBtn = section.locator('[data-recap-refresh]');
+    await expect(refreshBtn).toBeVisible();
+    await refreshBtn.click();
+
+    // Should land on fresh with recap content
+    await expect(section).toHaveAttribute('data-state', 'fresh', { timeout: 5000 });
+    // Fresh content renders at least one item or an empty placeholder
+    const hasList = await section.locator('.recap-list').count();
+    const hasEmpty = await section.locator('.recap-empty').count();
+    expect(hasList + hasEmpty).toBeGreaterThan(0);
+  });
+});
