@@ -2375,8 +2375,19 @@ ${goal}`
     return { ok: true, text, finishReason: 'stop' };
   }
 
+  // Gates the roadmap generate endpoint's mocks (the testMockData data branch at
+  // the fetch, the per-layer emitMockLayer AI mock, and the orientation
+  // short-circuit / __testOrientationRaw seam). LIN-409 widened this from the old
+  // `test-token`-only predicate onto the shared `shouldMockAi` superset so a
+  // GENUINE `provider: 'local'` session also reaches the AI mock — CI has no
+  // OpenRouter key, so a migrated local roadmap spec still needs it to fire.
+  // resolveRoadmapLLM runs BEFORE this and 503s on a missing apiKey, so the
+  // test-token 503 cases (no openRouterConnected) never reach here; the migrated
+  // happy paths provision openRouterConnected and do. The data branch reading
+  // testMockData for local sessions is harmless — workspaceApiLocalSeed is the
+  // same fixture byte-for-byte — and orphans no new deletion site beyond LIN-413.
   function isRoadmapTestMode(req) {
-    return process.env.NODE_ENV === 'test' && req.workspace && req.workspace.accessToken === 'test-token';
+    return shouldMockAi(req.workspace);
   }
 
   // --- Orientation (LIN-300) ------------------------------------------------
