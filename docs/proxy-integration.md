@@ -90,6 +90,15 @@ Authorization: Bearer YOUR_TOKEN
 
 ## Consumer API Endpoints
 
+### Response Shapes
+
+One convention across every endpoint, so a consumer can branch on the same fields everywhere:
+
+- **Success is the HTTP status.** Any `2xx` is success; any non-`2xx` is failure. There is no partial state — a write never returns `2xx` with a falsy `success`.
+- **Reads** return the data directly: a single resource *is* the object (`GET /me`, `GET /issues/{id}`, `GET /cycle/{id}`); a collection comes under a named key (`{ "issues": [...] }`, `{ "teams": [...] }`).
+- **Writes** return `{ "success": true, ... }`. Linear writes nest the affected entity under a named key (`{ "success": true, "issue": {...} }`); other writes (dispatch, token) carry their fields alongside `"success": true`. A write that does not land is a non-`2xx` (typically `502`), never a `2xx`.
+- **Errors** are always `{ "error": "<message>", "detail"?: "<upstream detail>" }` with a non-`2xx` status. `detail` carries the Linear or AI upstream's own message when there is one.
+
 ### Read Endpoints
 
 #### Get Instructions
@@ -645,7 +654,7 @@ The body embeds `YOUR_TOKEN` as a placeholder; substitute the consumer's `readWr
 
 All write endpoints require a `readWrite` scoped token. Read-only tokens receive `403`.
 
-Success responses wrap the affected entity (e.g. `{ "success": true, "issue": {...} }`) — read the documented shape rather than assuming the entity comes back top-level. **The response is authoritative:** a `2xx` with `"success": true` means the write landed; a non-`2xx` (or `"success": false`) means it did not. Creates are non-idempotent, so do **not** blind-retry a create on a lost/empty response — re-read (search or GET the issue) to confirm before retrying. As an extra guard, identical **comment** creates are deduped server-side within a short window: a repeat of the same `(issue + body)` returns the original comment with `"deduped": true` and HTTP `200` (not `201`) instead of minting a duplicate, so a confirming retry of the same body is safe.
+Success responses wrap the affected entity (e.g. `{ "success": true, "issue": {...} }`) — read the documented shape rather than assuming the entity comes back top-level. **The response is authoritative:** a `2xx` with `"success": true` means the write landed; a non-`2xx` (the write is rejected with `502`, never returned as a `2xx` with a falsy `success`) means it did not. Creates are non-idempotent, so do **not** blind-retry a create on a lost/empty response — re-read (search or GET the issue) to confirm before retrying. As an extra guard, identical **comment** creates are deduped server-side within a short window: a repeat of the same `(issue + body)` returns the original comment with `"deduped": true` and HTTP `200` (not `201`) instead of minting a duplicate, so a confirming retry of the same body is safe.
 
 #### Create Issue
 
