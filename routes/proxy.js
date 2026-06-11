@@ -33,6 +33,7 @@ import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT } from '
 import { buildAutopilotManual } from '../lib/prompts/autopilot-manual.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
 import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
+import { appendBlock, replace as replaceInDescription, DescriptionEditError } from '../lib/description-edit.js';
 
 // Lazy-load test fixtures only in test mode to avoid production dependency on test files
 let testMockData = null;
@@ -771,6 +772,17 @@ const UPDATE_ISSUE_MUTATION = gql`
   }
 `;
 
+// Lightweight read for description edits — the full ISSUE_DETAIL_QUERY is far
+// heavier than a read-modify-write of the body needs.
+const ISSUE_DESCRIPTION_QUERY = gql`
+  query($id: String!) {
+    issue(id: $id) {
+      id
+      description
+    }
+  }
+`;
+
 const CREATE_COMMENT_MUTATION = gql`
   mutation($input: CommentCreateInput!) {
     commentCreate(input: $input) {
@@ -1273,6 +1285,17 @@ PATCH ${baseUrl}/api/proxy/issues/{issueId}
   Body: { "title": "...", "description": "...", "stateId": "...", "assigneeId": "...", "priority": 0-4, "cycleId": "...", "parentId": "...|null" }
   → Update an existing issue; set cycleId to assign/move to a cycle; set parentId to a UUID to re-parent, or null to promote to top-level
   → { "success": true, "issue": { "id": "...", "identifier": "LIN-123", "title": "...", "url": "...", "state": { "name": "In Progress", "type": "started" } } }
+  → Passing "description" here REPLACES the whole body. For anything other than a deliberate full rewrite, prefer the two splice endpoints below — they let you supply only the new content, so you never re-emit (and risk corrupting) the existing body.
+
+POST ${baseUrl}/api/proxy/issues/{issueId}/description/append
+  Body: { "block": "..." }
+  → Append a block to the END of the description. The existing body is preserved byte-for-byte; "block" is added after a blank line. Use this to add findings, notes, or a new section. Returns the same { "success": true, "issue": {...} } shape as PATCH.
+
+POST ${baseUrl}/api/proxy/issues/{issueId}/description/replace
+  Body: { "oldString": "...", "newString": "..." }
+  → Replace ONE occurrence of "oldString" with "newString" in the description (surgical edit). Same old_string/new_string semantics as a code editor: quote a span you copied from GET /issue/{id}. Matching is normalised — Linear stores markdown punctuation backslash-escaped (e.g. \\#\\#, \\*\\*), so quoting either the escaped bytes or the rendered text works.
+  → Fails LOUD, never a silent no-op: 422 { "code": "NOT_FOUND" } if the span is absent, 422 { "code": "NOT_UNIQUE", "matchCount": N } if it appears more than once (quote a longer, unique span). On NOT_FOUND, re-read the description; to swap many occurrences at once, rewrite the whole body via PATCH instead.
+  → Returns { "success": true, "issue": {...} }.
 
 POST ${baseUrl}/api/proxy/issues/{issueId}/comments
   Body: { "body": "..." }
@@ -1904,6 +1927,116 @@ One convention across every endpoint, so you can branch on the same fields every
       console.error('Proxy update issue error:', err.message);
       res.status(status).json({ error: 'Failed to update issue', detail: graphqlErrorDetail(err) });
     }
+  });
+
+  /**
+   * Shared read-modify-write for the description edit endpoints. Reads the live
+   * body, lets `merge(current)` produce the new body, validates it, and writes.
+   * The agent never re-emits the original, so the LIN-398 corruption class cannot
+   * recur. `merge` may throw DescriptionEditError for a loud 422.
+   */
+  async function applyDescriptionEdit(req, res, endpoint, merge) {
+    const client = await getClient(req.proxyUrlKey);
+    if (!client) {
+      logEvent(req, endpoint, 503);
+      return res.status(503).json({ error: 'Workspace not available' });
+    }
+
+    const { issueId } = req.params;
+    if (!isValidIssueId(issueId)) {
+      logEvent(req, endpoint, 400);
+      return res.status(400).json({ error: 'Invalid issue ID format' });
+    }
+
+    let newDescription;
+    try {
+      const data = await client.request(ISSUE_DESCRIPTION_QUERY, { id: issueId });
+      if (!data.issue) {
+        logEvent(req, endpoint, 404);
+        return res.status(404).json({ error: 'Issue not found' });
+      }
+      newDescription = merge(data.issue.description || '');
+    } catch (err) {
+      if (err instanceof DescriptionEditError) {
+        logEvent(req, endpoint, 422);
+        return res.status(422).json({ error: err.message, code: err.code, matchCount: err.matchCount });
+      }
+      const status = graphqlErrorStatus(err);
+      logEvent(req, endpoint, status);
+      console.error('Proxy description edit (read) error:', err.message);
+      return res.status(status).json({ error: 'Failed to read issue description', detail: graphqlErrorDetail(err) });
+    }
+
+    if (newDescription.length > MAX_DESCRIPTION_LENGTH) {
+      logEvent(req, endpoint, 400);
+      return res.status(400).json({ error: 'resulting description exceeds maximum length' });
+    }
+    if (DANGEROUS_CHARS_REGEX.test(newDescription)) {
+      logEvent(req, endpoint, 400);
+      return res.status(400).json({ error: 'resulting description contains invalid characters' });
+    }
+
+    try {
+      const data = await client.request(UPDATE_ISSUE_MUTATION, { id: issueId, input: { description: newDescription } });
+      logEvent(req, endpoint, 200);
+      res.json(data.issueUpdate);
+    } catch (err) {
+      const status = graphqlErrorStatus(err);
+      logEvent(req, endpoint, status);
+      console.error('Proxy description edit (write) error:', err.message);
+      res.status(status).json({ error: 'Failed to update description', detail: graphqlErrorDetail(err) });
+    }
+  }
+
+  /**
+   * POST /api/proxy/issues/:issueId/description/append
+   * Append a block to the end of an issue's description. The agent supplies only
+   * the new content; the existing body is preserved byte-for-byte.
+   */
+  router.post('/api/proxy/issues/:issueId/description/append', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
+    const endpoint = '/api/proxy/issues/:id/description/append';
+    const { block } = req.body;
+    if (!block || typeof block !== 'string') {
+      logEvent(req, endpoint, 400);
+      return res.status(400).json({ error: 'block is required' });
+    }
+    if (block.length > MAX_DESCRIPTION_LENGTH) {
+      logEvent(req, endpoint, 400);
+      return res.status(400).json({ error: 'block exceeds maximum length' });
+    }
+    if (DANGEROUS_CHARS_REGEX.test(block)) {
+      logEvent(req, endpoint, 400);
+      return res.status(400).json({ error: 'block contains invalid characters' });
+    }
+    return applyDescriptionEdit(req, res, endpoint, (current) => appendBlock(current, block));
+  });
+
+  /**
+   * POST /api/proxy/issues/:issueId/description/replace
+   * Replace a single, uniquely-matched span in an issue's description. Matching is
+   * normalised (backslash-unescaped) on both sides and fails loud (422) when the
+   * span is missing or ambiguous. Full rewrites stay on PATCH .../issues/:id.
+   */
+  router.post('/api/proxy/issues/:issueId/description/replace', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
+    const endpoint = '/api/proxy/issues/:id/description/replace';
+    const { oldString, newString } = req.body;
+    if (!oldString || typeof oldString !== 'string') {
+      logEvent(req, endpoint, 400);
+      return res.status(400).json({ error: 'oldString is required' });
+    }
+    if (typeof newString !== 'string') {
+      logEvent(req, endpoint, 400);
+      return res.status(400).json({ error: 'newString is required' });
+    }
+    if (newString.length > MAX_DESCRIPTION_LENGTH) {
+      logEvent(req, endpoint, 400);
+      return res.status(400).json({ error: 'newString exceeds maximum length' });
+    }
+    if (DANGEROUS_CHARS_REGEX.test(newString)) {
+      logEvent(req, endpoint, 400);
+      return res.status(400).json({ error: 'newString contains invalid characters' });
+    }
+    return applyDescriptionEdit(req, res, endpoint, (current) => replaceInDescription(current, oldString, newString));
   });
 
   /**

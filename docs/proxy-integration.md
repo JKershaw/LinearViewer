@@ -741,6 +741,59 @@ Response:
 }
 ```
 
+> **Editing the description?** Passing `description` here **replaces the whole
+> body**. For anything other than a deliberate full rewrite, prefer the two
+> splice endpoints below: you supply only the new content and the server reads
+> the live body and merges it, so you never re-emit (and risk corrupting) the
+> existing description.
+
+#### Append to Description
+
+```
+POST /api/proxy/issues/{issueId}/description/append
+Content-Type: application/json
+
+{ "block": "## Findings\n\nRoot cause identified in `auth.js`." }
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `block` | string | Yes | Markdown to append to the end (max 100K chars) |
+
+The existing body is preserved byte-for-byte; `block` is added after a blank-line
+separator (or becomes the whole body if the description was empty). Use this to
+add findings, notes, or a new section. Returns the same `{ "success": true,
+"issue": {...} }` shape as Update Issue.
+
+#### Replace in Description
+
+```
+POST /api/proxy/issues/{issueId}/description/replace
+Content-Type: application/json
+
+{ "oldString": "status: pending", "newString": "status: complete" }
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `oldString` | string | Yes | Span to locate — quote it from `GET /issue/{id}` |
+| `newString` | string | Yes | Replacement (may be empty to delete the span) |
+
+Surgical, single-occurrence edit with the same `old_string`/`new_string`
+semantics as a code editor. Matching is **normalised**: Linear stores markdown
+punctuation backslash-escaped (e.g. `\#\#`, `\*\*`), so quoting either the
+escaped bytes returned by GET or the rendered text both work.
+
+It **fails loud — never a silent no-op**:
+
+| Status | `code` | Meaning |
+|--------|--------|---------|
+| `422` | `NOT_FOUND` | `oldString` didn't match — re-read the description and quote an exact span |
+| `422` | `NOT_UNIQUE` | matched `matchCount` places — quote a longer, unique span |
+
+To swap *every* occurrence of a string at once, rewrite the whole body via
+`PATCH` instead. On success, returns `{ "success": true, "issue": {...} }`.
+
 #### Add Comment
 
 ```
