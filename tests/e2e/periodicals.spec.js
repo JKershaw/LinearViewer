@@ -1,4 +1,9 @@
 import { test, expect } from '../fixtures/test-base.js';
+import {
+  seedLocalWorkspace,
+  workspaceApiLocalSeed,
+  LOCAL_WORKSPACE_URL_KEY,
+} from '../fixtures/local-harness.js';
 
 // Periodicals feature (LIN-341): a synthetic, workspace-flag-gated group on the
 // main workspace view containing the periodical template rows. The LIN-354 set
@@ -7,17 +12,31 @@ import { test, expect } from '../fixtures/test-base.js';
 // Documentation Review row and never asserts a total row count, so it is
 // agnostic to the rest of the registry.
 
-const TEST_WORKSPACE_URL_KEY = 'test-workspace';
+// Local-provider workspace seeded via /test/set-local-session (LIN-410). The
+// Periodicals group is injected in buildDashboardData purely from the
+// workspace-scoped `periodicals` flag, independent of which provider supplies
+// the real issues/projects — so the local provider fully backs this surface.
+const TEST_WORKSPACE_URL_KEY = LOCAL_WORKSPACE_URL_KEY;
 const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;
 
+// The `periodicals` flag is WORKSPACE-scoped (read from workspacePreferencesStore
+// by urlKey), NOT a session feature — so it must be set through the
+// workspace-feature route targeting THIS workspace's partition, not via
+// seedLocalWorkspace's session `features`. The urlKey must be threaded on both
+// set and reset, or the flag lands on (or leaks into) the wrong partition.
 async function setPeriodicalsFlag(page, enabled) {
-  const res = await page.goto(`/test/set-workspace-feature?key=periodicals&value=${enabled}`);
+  const res = await page.goto(
+    `/test/set-workspace-feature?key=periodicals&value=${enabled}&urlKey=${TEST_WORKSPACE_URL_KEY}`
+  );
   expect(res.ok()).toBeTruthy();
 }
 
 test.describe('Periodicals group', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/test/set-session');
+    await seedLocalWorkspace(page, workspaceApiLocalSeed);
+    // Isolate the dispatch queue so the queue-the-periodical test stays
+    // deterministic against other specs sharing the local-workspace partition.
+    await page.request.get(`/test/clear-dispatch-queue?urlKey=${TEST_WORKSPACE_URL_KEY}`);
   });
 
   test.afterEach(async ({ page }) => {
