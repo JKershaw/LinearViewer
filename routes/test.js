@@ -429,6 +429,18 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       req.session.activeWorkspaceId = LOCAL_WS_UUID;
       req.session.linearUserId = 'test-local-user-id';
 
+      // Optionally provision a mock OpenRouter key, mirroring /test/set-session
+      // (L93-97). Honored from query (GET) or body (POST). Superset/no-op by
+      // default: absent → delete, so existing local specs are unchanged. This is
+      // how a local session can clear resolveRoadmapLLM's apiKey 503 gate without
+      // exempting the gate itself.
+      const openRouterConnected = req.query.openRouterConnected || (req.body && req.body.openRouterConnected);
+      if (openRouterConnected) {
+        req.session.openRouterApiKey = 'test-openrouter-key';
+      } else {
+        delete req.session.openRouterApiKey;
+      }
+
       req.session.save(() => res.json({ ok: true, urlKey: LOCAL_WS_URL_KEY }));
     } catch (err) {
       res.status(500).json({ error: err.message });

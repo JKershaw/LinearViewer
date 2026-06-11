@@ -140,6 +140,17 @@ export const swimLocalSeed = localSeedFromLinearFixture({
  */
 export const pipelineLocalSeed = localSeedFromLinearFixture(testMockData);
 
+/**
+ * Same-identity alias of `pipelineLocalSeed` for the workspace-api migration
+ * cluster (LIN-402, parent LIN-388). The cluster (LIN-403..413) imports this
+ * semantically-named seed rather than `pipelineLocalSeed` directly, so its seed
+ * source can later evolve in ONE place. Today it MUST NOT diverge — aliasing the
+ * object (not re-deriving via `localSeedFromLinearFixture`) makes divergence
+ * structurally impossible and guarantees migrated specs reproduce the pipeline
+ * fixture's data byte-for-byte.
+ */
+export const workspaceApiLocalSeed = pipelineLocalSeed;
+
 // ---------------------------------------------------------------------------
 // Unit-side helpers — in-memory collection + LocalStore (no server/session).
 // ---------------------------------------------------------------------------
@@ -173,11 +184,16 @@ export function createLocalProvider() {
  *
  * @param {import('@playwright/test').Page} page
  * @param {{projects?: Array, issues?: Array}} [seed] - defaults to defaultLocalSeed
- * @param {{features?: Object}} [options] - session feature flags (whitelist-validated server-side)
+ * @param {{features?: Object, openRouterConnected?: boolean}} [options] - session
+ *   feature flags (whitelist-validated server-side) and, when truthy,
+ *   `openRouterConnected` to provision a mock OpenRouter key on the local session
+ *   (so e.g. roadmap specs reach the AI mock instead of resolveRoadmapLLM's 503).
  * @returns {Promise<{urlKey: string, dashboard: string}>}
  */
-export async function seedLocalWorkspace(page, seed = defaultLocalSeed, { features } = {}) {
-  const data = features ? { ...seed, features } : seed;
+export async function seedLocalWorkspace(page, seed = defaultLocalSeed, { features, openRouterConnected } = {}) {
+  const data = { ...seed };
+  if (features) data.features = features;
+  if (openRouterConnected) data.openRouterConnected = openRouterConnected;
   const resp = await page.request.post('/test/set-local-session', { data });
   if (!resp.ok()) {
     throw new Error(`seedLocalWorkspace failed: ${resp.status()} ${await resp.text()}`);
