@@ -15,7 +15,7 @@ import { renderPipelinePage } from '../lib/render-pipeline.js';
 import { renderErrorPage } from '../lib/render.js';
 import { buildPipelineSnapshot, getTaskForIssue } from '../lib/pipeline-state.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
-import { testMockData } from '../tests/fixtures/mock-data.js';
+import { getProviderForWorkspace } from '../lib/providers/registry.js';
 
 /**
  * @param {Object} deps
@@ -41,20 +41,21 @@ export function createPipelineRoutes({
 
   /**
    * Helper: build the deps object for pipeline-state functions.
+   *
+   * Resolve the workspace's provider so `/pipeline` works for any backend, not
+   * just Linear. Linear/legacy workspaces resolve to the Linear provider, so the
+   * injected `fetchProjects` is byte-equivalent to pipeline-state's default;
+   * local (and future) workspaces fetch from their own provider instead of
+   * hitting the Linear API with a non-Linear token (LIN-387).
    */
-  const isTestMode = process.env.NODE_ENV === 'test';
-
   function stateDeps(workspace) {
-    const deps = {
+    const provider = getProviderForWorkspace(workspace);
+    return {
       getWorkspaceAccessToken,
       dispatchStore: dispatchQueueStore,
-      foremanStore
+      foremanStore,
+      fetchProjects: (token) => provider.fetchProjects(token)
     };
-    // In test mode, inject mock fetchProjects to avoid hitting the Linear API
-    if (isTestMode && workspace?.accessToken === 'test-token') {
-      deps.fetchProjects = async () => testMockData;
-    }
-    return deps;
   }
 
   // ─── HTML page ──────────────────────────────────────────────────────────────

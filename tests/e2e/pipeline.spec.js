@@ -1,14 +1,22 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { seedLocalWorkspace, pipelineLocalSeed, LOCAL_WORKSPACE_URL_KEY } from '../fixtures/local-harness.js';
 
-const TEST_WORKSPACE_URL_KEY = 'test-workspace';
-const PIPELINE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/pipeline`;
-const SETTINGS_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/settings`;
-const API_PREFIX = `/workspace/${TEST_WORKSPACE_URL_KEY}`;
+// LIN-387: this spec rides the local-provider harness (seedLocalWorkspace +
+// pipelineLocalSeed) instead of the deleted `test-token` mock branch. The seed
+// is the SAME testMockData the mock used to return, so identifiers/titles the
+// assertions reference (TEST-1/2/14) are unchanged.
+const PIPELINE_URL = `/workspace/${LOCAL_WORKSPACE_URL_KEY}/pipeline`;
+const SETTINGS_URL = `/workspace/${LOCAL_WORKSPACE_URL_KEY}/settings`;
+const API_PREFIX = `/workspace/${LOCAL_WORKSPACE_URL_KEY}`;
+
+// Seed the local workspace; pipeline flag optional per-test.
+const seedPipeline = (page, features) =>
+  seedLocalWorkspace(page, pipelineLocalSeed, features ? { features } : undefined);
 
 test.describe('Pipeline Page', () => {
   test.describe('Feature Flag Gating', () => {
     test('pipeline page redirects to settings when feature flag is disabled', async ({ page }) => {
-      await page.goto('/test/set-session');
+      await seedPipeline(page);
       await page.goto(PIPELINE_URL);
       await page.waitForLoadState('networkidle');
 
@@ -21,7 +29,7 @@ test.describe('Pipeline Page', () => {
         route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ fetchedAt: new Date().toISOString(), active: [], queue: [], recent: [] }) })
       );
 
-      await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ pipeline: true }))}`);
+      await seedPipeline(page, { pipeline: true });
       await page.goto(PIPELINE_URL);
       await page.waitForLoadState('networkidle');
 
@@ -29,7 +37,7 @@ test.describe('Pipeline Page', () => {
     });
 
     test('pipeline toggle defaults to off in settings', async ({ page }) => {
-      await page.goto('/test/set-session');
+      await seedPipeline(page);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
 
@@ -40,7 +48,7 @@ test.describe('Pipeline Page', () => {
     });
 
     test('pipeline footer link visible when flag is on', async ({ page }) => {
-      await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ pipeline: true }))}`);
+      await seedPipeline(page, { pipeline: true });
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
 
@@ -49,7 +57,7 @@ test.describe('Pipeline Page', () => {
     });
 
     test('pipeline footer link hidden when flag is off', async ({ page }) => {
-      await page.goto('/test/set-session');
+      await seedPipeline(page);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
 
@@ -65,7 +73,7 @@ test.describe('Pipeline Page', () => {
         route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ fetchedAt: new Date().toISOString(), active: [], queue: [], recent: [] }) })
       );
 
-      await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ pipeline: true }))}`);
+      await seedPipeline(page, { pipeline: true });
       await page.goto(PIPELINE_URL);
       await page.waitForLoadState('networkidle');
     });
@@ -128,10 +136,10 @@ test.describe('Pipeline Page', () => {
   test.describe('Pipeline API', () => {
     test.beforeEach(async ({ page }) => {
       // Clear dispatch/foreman state to prevent cross-test contamination
-      await page.goto('/test/clear-dispatch-queue');
-      await page.goto('/test/clear-dispatch-history');
-      await page.goto('/test/clear-foreman-status');
-      await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ pipeline: true }))}`);
+      await page.goto(`/test/clear-dispatch-queue?urlKey=${LOCAL_WORKSPACE_URL_KEY}`);
+      await page.goto(`/test/clear-dispatch-history?urlKey=${LOCAL_WORKSPACE_URL_KEY}`);
+      await page.goto(`/test/clear-foreman-status?urlKey=${LOCAL_WORKSPACE_URL_KEY}`);
+      await seedPipeline(page, { pipeline: true });
     });
 
     test('state endpoint returns JSON snapshot', async ({ page }) => {
@@ -204,7 +212,7 @@ test.describe('Pipeline Page', () => {
 
   test.describe('Client-Side Rendering', () => {
     test('hydrates queue from embedded data', async ({ page }) => {
-      await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ pipeline: true }))}`);
+      await seedPipeline(page, { pipeline: true });
 
       // Let the real page load with mock data (no polling intercept for initial load)
       await page.route('**/api/pipeline/state', route =>
@@ -222,7 +230,7 @@ test.describe('Pipeline Page', () => {
     });
 
     test('queue entries show issue titles', async ({ page }) => {
-      await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ pipeline: true }))}`);
+      await seedPipeline(page, { pipeline: true });
       await page.route('**/api/pipeline/state', route =>
         route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ fetchedAt: new Date().toISOString(), active: [], queue: [], recent: [] }) })
       );
@@ -237,7 +245,7 @@ test.describe('Pipeline Page', () => {
     });
 
     test('empty states shown when no data', async ({ page }) => {
-      await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ pipeline: true }))}`);
+      await seedPipeline(page, { pipeline: true });
 
       // Intercept the initial page load to inject empty data
       await page.route('**/api/pipeline/state', route =>
@@ -262,7 +270,7 @@ test.describe('Pipeline Page', () => {
 
   test.describe('Overlay', () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ pipeline: true }))}`);
+      await seedPipeline(page, { pipeline: true });
       await page.route('**/api/pipeline/state', route =>
         route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ fetchedAt: new Date().toISOString(), active: [], queue: [], recent: [] }) })
       );
@@ -404,7 +412,7 @@ test.describe('Pipeline Page', () => {
     }
 
     test.beforeEach(async ({ page }) => {
-      await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ pipeline: true }))}`);
+      await seedPipeline(page, { pipeline: true });
       await page.route('**/api/pipeline/state', route =>
         route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ fetchedAt: new Date().toISOString(), active: [], queue: [], recent: [] }) })
       );
@@ -478,7 +486,7 @@ test.describe('Pipeline Page', () => {
 
   test.describe('Accessibility', () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ pipeline: true }))}`);
+      await seedPipeline(page, { pipeline: true });
       await page.route('**/api/pipeline/state', route =>
         route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ fetchedAt: new Date().toISOString(), active: [], queue: [], recent: [] }) })
       );
