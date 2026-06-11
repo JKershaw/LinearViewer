@@ -51,6 +51,31 @@ import { isTerminalState } from '../lib/tree.js';
 import { testMockTeams, testMockData } from '../tests/fixtures/mock-data.js';
 
 /**
+ * Whether the AI layer should be mocked for this request (LIN-388).
+ *
+ * The AI surfaces (recap/brief/recommend/prompt) historically gated their mock
+ * on `NODE_ENV==='test' && accessToken==='test-token'`, which conflated TWO
+ * mocks: the Linear DATA mock (testMockData) and the OpenRouter AI mock. The
+ * provider seam already serves the data layer, so the migration splits the gate:
+ * data stays on the narrow `test-token` check (the local provider serves it
+ * otherwise), while the AI mock is re-gated here onto BOTH test-token and
+ * local-provider sessions. CI has no OpenRouter key, so a migrated local spec
+ * still needs the server's deterministic mock to fire.
+ *
+ * This stays a SUPERSET of the old `test-token` predicate, so legacy specs are
+ * unaffected. It deliberately does NOT widen to all test sessions — the 503
+ * "AI not configured" tests run on `test-token` with the AI mock active; an
+ * unconfigured non-local session must still 503.
+ *
+ * @param {Object} workspace - req.workspace (carries provider + accessToken)
+ * @returns {boolean}
+ */
+function shouldMockAi(workspace) {
+  return process.env.NODE_ENV === 'test' &&
+    (workspace?.accessToken === 'test-token' || workspace?.provider === 'local');
+}
+
+/**
  * Send a generated prompt as JSON (default) or as a downloadable markdown
  * file when `?format=md` is set. The markdown branch serves the bare prompt
  * string with attachment headers (Content-Disposition); the in-app `+proxy`
@@ -1400,16 +1425,21 @@ ${goal}`;
       return res.status(503).json({ error: 'Recap cache not configured' });
     }
 
+    // `isTestMode` (test-token) gates the DATA mock; `mockAi` additionally fires
+    // the AI mock for local-provider sessions, whose data comes from the
+    // provider (LIN-388). The AI-config + free-tier guards key off `mockAi` so a
+    // migrated local session isn't 503'd for lacking an OpenRouter key.
     const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
+    const mockAi = shouldMockAi(workspace);
     const sessionApiKey = req.session.openRouterApiKey;
     const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
     const isFreeTier = !sessionApiKey && !process.env.OPENROUTER_API_KEY && !!freeTierKey;
 
-    if (!isTestMode && !isRecommendationEnabled(sessionApiKey) && !freeTierKey) {
+    if (!mockAi && !isRecommendationEnabled(sessionApiKey) && !freeTierKey) {
       return res.status(503).json({ error: 'AI recap is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.' });
     }
 
-    if (!isTestMode && isFreeTier) {
+    if (!mockAi && isFreeTier) {
       const check = await freeTierStore.tryUse(workspace.urlKey);
       if (!check.allowed) {
         return res.status(429).json({
@@ -1444,7 +1474,7 @@ ${goal}`;
 
       let recap;
       let modelUsed;
-      if (isTestMode) {
+      if (mockAi) {
         const mocked = buildMockRecap(context);
         recap = mocked;
         modelUsed = selectedModel;
@@ -1570,16 +1600,19 @@ ${goal}`;
       return res.status(503).json({ error: 'Brief cache not configured' });
     }
 
+    // See the recap POST note: `isTestMode` gates the DATA mock, `mockAi` the AI
+    // mock (incl. local-provider sessions) and the AI-config/free-tier guards.
     const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
+    const mockAi = shouldMockAi(workspace);
     const sessionApiKey = req.session.openRouterApiKey;
     const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
     const isFreeTier = !sessionApiKey && !process.env.OPENROUTER_API_KEY && !!freeTierKey;
 
-    if (!isTestMode && !isRecommendationEnabled(sessionApiKey) && !freeTierKey) {
+    if (!mockAi && !isRecommendationEnabled(sessionApiKey) && !freeTierKey) {
       return res.status(503).json({ error: 'AI brief is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.' });
     }
 
-    if (!isTestMode && isFreeTier) {
+    if (!mockAi && isFreeTier) {
       const check = await freeTierStore.tryUse(workspace.urlKey);
       if (!check.allowed) {
         return res.status(429).json({
@@ -1614,7 +1647,7 @@ ${goal}`;
 
       let brief;
       let modelUsed;
-      if (isTestMode) {
+      if (mockAi) {
         brief = buildMockBrief(context);
         modelUsed = selectedModel;
       } else {
@@ -1658,11 +1691,24 @@ ${goal}`;
     }
   });
 
+  /**
+   * Issue labels as a flat name[] for the deterministic mocks (LIN-388).
+   * Tolerant of BOTH context shapes: the test-token mock context
+   * (buildMockRecapContext) supplies `labels` as a plain array, while the
+   * provider's canonical context supplies `{ nodes: [{ name }] }`. Normalizing
+   * here lets the same mock builder serve a local-provider session unchanged.
+   */
+  function mockContextLabels(issue) {
+    const raw = issue?.labels;
+    if (Array.isArray(raw)) return raw;
+    return (raw?.nodes || []).map(l => l.name);
+  }
+
   /** Build a small deterministic brief (Markdown) for test mode. */
   function buildMockBrief(context) {
     const issue = context.issue || {};
     const remaining = (context.children || []).filter(c => !isTerminalState(c.state?.type));
-    const labels = issue.labels || [];
+    const labels = mockContextLabels(issue);
 
     const lines = [];
     lines.push('## Current');
@@ -1735,7 +1781,7 @@ ${goal}`;
 
   /** Build a small deterministic recap for test mode. */
   function buildMockRecap(context) {
-    const labels = context.issue?.labels || [];
+    const labels = mockContextLabels(context.issue);
     const done = [];
     const pending = [];
     const deviations = [];

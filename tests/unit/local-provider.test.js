@@ -127,6 +127,34 @@ describe('LocalProvider reads', () => {
     await assert.rejects(() => provider.fetchIssueContext(SCOPE, 'nope'), /Issue not found/);
   });
 
+  // LIN-388: the recap/brief/recommend/prompt surfaces call
+  // provider.fetchRecommendationContext (not fetchIssueContext). The local
+  // provider must implement it so a `provider: 'local'` session can drive them.
+  test('fetchRecommendationContext attaches focusedChild for a parent', async () => {
+    const ctx = await provider.fetchRecommendationContext(SCOPE, 'i1');
+    assert.equal(ctx.issue.identifier, 'LOCAL-1');
+    assert.equal(ctx.children.length, 1);
+    // selectFocusSubtask picks the only non-terminal child (LOCAL-2, unstarted).
+    assert.equal(ctx.focusedChild.issue.identifier, 'LOCAL-2');
+  });
+
+  test('fetchRecommendationContext returns a leaf task as-is (no focusedChild)', async () => {
+    const ctx = await provider.fetchRecommendationContext(SCOPE, 'i2');
+    assert.equal(ctx.issue.identifier, 'LOCAL-2');
+    assert.equal(ctx.children.length, 0);
+    assert.equal(ctx.focusedChild, undefined);
+  });
+
+  test('fetchRecommendationContext honors noDescend (frames parent as a leaf)', async () => {
+    const ctx = await provider.fetchRecommendationContext(SCOPE, 'i1', { noDescend: true });
+    assert.equal(ctx.issue.identifier, 'LOCAL-1');
+    assert.equal(ctx.focusedChild, undefined);
+  });
+
+  test('fetchRecommendationContext throws for a missing issue', async () => {
+    await assert.rejects(() => provider.fetchRecommendationContext(SCOPE, 'nope'), /Issue not found/);
+  });
+
   test('search / states / labels', async () => {
     assert.equal((await provider.search(SCOPE, 'parent')).length, 1);
     const states = await provider.states(SCOPE);
