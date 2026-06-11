@@ -9,11 +9,17 @@
  * accessibility with empty data).
  */
 import { test, expect } from '../fixtures/test-base.js';
+import { seedLocalWorkspace, pipelineLocalSeed, LOCAL_WORKSPACE_URL_KEY } from '../fixtures/local-harness.js';
 
-const WS = 'test-workspace';
+// LIN-387: real dispatch→take→foreman flow runs against the local-provider
+// workspace. Tokens/clears are scoped to LOCAL_WORKSPACE_URL_KEY via the
+// shared harness's `?urlKey=` param; the seed reuses testMockData so the
+// asserted identifiers/titles (TEST-14 'Add pagination to user list', TEST-15)
+// are unchanged.
+const WS = LOCAL_WORKSPACE_URL_KEY;
 const PIPELINE_URL = `/workspace/${WS}/pipeline`;
 const API = `/workspace/${WS}`;
-const FEATURES = JSON.stringify({ pipeline: true, dispatch: true, proxy: true });
+const FEATURES = { pipeline: true, dispatch: true, proxy: true };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -21,28 +27,30 @@ const FEATURES = JSON.stringify({ pipeline: true, dispatch: true, proxy: true })
  * Clear all dispatch/foreman state and set session with required features.
  */
 async function setupCleanSession(page) {
-  await page.goto('/test/clear-dispatch-queue');
-  await page.goto('/test/clear-dispatch-history');
-  await page.goto('/test/clear-dispatch-tokens');
-  await page.goto('/test/clear-proxy-tokens');
-  await page.goto('/test/clear-foreman-status');
-  await page.goto(`/test/set-session?features=${encodeURIComponent(FEATURES)}`);
+  await page.goto(`/test/clear-dispatch-queue?urlKey=${WS}`);
+  await page.goto(`/test/clear-dispatch-history?urlKey=${WS}`);
+  await page.goto(`/test/clear-dispatch-tokens?urlKey=${WS}`);
+  await page.goto(`/test/clear-proxy-tokens?urlKey=${WS}`);
+  await page.goto(`/test/clear-foreman-status?urlKey=${WS}`);
+  await seedLocalWorkspace(page, pipelineLocalSeed, { features: FEATURES });
 }
 
 /**
- * Create a consumer (dispatch) token. Returns the Bearer token string.
+ * Create a consumer (dispatch) token scoped to the local workspace.
+ * Returns the Bearer token string.
  */
 async function createConsumerToken(page) {
-  const resp = await page.goto('/test/create-dispatch-token');
+  const resp = await page.goto(`/test/create-dispatch-token?urlKey=${WS}`);
   const data = JSON.parse(await resp.text());
   return data.token;
 }
 
 /**
- * Create a readWrite proxy token. Returns the Bearer token string.
+ * Create a readWrite proxy token scoped to the local workspace.
+ * Returns the Bearer token string.
  */
 async function createProxyToken(page) {
-  const resp = await page.goto('/test/create-proxy-token?scope=readWrite');
+  const resp = await page.goto(`/test/create-proxy-token?scope=readWrite&urlKey=${WS}`);
   const data = JSON.parse(await resp.text());
   return data.token;
 }

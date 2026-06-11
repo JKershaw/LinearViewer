@@ -33,6 +33,7 @@ import { LocalStore } from '../../lib/local-store.js';
 import { LocalProvider } from '../../lib/providers/local/index.js';
 import { createMockCollection } from './mock-collection.js';
 import { swimSampleProjects, swimSampleIssues } from './swim-sample-data.js';
+import { testMockData } from './mock-data.js';
 
 /** urlKey of the seeded local workspace; doubles as its store partition key. */
 export const LOCAL_WORKSPACE_URL_KEY = 'local-workspace';
@@ -126,6 +127,18 @@ export const swimLocalSeed = localSeedFromLinearFixture({
   projects: swimSampleProjects,
   issues: swimSampleIssues,
 });
+
+/**
+ * The pipeline mock fixture as a local seed (LIN-387). Reuses the SAME
+ * `testMockData` the old `routes/pipeline.js` mock branch returned, so the
+ * migrated pipeline specs assert on identical data — TEST-1 'Parent task in
+ * progress' (started) parenting TEST-2 (unstarted) → parentChain, the started
+ * leaves TEST-14 'Add pagination to user list' / TEST-15 (In Review), and the
+ * backlog/unstarted queue items (TEST-5/6/13) with priorities. Team is dropped
+ * (local has no teams; pipeline does not filter by team) and URLs rewrite to
+ * local paths (the overlay test asserts link *text*, not href).
+ */
+export const pipelineLocalSeed = localSeedFromLinearFixture(testMockData);
 
 // ---------------------------------------------------------------------------
 // Unit-side helpers — in-memory collection + LocalStore (no server/session).

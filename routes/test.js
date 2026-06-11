@@ -157,12 +157,15 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   })
 
   // Endpoint to create a dispatch token for testing
-  // Optional query parameter: ?label=custom-label (default: 'test-token')
+  // Optional query parameters: ?label=custom-label (default: 'test-token'),
+  //   ?urlKey=<workspace> (default 'test-workspace' for back-compat; LIN-387
+  //   lets the pipeline-scenarios suite scope tokens to 'local-workspace').
   router.get('/test/create-dispatch-token', async (req, res) => {
     try {
+      const urlKey = req.query.urlKey || 'test-workspace'
       const label = req.query.label || 'test-token'
       const { tokenId, token } = await dispatchTokenStore.createToken(
-        'test-workspace',
+        urlKey,
         label
       )
       res.json({ tokenId, token })
@@ -174,7 +177,7 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   // Endpoint to clear dispatch queue for testing
   router.get('/test/clear-dispatch-queue', async (req, res) => {
     try {
-      await dispatchQueueStore.clear('test-workspace')
+      await dispatchQueueStore.clear(req.query.urlKey || 'test-workspace')
       res.send('ok')
     } catch (err) {
       res.status(500).json({ error: err.message })
@@ -184,7 +187,7 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   // Endpoint to clear dispatch tokens for testing
   router.get('/test/clear-dispatch-tokens', async (req, res) => {
     try {
-      await dispatchTokenStore.clear('test-workspace')
+      await dispatchTokenStore.clear(req.query.urlKey || 'test-workspace')
       res.send('ok')
     } catch (err) {
       res.status(500).json({ error: err.message })
@@ -228,7 +231,7 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   // Endpoint to clear dispatch history for testing
   router.get('/test/clear-dispatch-history', async (req, res) => {
     try {
-      await dispatchQueueStore.clearHistory('test-workspace')
+      await dispatchQueueStore.clearHistory(req.query.urlKey || 'test-workspace')
       res.send('ok')
     } catch (err) {
       res.status(500).json({ error: err.message })
@@ -236,11 +239,13 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   })
 
   // Endpoint to create a proxy token for testing
+  // Optional ?urlKey=<workspace> (default 'test-workspace' for back-compat).
   router.get('/test/create-proxy-token', async (req, res) => {
     try {
+      const urlKey = req.query.urlKey || 'test-workspace'
       const label = req.query.label || 'test-proxy-token'
       const scope = req.query.scope || 'read'
-      const result = await proxyTokenStore.createToken('test-workspace', {
+      const result = await proxyTokenStore.createToken(urlKey, {
         label,
         scope,
         singleUse: req.query.singleUse === 'true'
@@ -254,7 +259,7 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   // Endpoint to clear proxy tokens for testing
   router.get('/test/clear-proxy-tokens', async (req, res) => {
     try {
-      await proxyTokenStore.clear('test-workspace')
+      await proxyTokenStore.clear(req.query.urlKey || 'test-workspace')
       res.send('ok')
     } catch (err) {
       res.status(500).json({ error: err.message })
@@ -264,7 +269,7 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   // Endpoint to clear proxy events for testing
   router.get('/test/clear-proxy-events', async (req, res) => {
     try {
-      await proxyEventStore.clear('test-workspace')
+      await proxyEventStore.clear(req.query.urlKey || 'test-workspace')
       res.send('ok')
     } catch (err) {
       res.status(500).json({ error: err.message })
@@ -274,7 +279,7 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   // Endpoint to clear foreman status for testing
   router.get('/test/clear-foreman-status', async (req, res) => {
     try {
-      await foremanStore.clear('test-workspace')
+      await foremanStore.clear(req.query.urlKey || 'test-workspace')
       res.send('ok')
     } catch (err) {
       res.status(500).json({ error: err.message })
