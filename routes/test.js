@@ -221,9 +221,13 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   });
 
   // Endpoint to clear custom prompts for testing
+  // Optional ?urlKey=<workspace> (default 'test-workspace' for back-compat).
+  // The store is partitioned by workspace urlKey and /api/prompts/custom
+  // reads/writes the ACTIVE workspace, so local-session specs must pass
+  // ?urlKey=local-workspace to clear the partition they actually use.
   router.get('/test/clear-custom-prompts', async (req, res) => {
     try {
-      await customPromptsStore.deleteAll('test-workspace');
+      await customPromptsStore.deleteAll(req.query.urlKey || 'test-workspace');
       res.send('ok');
     } catch (err) {
       res.status(500).json({ error: err.message });
