@@ -1,7 +1,18 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/test-base.js';
+import {
+  seedLocalWorkspace,
+  workspaceApiLocalSeed,
+  LOCAL_WORKSPACE_URL_KEY,
+} from '../fixtures/local-harness.js';
 
-// Workspace URL key used in test session
-const TEST_WORKSPACE_URL_KEY = 'test-workspace';
+// Migrated onto the local-provider harness (LIN-412). Audit is NOT
+// provider-routed (runAudit goes straight to GraphQL), so the surface stays on
+// the deterministic audit mock — the route gate is widened to fire for local
+// sessions (provider === 'local') as well as the legacy `test-token` path. The
+// local seed only changes session/workspace resolution; the mocked audit report
+// (computeAuditFromData over testMockTeams/testMockData) is unchanged, so every
+// deterministic assertion below holds byte-for-byte.
+const TEST_WORKSPACE_URL_KEY = LOCAL_WORKSPACE_URL_KEY;
 const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;
 const AUDIT_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/audit`;
 const API_PREFIX = `/workspace/${TEST_WORKSPACE_URL_KEY}`;
@@ -22,8 +33,8 @@ test.describe('Operator Dashboard', () => {
 
   test.describe('Authenticated', () => {
     test.beforeEach(async ({ page }) => {
-      // Set up test session
-      await page.goto('/test/set-session');
+      // Seed the local workspace and establish a provider: 'local' session.
+      await seedLocalWorkspace(page, workspaceApiLocalSeed);
     });
 
     test('renders dashboard page', async ({ page }) => {
@@ -46,7 +57,7 @@ test.describe('Operator Dashboard', () => {
       // Should show workspace dropdown with workspace name
       const workspaceToggle = page.locator('#workspace-toggle');
       await expect(workspaceToggle).toBeVisible();
-      await expect(workspaceToggle).toContainText('Test Workspace');
+      await expect(workspaceToggle).toContainText('Local Workspace');
     });
 
     test('has back link to projects', async ({ page }) => {
@@ -140,7 +151,9 @@ test.describe('Operator Dashboard', () => {
 
 test.describe('Audit API', () => {
   test('returns 401 when not authenticated', async ({ request }) => {
-    // Try to call API without session
+    // No session: workspaceFromUrl validates the urlKey format (local-workspace
+    // is valid), then rejects the missing session with 401 before any workspace
+    // lookup — so this case stays reachable under the local prefix.
     const response = await request.get(`${API_PREFIX}/api/audit`);
     expect(response.status()).toBe(401);
 
@@ -149,8 +162,9 @@ test.describe('Audit API', () => {
   });
 
   test('returns valid audit report when authenticated', async ({ page, request }) => {
-    // Set up session
-    await page.goto('/test/set-session');
+    // Seed the local workspace and establish a provider: 'local' session before
+    // harvesting cookies.
+    await seedLocalWorkspace(page, workspaceApiLocalSeed);
 
     // Get cookies from page context
     const cookies = await page.context().cookies();

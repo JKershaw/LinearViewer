@@ -212,8 +212,15 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     const workspace = req.workspace;
 
     try {
-      // Use mock audit data in test mode
-      if (process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token') {
+      // Use mock audit data in test mode. Audit is NOT provider-routed —
+      // runAudit() goes straight to GraphQL — so the local provider can't back
+      // this surface; instead the deterministic mock gate is widened to fire for
+      // local sessions too (LIN-412). This stays a DATA-mock carve-out (its own
+      // predicate, NOT shouldMockAi): the semantics are "serve the deterministic
+      // audit report", not "mock the AI call". The mock data below is unchanged —
+      // the local-seed identity only affects session/workspace resolution.
+      if (process.env.NODE_ENV === 'test' &&
+          (workspace.accessToken === 'test-token' || workspace.provider === 'local')) {
         const mockAuditData = {
           teams: testMockTeams,
           projects: testMockData.projects.map(p => ({ ...p, state: 'started' })),
