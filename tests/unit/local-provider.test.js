@@ -201,10 +201,13 @@ describe('LocalProvider writes', () => {
     const created = await provider.createIssue(SCOPE, { title: 'L' });
     assert.equal(await provider.addLabel(SCOPE, created.id, 'bug'), true);
     let ctx = await provider.fetchIssueContext(SCOPE, created.id);
-    assert.deepEqual(ctx.issue.labels, { nodes: [{ name: 'bug' }] });
+    // fetchIssueContext's curated issue exposes labels as a flat name array,
+    // matching the Linear provider's contract (the prompt/AI consumers read it
+    // as an array). The raw `{ nodes }` shape is only for the tree path. (LIN-406.)
+    assert.deepEqual(ctx.issue.labels, ['bug']);
     await provider.removeLabel(SCOPE, created.id, 'bug');
     ctx = await provider.fetchIssueContext(SCOPE, created.id);
-    assert.deepEqual(ctx.issue.labels, { nodes: [] });
+    assert.deepEqual(ctx.issue.labels, []);
   });
 
   test('createRelation persists', async () => {

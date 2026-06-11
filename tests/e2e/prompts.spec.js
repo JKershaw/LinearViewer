@@ -1,15 +1,21 @@
 import { test, expect } from '../fixtures/test-base.js';
+import {
+  seedLocalWorkspace,
+  workspaceApiLocalSeed,
+  LOCAL_WORKSPACE_URL_KEY,
+} from '../fixtures/local-harness.js';
 
-// UUIDs for test issues (from mock-data.js)
+// UUIDs for test issues — workspaceApiLocalSeed shares the linear fixture's
+// identity, so these resolve unchanged on the local provider (LIN-406).
 const BLOCKED_ISSUE_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 const BUG_ISSUE_ID = 'dddddddd-dddd-dddd-dddd-ddddddddddde';
 const PLAN_ISSUE_ID = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeef';
 const CODE_REVIEW_ISSUE_ID = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
 
-// Workspace URL key used in test session
-const TEST_WORKSPACE_URL_KEY = 'test-workspace';
-const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;
-const API_PREFIX = `/workspace/${TEST_WORKSPACE_URL_KEY}`;
+// Local-provider workspace seeded via /test/set-local-session (LIN-406).
+const URL_KEY = LOCAL_WORKSPACE_URL_KEY;
+const WORKSPACE_URL = `/workspace/${URL_KEY}/`;
+const API_PREFIX = `/workspace/${URL_KEY}`;
 
 /**
  * Helper to expand Prompts section for an issue
@@ -42,8 +48,8 @@ async function clickMoreToggle(page, containerSelector, issueId) {
 
 test.describe('Promptable Labels', () => {
   test.beforeEach(async ({ page }) => {
-    // Set up test session
-    await page.goto('/test/set-session');
+    // Prompt GET is template/data-driven; the local provider supplies the data.
+    await seedLocalWorkspace(page, workspaceApiLocalSeed);
     await page.goto(WORKSPACE_URL);
     await page.waitForLoadState('networkidle');
   });
@@ -297,43 +303,21 @@ test.describe('Promptable Labels', () => {
 
 test.describe('Prompt API', () => {
   test.beforeEach(async ({ page }) => {
-    // Set up test session
-    await page.goto('/test/set-session');
+    // Prompt GET short-circuits 400/404 before any data fetch; positive GETs are
+    // served by the local provider.
+    await seedLocalWorkspace(page, workspaceApiLocalSeed);
   });
 
-  test('returns 401 for unauthenticated requests', async ({ page }) => {
-    // Clear session
-    await page.goto('/test/clear-session');
+  // NOTE: the 401-unauthenticated negative path is dropped on migration (LIN-406),
+  // mirroring the sibling brief/recap migrations. It exercises the shared auth
+  // middleware (lib/errors.js `unauthorized`), not the prompt surface, and is not
+  // expressible on a session-scoped local workspace — clearing the session removes
+  // the workspace itself (→ 404 at workspaceFromUrl, before any auth check). The
+  // generic 401 contract stays covered on the PAT/Linear path (audit.spec.js).
 
-    // Try to fetch prompt (use valid UUID format)
-    const response = await page.request.get(`${API_PREFIX}/api/prompt/${BLOCKED_ISSUE_ID}/blocked`);
-    expect(response.status()).toBe(401);
-
-    const body = await response.json();
-    expect(body.error).toBe('Not authenticated');
-  });
-
-  test('recommend stream descends a parent, streaming the breadcrumb then the leaf (LIN-327)', async ({ page }) => {
-    // issue-1 (TEST-1) is a parent; its actionable child is issue-2 (TEST-2). The
-    // stream should route through the container — emitting a live breadcrumb into the
-    // reasoning section — then deliver the terminal child's prompt, with the descent
-    // path in the done event.
-    const response = await page.request.get(`${API_PREFIX}/api/recommend/issue-1/stream`);
-    expect(response.status()).toBe(200);
-    expect(response.headers()['content-type']).toContain('text/event-stream');
-
-    const body = await response.text();
-    // The descent is streamed live as a reasoning delta (not a frozen "fetching" state).
-    expect(body).toContain('event: delta');
-    expect(body).toContain('TEST-1 is a container → routing to TEST-2');
-    // The prompt section is delivered (the terminal child's), and the stream closes.
-    expect(body).toContain('"section":"prompt"');
-    expect(body).toContain('event: done');
-    // The done event carries the terminal identifier and the auditable descent path.
-    expect(body).toContain('"identifier":"TEST-2"');
-    expect(body).toContain('"deferredVia":["TEST-1","TEST-2"]');
-    expect(body).toContain('"deferTruncated":false');
-  });
+  // NOTE: the recommend-stream parent-descent contract (LIN-327) lives in
+  // streaming.spec.js ('parent path streams delta events …'); it was duplicate
+  // coverage mis-filed under Prompt API and is dropped here on migration (LIN-406).
 
   test('returns 404 for unknown label', async ({ page }) => {
     // Use valid UUID format so we get to the label check
@@ -451,7 +435,7 @@ test.describe('Prompt API', () => {
 // Tests for promptable label rendering across different labels
 test.describe('Multiple Promptable Labels UI', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/test/set-session');
+    await seedLocalWorkspace(page, workspaceApiLocalSeed);
     await page.goto(WORKSPACE_URL);
     await page.waitForLoadState('networkidle');
   });
@@ -552,7 +536,7 @@ test.describe('Multiple Promptable Labels UI', () => {
 // Tests for "more" inline expansion feature
 test.describe('More Prompts Inline', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/test/set-session');
+    await seedLocalWorkspace(page, workspaceApiLocalSeed);
     await page.goto(WORKSPACE_URL);
     await page.waitForLoadState('networkidle');
   });
@@ -645,7 +629,7 @@ test.describe('More Prompts Inline', () => {
 test.describe('AI Recommendations', () => {
   test.beforeEach(async ({ page }) => {
     // AI suggest button requires OpenRouter to be configured
-    await page.goto('/test/set-session?openRouterConnected=true');
+    await seedLocalWorkspace(page, workspaceApiLocalSeed, { openRouterConnected: true });
     await page.goto(WORKSPACE_URL);
     await page.waitForLoadState('networkidle');
   });
@@ -665,8 +649,9 @@ test.describe('AI Recommendations', () => {
   });
 
   test('AI suggest button is hidden when OpenRouter is not configured', async ({ page }) => {
-    // Set up session WITHOUT OpenRouter
-    await page.goto('/test/set-session');
+    // Re-seed WITHOUT OpenRouter — the absence of the key is the thing under test,
+    // so it must not inherit the block's connected seed.
+    await seedLocalWorkspace(page, workspaceApiLocalSeed);
     await page.goto(WORKSPACE_URL);
     await page.waitForLoadState('networkidle');
 
@@ -829,14 +814,14 @@ test.describe('AI Recommendations', () => {
 
 test.describe('Recommendation API', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/test/set-session');
+    // openRouterConnected is required: on a local session isTestMode is false, so
+    // GET /api/recommend/status reports enabled:true only with the session key.
+    await seedLocalWorkspace(page, workspaceApiLocalSeed, { openRouterConnected: true });
   });
 
-  test('returns 401 for unauthenticated requests', async ({ page }) => {
-    await page.goto('/test/clear-session');
-    const response = await page.request.get(`${API_PREFIX}/api/recommend/${BLOCKED_ISSUE_ID}`);
-    expect(response.status()).toBe(401);
-  });
+  // NOTE: the 401-unauthenticated negative path is dropped on migration (LIN-406) —
+  // see the Prompt API block: it tests shared auth middleware, not the recommend
+  // surface, and is not expressible on a session-scoped local workspace.
 
   test('returns 400 for invalid issue ID format', async ({ page }) => {
     const response = await page.request.get(`${API_PREFIX}/api/recommend/INVALID!!!`);
