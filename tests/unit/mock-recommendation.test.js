@@ -3,8 +3,9 @@
  *
  * `generateMockRecommendation` must be SHAPE-TOLERANT: it serves both the
  * canonical provider issue (local sessions) and the Linear-shaped `testMockData`
- * issue still passed by the soon-orphaned isTestMode stream block (deleted by
- * LIN-413). `buildMockRecommendationHop` synthesises the resolver's computeOne
+ * issue still passed by the isTestMode stream / GET blocks (RETAINED at LIN-413 —
+ * free-tier.spec still drives them on the test-token path).
+ * `buildMockRecommendationHop` synthesises the resolver's computeOne
  * record — a defer for a parent with a non-terminal focused child, a real action
  * for a leaf — so a mocked local session drives the SAME descent as the real path.
  */

@@ -23,11 +23,22 @@
  *     the committed reference screenshots stay byte-stable
  * Migrate a spec onto this harness only when the local provider fully backs the
  * surface under test. Migrated so far: dashboard, swim (lanes/flow/vertical),
- * ship (+ orientation mode), interactions/detail. The remaining `testMockData`
- * branches (server.js, routes/pipeline.js, routes/proxy.js,
- * routes/workspace-api.js) still serve the roadmap / recap / brief / recommend /
- * proxy / foreman / audit / pipeline / settings specs and stay until those
- * surfaces migrate.
+ * ship (+ orientation mode), interactions/detail (incl. the comments toggle), and
+ * the workspace-api cluster (LIN-403..412): recap, brief, recommend/streaming,
+ * prompts, custom-prompts, and the workspace-model UI path.
+ *
+ * The detail-surface comments path is now fully provider-backed, so its
+ * `routes/workspace-api.js` `testMockData` data-mock branch was orphaned and
+ * deleted (LIN-413). The other workspace-api mock branches are NOT yet orphaned —
+ * they still serve UNMIGRATED test-token surfaces that share the same endpoints:
+ *   - swipe recap/brief accordions (swipe.spec)        → recap / brief
+ *   - free-tier suggest button + GET (free-tier.spec)  → recommend (stream + GET)
+ *   - feature-toggles (feature-toggles.spec)           → prompt
+ *   - foreman / mini-foreman / autopilot (foreman.spec)→ those prompt endpoints
+ *   - roadmap generate (roadmap.spec)                  → roadmap data branch
+ *   - audit (option b, LIN-412)                        → retained by design
+ * Those, plus the remaining `testMockData` branches in server.js,
+ * routes/pipeline.js and routes/proxy.js, stay until those surfaces migrate.
  */
 import { LocalStore } from '../../lib/local-store.js';
 import { LocalProvider } from '../../lib/providers/local/index.js';
