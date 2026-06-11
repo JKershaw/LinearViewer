@@ -99,6 +99,37 @@ One convention across every endpoint, so a consumer can branch on the same field
 - **Writes** return `{ "success": true, ... }`. Linear writes nest the affected entity under a named key (`{ "success": true, "issue": {...} }`); other writes (dispatch, token) carry their fields alongside `"success": true`. A write that does not land is a non-`2xx` (typically `502`), never a `2xx`.
 - **Errors** are always `{ "error": "<message>", "detail"?: "<upstream detail>" }` with a non-`2xx` status. `detail` carries the Linear or AI upstream's own message when there is one.
 
+#### Structured error envelope
+
+Some errors carry extra machine-readable fields so an automated caller can decide, in one read, whether to **wait or act**. Workspace-resolution failures (the `503 Workspace not available` returned by every workspace-requiring endpoint) are the first to use it:
+
+```json
+{
+  "error": "Workspace not available",
+  "code": "WORKSPACE_STORE_UNAVAILABLE",
+  "category": "upstream",
+  "retryable": true,
+  "detail": "Session store unreachable; dyno may be booting after a deploy.",
+  "context": { "workspaceUrlKey": "acme" }
+}
+```
+
+- `code` — stable identifier to branch on (the `error` string may be reworded; the `code` will not).
+- `category` — one of `upstream` | `auth` | `config` | `internal`.
+- `retryable` — `true` → back off and retry; `false` → escalate, retrying won't help.
+- `detail` — human-readable cause.
+- `context` — safe public identifiers only (`workspaceUrlKey` is the workspace slug). Never contains tokens, secrets, or workspace content.
+
+The workspace-unavailable `code`s and how to act on each:
+
+| `code` | `category` | `retryable` | What it means → what to do |
+| --- | --- | --- | --- |
+| `WORKSPACE_STORE_UNAVAILABLE` | `upstream` | `true` | Session store is unreachable (e.g. a dyno is booting right after a deploy). **Back off and retry** — it is expected to self-heal. |
+| `WORKSPACE_SESSION_EXPIRED` | `auth` | `false` | A session for this workspace exists but its token expired. **A human must re-authenticate**; retrying won't help. |
+| `WORKSPACE_NOT_CONNECTED` | `config` | `false` | No session references this workspace. **It is not connected** — connect it first; retrying won't help. |
+
+The HTTP status stays `503` for all three — only the body distinguishes them. Callers that don't recognise `code`/`category` can keep treating any non-`2xx` as failure; the new fields are purely additive. Other subsystems' errors may adopt the same envelope over time.
+
 ### Read Endpoints
 
 #### Get Instructions

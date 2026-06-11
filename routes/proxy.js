@@ -34,6 +34,7 @@ import { buildAutopilotManual } from '../lib/prompts/autopilot-manual.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
 import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
 import { appendBlock, replace as replaceInDescription, DescriptionEditError } from '../lib/description-edit.js';
+import { workspaceUnavailableEnvelope } from '../lib/errors.js';
 
 // Lazy-load test fixtures only in test mode to avoid production dependency on test files
 let testMockData = null;
@@ -847,11 +848,12 @@ const UPDATE_ISSUE_LABELS_MUTATION = gql`
  * @param {Object} options.recapCacheStore - Recap cache storage instance
  * @param {Object} options.briefCacheStore - Brief cache storage instance
  * @param {Function} options.workspaceFromUrl - Middleware to validate workspace
- * @param {Function} options.getWorkspaceAccessToken - Function to get workspace access token by urlKey
+ * @param {Function} options.getWorkspaceAccessToken - Function to get workspace access token by urlKey (token-only)
+ * @param {Function} options.resolveWorkspaceAccess - Function returning { token, reason } for actionable error envelopes (LIN-417)
  * @param {Function} options.getWorkspaceOpenRouterKey - Function to get OpenRouter API key from workspace sessions
  * @returns {Router} Express router with proxy routes
  */
-export function createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, briefCacheStore, dispatchQueueStore, workspaceFromUrl, getWorkspaceAccessToken, getWorkspaceOpenRouterKey, workspacePreferencesStore }) {
+export function createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, briefCacheStore, dispatchQueueStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, workspacePreferencesStore }) {
   const router = Router();
 
   // =========================================================================
@@ -904,16 +906,16 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanSto
    * hanging silently (which causes "stream idle timeout" in CLI callers).
    */
   async function getClient(urlKey, { timeoutMs = GRAPHQL_TIMEOUT_MS } = {}) {
-    const accessToken = await getWorkspaceAccessToken(urlKey);
-    if (!accessToken) {
-      return null;
+    const { token, reason } = await resolveWorkspaceAccess(urlKey);
+    if (!token) {
+      return { client: null, reason };
     }
     const clientOptions = {
-      headers: { Authorization: accessToken },
+      headers: { Authorization: token },
       signal: AbortSignal.timeout(timeoutMs),
     };
     if (proxyFetch) clientOptions.fetch = proxyFetch;
-    return new GraphQLClient(LINEAR_API_ENDPOINT, clientOptions);
+    return { client: new GraphQLClient(LINEAR_API_ENDPOINT, clientOptions), reason };
   }
 
   /**
@@ -928,6 +930,19 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanSto
       endpoint,
       status
     }).catch(err => console.error('Failed to log proxy event:', err));
+  }
+
+  /**
+   * Send the structured "workspace not available" 503 envelope (LIN-417).
+   * Status stays 503; the body carries code/category/retryable/detail and a
+   * safe `context` (public workspace slug only) so an automated caller can
+   * decide whether to back off (retryable) or escalate (auth/config).
+   * `reason` is threaded unmodified from resolveWorkspaceAccess via both the
+   * getClient path and the raw-token path.
+   */
+  function workspaceUnavailable(req, res, endpoint, reason) {
+    logEvent(req, endpoint, 503);
+    return res.status(503).json(workspaceUnavailableEnvelope(reason, req.proxyUrlKey));
   }
 
   /**
@@ -1454,10 +1469,9 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/me', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const client = await getClient(req.proxyUrlKey);
+      const { client, reason } = await getClient(req.proxyUrlKey);
       if (!client) {
-        logEvent(req, '/api/proxy/me', 503);
-        return res.status(503).json({ error: 'Workspace not available' });
+        return workspaceUnavailable(req, res, '/api/proxy/me', reason);
       }
 
       const data = await client.request(VIEWER_QUERY);
@@ -1476,10 +1490,9 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/teams', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const client = await getClient(req.proxyUrlKey);
+      const { client, reason } = await getClient(req.proxyUrlKey);
       if (!client) {
-        logEvent(req, '/api/proxy/teams', 503);
-        return res.status(503).json({ error: 'Workspace not available' });
+        return workspaceUnavailable(req, res, '/api/proxy/teams', reason);
       }
 
       const data = await client.request(TEAMS_QUERY);
@@ -1498,10 +1511,9 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/projects', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const client = await getClient(req.proxyUrlKey);
+      const { client, reason } = await getClient(req.proxyUrlKey);
       if (!client) {
-        logEvent(req, '/api/proxy/projects', 503);
-        return res.status(503).json({ error: 'Workspace not available' });
+        return workspaceUnavailable(req, res, '/api/proxy/projects', reason);
       }
 
       const data = await client.request(PROJECTS_QUERY);
@@ -1520,10 +1532,9 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/issues', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const client = await getClient(req.proxyUrlKey);
+      const { client, reason } = await getClient(req.proxyUrlKey);
       if (!client) {
-        logEvent(req, '/api/proxy/issues', 503);
-        return res.status(503).json({ error: 'Workspace not available' });
+        return workspaceUnavailable(req, res, '/api/proxy/issues', reason);
       }
 
       const teamId = req.query.teamId;
@@ -1562,10 +1573,9 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/issues/:issueId', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const client = await getClient(req.proxyUrlKey);
+      const { client, reason } = await getClient(req.proxyUrlKey);
       if (!client) {
-        logEvent(req, '/api/proxy/issues/:id', 503);
-        return res.status(503).json({ error: 'Workspace not available' });
+        return workspaceUnavailable(req, res, '/api/proxy/issues/:id', reason);
       }
 
       const { issueId } = req.params;
@@ -1605,10 +1615,9 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/search', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const client = await getClient(req.proxyUrlKey);
+      const { client, reason } = await getClient(req.proxyUrlKey);
       if (!client) {
-        logEvent(req, '/api/proxy/search', 503);
-        return res.status(503).json({ error: 'Workspace not available' });
+        return workspaceUnavailable(req, res, '/api/proxy/search', reason);
       }
 
       const query = req.query.q;
@@ -1638,10 +1647,9 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/states/:teamId', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const client = await getClient(req.proxyUrlKey);
+      const { client, reason } = await getClient(req.proxyUrlKey);
       if (!client) {
-        logEvent(req, '/api/proxy/states', 503);
-        return res.status(503).json({ error: 'Workspace not available' });
+        return workspaceUnavailable(req, res, '/api/proxy/states', reason);
       }
 
       const { teamId } = req.params;
@@ -1667,10 +1675,9 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/labels', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const client = await getClient(req.proxyUrlKey);
+      const { client, reason } = await getClient(req.proxyUrlKey);
       if (!client) {
-        logEvent(req, '/api/proxy/labels', 503);
-        return res.status(503).json({ error: 'Workspace not available' });
+        return workspaceUnavailable(req, res, '/api/proxy/labels', reason);
       }
 
       const teamId = req.query.teamId;
@@ -1698,10 +1705,9 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/cycles', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const client = await getClient(req.proxyUrlKey);
+      const { client, reason } = await getClient(req.proxyUrlKey);
       if (!client) {
-        logEvent(req, '/api/proxy/cycles', 503);
-        return res.status(503).json({ error: 'Workspace not available' });
+        return workspaceUnavailable(req, res, '/api/proxy/cycles', reason);
       }
 
       const teamId = req.query.teamId;
@@ -1729,10 +1735,9 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/cycle/:cycleId', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const client = await getClient(req.proxyUrlKey);
+      const { client, reason } = await getClient(req.proxyUrlKey);
       if (!client) {
-        logEvent(req, '/api/proxy/cycle', 503);
-        return res.status(503).json({ error: 'Workspace not available' });
+        return workspaceUnavailable(req, res, '/api/proxy/cycle', reason);
       }
 
       const { cycleId } = req.params;
@@ -1762,10 +1767,9 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/relations/:issueId', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const client = await getClient(req.proxyUrlKey);
+      const { client, reason } = await getClient(req.proxyUrlKey);
       if (!client) {
-        logEvent(req, '/api/proxy/relations', 503);
-        return res.status(503).json({ error: 'Workspace not available' });
+        return workspaceUnavailable(req, res, '/api/proxy/relations', reason);
       }
 
       const { issueId } = req.params;
@@ -1806,10 +1810,9 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.post('/api/proxy/issues', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      const client = await getClient(req.proxyUrlKey);
+      const { client, reason } = await getClient(req.proxyUrlKey);
       if (!client) {
-        logEvent(req, '/api/proxy/issues', 503);
-        return res.status(503).json({ error: 'Workspace not available' });
+        return workspaceUnavailable(req, res, '/api/proxy/issues', reason);
       }
 
       const { teamId, title, description, projectId, stateId, assigneeId, priority, parentId, cycleId } = req.body;
@@ -1869,10 +1872,9 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.patch('/api/proxy/issues/:issueId', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      const client = await getClient(req.proxyUrlKey);
+      const { client, reason } = await getClient(req.proxyUrlKey);
       if (!client) {
-        logEvent(req, '/api/proxy/issues/:id', 503);
-        return res.status(503).json({ error: 'Workspace not available' });
+        return workspaceUnavailable(req, res, '/api/proxy/issues/:id', reason);
       }
 
       const { issueId } = req.params;
@@ -1936,10 +1938,9 @@ One convention across every endpoint, so you can branch on the same fields every
    * recur. `merge` may throw DescriptionEditError for a loud 422.
    */
   async function applyDescriptionEdit(req, res, endpoint, merge) {
-    const client = await getClient(req.proxyUrlKey);
+    const { client, reason } = await getClient(req.proxyUrlKey);
     if (!client) {
-      logEvent(req, endpoint, 503);
-      return res.status(503).json({ error: 'Workspace not available' });
+      return workspaceUnavailable(req, res, endpoint, reason);
     }
 
     const { issueId } = req.params;
@@ -2045,10 +2046,9 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.post('/api/proxy/issues/:issueId/comments', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      const client = await getClient(req.proxyUrlKey);
+      const { client, reason } = await getClient(req.proxyUrlKey);
       if (!client) {
-        logEvent(req, '/api/proxy/issues/comments', 503);
-        return res.status(503).json({ error: 'Workspace not available' });
+        return workspaceUnavailable(req, res, '/api/proxy/issues/comments', reason);
       }
 
       const { issueId } = req.params;
@@ -2104,10 +2104,9 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.post('/api/proxy/issues/:issueId/relations', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      const client = await getClient(req.proxyUrlKey);
+      const { client, reason } = await getClient(req.proxyUrlKey);
       if (!client) {
-        logEvent(req, '/api/proxy/issues/relations', 503);
-        return res.status(503).json({ error: 'Workspace not available' });
+        return workspaceUnavailable(req, res, '/api/proxy/issues/relations', reason);
       }
 
       const { issueId } = req.params;
@@ -2158,10 +2157,9 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.delete('/api/proxy/issues/:issueId/relations/:relationId', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      const client = await getClient(req.proxyUrlKey);
+      const { client, reason } = await getClient(req.proxyUrlKey);
       if (!client) {
-        logEvent(req, '/api/proxy/issues/relations', 503);
-        return res.status(503).json({ error: 'Workspace not available' });
+        return workspaceUnavailable(req, res, '/api/proxy/issues/relations', reason);
       }
 
       const { issueId, relationId } = req.params;
@@ -2197,10 +2195,9 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.post('/api/proxy/issues/:issueId/labels', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      const client = await getClient(req.proxyUrlKey);
+      const { client, reason } = await getClient(req.proxyUrlKey);
       if (!client) {
-        logEvent(req, '/api/proxy/issues/labels', 503);
-        return res.status(503).json({ error: 'Workspace not available' });
+        return workspaceUnavailable(req, res, '/api/proxy/issues/labels', reason);
       }
 
       const { issueId } = req.params;
@@ -2251,10 +2248,9 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.delete('/api/proxy/issues/:issueId/labels/:labelId', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      const client = await getClient(req.proxyUrlKey);
+      const { client, reason } = await getClient(req.proxyUrlKey);
       if (!client) {
-        logEvent(req, '/api/proxy/issues/labels', 503);
-        return res.status(503).json({ error: 'Workspace not available' });
+        return workspaceUnavailable(req, res, '/api/proxy/issues/labels', reason);
       }
 
       const { issueId, labelId } = req.params;
@@ -2306,10 +2302,9 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/stack', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const accessToken = await getWorkspaceAccessToken(req.proxyUrlKey);
+      const { token: accessToken, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
       if (!accessToken) {
-        logEvent(req, '/api/proxy/stack', 503);
-        return res.status(503).json({ error: 'Workspace not available' });
+        return workspaceUnavailable(req, res, '/api/proxy/stack', reason);
       }
 
       const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 5, 1), 50);
@@ -2457,10 +2452,9 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/prompt/:identifier/:templateKey', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const accessToken = await getWorkspaceAccessToken(req.proxyUrlKey);
+      const { token: accessToken, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
       if (!accessToken) {
-        logEvent(req, '/api/proxy/prompt', 503);
-        return res.status(503).json({ error: 'Workspace not available' });
+        return workspaceUnavailable(req, res, '/api/proxy/prompt', reason);
       }
 
       const { identifier, templateKey } = req.params;
@@ -2693,10 +2687,9 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/recommend/:identifier', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const accessToken = await getWorkspaceAccessToken(req.proxyUrlKey);
+      const { token: accessToken, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
       if (!accessToken) {
-        logEvent(req, '/api/proxy/recommend', 503);
-        return res.status(503).json({ error: 'Workspace not available' });
+        return workspaceUnavailable(req, res, '/api/proxy/recommend', reason);
       }
 
       const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
@@ -2796,10 +2789,9 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/recap/:identifier', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const accessToken = await getWorkspaceAccessToken(req.proxyUrlKey);
+      const { token: accessToken, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
       if (!accessToken) {
-        logEvent(req, '/api/proxy/recap', 503);
-        return res.status(503).json({ error: 'Workspace not available' });
+        return workspaceUnavailable(req, res, '/api/proxy/recap', reason);
       }
       if (!recapCacheStore) {
         logEvent(req, '/api/proxy/recap', 503);
@@ -2926,10 +2918,9 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.post('/api/proxy/recap/:identifier', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const accessToken = await getWorkspaceAccessToken(req.proxyUrlKey);
+      const { token: accessToken, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
       if (!accessToken) {
-        logEvent(req, '/api/proxy/recap', 503);
-        return res.status(503).json({ error: 'Workspace not available' });
+        return workspaceUnavailable(req, res, '/api/proxy/recap', reason);
       }
       if (!recapCacheStore) {
         logEvent(req, '/api/proxy/recap', 503);
@@ -3040,10 +3031,9 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/brief/:identifier', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const accessToken = await getWorkspaceAccessToken(req.proxyUrlKey);
+      const { token: accessToken, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
       if (!accessToken) {
-        logEvent(req, '/api/proxy/brief', 503);
-        return res.status(503).json({ error: 'Workspace not available' });
+        return workspaceUnavailable(req, res, '/api/proxy/brief', reason);
       }
       if (!briefCacheStore) {
         logEvent(req, '/api/proxy/brief', 503);
@@ -3170,10 +3160,9 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.post('/api/proxy/brief/:identifier', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const accessToken = await getWorkspaceAccessToken(req.proxyUrlKey);
+      const { token: accessToken, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
       if (!accessToken) {
-        logEvent(req, '/api/proxy/brief', 503);
-        return res.status(503).json({ error: 'Workspace not available' });
+        return workspaceUnavailable(req, res, '/api/proxy/brief', reason);
       }
       if (!briefCacheStore) {
         logEvent(req, '/api/proxy/brief', 503);
@@ -3654,10 +3643,9 @@ One convention across every endpoint, so you can branch on the same fields every
       }
 
       // Recommendation preconditions — identical to GET /recommend.
-      const accessToken = await getWorkspaceAccessToken(req.proxyUrlKey);
+      const { token: accessToken, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
       if (!accessToken) {
-        logEvent(req, '/api/proxy/recommend-and-dispatch', 503);
-        return res.status(503).json({ error: 'Workspace not available' });
+        return workspaceUnavailable(req, res, '/api/proxy/recommend-and-dispatch', reason);
       }
       const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
       const sessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
