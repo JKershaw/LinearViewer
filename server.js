@@ -810,15 +810,22 @@ function workspaceFromUrl(req, res, next) {
 app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore }))
 
 // Mount proxy routes
-// getWorkspaceAccessToken: looks up a workspace access token from active sessions.
-// In test mode, returns 'test-token'. In production, finds the freshest non-expired token.
+// resolveWorkspaceAccess: looks up a workspace access token from active sessions
+// AND recovers WHY a lookup failed, so callers can surface an actionable signal
+// (LIN-417) instead of an opaque null. Returns { token, reason }:
+//   ok               → token present (success path)
+//   store_unreachable → session store find() threw (dyno booting post-deploy) — transient
+//   session_expired   → a session referenced this workspace but its token expired — re-auth
+//   not_connected     → no session references this workspace — never connected
+// In test mode, returns { token: 'test-token', reason: 'ok' } for 'test-workspace'.
 // Uses a short-lived cache (30s) to avoid scanning sessions on every proxy request.
+// The cache only ever holds successes, so it never masks a failure reason.
 const _tokenCache = new Map(); // urlKey -> { token, expiresAt, cachedAt }
 const TOKEN_CACHE_TTL_MS = 30 * 1000; // 30 seconds
 
-async function getWorkspaceAccessToken(urlKey) {
+async function resolveWorkspaceAccess(urlKey) {
   if (process.env.NODE_ENV === 'test' && urlKey === 'test-workspace') {
-    return 'test-token';
+    return { token: 'test-token', reason: 'ok' };
   }
 
   // Check cache first
@@ -826,7 +833,7 @@ async function getWorkspaceAccessToken(urlKey) {
   if (cached && Date.now() - cached.cachedAt < TOKEN_CACHE_TTL_MS) {
     // Only return if the token hasn't expired
     if (cached.expiresAt > Date.now() + TOKEN_REFRESH_BUFFER_MS) {
-      return cached.token;
+      return { token: cached.token, reason: 'ok' };
     }
   }
 
@@ -836,11 +843,14 @@ async function getWorkspaceAccessToken(urlKey) {
     const sessions = await sessionsCollection.find({}).toArray();
     let bestToken = null;
     let bestExpiry = 0;
+    let sawUrlKey = false; // did any session reference this workspace at all?
 
     for (const s of sessions) {
       const data = typeof s.session === 'string' ? JSON.parse(s.session) : s.session;
       const ws = data?.workspaces?.find(w => w.urlKey === urlKey);
-      if (ws?.accessToken && ws.tokenExpiresAt > Date.now() + TOKEN_REFRESH_BUFFER_MS) {
+      if (!ws) continue;
+      sawUrlKey = true;
+      if (ws.accessToken && ws.tokenExpiresAt > Date.now() + TOKEN_REFRESH_BUFFER_MS) {
         if (ws.tokenExpiresAt > bestExpiry) {
           bestToken = ws.accessToken;
           bestExpiry = ws.tokenExpiresAt;
@@ -850,13 +860,22 @@ async function getWorkspaceAccessToken(urlKey) {
 
     if (bestToken) {
       _tokenCache.set(urlKey, { token: bestToken, expiresAt: bestExpiry, cachedAt: Date.now() });
+      return { token: bestToken, reason: 'ok' };
     }
 
-    return bestToken;
+    // No usable token. A row referenced this workspace but its token was expired
+    // (auth / needs re-auth) vs no row referenced it at all (never connected).
+    return { token: null, reason: sawUrlKey ? 'session_expired' : 'not_connected' };
   } catch (err) {
     console.error('Error looking up workspace access token:', err);
+    return { token: null, reason: 'store_unreachable' };
   }
-  return null;
+}
+
+// Thin wrapper preserving the token-only contract for existing callers
+// (pipeline-state.js, routes/pipeline.js, routes/test.js). Unchanged behaviour.
+async function getWorkspaceAccessToken(urlKey) {
+  return (await resolveWorkspaceAccess(urlKey)).token;
 }
 
 // getWorkspaceOpenRouterKey: looks up an OpenRouter API key from active sessions
@@ -905,7 +924,7 @@ async function getWorkspaceOpenRouterKey(urlKey, linearUserId) {
   return null;
 }
 
-app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, briefCacheStore, dispatchQueueStore, workspaceFromUrl, getWorkspaceAccessToken, getWorkspaceOpenRouterKey, workspacePreferencesStore }))
+app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, briefCacheStore, dispatchQueueStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, workspacePreferencesStore }))
 
 // Mount workspace API routes (audit, prompts, recommendations, comments, images)
 app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, foremanStore }))
