@@ -16,6 +16,7 @@ import { Router } from 'express';
 import { GraphQLClient, gql } from 'graphql-request';
 import rateLimit from 'express-rate-limit';
 import { createProxyFetch } from '../lib/proxy-fetch.js';
+import { createDedupeCache, dedupeKey } from '../lib/proxy-dedupe.js';
 import { fetchProjects, fetchIssueContext, fetchRecommendationContext } from '../lib/linear.js';
 import { isRecommendationEnabled, getRecommendation } from '../lib/openrouter.js';
 import { resolveRecommendation, describeDescent, armHopSignal } from '../lib/recommend-recurse.js';
@@ -176,6 +177,12 @@ const LINEAR_API_ENDPOINT = 'https://api.linear.app/graphql';
 // Proxy-aware fetch for environments behind an HTTP proxy (e.g. corporate networks).
 // graphql-request's default fetch doesn't respect HTTP_PROXY/HTTPS_PROXY env vars.
 const proxyFetch = await createProxyFetch();
+
+// Short-window dedupe for non-idempotent comment creates (LIN-399). An
+// identical (workspace + issue + body) create arriving within the window
+// collapses to the first comment instead of minting a duplicate, so a
+// consumer that retries after a lost response gets the original back.
+const commentDedupe = createDedupeCache();
 
 // Rate limiters
 // Note: proxyLimiter is applied before authenticateProxyToken on consumer
@@ -964,6 +971,24 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanSto
     return 'Linear API request failed';
   }
 
+  /**
+   * Guard a Linear write mutation's result before reporting success.
+   *
+   * Linear's *Create/*Update/*Delete payloads carry a `success` boolean. A
+   * falsy one (or a missing payload) must never ride on a 2xx — autonomous
+   * agents need an authoritative signal, and a misleading success is exactly
+   * what drives a confused retry (LIN-399). On rejection this sends a 502 and
+   * returns true so the caller can `return` early.
+   *
+   * @returns {boolean} true if a failure response was sent
+   */
+  function writeRejected(req, res, endpoint, payload, errorMessage) {
+    if (payload && payload.success === true) return false;
+    logEvent(req, endpoint, 502);
+    res.status(502).json({ error: errorMessage, detail: payload || null });
+    return true;
+  }
+
   // =========================================================================
   // User-Facing API (Session Auth) - Token Management
   // =========================================================================
@@ -994,6 +1019,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanSto
       });
 
       res.status(201).json({
+        success: true,
         tokenId: result.tokenId,
         token: result.token,
         label: result.label,
@@ -1230,11 +1256,13 @@ GET ${baseUrl}/api/proxy/autopilot/manual
 ## Write Endpoints
 
 Success responses wrap the affected entity (e.g. { "success": true, "issue": {...} }) —
-read the documented shape rather than assuming the entity comes back top-level. Creates
-(issues, comments, relations) are NOT idempotent and there is no idempotency key: a 2xx
-with "success": true means the write landed even if your client-side parse came up
-empty, so inspect the raw response (or search) before retrying — a blind retry mints a
-duplicate.
+read the documented shape rather than assuming the entity comes back top-level. The
+response is authoritative: a 2xx with "success": true means the write landed; a non-2xx
+(or "success": false) means it did not. Do NOT blind-retry a create on a lost/empty
+response — if you got no clean response, re-read (search or GET the issue) to confirm
+before retrying. Identical comment creates are additionally deduped server-side within a
+short window: a repeat of the same (issue + body) returns the original comment with
+"deduped": true (HTTP 200) instead of minting a duplicate, so a confirming retry is safe.
 
 POST ${baseUrl}/api/proxy/issues
   Body: { "teamId": "...", "title": "...", "description": "...", "projectId": "...", "stateId": "...", "assigneeId": "...", "priority": 0-4, "cycleId": "...", "parentId": "..." }
@@ -1250,6 +1278,8 @@ POST ${baseUrl}/api/proxy/issues/{issueId}/comments
   Body: { "body": "..." }
   → Add a comment to an issue. Returns 201:
   → { "success": true, "comment": { "id": "...", "body": "...", "createdAt": "...", "user": { "name": "..." } } }
+  → Deduped within a short window: a repeat of the same (issue + body) returns the
+    original comment with "deduped": true and HTTP 200 (not 201) — no duplicate is created.
 
 POST ${baseUrl}/api/proxy/issues/{issueId}/relations
   Body: { "type": "blocks|related|duplicate", "relatedIssueId": "..." }
@@ -1330,13 +1360,31 @@ ${scope === 'read' ? '(Read-only — you can query but not modify data)' : '(Rea
 curl -H "Authorization: Bearer YOUR_TOKEN" ${baseUrl}/api/proxy/me
 ${readEndpoints}${writeEndpoints}
 
+## Response Shapes
+
+One convention across every endpoint, so you can branch on the same fields everywhere:
+
+- **Success is the HTTP status.** Any 2xx is success; any non-2xx is failure. There is no
+  partial state — a write never returns 2xx with a falsy success flag.
+- **Reads** return the data directly: a single resource as the object itself
+  (e.g. GET /me, GET /issues/{id}, GET /cycle/{id}), a collection under a named key
+  (e.g. { "issues": [...] }, { "teams": [...] }).
+- **Writes** return { "success": true, ...} — Linear writes nest the affected entity under a
+  named key ({ "success": true, "issue": {...} }); other writes (dispatch, token) carry their
+  fields alongside "success": true. A write that does not land is a non-2xx, never a 2xx.
+- **Errors** are always { "error": "<message>", "detail"?: "<upstream detail>" } with a non-2xx
+  status. "detail" carries the Linear or AI upstream's own message when there is one.
+
 ## Error Codes
 
+400 - Validation error (bad/missing field, malformed ID)
 401 - Invalid, expired, or consumed token
 403 - Endpoint requires read-write token (yours is read-only)
 404 - Resource not found
 429 - Rate limited (max 60 requests/minute)
 500 - Internal server error
+502 - Upstream write was rejected (the create/update did not land)
+503 - Workspace or AI service unavailable
 
 ## Notes
 
@@ -1349,8 +1397,13 @@ ${readEndpoints}${writeEndpoints}
 
 - **Validate Content-Type before parsing.** If the body is empty or
   \`Content-Type\` isn't \`application/json\`, it's almost always transient
-  client-side network flakiness, not a proxy error. Retry once before
-  surfacing the failure.
+  client-side network flakiness, not a proxy error. Safe to retry once for
+  reads (GET). For a create (POST issues/comments/relations), do NOT
+  blind-retry on an empty/lost response — the write may have already landed.
+  Re-read (search or GET the issue) to confirm first. Identical comment
+  creates are deduped server-side within a short window, so a confirming
+  retry of the same body returns the original (\`"deduped": true\`) rather
+  than a duplicate.
 - **\`/api/proxy/recommend\` can exceed 25s.** The server emits whitespace
   heartbeats inside a single 200 response to stay inside Heroku's router
   cap. \`JSON.parse\` ignores interior whitespace, so a plain
@@ -1776,6 +1829,7 @@ ${readEndpoints}${writeEndpoints}
       }
 
       const data = await client.request(CREATE_ISSUE_MUTATION, { input });
+      if (writeRejected(req, res, '/api/proxy/issues', data.issueCreate, 'Issue was not created')) return;
       logEvent(req, '/api/proxy/issues', 201);
       res.status(201).json(data.issueCreate);
     } catch (err) {
@@ -1841,6 +1895,7 @@ ${readEndpoints}${writeEndpoints}
       }
 
       const data = await client.request(UPDATE_ISSUE_MUTATION, { id: issueId, input });
+      if (writeRejected(req, res, '/api/proxy/issues/:id', data.issueUpdate, 'Issue was not updated')) return;
       logEvent(req, '/api/proxy/issues/:id', 200);
       res.json(data.issueUpdate);
     } catch (err) {
@@ -1882,9 +1937,24 @@ ${readEndpoints}${writeEndpoints}
         return res.status(400).json({ error: 'body contains invalid characters' });
       }
 
+      // Deterministic dedupe (LIN-399): if an identical comment was just
+      // created for this issue, return that one instead of minting a duplicate.
+      const key = dedupeKey(req.proxyUrlKey, issueId, body);
+      const prior = commentDedupe.get(key);
+      if (prior) {
+        logEvent(req, '/api/proxy/issues/comments', 200);
+        return res.status(200).json({ ...prior, deduped: true });
+      }
+
       const data = await client.request(CREATE_COMMENT_MUTATION, {
         input: { issueId, body }
       });
+
+      // Surface a clear failure instead of a misleading 201 when Linear
+      // reports the write did not land.
+      if (writeRejected(req, res, '/api/proxy/issues/comments', data.commentCreate, 'Comment was not created')) return;
+
+      commentDedupe.set(key, data.commentCreate);
       logEvent(req, '/api/proxy/issues/comments', 201);
       res.status(201).json(data.commentCreate);
     } catch (err) {
@@ -1932,6 +2002,7 @@ ${readEndpoints}${writeEndpoints}
       }
 
       const data = await client.request(CREATE_RELATION_MUTATION, { input });
+      if (writeRejected(req, res, '/api/proxy/issues/relations', data.issueRelationCreate, 'Relation was not created')) return;
       logEvent(req, '/api/proxy/issues/relations', 201);
       res.status(201).json(data.issueRelationCreate);
     } catch (err) {
@@ -1970,6 +2041,7 @@ ${readEndpoints}${writeEndpoints}
       }
 
       const data = await client.request(DELETE_RELATION_MUTATION, { id: relationId });
+      if (writeRejected(req, res, '/api/proxy/issues/relations', data.issueRelationDelete, 'Relation was not removed')) return;
       logEvent(req, '/api/proxy/issues/relations', 200);
       res.json(data.issueRelationDelete);
     } catch (err) {
@@ -2026,6 +2098,7 @@ ${readEndpoints}${writeEndpoints}
         id: issueId,
         input: { labelIds: [...currentLabelIds, labelId] }
       });
+      if (writeRejected(req, res, '/api/proxy/issues/labels', data.issueUpdate, 'Label was not added')) return;
       logEvent(req, '/api/proxy/issues/labels', 200);
       res.json(data.issueUpdate);
     } catch (err) {
@@ -2078,6 +2151,7 @@ ${readEndpoints}${writeEndpoints}
         id: issueId,
         input: { labelIds: filtered }
       });
+      if (writeRejected(req, res, '/api/proxy/issues/labels', data.issueUpdate, 'Label was not removed')) return;
       logEvent(req, '/api/proxy/issues/labels', 200);
       res.json(data.issueUpdate);
     } catch (err) {
@@ -3389,6 +3463,7 @@ ${readEndpoints}${writeEndpoints}
 
       logEvent(req, '/api/proxy/dispatch', 201);
       res.status(201).json({
+        success: true,
         id: item._id,
         status: 'queued',
         promptName: item.promptName,
@@ -3549,6 +3624,7 @@ ${readEndpoints}${writeEndpoints}
         // (research) · dispatched") from the structured header, never a prompt body.
         const descent = describeDescent(deferredVia, rec);
         keepalive.send(201, {
+          success: true,
           id: item._id,
           status: 'queued',
           kind: item.kind,
