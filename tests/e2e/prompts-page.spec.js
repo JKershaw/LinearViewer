@@ -1,9 +1,26 @@
-import { test, expect } from '@playwright/test';
+/**
+ * E2E tests for the /prompts catalog page (migrated to the local provider in LIN-407).
+ *
+ * The prompts page is template-driven: its handler (server.js
+ * `GET /workspace/:urlKey/prompts`) renders the 15-template catalog from
+ * `lib/prompt-templates.js` and reads only workspace CONFIG — `workspace.name`,
+ * `urlKey`, `req.session.workspaces`, and feature flags — never issue data, a
+ * provider fetch, or `testMockData`. So this surface needs a plain
+ * `provider: 'local'` session and nothing more: `seedLocalWorkspace(page)`
+ * establishes it (workspace config only — no issue fixture, no AI mock, no
+ * feature flags), replacing the old `/test/set-session` + `test-workspace`
+ * mock harness.
+ */
+import { test, expect } from '../fixtures/test-base.js';
+import {
+  seedLocalWorkspace,
+  LOCAL_WORKSPACE_URL_KEY,
+} from '../fixtures/local-harness.js';
 
-// Workspace URL key used in test session
-const TEST_WORKSPACE_URL_KEY = 'test-workspace';
-const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;
-const PROMPTS_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/prompts`;
+// Local-provider workspace seeded via /test/set-local-session (LIN-407).
+const URL_KEY = LOCAL_WORKSPACE_URL_KEY;
+const WORKSPACE_URL = `/workspace/${URL_KEY}/`;
+const PROMPTS_URL = `/workspace/${URL_KEY}/prompts`;
 
 test.describe('Prompts Page', () => {
   test.describe('Unauthenticated', () => {
@@ -21,8 +38,9 @@ test.describe('Prompts Page', () => {
 
   test.describe('Authenticated', () => {
     test.beforeEach(async ({ page }) => {
-      // Set up test session
-      await page.goto('/test/set-session');
+      // Prompts page is template-driven and reads only workspace config, so a
+      // plain local session suffices — no issue/AI/flag seeding (LIN-407).
+      await seedLocalWorkspace(page);
     });
 
     test('renders prompts page', async ({ page }) => {
@@ -41,7 +59,7 @@ test.describe('Prompts Page', () => {
       // Should show workspace dropdown with workspace name
       const workspaceToggle = page.locator('#workspace-toggle');
       await expect(workspaceToggle).toBeVisible();
-      await expect(workspaceToggle).toContainText('Test Workspace');
+      await expect(workspaceToggle).toContainText('Local Workspace');
     });
 
     test('has back link to projects', async ({ page }) => {
@@ -127,12 +145,12 @@ test.describe('Prompts Page', () => {
       await expect(page.locator('.page-footer')).toBeVisible();
 
       // Should have settings link with workspace prefix
-      const settingsLink = page.locator(`.footer-action[href="/workspace/${TEST_WORKSPACE_URL_KEY}/settings"]`);
+      const settingsLink = page.locator(`.footer-action[href="/workspace/${URL_KEY}/settings"]`);
       await expect(settingsLink).toBeVisible();
       await expect(settingsLink).toContainText('settings');
 
       // Should have swim link with workspace prefix
-      const swimLink = page.locator(`.footer-action[href="/workspace/${TEST_WORKSPACE_URL_KEY}/swim"]`);
+      const swimLink = page.locator(`.footer-action[href="/workspace/${URL_KEY}/swim"]`);
       await expect(swimLink).toBeVisible();
     });
   });
