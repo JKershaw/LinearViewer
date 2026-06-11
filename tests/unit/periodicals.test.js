@@ -57,13 +57,16 @@ describe('periodicals registry', () => {
   });
 });
 
-// The shared two-stage "meta" contract (LIN-354): Stage 1 (the periodical
-// prompt itself) is a *task-generation* step — research the repo and mint ONE
-// project-specific review task, then stop. The minted task's description, which
-// the prompt dictates, carries the Stage-2 review contract: read prior runs,
-// produce an uncapped severity-ranked report, propose-but-don't-create follow-up
-// tickets, and leave the task In Progress for triage. Asserting this over the
-// whole registry locks the contract for new periodicals too.
+// The shared two-stage "meta" contract (LIN-354, concluded under LIN-386):
+// Stage 1 (the periodical prompt itself) is a *task-generation* step — research
+// the repo and mint ONE project-specific review task, then stop. The minted
+// task's description, which the prompt dictates, carries the Stage-2 review
+// contract: read prior runs, produce an uncapped severity-ranked report, then
+// SELF-CONCLUDE — mint a bounded set of high-severity follow-up tasks, summarise
+// the report in a Linear comment, and close the task. Leaving the task In
+// Progress (the original LIN-354 contract) made it loop on `review` forever
+// (LIN-386), so the task now ends itself. Asserting this over the whole registry
+// locks the contract for new periodicals too.
 describe('shared two-stage contract (all periodicals)', () => {
   for (const template of PERIODICALS) {
     describe(template.title, () => {
@@ -91,13 +94,19 @@ describe('shared two-stage contract (all periodicals)', () => {
         assert.match(prompt, /make-work/i);
       });
 
-      test('minted task contract: propose-don\'t-create, leave In Progress, review-only', () => {
-        assert.match(prompt, /follow-up ticket/i);
-        assert.match(prompt, /don't create them|do not create/i);
-        assert.match(prompt, /triage/i);
-        // The report run holds the task In Progress for the triage step.
-        assert.match(prompt, /In Progress/);
-        assert.match(prompt, /do not close|don't close/i);
+      test('minted task contract: bounded follow-up creation, self-conclude, review-only', () => {
+        // The task creates a CAPPED set of follow-up tasks itself (LIN-386),
+        // rather than the old propose-but-don't-create + leave-In-Progress
+        // contract that looped on `review` forever.
+        assert.match(prompt, /follow-up task/i);
+        assert.match(prompt, /bounded|cap it|at most/i);
+        // Every finding still lands in the report even if not promoted to a task.
+        assert.match(prompt, /every finding|not promote|nothing is lost/i);
+        // The task ends itself: Linear summary + close. It must NOT be left open.
+        assert.match(prompt, /conclude this task|move the task to its done|done\/completed state/i);
+        assert.match(prompt, /summary of the report/i);
+        assert.match(prompt, /do not leave it open|left open/i);
+        // Producing the report still changes no code.
         assert.match(prompt, /review-only/i);
       });
 
