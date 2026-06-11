@@ -109,7 +109,7 @@ describe('collectKpiStats', () => {
     assert.ok(stats.hourOfDay.every(count => count === 0));
     assert.strictEqual(stats.vanity.busiestDay, null);
     assert.strictEqual(stats.vanity.readsPerWrite, null);
-    assert.strictEqual(stats.vanity.medianMinutesToResolve, null);
+    assert.strictEqual(stats.vanity.medianQueueToTakeMinutes, null);
   });
 
   test('counts workspaces as the union of keys across collections', async () => {
@@ -285,7 +285,9 @@ describe('collectKpiStats', () => {
     assert.deepStrictEqual(stats.funnel, { dispatched: 5, taken: 3, reported: 2, completed: 1 });
   });
 
-  test('computes median dispatch→resolution minutes for taken items', async () => {
+  test('computes median queue→take latency minutes for taken items', async () => {
+    // resolvedAt is take/archive time (not completion), so this measures the
+    // dispatch→claim wait, not task duration (LIN-400).
     const minutes = (n) => new Date(NOW.getTime() - n * 60000);
     const collections = buildCollections({
       dispatchHistory: createMockCollection([
@@ -298,7 +300,7 @@ describe('collectKpiStats', () => {
     });
 
     const stats = await collectKpiStats(collections, { now: NOW });
-    assert.strictEqual(stats.vanity.medianMinutesToResolve, 30);
+    assert.strictEqual(stats.vanity.medianQueueToTakeMinutes, 30);
   });
 
   test('buckets step outcomes from foreman-status, defaulting to other', async () => {
