@@ -723,6 +723,98 @@ test.describe('Proxy API - Dispatch', () => {
     expect(watched.status).toBe('failed');
   });
 
+  // ---- Long-poll (?wait=Ns), LIN-392 -------------------------------------
+
+  test('?wait returns early the instant feedback arrives (no sleep/backoff)', async ({ request }) => {
+    const enqueue = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'long task', issueIdentifier: 'LIN-392' }
+    });
+    const { id } = await enqueue.json();
+    await request.post(`/api/dispatch/take/${id}`, {
+      headers: { Authorization: `Bearer ${consumerToken}` }
+    });
+
+    // Start a long-poll, then post a terminal marker shortly after. The held
+    // request should return promptly (well under its cap), not wait it out.
+    const started = Date.now();
+    const watchPromise = request.get(`/api/proxy/dispatch/${id}?wait=10`, {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    // Give the handler time to do its first (non-terminal) read and arm the wait.
+    await new Promise(r => setTimeout(r, 500));
+    await request.post(`/api/dispatch/feedback/${id}`, {
+      headers: { Authorization: `Bearer ${consumerToken}`, 'Content-Type': 'application/json' },
+      data: { message: '[done] landed in 3s' }
+    });
+
+    const watched = await (await watchPromise).json();
+    const elapsed = Date.now() - started;
+    expect(watched.status).toBe('done');
+    expect(elapsed).toBeLessThan(8000); // returned on the change, not at the 10s cap
+  });
+
+  test('?wait short-circuits immediately on an already-terminal item', async ({ request }) => {
+    const enqueue = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'already finished' }
+    });
+    const { id } = await enqueue.json();
+    await request.post(`/api/dispatch/take/${id}`, {
+      headers: { Authorization: `Bearer ${consumerToken}` }
+    });
+    await request.post(`/api/dispatch/feedback/${id}`, {
+      headers: { Authorization: `Bearer ${consumerToken}`, 'Content-Type': 'application/json' },
+      data: { message: '[done] finished before the watch started' }
+    });
+
+    // Even with a long cap, an already-terminal item returns at once — re-checking
+    // a finished item never incurs the hold.
+    const started = Date.now();
+    const watched = await (await request.get(`/api/proxy/dispatch/${id}?wait=30`, {
+      headers: { Authorization: `Bearer ${readToken}` }
+    })).json();
+    const elapsed = Date.now() - started;
+    expect(watched.status).toBe('done');
+    expect(elapsed).toBeLessThan(3000);
+  });
+
+  test('?wait returns the current snapshot at the cap when nothing changes', async ({ request }) => {
+    const enqueue = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'quiet task', issueIdentifier: 'LIN-393' }
+    });
+    const { id } = await enqueue.json();
+
+    // No transition during the window → resolves at the (short) cap with the
+    // current snapshot so the caller simply loops again.
+    const started = Date.now();
+    const watched = await (await request.get(`/api/proxy/dispatch/${id}?wait=2`, {
+      headers: { Authorization: `Bearer ${readToken}` }
+    })).json();
+    const elapsed = Date.now() - started;
+    expect(watched.status).toBe('queued');
+    expect(watched.issueIdentifier).toBe('LIN-393');
+    expect(elapsed).toBeGreaterThanOrEqual(1500); // it actually held
+  });
+
+  test('invalid / absent ?wait falls back to the immediate short-poll', async ({ request }) => {
+    const enqueue = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'short poll please', issueIdentifier: 'LIN-394' }
+    });
+    const { id } = await enqueue.json();
+
+    for (const qs of ['', '?wait=0', '?wait=abc', '?wait=-5']) {
+      const started = Date.now();
+      const watched = await (await request.get(`/api/proxy/dispatch/${id}${qs}`, {
+        headers: { Authorization: `Bearer ${readToken}` }
+      })).json();
+      expect(watched.status).toBe('queued');
+      expect(Date.now() - started).toBeLessThan(1500); // never held
+    }
+  });
+
   test('list finds items by issueIdentifier across queue and history', async ({ request }) => {
     // One item left queued, one taken — the list should surface both and
     // filtering by issueIdentifier should narrow to the right one.

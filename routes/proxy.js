@@ -403,6 +403,50 @@ function deriveTerminalStatus(feedback) {
   return null;
 }
 
+// Long-poll tuning for GET /api/proxy/dispatch/:id?wait=Ns (LIN-392).
+// DISPATCH_WAIT_MAX_S caps the hold below the ~60s ceiling that armKeepalive
+// (flush at 25s) buys us past Heroku's 30s H12; the re-check interval bounds
+// worst-case detection latency. Module-level so tests can drive the loop at
+// short `wait` values instead of real-time waits.
+const DISPATCH_WAIT_MAX_S = 50;
+const DISPATCH_WAIT_POLL_MS = 1500;
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Shapes a store item into the watch-endpoint response body. Shared by the
+// immediate short-poll and the long-poll so both return byte-identical JSON.
+function formatDispatchWatch(item) {
+  const terminalStatus = deriveTerminalStatus(item.feedback);
+  return {
+    id: item.id,
+    status: terminalStatus || item.status,
+    promptName: item.promptName,
+    kind: item.kind || 'custom',
+    issueIdentifier: item.issueIdentifier,
+    issueUrl: item.issueUrl,
+    target: item.target,
+    dispatchedAt: item.dispatchedAt,
+    resolvedAt: item.resolvedAt || null,
+    feedback: (item.feedback || []).map(f => ({
+      message: f.message,
+      url: f.url || null,
+      urlLabel: f.urlLabel || null,
+      timestamp: f.timestamp || null
+    }))
+  };
+}
+
+// A dispatch item has "changed" for long-poll purposes when its derived
+// terminal status appears (or shifts — last-marker-wins is not monotonic) or
+// new feedback arrives. Compared against a baseline snapshot captured on the
+// handler's first read.
+function dispatchWatchChanged(baseline, item) {
+  return (
+    (deriveTerminalStatus(item.feedback) || item.status) !== baseline.status ||
+    (item.feedback || []).length !== baseline.feedbackLength
+  );
+}
+
 // =============================================================================
 // GraphQL Queries
 // =============================================================================
@@ -3592,6 +3636,14 @@ ${readEndpoints}${writeEndpoints}
    * poll half of the autopilot loop — the orchestrator reads feedback here to
    * decide its next step. Feedback is free-form by design; the orchestrator
    * (the judge) reads it rather than relying on a structured "done" flag.
+   *
+   * Optional ?wait=Ns (LIN-392) turns this into a server-side long-poll: the
+   * handler holds the request open (re-checking the store every ~1.5s) and
+   * returns the instant the derived status transitions or new feedback arrives,
+   * else returns the current snapshot at a ~50s cap so the caller simply calls
+   * again. This collapses the autopilot watch loop to a no-sleep/no-backoff
+   * `do { GET ...?wait=50 } while (!terminal)`. No ?wait preserves today's
+   * immediate short-poll, byte-for-byte.
    */
   router.get('/api/proxy/dispatch/:id', proxyLimiter, authenticateProxyToken, async (req, res) => {
     if (!dispatchQueueStore) {
@@ -3605,6 +3657,12 @@ ${readEndpoints}${writeEndpoints}
       return res.status(400).json({ error: 'Invalid dispatch id' });
     }
 
+    // Parse + clamp ?wait. Garbage / non-positive → 0 → unchanged short-poll.
+    const waitSeconds = Math.min(
+      Math.max(0, Math.floor(Number(req.query.wait)) || 0),
+      DISPATCH_WAIT_MAX_S
+    );
+
     try {
       const item = await dispatchQueueStore.getItemStatus(req.proxyUrlKey, id);
       if (!item) {
@@ -3612,28 +3670,41 @@ ${readEndpoints}${writeEndpoints}
         return res.status(404).json({ error: 'Dispatch item not found' });
       }
 
+      // First read short-circuits: no wait requested, or already terminal.
+      // (The terminal short-circuit also keeps re-polling a finished item free
+      // — the caller can re-verify without ever incurring the hold.)
+      let current = item;
+      const alreadyTerminal = deriveTerminalStatus(current.feedback) !== null;
+      if (waitSeconds > 0 && !alreadyTerminal) {
+        // Hold the request open. armKeepalive flushes 200 + JSON whitespace at
+        // 25s so the connection survives Heroku's 30s H12 while we wait; the
+        // baseline is this first (non-terminal) read, so a change that already
+        // landed is reflected in the baseline AND in whatever we ultimately
+        // return — the caller never loses data, only an early return.
+        const keepalive = armKeepalive(res);
+        const baseline = {
+          status: deriveTerminalStatus(current.feedback) || current.status,
+          feedbackLength: (current.feedback || []).length
+        };
+        const deadline = Date.now() + waitSeconds * 1000;
+        while (Date.now() < deadline) {
+          await sleep(DISPATCH_WAIT_POLL_MS);
+          if (res.writableEnded || res.destroyed) {
+            keepalive.stop();
+            return; // client gave up
+          }
+          const next = await dispatchQueueStore.getItemStatus(req.proxyUrlKey, id);
+          if (!next) break; // item expired mid-wait; return last known snapshot
+          current = next;
+          if (dispatchWatchChanged(baseline, current)) break;
+        }
+        keepalive.stop();
+        logEvent(req, '/api/proxy/dispatch/:id', 200);
+        return keepalive.send(200, formatDispatchWatch(current));
+      }
+
       logEvent(req, '/api/proxy/dispatch/:id', 200);
-      // Surface a terminal status (done/failed/aborted) derived from the runner's
-      // final feedback marker, so the orchestrator can poll a field instead of
-      // parsing prose. Falls back to the queue lifecycle status (queued/taken).
-      const terminalStatus = deriveTerminalStatus(item.feedback);
-      res.json({
-        id: item.id,
-        status: terminalStatus || item.status,
-        promptName: item.promptName,
-        kind: item.kind || 'custom',
-        issueIdentifier: item.issueIdentifier,
-        issueUrl: item.issueUrl,
-        target: item.target,
-        dispatchedAt: item.dispatchedAt,
-        resolvedAt: item.resolvedAt || null,
-        feedback: (item.feedback || []).map(f => ({
-          message: f.message,
-          url: f.url || null,
-          urlLabel: f.urlLabel || null,
-          timestamp: f.timestamp || null
-        }))
-      });
+      res.json(formatDispatchWatch(current));
     } catch (err) {
       logEvent(req, '/api/proxy/dispatch/:id', 500);
       console.error('Proxy dispatch watch error:', err.message);

@@ -915,9 +915,29 @@ Returns `201`:
 
 ```
 GET /api/proxy/dispatch/{id}
+GET /api/proxy/dispatch/{id}?wait=50
 ```
 
 Poll this after enqueuing. `status` is terminal (`done`/`failed`/`aborted`) once the runner posts the matching feedback marker; until then it is `queued` or `taken`.
+
+**Long-poll with `?wait=Ns` (recommended for waiting).** Without `?wait`, the endpoint returns the current state immediately — a plain short-poll, so you own the waiting (and tend to oversleep). With `?wait=N` (capped at 50s) the server holds the request open and **returns the instant `status` transitions or new feedback arrives**, else returns the current snapshot at the cap so you simply call again. Your watch loop collapses to a no-sleep, no-backoff:
+
+```bash
+# bash — don't name the var `status` in zsh (it's a read-only alias for $?)
+while :; do
+  body=$(curl -s -H "Authorization: Bearer $TOKEN" \
+    "$BASE/api/proxy/dispatch/$ID?wait=50")
+  dispatch_status=$(jq -r .status <<<"$body")
+  case "$dispatch_status" in done|failed|aborted) break ;; esac
+done
+```
+
+Notes:
+- Detection latency is ~1–2s (the server's internal re-check interval), not "up to one sleep interval." One held request replaces many short polls — friendly to the 60/min rate limit.
+- A long hold may stream interior whitespace heartbeats inside the single `200` (same keepalive mechanism as `GET /recommend`); `JSON.parse` ignores them. Don't set a client timeout below ~60s when using `?wait`.
+- Re-polling an already-terminal item with `?wait` returns immediately (no hold) — re-verifying a finished item is free.
+- `?wait=0` / absent / invalid values are the plain immediate short-poll (fully backwards-compatible).
+- `status` is **reported, not adjudicated**: a `done` means the runner's session ended, not that the work is correct (a worker can background a long command, exit, and post `done` early). Treat `done` as "go look" — cross-check the `[evidence]` URLs, and if unsatisfied, dispatch fresh work. The long-poll never locks anything in.
 
 ```json
 {
