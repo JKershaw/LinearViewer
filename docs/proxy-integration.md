@@ -949,6 +949,7 @@ Notes:
   "target": "cli",
   "dispatchedAt": "...",
   "resolvedAt": "...",
+  "completedAt": "...",
   "feedback": [
     { "message": "[working] 6 tools in 32s: Bash×6 · next heartbeat in ≤1m", "url": null, "urlLabel": null, "timestamp": "..." },
     { "message": "[evidence] Pull request · 3 mentions", "url": "https://github.com/org/repo/pull/286", "urlLabel": null, "timestamp": "..." },
@@ -959,6 +960,8 @@ Notes:
 
 Feedback is free-form text — read it (the recap, heartbeats) for detail; `status` gives the terminal signal and `[evidence]` entries give the artifact URLs to verify against. Poll until `status` is terminal. (If you poll in a shell loop, don't name the variable `status`: zsh reserves it as a read-only alias for `$?` and the assignment aborts. Use `dispatch_status`, or run the loop under `bash`.)
 
+**Timestamps — don't mistake `resolvedAt` for completion.** `resolvedAt` is stamped when the runner *claims* the item (take/archive time); it lands seconds after `dispatchedAt` no matter how long the task runs, so it is **not** a completion signal. The truthful completion time is **`completedAt`** — the timestamp of the terminal `[done]`/`[failed]`/`[aborted]` feedback marker, `null` until that marker exists. `status` remains the authoritative completion *signal*; `completedAt` is the completion *time*.
+
 #### List Dispatches
 
 ```
@@ -968,7 +971,7 @@ GET /api/proxy/dispatch?issueIdentifier={LIN-42}&status={queued|taken|done|faile
 All query params optional. Merges the live queue and recent history, newest first — use it to resolve an item's `id` when you only know the issue. `status` is the same derived terminal status as the watch endpoint, so it is a valid filter value.
 
 ```json
-{ "items": [ { "id": "uuid", "status": "done", "promptName": "...", "issueIdentifier": "LIN-42", "issueUrl": "...", "target": "cli", "dispatchedAt": "...", "resolvedAt": "...", "feedbackCount": 10 } ], "total": 1 }
+{ "items": [ { "id": "uuid", "status": "done", "promptName": "...", "issueIdentifier": "LIN-42", "issueUrl": "...", "target": "cli", "dispatchedAt": "...", "resolvedAt": "...", "completedAt": "...", "feedbackCount": 10 } ], "total": 1 }
 ```
 
 ## Error Handling

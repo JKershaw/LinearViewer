@@ -58,7 +58,7 @@ function buildStats(overrides = {}) {
     vanity: {
       busiestDay: { day: '2026-06-10', count: 26 },
       readsPerWrite: 12.4,
-      medianMinutesToResolve: 11,
+      medianQueueToTakeMinutes: 11,
       dbBackend: 'mangodb'
     },
     ...overrides
@@ -121,25 +121,25 @@ describe('renderKpisPage', () => {
     const html = renderKpisPage(buildStats());
     assert.ok(html.includes('busiest day'));
     assert.ok(html.includes('reads per write: <strong>12.4:1</strong>'));
-    assert.ok(html.includes('median dispatch→done: <strong>11m</strong>'));
+    assert.ok(html.includes('median queue→take latency: <strong>11m</strong>'));
     assert.ok(html.includes('mangodb'));
     assert.ok(html.includes('<meta name="robots" content="noindex">'));
   });
 
-  test('formats long median resolution times in hours', () => {
+  test('formats long median queue→take latency in hours', () => {
     const html = renderKpisPage(buildStats({
-      vanity: { busiestDay: null, readsPerWrite: null, medianMinutesToResolve: 150, dbBackend: null }
+      vanity: { busiestDay: null, readsPerWrite: null, medianQueueToTakeMinutes: 150, dbBackend: null }
     }));
-    assert.ok(html.includes('median dispatch→done: <strong>2.5h</strong>'));
+    assert.ok(html.includes('median queue→take latency: <strong>2.5h</strong>'));
   });
 
   test('omits empty vanity stats when there is no activity', () => {
     const html = renderKpisPage(buildStats({
-      vanity: { busiestDay: null, readsPerWrite: null, medianMinutesToResolve: null, dbBackend: null }
+      vanity: { busiestDay: null, readsPerWrite: null, medianQueueToTakeMinutes: null, dbBackend: null }
     }));
     assert.ok(!html.includes('busiest day'));
     assert.ok(!html.includes('reads per write'));
-    assert.ok(!html.includes('median dispatch→done'));
+    assert.ok(!html.includes('median queue→take latency'));
     assert.ok(html.includes('generated:'));
   });
 });

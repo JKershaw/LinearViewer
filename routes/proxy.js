@@ -384,23 +384,48 @@ const TERMINAL_FEEDBACK_REGEX = /^\s*\[(done|complete|failed|aborted)\]/i;
 const TERMINAL_MARKER_TO_STATUS = { done: 'done', complete: 'done', failed: 'failed', aborted: 'aborted' };
 
 /**
- * Scans feedback entries for a terminal marker and returns the mapped status of
- * the LAST one found (the runner posts the terminal event last), or null if none.
+ * Scans feedback entries for a terminal marker and returns the LAST one found
+ * (the runner posts the terminal event last) as {entry, status}, or null if none.
  *
- * @param {Array<{message?: string}>} feedback
- * @returns {('done'|'failed'|'aborted')|null}
+ * @param {Array<{message?: string, timestamp?: string}>} feedback
+ * @returns {{entry: object, status: ('done'|'failed'|'aborted')}|null}
  */
-function deriveTerminalStatus(feedback) {
+function findTerminalFeedback(feedback) {
   if (!Array.isArray(feedback)) {
     return null;
   }
   for (let i = feedback.length - 1; i >= 0; i--) {
     const match = TERMINAL_FEEDBACK_REGEX.exec(feedback[i]?.message || '');
     if (match) {
-      return TERMINAL_MARKER_TO_STATUS[match[1].toLowerCase()];
+      return { entry: feedback[i], status: TERMINAL_MARKER_TO_STATUS[match[1].toLowerCase()] };
     }
   }
   return null;
+}
+
+/**
+ * The terminal status derived from the feedback markers, or null if none.
+ *
+ * @param {Array<{message?: string}>} feedback
+ * @returns {('done'|'failed'|'aborted')|null}
+ */
+function deriveTerminalStatus(feedback) {
+  return findTerminalFeedback(feedback)?.status || null;
+}
+
+/**
+ * The truthful task-completion time: the timestamp of the terminal feedback
+ * entry (when the runner posted [done]/[failed]/[aborted]), or null until that
+ * marker exists. Distinct from `resolvedAt`, which marks when the runner
+ * *claimed* the item (take/archive time) — that lands seconds after enqueue
+ * regardless of how long the work runs, so it must not be read as completion
+ * (LIN-400). Derived on read; no schema/storage change.
+ *
+ * @param {Array<{message?: string, timestamp?: string}>} feedback
+ * @returns {string|null}
+ */
+function deriveCompletedAt(feedback) {
+  return findTerminalFeedback(feedback)?.entry?.timestamp || null;
 }
 
 // Long-poll tuning for GET /api/proxy/dispatch/:id?wait=Ns (LIN-392).
@@ -426,7 +451,10 @@ function formatDispatchWatch(item) {
     issueUrl: item.issueUrl,
     target: item.target,
     dispatchedAt: item.dispatchedAt,
+    // resolvedAt is take/archive time (when the runner claimed the item), NOT
+    // completion. completedAt is the real completion time, null until terminal.
     resolvedAt: item.resolvedAt || null,
+    completedAt: deriveCompletedAt(item.feedback),
     feedback: (item.feedback || []).map(f => ({
       message: f.message,
       url: f.url || null,
@@ -1274,6 +1302,7 @@ GET ${baseUrl}/api/proxy/dispatch/{id}
   → Watch a dispatched item: whether it is still queued or has been taken by the runner, plus any feedback posted back. Poll this after dispatching.
   → { "id": "...", "status": "queued|taken|done|failed|aborted", "kind": "implementation", "feedback": [{ "message": "...", "url": "...", "timestamp": "..." }], ... }
   → status is terminal (done/failed/aborted) once the runner posts a "[done]"/"[failed]"/"[aborted]" feedback marker; until then it is queued or taken. Poll until status is terminal.
+  → completedAt is the real completion time (timestamp of the terminal marker), null until terminal. resolvedAt is take/archive time (lands seconds after dispatch) — do NOT read it as completion.
   → Feedback is free-form text — read it (e.g. the final recap) for the detail; status gives you the terminal signal without parsing prose.
 
 ## Shell Tip
@@ -3616,7 +3645,9 @@ ${readEndpoints}${writeEndpoints}
         issueUrl: i.issueUrl,
         target: i.target,
         dispatchedAt: i.dispatchedAt,
+        // resolvedAt = take/archive time; completedAt = real completion (null until terminal).
         resolvedAt: i.resolvedAt || null,
+        completedAt: deriveCompletedAt(i.feedback),
         feedbackCount: (i.feedback || []).length
       }));
 

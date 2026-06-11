@@ -682,6 +682,8 @@ test.describe('Proxy API - Dispatch', () => {
       headers: { Authorization: `Bearer ${readToken}` }
     })).json();
     expect(watched.status).toBe('taken');
+    // completedAt is null until a terminal marker exists (LIN-400).
+    expect(watched.completedAt).toBeNull();
 
     // Runner posts the terminal event last.
     await request.post(`/api/dispatch/feedback/${id}`, {
@@ -694,13 +696,21 @@ test.describe('Proxy API - Dispatch', () => {
     expect(watched.status).toBe('done');
     // Feedback stream is untouched — the recap/detail is still all there.
     expect(watched.feedback).toHaveLength(2);
+    // completedAt is the timestamp of the terminal feedback entry — the real
+    // completion time, distinct from resolvedAt (take time).
+    const terminalEntry = watched.feedback[watched.feedback.length - 1];
+    expect(watched.completedAt).toBe(terminalEntry.timestamp);
+    expect(watched.completedAt).not.toBeNull();
 
     // The derived status is filterable in the list endpoint too.
     const doneList = await (await request.get('/api/proxy/dispatch?status=done', {
       headers: { Authorization: `Bearer ${readToken}` }
     })).json();
-    expect(doneList.items.find(i => i.id === id)).toBeTruthy();
+    const listed = doneList.items.find(i => i.id === id);
+    expect(listed).toBeTruthy();
     expect(doneList.items.every(i => i.status === 'done')).toBe(true);
+    // List endpoint surfaces completedAt too.
+    expect(listed.completedAt).toBe(terminalEntry.timestamp);
   });
 
   test('watch surfaces a failed status from the [failed] feedback marker', async ({ request }) => {
