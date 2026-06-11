@@ -24,7 +24,7 @@ import { defaultLocalSeed, LOCAL_WORKSPACE_URL_KEY } from '../tests/fixtures/loc
  * @param {Function} options.getWorkspaceAccessToken - Function to look up workspace access token
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, reportHistoryStore, localStore, getWorkspaceAccessToken }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, briefCacheStore, reportHistoryStore, localStore, getWorkspaceAccessToken }) {
   const router = Router();
 
   // Endpoint to set a test session without going through OAuth flow
@@ -320,6 +320,22 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
         return res.status(400).json({ error: 'issueId required' });
       }
       await recapCacheStore.delete(urlKey, issueId);
+      res.send('ok');
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Endpoint to clear a specific brief cache entry for tests.
+  // Query params: ?urlKey=...&issueId=...
+  router.get('/test/clear-brief-cache', async (req, res) => {
+    try {
+      const urlKey = req.query.urlKey || 'test-workspace';
+      const issueId = req.query.issueId;
+      if (!issueId) {
+        return res.status(400).json({ error: 'issueId required' });
+      }
+      await briefCacheStore.delete(urlKey, issueId);
       res.send('ok');
     } catch (err) {
       res.status(500).json({ error: err.message });

@@ -499,3 +499,52 @@ test.describe('Recap UI — Swipe', () => {
     expect(hasList + hasEmpty).toBeGreaterThan(0);
   });
 });
+
+// ============================================================================
+// Brief accordion on the swipe card.
+// Relocated unchanged from brief.spec.js (LIN-404): this exercises the swipe
+// surface, which is NOT yet migrated to the local provider, so it stays on the
+// test-token (`/test/set-session`) path here rather than being rewritten.
+// ============================================================================
+
+test.describe('Brief UI — Swipe', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/test/set-session');
+    await page.goto(SWIPE_URL);
+    await page.waitForLoadState('networkidle');
+  });
+
+  test('swipe card renders brief accordion', async ({ page }) => {
+    const briefAccordion = page.locator('.swipe-accordion-header[data-accordion="brief"]').first();
+    await expect(briefAccordion).toBeVisible();
+    await expect(briefAccordion).toContainText(/Brief/i);
+  });
+
+  test('opening brief accordion initialises the section', async ({ page }) => {
+    const briefAccordion = page.locator('.swipe-accordion-header[data-accordion="brief"]').first();
+    await briefAccordion.click();
+
+    const body = page.locator('.swipe-accordion-body[data-accordion-body="brief"]').first();
+    await expect(body).toHaveClass(/open/);
+
+    const section = body.locator('.brief-section').first();
+    await expect(section).toHaveAttribute('data-state', /missing|fresh|stale|generating|loading/);
+  });
+
+  test('refresh button triggers POST and shows fresh content', async ({ page }) => {
+    const briefAccordion = page.locator('.swipe-accordion-header[data-accordion="brief"]').first();
+    await briefAccordion.click();
+
+    const section = page.locator('.swipe-accordion-body[data-accordion-body="brief"] .brief-section').first();
+    // Wait for the initial GET to resolve
+    await expect(section).not.toHaveAttribute('data-state', 'loading', { timeout: 5000 });
+
+    const refreshBtn = section.locator('[data-brief-refresh]');
+    await expect(refreshBtn).toBeVisible();
+    await refreshBtn.click();
+
+    // Should land on fresh with rendered Markdown content
+    await expect(section).toHaveAttribute('data-state', 'fresh', { timeout: 5000 });
+    await expect(section.locator('.brief-content')).toBeVisible();
+  });
+});
