@@ -1264,12 +1264,14 @@ describe('getPromptDescriptionsForAI', () => {
 });
 
 // =============================================================================
-// Surface Assessment (refactoring recommendations) — handwritten path
+// Surface Assessment necessity gate (LIN-192 origin, LIN-397 gate) — handwritten path
 //
-// The handwritten path must match the meta-prompt: research surfaces a refactor
-// recommendation (Surface Assessment), and plan turns a named prerequisite refactor
-// into a separate blocking subtask. The mirror tests for the AI path live in
-// tests/unit/openrouter.test.js.
+// The handwritten path must match the meta-prompt: research ends with a Surface
+// Assessment gated on necessity (consumer test + who-pays test, third verdict for
+// noticed-but-not-required improvements, size routed to sequencing), and plan turns
+// only a necessary prerequisite refactor into a separate blocking subtask. These
+// pin the gate, not just the section's presence. The mirror tests for the AI path
+// live in tests/unit/openrouter.test.js.
 // =============================================================================
 
 describe('Surface Assessment (handwritten path)', () => {
@@ -1287,7 +1289,21 @@ describe('Surface Assessment (handwritten path)', () => {
   test('research template ends research with a Surface Assessment', () => {
     const result = generatePrompt('research', mockIssue, mockContext);
     assert.ok(result.prompt.includes('Surface Assessment'), 'research must include Surface Assessment');
-    assert.ok(result.prompt.includes('refactor needed'), 'must offer the refactor-needed option');
+    assert.ok(result.prompt.includes('refactor required'), 'must offer the refactor-required verdict');
+  });
+
+  test('research gates the refactor verdict on necessity, not availability', () => {
+    const result = generatePrompt('research', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('Consumer test'), 'must require citing the in-task consumer of the new seam');
+    assert.ok(result.prompt.includes('Who-pays test'), 'must require a beneficiary-or-bystander accounting per touched consumer');
+    assert.ok(
+      result.prompt.includes('improvement noticed, not required'),
+      'must offer the third verdict so noticed improvements have a non-blocking home'
+    );
+    assert.ok(
+      result.prompt.includes('Size is not a rejection criterion'),
+      'size must route to sequencing, never to worth'
+    );
   });
 
   test('research routes the Surface Assessment into the comment so plan can read it', () => {
@@ -1298,13 +1314,29 @@ describe('Surface Assessment (handwritten path)', () => {
     );
   });
 
-  test('plan template sequences a prerequisite refactor as a separate blocking subtask', () => {
+  test('plan template sequences a necessary prerequisite refactor as a separate blocking subtask', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
     assert.ok(result.prompt.includes('Surface Assessment'), 'plan must reference the prior Surface Assessment');
-    assert.ok(result.prompt.includes('blocking subtask'), 'plan must encode a prerequisite refactor as a blocking subtask');
+    assert.ok(result.prompt.includes('blocking subtask'), 'plan must encode a necessary prerequisite refactor as a blocking subtask');
     assert.ok(
       result.prompt.includes('do not absorb the refactor into implementation'),
       'plan must preserve the sequencing guarantee'
+    );
+  });
+
+  test('plan template rejects consumer-less or bystander-taxing refactors', () => {
+    const result = generatePrompt('plan', mockIssue, mockContext);
+    assert.ok(
+      result.prompt.includes('refactor required'),
+      'the blocking-subtask ratchet must be conditioned on the refactor-required verdict'
+    );
+    assert.ok(
+      result.prompt.includes('no consumer in this task'),
+      'plan must reject refactors with no in-task consumer'
+    );
+    assert.ok(
+      result.prompt.includes('does not become a subtask'),
+      'rejected refactors are folded inline, scoped down, or noted — never spun into subtasks'
     );
   });
 });

@@ -765,12 +765,13 @@ describe('buildMetaPromptTemplate class check (LIN-313)', () => {
 });
 
 // =============================================================================
-// Surface Assessment (refactoring recommendations) — AI path
+// Surface Assessment necessity gate (LIN-192 origin, LIN-397 gate) — AI path
 //
-// Research must surface a refactor recommendation, and plan must sequence a named
-// prerequisite refactor as a separate blocking subtask. These guard the meta-prompt
-// rules against drift and mirror the handwritten-path tests in
-// tests/unit/prompt-templates.test.js.
+// Research must gate the refactor verdict on necessity (consumer test + who-pays
+// test, third verdict, size routed to sequencing), and plan must sequence only a
+// necessary prerequisite refactor as a separate blocking subtask while rejecting
+// speculative ones. These pin the gate against drift and mirror the
+// handwritten-path tests in tests/unit/prompt-templates.test.js.
 // =============================================================================
 
 describe('buildMetaPromptTemplate Surface Assessment', () => {
@@ -789,21 +790,39 @@ describe('buildMetaPromptTemplate Surface Assessment', () => {
     });
   }
 
-  test('research-prompts rule requires a Surface Assessment naming any refactor', () => {
+  test('research-prompts rule gates the Surface Assessment on necessity, not availability', () => {
     const result = build();
     assert.ok(result.includes('Surface Assessment'), 'meta-prompt must require a Surface Assessment');
-    assert.ok(result.includes('refactor needed'), 'must offer the refactor-needed option');
+    assert.ok(result.includes('refactor required'), 'must offer the refactor-required verdict');
+    assert.ok(result.includes('consumer test'), 'must require citing the in-task consumer of the new seam');
+    assert.ok(result.includes('who-pays test'), 'must require a beneficiary-or-bystander accounting per touched consumer');
+    assert.ok(
+      result.includes('improvement noticed, not required'),
+      'must offer the third verdict so noticed improvements have a non-blocking home'
+    );
+    assert.ok(
+      result.includes('Size is not a rejection criterion'),
+      'size must route to sequencing, never to worth'
+    );
   });
 
-  test('plan-prompts rule sequences a prerequisite refactor as a separate blocking subtask', () => {
+  test('plan-prompts rule sequences a necessary refactor and rejects speculative ones', () => {
     const result = build();
     assert.ok(
       result.includes('separate blocking subtask'),
-      'plan rule must encode a prerequisite refactor as a separate blocking subtask'
+      'plan rule must encode a necessary prerequisite refactor as a separate blocking subtask'
     );
     assert.ok(
       result.includes('do not absorb the refactor into implementation steps'),
       'plan rule must preserve the sequencing guarantee'
+    );
+    assert.ok(
+      result.includes('names its in-task consumer'),
+      'the blocking-subtask ratchet must be conditioned on a verdict naming its in-task consumer'
+    );
+    assert.ok(
+      result.includes('must not become a subtask'),
+      'consumer-less or bystander-taxing refactors are folded inline, scoped down, or noted'
     );
   });
 });
