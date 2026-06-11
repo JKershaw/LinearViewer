@@ -197,7 +197,9 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   // Endpoint to clear free tier usage for testing
   router.get('/test/clear-free-tier', async (req, res) => {
     try {
-      await freeTierStore.clear('test-workspace')
+      // urlKey-parameterized (default test-workspace) so a migrated local spec
+      // can clear/charge its OWN workspace's free-tier counter (LIN-405).
+      await freeTierStore.clear(req.query.urlKey || 'test-workspace')
       res.send('ok')
     } catch (err) {
       res.status(500).json({ error: err.message })
@@ -301,8 +303,9 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   router.get('/test/add-free-tier-usage', async (req, res) => {
     try {
       const count = parseInt(req.query.count, 10) || 1
+      const urlKey = req.query.urlKey || 'test-workspace'
       for (let i = 0; i < count; i++) {
-        await freeTierStore.recordUsage('test-workspace')
+        await freeTierStore.recordUsage(urlKey)
       }
       res.send('ok')
     } catch (err) {
@@ -455,6 +458,17 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
         req.session.openRouterApiKey = 'test-openrouter-key';
       } else {
         delete req.session.openRouterApiKey;
+      }
+
+      // Optionally simulate free-tier mode (no key, session flag), mirroring
+      // /test/set-session (L100-103). Needed for the recommend free-tier block,
+      // which charges via the session flag — CI sets no OPENROUTER_FREE_TIER_KEY,
+      // so the env-key gate never fires (LIN-405). Superset/no-op by default.
+      const freeTierEnabled = req.query.freeTierEnabled || (req.body && req.body.freeTierEnabled);
+      if (freeTierEnabled) {
+        req.session.freeTierEnabled = true;
+      } else {
+        delete req.session.freeTierEnabled;
       }
 
       req.session.save(() => res.json({ ok: true, urlKey: LOCAL_WS_URL_KEY }));

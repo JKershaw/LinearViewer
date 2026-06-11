@@ -184,16 +184,19 @@ export function createLocalProvider() {
  *
  * @param {import('@playwright/test').Page} page
  * @param {{projects?: Array, issues?: Array}} [seed] - defaults to defaultLocalSeed
- * @param {{features?: Object, openRouterConnected?: boolean}} [options] - session
- *   feature flags (whitelist-validated server-side) and, when truthy,
- *   `openRouterConnected` to provision a mock OpenRouter key on the local session
- *   (so e.g. roadmap specs reach the AI mock instead of resolveRoadmapLLM's 503).
+ * @param {{features?: Object, openRouterConnected?: boolean, freeTierEnabled?: boolean}} [options] -
+ *   session feature flags (whitelist-validated server-side); `openRouterConnected`
+ *   to provision a mock OpenRouter key on the local session (so e.g. roadmap specs
+ *   reach the AI mock instead of resolveRoadmapLLM's 503); and `freeTierEnabled` to
+ *   simulate free-tier mode (no key, session flag) for the recommend free-tier
+ *   block (LIN-405).
  * @returns {Promise<{urlKey: string, dashboard: string}>}
  */
-export async function seedLocalWorkspace(page, seed = defaultLocalSeed, { features, openRouterConnected } = {}) {
+export async function seedLocalWorkspace(page, seed = defaultLocalSeed, { features, openRouterConnected, freeTierEnabled } = {}) {
   const data = { ...seed };
   if (features) data.features = features;
   if (openRouterConnected) data.openRouterConnected = openRouterConnected;
+  if (freeTierEnabled) data.freeTierEnabled = freeTierEnabled;
   const resp = await page.request.post('/test/set-local-session', { data });
   if (!resp.ok()) {
     throw new Error(`seedLocalWorkspace failed: ${resp.status()} ${await resp.text()}`);

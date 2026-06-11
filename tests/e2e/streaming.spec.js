@@ -5,14 +5,27 @@
  * incrementally with phase indicators.
  *
  * LIN-185: Stream AI suggested prompt
+ * LIN-405: Migrated onto a GENUINE `provider: 'local'` session seeded from
+ * `workspaceApiLocalSeed`, not the `test-token` + `testMockData` mock
+ * short-circuit. The AI mock (generateMockRecommendation + mock SSE) still fires
+ * because `shouldMockAi` re-gates it onto local sessions (#388/#399); the recommend
+ * routes now read their DATA from the provider. The test-token 503 'AI not
+ * configured' coverage stays on its own (non-local) path, untouched.
  */
 import { test, expect } from '../fixtures/test-base.js';
+import {
+  seedLocalWorkspace,
+  workspaceApiLocalSeed,
+  LOCAL_WORKSPACE_URL_KEY,
+} from '../fixtures/local-harness.js';
 
-const WORKSPACE_URL = '/workspace/test-workspace';
-const API_PREFIX = '/workspace/test-workspace';
+const URL_KEY = LOCAL_WORKSPACE_URL_KEY;
+const WORKSPACE_URL = `/workspace/${URL_KEY}`;
+const API_PREFIX = `/workspace/${URL_KEY}`;
+// TEST-11: a leaf task labelled `blocked` → hits the leaf fast-path of the stream.
 const BLOCKED_ISSUE_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
-// A parent (container) task: TEST-1 has an incomplete child TEST-2, so the stream
-// takes the node/descent path rather than the leaf path (LIN-327/LIN-346).
+// A parent (container) task: TEST-1 (issue-1) has an incomplete child TEST-2, so the
+// stream takes the node/descent path rather than the leaf path (LIN-327/LIN-346).
 const PARENT_ISSUE_ID = 'issue-1';
 
 /**
@@ -47,7 +60,7 @@ function parseSSE(text) {
 
 test.describe('Streaming AI Recommendations - API', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/test/set-session');
+    await seedLocalWorkspace(page, workspaceApiLocalSeed, { openRouterConnected: true });
   });
 
   test('returns SSE content type', async ({ page }) => {
@@ -228,8 +241,11 @@ test.describe('Streaming AI Recommendations - API', () => {
 
 test.describe('Streaming AI Recommendations - Free Tier', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/test/clear-free-tier');
-    await page.goto('/test/set-session?freeTierEnabled=true');
+    // Seed a local session in free-tier mode (no key, session flag) so charging
+    // rides the session-flag path — CI sets no OPENROUTER_FREE_TIER_KEY (LIN-405).
+    // Clear THIS workspace's counter (the route charges workspace.urlKey).
+    await seedLocalWorkspace(page, workspaceApiLocalSeed, { freeTierEnabled: true });
+    await page.goto(`/test/clear-free-tier?urlKey=${URL_KEY}`);
   });
 
   test('includes free tier metadata in done event', async ({ page }) => {
@@ -247,7 +263,7 @@ test.describe('Streaming AI Recommendations - Free Tier', () => {
   });
 
   test('returns 429 when rate limited', async ({ page }) => {
-    await page.goto('/test/add-free-tier-usage?count=5');
+    await page.goto(`/test/add-free-tier-usage?count=5&urlKey=${URL_KEY}`);
 
     const response = await page.request.get(
       `${API_PREFIX}/api/recommend/${BLOCKED_ISSUE_ID}/stream`
@@ -271,9 +287,9 @@ async function expandPromptsSection(page, containerSelector, issueId) {
 
 test.describe('Streaming AI Recommendations - UI', () => {
   test.beforeEach(async ({ page }) => {
-    // AI suggest button requires OpenRouter to be configured
-    await page.goto('/test/set-session?openRouterConnected=true');
-    await page.goto(WORKSPACE_URL);
+    // AI suggest button requires OpenRouter to be configured.
+    await seedLocalWorkspace(page, workspaceApiLocalSeed, { openRouterConnected: true });
+    await page.goto(`${WORKSPACE_URL}/`);
     await page.waitForLoadState('networkidle');
   });
 
@@ -375,8 +391,11 @@ test.describe('Streaming AI Recommendations - UI', () => {
 
   test('LIN-191: dispatch and copy buttons disabled during streaming, enabled after', async ({ page }) => {
     // Re-setup with dispatch enabled
-    await page.goto(`/test/set-session?openRouterConnected=true&features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
-    await page.goto(WORKSPACE_URL);
+    await seedLocalWorkspace(page, workspaceApiLocalSeed, {
+      openRouterConnected: true,
+      features: { dispatch: true },
+    });
+    await page.goto(`${WORKSPACE_URL}/`);
     await page.waitForLoadState('networkidle');
 
     // Expand the blocked issue

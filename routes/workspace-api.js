@@ -99,6 +99,97 @@ function sendPromptResult(req, res, { json, prompt, identifier, downloadName }) 
 }
 
 /**
+ * Generate mock recommendation content for the AI mock (LIN-185, LIN-405).
+ *
+ * Shared by the streaming and non-streaming recommend endpoints. Kept
+ * SHAPE-TOLERANT so it serves BOTH the canonical provider issue (local
+ * sessions, post-LIN-405) and the Linear-shaped `testMockData` issue still
+ * passed by the soon-orphaned `isTestMode` stream block (deleted by LIN-413):
+ *   - labels arrive either as a plain `['blocked']` array or as `{ nodes: [...] }`;
+ *   - the identifier is read from `issue.identifier` (canonical urls end in a
+ *     UUID, so the historic `url.split('/').pop()` is only a last-ditch fallback).
+ * @param {Object} mockIssue - A canonical or Linear-shaped issue.
+ * @returns {{ reasoning: string, prompt: string, identifier: string }}
+ */
+export function generateMockRecommendation(mockIssue) {
+  const rawLabels = mockIssue.labels;
+  const labels = Array.isArray(rawLabels)
+    ? rawLabels
+    : (rawLabels?.nodes || []).map(l => l.name);
+  let reasoning = 'Start by getting an overview of what this task involves before deciding on the next steps.';
+  let goal = 'Summarize what this task involves and how it fits into the broader project context.';
+
+  if (labels.includes(WORK_ISSUE_LABELS.BLOCKED)) {
+    reasoning = 'This task is blocked. Analyzing the blocker will help identify ways to unblock progress.';
+    goal = 'Identify the blocker type and root cause, evaluate options to unblock, and recommend the best path.';
+  } else if (labels.includes(WORK_ISSUE_LABELS.BUG)) {
+    reasoning = 'This is a bug. Investigating the issue systematically will help find the root cause and fix.';
+    goal = 'Identify reproduction steps, hypothesize likely causes, and suggest a debugging approach.';
+  } else if (mockIssue.state?.type === 'backlog' || mockIssue.state?.type === 'unstarted') {
+    reasoning = 'This task is ready to start. Creating an implementation plan will provide a clear path forward.';
+    goal = 'Research the codebase, identify files to modify, and create a step-by-step implementation plan.';
+  }
+
+  const identifier = mockIssue.identifier || mockIssue.url?.split('/').pop() || 'ISSUE';
+
+  const prompt = `Help me with task ${identifier}
+
+## Context
+
+**Project:** Test Project
+**Status:** ${mockIssue.state?.name || 'Unknown'}
+${labels.length > 0 ? `**Labels:** ${labels.join(', ')}` : ''}
+
+## Goal
+
+${goal}`;
+
+  return { reasoning, prompt, identifier };
+}
+
+/**
+ * Build one mock recommendation hop from provider context for the resolver's
+ * `computeOne` (LIN-405). Deterministically mirrors what a single
+ * getRecommendation(Stream) call would return so a local (AI-mocked) session
+ * drives the SAME `resolveRecommendation` descent the real path uses:
+ *   - a parent whose focused child is non-terminal synthesises a `defer` to that
+ *     child (passing `children`/`state` through so the resolver's LIN-353
+ *     terminal-edge guard can validate the hop), so e.g. TEST-1 → TEST-2 descends;
+ *   - a leaf returns a real (non-defer) action carrying the mock prompt.
+ * @param {Object} ctx - provider.fetchRecommendationContext result.
+ * @returns {Object} A computeOne hop record.
+ */
+export function buildMockRecommendationHop(ctx) {
+  const base = {
+    identifier: ctx.issue.identifier,
+    truncated: false,
+    completionTokens: null,
+    issueUrl: ctx.issue.url,
+    repo: parseRepoFromDescription(ctx.project?.description),
+    state: ctx.issue.state,
+    children: ctx.children,
+  };
+  const focusChild = ctx.focusedChild?.issue;
+  if (focusChild) {
+    return {
+      ...base,
+      reasoning: `${ctx.issue.identifier} is a container → routing to ${focusChild.identifier}`,
+      prompt: null,
+      recommendedAction: 'defer',
+      deferTo: focusChild.identifier,
+    };
+  }
+  const { reasoning, prompt } = generateMockRecommendation(ctx.issue);
+  return {
+    ...base,
+    reasoning,
+    prompt,
+    recommendedAction: 'recommend',
+    deferTo: null,
+  };
+}
+
+/**
  * Create workspace API routes with required dependencies.
  * @param {Object} options
  * @param {Function} options.workspaceFromUrl - Middleware to extract workspace from URL
@@ -684,16 +775,26 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     }
 
     // Check if feature is enabled (except in test mode)
+    // `isTestMode` (test-token) gates the DATA mock; `mockAi` additionally fires
+    // the AI mock for local-provider sessions, whose data comes from the provider
+    // (LIN-388/LIN-405). The 503/free-tier guards key off `mockAi` so a migrated
+    // local session isn't 503'd for lacking an OpenRouter key.
     const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token'
+    const mockAi = shouldMockAi(workspace)
     const sessionApiKey = req.session.openRouterApiKey
     const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY
     const isFreeTier = !sessionApiKey && !process.env.OPENROUTER_API_KEY && !!freeTierKey
-    if (!isTestMode && !isRecommendationEnabled(sessionApiKey) && !freeTierKey) {
+    // Free-tier on the AI-mock path is the session flag (CI sets no env key, so
+    // `isFreeTier` is always false there); the test-token DATA mock charges its
+    // own inside the isTestMode block below, so this is scoped to !isTestMode.
+    const testIsFreeTier = req.session.freeTierEnabled && !sessionApiKey && !process.env.OPENROUTER_API_KEY
+    const surfaceFreeTier = !isTestMode && (mockAi ? testIsFreeTier : isFreeTier)
+    if (!mockAi && !isRecommendationEnabled(sessionApiKey) && !freeTierKey) {
       return res.status(503).json({ error: 'AI recommendation feature is not configured. Connect your OpenRouter account or set OPENROUTER_API_KEY.' })
     }
 
     // Atomically check rate limits and record usage before proceeding
-    if (!isTestMode && isFreeTier) {
+    if (surfaceFreeTier) {
       const check = await freeTierStore.tryUse(workspace.urlKey)
       if (!check.allowed) {
         return res.status(429).json({
@@ -809,6 +910,9 @@ ${goal}`
         computeOne: async (id) => {
           // Two-tier context for parent tasks; the focused child seeds the defer choice.
           const ctx = await getProviderForWorkspace(workspace).fetchRecommendationContext(getWorkspaceToken(workspace), id)
+          // AI mock (local session): synthesise the hop deterministically so the
+          // SAME resolver drives the descent without an OpenRouter call (LIN-405).
+          if (mockAi) return buildMockRecommendationHop(ctx)
           const r = await getRecommendation(
             ctx.issue,
             { parent: ctx.parent, siblings: ctx.siblings, project: ctx.project, children: ctx.children, comments: ctx.comments, focusedChild: ctx.focusedChild },
@@ -847,7 +951,7 @@ ${goal}`
       }
 
       // Include free tier metadata
-      if (isFreeTier) {
+      if (surfaceFreeTier) {
         const usage = await freeTierStore.getUsage(workspace.urlKey)
         result.freeTier = {
           used: true,
@@ -891,43 +995,6 @@ ${goal}`
   }
 
   /**
-   * Generate mock recommendation content for test mode.
-   * Shared logic between streaming and non-streaming endpoints.
-   */
-  function generateMockRecommendation(mockIssue) {
-    const labels = (mockIssue.labels?.nodes || []).map(l => l.name);
-    let reasoning = 'Start by getting an overview of what this task involves before deciding on the next steps.';
-    let goal = 'Summarize what this task involves and how it fits into the broader project context.';
-
-    if (labels.includes(WORK_ISSUE_LABELS.BLOCKED)) {
-      reasoning = 'This task is blocked. Analyzing the blocker will help identify ways to unblock progress.';
-      goal = 'Identify the blocker type and root cause, evaluate options to unblock, and recommend the best path.';
-    } else if (labels.includes(WORK_ISSUE_LABELS.BUG)) {
-      reasoning = 'This is a bug. Investigating the issue systematically will help find the root cause and fix.';
-      goal = 'Identify reproduction steps, hypothesize likely causes, and suggest a debugging approach.';
-    } else if (mockIssue.state?.type === 'backlog' || mockIssue.state?.type === 'unstarted') {
-      reasoning = 'This task is ready to start. Creating an implementation plan will provide a clear path forward.';
-      goal = 'Research the codebase, identify files to modify, and create a step-by-step implementation plan.';
-    }
-
-    const identifier = mockIssue.url?.split('/').pop() || 'ISSUE';
-
-    const prompt = `Help me with task ${identifier}
-
-## Context
-
-**Project:** Test Project
-**Status:** ${mockIssue.state?.name || 'Unknown'}
-${labels.length > 0 ? `**Labels:** ${labels.join(', ')}` : ''}
-
-## Goal
-
-${goal}`;
-
-    return { reasoning, prompt, identifier };
-  }
-
-  /**
    * Stream AI-generated prompt for a task via Server-Sent Events.
    * Delivers content incrementally with phase indicators.
    *
@@ -947,17 +1014,38 @@ ${goal}`;
       return res.status(400).json({ error: 'Invalid issue ID format' });
     }
 
+    // See the GET handler: `isTestMode` gates the DATA mock; `mockAi` fires the
+    // AI mock for local sessions; 503/free-tier guards key off `mockAi` (LIN-405).
     const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
+    const mockAi = shouldMockAi(workspace);
     const sessionApiKey = req.session.openRouterApiKey;
     const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
     const isFreeTier = !sessionApiKey && !process.env.OPENROUTER_API_KEY && !!freeTierKey;
+    const testIsFreeTier = req.session.freeTierEnabled && !sessionApiKey && !process.env.OPENROUTER_API_KEY;
+    const surfaceFreeTier = !isTestMode && (mockAi ? testIsFreeTier : isFreeTier);
 
-    if (!isTestMode && !isRecommendationEnabled(sessionApiKey) && !freeTierKey) {
+    if (!mockAi && !isRecommendationEnabled(sessionApiKey) && !freeTierKey) {
       return res.status(503).json({ error: 'AI recommendation feature is not configured.' });
     }
 
+    // AI-mock local path: a missing issue must 404 with a real HTTP status BEFORE
+    // the SSE headers flush. The production stream surfaces not-found as an in-stream
+    // `error` event (headers already sent), but the deterministic mock can verify
+    // existence up front, matching the test-token 404 contract (LIN-405). test-token
+    // keeps its own 404 in the isTestMode block below.
+    if (mockAi && !isTestMode) {
+      try {
+        await getProviderForWorkspace(workspace).fetchRecommendationContext(getWorkspaceToken(workspace), issueId);
+      } catch (err) {
+        if (/not found/i.test(err?.message)) {
+          return res.status(404).json({ error: 'Issue not found' });
+        }
+        throw err;
+      }
+    }
+
     // Rate limiting (before streaming starts)
-    if (!isTestMode && isFreeTier) {
+    if (surfaceFreeTier) {
       const check = await freeTierStore.tryUse(workspace.urlKey);
       if (!check.allowed) {
         return res.status(429).json({
@@ -1156,6 +1244,19 @@ ${goal}`;
                 id,
                 { signal: AbortSignal.any([hop.signal, AbortSignal.timeout(CONTEXT_FETCH_TIMEOUT_MS)]) }
               );
+              // AI mock (local session): synthesise the hop; the terminal hop streams
+              // its reasoning+prompt deltas (mirroring getRecommendationStream), while a
+              // defer hop streams nothing here — its breadcrumb comes from onHop (LIN-405).
+              if (mockAi) {
+                const mockHop = buildMockRecommendationHop(ctx);
+                if (!closed && mockHop.recommendedAction !== 'defer') {
+                  sendSSE(res, 'phase', { phase: 'reasoning' });
+                  sendSSE(res, 'delta', { section: 'reasoning', content: mockHop.reasoning });
+                  sendSSE(res, 'phase', { phase: 'prompt' });
+                  sendSSE(res, 'delta', { section: 'prompt', content: mockHop.prompt });
+                }
+                return mockHop;
+              }
               const r = await getRecommendationStream(
                 ctx.issue,
                 { parent: ctx.parent, siblings: ctx.siblings, project: ctx.project, children: ctx.children, comments: ctx.comments, focusedChild: ctx.focusedChild },
@@ -1185,7 +1286,7 @@ ${goal}`;
         if (closed) return;
 
         const metadata = { issueUrl: rec.issueUrl, repo: rec.repo, identifier: rec.identifier, deferredVia, deferTruncated, deferStopReason };
-        if (isFreeTier) {
+        if (surfaceFreeTier) {
           const usage = await freeTierStore.getUsage(workspace.urlKey);
           metadata.freeTier = { used: true, remaining: usage.remaining, limit: usage.limit, resetsAt: usage.resetsAt };
         }
@@ -1211,7 +1312,7 @@ ${goal}`;
         repo: parseRepoFromDescription(project?.description)
       };
 
-      if (isFreeTier) {
+      if (surfaceFreeTier) {
         const usage = await freeTierStore.getUsage(workspace.urlKey);
         metadata.freeTier = {
           used: true,
@@ -1221,26 +1322,43 @@ ${goal}`;
         };
       }
 
-      await getRecommendationStream(
-        issue,
-        { parent, siblings, project, children, comments, focusedChild },
-        {
-          apiKey: apiKeyToUse,
-          model: selectedModel,
-          featureFlags: getFeatureFlags(req.session),
-          providerUi: getProviderForWorkspace(workspace)?.ui || null,
-          signal: abortController.signal
-        },
-        (type, data) => {
-          if (closed) return;
-          // Merge metadata into the done event so all data arrives in one event
-          if (type === 'done') {
-            sendSSE(res, 'done', { ...data, ...metadata });
-          } else {
-            sendSSE(res, type, data);
+      // AI mock (local session) leaf fast-path: emit the same SSE phase/delta/done
+      // sequence the real token stream would, split into 2 chunks per section so
+      // the multi-chunk assembly assertions hold (LIN-405). The leaf TEST-11 reaches
+      // here (children=[]), so mocking only the descent computeOne would miss it.
+      if (mockAi) {
+        const { reasoning, prompt } = generateMockRecommendation(issue);
+        sendSSE(res, 'phase', { phase: 'reasoning' });
+        const reasoningMid = Math.floor(reasoning.length / 2);
+        sendSSE(res, 'delta', { section: 'reasoning', content: reasoning.slice(0, reasoningMid) });
+        sendSSE(res, 'delta', { section: 'reasoning', content: reasoning.slice(reasoningMid) });
+        sendSSE(res, 'phase', { phase: 'prompt' });
+        const promptMid = Math.floor(prompt.length / 2);
+        sendSSE(res, 'delta', { section: 'prompt', content: prompt.slice(0, promptMid) });
+        sendSSE(res, 'delta', { section: 'prompt', content: prompt.slice(promptMid) });
+        sendSSE(res, 'done', { truncated: false, completionTokens: null, ...metadata });
+      } else {
+        await getRecommendationStream(
+          issue,
+          { parent, siblings, project, children, comments, focusedChild },
+          {
+            apiKey: apiKeyToUse,
+            model: selectedModel,
+            featureFlags: getFeatureFlags(req.session),
+            providerUi: getProviderForWorkspace(workspace)?.ui || null,
+            signal: abortController.signal
+          },
+          (type, data) => {
+            if (closed) return;
+            // Merge metadata into the done event so all data arrives in one event
+            if (type === 'done') {
+              sendSSE(res, 'done', { ...data, ...metadata });
+            } else {
+              sendSSE(res, type, data);
+            }
           }
-        }
-      );
+        );
+      }
     } catch (error) {
       if (closed) return;
       console.error('Streaming recommendation error:', error);
