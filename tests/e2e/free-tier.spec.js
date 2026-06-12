@@ -1,10 +1,25 @@
 import { test, expect } from '../fixtures/test-base.js';
+import {
+  seedLocalWorkspace,
+  workspaceApiLocalSeed,
+  LOCAL_WORKSPACE_URL_KEY,
+} from '../fixtures/local-harness.js';
 
-// UUIDs for test issues (from mock-data.js)
+// Migrated onto a GENUINE `provider: 'local'` session (LIN-425, parent S3),
+// consume-only against the LIN-405 harness surface. `freeTierEnabled` rides the
+// third `options` arg of seedLocalWorkspace (NOT the seed object) — CI sets no
+// OPENROUTER_FREE_TIER_KEY, so charging goes through the session-flag path. The
+// recommend AI response stays mocked (`shouldMockAi` covers local). The free-tier
+// store is urlKey-partitioned and recommend charges `workspace.urlKey`, so every
+// `/test/clear-free-tier` and `/test/add-free-tier-usage` MUST pass
+// `?urlKey=local-workspace` (they default to `test-workspace`).
+
+// UUID for TEST-11 ("Blocked on external API access", In Progress) — a leaf task,
+// preserved by workspaceApiLocalSeed so existing locators/ids survive.
 const BLOCKED_ISSUE_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 
 // Workspace URL key used in test session
-const TEST_WORKSPACE_URL_KEY = 'test-workspace';
+const TEST_WORKSPACE_URL_KEY = LOCAL_WORKSPACE_URL_KEY;
 const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;
 const API_PREFIX = `/workspace/${TEST_WORKSPACE_URL_KEY}`;
 
@@ -24,9 +39,9 @@ async function expandPromptsSection(page, containerSelector, issueId) {
 test.describe('Free Tier API', () => {
   test.beforeEach(async ({ page }) => {
     // Set up session with free tier enabled (no OAuth, no env key)
-    await page.goto('/test/set-session?freeTierEnabled=true');
+    await seedLocalWorkspace(page, workspaceApiLocalSeed, { freeTierEnabled: true });
     // Clear any previous usage
-    await page.goto('/test/clear-free-tier');
+    await page.goto(`/test/clear-free-tier?urlKey=${TEST_WORKSPACE_URL_KEY}`);
   });
 
   test('recommend status returns free tier info', async ({ page }) => {
@@ -71,7 +86,7 @@ test.describe('Free Tier API', () => {
 
   test('returns 429 when daily limit is exceeded', async ({ page }) => {
     // Pre-fill usage to the limit
-    await page.goto('/test/add-free-tier-usage?count=5');
+    await page.goto(`/test/add-free-tier-usage?count=5&urlKey=${TEST_WORKSPACE_URL_KEY}`);
 
     const response = await page.request.get(`${API_PREFIX}/api/recommend/${BLOCKED_ISSUE_ID}`);
     expect(response.status()).toBe(429);
@@ -85,7 +100,7 @@ test.describe('Free Tier API', () => {
 
   test('status endpoint shows 0 remaining when limit exceeded', async ({ page }) => {
     // Pre-fill usage to the limit
-    await page.goto('/test/add-free-tier-usage?count=5');
+    await page.goto(`/test/add-free-tier-usage?count=5&urlKey=${TEST_WORKSPACE_URL_KEY}`);
 
     const response = await page.request.get(`${API_PREFIX}/api/recommend/status`);
     expect(response.status()).toBe(200);
@@ -96,7 +111,7 @@ test.describe('Free Tier API', () => {
 
   test('users with OAuth keys do not get free tier metadata', async ({ page }) => {
     // Set up session with OAuth (overrides free tier)
-    await page.goto('/test/set-session?openRouterConnected=true');
+    await seedLocalWorkspace(page, workspaceApiLocalSeed, { openRouterConnected: true });
 
     const response = await page.request.get(`${API_PREFIX}/api/recommend/${BLOCKED_ISSUE_ID}`);
     expect(response.status()).toBe(200);
@@ -106,7 +121,7 @@ test.describe('Free Tier API', () => {
   });
 
   test('recommend status shows oauth source when user has key', async ({ page }) => {
-    await page.goto('/test/set-session?openRouterConnected=true');
+    await seedLocalWorkspace(page, workspaceApiLocalSeed, { openRouterConnected: true });
 
     const response = await page.request.get(`${API_PREFIX}/api/recommend/status`);
     expect(response.status()).toBe(200);
@@ -118,7 +133,7 @@ test.describe('Free Tier API', () => {
 
   test('concurrent requests respect rate limits', async ({ page }) => {
     // Pre-fill usage to 3 of 5 (leaving 2 remaining)
-    await page.goto('/test/add-free-tier-usage?count=3');
+    await page.goto(`/test/add-free-tier-usage?count=3&urlKey=${TEST_WORKSPACE_URL_KEY}`);
 
     // Fire 4 concurrent requests — only 2 should succeed
     const results = await Promise.all(
@@ -146,8 +161,8 @@ test.describe('Free Tier API', () => {
 test.describe('Free Tier UI', () => {
   test.beforeEach(async ({ page }) => {
     // Set up free tier session and clear usage
-    await page.goto('/test/set-session?freeTierEnabled=true');
-    await page.goto('/test/clear-free-tier');
+    await seedLocalWorkspace(page, workspaceApiLocalSeed, { freeTierEnabled: true });
+    await page.goto(`/test/clear-free-tier?urlKey=${TEST_WORKSPACE_URL_KEY}`);
     await page.goto(WORKSPACE_URL);
     await page.waitForLoadState('networkidle');
   });
@@ -201,7 +216,7 @@ test.describe('Free Tier UI', () => {
 
   test('shows error message when limit exceeded', async ({ page }) => {
     // Pre-fill usage to the limit
-    await page.goto('/test/add-free-tier-usage?count=5');
+    await page.goto(`/test/add-free-tier-usage?count=5&urlKey=${TEST_WORKSPACE_URL_KEY}`);
     await page.goto(WORKSPACE_URL);
     await page.waitForLoadState('networkidle');
 
@@ -233,8 +248,8 @@ test.describe('Free Tier UI', () => {
 
 test.describe('Free Tier Settings', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/test/set-session?freeTierEnabled=true');
-    await page.goto('/test/clear-free-tier');
+    await seedLocalWorkspace(page, workspaceApiLocalSeed, { freeTierEnabled: true });
+    await page.goto(`/test/clear-free-tier?urlKey=${TEST_WORKSPACE_URL_KEY}`);
   });
 
   test('settings page shows free tier status', async ({ page }) => {
@@ -252,7 +267,7 @@ test.describe('Free Tier Settings', () => {
 
   test('settings page shows usage info', async ({ page }) => {
     // Use 2 prompts first
-    await page.goto('/test/add-free-tier-usage?count=2');
+    await page.goto(`/test/add-free-tier-usage?count=2&urlKey=${TEST_WORKSPACE_URL_KEY}`);
 
     await page.goto(`${API_PREFIX}/settings`);
     await page.waitForLoadState('networkidle');

@@ -1,15 +1,29 @@
 import { test, expect } from '../fixtures/test-base.js';
+import {
+  seedLocalWorkspace,
+  workspaceApiLocalSeed,
+  LOCAL_WORKSPACE_URL_KEY,
+} from '../fixtures/local-harness.js';
 
-// Workspace URL key used in test session
-const TEST_WORKSPACE_URL_KEY = 'test-workspace';
+// Migrated onto a GENUINE `provider: 'local'` session (LIN-425, parent S3) seeded
+// from `workspaceApiLocalSeed` — the same `testMockData` ids/titles the old
+// `test-token` path used, so TEST_ISSUE_ID (TEST-6) and the prompt-content
+// assertions survive. Flag-specific tests re-seed via the third `options` arg
+// (`{ features }`) instead of `/test/set-session?features=`.
+//
+// One faithful assertion shift: the prompt's tracker reference renders as the
+// provider's display name. On the local provider that is "in Local", not "in
+// Linear" (applyPromptCapabilities renames `Linear` → `Local`). The `linearMcp`
+// toggle still gates that reference identically — only the tracker name differs.
+const TEST_WORKSPACE_URL_KEY = LOCAL_WORKSPACE_URL_KEY;
 const SETTINGS_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/settings`;
-// UUID-format issue ID from mock data (issue-4 = "Beta task in progress", In Progress state)
+// UUID-format issue ID from the seed (TEST-6 = "Task needing preparation", Backlog)
 const TEST_ISSUE_ID = '66666666-6666-6666-6666-666666666666';
 
 test.describe('Feature Toggle Settings', () => {
   test.beforeEach(async ({ page }) => {
-    // Set up test session
-    await page.goto('/test/set-session');
+    // Seed a local-backed workspace with default feature flags.
+    await seedLocalWorkspace(page, workspaceApiLocalSeed);
   });
 
   test('settings page shows AI and Workflow sections with all toggles', async ({ page }) => {
@@ -107,26 +121,27 @@ test.describe('Feature Toggle Settings', () => {
   // Linear references toggle affects prompt content
   // =========================================================================
 
-  test('prompts include Linear references by default', async ({ page }) => {
-    // Default: linearMcp is ON
+  test('prompts include tracker references by default', async ({ page }) => {
+    // Default: linearMcp is ON. The tracker reference renders with the provider's
+    // display name — "in Local" on the local provider (was "in Linear" on Linear).
     const response = await page.request.get(
       `/workspace/${TEST_WORKSPACE_URL_KEY}/api/prompt/${TEST_ISSUE_ID}/look-into`
     );
     expect(response.ok()).toBeTruthy();
     const data = await response.json();
-    expect(data.prompt).toContain('in Linear');
+    expect(data.prompt).toContain('in Local');
   });
 
-  test('prompts exclude Linear references when linearMcp is off', async ({ page }) => {
-    // Set session with linearMcp OFF
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ linearMcp: false }))}`);
+  test('prompts exclude tracker references when linearMcp is off', async ({ page }) => {
+    // Re-seed with linearMcp OFF — the tracker reference must drop out entirely.
+    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { linearMcp: false } });
 
     const response = await page.request.get(
       `/workspace/${TEST_WORKSPACE_URL_KEY}/api/prompt/${TEST_ISSUE_ID}/look-into`
     );
     expect(response.ok()).toBeTruthy();
     const data = await response.json();
-    expect(data.prompt).not.toContain('in Linear');
+    expect(data.prompt).not.toContain('in Local');
   });
 
   // =========================================================================
@@ -145,7 +160,7 @@ test.describe('Feature Toggle Settings', () => {
 
   test('prompts include git workflow when featureBranches is on', async ({ page }) => {
     // Set session with featureBranches ON
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ featureBranches: true }))}`);
+    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { featureBranches: true } });
 
     const response = await page.request.get(
       `/workspace/${TEST_WORKSPACE_URL_KEY}/api/prompt/${TEST_ISSUE_ID}/plan`
@@ -172,7 +187,7 @@ test.describe('Feature Toggle Settings', () => {
   });
 
   test('dispatch UI is visible when dispatch is on', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { dispatch: true } });
 
     await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/`);
     await page.waitForLoadState('networkidle');
@@ -190,7 +205,7 @@ test.describe('Feature Toggle Settings', () => {
   });
 
   test('dispatch link visible in footer when dispatch on', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { dispatch: true } });
 
     await page.goto(SETTINGS_URL);
     await page.waitForLoadState('networkidle');
@@ -204,7 +219,7 @@ test.describe('Feature Toggle Settings', () => {
   // =========================================================================
 
   test('prompts section is hidden when promptButtons is off', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ promptButtons: false }))}`);
+    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { promptButtons: false } });
 
     await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/`);
     await page.waitForLoadState('networkidle');
@@ -234,7 +249,7 @@ test.describe('Feature Toggle Settings', () => {
   // =========================================================================
 
   test('AI suggest button is hidden when aiRecommendations is off', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ aiRecommendations: false }))}`);
+    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { aiRecommendations: false } });
 
     await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/`);
     await page.waitForLoadState('networkidle');
@@ -279,7 +294,7 @@ test.describe('Feature Toggle Settings', () => {
   });
 
   test('code review sub-toggles visible when codeReview is on', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ codeReview: true }))}`);
+    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { codeReview: true } });
 
     await page.goto(SETTINGS_URL);
     await page.waitForLoadState('networkidle');
@@ -310,7 +325,7 @@ test.describe('Feature Toggle Settings', () => {
 
   test('clicking codeReview toggle dynamically hides sub-toggles via AJAX', async ({ page }) => {
     // Start with codeReview ON
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ codeReview: true }))}`);
+    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { codeReview: true } });
     await page.goto(SETTINGS_URL);
     await page.waitForLoadState('networkidle');
 
@@ -353,7 +368,7 @@ test.describe('Feature Toggle Settings', () => {
   });
 
   test('plan prompt does NOT get code review sections (plan is not implementation)', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ codeReview: true, codeReviewCicd: true, codeReviewPr: true }))}`);
+    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { codeReview: true, codeReviewCicd: true, codeReviewPr: true } });
 
     const response = await page.request.get(
       `/workspace/${TEST_WORKSPACE_URL_KEY}/api/prompt/${TEST_ISSUE_ID}/plan`
@@ -367,7 +382,7 @@ test.describe('Feature Toggle Settings', () => {
   });
 
   test('implementation prompt also gets code review sections', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ codeReview: true, codeReviewCicd: true }))}`);
+    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { codeReview: true, codeReviewCicd: true } });
 
     const response = await page.request.get(
       `/workspace/${TEST_WORKSPACE_URL_KEY}/api/prompt/${TEST_ISSUE_ID}/implementation`
@@ -379,7 +394,7 @@ test.describe('Feature Toggle Settings', () => {
   });
 
   test('code-review prompt does NOT get code review sections', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ codeReview: true, codeReviewCicd: true }))}`);
+    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { codeReview: true, codeReviewCicd: true } });
 
     const response = await page.request.get(
       `/workspace/${TEST_WORKSPACE_URL_KEY}/api/prompt/${TEST_ISSUE_ID}/code-review`
@@ -417,7 +432,7 @@ test.describe('Feature Toggle Settings', () => {
   });
 
   test('proxy footer link visible when proxy is on', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
+    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { proxy: true } });
 
     await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/`);
     await page.waitForLoadState('networkidle');
@@ -433,7 +448,7 @@ test.describe('Feature Toggle Settings', () => {
   });
 
   test('proxy page loads when proxy is on', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
+    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { proxy: true } });
 
     await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/proxy`);
     await page.waitForLoadState('networkidle');
@@ -472,7 +487,7 @@ test.describe('Feature Toggle Settings', () => {
   });
 
   test('proxy toggle button rendered in prompt containers when proxy feature is on', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
+    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { proxy: true } });
 
     await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/`);
     await page.waitForLoadState('networkidle');
@@ -483,7 +498,7 @@ test.describe('Feature Toggle Settings', () => {
   });
 
   test('proxy toggle button appears on dispatch page when proxy is on', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true, dispatch: true }))}`);
+    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { proxy: true, dispatch: true } });
 
     await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/dispatch`);
     await page.waitForLoadState('networkidle');
@@ -495,7 +510,7 @@ test.describe('Feature Toggle Settings', () => {
   });
 
   test('proxy toggle button absent on dispatch page when proxy is off', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { dispatch: true } });
 
     await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/dispatch`);
     await page.waitForLoadState('networkidle');

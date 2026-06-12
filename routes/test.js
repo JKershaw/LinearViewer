@@ -206,11 +206,16 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     }
   })
 
-  // Endpoint to clear recent custom prompts for testing
+  // Endpoint to clear recent custom prompts for testing.
+  // Recents are stored per user (req.session.linearUserId), so clear the CURRENT
+  // session's user when one exists — a local session uses 'test-local-user-id',
+  // not the 'test-linear-user-id' the test-token path uses (LIN-425). Falls back
+  // to the test-token user for callers that clear before establishing a session.
   router.get('/test/clear-recent-prompts', async (req, res) => {
     try {
-      const prefs = await userPreferencesStore.getUserPreferences('test-linear-user-id');
-      await userPreferencesStore.saveUserPreferences('test-linear-user-id', {
+      const userId = req.session.linearUserId || 'test-linear-user-id';
+      const prefs = await userPreferencesStore.getUserPreferences(userId);
+      await userPreferencesStore.saveUserPreferences(userId, {
         ...prefs,
         recentCustomPrompts: {}
       });
