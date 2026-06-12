@@ -2,3 +2,6 @@ node_modules/
 .env
 data/
 test-results/
+
+# Real proxy task fixtures — contain live Linear task text; never commit to this public repo
+scripts/eval/fixtures/

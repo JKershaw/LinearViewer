@@ -1,0 +1,660 @@
+{
+  "meta": {
+    "model": "openai/gpt-5.4-mini",
+    "K": 3,
+    "arms": [
+      "baseline",
+      "disposition",
+      "broadened",
+      "completion-first"
+    ],
+    "date": "2026-06-12T17:34:33.816Z"
+  },
+  "agg": {
+    "baseline": {
+      "hit": 26,
+      "n": 30,
+      "byBucket": {
+        "review": {
+          "hit": 6,
+          "n": 6
+        },
+        "triage": {
+          "hit": 3,
+          "n": 3
+        },
+        "guard-research": {
+          "hit": 3,
+          "n": 3
+        },
+        "guard-common": {
+          "hit": 14,
+          "n": 18
+        }
+      },
+      "researchOverfire": 3,
+      "overfireN": 24
+    },
+    "disposition": {
+      "hit": 28,
+      "n": 30,
+      "byBucket": {
+        "review": {
+          "hit": 6,
+          "n": 6
+        },
+        "triage": {
+          "hit": 2,
+          "n": 3
+        },
+        "guard-research": {
+          "hit": 3,
+          "n": 3
+        },
+        "guard-common": {
+          "hit": 17,
+          "n": 18
+        }
+      },
+      "researchOverfire": 1,
+      "overfireN": 24
+    },
+    "broadened": {
+      "hit": 25,
+      "n": 30,
+      "byBucket": {
+        "review": {
+          "hit": 6,
+          "n": 6
+        },
+        "triage": {
+          "hit": 1,
+          "n": 3
+        },
+        "guard-research": {
+          "hit": 3,
+          "n": 3
+        },
+        "guard-common": {
+          "hit": 15,
+          "n": 18
+        }
+      },
+      "researchOverfire": 2,
+      "overfireN": 24
+    },
+    "completion-first": {
+      "hit": 24,
+      "n": 30,
+      "byBucket": {
+        "review": {
+          "hit": 6,
+          "n": 6
+        },
+        "triage": {
+          "hit": 1,
+          "n": 3
+        },
+        "guard-research": {
+          "hit": 3,
+          "n": 3
+        },
+        "guard-common": {
+          "hit": 14,
+          "n": 18
+        }
+      },
+      "researchOverfire": 1,
+      "overfireN": 24
+    }
+  },
+  "detail": [
+    {
+      "case": "review: terminal Done leaf",
+      "bucket": "review",
+      "arm": "baseline",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "review: terminal Done leaf",
+      "bucket": "review",
+      "arm": "disposition",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "review: terminal Done leaf",
+      "bucket": "review",
+      "arm": "broadened",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "review: terminal Done leaf",
+      "bucket": "review",
+      "arm": "completion-first",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "review: landed but still In Progress",
+      "bucket": "review",
+      "arm": "baseline",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "review: landed but still In Progress",
+      "bucket": "review",
+      "arm": "disposition",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "review: landed but still In Progress",
+      "bucket": "review",
+      "arm": "broadened",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "review: landed but still In Progress",
+      "bucket": "review",
+      "arm": "completion-first",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "triage: vague empty intent",
+      "bucket": "triage",
+      "arm": "baseline",
+      "expect": [
+        "triage",
+        "look into",
+        "research",
+        "scoping"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "research": 3
+      }
+    },
+    {
+      "case": "triage: vague empty intent",
+      "bucket": "triage",
+      "arm": "disposition",
+      "expect": [
+        "triage",
+        "look into",
+        "research",
+        "scoping"
+      ],
+      "hits": 2,
+      "K": 3,
+      "dist": {
+        "plan": 1,
+        "research": 2
+      }
+    },
+    {
+      "case": "triage: vague empty intent",
+      "bucket": "triage",
+      "arm": "broadened",
+      "expect": [
+        "triage",
+        "look into",
+        "research",
+        "scoping"
+      ],
+      "hits": 1,
+      "K": 3,
+      "dist": {
+        "plan": 2,
+        "research": 1
+      }
+    },
+    {
+      "case": "triage: vague empty intent",
+      "bucket": "triage",
+      "arm": "completion-first",
+      "expect": [
+        "triage",
+        "look into",
+        "research",
+        "scoping"
+      ],
+      "hits": 1,
+      "K": 3,
+      "dist": {
+        "plan": 2,
+        "look into": 1
+      }
+    },
+    {
+      "case": "guard research: external unpinned API",
+      "bucket": "guard-research",
+      "arm": "baseline",
+      "expect": [
+        "research",
+        "spike"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "research": 3
+      }
+    },
+    {
+      "case": "guard research: external unpinned API",
+      "bucket": "guard-research",
+      "arm": "disposition",
+      "expect": [
+        "research",
+        "spike"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "research": 3
+      }
+    },
+    {
+      "case": "guard research: external unpinned API",
+      "bucket": "guard-research",
+      "arm": "broadened",
+      "expect": [
+        "research",
+        "spike"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "research": 3
+      }
+    },
+    {
+      "case": "guard research: external unpinned API",
+      "bucket": "guard-research",
+      "arm": "completion-first",
+      "expect": [
+        "research",
+        "spike"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "research": 3
+      }
+    },
+    {
+      "case": "guard implement: trivial typo",
+      "bucket": "guard-common",
+      "arm": "baseline",
+      "expect": [
+        "implement"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "implement": 3
+      }
+    },
+    {
+      "case": "guard implement: trivial typo",
+      "bucket": "guard-common",
+      "arm": "disposition",
+      "expect": [
+        "implement"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "implement": 3
+      }
+    },
+    {
+      "case": "guard implement: trivial typo",
+      "bucket": "guard-common",
+      "arm": "broadened",
+      "expect": [
+        "implement"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "implement": 3
+      }
+    },
+    {
+      "case": "guard implement: trivial typo",
+      "bucket": "guard-common",
+      "arm": "completion-first",
+      "expect": [
+        "implement"
+      ],
+      "hits": 2,
+      "K": 3,
+      "dist": {
+        "implement": 2,
+        "implementation": 1
+      }
+    },
+    {
+      "case": "guard implement: plan documented, fits one session",
+      "bucket": "guard-common",
+      "arm": "baseline",
+      "expect": [
+        "implement"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "implement": 3
+      }
+    },
+    {
+      "case": "guard implement: plan documented, fits one session",
+      "bucket": "guard-common",
+      "arm": "disposition",
+      "expect": [
+        "implement"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "implement": 3
+      }
+    },
+    {
+      "case": "guard implement: plan documented, fits one session",
+      "bucket": "guard-common",
+      "arm": "broadened",
+      "expect": [
+        "implement"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "implement": 3
+      }
+    },
+    {
+      "case": "guard implement: plan documented, fits one session",
+      "bucket": "guard-common",
+      "arm": "completion-first",
+      "expect": [
+        "implement"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "implement": 3
+      }
+    },
+    {
+      "case": "guard plan: multi-surface, no plan",
+      "bucket": "guard-common",
+      "arm": "baseline",
+      "expect": [
+        "plan"
+      ],
+      "hits": 2,
+      "K": 3,
+      "dist": {
+        "research": 1,
+        "plan": 2
+      }
+    },
+    {
+      "case": "guard plan: multi-surface, no plan",
+      "bucket": "guard-common",
+      "arm": "disposition",
+      "expect": [
+        "plan"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "plan": 3
+      }
+    },
+    {
+      "case": "guard plan: multi-surface, no plan",
+      "bucket": "guard-common",
+      "arm": "broadened",
+      "expect": [
+        "plan"
+      ],
+      "hits": 1,
+      "K": 3,
+      "dist": {
+        "plan": 1,
+        "research": 2
+      }
+    },
+    {
+      "case": "guard plan: multi-surface, no plan",
+      "bucket": "guard-common",
+      "arm": "completion-first",
+      "expect": [
+        "plan"
+      ],
+      "hits": 2,
+      "K": 3,
+      "dist": {
+        "plan": 2,
+        "research": 1
+      }
+    },
+    {
+      "case": "guard blocked",
+      "bucket": "guard-common",
+      "arm": "baseline",
+      "expect": [
+        "blocked"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "blocked": 3
+      }
+    },
+    {
+      "case": "guard blocked",
+      "bucket": "guard-common",
+      "arm": "disposition",
+      "expect": [
+        "blocked"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "blocked": 3
+      }
+    },
+    {
+      "case": "guard blocked",
+      "bucket": "guard-common",
+      "arm": "broadened",
+      "expect": [
+        "blocked"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "blocked": 3
+      }
+    },
+    {
+      "case": "guard blocked",
+      "bucket": "guard-common",
+      "arm": "completion-first",
+      "expect": [
+        "blocked"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "blocked": 3
+      }
+    },
+    {
+      "case": "guard bug",
+      "bucket": "guard-common",
+      "arm": "baseline",
+      "expect": [
+        "bug"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "bug": 3
+      }
+    },
+    {
+      "case": "guard bug",
+      "bucket": "guard-common",
+      "arm": "disposition",
+      "expect": [
+        "bug"
+      ],
+      "hits": 2,
+      "K": 3,
+      "dist": {
+        "research": 1,
+        "bug": 2
+      }
+    },
+    {
+      "case": "guard bug",
+      "bucket": "guard-common",
+      "arm": "broadened",
+      "expect": [
+        "bug"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "bug": 3
+      }
+    },
+    {
+      "case": "guard bug",
+      "bucket": "guard-common",
+      "arm": "completion-first",
+      "expect": [
+        "bug"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "bug": 3
+      }
+    },
+    {
+      "case": "guard breakdown: plan says needs multiple sessions",
+      "bucket": "guard-common",
+      "arm": "baseline",
+      "expect": [
+        "breakdown"
+      ],
+      "hits": 0,
+      "K": 3,
+      "dist": {
+        "research": 2,
+        "plan": 1
+      }
+    },
+    {
+      "case": "guard breakdown: plan says needs multiple sessions",
+      "bucket": "guard-common",
+      "arm": "disposition",
+      "expect": [
+        "breakdown"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "breakdown": 3
+      }
+    },
+    {
+      "case": "guard breakdown: plan says needs multiple sessions",
+      "bucket": "guard-common",
+      "arm": "broadened",
+      "expect": [
+        "breakdown"
+      ],
+      "hits": 2,
+      "K": 3,
+      "dist": {
+        "breakdown": 2,
+        "plan": 1
+      }
+    },
+    {
+      "case": "guard breakdown: plan says needs multiple sessions",
+      "bucket": "guard-common",
+      "arm": "completion-first",
+      "expect": [
+        "breakdown"
+      ],
+      "hits": 1,
+      "K": 3,
+      "dist": {
+        "plan": 2,
+        "breakdown": 1
+      }
+    }
+  ]
+}
