@@ -1,0 +1,749 @@
+{
+  "meta": {
+    "model": "openai/gpt-5.4-mini",
+    "K": 3,
+    "arms": [
+      "baseline",
+      "disposition",
+      "broadened",
+      "completion-first"
+    ],
+    "date": "2026-06-12T17:57:56.955Z"
+  },
+  "agg": {
+    "baseline": {
+      "hit": 31,
+      "n": 36,
+      "byBucket": {
+        "node": {
+          "hit": 4,
+          "n": 6
+        },
+        "review": {
+          "hit": 24,
+          "n": 24
+        },
+        "blocked": {
+          "hit": 2,
+          "n": 3
+        },
+        "implement": {
+          "hit": 1,
+          "n": 3
+        }
+      },
+      "researchOverfire": 1,
+      "overfireN": 36
+    },
+    "disposition": {
+      "hit": 33,
+      "n": 36,
+      "byBucket": {
+        "node": {
+          "hit": 6,
+          "n": 6
+        },
+        "review": {
+          "hit": 24,
+          "n": 24
+        },
+        "blocked": {
+          "hit": 0,
+          "n": 3
+        },
+        "implement": {
+          "hit": 3,
+          "n": 3
+        }
+      },
+      "researchOverfire": 0,
+      "overfireN": 36
+    },
+    "broadened": {
+      "hit": 35,
+      "n": 36,
+      "byBucket": {
+        "node": {
+          "hit": 6,
+          "n": 6
+        },
+        "review": {
+          "hit": 24,
+          "n": 24
+        },
+        "blocked": {
+          "hit": 3,
+          "n": 3
+        },
+        "implement": {
+          "hit": 2,
+          "n": 3
+        }
+      },
+      "researchOverfire": 0,
+      "overfireN": 36
+    },
+    "completion-first": {
+      "hit": 35,
+      "n": 36,
+      "byBucket": {
+        "node": {
+          "hit": 5,
+          "n": 6
+        },
+        "review": {
+          "hit": 24,
+          "n": 24
+        },
+        "blocked": {
+          "hit": 3,
+          "n": 3
+        },
+        "implement": {
+          "hit": 3,
+          "n": 3
+        }
+      },
+      "researchOverfire": 0,
+      "overfireN": 36
+    }
+  },
+  "detail": [
+    {
+      "case": "LIN-385",
+      "bucket": "node",
+      "arm": "baseline",
+      "expect": [
+        "defer"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "defer": 3
+      }
+    },
+    {
+      "case": "LIN-385",
+      "bucket": "node",
+      "arm": "disposition",
+      "expect": [
+        "defer"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "defer": 3
+      }
+    },
+    {
+      "case": "LIN-385",
+      "bucket": "node",
+      "arm": "broadened",
+      "expect": [
+        "defer"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "defer": 3
+      }
+    },
+    {
+      "case": "LIN-385",
+      "bucket": "node",
+      "arm": "completion-first",
+      "expect": [
+        "defer"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "defer": 3
+      }
+    },
+    {
+      "case": "LIN-389",
+      "bucket": "node",
+      "arm": "baseline",
+      "expect": [
+        "defer"
+      ],
+      "hits": 1,
+      "K": 3,
+      "dist": {
+        "defer": 1,
+        "breakdown": 2
+      }
+    },
+    {
+      "case": "LIN-389",
+      "bucket": "node",
+      "arm": "disposition",
+      "expect": [
+        "defer"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "defer": 3
+      }
+    },
+    {
+      "case": "LIN-389",
+      "bucket": "node",
+      "arm": "broadened",
+      "expect": [
+        "defer"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "defer": 3
+      }
+    },
+    {
+      "case": "LIN-389",
+      "bucket": "node",
+      "arm": "completion-first",
+      "expect": [
+        "defer"
+      ],
+      "hits": 2,
+      "K": 3,
+      "dist": {
+        "defer": 2,
+        "breakdown": 1
+      }
+    },
+    {
+      "case": "LIN-388",
+      "bucket": "review",
+      "arm": "baseline",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "LIN-388",
+      "bucket": "review",
+      "arm": "disposition",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "LIN-388",
+      "bucket": "review",
+      "arm": "broadened",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "LIN-388",
+      "bucket": "review",
+      "arm": "completion-first",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "LIN-390",
+      "bucket": "blocked",
+      "arm": "baseline",
+      "expect": [
+        "blocked",
+        "implement"
+      ],
+      "hits": 2,
+      "K": 3,
+      "dist": {
+        "blocked": 2,
+        "research": 1
+      }
+    },
+    {
+      "case": "LIN-390",
+      "bucket": "blocked",
+      "arm": "disposition",
+      "expect": [
+        "blocked",
+        "implement"
+      ],
+      "hits": 0,
+      "K": 3,
+      "dist": {
+        "breakdown": 1,
+        "plan": 2
+      }
+    },
+    {
+      "case": "LIN-390",
+      "bucket": "blocked",
+      "arm": "broadened",
+      "expect": [
+        "blocked",
+        "implement"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "blocked": 2,
+        "implement": 1
+      }
+    },
+    {
+      "case": "LIN-390",
+      "bucket": "blocked",
+      "arm": "completion-first",
+      "expect": [
+        "blocked",
+        "implement"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "implement": 1,
+        "blocked": 2
+      }
+    },
+    {
+      "case": "LIN-428",
+      "bucket": "implement",
+      "arm": "baseline",
+      "expect": [
+        "implement"
+      ],
+      "hits": 1,
+      "K": 3,
+      "dist": {
+        "plan": 2,
+        "implement": 1
+      }
+    },
+    {
+      "case": "LIN-428",
+      "bucket": "implement",
+      "arm": "disposition",
+      "expect": [
+        "implement"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "implement": 3
+      }
+    },
+    {
+      "case": "LIN-428",
+      "bucket": "implement",
+      "arm": "broadened",
+      "expect": [
+        "implement"
+      ],
+      "hits": 2,
+      "K": 3,
+      "dist": {
+        "plan": 1,
+        "implement": 2
+      }
+    },
+    {
+      "case": "LIN-428",
+      "bucket": "implement",
+      "arm": "completion-first",
+      "expect": [
+        "implement"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "implement": 3
+      }
+    },
+    {
+      "case": "LIN-387",
+      "bucket": "review",
+      "arm": "baseline",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "LIN-387",
+      "bucket": "review",
+      "arm": "disposition",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "LIN-387",
+      "bucket": "review",
+      "arm": "broadened",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "LIN-387",
+      "bucket": "review",
+      "arm": "completion-first",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "LIN-403",
+      "bucket": "review",
+      "arm": "baseline",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "LIN-403",
+      "bucket": "review",
+      "arm": "disposition",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "LIN-403",
+      "bucket": "review",
+      "arm": "broadened",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "LIN-403",
+      "bucket": "review",
+      "arm": "completion-first",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "LIN-405",
+      "bucket": "review",
+      "arm": "baseline",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "LIN-405",
+      "bucket": "review",
+      "arm": "disposition",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "LIN-405",
+      "bucket": "review",
+      "arm": "broadened",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "LIN-405",
+      "bucket": "review",
+      "arm": "completion-first",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "LIN-406",
+      "bucket": "review",
+      "arm": "baseline",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "LIN-406",
+      "bucket": "review",
+      "arm": "disposition",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "LIN-406",
+      "bucket": "review",
+      "arm": "broadened",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "LIN-406",
+      "bucket": "review",
+      "arm": "completion-first",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "LIN-412",
+      "bucket": "review",
+      "arm": "baseline",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "LIN-412",
+      "bucket": "review",
+      "arm": "disposition",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "LIN-412",
+      "bucket": "review",
+      "arm": "broadened",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "LIN-412",
+      "bucket": "review",
+      "arm": "completion-first",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "LIN-424",
+      "bucket": "review",
+      "arm": "baseline",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "LIN-424",
+      "bucket": "review",
+      "arm": "disposition",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "LIN-424",
+      "bucket": "review",
+      "arm": "broadened",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "LIN-424",
+      "bucket": "review",
+      "arm": "completion-first",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "LIN-427",
+      "bucket": "review",
+      "arm": "baseline",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "LIN-427",
+      "bucket": "review",
+      "arm": "disposition",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "LIN-427",
+      "bucket": "review",
+      "arm": "broadened",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    },
+    {
+      "case": "LIN-427",
+      "bucket": "review",
+      "arm": "completion-first",
+      "expect": [
+        "review"
+      ],
+      "hits": 3,
+      "K": 3,
+      "dist": {
+        "review": 3
+      }
+    }
+  ]
+}
