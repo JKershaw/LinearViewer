@@ -5,7 +5,8 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { buildForest, buildInProgressForest, NO_PROJECT_ID, PERIODICALS_PROJECT_ID, isTerminalState, isCompleted, TERMINAL_STATE_TYPES } from '../../lib/tree.js';
+import { buildForest, buildInProgressForest, NO_PROJECT_ID, PERIODICALS_PROJECT_ID, isTerminalState, isCompleted, TERMINAL_STATE_TYPES, selectFocusSubtask, computeFrontierFacts } from '../../lib/tree.js';
+import { childrenToGraphNodes, computeGraphFeatures } from '../../lib/graph-features.js';
 
 // =============================================================================
 // Test Helpers
@@ -321,5 +322,186 @@ describe('isCompleted', () => {
   test('treats started-state issues as not completed', () => {
     const issue = { state: { name: 'In Progress', type: 'started' } };
     assert.strictEqual(isCompleted(issue), false);
+  });
+});
+
+// =============================================================================
+// selectFocusSubtask — frontier ranking + skip-blocked (LIN-433)
+// =============================================================================
+
+/**
+ * Build a canonical child. `inverseBlocks` is a list of {identifier, type}
+ * blockers — modelling "blocker blocks this child" via the child's inverse
+ * `blocks` edge, which is how canonical children actually carry blocking data
+ * (no forward blocksIds). `blockedLabel` adds the soft `blocked` label.
+ */
+function makeChild(identifier, type, { inverseBlocks = [], blockedLabel = false } = {}) {
+  return {
+    id: 'id-' + identifier,
+    identifier,
+    title: identifier,
+    state: { name: type, type },
+    labels: { nodes: blockedLabel ? [{ name: 'blocked' }] : [] },
+    inverseRelations: {
+      nodes: inverseBlocks.map(b => ({
+        type: 'blocks',
+        issue: { id: 'id-' + b.identifier, state: { type: b.type || 'unstarted' } }
+      }))
+    }
+  };
+}
+
+describe('childrenToGraphNodes (LIN-433)', () => {
+  test('reconstructs in-set blocksIds from inverse blocks edges', () => {
+    // LIN-30 blocks LIN-40 (modelled as inverse-blocks on LIN-40).
+    const children = [
+      makeChild('LIN-30', 'unstarted'),
+      makeChild('LIN-40', 'unstarted', { inverseBlocks: [{ identifier: 'LIN-30' }] })
+    ];
+    const nodes = childrenToGraphNodes(children);
+    const blocker = nodes.find(n => n.identifier === 'LIN-30');
+    assert.deepStrictEqual(blocker.blocksIds, ['id-LIN-40']);
+  });
+
+  test('ignores blockers that are not in the sibling set', () => {
+    const children = [
+      makeChild('LIN-40', 'unstarted', { inverseBlocks: [{ identifier: 'LIN-99' }] })
+    ];
+    const nodes = childrenToGraphNodes(children);
+    assert.deepStrictEqual(nodes[0].blocksIds, []);
+  });
+
+  test('does not mutate the input children', () => {
+    const children = [makeChild('LIN-1', 'unstarted')];
+    childrenToGraphNodes(children);
+    assert.strictEqual(children[0].downstreamUnblocks, undefined);
+    assert.strictEqual(children[0].blocksIds, undefined);
+  });
+});
+
+describe('selectFocusSubtask', () => {
+  test('(i) HAR-149 shape: a blocked in-progress child is NOT chosen; the non-blocked frontier is', () => {
+    // LIN-2 is in progress but blocked by active LIN-9; LIN-3 is in progress, free.
+    const children = [
+      makeChild('LIN-2', 'started', { inverseBlocks: [{ identifier: 'LIN-9', type: 'started' }] }),
+      makeChild('LIN-3', 'started')
+    ];
+    assert.strictEqual(selectFocusSubtask(children).identifier, 'LIN-3');
+  });
+
+  test('(i) all in-progress children blocked → descends to the non-blocked todo, not the blocked started child', () => {
+    const children = [
+      makeChild('LIN-2', 'started', { inverseBlocks: [{ identifier: 'LIN-9', type: 'started' }] }),
+      makeChild('LIN-5', 'unstarted')
+    ];
+    assert.strictEqual(selectFocusSubtask(children).identifier, 'LIN-5');
+  });
+
+  test('(ii) within a tier, higher downstreamUnblocks wins over identifier order', () => {
+    // Non-blocked todos: LIN-30 (blocks LIN-40) and LIN-20 (blocks nothing).
+    // Identifier order would pick LIN-20; frontier ranking prefers LIN-30 (unblocks 1).
+    const children = [
+      makeChild('LIN-20', 'unstarted'),
+      makeChild('LIN-30', 'unstarted'),
+      makeChild('LIN-40', 'unstarted', { inverseBlocks: [{ identifier: 'LIN-30' }] })
+    ];
+    assert.strictEqual(selectFocusSubtask(children).identifier, 'LIN-30');
+  });
+
+  test('(ii) critical-path length breaks ties when unblocks counts are equal', () => {
+    // Chain LIN-10 → LIN-11 → LIN-12 gives LIN-10 critical path 3, unblocks 2.
+    // LIN-50 blocks only LIN-51: unblocks 1. Both non-blocked todos; LIN-10 wins on unblocks.
+    const children = [
+      makeChild('LIN-50', 'unstarted'),
+      makeChild('LIN-51', 'unstarted', { inverseBlocks: [{ identifier: 'LIN-50' }] }),
+      makeChild('LIN-10', 'unstarted'),
+      makeChild('LIN-11', 'unstarted', { inverseBlocks: [{ identifier: 'LIN-10' }] }),
+      makeChild('LIN-12', 'unstarted', { inverseBlocks: [{ identifier: 'LIN-11' }] })
+    ];
+    assert.strictEqual(selectFocusSubtask(children).identifier, 'LIN-10');
+  });
+
+  test('(iii) an edge-free set degrades to identifier order (today\'s behavior preserved)', () => {
+    const children = [
+      makeChild('LIN-30', 'unstarted'),
+      makeChild('LIN-10', 'unstarted'),
+      makeChild('LIN-20', 'unstarted')
+    ];
+    assert.strictEqual(selectFocusSubtask(children).identifier, 'LIN-10');
+  });
+
+  test('non-blocked in-progress is preferred over a non-blocked todo', () => {
+    const children = [
+      makeChild('LIN-9', 'unstarted'),
+      makeChild('LIN-7', 'started')
+    ];
+    assert.strictEqual(selectFocusSubtask(children).identifier, 'LIN-7');
+  });
+
+  test('the `blocked` label alone excludes an in-progress child', () => {
+    const children = [
+      makeChild('LIN-2', 'started', { blockedLabel: true }),
+      makeChild('LIN-3', 'unstarted')
+    ];
+    assert.strictEqual(selectFocusSubtask(children).identifier, 'LIN-3');
+  });
+
+  test('all candidates blocked → falls back to lowest-identifier non-terminal', () => {
+    const children = [
+      makeChild('LIN-5', 'started', { blockedLabel: true }),
+      makeChild('LIN-3', 'unstarted', { blockedLabel: true })
+    ];
+    assert.strictEqual(selectFocusSubtask(children).identifier, 'LIN-3');
+  });
+
+  test('terminal blocker does not block (resolved) — its successor stays eligible', () => {
+    // LIN-3 is blocked only by LIN-9 which is Done → LIN-3 is actionable.
+    const children = [
+      makeChild('LIN-3', 'started', { inverseBlocks: [{ identifier: 'LIN-9', type: 'completed' }] })
+    ];
+    assert.strictEqual(selectFocusSubtask(children).identifier, 'LIN-3');
+  });
+
+  test('returns null for empty / nullish input', () => {
+    assert.strictEqual(selectFocusSubtask([]), null);
+    assert.strictEqual(selectFocusSubtask(null), null);
+    assert.strictEqual(selectFocusSubtask(undefined), null);
+  });
+
+  test('all children terminal → undefined (no non-terminal to pick)', () => {
+    const children = [makeChild('LIN-1', 'completed'), makeChild('LIN-2', 'canceled')];
+    assert.strictEqual(selectFocusSubtask(children), undefined);
+  });
+});
+
+describe('computeFrontierFacts (LIN-433)', () => {
+  test('reports open/blocked counts and the descent-aligned next child', () => {
+    const children = [
+      makeChild('LIN-1', 'completed'),
+      makeChild('LIN-2', 'started', { inverseBlocks: [{ identifier: 'LIN-9', type: 'started' }] }),
+      makeChild('LIN-3', 'started')
+    ];
+    const facts = computeFrontierFacts(children);
+    assert.strictEqual(facts.openCount, 2);          // LIN-2, LIN-3 (LIN-1 terminal)
+    assert.strictEqual(facts.blockedCount, 1);       // LIN-2 blocked
+    assert.strictEqual(facts.nextChild, 'LIN-3');    // same child selectFocusSubtask picks
+    assert.deepStrictEqual(
+      facts.openChildren,
+      [{ identifier: 'LIN-2', blocked: true }, { identifier: 'LIN-3', blocked: false }]
+    );
+  });
+
+  test('nextChild matches selectFocusSubtask exactly (no advertised/descent disagreement)', () => {
+    const children = [
+      makeChild('LIN-20', 'unstarted'),
+      makeChild('LIN-30', 'unstarted'),
+      makeChild('LIN-40', 'unstarted', { inverseBlocks: [{ identifier: 'LIN-30' }] })
+    ];
+    assert.strictEqual(computeFrontierFacts(children).nextChild, selectFocusSubtask(children).identifier);
+  });
+
+  test('returns null for empty input', () => {
+    assert.strictEqual(computeFrontierFacts([]), null);
+    assert.strictEqual(computeFrontierFacts(null), null);
   });
 });
