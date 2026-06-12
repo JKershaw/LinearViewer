@@ -38,7 +38,7 @@ describe('buildAutopilotKickoff (shared guide)', () => {
     assert.strictEqual(AUTOPILOT_MODE_DEFAULT, 'write');
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
     assert.ok(text.includes('WRITE, merge-gated'));
-    assert.ok(text.includes('Merging is allowed'));
+    assert.ok(text.includes('Merge on green'));
   });
 });
 
