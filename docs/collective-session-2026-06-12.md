@@ -268,6 +268,43 @@ proof the invariant holds one stack below the north star:
   there is no dedicated *stability* periodical that serves as the apex
   terminating condition. That is the proposal, not the state.
 
+## The convergent deliverable: one signed four-field envelope
+
+By the end the room collapsed its many proposed wires into a **single artifact**
+that carries the whole law on the wire — greenfield, one mirrored ticket per
+repo, no legacy to retrofit. The envelope has four frozen fields, each with
+exactly one rightful minter; every other node may read/relay but never author it:
+
+| Field | Minted by | Everyone else |
+|---|---|---|
+| **signed identity** | the producer's keypair (dash / harbour / LinearViewer) | verify the signature, never the nick; relay-only |
+| **outcome code** | the actor/witness, from a frozen vocab (harbour's `error-codes.js` as seed) | carry/read it; never recompute it |
+| **payload** (factors / subtasks / guidance / url) | the producer | append-only relay; read-only consume |
+| **routing altitude** (`diff` / `decomposition` / `worth` / `intent`) | the producer stamps the address | the router *obeys* it; rewriting an address is judging |
+
+This instantiates the un-authorable-judge law field-by-field on one wire. Each
+repo implements its corner: **dash mints** (feasibility → `outcome code`, factors
+→ `payload`, and stamps `routing altitude`: a refusal → `decomposition`,
+correction-exhaustion → `worth`); **simple-dispatcher relays** all four and
+authors none (it is structurally a router, which is also why it can't run away);
+**harbour mints** rich consequence + brings the ECDH/HKDF signing and seed vocab;
+**LinearViewer consumes** + mints `decomposition` when it emits work.
+
+**LinearViewer's unique corner: the `worth` address is the wire reaching the
+ceiling.** `diff` lands on dash, `decomposition` lands on LinearViewer — but
+`worth` has nowhere below the human to land. An envelope stamped
+`routing-altitude=worth` (e.g. dash's correction-exhaustion) is saying *the
+gradient ran out — this is no longer can-I or how, it is should-I.* By the law,
+LinearViewer **detects and surfaces** that; it must not **resolve** it. So
+worth-addressed envelopes terminate at the drift/north-star layer and then at
+John. That field is the structural handoff from machine to human — the rung
+harbour named above "is the minter still real?".
+
+"Verify by dispatch" (simple-dispatcher's insight): a relay becomes a witness not
+by writing verification code but by *dispatching the verify-question to a floor
+that already mints* (call GitHub / run the suite / bind the port on a Harbour
+instance) and relaying the exit code it mints — never holding the eraser.
+
 ## Proposed follow-up tickets (LinearViewer side)
 
 Drafts to file against this repo. Each is small; the discipline is the point.
@@ -277,35 +314,27 @@ Drafts to file against this repo. Each is small; the discipline is the point.
    autopilot to treat a stable+aligned reading as a terminating "idle" state —
    the off-switch. Depends on autopilot→periodical scheduling (currently
    deferred).
-2. **Structured dispatch feedback (JOINT ticket with simple-dispatcher).** Widen
-   the dispatch feedback schema from a prose `{ message, url, urlLabel }` to carry
-   dash's `StructuredFeedback` (`{ type, factors, guidance }`), machine-readable.
-   The transport (append-only, ownership-enforced) already exists. simple-dispatcher
-   confirmed the wire is missing on *both* ends, so the schema must be agreed *at
-   the seam*, not authored by either side alone — the wire is a trust boundary,
-   so its contract is co-designed.
-3. **Feedback consumer → re-decomposition.** Today feedback is stored and
-   displayed but nothing *consumes* it. Route a feasibility refusal back into the
-   plan altitude as a gradient that retunes decomposition — closing dash's
-   40→85% lever as a loop. Altitude rule (so we don't violate our own law): the
-   dispatcher **routes**, it does not **judge** — feasibility is dash's verdict to
-   mint, decomposition is LinearViewer's; "cheapest-first at dispatch" means route
-   on dash's *published* capability + bounce its refusal upward, never the
-   dispatcher re-deriving feasibility itself.
-4. **Signed-payload wire standard.** simple-dispatcher consumes this repo's queue
-   and fans out to executors; today its feedback rides a Bearer *token* (same
-   maturity as dash's UUID, not harbour's keypair). The bus should adopt
-   harbour's signed-payload pattern (trust rides the payload, transport assumed
-   hostile); LinearViewer's queue-auth and the dispatcher's writer both migrate.
-   The session's 100%-reproduction identity finding is the justification.
-   (Note: a Harbour prong would be a genuinely *new* 5th dispatch target — the
-   environment an executor runs inside — not an existing wire; John's
-   "remote-control webview" today is Claude's `--remote-control`, a different
-   surface from harbour's ECDH remote mode.)
-5. **Cross-node verification, not self-report.** Continue the epistemic-drift
-   work: weight external evidence (CI/PR/diff/session log) over the agent's
-   self-reported `status: complete` in the completion judge. (Aligned with
-   LIN-430, which already checks CI green at merge time rather than from memory.)
+2. **Implement LinearViewer's corner of the signed envelope** (subsumes the
+   earlier separate "structured feedback", "feedback consumer", and "signed
+   wire" tickets — the room collapsed them into one artifact):
+   - *Consume* the four-field envelope: verify `signed identity` (migrate
+     queue-auth from Bearer token to signature verification — the
+     100%-reproduction identity finding is the justification); read `outcome code`
+     from the frozen vocab without recomputing; ingest `payload`
+     factors/subtasks; **obey** `routing altitude`.
+   - *Mint* `decomposition`: when emitting work to the queue, stamp it small with
+     file-paths (the 40→85% lever) and carry the routing address.
+   - *Terminate* `routing-altitude=worth` at the drift/north-star layer →
+     surface to John; detect, never resolve.
+   - Altitude rule baked in: the dispatcher **routes**, it does not **judge** —
+     feasibility is dash's to mint, decomposition is LinearViewer's. Co-designed
+     at the seam with dash + simple-dispatcher + harbour.
+3. **Cross-node verification, not self-report.** Continue the epistemic-drift
+   work: weight external evidence over the agent's self-reported
+   `status: complete`. Today LinearViewer sits at **rung 1** of the verification
+   ladder (LIN-430 reads GitHub's computed green/red at merge); richer truth is
+   obtained the dispatcher's way — *verify-by-dispatch* to a Harbour floor —
+   climbing the ladder as far as blast radius demands.
 
 ## Cadence
 
