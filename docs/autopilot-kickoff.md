@@ -174,7 +174,7 @@ worker: no code, no PRs, no Linear state changes, findings and evidence pointers
 **Proxy:** base `https://projects.jkershaw.com/api/proxy` · Bearer token injected at
 dispatch (not shown here) · full verb catalog at `GET /instructions`.
 
-**Top of the stack** (`/stack?view=digest`, top 5 — one-line headlines, drill into a pick with `/brief/{id}`):
+**Top of the stack** (`/stack?view=digest`, top 5 — one-line headlines plus the deterministic ranking features behind each position (`downstreamUnblocks`, `criticalPathLen`, optional `heldBy`, compact `why`), drill into a pick with `/brief/{id}`):
 
 | # | id | type | where it stands | north-star |
 |---|------|------|-----------------|------------|

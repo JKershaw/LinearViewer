@@ -258,6 +258,12 @@ test.describe('Proxy API - Consumer Endpoints', () => {
       expect(t).not.toHaveProperty('description');
       expect(typeof t.blocks).toBe('number');
       expect(typeof t.children).toBe('number');
+      // LIN-391 explainability fields
+      expect(typeof t.downstreamUnblocks).toBe('number');
+      expect(typeof t.criticalPathLen).toBe('number');
+      expect(Array.isArray(t.why)).toBe(true);
+      // heldBy is present only when an off-page blocker forced the position
+      if ('heldBy' in t) expect(Array.isArray(t.heldBy)).toBe(true);
     }
   });
 
@@ -274,6 +280,26 @@ test.describe('Proxy API - Consumer Endpoints', () => {
       expect(t).toHaveProperty('description');
       expect(Array.isArray(t.children)).toBe(true);
       expect(Array.isArray(t.blocksIds)).toBe(true);
+      // LIN-391: full view carries the same computed scalars as digest
+      expect(typeof t.downstreamUnblocks).toBe('number');
+      expect(typeof t.criticalPathLen).toBe('number');
+    }
+  });
+
+  test('GET /api/proxy/stack full and digest agree on computed feature scalars', async ({ request }) => {
+    const headers = { Authorization: `Bearer ${readToken}` };
+    const [fullResp, digestResp] = await Promise.all([
+      request.get('/api/proxy/stack?limit=10', { headers }),
+      request.get('/api/proxy/stack?limit=10&view=digest', { headers })
+    ]);
+    const full = await fullResp.json();
+    const digest = await digestResp.json();
+    const digestById = new Map(digest.tasks.map(t => [t.id, t]));
+    for (const f of full.tasks) {
+      const d = digestById.get(f.id);
+      if (!d) continue;
+      expect(d.downstreamUnblocks).toBe(f.downstreamUnblocks);
+      expect(d.criticalPathLen).toBe(f.criticalPathLen);
     }
   });
 

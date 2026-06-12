@@ -26,7 +26,7 @@ import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
 import { hashContext } from '../lib/recap-cache.js';
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, isTerminalState, NO_PROJECT_ID } from '../lib/tree.js';
-import { flattenTrees, sortIssuesForSwipe, applyBlockingOrder, clusterByParent } from '../lib/render-swipe.js';
+import { flattenTrees, sortIssuesForSwipe, applyBlockingOrder, clusterByParent, computeGraphFeatures, computeOffPageBlockers, buildWhy } from '../lib/render-swipe.js';
 import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, DISPATCH_KINDS } from '../lib/prompt-templates.js';
 import { parseRepoFromDescription, buildPromptFilename } from '../lib/prompt-formatters.js';
 import { buildForemanPlaybook } from '../lib/prompts/foreman-playbook.js';
@@ -1256,8 +1256,17 @@ GET ${baseUrl}/api/proxy/stack?limit={n}&view=digest
     \`description\` for a deterministic one-line \`headline\`, and \`children\`/\`blocks\` are
     counts (not arrays). Use this to orient over the whole stack cheaply, then fetch full
     detail (\`/brief/{id}\` or the full \`/stack\`) only for the task you pick.
+  → Each line also carries deterministic ranking features (computed in-set, no LLM):
+    \`downstreamUnblocks\` (how many tasks this one transitively unblocks),
+    \`criticalPathLen\` (longest dependency chain through it), an optional \`heldBy\`
+    (off-page blockers that forced this line's position when a small \`limit\` hides
+    them), and a compact \`why\` array summarizing why it ranks where it does. The
+    ordering itself factors \`downstreamUnblocks\`/\`criticalPathLen\` in (just below
+    state, above priority), so the order is explainable, not just opaque.
   → { "tasks": [{ "identifier": "LIN-296", "title": "...", "headline": "...", "state": {...},
       "labels": [...], "priority": 1, "section": "in-progress", "blocks": 0, "children": 2,
+      "downstreamUnblocks": 6, "criticalPathLen": 4, "heldBy": ["LIN-412"],
+      "why": ["bug", "unblocks 6", "critical path 4", "held by LIN-412"],
       "parent": { "identifier": "LIN-295" }, "url": "..." }], "total": 98, "view": "digest" }
 
 GET ${baseUrl}/api/proxy/recommend/{identifier}
@@ -2460,7 +2469,11 @@ One convention across every endpoint, so you can branch on the same fields every
         if (parent) parent.children = children;
       }
 
-      // Sort and cluster
+      // Compute transitive graph features (LIN-391) BEFORE the sort — they are
+      // sort-keys (downstreamUnblocks/criticalPathLen) and also stamped onto the
+      // digest line. Same ordering as the swipe view (renderSwipePage), which
+      // runs the identical pipeline.
+      computeGraphFeatures(allIssues);
       sortIssuesForSwipe(allIssues);
       const sortedIssues = clusterByParent(applyBlockingOrder(allIssues));
 
@@ -2477,42 +2490,61 @@ One convention across every endpoint, so you can branch on the same fields every
       // context — then drill into one task's detail (full description / `/brief`)
       // only for the item it picks. See docs/autopilot-kickoff.md.
       const sliced = sortedIssues.slice(0, limit);
+      // Off-page blockers (LIN-391): direct blockers pushed beyond the slice that
+      // still shaped a visible line's position. Derived from final post-cluster
+      // positions; no transitive closure stored.
+      const offPageBlockers = computeOffPageBlockers(sortedIssues, limit);
       const isDigest = req.query.view === 'digest';
       const tasks = isDigest
-        ? sliced.map(issue => ({
-            id: issue.id,
-            identifier: issue.identifier,
-            title: issue.title,
-            headline: toStackHeadline(issue.description),
-            priority: issue.priority,
-            state: { name: issue.stateName, type: issue.stateType },
-            labels: issue.labels || [],
-            section: issue.section || null,
-            assignee: issue.assignee || null,
-            project: issue.projectName ? { name: issue.projectName } : null,
-            parent: issue.parentId
-              ? { identifier: issue.parentIdentifier || null }
-              : null,
-            blocks: (issue.blocksIds || []).length,
-            children: (issue.children || []).length,
-            url: issue.url
-          }))
-        : sliced.map(issue => ({
-            id: issue.id,
-            identifier: issue.identifier,
-            title: issue.title,
-            description: issue.description,
-            priority: issue.priority,
-            url: issue.url,
-            state: { name: issue.stateName, type: issue.stateType },
-            labels: issue.labels || [],
-            project: issue.projectName ? { name: issue.projectName } : null,
-            parent: issue.parentId
-              ? { id: issue.parentId, identifier: issue.parentIdentifier || null, title: issue.parentTitle || null }
-              : null,
-            children: issue.children || [],
-            blocksIds: issue.blocksIds || []
-          }));
+        ? sliced.map(issue => {
+            const heldBy = offPageBlockers.get(issue.id) || [];
+            return {
+              id: issue.id,
+              identifier: issue.identifier,
+              title: issue.title,
+              headline: toStackHeadline(issue.description),
+              priority: issue.priority,
+              state: { name: issue.stateName, type: issue.stateType },
+              labels: issue.labels || [],
+              section: issue.section || null,
+              assignee: issue.assignee || null,
+              project: issue.projectName ? { name: issue.projectName } : null,
+              parent: issue.parentId
+                ? { identifier: issue.parentIdentifier || null }
+                : null,
+              blocks: (issue.blocksIds || []).length,
+              children: (issue.children || []).length,
+              // Explainability (LIN-391): transitive features + compact `why`.
+              downstreamUnblocks: issue.downstreamUnblocks || 0,
+              criticalPathLen: issue.criticalPathLen || 0,
+              ...(heldBy.length > 0 ? { heldBy } : {}),
+              why: buildWhy(issue, heldBy),
+              url: issue.url
+            };
+          })
+        : sliced.map(issue => {
+            const heldBy = offPageBlockers.get(issue.id) || [];
+            return {
+              id: issue.id,
+              identifier: issue.identifier,
+              title: issue.title,
+              description: issue.description,
+              priority: issue.priority,
+              url: issue.url,
+              state: { name: issue.stateName, type: issue.stateType },
+              labels: issue.labels || [],
+              project: issue.projectName ? { name: issue.projectName } : null,
+              parent: issue.parentId
+                ? { id: issue.parentId, identifier: issue.parentIdentifier || null, title: issue.parentTitle || null }
+                : null,
+              children: issue.children || [],
+              blocksIds: issue.blocksIds || [],
+              // Same computed scalars as digest, for full/digest consistency (LIN-391).
+              downstreamUnblocks: issue.downstreamUnblocks || 0,
+              criticalPathLen: issue.criticalPathLen || 0,
+              ...(heldBy.length > 0 ? { heldBy } : {})
+            };
+          });
 
       logEvent(req, '/api/proxy/stack', 200);
       res.json({ tasks, total: sortedIssues.length, view: isDigest ? 'digest' : 'full' });
