@@ -102,17 +102,15 @@ node. No LLM. This is the bulk of the logic and should be boring, tested code:
 - the plan's session-fit answer ("fits one session" / "needs multiple sessions"), if present
 - bug-investigation-present (bug label + prior code-grounded comment)
 
-### Stage 2 — The decision `[L]` (one tight call)
-The LLM receives the Stage-1 facts as **structured fields** and returns a **structured decision**
-via JSON / tool-use — not a regex-scraped `→ **action**` line:
-
-```
-{ "action": "<enum>", "deferTo": "<id|null>", "reason": "<one line>" }
-```
-
-Small, cheap, easy to eval, easy to vote/ensemble if more stability is needed. This is the
-"LLM makes the choice using exactly the right information" target. The brittle
-`parseRecommendedAction` / `parseDeferTo` regexes retire.
+### Stage 2 — The decision `[L]` (one tight, separated call)
+The LLM receives the Stage-1 facts as **explicit, labelled inputs** and returns a decision in a
+**tight markdown contract** (action + optional defer target + one-line reason). Markdown — not
+JSON / tool-use — is the deliberate choice: models follow a markdown contract more reliably than a
+strict JSON schema here, and the existing markers (`→ **action**`, `**DeferTo:**`) are already
+battle-tested. **The reliability win is the *separation* and the *fact-surfacing*, not the
+serialization format**: routing becomes a small call fed exact facts, decoupled from prose
+generation, so it can be eval'd — and voted/ensembled — on its own. The marker parsers stay; they
+get a narrower, well-specified contract to parse.
 
 ### Stage 3 — Generation `[L]` (terminal node only)
 Once routing lands on a real action, a second call writes the prompt body for that one action.
@@ -211,33 +209,71 @@ LLM-authored variant) — flagged as an open decision (Section 8), not pre-commi
 
 ## 7. Sequencing (eval-first, de-risked — not a big-bang rewrite)
 
-What makes a re-architecture safe is that we already have the measurement tool. Institutionalize
-it; gate every step on it. **Nothing ships without moving the numbers.**
+What makes a re-architecture safe is a measurement tool that exists *before* the first change, plus
+**one discipline applied to every task: a task is either _behavior-preserving_ (eval frozen — the
+safety property) or _behavior-changing_ (eval expected to move — the point), never both.** That is
+what keeps a regression unambiguous and prevents half-finished tasks.
 
-1. **Baseline eval fixture.** Commit today's experiment as a reusable eval: the real nodes
-   (LIN-385/389/428, HAR-149/545/616) + expected routing/action, run N times, scored on
-   **stability + correctness**. This is the definition of "reliable" and the regression guard.
-   (Extends the existing `scripts/eval-*` pattern.)
-2. **Two low-risk fact fixes** (no architecture change yet): frontier ranking `[D]`, and surface
-   the structured facts into the *existing* meta-prompt. Re-run the harness — expected to kill the
-   HAR-149 mis-route and shrink the LIN-389 fork on their own.
-3. **The architectural split:** Stage 1 fact module → Stage 2 structured decision call (tool-use)
-   → Stage 3 generation-only-at-terminal. Re-measure.
-4. **Collapse the two-path tax.** Re-measure.
+Proposed parent ticket with subtasks:
+
+1. **Baseline eval harness** _(no production change; gate for all others)_. Reusable eval over the
+   real fixtures (LIN-385/389/428, HAR-149/545/616), each with an **acceptable-outcome set**
+   (expected terminal node(s) + action(s)) and a **stability threshold**; N runs; scored on
+   stability + correctness. Record the current (messy) baseline. Extends the existing
+   `scripts/eval-*` pattern. **DoD:** harness committed, baseline numbers recorded, per-fixture
+   exit criteria defined.
+2. **Low-risk fact fixes** _(behavior-changing)_. Frontier ranking `[D]` via the `digest` signals;
+   surface structured facts into the *existing* markdown meta-prompt. **DoD:** eval shows the
+   HAR-149 mis-route gone and the LIN-389 fork shrunk vs baseline; no fixture regresses.
+3. **Behavior-preserving refactor** _(eval frozen)_. Extract the three responsibilities (fact
+   assembly / decision / generation) into testable modules **around the existing single call** —
+   this is a code reorganization, not a runtime change. **DoD:** eval within noise of the post-fix
+   baseline; fact assembly covered by network-free unit tests.
+4. **Collapse the two-path tax + iterate** _(behavior-changing)_. One source of truth per behavior
+   rule; expand eval coverage; iterate prompts; **loop until every fixture meets its exit
+   criteria** (gives the loop a terminal state). **DoD:** dual-maintenance removed; all fixture
+   thresholds met.
+5. **Code-health review / tidy** _(behavior-preserving)_. Final clean-up and review pass against the
+   code-health checklist. **DoD:** review notes addressed; docs updated.
+
+**Conditional, only if the data demands it — split into two runtime LLM calls** (decision call
+separate from generation call). The Stage-2/3 split is a *code* seam in step 3; making it two actual
+LLM round-trips is a heavier runtime change (cheaper descent + votable routing, at the cost of a
+second terminal call). **Do this only if step 4's eval shows the single fact-fed call still
+flip-flops below threshold** — otherwise it is over-engineering. Behavior-changing; separately
+justified.
 
 Each step is independently shippable; you are never holding a half-rewritten system.
 
 ---
 
-## 8. Open decisions (for the team)
+## 8. Decisions
 
-1. **Two-path resolution:** collapse to a single path, or keep two and share rule definitions?
-   (Needs a look at the original rationale before deciding.)
-2. **Decision-call shape:** structured JSON / tool-use *(recommended)* vs. keep markdown-with-markers.
-3. **Stability lever, if Stage-2 facts aren't enough:** best-of-N vote on the action, a
-   lower-variance routing model, or accept residual leaf-action variance.
-4. **Frontier ranking weights:** confirm the `digest` signal ordering
-   (not-blocked > unblocks-most > critical-path > in-progress > id) is the policy we want.
+**Settled**
+- **Decision-call format:** markdown with the existing tight markers (not JSON / tool-use) —
+  markdown is more reliable for the model to produce here; the win is separation + fact-surfacing,
+  not the format.
+- **Two-path tax:** collapse toward one source of truth per behavior rule (step 4).
+- **Runtime two-call split:** deferred and conditional — only if step-4 data shows it is needed.
+
+**To settle before building the eval (step 1)**
+- **Correctness oracle:** per-fixture acceptable-outcome sets + stability thresholds. Some fixtures
+  are "must be deterministic" (frontier pick); others are "must be stable within an acceptable set"
+  (leaf action on a genuinely ambiguous ticket). The eval scores against these, not a single gold
+  answer.
+- **Execution model:** the eval calls the live model (variance *is* the metric), so it needs API
+  keys + a cost budget and is run deliberately at task boundaries — **not** wired into per-commit CI.
+
+**Scope fences (carried over unchanged — do not re-open)**
+- Provider capability-awareness (LIN-177) is preserved as-is through the refactor.
+- Traversal guards in `recommend-recurse.js` stay; the only deterministic change there is the
+  `selectFocusSubtask` frontier ranking.
+- Frontier ranking weights (not-blocked > unblocks-most > critical-path > in-progress > id) to be
+  confirmed against the `digest` policy.
+
+**Stability lever, if Stage-2 facts aren't enough**
+- Best-of-N vote on the action, a lower-variance routing model, or accept residual leaf-action
+  variance — chosen on step-4 data.
 
 ---
 
