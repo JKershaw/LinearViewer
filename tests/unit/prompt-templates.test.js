@@ -1379,7 +1379,8 @@ describe('Scale to the task (handwritten path)', () => {
 // LIN-177 S4/S5: Capability-aware prompts (provider.ui threaded into both paths)
 // =============================================================================
 import { generateCustomPrompt } from '../../lib/prompt-templates.js';
-import { resolvePromptUi, applyPromptCapabilities, DEFAULT_PROMPT_UI, formatSubtaskSummary } from '../../lib/prompt-formatters.js';
+import { resolvePromptUi, applyPromptCapabilities, DEFAULT_PROMPT_UI, formatSubtaskSummary, appendGroundingSections } from '../../lib/prompt-formatters.js';
+import { applyGroundingToRecommendation } from '../../lib/openrouter.js';
 import { buildMetaPromptTemplate } from '../../lib/prompts/meta-prompt-template.js';
 
 describe('resolvePromptUi (LIN-177 S4)', () => {
@@ -1639,5 +1640,73 @@ describe('applyPromptCapabilities is a no-op for the Linear floor (LIN-177 S4)',
   test('Linear caps leave text untouched', () => {
     const txt = '## Workflow\n\n1. **Start**: Set X status to "In Progress" in Linear\n2. **Fetch details**: in Linear\n\n**Subtasks:** 1/2 done';
     assert.strictEqual(applyPromptCapabilities(txt, resolvePromptUi({}, null)), txt);
+  });
+});
+
+// =============================================================================
+// Cross-path grounding parity (LIN-435: ONE source of truth for the
+// deterministic re-grounding rules). The handwritten path (generatePrompt) and
+// the AI meta-prompt path (applyGroundingToRecommendation) must append
+// byte-identical grounding sections from the same appendGroundingSections seam,
+// so the rules can never drift between paths (the broken meta staleness date is
+// the defect this kills).
+// =============================================================================
+describe('cross-path grounding parity (LIN-435)', () => {
+  const issue = {
+    identifier: 'LIN-700', title: 'T', description: 'd',
+    state: { name: 'Todo', type: 'unstarted' },
+    createdAt: '2026-03-01T00:00:00.000Z', labels: ['implementation']
+  };
+  const context = { children: [], comments: [] };
+
+  test('handwritten and meta paths append byte-identical grounding sections', () => {
+    const grounding = appendGroundingSections('', issue, context);
+    assert.ok(grounding.length > 0, 'fixture produces a non-empty grounding (staleness is unconditional)');
+
+    // Handwritten path: generatePrompt ends with exactly these grounding sections
+    // (the capability post-pass is a no-op for Linear and for grounding text).
+    const hw = generatePrompt('implementation', issue, context).prompt;
+    assert.ok(hw.endsWith(grounding), 'handwritten prompt ends with the shared grounding sections');
+
+    // Meta path: the post-pass appends the identical grounding to the LLM body.
+    const meta = applyGroundingToRecommendation(
+      { reasoning: 'r', prompt: 'BODY', truncated: false, recommendedAction: 'implement', deferTo: null, completionTokens: 1 },
+      issue, context
+    );
+    assert.strictEqual(meta.prompt, 'BODY' + grounding, 'meta path appends the identical grounding');
+  });
+
+  test('staleness --since date is injected deterministically from issue.createdAt (no placeholder)', () => {
+    const meta = applyGroundingToRecommendation({ prompt: 'BODY' }, issue, context);
+    assert.ok(
+      meta.prompt.includes('git log --since="2026-03-01T00:00:00.000Z"'),
+      'the real createdAt is substituted into --since'
+    );
+    assert.ok(
+      !/\[ticket created date\]|<the ticket's Created date>/.test(meta.prompt),
+      'no meta-prompt placeholder leaks into the grounded prompt'
+    );
+  });
+
+  test('defer replies (prompt:null) get NO grounding — the no-body cost contract (LIN-327/328)', () => {
+    const deferReply = { reasoning: 'r', prompt: null, truncated: false, recommendedAction: 'defer', deferTo: 'LIN-2', completionTokens: 1 };
+    const out = applyGroundingToRecommendation(deferReply, issue, context);
+    assert.strictEqual(out.prompt, null, 'a defer body stays null');
+    assert.deepStrictEqual(out, deferReply, 'a defer reply is returned unchanged');
+  });
+
+  test('terminal-state + bug-investigated sections also match across paths', () => {
+    const terminalBug = {
+      identifier: 'LIN-701', title: 'T', description: 'd',
+      state: { name: 'Done', type: 'completed' },
+      createdAt: '2026-03-01T00:00:00.000Z', labels: ['bug']
+    };
+    const ctx = { children: [], comments: [{ body: 'root cause found', user: 'Dev', createdAt: '2026-03-02T00:00:00.000Z' }] };
+    const grounding = appendGroundingSections('', terminalBug, ctx);
+    assert.ok(/Task Already Complete/.test(grounding), 'terminal-state note present in the shared grounding');
+    assert.ok(/Prior Investigation On Record/.test(grounding), 'bug-investigated note present in the shared grounding');
+
+    const meta = applyGroundingToRecommendation({ prompt: 'BODY' }, terminalBug, ctx);
+    assert.strictEqual(meta.prompt, 'BODY' + grounding, 'meta path matches for the terminal+bug case too');
   });
 });
