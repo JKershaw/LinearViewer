@@ -1,14 +1,39 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { seedLocalWorkspace, LOCAL_WORKSPACE_URL_KEY } from '../fixtures/local-harness.js';
 
-const TEST_WORKSPACE_URL_KEY = 'test-workspace';
+// Migrated onto a GENUINE `provider: 'local'` session (LIN-425, parent S3). The
+// dispatch queue/tokens/history stores stay store-backed (urlKey-scoped), NOT
+// provider-backed — so every `/test/*` cleanup/create route must carry
+// `?urlKey=local-workspace` (they default to `test-workspace`). The repo selector
+// reads the provider's projects, so we seed exactly ONE project carrying
+// `repo=test-repo` (→ "none" + one repo option, matching the old testMockData set).
+const TEST_WORKSPACE_URL_KEY = LOCAL_WORKSPACE_URL_KEY;
 const DISPATCH_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/dispatch`;
 const SETTINGS_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/settings`;
 const API_PREFIX = `/workspace/${TEST_WORKSPACE_URL_KEY}`;
 
+// Minimal provider seed for the repo selector: a single project whose content
+// carries `repo=test-repo`, so the selector renders exactly two options
+// (the "none" default + "Project Alpha (test-repo)"). No issues are needed —
+// the dispatch page does not render the issue tree.
+const REPO_SEED = {
+  projects: [
+    { id: 'local-proj-1', name: 'Project Alpha', content: 'repo=test-repo', sortOrder: 1 },
+  ],
+  issues: [],
+};
+
+// Seed the `request` fixture's OWN session (a separate cookie jar from `page`)
+// so its session-scoped dispatch POSTs resolve the local workspace. seedLocalWorkspace
+// only needs a `.request` API context, so a `{ request }` shim suffices.
+function seedRequestSession(request) {
+  return seedLocalWorkspace({ request }, REPO_SEED, { features: { dispatch: true } });
+}
+
 test.describe('Dispatch Page', () => {
   test.describe('Page Access', () => {
     test('dispatch page loads when feature flag is enabled', async ({ page }) => {
-      await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true } });
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
 
@@ -17,7 +42,7 @@ test.describe('Dispatch Page', () => {
     });
 
     test('dispatch page redirects to settings when feature flag is disabled', async ({ page }) => {
-      await page.goto('/test/set-session');
+      await seedLocalWorkspace(page, REPO_SEED);
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
 
@@ -26,7 +51,7 @@ test.describe('Dispatch Page', () => {
     });
 
     test('dispatch page shows all four sections', async ({ page }) => {
-      await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true } });
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
 
@@ -39,9 +64,11 @@ test.describe('Dispatch Page', () => {
 
   test.describe('Custom Prompt Dispatcher', () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto('/test/clear-dispatch-queue');
+      // Seed FIRST so the local session (user `test-local-user-id`) exists before
+      // clearing recents — `/test/clear-recent-prompts` clears the session's user.
+      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true } });
+      await page.goto(`/test/clear-dispatch-queue?urlKey=${TEST_WORKSPACE_URL_KEY}`);
       await page.goto('/test/clear-recent-prompts');
-      await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
       // Dispatch options now live behind a disclosure trigger; expand it so the
@@ -252,7 +279,7 @@ test.describe('Dispatch Page', () => {
 
   test.describe('Dispatch Options Disclosure', () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true } });
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
     });
@@ -319,7 +346,7 @@ test.describe('Dispatch Page', () => {
     });
 
     test('clicking an option inside the panel still dispatches (send handler fires)', async ({ page }) => {
-      await page.goto('/test/clear-dispatch-queue');
+      await page.goto(`/test/clear-dispatch-queue?urlKey=${TEST_WORKSPACE_URL_KEY}`);
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
 
@@ -345,8 +372,8 @@ test.describe('Dispatch Page', () => {
 
   test.describe('Queue List', () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto('/test/clear-dispatch-queue');
-      await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+      await page.goto(`/test/clear-dispatch-queue?urlKey=${TEST_WORKSPACE_URL_KEY}`);
+      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true } });
     });
 
     test('queue list shows empty state', async ({ page }) => {
@@ -359,7 +386,7 @@ test.describe('Dispatch Page', () => {
 
     test('queue list shows dispatched items', async ({ page, request }) => {
       // Dispatch items via API
-      await request.get(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+      await seedRequestSession(request);
       await request.post(`${API_PREFIX}/api/dispatch`, {
         data: { prompt: 'Test prompt 1', promptName: 'Test One' }
       });
@@ -376,7 +403,7 @@ test.describe('Dispatch Page', () => {
 
     test('can remove item from queue list', async ({ page, request }) => {
       // Dispatch an item
-      await request.get(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+      await seedRequestSession(request);
       await request.post(`${API_PREFIX}/api/dispatch`, {
         data: { prompt: 'To remove', promptName: 'Remove Me' }
       });
@@ -417,8 +444,8 @@ test.describe('Dispatch Page', () => {
 
   test.describe('Token Management', () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto('/test/clear-dispatch-tokens');
-      await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+      await page.goto(`/test/clear-dispatch-tokens?urlKey=${TEST_WORKSPACE_URL_KEY}`);
+      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true } });
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
     });
@@ -496,10 +523,10 @@ test.describe('Dispatch Page', () => {
 
   test.describe('Dispatch History', () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto('/test/clear-dispatch-queue');
-      await page.goto('/test/clear-dispatch-tokens');
-      await page.goto('/test/clear-dispatch-history');
-      await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+      await page.goto(`/test/clear-dispatch-queue?urlKey=${TEST_WORKSPACE_URL_KEY}`);
+      await page.goto(`/test/clear-dispatch-tokens?urlKey=${TEST_WORKSPACE_URL_KEY}`);
+      await page.goto(`/test/clear-dispatch-history?urlKey=${TEST_WORKSPACE_URL_KEY}`);
+      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true } });
     });
 
     test('history shows empty state', async ({ page }) => {
@@ -511,10 +538,10 @@ test.describe('Dispatch Page', () => {
     });
 
     test('taken item shows in history with correct status', async ({ page, request }) => {
-      const tokenResponse = await request.get('/test/create-dispatch-token');
+      const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${TEST_WORKSPACE_URL_KEY}`);
       const { token } = await tokenResponse.json();
 
-      await request.get(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+      await seedRequestSession(request);
 
       const createResponse = await request.post(`${API_PREFIX}/api/dispatch`, {
         data: { prompt: 'Taken prompt', promptName: 'Taken Test' }
@@ -535,7 +562,7 @@ test.describe('Dispatch Page', () => {
     });
 
     test('cancelled item shows in history with correct status', async ({ page, request }) => {
-      await request.get(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+      await seedRequestSession(request);
 
       const createResponse = await request.post(`${API_PREFIX}/api/dispatch`, {
         data: { prompt: 'Cancelled prompt', promptName: 'Cancel Test' }
@@ -553,7 +580,7 @@ test.describe('Dispatch Page', () => {
     });
 
     test('all history items load without pagination', async ({ page, request }) => {
-      await request.get(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+      await seedRequestSession(request);
 
       // Create 25 history items
       for (let i = 1; i <= 25; i++) {
@@ -576,7 +603,7 @@ test.describe('Dispatch Page', () => {
     });
 
     test('history item is expandable and shows full prompt', async ({ page, request }) => {
-      await request.get(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+      await seedRequestSession(request);
 
       const createResponse = await request.post(`${API_PREFIX}/api/dispatch`, {
         data: { prompt: 'Full prompt text for expansion test', promptName: 'Expand Test' }
@@ -607,7 +634,7 @@ test.describe('Dispatch Page', () => {
     });
 
     test('history item shows slash command highlighting in expanded prompt', async ({ page, request }) => {
-      await request.get(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+      await seedRequestSession(request);
 
       const createResponse = await request.post(`${API_PREFIX}/api/dispatch`, {
         data: { prompt: '/plan implement the new feature', promptName: 'Slash Test' }
@@ -631,18 +658,18 @@ test.describe('Dispatch Page', () => {
 
   test.describe('Feedback in History', () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto('/test/clear-dispatch-queue');
-      await page.goto('/test/clear-dispatch-tokens');
-      await page.goto('/test/clear-dispatch-history');
-      await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+      await page.goto(`/test/clear-dispatch-queue?urlKey=${TEST_WORKSPACE_URL_KEY}`);
+      await page.goto(`/test/clear-dispatch-tokens?urlKey=${TEST_WORKSPACE_URL_KEY}`);
+      await page.goto(`/test/clear-dispatch-history?urlKey=${TEST_WORKSPACE_URL_KEY}`);
+      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true } });
     });
 
     test('history item with feedback shows feedback entries', async ({ page, request }) => {
       // Set up: create token, dispatch, take, add feedback
-      const tokenResponse = await request.get('/test/create-dispatch-token');
+      const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${TEST_WORKSPACE_URL_KEY}`);
       const { token } = await tokenResponse.json();
 
-      await request.get(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+      await seedRequestSession(request);
 
       const createResponse = await request.post(`${API_PREFIX}/api/dispatch`, {
         data: { prompt: 'Test prompt', promptName: 'Feedback Test', issueIdentifier: 'LIN-42' }
@@ -688,7 +715,7 @@ test.describe('Dispatch Page', () => {
     });
 
     test('history item without feedback shows no feedback section', async ({ page, request }) => {
-      await request.get(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+      await seedRequestSession(request);
 
       const createResponse = await request.post(`${API_PREFIX}/api/dispatch`, {
         data: { prompt: 'No feedback item', promptName: 'Plain Test' }
@@ -707,10 +734,10 @@ test.describe('Dispatch Page', () => {
     });
 
     test('refresh button reloads history', async ({ page, request }) => {
-      const tokenResponse = await request.get('/test/create-dispatch-token');
+      const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${TEST_WORKSPACE_URL_KEY}`);
       const { token } = await tokenResponse.json();
 
-      await request.get(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+      await seedRequestSession(request);
 
       const createResponse = await request.post(`${API_PREFIX}/api/dispatch`, {
         data: { prompt: 'Refresh test', promptName: 'Refresh Test' }
@@ -749,7 +776,7 @@ test.describe('Dispatch Page', () => {
 
   test.describe('Navigation', () => {
     test('footer shows dispatch link when feature enabled', async ({ page }) => {
-      await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true } });
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
 
@@ -759,7 +786,7 @@ test.describe('Dispatch Page', () => {
     });
 
     test('footer dispatch link works from other pages', async ({ page }) => {
-      await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true } });
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
 
@@ -775,7 +802,7 @@ test.describe('Dispatch Page', () => {
     });
 
     test('footer does not show dispatch link when feature disabled', async ({ page }) => {
-      await page.goto('/test/set-session');
+      await seedLocalWorkspace(page, REPO_SEED);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
 
@@ -784,7 +811,7 @@ test.describe('Dispatch Page', () => {
     });
 
     test('navbar shows projects link on dispatch page', async ({ page }) => {
-      await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true } });
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
 
@@ -795,7 +822,7 @@ test.describe('Dispatch Page', () => {
 
   test.describe('Settings Page Cleanup', () => {
     test('settings page no longer shows dispatch section when dispatch enabled', async ({ page }) => {
-      await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true } });
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
 
@@ -808,7 +835,7 @@ test.describe('Dispatch Page', () => {
     });
 
     test('settings page still shows dispatch feature toggle', async ({ page }) => {
-      await page.goto('/test/set-session');
+      await seedLocalWorkspace(page, REPO_SEED);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
 
