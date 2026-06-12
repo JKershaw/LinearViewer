@@ -1078,6 +1078,20 @@ button.nav-action {
   /* Reduce vertical spacing on issue lines */
   .line {
     padding: 2px 0;
+    /* Allow trailing badges to wrap to their own line instead of squeezing
+       the flex:1 title into a narrow column (LIN-423). */
+    flex-wrap: wrap;
+  }
+
+  /* On narrow screens the project name badge drops to its own line beneath the
+     title rather than competing for horizontal space (LIN-423). flex-basis:100%
+     forces the wrap; order:1 moves it past the toggle so the toggle stays on the
+     title's row. The left indent aligns it under the title text (past the state
+     icon). Applies to both In Progress and Recently Completed rows. */
+  .in-progress-project {
+    flex-basis: 100%;
+    order: 1;
+    margin-left: 2.4ch;
   }
 
   .project {
