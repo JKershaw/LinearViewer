@@ -126,9 +126,11 @@ loop that follow are the machinery you run *through* that lens. (The same handbo
 
 ## Merging and the finish line
 
-Merging is allowed when the run is authorized for it and the gate is green — you've **seen**
-CI pass and the diff is what was approved. It's earned by evidence, never a rubber stamp,
-and it's a step *within* the loop, not the end of it. The loop's real finish lines are the
+Merge on green. Right before you merge, check CI yourself on the exact commit you're about
+to land — fresh each time, not a green you saw a few steps back. Green, and the diff is the
+one that was approved? Merge. Still running, just wait and look again. Failing, or the diff
+isn't what was approved, is the human's call — pause and hand back. Merging is a step
+*within* the loop, not the end of it. The loop's real finish lines are the
 two human-meaningful ones: **the feature/task is complete** (verified), or **it's reached a
 point that wants human review**. An open-ended "just keep the stack moving" run has no
 finish line — it runs until it needs you.
