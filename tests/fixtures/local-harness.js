@@ -162,6 +162,27 @@ export const pipelineLocalSeed = localSeedFromLinearFixture(testMockData);
  */
 export const workspaceApiLocalSeed = pipelineLocalSeed;
 
+/**
+ * Bespoke seed for the search spec (LIN-426). Derives from `testMockData` so the
+ * data stays byte-faithful to what the old `/test/set-session` mock served, then
+ * narrows to the exact subset the 13 search cases exercise: projects
+ * `proj-alpha`/`proj-beta` and issues `issue-1..5`. Seeding the EXACT ids the
+ * spec's selectors already use (`.project[data-id="proj-alpha"]`,
+ * `.node[data-id="issue-2"]`, …) means zero selector churn and byte-identical
+ * assertions. The route through `localSeedFromLinearFixture` preserves the two
+ * coverage-critical shapes: assignee as an object (`issue-4` → `{ name: 'Charlie' }`,
+ * for the assignee-search case) and labels round-tripping to `labels.nodes[].name`
+ * (`issue-4` → `urgent`, for the label-search case). The `issue-2 → issue-1`
+ * parent link (ancestor-match case) flattens to `parentId` via the fixture
+ * converter. `testMockData`/mock-data.js itself is untouched (S2/S4-owned).
+ */
+const SEARCH_PROJECT_IDS = new Set(['proj-alpha', 'proj-beta']);
+const SEARCH_ISSUE_IDS = new Set(['issue-1', 'issue-2', 'issue-3', 'issue-4', 'issue-5']);
+export const searchLocalSeed = localSeedFromLinearFixture({
+  projects: testMockData.projects.filter(p => SEARCH_PROJECT_IDS.has(p.id)),
+  issues: testMockData.issues.filter(i => SEARCH_ISSUE_IDS.has(i.id)),
+});
+
 // ---------------------------------------------------------------------------
 // Unit-side helpers — in-memory collection + LocalStore (no server/session).
 // ---------------------------------------------------------------------------
