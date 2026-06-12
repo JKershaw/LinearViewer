@@ -1,11 +1,22 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { seedLocalWorkspace, workspaceApiLocalSeed, LOCAL_WORKSPACE_URL_KEY } from '../fixtures/local-harness.js';
 
-const TEST_WORKSPACE_URL_KEY = 'test-workspace';
+// LIN-427: the swipe surface is fully modeled by the local provider (the page
+// reads projects/issues through fetchAndPrepareProjects, and the recap/brief AI
+// mock re-gates onto local sessions per #399), so all four describe blocks ride a
+// GENUINE `provider: 'local'` session seeded from `workspaceApiLocalSeed` (the
+// shared pipeline/workspace-api fixture, derived from testMockData) instead of the
+// `test-token` + `testMockData` mock short-circuit. The seed preserves the exact
+// identifiers/labels/relations the selectors assert on (TEST-1..TEST-15, Project
+// Alpha, bug/urgent/feature labels, TEST-15→TEST-14 blocks, TEST-1→TEST-2 parent),
+// so assertions stay byte-identical. The shared workspace URL constant couples all
+// four blocks, so they migrate together.
+const TEST_WORKSPACE_URL_KEY = LOCAL_WORKSPACE_URL_KEY;
 const SWIPE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/swipe`;
 
 test.describe('Swipe Page', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/test/set-session');
+    await seedLocalWorkspace(page, workspaceApiLocalSeed);
     await page.goto(SWIPE_URL);
     await page.waitForLoadState('networkidle');
   });
@@ -341,19 +352,20 @@ test.describe('Swipe Page', () => {
 
 test.describe('Swipe Dispatched Sessions', () => {
   const API = `/workspace/${TEST_WORKSPACE_URL_KEY}`;
-  const DISPATCH_FEATURES = JSON.stringify({ dispatch: true });
 
   // Acts as a dispatch consumer to seed real sessions, mirroring
   // pipeline-scenarios.spec.js. Sessions come from the local dispatch/foreman
-  // stores, so no Linear mock is needed.
+  // stores, so the session is a GENUINE local-provider session (the dispatch
+  // feature flag is set via seedLocalWorkspace); clears are scoped to the local
+  // workspace via `?urlKey=`.
   async function clearSessions(page) {
-    await page.goto('/test/clear-dispatch-queue');
-    await page.goto('/test/clear-dispatch-history');
-    await page.goto('/test/clear-dispatch-tokens');
+    await page.goto(`/test/clear-dispatch-queue?urlKey=${TEST_WORKSPACE_URL_KEY}`);
+    await page.goto(`/test/clear-dispatch-history?urlKey=${TEST_WORKSPACE_URL_KEY}`);
+    await page.goto(`/test/clear-dispatch-tokens?urlKey=${TEST_WORKSPACE_URL_KEY}`);
   }
 
   async function createConsumerToken(page) {
-    const resp = await page.goto('/test/create-dispatch-token');
+    const resp = await page.goto(`/test/create-dispatch-token?urlKey=${TEST_WORKSPACE_URL_KEY}`);
     return JSON.parse(await resp.text()).token;
   }
 
@@ -391,7 +403,7 @@ test.describe('Swipe Dispatched Sessions', () => {
 
   test.beforeEach(async ({ page }) => {
     await clearSessions(page);
-    await page.goto(`/test/set-session?features=${encodeURIComponent(DISPATCH_FEATURES)}`);
+    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { dispatch: true } });
   });
 
   test('accordion header shows the baked-in session count', async ({ page }) => {
@@ -440,7 +452,7 @@ test.describe('Swipe Dispatched Sessions', () => {
   });
 
   test('accordion is absent when dispatch feature is disabled', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: false }))}`);
+    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { dispatch: false } });
     await openSwipeAt(page, 'TEST-14');
 
     await expect(sessionsAccordion(page)).toHaveCount(0);
@@ -449,14 +461,15 @@ test.describe('Swipe Dispatched Sessions', () => {
 
 // ============================================================================
 // Recap accordion on the swipe card.
-// Relocated unchanged from recap.spec.js (LIN-403): this exercises the swipe
-// surface, which is NOT yet migrated to the local provider, so it stays on the
-// test-token (`/test/set-session`) path here rather than being rewritten.
+// Originally relocated from recap.spec.js (LIN-403). Migrated onto the local
+// provider with the rest of the swipe surface in LIN-427: the recap AI mock
+// (buildMockRecap) re-gates onto local sessions (#399), so the refresh flow
+// resolves to fresh content without the test-token path.
 // ============================================================================
 
 test.describe('Recap UI — Swipe', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/test/set-session');
+    await seedLocalWorkspace(page, workspaceApiLocalSeed);
     await page.goto(SWIPE_URL);
     await page.waitForLoadState('networkidle');
   });
@@ -502,14 +515,15 @@ test.describe('Recap UI — Swipe', () => {
 
 // ============================================================================
 // Brief accordion on the swipe card.
-// Relocated unchanged from brief.spec.js (LIN-404): this exercises the swipe
-// surface, which is NOT yet migrated to the local provider, so it stays on the
-// test-token (`/test/set-session`) path here rather than being rewritten.
+// Originally relocated from brief.spec.js (LIN-404). Migrated onto the local
+// provider with the rest of the swipe surface in LIN-427: the brief AI mock
+// (buildMockBrief) re-gates onto local sessions (#399), so the refresh flow
+// resolves to fresh Markdown content without the test-token path.
 // ============================================================================
 
 test.describe('Brief UI — Swipe', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/test/set-session');
+    await seedLocalWorkspace(page, workspaceApiLocalSeed);
     await page.goto(SWIPE_URL);
     await page.waitForLoadState('networkidle');
   });

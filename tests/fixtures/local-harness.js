@@ -23,15 +23,18 @@
  *     the committed reference screenshots stay byte-stable
  * Migrate a spec onto this harness only when the local provider fully backs the
  * surface under test. Migrated so far: dashboard, swim (lanes/flow/vertical),
- * ship (+ orientation mode), interactions/detail (incl. the comments toggle), and
- * the workspace-api cluster (LIN-403..412): recap, brief, recommend/streaming,
- * prompts, custom-prompts, and the workspace-model UI path.
+ * ship (+ orientation mode), interactions/detail (incl. the comments toggle), the
+ * swipe surface (page, dispatched sessions, and the recap/brief accordions —
+ * LIN-427), and the workspace-api cluster (LIN-403..412): recap, brief,
+ * recommend/streaming, prompts, custom-prompts, and the workspace-model UI path.
  *
  * The detail-surface comments path is now fully provider-backed, so its
  * `routes/workspace-api.js` `testMockData` data-mock branch was orphaned and
- * deleted (LIN-413). The other workspace-api mock branches are NOT yet orphaned —
- * they still serve UNMIGRATED test-token surfaces that share the same endpoints:
- *   - swipe recap/brief accordions (swipe.spec)        → recap / brief
+ * deleted (LIN-413). With swipe migrated (LIN-427), the recap / brief mock
+ * branches no longer back any test-token surface and are now orphaned too, but
+ * their deletion is owned by sibling work — they are NOT removed here. The other
+ * workspace-api mock branches are still live, serving UNMIGRATED test-token
+ * surfaces that share the same endpoints:
  *   - free-tier suggest button + GET (free-tier.spec)  → recommend (stream + GET)
  *   - feature-toggles (feature-toggles.spec)           → prompt
  *   - foreman / mini-foreman / autopilot (foreman.spec)→ those prompt endpoints
