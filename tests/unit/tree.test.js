@@ -5,8 +5,8 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { buildForest, buildInProgressForest, NO_PROJECT_ID, PERIODICALS_PROJECT_ID, isTerminalState, isCompleted, TERMINAL_STATE_TYPES, selectFocusSubtask, computeFrontierFacts } from '../../lib/tree.js';
-import { childrenToGraphNodes, computeGraphFeatures } from '../../lib/graph-features.js';
+import { buildForest, buildInProgressForest, NO_PROJECT_ID, PERIODICALS_PROJECT_ID, isTerminalState, isCompleted, TERMINAL_STATE_TYPES, selectFocusSubtask, computeFrontierFacts, isBlocked } from '../../lib/tree.js';
+import { childrenToGraphNodes, computeGraphFeatures, hasOpenFrontier } from '../../lib/graph-features.js';
 
 // =============================================================================
 // Test Helpers
@@ -471,6 +471,100 @@ describe('selectFocusSubtask', () => {
   test('all children terminal → undefined (no non-terminal to pick)', () => {
     const children = [makeChild('LIN-1', 'completed'), makeChild('LIN-2', 'canceled')];
     assert.strictEqual(selectFocusSubtask(children), undefined);
+  });
+});
+
+// =============================================================================
+// Transitive dead-end guard — hasOpenFrontier + selectFocusSubtask (LIN-444)
+// =============================================================================
+
+/** Attach a subtree to a child built by makeChild. */
+function withChildren(child, kids) {
+  return { ...child, children: { nodes: kids } };
+}
+
+describe('hasOpenFrontier (LIN-444)', () => {
+  test('a non-blocked leaf reaches an open frontier (itself)', () => {
+    assert.strictEqual(hasOpenFrontier(makeChild('LIN-1', 'unstarted'), isBlocked), true);
+  });
+
+  test('a terminal node reaches no frontier', () => {
+    assert.strictEqual(hasOpenFrontier(makeChild('LIN-1', 'completed'), isBlocked), false);
+  });
+
+  test('a directly-blocked node reaches no frontier', () => {
+    const n = makeChild('LIN-1', 'started', { inverseBlocks: [{ identifier: 'LIN-9', type: 'started' }] });
+    assert.strictEqual(hasOpenFrontier(n, isBlocked), false);
+  });
+
+  test('non-blocked parent whose only child dead-ends in a block is itself a dead end', () => {
+    const blockedKid = makeChild('LIN-502', 'unstarted', { inverseBlocks: [{ identifier: 'LIN-900', type: 'started' }] });
+    const parent = withChildren(makeChild('LIN-497', 'started'), [blockedKid]);
+    assert.strictEqual(hasOpenFrontier(parent, isBlocked), false);
+  });
+
+  test('non-blocked parent with an open child reaches an open frontier', () => {
+    const openKid = makeChild('LIN-616', 'unstarted');
+    const parent = withChildren(makeChild('LIN-545', 'started'), [openKid]);
+    assert.strictEqual(hasOpenFrontier(parent, isBlocked), true);
+  });
+
+  test('ids-only children (no state/blocked signal) degrade to open — guard stays inert', () => {
+    const parent = withChildren(makeChild('LIN-1', 'started'), [{ id: 'g1' }, { id: 'g2' }]);
+    assert.strictEqual(hasOpenFrontier(parent, isBlocked), true);
+  });
+
+  test('a parent reaches an open frontier if ANY branch is open (mixed children)', () => {
+    const blockedKid = makeChild('LIN-2', 'unstarted', { inverseBlocks: [{ identifier: 'LIN-9', type: 'started' }] });
+    const openKid = makeChild('LIN-3', 'unstarted');
+    const parent = withChildren(makeChild('LIN-1', 'started'), [blockedKid, openKid]);
+    assert.strictEqual(hasOpenFrontier(parent, isBlocked), true);
+  });
+});
+
+describe('selectFocusSubtask — transitive dead-end guard (LIN-444)', () => {
+  // HAR-149 shape: two non-blocked in-progress children. HAR-497 (lower id) would
+  // win on identifier order, but its only child dead-ends at a blocked node; HAR-545
+  // descends into an open frontier. The guard routes to HAR-545.
+  const deadEnd = (id) => withChildren(
+    makeChild(id, 'started'),
+    [makeChild(id + '-blocked', 'unstarted', { inverseBlocks: [{ identifier: 'EXT-1', type: 'started' }] })]
+  );
+  const openEpic = (id, childState = 'unstarted') => withChildren(
+    makeChild(id, 'started'),
+    [makeChild(id + '-open', childState)]
+  );
+
+  test('the dead-branch child is skipped for the open-frontier sibling', () => {
+    const children = [deadEnd('LIN-497'), openEpic('LIN-545')];
+    assert.strictEqual(selectFocusSubtask(children).identifier, 'LIN-545');
+  });
+
+  test('without subtree blocked-ness the harness/provider is blind → identifier order (the red baseline)', () => {
+    // Same two epics, but children carry no subtree → both read as open → LIN-497 wins.
+    const children = [makeChild('LIN-497', 'started'), makeChild('LIN-545', 'started')];
+    assert.strictEqual(selectFocusSubtask(children).identifier, 'LIN-497');
+  });
+
+  test('open frontier beats the state tier: an open todo is chosen over a dead-end in-progress', () => {
+    const children = [deadEnd('LIN-497'), withChildren(makeChild('LIN-545', 'unstarted'), [makeChild('LIN-616', 'unstarted')])];
+    assert.strictEqual(selectFocusSubtask(children).identifier, 'LIN-545');
+  });
+
+  test('ranking signal, not a hard skip: when every candidate dead-ends, the best dead-end is still chosen', () => {
+    const children = [deadEnd('LIN-497'), deadEnd('LIN-498')];
+    // No open frontier anywhere → fall back to the dead-end pool, lowest identifier.
+    assert.strictEqual(selectFocusSubtask(children).identifier, 'LIN-497');
+  });
+
+  test('within the open pool, frontier ranking still applies (no behavior loss)', () => {
+    // Both open; LIN-30 blocks LIN-40 in-set → higher downstreamUnblocks wins over id order.
+    const children = [
+      withChildren(makeChild('LIN-20', 'unstarted'), [makeChild('LIN-21', 'unstarted')]),
+      withChildren(makeChild('LIN-30', 'unstarted'), [makeChild('LIN-31', 'unstarted')]),
+      makeChild('LIN-40', 'unstarted', { inverseBlocks: [{ identifier: 'LIN-30' }] })
+    ];
+    assert.strictEqual(selectFocusSubtask(children).identifier, 'LIN-30');
   });
 });
 
