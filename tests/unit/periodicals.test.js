@@ -9,12 +9,12 @@ import { PERIODICALS, getPeriodicals, buildPeriodicalNodes } from '../../lib/per
 import { PERIODICALS_PROJECT_ID } from '../../lib/tree.js';
 
 describe('periodicals registry', () => {
-  test('seeds the LIN-354 review set plus Drift & Coherence (6 templates)', () => {
-    assert.strictEqual(PERIODICALS.length, 6);
+  test('seeds the LIN-354 review set plus Drift & Coherence and Comprehension-Debt (7 templates)', () => {
+    assert.strictEqual(PERIODICALS.length, 7);
     assert.strictEqual(getPeriodicals(), PERIODICALS);
   });
 
-  test('contains Documentation, Test Coverage, Security, API Quality, Code Quality, and Drift & Coherence reviews', () => {
+  test('contains Documentation, Test Coverage, Security, API Quality, Code Quality, Drift & Coherence, and Comprehension-Debt reviews', () => {
     // Assert by id/title/mode rather than position so the registry can grow.
     const byId = Object.fromEntries(PERIODICALS.map(t => [t.id, t]));
 
@@ -24,7 +24,8 @@ describe('periodicals registry', () => {
       'security-review': 'Security Review',
       'api-quality': 'API Quality Review',
       'code-quality': 'Code Quality Review',
-      'drift-coherence': 'Drift & Coherence Review'
+      'drift-coherence': 'Drift & Coherence Review',
+      'comprehension-debt': 'Comprehension-Debt Review'
     };
 
     for (const [id, title] of Object.entries(expected)) {
@@ -268,6 +269,42 @@ describe('Drift & Coherence Review specifics (LIN-369)', () => {
     assert.doesNotMatch(prompt, /search Linear by|comments on the minted task/i);
     // No repo-specific symbols leak in.
     assert.doesNotMatch(prompt, /escapeHtml|workspace-api|jsonError/);
+  });
+});
+
+describe('Comprehension-Debt Review specifics (LIN-370)', () => {
+  const prompt = PERIODICALS.find(t => t.id === 'comprehension-debt').generatePrompt();
+
+  test('covers the three risk signals: non-obvious why, offsite rationale, cold-modify', () => {
+    assert.match(prompt, /comprehension debt/i);
+    assert.match(prompt, /non-obvious/i);
+    assert.match(prompt, /rationale/i);
+    // The why-not-what constraint-comment framing.
+    assert.match(prompt, /constraint-comment/i);
+    assert.match(prompt, /restates \*\*what\*\*|restate \*\*what\*\*/i);
+    // Explanation living offsite in closed tickets / PR bodies.
+    assert.match(prompt, /closed ticket|merged PR|offsite/i);
+    // The cold-hand-off standard: could a newcomer safely MODIFY the module.
+    assert.match(prompt, /cold-hand-off/i);
+    assert.match(prompt, /modify/i);
+  });
+
+  test('names the altitude difference from the Documentation Review (no double-flagging)', () => {
+    assert.match(prompt, /module\/system altitude|module-altitude/i);
+    assert.match(prompt, /Documentation Review/);
+    assert.match(prompt, /do not re-flag/i);
+  });
+
+  test('carries the anti-inflation guard (minimal note, not net-new prose)', () => {
+    assert.match(prompt, /inflation/i);
+    assert.match(prompt, /minimal constraint-note/i);
+    assert.match(prompt, /never net-new prose/i);
+    // A legible module is a valid clean result.
+    assert.match(prompt, /clean.*result|genuine result/i);
+  });
+
+  test('stays general: no specific module surfaces leak in', () => {
+    assert.doesNotMatch(prompt, /swim-graph|swim-lanes|roadmap|ship-layout/i);
   });
 });
 
