@@ -13,6 +13,7 @@ import {
   parseRecommendedAction,
   parseDeferTo,
   parseRecommendationResponse,
+  applyGroundingToRecommendation,
   getRecommendationStream,
   getRecommendation,
   getModelDisplayName,
@@ -22,6 +23,7 @@ import {
   SIBLING_CAP,
   EPIC_TITLE_PATTERN
 } from '../../lib/openrouter.js';
+import { appendGroundingSections } from '../../lib/prompt-formatters.js';
 import { buildMetaPromptTemplate } from '../../lib/prompts/meta-prompt-template.js';
 import { getAIRecommendationActionNames, deriveDispatchKind, isValidDispatchKind, DISPATCH_KIND_DEFAULT } from '../../lib/prompt-templates.js';
 
@@ -1158,15 +1160,22 @@ describe('getRecommendationStream (LIN-346)', () => {
     assert.ok(reasoningDeltas.length > 0, 'streamed reasoning deltas');
     assert.ok(promptDeltas.length > 0, 'streamed prompt deltas');
     assert.strictEqual(reasoningDeltas.map(e => e.data.content).join(''), '→ **research**\nLook into it.');
-    assert.strictEqual(promptDeltas.map(e => e.data.content).join(''), 'Go research the thing.');
+    // The LLM body streams first, then the deterministic grounding post-pass (LIN-435)
+    // streams as an additional prompt delta so the leaf view matches the shipped prompt.
+    const grounding = appendGroundingSections('', ISSUE, CONTEXT);
+    assert.strictEqual(promptDeltas.map(e => e.data.content).join(''), 'Go research the thing.' + grounding);
 
     // emits a terminal done
     assert.strictEqual(events.filter(e => e.type === 'done').length, 1);
 
-    // (b) returns a structured object byte-identical to the buffered parse of the same raw
-    assert.deepStrictEqual(result, parseRecommendationResponse(raw, 'stop', 17));
+    // (b) returns a structured object equal to the buffered parse with the SAME grounding
+    // post-pass applied — proving the streamed and returned prompts both carry grounding.
+    assert.deepStrictEqual(
+      result,
+      applyGroundingToRecommendation(parseRecommendationResponse(raw, 'stop', 17), ISSUE, CONTEXT)
+    );
     assert.strictEqual(result.recommendedAction, 'research');
-    assert.strictEqual(result.prompt, 'Go research the thing.');
+    assert.strictEqual(result.prompt, 'Go research the thing.' + grounding);
     assert.strictEqual(result.truncated, false);
     assert.strictEqual(result.completionTokens, 17);
   });
