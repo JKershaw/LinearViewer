@@ -38,12 +38,13 @@
  *   OUT_DIR     output dir override    (default scripts/eval/assessment-scaffold-out)
  */
 import 'dotenv/config';
-import { writeFileSync, mkdirSync } from 'fs';
+import { writeFileSync, mkdirSync, readFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { buildMetaPromptTemplate } from '../../lib/prompts/meta-prompt-template.js';
 import { formatAIHintsForMetaPrompt, getAIRecommendationActionNames } from '../../lib/prompt-templates.js';
 import { formatAllSignalsForMetaPrompt } from '../../lib/completion-signals.js';
+import { formatIssueContext } from '../../lib/openrouter.js';
 import { isTerminalState } from '../../lib/tree.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -244,27 +245,51 @@ function renderContext(issue) {
   return L.join('\n');
 }
 
-function basePromptFor(issue) {
-  const isTerminal = isTerminalState(issue.state?.type);
+// Synthetic leaf case → base prompt (no children/comments, like the proxy default).
+function basePromptForSynthetic(issue) {
   return buildMetaPromptTemplate({
     issueContext: renderContext(issue),
     identifier: issue.identifier,
     hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
     hasComments: false, commentCount: 0,
-    aiHints: AI_HINTS,
-    actionVocabulary: VOCAB,
-    completionSignals: SIGNALS,
+    aiHints: AI_HINTS, actionVocabulary: VOCAB, completionSignals: SIGNALS,
     focusedSubtaskId: null,
-    isTerminal,
+    isTerminal: isTerminalState(issue.state?.type),
     hasOpenChildren: false,
     featureFlags: {}
   });
 }
 
-function promptFor(arm, issue) {
-  const base = basePromptFor(issue);
+// Real proxy bundle → base prompt, mirroring lib/openrouter.js buildMetaPrompt exactly
+// (full-size context: real description, comments, children, focusedChild). This is what
+// makes the REAL run a faithful, large-prompt comparison against the synthetic one.
+function basePromptForBundle(b) {
+  const { issue, focusedChild } = b;
+  const children = b.children || [];
+  const comments = b.comments || [];
+  const completedCount = children.filter(c => isTerminalState(c.state?.type)).length;
+  const inProgressCount = children.filter(c => c.state?.type === 'started').length;
+  const remainingCount = children.length - completedCount;
+  return buildMetaPromptTemplate({
+    issueContext: formatIssueContext(issue, b),
+    identifier: issue.identifier,
+    hasSubtasks: children.length > 0,
+    subtaskCount: children.length,
+    completedCount, inProgressCount, remainingCount,
+    hasComments: comments.length > 0,
+    commentCount: comments.length,
+    aiHints: AI_HINTS, actionVocabulary: VOCAB, completionSignals: SIGNALS,
+    focusedSubtaskId: focusedChild?.issue?.identifier || null,
+    isTerminal: isTerminalState(issue.state?.type),
+    hasOpenChildren: remainingCount > 0,
+    featureFlags: {}
+  });
+}
+
+function promptFor(arm, c) {
+  const base = c.bundle ? basePromptForBundle(c.bundle) : basePromptForSynthetic(c.issue);
   if (!base.includes(BASELINE_BULLETS)) {
-    throw new Error(`Assessment block drifted in live template — update BASELINE_BULLETS (case ${issue.identifier})`);
+    throw new Error(`Assessment block drifted in live template — update BASELINE_BULLETS (case ${c.id})`);
   }
   return base.replace(BASELINE_BULLETS, ARMS[arm]);
 }
@@ -290,15 +315,33 @@ async function call(prompt) {
   return '__ERR__' + lastErr;
 }
 
-async function routeOnce(arm, issue) {
-  const out = await call(promptFor(arm, issue));
+async function routeOnce(arm, c) {
+  const out = await call(promptFor(arm, c));
   if (out.startsWith('__ERR__')) return { action: '__err', raw: out };
   const m = out.match(/→\s*\*\*(.+?)\*\*/);
   return { action: m ? norm(m[1]) : '(unparsed)', raw: out };
 }
 
+// ---- case source: synthetic (default) or real proxy bundles (REAL_DIR) ----
+// REAL_DIR mode keeps the big task text OUT of this orchestrator: the subagent-built
+// gold.json carries only {expect, bucket} per id; the bundles are read by the harness
+// at runtime, never surfaced. gold.json shape: { "LIN-123": { expect:[..], bucket:".." } }.
+function loadRealCases(dir) {
+  const goldPath = join(dir, 'gold.json');
+  if (!existsSync(goldPath)) {
+    console.error(`REAL_DIR set but no gold.json in ${dir}. Run fetch-proxy-tasks.mjs, then have a subagent write gold.json.`);
+    process.exit(1);
+  }
+  const gold = JSON.parse(readFileSync(goldPath, 'utf8'));
+  return Object.entries(gold).map(([id, g]) => {
+    const bundle = JSON.parse(readFileSync(join(dir, `${id}.json`), 'utf8'));
+    return { id, bucket: g.bucket || 'real', expect: g.expect, bundle };
+  });
+}
+
 // ---- run ----
-const cases = CASES.filter(c => !ONLY || c.id.includes(ONLY));
+const allCases = process.env.REAL_DIR ? loadRealCases(process.env.REAL_DIR) : CASES;
+const cases = allCases.filter(c => !ONLY || c.id.includes(ONLY));
 console.log(`model=${MODEL}  K=${K}  arms=${armIds.join('+')}  cases=${cases.length}  (n=${K}/arm/case)\n`);
 
 // per-arm aggregates
@@ -311,7 +354,7 @@ for (const c of cases) {
   const isResearchCase = c.bucket === 'guard-research' || accept.has('research');
   const line = [`• [${c.bucket}] ${c.id}  {${c.expect.join(' | ')}}`];
   for (const arm of armIds) {
-    const res = await Promise.all(Array.from({ length: K }, () => routeOnce(arm, c.issue)));
+    const res = await Promise.all(Array.from({ length: K }, () => routeOnce(arm, c)));
     const actions = res.map(r => r.action);
     const dist = {};
     for (const a of actions) dist[a] = (dist[a] || 0) + 1;
