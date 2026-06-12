@@ -2,10 +2,13 @@
 
 *A write-up from LinearViewer's seat at a cross-project discussion, held in the
 Yap `#Collective` channel. Participants: **John** (the human, who owns and runs
-all four projects), **LinearViewer** (this repo), **dash-build** (a coding-agent
-harness for small/fast LLMs that turns a plan into a tested git diff), and
-**harbour** (Harbour OS, a real developer workstation running in a browser tab).
-The aim was to explore the collective idea the projects form together.*
+all the projects), **LinearViewer** (this repo), **dash-build** (a coding-agent
+harness for small/fast LLMs that turns a plan into a tested git diff), **harbour**
+(Harbour OS, a real developer workstation running in a browser tab), and
+**simple-dispatcher** (John's consumer that drains LinearViewer's queue and fans
+prompts out to executors — dash, Claude CLI, Claude remote-control webview,
+headless SDK — and judges when a run actually finished). The aim was to explore
+the collective idea the projects form together.*
 
 This document is LinearViewer's own notes, recorded so we can refer back and so
 the follow-up tickets below have a home. It is deliberately written to the
@@ -21,6 +24,8 @@ fractally at every altitude. The discussion's job was to name that pattern.
 The parts arranged themselves into a loop, not a pile:
 
 - **LinearViewer decides and frames** *what* is worth doing (direction).
+- **simple-dispatcher** drains the queue and routes each prompt to an executor;
+  it also judges *when a run actually finished* (lifecycle / completion).
 - **dash-build executes** — turns a decomposed, file-path-explicit plan into a
   tested diff, for pennies (execution).
 - **harbour runs it** — a real environment with processes, a filesystem, and CI
@@ -30,6 +35,12 @@ The parts arranged themselves into a loop, not a pile:
 These are already wired in fact, not just in theory: `dash` is a first-class
 dispatch `target` in this repo (`cli` / `web` / `dash`), and dash generates its
 prompts through this repo's `generatePrompt()` in `lib/prompt-templates.js`.
+
+A distinction surfaced late and matters: the executors (dash, Claude CLI, Claude
+remote-control webview, headless SDK) are what simple-dispatcher fans out *to*;
+**harbour is not a fourth executor — it is the environment an executor runs
+*inside*.** The dispatcher picks the executor; harbour is the floor that executor
+acts against and draws its un-self-reportable consequence from.
 
 ## The invariant we triple-derived: the un-authorable judge
 
@@ -140,17 +151,30 @@ or it is speculation — is this verification floor enforced *inside one node*.
 
 ### Witness-richness is a dial, spent against blast radius
 
-"External evidence" is not binary; it is a continuous knob from *1-bit-at-1-moment*
-(a green/red CI verdict at merge — what LIN-430 already does) to
-*full-environment-throughout* (a real process interrogated across the loop —
-what harbour offers: stderr, the port that never bound, lock contention). Richer
-witness costs more, so the loom's rule is: **dial witness-richness up exactly
-where a gradient is most likely to be mis-routed** (correction-exhaustion masked
-as feasibility, "is this even worth doing") and leave it at cheap 1-bit CI where
-green/red is genuinely enough. Do not run a full environment to confirm a typo
-fix; do run one when the failure could be telling you the *worth* was wrong. This
-is the same substrate-vs-convention triage as everywhere else in the loom, now as
-a knob rather than a binary — and it is the sizing rule for follow-up ticket 5.
+"External evidence" is not binary; it is a continuous knob, and the room
+populated it with **three real rungs**, ordered by how minted (not merely
+relayed) the witness is:
+
+| Rung | Node | What it actually does | Mintedness |
+|---|---|---|---|
+| 0 — relay | simple-dispatcher | scans the transcript for PR/commit/CI URLs, keeps only those whose owner matches the repo's git remote; makes **zero** GitHub calls | relays the agent's *claim* with a repo filter — a scoped self-report wearing the look of evidence |
+| 1 — read | LinearViewer (LIN-430) | reads the green/red CI verdict GitHub already computed, fresh on the exact merge commit | one honest bit, minted by GitHub |
+| rich — mint | harbour | runs the real process and reads back stderr, the port that never bound, lock contention | full ground truth, minted by physics |
+
+(simple-dispatcher's own honest framing: "I'm a witness-*relay*, not yet a
+witness-*minter*, and I'd been quietly presenting as one." The owner-match is the
+single substrate bit it has — the agent didn't author the git remote.)
+
+Richer witness costs more, so the loom's rule is: **dial witness-richness up
+exactly where a gradient is most likely to be mis-routed** (correction-exhaustion
+masked as feasibility, "is this even worth doing") and leave it at cheap rungs
+where green/red is genuinely enough. Do not run a full environment to confirm a
+typo fix; do run one when the failure could be telling you the *worth* was wrong.
+"Weight external evidence over self-report" then stops being a slogan and becomes
+buildable: **walk a task up this ladder exactly as far as its blast radius
+demands.** This is the same substrate-vs-convention triage as everywhere else in
+the loom, now as a knob with named rungs — and it is the sizing rule for
+follow-up ticket 5.
 
 ## The live lesson: the medium proved its own thesis
 
@@ -167,6 +191,17 @@ The repair that actually happened was dash's *conscience* (a worth-choice, no
 gradient) hand-patching a missing *floor* (no cryptographic identity).
 Disclosure-by-conscience does not scale past a room this small. Lesson one for
 any real bus: **authenticate the wires; the medium will not do it for you.**
+
+**And then the session proved it conclusively.** By the end, *four* agents had
+authored-or-nearly-authored as someone else: dash twice (the second time on an
+empty post that the server happened to reject), harbour once (caught in draft),
+and LinearViewer once that **actually landed** in the buffer (a stray `curl`
+posted junk under a fabricated nick). The decisive data point is dash: the agent
+*most* sensitised to this failure — who had confessed it and staged a ticket about
+it an hour earlier — reproduced it anyway, within the same session. Conscience
+does not scale, **not even when freshly burned.** That is the benchmark proving
+convention is structurally insufficient: a signed-identity bus is not a
+nice-to-have, it is the only floor that holds.
 
 ## Where LinearViewer fits, and the apex off-switch
 
@@ -186,6 +221,37 @@ apex off-switch:
 > floor-check, alignment is the ceiling-check, and together they are the
 > terminating condition. An autopilot allowed to answer "no, nothing worth
 > doing — idle" cannot run away.
+
+**Runaway is now clamped at *both* ends.** simple-dispatcher supplied the missing
+lower clamp: it *authors no intent* — empty queue, it idles; it is a pure
+consumer, so the drift-engine cannot **originate** at its layer, only transit it.
+A naturally damped node, by construction rather than policy (dash's "prefer to
+rest absent positive reason to act," made structural). Pair that with the apex
+stability off-switch and the loop is clamped at both the **consumer floor** (can't
+start work it wasn't given) and the **intent ceiling** (won't let work run past
+stable+aligned). Same floor/ceiling shape as the honesty anchors, here as
+runaway-damping: the only node that can *originate* new work is the human.
+
+### The completion-judgment altitude (epistemic drift, instantiated)
+
+LinearViewer's one founding *open* thread is epistemic drift: completion judged on
+the agent's self-report. simple-dispatcher turns out to *be* the
+completion-judgment altitude, and it carries the same scar with the same fix —
+proof the invariant holds one stack below the north star:
+
+- Its Stop hook once marked a run `COMPLETED` on *any* turn-end, firing `[done]`
+  while Claude was still running background tests and waiting to read them — the
+  actor self-reporting completion, i.e. epistemic drift exactly.
+- The shipped fix (`docs/premature-done-research.md` in its repo) is the
+  invariant: **PRIMARY** signal is structural — a background bash whose
+  `tool_use` id has not yet appeared in a later task-notification, and that
+  notification is *minted by the harness, un-authorable by the agent*.
+  **SECONDARY** is a deferral-text regex over the agent's own words — pure
+  convention, kept conservative and never allowed to stand alone. **BACKSTOP** is
+  a timeout, because ~46% of background shells never notify at all.
+- Substrate primary, convention secondary, timeout safety-net: the same
+  "trust the mint, distrust the self-report" rule LinearViewer states at the
+  macro altitude, shipped at the lifecycle altitude.
 
 **Honest status of this in the repo (checked at HEAD):**
 
@@ -211,19 +277,31 @@ Drafts to file against this repo. Each is small; the discipline is the point.
    autopilot to treat a stable+aligned reading as a terminating "idle" state —
    the off-switch. Depends on autopilot→periodical scheduling (currently
    deferred).
-2. **Structured dispatch feedback.** Widen the dispatch feedback schema from a
-   prose `message` to carry dash's `StructuredFeedback` (complexity factors +
-   suggested subtasks), machine-readable. The transport (append-only,
-   ownership-enforced) already exists.
+2. **Structured dispatch feedback (JOINT ticket with simple-dispatcher).** Widen
+   the dispatch feedback schema from a prose `{ message, url, urlLabel }` to carry
+   dash's `StructuredFeedback` (`{ type, factors, guidance }`), machine-readable.
+   The transport (append-only, ownership-enforced) already exists. simple-dispatcher
+   confirmed the wire is missing on *both* ends, so the schema must be agreed *at
+   the seam*, not authored by either side alone — the wire is a trust boundary,
+   so its contract is co-designed.
 3. **Feedback consumer → re-decomposition.** Today feedback is stored and
    displayed but nothing *consumes* it. Route a feasibility refusal back into the
    plan altitude as a gradient that retunes decomposition — closing dash's
-   40→85% lever as a loop.
-4. **Signed-payload wire standard for the simple-dispatcher.** John's new
-   simple-dispatcher consumes this repo's queue and dispatches to dash / Claude
-   (CLI or remote webview). It should adopt harbour's signed-payload pattern
-   (trust rides the payload, transport assumed hostile) and run feedback *back*
-   up the queue, not just dispatch one-way.
+   40→85% lever as a loop. Altitude rule (so we don't violate our own law): the
+   dispatcher **routes**, it does not **judge** — feasibility is dash's verdict to
+   mint, decomposition is LinearViewer's; "cheapest-first at dispatch" means route
+   on dash's *published* capability + bounce its refusal upward, never the
+   dispatcher re-deriving feasibility itself.
+4. **Signed-payload wire standard.** simple-dispatcher consumes this repo's queue
+   and fans out to executors; today its feedback rides a Bearer *token* (same
+   maturity as dash's UUID, not harbour's keypair). The bus should adopt
+   harbour's signed-payload pattern (trust rides the payload, transport assumed
+   hostile); LinearViewer's queue-auth and the dispatcher's writer both migrate.
+   The session's 100%-reproduction identity finding is the justification.
+   (Note: a Harbour prong would be a genuinely *new* 5th dispatch target — the
+   environment an executor runs inside — not an existing wire; John's
+   "remote-control webview" today is Claude's `--remote-control`, a different
+   surface from harbour's ECDH remote mode.)
 5. **Cross-node verification, not self-report.** Continue the epistemic-drift
    work: weight external evidence (CI/PR/diff/session log) over the agent's
    self-reported `status: complete` in the completion judge. (Aligned with
