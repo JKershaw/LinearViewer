@@ -1454,9 +1454,10 @@ describe('meta-prompt Step 0: open parent, all subtasks complete (LIN-364)', () 
     completionSignals: 'S', focusedSubtaskId: null
   };
 
-  test('open parent with all subtasks complete gets the review/close branch forbidding defer', () => {
+  test('open parent with all subtasks complete gets the unified review/close branch forbidding defer', () => {
     const p = buildMetaPromptTemplate({ ...baseArgs, isTerminal: false, hasOpenChildren: false });
-    assert.ok(/open but every subtask is already complete/i.test(p), 'the all-complete Step 0 branch must be present');
+    assert.ok(/Step 0: The substantive work here is already complete/i.test(p), 'the unified completion Step 0 branch must be present');
+    assert.ok(/all \d+ of its subtasks are in a terminal state/i.test(p), 'it must name the all-subtasks-complete case');
     assert.ok(/Do NOT `?defer`?/i.test(p), 'it must explicitly forbid defer');
     assert.ok(/recommend `?review`?/i.test(p), 'it must steer toward review/close');
   });
@@ -1465,20 +1466,21 @@ describe('meta-prompt Step 0: open parent, all subtasks complete (LIN-364)', () 
     const p = buildMetaPromptTemplate({
       ...baseArgs, completedCount: 1, remainingCount: 1, isTerminal: false, hasOpenChildren: true
     });
-    assert.ok(!/open but every subtask is already complete/i.test(p), 'a parent with an open child is not short-circuited');
+    assert.ok(!/The substantive work here is already complete/i.test(p), 'a parent with an open child is not short-circuited');
   });
 
   test('a leaf (no subtasks) does NOT get the branch', () => {
     const p = buildMetaPromptTemplate({
       ...baseArgs, hasSubtasks: false, subtaskCount: 0, completedCount: 0, isTerminal: false, hasOpenChildren: false
     });
-    assert.ok(!/open but every subtask is already complete/i.test(p), 'a leaf has no subtasks to be complete');
+    assert.ok(!/The substantive work here is already complete/i.test(p), 'a leaf with no subtasks is not short-circuited at Step 0');
   });
 
-  test('a terminal parent gets the terminal Step 0, NOT the open-parent branch (mutually exclusive)', () => {
+  test('a terminal parent gets the unified Step 0 with the terminal clause, not the all-subtasks clause', () => {
     const p = buildMetaPromptTemplate({ ...baseArgs, isTerminal: true, hasOpenChildren: false });
-    assert.ok(/already in a terminal state/i.test(p), 'terminal task gets the terminal Step 0');
-    assert.ok(!/open but every subtask is already complete/i.test(p), 'and NOT the non-terminal all-complete branch');
+    assert.ok(/Step 0: The substantive work here is already complete/i.test(p), 'a terminal task gets the unified completion Step 0');
+    assert.ok(/its state is already a terminal state/i.test(p), 'with the terminal-state clause');
+    assert.ok(!/all \d+ of its subtasks are in a terminal state/i.test(p), 'and NOT the non-terminal all-subtasks-complete clause');
   });
 });
 

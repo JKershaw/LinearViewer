@@ -601,6 +601,45 @@ describe('buildMetaPromptTemplate terminal-state branch (LIN-353)', () => {
     assert.ok(/still has open children/i.test(text), 'the open-children terminal branch must be present');
     assert.ok(/descend|route to the open child/i.test(text), 'it must steer toward the open child, not close');
   });
+
+  test('an open parent whose every subtask is terminal gets the unified Step 0 review/close branch', () => {
+    const text = build({ isTerminal: false, hasSubtasks: true, subtaskCount: 3, remainingCount: 0, hasOpenChildren: false });
+    assert.ok(/### Step 0:/.test(text), 'the unified completion Step 0 must fire for an all-subtasks-done parent');
+    assert.ok(/\breview\b/.test(text), 'it must steer toward review/close');
+    assert.ok(/close it out|close-out/i.test(text), 'it must frame the remaining work as the parent close-out');
+    assert.ok(/do NOT \`?defer\`?/i.test(text), 'it must still forbid deferring into a finished child (LIN-364)');
+  });
+});
+
+// =============================================================================
+// Review routing (review-never-recommended fix): `review` is no longer gated to
+// terminal/all-subtasks-done states. Step 3 routes a leaf whose implementation has
+// already landed (completion signals recorded) to `review` instead of looping
+// `implementation` — the cause of merged-but-In-Progress tasks never advancing.
+// =============================================================================
+describe('buildMetaPromptTemplate review routing for landed implementation', () => {
+  function build(overrides = {}) {
+    return buildMetaPromptTemplate({
+      issueContext: 'Test context', identifier: 'LIN-1', hasSubtasks: false,
+      subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
+      hasComments: true, commentCount: 2, aiHints: 'hints',
+      actionVocabulary: getAIRecommendationActionNames().join(', '), ...overrides
+    });
+  }
+
+  test('Step 3 instructs routing an already-landed implementation to review', () => {
+    const text = build({ isTerminal: false, hasOpenChildren: false });
+    assert.ok(/already landed/i.test(text), 'Step 3 must check whether implementation has already landed');
+    assert.ok(/Recommend \`review\`/.test(text), 'a landed implementation must route to review');
+  });
+
+  test('Step 3 guards against re-recommending implementation on done work and on In Progress alone', () => {
+    const text = build({ isTerminal: false, hasOpenChildren: false });
+    assert.ok(/Do NOT re-recommend \`implementation\` on work that is already done/i.test(text),
+      'it must forbid re-implementing already-done work');
+    assert.ok(/In Progress state is NOT by itself evidence/i.test(text),
+      'an In Progress state alone must not be read as unfinished');
+  });
 });
 
 // =============================================================================
