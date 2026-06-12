@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { seedLocalWorkspace } from '../fixtures/local-harness.js';
 
 test.describe('Landing Swim Page (/swim)', () => {
   test.beforeEach(async ({ page }) => {
@@ -76,7 +77,7 @@ test.describe('Landing Swim Page (/swim)', () => {
   });
 
   test('authenticated users are redirected to workspace swim', async ({ page }) => {
-    await page.goto('/test/set-session');
+    await seedLocalWorkspace(page);
     await page.goto('/swim');
     await expect(page).toHaveURL(/\/workspace\/.+\/swim/);
   });

@@ -6,8 +6,9 @@
  * the per-user feature path.
  */
 import { test, expect } from '../fixtures/test-base.js';
+import { seedLocalWorkspace, LOCAL_WORKSPACE_URL_KEY } from '../fixtures/local-harness.js';
 
-const URL_KEY = 'test-workspace';
+const URL_KEY = LOCAL_WORKSPACE_URL_KEY;
 const SETTINGS_URL = `/workspace/${URL_KEY}/settings`;
 
 test.describe('Workspace feature toggles', () => {
@@ -15,7 +16,7 @@ test.describe('Workspace feature toggles', () => {
     // Clean slate: delete the whole workspace-prefs doc (no modelId = delete),
     // which resets the periodicals override back to its default (off).
     await request.get(`/test/set-workspace-model?urlKey=${URL_KEY}`);
-    await page.goto('/test/set-session');
+    await seedLocalWorkspace(page);
   });
 
   test.afterEach(async ({ request }) => {
@@ -100,7 +101,7 @@ test.describe('Workspace feature toggles', () => {
   });
 
   test('handler rejects an invalid workspace feature key', async ({ page }) => {
-    await page.goto('/test/set-session');
+    await seedLocalWorkspace(page);
     const res = await page.request.post(`/workspace/${URL_KEY}/settings/workspace-features`, {
       form: { feature: 'linearMcp', enabled: 'true' } // a per-user key, not a workspace key
     });
