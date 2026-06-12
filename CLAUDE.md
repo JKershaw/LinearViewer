@@ -33,7 +33,8 @@ lib/
   linear.js            GraphQL client for Linear API
   linear-cli.js        CLI tool for AI agents to query/modify Linear
   bash-tool.js         Safe bash executor with data/code separation (stdin + argv modes)
-  tree.js              Transforms flat issues → nested tree structure
+  tree.js              Transforms flat issues → nested tree structure (frontier ranking in selectFocusSubtask)
+  graph-features.js    Network-free blocking-graph / critical-path primitives (shared by swipe + frontier ranking)
   openrouter.js        OpenRouter API client for AI recommendations
   providers/           Provider abstraction (decouples views from Linear specifics)
     interface.js       Provider interface contract
@@ -83,6 +84,7 @@ lib/
   brief.js             Current-state task brief prompt + handling
   brief-cache.js       Hash-based cache for AI briefs
   recommend-recurse.js Server-side recommendation recursion (defer routing)
+  recommendation-facts.js  Deterministic, network-free per-node fact assembly (assembleNodeFacts) — single fact seam for both prompt paths
   session-store.js     MongoDB/MangoDB session store
   user-preferences.js  Cross-device preference storage (MongoDB)
   workspace-preferences.js  Workspace-level preference storage

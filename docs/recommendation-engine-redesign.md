@@ -1,7 +1,10 @@
 # Recommendation Engine Redesign — "Make It Good"
 
-**Status:** Draft proposal (for team alignment — no code yet)
-**Scope:** Full re-architecture of the AI "Recommended next prompt" path
+**Status:** Shipped (LIN-431 epic, subtasks LIN-432…436, June 2026). This document is now
+the as-built record: Sections 1–6 are the original measured investigation and design
+rationale (the *why*), preserved unchanged; **Section 7 carries the as-shipped result per
+subtask**, mapping each step to the code and PR that landed.
+**Scope:** Re-architecture of the AI "Recommended next prompt" path
 **Author:** generated from a measured investigation, June 2026
 **Related:** `docs/recommender-failure-patterns.md`, `docs/recommender-structural-drift.md`, `docs/meta-prompt-audit-report.md`, `docs/prompt-change-validation.md`
 
@@ -214,7 +217,29 @@ What makes a re-architecture safe is a measurement tool that exists *before* the
 safety property) or _behavior-changing_ (eval expected to move — the point), never both.** That is
 what keeps a regression unambiguous and prevents half-finished tasks.
 
-Proposed parent ticket with subtasks:
+**As shipped (LIN-431 epic).** All five subtasks landed; the conditional two-call split was
+**not** triggered (see the note after the list). Per-subtask result:
+
+| # | Subtask | Shipped as | PR |
+|---|---|---|---|
+| 0 | `review` as a first-class routing step (un-strand In Progress leaves) | meta-prompt Step-0 unified review rule (`lib/prompts/meta-prompt-template.js`) | #430 |
+| 1 | Baseline eval harness (the red test) | `scripts/eval-recommend-baseline.mjs` + committed baseline under `scripts/eval/recommend-baseline/` (local pipeline, not the deployed proxy) | #429 |
+| 2 | Low-risk fact fixes | frontier ranking in `selectFocusSubtask` (`lib/tree.js`) + new network-free `lib/graph-features.js`; structured facts surfaced into the existing markdown meta-prompt | #432 |
+| 3 | Behavior-preserving refactor (fact-assembly seam) | new `lib/recommendation-facts.js` (`assembleNodeFacts`) — the single fact seam, single LLM call unchanged | #435 |
+| 4 | Collapse the two-path tax | `appendGroundingSections()` post-pass in `lib/prompt-formatters.js`, run by BOTH paths; meta-prompt's duplicated grounding prose deleted (also fixed the broken meta staleness `--since` date) | #437 |
+| 5 | Code-health review / tidy | this review (LIN-436): docs reconciled to as-built, tests + eval confirmed green | — |
+
+**Eval outcome vs the §2 baseline.** The descent flip-flop the redesign targeted is gone: the
+LIN-385 epic now resolves to its intended leaf (LIN-428) on 6/6 runs (was 3/6, with the rest
+stalling at LIN-389 `breakdown` or doing node-work at LIN-385), and the LIN-389 mid-node reaches
+LIN-428 on 6/6 (was 4/6) — see `scripts/eval/recommend-baseline/candidate-lin433/table.md`.
+Residual **leaf-action** variance (research↔plan↔implement on a well-scoped leaf) persists; the
+redesign explicitly classes this as the inherent provider-nondeterminism tax, separately
+addressable by voting/model choice — **not** the descent flip-flop the two-call split targets.
+
+---
+
+Original proposed sequencing (preserved):
 
 1. **Baseline eval harness (the red test)** _(no production change; gate for all others)_. A
    **deliberately minimal** repeat-runner committed to `scripts/`: runs N× on the two reference
@@ -248,6 +273,14 @@ LLM round-trips is a heavier runtime change (cheaper descent + votable routing, 
 second terminal call). **Do this only if step 4's eval shows the single fact-fed call still
 flip-flops below threshold** — otherwise it is over-engineering. Behavior-changing; separately
 justified.
+
+> **Resolved (LIN-436): not triggered.** The step-4 eval shows the single fact-fed decision call
+> no longer flip-flops on *descent* — the failure this split was meant to cure (LIN-385 6/6 to the
+> intended leaf). The only remaining variance is leaf **action** choice, which §5 already classes
+> as the inherent provider-nondeterminism tax (fixable by voting/model choice), not the descent
+> flip-flop. So the two-call split stays unbuilt. If a future eval shows leaf-action variance
+> actually crossing the green bar, that is the trigger to file the separate ticket — it was not met
+> here.
 
 Each step is independently shippable; you are never holding a half-rewritten system.
 
