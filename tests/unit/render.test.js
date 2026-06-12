@@ -10,12 +10,13 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { renderLabels, renderDisplayLabels, renderPage } from '../../lib/render.js';
+import { renderLabels, renderDisplayLabels, renderPage, renderDetailsContent } from '../../lib/render.js';
 import { PERIODICALS_PROJECT_ID, NO_PROJECT_ID } from '../../lib/tree.js';
 import { testMockPeriodicalsTree } from '../fixtures/mock-data.js';
 // Side-effect import: the Linear provider self-registers on load, so getProvider
 // ('linear') (used by the add-task link) resolves in this unit-test context.
 import '../../lib/providers/linear/index.js';
+import { linearProvider } from '../../lib/providers/linear/index.js';
 import { registerProvider } from '../../lib/providers/registry.js';
 
 // =============================================================================
@@ -282,15 +283,17 @@ describe('renderPage description rendering', () => {
     });
 
     test('does NOT render --- blocks as prompt container for authenticated users', () => {
-      const projectTree = createProjectTree(issueWithDashBlock);
-      const result = renderPage([projectTree], [], [], 'Test', { isLanding: false });
+      // LIN-442: the authenticated dashboard defers the detail block to a lazy
+      // per-issue fetch, so the description renders via renderDetailsContent (the
+      // /api/detail payload), not inline in renderPage.
+      const detail = renderDetailsContent(issueWithDashBlock, { isLanding: false, urlKey: 'test' });
 
       // Should NOT have the "Setup Prompt" container that comes from --- blocks
       // (There may be other prompt-containers for the interactive prompt UI)
-      assert.ok(!result.includes('Setup Prompt'), 'Authenticated view should NOT render "Setup Prompt"');
+      assert.ok(!detail.includes('Setup Prompt'), 'Authenticated view should NOT render "Setup Prompt"');
 
       // The description text should be rendered as plain text
-      assert.ok(result.includes('Some intro'), 'Description intro should be visible');
+      assert.ok(detail.includes('Some intro'), 'Description intro should be visible');
     });
 
     test('renders description with --- as plain text for authenticated users', () => {
@@ -311,6 +314,63 @@ describe('renderPage description rendering', () => {
                 !result.includes('Setup Prompt'),
                 'Should not render --- content as Setup Prompt');
     });
+  });
+});
+
+// =============================================================================
+// Lazy detail rendering (LIN-442)
+//
+// The authenticated dashboard ships collapsed lines only: renderNode emits an
+// empty, lazy `.details` wrapper and the client fetches the rendered block from
+// /api/detail on first expand. The landing page (no fetch route) stays inline.
+// =============================================================================
+
+describe('lazy detail rendering (LIN-442)', () => {
+  const heavyIssue = {
+    id: 'issue-heavy',
+    identifier: 'TEST-9',
+    title: 'Heavy issue',
+    description: 'A long description that used to be serialized inline on every load',
+    state: { type: 'started' },
+    estimate: 5,
+    labels: { nodes: [] },
+    url: 'https://linear.app/test/issue/TEST-9'
+  };
+  function tree(issue) {
+    return {
+      project: { id: 'project-1', name: 'Test Project', content: null, url: null },
+      incomplete: [{ issue, children: [], depth: 0 }],
+      completed: [],
+      completedCount: 0
+    };
+  }
+
+  test('authenticated dashboard emits an empty lazy wrapper, not inline detail', () => {
+    const result = renderPage([tree(heavyIssue)], [], [], 'Test', { isLanding: false, urlKey: 'ws' });
+
+    // The wrapper is present and flagged lazy, carrying the keys the client fetch needs.
+    assert.ok(result.includes('data-lazy="1"'), 'emits a lazy details wrapper');
+    assert.ok(result.includes('data-details-for="issue-heavy"'), 'wrapper keyed by issue id');
+    assert.ok(result.includes('data-url-key="ws"'), 'wrapper carries urlKey for the fetch');
+
+    // The heavy inline content must NOT be in the page payload anymore.
+    assert.ok(!result.includes('A long description'), 'description is deferred, not inline');
+    assert.ok(!result.includes('data-toggle="comments"'), 'comments shell is deferred');
+    assert.ok(!result.includes('data-toggle="details"'), 'Details sub-toggle is deferred');
+  });
+
+  test('landing page still renders detail inline (no lazy wrapper, no fetch route)', () => {
+    const result = renderPage([tree(heavyIssue)], [], [], 'Test', { isLanding: true });
+
+    assert.ok(!result.includes('data-lazy'), 'no lazy wrapper on landing');
+    assert.ok(result.includes('A long description'), 'description rendered inline for landing');
+  });
+
+  test('renderDetailsContent returns the inner block the route serves', () => {
+    const detail = renderDetailsContent(heavyIssue, { isLanding: false, urlKey: 'ws' });
+    assert.ok(detail.includes('A long description'), 'description present in detail content');
+    assert.ok(detail.includes('data-toggle="comments"'), 'comments shell present in detail content');
+    assert.ok(!detail.startsWith('<div class="details'), 'returns inner content, not the wrapper');
   });
 });
 
@@ -429,17 +489,33 @@ describe('capability-aware rendering (LIN-177 S3)', () => {
   // uses a fresh name so permutations don't clobber one another (the registry
   // is module-global and last-write-wins).
   let stubSeq = 0;
-  function renderWithProviderUi(ui) {
+  function makeStubProvider(ui) {
     const name = `stub-${stubSeq++}`;
-    registerProvider({
+    const provider = {
       name,
       ui: { write: true, comments: true, estimates: true, subtasks: true, displayName: 'Stub Tracker', ...ui },
       getCreateTaskUrl: (urlKey, projectId) => `https://stub.example/${urlKey}/new?project=${projectId}`
-    });
+    };
+    registerProvider(provider);
+    return provider;
+  }
+  function renderWithProviderUi(ui) {
+    const provider = makeStubProvider(ui);
     return renderPage([stubTree()], [], [], 'Test', {
       isLanding: false,
       urlKey: 'ws',
-      workspaces: [{ id: 'w1', name: 'WS', urlKey: 'ws', provider: name }]
+      workspaces: [{ id: 'w1', name: 'WS', urlKey: 'ws', provider: provider.name }]
+    });
+  }
+  // LIN-442: detail content (comments toggle, estimate, View-in link) is now
+  // served by the lazy /api/detail surface, i.e. renderDetailsContent — so the
+  // detail-scoped capability gates are asserted there rather than in renderPage.
+  function detailContentWithProviderUi(ui) {
+    const provider = makeStubProvider(ui);
+    return renderDetailsContent(stubTree().incomplete[0].issue, {
+      isLanding: false,
+      urlKey: 'ws',
+      provider
     });
   }
 
@@ -462,27 +538,35 @@ describe('capability-aware rendering (LIN-177 S3)', () => {
   });
 
   test('comments=true shows the Comments toggle; comments=false hides it', () => {
-    assert.ok(renderWithProviderUi({ comments: true }).includes('data-toggle="comments"'), 'comments toggle shown');
-    assert.ok(!renderWithProviderUi({ comments: false }).includes('data-toggle="comments"'), 'comments toggle hidden');
+    assert.ok(detailContentWithProviderUi({ comments: true }).includes('data-toggle="comments"'), 'comments toggle shown');
+    assert.ok(!detailContentWithProviderUi({ comments: false }).includes('data-toggle="comments"'), 'comments toggle hidden');
   });
 
   test('estimates=true shows "N pts"; estimates=false hides it', () => {
-    assert.ok(renderWithProviderUi({ estimates: true }).includes('3 pts'), 'estimate shown');
-    assert.ok(!renderWithProviderUi({ estimates: false }).includes('3 pts'), 'estimate hidden');
+    assert.ok(detailContentWithProviderUi({ estimates: true }).includes('3 pts'), 'estimate shown');
+    assert.ok(!detailContentWithProviderUi({ estimates: false }).includes('3 pts'), 'estimate hidden');
   });
 
   test('legacy/Linear workspace renders byte-identically (back-compat)', () => {
     // No `provider` field on the workspace → resolves the Linear provider, whose
-    // ui keeps all affordances on and displayName 'Linear'.
+    // ui keeps all affordances on and displayName 'Linear'. Page-level affordances
+    // stay in renderPage; detail-level ones (LIN-442) live in the lazy detail
+    // content — assert each on its own surface.
     const result = renderPage([stubTree()], [], [], 'Test', {
       isLanding: false,
       urlKey: 'ws',
       workspaces: [{ id: 'w1', name: 'WS', urlKey: 'ws' }]
     });
-    assert.ok(result.includes('View in Linear →'), 'Linear display name preserved');
     assert.ok(result.includes('data-action="create-task"'), 'add-task present for Linear');
     assert.ok(result.includes('linear.app/'), 'Linear create URL preserved');
-    assert.ok(result.includes('data-toggle="comments"'), 'comments toggle present for Linear');
-    assert.ok(result.includes('3 pts'), 'estimate present for Linear');
+
+    const detail = renderDetailsContent(stubTree().incomplete[0].issue, {
+      isLanding: false,
+      urlKey: 'ws',
+      provider: linearProvider
+    });
+    assert.ok(detail.includes('View in Linear →'), 'Linear display name preserved');
+    assert.ok(detail.includes('data-toggle="comments"'), 'comments toggle present for Linear');
+    assert.ok(detail.includes('3 pts'), 'estimate present for Linear');
   });
 });

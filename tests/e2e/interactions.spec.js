@@ -270,9 +270,10 @@ test.describe('Detail Section Toggles', () => {
     // Find same issue in project section (if it exists there)
     const projectDetails = page.locator(`.project .details[data-details-for="${issueId}"]`);
     if (await projectDetails.count() > 0) {
-      // Project section's Details should still be collapsed (independent state)
-      const projectDetailsContent = projectDetails.locator('.detail-content[data-content="details"]');
-      await expect(projectDetailsContent).toHaveClass(/hidden/);
+      // Independent state: expanding the In-Progress copy must not expand — or,
+      // under LIN-442 lazy loading, even fetch — the project-section copy. Its
+      // wrapper stays collapsed (hidden) and its content unloaded.
+      await expect(projectDetails).toHaveClass(/hidden/);
     }
   });
 

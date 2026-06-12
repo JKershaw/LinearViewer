@@ -443,7 +443,7 @@ app.use(createOpenRouterAuthRoutes())
  * @param {string|null} teamId - Optional team ID to filter issues by
  * @returns {Promise<{trees, inProgressTrees, organizationName, teams, selectedTeamId}>} Prepared data for rendering
  */
-async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = null, urlKey = null) {
+async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = null, urlKey = null, { slim = false } = {}) {
   const provider = getProviderForWorkspace(workspace);
   const accessToken = getWorkspaceToken(workspace);
   // Use mock data in test mode to avoid hitting the provider API
@@ -454,10 +454,13 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
     ? testMockTeams
     : await provider.fetchTeams(accessToken);
 
-  // Fetch projects and issues (filtered by team if specified)
+  // Fetch projects and issues (filtered by team if specified).
+  // `slim` (LIN-442) is the homepage's description-trim: it only reaches the
+  // dashboard + its token-refresh retry, never swim/ship/swipe, which keep the
+  // full query.
   let { organizationName, projects, issues } = isTestMode
     ? (mockOverride || testMockData)
-    : await provider.fetchProjects(accessToken, teamId);
+    : await provider.fetchProjects(accessToken, teamId, { slim });
 
   // In test mode, manually filter issues by team
   if (isTestMode && teamId) {
@@ -574,7 +577,7 @@ async function handleTokenRefreshAndRetry(workspace, session, teamId, openRouter
   const deployInfo = getDeployInfo()
   // Pass urlKey so the periodicals group renders consistently after a token
   // refresh, matching the primary dashboard route (LIN-341).
-  const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey);
+  const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true });
   const html = renderPage(trees, inProgressTrees, recentActivityTrees, organizationName, {
     teams,
     selectedTeamId,
@@ -956,7 +959,7 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
       customPrompts = (await customPromptsStore.list(workspace.urlKey)).map(p => ({ id: p.id, name: p.name }));
     } catch (e) { /* non-fatal */ }
 
-    const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey);
+    const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true });
     const isLocalhost = ['localhost', '127.0.0.1'].some(h => req.get('host')?.startsWith(h));
     const html = renderPage(trees, inProgressTrees, recentActivityTrees, organizationName, {
       teams,

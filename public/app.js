@@ -239,6 +239,54 @@ async function loadComments(toggle, content) {
   }
 }
 
+/**
+ * Load and inject an issue's detail block on first expand.
+ * LIN-442: the dashboard ships collapsed lines only; the detail block
+ * (description, metadata, comments shell, prompt/foreman/autopilot containers)
+ * is fetched here from /api/detail and injected into the empty `.details`
+ * wrapper. Mirrors loadComments; guards against double-fetch via data-loaded.
+ * @param {HTMLElement} details - The lazy `.details` wrapper element
+ */
+async function loadDetails(details) {
+  const issueId = details.dataset.detailsFor
+  const urlKey = details.dataset.urlKey
+  if (!issueId || !urlKey) return
+  // 'loading' or 'true' — already fetched or in flight; don't refetch.
+  if (details.dataset.loaded) return
+
+  details.dataset.loaded = 'loading'
+  try {
+    const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/detail/${encodeURIComponent(issueId)}`)
+    if (!response.ok) {
+      throw new Error(`Failed to fetch detail: ${response.status}`)
+    }
+    const data = await response.json()
+    details.innerHTML = data.html || ''
+    details.dataset.loaded = 'true'
+  } catch (error) {
+    console.error('Failed to load detail:', error)
+    details.innerHTML = '<div class="detail-line"><span class="detail-text">Failed to load details</span></div>'
+    // Clear the flag so a later expand can retry.
+    delete details.dataset.loaded
+  }
+}
+
+/**
+ * Fetch any lazy `.details` blocks that are actually visible and not yet loaded
+ * (e.g. after restoring persisted expand state or re-expanding a project).
+ * loadDetails itself guards against duplicate fetches.
+ * @param {ParentNode} [root=document] - Subtree to scan
+ */
+function loadVisibleLazyDetails(root) {
+  (root || document).querySelectorAll('.details[data-lazy]').forEach(details => {
+    if (details.dataset.loaded) return
+    if (details.classList.contains('hidden')) return
+    // offsetParent === null ⇒ hidden by a collapsed ancestor (.node/.project).
+    if (details.offsetParent === null) return
+    loadDetails(details)
+  })
+}
+
 function hasStoredState() {
   try {
     return localStorage.getItem(STORAGE_KEY) !== null
@@ -456,6 +504,10 @@ function applyState(state) {
     const children = project.querySelectorAll('.node, .project-description, .project-meta, .completed-toggle, [data-completed-for]')
     children.forEach(hide)
   })
+
+  // LIN-442: hydrate detail blocks for any items restored to an expanded,
+  // visible state. Runs last so collapsed-project nodes (now hidden) are skipped.
+  loadVisibleLazyDetails(document)
 }
 
 // Get default collapsed project IDs from HTML data attributes
@@ -517,6 +569,9 @@ function init() {
       if (details) show(details)
       // Both sections can have children
       showDescendantsRespectingExpanded(id, state.expanded, section)
+      // LIN-442: fetch this node's (and any now-visible expanded descendants')
+      // lazy detail blocks.
+      loadVisibleLazyDetails(node)
     } else {
       if (details) hide(details)
       // Both sections can have children
@@ -581,6 +636,10 @@ function init() {
     }
 
     setArrow(header, !isCollapsed)
+
+    // LIN-442: when a project is re-expanded, hydrate detail blocks for any of
+    // its now-visible expanded nodes.
+    if (!isCollapsed) loadVisibleLazyDetails(project)
   }
 
   // ==========================================================================
