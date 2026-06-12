@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { seedLocalWorkspace } from '../fixtures/local-harness.js';
 
 test.describe('Landing Swipe Page (/swipe)', () => {
   test.beforeEach(async ({ page }) => {
@@ -126,7 +127,7 @@ test.describe('Landing Swipe Page (/swipe)', () => {
   });
 
   test('authenticated users visiting /swipe/:identifier are redirected to workspace swipe', async ({ page }) => {
-    await page.goto('/test/set-session');
+    await seedLocalWorkspace(page);
     await page.goto('/swipe/LV-8');
 
     // Server redirects to workspace swipe (identifier passed through,
@@ -135,7 +136,7 @@ test.describe('Landing Swipe Page (/swipe)', () => {
   });
 
   test('authenticated users are redirected to workspace swipe', async ({ page }) => {
-    await page.goto('/test/set-session');
+    await seedLocalWorkspace(page);
     await page.goto('/swipe');
 
     await expect(page).toHaveURL(/\/workspace\/.+\/swipe/);

@@ -1,11 +1,12 @@
 import { test, expect } from '../fixtures/test-base.js'
+import { seedLocalWorkspace, LOCAL_WORKSPACE_URL_KEY } from '../fixtures/local-harness.js'
 
-const TEST_WORKSPACE_URL_KEY = 'test-workspace'
+const TEST_WORKSPACE_URL_KEY = LOCAL_WORKSPACE_URL_KEY
 const SETTINGS_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/settings`
 
 test.describe('Settings Page', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/test/set-session')
+    await seedLocalWorkspace(page)
     await page.goto(SETTINGS_URL)
     await page.waitForLoadState('networkidle')
   })
@@ -29,7 +30,7 @@ test.describe('Settings Page', () => {
   test('shows workspace dropdown in nav', async ({ page }) => {
     const workspaceToggle = page.locator('#workspace-toggle')
     await expect(workspaceToggle).toBeVisible()
-    await expect(workspaceToggle).toContainText('Test Workspace')
+    await expect(workspaceToggle).toContainText('Local Workspace')
   })
 })
 
@@ -37,8 +38,8 @@ test.describe('Token Management', () => {
   const DISPATCH_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/dispatch`
 
   test.beforeEach(async ({ page }) => {
-    await page.goto('/test/clear-dispatch-tokens')
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`)
+    await page.goto(`/test/clear-dispatch-tokens?urlKey=${TEST_WORKSPACE_URL_KEY}`)
+    await seedLocalWorkspace(page, undefined, { features: { dispatch: true } })
     await page.goto(DISPATCH_URL)
     await page.waitForLoadState('networkidle')
   })
@@ -167,8 +168,8 @@ test.describe('Token API Integration', () => {
   const DISPATCH_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/dispatch`
 
   test.beforeEach(async ({ page }) => {
-    await page.goto('/test/clear-dispatch-tokens')
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`)
+    await page.goto(`/test/clear-dispatch-tokens?urlKey=${TEST_WORKSPACE_URL_KEY}`)
+    await seedLocalWorkspace(page, undefined, { features: { dispatch: true } })
   })
 
   test('created token works with consumer API', async ({ page, request }) => {
