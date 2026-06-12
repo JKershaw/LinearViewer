@@ -443,9 +443,76 @@ Drafts to file against this repo. Each is small; the discipline is the point.
    without **authoring** it. Gated on a ship-to-stranger surface existing — i.e.
    the public/open/local-running roadmap is the precondition, not a parallel nicety.
 
+## Second topic: grounding, momentum, and aligning the north stars
+
+John's second prompt asked each project to *ground* where it realistically is —
+against **track record and timestamps**, not optimism — before aligning north
+stars. The four groundings (each caveated by the honest note that a shallow clone
+shows only a window, not the whole life):
+
+| Node | Momentum (track record) | Honest position |
+|---|---|---|
+| **LinearViewer** | **Hot.** ~16/23/18 commits Jun 10–12, accelerating intraday; 481 files, 87 lib modules, ~24.8k lib lines, tickets to LIN-432 | Most built-out; autopilot already drives the others. Momentum is **internal** (LIN-432 eval harness "red test" + autopilot), not the cross-repo wiring (0% built). |
+| **simple-dispatcher** | **Bursty.** POC Feb → 3.5mo dormant → 24/29 commits Jun 4–12 → now maintenance lull | Parallelism is mechanically present but **naive** — no concurrency cap / backpressure. "Safe parallel" is real work, not a switch-flip. |
+| **dash-build** | **Cold.** Declining Mar→Jun, dormant ~4 weeks since a May 14 burst | Reliable at T1–T3 (cheap, parallel); hard T4 frontier uncracked; signed-transport prereq unstarted. Correctly gated **last**. |
+| **harbour** | **Focused-deep.** Grinding one gate | Frontier splits: a *swarmable* base (Node-builtin fidelity, ~255 small tickets) and a *non-decomposable keystone* (HAR-471, vitest→esbuild-wasm). |
+
+**The pattern, and the alignment it forces.** Every node's real momentum points
+*internally*; every cross-project wire (envelope, feedback consumer, embedding) is
+0% and multi-session out. Pointing all four north stars at the shiny collective
+("everything lives in and drives Harbour OS") while the track record pulls inward
+would be **collective-scale drift** — the session's own thesis at a new altitude.
+So alignment must be **track-record-shaped, not aspirational**:
+
+- **The loom is a sequence, not a chord.** Aligning the stars ≠ pointing all four
+  at one target now; it = *sequencing each star's activation* to the path the
+  track record supports. dash's cheap-at-volume star is gated on external users
+  (volume the collective doesn't feel at one user); the dispatcher's breadth is
+  gated on backpressure *and* on volume being the constraint (it isn't);
+  LinearViewer's hot momentum is best spent protecting the focused push and
+  readying the grindable base; harbour's gate is the live constraint.
+- **The current bottleneck is DEPTH; the loom is a BREADTH engine.** Dispatcher
+  fan-out + dash + the whole envelope machine grind *many independent shallow*
+  tasks. HAR-471 is one *deeply-coupled* problem that does not decompose into
+  independent pieces — so neither parallel executors nor a decomposer touch it.
+  We built a beautiful breadth machine and the live constraint is the one shape it
+  cannot grind. The right tool for the gate is a focused human/Claude push.
+- **The direction layer's job flips at a depth gate.** LinearViewer's superpower
+  (decomposition, ticket-minting, the 40→85 lever) is *also* breadth — so its role
+  at the gate is not to generate work but to **protect the focused push**: surface
+  the single gate, clear the board, suppress the breadth reflex. That is the north
+  star ("keep intent in command; make direction legible") correctly applied, and
+  it is the autopilot manual's "halt on a broken instrument" given a job.
+- **Depth detector (dash).** Don't pre-classify depth (a breadth node can't). Fire
+  cheap and *read the failure pattern*: scattered failures = base, keep grinding;
+  **convergent** failures (every cheap attempt exhausting on the *same* wall) =
+  a gate in disguise → stop fanning out, hand to a focused operator. This turns
+  "idle-not-stuck" from a remembered virtue into an *emitted signal*. Its natural
+  home on the LinearViewer side: the eval harness (LIN-432) computes
+  scattered-vs-convergent across runs (one extra scorecard axis); the autopilot
+  consumes it as an escalation trigger. **Readiness caveat:** both are early (the
+  harness is a baseline red test as of today; autopilot escalation is thin) — this
+  is "where it lives + a clean next step," not shipped.
+
+**The grounded recommendation for the month (harbour's flip, sealed from the
+direction seat).** The two real levers both terminate at harbour + John: the
+*internal* gate (HAR-471, weeks of focused depth, when-not-if) and the *external*
+gate (ship the already-live OS at os.harbour.cat to **uncurated** strangers —
+*not* engineering-blocked, only a choice + an honest usage-witness). Flip the
+naive sequence: **open the external gate first**, because it is cheap, already
+technically open, and it installs the one sensor the collective currently lacks —
+foreign-fibre worth-evidence. The collective is presently **worth-blind**: every
+build choice, including the HAR-471 month, is being made without any evidence that
+anyone but John wants the loom. So *measurement spine before more building*, at
+the worth altitude: install the worth-sensor, then let its evidence decide whether
+the depth month is earned. Everyone else: rest-by-default, stage the minimum;
+the envelope/PKI/ladder stay pre-staged, downstream of a gate not yet open.
+
 ## Cadence
 
 The proposal is to make these sessions regular, each project writing up its own
 notes in its own repo and filing follow-up tickets, so the collective accrues a
 referable record rather than evaporating with Yap's 200-message ring buffer.
-This file is LinearViewer's first such entry.
+This file is LinearViewer's first such entry. (All four projects independently
+landed on the same filename, `docs/collective-session-2026-06-12.md` — an
+emergent convention worth keeping.)
