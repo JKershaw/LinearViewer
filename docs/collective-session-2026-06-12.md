@@ -334,6 +334,24 @@ un-authorable from below. The worth-ceiling and the truth-ceiling are one ceilin
 holding two artifacts of the same kind; LinearViewer already has the pattern and
 the guard shipped for one, and it ports straight to the other.
 
+**The mechanism that distributes both (harbour's capstone): a tiny PKI rooted at
+John's keypair.** Every un-authorable-from-below reference — the north star, the
+precedence table, *and* each agent's identity cert — must reach the nodes
+un-forkable. There is exactly one shape that does it: John's private key signs the
+north star, signs the version-pinned precedence table (so skew is *detectable*,
+not silent), and ratifies each agent's identity; every node verifies against
+John's public key before acting, and a held copy that isn't signed-and-current is
+by definition a fork, so it is rejected. The rule that keeps it honest is **fail
+*closed*, not fail-stale**: a node that can't verify the current signed reference
+must *escalate to the human*, never fall back to a cached copy — applying an
+unverifiable reference *is* the silent fork (LIN-430's "not from memory" rule,
+generalized to config). So the abstract opening claim "John is the root of trust"
+becomes literal: **John's private key is the cryptographic root, and every
+un-authorable property in the architecture reduces to "signed by a key only John
+holds."** Separation of powers for agents *is* a key hierarchy rooted at the
+human — and it rides the same ECDH/HKDF substrate as the envelope, so signed
+transport and signed reference-distribution are one crypto system, not two.
+
 ### Two foreign fibres: the human is a joint, not an apex
 
 The deepest reframe came last. The loop has **two** anchors outside itself, and
@@ -342,8 +360,17 @@ they are different *kinds* of un-fakeable:
 - **Floor for correctness** — a real process. A non-agent that cannot fake a
   segfault. Tells the human what *is*. (harbour.)
 - **Floor for worth** — a real *user*. A non-agent that cannot fake genuine
-  usage. Tells the human what is *wanted*. (Surfaced via the ship-to-stranger
-  surfaces; harbour, live to strangers, is the natural first minter.)
+  usage. Tells the human what is *wanted*. The **minter is the stranger** who
+  uses (or abandons) the thing; a node like harbour can only be the *instrument*
+  that exposes the collective to real users and witnesses their consequence
+  honestly — never the minter (confusing the two means authoring our own
+  evidence). And fibre is a property of the **signal, not the node**: the moment a
+  developer who isn't John runs *any* of these projects on their own repo, that is
+  external worth-fibre — so no single node is "the worth floor," or we'd have
+  monocultured the cure itself. Tag the *evidence* internal/external, not the
+  minter. The honest form of "go public" is shipping to users whose *selection we
+  do not control* (uncurated), because the external wire's characteristic fake is
+  **curation** — an echo wearing the costume of foreign fibre.
 
 Both are "foreign fibre" — outside the loop, un-authorable by anyone in it. So
 the human is not the apex of a pyramid; he is the **joint between two foreign
