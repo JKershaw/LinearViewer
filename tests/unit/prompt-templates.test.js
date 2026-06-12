@@ -1379,7 +1379,7 @@ describe('Scale to the task (handwritten path)', () => {
 // LIN-177 S4/S5: Capability-aware prompts (provider.ui threaded into both paths)
 // =============================================================================
 import { generateCustomPrompt } from '../../lib/prompt-templates.js';
-import { resolvePromptUi, applyPromptCapabilities, DEFAULT_PROMPT_UI } from '../../lib/prompt-formatters.js';
+import { resolvePromptUi, applyPromptCapabilities, DEFAULT_PROMPT_UI, formatSubtaskSummary } from '../../lib/prompt-formatters.js';
 import { buildMetaPromptTemplate } from '../../lib/prompts/meta-prompt-template.js';
 
 describe('resolvePromptUi (LIN-177 S4)', () => {
@@ -1509,6 +1509,61 @@ describe('meta-prompt Step 2: bug already investigated (LIN-366)', () => {
   test('with comments present, it directs the model to read them', () => {
     const p = buildMetaPromptTemplate({ ...baseArgs, hasComments: true, commentCount: 3 });
     assert.ok(/There are 3 comment\(s\) — read them/i.test(p), 'comment-count phrasing must surface when comments exist');
+  });
+});
+
+describe('FRONTIER FACTS fact-surfacing (LIN-433)', () => {
+  const frontierFacts = {
+    openCount: 3,
+    blockedCount: 1,
+    openChildren: [
+      { identifier: 'LIN-401', blocked: true },
+      { identifier: 'LIN-402', blocked: false },
+      { identifier: 'LIN-428', blocked: false }
+    ],
+    nextChild: 'LIN-428',
+    sessionFit: 'fits one session'
+  };
+  const baseArgs = {
+    issueContext: 'CTX', identifier: 'LIN-385',
+    hasSubtasks: true, subtaskCount: 4, completedCount: 1, inProgressCount: 0, remainingCount: 3,
+    hasComments: false, commentCount: 0, aiHints: 'H', actionVocabulary: 'plan, implementation, review, breakdown, defer',
+    completionSignals: 'S', focusedSubtaskId: 'LIN-428', isTerminal: false, hasOpenChildren: true
+  };
+
+  test('meta-prompt renders the deterministic block when frontierFacts is supplied', () => {
+    const p = buildMetaPromptTemplate({ ...baseArgs, frontierFacts });
+    assert.ok(/FRONTIER FACTS \(deterministic/i.test(p), 'the block header must be present');
+    assert.ok(/Open children: 3 \(1 blocked, 2 actionable\)/.test(p), 'open/blocked/actionable counts surface');
+    assert.ok(/LIN-401 \[blocked\]/.test(p) && /LIN-428 \[actionable\]/.test(p), 'per-child blocker status surfaces');
+    assert.ok(/Frontier next child[^\n]*: LIN-428/.test(p), 'the frontier next child surfaces');
+    assert.ok(/Plan session-fit answer: fits one session/.test(p), 'the extracted session-fit hint surfaces');
+  });
+
+  test('meta-prompt omits the block when frontierFacts is absent (Linear-parity default)', () => {
+    const p = buildMetaPromptTemplate({ ...baseArgs, frontierFacts: null });
+    assert.ok(!/FRONTIER FACTS/.test(p), 'no block without frontierFacts (the parity default)');
+  });
+
+  test('SUGGESTED NEXT prose advertises the frontier picker, not the stale priority order', () => {
+    const p = buildMetaPromptTemplate({ ...baseArgs, frontierFacts });
+    assert.ok(/Blocked children are skipped/i.test(p), 'prose names the skip-blocked behavior');
+    assert.ok(/unblocks-most then critical-path/i.test(p), 'prose names the frontier ranking');
+    assert.ok(!/first non-blocked todo > first incomplete/i.test(p), 'the stale priority wording is gone');
+  });
+
+  test('handwritten path mirrors the same facts via formatSubtaskSummary', () => {
+    const children = [
+      { id: 'a', identifier: 'LIN-401', title: 't', state: { type: 'unstarted' },
+        labels: { nodes: [{ name: 'blocked' }] }, inverseRelations: { nodes: [] } },
+      { id: 'b', identifier: 'LIN-428', title: 't', state: { type: 'started' },
+        labels: { nodes: [] }, inverseRelations: { nodes: [] } }
+    ];
+    const summary = formatSubtaskSummary(children);
+    assert.ok(/\*\*Subtasks:\*\* 0\/2 done, 1 in progress → Continue: LIN-428/.test(summary),
+      'summary advertises the frontier-picked next child');
+    assert.ok(/\*\*Frontier facts:\*\* 2 open child\(ren\), 1 blocked, next frontier child LIN-428/.test(summary),
+      'the mirrored FRONTIER FACTS line carries the same open/blocked counts and next child');
   });
 });
 
