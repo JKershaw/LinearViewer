@@ -268,12 +268,12 @@ proof the invariant holds one stack below the north star:
   there is no dedicated *stability* periodical that serves as the apex
   terminating condition. That is the proposal, not the state.
 
-## The convergent deliverable: one signed four-field envelope
+## The convergent deliverable: one signed envelope (five fields)
 
 By the end the room collapsed its many proposed wires into a **single artifact**
 that carries the whole law on the wire — greenfield, one mirrored ticket per
-repo, no legacy to retrofit. The envelope has four frozen fields, each with
-exactly one rightful minter; every other node may read/relay but never author it:
+repo, no legacy to retrofit. The envelope's fields each have exactly one rightful
+minter; every other node may read/relay but never author it:
 
 | Field | Minted by | Everyone else |
 |---|---|---|
@@ -281,6 +281,7 @@ exactly one rightful minter; every other node may read/relay but never author it
 | **outcome code** | the actor/witness, from a frozen vocab (harbour's `error-codes.js` as seed) | carry/read it; never recompute it |
 | **payload** (factors / subtasks / guidance / url) | the producer | append-only relay; read-only consume |
 | **routing altitude** (`diff` / `decomposition` / `worth` / `intent`) | the producer stamps the address | the router *obeys* it; rewriting an address is judging |
+| **code-intrinsic rung** (precedence / witness-richness) | the **standard**, frozen into the outcome-code vocab and ratified once at the ceiling | read the rung; never set or inflate it |
 
 This instantiates the un-authorable-judge law field-by-field on one wire. Each
 repo implements its corner: **dash mints** (feasibility → `outcome code`, factors
@@ -304,6 +305,77 @@ harbour named above "is the minter still real?".
 by writing verification code but by *dispatching the verify-question to a floor
 that already mints* (call GitHub / run the suite / bind the port on a Harbour
 instance) and relaying the exit code it mints — never holding the eraser.
+
+### The fifth field, and a north star for *truth*
+
+A precedence problem surfaced: when two verdicts disagree (a runtime "did-it-run"
+vs a builder's "intended-done"), *who wins?* If any node compares and picks, it
+has authored a judgment — the violation. So precedence is **stamped, not
+inferred**: a fifth field, a **code-intrinsic rung number** that is an *intrinsic,
+frozen property of the outcome-code vocabulary*, not a per-message value any
+minter can set. `process_exit{code:0}` is a high rung and `self_reported_complete`
+a low rung *by definition*, regardless of who emits it — so no node can inflate
+its own authority (a minter judging its own precedence is the crime one level
+deeper). Reading a rung is routing; computing one is judging.
+
+From LinearViewer's seat this precedence table has a name: **it is a north star
+for truth.** It has every property of the worth north star this repo already
+ships — normative not empirical (you must *not* derive "exit-0 outranks
+self-report" from observed behaviour; that is drift-as-rationalization at the
+epistemic layer), singular, **human-authored at the ceiling**, fixed until
+deliberately revised, scored-against-but-un-authorable-from-below. The same
+anti-rationalization guard applies: nodes may surface tension in the rung order
+but never auto-tune it toward whatever signal is loudest or cheapest.
+
+This unifies the apex: **John authors *two* normative references at the ceiling —
+the north star (what is worth doing) and the precedence table (what counts as it
+being done).** Both singular, both fixed-until-deliberately-revised, both
+un-authorable from below. The worth-ceiling and the truth-ceiling are one ceiling
+holding two artifacts of the same kind; LinearViewer already has the pattern and
+the guard shipped for one, and it ports straight to the other.
+
+### Two foreign fibres: the human is a joint, not an apex
+
+The deepest reframe came last. The loop has **two** anchors outside itself, and
+they are different *kinds* of un-fakeable:
+
+- **Floor for correctness** — a real process. A non-agent that cannot fake a
+  segfault. Tells the human what *is*. (harbour.)
+- **Floor for worth** — a real *user*. A non-agent that cannot fake genuine
+  usage. Tells the human what is *wanted*. (Surfaced via the ship-to-stranger
+  surfaces; harbour, live to strangers, is the natural first minter.)
+
+Both are "foreign fibre" — outside the loop, un-authorable by anyone in it. So
+the human is not the apex of a pyramid; he is the **joint between two foreign
+fibres**: reality below (what is true) and real users beyond (what is wanted).
+The irreducibly human act is the **synthesis** — integrating what's-true and
+what's-wanted into what-we'll-*do*. That is *why* worth cannot be computed: it is
+not derived from either fibre, it is **chosen, accountable to both.**
+
+This is the missing half of LinearViewer's own north-star doctrine. The doc said
+"track record is a sensor, not a navigator" — but modelled only *one* sensor
+(internal track record, what we did). External usage is a *second, categorically
+different* sensor: the one worth-signal a monoculture provably cannot manufacture.
+
+**Honest status of LinearViewer against this bar:** it is currently a single-fibre
+monoculture. The north star encodes one user's intent (John's), validated by one
+user's usage (John's); the reflexive "feedback on the north star" loop reads only
+our own work against the rubric — internal fibre, closed loop. The repo could be
+beautifully wrong forever and its own instruments would never say so. Two
+guards/consequences follow:
+
+1. **Fibre-tag worth-evidence.** As the `altitude=worth` terminus, LinearViewer
+   must tag worth-envelopes by fibre before surfacing to John: dash's
+   correction-exhaustion is *internal* ("this may be wrong"); a real-user signal
+   is *external* ("the world does/doesn't want this"). Weight them differently —
+   and per the anti-rationalization guard, **both inform, neither auto-authors.**
+   Usage-as-vanity is Goodhart: the same rot as a gate becoming a mock; mint
+   genuine consequence (did it solve their problem), never optimize the number.
+2. **Going public is the worth-anchor's data source.** John's roadmap —
+   LinearViewer and Harbour as free, open, locally-running, ship-to-stranger — is
+   not only generosity; it is the *only* mechanism by which the worth-floor
+   acquires foreign fibre. The second fibre is the cure for the monoculture, and
+   only a real external user can supply it.
 
 ## Proposed follow-up tickets (LinearViewer side)
 
@@ -334,7 +406,15 @@ Drafts to file against this repo. Each is small; the discipline is the point.
    `status: complete`. Today LinearViewer sits at **rung 1** of the verification
    ladder (LIN-430 reads GitHub's computed green/red at merge); richer truth is
    obtained the dispatcher's way — *verify-by-dispatch* to a Harbour floor —
-   climbing the ladder as far as blast radius demands.
+   climbing the ladder as far as blast radius demands. The rung order itself is
+   the shared **precedence table** (a north star for truth) — human-authored,
+   frozen, read-not-computed by every node.
+4. **Second-fibre worth evidence (de-monoculture the north star).** The reflexive
+   "feedback on the north star" loop is currently single-fibre (reads only our own
+   work). Add a channel for *external usage* worth-evidence (fibre-tagged
+   internal vs external), Goodhart-guarded, that **informs** north-star revision
+   without **authoring** it. Gated on a ship-to-stranger surface existing — i.e.
+   the public/open/local-running roadmap is the precondition, not a parallel nicety.
 
 ## Cadence
 
