@@ -105,7 +105,7 @@ describe('proxy relationship queries', () => {
     // comments). A flat-array response would reintroduce the inconsistency.
     const handlerStart = proxySource.indexOf("logEvent(req, '/api/proxy/relations', 200)");
     assert.ok(handlerStart !== -1, '/relations 200 handler not found');
-    const block = proxySource.slice(handlerStart, handlerStart + 400);
+    const block = proxySource.slice(handlerStart, handlerStart + 600);
     assert.match(block, /relations:\s*\{\s*nodes:/, 'relations must be wrapped as { nodes: [...] }');
     assert.match(block, /inverseRelations:\s*\{\s*nodes:/, 'inverseRelations must be wrapped as { nodes: [...] }');
   });

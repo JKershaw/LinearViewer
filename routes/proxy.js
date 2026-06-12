@@ -18,6 +18,7 @@ import rateLimit from 'express-rate-limit';
 import { createProxyFetch } from '../lib/proxy-fetch.js';
 import { createDedupeCache, dedupeKey } from '../lib/proxy-dedupe.js';
 import { fetchProjects, fetchIssueContext, fetchRecommendationContext } from '../lib/linear.js';
+import { applyTrashedSignal, isTrashed } from '../lib/trashed-signal.js';
 import { isRecommendationEnabled, getRecommendation } from '../lib/openrouter.js';
 import { resolveRecommendation, describeDescent, armHopSignal } from '../lib/recommend-recurse.js';
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
@@ -578,6 +579,7 @@ const ISSUE_DETAIL_QUERY = gql`
       description
       url
       state { name type }
+      trashed
       assignee { name }
       labels { nodes { id name color } }
       priority
@@ -730,6 +732,7 @@ const LABELS_BY_TEAM_QUERY = gql`
 const RELATIONS_QUERY = gql`
   query($issueId: String!) {
     issue(id: $issueId) {
+      trashed
       relations {
         nodes {
           id
@@ -780,6 +783,7 @@ const ISSUE_DESCRIPTION_QUERY = gql`
     issue(id: $id) {
       id
       description
+      trashed
     }
   }
 `;
@@ -821,7 +825,21 @@ const ISSUE_LABELS_QUERY = gql`
   query($issueId: String!) {
     issue(id: $issueId) {
       id
+      trashed
       labels { nodes { id name } }
+    }
+  }
+`;
+
+// LIN-401: a lightweight trashed-only probe for write handlers that don't
+// otherwise read the issue (PATCH, comments, relation create). Linear still
+// resolves trashed issues by ID, so without this a write would silently mutate
+// a soft-deleted ghost.
+const TRASHED_GUARD_QUERY = gql`
+  query($id: String!) {
+    issue(id: $id) {
+      id
+      trashed
     }
   }
 `;
@@ -1161,12 +1179,22 @@ GET ${baseUrl}/api/proxy/issues/{issueId}
   → {
       "id": "...", "identifier": "LIN-123", "title": "...", "description": "...",
       "state": { "name": "In Progress", "type": "started" },
+      "trashed": false,
       "labels":   { "nodes": [{ "name": "bug" }] },
       "children": { "nodes": [{ "id": "...", "identifier": "LIN-124", "title": "..." }] },
       "parent":   { "id": "...", "identifier": "LIN-100", "title": "..." },
       "comments": { "nodes": [{ "id": "...", "body": "...", "createdAt": "..." }] }
     }
   → Note: labels / children / comments use Linear's {nodes: [...]} wrapper.
+  → TRASHED ISSUES: Linear soft-deletes (trash for ~30 days). A deleted issue
+    vanishes from every list/search/child collection but STILL resolves by ID,
+    carrying its stale pre-deletion state. When that happens this endpoint sets
+    "trashed": true AND overrides the reported state to
+    { "name": "Trashed", "type": "canceled" } so you cannot mistake a deleted
+    ghost for live work. Key off state.type ("canceled" ⇒ terminal, do not act)
+    and read "trashed" to tell a deleted issue from a user-canceled one. The
+    foreman endpoints (recommend/recap/brief/prompt) refuse a trashed target
+    with 404; the write endpoints refuse with 409.
 
 GET ${baseUrl}/api/proxy/search?q={query}
   → Search issues by text (max 50 results)
@@ -1189,8 +1217,12 @@ GET ${baseUrl}/api/proxy/cycle/{cycleId}
 
 GET ${baseUrl}/api/proxy/relations/{issueId}
   → Issue relations (blocks, blocked-by, related, duplicate)
-  → { "relations":        { "nodes": [{ "id": "...", "type": "blocks", "relatedIssue": { "id": "...", "identifier": "LIN-9" } }] },
+  → { "trashed": false,
+      "relations":        { "nodes": [{ "id": "...", "type": "blocks", "relatedIssue": { "id": "...", "identifier": "LIN-9" } }] },
       "inverseRelations": { "nodes": [{ "id": "...", "type": "blocks", "issue": { "id": "...", "identifier": "LIN-7" } }] } }
+  → "trashed": true means the issue itself has been soft-deleted (this query has
+    no root state to override, so the flag is the only signal). Relations are
+    still returned so you can see what a now-deleted issue was related to.
   → Note: relations / inverseRelations use Linear's {nodes: [...]} wrapper,
     same as relations on /issue/{id}. \`relatedIssue\` is the target of an
     outgoing relation; \`issue\` is the source of an inverse (e.g. blocked-by) one.
@@ -1418,7 +1450,8 @@ One convention across every endpoint, so you can branch on the same fields every
 400 - Validation error (bad/missing field, malformed ID)
 401 - Invalid, expired, or consumed token
 403 - Endpoint requires read-write token (yours is read-only)
-404 - Resource not found
+404 - Resource not found (includes a trashed target on the foreman endpoints)
+409 - Refusing to modify a trashed (soft-deleted) issue (write endpoints)
 429 - Rate limited (max 60 requests/minute)
 500 - Internal server error
 502 - Upstream write was rejected (the create/update did not land)
@@ -1599,6 +1632,11 @@ One convention across every endpoint, so you can branch on the same fields every
           return (isNaN(ta) ? 0 : ta) - (isNaN(tb) ? 0 : tb);
         });
       }
+
+      // LIN-401: a trashed issue still resolves by ID with a stale pre-deletion
+      // state. Override it to a terminal Trashed/canceled state + trashed flag so
+      // a consumer cannot mistake the ghost for live work.
+      applyTrashedSignal(data.issue);
 
       logEvent(req, '/api/proxy/issues/:id', 200);
       res.json(data.issue);
@@ -1784,11 +1822,16 @@ One convention across every endpoint, so you can branch on the same fields every
         return res.status(404).json({ error: 'Issue not found' });
       }
 
+      // LIN-401: this query selects only relations (no root state to override),
+      // so a trashed target is signalled by a top-level `trashed: true` flag.
+      // The relations themselves are still returned — a consumer may legitimately
+      // want to see what a now-deleted issue was related to.
       logEvent(req, '/api/proxy/relations', 200);
       // Wrap in Linear's {nodes:[...]} shape to match /issue and the rest of
       // the raw-read surface (labels/children/comments), so consumers see a
       // single consistent convention across endpoints.
       res.json({
+        trashed: isTrashed(data.issue),
         relations: { nodes: data.issue.relations?.nodes || [] },
         inverseRelations: { nodes: data.issue.inverseRelations?.nodes || [] }
       });
@@ -1870,6 +1913,23 @@ One convention across every endpoint, so you can branch on the same fields every
    * PATCH /api/proxy/issues/:issueId
    * Update an issue.
    */
+  /**
+   * LIN-401: refuse a write whose target is a trashed (soft-deleted) issue.
+   * Returns true (and sends a 409) when the issue is trashed, so the caller can
+   * `if (await refuseIfTrashed(...)) return;` before mutating. A missing issue
+   * (null) is NOT refused here — the mutation proceeds and Linear's own
+   * not-found error maps to the usual status, preserving existing behaviour.
+   */
+  async function refuseIfTrashed(client, issueId, req, res, endpoint) {
+    const data = await client.request(TRASHED_GUARD_QUERY, { id: issueId });
+    if (isTrashed(data.issue)) {
+      logEvent(req, endpoint, 409);
+      res.status(409).json({ error: 'Issue is trashed; refusing to modify a deleted issue' });
+      return true;
+    }
+    return false;
+  }
+
   router.patch('/api/proxy/issues/:issueId', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
       const { client, reason } = await getClient(req.proxyUrlKey);
@@ -1919,6 +1979,8 @@ One convention across every endpoint, so you can branch on the same fields every
         return res.status(400).json({ error: 'No valid fields to update' });
       }
 
+      if (await refuseIfTrashed(client, issueId, req, res, '/api/proxy/issues/:id')) return;
+
       const data = await client.request(UPDATE_ISSUE_MUTATION, { id: issueId, input });
       if (writeRejected(req, res, '/api/proxy/issues/:id', data.issueUpdate, 'Issue was not updated')) return;
       logEvent(req, '/api/proxy/issues/:id', 200);
@@ -1955,6 +2017,10 @@ One convention across every endpoint, so you can branch on the same fields every
       if (!data.issue) {
         logEvent(req, endpoint, 404);
         return res.status(404).json({ error: 'Issue not found' });
+      }
+      if (isTrashed(data.issue)) {
+        logEvent(req, endpoint, 409);
+        return res.status(409).json({ error: 'Issue is trashed; refusing to modify a deleted issue' });
       }
       newDescription = merge(data.issue.description || '');
     } catch (err) {
@@ -2070,6 +2136,8 @@ One convention across every endpoint, so you can branch on the same fields every
         return res.status(400).json({ error: 'body contains invalid characters' });
       }
 
+      if (await refuseIfTrashed(client, issueId, req, res, '/api/proxy/issues/comments')) return;
+
       // Deterministic dedupe (LIN-399): if an identical comment was just
       // created for this issue, return that one instead of minting a duplicate.
       const key = dedupeKey(req.proxyUrlKey, issueId, body);
@@ -2124,6 +2192,8 @@ One convention across every endpoint, so you can branch on the same fields every
       if (!relatedIssueId || !isValidIssueId(relatedIssueId)) {
         return res.status(400).json({ error: 'Valid relatedIssueId is required' });
       }
+
+      if (await refuseIfTrashed(client, issueId, req, res, '/api/proxy/issues/relations')) return;
 
       // Handle blocked-by as inverse blocks
       let input;
@@ -2217,6 +2287,10 @@ One convention across every endpoint, so you can branch on the same fields every
         logEvent(req, '/api/proxy/issues/labels', 404);
         return res.status(404).json({ error: 'Issue not found' });
       }
+      if (isTrashed(issueData.issue)) {
+        logEvent(req, '/api/proxy/issues/labels', 409);
+        return res.status(409).json({ error: 'Issue is trashed; refusing to modify a deleted issue' });
+      }
 
       const currentLabelIds = (issueData.issue.labels?.nodes || []).map(l => l.id);
       if (currentLabelIds.includes(labelId)) {
@@ -2266,6 +2340,10 @@ One convention across every endpoint, so you can branch on the same fields every
       if (!issueData.issue) {
         logEvent(req, '/api/proxy/issues/labels', 404);
         return res.status(404).json({ error: 'Issue not found' });
+      }
+      if (isTrashed(issueData.issue)) {
+        logEvent(req, '/api/proxy/issues/labels', 409);
+        return res.status(409).json({ error: 'Issue is trashed; refusing to modify a deleted issue' });
       }
 
       const currentLabelIds = (issueData.issue.labels?.nodes || []).map(l => l.id);
