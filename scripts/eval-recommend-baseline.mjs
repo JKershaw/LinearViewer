@@ -150,14 +150,50 @@ function reshapeIssue(raw) {
   };
 }
 
+/**
+ * LIN-444 Part B (harness enrichment): attach the blocked-ness signal that
+ * selectFocusSubtask / hasOpenFrontier read to an in-set child. The proxy
+ * `/issues/{id}` children list carries only {id,identifier,title,state}, so
+ * `isBlocked()` and the transitive dead-end guard are BLIND — every child reads as a
+ * non-blocked leaf, ranking degrades to identifier order, and HAR-149 would
+ * FALSE-RED (the wrong child looks just as open as the right one). Fetch the child's
+ * own `/issues/{id}` for its `labels` + `inverseRelations`, and one level deeper
+ * attach each grandchild's blocked-ness too, so the harness reproduces the real
+ * subtree frontier (HAR-497 → blocked HAR-502 dead branch vs HAR-545 → open
+ * HAR-616). This mirrors the depth the enriched Linear query now fetches; it changes
+ * only what the harness can SEE, never production behavior.
+ */
+async function enrichChildBlockedness(proxyGet, basic, depth) {
+  let raw;
+  try { raw = await proxyGet(`/issues/${basic.identifier}`); }
+  catch { return { id: basic.id, identifier: basic.identifier, title: basic.title, state: basic.state }; }
+  const node = {
+    id: raw.id,
+    identifier: raw.identifier,
+    title: raw.title,
+    state: raw.state,
+    labels: { nodes: raw.labels?.nodes || [] },
+    inverseRelations: { nodes: raw.inverseRelations?.nodes || [] }
+  };
+  if (depth > 0) {
+    const grandkids = raw.children?.nodes || [];
+    node.children = {
+      nodes: await Promise.all(grandkids.map(gc => enrichChildBlockedness(proxyGet, gc, depth - 1)))
+    };
+  }
+  return node;
+}
+
 /** Build the full context object for one node from proxy reads (mirrors fetchRecommendationContext). */
 async function fetchContext(proxyGet, identifier) {
   const raw = await proxyGet(`/issues/${identifier}`);
   const issue = reshapeIssue(raw);
 
-  const children = (raw.children?.nodes || [])
-    .map(c => ({ id: c.id, identifier: c.identifier, title: c.title, state: c.state }))
-    .sort(byStateOrder);
+  // Enrich each child with subtree blocked-ness (one level deep) so the transitive
+  // dead-end guard (LIN-444) can see what production now sees; then state-sort.
+  const children = (await Promise.all(
+    (raw.children?.nodes || []).map(c => enrichChildBlockedness(proxyGet, c, 1))
+  )).sort(byStateOrder);
 
   const comments = (raw.comments?.nodes || [])
     .map(c => ({ body: c.body, createdAt: c.createdAt, user: c.user?.name || 'Unknown' }))
