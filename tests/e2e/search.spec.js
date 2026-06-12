@@ -1,13 +1,19 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/test-base.js';
+import { seedLocalWorkspace, searchLocalSeed, LOCAL_WORKSPACE_URL_KEY } from '../fixtures/local-harness.js';
 
-// Workspace URL key used in test session
-const TEST_WORKSPACE_URL_KEY = 'test-workspace';
+// LIN-426: the search surface is fully modeled by the local provider (the search
+// index reads title, description, assignee.name, identifier, and label names), so
+// this spec rides a seeded local workspace instead of the `test-token` mock. The
+// bespoke `searchLocalSeed` reuses the EXACT ids the selectors below already use
+// (proj-alpha/beta, issue-1..5), so assertions stay byte-identical; it preserves
+// assignee `{ name: 'Charlie' }` (issue-4) and label `urgent` for the assignee /
+// label search cases, and the issue-2 → issue-1 parent link for the ancestor case.
+const TEST_WORKSPACE_URL_KEY = LOCAL_WORKSPACE_URL_KEY;
 const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;
 
 test.describe('Search Feature', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/test/set-session');
-    await page.evaluate(() => localStorage.clear());
+    await seedLocalWorkspace(page, searchLocalSeed);
     await page.goto(WORKSPACE_URL);
   });
 
