@@ -326,7 +326,8 @@ A specific focus is just the goal field, or a hand-written prompt followed by th
   derived). *Partly deferred:* the **fully computed/baked** orientation snapshot (periodical
   cadence + top-of-stack embedded at dispatch) is still deferred, but the orientation
   *primitive* now exists — `GET /stack?view=digest` returns a compact, deterministic
-  one-line-per-task projection (drops full descriptions for a `headline` + counts), so
+  one-line-per-task projection (drops full descriptions for a `headline` + counts, plus
+  per-line ranking features `downstreamUnblocks`/`criticalPathLen`/`heldBy`/`why`), so
   Autopilot's first orient action gets a sense of the whole stack without holding every task's
   full body in context. Baking that same projection into the kickoff at dispatch is the
   remaining (now-trivial) step. See [`autopilot-kickoff.md`](./autopilot-kickoff.md).

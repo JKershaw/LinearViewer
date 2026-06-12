@@ -5,7 +5,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { sortIssuesForSwipe, applyBlockingOrder, clusterByParent, buildFilterGroups, flattenTrees } from '../../lib/render-swipe.js';
+import { sortIssuesForSwipe, applyBlockingOrder, clusterByParent, buildFilterGroups, flattenTrees, computeGraphFeatures, computeOffPageBlockers, buildWhy } from '../../lib/render-swipe.js';
 
 // =============================================================================
 // Test Helpers
@@ -87,6 +87,46 @@ describe('sortIssuesForSwipe', () => {
     ];
     sortIssuesForSwipe(cards);
     assert.deepStrictEqual(cards.map(c => c.id), ['low', 'none']);
+  });
+
+  // LIN-391: downstreamUnblocks then criticalPathLen are tiebreakers sitting
+  // BELOW state and ABOVE priority.
+  test('breaks ties by downstreamUnblocks (desc) below state, above priority', () => {
+    const cards = [
+      createCard({ id: 'lowunblock', stateType: 'unstarted', priority: 1, downstreamUnblocks: 1 }),
+      createCard({ id: 'highunblock', stateType: 'unstarted', priority: 4, downstreamUnblocks: 6 }),
+    ];
+    sortIssuesForSwipe(cards);
+    // higher downstreamUnblocks wins despite worse priority
+    assert.deepStrictEqual(cards.map(c => c.id), ['highunblock', 'lowunblock']);
+  });
+
+  test('breaks downstreamUnblocks ties by criticalPathLen (desc)', () => {
+    const cards = [
+      createCard({ id: 'shortpath', stateType: 'unstarted', priority: 1, downstreamUnblocks: 3, criticalPathLen: 2 }),
+      createCard({ id: 'longpath', stateType: 'unstarted', priority: 4, downstreamUnblocks: 3, criticalPathLen: 5 }),
+    ];
+    sortIssuesForSwipe(cards);
+    assert.deepStrictEqual(cards.map(c => c.id), ['longpath', 'shortpath']);
+  });
+
+  test('state still dominates the new feature tiebreakers', () => {
+    const cards = [
+      createCard({ id: 'backlogHighUnblock', stateType: 'backlog', priority: 1, downstreamUnblocks: 9, criticalPathLen: 9 }),
+      createCard({ id: 'startedNoUnblock', stateType: 'started', priority: 4, downstreamUnblocks: 0, criticalPathLen: 1 }),
+    ];
+    sortIssuesForSwipe(cards);
+    // in-progress work is never displaced by a high-unblock backlog item
+    assert.deepStrictEqual(cards.map(c => c.id), ['startedNoUnblock', 'backlogHighUnblock']);
+  });
+
+  test('falls back to priority when features are absent/equal', () => {
+    const cards = [
+      createCard({ id: 'low', stateType: 'unstarted', priority: 4 }),
+      createCard({ id: 'urgent', stateType: 'unstarted', priority: 1 }),
+    ];
+    sortIssuesForSwipe(cards);
+    assert.deepStrictEqual(cards.map(c => c.id), ['urgent', 'low']);
   });
 });
 
@@ -476,5 +516,145 @@ describe('blocksIds extraction', () => {
     const issue = { id: 'a', state: { type: 'unstarted', name: 'Todo' } };
     const [card] = flattenTrees(treeFor(issue), 'project');
     assert.deepStrictEqual(card.blocksIds, []);
+  });
+});
+
+// =============================================================================
+// computeGraphFeatures (LIN-391)
+// =============================================================================
+
+describe('computeGraphFeatures', () => {
+  test('chain A→B→C: downstreamUnblocks and criticalPathLen', () => {
+    const a = createCard({ id: 'a', stateType: 'backlog', blocksIds: ['b'] });
+    const b = createCard({ id: 'b', stateType: 'backlog', blocksIds: ['c'] });
+    const c = createCard({ id: 'c', stateType: 'backlog' });
+    computeGraphFeatures([a, b, c]);
+    assert.deepStrictEqual(
+      { a: a.downstreamUnblocks, b: b.downstreamUnblocks, c: c.downstreamUnblocks },
+      { a: 2, b: 1, c: 0 }
+    );
+    assert.deepStrictEqual(
+      { a: a.criticalPathLen, b: b.criticalPathLen, c: c.criticalPathLen },
+      { a: 3, b: 2, c: 1 }
+    );
+  });
+
+  test('diamond counts distinct successors, not path multiplicity', () => {
+    // A blocks B and C; B and C both block D.
+    const a = createCard({ id: 'a', stateType: 'backlog', blocksIds: ['b', 'c'] });
+    const b = createCard({ id: 'b', stateType: 'backlog', blocksIds: ['d'] });
+    const c = createCard({ id: 'c', stateType: 'backlog', blocksIds: ['d'] });
+    const d = createCard({ id: 'd', stateType: 'backlog' });
+    computeGraphFeatures([a, b, c, d]);
+    // distinct successors of A = {b, c, d} = 3 (NOT 4 — d reached via two paths)
+    assert.strictEqual(a.downstreamUnblocks, 3);
+    assert.strictEqual(a.criticalPathLen, 3); // a→b→d (or a→c→d)
+    assert.strictEqual(d.downstreamUnblocks, 0);
+    assert.strictEqual(d.criticalPathLen, 1);
+  });
+
+  test('ignores edges from terminal-state blockers', () => {
+    const done = createCard({ id: 'done', stateType: 'completed', blocksIds: ['x'] });
+    const x = createCard({ id: 'x', stateType: 'unstarted' });
+    computeGraphFeatures([done, x]);
+    assert.strictEqual(done.downstreamUnblocks, 0);
+    assert.strictEqual(done.criticalPathLen, 1);
+  });
+
+  test('ignores out-of-set edges', () => {
+    const a = createCard({ id: 'a', stateType: 'backlog', blocksIds: ['not-in-set'] });
+    const b = createCard({ id: 'b', stateType: 'backlog' });
+    computeGraphFeatures([a, b]);
+    assert.strictEqual(a.downstreamUnblocks, 0);
+    assert.strictEqual(a.criticalPathLen, 1);
+  });
+
+  test('is cycle-safe (no throw, finite values)', () => {
+    const a = createCard({ id: 'a', stateType: 'unstarted', blocksIds: ['b'] });
+    const b = createCard({ id: 'b', stateType: 'unstarted', blocksIds: ['a'] });
+    assert.doesNotThrow(() => computeGraphFeatures([a, b]));
+    assert.ok(Number.isFinite(a.criticalPathLen));
+    assert.ok(Number.isFinite(b.criticalPathLen));
+    assert.ok(Number.isFinite(a.downstreamUnblocks));
+  });
+});
+
+// =============================================================================
+// Full pipeline invariants with features (LIN-391)
+// =============================================================================
+
+describe('pipeline invariants hold after computeGraphFeatures', () => {
+  test('terminal last, bugs first, blockers before blocked, subtasks before parent', () => {
+    const cards = [
+      createCard({ id: 'done', stateType: 'completed' }),
+      createCard({ id: 'bug', stateType: 'unstarted', labels: ['bug'] }),
+      createCard({ id: 'parent', stateType: 'unstarted' }),
+      createCard({ id: 'child', stateType: 'unstarted', parentId: 'parent' }),
+      createCard({ id: 'blocker', stateType: 'unstarted', priority: 4, blocksIds: ['blocked'] }),
+      createCard({ id: 'blocked', stateType: 'unstarted', priority: 1 }),
+    ];
+    computeGraphFeatures(cards);
+    sortIssuesForSwipe(cards);
+    const result = clusterByParent(applyBlockingOrder(cards));
+    const ids = result.map(i => i.id);
+    const pos = id => ids.indexOf(id);
+
+    // terminal last
+    assert.strictEqual(ids[ids.length - 1], 'done');
+    // blocker before blocked
+    assert.ok(pos('blocker') < pos('blocked'), 'blocker before blocked');
+    // subtask before parent
+    assert.ok(pos('child') < pos('parent'), 'subtask before parent');
+    // bug ahead of plain non-bug peers (parent/blocked which aren't bugs)
+    assert.ok(pos('bug') < pos('parent'), 'bug ahead of non-bug');
+  });
+});
+
+// =============================================================================
+// computeOffPageBlockers (LIN-391)
+// =============================================================================
+
+describe('computeOffPageBlockers', () => {
+  test('flags a visible line held by a blocker pushed off-page by clustering', () => {
+    // child is blocked by an off-page blocker, but clusters up with its parent
+    // to the front. With limit=2, the blocker lands beyond the slice.
+    const child = createCard({ id: 'child', identifier: 'LIN-child', parentId: 'parent', stateType: 'unstarted', priority: 1 });
+    const parent = createCard({ id: 'parent', identifier: 'LIN-parent', stateType: 'unstarted', priority: 1 });
+    const blocker = createCard({ id: 'blocker', identifier: 'LIN-blocker', stateType: 'unstarted', priority: 4, blocksIds: ['child'] });
+    // Final order: clusterByParent pulls [child, parent] to the front; blocker trails.
+    const sorted = clusterByParent([child, parent, blocker]);
+    assert.deepStrictEqual(sorted.map(i => i.id), ['child', 'parent', 'blocker']);
+
+    const heldBy = computeOffPageBlockers(sorted, 2); // blocker at index 2 is off-page
+    assert.deepStrictEqual(heldBy.get('child'), ['LIN-blocker']);
+  });
+
+  test('empty when all blockers are on-page', () => {
+    const blocker = createCard({ id: 'blocker', identifier: 'LIN-1', stateType: 'unstarted', blocksIds: ['blocked'] });
+    const blocked = createCard({ id: 'blocked', identifier: 'LIN-2', stateType: 'unstarted' });
+    const sorted = [blocker, blocked];
+    const heldBy = computeOffPageBlockers(sorted, 5);
+    assert.strictEqual(heldBy.size, 0);
+  });
+});
+
+// =============================================================================
+// buildWhy (LIN-391)
+// =============================================================================
+
+describe('buildWhy', () => {
+  test('composes reasons in stable order', () => {
+    const issue = createCard({ labels: ['bug'], downstreamUnblocks: 6, criticalPathLen: 4 });
+    assert.deepStrictEqual(buildWhy(issue, ['LIN-412']), ['bug', 'unblocks 6', 'critical path 4', 'held by LIN-412']);
+  });
+
+  test('omits zero/absent features', () => {
+    const issue = createCard({ labels: ['feature'], downstreamUnblocks: 0, criticalPathLen: 1 });
+    assert.deepStrictEqual(buildWhy(issue), []);
+  });
+
+  test('collapses multiple held-by blockers with a +N suffix', () => {
+    const issue = createCard({ labels: [], downstreamUnblocks: 2, criticalPathLen: 1 });
+    assert.deepStrictEqual(buildWhy(issue, ['LIN-1', 'LIN-2', 'LIN-3']), ['unblocks 2', 'held by LIN-1 +2']);
   });
 });

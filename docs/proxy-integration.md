@@ -507,6 +507,44 @@ Returns a prioritized, deduplicated task list using the same ordering as the in-
 
 `total` is the full count before `limit` is applied. `parent` is `null` for top-level issues; `children` is `[]` when there are none.
 
+Every task also carries deterministic, in-set ranking features (no LLM): `downstreamUnblocks` (how many tasks this one transitively unblocks), `criticalPathLen` (longest dependency chain through it, the node itself counting as 1), and an optional `heldBy` (identifiers of blockers pushed beyond `limit` that still forced this line's position). The ordering factors `downstreamUnblocks` then `criticalPathLen` in just below state and above priority, so it is explainable rather than opaque.
+
+##### Digest view (`?view=digest`)
+
+```
+GET /api/proxy/stack?limit={n}&view=digest
+```
+
+A compact orientation projection: each task drops the full `description` for a deterministic one-line `headline`, and `children`/`blocks` collapse to counts. Use it to orient over the whole stack cheaply, then drill into a pick with `/brief/{id}` or the full `/stack`. In addition to the ranking features above, each digest line carries a compact `why` array summarizing why it ranks where it does.
+
+```json
+{
+  "tasks": [
+    {
+      "identifier": "ENG-42",
+      "title": "Fix login bug",
+      "headline": "Users can't log in after token refresh",
+      "priority": 1,
+      "state": { "name": "In Progress", "type": "started" },
+      "labels": ["bug"],
+      "section": "in-progress",
+      "blocks": 6,
+      "children": 2,
+      "downstreamUnblocks": 6,
+      "criticalPathLen": 4,
+      "heldBy": ["ENG-50"],
+      "why": ["bug", "unblocks 6", "critical path 4", "held by ENG-50"],
+      "parent": { "identifier": "ENG-40" },
+      "url": "https://linear.app/..."
+    }
+  ],
+  "total": 98,
+  "view": "digest"
+}
+```
+
+`heldBy` and the `held by …` entry in `why` are present only when a small `limit` hides a blocker that shaped the line's position; both are omitted otherwise.
+
 #### Generate Prompt (deterministic)
 
 ```
