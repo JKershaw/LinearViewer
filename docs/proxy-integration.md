@@ -243,6 +243,7 @@ Response includes full context: description, comments, children, parent, relatio
   "description": "Markdown content...",
   "url": "https://linear.app/...",
   "state": { "name": "In Progress", "type": "started" },
+  "trashed": false,
   "assignee": { "name": "Alice" },
   "labels": { "nodes": [{ "id": "uuid", "name": "bug", "color": "#eb5757" }] },
   "priority": 1,
@@ -256,6 +257,23 @@ Response includes full context: description, comments, children, parent, relatio
 ```
 
 `parent` is `null` when the issue has no parent. `children.nodes` is empty (`[]`) when there are no sub-issues. `labels`, `children`, and `comments` use Linear's `{ nodes: [...] }` wrapper.
+
+##### Trashed (soft-deleted) issues
+
+Linear soft-deletes: a deleted issue goes to trash for ~30 days and disappears from every list, search result, and parent/child collection — but it **still resolves when fetched by ID**, carrying whatever workflow state it had at deletion. To stop consumers reasoning from these ghosts, a by-ID read of a trashed issue:
+
+- sets a top-level **`"trashed": true`**, and
+- **overrides** the reported state to **`{ "name": "Trashed", "type": "canceled" }`** (the pre-deletion state is the misleading datum, so it is replaced, not merely flagged).
+
+Key off `state.type` — `"canceled"` is terminal, so every consumer that already skips terminal work skips a trashed issue for free. Read the `"trashed"` flag (and the `"Trashed"` name) when you need to distinguish a *deleted* issue from one a user *canceled* on purpose. Live issues carry `"trashed": false`.
+
+The same asymmetry is handled on the other by-ID surfaces:
+
+- `GET /api/proxy/relations/{id}` returns a top-level `"trashed": true` (it has no root state to override); the relations are still returned so you can see what a now-deleted issue was related to.
+- The foreman context endpoints (`/recommend`, `/recap`, `/brief`, `/prompt`) **refuse** a trashed target with **`404`** rather than distilling or recommending work on a ghost.
+- The write endpoints (`PATCH /issues/{id}`, comments, relation-create, labels, description `append`/`replace`) **refuse** a trashed target with **`409`** rather than silently mutating a deleted issue.
+
+Collection endpoints (`/issues`, `/search`, `/stack`) and nested `children`/`parent`/relation lists are unaffected — Linear already excludes trash from those.
 
 #### Search Issues
 
@@ -1077,7 +1095,8 @@ All query params optional. Merges the live queue and recent history, newest firs
 | 401 | `Missing or invalid Authorization header` | No Bearer token provided |
 | 401 | `Invalid, expired, or consumed token` | Token doesn't exist, expired, or was single-use and already used |
 | 403 | `This endpoint requires a read-write token` | Write endpoint called with read-only token |
-| 404 | `Issue not found` / `Cycle not found` | Resource doesn't exist |
+| 404 | `Issue not found` / `Cycle not found` | Resource doesn't exist — or, on the foreman context endpoints, the target is trashed |
+| 409 | `Issue is trashed; refusing to modify a deleted issue` | Write target is a trashed (soft-deleted) issue |
 | 429 | `Too many proxy requests` | Rate limit exceeded (60/minute) |
 | 503 | `Workspace not available` | Workspace access token expired or unavailable |
 | 500 | `Failed to ...` | Server error |
