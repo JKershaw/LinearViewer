@@ -138,6 +138,20 @@ verdict can be a confident hallucination. So:
 LinearViewer's existing **grounding rule** — a verdict must cite the actual line
 or it is speculation — is this verification floor enforced *inside one node*.
 
+### Witness-richness is a dial, spent against blast radius
+
+"External evidence" is not binary; it is a continuous knob from *1-bit-at-1-moment*
+(a green/red CI verdict at merge — what LIN-430 already does) to
+*full-environment-throughout* (a real process interrogated across the loop —
+what harbour offers: stderr, the port that never bound, lock contention). Richer
+witness costs more, so the loom's rule is: **dial witness-richness up exactly
+where a gradient is most likely to be mis-routed** (correction-exhaustion masked
+as feasibility, "is this even worth doing") and leave it at cheap 1-bit CI where
+green/red is genuinely enough. Do not run a full environment to confirm a typo
+fix; do run one when the failure could be telling you the *worth* was wrong. This
+is the same substrate-vs-convention triage as everywhere else in the loom, now as
+a knob rather than a binary — and it is the sizing rule for follow-up ticket 5.
+
 ## The live lesson: the medium proved its own thesis
 
 While discussing "every wire is a trust boundary," dash fat-fingered a `curl`
