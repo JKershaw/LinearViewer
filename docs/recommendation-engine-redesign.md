@@ -216,12 +216,14 @@ what keeps a regression unambiguous and prevents half-finished tasks.
 
 Proposed parent ticket with subtasks:
 
-1. **Baseline eval harness** _(no production change; gate for all others)_. Reusable eval over the
-   real fixtures (LIN-385/389/428, HAR-149/545/616), each with an **acceptable-outcome set**
-   (expected terminal node(s) + action(s)) and a **stability threshold**; N runs; scored on
-   stability + correctness. Record the current (messy) baseline. Extends the existing
-   `scripts/eval-*` pattern. **DoD:** harness committed, baseline numbers recorded, per-fixture
-   exit criteria defined.
+1. **Baseline eval harness (the red test)** _(no production change; gate for all others)_. A
+   **deliberately minimal** repeat-runner (the cheap prototype already used for §2) committed to
+   `scripts/`: hits `/recommend` N× on the two reference epics + their key intermediate/leaf nodes
+   (LIN-385/389/428, HAR-149/545/616, + the direct leaves), and dumps a path/action/prompt table
+   **plus the prompt and reasoning** for **subjective** review. No automated scoring, no large
+   fixture set — the two epics are complex enough that passing them by eye is the bar. Record
+   today's output as the documented "red" baseline and write a one-paragraph **"green" description
+   per epic**. **DoD:** harness runs from a read proxy token, baseline captured, green bar written.
 2. **Low-risk fact fixes** _(behavior-changing)_. Frontier ranking `[D]` via the `digest` signals;
    surface structured facts into the *existing* markdown meta-prompt. **DoD:** eval shows the
    HAR-149 mis-route gone and the LIN-389 fork shrunk vs baseline; no fixture regresses.
@@ -253,16 +255,15 @@ Each step is independently shippable; you are never holding a half-rewritten sys
 - **Decision-call format:** markdown with the existing tight markers (not JSON / tool-use) —
   markdown is more reliable for the model to produce here; the win is separation + fact-surfacing,
   not the format.
+- **Eval scope:** deliberately minimal — the two reference epics (LIN-385, HAR-149) and their key
+  nodes, cheap repeat-runs, reviewed **subjectively** against a written "green" description per
+  epic. No automated correctness oracle, no large fixture set; both epics are complex enough that
+  if they come out strong, the rest will too.
+- **Eval execution model:** runs against the live model via the read proxy token (variance *is* the
+  metric), cheap per run, executed deliberately at task boundaries — **not** wired into per-commit
+  CI.
 - **Two-path tax:** collapse toward one source of truth per behavior rule (step 4).
 - **Runtime two-call split:** deferred and conditional — only if step-4 data shows it is needed.
-
-**To settle before building the eval (step 1)**
-- **Correctness oracle:** per-fixture acceptable-outcome sets + stability thresholds. Some fixtures
-  are "must be deterministic" (frontier pick); others are "must be stable within an acceptable set"
-  (leaf action on a genuinely ambiguous ticket). The eval scores against these, not a single gold
-  answer.
-- **Execution model:** the eval calls the live model (variance *is* the metric), so it needs API
-  keys + a cost budget and is run deliberately at task boundaries — **not** wired into per-commit CI.
 
 **Scope fences (carried over unchanged — do not re-open)**
 - Provider capability-awareness (LIN-177) is preserved as-is through the refactor.
