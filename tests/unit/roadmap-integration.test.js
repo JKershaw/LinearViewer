@@ -537,7 +537,11 @@ describe('summarizeRoadmapModel', () => {
     assert.ok(summary.includes('DELIVERY CADENCE'), 'should have delivery cadence section');
     assert.ok(summary.includes('5.5'), 'should include tasks/week');
     assert.ok(!summary.includes('Points/week'), 'should not include points/week');
-    assert.ok(!summary.includes('12'), 'should not surface points number');
+    // Strip the "Report date: YYYY-MM-DD" line before the bare-number check —
+    // otherwise a points value that happens to be a substring of today's date
+    // (e.g. 12 on the 12th of the month) gives a false positive.
+    const body = summary.replace(/Report date: \d{4}-\d{2}-\d{2}/, '');
+    assert.ok(!body.includes('12'), 'should not surface points number');
     assert.ok(!summary.includes('increasing'), 'should not include trend label');
   });
 
