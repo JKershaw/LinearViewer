@@ -217,13 +217,17 @@ what keeps a regression unambiguous and prevents half-finished tasks.
 Proposed parent ticket with subtasks:
 
 1. **Baseline eval harness (the red test)** _(no production change; gate for all others)_. A
-   **deliberately minimal** repeat-runner (the cheap prototype already used for §2) committed to
-   `scripts/`: hits `/recommend` N× on the two reference epics + their key intermediate/leaf nodes
-   (LIN-385/389/428, HAR-149/545/616, + the direct leaves), and dumps a path/action/prompt table
-   **plus the prompt and reasoning** for **subjective** review. No automated scoring, no large
-   fixture set — the two epics are complex enough that passing them by eye is the bar. Record
-   today's output as the documented "red" baseline and write a one-paragraph **"green" description
-   per epic**. **DoD:** harness runs from a read proxy token, baseline captured, green bar written.
+   **deliberately minimal** repeat-runner committed to `scripts/`: runs N× on the two reference
+   epics + their key intermediate/leaf nodes (LIN-385/389/428, HAR-149/545/616, + the direct
+   leaves), and dumps a path/action/prompt table **plus the prompt and reasoning** for
+   **subjective** review. No automated scoring, no large fixture set — the two epics are complex
+   enough that passing them by eye is the bar. **Critical:** the harness must drive the **local**
+   recommendation pipeline (`lib/` `getRecommendation` / `resolveRecommendation` + the OpenRouter
+   key), fetching node context via the proxy *read* endpoints — **not** the deployed
+   `/api/proxy/recommend`, which runs production and will not reflect a branch's changes. Capture
+   the committed "red" baseline with *this* local harness (the §2 proxy numbers are a reference
+   only) and write a one-paragraph **"green" description per epic**. **DoD:** local harness runs,
+   baseline captured + committed, green bar written.
 2. **Low-risk fact fixes** _(behavior-changing)_. Frontier ranking `[D]` via the `digest` signals;
    surface structured facts into the *existing* markdown meta-prompt. **DoD:** eval shows the
    HAR-149 mis-route gone and the LIN-389 fork shrunk vs baseline; no fixture regresses.
@@ -259,9 +263,10 @@ Each step is independently shippable; you are never holding a half-rewritten sys
   nodes, cheap repeat-runs, reviewed **subjectively** against a written "green" description per
   epic. No automated correctness oracle, no large fixture set; both epics are complex enough that
   if they come out strong, the rest will too.
-- **Eval execution model:** runs against the live model via the read proxy token (variance *is* the
-  metric), cheap per run, executed deliberately at task boundaries — **not** wired into per-commit
-  CI.
+- **Eval execution model:** drives the **local** recommendation code (context fetched via the proxy
+  *read* endpoints + the OpenRouter key), against the live model (variance *is* the metric), cheap
+  per run, executed deliberately at task boundaries — **not** the deployed `/api/proxy/recommend`
+  (which won't reflect branch changes) and **not** wired into per-commit CI.
 - **Two-path tax:** collapse toward one source of truth per behavior rule (step 4).
 - **Runtime two-call split:** deferred and conditional — only if step-4 data shows it is needed.
 
