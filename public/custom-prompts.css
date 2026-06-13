@@ -33,20 +33,11 @@
 /* =============================================================================
    Prompt Cards
    ============================================================================= */
-.custom-prompt-card {
-  border: 1px solid var(--fg-vdim);
-  border-radius: 4px;
-  padding: 0.75rem;
-  margin-bottom: 0.75rem;
-  background: var(--bg);
-}
-
-.custom-prompt-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.5rem;
-}
+/* The card container (.custom-prompt-card) and its header row
+   (.custom-prompt-header) are now the canonical `.card` / `.card-header`
+   (style.css, LIN-468); those class names survive on the markup (server +
+   client) as no-style E2E/JS hooks. Only the custom-prompt-specific children
+   below remain here. */
 
 .custom-prompt-name {
   font-family: var(--font-content);
