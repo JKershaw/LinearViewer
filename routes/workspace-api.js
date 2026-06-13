@@ -20,6 +20,7 @@ import { buildRoadmapGapMessages } from '../lib/prompts/roadmap-gap-template.js'
 import { buildRoadmapDigestMessages } from '../lib/prompts/roadmap-digest-template.js';
 import { buildRoadmapOrientationMessages, serializeOrientationCandidates, countOrientationCandidates, parseOrientationLines, ORIENTATION_BEARINGS } from '../lib/prompts/roadmap-orientation-template.js';
 import { generatePrompt, generateCustomPrompt, hasPrompt, getAvailablePrompts } from '../lib/prompt-templates.js';
+import { renderDetailsContent } from '../lib/render.js';
 import { WORK_ISSUE_LABELS } from '../lib/workflow-config.js';
 import { parseRepoFromDescription, buildPromptFilename } from '../lib/prompt-formatters.js';
 import { buildForemanPlaybook, buildMiniForemanStep } from '../lib/prompts/foreman-playbook.js';
@@ -1416,6 +1417,80 @@ ${goal}`
       }
 
       res.status(500).json({ error: 'Failed to fetch comments', message: error.message })
+    }
+  })
+
+  /**
+   * Render one issue's detail block for the lazy dashboard (LIN-442).
+   *
+   * The authenticated homepage now ships only collapsed lines; `renderNode`
+   * emits an empty `.details` wrapper and the client fetches the rendered inner
+   * HTML here on first expand (mirroring the comments lazy-load). This is what
+   * removes the dominant multi-MB per-page payload on large projects.
+   *
+   * Provider-backed for real workspaces (local in E2E, Linear in prod), with a
+   * test-token/testMockData branch for the mock specs (`/test/set-session`),
+   * since those render the homepage from fixtures, not the provider API. The
+   * returned HTML is byte-identical to what `renderDetails` emitted inline before
+   * — same feature flags, provider UI, and prompt containers.
+   *
+   * @route GET /workspace/:urlKey/api/detail/:issueId
+   * @returns {Object} { html } - inner HTML for the issue's `.details` block
+   */
+  router.get('/workspace/:urlKey/api/detail/:issueId', workspaceFromUrl, async (req, res) => {
+    const workspace = req.workspace
+    const { issueId } = req.params
+
+    if (!isValidIssueId(issueId)) {
+      return res.status(400).json({ error: 'Invalid issue ID format' })
+    }
+
+    try {
+      const provider = getProviderForWorkspace(workspace)
+
+      // Test mode (test-token + testMockData): the homepage renders from the mock
+      // fixtures, not the provider API, so the lazy detail must too — fetching via
+      // the Linear provider with 'test-token' would hit the network. Mirrors the
+      // prompt route's test-mode branch.
+      let issue
+      if (process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token') {
+        issue = testMockData.issues.find(i => i.id === issueId)
+        if (!issue) {
+          return res.status(404).json({ error: 'Issue not found' })
+        }
+      } else {
+        issue = await provider.fetchIssueFields(getWorkspaceToken(workspace), issueId)
+      }
+
+      // Custom prompts (non-blocking, fallback to empty) — matches the homepage.
+      let customPrompts = []
+      try {
+        customPrompts = (await customPromptsStore.list(workspace.urlKey)).map(p => ({ id: p.id, name: p.name }))
+      } catch (e) { /* non-fatal */ }
+
+      const isLocalhost = ['localhost', '127.0.0.1'].some(h => req.get('host')?.startsWith(h))
+
+      const html = renderDetailsContent(issue, {
+        isLanding: false,
+        openRouterSource: getOpenRouterSource(req),
+        urlKey: workspace.urlKey,
+        featureFlags: getFeatureFlags(req.session),
+        customPrompts,
+        isLocalhost,
+        provider
+      })
+
+      res.json({ html })
+    } catch (error) {
+      console.error('Detail fetch error:', error)
+
+      if (error.response?.status === 401) {
+        return res.status(401).json({ error: 'Token expired or invalid' })
+      }
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message })
+      }
+      res.status(500).json({ error: 'Failed to fetch detail', message: error.message })
     }
   })
 

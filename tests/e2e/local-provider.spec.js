@@ -32,6 +32,8 @@ test.describe('Local provider (no test-token mock)', () => {
 
   test('detail link is provider-aware: "View in Local" (not Linear)', async ({ page }) => {
     // render.js interpolates provider.ui.displayName ('Local') into the link.
+    // LIN-442: the detail block is lazy — expand an issue to load it first.
+    await page.locator('.line.expandable').first().click();
     await expect(page.locator('.detail-link', { hasText: 'View in Local' }).first()).toBeAttached();
     // No dashboard detail link should still say "View in Linear" for this workspace.
     await expect(page.locator('.detail-link', { hasText: 'View in Linear' })).toHaveCount(0);

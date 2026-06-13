@@ -38,7 +38,7 @@ describe('LocalProvider capability profile (LIN-356 step D)', () => {
 
   test('implements the required writes + reads', () => {
     for (const m of ['createIssue', 'updateIssue', 'createComment', 'createRelation',
-      'addLabel', 'removeLabel', 'fetchIssueComments', 'search', 'states', 'labels',
+      'addLabel', 'removeLabel', 'fetchIssueComments', 'fetchIssueFields', 'search', 'states', 'labels',
       'fetchProjects', 'fetchProjectsList', 'fetchTeams']) {
       assert.equal(provider.supports(m), true, `expected supports('${m}')`);
     }
@@ -125,6 +125,23 @@ describe('LocalProvider reads', () => {
 
   test('fetchIssueContext throws for a missing issue', async () => {
     await assert.rejects(() => provider.fetchIssueContext(SCOPE, 'nope'), /Issue not found/);
+  });
+
+  // LIN-442: the lazy dashboard detail surface calls provider.fetchIssueFields
+  // and feeds the result straight to renderDetailsContent, so it must return the
+  // raw `{ nodes }`-labelled canonical issue (NOT fetchIssueContext's flat-array
+  // curated shape).
+  test('fetchIssueFields returns one canonical issue in render shape', async () => {
+    const issue = await provider.fetchIssueFields(SCOPE, 'LOCAL-1');
+    assert.equal(issue.id, 'i1');
+    assert.equal(issue.identifier, 'LOCAL-1');
+    assert.equal(issue.title, 'Parent');
+    assert.deepEqual(issue.labels, { nodes: [{ name: 'bug' }] });
+    assert.equal(issue.project.name, 'Alpha');
+  });
+
+  test('fetchIssueFields throws for a missing issue', async () => {
+    await assert.rejects(() => provider.fetchIssueFields(SCOPE, 'nope'), /Issue not found/);
   });
 
   // LIN-388: the recap/brief/recommend/prompt surfaces call

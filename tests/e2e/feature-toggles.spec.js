@@ -492,9 +492,11 @@ test.describe('Feature Toggle Settings', () => {
     await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/`);
     await page.waitForLoadState('networkidle');
 
-    // Proxy toggle buttons should be present in the DOM (inside hidden prompt containers)
-    const toggleCount = await page.locator('.prompt-proxy-toggle').count();
-    expect(toggleCount).toBeGreaterThan(0);
+    // LIN-442: prompt containers (and their +proxy toggle) now live in the lazy
+    // detail block, fetched on first expand — so expand an issue, then the
+    // toggle is present in the DOM (inside the hidden prompt container).
+    await page.locator('.line.expandable').first().click();
+    await expect(page.locator('.prompt-proxy-toggle').first()).toBeAttached();
   });
 
   test('proxy toggle button appears on dispatch page when proxy is on', async ({ page }) => {

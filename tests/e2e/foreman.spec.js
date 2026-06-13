@@ -1052,6 +1052,8 @@ test.describe('Mini-foreman Button - Main Projects View', () => {
     await page.goto('/workspace/test-workspace/');
     await page.waitForLoadState('networkidle');
 
+    // LIN-442: the detail block (with the prompt bar) is lazy — expand first.
+    await page.locator('.line.expandable').first().click();
     const firstPromptsBar = page.locator('.detail-prompts').first();
     await expect(firstPromptsBar).toBeAttached();
     await expect(firstPromptsBar.locator('.mini-foreman-btn')).toHaveCount(1);
@@ -1093,6 +1095,8 @@ test.describe('Autopilot Button - Main Projects View', () => {
     await page.goto('/workspace/test-workspace/');
     await page.waitForLoadState('networkidle');
 
+    // LIN-442: the detail block (with the prompt bar) is lazy — expand first.
+    await page.locator('.line.expandable').first().click();
     const firstPromptsBar = page.locator('.detail-prompts').first();
     await expect(firstPromptsBar).toBeAttached();
     await expect(firstPromptsBar.locator('.autopilot-btn')).toHaveCount(1);
@@ -1135,6 +1139,8 @@ test.describe('Foreman Button - Main Projects View', () => {
     await page.waitForLoadState('networkidle');
 
     // Scope to the first actionable issue's prompt buttons row
+    // LIN-442: the detail block (with the prompt bar) is lazy — expand first.
+    await page.locator('.line.expandable').first().click();
     const firstPromptsBar = page.locator('.detail-prompts').first();
     await expect(firstPromptsBar).toBeAttached();
     await expect(firstPromptsBar.locator('.foreman-btn')).toHaveCount(1);
