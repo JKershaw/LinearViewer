@@ -26,6 +26,7 @@ routes/
   dispatch.js          Dispatch queue API (user + consumer endpoints)
   proxy.js             Linear API proxy (token auth, read/write endpoints, cycles, labels, foreman)
   pipeline.js          Pipeline page and JSON polling routes
+  collective.js        Collective experiment (experimental): page, multi-workspace dispatch fan-out, Yap state/say proxy (LIN-450)
   workspace-api.js     Workspace API routes (prompts, recommendations, audit, comments, images)
   test.js              Test-only routes for E2E tests (mock sessions, fixtures)
   legacy-redirects.js  Backward-compatible redirects for old URLs
@@ -51,6 +52,7 @@ lib/
   render-custom-prompts.js  Custom prompts page (/prompts/custom) renderer
   render-dispatch.js   Dispatch page renderer (prompt, queue, tokens, history)
   render-pipeline.js   Pipeline page renderer (floor view shell)
+  render-collective.js Collective page renderer (experimental discussion shell)
   render-foreman.js    Foreman page renderer (live observation view)
   render-roadmap.js    Roadmap page renderer (delivery-focused)
   render-ship.js       Ship page renderer (radial view shell)
@@ -77,6 +79,7 @@ lib/
     autopilot-kickoff.js     Autopilot kickoff briefing template
     autopilot-manual.js      Autopilot operating manual ("handbook")
     foreman-playbook.js      Foreman playbook template
+    collective-participant.js  Collective discussion participant prompt (experimental, LIN-450)
     roadmap-*.js             Roadmap narrative-pipeline templates (orientation,
                              trajectory, north-star, product, gap, narrative, digest, chat)
   recap.js             Task recap prompt + response handling
@@ -103,6 +106,7 @@ lib/
   workflow-config.js   Centralized workflow label configuration
   harbour-spawn.js     Spawns Claude Code sessions in Harbour OS (OSC escapes)
   harbour-feedback-tokens.js  Short-lived single-use feedback tokens for repo agents
+  yap-client.js        Thin server-side HTTP client for the Yap chat server (Collective; channel/nick helpers)
   audit.js             Workspace audit module (computes audit report from Linear)
   feature-defaults.js  Feature toggle keys, defaults, and helpers
   token-refresh.js     Linear OAuth token refresh
@@ -131,6 +135,7 @@ public/
   custom-prompts.css / .js      Custom prompts page
   dispatch.css / dispatch.js    Dispatch page (prompt, queue, tokens, history)
   pipeline.css / pipeline.js    Pipeline floor view (polling, diffing, overlays)
+  collective.css / collective.js  Collective page (setup, transcript poll, say box)
   foreman.css / foreman.js      Foreman observation page
   roadmap.css / roadmap.js      Roadmap page
   ship.css / ship.js            Ship radial view
@@ -258,6 +263,8 @@ MONGODB_URI             MongoDB connection string (optional, uses file storage i
 OPENROUTER_API_KEY      Server-side OpenRouter API key (optional, users can connect via OAuth)
 OPENROUTER_REDIRECT_URI Callback URL for OpenRouter OAuth (optional, defaults to /auth/openrouter/callback)
 OPENROUTER_FREE_TIER_KEY Server-side API key for free tier users (optional, enables rate-limited free prompts)
+YAP_BASE_URL            Yap chat server base URL (optional, enables the experimental Collective live view)
+YAP_PASSWORD            Yap server password (optional, sent as Bearer auth on Yap calls)
 ```
 
 ## Linear API
@@ -330,6 +337,22 @@ The proxy allows authenticated users to generate secure tokens for external AI a
 Consumer endpoints are Bearer-token authenticated and fall into three groups: **read** (issues, teams, projects, cycles, labels, search, relations), **write** (`readWrite` scope — create/update issues, comments, relations, labels), and **foreman** task automation (stack, prompt, recommend, recap, brief, status, sessions, tasks, playbook). The full endpoint catalog, request/response shapes, and scope rules are the consumer contract and live in the integration guide — that's the source of truth, not this file. (Issue IDs accept both UUIDs and identifiers like `LIN-123`.)
 
 **See [docs/proxy-integration.md](docs/proxy-integration.md)** for the full consumer integration guide.
+
+## Collective (experimental, LIN-450)
+
+A rough-draft experiment, **gated behind a per-user `collective` feature flag and surfaced only via a link in Settings**. It automates the manual cross-project discussion written up in `docs/collective-session-2026-06-12.md`: pick a subset of your connected workspaces, name a [Yap](https://github.com/jkershaw/yap) channel, and start — the page fans `buildCollectiveParticipantPrompt(...)` out to each selected workspace's **unchanged** dispatch route (`dispatchQueueStore.addItem`), then renders the live channel and lets you inject input via a thin server-side Yap proxy.
+
+- **Substrate:** dispatch `target` is `cli`/`web` only (full Claude Code sessions); `dash`/`local` are rejected. Each selected workspace must have a live consumer draining its queue.
+- **Channel name** is the single shared contract across the participant prompt, the fan-out, and the `state`/`say` endpoints — normalized once via `normalizeYapChannel`.
+- **Side-effect policy is prompt-only:** participants may carry a `readWrite` proxy token (best-effort minted per fan-out), but the participant prompt requires asking John in-channel before any Linear write / ticket / mutation. There is no deterministic write-lock — a named, accepted V1 gap.
+- **Yap** is ephemeral (200-msg ring buffer, unauthenticated nicks). Set `YAP_BASE_URL` (+ optional `YAP_PASSWORD`) to enable the live view; unset, the page loads but the transcript/say endpoints return 503.
+- **Deferred past V1:** chat/per-agent recaps, a durable transcript store, auto-cadence, and the within-a-project variant.
+
+Endpoints (session auth, workspace-anchored but operating over `session.workspaces`):
+- `GET  /workspace/:urlKey/collective` — page (redirects to settings when the flag is off)
+- `POST /workspace/:urlKey/collective/start` — multi-workspace dispatch fan-out
+- `GET  /workspace/:urlKey/api/collective/state` — JSON poll fronting `yap.poll`
+- `POST /workspace/:urlKey/api/collective/say` — inject human input via `yap.say`
 
 ## Linear CLI (for AI Agents)
 

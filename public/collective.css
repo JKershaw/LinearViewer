@@ -1,0 +1,201 @@
+/**
+ * Collective Page Styles (LIN-450, V1).
+ *
+ * CLI-aesthetic, light theme, on Phase-0 tokens. The page has two stacked
+ * boxed sections (Set up / Discussion); the transcript is a simple monospace
+ * message log polled from Yap.
+ */
+
+.collective-header h1 {
+  margin-bottom: var(--space-1);
+}
+
+.collective-subtitle {
+  color: var(--fg-dim);
+  font-size: var(--font-size-sm);
+  margin-top: 0;
+  margin-bottom: var(--space-4);
+}
+
+.collective-experimental {
+  color: var(--fg-dim);
+  font-size: var(--font-size-sm);
+  margin: 0 0 var(--space-3);
+}
+
+.collective-warning {
+  color: var(--accent);
+  font-size: var(--font-size-sm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  margin: 0 0 var(--space-3);
+}
+
+.collective-warning code {
+  font-family: var(--font-mono);
+}
+
+/* ── Setup fields ───────────────────────────────────────────────────────── */
+
+.collective-field {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.collective-label {
+  font-family: var(--font-mono);
+  color: var(--fg-dim);
+  min-width: 6.5rem;
+  padding-top: var(--space-1);
+}
+
+.collective-ws-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1;
+}
+
+.collective-ws-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  font-family: var(--font-mono);
+}
+
+.collective-ws-name {
+  color: var(--fg);
+}
+
+.collective-empty,
+.collective-transcript-empty {
+  color: var(--fg-vdim);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+}
+
+.collective-input,
+.collective-select {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-base);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.collective-input-wide {
+  flex: 1;
+  min-width: 16rem;
+}
+
+.collective-start-status {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--fg-dim);
+  align-self: center;
+}
+
+.collective-start-status.is-error {
+  color: var(--red);
+}
+
+/* ── Transcript ─────────────────────────────────────────────────────────── */
+
+.collective-transcript-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+}
+
+.collective-channel-label {
+  color: var(--fg);
+  font-weight: 500;
+}
+
+.collective-poll-status {
+  color: var(--fg-dim);
+}
+
+.collective-transcript {
+  list-style: none;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  max-height: 60vh;
+  overflow-y: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.collective-transcript:empty {
+  display: none;
+}
+
+.collective-msg {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  border-bottom: 1px solid var(--border-subtle);
+  align-items: baseline;
+}
+
+.collective-msg:last-child {
+  border-bottom: none;
+}
+
+.collective-msg-nick {
+  color: var(--green);
+  flex-shrink: 0;
+  min-width: 7rem;
+  font-weight: 500;
+}
+
+.collective-msg-body {
+  color: var(--fg);
+  flex: 1;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.collective-msg-time {
+  color: var(--fg-vdim);
+  flex-shrink: 0;
+  font-size: var(--font-size-sm);
+}
+
+.collective-msg-action .collective-msg-body {
+  color: var(--fg-dim);
+  font-style: italic;
+}
+
+/* ── Say box ────────────────────────────────────────────────────────────── */
+
+.collective-say {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+@media (max-width: 600px) {
+  .collective-label {
+    min-width: 0;
+    width: 100%;
+  }
+  .collective-msg {
+    flex-wrap: wrap;
+  }
+  .collective-msg-nick {
+    min-width: 0;
+  }
+}
