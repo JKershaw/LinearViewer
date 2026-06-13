@@ -92,10 +92,13 @@
   function renderCard(prompt) {
     const charCount = prompt.template.length;
     const card = document.createElement('div');
-    card.className = 'custom-prompt-card';
+    // Mirror the server renderer (lib/render-custom-prompts.js → renderCard):
+    // canonical `.card`/`.card-header` chrome with the `.custom-prompt-*` names
+    // kept as no-style E2E/JS hooks, so live-inserted cards match reloaded ones.
+    card.className = 'card custom-prompt-card';
     card.dataset.promptId = prompt.id;
     card.innerHTML = `
-      <div class="custom-prompt-header">
+      <div class="card-header custom-prompt-header">
         <span class="custom-prompt-name">${window.escapeHtml(prompt.name)}</span>
         <span class="prompt-chars">${charCount.toLocaleString()} chars</span>
       </div>

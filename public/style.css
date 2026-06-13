@@ -2067,6 +2067,65 @@ button.nav-action {
   color: var(--fg);
 }
 
+/* =========================================================================
+   Card (LIN-468, Phase A.4)
+   Canonical slot-based content card, rendered by renderCard()
+   (lib/components/card.js). Absorbs the near-duplicate per-page card chrome —
+   the .prompt-card container + .prompt-header row and the .custom-prompt-card
+   container + .custom-prompt-header row. Those variant class NAMES survive on
+   the markup as no-style semantic/E2E hooks (referenced by E2E specs and
+   client JS), riding alongside `.card`/`.card-header`; the styling lives here.
+   Tokenised throughout: the move to --space-3 padding, --bg-alt fill,
+   --border-subtle hairline and --radius-sm (3px) corners is the deliberate,
+   reviewed pixel shift on /prompts, /prompts/custom and /styleguide. Tag/chip
+   styling inside .card-labels is intentionally NOT here — LIN-465 owns it.
+   ========================================================================= */
+.card {
+  margin-bottom: var(--space-3);
+  padding: var(--space-3);
+  background: var(--bg-alt);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+
+/* State accent — a thicker colored left border over the base hairline. */
+.card-accent {
+  border-left-width: 3px;
+}
+
+.card-accent--in-progress { border-left-color: var(--yellow); }
+.card-accent--done { border-left-color: var(--green); }
+.card-accent--todo { border-left-color: var(--fg-dim); }
+.card-accent--backlog { border-left-color: var(--fg-vdim); }
+.card-accent--failed { border-left-color: var(--red); }
+
+.card-header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-2);
+}
+
+.card-title {
+  font-family: var(--font-content);
+  font-weight: 500;
+  color: var(--fg);
+}
+
+.card-meta {
+  font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
+  color: var(--fg-dim);
+  margin-left: auto;
+}
+
+.card-labels {
+  display: flex;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+}
+
 /*
    Legal Pages
    Styled to match the landing and projects page aesthetic.

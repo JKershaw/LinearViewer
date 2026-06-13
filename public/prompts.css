@@ -94,21 +94,10 @@
 /* =============================================================================
    Prompt Cards
    ============================================================================= */
-.prompt-card {
-  margin-bottom: 1rem;
-  padding: 0.75rem;
-  background: rgba(0, 0, 0, 0.02);
-  border-radius: 4px;
-  border-left: 3px solid var(--fg-vdim);
-}
-
-.prompt-header {
-  display: flex;
-  align-items: baseline;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  margin-bottom: 0.5rem;
-}
+/* The card container (.prompt-card) and its header row (.prompt-header) are now
+   the canonical `.card` / `.card-header` (style.css, LIN-468); those class names
+   survive on the markup as no-style E2E/JS hooks. Only the prompt-specific
+   children below remain here. */
 
 .prompt-name {
   font-family: var(--font-content);
