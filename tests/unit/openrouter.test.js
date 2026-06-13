@@ -645,6 +645,60 @@ describe('buildMetaPromptTemplate review routing for landed implementation', () 
 });
 
 // =============================================================================
+// Review routing for a PLAN-LESS leaf (LIN-448) — LIN-431's already-landed guard
+// only fired inside the "a complete plan exists" branch, so a research→implementation
+// leaf (no `plan` step, no `## Implementation Plan` block, no session-fit answer)
+// bypassed it and fell through to "implementation readiness" (the "simple enough to
+// implement directly" path), looping `implementation` on a merged-but-In-Progress
+// leaf. The fix hoists the landed check ABOVE the plan gate so it fires for any leaf
+// carrying completion signals, planned or not.
+// =============================================================================
+describe('buildMetaPromptTemplate review routing for a plan-less landed leaf (LIN-448)', () => {
+  function build(overrides = {}) {
+    return buildMetaPromptTemplate({
+      issueContext: 'Test context', identifier: 'LIN-1', hasSubtasks: false,
+      subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
+      hasComments: true, commentCount: 1, aiHints: 'hints',
+      actionVocabulary: getAIRecommendationActionNames().join(', '), ...overrides
+    });
+  }
+
+  test('the already-landed check is hoisted ABOVE the plan-exists gate, not nested under it', () => {
+    const text = build({ isTerminal: false, hasOpenChildren: false });
+    const landedIdx = text.indexOf('already landed');
+    const planGateIdx = text.indexOf('check whether a plan exists');
+    assert.ok(landedIdx !== -1, 'the already-landed check must be present in Step 3');
+    assert.ok(planGateIdx !== -1, 'the plan-exists gate must be present in Step 3');
+    assert.ok(landedIdx < planGateIdx,
+      'the already-landed check must precede the plan-exists gate so plan-less leaves still hit it');
+  });
+
+  test('the landed check explicitly covers the plan-less research→implementation leaf shape', () => {
+    const text = build({ isTerminal: false, hasOpenChildren: false });
+    assert.ok(/plan-less\s+\`research → implementation\`\s+leaf/i.test(text),
+      'the landed-check must name the plan-less research→implementation leaf shape from LIN-448');
+    assert.ok(/no \`plan\` step/i.test(text),
+      'it must acknowledge leaves that reached implementation with no plan step');
+  });
+
+  test('"simple enough to implement directly" is explicitly NOT a reason to skip the landed check', () => {
+    const text = build({ isTerminal: false, hasOpenChildren: false });
+    assert.ok(/small enough to just do it.*NOT a reason to skip this landed-evidence check/is.test(text),
+      'the "simple enough to implement directly" path must not bypass the landed-evidence check');
+  });
+
+  test('the guard applies to a childless open leaf (no subtasks, In Progress)', () => {
+    const text = build({ isTerminal: false, hasSubtasks: false, hasOpenChildren: false });
+    // Step 0's deterministic review rule cannot fire for a childless open leaf...
+    assert.ok(!/### Step 0: The substantive work here is already complete/.test(text),
+      'Step 0 deterministic review must NOT fire for a childless open leaf (the LIN-448 gap)');
+    // ...so Step 3's hoisted soft check is the path that must route it to review.
+    assert.ok(/already landed/i.test(text) && /Recommend \`review\`/.test(text),
+      'Step 3 must carry the already-landed → review path for the childless open leaf');
+  });
+});
+
+// =============================================================================
 // Single-action boundary (LIN-358) — the generated prompt body must stay within
 // the one recommended action and hand off by naming the follow-up, rather than
 // carrying the work into the next phase. The reported symptom was an "unblock"

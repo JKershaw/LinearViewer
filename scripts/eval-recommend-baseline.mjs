@@ -102,6 +102,67 @@ const WORKSPACES = [
       { id: 'HAR-545', role: 'mid' },
       { id: 'HAR-616', role: 'leaf' }
     ]
+  },
+  // Synthetic workspace (LIN-448) — network-free fixtures, no token needed (the
+  // sentinel token keeps the workspace from being skip-gated). Each target's context
+  // is pre-built in `fixtures` and short-circuits the proxy in computeOne.
+  {
+    name: 'Synthetic',
+    base: null,
+    token: 'fixture',
+    targets: [
+      { id: 'FIX-448-leaf', role: 'plan-less research→implementation leaf, merged but In Progress (expect → review)' }
+    ],
+    fixtures: {
+      // The LIN-390 shape that looped `implementation` x3: reached implementation via
+      // research (NO `plan` step → no `## Implementation Plan`, no session-fit answer),
+      // description ends in a present-tense "Next step:" imperative left over from
+      // research, and a "PR merged" completion comment sits in the thread. Expected
+      // routing: `review`.
+      //
+      // Honest scope (LIN-448): this is live SHAPE-COVERAGE, not a self-reproducing red
+      // test. On gpt-5.4-mini this minimal reconstruction routes to `review` 4/4 with
+      // AND without the Step-3 hoist (the model already weighs the merged comment), so
+      // it does not reproduce the loop in isolation — the AUTHORITATIVE red→green guard
+      // is the deterministic structural test in tests/unit/openrouter.test.js
+      // ('plan-less landed leaf (LIN-448)'), which is 3/4 red on the pre-hoist prompt.
+      // This target keeps the shape under continuous live measurement so a future prompt
+      // edit that re-buries the guard (combined with a weaker model) cannot regress it
+      // silently.
+      'FIX-448-leaf': {
+        issue: {
+          id: 'fix-448-leaf-uuid',
+          identifier: 'FIX-448-leaf',
+          title: 'Delete orphaned roadmap test-mode branch; finalize harness boundary header',
+          description: [
+            '## Research findings',
+            '',
+            'The orphaned `test-mode` branch in `server.js:1177` is dead — no caller reaches it',
+            'since the harness boundary moved. The harness header is the canonical seam now.',
+            '',
+            '**Next step:** delete `server.js:1177` only; finalize the harness header; verify the',
+            'roadmap + error-handling specs stay green.'
+          ].join('\n'),
+          url: 'https://linear.app/linearviewer/issue/FIX-448-leaf',
+          state: { name: 'In Progress', type: 'started' },
+          createdAt: '2026-06-13T00:00:00.000Z',
+          labels: []
+        },
+        parent: null,
+        siblings: [],
+        siblingsTotal: 0,
+        project: { name: 'Autopilot, Recommendation & Prompt Engine', description: null },
+        children: [],
+        comments: [
+          {
+            body: '## S4 implemented — PR #442 merged ✅\n\nDeleted the orphaned branch and finalized the harness boundary header. CI green on `main`; commit landed.',
+            createdAt: '2026-06-13T01:00:00.000Z',
+            user: 'engineer'
+          }
+        ],
+        focusedChild: null
+      }
+    }
   }
 ];
 
@@ -251,10 +312,15 @@ async function fetchContext(proxyGet, identifier) {
  * inner computeRecommendation live branch (the shape resolveRecommendation needs:
  * recommendedAction + deferTo drive descent; state + children arm the LIN-353 guards).
  */
-function makeComputeOne(proxyGet) {
+function makeComputeOne(proxyGet, fixtures = {}) {
   return async function computeOne(identifier) {
+    // Synthetic targets (LIN-448) carry their own pre-built context and never touch
+    // the proxy: the merged-but-In-Progress leaf they reproduce was flipped to Done by
+    // the run's workaround, so its live state no longer exercises the loop. The fixture
+    // pins the exact shape — plan-less research→implementation leaf, In Progress, with a
+    // "PR merged" comment — so the LLM-level routing stays measurable as a red test.
     const { issue, parent, siblings, siblingsTotal, project, children, comments, focusedChild } =
-      await fetchContext(proxyGet, identifier);
+      fixtures[identifier] || await fetchContext(proxyGet, identifier);
 
     const recommendation = await getRecommendation(
       issue,
@@ -277,7 +343,7 @@ function makeComputeOne(proxyGet) {
 
 /** Run one target K times through resolveRecommendation, capturing each run. */
 async function runTarget(workspace, target, proxyGet) {
-  const computeOne = makeComputeOne(proxyGet);
+  const computeOne = makeComputeOne(proxyGet, workspace.fixtures);
   const runs = [];
   for (let i = 0; i < K; i++) {
     try {
