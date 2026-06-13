@@ -40,6 +40,12 @@ describe('buildAutopilotKickoff (shared guide)', () => {
     assert.ok(text.includes('WRITE, merge-gated'));
     assert.ok(text.includes('Merge on green'));
   });
+
+  test('frames the finish as having natural give — an extra pass is normal, not a stall', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
+    assert.ok(text.includes('natural give'));
+    assert.ok(text.includes('not churn or a stall'));
+  });
 });
 
 describe('buildAutopilotKickoff (inline handbook / disposition layer)', () => {

@@ -130,10 +130,12 @@ Merge on green. Right before you merge, check CI yourself on the exact commit yo
 to land — fresh each time, not a green you saw a few steps back. Green, and the diff is the
 one that was approved? Merge. Still running, just wait and look again. Failing, or the diff
 isn't what was approved, is the human's call — pause and hand back. Merging is a step
-*within* the loop, not the end of it. The loop's real finish lines are the
-two human-meaningful ones: **the feature/task is complete** (verified), or **it's reached a
-point that wants human review**. An open-ended "just keep the stack moving" run has no
-finish line — it runs until it needs you.
+*within* the loop, not the end of it. The very end has some natural give: sometimes a task
+closes out in the same pass that finishes the work, sometimes it takes one more short pass to
+settle — both are normal, the tail of healthy work, not churn or a stall. The loop's real
+finish lines are the two human-meaningful ones: **the feature/task is complete** (verified),
+or **it's reached a point that wants human review**. An open-ended "just keep the stack
+moving" run has no finish line — it runs until it needs you.
 
 ## When to halt (stop, surface, don't work around)
 
