@@ -18,15 +18,25 @@
  * on the Linear `test-token` path and must NOT be migrated here:
  *   - OAuth / PAT auth bootstrap        (auth.spec, pat-auth.spec, openrouter-auth.spec)
  *   - the Linear API proxy contract     (proxy.spec, proxy-toggle-copy.spec)
+ *   - the foreman / dispatch API contracts (foreman.spec — proxy/foreman-prompt
+ *     contract, provider re-point tracked under LIN-306; dispatch.spec)
  *   - cycles / teams / estimate-driven surfaces (the provider declares these off)
+ *   - the boundary (pinned) cases of two mixed-harness specs (LIN-428): the
+ *     Team-Filtering (teams off) + OAuth-error cases of error-handling.spec, and
+ *     the multi-workspace switch / removal / max-workspaces cases of
+ *     workspace.spec (the single-workspace local harness cannot represent
+ *     `multiWorkspace`/`maxWorkspaces`)
  *   - visual-regression specs (tests/visual/*) — pinned to the mock fixtures so
  *     the committed reference screenshots stay byte-stable
  * Migrate a spec onto this harness only when the local provider fully backs the
  * surface under test. Migrated so far: dashboard, swim (lanes/flow/vertical),
  * ship (+ orientation mode), interactions/detail (incl. the comments toggle), the
  * swipe surface (page, dispatched sessions, and the recap/brief accordions —
- * LIN-427), and the workspace-api cluster (LIN-403..412): recap, brief,
- * recommend/streaming, prompts, custom-prompts, and the workspace-model UI path.
+ * LIN-427), the workspace-api cluster (LIN-403..412): recap, brief,
+ * recommend/streaming, prompts, custom-prompts, and the workspace-model UI path,
+ * and the migrated subsets of two mixed-harness boundary specs (LIN-428):
+ * error-handling.spec's Input-Validation + Session-State cases and
+ * workspace.spec's two single-workspace selector cases.
  *
  * The detail-surface comments path is now fully provider-backed, so its
  * `routes/workspace-api.js` `testMockData` data-mock branch was orphaned and

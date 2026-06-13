@@ -1,12 +1,25 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/test-base.js';
+import { seedLocalWorkspace, localDashboardUrl } from '../fixtures/local-harness.js';
 
-// Workspace URL key used in test session
+// Mixed-harness boundary split (LIN-428, parent S3/LIN-389).
+//   - Input Validation + Session State migrate onto a GENUINE `provider: 'local'`
+//     session (seedLocalWorkspace) — provider-agnostic validation and the
+//     session lifecycle are fully modelled by the local harness.
+//   - Team Filtering + OAuth Error Handling stay PINNED on the Linear
+//     `test-token` path: team filtering needs the full team data the local
+//     provider declares OFF, and OAuth callbacks are the auth bootstrap the
+//     local harness deliberately does not model.
+
+// Workspace URL key used in the PINNED (test-token) sessions below.
 const TEST_WORKSPACE_URL_KEY = 'test-workspace';
 const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;
 
+// Dashboard URL for the migrated local-backed workspace.
+const LOCAL_DASHBOARD = localDashboardUrl();
+
 test.describe('Input Validation', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/test/set-session');
+    await seedLocalWorkspace(page);
   });
 
   test('invalid workspace urlKey on remove returns 400', async ({ page }) => {
@@ -18,19 +31,19 @@ test.describe('Input Validation', () => {
 
   test('invalid team filter is ignored', async ({ page }) => {
     // Invalid team ID should be ignored (not cause error)
-    await page.goto(`${WORKSPACE_URL}?team=invalid-team-id`);
+    await page.goto(`${LOCAL_DASHBOARD}?team=invalid-team-id`);
 
     // Page should still load normally
     await expect(page.locator('.nav-bar')).toBeVisible();
-    await expect(page.locator('.project')).toHaveCount(2); // Both test projects
+    await expect(page.locator('.project')).toHaveCount(2); // Both local-seed projects
   });
 });
 
 test.describe('Session State', () => {
   test('cleared session shows landing page', async ({ page }) => {
-    // First authenticate
-    await page.goto('/test/set-session');
-    await page.goto(WORKSPACE_URL);
+    // First authenticate (seed a local-backed session)
+    await seedLocalWorkspace(page);
+    await page.goto(LOCAL_DASHBOARD);
     await expect(page.locator('.nav-bar')).toBeVisible();
 
     // Clear session
@@ -42,8 +55,8 @@ test.describe('Session State', () => {
   });
 
   test('session persists across page reloads', async ({ page }) => {
-    await page.goto('/test/set-session');
-    await page.goto(WORKSPACE_URL);
+    await seedLocalWorkspace(page);
+    await page.goto(LOCAL_DASHBOARD);
     await expect(page.locator('.nav-bar')).toBeVisible();
 
     // Reload the page
@@ -51,11 +64,12 @@ test.describe('Session State', () => {
 
     // Session should still be valid
     await expect(page.locator('.nav-bar')).toBeVisible();
-    await expect(page.locator('#workspace-toggle')).toHaveText('Test Workspace');
+    await expect(page.locator('#workspace-toggle')).toHaveText('Local Workspace');
   });
 });
 
 test.describe('Team Filtering', () => {
+  // PINNED: needs full team data the local provider declares OFF.
   test.beforeEach(async ({ page }) => {
     await page.goto('/test/set-session');
   });
@@ -112,6 +126,7 @@ test.describe('Team Filtering', () => {
 });
 
 test.describe('OAuth Error Handling', () => {
+  // PINNED: OAuth callbacks are the auth bootstrap the local harness does not model.
   test('OAuth callback with error shows friendly message', async ({ page }) => {
     // Simulate user denying access
     await page.goto('/auth/callback?error=access_denied');
