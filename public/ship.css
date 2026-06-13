@@ -14,7 +14,7 @@ body:has(.ship-page) {
   cursor: grab;
   /* Fill remaining viewport beneath navbar; height tweaked once nav is measured. */
   height: calc(100vh - 56px);
-  background: var(--bg, #fff);
+  background: var(--bg);
 }
 
 .ship-page:active {
@@ -75,7 +75,7 @@ body:has(.ship-page) {
 .ship-rect-empty {
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
   font-size: 11px;
-  color: var(--fg-dim, #888);
+  color: var(--fg-dim);
   text-align: center;
   padding: 1rem 0.5rem;
   font-style: italic;
@@ -354,7 +354,7 @@ body:has(.ship-page) {
   left: 50%;
   transform: translate(-50%, -50%);
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
-  color: var(--fg-dim, #666);
+  color: var(--fg-dim);
   font-style: italic;
   font-size: 13px;
 }

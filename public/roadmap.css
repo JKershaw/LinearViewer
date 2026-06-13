@@ -79,8 +79,8 @@ details.roadmap-layer > summary:hover {
 
 /* Per-layer state glyph on the summary, visible while the layer is collapsed. */
 details.roadmap-layer[data-state="streaming"] > summary::before { content: '◐ '; color: var(--fg-dim); }
-details.roadmap-layer[data-state="done"] > summary::before { content: '✓ '; color: var(--ok, #2a8f4e); }
-details.roadmap-layer[data-state="failed"] > summary::before { content: '✕ '; color: var(--accent, #c33); }
+details.roadmap-layer[data-state="done"] > summary::before { content: '✓ '; color: var(--ok); }
+details.roadmap-layer[data-state="failed"] > summary::before { content: '✕ '; color: var(--accent); }
 details.roadmap-layer[data-state="not-available"] > summary::before { content: '○ '; color: var(--fg-dim); }
 
 /* =============================================================================
@@ -629,7 +629,7 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
 }
 
 .roadmap-layer[data-state="failed"] .roadmap-layer-status {
-  color: var(--accent, #c33);
+  color: var(--accent);
 }
 
 .roadmap-layer-retry {
