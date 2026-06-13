@@ -34,15 +34,9 @@
   min-width: 0;
 }
 
-.dispatch-label {
-  color: var(--fg-dim);
-  min-width: 10ch;
-  flex-shrink: 0;
-}
-
-.dispatch-value {
-  color: var(--fg);
-}
+/* The dim-label + value row converged onto the canonical `.field` component
+   (style.css, LIN-463): `.dispatch-label`/`.dispatch-value` were byte-identical
+   to `.field-label`/`.field-value` and have been retired. */
 
 .dispatch-form {
   display: inline;

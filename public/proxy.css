@@ -16,11 +16,9 @@
   margin: 0 0 0.75rem 0;
 }
 
-.proxy-label {
-  color: var(--fg-dim);
-  min-width: 10ch;
-  flex-shrink: 0;
-}
+/* The dim-label row converged onto the canonical `.field` component (style.css,
+   LIN-463): `.proxy-label` was byte-identical to `.field-label` and has been
+   retired. */
 
 /* =============================================================================
    Agent Prompt Section

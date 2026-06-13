@@ -2036,6 +2036,36 @@ button.nav-action {
   margin-top: var(--space-2);
 }
 
+/* =============================================================================
+   Field (LIN-463, Phase A.3)
+   Canonical horizontal dim-label + value row, rendered by renderField()
+   (lib/components/field.js). Absorbs the byte-identical per-page label/value
+   rules — .dispatch-label/.dispatch-value and .proxy-label here; the settings
+   .settings-label/.settings-value (and their semantic .connected/.disconnected/
+   … value variants) follow in Session 2. The row (.field) carries the same
+   flex/spacing/font as the shared `.X-section .line` rule it converges, so a
+   migrated field row renders byte-for-byte; the `.line` NAME stays on the
+   non-field rows in those sections.
+   ============================================================================= */
+.field {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.4rem 0;
+  font-family: var(--font-content);
+  font-size: 0.9em;
+}
+
+.field-label {
+  color: var(--fg-dim);
+  min-width: 10ch;
+  flex-shrink: 0;
+}
+
+.field-value {
+  color: var(--fg);
+}
+
 /*
    Legal Pages
    Styled to match the landing and projects page aesthetic.
