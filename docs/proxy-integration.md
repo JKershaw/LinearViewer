@@ -1086,8 +1086,9 @@ done
 Notes:
 - Detection latency is ~1–2s (the server's internal re-check interval), not "up to one sleep interval." One held request replaces many short polls — friendly to the 60/min rate limit.
 - A long hold may stream interior whitespace heartbeats inside the single `200` (same keepalive mechanism as `GET /recommend`); `JSON.parse` ignores them. Don't set a client timeout below ~60s when using `?wait`.
-- Re-polling an already-terminal item with `?wait` returns immediately (no hold) — re-verifying a finished item is free.
-- `?wait=0` / absent / invalid values are the plain immediate short-poll (fully backwards-compatible).
+- **Know why a response came back.** When you pass `?wait`, the body carries **`reason`** (`change` | `timeout` | `terminal`) and **`waitedMs`** (how long the server actually held). `change` = a status transition or new feedback arrived; `timeout` = the full window elapsed with nothing new; `terminal` = the item was already finished so there was no hold. This matters because during a quiet stretch (the worker is heads-down, no feedback) the snapshot is byte-identical call to call — `reason: "timeout"` with `waitedMs` near `wait×1000` is how you tell "the hold worked, the worker's just quiet" from a fast empty return. There's no need to time your own calls or wrap `?wait` in a tighter loop; just `do { ... } while (!terminal)`.
+- Re-polling an already-terminal item with `?wait` returns immediately (no hold), with `reason: "terminal"` and `waitedMs: 0` — re-verifying a finished item is free.
+- `?wait=0` / absent / invalid values are the plain immediate short-poll (fully backwards-compatible) — and omit `reason`/`waitedMs` entirely (those fields appear only when `?wait>0`).
 - `status` is **reported, not adjudicated**: a `done` means the runner's session ended, not that the work is correct (a worker can background a long command, exit, and post `done` early). Treat `done` as "go look" — cross-check the `[evidence]` URLs, and if unsatisfied, dispatch fresh work. The long-poll never locks anything in.
 
 ```json
@@ -1101,6 +1102,8 @@ Notes:
   "dispatchedAt": "...",
   "resolvedAt": "...",
   "completedAt": "...",
+  "reason": "change|timeout|terminal",
+  "waitedMs": 50000,
   "feedback": [
     { "message": "[working] 6 tools in 32s: Bash×6 · next heartbeat in ≤1m", "url": null, "urlLabel": null, "timestamp": "..." },
     { "message": "[evidence] Pull request · 3 mentions", "url": "https://github.com/org/repo/pull/286", "urlLabel": null, "timestamp": "..." },
@@ -1109,7 +1112,7 @@ Notes:
 }
 ```
 
-Feedback is free-form text — read it (the recap, heartbeats) for detail; `status` gives the terminal signal and `[evidence]` entries give the artifact URLs to verify against. Poll until `status` is terminal. (If you poll in a shell loop, don't name the variable `status`: zsh reserves it as a read-only alias for `$?` and the assignment aborts. Use `dispatch_status`, or run the loop under `bash`.)
+(`reason` and `waitedMs` are shown above for completeness; they are present only on `?wait>0` responses and absent from the plain short-poll.) Feedback is free-form text — read it (the recap, heartbeats) for detail; `status` gives the terminal signal and `[evidence]` entries give the artifact URLs to verify against. Poll until `status` is terminal. (If you poll in a shell loop, don't name the variable `status`: zsh reserves it as a read-only alias for `$?` and the assignment aborts. Use `dispatch_status`, or run the loop under `bash`.)
 
 **Timestamps — don't mistake `resolvedAt` for completion.** `resolvedAt` is stamped when the runner *claims* the item (take/archive time); it lands seconds after `dispatchedAt` no matter how long the task runs, so it is **not** a completion signal. The truthful completion time is **`completedAt`** — the timestamp of the terminal `[done]`/`[failed]`/`[aborted]` feedback marker, `null` until that marker exists. `status` remains the authoritative completion *signal*; `completedAt` is the completion *time*.
 

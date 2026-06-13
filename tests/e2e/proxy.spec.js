@@ -834,6 +834,10 @@ test.describe('Proxy API - Dispatch', () => {
     const elapsed = Date.now() - started;
     expect(watched.status).toBe('done');
     expect(elapsed).toBeLessThan(8000); // returned on the change, not at the 10s cap
+    // Legibility: the response says WHY it came back.
+    expect(watched.reason).toBe('change');
+    expect(watched.waitedMs).toBeGreaterThanOrEqual(0);
+    expect(watched.waitedMs).toBeLessThan(10000); // well under the cap
   });
 
   test('?wait short-circuits immediately on an already-terminal item', async ({ request }) => {
@@ -859,6 +863,9 @@ test.describe('Proxy API - Dispatch', () => {
     const elapsed = Date.now() - started;
     expect(watched.status).toBe('done');
     expect(elapsed).toBeLessThan(3000);
+    // Short-circuit is legible too: terminal, no hold.
+    expect(watched.reason).toBe('terminal');
+    expect(watched.waitedMs).toBe(0);
   });
 
   test('?wait returns the current snapshot at the cap when nothing changes', async ({ request }) => {
@@ -878,6 +885,9 @@ test.describe('Proxy API - Dispatch', () => {
     expect(watched.status).toBe('queued');
     expect(watched.issueIdentifier).toBe('LIN-393');
     expect(elapsed).toBeGreaterThanOrEqual(1500); // it actually held
+    // The cap-elapsed return is now self-describing: held the full window, nothing new.
+    expect(watched.reason).toBe('timeout');
+    expect(watched.waitedMs).toBeGreaterThanOrEqual(1500);
   });
 
   test('invalid / absent ?wait falls back to the immediate short-poll', async ({ request }) => {
@@ -894,6 +904,9 @@ test.describe('Proxy API - Dispatch', () => {
       })).json();
       expect(watched.status).toBe('queued');
       expect(Date.now() - started).toBeLessThan(1500); // never held
+      // Short-poll stays byte-identical to the pre-?wait contract: no legibility fields.
+      expect(watched.reason).toBeUndefined();
+      expect(watched.waitedMs).toBeUndefined();
     }
   });
 
