@@ -60,8 +60,8 @@
   display: inline-block;
   font-size: 0.7em;
   font-weight: 400;
-  color: var(--yellow, #b8860b);
-  border: 1px solid var(--yellow, #b8860b);
+  color: var(--yellow);
+  border: 1px solid var(--yellow);
   border-radius: 3px;
   padding: 0.1rem 0.4rem;
   vertical-align: middle;
@@ -73,7 +73,7 @@
 .foreman-live-indicator {
   font-family: var(--font-structural);
   font-size: 0.75em;
-  color: var(--green, #16a085);
+  color: var(--green);
   animation: foreman-live-pulse 2s ease-in-out infinite;
 }
 
@@ -164,7 +164,7 @@
 }
 
 .foreman-session-live {
-  color: var(--green, #16a085);
+  color: var(--green);
   font-family: var(--font-structural);
   font-size: 0.75em;
   animation: foreman-live-pulse 2s ease-in-out infinite;
@@ -229,7 +229,7 @@
   line-height: 1;
 }
 
-.foreman-filter-chip-clear:hover { color: var(--red, #c0392b); }
+.foreman-filter-chip-clear:hover { color: var(--red); }
 
 /* =============================================================================
    Timeline identifier button (filter-toggle) + arrow-to-Linear
@@ -254,7 +254,7 @@ button.foreman-timeline-identifier:hover { opacity: 0.75; }
   text-decoration: none;
   padding: 0 0.25rem;
 }
-.foreman-timeline-identifier-link:hover { color: var(--blue, #2a66c9); }
+.foreman-timeline-identifier-link:hover { color: var(--blue); }
 
 .foreman-timeline-session {
   font-family: var(--font-structural);
@@ -295,18 +295,18 @@ button.foreman-timeline-identifier:hover { opacity: 0.75; }
   min-width: 1em;
   text-align: center;
 }
-.foreman-state.done { color: var(--green, #16a085); }
-.foreman-state.in-progress { color: var(--yellow, #d4a600); }
-.foreman-state.todo { color: var(--fg-dim, #999); }
-.foreman-state.backlog { color: var(--fg-vdim, #ccc); }
-.foreman-state.failed { color: var(--red, #c0392b); }
+.foreman-state.done { color: var(--green); }
+.foreman-state.in-progress { color: var(--yellow); }
+.foreman-state.todo { color: var(--fg-dim); }
+.foreman-state.backlog { color: var(--fg-vdim); }
+.foreman-state.failed { color: var(--red); }
 
 .foreman-card-accent {
   height: 3px;
   width: 100%;
 }
-.foreman-card-accent.in-progress { background: linear-gradient(90deg, #d4a600, #e8c547); }
-.foreman-card-accent.done { background: linear-gradient(90deg, #16a085, #2ecc71); }
+.foreman-card-accent.in-progress { background: linear-gradient(90deg, var(--yellow), #e8c547); }
+.foreman-card-accent.done { background: linear-gradient(90deg, var(--green), #2ecc71); }
 .foreman-card-accent.todo { background: #ddd; }
 .foreman-card-accent.backlog { background: #eee; }
 .foreman-card-accent.failed { background: linear-gradient(90deg, #c0392b, #e74c3c); }
@@ -326,7 +326,7 @@ button.foreman-timeline-identifier:hover { opacity: 0.75; }
 
 .foreman-meta-label {
   font-family: var(--font-structural);
-  color: var(--fg-dim, #999);
+  color: var(--fg-dim);
   font-size: 0.75em;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -336,7 +336,7 @@ button.foreman-timeline-identifier:hover { opacity: 0.75; }
 }
 
 .foreman-meta-value {
-  color: var(--fg, #333);
+  color: var(--fg);
   word-break: break-word;
   min-width: 0;
   flex: 1;
@@ -355,9 +355,9 @@ button.foreman-timeline-identifier:hover { opacity: 0.75; }
   padding: 0.1rem 0.45rem;
   font-size: 0.75em;
   font-family: var(--font-structural);
-  border: 1px solid var(--fg-vdim, #e0e0e0);
+  border: 1px solid var(--fg-vdim);
   border-radius: 10px;
-  color: var(--fg-dim, #666);
+  color: var(--fg-dim);
   background: rgba(0, 0, 0, 0.02);
 }
 
@@ -365,16 +365,16 @@ button.foreman-timeline-identifier:hover { opacity: 0.75; }
   letter-spacing: 1px;
   font-family: var(--font-structural);
 }
-.priority-dots .filled { color: var(--fg, #1a1a1a); }
-.priority-dots .empty { color: var(--fg-vdim, #ddd); }
+.priority-dots .filled { color: var(--fg); }
+.priority-dots .empty { color: var(--fg-vdim); }
 
 /* =============================================================================
    Now working — active task card
    ============================================================================= */
 .foreman-now-card {
-  border: 1px solid var(--fg-vdim, #e0e0e0);
+  border: 1px solid var(--fg-vdim);
   border-radius: 12px;
-  background: var(--bg, #fff);
+  background: var(--bg);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   overflow: hidden;
 }
@@ -455,11 +455,11 @@ a.foreman-now-identifier:hover { opacity: 0.75; }
   background: rgba(0, 0, 0, 0.015);
 }
 
-.foreman-timeline-item.in-progress { border-left-color: var(--yellow, #d4a600); }
-.foreman-timeline-item.done { border-left-color: var(--green, #16a085); }
-.foreman-timeline-item.failed { border-left-color: var(--red, #c0392b); }
+.foreman-timeline-item.in-progress { border-left-color: var(--yellow); }
+.foreman-timeline-item.done { border-left-color: var(--green); }
+.foreman-timeline-item.failed { border-left-color: var(--red); }
 .foreman-timeline-item.todo,
-.foreman-timeline-item.backlog { border-left-color: var(--fg-vdim, #ccc); }
+.foreman-timeline-item.backlog { border-left-color: var(--fg-vdim); }
 
 .foreman-timeline-item > .foreman-state {
   padding-top: 0.1rem;
@@ -504,9 +504,9 @@ a.foreman-timeline-identifier:hover { opacity: 0.75; }
   background: rgba(0, 0, 0, 0.04);
 }
 
-.foreman-timeline-item.done .foreman-timeline-status { color: var(--green, #16a085); }
-.foreman-timeline-item.in-progress .foreman-timeline-status { color: var(--yellow, #b8860b); }
-.foreman-timeline-item.failed .foreman-timeline-status { color: var(--red, #c0392b); }
+.foreman-timeline-item.done .foreman-timeline-status { color: var(--green); }
+.foreman-timeline-item.in-progress .foreman-timeline-status { color: var(--yellow); }
+.foreman-timeline-item.failed .foreman-timeline-status { color: var(--red); }
 
 .foreman-timeline-time {
   margin-left: auto;
@@ -549,9 +549,9 @@ a.foreman-timeline-identifier:hover { opacity: 0.75; }
 
 .foreman-stack-card {
   display: block;
-  border: 1px solid var(--fg-vdim, #e0e0e0);
+  border: 1px solid var(--fg-vdim);
   border-radius: 10px;
-  background: var(--bg, #fff);
+  background: var(--bg);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   overflow: hidden;
   color: inherit;
@@ -721,15 +721,15 @@ a.foreman-stack-card-link:focus .foreman-stack-title {
 
 .foreman-token-select:focus {
   outline: none;
-  border-color: var(--blue, #2a66c9);
+  border-color: var(--blue);
 }
 
 .foreman-playbook-feedback {
   font-size: 0.85em;
-  color: var(--green, #16a085);
+  color: var(--green);
 }
 
-.foreman-playbook-feedback.error { color: var(--red, #c0392b); }
+.foreman-playbook-feedback.error { color: var(--red); }
 
 .foreman-playbook-output {
   font-family: var(--font-structural);
@@ -754,15 +754,15 @@ a.foreman-stack-card-link:focus .foreman-stack-title {
 
 .foreman-playbook-output.has-content:hover,
 .foreman-playbook-output.has-content:focus {
-  border-color: var(--blue, #2a66c9);
+  border-color: var(--blue);
   background: rgba(0, 0, 0, 0.04);
   outline: none;
 }
 
 #foreman-copy-btn.copied {
-  background: var(--green, #16a085);
-  color: var(--bg, #fff);
-  border-color: var(--green, #16a085);
+  background: var(--green);
+  color: var(--bg);
+  border-color: var(--green);
 }
 
 .foreman-refresh {

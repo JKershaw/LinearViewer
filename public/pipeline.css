@@ -769,8 +769,8 @@ body.overlay-open {
 .overlay-recap-wrap {
   margin: 0.5rem 0 1rem 0;
   padding: 0.5rem 0;
-  border-top: 1px solid var(--border, rgba(0, 0, 0, 0.08));
-  border-bottom: 1px solid var(--border, rgba(0, 0, 0, 0.08));
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .overlay-recap-mount {
