@@ -5,15 +5,8 @@
  * Maintains CLI aesthetic with CSS variables.
  */
 
-/* =============================================================================
-   Page Header
-   ============================================================================= */
-.prompts-subtitle {
-  color: var(--fg-dim);
-  font-family: var(--font-content);
-  font-size: 0.9em;
-  margin-top: 0.5rem;
-}
+/* `.prompts-subtitle` is now a no-style E2E hook (prompts-page.spec.js);
+   canonical styling lives in `.page-header__subtitle` (style.css, LIN-462). */
 
 .nav-value-static {
   font-family: var(--font-content);

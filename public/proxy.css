@@ -9,13 +9,6 @@
    in style.css, LIN-461). `.proxy-section` survives only as a hook for the
    `.proxy-section .line` descendant rule below. */
 
-.proxy-subtitle {
-  color: var(--fg-dim);
-  font-family: var(--font-content);
-  font-size: 0.9em;
-  margin-top: 0.5rem;
-}
-
 .proxy-hint {
   color: var(--fg-dim);
   font-family: var(--font-content);
