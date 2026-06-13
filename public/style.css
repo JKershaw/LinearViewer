@@ -2018,6 +2018,24 @@ button.nav-action {
   border-bottom: 1px solid var(--fg-vdim);
 }
 
+/* =============================================================================
+   Page Header (LIN-462, Phase A.2)
+   Canonical home for the page-level <h1> + optional subtitle, rendered by
+   renderPageHeader() (lib/components/page-header.js). The <header> layout
+   (centering, margin) comes from the global `header` rule above; this block
+   owns only the subtitle, absorbing the former per-page `*-subtitle` rules.
+   Load-bearing test-hook classes (.dashboard-subtitle, .dispatch-subtitle,
+   .prompts-subtitle) ride alongside `.page-header__subtitle` as no-style hooks
+   (passed via subtitleClass). `0.9em` has no exact Phase-0 token, so it stays a
+   literal — preserving the prior look byte-for-byte (LIN-461 convention).
+   ============================================================================= */
+.page-header__subtitle {
+  color: var(--fg-dim);
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  margin-top: var(--space-2);
+}
+
 /*
    Legal Pages
    Styled to match the landing and projects page aesthetic.

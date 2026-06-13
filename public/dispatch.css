@@ -10,15 +10,8 @@
    dispatch.js reaches the send panel via `.closest('.dispatch-section')` and the
    `.dispatch-section .line` rule below scopes on it. */
 
-/* =============================================================================
-   Page Layout
-   ============================================================================= */
-.dispatch-subtitle {
-  color: var(--fg-dim);
-  font-family: var(--font-content);
-  font-size: 0.9em;
-  margin-top: 0.5rem;
-}
+/* `.dispatch-subtitle` is now a no-style E2E hook (dispatch-page.spec.js);
+   canonical styling lives in `.page-header__subtitle` (style.css, LIN-462). */
 
 /* =============================================================================
    Dispatch Nodes (tree items)
