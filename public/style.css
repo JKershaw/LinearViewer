@@ -2040,9 +2040,10 @@ button.nav-action {
    Field (LIN-463, Phase A.3)
    Canonical horizontal dim-label + value row, rendered by renderField()
    (lib/components/field.js). Absorbs the byte-identical per-page label/value
-   rules — .dispatch-label/.dispatch-value and .proxy-label here; the settings
-   .settings-label/.settings-value (and their semantic .connected/.disconnected/
-   … value variants) follow in Session 2. The row (.field) carries the same
+   rules — .dispatch-label/.dispatch-value, .proxy-label, and (Session 2) the
+   settings .settings-label/.settings-value. The settings semantic value variants
+   (.connected/.disconnected/… colours) survive as no-style hooks on
+   `settings-value`, not as duplicated row CSS. The row (.field) carries the same
    flex/spacing/font as the shared `.X-section .line` rule it converges, so a
    migrated field row renders byte-for-byte; the `.line` NAME stays on the
    non-field rows in those sections.
