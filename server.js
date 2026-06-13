@@ -1172,10 +1172,8 @@ app.get('/workspace/:urlKey/roadmap', workspaceFromUrl, async (req, res) => {
 
   try {
     // Fetch raw data — roadmap needs raw issues for velocity/queue calculations
-    const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
-    const { organizationName, projects, issues } = isTestMode
-      ? testMockData
-      : await getProviderForWorkspace(workspace).fetchProjects(getWorkspaceToken(workspace), teamId);
+    const { organizationName, projects, issues } =
+      await getProviderForWorkspace(workspace).fetchProjects(getWorkspaceToken(workspace), teamId);
 
     // Build roadmap model from deterministic layer
     const roadmapModel = buildRoadmapModel(projects, issues);

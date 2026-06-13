@@ -50,8 +50,23 @@
  *   - foreman / mini-foreman / autopilot (foreman.spec)→ those prompt endpoints
  *   - roadmap generate (roadmap.spec)                  → roadmap data branch
  *   - audit (option b, LIN-412)                        → retained by design
- * Those, plus the remaining `testMockData` branches in server.js,
- * routes/pipeline.js and routes/proxy.js, stay until those surfaces migrate.
+ * The remaining cross-surface `testMockData` branches are now the PERMANENT
+ * boundary, not migration leftovers (LIN-385 closed; LIN-390 was S4, last):
+ *   - server.js:462 (`fetchAndPrepareProjects`, the shared authed-render seam) is
+ *     co-owned: its `mockOverride` arm feeds the swim/ship VISUAL specs
+ *     (swim-sample-data.js — `swimSampleData`/`shipDenseSampleData`, NOT
+ *     mock-data.js), and its `testMockData` arm backs the LIN-428 boundary E2E
+ *     (workspace multiWorkspace/maxWorkspaces, error-handling Team-Filtering,
+ *     dispatch Queue).
+ *   - server.js:1331 (dispatch page) is pinned by dispatch.spec's Custom Prompt
+ *     Dispatch case.
+ *   - routes/proxy.js stays for the Linear API proxy + foreman contract (provider
+ *     re-point tracked under LIN-306).
+ * `mock-data.js`/`testMockData` is therefore co-owned by proxy.spec + the boundary
+ * E2E and is NOT retireable; `swim-sample-data.js` stays for the visual arm.
+ * `routes/pipeline.js` no longer has a mock branch (deleted in S1, LIN-387) and
+ * the server.js roadmap branch was orphaned (roadmap.spec migrated in LIN-409) and
+ * deleted in S4 (LIN-390).
  */
 import { LocalStore } from '../../lib/local-store.js';
 import { LocalProvider } from '../../lib/providers/local/index.js';
