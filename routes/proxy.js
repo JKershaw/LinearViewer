@@ -449,10 +449,19 @@ const DISPATCH_WAIT_POLL_MS = 1500;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Shapes a store item into the watch-endpoint response body. Shared by the
-// immediate short-poll and the long-poll so both return byte-identical JSON.
-function formatDispatchWatch(item) {
+// immediate short-poll and the long-poll.
+//
+// `meta` (long-poll only) makes the response self-describing about WHY it
+// returned, so a held-the-full-window return is distinguishable from a
+// short-circuit — they were previously byte-identical, which made a working
+// 50s hold look like a fast empty return to a caller with no wall-clock on its
+// own calls. `reason` ∈ 'terminal' (already done before the hold), 'change'
+// (status transition or new feedback during the hold), 'timeout' (held the full
+// window, nothing new); `waitedMs` is how long the handler actually held. Omitted
+// on the plain short-poll (no `?wait`) so that path stays byte-identical.
+function formatDispatchWatch(item, meta = null) {
   const terminalStatus = deriveTerminalStatus(item.feedback);
-  return {
+  const body = {
     id: item.id,
     status: terminalStatus || item.status,
     promptName: item.promptName,
@@ -472,6 +481,11 @@ function formatDispatchWatch(item) {
       timestamp: f.timestamp || null
     }))
   };
+  if (meta) {
+    body.reason = meta.reason;
+    body.waitedMs = meta.waitedMs;
+  }
+  return body;
 }
 
 // A dispatch item has "changed" for long-poll purposes when its derived
@@ -4013,7 +4027,15 @@ One convention across every endpoint, so you can branch on the same fields every
       // — the caller can re-verify without ever incurring the hold.)
       let current = item;
       const alreadyTerminal = deriveTerminalStatus(current.feedback) !== null;
-      if (waitSeconds > 0 && !alreadyTerminal) {
+      if (waitSeconds > 0) {
+        // Long-poll path. The response carries `reason`/`waitedMs` so the caller
+        // can tell WHY it came back (see formatDispatchWatch) — a terminal item
+        // short-circuits with no hold; otherwise we hold and report 'change' vs
+        // 'timeout'.
+        if (alreadyTerminal) {
+          logEvent(req, '/api/proxy/dispatch/:id', 200);
+          return res.json(formatDispatchWatch(current, { reason: 'terminal', waitedMs: 0 }));
+        }
         // Hold the request open. armKeepalive flushes 200 + JSON whitespace at
         // 25s so the connection survives Heroku's 30s H12 while we wait; the
         // baseline is this first (non-terminal) read, so a change that already
@@ -4024,7 +4046,9 @@ One convention across every endpoint, so you can branch on the same fields every
           status: deriveTerminalStatus(current.feedback) || current.status,
           feedbackLength: (current.feedback || []).length
         };
-        const deadline = Date.now() + waitSeconds * 1000;
+        const waitStart = Date.now();
+        const deadline = waitStart + waitSeconds * 1000;
+        let reason = 'timeout'; // default: held the full window, nothing new
         while (Date.now() < deadline) {
           await sleep(DISPATCH_WAIT_POLL_MS);
           if (res.writableEnded || res.destroyed) {
@@ -4034,11 +4058,11 @@ One convention across every endpoint, so you can branch on the same fields every
           const next = await dispatchQueueStore.getItemStatus(req.proxyUrlKey, id);
           if (!next) break; // item expired mid-wait; return last known snapshot
           current = next;
-          if (dispatchWatchChanged(baseline, current)) break;
+          if (dispatchWatchChanged(baseline, current)) { reason = 'change'; break; }
         }
         keepalive.stop();
         logEvent(req, '/api/proxy/dispatch/:id', 200);
-        return keepalive.send(200, formatDispatchWatch(current));
+        return keepalive.send(200, formatDispatchWatch(current, { reason, waitedMs: Date.now() - waitStart }));
       }
 
       logEvent(req, '/api/proxy/dispatch/:id', 200);
