@@ -60,6 +60,8 @@ import { renderSwipePage } from './lib/render-swipe.js'
 import { renderSwimPage } from './lib/render-swim.js'
 import { renderShipPage } from './lib/render-ship.js'
 import { createPipelineRoutes } from './routes/pipeline.js'
+import { createCollectiveRoutes } from './routes/collective.js'
+import { yapClientFromEnv } from './lib/yap-client.js'
 import { getLoopsForWorkspace } from './lib/pipeline-loops.js'
 import { buildSessionCounts } from './lib/sessions-view.js'
 import { renderRoadmapPage } from './lib/render-roadmap.js'
@@ -941,6 +943,11 @@ app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRoute
 
 // Mount pipeline routes (page + JSON polling)
 app.use(createPipelineRoutes({ workspaceFromUrl, getWorkspaceAccessToken, dispatchQueueStore, foremanStore, getOpenRouterSource, getDeployInfo, handleUnauthorizedError }))
+
+// Mount collective routes (experimental cross-project discussion — LIN-450).
+// yapClient is null when YAP_BASE_URL is unset; the routes degrade gracefully.
+const yapClient = yapClientFromEnv()
+app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyTokenStore, yapClient, getOpenRouterSource, getDeployInfo }))
 
 /**
  * Workspace project view - renders the interactive tree view.

@@ -264,6 +264,28 @@ main.pipeline-page[data-url-key]       - page container
 - `GET /workspace/{urlKey}/api/sessions/{identifier}` → `{ sessions: [...] }` (newest-first dispatch loops for one issue, with feedback)
 - Swipe card "Dispatched Sessions [N]" accordion (`data-accordion="sessions"`); shown only when the `dispatch` feature flag is on. `[N]` count is baked into the card server-side.
 
+## Collective (experimental)
+
+The Collective page (`/workspace/{urlKey}/collective`) dispatches full Claude Code sessions from several connected workspaces into one Yap chat channel for a watched cross-project discussion. Requires the per-user `collective` feature flag; surfaced only via a link in Settings.
+
+### Collective DOM Structure
+```
+main.collective-page[data-url-key]      - page container
+  .collective-ws-check[value]           - workspace checkbox (value = urlKey)
+  #collective-channel                   - Yap channel input (default "#Collective")
+  #collective-topic                     - discussion topic input
+  #collective-target                    - dispatch target select (cli | web)
+  #collective-start                     - start-discussion button
+  #collective-transcript                - live message log (ul)
+  #collective-say-input / #collective-say-btn - inject human input
+```
+
+### Collective Endpoints
+- `POST /workspace/{urlKey}/collective/start` — fan-out `{ workspaceUrlKeys[], channel, topic, target }`
+- `GET  /workspace/{urlKey}/api/collective/state?channel=&since=` — poll the channel (503 when Yap unconfigured)
+- `POST /workspace/{urlKey}/api/collective/say` — `{ channel, message }` (503 when Yap unconfigured)
+- `window.__COLLECTIVE_DATA__` carries `{ urlKey, defaultChannel, yapConfigured }`
+
 ## Common Workflows
 
 1. **Find in-progress tasks**: Look in "In Progress" section at top (displays as tree with subtasks)
