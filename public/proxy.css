@@ -5,23 +5,9 @@
  * Reuses dispatch/token visual language for consistency.
  */
 
-/* =============================================================================
-   Proxy Section
-   ============================================================================= */
-.proxy-section {
-  margin-bottom: 2rem;
-  padding: 1rem;
-  background: rgba(0, 0, 0, 0.02);
-  border-radius: 4px;
-}
-
-.proxy-section-header {
-  font-family: var(--font-content);
-  font-size: 1em;
-  font-weight: 500;
-  color: var(--fg);
-  margin: 0 0 0.75rem 0;
-}
+/* Section styling is canonical now (.section / .section--boxed / .section-header
+   in style.css, LIN-461). `.proxy-section` survives only as a hook for the
+   `.proxy-section .line` descendant rule below. */
 
 .proxy-subtitle {
   color: var(--fg-dim);
