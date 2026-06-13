@@ -1,5 +1,5 @@
 /**
- * Unit tests for lib/periodicals.js (LIN-341 / LIN-344 / LIN-354 / LIN-369)
+ * Unit tests for lib/periodicals.js (LIN-341 / LIN-344 / LIN-354 / LIN-369 / LIN-453)
  *
  * Run with: node --test tests/unit/periodicals.test.js
  */
@@ -9,30 +9,34 @@ import { PERIODICALS, getPeriodicals, buildPeriodicalNodes } from '../../lib/per
 import { PERIODICALS_PROJECT_ID } from '../../lib/tree.js';
 
 describe('periodicals registry', () => {
-  test('seeds the LIN-354 review set plus Drift & Coherence and Comprehension-Debt (7 templates)', () => {
-    assert.strictEqual(PERIODICALS.length, 7);
+  test('seeds the LIN-354 review set plus Drift & Coherence, Comprehension-Debt, and Stability (8 templates)', () => {
+    assert.strictEqual(PERIODICALS.length, 8);
     assert.strictEqual(getPeriodicals(), PERIODICALS);
   });
 
-  test('contains Documentation, Test Coverage, Security, API Quality, Code Quality, Drift & Coherence, and Comprehension-Debt reviews', () => {
+  test('contains the seven corrective reviews plus the advisory Stability Review', () => {
     // Assert by id/title/mode rather than position so the registry can grow.
     const byId = Object.fromEntries(PERIODICALS.map(t => [t.id, t]));
 
+    // id -> [title, mode]. The seven code-surface reviews are 'corrective'
+    // (they mint fix-tasks); the Stability Review (LIN-453) is the first
+    // 'advisory' entry — a governor that reports for a human to act on.
     const expected = {
-      'documentation-review': 'Documentation Review',
-      'test-coverage-gap': 'Test Coverage Gap Review',
-      'security-review': 'Security Review',
-      'api-quality': 'API Quality Review',
-      'code-quality': 'Code Quality Review',
-      'drift-coherence': 'Drift & Coherence Review',
-      'comprehension-debt': 'Comprehension-Debt Review'
+      'documentation-review': ['Documentation Review', 'corrective'],
+      'test-coverage-gap': ['Test Coverage Gap Review', 'corrective'],
+      'security-review': ['Security Review', 'corrective'],
+      'api-quality': ['API Quality Review', 'corrective'],
+      'code-quality': ['Code Quality Review', 'corrective'],
+      'drift-coherence': ['Drift & Coherence Review', 'corrective'],
+      'comprehension-debt': ['Comprehension-Debt Review', 'corrective'],
+      'stability-review': ['Stability Review', 'advisory']
     };
 
-    for (const [id, title] of Object.entries(expected)) {
+    for (const [id, [title, mode]] of Object.entries(expected)) {
       const t = byId[id];
       assert.ok(t, `has ${id} entry`);
       assert.strictEqual(t.title, title);
-      assert.strictEqual(t.mode, 'corrective');
+      assert.strictEqual(t.mode, mode);
       assert.strictEqual(typeof t.generatePrompt, 'function');
     }
   });
@@ -63,11 +67,18 @@ describe('periodicals registry', () => {
 // the repo and mint ONE project-specific review task, then stop. The minted
 // task's description, which the prompt dictates, carries the Stage-2 review
 // contract: read prior runs, produce an uncapped severity-ranked report, then
-// SELF-CONCLUDE — mint a bounded set of high-severity follow-up tasks, summarise
-// the report in a Linear comment, and close the task. Leaving the task In
-// Progress (the original LIN-354 contract) made it loop on `review` forever
-// (LIN-386), so the task now ends itself. Asserting this over the whole registry
-// locks the contract for new periodicals too.
+// SELF-CONCLUDE — summarise the report in a Linear comment and close the task.
+// Leaving the task In Progress (the original LIN-354 contract) made it loop on
+// `review` forever (LIN-386), so the task now ends itself.
+//
+// One half of the Stage-2 contract — *minting a bounded set of follow-up tasks*
+// — is shared only by the seven CORRECTIVE reviews, which turn findings into
+// fix-work. The advisory Stability Review (LIN-453) deliberately mints NO
+// follow-ups: it is a governor that hands its read to a human. So the
+// follow-up-creation assertion is scoped to mode === 'corrective' below, while
+// everything else (mint-one-task, read-prior-runs + uncapped report,
+// self-conclude, review-only, stays-general) stays universal across the
+// registry and locks the contract for new periodicals of either mode.
 describe('shared two-stage contract (all periodicals)', () => {
   for (const template of PERIODICALS) {
     describe(template.title, () => {
@@ -95,15 +106,9 @@ describe('shared two-stage contract (all periodicals)', () => {
         assert.match(prompt, /make-work/i);
       });
 
-      test('minted task contract: bounded follow-up creation, self-conclude, review-only', () => {
-        // The task creates a CAPPED set of follow-up tasks itself (LIN-386),
-        // rather than the old propose-but-don't-create + leave-In-Progress
-        // contract that looped on `review` forever.
-        assert.match(prompt, /follow-up task/i);
-        assert.match(prompt, /bounded|cap it|at most/i);
-        // Every finding still lands in the report even if not promoted to a task.
-        assert.match(prompt, /every finding|not promote|nothing is lost/i);
-        // The task ends itself: Linear summary + close. It must NOT be left open.
+      test('minted task contract: self-conclude, review-only', () => {
+        // The task ends itself: Linear summary + close. It must NOT be left open
+        // (LIN-386 — leaving it In Progress looped on `review` forever).
         assert.match(prompt, /conclude this task|move the task to its done|done\/completed state/i);
         assert.match(prompt, /summary of the report/i);
         assert.match(prompt, /do not leave it open|left open/i);
@@ -121,6 +126,23 @@ describe('shared two-stage contract (all periodicals)', () => {
         // The report location is discovered at run time, never hard-coded.
         assert.doesNotMatch(prompt, /save_comment|home issue/i);
       });
+    });
+  }
+});
+
+// Bounded follow-up creation is a CORRECTIVE-mode concern only: those reviews
+// turn findings into a capped set of fix-tasks itself (LIN-386), rather than the
+// old propose-but-don't-create + leave-In-Progress contract that looped on
+// `review` forever. The advisory Stability Review is excluded by mode (it mints
+// no follow-ups — see its own specifics block).
+describe('corrective reviews: bounded follow-up creation', () => {
+  for (const template of PERIODICALS.filter(t => t.mode === 'corrective')) {
+    test(`${template.title} mints a capped follow-up set, records every finding`, () => {
+      const prompt = template.generatePrompt();
+      assert.match(prompt, /follow-up task/i);
+      assert.match(prompt, /bounded|cap it|at most/i);
+      // Every finding still lands in the report even if not promoted to a task.
+      assert.match(prompt, /every finding|not promote|nothing is lost/i);
     });
   }
 });
@@ -305,6 +327,58 @@ describe('Comprehension-Debt Review specifics (LIN-370)', () => {
 
   test('stays general: no specific module surfaces leak in', () => {
     assert.doesNotMatch(prompt, /swim-graph|swim-lanes|roadmap|ship-layout/i);
+  });
+});
+
+describe('Stability Review specifics (LIN-453)', () => {
+  const template = PERIODICALS.find(t => t.id === 'stability-review');
+  const prompt = template.generatePrompt();
+
+  test('is the advisory governor (mode + brake framing)', () => {
+    assert.strictEqual(template.mode, 'advisory');
+    assert.match(prompt, /advisory/i);
+    assert.match(prompt, /governor|brake/i);
+    // The 0→1 → cadence → settled-state trajectory framing from the ticket.
+    assert.match(prompt, /trajectory/i);
+    assert.match(prompt, /settled state/i);
+    assert.match(prompt, /spiralling|spiral/i);
+  });
+
+  test('measures the relative rate of change over time (churn, trend, convergence)', () => {
+    assert.match(prompt, /churn/i);
+    // Relative, not absolute — the Nagappan-Ball lesson.
+    assert.match(prompt, /relative/i);
+    assert.match(prompt, /absolute/i);
+    assert.match(prompt, /converg/i);
+    assert.match(prompt, /rate of change/i);
+    // Discriminates healthy stabilisation from stagnation / runaway.
+    assert.match(prompt, /stagnation/i);
+  });
+
+  test('trend-aware: delta framing, first-run baseline, trend ledger', () => {
+    assert.match(prompt, /trend-aware/i);
+    assert.match(prompt, /new, unchanged, improved, worsened, or resolved/i);
+    assert.match(prompt, /point-in-time snapshot/i);
+    assert.match(prompt, /baseline/i);
+    assert.match(prompt, /trend ledger/i);
+  });
+
+  test('governor divergence: reports for a human decision, mints NO follow-up tasks', () => {
+    assert.match(prompt, /human decision|leave the decision|a human/i);
+    assert.match(prompt, /no follow-up|not create follow-up/i);
+    // Still self-concludes (the universal contract) — covered in the shared loop.
+  });
+
+  test('names the altitude difference from Code Quality and Drift & Coherence', () => {
+    assert.match(prompt, /Code Quality Review/);
+    assert.match(prompt, /Drift & Coherence Review/);
+    assert.match(prompt, /do not (re-flag|double-flag)/i);
+  });
+
+  test('carries the human-vs-agent caveat: fold in the shape, not the thresholds', () => {
+    assert.match(prompt, /human-team/i);
+    assert.match(prompt, /threshold/i);
+    assert.match(prompt, /shape/i);
   });
 });
 
