@@ -67,10 +67,30 @@ test.describe('Collective Page (experimental)', () => {
     });
 
     test('has channel, topic, target, and start controls', async ({ page }) => {
-      await expect(page.locator('#collective-channel')).toHaveValue('#Collective');
-      await expect(page.locator('#collective-topic')).toBeVisible();
+      // Default channel is a friendly random name: #word-word-YYYY-MM-DD.
+      await expect(page.locator('#collective-channel')).toHaveValue(/^#[a-z]+-[a-z]+-\d{4}-\d{2}-\d{2}$/);
       await expect(page.locator('#collective-target')).toBeVisible();
       await expect(page.locator('#collective-start')).toBeVisible();
+    });
+
+    test('topic is a multi-line textarea', async ({ page }) => {
+      const topic = page.locator('textarea#collective-topic');
+      await expect(topic).toBeVisible();
+    });
+
+    test('view prompt shows a copyable participant prompt preview', async ({ page }) => {
+      await page.locator('#collective-channel').fill('#review-room-2026-06-13');
+      await page.locator('#collective-topic').fill('what should we build next?');
+      await page.locator('#collective-view-prompt').click();
+
+      const pre = page.locator('#collective-prompt-preview');
+      await expect(pre).toBeVisible({ timeout: 5000 });
+      const text = await pre.textContent();
+      expect(text).toContain('#review-room-2026-06-13');
+      expect(text).toContain('what should we build next?');
+      // The auto-appended Linear-access block is shown with a placeholder token.
+      expect(text).toContain('Linear access (auto-appended)');
+      await expect(page.locator('#collective-prompt-copy')).toBeVisible();
     });
 
     test('only offers cli and web targets', async ({ page }) => {
@@ -129,19 +149,38 @@ test.describe('Collective Page (experimental)', () => {
     });
   });
 
-  test.describe('Yap proxy endpoints (unconfigured in test)', () => {
-    test('state endpoint reports Yap not configured', async ({ page }) => {
+  test.describe('Yap proxy endpoints (mock Yap)', () => {
+    // YAP_BASE_URL points at the in-process mock Yap (routes/test.js), so the
+    // poll/say plumbing round-trips deterministically without real egress.
+    test('say then state round-trips a message through Yap', async ({ page }) => {
       await page.goto(`/test/set-session?${featuresParam({ collective: true })}`);
-      const res = await page.request.get(`${API_PREFIX}/api/collective/state?channel=%23Collective`);
-      expect(res.status()).toBe(503);
+      await page.request.get('/test/yap/clear');
+      const channel = '#e2e-roundtrip-2026-06-13';
+
+      const say = await page.request.post(`${API_PREFIX}/api/collective/say`, {
+        data: { channel, message: 'hello from John' },
+      });
+      expect(say.status()).toBe(200);
+      expect((await say.json()).ok).toBe(true);
+
+      const state = await page.request.get(`${API_PREFIX}/api/collective/state?channel=${encodeURIComponent(channel)}&since=0`);
+      expect(state.status()).toBe(200);
+      const body = await state.json();
+      expect(body.channel).toBe(channel);
+      expect(body.messages.some(m => m.text === 'hello from John')).toBe(true);
     });
 
-    test('say endpoint reports Yap not configured', async ({ page }) => {
+    test('the say box posts the human input and it appears in the transcript', async ({ page }) => {
+      await page.request.get('/test/yap/clear');
       await page.goto(`/test/set-session?${featuresParam({ collective: true })}`);
-      const res = await page.request.post(`${API_PREFIX}/api/collective/say`, {
-        data: { channel: '#Collective', message: 'hello' },
-      });
-      expect(res.status()).toBe(503);
+      await page.goto(COLLECTIVE_URL);
+      await page.waitForLoadState('networkidle');
+
+      await page.locator('#collective-say-input').fill('steering note from the human');
+      await page.locator('#collective-say-btn').click();
+
+      await expect(page.locator('.collective-msg-body:has-text("steering note from the human")'))
+        .toBeVisible({ timeout: 8000 });
     });
   });
 });

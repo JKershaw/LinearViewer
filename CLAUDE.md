@@ -263,7 +263,7 @@ MONGODB_URI             MongoDB connection string (optional, uses file storage i
 OPENROUTER_API_KEY      Server-side OpenRouter API key (optional, users can connect via OAuth)
 OPENROUTER_REDIRECT_URI Callback URL for OpenRouter OAuth (optional, defaults to /auth/openrouter/callback)
 OPENROUTER_FREE_TIER_KEY Server-side API key for free tier users (optional, enables rate-limited free prompts)
-YAP_BASE_URL            Yap chat server base URL (optional, enables the experimental Collective live view)
+YAP_BASE_URL            Yap chat server base URL for the experimental Collective live view (optional, defaults to https://yap.jkershaw.com)
 YAP_PASSWORD            Yap server password (optional, sent as Bearer auth on Yap calls)
 ```
 
@@ -343,14 +343,16 @@ Consumer endpoints are Bearer-token authenticated and fall into three groups: **
 A rough-draft experiment, **gated behind a per-user `collective` feature flag and surfaced only via a link in Settings**. It automates the manual cross-project discussion written up in `docs/collective-session-2026-06-12.md`: pick a subset of your connected workspaces, name a [Yap](https://github.com/jkershaw/yap) channel, and start — the page fans `buildCollectiveParticipantPrompt(...)` out to each selected workspace's **unchanged** dispatch route (`dispatchQueueStore.addItem`), then renders the live channel and lets you inject input via a thin server-side Yap proxy.
 
 - **Substrate:** dispatch `target` is `cli`/`web` only (full Claude Code sessions); `dash`/`local` are rejected. Each selected workspace must have a live consumer draining its queue.
-- **Channel name** is the single shared contract across the participant prompt, the fan-out, and the `state`/`say` endpoints — normalized once via `normalizeYapChannel`.
+- **Channel name** is the single shared contract across the participant prompt, the fan-out, and the `state`/`say` endpoints — normalized once via `normalizeYapChannel`. The page seeds a fresh friendly default per load via `randomChannelName()` (`#word-word-YYYY-MM-DD`).
 - **Side-effect policy is prompt-only:** participants may carry a `readWrite` proxy token (best-effort minted per fan-out), but the participant prompt requires asking John in-channel before any Linear write / ticket / mutation. There is no deterministic write-lock — a named, accepted V1 gap.
-- **Yap** is ephemeral (200-msg ring buffer, unauthenticated nicks). Set `YAP_BASE_URL` (+ optional `YAP_PASSWORD`) to enable the live view; unset, the page loads but the transcript/say endpoints return 503.
+- **Yap** is ephemeral (200-msg ring buffer, unauthenticated nicks); poll/history return the body in a `text` field, normalized by the `state` endpoint. `YAP_BASE_URL` defaults to `https://yap.jkershaw.com` (override per env; optional `YAP_PASSWORD`), so the live view works out of the box. `lib/yap-client.js` uses the proxy-aware fetch (`createProxyFetch`), so Yap calls route through the same egress proxy as Linear calls when one is configured.
+- **Prompt preview:** `POST .../collective/preview` builds the participant prompt for the chosen channel/topic (sample nick + placeholder token) so the page can show & copy exactly what each participant receives.
 - **Deferred past V1:** chat/per-agent recaps, a durable transcript store, auto-cadence, and the within-a-project variant.
 
 Endpoints (session auth, workspace-anchored but operating over `session.workspaces`):
 - `GET  /workspace/:urlKey/collective` — page (redirects to settings when the flag is off)
 - `POST /workspace/:urlKey/collective/start` — multi-workspace dispatch fan-out
+- `POST /workspace/:urlKey/collective/preview` — build the participant prompt (view & copy, no dispatch)
 - `GET  /workspace/:urlKey/api/collective/state` — JSON poll fronting `yap.poll`
 - `POST /workspace/:urlKey/api/collective/say` — inject human input via `yap.say`
 

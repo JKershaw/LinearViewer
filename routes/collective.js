@@ -21,7 +21,7 @@ import { Router } from 'express';
 import { renderCollectivePage } from '../lib/render-collective.js';
 import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
-import { normalizeYapChannel, nickFromWorkspaceName } from '../lib/yap-client.js';
+import { normalizeYapChannel, nickFromWorkspaceName, randomChannelName } from '../lib/yap-client.js';
 import {
   buildCollectiveParticipantPrompt,
   DEFAULT_COLLECTIVE_CHANNEL,
@@ -76,7 +76,9 @@ export function createCollectiveRoutes({
       const html = renderCollectivePage(
         {
           workspaces: (req.session.workspaces || []).map(w => ({ urlKey: w.urlKey, name: w.name })),
-          defaultChannel: DEFAULT_COLLECTIVE_CHANNEL,
+          // A fresh, friendly channel suggestion per page load (words + date),
+          // so each new discussion lands in its own channel by default.
+          defaultChannel: randomChannelName(),
           defaultTopic: DEFAULT_COLLECTIVE_TOPIC,
           yapConfigured: !!yapClient,
         },
@@ -206,6 +208,46 @@ export function createCollectiveRoutes({
     res.status(201).json({ channel, topic, target, dispatched });
   });
 
+  // ─── Preview: build the participant prompt without dispatching ───────────────
+  // Lets the user view (and copy) exactly the prompt each participant receives,
+  // for the chosen channel/topic. Uses a sample nick and a placeholder Linear
+  // token so the full shape — including the auto-appended Linear-access block —
+  // is visible without minting a real token.
+
+  router.post('/workspace/:urlKey/collective/preview', workspaceFromUrl, (req, res) => {
+    const featureFlags = getFeatureFlags(req.session);
+    if (featureFlags.collective !== true) {
+      return res.status(403).json({ error: 'Collective feature is not enabled' });
+    }
+
+    const { channel: rawChannel, topic: rawTopic, nick: rawNick } = req.body || {};
+    const channel = normalizeYapChannel(rawChannel || DEFAULT_COLLECTIVE_CHANNEL);
+    if (!channel) {
+      return res.status(400).json({ error: 'A valid channel name is required' });
+    }
+    const topic = (typeof rawTopic === 'string' && rawTopic.trim())
+      ? rawTopic.trim().slice(0, 500)
+      : DEFAULT_COLLECTIVE_TOPIC;
+
+    // Representative nick: the supplied one, else the first connected workspace,
+    // else a generic placeholder.
+    const sampleNick = (typeof rawNick === 'string' && nickFromWorkspaceName(rawNick))
+      ? nickFromWorkspaceName(rawNick)
+      : nickFromWorkspaceName(req.session.workspaces?.[0]?.name || 'your-project');
+
+    const prompt = buildCollectiveParticipantPrompt({
+      channel,
+      nick: sampleNick,
+      yapBaseUrl: yapClient?.baseUrl || process.env.YAP_BASE_URL || '',
+      yapPassword: process.env.YAP_PASSWORD || null,
+      topic,
+      proxyBaseUrl: `${req.protocol}://${req.get('host')}`,
+      proxyToken: 'YOUR_READWRITE_PROXY_TOKEN', // placeholder — real token minted at dispatch
+    });
+
+    res.json({ channel, topic, nick: sampleNick, prompt });
+  });
+
   // ─── JSON poll: render the live channel ──────────────────────────────────────
 
   router.get('/workspace/:urlKey/api/collective/state', workspaceFromUrl, async (req, res) => {
@@ -221,9 +263,20 @@ export function createCollectiveRoutes({
 
     try {
       const result = await yapClient.poll(channel, OBSERVER_NICK, since);
+      // Normalise Yap's message shape for the client: Yap returns the body in a
+      // `text` field (verified against the live server), with `message` used
+      // only on the outbound say request. Expose a stable shape so the renderer
+      // never has to guess the field name.
+      const messages = (result.messages || []).map(m => ({
+        id: m.id,
+        nick: m.nick || '?',
+        text: m.text ?? m.message ?? '',
+        type: m.type || 'message',
+        timestamp: m.timestamp ?? null,
+      }));
       res.json({
         channel,
-        messages: result.messages || [],
+        messages,
         cursor: result.cursor ?? since,
         truncated: !!result.truncated,
       });

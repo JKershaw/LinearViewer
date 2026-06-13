@@ -272,18 +272,21 @@ The Collective page (`/workspace/{urlKey}/collective`) dispatches full Claude Co
 ```
 main.collective-page[data-url-key]      - page container
   .collective-ws-check[value]           - workspace checkbox (value = urlKey)
-  #collective-channel                   - Yap channel input (default "#Collective")
-  #collective-topic                     - discussion topic input
+  #collective-channel                   - Yap channel input (random default: #word-word-YYYY-MM-DD)
+  #collective-topic                     - discussion topic textarea
   #collective-target                    - dispatch target select (cli | web)
   #collective-start                     - start-discussion button
+  #collective-view-prompt               - build & show the participant prompt
+  #collective-prompt-preview / #collective-prompt-copy - prompt preview + copy
   #collective-transcript                - live message log (ul)
   #collective-say-input / #collective-say-btn - inject human input
 ```
 
 ### Collective Endpoints
 - `POST /workspace/{urlKey}/collective/start` — fan-out `{ workspaceUrlKeys[], channel, topic, target }`
-- `GET  /workspace/{urlKey}/api/collective/state?channel=&since=` — poll the channel (503 when Yap unconfigured)
-- `POST /workspace/{urlKey}/api/collective/say` — `{ channel, message }` (503 when Yap unconfigured)
+- `POST /workspace/{urlKey}/collective/preview` — `{ channel, topic }` → `{ prompt }` (view/copy, no dispatch)
+- `GET  /workspace/{urlKey}/api/collective/state?channel=&since=` — poll the channel; messages normalized to `{ id, nick, text, type, timestamp }`
+- `POST /workspace/{urlKey}/api/collective/say` — `{ channel, message }`
 - `window.__COLLECTIVE_DATA__` carries `{ urlKey, defaultChannel, yapConfigured }`
 
 ## Common Workflows

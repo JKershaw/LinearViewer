@@ -64,7 +64,7 @@ function appendMessages(messages) {
     if (msg.type === 'action') li.classList.add('collective-msg-action');
 
     const nick = msg.nick || '?';
-    const body = msg.message || '';
+    const body = msg.text || '';
     const time = relativeTime(msg.timestamp);
 
     li.innerHTML = `
@@ -193,6 +193,56 @@ async function startDiscussion() {
   }
 }
 
+// ─── View & copy the participant prompt ──────────────────────────────────────
+
+async function viewPrompt() {
+  const urlKey = collectiveData?.urlKey;
+  if (!urlKey) return;
+
+  const channel = (document.getElementById('collective-channel')?.value || '').trim();
+  const topic = (document.getElementById('collective-topic')?.value || '').trim();
+  const wrap = document.getElementById('collective-prompt-wrap');
+  const pre = document.getElementById('collective-prompt-preview');
+  const btn = document.getElementById('collective-view-prompt');
+
+  if (btn) { btn.disabled = true; btn.textContent = 'loading…'; }
+  try {
+    const res = await fetch(`/workspace/${encodeURIComponent(urlKey)}/collective/preview`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ channel, topic }),
+    });
+    if (res.status === 401) { window.location.href = '/logout'; return; }
+    const data = await res.json();
+    if (!res.ok) {
+      setStartStatus(data.error || 'Could not build the prompt.', true);
+      return;
+    }
+    if (pre) pre.textContent = data.prompt || '';
+    if (wrap) wrap.classList.remove('hidden');
+  } catch (e) {
+    console.error('Preview failed:', e);
+    setStartStatus('Could not build the prompt.', true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'view prompt'; }
+  }
+}
+
+async function copyPrompt() {
+  const pre = document.getElementById('collective-prompt-preview');
+  const btn = document.getElementById('collective-prompt-copy');
+  if (!pre || !btn) return;
+  try {
+    await navigator.clipboard.writeText(pre.textContent || '');
+    btn.textContent = 'copied!';
+    setTimeout(() => { btn.textContent = 'copy'; }, 1500);
+  } catch (e) {
+    console.error('Copy failed:', e);
+    btn.textContent = 'failed';
+    setTimeout(() => { btn.textContent = 'copy'; }, 1500);
+  }
+}
+
 // ─── Inject human input ─────────────────────────────────────────────────────
 
 async function sayMessage() {
@@ -242,6 +292,8 @@ function init() {
   }
 
   document.getElementById('collective-start')?.addEventListener('click', startDiscussion);
+  document.getElementById('collective-view-prompt')?.addEventListener('click', viewPrompt);
+  document.getElementById('collective-prompt-copy')?.addEventListener('click', copyPrompt);
   document.getElementById('collective-say-btn')?.addEventListener('click', sayMessage);
   document.getElementById('collective-say-input')?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); sayMessage(); }
