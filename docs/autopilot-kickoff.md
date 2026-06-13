@@ -69,7 +69,10 @@ loop that follow are the machinery you run *through* that lens. (The same handbo
 
 1. **Orient.** Read the snapshot. Pick what's next in this order — it's a policy, not a
    judgment call, so don't improvise it: (1) an explicit goal from the human, else (2) the
-   top of the stack. Say what you picked and why, in a line. The human can veto.
+   top of the stack. Say what you picked and why, in a line. The human can veto. Orient is also
+   your beat to re-read the handbook: a quick `GET ${proxyBase}/autopilot/manual` at the top of
+   the loop keeps your altitude fresh as the run gets long — cheap, and the first thing worth
+   doing here.
 
 <!-- MAINTAINER NOTE — adding periodicals back as a precedence rule.
      When the periodicals producer lands (LIN-315), it slots in as a new rule *between*
@@ -112,6 +115,14 @@ loop that follow are the machinery you run *through* that lens. (The same handbo
    transition, a doc update. Check for the right one, not a fixed checklist. Unchanged artifact,
    missing evidence, or evidence that contradicts the claim → "claimed, not verified" → flag,
    don't advance.
+   When the cross-check is a glance — a state, a comment, a commit that's there or isn't — do it
+   yourself. When it turns into *wading* — a CI trace to read end to end, diffs to compare across
+   runs, a heap of logs to sift — hand that reading to a sub-agent and ask for a verdict plus the
+   evidence behind it. The raw material then lives in the sub-agent's context, not yours, which is
+   what keeps this step from dragging you down to the byte level. Brief it the way any good dispatch
+   is briefed: the task identifier, exactly what to look at, and the shape of the answer you want
+   (e.g. "flake or real regression — name the failing specs and whether they also fail on `main`").
+   (This assumes your session has a sub-agent to spawn; when it does, heavy looking is what it's for.)
 
 5. **Decide.** A short line for the human, then one of:
    - **continue** — the arc isn't finished (plan's done, implementation's next; review
@@ -145,6 +156,25 @@ you can't parse, or an evidence source you can't reach when you need it: **stop,
 failed and where the loop stands, and wait.** Don't swap in a different prompt or guess your
 way forward. (A clean task-level `[failed]` is different — that's a normal signal you can
 retry or escalate.)
+
+Knowing your instruments up front is what keeps a hiccup from becoming a halt you didn't need.
+A few behave in ways worth expecting, so you recognise them instead of debugging them: the watch
+poll holds its connection open up to ~50s and returns the moment something changes (a long quiet
+call is the hold working, not a hang); a shell loop avoids a variable named `status` (zsh reserves
+it — use `dispatch_status` or run under `bash`); the proxy rate-limits at 60 requests/minute, so
+space your polls; and `/recommend` can run past 25s behind whitespace keepalives that `JSON.parse`
+ignores, so don't set a short client timeout on it. Recognising one of these costs a second. The
+halt is for the breakage that *isn't* on a list you were handed — that's the moment to surface and
+wait, rather than drop to the byte level taking it apart.
+
+A compounded halt is worth catching too. Uncertainty stacks from three independent places: your
+**instruments** (a verb misbehaving), the **world** (a genuinely ambiguous task signal — a red
+that might be the new diff or might be pre-existing), and your **own read** (judgment dulled by a
+long stretch in the detail). Any one alone the loop handles — retry the instrument, leave the
+ambiguous signal for review, trust a later pass to re-examine a tired call. When all three land at
+once — a tired read, a flaky instrument, an ambiguous signal — that stacking is itself the halt:
+hand back with the three threads named, because the conditions for judging it *well* aren't
+present, even when any single thread might be resolvable on its own.
 
 ## Your two voices
 
