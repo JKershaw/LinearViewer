@@ -49,6 +49,7 @@ import { swimSampleData } from './tests/fixtures/swim-sample-data.js'
 import { shipDenseSampleData } from './tests/fixtures/ship-dense-sample-data.js'
 import { renderAuditPage } from './lib/render-audit.js'
 import { renderPrivacyPolicy, renderTermsOfService } from './lib/render-legal.js'
+import { renderStyleguide } from './lib/render-styleguide.js'
 import { renderKpisPage } from './lib/render-kpis.js'
 import { collectKpiStats } from './lib/kpi-stats.js'
 import { renderSettingsPage } from './lib/render-settings.js'
@@ -323,7 +324,7 @@ async function ensurePATSession(req, res, next) {
   // Skip routes that don't need auth
   if (req.path.startsWith('/auth/') || req.path === '/logout' ||
       req.path.startsWith('/test/') || req.path === '/privacy' ||
-      req.path === '/terms') {
+      req.path === '/terms' || req.path === '/styleguide') {
     return next();
   }
 
@@ -410,7 +411,7 @@ async function ensureValidToken(req, res, next) {
 // Apply middleware to all routes except auth and logout
 // Note: workspace routes need token refresh too (they access Linear API)
 app.use((req, res, next) => {
-  if (req.path.startsWith('/auth/') || req.path === '/logout' || req.path === '/privacy' || req.path === '/terms' || req.path === '/kpis') {
+  if (req.path.startsWith('/auth/') || req.path === '/logout' || req.path === '/privacy' || req.path === '/terms' || req.path === '/styleguide' || req.path === '/kpis') {
     return next();
   }
   ensureValidToken(req, res, next);
@@ -719,6 +720,12 @@ app.get('/privacy', (req, res) => {
 
 app.get('/terms', (req, res) => {
   res.send(renderTermsOfService({ deployInfo: getDeployInfo() }))
+})
+
+// Static design-token reference + visual-regression baseline (LIN-457).
+// Deliberately deterministic: no deployInfo, no live data.
+app.get('/styleguide', (req, res) => {
+  res.send(renderStyleguide())
 })
 
 // =============================================================================
