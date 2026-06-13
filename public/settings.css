@@ -26,15 +26,13 @@
   font-size: 0.9em;
 }
 
-.settings-label {
-  color: var(--fg-dim);
-  min-width: 10ch;
-  flex-shrink: 0;
-}
-
-.settings-value {
-  color: var(--fg);
-}
+/* The dim-label + value row converged onto the canonical `.field` component
+   (style.css, LIN-463): `.settings-label`/`.settings-value` were byte-identical
+   to `.field-label`/`.field-value` and have been retired — labels now render as
+   `.field-label`, the two non-semantic values as `.field-value`. Only the five
+   SEMANTIC value-colour variants survive below: they ride on the `settings-value`
+   class still emitted on those spans (a no-style hook now), and `.connected` /
+   `.disconnected` are also load-bearing E2E selectors (openrouter-auth.spec.js). */
 
 .settings-value.connected {
   color: var(--green);
