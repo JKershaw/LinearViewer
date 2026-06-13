@@ -371,11 +371,13 @@ button.foreman-timeline-identifier:hover { opacity: 0.75; }
 /* =============================================================================
    Now working — active task card
    ============================================================================= */
+/* Hybrid card convergence (LIN-470, Option C): the container chrome
+   (--bg-alt fill, --radius-sm, --border-subtle hairline, no shadow) now comes
+   from canonical `.card`. The only documented per-page delta kept is the top
+   accent-bar — so padding moves to the inner wrapper and overflow clips the
+   full-width bar to the rounded corners. */
 .foreman-now-card {
-  border: 1px solid var(--fg-vdim);
-  border-radius: 12px;
-  background: var(--bg);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  padding: 0;
   overflow: hidden;
 }
 
@@ -383,15 +385,12 @@ button.foreman-timeline-identifier:hover { opacity: 0.75; }
   padding: 0.9rem 1rem 1rem;
 }
 
+/* Header layout (baseline-flex, gap, margin) comes from canonical `.card-header`;
+   only the foreman-specific typography stays here. */
 .foreman-now-header {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
   font-family: var(--font-structural);
   font-size: 0.85em;
   color: var(--fg-dim);
-  margin-bottom: 0.35rem;
-  flex-wrap: wrap;
 }
 
 .foreman-now-identifier {
@@ -547,12 +546,14 @@ a.foreman-timeline-identifier:hover { opacity: 0.75; }
   gap: 0.5rem;
 }
 
+/* Hybrid card convergence (LIN-470, Option C): container chrome from canonical
+   `.card`; the top accent-bar is the kept per-page delta (padding on the inner
+   wrapper, overflow clips the bar). margin-bottom is zeroed because
+   `.foreman-stack-cards` already spaces siblings with a flex gap. */
 .foreman-stack-card {
   display: block;
-  border: 1px solid var(--fg-vdim);
-  border-radius: 10px;
-  background: var(--bg);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  padding: 0;
+  margin-bottom: 0;
   overflow: hidden;
   color: inherit;
   text-decoration: none;
@@ -574,14 +575,11 @@ a.foreman-stack-card-link:focus {
   padding: 0.6rem 0.85rem 0.7rem;
 }
 
+/* Header layout comes from canonical `.card-header`; foreman typography stays. */
 .foreman-stack-head {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
   font-family: var(--font-structural);
   font-size: 0.8em;
   color: var(--fg-dim);
-  margin-bottom: 0.3rem;
 }
 
 .foreman-stack-identifier {

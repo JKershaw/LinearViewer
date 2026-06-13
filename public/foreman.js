@@ -403,7 +403,7 @@
     nowCard.innerHTML = `
       <div class="foreman-card-accent ${visual.cls}"></div>
       <div class="foreman-card-inner">
-        <div class="foreman-now-header">
+        <div class="card-header foreman-now-header">
           <span class="foreman-state ${visual.cls}" aria-hidden="true">${visual.char}</span>
           ${identifierHtml}
           <span class="foreman-now-action">${escapeHtml(activeEntry.action)}</span>
@@ -565,14 +565,14 @@
         : '';
 
       const linkOpen = task.url
-        ? `<a class="foreman-stack-card foreman-stack-card-link" href="${escapeHtml(task.url)}" target="_blank" rel="noopener noreferrer" title="Open ${escapeHtml(identifier)} in ${escapeHtml(providerName)}">`
-        : `<div class="foreman-stack-card">`;
+        ? `<a class="card foreman-stack-card foreman-stack-card-link" href="${escapeHtml(task.url)}" target="_blank" rel="noopener noreferrer" title="Open ${escapeHtml(identifier)} in ${escapeHtml(providerName)}">`
+        : `<div class="card foreman-stack-card">`;
       const linkClose = task.url ? `</a>` : `</div>`;
 
       return `${linkOpen}
         <div class="foreman-card-accent ${state.cls}"></div>
         <div class="foreman-stack-card-inner">
-          <div class="foreman-stack-head">
+          <div class="card-header foreman-stack-head">
             <span class="foreman-state ${state.cls}" aria-hidden="true">${state.char}</span>
             <span class="foreman-stack-identifier">${escapeHtml(identifier)}</span>
             <span class="foreman-stack-position">${idx + 1} / ${tasks.length}</span>
