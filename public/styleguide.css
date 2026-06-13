@@ -1,0 +1,130 @@
+/* Style Guide page (LIN-457, Phase 0C)
+   Scoped layout for the static token-reference / visual-regression baseline.
+   Uses only :root tokens — no new colors or magic numbers introduced here. */
+
+.styleguide-content {
+  max-width: 60rem;
+}
+
+.styleguide-content .sg-intro {
+  margin-left: 0;
+  margin-bottom: var(--space-5);
+}
+
+.sg-name {
+  font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
+  color: var(--fg);
+}
+
+.sg-value {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--fg-dim);
+}
+
+/* Grid of swatch figures (color / radius / elevation) */
+.sg-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+  gap: var(--space-4);
+}
+
+.sg-swatch {
+  margin: 0;
+}
+
+.sg-swatch figcaption {
+  margin-top: var(--space-2);
+}
+
+.sg-chip {
+  width: 100%;
+  height: 3.5rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+}
+
+.sg-chip--border {
+  border-style: solid;
+  border-width: 3px;
+  background: var(--bg-muted);
+}
+
+.sg-box {
+  width: 100%;
+  height: 3.5rem;
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+}
+
+/* Vertical stacks (typography, spacing, glyphs) */
+.sg-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.sg-font-row,
+.sg-glyph-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.sg-font-sample {
+  margin: 0;
+  margin-left: 0;
+  color: var(--fg);
+  flex: 1;
+}
+
+.sg-space-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.sg-space-bar {
+  height: var(--space-3);
+  background: var(--blue);
+  border-radius: var(--radius-sm);
+  flex: none;
+}
+
+.sg-glyph {
+  font-family: var(--font-structural);
+  font-size: var(--font-size-lg);
+}
+
+.sg-glyph-label {
+  font-family: var(--font-content);
+  color: var(--fg);
+  min-width: 8rem;
+}
+
+/* Z-index demo: offset, overlapping cards proving stacking order */
+.sg-z-stack {
+  position: relative;
+  height: 9rem;
+}
+
+.sg-z-card {
+  position: absolute;
+  width: 9rem;
+  padding: var(--space-2);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+
+.sg-tree {
+  margin-top: var(--space-3);
+  font-family: var(--font-structural);
+  color: var(--fg-dim);
+  background: var(--bg-alt);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+}
