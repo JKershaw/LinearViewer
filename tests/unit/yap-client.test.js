@@ -10,6 +10,8 @@ import {
   yapClientFromEnv,
   normalizeYapChannel,
   nickFromWorkspaceName,
+  randomChannelName,
+  DEFAULT_YAP_BASE_URL,
 } from '../../lib/yap-client.js';
 
 describe('normalizeYapChannel', () => {
@@ -124,13 +126,34 @@ describe('createYapClient', () => {
 });
 
 describe('yapClientFromEnv', () => {
-  test('returns null when YAP_BASE_URL is unset', () => {
-    assert.strictEqual(yapClientFromEnv({}), null);
+  test('defaults to yap.jkershaw.com when YAP_BASE_URL is unset', () => {
+    const client = yapClientFromEnv({});
+    assert.ok(client);
+    assert.strictEqual(client.baseUrl, DEFAULT_YAP_BASE_URL);
+    assert.strictEqual(DEFAULT_YAP_BASE_URL, 'https://yap.jkershaw.com');
   });
 
   test('builds a client from env', () => {
     const client = yapClientFromEnv({ YAP_BASE_URL: 'https://yap.test', YAP_PASSWORD: 'p' });
     assert.ok(client);
     assert.strictEqual(client.baseUrl, 'https://yap.test');
+  });
+});
+
+describe('randomChannelName', () => {
+  test('produces #adjective-noun-date with the given date', () => {
+    const name = randomChannelName(new Date('2026-06-13T10:00:00Z'), () => 0);
+    assert.match(name, /^#[a-z]+-[a-z]+-2026-06-13$/);
+  });
+
+  test('round-trips through normalizeYapChannel unchanged', () => {
+    const name = randomChannelName(new Date('2026-06-13T10:00:00Z'), () => 0.5);
+    assert.strictEqual(normalizeYapChannel(name), name);
+  });
+
+  test('varies with the RNG', () => {
+    const a = randomChannelName(new Date('2026-06-13T10:00:00Z'), () => 0);
+    const b = randomChannelName(new Date('2026-06-13T10:00:00Z'), () => 0.99);
+    assert.notStrictEqual(a, b);
   });
 });

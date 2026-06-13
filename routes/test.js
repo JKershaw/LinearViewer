@@ -27,6 +27,43 @@ import { defaultLocalSeed, LOCAL_WORKSPACE_URL_KEY } from '../tests/fixtures/loc
 export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, briefCacheStore, reportHistoryStore, localStore, getWorkspaceAccessToken }) {
   const router = Router();
 
+  // ── Mock Yap server (LIN-450) ─────────────────────────────────────────────
+  // A tiny in-memory stand-in for the Yap chat server so the Collective live
+  // view can be exercised deterministically in e2e without real network egress.
+  // Enabled by pointing YAP_BASE_URL at `http://localhost:PORT/test/yap`
+  // (see playwright.config.js). say→poll round-trips through a per-channel ring.
+  const yapBuffers = new Map(); // channel -> { messages: [], nextId }
+  const yapChannel = (name) => {
+    if (!yapBuffers.has(name)) yapBuffers.set(name, { messages: [], nextId: 1 });
+    return yapBuffers.get(name);
+  };
+  router.post('/test/yap/api/join', (req, res) => {
+    const buf = yapChannel(req.body?.channel || '#test');
+    res.json({ recent: buf.messages.slice(-50), cursor: buf.nextId - 1 });
+  });
+  router.post('/test/yap/api/say', (req, res) => {
+    // Mirror real Yap: the say request carries `message`, but stored/polled
+    // messages expose the body as `text`.
+    const { channel = '#test', nick = 'anon', message = '', type } = req.body || {};
+    const buf = yapChannel(channel);
+    const id = buf.nextId++;
+    const entry = { id, channel, nick, text: message, type: type || 'message', timestamp: Date.now() };
+    buf.messages.push(entry);
+    res.json({ id, timestamp: entry.timestamp });
+  });
+  router.post('/test/yap/api/poll', (req, res) => {
+    const { channel = '#test', since_id = 0 } = req.body || {};
+    const buf = yapChannel(channel);
+    const messages = buf.messages.filter(m => m.id > since_id);
+    res.json({ messages, mentions: [], cursor: buf.nextId - 1, truncated: false });
+  });
+  router.post('/test/yap/api/history', (req, res) => {
+    const buf = yapChannel(req.body?.channel || '#test');
+    const limit = req.body?.limit;
+    res.json({ messages: limit ? buf.messages.slice(-limit) : buf.messages });
+  });
+  router.get('/test/yap/clear', (req, res) => { yapBuffers.clear(); res.send('ok'); });
+
   // Endpoint to set a test session without going through OAuth flow
   // Query parameters:
   //   ?tokenExpired=true        - Set token expiry in the past

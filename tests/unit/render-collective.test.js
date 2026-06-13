@@ -51,11 +51,19 @@ describe('renderCollectivePage', () => {
     assert.ok(html.includes('"yapConfigured":true'));
   });
 
-  test('seeds the channel and topic inputs', () => {
+  test('seeds the channel input and topic textarea', () => {
     const html = render();
     assert.ok(html.includes('id="collective-channel"'));
     assert.ok(html.includes('value="#Collective"'));
-    assert.ok(html.includes('how far could these go?'));
+    // Topic is a textarea (multi-line), with the default as its content.
+    assert.ok(/<textarea id="collective-topic"[^>]*>how far could these go\?<\/textarea>/.test(html));
+  });
+
+  test('has a view-prompt control and copyable preview panel', () => {
+    const html = render();
+    assert.ok(html.includes('id="collective-view-prompt"'));
+    assert.ok(html.includes('id="collective-prompt-preview"'));
+    assert.ok(html.includes('id="collective-prompt-copy"'));
   });
 
   test('only offers cli and web targets (not dash)', () => {
