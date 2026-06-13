@@ -5,23 +5,10 @@
  * Uses the same tree/node visual language as the dashboard (from style.css).
  */
 
-/* =============================================================================
-   Dispatch Section
-   ============================================================================= */
-.dispatch-section {
-  margin-bottom: 2rem;
-  padding: 1rem;
-  background: rgba(0, 0, 0, 0.02);
-  border-radius: 4px;
-}
-
-.dispatch-section-header {
-  font-family: var(--font-content);
-  font-size: 1em;
-  font-weight: 500;
-  color: var(--fg);
-  margin: 0 0 0.75rem 0;
-}
+/* Section styling is canonical now (.section / .section--boxed / .section-header
+   in style.css, LIN-461). `.dispatch-section` survives only as a hook:
+   dispatch.js reaches the send panel via `.closest('.dispatch-section')` and the
+   `.dispatch-section .line` rule below scopes on it. */
 
 /* =============================================================================
    Page Layout

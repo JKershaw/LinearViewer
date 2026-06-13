@@ -59,19 +59,10 @@
 /* =============================================================================
    Sections
    ============================================================================= */
-.prompts-section {
-  margin-bottom: 2rem;
-}
-
-.section-header {
-  font-family: var(--font-content);
-  font-size: 1.1em;
-  font-weight: 500;
-  color: var(--fg);
-  margin-bottom: 1rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--fg-vdim);
-}
+/* Section + heading styling is canonical now (.section / .section-header /
+   .section-header--ruled in style.css, LIN-461). The catalog headers render as
+   the ruled variant; only the page-specific description + meta-box accent
+   remain here. */
 
 .section-description {
   color: var(--fg-dim);

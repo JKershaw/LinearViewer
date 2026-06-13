@@ -1974,6 +1974,50 @@ button.nav-action {
   }
 }
 
+/* =========================================================================
+   Section component (LIN-461, Phase A.1)
+
+   Canonical in-card section wrapper + heading, built on Phase-0 tokens. This
+   is the single owner of section styling: the per-page variant rules
+   (.dispatch-section / .proxy-section / .settings-section / .prompts-section /
+   .custom-prompts-section / .legal-section box+margin) were retired into it.
+   A few of those class NAMES survive on the markup as pure behavioural/test
+   hooks (dispatch.js `.closest()`, `.X-section .line` descendant scoping, and
+   E2E selectors) — they carry no styling of their own.
+
+   `--boxed` is the dispatch/proxy/settings light box; its move to --radius-sm
+   (3px, was 4px) and --bg-alt (0.03, was 0.02) is the deliberate, reviewed
+   token-convergence pixel shift on those three pages + /styleguide.
+   ========================================================================= */
+.section {
+  margin-bottom: var(--space-5);
+}
+
+.section--boxed {
+  padding: var(--space-3);
+  background: var(--bg-alt);
+  border-radius: var(--radius-sm);
+}
+
+/* Scoped under .section so the generic `.section-header` name can't collide
+   with the unrelated `.section-header` on the audit dashboard (audit.js), which
+   has its own baseline and never sits inside a `.section`. */
+.section .section-header {
+  font-family: var(--font-content);
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  color: var(--fg);
+  margin: 0 0 0.75rem 0;
+}
+
+/* Underlined heading — prompts catalog. Additive over .section-header. */
+.section .section-header--ruled {
+  font-size: 1.1em;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--fg-vdim);
+}
+
 /*
    Legal Pages
    Styled to match the landing and projects page aesthetic.
@@ -1988,10 +2032,6 @@ button.nav-action {
   font-weight: normal;
   margin-bottom: 2rem;
   text-align: center;
-}
-
-.legal-section {
-  margin-bottom: 2.5rem;
 }
 
 .legal-content h3 {

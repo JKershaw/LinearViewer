@@ -6,23 +6,11 @@
  * Settings-specific overrides for labels, toggles, and forms below.
  */
 
-/* =============================================================================
-   Settings Section
-   ============================================================================= */
-.settings-section {
-  margin-bottom: 2rem;
-  padding: 1rem;
-  background: rgba(0, 0, 0, 0.02);
-  border-radius: 4px;
-}
-
-.settings-header {
-  font-family: var(--font-content);
-  font-size: 1em;
-  font-weight: 500;
-  color: var(--fg);
-  margin: 0 0 0.75rem 0;
-}
+/* Section styling is canonical now (.section / .section--boxed / .section-header
+   in style.css, LIN-461). `.settings-section` / `.settings-header` survive only
+   as hooks: app.js delegates toggles via `.settings-section .toggle-btn`, the
+   `.settings-section .line` rule below scopes on it, and several E2E specs
+   assert on `.settings-section` / `.settings-header`. */
 
 /* =============================================================================
    Settings Nodes (tree items)

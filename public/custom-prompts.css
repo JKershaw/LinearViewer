@@ -23,12 +23,8 @@
   color: var(--fg-dim);
 }
 
-/* =============================================================================
-   Section
-   ============================================================================= */
-.custom-prompts-section {
-  margin-bottom: 2rem;
-}
+/* Section styling is canonical now (.section in style.css, LIN-461); the
+   per-page `.custom-prompts-section` wrapper class was retired. */
 
 /* =============================================================================
    Empty State
