@@ -1,18 +1,31 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/test-base.js';
+import { seedLocalWorkspace, localDashboardUrl } from '../fixtures/local-harness.js';
 
-// Workspace URL keys used in test sessions
+// Mixed-harness boundary split (LIN-428, parent S3/LIN-389).
+//   - The two single-workspace selector cases ('single workspace shows in
+//     selector', 'clicking outside closes workspace selector') migrate onto a
+//     GENUINE `provider: 'local'` session (seedLocalWorkspace).
+//   - Every multi-workspace / switch / removal / max-workspaces case stays
+//     PINNED on the Linear `test-token` path: the single-workspace local harness
+//     cannot represent the `multiWorkspace`/`maxWorkspaces` session state those
+//     cases exercise.
+
+// Workspace URL keys used in the PINNED (test-token) sessions below.
 const TEST_WORKSPACE_URL_KEY = 'test-workspace';
 const SECOND_WORKSPACE_URL_KEY = 'second-workspace';
 const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;
 
+// Dashboard URL for the migrated local-backed workspace.
+const LOCAL_DASHBOARD = localDashboardUrl();
+
 test.describe('Workspace Selector', () => {
   test('single workspace shows in selector', async ({ page }) => {
-    await page.goto('/test/set-session');
-    await page.goto(WORKSPACE_URL);
+    await seedLocalWorkspace(page);
+    await page.goto(LOCAL_DASHBOARD);
 
     const workspaceToggle = page.locator('#workspace-toggle');
     await expect(workspaceToggle).toBeVisible();
-    await expect(workspaceToggle).toHaveText('Test Workspace');
+    await expect(workspaceToggle).toHaveText('Local Workspace');
 
     // Click to open options
     await workspaceToggle.click();
@@ -46,8 +59,8 @@ test.describe('Workspace Selector', () => {
   });
 
   test('clicking outside closes workspace selector', async ({ page }) => {
-    await page.goto('/test/set-session');
-    await page.goto(WORKSPACE_URL);
+    await seedLocalWorkspace(page);
+    await page.goto(LOCAL_DASHBOARD);
 
     const workspaceToggle = page.locator('#workspace-toggle');
     await workspaceToggle.click();
