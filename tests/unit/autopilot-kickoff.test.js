@@ -40,6 +40,17 @@ describe('buildAutopilotKickoff (shared guide)', () => {
     assert.ok(text.includes('WRITE, merge-gated'));
     assert.ok(text.includes('Merge on green'));
   });
+
+  test('names the post-merge close-out pass as the designed final beat, not looping', () => {
+    // The wobble this defuses: a freshly-merged task is re-selected for a close-out
+    // pass, which the looping detector ("same kind repeating") would otherwise flag.
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
+    assert.ok(text.includes('close-out pass'));
+    assert.ok(text.includes('merging is not closing'));
+    assert.ok(text.includes('designed final beat'));
+    // Stays honest: the close lives in the loop, not an asserted auto-close integration.
+    assert.ok(!/webhook/i.test(text));
+  });
 });
 
 describe('buildAutopilotKickoff (inline handbook / disposition layer)', () => {
