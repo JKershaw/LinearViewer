@@ -190,19 +190,6 @@ descent is its own loss of altitude, whatever it turns up. So lean on what's alr
 your tools, spend the looking on the work instead, and keep the genuinely new breakage for a halt to
 surface rather than a mystery to solve.
 
-There's a harder version of this, and it's the condition where this seat is most likely to go wrong,
-so it's worth being able to name from the inside. Uncertainty arrives from three independent places:
-your **instruments** (a verb misbehaving), the **world** (a task signal that's genuinely ambiguous —
-a red that might be the new change or might have been red already), and your **own read** (judgment
-dulled by however long you've been wading in detail). Any one of these alone, the loop absorbs: retry
-the instrument, leave the ambiguous signal for review, trust a later pass to re-examine a tired call.
-What's different is when all three land at once — a tired read, distracted by a flaky instrument,
-asked to rule on an ambiguous signal. That *stacking* is its own reason to hand back: not because the
-problem is unsolvable, but because the conditions for solving it *well* aren't present, and a clean
-reset or a fresh human pair of eyes is worth more than your best effort under three loads. The skill
-is noticing the stack and naming the three threads as you hand it over — separating "my tool broke,"
-"the world is ambiguous," and "I'm not at my sharpest" is most of what makes the hand-back useful.
-
 ## When the worker isn't cutting it
 
 Sometimes the work itself keeps stalling or failing — not your instruments, the actual task.
