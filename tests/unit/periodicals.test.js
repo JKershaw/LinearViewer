@@ -1,5 +1,5 @@
 /**
- * Unit tests for lib/periodicals.js (LIN-341 / LIN-344 / LIN-354 / LIN-369 / LIN-453)
+ * Unit tests for lib/periodicals.js (LIN-341 / LIN-344 / LIN-354 / LIN-369 / LIN-453 / LIN-371)
  *
  * Run with: node --test tests/unit/periodicals.test.js
  */
@@ -9,16 +9,16 @@ import { PERIODICALS, getPeriodicals, buildPeriodicalNodes } from '../../lib/per
 import { PERIODICALS_PROJECT_ID } from '../../lib/tree.js';
 
 describe('periodicals registry', () => {
-  test('seeds the LIN-354 review set plus Drift & Coherence, Comprehension-Debt, and Stability (8 templates)', () => {
-    assert.strictEqual(PERIODICALS.length, 8);
+  test('seeds the LIN-354 review set plus Drift & Coherence, Comprehension-Debt, Stability, and Dependency & Supply-Chain (9 templates)', () => {
+    assert.strictEqual(PERIODICALS.length, 9);
     assert.strictEqual(getPeriodicals(), PERIODICALS);
   });
 
-  test('contains the seven corrective reviews plus the advisory Stability Review', () => {
+  test('contains the eight corrective reviews plus the advisory Stability Review', () => {
     // Assert by id/title/mode rather than position so the registry can grow.
     const byId = Object.fromEntries(PERIODICALS.map(t => [t.id, t]));
 
-    // id -> [title, mode]. The seven code-surface reviews are 'corrective'
+    // id -> [title, mode]. The eight code-surface reviews are 'corrective'
     // (they mint fix-tasks); the Stability Review (LIN-453) is the first
     // 'advisory' entry — a governor that reports for a human to act on.
     const expected = {
@@ -29,7 +29,8 @@ describe('periodicals registry', () => {
       'code-quality': ['Code Quality Review', 'corrective'],
       'drift-coherence': ['Drift & Coherence Review', 'corrective'],
       'comprehension-debt': ['Comprehension-Debt Review', 'corrective'],
-      'stability-review': ['Stability Review', 'advisory']
+      'stability-review': ['Stability Review', 'advisory'],
+      'dependency-supply-chain': ['Dependency & Supply-Chain Review', 'corrective']
     };
 
     for (const [id, [title, mode]] of Object.entries(expected)) {
@@ -379,6 +380,56 @@ describe('Stability Review specifics (LIN-453)', () => {
     assert.match(prompt, /human-team/i);
     assert.match(prompt, /threshold/i);
     assert.match(prompt, /shape/i);
+  });
+});
+
+describe('Dependency & Supply-Chain Review specifics (LIN-371)', () => {
+  const prompt = PERIODICALS.find(t => t.id === 'dependency-supply-chain').generatePrompt();
+
+  test('covers the four checks: CVEs, lockfile integrity, new-package provenance, tree growth', () => {
+    assert.match(prompt, /supply-chain/i);
+    // CVEs via the cheap built-in audit, no new scanner dependency.
+    assert.match(prompt, /CVE/);
+    assert.match(prompt, /npm audit/);
+    assert.match(prompt, /no new scanner dependency/i);
+    // Lockfile integrity and unexpected diffs.
+    assert.match(prompt, /lockfile integrity/i);
+    // New-package provenance signals: registry age, download volume, name-proximity.
+    assert.match(prompt, /registry creation date|registry age/i);
+    assert.match(prompt, /download volume/i);
+    assert.match(prompt, /slopsquatting/i);
+    // Dependency-tree growth rate.
+    assert.match(prompt, /tree growth|tree-growth/i);
+  });
+
+  test('defends the minimal-runtime posture: a new runtime dep is a finding to justify', () => {
+    assert.match(prompt, /minimal-runtime/i);
+    assert.match(prompt, /vendored/i);
+    // New runtime dependency must be a finding requiring justification, not silent.
+    assert.match(prompt, /runtime dependency as a finding that must be justified/i);
+    assert.match(prompt, /silent/i);
+  });
+
+  test('names the altitude difference from the Security Review (no double-flagging CVEs)', () => {
+    assert.match(prompt, /provenance/i);
+    assert.match(prompt, /Security Review/);
+    assert.match(prompt, /do not (re-list|re-flag|double-flag)/i);
+  });
+
+  test('trend contract: delta framing, first-run baseline, trend ledger', () => {
+    assert.match(prompt, /trend-aware/i);
+    assert.match(prompt, /new, unchanged, improved, worsened, or resolved/i);
+    assert.match(prompt, /point-in-time snapshot/i);
+    assert.match(prompt, /baseline/i);
+    assert.match(prompt, /trend ledger/i);
+  });
+
+  test('stays general: anchors the ecosystem instrument but leaks no source surfaces', () => {
+    // package.json / package-lock.json do not trip the shared .js guard (no word
+    // boundary in ".json"), but prefer ecosystem-agnostic manifest/lockfile phrasing.
+    assert.match(prompt, /manifest/i);
+    assert.match(prompt, /lockfile/i);
+    assert.doesNotMatch(prompt, /gitleaks|trufflehog|snyk|dependabot|renovate/i);
   });
 });
 
