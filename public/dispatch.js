@@ -475,15 +475,14 @@ async function createDispatchToken(urlKey, label) {
   try {
     if (submitBtn) submitBtn.textContent = 'creating...'
 
-    const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/tokens`, {
+    // on401:false — keep the existing throw→catch→toast path (no redirect) so
+    // the button-text reset in `finally` still runs.
+    const { token } = await api(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/tokens`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ label })
+      body: JSON.stringify({ label }),
+      on401: false
     })
-
-    if (!response.ok) throw new Error('Failed to create token')
-
-    const { token } = await response.json()
 
     // Show token in modal (one-time display)
     showDispatchTokenModal(token)
@@ -503,11 +502,11 @@ async function createDispatchToken(urlKey, label) {
  */
 async function revokeDispatchToken(urlKey, tokenId) {
   try {
-    const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/tokens/${tokenId}`, {
-      method: 'DELETE'
+    // on401:false — keep the existing throw→catch→toast path (no redirect).
+    await api(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/tokens/${tokenId}`, {
+      method: 'DELETE',
+      on401: false
     })
-
-    if (!response.ok) throw new Error('Failed to revoke token')
 
     // Remove from DOM
     document.querySelector(`.token-item[data-token-id="${tokenId}"]`)?.remove()
