@@ -25,7 +25,9 @@ describe('buildAutopilotKickoff (shared guide)', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
     assert.ok(text.includes('Evidence beats self-report'));
     assert.ok(text.includes('Stay light'));
-    assert.ok(text.includes('When to halt'));
+    // The halt rule now lives in the consolidated instruments block
+    // ("## Your instruments — and when to halt").
+    assert.ok(text.includes('and when to halt'));
   });
 
   test('warns that a terminal done is a session boundary, not proof of success', () => {
