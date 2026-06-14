@@ -354,7 +354,7 @@
     metaRows.push(
       `<div class="foreman-meta-row">
         <span class="foreman-meta-label">Status</span>
-        <span class="foreman-meta-value"><span class="foreman-state ${visual.cls}">${visual.char}</span> ${escapeHtml(visual.label || activeEntry.status)}</span>
+        <span class="foreman-meta-value"><span class="foreman-state ${visual.cls} status-pill__char status-pill--${visual.cls}">${visual.char}</span> ${escapeHtml(visual.label || activeEntry.status)}</span>
       </div>`
     );
     metaRows.push(
@@ -404,7 +404,7 @@
       <div class="foreman-card-accent ${visual.cls}"></div>
       <div class="foreman-card-inner">
         <div class="card-header foreman-now-header">
-          <span class="foreman-state ${visual.cls}" aria-hidden="true">${visual.char}</span>
+          <span class="foreman-state ${visual.cls} status-pill__char status-pill--${visual.cls}" aria-hidden="true">${visual.char}</span>
           ${identifierHtml}
           <span class="foreman-now-action">${escapeHtml(activeEntry.action)}</span>
         </div>
@@ -484,7 +484,7 @@
         ? `<span class="foreman-timeline-session" title="Session token: ${escapeHtml(item.tokenLabel)}">${escapeHtml(item.tokenLabel)}</span>`
         : '';
       return `<article class="foreman-timeline-item ${visual.cls}">
-        <span class="foreman-state ${visual.cls}" aria-hidden="true">${visual.char}</span>
+        <span class="foreman-state ${visual.cls} status-pill__char status-pill--${visual.cls}" aria-hidden="true">${visual.char}</span>
         <div class="foreman-timeline-body">
           <div class="foreman-timeline-head">
             ${identifierHtml}
@@ -573,7 +573,7 @@
         <div class="foreman-card-accent ${state.cls}"></div>
         <div class="foreman-stack-card-inner">
           <div class="card-header foreman-stack-head">
-            <span class="foreman-state ${state.cls}" aria-hidden="true">${state.char}</span>
+            <span class="foreman-state ${state.cls} status-pill__char status-pill--${state.cls}" aria-hidden="true">${state.char}</span>
             <span class="foreman-stack-identifier">${escapeHtml(identifier)}</span>
             <span class="foreman-stack-position">${idx + 1} / ${tasks.length}</span>
           </div>
@@ -636,7 +636,7 @@
           role="tab"
           aria-selected="${selected}"
           title="Last: ${escapeHtml(s.lastAction || '')} · ${escapeHtml(s.lastStatus || '')} · ${escapeHtml(formatRelativeTime(s.lastSeen))}">
-          <span class="foreman-state ${visual.cls}" aria-hidden="true">${visual.char}</span>
+          <span class="foreman-state ${visual.cls} status-pill__char status-pill--${visual.cls}" aria-hidden="true">${visual.char}</span>
           <span class="foreman-session-chip-label">${escapeHtml(label)}</span>
           <span class="foreman-session-chip-count">${s.itemCount}</span>
           ${badge}
@@ -691,7 +691,7 @@
       return `<button class="foreman-thread-chip${selected ? ' is-selected' : ''}" type="button"
           data-task-identifier="${escapeHtml(t.taskIdentifier)}"
           title="${escapeHtml(t.lastAction || '')} · ${escapeHtml(t.lastStatus || '')} · ${escapeHtml(formatRelativeTime(t.lastSeen))}">
-          <span class="foreman-state ${visual.cls}" aria-hidden="true">${visual.char}</span>
+          <span class="foreman-state ${visual.cls} status-pill__char status-pill--${visual.cls}" aria-hidden="true">${visual.char}</span>
           <span class="foreman-thread-chip-id">${escapeHtml(t.taskIdentifier)}</span>
           <span class="foreman-thread-chip-count">${t.itemCount}</span>
         </button>`;
