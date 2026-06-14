@@ -382,7 +382,7 @@
     }
     const labels = normaliseLabels(task?.labels);
     if (labels.length) {
-      const tagsHtml = labels.map(l => `<span class="foreman-label-tag">${escapeHtml(l)}</span>`).join('');
+      const tagsHtml = labels.map(l => `<span class="foreman-label-tag badge">${escapeHtml(l)}</span>`).join('');
       metaRows.push(
         `<div class="foreman-meta-row">
           <span class="foreman-meta-label">Labels</span>
@@ -554,7 +554,7 @@
       const identifier = task.identifier || task.id || '';
       const labels = normaliseLabels(task.labels);
       const labelsHtml = labels.length
-        ? `<div class="foreman-stack-labels">${labels.map(l => `<span class="foreman-label-tag">${escapeHtml(l)}</span>`).join('')}</div>`
+        ? `<div class="foreman-stack-labels">${labels.map(l => `<span class="foreman-label-tag badge">${escapeHtml(l)}</span>`).join('')}</div>`
         : '';
       const priorityHtml = task.priority
         ? `<span class="foreman-stack-priority">${renderPriorityDots(task.priority)}</span>`

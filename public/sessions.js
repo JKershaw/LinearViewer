@@ -94,7 +94,7 @@
       <div class="session-entry" data-agent-state="${esc(s.agentState || '')}">
         <div class="session-header">
           <span class="session-state ${si.css}">${si.symbol}</span>
-          <span class="session-stage">${esc(stageLabel(s.stage))}</span>
+          <span class="session-stage badge">${esc(stageLabel(s.stage))}</span>
           <span class="session-prompt-name">${esc(s.promptName || '')}</span>
           ${s.iteration ? `<span class="session-iteration">#${esc(s.iteration)}</span>` : ''}
           <span class="session-time">${esc(time)}</span>

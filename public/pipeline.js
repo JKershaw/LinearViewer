@@ -125,7 +125,7 @@ function renderCell(task) {
     </div>
     <div class="cell-title">${escapeHtml(task.title || '')}</div>
     <div class="cell-footer">
-      <span class="cell-stage cell-stage-badge">${escapeHtml(stageLabel(task.currentStage))}</span>
+      <span class="cell-stage cell-stage-badge badge">${escapeHtml(stageLabel(task.currentStage))}</span>
       <span class="cell-state ${si.css}">${si.symbol}</span>
     </div>
     ${renderProgressBar(task.loops)}
@@ -439,7 +439,7 @@ function renderLoopEntry(loop, isLatest) {
     <div class="loop-entry${pulseClass}" data-agent-state="${escapeHtml(loop.agentState || '')}">
       <div class="loop-header">
         <span class="loop-state ${si.css}">${si.symbol}</span>
-        <span class="loop-stage">${escapeHtml(stageLabel(loop.stage))}</span>
+        <span class="loop-stage badge">${escapeHtml(stageLabel(loop.stage))}</span>
         <span class="loop-prompt-name">${escapeHtml(loop.promptName || '')}</span>
         <span class="loop-time">${time}</span>
       </div>
@@ -754,7 +754,7 @@ async function openParentOverlay(identifier) {
           <div class="overlay-header-left">
             <span class="overlay-id">${escapeHtml(task.identifier)}</span>
             <span class="overlay-title">${escapeHtml(task.title || '')}</span>
-            <span class="overlay-badge">container</span>
+            <span class="overlay-badge badge">container</span>
           </div>
           <button class="overlay-close" aria-label="Close">×</button>
         </div>

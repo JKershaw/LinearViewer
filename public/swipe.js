@@ -245,7 +245,7 @@ function renderCard(direction) {
   }
 
   if (issue.labels && issue.labels.length > 0) {
-    const labelsHtml = issue.labels.map(l => `<span class="swipe-label-tag">${_esc(l)}</span>`).join('');
+    const labelsHtml = issue.labels.map(l => `<span class="swipe-label-tag badge">${_esc(l)}</span>`).join('');
     metaHtml += `<div class="swipe-card-meta-row">
       <span class="swipe-card-meta-label">Labels</span>
       <span class="swipe-card-labels">${labelsHtml}</span>
