@@ -2127,6 +2127,43 @@ button.nav-action {
 }
 
 /*
+   Status Pill (LIN-465, Phase A.5)
+   The canonical state→glyph+label pill. Shares card-accent's state vocabulary
+   and Phase-0 color tokens so a pill and a card accent compose on one interface.
+   Coexists with the per-page pill CSS (.foreman-state, swipe .state.*, …) until
+   Phase B points the client JS at this class.
+*/
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0.1rem 0.45rem;
+  font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+  color: var(--fg-dim);
+  background: var(--bg-alt);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+}
+
+.status-pill__char {
+  display: inline-block;
+  min-width: 1em;
+  text-align: center;
+}
+
+/* State color modifiers — same state→token mapping as .card-accent--*. */
+.status-pill--in-progress { color: var(--yellow); }
+.status-pill--done { color: var(--green); }
+.status-pill--todo { color: var(--fg-dim); }
+.status-pill--backlog { color: var(--fg-vdim); }
+.status-pill--failed { color: var(--red); }
+
+/* Neutral, stateless label/tag chip (no state color). */
+.status-pill--tag { color: var(--fg-dim); }
+
+/*
    Legal Pages
    Styled to match the landing and projects page aesthetic.
 */
