@@ -82,7 +82,7 @@
       case 'started':
         return { char: '\u25D0', cls: 'in-progress', label: 'started' };
       case 'backlog':
-        return { char: '\u25CC', cls: 'backlog', label: 'backlog' };
+        return { char: '\u25CB', cls: 'backlog', label: 'backlog' };
       default:
         return { char: '\u25CB', cls: 'todo', label: stateType || 'unstarted' };
     }

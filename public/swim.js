@@ -757,7 +757,7 @@ function stateIndicator(stateType) {
   if (isTerminalState(stateType)) return '<span class="swim-box-state done">\u2713</span>';
   switch (stateType) {
     case 'started': return '<span class="swim-box-state in-progress">\u25D0</span>';
-    case 'backlog': return '<span class="swim-box-state backlog">\u25CC</span>';
+    case 'backlog': return '<span class="swim-box-state backlog">\u25CB</span>';
     default: return '<span class="swim-box-state todo">\u25CB</span>';
   }
 }
