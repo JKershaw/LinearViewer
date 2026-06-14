@@ -239,6 +239,137 @@ window.initDisclosure = function initDisclosure() {
 };
 
 // =============================================================================
+// Modal (shared overlay dialog)
+// =============================================================================
+
+// Tracks the currently-open modal's teardown so closeModal()/a second showModal()
+// can dismiss it cleanly (remove DOM + detach the Escape listener). Only one
+// modal is ever open at a time, so a single reference suffices.
+let activeModalClose = null;
+
+/**
+ * Show a shared overlay modal.
+ *
+ * Structural classes are derived from `className` so the same helper can back
+ * different modals while preserving each one's E2E/CSS contract — e.g.
+ * `className:'token-modal'` emits `.token-modal-overlay`, `.token-modal`,
+ * `.token-modal-header`, and `.token-modal-close` exactly as the hand-rolled
+ * token modals did. The caller owns the body markup (and wires any buttons
+ * inside it) via the returned `modal` element.
+ *
+ * Behaviour standardised from the dispatch token modal: close on overlay click,
+ * close button, and Escape. The pipeline overlay is intentionally NOT built on
+ * this helper — it is a persistent polling singleton, a different primitive.
+ *
+ * @global
+ * @param {Object} opts
+ * @param {string} [opts.className='modal'] Base class; structural classes derive from it
+ * @param {string} [opts.title='']          Header text (escaped)
+ * @param {string} [opts.bodyHtml='']       Trusted body HTML appended after the header
+ * @param {Function} [opts.onClose]         Called once after the modal is torn down
+ * @returns {{overlay: HTMLElement, modal: HTMLElement, close: Function}}
+ */
+window.showModal = function showModal({ className = 'modal', title = '', bodyHtml = '', onClose } = {}) {
+  // Tear down any existing modal cleanly before opening a new one.
+  if (activeModalClose) activeModalClose();
+  // Belt-and-suspenders: drop any stray nodes of this class not opened via showModal.
+  document.querySelectorAll(`.${className}-overlay, .${className}`).forEach(el => el.remove());
+
+  const overlay = document.createElement('div');
+  overlay.className = `${className}-overlay`;
+
+  const modal = document.createElement('div');
+  modal.className = className;
+  modal.innerHTML = `
+    <div class="${className}-header">
+      <strong>${window.escapeHtml(title)}</strong>
+      <button class="${className}-close" aria-label="Close">&times;</button>
+    </div>
+    ${bodyHtml}`;
+
+  document.body.appendChild(overlay);
+  document.body.appendChild(modal);
+
+  let closed = false;
+  function close() {
+    if (closed) return;
+    closed = true;
+    document.removeEventListener('keydown', onKeydown);
+    overlay.remove();
+    modal.remove();
+    if (activeModalClose === close) activeModalClose = null;
+    if (typeof onClose === 'function') onClose();
+  }
+  function onKeydown(e) {
+    if (e.key === 'Escape') close();
+  }
+
+  overlay.addEventListener('click', close);
+  modal.querySelector(`.${className}-close`).addEventListener('click', close);
+  document.addEventListener('keydown', onKeydown);
+
+  activeModalClose = close;
+  return { overlay, modal, close };
+};
+
+/**
+ * Close the currently-open shared modal, if any (full teardown).
+ * @global
+ */
+window.closeModal = function closeModal() {
+  if (activeModalClose) activeModalClose();
+};
+
+// =============================================================================
+// Toast (transient notifications)
+// =============================================================================
+
+/**
+ * Show a transient toast notification, auto-dismissed after `duration` ms.
+ * Replaces blocking `alert()` calls so error surfaces are non-modal and
+ * consistent. Click a toast to dismiss it early.
+ *
+ * @global
+ * @param {string} message            Text to display (rendered as text, not HTML)
+ * @param {Object} [opts]
+ * @param {string} [opts.type='info']    Visual variant: 'info' | 'error'
+ * @param {number} [opts.duration=4000]  Auto-dismiss delay in ms
+ * @returns {HTMLElement} The toast element
+ */
+window.toast = function toast(message, opts = {}) {
+  const { type = 'info', duration = 4000 } = opts;
+
+  let container = document.querySelector('.toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.className = 'toast-container';
+    document.body.appendChild(container);
+  }
+
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`;
+  el.setAttribute('role', type === 'error' ? 'alert' : 'status');
+  el.textContent = message;
+  container.appendChild(el);
+
+  // Next frame so the entrance transition runs.
+  requestAnimationFrame(() => el.classList.add('toast-visible'));
+
+  function remove() {
+    el.classList.remove('toast-visible');
+    setTimeout(() => {
+      el.remove();
+      if (container && !container.children.length) container.remove();
+    }, 200);
+  }
+
+  const timer = setTimeout(remove, duration);
+  el.addEventListener('click', () => { clearTimeout(timer); remove(); });
+
+  return el;
+};
+
+// =============================================================================
 // Navigation Bar (workspace/team selectors)
 // =============================================================================
 
