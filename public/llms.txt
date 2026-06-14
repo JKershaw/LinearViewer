@@ -289,6 +289,26 @@ main.collective-page[data-url-key]      - page container
 - `POST /workspace/{urlKey}/api/collective/say` — `{ channel, message }`
 - `window.__COLLECTIVE_DATA__` carries `{ urlKey, defaultChannel, yapConfigured }`
 
+## Task Chat (experimental)
+
+The Task Chat page (`/workspace/{urlKey}/task-chat`) lets you hold a grounded, multi-turn conversation with a single task. The task answers in the first person from its own Linear context (description, comments, subtasks, status). Requires the per-user `taskChat` feature flag; reached only via a link in Settings. Read-only (no Linear writes); history is in-browser and ephemeral.
+
+### Task Chat DOM Structure
+```
+main.task-chat-page[data-url-key]      - page container
+  #task-chat-id                         - task identifier input (e.g. LIN-123)
+  #task-chat-transcript                 - conversation log (ul)
+    li.task-chat-msg.task-chat-msg-user      - your turn
+    li.task-chat-msg.task-chat-msg-assistant - the task's turn
+  #task-chat-question                   - question input
+  #task-chat-send                       - ask button
+  #task-chat-reset                      - clear the conversation
+```
+
+### Task Chat Endpoint
+- `POST /workspace/{urlKey}/api/task-chat/{issueId}` — SSE stream; body `{ question, history[] }`. Events: `token` (`{ token }`), `done`, `error`. Issue IDs accept identifiers like `LIN-123`.
+- `window.__TASK_CHAT_DATA__` carries `{ urlKey }`.
+
 ## Common Workflows
 
 1. **Find in-progress tasks**: Look in "In Progress" section at top (displays as tree with subtasks)
