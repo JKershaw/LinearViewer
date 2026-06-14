@@ -150,8 +150,8 @@
 
 .swipe-card-status .state.done { color: var(--green); }
 .swipe-card-status .state.in-progress { color: var(--yellow); }
-.swipe-card-status .state.todo { color: #999; }
-.swipe-card-status .state.backlog { color: #ccc; }
+.swipe-card-status .state.todo { color: var(--fg-dim); }
+.swipe-card-status .state.backlog { color: var(--fg-vdim); }
 
 .swipe-card-identifier {
   color: var(--fg-dim);
@@ -316,8 +316,8 @@ a.swipe-relation-issue:hover {
 
 .swipe-relation-done { color: var(--green); }
 .swipe-relation-in-progress { color: var(--yellow); }
-.swipe-relation-todo { color: #999; }
-.swipe-relation-backlog { color: #ccc; }
+.swipe-relation-todo { color: var(--fg-dim); }
+.swipe-relation-backlog { color: var(--fg-vdim); }
 
 /* Expandable Accordion Sections */
 .swipe-card-accordion {

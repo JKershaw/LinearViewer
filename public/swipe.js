@@ -189,7 +189,7 @@ function getStateInfo(stateType) {
     case 'started':
       return { char: '\u25D0', cls: 'in-progress' };
     case 'backlog':
-      return { char: '\u25CC', cls: 'backlog' };
+      return { char: '\u25CB', cls: 'backlog' };
     default:
       return { char: '\u25CB', cls: 'todo' };
   }
@@ -430,7 +430,7 @@ function renderCard(direction) {
     <div class="swipe-card-inner">
       <div class="swipe-card-header">
         <div class="swipe-card-status">
-          <span class="state ${state.cls}">${state.char}</span>
+          <span class="state ${state.cls} status-pill__char status-pill--${state.cls}">${state.char}</span>
           <span class="swipe-card-identifier">${_esc(issue.identifier)}</span>
         </div>
         <span class="swipe-card-position">${currentIndex + 1} / ${total}</span>

@@ -227,8 +227,8 @@ body:has(.swim-page) {
 }
 .swim-box-state.done { color: var(--green); }
 .swim-box-state.in-progress { color: var(--yellow); }
-.swim-box-state.todo { color: #999; }
-.swim-box-state.backlog { color: #ccc; }
+.swim-box-state.todo { color: var(--fg-dim); }
+.swim-box-state.backlog { color: var(--fg-vdim); }
 
 .swim-box-title {
   flex: 1 1 0;
