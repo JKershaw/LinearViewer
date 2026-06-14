@@ -2164,6 +2164,19 @@ button.nav-action {
 .status-pill--tag { color: var(--fg-dim); }
 
 /*
+   Empty State (LIN-466, Phase A.6)
+   The canonical "nothing here yet" placeholder. The five per-page empty states
+   genuinely diverge (foreman dashed border, roadmap structural font, swipe
+   italic, distinct paddings/alignments) — only the dim foreground is universal,
+   so the canonical class carries just that shared subset and composes with the
+   RETAINED per-page variant class for byte-identical rendering. Convergence onto
+   one canonical look is the tracked Phase-B seam.
+*/
+.emptyState {
+  color: var(--fg-dim);
+}
+
+/*
    Legal Pages
    Styled to match the landing and projects page aesthetic.
 */
