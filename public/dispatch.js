@@ -492,7 +492,7 @@ async function createDispatchToken(urlKey, label) {
     await loadDispatchTokenList(urlKey)
   } catch (e) {
     console.error('Failed to create token:', e)
-    alert('Failed to create token: ' + e.message)
+    toast('Failed to create token: ' + e.message, { type: 'error' })
   } finally {
     if (submitBtn) submitBtn.textContent = originalText
   }
@@ -519,7 +519,7 @@ async function revokeDispatchToken(urlKey, tokenId) {
     }
   } catch (e) {
     console.error('Failed to revoke token:', e)
-    alert('Failed to revoke token: ' + e.message)
+    toast('Failed to revoke token: ' + e.message, { type: 'error' })
   }
 }
 
@@ -527,16 +527,7 @@ async function revokeDispatchToken(urlKey, tokenId) {
  * Show modal with newly created token (one-time display)
  */
 function showDispatchTokenModal(token) {
-  const overlay = document.createElement('div')
-  overlay.className = 'token-modal-overlay'
-
-  const modal = document.createElement('div')
-  modal.className = 'token-modal'
-  modal.innerHTML = `
-    <div class="token-modal-header">
-      <strong>Token Created</strong>
-      <button class="token-modal-close" aria-label="Close">×</button>
-    </div>
+  const bodyHtml = `
     <p>Copy this token now - it won't be shown again:</p>
     <div class="token-display">
       <span class="token-value">${escapeHtml(token)}</span>
@@ -548,27 +539,10 @@ function showDispatchTokenModal(token) {
     </div>
   `
 
-  document.body.appendChild(overlay)
-  document.body.appendChild(modal)
+  const { modal } = showModal({ className: 'token-modal', title: 'Token Created', bodyHtml })
 
-  const close = () => {
-    overlay.remove()
-    modal.remove()
-  }
-
-  overlay.addEventListener('click', close)
-  modal.querySelector('.token-modal-close').addEventListener('click', close)
-
-  const escHandler = (e) => {
-    if (e.key === 'Escape') {
-      close()
-      document.removeEventListener('keydown', escHandler)
-    }
-  }
-  document.addEventListener('keydown', escHandler)
-
-  modal.querySelector('.token-copy-btn').addEventListener('click', async () => {
-    const copyBtn = modal.querySelector('.token-copy-btn')
+  const copyBtn = modal.querySelector('.token-copy-btn')
+  copyBtn.addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText(token)
       copyBtn.textContent = 'copied!'

@@ -4,7 +4,7 @@
  * Handles: token generation, agent prompt creation, token CRUD, event log display.
  */
 
-/* global escapeHtml */
+/* global escapeHtml, showModal, toast */
 
 (function () {
   'use strict';
@@ -151,7 +151,7 @@ This will return all available endpoints with examples. Your token scope is: ${s
         refreshTokenCount();
         loadTokens();
       } catch (err) {
-        alert('Failed to create token: ' + err.message);
+        toast('Failed to create token: ' + err.message, { type: 'error' });
       }
     });
   }
@@ -219,7 +219,7 @@ This will return all available endpoints with examples. Your token scope is: ${s
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
           loadTokens();
         } catch (err) {
-          alert('Failed to revoke: ' + err.message);
+          toast('Failed to revoke: ' + err.message, { type: 'error' });
         }
       });
     });
@@ -267,19 +267,7 @@ This will return all available endpoints with examples. Your token scope is: ${s
   }
 
   function showTokenModal(token, label, scope) {
-    // Remove existing modal
-    document.querySelectorAll('.token-modal-overlay, .token-modal').forEach(el => el.remove());
-
-    const overlay = document.createElement('div');
-    overlay.className = 'token-modal-overlay';
-
-    const modal = document.createElement('div');
-    modal.className = 'token-modal';
-    modal.innerHTML = `
-      <div class="token-modal-header">
-        <strong>Token Created</strong>
-        <button class="token-modal-close">&times;</button>
-      </div>
+    const bodyHtml = `
       <p>Save this token now — it cannot be retrieved later.</p>
       <div class="token-display">
         <span class="token-value">${escapeHtml(token)}</span>
@@ -292,19 +280,18 @@ This will return all available endpoints with examples. Your token scope is: ${s
         </div>
       </div>`;
 
-    document.body.appendChild(overlay);
-    document.body.appendChild(modal);
+    const { modal } = showModal({ className: 'token-modal', title: 'Token Created', bodyHtml });
 
-    const close = () => { overlay.remove(); modal.remove(); };
-    overlay.addEventListener('click', close);
-    modal.querySelector('.token-modal-close').addEventListener('click', close);
-    modal.querySelector('.token-copy-btn').addEventListener('click', async () => {
+    // Standardised on the dispatch copy-revert behaviour (was: stuck on "copied!").
+    const copyBtn = modal.querySelector('.token-copy-btn');
+    copyBtn.addEventListener('click', async () => {
       try {
         await navigator.clipboard.writeText(token);
-        modal.querySelector('.token-copy-btn').textContent = 'copied!';
+        copyBtn.textContent = 'copied!';
       } catch {
-        // fallback
+        copyBtn.textContent = 'failed';
       }
+      setTimeout(() => { copyBtn.textContent = 'copy'; }, 1500);
     });
   }
 
