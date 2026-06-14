@@ -72,6 +72,13 @@
   color: var(--fg);
 }
 
+/* Retained per-page variant of the canonical empty state (LIN-476, Phase B.1).
+   The markup now composes `.emptyState <variant>` via renderEmptyState(); the
+   base carries only `color: var(--fg-dim)`. Collective's look genuinely diverges
+   (vdim foreground, mono, sm) so every declaration below is a real override or
+   net-new — none duplicate the base, so nothing is removed. The class names also
+   survive as hooks (`collective.js` toggles `.hidden` on the transcript empty by
+   id; this rule keeps the byte-identical visual treatment). */
 .collective-empty,
 .collective-transcript-empty {
   color: var(--fg-vdim);
