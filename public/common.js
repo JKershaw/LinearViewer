@@ -67,6 +67,72 @@ function initDeployTime() {
 }
 
 // =============================================================================
+// API (shared fetch wrapper)
+// =============================================================================
+
+/**
+ * Shared JSON fetch wrapper — one error/401 contract for the client.
+ *
+ * The client carried five divergent fetch error/401 shapes across ~69 call
+ * sites (generic throw, `HTTP <status>` throw, 401→redirect, silent swallow,
+ * parse-body+special-case). `api()` is a strict superset: it does the fetch,
+ * returns the parsed JSON body on 2xx, and on a non-2xx best-effort parses the
+ * error body and throws an Error carrying `.status` and `.body`, so callers can
+ * still branch (e.g. 429 freeTier reads `err.body.freeTier`, 401 reads
+ * `err.status`). Adoption is incremental — streaming/SSE readers and pollers
+ * that intentionally swallow failures are deliberately left on raw `fetch`.
+ *
+ * @global
+ * @param {string} url                       Request URL
+ * @param {Object} [opts]                     Passed to fetch (method, headers, body, …) plus:
+ * @param {string|false} [opts.on401='/logout'] On a 401, redirect here; `false` opts out
+ *                                            (the error is thrown like any other so the
+ *                                            caller can branch on `.status`). Other 401
+ *                                            targets are supported (e.g. audit.js → `/`).
+ * @param {boolean} [opts.toastOnError=false] When true, surface the error via
+ *                                            `window.toast(msg, {type:'error'})` before throwing.
+ * @returns {Promise<*>} Parsed JSON body on success (null if the body is empty/non-JSON).
+ * @throws {Error} On a non-2xx response. The error carries `.status` and `.body`
+ *                 (the parsed error payload, or null if it wasn't JSON).
+ */
+window.api = async function api(url, opts = {}) {
+  const { on401 = '/logout', toastOnError = false, ...fetchOpts } = opts;
+
+  const response = await fetch(url, fetchOpts);
+
+  // 401 → redirect by default (session expired). `on401:false` falls through to
+  // the normal throw path so the caller can branch on `err.status === 401`.
+  if (response.status === 401 && on401 !== false) {
+    window.location.href = on401;
+    const err = new Error('Unauthorized');
+    err.status = 401;
+    throw err;
+  }
+
+  // Parse the body once, best-effort — used for both the success value and the
+  // error shape. An empty/non-JSON body leaves it null.
+  let body = null;
+  try {
+    body = await response.json();
+  } catch (e) {
+    // Non-JSON or empty body — leave body null.
+  }
+
+  if (!response.ok) {
+    const message = (body && (body.error || body.message)) || `HTTP ${response.status}`;
+    if (toastOnError && typeof window.toast === 'function') {
+      window.toast(message, { type: 'error' });
+    }
+    const err = new Error(message);
+    err.status = response.status;
+    err.body = body;
+    throw err;
+  }
+
+  return body;
+};
+
+// =============================================================================
 // Dispatch
 // =============================================================================
 
@@ -124,31 +190,21 @@ window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
   }
   if (repo) payload.repo = repo;
 
-  const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch`, {
+  // on401:false — dispatch surfaces (swipe etc.) branch on err.status rather
+  // than redirecting, so the 401 is thrown like any other error.
+  const result = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
+    on401: false
   });
-
-  if (!response.ok) {
-    let message = 'Dispatch failed';
-    try {
-      const body = await response.json();
-      if (body && body.error) message = body.error;
-    } catch (e) {
-      // Non-JSON error body — keep the generic message.
-    }
-    const err = new Error(message);
-    err.status = response.status;
-    throw err;
-  }
 
   // Refresh the nav queue badge where that machinery exists (dashboard etc.).
   if (typeof window.updateQueueBadge === 'function') {
     window.updateQueueBadge(urlKey);
   }
 
-  return response.json();
+  return result;
 };
 
 // =============================================================================
