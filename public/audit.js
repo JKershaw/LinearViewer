@@ -307,9 +307,9 @@ function renderLabelsContent(labels) {
   // Render workflow label (present or missing)
   const renderWorkflowLabel = (label) => {
     if (label.exists) {
-      return `<span class="label-tag workflow present"><span class="tag-name">${escapeHtml(label.name)}</span><span class="tag-count">(${label.issueCount})</span></span>`;
+      return `<span class="label-tag workflow present badge"><span class="tag-name">${escapeHtml(label.name)}</span><span class="tag-count">(${label.issueCount})</span></span>`;
     } else {
-      return `<span class="label-tag workflow missing"><span class="tag-name">${escapeHtml(label.name)}</span><span class="tag-status">missing</span></span>`;
+      return `<span class="label-tag workflow missing badge"><span class="tag-name">${escapeHtml(label.name)}</span><span class="tag-status">missing</span></span>`;
     }
   };
 
@@ -318,7 +318,7 @@ function renderLabelsContent(labels) {
 
   // Other labels (non-workflow)
   const otherTags = other.slice(0, 20).map(l =>
-    `<span class="label-tag other"><span class="tag-name">${escapeHtml(l.name)}</span><span class="tag-count">(${l.issueCount})</span></span>`
+    `<span class="label-tag other badge"><span class="tag-name">${escapeHtml(l.name)}</span><span class="tag-count">(${l.issueCount})</span></span>`
   ).join('');
 
   const moreOther = other.length > 20

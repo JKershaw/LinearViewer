@@ -2164,6 +2164,20 @@ button.nav-action {
 .status-pill--tag { color: var(--fg-dim); }
 
 /*
+   Badge convergence anchor (LIN-477, Phase B.2)
+   Semantic hook emitted by client badge JS alongside each retained per-page
+   hook class (label-tag, cell-stage-badge, loop-stage, overlay-badge,
+   foreman-label-tag, swipe-label-tag, session-stage). The client badge family
+   is heterogeneous — radii 3px→8px→10px, content/structural/11px-mono fonts,
+   and two text-only members (loop-stage, session-stage with no chrome) — so
+   .badge is INTENTIONALLY CHROMELESS in this phase: any shared chrome here
+   would leak onto the text-only members and onto chrome badges for properties
+   their hook rule doesn't re-set, regressing the rendering. Real style
+   consolidation (collapsing hook rules into .badge + deltas) is the deferred,
+   non-byte-careful Phase-B follow-on. Keep this rule inert. */
+.badge {}
+
+/*
    Empty State (LIN-466, Phase A.6)
    The canonical "nothing here yet" placeholder. The five per-page empty states
    genuinely diverge (foreman dashed border, roadmap structural font, swipe
