@@ -4,7 +4,7 @@
  * Handles: token generation, agent prompt creation, token CRUD, event log display.
  */
 
-/* global escapeHtml, showModal, toast */
+/* global escapeHtml, showModal, toast, api */
 
 (function () {
   'use strict';
@@ -52,22 +52,18 @@
 
       try {
         const scope = scopeSelect?.value || 'read';
-        const resp = await fetch(`${apiBase}/tokens`, {
+        // on401:false — failures surface via showFeedback (the catch), so a 401
+        // must not redirect out from under the bespoke inline feedback.
+        const data = await window.api(`${apiBase}/tokens`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             label: 'agent-prompt',
             scope,
             singleUse: false
-          })
+          }),
+          on401: false
         });
-
-        if (!resp.ok) {
-          const err = await resp.json().catch(() => ({}));
-          throw new Error(err.error || `HTTP ${resp.status}`);
-        }
-
-        const data = await resp.json();
         const token = data.token;
 
         const prompt = buildAgentPrompt(token, scope);
@@ -129,18 +125,14 @@ This will return all available endpoints with examples. Your token scope is: ${s
       const scope = formData.get('scope') || 'read';
 
       try {
-        const resp = await fetch(`${apiBase}/tokens`, {
+        // on401:false — failure is reported by the catch's toast; keep that path
+        // rather than redirecting.
+        const data = await window.api(`${apiBase}/tokens`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ label, scope })
+          body: JSON.stringify({ label, scope }),
+          on401: false
         });
-
-        if (!resp.ok) {
-          const err = await resp.json().catch(() => ({}));
-          throw new Error(err.error || `HTTP ${resp.status}`);
-        }
-
-        const data = await resp.json();
         showTokenModal(data.token, data.label, data.scope);
         createTokenForm.reset();
 
@@ -158,10 +150,9 @@ This will return all available endpoints with examples. Your token scope is: ${s
 
   async function fetchTokens() {
     try {
-      const resp = await fetch(`${apiBase}/tokens`);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const data = await resp.json();
-      return data.tokens || [];
+      // on401:false — callers treat null as "failed to load"; never redirect.
+      const data = await window.api(`${apiBase}/tokens`, { on401: false });
+      return (data && data.tokens) || [];
     } catch {
       return null;
     }
@@ -215,8 +206,8 @@ This will return all available endpoints with examples. Your token scope is: ${s
         if (!confirm('Revoke this token?')) return;
 
         try {
-          const resp = await fetch(`${apiBase}/tokens/${tokenId}`, { method: 'DELETE' });
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          // on401:false — failure is reported by the catch's toast, not a redirect.
+          await window.api(`${apiBase}/tokens/${tokenId}`, { method: 'DELETE', on401: false });
           loadTokens();
         } catch (err) {
           toast('Failed to revoke: ' + err.message, { type: 'error' });
@@ -303,9 +294,8 @@ This will return all available endpoints with examples. Your token scope is: ${s
     if (!eventsList) return;
 
     try {
-      const resp = await fetch(`${apiBase}/events?limit=${EVENTS_PAGE_SIZE}&offset=${eventsOffset}`);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const data = await resp.json();
+      // on401:false — failure surfaces on the inline empty state below.
+      const data = await window.api(`${apiBase}/events?limit=${EVENTS_PAGE_SIZE}&offset=${eventsOffset}`, { on401: false });
       eventsTotal = Number.isFinite(data.total) ? data.total : (data.items?.length || 0);
       if (eventsCount) {
         eventsCount.textContent = eventsTotal ? `(${eventsTotal})` : '(0)';
@@ -358,9 +348,8 @@ This will return all available endpoints with examples. Your token scope is: ${s
   async function refreshEventsCount() {
     if (!eventsCount) return;
     try {
-      const resp = await fetch(`${apiBase}/events?limit=1&offset=0`);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const data = await resp.json();
+      // on401:false — best-effort count; clears silently on failure (the catch).
+      const data = await window.api(`${apiBase}/events?limit=1&offset=0`, { on401: false });
       const total = Number.isFinite(data.total) ? data.total : 0;
       eventsCount.textContent = total ? `(${total})` : '(0)';
     } catch {
