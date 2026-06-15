@@ -28,13 +28,14 @@ async function getOrCreateProxyToken(urlKey) {
   if (cachedProxyToken) return cachedProxyToken
 
   try {
-    const resp = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/proxy/tokens`, {
+    // on401:false — a failed mint should fall through to the null return (the
+    // caller surfaces it), not redirect the whole page to /logout.
+    const data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/proxy/tokens`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ label: 'prompt-proxy', scope: 'readWrite', singleUse: false })
+      body: JSON.stringify({ label: 'prompt-proxy', scope: 'readWrite', singleUse: false }),
+      on401: false
     })
-    if (!resp.ok) return null
-    const data = await resp.json()
     cachedProxyToken = data.token
     return cachedProxyToken
   } catch {
@@ -197,14 +198,8 @@ async function loadComments(toggle, content) {
   errorEl?.classList.add('hidden')
 
   try {
-    const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/comments/${encodeURIComponent(issueId)}`)
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch comments: ${response.status}`)
-    }
-
-    const data = await response.json()
-    const comments = data.comments || []
+    const data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/comments/${encodeURIComponent(issueId)}`)
+    const comments = (data && data.comments) || []
 
     // Mark as loaded (don't re-fetch on toggle)
     content.dataset.loaded = 'true'
@@ -256,12 +251,8 @@ async function loadDetails(details) {
 
   details.dataset.loaded = 'loading'
   try {
-    const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/detail/${encodeURIComponent(issueId)}`)
-    if (!response.ok) {
-      throw new Error(`Failed to fetch detail: ${response.status}`)
-    }
-    const data = await response.json()
-    details.innerHTML = data.html || ''
+    const data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/detail/${encodeURIComponent(issueId)}`)
+    details.innerHTML = (data && data.html) || ''
     details.dataset.loaded = 'true'
   } catch (error) {
     console.error('Failed to load detail:', error)
@@ -941,17 +932,10 @@ function initPrompts() {
       // Get workspace URL key from data attribute (workspace-prefixed URLs)
       const urlKey = promptContainer.dataset.urlKey
       const apiPrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : ''
-      const response = await fetch(
+      const data = await window.api(
         `${apiPrefix}/api/prompt/${issueId}/${encodeURIComponent(labelName)}`,
         { signal: abortController.signal }
       )
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to load prompt')
-      }
-
-      const data = await response.json()
 
       // Only update if this is still the active request
       if (activePromptFetch === abortController) {
@@ -1175,6 +1159,9 @@ function initPrompts() {
  */
 async function updateQueueBadge(urlKey) {
   try {
+    // Deliberately raw fetch (NOT window.api): this is a 1s background poller that
+    // must silently swallow failures — it must never redirect to /logout or toast
+    // on a transient error. (api() carve-out: pollers stay on raw fetch.)
     const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/count`)
     if (!response.ok) return
 
@@ -1301,13 +1288,8 @@ async function showQueuePanel(urlKey) {
 
   // Load items
   try {
-    const r = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch`)
-    if (r.ok) {
-      const { items } = await r.json()
-      renderQueueItems(panel, items, urlKey)
-    } else {
-      throw new Error('Failed to load queue')
-    }
+    const { items } = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch`)
+    renderQueueItems(panel, items, urlKey)
   } catch (e) {
     console.error('Failed to load queue items:', e)
     panel.querySelector('.queue-panel-items').innerHTML =
@@ -1365,11 +1347,10 @@ async function removeQueueItem(urlKey, itemId) {
   }
 
   try {
-    const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/${encodeURIComponent(itemId)}`, {
-      method: 'DELETE'
+    await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/${encodeURIComponent(itemId)}`, {
+      method: 'DELETE',
+      toastOnError: true
     })
-
-    if (!response.ok) throw new Error('Failed to remove item')
 
     // Remove item from DOM (itemId validated as UUID above, safe for selector)
     document.querySelector(`.queue-item[data-item-id="${itemId}"]`)?.remove()
@@ -1414,30 +1395,21 @@ function initFeatureToggles() {
     btn.disabled = true
 
     try {
-      const res = await fetch(form.action, {
+      // on401:false — auth failures fall through to the catch (which redirects
+      // to /logout for both 401 and 403); other non-2xx/network errors fall back
+      // to a full form POST so the server can render the error.
+      const data = await window.api(form.action, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           'X-Requested-With': 'XMLHttpRequest'
         },
-        body: new URLSearchParams(new FormData(form))
+        body: new URLSearchParams(new FormData(form)),
+        on401: false
       })
 
-      // Auth errors — redirect to re-authenticate
-      if (res.status === 401 || res.status === 403) {
-        window.location.href = '/logout'
-        return
-      }
-
-      // Validation or server error — fall back to form POST for error display
-      if (!res.ok) {
-        form.submit()
-        return
-      }
-
       // Server returns JSON for AJAX requests: { ok, feature, enabled }
-      const data = await res.json()
-      if (!data.ok) {
+      if (!data || !data.ok) {
         form.submit()
         return
       }
@@ -1487,7 +1459,12 @@ function initFeatureToggles() {
         }
       }
     } catch (err) {
-      // Network error — fall back to standard form submission
+      // Auth failure — redirect to re-authenticate (covers 401 and 403).
+      if (err.status === 401 || err.status === 403) {
+        window.location.href = '/logout'
+        return
+      }
+      // Validation / server / network error — fall back to standard form POST.
       console.warn('Feature toggle AJAX failed, falling back to form POST:', err)
       form.submit()
     } finally {
@@ -1721,6 +1698,9 @@ function initRecommendations() {
     try {
       const urlKey = recommendContainer.dataset.urlKey
       const apiPrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : ''
+      // Deliberately raw fetch (NOT window.api): this is an SSE stream read via
+      // response.body.getReader() (readSSEStream below). api() consumes the body
+      // as JSON, so streaming readers stay on raw fetch. (api() carve-out.)
       const response = await fetch(
         `${apiPrefix}/api/recommend/${issueId}/stream`,
         { signal: abortController.signal }
@@ -2077,10 +2057,9 @@ async function initFreeTierStatus() {
   if (!urlKey) return
 
   try {
-    const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/recommend/status`)
-    if (!response.ok) return
-
-    const data = await response.json()
+    // on401:false — a background status fetch must not bounce the page to /logout.
+    const data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/recommend/status`, { on401: false })
+    if (!data) return
     if (data.modelName) updateFooterModel(data.modelName)
     if (data.freeTier) {
       if (footerStatus) updateFooterFreeTier(data.freeTier)
@@ -2165,17 +2144,10 @@ function initForeman() {
     try {
       const urlKey = container.dataset.urlKey
       const apiPrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : ''
-      const response = await fetch(
+      const data = await window.api(
         `${apiPrefix}/api/foreman-prompt/${issueId}`,
         { signal: abortController.signal }
       )
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({}))
-        throw new Error(error.error || 'Failed to load foreman prompt')
-      }
-
-      const data = await response.json()
 
       if (activeForemanFetch === abortController) {
         promptText.dataset.rawPrompt = data.prompt
@@ -2245,17 +2217,10 @@ function initMiniForeman() {
     try {
       const urlKey = container.dataset.urlKey
       const apiPrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : ''
-      const response = await fetch(
+      const data = await window.api(
         `${apiPrefix}/api/mini-foreman-prompt/${issueId}`,
         { signal: abortController.signal }
       )
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({}))
-        throw new Error(error.error || 'Failed to load mini-foreman prompt')
-      }
-
-      const data = await response.json()
 
       if (activeMiniForemanFetch === abortController) {
         promptText.dataset.rawPrompt = data.prompt
@@ -2323,17 +2288,10 @@ function initAutopilot() {
     try {
       const urlKey = container.dataset.urlKey
       const apiPrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : ''
-      const response = await fetch(
+      const data = await window.api(
         `${apiPrefix}/api/autopilot-prompt/${issueId}`,
         { signal: abortController.signal }
       )
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({}))
-        throw new Error(error.error || 'Failed to load autopilot prompt')
-      }
-
-      const data = await response.json()
 
       if (activeAutopilotFetch === abortController) {
         promptText.dataset.rawPrompt = data.prompt
