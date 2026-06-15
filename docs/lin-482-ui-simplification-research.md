@@ -5,6 +5,13 @@ epic; this is the deferred **Phase C decision point** named in
 [`docs/ui-improvement-strategy.md`](./ui-improvement-strategy.md). Concrete UI
 changes are out of scope and become separate tickets.
 
+> **Outcome (decided with owner, 2026-06-15).** Direction agreed; see
+> [Decision & follow-up](#decision--follow-up-decided-2026-06-15) at the end.
+> Step 1 (comprehensive tidy-up to one source of truth) is ticketed under
+> **LIN-491**; a tool/framework (htmx) is **deferred to Step 2**. Note the
+> [correction](#decision--follow-up-decided-2026-06-15) on deliberate
+> divergence — some flagged "duplication" is load-bearing and must be kept.
+
 ## Recommendation (TL;DR)
 
 **Continue incrementally — finish adopting the layer we just built. Do not start
@@ -216,3 +223,59 @@ means introducing it now would be speculation.
 Steps 1–4 are pure incremental adoption (low risk). Step 5 is the product call
 this research surfaces. Steps 6–7 are the deferred, optional Phase-C structure
 and the eventual redesign gate.
+
+## Decision & follow-up (decided 2026-06-15)
+
+After the research above, the direction was decided with the owner.
+
+**On the "no frameworks" rule.** It was reaffirmed *for now*, with a refinement:
+the half worth keeping is *"no SPA / no build step"* (cheap to hold); the half
+with rising cost is *"no helpers at all"* — already quietly relaxed via the
+vendored single-file helpers (`marked`/`purify`/`chart`). Split by axis:
+
+- **Styling / token complexity → no tool fixes it.** Every option (Tailwind,
+  Open Props, classless CSS) is built on tokens; the pain is the *half-wired*
+  state, not the concept. Finishing the wiring is the simplifier; a CSS
+  framework would also fight the CLI aesthetic and the bespoke visualizations.
+- **Interactivity / data axis → one tool has real merit: htmx** (vendored,
+  no build step, fits the server-rendered model; would retire the per-page
+  `fetch()`+DOM-patch JS for the CRUD-ish surfaces — not the visualizations).
+  **Deferred to Step 2.**
+- **React/Vue/Svelte → no** (rewrite + build step + orphans the current layer).
+
+**Agreed two-step plan.**
+
+1. **Step 1 — comprehensive tidy-up to one source of truth (decided, ticketed).**
+   Bring the LIN-368 layer to 100% adoption with **no dangling pieces**, *before*
+   evaluating any tool. Owner's principle: finish the alignment even where Step 2
+   might rework part of it — solid ground with nothing dangling is the best base
+   to choose from (so the Step-1 client-primitive convergence is completed *now*,
+   intentionally, even though an htmx spike may later absorb it).
+2. **Step 2 — evaluate a nicer setup on the clean base (deferred, not ticketed).**
+   Spike htmx + a clean data API on one converged page, judge from real code,
+   then decide rollout.
+
+**Why the migration had stalled (investigated, not assumed).** Not abandoned:
+LIN-368 deliberately closed at the *capability + proof-of-adoption* milestone —
+Phase A (LIN-460) migrated only pages with a *true server-side seam* and
+documented the rest; Phase B (LIN-475) shipped `api()` as **wave-1**; token
+wiring was a conscious "definitions only" choice (LIN-456). The remaining waves
+were simply never re-ticketed. LIN-491 now gives them a home.
+
+**Correction to the residual estimate above.** Much of the "residual
+duplication" tabulated earlier is **deliberate, load-bearing divergence**, not
+unfinished work, and must be preserved: swipe gesture affordances
+(12px radius/shadow/accent), `.swim-box`/ship graph primitives, foreman's
+documented delta, and hook classes that client JS + E2E selectors depend on
+("remove duplicate *styling*, never the names"). The genuinely-unfinished part is
+narrower: token wiring, `api()` waves 2+, and 2–3 leftover modal/toast copies.
+
+**Step 1 tickets (under umbrella LIN-491):**
+
+| Ticket | Work |
+|---|---|
+| LIN-492 | Expand visual baselines to convergence surfaces (safety net — first) |
+| LIN-493 | Finish token wiring — one source of truth in `:root` |
+| LIN-494 | Converge genuinely-duplicated server components (preserve divergences) |
+| LIN-495 | Finish client-primitive adoption — `api()` waves + modal/toast |
+| LIN-496 | Retire-or-fold orphaned `/ship`; ratify first-class view set |
