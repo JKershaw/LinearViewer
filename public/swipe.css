@@ -5,7 +5,7 @@
 .swipe-page {
   max-width: 520px;
   margin: 0 auto;
-  padding: 0.75rem 1rem 2rem;
+  padding: 0.75rem var(--space-3) var(--space-5);
 }
 
 /* Filter Bar */
@@ -15,7 +15,7 @@
 
 .swipe-filter-select {
   width: 100%;
-  padding: 0.5rem 0.75rem;
+  padding: var(--space-2) 0.75rem;
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
   font-size: 13px;
   border: 1px solid #e0e0e0;
@@ -82,7 +82,7 @@
 /* Card */
 .swipe-card {
   border: 1px solid #e0e0e0;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 0;
   background: var(--bg);
   will-change: transform, opacity;
@@ -109,7 +109,7 @@
 .swipe-card-empty {
   text-align: center;
   color: var(--fg-dim);
-  padding: 3rem 1rem;
+  padding: 3rem var(--space-3);
   font-style: italic;
 }
 
@@ -120,12 +120,12 @@
 }
 .swipe-card-accent.in-progress { background: linear-gradient(90deg, var(--yellow), #e8c547); }
 .swipe-card-accent.done { background: linear-gradient(90deg, var(--green), #2ecc71); }
-.swipe-card-accent.todo { background: #ddd; }
-.swipe-card-accent.backlog { background: #eee; }
+.swipe-card-accent.todo { background: var(--border); }
+.swipe-card-accent.backlog { background: var(--fg-vdim); }
 
 /* Card inner content */
 .swipe-card-inner {
-  padding: 1rem 1.25rem 1.25rem;
+  padding: var(--space-3) 1.25rem 1.25rem;
 }
 
 /* Card Header: status + identifier + position */
@@ -133,7 +133,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-2);
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
   font-size: 12px;
 }
@@ -192,13 +192,13 @@
   gap: 0.35rem;
   font-size: 13px;
   color: var(--fg-dim);
-  padding-bottom: 0.25rem;
+  padding-bottom: var(--space-1);
 }
 
 .swipe-card-meta-row {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 .swipe-card-meta-label {
@@ -221,13 +221,13 @@
 }
 
 .priority-dots .filled { color: var(--fg); }
-.priority-dots .empty { color: #ddd; }
+.priority-dots .empty { color: var(--border); }
 
 /* Label Tags */
 .swipe-card-labels {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem;
+  gap: var(--space-1);
 }
 
 .swipe-label-tag {
@@ -244,8 +244,8 @@
 /* Blocking Relationship Rows */
 .swipe-meta-blocks {
   border: 1px solid #e74c3c;
-  border-radius: 6px;
-  padding: 0.3rem 0.5rem;
+  border-radius: var(--radius-md);
+  padding: 0.3rem var(--space-2);
   margin-top: 0.15rem;
 }
 .swipe-meta-blocks .swipe-card-meta-label { color: #c0392b; }
@@ -254,8 +254,8 @@
 .swipe-meta-blocked {
   background: var(--bg-muted);
   border: 1px solid #e8e8e8;
-  border-radius: 6px;
-  padding: 0.3rem 0.5rem;
+  border-radius: var(--radius-md);
+  padding: 0.3rem var(--space-2);
   margin-top: 0.15rem;
 }
 .swipe-meta-blocked .swipe-card-meta-label { color: var(--fg-dim); }
@@ -281,8 +281,8 @@ a.swipe-blocking-issue:hover {
 .swipe-meta-parent {
   background: var(--bg-muted);
   border: 1px solid #e8e8e8;
-  border-radius: 6px;
-  padding: 0.3rem 0.5rem;
+  border-radius: var(--radius-md);
+  padding: 0.3rem var(--space-2);
   margin-top: 0.15rem;
 }
 .swipe-meta-parent .swipe-card-meta-label { color: var(--fg-dim); }
@@ -290,12 +290,12 @@ a.swipe-blocking-issue:hover {
 .swipe-meta-subtasks {
   background: var(--bg-muted);
   border: 1px solid #e8e8e8;
-  border-radius: 6px;
-  padding: 0.3rem 0.5rem;
+  border-radius: var(--radius-md);
+  padding: 0.3rem var(--space-2);
   margin-top: 0.15rem;
 }
 .swipe-meta-subtasks .swipe-card-meta-label { color: var(--fg-dim); }
-.swipe-meta-subtasks .swipe-card-meta-value { display: flex; flex-wrap: wrap; align-items: center; gap: 0.15rem 0.5rem; }
+.swipe-meta-subtasks .swipe-card-meta-value { display: flex; flex-wrap: wrap; align-items: center; gap: 0.15rem var(--space-2); }
 
 .swipe-relation-issue {
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
@@ -321,12 +321,12 @@ a.swipe-relation-issue:hover {
 
 /* Expandable Accordion Sections */
 .swipe-card-accordion {
-  margin-top: 0.25rem;
+  margin-top: var(--space-1);
   border-top: 1px solid #f0f0f0;
 }
 
 .swipe-card-accordion:first-of-type {
-  margin-top: 0.5rem;
+  margin-top: var(--space-2);
 }
 
 .swipe-accordion-header {
@@ -358,7 +358,7 @@ a.swipe-relation-issue:hover {
 
 .swipe-accordion-body {
   display: none;
-  padding: 0.5rem 0 0.75rem;
+  padding: var(--space-2) 0 0.75rem;
   font-size: 14px;
   line-height: 1.6;
   color: var(--fg);
@@ -371,22 +371,22 @@ a.swipe-relation-issue:hover {
 }
 
 /* Markdown content in accordion */
-.swipe-accordion-body p { margin: 0 0 0.5rem; }
+.swipe-accordion-body p { margin: 0 0 var(--space-2); }
 .swipe-accordion-body ul,
-.swipe-accordion-body ol { margin: 0 0 0.5rem; padding-left: 1.5rem; }
+.swipe-accordion-body ol { margin: 0 0 var(--space-2); padding-left: var(--space-4); }
 .swipe-accordion-body code {
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
   font-size: 13px;
   background: var(--bg-muted);
   padding: 0.1rem 0.3rem;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 }
 .swipe-accordion-body pre {
   background: var(--bg-muted);
   padding: 0.75rem;
   border-radius: 4px;
   overflow-x: auto;
-  margin: 0 0 0.5rem;
+  margin: 0 0 var(--space-2);
 }
 .swipe-accordion-body pre code {
   background: none;
@@ -401,11 +401,11 @@ a.swipe-relation-issue:hover {
 .swipe-comments-loading {
   color: var(--fg-dim);
   font-style: italic;
-  padding: 0.5rem 0;
+  padding: var(--space-2) 0;
 }
 
 .swipe-comment {
-  padding: 0.5rem 0;
+  padding: var(--space-2) 0;
   border-bottom: 1px solid #f0f0f0;
 }
 
@@ -448,19 +448,19 @@ a.swipe-relation-issue:hover {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #ddd;
+  background: var(--border);
   transition: background 0.2s, transform 0.2s;
 }
 
 .swipe-counter-dot.active {
-  background: #666;
+  background: var(--fg-dim);
   transform: scale(1.3);
 }
 
 /* Linear Link */
 .swipe-card-link {
   display: block;
-  margin-top: 0.5rem;
+  margin-top: var(--space-2);
   padding-top: 0.4rem;
   border-top: 1px solid #f0f0f0;
   font-size: 11px;
@@ -489,7 +489,7 @@ a.swipe-relation-issue:hover {
 .swipe-prompts-cache-hint {
   color: var(--fg-dim);
   font-size: 11px;
-  margin-left: 0.25rem;
+  margin-left: var(--space-1);
 }
 
 /* Prompt Buttons - compact centered row */
@@ -497,7 +497,7 @@ a.swipe-relation-issue:hover {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin: 0.5rem 0 0.25rem;
+  margin: var(--space-2) 0 var(--space-1);
   justify-content: center;
 }
 
@@ -574,7 +574,7 @@ a.swipe-relation-issue:hover {
   display: none;
   flex-wrap: wrap;
   gap: 6px;
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-2);
   justify-content: center;
 }
 
@@ -601,7 +601,7 @@ a.swipe-relation-issue:hover {
 .prompt-section[data-phase="fresh"] .swipe-prompt-header,
 .prompt-section[data-phase="generating"] .swipe-prompt-header,
 .prompt-section[data-phase="error"] .swipe-prompt-header {
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--fg-vdim);
   margin-bottom: 0.4rem;
 }
 
@@ -620,8 +620,8 @@ a.swipe-relation-issue:hover {
 .swipe-prompt-actions button,
 .prompt-section .swipe-prompt-change {
   padding: 0.2rem 0.45rem;
-  border: 1px solid #ddd;
-  border-radius: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   background: var(--bg);
   color: var(--fg-dim);
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
@@ -656,7 +656,7 @@ a.swipe-relation-issue:hover {
 }
 
 .swipe-prompt-text {
-  padding: 0.5rem 0 0;
+  padding: var(--space-2) 0 0;
   font-size: 13px;
   line-height: 1.6;
   max-height: 400px;
@@ -666,7 +666,7 @@ a.swipe-relation-issue:hover {
 
 /* Warning banner: surfaces a truncated/incomplete generation to the user */
 .swipe-prompt-warning {
-  margin-top: 0.5rem;
+  margin-top: var(--space-2);
   padding: 0.4rem 0.6rem;
   font-size: 12px;
   line-height: 1.4;
@@ -699,7 +699,7 @@ a.swipe-relation-issue:hover {
 /* Subtle indicator on the element currently being written to */
 .prompt-section.streaming .swipe-prompt-text .stream-cursor {
   border-left: 2px solid rgba(0,0,0,0.12);
-  padding-left: 0.5rem;
+  padding-left: var(--space-2);
   transition: border-color 0.3s;
 }
 
@@ -709,15 +709,15 @@ a.swipe-relation-issue:hover {
   -webkit-mask-image: linear-gradient(to bottom, #000 75%, transparent 100%);
 }
 
-.swipe-prompt-text p { margin: 0 0 0.5rem; }
+.swipe-prompt-text p { margin: 0 0 var(--space-2); }
 .swipe-prompt-text ul,
-.swipe-prompt-text ol { margin: 0 0 0.5rem; padding-left: 1.5rem; }
+.swipe-prompt-text ol { margin: 0 0 var(--space-2); padding-left: var(--space-4); }
 .swipe-prompt-text code {
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
   font-size: 12px;
   background: var(--bg-muted);
   padding: 0.1rem 0.3rem;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 }
 .swipe-prompt-text pre {
   background: var(--bg-muted);
@@ -745,7 +745,7 @@ a.swipe-relation-issue:hover {
   color: var(--fg-dim);
   cursor: pointer;
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--fg-vdim);
   user-select: none;
 }
 .prompt-section .swipe-reasoning-toggle:hover {
@@ -758,7 +758,7 @@ a.swipe-relation-issue:hover {
   font-size: 12px;
   line-height: 1.5;
   color: var(--fg-dim);
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--fg-vdim);
   max-height: 300px;
   overflow-y: auto;
 }
@@ -766,13 +766,13 @@ a.swipe-relation-issue:hover {
 .swipe-reasoning-toggle.hidden { display: none; }
 .swipe-reasoning-content p { margin: 0 0 0.4rem; }
 .swipe-reasoning-content ul,
-.swipe-reasoning-content ol { margin: 0 0 0.4rem; padding-left: 1.5rem; }
+.swipe-reasoning-content ol { margin: 0 0 0.4rem; padding-left: var(--space-4); }
 .swipe-reasoning-content code {
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
   font-size: 11px;
   background: var(--bg-muted);
   padding: 0.1rem 0.3rem;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 }
 
 /* ==========================================================================
@@ -781,11 +781,11 @@ a.swipe-relation-issue:hover {
 
 @media (min-width: 641px) {
   .swipe-page {
-    padding: 1rem 2rem 3rem;
+    padding: var(--space-3) var(--space-5) 3rem;
   }
 
   .swipe-card-inner {
-    padding: 1.25rem 1.5rem 1.5rem;
+    padding: 1.25rem var(--space-4) var(--space-4);
   }
 
   .swipe-card-title {
@@ -799,11 +799,11 @@ a.swipe-relation-issue:hover {
 
 @media (max-width: 400px) {
   .swipe-page {
-    padding: 0.5rem 0.75rem 1.5rem;
+    padding: var(--space-2) 0.75rem var(--space-4);
   }
 
   .swipe-card-inner {
-    padding: 0.75rem 1rem 1rem;
+    padding: 0.75rem var(--space-3) var(--space-3);
   }
 
   .swipe-card-title {
@@ -834,13 +834,13 @@ a.swipe-relation-issue:hover {
 
 .sessions-section {
   font-family: var(--font-structural);
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
 }
 
 .sessions-header {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
   padding-bottom: 0.4rem;
   margin-bottom: 0.3rem;
   border-bottom: 1px solid var(--fg-vdim);
@@ -872,7 +872,7 @@ a.swipe-relation-issue:hover {
 
 .sessions-empty {
   color: var(--fg-dim);
-  padding: 0.5rem 0;
+  padding: var(--space-2) 0;
 }
 
 .sessions-error {
@@ -881,7 +881,7 @@ a.swipe-relation-issue:hover {
 
 .session-entry {
   border-bottom: 1px solid var(--fg-vdim);
-  padding: 0.5rem 0;
+  padding: var(--space-2) 0;
 }
 
 .session-entry:last-child {
@@ -891,7 +891,7 @@ a.swipe-relation-issue:hover {
 .session-header {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
   flex-wrap: wrap;
 }
 
@@ -932,7 +932,7 @@ a.swipe-relation-issue:hover {
 }
 
 .session-feedback {
-  padding: 0.25rem 0 0 1.25rem;
+  padding: var(--space-1) 0 0 1.25rem;
 }
 
 .session-feedback-entry {
