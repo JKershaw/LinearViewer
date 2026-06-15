@@ -1254,6 +1254,9 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
   // Check for model validation error from redirect
   const modelError = req.query.error;
 
+  // LLM usage KPIs (LIN-418): aggregate per-call metadata over the retained window.
+  const llmStats = await llmCallLogStore.summarize(workspace.urlKey);
+
   const html = renderSettingsPage(workspace.name || 'Workspace', {
     openRouterConnected: !!(openRouterSource === 'oauth' || openRouterSource === 'env'),
     openRouterSource,
@@ -1264,7 +1267,8 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
     urlKey: workspace.urlKey,
     workspaces: req.session.workspaces,
     featureFlags: getFeatureFlags(req.session),
-    workspaceFeatures
+    workspaceFeatures,
+    llmStats
   });
   res.send(html);
 });

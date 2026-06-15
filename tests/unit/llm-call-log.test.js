@@ -137,3 +137,46 @@ describe('LlmCallLogStore.listCalls', () => {
     assert.deepStrictEqual(await store.listCalls(), { items: [], total: 0 });
   });
 });
+
+describe('LlmCallLogStore.summarize', () => {
+  let store;
+  let collection;
+
+  beforeEach(() => {
+    collection = createMockCollection();
+    store = new LlmCallLogStore({ collection });
+  });
+
+  test('totals calls/cost/tokens and breaks down by feature (busiest first)', async () => {
+    await store.record({ urlKey: 'acme', feature: 'recommend', cost: 0.01, totalTokens: 100 });
+    await store.record({ urlKey: 'acme', feature: 'recommend', cost: 0.02, totalTokens: 200 });
+    await store.record({ urlKey: 'acme', feature: 'brief', cost: 0.005, totalTokens: 50 });
+    await store.record({ urlKey: 'other', feature: 'recap', cost: 1, totalTokens: 999 }); // different workspace
+
+    const s = await store.summarize('acme');
+    assert.strictEqual(s.totalCalls, 3);
+    assert.ok(Math.abs(s.totalCost - 0.035) < 1e-9);
+    assert.strictEqual(s.totalTokens, 350);
+    assert.strictEqual(s.byFeature[0].feature, 'recommend'); // busiest first
+    assert.strictEqual(s.byFeature[0].calls, 2);
+    assert.ok(Math.abs(s.byFeature[0].cost - 0.03) < 1e-9);
+    assert.strictEqual(s.byFeature[1].feature, 'brief');
+    assert.ok(s.lastCallAt);
+  });
+
+  test('records missing cost/tokens are skipped, not counted as zero understatement', async () => {
+    await store.record({ urlKey: 'acme', feature: 'recommend', cost: 0.01, totalTokens: 100 });
+    await store.record({ urlKey: 'acme', feature: 'task-chat' }); // no cost/tokens reported
+    const s = await store.summarize('acme');
+    assert.strictEqual(s.totalCalls, 2);
+    assert.ok(Math.abs(s.totalCost - 0.01) < 1e-9);
+    assert.strictEqual(s.totalTokens, 100);
+  });
+
+  test('empty for unknown workspace, missing urlKey, or no collection', async () => {
+    const empty = { totalCalls: 0, totalCost: 0, totalTokens: 0, byFeature: [], lastCallAt: null };
+    assert.deepStrictEqual(await store.summarize('nope'), empty);
+    assert.deepStrictEqual(await store.summarize(), empty);
+    assert.deepStrictEqual(await new LlmCallLogStore({}).summarize('acme'), empty);
+  });
+});

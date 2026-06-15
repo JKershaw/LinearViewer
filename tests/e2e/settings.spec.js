@@ -32,6 +32,12 @@ test.describe('Settings Page', () => {
     await expect(workspaceToggle).toBeVisible()
     await expect(workspaceToggle).toContainText('Local Workspace')
   })
+
+  test('shows the AI usage KPI section (LIN-418)', async ({ page }) => {
+    await expect(page.locator('.settings-header:has-text("AI usage")')).toBeVisible()
+    // No LLM calls in a fresh local workspace → empty state.
+    await expect(page.locator('.settings-section:has(.settings-header:has-text("AI usage"))')).toContainText('none recorded yet')
+  })
 })
 
 test.describe('Token Management', () => {
