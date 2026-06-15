@@ -40,14 +40,9 @@ async function renderDispatchRecentPrompts(container, urlKey) {
   if (!container) return
 
   try {
-    const res = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/recent-prompts`)
-    if (res.status === 401) {
-      window.location.href = '/logout'
-      return
-    }
-    if (!res.ok) return
-
-    const { prompts } = await res.json()
+    // Default on401 — preserves this call's existing 401→/logout redirect.
+    const data = await api(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/recent-prompts`)
+    const prompts = data && data.prompts
     if (!prompts || prompts.length === 0) {
       container.innerHTML = ''
       return
@@ -102,11 +97,13 @@ async function dispatchPageCustomPrompt({ urlKey, prompt, target, repo, kind, pr
     }
 
     // Save to recent prompts, then refresh recents list
+    // on401:false — a background best-effort save must not bounce the page to /logout.
     try {
-      await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/recent-prompts`, {
+      await api(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/recent-prompts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt })
+        body: JSON.stringify({ prompt }),
+        on401: false
       })
     } catch (e) {
       // Best-effort
@@ -186,12 +183,9 @@ function initDispatchPagePrompt() {
       loadBtn.disabled = true
       loadBtn.textContent = 'loading...'
       try {
-        const resp = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/autopilot-prompt`)
-        if (!resp.ok) {
-          const err = await resp.json().catch(() => ({}))
-          throw new Error(err.error || `HTTP ${resp.status}`)
-        }
-        const data = await resp.json()
+        // on401:false — failures surface on the bespoke inline feedback el below
+        // (the catch), so a 401 must not redirect out from under it.
+        const data = await api(`/workspace/${encodeURIComponent(urlKey)}/api/autopilot-prompt`, { on401: false })
         textarea.value = data.prompt
         textarea.dataset.kind = data.kind || 'autopilot'
         textarea.dataset.promptName = data.promptName || 'Autopilot (stack walk)'
@@ -312,10 +306,9 @@ async function refreshQueueList(urlKey) {
   if (!container) return
 
   try {
-    const r = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch`)
-    if (!r.ok) throw new Error('Failed to load queue')
-
-    const { items } = await r.json()
+    // on401:false — this 3s poll surfaces failure inline (empty state below);
+    // a transient 401 must not bounce the page to /logout mid-poll.
+    const { items } = await api(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch`, { on401: false })
     renderDispatchQueueList(container, items, urlKey)
   } catch (e) {
     console.error('Failed to load queue items:', e)
@@ -362,11 +355,12 @@ async function removeQueueListItem(urlKey, itemId) {
   }
 
   try {
-    const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/${encodeURIComponent(itemId)}`, {
-      method: 'DELETE'
+    // toastOnError:true + default on401 — mirrors the dashboard's removeQueueItem
+    // (app.js); a removal that previously only console.error'd now surfaces.
+    await api(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/${encodeURIComponent(itemId)}`, {
+      method: 'DELETE',
+      toastOnError: true
     })
-
-    if (!response.ok) throw new Error('Failed to remove item')
 
     // Remove item from DOM
     document.querySelector(`.queue-list .queue-item[data-item-id="${itemId}"]`)?.remove()
@@ -427,10 +421,9 @@ async function loadDispatchTokenList(urlKey) {
   if (!listEl) return
 
   try {
-    const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/tokens`)
-    if (!response.ok) throw new Error('Failed to load tokens')
-
-    const { tokens } = await response.json()
+    // on401:false — consistent with the token CRUD calls (no redirect); failure
+    // surfaces on the inline empty state below.
+    const { tokens } = await api(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/tokens`, { on401: false })
     renderDispatchTokenList(listEl, tokens, urlKey)
   } catch (e) {
     console.error('Failed to load tokens:', e)
@@ -621,10 +614,9 @@ async function loadDispatchHistory(urlKey, offset) {
   if (!historyEl) return
 
   try {
-    const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/history?offset=${offset}`)
-    if (!response.ok) throw new Error('Failed to load history')
-
-    const { items, total } = await response.json()
+    // on401:false — best-effort list load; failure surfaces on the inline empty
+    // state below rather than redirecting.
+    const { items, total } = await api(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/history?offset=${offset}`, { on401: false })
     renderDispatchHistoryList(historyEl, items, total, offset, urlKey)
   } catch (e) {
     console.error('Failed to load history:', e)
