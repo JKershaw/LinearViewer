@@ -54,14 +54,16 @@
     if (cachedProxyToken) return cachedProxyToken;
     if (!urlKey) return null;
     try {
-      const resp = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/proxy/tokens`, {
+      // Background token mint behind the +proxy toggle — on401:false so a stale
+      // session never bounces the page to /logout; any failure (incl. 401 or a
+      // token rate-limit) is swallowed to null and surfaced by the caller.
+      const data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/proxy/tokens`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label: 'prompt-proxy', scope: 'readWrite', singleUse: false })
+        body: JSON.stringify({ label: 'prompt-proxy', scope: 'readWrite', singleUse: false }),
+        on401: false
       });
-      if (!resp.ok) return null;
-      const data = await resp.json();
-      cachedProxyToken = data.token;
+      cachedProxyToken = (data && data.token) || null;
       return cachedProxyToken;
     } catch { return null; }
   }
@@ -310,6 +312,9 @@
 
       try {
         if (label === '__ai__') {
+          // SSE carve-out: window.api() parses the body as JSON, but this is a
+          // streamed text/event-stream consumed by handleStreamingResponse via a
+          // ReadableStream reader — it must stay on raw fetch().
           const response = await fetch(`${apiPrefix}/api/recommend/${issueId}/stream`, { signal: ac.signal });
           if (!response.ok) {
             const error = await response.json().catch(() => ({}));
@@ -317,12 +322,9 @@
           }
           await handleStreamingResponse(response, label, ac);
         } else if (label === '__foreman__') {
-          const response = await fetch(`${apiPrefix}/api/foreman-prompt/${issueId}`, { signal: ac.signal });
-          if (!response.ok) {
-            const error = await response.json().catch(() => ({}));
-            throw new Error(error.error || 'Failed to load foreman prompt');
-          }
-          const result = await response.json();
+          // on401:false — a stale session surfaces in this section's own error
+          // state (the catch below), it does not bounce the page to /logout.
+          const result = await window.api(`${apiPrefix}/api/foreman-prompt/${issueId}`, { signal: ac.signal, on401: false });
           if (abortController !== ac || destroyed) return;
           const html = renderMarkdown(result.prompt);
           const entry = { label, name: result.promptName || 'Foreman', raw: result.prompt, html };
@@ -332,12 +334,7 @@
           state.result = entry;
           render();
         } else if (label === '__mini-foreman__') {
-          const response = await fetch(`${apiPrefix}/api/mini-foreman-prompt/${issueId}`, { signal: ac.signal });
-          if (!response.ok) {
-            const error = await response.json().catch(() => ({}));
-            throw new Error(error.error || 'Failed to load mini-foreman prompt');
-          }
-          const result = await response.json();
+          const result = await window.api(`${apiPrefix}/api/mini-foreman-prompt/${issueId}`, { signal: ac.signal, on401: false });
           if (abortController !== ac || destroyed) return;
           const html = renderMarkdown(result.prompt);
           const entry = { label, name: result.promptName || 'Mini-foreman', raw: result.prompt, html };
@@ -347,12 +344,7 @@
           state.result = entry;
           render();
         } else if (label === '__autopilot__') {
-          const response = await fetch(`${apiPrefix}/api/autopilot-prompt/${issueId}`, { signal: ac.signal });
-          if (!response.ok) {
-            const error = await response.json().catch(() => ({}));
-            throw new Error(error.error || 'Failed to load autopilot prompt');
-          }
-          const result = await response.json();
+          const result = await window.api(`${apiPrefix}/api/autopilot-prompt/${issueId}`, { signal: ac.signal, on401: false });
           if (abortController !== ac || destroyed) return;
           const html = renderMarkdown(result.prompt);
           // Carry kind through so the dispatch tags the item as the autopilot meta-loop.
@@ -363,12 +355,7 @@
           state.result = entry;
           render();
         } else {
-          const response = await fetch(`${apiPrefix}/api/prompt/${issueId}/${encodeURIComponent(label)}`, { signal: ac.signal });
-          if (!response.ok) {
-            const error = await response.json().catch(() => ({}));
-            throw new Error(error.error || 'Failed to load prompt');
-          }
-          const result = await response.json();
+          const result = await window.api(`${apiPrefix}/api/prompt/${issueId}/${encodeURIComponent(label)}`, { signal: ac.signal, on401: false });
           if (abortController !== ac || destroyed) return;
           const html = renderMarkdown(result.prompt);
           const entry = { label, name: result.promptName || '', raw: result.prompt, html };
