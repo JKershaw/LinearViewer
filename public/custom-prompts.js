@@ -58,31 +58,28 @@
   // API calls
   // =========================================================================
 
+  // Default on401 (→ /logout): a 401 here means the session expired. Non-401
+  // failures throw and are surfaced by the bespoke inline button states below.
   async function createPrompt(name, template) {
-    const res = await fetch(apiBase, {
+    const body = await window.api(apiBase, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, template })
     });
-    if (!res.ok) throw new Error('Failed to create prompt');
-    return (await res.json()).prompt;
+    return body.prompt;
   }
 
   async function updatePrompt(id, name, template) {
-    const res = await fetch(`${apiBase}/${encodeURIComponent(id)}`, {
+    const body = await window.api(`${apiBase}/${encodeURIComponent(id)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, template })
     });
-    if (!res.ok) throw new Error('Failed to update prompt');
-    return (await res.json()).prompt;
+    return body.prompt;
   }
 
   async function deletePrompt(id) {
-    const res = await fetch(`${apiBase}/${encodeURIComponent(id)}`, {
-      method: 'DELETE'
-    });
-    if (!res.ok) throw new Error('Failed to delete prompt');
+    await window.api(`${apiBase}/${encodeURIComponent(id)}`, { method: 'DELETE' });
   }
 
   // =========================================================================

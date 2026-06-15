@@ -765,10 +765,9 @@ async function loadComments(container) {
   const apiPrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : '';
 
   try {
-    const response = await fetch(`${apiPrefix}/api/comments/${encodeURIComponent(issue.id)}`);
-    if (!response.ok) throw new Error('Failed to load comments');
-
-    const result = await response.json();
+    // on401:false — keep throwing into the inline catch below (renders
+    // "Could not load comments") rather than redirecting on 401.
+    const result = await window.api(`${apiPrefix}/api/comments/${encodeURIComponent(issue.id)}`, { on401: false });
     const comments = result.comments || [];
 
     if (comments.length === 0) {

@@ -164,17 +164,13 @@ async function startDiscussion() {
   setStartStatus('');
 
   try {
-    const res = await fetch(`/workspace/${encodeURIComponent(urlKey)}/collective/start`, {
+    // Default on401 (→ /logout) matches the prior manual redirect. Server
+    // errors throw with .body; the catch surfaces data.error inline as before.
+    const data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/collective/start`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ workspaceUrlKeys, channel, topic, target }),
     });
-    if (res.status === 401) { window.location.href = '/logout'; return; }
-    const data = await res.json();
-    if (!res.ok) {
-      setStartStatus(data.error || 'Failed to start discussion.', true);
-      return;
-    }
 
     const ok = (data.dispatched || []).filter(d => d.ok);
     const failed = (data.dispatched || []).filter(d => !d.ok);
@@ -187,7 +183,7 @@ async function startDiscussion() {
     startPolling(data.channel);
   } catch (e) {
     console.error('Start failed:', e);
-    setStartStatus('Failed to start discussion.', true);
+    setStartStatus((e.body && e.body.error) || 'Failed to start discussion.', true);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'start discussion'; }
   }
@@ -207,22 +203,16 @@ async function viewPrompt() {
 
   if (btn) { btn.disabled = true; btn.textContent = 'loading…'; }
   try {
-    const res = await fetch(`/workspace/${encodeURIComponent(urlKey)}/collective/preview`, {
+    const data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/collective/preview`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ channel, topic }),
     });
-    if (res.status === 401) { window.location.href = '/logout'; return; }
-    const data = await res.json();
-    if (!res.ok) {
-      setStartStatus(data.error || 'Could not build the prompt.', true);
-      return;
-    }
     if (pre) pre.textContent = data.prompt || '';
     if (wrap) wrap.classList.remove('hidden');
   } catch (e) {
     console.error('Preview failed:', e);
-    setStartStatus('Could not build the prompt.', true);
+    setStartStatus((e.body && e.body.error) || 'Could not build the prompt.', true);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'view prompt'; }
   }
@@ -259,24 +249,18 @@ async function sayMessage() {
   if (btn) btn.disabled = true;
 
   try {
-    const res = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/collective/say`, {
+    await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/collective/say`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ channel, message }),
     });
-    if (res.status === 401) { window.location.href = '/logout'; return; }
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setPollStatus(data.error || 'say failed');
-      return;
-    }
     input.value = '';
     // If we weren't already watching this channel, start now.
     if (!activeChannel) startPolling(channel);
     else pollState();
   } catch (e) {
     console.error('Say failed:', e);
-    setPollStatus('say failed');
+    setPollStatus((e.body && e.body.error) || 'say failed');
   } finally {
     if (btn) btn.disabled = false;
   }

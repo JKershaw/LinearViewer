@@ -37,26 +37,14 @@
     return `/workspace/${encodeURIComponent(urlKey)}/api/recap/${encodeURIComponent(identifier)}`;
   }
 
+  // on401:false — recap errors (incl. 401) throw with .status/.body so the
+  // inline renderError path shows them, rather than redirecting to /logout.
   async function fetchRecapStatus(urlKey, identifier) {
-    const res = await fetch(recapUrl(urlKey, identifier));
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      const err = new Error(body.error || `Recap GET failed: ${res.status}`);
-      err.status = res.status;
-      throw err;
-    }
-    return res.json();
+    return window.api(recapUrl(urlKey, identifier), { on401: false });
   }
 
   async function postRecap(urlKey, identifier) {
-    const res = await fetch(recapUrl(urlKey, identifier), { method: 'POST' });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      const err = new Error(body.error || `Recap POST failed: ${res.status}`);
-      err.status = res.status;
-      throw err;
-    }
-    return res.json();
+    return window.api(recapUrl(urlKey, identifier), { method: 'POST', on401: false });
   }
 
   function renderItems(items, { marker, markerClass }) {
