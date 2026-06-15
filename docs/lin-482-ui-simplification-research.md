@@ -11,6 +11,13 @@ changes are out of scope and become separate tickets.
 > **LIN-491**; a tool/framework (htmx) is **deferred to Step 2**. Note the
 > [correction](#decision--follow-up-decided-2026-06-15) on deliberate
 > divergence — some flagged "duplication" is load-bearing and must be kept.
+>
+> **Correction on `/ship` (owner):** the "orphaned ⇒ retire/fold" inference
+> below was wrong. `/ship` is a **key view, experimental and in active
+> development** (missing link = in-dev, not abandoned). It is reclassified
+> **experimental** (with collective), **never retired**, and stands as a useful
+> signal of a *new view concept that doesn't fit the current section/card/token
+> mould* — input for Step 2. See LIN-496.
 
 ## Recommendation (TL;DR)
 
