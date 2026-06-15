@@ -180,6 +180,10 @@ Provider capability-awareness (LIN-177 S4/S5) also spans BOTH paths via a single
 
 When changing prompt behavior, see **[docs/prompt-change-validation.md](docs/prompt-change-validation.md)** for the repeatable process (both-paths rule, overfitting guards, structural tests, and the offline A/B eval harness `scripts/eval-completeness-check.mjs`).
 
+### View Tiers
+
+Views are surfaced in one of three deliberate tiers (LIN-496). **First-class** (dashboard / swipe / swim / settings) — always-on footer links, no flag. **Experimental** (collective / taskChat / ship) — per-user flag (default off) in `lib/feature-defaults.js`, listed in `EXPERIMENTAL_FEATURES` in `lib/render-settings.js`, surfaced **only** via a Settings link when on, and route-gated to redirect to `/settings` when off. **Flagged power-user** (roadmap / dispatch / proxy / foreman / pipeline) — per-user flag plus a conditional footer link in `lib/components/footer.js`. `/ship` is a key in-development experiment (radial dependency layout), not a retirement candidate; its radial layout is the protected experiment and its token wiring is LIN-500. Full model + the Step-2 "new canvas/radial concept doesn't fit the section/card/token model" friction note: **[docs/view-tiers.md](docs/view-tiers.md)**.
+
 ## Code Style
 
 - ES modules (`import`/`export`)

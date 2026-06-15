@@ -1105,6 +1105,13 @@ app.get('/workspace/:urlKey/ship', workspaceFromUrl, async (req, res) => {
   const workspace = req.workspace;
   const deployInfo = getDeployInfo();
   const openRouterSource = getOpenRouterSource(req);
+
+  // Gate: ship is an experimental, in-development view surfaced via Settings
+  // (LIN-496). When the flag is off, redirect to settings — mirrors collective.
+  if (getFeatureFlags(req.session).ship !== true) {
+    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
+  }
+
   const rawTeam = req.query.team;
   const teamId = rawTeam && rawTeam !== 'all' && UUID_REGEX.test(rawTeam) ? rawTeam : null;
 
