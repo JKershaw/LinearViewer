@@ -160,10 +160,10 @@
   async function loadTokens() {
     if (!tokenSelect) return;
     try {
-      const resp = await fetch(`${apiBase}/tokens`);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const data = await resp.json();
-      const tokens = (data.tokens || []).filter(t => t.scope === 'readWrite' && !t.consumed);
+      // on401:false — this observer page surfaces its own inline error instead
+      // of bouncing to /logout.
+      const data = await window.api(`${apiBase}/tokens`, { on401: false });
+      const tokens = ((data && data.tokens) || []).filter(t => t.scope === 'readWrite' && !t.consumed);
 
       if (!tokens.length) {
         tokenSelect.innerHTML = '<option value="">(no read-write tokens yet)</option>';
@@ -196,16 +196,13 @@
     showFeedback(playbookFeedback, 'Generating...', false, true);
 
     try {
-      const resp = await fetch(`${apiBase}/tokens`, {
+      // on401:false — failure is surfaced inline via showFeedback below, not a redirect.
+      const data = await window.api(`${apiBase}/tokens`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label: 'foreman-session', scope: 'readWrite', singleUse: false })
+        body: JSON.stringify({ label: 'foreman-session', scope: 'readWrite', singleUse: false }),
+        on401: false
       });
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        throw new Error(err.error || `HTTP ${resp.status}`);
-      }
-      const data = await resp.json();
       currentToken = data.token;
 
       await loadPlaybook();
@@ -245,6 +242,8 @@
     playbookOutput.classList.remove('has-content');
     if (copyBtn) copyBtn.disabled = true;
 
+    // Raw fetch carve-out: the playbook is served as text/markdown, not JSON, so
+    // window.api() (which parses the body as JSON) can't read it.
     const resp = await fetch('/api/proxy/foreman/playbook', {
       headers: { Authorization: `Bearer ${currentToken}` }
     });
@@ -269,6 +268,8 @@
     if (copyBtn) copyBtn.disabled = true;
 
     try {
+      // Raw fetch carve-out: the kickoff briefing is text/markdown, not JSON, so
+      // window.api() (which parses the body as JSON) can't read it.
       const resp = await fetch('/api/proxy/autopilot/kickoff', {
         headers: { Authorization: `Bearer ${currentToken}` }
       });
@@ -443,12 +444,13 @@
 
     try {
       const query = buildStatusQuery({ offset: statusOffset });
-      const resp = await fetch(`/api/proxy/foreman/status?${query}`, {
-        headers: { Authorization: `Bearer ${currentToken}` }
+      // on401:false — a 401 here means a stale Bearer token, not an expired
+      // session, so it must not bounce the page to /logout.
+      const data = await window.api(`/api/proxy/foreman/status?${query}`, {
+        headers: { Authorization: `Bearer ${currentToken}` },
+        on401: false
       });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const data = await resp.json();
-      const items = data.items || [];
+      const items = (data && data.items) || [];
       statusTotal = typeof data.total === 'number' ? data.total : (statusOffset + items.length);
 
       if (reset) statusItems.length = 0;
@@ -526,12 +528,12 @@
     }
 
     try {
-      const resp = await fetch('/api/proxy/stack?limit=5', {
-        headers: { Authorization: `Bearer ${currentToken}` }
+      // on401:false — stale Bearer token, not an expired session (see loadStatus).
+      const data = await window.api('/api/proxy/stack?limit=5', {
+        headers: { Authorization: `Bearer ${currentToken}` },
+        on401: false
       });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const data = await resp.json();
-      renderStack(data.tasks || []);
+      renderStack((data && data.tasks) || []);
     } catch {
       stackList.innerHTML = '<div class="foreman-empty">Failed to load stack — click refresh to retry.</div>';
     }
@@ -600,12 +602,12 @@
   async function loadSessions() {
     if (!sessionsList || !currentToken) return;
     try {
-      const resp = await fetch('/api/proxy/foreman/sessions', {
-        headers: { Authorization: `Bearer ${currentToken}` }
+      // on401:false — stale Bearer token, not an expired session (see loadStatus).
+      const data = await window.api('/api/proxy/foreman/sessions', {
+        headers: { Authorization: `Bearer ${currentToken}` },
+        on401: false
       });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const data = await resp.json();
-      sessions = data.sessions || [];
+      sessions = (data && data.sessions) || [];
       renderSessions();
     } catch {
       // Non-fatal: just don't show sessions. The timeline still works.
@@ -664,12 +666,12 @@
     try {
       const params = new URLSearchParams();
       if (filters.tokenId) params.set('tokenId', filters.tokenId);
-      const resp = await fetch(`/api/proxy/foreman/tasks${params.toString() ? '?' + params.toString() : ''}`, {
-        headers: { Authorization: `Bearer ${currentToken}` }
+      // on401:false — stale Bearer token, not an expired session (see loadStatus).
+      const data = await window.api(`/api/proxy/foreman/tasks${params.toString() ? '?' + params.toString() : ''}`, {
+        headers: { Authorization: `Bearer ${currentToken}` },
+        on401: false
       });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const data = await resp.json();
-      renderThreads(data.tasks || []);
+      renderThreads((data && data.tasks) || []);
     } catch {
       // Non-fatal.
     }
