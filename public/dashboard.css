@@ -1,0 +1,307 @@
+/**
+ * Dashboard page styles (LIN-509).
+ *
+ * Mobile-first, modelled on Foreman/Swipe (single column, touch targets,
+ * horizontal-scroll chips) rather than the Pipeline desktop floor. Reuses the
+ * shared light theme variables (--fg, --fg-dim, --bg, --green/--yellow/--red).
+ */
+
+.dashboard-page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 0.75rem;
+}
+
+.dashboard-header h1 {
+  margin: 0.5rem 0 0.1rem;
+}
+
+.dashboard-subtitle {
+  margin: 0 0 0.75rem;
+  color: var(--fg-dim);
+  font-size: 0.9em;
+}
+
+.dashboard-section {
+  margin-bottom: 1rem;
+}
+
+/* ─── Controls / filter chips ─────────────────────────────────────────────── */
+
+.dashboard-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.dashboard-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  overflow-x: auto;
+}
+
+.dashboard-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--fg-vdim);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: 0.85em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.dashboard-chip .dashboard-chip-dot {
+  width: 0.55em;
+  height: 0.55em;
+  border-radius: 50%;
+  background: var(--fg-vdim);
+}
+
+.dashboard-chip.is-on {
+  color: var(--fg);
+  border-color: var(--fg-dim);
+  background: var(--bg-muted);
+}
+
+.dashboard-chip.is-on .dashboard-chip-dot {
+  background: var(--green);
+}
+
+.dashboard-poll-status {
+  font-size: 0.8em;
+  color: var(--fg-dim);
+}
+
+/* ─── Feed rows ───────────────────────────────────────────────────────────── */
+
+.dashboard-feed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.dashboard-run {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.6rem;
+  border: 1px solid var(--fg-vdim);
+  border-radius: 6px;
+  background: var(--bg);
+  cursor: pointer;
+  min-height: 44px; /* touch target */
+}
+
+.dashboard-run:hover,
+.dashboard-run:focus-visible {
+  border-color: var(--fg-dim);
+  background: var(--bg-muted);
+  outline: none;
+}
+
+.dashboard-run[data-agent-state="running"] { background: color-mix(in srgb, var(--yellow) 6%, var(--bg)); }
+.dashboard-run[data-agent-state="waiting"] { background: color-mix(in srgb, var(--yellow) 4%, var(--bg)); }
+.dashboard-run[data-agent-state="complete"] { background: color-mix(in srgb, var(--green) 5%, var(--bg)); }
+.dashboard-run[data-agent-state="error"] { background: color-mix(in srgb, var(--red) 6%, var(--bg)); }
+
+.dashboard-run-icon {
+  flex: 0 0 auto;
+  width: 1.4em;
+  text-align: center;
+  color: var(--fg-dim);
+}
+.dashboard-run-icon[data-state="complete"] { color: var(--green); }
+.dashboard-run-icon[data-state="error"] { color: var(--red); }
+.dashboard-run-icon[data-state="running"],
+.dashboard-run-icon[data-state="waiting"] { color: var(--yellow); }
+
+.dashboard-run-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.dashboard-run-title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-run-sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.78em;
+  color: var(--fg-dim);
+}
+
+.dashboard-run-ws { color: var(--fg); }
+
+.dashboard-run-time {
+  flex: 0 0 auto;
+  font-size: 0.75em;
+  color: var(--fg-dim);
+  white-space: nowrap;
+}
+
+.dashboard-run.cell-new {
+  animation: cell-appear 0.4s ease-out;
+}
+
+@keyframes cell-appear {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-run.cell-new { animation: none; }
+}
+
+.dashboard-feed-empty {
+  color: var(--fg-dim);
+  font-size: 0.85em;
+  padding: 0.4rem 0;
+}
+
+.dashboard-empty { color: var(--fg-dim); }
+
+/* ─── Drill-down overlay ──────────────────────────────────────────────────── */
+
+.dashboard-overlay {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--fg) 30%, transparent);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 100;
+  padding: 0;
+}
+
+.dashboard-overlay.hidden { display: none; }
+
+.dashboard-overlay-card {
+  width: 100%;
+  max-width: 640px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--bg);
+  border: 1px solid var(--fg-dim);
+  border-radius: 10px 10px 0 0;
+  padding: 0.9rem 1rem 1.4rem;
+}
+
+.dashboard-overlay-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--fg-vdim);
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.6rem;
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+}
+
+.dashboard-overlay-title { font-weight: 600; }
+
+.dashboard-overlay-close {
+  border: none;
+  background: none;
+  color: var(--fg-dim);
+  font-size: 1.1em;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.dashboard-detail {
+  margin: 0 0 0.8rem;
+  display: grid;
+  gap: 0.3rem;
+}
+.dashboard-detail > div {
+  display: grid;
+  grid-template-columns: 6.5rem 1fr;
+  gap: 0.5rem;
+}
+.dashboard-detail dt {
+  color: var(--fg-dim);
+  font-size: 0.85em;
+}
+.dashboard-detail dd { margin: 0; word-break: break-word; }
+
+.dashboard-block { margin-bottom: 0.9rem; }
+.dashboard-block h3 {
+  font-size: 0.9em;
+  margin: 0 0 0.35rem;
+  color: var(--fg-dim);
+  font-weight: 600;
+}
+
+.dashboard-fb {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.dashboard-fb li {
+  padding: 0.4rem 0.5rem;
+  border-left: 2px solid var(--fg-vdim);
+  background: var(--bg-muted);
+  font-size: 0.85em;
+  white-space: pre-wrap;
+}
+
+.dashboard-dim { color: var(--fg-dim); font-size: 0.85em; }
+.dashboard-error { color: var(--red); font-size: 0.85em; }
+
+/* ─── Run summary ─────────────────────────────────────────────────────────── */
+
+.dashboard-summary-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.dashboard-summary-outcome { font-weight: 600; margin: 0.3rem 0; }
+
+.dashboard-summary-what {
+  margin: 0.2rem 0;
+  padding-left: 1.1rem;
+}
+.dashboard-summary-what li { margin-bottom: 0.15rem; }
+
+.dashboard-summary-sec { margin-top: 0.5rem; }
+.dashboard-summary-lbl {
+  display: block;
+  font-size: 0.75em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-dim);
+}
+.dashboard-summary-sec ul { margin: 0.15rem 0; padding-left: 1.1rem; }
+.dashboard-summary-sec p { margin: 0.15rem 0; }
+
+/* Wider screens: overlay floats centred rather than as a bottom sheet. */
+@media (min-width: 700px) {
+  .dashboard-overlay { align-items: center; padding: 1rem; }
+  .dashboard-overlay-card { border-radius: 10px; }
+}

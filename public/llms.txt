@@ -289,6 +289,31 @@ main.collective-page[data-url-key]      - page container
 - `POST /workspace/{urlKey}/api/collective/say` — `{ channel, message }`
 - `window.__COLLECTIVE_DATA__` carries `{ urlKey, defaultChannel, yapConfigured }`
 
+## Autopilot Dashboard (experimental)
+
+The Autopilot Dashboard (`/workspace/{urlKey}/dashboard`) is a realtime, mobile-first feed of autopilot runs merged across ALL connected workspaces. Requires the per-user `dashboard` feature flag; surfaced only via a link in Settings. NOTE: distinct from the first-class project tree view (the "dashboard" at `/workspace/{urlKey}/`); this is the separate experimental autopilot view. A "run" is a derived Loop record (dispatch + foreman); the live feed reads Mongo only (no Linear calls per poll).
+
+### Autopilot Dashboard DOM Structure
+```
+main.dashboard-page[data-url-key]       - page container
+  #dashboard-chips                       - workspace filter chips (group)
+    .dashboard-chip[data-ws].is-on       - one per workspace (data-ws = urlKey); .is-on when shown
+  #dashboard-poll-status                 - live poll status line
+  #dashboard-active / #dashboard-active-empty   - active runs feed (ul) + empty state
+  #dashboard-recent / #dashboard-recent-empty   - recent runs feed (ul) + empty state
+    li.dashboard-run[data-loop-id][data-workspace][data-agent-state] - one run (click/Enter opens overlay)
+  #dashboard-overlay                     - run drill-down overlay (hidden by default)
+    #dashboard-overlay-body              - run detail (prompt/stage/summary/feedback + hydrated state/labels)
+    #dashboard-summary-btn               - "summarise" button (enabled only for terminal runs)
+    #dashboard-summary-out               - run-summary output
+```
+
+### Autopilot Dashboard Endpoints
+- `GET  /workspace/{urlKey}/api/dashboard/loops` — merged cross-workspace runs → `{ workspaces[], active[], recent[], counts, generatedAt }`; each run is workspace-tagged (`workspaceUrlKey`, `workspaceName`). Polled every 5s (visibility-gated).
+- `GET|POST /workspace/{urlKey}/api/dashboard/run-summary/{loopId}` — cached short summary `{ outcome, whatHappened[], blockers[], next }`. POST forces regeneration. 409 if the run is still active (terminal-only), 404 if unknown.
+- `GET  /workspace/{urlKey}/api/dashboard/hydrate/{wsUrlKey}/{identifier}` — best-effort live Linear state/labels for a run's issue (drill-down only); returns `{ hydrated: false }` rather than erroring on an expired token.
+- `window.__DASHBOARD_DATA__` carries `{ urlKey, workspaces }`.
+
 ## Task Chat (experimental)
 
 The Task Chat page (`/workspace/{urlKey}/task-chat`) lets you hold a grounded, multi-turn conversation with a single task. The task answers in the first person from its own Linear context (description, comments, subtasks, status). Requires the per-user `taskChat` feature flag; reached only via a link in Settings. Read-only (no Linear writes); history is in-browser and ephemeral.
