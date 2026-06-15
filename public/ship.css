@@ -77,7 +77,7 @@ body:has(.ship-page) {
   font-size: 11px;
   color: var(--fg-dim);
   text-align: center;
-  padding: 1rem 0.5rem;
+  padding: var(--space-3) var(--space-2);
   font-style: italic;
   grid-column: 1 / -1;
 }
@@ -121,7 +121,7 @@ body:has(.ship-page) {
 .ship-sector-guide {
   position: absolute;
   pointer-events: none;
-  z-index: 1;
+  z-index: var(--z-base);
   top: 0; left: 0;
   width: 100%;
   height: 100%;
@@ -148,10 +148,10 @@ body:has(.ship-page) {
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: #2c3e50;
-  background: #fff;
+  background: var(--bg);
   border: 1px solid rgba(44, 62, 80, 0.25);
   padding: 3px 9px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   pointer-events: none;
   z-index: 6; /* above .ship-rect (5) so labels never get clipped by the ship */
   white-space: nowrap;
@@ -181,10 +181,10 @@ body:has(.ship-page) {
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: #2c3e50;
-  background: #fff;
+  background: var(--bg);
   border: 1px solid rgba(44, 62, 80, 0.25);
   padding: 3px 9px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   white-space: nowrap;
   transition: border-color 120ms ease, color 120ms ease;
@@ -200,7 +200,7 @@ body:has(.ship-page) {
 }
 
 .ship-heading-picker {
-  background: #fff;
+  background: var(--bg);
   border: 1px solid rgba(44, 62, 80, 0.25);
   border-radius: 4px;
   padding: 10px 12px;
@@ -238,8 +238,8 @@ body:has(.ship-page) {
   font-size: 11px;
   padding: 3px 6px;
   border: 1px solid rgba(44, 62, 80, 0.25);
-  border-radius: 3px;
-  background: #fff;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
   color: #2c3e50;
 }
 
@@ -251,7 +251,7 @@ body:has(.ship-page) {
   color: rgba(44, 62, 80, 0.7);
   background: none;
   border: 1px dashed rgba(44, 62, 80, 0.25);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   padding: 4px 8px;
   cursor: pointer;
   margin-top: 2px;
@@ -276,7 +276,7 @@ body:has(.ship-page) {
   display: flex;
   align-items: center;
   gap: 0;
-  background: #fff;
+  background: var(--bg);
   border: 1px solid rgba(44, 62, 80, 0.25);
   border-radius: 4px;
   overflow: hidden;
@@ -289,7 +289,7 @@ body:has(.ship-page) {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: rgba(44, 62, 80, 0.6);
-  background: #fff;
+  background: var(--bg);
   border: none;
   padding: 5px 11px;
   cursor: pointer;
@@ -306,7 +306,7 @@ body:has(.ship-page) {
 }
 
 .ship-mode-btn.active {
-  color: #fff;
+  color: var(--bg);
   background: #2c3e50;
 }
 
