@@ -161,3 +161,92 @@ test.describe('Swipe page', () => {
     await capture(page, `/workspace/${URL_KEY}/swipe`, 'swipe');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Overlays — shared modal + toast primitives (LIN-506, Wave F).
+//
+// The convergence work (LIN-495) made `window.showModal`/`window.toast` in
+// common.js the SINGLE implementations of these primitives. The page-level
+// `goto()+fullPage` capture above structurally cannot represent them: they are
+// position:fixed overlays that only exist after an interaction. So, like ship
+// test 03 (a click then a viewport screenshot), these specs drive the page into
+// the overlay state first, then capture the viewport (NOT fullPage — a fixed
+// overlay does not belong in a full-page scroll capture).
+//
+// We invoke the canonical helpers directly rather than chasing a real click
+// path: the only in-app trigger for the styled modal is a successful token mint
+// (network-dependent, not deterministic here), whereas calling the shared
+// helper renders the exact converged primitive every time. The modal uses the
+// real `token-modal` className (the only styled variant — bare `modal` has no
+// CSS) with the same body markup dispatch.js/proxy.js show on token creation.
+// ---------------------------------------------------------------------------
+test.describe('Overlays (modal / toast)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto(`/test/set-session?features=${FEATURES}`);
+    // The dispatch page loads common.js (showModal/toast) + escapeHtml.
+    await page.goto(`/workspace/${URL_KEY}/dispatch`);
+    await page.waitForLoadState('networkidle');
+  });
+
+  test('modal', async ({ page }) => {
+    await page.evaluate(() => {
+      const token = 'lin_proxy_EXAMPLE0TOKEN0FOR0SCREENSHOT0ONLY';
+      const bodyHtml = `
+        <p>Copy this token now - it won't be shown again:</p>
+        <div class="token-display">
+          <span class="token-value">${window.escapeHtml(token)}</span>
+          <button class="token-copy-btn">copy</button>
+        </div>
+        <div class="token-usage-hint">
+          Use in Authorization header:<br>
+          <code>Authorization: Bearer &lt;token&gt;</code>
+        </div>`;
+      window.showModal({ className: 'token-modal', title: 'Token Created', bodyHtml });
+    });
+    await page.waitForSelector('.token-modal');
+
+    await page.setViewportSize(DESKTOP);
+    await page.screenshot({ path: `${DIR}/overlay-modal-desktop.png` });
+
+    await page.setViewportSize(MOBILE);
+    await page.screenshot({ path: `${DIR}/overlay-modal-mobile.png` });
+  });
+
+  test('toast', async ({ page }) => {
+    // Long duration so the toasts stay put for the capture (default auto-dismiss
+    // is 4s). Both variants stacked shows the info + error treatments together.
+    await page.evaluate(() => {
+      window.toast('Queued prompt for LIN-123', { type: 'info', duration: 60000 });
+      window.toast('Failed to remove item: request timed out', { type: 'error', duration: 60000 });
+    });
+    // Let the requestAnimationFrame entrance transition (toast-visible) settle.
+    await page.waitForSelector('.toast-visible');
+    await page.waitForTimeout(300);
+
+    await page.setViewportSize(DESKTOP);
+    await page.screenshot({ path: `${DIR}/overlay-toast-desktop.png` });
+
+    await page.setViewportSize(MOBILE);
+    await page.screenshot({ path: `${DIR}/overlay-toast-mobile.png` });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Collective page — DEFERRED (LIN-506, Wave F), per the LIN-492 convention of
+// logging a deferral rather than silently skipping. A committed baseline needs
+// the captured pixels to be deterministic; collective is not, and no CHEAP seam
+// exists to make it so:
+//   1. The channel name is `randomChannelName()` (random words + today's UTC
+//      date) generated server-side per request at routes/collective.js, with no
+//      request/session input wired to pin it — so the channel string in the
+//      input + label varies every run.
+//   2. This visual config's web server does NOT set YAP_BASE_URL (unlike the
+//      base playwright.config.js), so the live view renders "Yap not
+//      configured" rather than a real transcript.
+// Making it deterministic would mean adding a production-route test seam purely
+// for a screenshot — explicitly out of scope for this PNG-artifact task. Revisit
+// if a channel-pin seam lands.
+// ---------------------------------------------------------------------------
+test.describe('Collective page', () => {
+  test.skip('collective (deferred — non-deterministic channel + no mock Yap wired here)', () => {});
+});

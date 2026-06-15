@@ -94,6 +94,10 @@ async function pollState() {
   try {
     const url = `/workspace/${encodeURIComponent(urlKey)}/api/collective/state`
       + `?channel=${encodeURIComponent(activeChannel)}&since=${cursor}`;
+    // Raw fetch carve-out: this is a background poller with bespoke per-status
+    // handling (503 → "Yap not configured", non-ok → "● disconnected") that
+    // window.api()'s throw-on-non-2xx path can't express; it must stay on raw
+    // fetch so a transient poll failure degrades the status line, not the page.
     const res = await fetch(url);
     if (res.status === 401) {
       window.location.href = '/logout';

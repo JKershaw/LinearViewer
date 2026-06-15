@@ -123,6 +123,9 @@
 
     var priorHistory = chatHistory.slice(0, -1); // server re-adds the question
 
+    // Raw fetch carve-out: Server-Sent Events stream consumed via the reader
+    // below; window.api() parses the body as JSON and would break the stream,
+    // so the SSE reader keeps its own response handling.
     fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/task-chat/' + encodeURIComponent(taskId), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
