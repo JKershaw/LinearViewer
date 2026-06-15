@@ -44,26 +44,14 @@
     return `/workspace/${encodeURIComponent(urlKey)}/api/brief/${encodeURIComponent(identifier)}`;
   }
 
+  // on401:false — brief errors (incl. 401) throw with .status/.body so the
+  // inline renderError path shows them, rather than redirecting to /logout.
   async function fetchBriefStatus(urlKey, identifier) {
-    const res = await fetch(briefUrl(urlKey, identifier));
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      const err = new Error(body.error || `Brief GET failed: ${res.status}`);
-      err.status = res.status;
-      throw err;
-    }
-    return res.json();
+    return window.api(briefUrl(urlKey, identifier), { on401: false });
   }
 
   async function postBrief(urlKey, identifier) {
-    const res = await fetch(briefUrl(urlKey, identifier), { method: 'POST' });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      const err = new Error(body.error || `Brief POST failed: ${res.status}`);
-      err.status = res.status;
-      throw err;
-    }
-    return res.json();
+    return window.api(briefUrl(urlKey, identifier), { method: 'POST', on401: false });
   }
 
   function header(label, meta, refreshLabel) {

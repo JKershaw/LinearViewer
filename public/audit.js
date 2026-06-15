@@ -48,17 +48,8 @@ async function runAudit() {
   try {
     // Get the API URL from the page's data attribute (workspace-prefixed)
     const auditUrl = document.body.dataset.apiAuditUrl || '/api/audit';
-    const response = await fetch(auditUrl);
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        window.location.href = '/';
-        return;
-      }
-      throw new Error(`Audit failed: ${response.status}`);
-    }
-
-    const report = await response.json();
+    // on401:'/' preserves audit's custom redirect target (not /logout).
+    const report = await window.api(auditUrl, { on401: '/' });
     renderReport(report);
     auditStatus.textContent = 'Audit complete';
     auditStatus.className = 'audit-status';

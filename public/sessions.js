@@ -63,15 +63,10 @@
     return `/workspace/${encodeURIComponent(urlKey)}/api/sessions/${encodeURIComponent(identifier)}`;
   }
 
+  // on401:false — sessions errors (incl. 401) throw with .status/.body so the
+  // inline renderer shows them, rather than redirecting to /logout.
   async function fetchSessions(urlKey, identifier) {
-    const res = await fetch(sessionsUrl(urlKey, identifier));
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      const err = new Error(body.error || `Sessions GET failed: ${res.status}`);
-      err.status = res.status;
-      throw err;
-    }
-    return res.json();
+    return window.api(sessionsUrl(urlKey, identifier), { on401: false });
   }
 
   function renderFeedback(feedback) {
