@@ -19,17 +19,17 @@
    ============================================================================= */
 .prompts-summary {
   display: flex;
-  gap: 1.5rem;
+  gap: var(--space-4);
   flex-wrap: wrap;
-  margin-bottom: 2rem;
-  padding: 1rem;
+  margin-bottom: var(--space-5);
+  padding: var(--space-3);
   background: rgba(0, 0, 0, 0.02);
   border-radius: 4px;
 }
 
 .summary-stats {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--space-2);
   align-items: center;
   flex-wrap: wrap;
   font-family: var(--font-content);
@@ -61,7 +61,7 @@
   color: var(--fg-dim);
   font-family: var(--font-content);
   font-size: 0.9em;
-  margin-bottom: 1rem;
+  margin-bottom: var(--space-3);
   line-height: 1.5;
 }
 
@@ -69,7 +69,7 @@
    Category Grouping
    ============================================================================= */
 .prompt-category {
-  margin-bottom: 1.5rem;
+  margin-bottom: var(--space-4);
 }
 
 .category-header {
@@ -78,7 +78,7 @@
   font-weight: 500;
   color: var(--fg);
   margin: 0 0 0.75rem 0;
-  padding-bottom: 0.25rem;
+  padding-bottom: var(--space-1);
   border-bottom: 1px solid var(--fg-vdim);
 }
 
@@ -88,7 +88,7 @@
 }
 
 .category-templates {
-  padding-left: 0.5rem;
+  padding-left: var(--space-2);
 }
 
 /* =============================================================================
@@ -107,11 +107,11 @@
 
 .prompt-label {
   font-family: var(--font-structural);
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
   color: var(--fg-dim);
   background: rgba(0, 0, 0, 0.05);
   padding: 0.1rem 0.4rem;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 }
 
 .prompt-chars {
@@ -123,9 +123,9 @@
 
 .prompt-description {
   font-family: var(--font-content);
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
   color: var(--fg-dim);
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-2);
   line-height: 1.4;
 }
 
@@ -136,15 +136,15 @@
   font-family: var(--font-content);
   font-size: 0.8em;
   color: var(--fg-dim);
-  margin-bottom: 0.5rem;
-  padding: 0.5rem;
+  margin-bottom: var(--space-2);
+  padding: var(--space-2);
   background: rgba(0, 0, 0, 0.02);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   line-height: 1.5;
 }
 
 .ai-hint-row {
-  margin-bottom: 0.25rem;
+  margin-bottom: var(--space-1);
 }
 
 .ai-hint-row:last-child {
@@ -163,14 +163,14 @@
   font-family: var(--font-content);
   font-size: 0.8em;
   color: var(--fg-dim);
-  margin-bottom: 0.5rem;
-  padding: 0.5rem;
+  margin-bottom: var(--space-2);
+  padding: var(--space-2);
   background: rgba(22, 160, 133, 0.05);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 }
 
 .signals-core {
-  margin-bottom: 0.25rem;
+  margin-bottom: var(--space-1);
 }
 
 .signals-label {
@@ -179,11 +179,11 @@
 }
 
 .signals-list {
-  margin-top: 0.25rem;
+  margin-top: var(--space-1);
 }
 
 .signals-list ul {
-  margin: 0.25rem 0 0 1.5rem;
+  margin: var(--space-1) 0 0 var(--space-4);
   padding: 0;
   list-style-type: disc;
 }
@@ -196,15 +196,15 @@
    Expandable Prompt Details
    ============================================================================= */
 .prompt-details {
-  margin-top: 0.5rem;
+  margin-top: var(--space-2);
 }
 
 .prompt-details summary {
   font-family: var(--font-content);
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
   color: var(--blue);
   cursor: pointer;
-  padding: 0.25rem 0;
+  padding: var(--space-1) 0;
 }
 
 .prompt-details summary:hover {
@@ -219,8 +219,8 @@
   background: var(--bg);
   border: 1px solid var(--fg-vdim);
   border-radius: 4px;
-  padding: 1rem;
-  margin-top: 0.5rem;
+  padding: var(--space-3);
+  margin-top: var(--space-2);
   overflow-x: auto;
   white-space: pre-wrap;
   word-break: break-word;
@@ -233,20 +233,20 @@
    ============================================================================= */
 .meta-prompt-section {
   background: rgba(0, 0, 0, 0.02);
-  padding: 1rem;
+  padding: var(--space-3);
   border-radius: 4px;
   border-left: 3px solid var(--blue);
 }
 
 .meta-prompt-section .section-header {
   border-bottom: none;
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-2);
   padding-bottom: 0;
 }
 
 .meta-prompt-stats {
   font-family: var(--font-content);
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
   color: var(--fg-dim);
   margin-bottom: 0.75rem;
 }
@@ -261,13 +261,13 @@
 @media (max-width: 640px) {
   .prompts-summary {
     flex-direction: column;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
 
   .prompt-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 0.25rem;
+    gap: var(--space-1);
   }
 
   .prompt-chars {

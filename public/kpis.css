@@ -3,19 +3,19 @@
 .kpis-content {
   max-width: 900px;
   margin: 0 auto;
-  padding: 1rem;
+  padding: var(--space-3);
 }
 
 .kpis-content h2 {
   font-family: var(--font-structural);
   font-size: 1.2rem;
-  margin-bottom: 0.25rem;
+  margin-bottom: var(--space-1);
 }
 
 .kpi-subtitle {
   color: var(--fg-dim);
   font-size: 0.85rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: var(--space-4);
 }
 
 /* Stat cards */
@@ -23,7 +23,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 0.75rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: var(--space-4);
 }
 
 .kpi-card {
@@ -72,17 +72,17 @@
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--fg-dim);
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-2);
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 /* Range toggle (e.g. 30d / 24h on the hero chart) */
 .kpi-range-toggle {
   display: inline-flex;
-  gap: 0.25rem;
+  gap: var(--space-1);
 }
 
 .kpi-range-btn {
@@ -91,7 +91,7 @@
   color: var(--fg-dim);
   background: none;
   border: 1px solid var(--fg-vdim);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   padding: 0.05rem 0.45rem;
   cursor: pointer;
 }
@@ -131,7 +131,7 @@
 
 /* Vanity strip */
 .kpi-vanity {
-  margin-top: 1rem;
+  margin-top: var(--space-3);
   color: var(--fg-dim);
   font-family: var(--font-structural);
   font-size: 0.8rem;
@@ -152,7 +152,7 @@
 
   .kpi-cards {
     grid-template-columns: repeat(2, 1fr);
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
 
   .kpi-card {

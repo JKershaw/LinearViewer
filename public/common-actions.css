@@ -11,11 +11,11 @@
 .action-btn {
   background: none;
   border: none;
-  padding: 0.2rem 0.5rem;
+  padding: 0.2rem var(--space-2);
   font-family: var(--font-content);
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
   cursor: pointer;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   text-decoration: none;
 }
 
@@ -57,15 +57,15 @@
 .token-form {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 .token-label-input {
   font-family: var(--font-content);
   font-size: 0.9em;
-  padding: 0.25rem 0.5rem;
+  padding: var(--space-1) var(--space-2);
   border: 1px solid var(--fg-vdim);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   background: var(--bg);
   color: var(--fg);
   min-width: 18ch;
@@ -94,14 +94,14 @@
 .token-list-empty {
   color: var(--fg-dim);
   font-size: 0.9em;
-  padding: 0.25rem 0;
+  padding: var(--space-1) 0;
 }
 
 .token-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.5rem 0;
+  padding: var(--space-2) 0;
   border-bottom: 1px solid var(--fg-vdim);
 }
 
@@ -155,8 +155,8 @@
   border: 1px solid var(--fg-vdim);
   border-radius: 4px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-  z-index: 1000;
-  padding: 1rem;
+  z-index: var(--z-overlay);
+  padding: var(--space-3);
   font-family: var(--font-content);
 }
 
@@ -168,7 +168,7 @@
 }
 
 .token-modal-header strong {
-  font-size: 1em;
+  font-size: var(--font-size-base);
 }
 
 .token-modal-close {
@@ -177,7 +177,7 @@
   font-size: 1.3em;
   color: var(--fg-dim);
   cursor: pointer;
-  padding: 0 0.25rem;
+  padding: 0 var(--space-1);
   line-height: 1;
 }
 
@@ -188,33 +188,33 @@
 .token-modal p {
   font-size: 0.9em;
   color: var(--fg-dim);
-  margin: 0 0 0.5rem 0;
+  margin: 0 0 var(--space-2) 0;
 }
 
 .token-display {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem;
+  gap: var(--space-2);
+  padding: var(--space-2);
   background: rgba(0, 0, 0, 0.03);
   border: 1px solid var(--fg-vdim);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 }
 
 .token-value {
   flex: 1;
   font-family: var(--font-structural);
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
   word-break: break-all;
   color: var(--fg);
 }
 
 .token-copy-btn {
   flex-shrink: 0;
-  padding: 0.25rem 0.5rem;
+  padding: var(--space-1) var(--space-2);
   background: none;
   border: 1px solid var(--fg-vdim);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   font-family: var(--font-content);
   font-size: 0.8em;
   color: var(--fg-dim);
@@ -227,11 +227,11 @@
 }
 
 .token-usage-hint {
-  margin-top: 1rem;
-  padding: 0.5rem;
+  margin-top: var(--space-3);
+  padding: var(--space-2);
   background: rgba(0, 0, 0, 0.02);
-  border-radius: 3px;
-  font-size: 0.85em;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
   color: var(--fg-dim);
 }
 
@@ -241,7 +241,7 @@
 }
 
 .token-usage-hint-code {
-  margin-top: 0.5rem;
+  margin-top: var(--space-2);
 }
 
 /* =============================================================================
@@ -249,12 +249,12 @@
    ============================================================================= */
 .toast-container {
   position: fixed;
-  bottom: 1rem;
-  right: 1rem;
+  bottom: var(--space-3);
+  right: var(--space-3);
   z-index: 1100; /* above the token modal (1000) */
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--space-2);
   max-width: min(380px, 90vw);
   pointer-events: none; /* let clicks pass through gaps; toasts re-enable below */
 }
@@ -304,6 +304,6 @@
   .token-item {
     flex-direction: column;
     align-items: flex-start;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
 }

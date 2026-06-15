@@ -12,7 +12,7 @@
 .proxy-hint {
   color: var(--fg-dim);
   font-family: var(--font-content);
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
   margin: 0 0 0.75rem 0;
 }
 
@@ -41,17 +41,17 @@
 .proxy-scope-toggle {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
   font-family: var(--font-content);
   font-size: 0.9em;
 }
 
 .proxy-scope-select {
   font-family: var(--font-content);
-  font-size: 0.85em;
-  padding: 0.25rem 0.4rem;
+  font-size: var(--font-size-sm);
+  padding: var(--space-1) 0.4rem;
   border: 1px solid var(--fg-vdim);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   background: var(--bg);
   color: var(--fg);
 }
@@ -62,7 +62,7 @@
 }
 
 .proxy-prompt-feedback {
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
   color: var(--green);
 }
 
@@ -76,7 +76,7 @@
   padding: 0.75rem;
   background: rgba(0, 0, 0, 0.03);
   border: 1px solid var(--fg-vdim);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   white-space: pre-wrap;
   word-break: break-all;
   color: var(--fg-dim);
@@ -112,12 +112,12 @@
 
 .proxy-example {
   font-family: var(--font-content);
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
 }
 
 .proxy-example-label {
   color: var(--fg-dim);
-  margin-bottom: 0.25rem;
+  margin-bottom: var(--space-1);
 }
 
 .proxy-example-code {
@@ -127,7 +127,7 @@
   padding: 0.4rem 0.6rem;
   background: rgba(0, 0, 0, 0.03);
   border: 1px solid var(--fg-vdim);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   color: var(--fg);
   word-break: break-all;
   white-space: pre-wrap;
@@ -137,14 +137,14 @@
    Event Log
    ============================================================================= */
 .proxy-events-list {
-  margin-top: 0.5rem;
+  margin-top: var(--space-2);
 }
 
 .proxy-events-loading,
 .proxy-events-empty {
   color: var(--fg-dim);
   font-size: 0.9em;
-  padding: 0.25rem 0;
+  padding: var(--space-1) 0;
 }
 
 .proxy-event-item {
@@ -153,7 +153,7 @@
   gap: 0.75rem;
   padding: 0.35rem 0;
   border-bottom: 1px solid var(--fg-vdim);
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
   font-family: var(--font-content);
 }
 
@@ -197,14 +197,14 @@
 
 .proxy-event-meta {
   color: var(--fg-dim);
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
   white-space: nowrap;
 }
 
 /* Refresh button */
 .proxy-events-refresh {
   color: var(--fg-dim);
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
   vertical-align: middle;
 }
 
@@ -216,22 +216,22 @@
    Collapsible Sections (Tokens list, Event Log)
    ============================================================================= */
 .proxy-collapsible {
-  margin-top: 0.5rem;
+  margin-top: var(--space-2);
 }
 
 .proxy-collapsible-summary {
   list-style: none;
   cursor: pointer;
-  padding: 0.35rem 0.5rem;
+  padding: 0.35rem var(--space-2);
   border: 1px solid var(--fg-vdim);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   font-family: var(--font-content);
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
   color: var(--fg-dim);
   user-select: none;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 .proxy-collapsible-summary::-webkit-details-marker {
@@ -269,8 +269,8 @@
    Show-more (tokens)
    ============================================================================= */
 .token-show-more {
-  margin-top: 0.5rem;
-  font-size: 0.85em;
+  margin-top: var(--space-2);
+  font-size: var(--font-size-sm);
   color: var(--fg-dim);
 }
 
@@ -287,7 +287,7 @@
   font-weight: 400;
   padding: 0.05rem 0.35rem;
   margin-left: 0.4rem;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   background: rgba(0, 0, 0, 0.04);
   color: var(--fg-dim);
   vertical-align: middle;
@@ -310,11 +310,11 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  margin-top: 0.5rem;
-  padding-top: 0.5rem;
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
   border-top: 1px solid var(--fg-vdim);
   font-family: var(--font-content);
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
 }
 
 .proxy-events-pager-info {

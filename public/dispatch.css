@@ -52,10 +52,10 @@
   width: 100%;
   box-sizing: border-box;
   font-family: var(--font-structural);
-  font-size: 0.85em;
-  padding: 0.5rem;
+  font-size: var(--font-size-sm);
+  padding: var(--space-2);
   border: 1px solid var(--fg-vdim);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   background: var(--bg);
   color: var(--fg);
   resize: vertical;
@@ -69,10 +69,10 @@
 
 .dispatch-repo-select {
   font-family: var(--font-content);
-  font-size: 0.85em;
-  padding: 0.25rem 0.4rem;
+  font-size: var(--font-size-sm);
+  padding: var(--space-1) 0.4rem;
   border: 1px solid var(--fg-vdim);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   background: var(--bg);
   color: var(--fg);
 }
@@ -83,7 +83,7 @@
 }
 
 .dispatch-prompt-actions {
-  gap: 0.5rem;
+  gap: var(--space-2);
   flex-wrap: wrap;
 }
 
@@ -98,13 +98,13 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
   flex-basis: 100%;
   padding: 0.4rem 0 0.1rem;
 }
 
 .dispatch-prompt-feedback {
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
   color: var(--green);
 }
 
@@ -115,21 +115,21 @@
 .dispatch-recents-container .queue-recents-label {
   font-size: 0.8em;
   color: var(--fg-dim);
-  margin-top: 0.25rem;
+  margin-top: var(--space-1);
 }
 
 .dispatch-recents-container .queue-recents-list {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  margin-top: 0.25rem;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
 }
 
 .dispatch-recents-container .queue-recent-item {
   background: none;
   border: 1px solid var(--fg-vdim);
-  border-radius: 3px;
-  padding: 0.3rem 0.5rem;
+  border-radius: var(--radius-sm);
+  padding: 0.3rem var(--space-2);
   font-family: var(--font-content);
   font-size: 0.75em;
   color: var(--fg-dim);
@@ -155,14 +155,14 @@
    Queue List
    ============================================================================= */
 .queue-list {
-  margin-top: 0.5rem;
+  margin-top: var(--space-2);
 }
 
 .queue-list-loading,
 .queue-list-empty {
   color: var(--fg-dim);
   font-size: 0.9em;
-  padding: 0.25rem 0;
+  padding: var(--space-1) 0;
 }
 
 /* Queue items reuse .queue-item styles from style.css (shared with navbar panel) */
@@ -186,10 +186,10 @@
 
 .guide-code {
   font-family: var(--font-structural);
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
   background: rgba(0, 0, 0, 0.04);
   padding: 0.1rem 0.35rem;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--fg-vdim);
 }
 
@@ -224,14 +224,14 @@
 .history-list-empty {
   color: var(--fg-dim);
   font-size: 0.9em;
-  padding: 0.25rem 0;
+  padding: var(--space-1) 0;
 }
 
 .history-item {
   display: flex;
   align-items: flex-start;
   gap: 0.75rem;
-  padding: 0.5rem 0;
+  padding: var(--space-2) 0;
   border-bottom: 1px solid var(--fg-vdim);
   font-size: 0.9em;
 }
@@ -285,12 +285,12 @@
 .history-prompt {
   display: none;
   margin-top: 0.35rem;
-  padding: 0.4rem 0.5rem;
+  padding: 0.4rem var(--space-2);
   background: rgba(0, 0, 0, 0.03);
   border: 1px solid var(--fg-vdim);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   font-family: var(--font-structural);
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
   color: var(--fg);
   white-space: pre-wrap;
   word-break: break-word;
@@ -303,7 +303,7 @@
 .history-issue {
   color: var(--blue);
   text-decoration: none;
-  margin-left: 0.5rem;
+  margin-left: var(--space-2);
 }
 
 .history-issue:hover {
@@ -319,11 +319,11 @@
 /* Feedback entries within history items */
 .feedback-list {
   margin-top: 0.35rem;
-  padding-left: 0.25rem;
+  padding-left: var(--space-1);
 }
 
 .feedback-entry {
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
   color: var(--fg);
   padding: 0.1rem 0;
   word-break: break-word;
@@ -351,7 +351,7 @@
 /* History refresh button */
 .history-refresh {
   color: var(--fg-dim);
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
   vertical-align: middle;
 }
 
@@ -364,10 +364,10 @@
   margin-top: 0.75rem;
   background: none;
   border: 1px solid var(--fg-vdim);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   padding: 0.3rem 0.75rem;
   font-family: var(--font-content);
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
   color: var(--fg-dim);
   cursor: pointer;
 }

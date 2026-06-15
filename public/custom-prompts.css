@@ -9,11 +9,11 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 1rem;
+  margin-bottom: var(--space-3);
 }
 
 .custom-prompts-count {
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
   color: var(--fg-dim);
 }
 
@@ -26,7 +26,7 @@
 .custom-prompts-empty {
   color: var(--fg-dim);
   font-size: 0.9em;
-  padding: 2rem 0;
+  padding: var(--space-5) 0;
   text-align: center;
 }
 
@@ -50,9 +50,9 @@
   font-size: 0.8em;
   color: var(--fg-dim);
   background: rgba(0, 0, 0, 0.02);
-  padding: 0.5rem;
-  border-radius: 3px;
-  margin: 0 0 0.5rem 0;
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  margin: 0 0 var(--space-2) 0;
   white-space: pre-wrap;
   word-break: break-word;
   max-height: 6em;
@@ -61,7 +61,7 @@
 
 .custom-prompt-actions {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 /* =============================================================================
@@ -70,8 +70,8 @@
 .custom-prompt-editor {
   border: 1px solid var(--blue);
   border-radius: 4px;
-  padding: 1rem;
-  margin-bottom: 1rem;
+  padding: var(--space-3);
+  margin-bottom: var(--space-3);
   background: rgba(37, 99, 235, 0.02);
 }
 
@@ -82,9 +82,9 @@
 .editor-label {
   display: block;
   font-family: var(--font-structural);
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
   color: var(--fg-dim);
-  margin-bottom: 0.25rem;
+  margin-bottom: var(--space-1);
 }
 
 .custom-prompt-name-input {
@@ -92,9 +92,9 @@
   box-sizing: border-box;
   font-family: var(--font-content);
   font-size: 0.9em;
-  padding: 0.35rem 0.5rem;
+  padding: 0.35rem var(--space-2);
   border: 1px solid var(--fg-vdim);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   background: var(--bg);
   color: var(--fg);
 }
@@ -108,10 +108,10 @@
   width: 100%;
   box-sizing: border-box;
   font-family: var(--font-structural);
-  font-size: 0.85em;
-  padding: 0.5rem;
+  font-size: var(--font-size-sm);
+  padding: var(--space-2);
   border: 1px solid var(--fg-vdim);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   background: var(--bg);
   color: var(--fg);
   resize: vertical;
@@ -128,13 +128,13 @@
   text-align: right;
   font-size: 0.8em;
   color: var(--fg-dim);
-  margin-top: 0.25rem;
+  margin-top: var(--space-1);
 }
 
 .editor-actions {
   display: flex;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
 }
 
 /* =============================================================================
@@ -142,7 +142,7 @@
    ============================================================================= */
 .variable-reference {
   margin-bottom: 0.75rem;
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
 }
 
 .variable-reference summary {
@@ -152,10 +152,10 @@
 }
 
 .variable-list {
-  margin-top: 0.5rem;
-  padding: 0.5rem;
+  margin-top: var(--space-2);
+  padding: var(--space-2);
   background: rgba(0, 0, 0, 0.02);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 }
 
 .variable-item {
@@ -173,7 +173,7 @@
 
 .variable-desc {
   color: var(--fg-dim);
-  margin-left: 0.5rem;
+  margin-left: var(--space-2);
 }
 
 /* =============================================================================
