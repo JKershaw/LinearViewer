@@ -308,7 +308,7 @@ button.foreman-timeline-identifier:hover { opacity: 0.75; }
 .foreman-card-accent.in-progress { background: linear-gradient(90deg, var(--yellow), #e8c547); }
 .foreman-card-accent.done { background: linear-gradient(90deg, var(--green), #2ecc71); }
 .foreman-card-accent.todo { background: var(--border); }
-.foreman-card-accent.backlog { background: #eee; }
+.foreman-card-accent.backlog { background: var(--fg-vdim); }
 .foreman-card-accent.failed { background: linear-gradient(90deg, #c0392b, #e74c3c); }
 
 .foreman-meta {
