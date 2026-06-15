@@ -254,7 +254,8 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
       const messages = buildTaskChatMessages(context.issue, context, question.trim(), safeHistory);
       await streamChat(
         messages,
-        { apiKey: apiKeyToUse, model: selectedModel, maxTokens: 1500 },
+        { apiKey: apiKeyToUse, model: selectedModel, maxTokens: 1500,
+          callMeta: { urlKey: workspace?.urlKey || null, feature: 'task-chat', issueIdentifier: context.issue?.identifier || null } },
         (type, data) => {
           sendSSE(res, type, data);
           if (type === 'done' || type === 'error') {

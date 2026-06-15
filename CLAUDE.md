@@ -97,6 +97,7 @@ lib/
   dispatch-tokens.js   Consumer API token management
   foreman-store.js     Foreman status append-only log storage
   report-history-store.js  Durable per-workspace roadmap report runs
+  llm-call-log.js      Append-only per-LLM-call metadata log (model, provider, tokens, cost, time; LIN-418)
   free-tier-store.js   Free tier usage tracking and rate limiting
   proxy-tokens.js      Proxy token hashing and validation
   proxy-events.js      Proxy event audit logging

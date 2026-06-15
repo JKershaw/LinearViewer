@@ -16,6 +16,7 @@ import {
   applyGroundingToRecommendation,
   getRecommendationStream,
   getRecommendation,
+  setLlmCallRecorder,
   getModelDisplayName,
   DEFAULT_MODEL,
   EPIC_CHILD_THRESHOLD,
@@ -1263,6 +1264,124 @@ describe('getRecommendationStream (LIN-346)', () => {
     assert.strictEqual(result.truncated, true, 'structured return carries truncated');
     const done = events.find(e => e.type === 'done');
     assert.strictEqual(done.data.truncated, true, 'done event carries truncated');
+  });
+});
+
+// =============================================================================
+// LLM call recorder hook (LIN-418)
+// =============================================================================
+
+describe('LLM call recorder (LIN-418)', () => {
+  let originalFetch;
+  let savedProxyEnv;
+  const ISSUE = {
+    identifier: 'LIN-1', title: 'A leaf task', description: 'Do the thing.',
+    url: 'https://linear.app/test/issue/LIN-1', state: { name: 'In Progress', type: 'started' }
+  };
+  const CONTEXT = { parent: null, siblings: [], project: { description: '' }, children: [], comments: [], focusedChild: null };
+
+  beforeEach(() => {
+    originalFetch = global.fetch;
+    savedProxyEnv = {
+      HTTPS_PROXY: process.env.HTTPS_PROXY, HTTP_PROXY: process.env.HTTP_PROXY,
+      https_proxy: process.env.https_proxy, http_proxy: process.env.http_proxy
+    };
+    delete process.env.HTTPS_PROXY; delete process.env.HTTP_PROXY;
+    delete process.env.https_proxy; delete process.env.http_proxy;
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    setLlmCallRecorder(null);
+    for (const [k, v] of Object.entries(savedProxyEnv)) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+  });
+
+  // Mock SSE response that carries usage accounting (cost + tokens), provider, and model
+  // in the final chunk — the shape OpenRouter returns when usage:{include:true} is set.
+  function mockStreamResponse(pieces, { provider = 'OpenAI', model = 'openai/gpt-5.4-mini' } = {}) {
+    const enc = new TextEncoder();
+    const blocks = pieces.map(p => `data: ${JSON.stringify({ provider, model, choices: [{ delta: { content: p }, finish_reason: null }] })}\n\n`);
+    blocks.push(`data: ${JSON.stringify({ provider, model, choices: [{ delta: {}, finish_reason: 'stop' }], usage: { prompt_tokens: 1200, completion_tokens: 30, total_tokens: 1230, cost: 0.00042 } })}\n\n`);
+    blocks.push('data: [DONE]\n\n');
+    return { ok: true, body: (async function* () { for (const b of blocks) yield enc.encode(b); })() };
+  }
+
+  test('getRecommendationStream records model, provider, tokens, cost + caller callMeta', async () => {
+    const pieces = ['## Reasoning\n→ **research**\nLook into it.\n## Prompt\nGo research.'];
+    global.fetch = mock.fn(async () => mockStreamResponse(pieces));
+
+    const records = [];
+    setLlmCallRecorder((r) => records.push(r));
+
+    await getRecommendationStream(
+      ISSUE, CONTEXT,
+      { apiKey: 'test-key', callMeta: { urlKey: 'acme', feature: 'recommend', issueIdentifier: 'LIN-1' } },
+      () => {}
+    );
+
+    assert.strictEqual(records.length, 1);
+    const r = records[0];
+    assert.strictEqual(r.urlKey, 'acme');
+    assert.strictEqual(r.feature, 'recommend');
+    assert.strictEqual(r.issueIdentifier, 'LIN-1');
+    assert.strictEqual(r.provider, 'OpenAI');
+    assert.strictEqual(r.model, 'openai/gpt-5.4-mini');
+    assert.strictEqual(r.promptTokens, 1200);
+    assert.strictEqual(r.completionTokens, 30);
+    assert.strictEqual(r.cost, 0.00042);
+    assert.strictEqual(r.finishReason, 'stop');
+    assert.ok(typeof r.durationMs === 'number' && r.durationMs >= 0);
+  });
+
+  test('records even without callMeta (every call is logged)', async () => {
+    const pieces = ['## Reasoning\n→ **research**\nx.\n## Prompt\ny.'];
+    global.fetch = mock.fn(async () => mockStreamResponse(pieces));
+
+    const records = [];
+    setLlmCallRecorder((r) => records.push(r));
+
+    await getRecommendationStream(ISSUE, CONTEXT, { apiKey: 'test-key' }, () => {});
+
+    assert.strictEqual(records.length, 1);
+    assert.strictEqual(records[0].cost, 0.00042);
+    assert.strictEqual(records[0].urlKey, undefined); // no attribution, still logged
+  });
+
+  test('a throwing recorder never breaks the call', async () => {
+    const pieces = ['## Reasoning\n→ **research**\nx.\n## Prompt\ny.'];
+    global.fetch = mock.fn(async () => mockStreamResponse(pieces));
+    setLlmCallRecorder(() => { throw new Error('recorder boom'); });
+
+    // Should resolve normally despite the recorder throwing.
+    const result = await getRecommendationStream(ISSUE, CONTEXT, { apiKey: 'test-key' }, () => {});
+    assert.strictEqual(result.recommendedAction, 'research');
+  });
+
+  test('streamChat surfaces usage in its done event and records the call', async () => {
+    const pieces = ['Hello ', 'world.'];
+    global.fetch = mock.fn(async () => mockStreamResponse(pieces));
+
+    const records = [];
+    setLlmCallRecorder((r) => records.push(r));
+
+    const events = [];
+    const { streamChat } = await import('../../lib/openrouter.js');
+    await streamChat(
+      [{ role: 'user', content: 'hi' }],
+      { apiKey: 'test-key', callMeta: { urlKey: 'acme', feature: 'task-chat' } },
+      (type, data) => events.push({ type, data })
+    );
+
+    const done = events.find(e => e.type === 'done');
+    assert.ok(done, 'emits a done event');
+    assert.strictEqual(done.data.usage.cost, 0.00042);
+    assert.strictEqual(done.data.usage.completionTokens, 30);
+
+    assert.strictEqual(records.length, 1);
+    assert.strictEqual(records[0].feature, 'task-chat');
+    assert.strictEqual(records[0].cost, 0.00042);
   });
 });
 

@@ -926,7 +926,8 @@ ${goal}`
           const r = await getRecommendation(
             ctx.issue,
             { parent: ctx.parent, siblings: ctx.siblings, project: ctx.project, children: ctx.children, comments: ctx.comments, focusedChild: ctx.focusedChild },
-            { apiKey: apiKeyToUse, model: selectedModel, featureFlags: getFeatureFlags(req.session), providerUi: getProviderForWorkspace(workspace)?.ui || null }
+            { apiKey: apiKeyToUse, model: selectedModel, featureFlags: getFeatureFlags(req.session), providerUi: getProviderForWorkspace(workspace)?.ui || null,
+              callMeta: { urlKey: workspace.urlKey, feature: 'recommend', issueIdentifier: ctx.issue.identifier } }
           )
           return {
             identifier: ctx.issue.identifier,
@@ -1270,7 +1271,8 @@ ${goal}`
               const r = await getRecommendationStream(
                 ctx.issue,
                 { parent: ctx.parent, siblings: ctx.siblings, project: ctx.project, children: ctx.children, comments: ctx.comments, focusedChild: ctx.focusedChild },
-                { apiKey: apiKeyToUse, model: selectedModel, featureFlags: getFeatureFlags(req.session), providerUi: getProviderForWorkspace(workspace)?.ui || null, signal: hop.signal },
+                { apiKey: apiKeyToUse, model: selectedModel, featureFlags: getFeatureFlags(req.session), providerUi: getProviderForWorkspace(workspace)?.ui || null, signal: hop.signal,
+                  callMeta: { urlKey: workspace.urlKey, feature: 'recommend', issueIdentifier: ctx.issue.identifier } },
                 (type, data) => {
                   if (closed) return;
                   // Forward phase + delta live; swallow the per-hop done — the handler
@@ -1356,7 +1358,8 @@ ${goal}`
             model: selectedModel,
             featureFlags: getFeatureFlags(req.session),
             providerUi: getProviderForWorkspace(workspace)?.ui || null,
-            signal: abortController.signal
+            signal: abortController.signal,
+            callMeta: { urlKey: workspace.urlKey, feature: 'recommend', issueIdentifier: issue.identifier }
           },
           (type, data) => {
             if (closed) return;
@@ -1673,7 +1676,7 @@ ${goal}`
         const result = await generateRecap(
           context.issue,
           context,
-          { apiKey: apiKeyToUse, model: selectedModel }
+          { apiKey: apiKeyToUse, model: selectedModel, callMeta: { urlKey: workspace?.urlKey } }
         );
         recap = result.recap;
         modelUsed = result.model;
@@ -1845,7 +1848,7 @@ ${goal}`
         const result = await generateBrief(
           context.issue,
           context,
-          { apiKey: apiKeyToUse, model: selectedModel }
+          { apiKey: apiKeyToUse, model: selectedModel, callMeta: { urlKey: workspace?.urlKey } }
         );
         brief = result.brief;
         modelUsed = result.model;
@@ -2406,14 +2409,14 @@ ${goal}`
    *
    * @returns {Promise<{ok: boolean, text: string, finishReason: ?string}>}
    */
-  async function streamLayer(res, { messages, apiKey, model, maxTokens, layer, layerName }) {
+  async function streamLayer(res, { messages, apiKey, model, maxTokens, layer, layerName, urlKey }) {
     sendSSE(res, 'layer-start', { layer });
     let text = '';
     let finishReason = null;
     try {
       await streamChat(
         messages,
-        { apiKey, model, maxTokens },
+        { apiKey, model, maxTokens, callMeta: { urlKey: urlKey || null, feature: 'roadmap', issueIdentifier: layer || null } },
         (type, data) => {
           if (type === 'token') {
             const token = (data && data.token) || '';
@@ -2593,7 +2596,8 @@ ${goal}`
         let text = '';
         await streamChat(
           messages,
-          { apiKey: llm.apiKey, model: llm.model, maxTokens: orientationMaxTokens(candidates.length) },
+          { apiKey: llm.apiKey, model: llm.model, maxTokens: orientationMaxTokens(candidates.length),
+            callMeta: { urlKey: req.workspace?.urlKey || null, feature: 'roadmap-orientation' } },
           (type, data) => { if (type === 'token') text += (data && data.token) || ''; }
         );
         parsed = parseOrientationLines(text);
@@ -2719,7 +2723,7 @@ ${goal}`
         sendSSE(res, 'layer-error', { layer, message: `Failed to build ${layerName} prompt` });
         return { ok: false, text: '' };
       }
-      return streamLayer(res, { messages, apiKey: llm.apiKey, model: llm.model, maxTokens, layer, layerName });
+      return streamLayer(res, { messages, apiKey: llm.apiKey, model: llm.model, maxTokens, layer, layerName, urlKey: req.workspace?.urlKey });
     }
 
     try {
@@ -2894,7 +2898,8 @@ ${goal}`
     try {
       await streamChat(
         messages,
-        { apiKey: apiKeyToUse, model: selectedModel, maxTokens: 3000 },
+        { apiKey: apiKeyToUse, model: selectedModel, maxTokens: 3000,
+          callMeta: { urlKey: req.workspace?.urlKey || null, feature: 'roadmap-chat' } },
         (type, data) => {
           sendSSE(res, type, data);
           if (type === 'done' || type === 'error') {
