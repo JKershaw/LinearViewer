@@ -327,6 +327,10 @@ async function pollState() {
   if (!urlKey) return;
 
   try {
+    // Silent-poller carve-out: this runs on an interval and deliberately
+    // swallows non-2xx/transient failures (returns quietly, no error surface),
+    // so it stays on raw fetch() rather than window.api(). It keeps its own
+    // 401→/logout redirect for the session-expiry case.
     const res = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/pipeline/state`);
     if (res.status === 401) {
       window.location.href = '/logout';
@@ -586,9 +590,9 @@ async function openLeafOverlay(identifier) {
   `);
 
   try {
-    const res = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/pipeline/task/${encodeURIComponent(identifier)}`);
-    if (!res.ok) throw new Error('Failed to fetch task');
-    const task = await res.json();
+    // on401:false — a stale session surfaces in the overlay's own error body
+    // (the catch below), it does not bounce the page to /logout.
+    const task = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/pipeline/task/${encodeURIComponent(identifier)}`, { on401: false });
 
     showOverlay(renderLeafOverlayContent(task));
     wireOverlayControls(task, urlKey);
@@ -598,6 +602,8 @@ async function openLeafOverlay(identifier) {
     overlayPollId = setInterval(async () => {
       if (document.hidden) return;
       try {
+        // Silent-poller carve-out: this interval refresh deliberately swallows
+        // failures (returns quietly), so it stays on raw fetch().
         const r = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/pipeline/task/${encodeURIComponent(identifier)}`);
         if (!r.ok) return;
         const updated = await r.json();
@@ -640,14 +646,9 @@ function wireOverlayControls(task, urlKey) {
       recommendBtn.disabled = true;
 
       try {
-        const recRes = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/recommendations/${encodeURIComponent(task.identifier)}`);
-        if (recRes.status === 401) {
-          window.location.href = '/logout';
-          return;
-        }
-        if (!recRes.ok) throw new Error('Recommend failed');
-
-        const data = await recRes.json();
+        // Default on401 — this operator action keeps the existing 401→/logout
+        // redirect; any other failure throws into the catch (button → 'failed').
+        const data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/recommendations/${encodeURIComponent(task.identifier)}`);
         const prompt = data.recommendation || data.prompt || '';
         const promptName = data.promptName || data.templateKey || 'ai-recommend';
 
@@ -736,9 +737,9 @@ async function openParentOverlay(identifier) {
   `);
 
   try {
-    const res = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/pipeline/task/${encodeURIComponent(identifier)}`);
-    if (!res.ok) throw new Error('Failed to fetch parent');
-    const task = await res.json();
+    // on401:false — a stale session surfaces in the overlay's own error body
+    // (the catch below), it does not bounce the page to /logout.
+    const task = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/pipeline/task/${encodeURIComponent(identifier)}`, { on401: false });
 
     const si = stateIndicator(task.agentState);
     const loops = task.loops || [];
