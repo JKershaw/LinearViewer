@@ -25,6 +25,7 @@
  * re-seed in beforeEach for the same reason.
  */
 import { test } from '../fixtures/test-base.js';
+import { seedLocalWorkspace, pipelineLocalSeed, LOCAL_WORKSPACE_URL_KEY } from '../fixtures/local-harness.js';
 
 const URL_KEY = 'test-workspace';
 const DIR = 'tests/screenshots/pages';
@@ -123,6 +124,27 @@ test.describe('Authenticated pages', () => {
 
   test('audit', async ({ page }) => {
     await capture(page, `/workspace/${URL_KEY}/audit`, 'audit');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Pipeline (LIN-492) — a convergence surface the later client-primitive / api()
+// wave edits, so it needs a baseline. Unlike the pages above, pipeline has NO
+// `test-token` → `testMockData` mock arm (deleted in LIN-387): its snapshot is
+// built by buildPipelineSnapshot over the real provider read seam, so a
+// test-token session would 401 against live Linear and redirect to the landing
+// page. It must therefore ride the deterministic LOCAL provider harness
+// (seedLocalWorkspace + pipelineLocalSeed → the `local-workspace` partition),
+// the path the pipeline E2E specs already use. settleMs lets the floor-view
+// shell finish its first internal `/api/pipeline/state` poll before capture.
+// ---------------------------------------------------------------------------
+test.describe('Pipeline page', () => {
+  test.beforeEach(async ({ page }) => {
+    await seedLocalWorkspace(page, pipelineLocalSeed, { features: { pipeline: true } });
+  });
+
+  test('pipeline', async ({ page }) => {
+    await capture(page, `/workspace/${LOCAL_WORKSPACE_URL_KEY}/pipeline`, 'pipeline', { settleMs: 400 });
   });
 });
 
