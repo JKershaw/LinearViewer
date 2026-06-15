@@ -21,9 +21,9 @@ async function clearRuns(page) {
   await page.goto(`/test/clear-foreman-status?urlKey=${URL_KEY}`);
 }
 
-async function seedQueuedRun(page, { issueIdentifier, issueTitle }) {
+async function seedQueuedRun(page, { issueIdentifier, issueTitle, kind = 'plan' }) {
   const res = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
-    data: { prompt: 'do the thing', promptName: 'plan', issueIdentifier, issueTitle, target: 'cli' }
+    data: { prompt: 'do the thing', promptName: 'plan', kind, issueIdentifier, issueTitle, target: 'cli' }
   });
   expect(res.status(), `dispatch seed failed: ${await res.text()}`).toBe(201);
   return (await res.json()).item;
@@ -75,7 +75,8 @@ test.describe('Autopilot Dashboard (experimental)', () => {
       await page.waitForLoadState('networkidle');
     });
 
-    test('renders the controls, active and recent sections', async ({ page }) => {
+    test('renders the banner, controls, active and recent sections', async ({ page }) => {
+      await expect(page.locator('#dashboard-banner')).toBeVisible();
       await expect(page.locator('.dashboard-controls-section')).toBeVisible();
       await expect(page.locator('.dashboard-active-section')).toBeVisible();
       await expect(page.locator('.dashboard-recent-section')).toBeVisible();
@@ -85,6 +86,11 @@ test.describe('Autopilot Dashboard (experimental)', () => {
       const chips = page.locator('.dashboard-chip');
       await expect(chips).toHaveCount(2);
       await expect(page.locator('.dashboard-chip.is-on')).toHaveCount(2);
+    });
+
+    test('defaults the scope toggle to autopilot', async ({ page }) => {
+      await expect(page.locator('.dashboard-scope-btn[data-scope="autopilot"]')).toHaveClass(/is-on/);
+      await expect(page.locator('.dashboard-scope-btn[data-scope="all"]')).not.toHaveClass(/is-on/);
     });
   });
 
@@ -120,14 +126,42 @@ test.describe('Autopilot Dashboard (experimental)', () => {
       expect(run.workspaceName).toBeTruthy();
     });
 
-    test('the dashboard page renders a seeded run in the active feed', async ({ page }) => {
+    test('the dashboard page renders a seeded autopilot run in the active feed', async ({ page }) => {
       await page.goto(`/test/set-session?${ENABLED}`);
       await clearRuns(page);
-      await seedQueuedRun(page, { issueIdentifier: 'LIN-902', issueTitle: 'Visible run' });
+      // Autopilot kind so it survives the default autopilot-only scope.
+      await seedQueuedRun(page, { issueIdentifier: 'LIN-902', issueTitle: 'Visible run', kind: 'autopilot' });
 
       await page.goto(DASHBOARD_URL);
       await page.waitForLoadState('networkidle');
-      await expect(page.locator('#dashboard-active .dashboard-run').filter({ hasText: 'Visible run' })).toBeVisible();
+      await expect(page.locator('#dashboard-active .dashboard-session').filter({ hasText: 'Visible run' })).toBeVisible();
+    });
+
+    test('a non-autopilot run is hidden by default but shown under "All runs"', async ({ page }) => {
+      await page.goto(`/test/set-session?${ENABLED}`);
+      await clearRuns(page);
+      await seedQueuedRun(page, { issueIdentifier: 'LIN-904', issueTitle: 'Manual run', kind: 'plan' });
+
+      await page.goto(DASHBOARD_URL);
+      await page.waitForLoadState('networkidle');
+      // Default scope = autopilot-only → the plain run is filtered out.
+      await expect(page.locator('.dashboard-session').filter({ hasText: 'Manual run' })).toHaveCount(0);
+      // Flip to "All runs" → it appears.
+      await page.locator('.dashboard-scope-btn[data-scope="all"]').click();
+      await expect(page.locator('.dashboard-session').filter({ hasText: 'Manual run' })).toBeVisible();
+    });
+
+    test('expanding a session reveals its nested run events', async ({ page }) => {
+      await page.goto(`/test/set-session?${ENABLED}`);
+      await clearRuns(page);
+      await seedQueuedRun(page, { issueIdentifier: 'LIN-905', issueTitle: 'Expandable run', kind: 'autopilot' });
+
+      await page.goto(DASHBOARD_URL);
+      await page.waitForLoadState('networkidle');
+      const card = page.locator('.dashboard-session').filter({ hasText: 'Expandable run' });
+      await expect(card).toBeVisible();
+      await card.locator('.dashboard-session-head').click();
+      await expect(card.locator('.dashboard-runs .dashboard-event')).toHaveCount(1);
     });
   });
 
