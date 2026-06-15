@@ -426,7 +426,7 @@ app.use((req, res, next) => {
 // Mount extracted route modules
 app.use(getProvider('linear').getAuthRouter({ sessionStore, userPreferencesStore }))
 app.use(createWorkspaceRoutes({ localStore }))
-app.use(createOpenRouterAuthRoutes())
+app.use(createOpenRouterAuthRoutes({ userPreferencesStore }))
 // Note: Dispatch routes mounted after workspaceFromUrl middleware is defined
 
 // =============================================================================
@@ -891,13 +891,15 @@ async function getWorkspaceAccessToken(urlKey) {
   return (await resolveWorkspaceAccess(urlKey)).token;
 }
 
-// getWorkspaceOpenRouterKey: looks up an OpenRouter API key from active sessions
-// for the token creator's session. Only returns a key when the linearUserId matches,
-// preventing one user's proxy token from consuming another user's OpenRouter quota.
-// Uses a short-lived cache (30s) keyed by urlKey+linearUserId.
-const _openRouterKeyCache = new Map(); // "urlKey:linearUserId" -> { key, cachedAt }
-const OPENROUTER_KEY_CACHE_TTL_MS = 30 * 1000; // 30 seconds
-
+// getWorkspaceOpenRouterKey: resolves the token creator's OpenRouter API key for
+// proxy consumers. The key is read directly from the durable per-user preferences
+// store (LIN-498), keyed by the token creator's linearUserId — the single source
+// of truth. This replaced a DB-wide scan of all sessions plus a 30s cache, which
+// became stale after session.regenerate() (the proxy would find the new, keyless
+// session and report "AI not configured"). Only the creator's own key is returned,
+// so one user's proxy token can't consume another user's OpenRouter quota.
+// urlKey is retained for signature compatibility/logging; authorization is already
+// enforced by the workspace-scoped proxy token's creator binding.
 async function getWorkspaceOpenRouterKey(urlKey, linearUserId) {
   if (process.env.NODE_ENV === 'test' && urlKey === 'test-workspace') {
     return null;
@@ -908,33 +910,12 @@ async function getWorkspaceOpenRouterKey(urlKey, linearUserId) {
     return null;
   }
 
-  const cacheKey = `${urlKey}:${linearUserId}`;
-
-  // Check cache first
-  const cached = _openRouterKeyCache.get(cacheKey);
-  if (cached && Date.now() - cached.cachedAt < OPENROUTER_KEY_CACHE_TTL_MS) {
-    return cached.key;
-  }
-
   try {
-    const sessions = await sessionsCollection.find({}).toArray();
-
-    for (const s of sessions) {
-      const data = typeof s.session === 'string' ? JSON.parse(s.session) : s.session;
-      // Only use the key from the token creator's own session
-      if (data?.linearUserId !== linearUserId) continue;
-      const ws = data?.workspaces?.find(w => w.urlKey === urlKey);
-      if (ws && data.openRouterApiKey) {
-        _openRouterKeyCache.set(cacheKey, { key: data.openRouterApiKey, cachedAt: Date.now() });
-        return data.openRouterApiKey;
-      }
-    }
-
-    _openRouterKeyCache.set(cacheKey, { key: null, cachedAt: Date.now() });
+    return await userPreferencesStore.getOpenRouterApiKey(linearUserId);
   } catch (err) {
     console.error('Error looking up workspace OpenRouter key:', err);
+    return null;
   }
-  return null;
 }
 
 app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, briefCacheStore, dispatchQueueStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, workspacePreferencesStore }))

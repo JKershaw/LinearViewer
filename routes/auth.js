@@ -10,6 +10,7 @@ import { Router } from 'express'
 import { getProvider } from '../lib/providers/registry.js'
 import { renderErrorPage } from '../lib/render.js'
 import { upsertWorkspace, saveSession, updateWorkspaceTokens } from '../lib/workspace.js'
+import { applyUserPreferencesToSession } from '../lib/user-preferences.js'
 
 /**
  * Create auth routes with required dependencies.
@@ -183,15 +184,14 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore }) {
         req.session.linearUserId = viewer.id
 
         // Load saved user preferences and apply to session.
+        // regenerate() wiped the session, so rehydrate every durable field
+        // session readers rely on — features, northStarByWorkspace, and the
+        // OpenRouter key (LIN-498: previously dropped here, wiping the user's
+        // OpenRouter connection on routine re-auth / account / workspace switch).
         // modelId lives at the workspace level (LIN-283) — no session hydration here.
         if (userPreferencesStore) {
           const savedPrefs = await userPreferencesStore.getUserPreferences(viewer.id)
-          if (savedPrefs.features) {
-            req.session.features = savedPrefs.features
-          }
-          if (savedPrefs.northStarByWorkspace) {
-            req.session.northStarByWorkspace = savedPrefs.northStarByWorkspace
-          }
+          applyUserPreferencesToSession(req.session, savedPrefs)
         }
 
         // Add/update workspace in session
