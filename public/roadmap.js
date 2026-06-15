@@ -345,6 +345,9 @@
     var team = currentTeamParam();
     if (team) body.team = team;
 
+    // Raw fetch carve-out: this is a Server-Sent Events stream consumed via
+    // readSSEStream(response, …). window.api() parses the body as JSON and would
+    // swallow the stream, so the SSE reader keeps its own response handling.
     return fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/roadmap/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
@@ -424,12 +427,14 @@
       collected.trajectory || collected.northStarReading || collected.gap;
     if (!hasContent) return Promise.resolve(null);
 
-    return fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/roadmap/reports', {
+    // on401:false — durability is best-effort, so a stale session must not
+    // redirect mid-save; the .catch swallows the throw like the old non-ok path.
+    return window.api('/workspace/' + encodeURIComponent(urlKey) + '/api/roadmap/reports', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ northStar: northStar || '', narrative: collected, orientation: orientation || [] })
+      body: JSON.stringify({ northStar: northStar || '', narrative: collected, orientation: orientation || [] }),
+      on401: false
     })
-      .then(function(r) { return r.ok ? r.json() : null; })
       .then(function(body) { return (body && body.report) || null; })
       .catch(function() { return null; /* durability is best-effort */ });
   }
@@ -442,18 +447,21 @@
     var btn = section.querySelector('.roadmap-generate-reading-btn');
     if (!textarea || !btn) return;
 
-    // Load any saved north star value into the textarea
-    fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/roadmap/north-star')
-      .then(function(r) { return r.ok ? r.json() : { northStar: '' }; })
+    // Load any saved north star value into the textarea.
+    // on401:false — a failed background load leaves the textarea empty rather
+    // than redirecting on a stale session.
+    window.api('/workspace/' + encodeURIComponent(urlKey) + '/api/roadmap/north-star', { on401: false })
       .then(function(body) { textarea.value = (body && body.northStar) || ''; })
       .catch(function() { /* keep empty */ });
 
     // Save on blur. No debounce: blur is a deliberate user action.
     textarea.addEventListener('blur', function() {
-      fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/roadmap/north-star', {
+      // on401:false — fire-and-forget; the next save retries (see .catch).
+      window.api('/workspace/' + encodeURIComponent(urlKey) + '/api/roadmap/north-star', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ northStar: textarea.value })
+        body: JSON.stringify({ northStar: textarea.value }),
+        on401: false
       }).catch(function() { /* swallow — next save will retry */ });
     });
 
@@ -502,8 +510,9 @@
 
   /** Fetch the summary list and render the history panel. Resolves with summaries. */
   function loadHistory() {
-    return fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/roadmap/reports')
-      .then(function(r) { return r.ok ? r.json() : null; })
+    // on401:false — history is a background panel load; a failure renders an
+    // empty list (see .catch) rather than redirecting.
+    return window.api('/workspace/' + encodeURIComponent(urlKey) + '/api/roadmap/reports', { on401: false })
       .then(function(body) {
         var reports = (body && body.reports) || [];
         historyState.summaries = reports;
@@ -609,8 +618,13 @@
     setViewingBanner(isLatest, summary);
     if (!applyToPanels) return Promise.resolve();
 
-    return fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/roadmap/reports/' + encodeURIComponent(id))
-      .then(function(r) { return r.ok ? r.json() : null; })
+    // toastOnError — selecting a past reading is a user action; a failure here
+    // was previously silent (panels just stayed as-is). on401:false keeps a
+    // stale session from redirecting; the .catch still leaves panels untouched.
+    return window.api('/workspace/' + encodeURIComponent(urlKey) + '/api/roadmap/reports/' + encodeURIComponent(id), {
+      on401: false,
+      toastOnError: true
+    })
       .then(function(body) { if (body && body.report) applyReport(body.report); })
       .catch(function() { /* leave panels as-is */ });
   }
@@ -708,6 +722,9 @@
 
       historyEl.scrollTop = historyEl.scrollHeight;
 
+      // Raw fetch carve-out: Server-Sent Events stream consumed via
+      // readSSEStream(response, …); window.api() would parse the body as JSON
+      // and break the stream, so the SSE reader keeps its own response handling.
       fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/roadmap/chat', {
         method: 'POST',
         headers: {
