@@ -2762,7 +2762,8 @@ One convention across every endpoint, so you can branch on the same fields every
             apiKey: sessionApiKey,
             model: selectedModel,
             featureFlags: {},
-            signal: AbortSignal.any([signal, hop.signal])
+            signal: AbortSignal.any([signal, hop.signal]),
+            callMeta: { urlKey, feature: 'recommend', issueIdentifier: issue.identifier }
           }
         ),
         LLM_TIMEOUT_MS
@@ -2988,7 +2989,7 @@ One convention across every endpoint, so you can branch on the same fields every
           modelUsed = selectedModel;
         } else {
           const result = await withTimeout(
-            generateRecap(context.issue, context, { apiKey: sessionApiKey, model: selectedModel }),
+            generateRecap(context.issue, context, { apiKey: sessionApiKey, model: selectedModel, callMeta: { urlKey: req.proxyUrlKey } }),
             LLM_TIMEOUT_MS
           );
           recap = result.recap;
@@ -3091,7 +3092,7 @@ One convention across every endpoint, so you can branch on the same fields every
           modelUsed = selectedModel;
         } else {
           const result = await withTimeout(
-            generateRecap(context.issue, context, { apiKey: sessionApiKey, model: selectedModel }),
+            generateRecap(context.issue, context, { apiKey: sessionApiKey, model: selectedModel, callMeta: { urlKey: req.proxyUrlKey } }),
             LLM_TIMEOUT_MS
           );
           recap = result.recap;
@@ -3230,7 +3231,7 @@ One convention across every endpoint, so you can branch on the same fields every
           modelUsed = selectedModel;
         } else {
           const result = await withTimeout(
-            generateBrief(context.issue, context, { apiKey: sessionApiKey, model: selectedModel }),
+            generateBrief(context.issue, context, { apiKey: sessionApiKey, model: selectedModel, callMeta: { urlKey: req.proxyUrlKey } }),
             LLM_TIMEOUT_MS
           );
           brief = result.brief;
@@ -3333,7 +3334,7 @@ One convention across every endpoint, so you can branch on the same fields every
           modelUsed = selectedModel;
         } else {
           const result = await withTimeout(
-            generateBrief(context.issue, context, { apiKey: sessionApiKey, model: selectedModel }),
+            generateBrief(context.issue, context, { apiKey: sessionApiKey, model: selectedModel, callMeta: { urlKey: req.proxyUrlKey } }),
             LLM_TIMEOUT_MS
           );
           brief = result.brief;

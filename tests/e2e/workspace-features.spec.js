@@ -81,7 +81,7 @@ test.describe('Workspace feature toggles', () => {
     await expect(periodicalsSection.locator('.settings-header')).toHaveText('Workspace features');
 
     // And the AI / Workflow sections do not render it.
-    const aiSection = page.locator('.settings-section', { has: page.locator('.settings-header:has-text("AI")') });
+    const aiSection = page.locator('.settings-section', { has: page.locator('.settings-header:text-is("AI")') });
     await expect(aiSection.locator('[data-feature="periodicals"]')).toHaveCount(0);
   });
 

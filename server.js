@@ -26,6 +26,7 @@ import { FreeTierStore } from './lib/free-tier-store.js'
 import { RecapCacheStore } from './lib/recap-cache.js'
 import { BriefCacheStore } from './lib/brief-cache.js'
 import { ReportHistoryStore } from './lib/report-history-store.js'
+import { LlmCallLogStore } from './lib/llm-call-log.js'
 import { getProvider, getProviderForWorkspace } from './lib/providers/registry.js'
 import './lib/providers/linear/index.js' // side effect: self-registers the Linear provider into the registry
 import { localProvider } from './lib/providers/local/index.js' // side effect: self-registers the Local provider; store injected below
@@ -69,7 +70,7 @@ import { renderRoadmapPage } from './lib/render-roadmap.js'
 import { buildRoadmapModel } from './lib/roadmap.js'
 import { renderProxyPage } from './lib/render-proxy.js'
 import { renderForemanPage } from './lib/render-foreman.js'
-import { AVAILABLE_MODELS } from './lib/openrouter.js'
+import { AVAILABLE_MODELS, setLlmCallRecorder } from './lib/openrouter.js'
 import { resolveWorkspaceModel, getWorkspaceFeatures, isWorkspaceFeatureEnabled, setWorkspaceFeature } from './lib/workspace-preferences.js'
 import { getFeatureFlags, isValidFeatureKey, isValidWorkspaceFeatureKey, WORKSPACE_FEATURES } from './lib/feature-defaults.js'
 
@@ -248,6 +249,15 @@ const reportHistoryCollection = db.collection('report-history')
 const reportHistoryStore = new ReportHistoryStore({
   collection: reportHistoryCollection
 })
+
+// LLM call log (LIN-418): per-call metadata (model, provider, tokens, cost, time).
+// Registered as the openrouter client's recorder hook so every LLM call is logged
+// without the client importing the store.
+const llmCallLogCollection = db.collection('llm-call-log')
+const llmCallLogStore = new LlmCallLogStore({
+  collection: llmCallLogCollection
+})
+setLlmCallRecorder((call) => llmCallLogStore.record(call))
 
 // =============================================================================
 // Express App Configuration
@@ -1251,6 +1261,9 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
   // Check for model validation error from redirect
   const modelError = req.query.error;
 
+  // LLM usage KPIs (LIN-418): aggregate per-call metadata over the retained window.
+  const llmStats = await llmCallLogStore.summarize(workspace.urlKey);
+
   const html = renderSettingsPage(workspace.name || 'Workspace', {
     openRouterConnected: !!(openRouterSource === 'oauth' || openRouterSource === 'env'),
     openRouterSource,
@@ -1261,7 +1274,8 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
     urlKey: workspace.urlKey,
     workspaces: req.session.workspaces,
     featureFlags: getFeatureFlags(req.session),
-    workspaceFeatures
+    workspaceFeatures,
+    llmStats
   });
   res.send(html);
 });

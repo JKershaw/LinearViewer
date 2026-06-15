@@ -31,8 +31,8 @@ test.describe('Feature Toggle Settings', () => {
     await page.waitForLoadState('networkidle');
 
     // AI and Workflow section headers should be visible
-    await expect(page.locator('.settings-header:has-text("AI")')).toBeVisible();
-    await expect(page.locator('.settings-header:has-text("Workflow")')).toBeVisible();
+    await expect(page.locator('.settings-header:text-is("AI")')).toBeVisible();
+    await expect(page.locator('.settings-header:text-is("Workflow")')).toBeVisible();
 
     // All feature toggle labels should be present (split across sections)
     await expect(page.locator('.feature-toggle-label:has-text("Use Linear MCP")')).toBeVisible();
