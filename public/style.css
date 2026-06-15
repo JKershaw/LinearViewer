@@ -91,7 +91,7 @@ body {
   line-height: 1.6;
   background: var(--bg);
   color: var(--fg);
-  padding: 2rem;
+  padding: var(--space-5);
   max-width: 120ch;  /* Optimal reading width */
   margin-left: auto;
   margin-right: auto;
@@ -103,7 +103,7 @@ body {
    ============================================================================= */
 header {
   text-align: center;
-  margin-bottom: 2rem;
+  margin-bottom: var(--space-5);
 }
 
 h1 {
@@ -131,9 +131,9 @@ h1 {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  margin-bottom: 1rem;
+  margin-bottom: var(--space-3);
   flex-wrap: wrap;
-  gap: 0.5rem 2ch;
+  gap: var(--space-2) 2ch;
 }
 
 .nav-filters {
@@ -202,12 +202,12 @@ button.nav-action {
 .queue-badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0.2rem 0.5rem;
+  gap: var(--space-1);
+  padding: 0.2rem var(--space-2);
   background: var(--blue);
   color: white;
   border: none;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   font-size: 0.8em;
   font-family: var(--font-content);
   cursor: pointer;
@@ -237,7 +237,7 @@ button.nav-action {
   border: 1px solid var(--fg-vdim);
   border-radius: 4px;
   box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-  z-index: 1000;
+  z-index: var(--z-overlay);
   overflow: hidden;
 }
 
@@ -249,7 +249,7 @@ button.nav-action {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.75rem 1rem;
+  padding: 0.75rem var(--space-3);
   background: var(--bg-muted);
   border-bottom: 1px solid var(--fg-vdim);
   font-family: var(--font-content);
@@ -262,7 +262,7 @@ button.nav-action {
   font-size: 1.2em;
   color: var(--fg-dim);
   cursor: pointer;
-  padding: 0 0.25rem;
+  padding: 0 var(--space-1);
 }
 
 .queue-panel-close:hover {
@@ -276,7 +276,7 @@ button.nav-action {
 }
 
 .queue-item {
-  padding: 0.75rem 1rem;
+  padding: 0.75rem var(--space-3);
   border-bottom: 1px solid var(--fg-vdim);
 }
 
@@ -288,7 +288,7 @@ button.nav-action {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 .queue-item-title {
@@ -315,11 +315,11 @@ button.nav-action {
 .queue-item-meta {
   font-size: 0.8em;
   color: var(--fg-dim);
-  margin-top: 0.25rem;
+  margin-top: var(--space-1);
 }
 
 .queue-panel-empty {
-  padding: 2rem 1rem;
+  padding: var(--space-5) var(--space-3);
   text-align: center;
   color: var(--fg-dim);
   font-family: var(--font-content);
@@ -343,9 +343,9 @@ button.nav-action {
    Options Panel (appears below nav bar when selector is expanded)
    ============================================================================= */
 .nav-options-panel {
-  padding: 0.5rem 0;
+  padding: var(--space-2) 0;
   margin-left: 3ch;  /* Indent for visual containment */
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-2);
   max-width: 30ch;  /* Keep compact on desktop */
 }
 
@@ -394,7 +394,7 @@ button.nav-action {
 
 .option-marker {
   color: var(--blue);
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
 }
 
 .option-marker-placeholder {
@@ -427,8 +427,8 @@ button.nav-action {
    Search input below nav bar for filtering issues by keyword.
 */
 .search-panel {
-  padding: 0.5rem 0;
-  margin-bottom: 0.5rem;
+  padding: var(--space-2) 0;
+  margin-bottom: var(--space-2);
 }
 
 .search-panel.hidden {
@@ -445,7 +445,7 @@ button.nav-action {
   font-family: var(--font-structural);
   font-size: 0.9em;
   border: 1px solid var(--fg-vdim);
-  padding: 0.25rem 0.5rem;
+  padding: var(--space-1) var(--space-2);
   color: var(--fg);
   background: var(--bg);
   flex: 1;
@@ -473,7 +473,7 @@ button.nav-action {
 .search-no-results {
   color: var(--fg-dim);
   font-size: 0.9em;
-  padding: 0.5rem 0;
+  padding: var(--space-2) 0;
 }
 
 .search-no-results.hidden {
@@ -494,7 +494,7 @@ button.nav-action {
   color: var(--yellow);
   font-weight: 600;
   cursor: pointer;
-  padding: 0.5rem 0;
+  padding: var(--space-2) 0;
   font-family: var(--font-content);
 }
 
@@ -528,7 +528,7 @@ button.nav-action {
   color: var(--green);
   font-weight: 600;
   cursor: pointer;
-  padding: 0.5rem 0;
+  padding: var(--space-2) 0;
   font-family: var(--font-content);
 }
 
@@ -546,7 +546,7 @@ button.nav-action {
   color: var(--blue);
   font-weight: 600;
   cursor: pointer;
-  padding: 0.5rem 0;
+  padding: var(--space-2) 0;
   font-family: var(--font-content);
 }
 
@@ -568,14 +568,14 @@ button.nav-action {
 .project[data-project-type="periodicals"] .periodical-mode {
   color: var(--fg-dim);
   font-family: var(--font-structural);
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
   margin-left: 0.75ch;
 }
 
 .project-description {
   color: var(--fg-dim);
   margin-left: 3ch;  /* Indent under project header */
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-2);
   word-wrap: break-word;
   overflow-wrap: break-word;
   cursor: pointer;
@@ -650,9 +650,9 @@ button.nav-action {
   cursor: pointer;
   margin-left: 1ch;
   flex-shrink: 0;
-  padding: 0.25rem 0.5rem;
+  padding: var(--space-1) var(--space-2);
   margin-right: -0.5rem;
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
 }
 
 .toggle:hover {
@@ -683,7 +683,7 @@ button.nav-action {
   cursor: pointer;
   font-size: 0.8em;
   font-family: var(--font-content);
-  padding: 0.25rem 0;
+  padding: var(--space-1) 0;
   display: block;
 }
 
@@ -693,8 +693,8 @@ button.nav-action {
 
 /* LIN-158: Nested toggle (e.g., Comments inside Details) */
 .detail-toggle.nested-toggle {
-  margin-top: 0.5rem;
-  padding-left: 1rem;
+  margin-top: var(--space-2);
+  padding-left: var(--space-3);
   /* LIN-456: --border was undefined here (no fallback), so this resolved to the
      initial border color (currentColor). Locked to currentColor to preserve that
      exact rendering now that --border is defined. (Latent: likely intended #ddd —
@@ -705,12 +705,12 @@ button.nav-action {
 /* Content wrapper for toggleable sections */
 .detail-content {
   padding-left: 1.5ch;
-  margin-bottom: 0.25rem;
+  margin-bottom: var(--space-1);
 }
 
 /* LIN-158: Nested content (comments inside details) inherits border styling */
 .detail-content .detail-content {
-  margin-left: 1rem;
+  margin-left: var(--space-3);
   /* LIN-456: see .nested-toggle above — preserve currentColor rendering. */
   border-left: 1px solid currentColor;
 }
@@ -725,7 +725,7 @@ button.nav-action {
 /* Mobile: larger tap targets for toggles */
 @media (max-width: 640px) {
   .detail-toggle {
-    padding: 0.5rem 0;
+    padding: var(--space-2) 0;
   }
 }
 
@@ -741,14 +741,14 @@ button.nav-action {
   color: var(--fg-dim);
   cursor: pointer;
   margin-left: 4ch;
-  padding: 0.5rem 0;
+  padding: var(--space-2) 0;
   font-family: var(--font-content);
 }
 
 /* "+ Add task" link at end of task list */
 .add-task-link {
   color: var(--fg-dim);
-  padding: 0.25rem 0;
+  padding: var(--space-1) 0;
   padding-left: 1.5em;
   font-family: var(--font-content);
 }
@@ -884,7 +884,7 @@ button.nav-action {
   color: var(--fg-dim);
   font-family: var(--font-content);
   font-size: 0.9em;
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-2);
 }
 
 .issue-description .desc-truncated {
@@ -895,7 +895,7 @@ button.nav-action {
   display: block;
   max-height: 60vh;
   overflow-y: auto;
-  padding-right: 0.5rem;
+  padding-right: var(--space-2);
 }
 
 .issue-description .desc-full-content {
@@ -924,7 +924,7 @@ button.nav-action {
 .issue-description .desc-full-content code {
   background: var(--bg-muted);
   padding: 0.1em 0.3em;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   font-family: var(--font-structural);
   font-size: 0.9em;
 }
@@ -958,14 +958,14 @@ button.nav-action {
   max-width: 100%;
   height: auto;
   border-radius: 4px;
-  margin: 0.5rem 0;
+  margin: var(--space-2) 0;
   display: block;
 }
 
 .issue-description .img-error {
   color: var(--fg-dim);
   font-style: italic;
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
 }
 
 /* Toggle button for description expand/collapse */
@@ -995,7 +995,7 @@ button.nav-action {
   color: var(--fg-dim);
   font-style: italic;
   font-size: 0.9em;
-  padding: 0.25rem 0;
+  padding: var(--space-1) 0;
 }
 
 .comments-error {
@@ -1003,12 +1003,12 @@ button.nav-action {
 }
 
 .comments-list {
-  margin-top: 0.25rem;
+  margin-top: var(--space-1);
 }
 
 .comment {
-  margin: 0.5rem 0;
-  padding: 0.5rem 0 0.5rem 0.75rem;
+  margin: var(--space-2) 0;
+  padding: var(--space-2) 0 var(--space-2) 0.75rem;
   border-left: 2px solid var(--fg-vdim);
 }
 
@@ -1018,8 +1018,8 @@ button.nav-action {
 
 .comment-meta {
   color: var(--fg-dim);
-  font-size: 0.85em;
-  margin-bottom: 0.25rem;
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-1);
   font-family: var(--font-content);
 }
 
@@ -1044,7 +1044,7 @@ button.nav-action {
 .comment-body code {
   background: var(--bg-muted);
   padding: 0.1em 0.3em;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   font-family: var(--font-structural);
   font-size: 0.9em;
 }
@@ -1063,7 +1063,7 @@ button.nav-action {
 /* Tablets and large phones */
 @media (max-width: 640px) {
   body {
-    padding: 1rem;
+    padding: var(--space-3);
     font-size: 14px;
   }
 
@@ -1073,7 +1073,7 @@ button.nav-action {
     flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
-    gap: 0.5rem 1ch;
+    gap: var(--space-2) 1ch;
   }
 
   .nav-filters {
@@ -1115,7 +1115,7 @@ button.nav-action {
   }
 
   header {
-    margin-bottom: 1.5rem;
+    margin-bottom: var(--space-4);
   }
 
   h1 {
@@ -1142,15 +1142,15 @@ button.nav-action {
   }
 
   .project {
-    margin-bottom: 2rem;
+    margin-bottom: var(--space-5);
   }
 
   .in-progress-section {
-    margin-bottom: 2rem;
+    margin-bottom: var(--space-5);
   }
 
   .recent-activity-section {
-    margin-bottom: 2rem;
+    margin-bottom: var(--space-5);
   }
 
   .project-header {
@@ -1158,19 +1158,19 @@ button.nav-action {
   }
 
   .project-description {
-    margin-bottom: 0.5rem;
+    margin-bottom: var(--space-2);
   }
 
   /* Larger tap targets for touch devices (44px minimum recommended) */
   .toggle {
-    padding: 0.5rem 0.75rem;
-    margin: -0.5rem -0.75rem -0.5rem 0.5rem;
+    padding: var(--space-2) 0.75rem;
+    margin: -0.5rem -0.75rem -0.5rem var(--space-2);
     font-size: 1rem;
   }
 
   .completed-toggle {
     margin-left: 3ch;
-    padding: 0.5rem 0;
+    padding: var(--space-2) 0;
     display: block;
   }
 
@@ -1192,7 +1192,7 @@ button.nav-action {
   }
 
   header {
-    margin-bottom: 1rem;
+    margin-bottom: var(--space-3);
   }
 
   h1 {
@@ -1200,15 +1200,15 @@ button.nav-action {
   }
 
   .project {
-    margin-bottom: 1.5rem;
+    margin-bottom: var(--space-4);
   }
 
   .in-progress-section {
-    margin-bottom: 1.5rem;
+    margin-bottom: var(--space-4);
   }
 
   .recent-activity-section {
-    margin-bottom: 1.5rem;
+    margin-bottom: var(--space-4);
   }
 
   /* Tighter nav spacing on very small phones */
@@ -1228,9 +1228,9 @@ button.nav-action {
    Uses box-drawing characters to match CLI aesthetic.
 */
 .setup-notice {
-  margin: 1.5rem auto;
+  margin: var(--space-4) auto;
   max-width: 60ch;
-  padding: 0.75rem 1rem;
+  padding: 0.75rem var(--space-3);
   background: var(--bg-muted);
   border-radius: 4px;
   font-size: 0.85rem;
@@ -1266,13 +1266,13 @@ button.nav-action {
 
 .login-container p {
   color: var(--fg-dim);
-  margin-bottom: 1.5rem;
+  margin-bottom: var(--space-4);
   font-family: var(--font-content);
 }
 
 .login-button {
   display: inline-block;
-  padding: 0.75rem 1.5rem;
+  padding: 0.75rem var(--space-4);
   background: #5e6ad2;  /* Linear's brand purple */
   color: white;
   text-decoration: none;
@@ -1292,7 +1292,7 @@ button.nav-action {
   align-items: center;
   justify-content: center;
   gap: 0.75ch;
-  margin-top: 1.5rem;
+  margin-top: var(--space-4);
   font-family: var(--font-content);
 }
 
@@ -1345,19 +1345,19 @@ button.nav-action {
   font-size: 1.25rem;
   font-weight: 500;
   color: var(--fg);
-  margin-bottom: 1rem;
+  margin-bottom: var(--space-3);
 }
 
 .error-message {
   color: var(--fg-dim);
-  margin-bottom: 2rem;
+  margin-bottom: var(--space-5);
   font-family: var(--font-content);
   line-height: 1.5;
 }
 
 .error-home-link {
   display: block;
-  margin-top: 1rem;
+  margin-top: var(--space-3);
   color: var(--fg-dim);
   font-family: var(--font-content);
   font-size: 0.9em;
@@ -1378,13 +1378,13 @@ button.nav-action {
 .label-prompt {
   display: inline-block;
   background: none;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border);
   padding: 0.15rem 0.4rem;
   font-family: var(--font-content);
   font-size: 0.8em;
   color: var(--fg-dim);
   cursor: pointer;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   text-decoration: none;
   margin-right: 0.3rem;
   margin-bottom: 0.4rem;
@@ -1431,7 +1431,7 @@ button.nav-action {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-2);
 }
 
 .prompt-name {
@@ -1445,12 +1445,12 @@ button.nav-action {
 .prompt-download {
   background: none;
   border: 1px solid var(--fg-vdim);
-  padding: 0.25rem 0.5rem;
+  padding: var(--space-1) var(--space-2);
   font-family: var(--font-content);
   font-size: 0.8em;
   color: var(--fg-dim);
   cursor: pointer;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 }
 
 .prompt-copy:hover,
@@ -1471,12 +1471,12 @@ button.nav-action {
 .dispatch-disclosure {
   background: none;
   border: 1px solid var(--blue);
-  padding: 0.25rem 0.5rem;
+  padding: var(--space-1) var(--space-2);
   font-family: var(--font-content);
   font-size: 0.8em;
   color: var(--blue);
   cursor: pointer;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   user-select: none;
 }
 
@@ -1498,12 +1498,12 @@ button.nav-action {
 .prompt-dispatch {
   background: none;
   border: 1px solid var(--blue);
-  padding: 0.25rem 0.5rem;
+  padding: var(--space-1) var(--space-2);
   font-family: var(--font-content);
   font-size: 0.8em;
   color: var(--blue);
   cursor: pointer;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 }
 
 .prompt-dispatch:hover {
@@ -1520,13 +1520,13 @@ button.nav-action {
 .prompt-proxy-toggle {
   background: none;
   border: 1px solid var(--fg-vdim);
-  padding: 0.25rem 0.5rem;
+  padding: var(--space-1) var(--space-2);
   font-family: var(--font-content);
   font-size: 0.8em;
   color: var(--fg-vdim);
   cursor: pointer;
-  border-radius: 3px;
-  margin-left: 0.25rem;
+  border-radius: var(--radius-sm);
+  margin-left: var(--space-1);
 }
 
 .prompt-proxy-toggle:hover {
@@ -1548,7 +1548,7 @@ button.nav-action {
 /* Prompt text - monospace, preserves formatting */
 .prompt-text {
   font-family: var(--font-structural);
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
   line-height: 1.5;
   color: var(--fg);
   white-space: pre-wrap;
@@ -1563,7 +1563,7 @@ button.nav-action {
 /* Mobile adjustments for prompt container */
 @media (max-width: 640px) {
   .prompt-container {
-    padding: 0.5rem;
+    padding: var(--space-2);
   }
 
   .prompt-text {
@@ -1593,7 +1593,7 @@ button.nav-action {
 .recommend-reasoning h1,
 .recommend-reasoning h2 {
   font-family: var(--font-content);
-  font-size: 1em;
+  font-size: var(--font-size-base);
   font-weight: 600;
   color: var(--fg);
   margin: 1em 0 0.5em 0;
@@ -1655,7 +1655,7 @@ button.nav-action {
 .recommend-reasoning pre {
   background: var(--bg);
   border: 1px solid var(--fg-vdim);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   padding: 0.75em;
   margin: 0.5em 0;
   overflow-x: auto;
@@ -1675,10 +1675,10 @@ button.nav-action {
 .prompt-text code,
 .recommend-reasoning code {
   font-family: var(--font-structural);
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
   background: var(--bg);
   border: 1px solid var(--fg-vdim);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   padding: 0.1em 0.3em;
 }
 
@@ -1737,7 +1737,7 @@ button.nav-action {
 .recommend-container {
   margin-top: 0.75rem;
   padding: 0.75rem;
-  background: linear-gradient(135deg, #f0f7ff 0%, #f8f9fa 100%);
+  background: linear-gradient(135deg, #f0f7ff 0%, var(--bg-muted) 100%);
   border: 1px solid var(--blue);
   border-left: 3px solid var(--blue);
   border-radius: 4px;
@@ -1748,8 +1748,8 @@ button.nav-action {
   font-family: var(--font-content);
   font-size: 0.8em;
   color: var(--blue);
-  padding: 0.25rem 0;
-  margin-bottom: 0.25rem;
+  padding: var(--space-1) 0;
+  margin-bottom: var(--space-1);
 }
 
 .streaming-phase::before {
@@ -1766,7 +1766,7 @@ button.nav-action {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-2);
 }
 
 .recommend-title {
@@ -1779,7 +1779,7 @@ button.nav-action {
 .recommend-close {
   background: none;
   border: none;
-  padding: 0.25rem 0.5rem;
+  padding: var(--space-1) var(--space-2);
   font-family: var(--font-content);
   font-size: 0.8em;
   color: var(--fg-dim);
@@ -1792,14 +1792,14 @@ button.nav-action {
 
 .recommend-header-actions {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--space-2);
   align-items: center;
 }
 
 .reasoning-toggle {
   background: none;
   border: none;
-  padding: 0.25rem 0.5rem;
+  padding: var(--space-1) var(--space-2);
   font-family: var(--font-content);
   font-size: 0.8em;
   color: var(--blue);
@@ -1821,32 +1821,32 @@ button.nav-action {
 .recommend-actions {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 /* Generated prompt display within recommendation */
 .recommend-prompt {
-  margin-top: 0.5rem;
+  margin-top: var(--space-2);
 }
 
 .recommend-prompt .prompt-header {
-  margin-bottom: 0.25rem;
+  margin-bottom: var(--space-1);
 }
 
 .recommend-prompt .prompt-text {
   background: white;
   padding: 0.75rem;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   max-height: 300px;
   overflow-y: auto;
   white-space: pre-wrap;
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
   line-height: 1.5;
 }
 
 .free-tier-info {
-  margin-top: 0.5rem;
-  padding: 0.25rem 0;
+  margin-top: var(--space-2);
+  padding: var(--space-1) 0;
   font-size: 0.8em;
   color: var(--fg-dim);
 }
@@ -1862,11 +1862,11 @@ button.nav-action {
 /* Mobile adjustments */
 @media (max-width: 640px) {
   .recommend-container {
-    padding: 0.5rem;
+    padding: var(--space-2);
   }
 
   .recommend-reasoning {
-    font-size: 0.85em;
+    font-size: var(--font-size-sm);
   }
 
   .recommend-prompt .prompt-text {
@@ -1882,15 +1882,15 @@ button.nav-action {
 */
 .page-footer {
   margin-top: 3rem;
-  padding-top: 1rem;
+  padding-top: var(--space-3);
   border-top: 1px solid var(--fg-vdim);
   text-align: center;
   font-family: var(--font-content);
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
 }
 
 .footer-actions {
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-2);
 }
 
 .footer-action {
@@ -1969,7 +1969,7 @@ button.nav-action {
 /* Mobile adjustments for footer */
 @media (max-width: 640px) {
   .page-footer {
-    margin-top: 2rem;
+    margin-top: var(--space-5);
     padding-top: 0.75rem;
   }
 }
@@ -2013,8 +2013,8 @@ button.nav-action {
 /* Underlined heading — prompts catalog. Additive over .section-header. */
 .section .section-header--ruled {
   font-size: 1.1em;
-  margin-bottom: 1rem;
-  padding-bottom: 0.5rem;
+  margin-bottom: var(--space-3);
+  padding-bottom: var(--space-2);
   border-bottom: 1px solid var(--fg-vdim);
 }
 
@@ -2202,7 +2202,7 @@ button.nav-action {
   color: var(--fg);
   font-family: var(--font-content);
   font-weight: normal;
-  margin-bottom: 2rem;
+  margin-bottom: var(--space-5);
   text-align: center;
 }
 
@@ -2210,8 +2210,8 @@ button.nav-action {
   color: var(--blue);
   font-weight: 600;
   font-family: var(--font-content);
-  padding: 0.5rem 0;
-  margin-bottom: 0.5rem;
+  padding: var(--space-2) 0;
+  margin-bottom: var(--space-2);
 }
 
 .legal-content p {
@@ -2240,7 +2240,7 @@ button.nav-action {
   align-items: center;
   gap: 0.75ch;
   flex-wrap: wrap;
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-2);
 }
 
 .recap-status-label {
@@ -2250,17 +2250,17 @@ button.nav-action {
 
 .recap-meta {
   color: var(--fg-dim);
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
 }
 
 .recap-refresh {
   margin-left: auto;
   font-family: inherit;
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
   padding: 0.15rem 0.6rem;
   background: transparent;
   border: 1px solid var(--fg-dim);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   color: var(--fg);
   cursor: pointer;
 }
@@ -2321,10 +2321,10 @@ button.nav-action {
 
 .recap-section-title {
   color: var(--fg-dim);
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  margin-bottom: 0.25rem;
+  margin-bottom: var(--space-1);
 }
 
 .recap-item {
@@ -2361,7 +2361,7 @@ button.nav-action {
 
 .recap-item-evidence {
   color: var(--fg-dim);
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
   word-wrap: break-word;
   overflow-wrap: break-word;
 }
@@ -2394,7 +2394,7 @@ button.nav-action {
   align-items: center;
   gap: 0.75ch;
   flex-wrap: wrap;
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-2);
 }
 
 .brief-status-label {
@@ -2404,17 +2404,17 @@ button.nav-action {
 
 .brief-meta {
   color: var(--fg-dim);
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
 }
 
 .brief-refresh {
   margin-left: auto;
   font-family: inherit;
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
   padding: 0.15rem 0.6rem;
   background: transparent;
   border: 1px solid var(--fg-dim);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   color: var(--fg);
   cursor: pointer;
 }
@@ -2470,11 +2470,11 @@ button.nav-action {
 }
 
 .brief-content h2 {
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--fg-dim);
-  margin: 0.75rem 0 0.25rem;
+  margin: 0.75rem 0 var(--space-1);
 }
 
 .brief-content h2:first-child {
@@ -2482,7 +2482,7 @@ button.nav-action {
 }
 
 .brief-content ul {
-  margin: 0.25rem 0 0.5rem;
+  margin: var(--space-1) 0 var(--space-2);
   padding-left: 1.5ch;
 }
 
@@ -2491,5 +2491,5 @@ button.nav-action {
 }
 
 .brief-content p {
-  margin: 0.25rem 0 0.5rem;
+  margin: var(--space-1) 0 var(--space-2);
 }
