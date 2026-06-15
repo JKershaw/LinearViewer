@@ -1147,6 +1147,56 @@ describe('review template', () => {
       'review signals array includes the new test-level coverage signal'
     );
   });
+
+  // LIN-474: review is review-and-close. The body carries a Close-Out Gate that
+  // verifies merged/CI state, reconciles related tasks, and (when it cannot close)
+  // files a `blocks` ticket and routes to it instead of looping back to review.
+  test('review body carries the Close-Out Gate after Manual Verification, before Completion', () => {
+    const result = generatePrompt('review', mockIssue, mockContext);
+    const manualIdx = result.prompt.indexOf('### Manual Verification');
+    const gateIdx = result.prompt.indexOf('### Close-Out Gate');
+    const completionIdx = result.prompt.indexOf('### Completion');
+    assert.ok(gateIdx !== -1, 'Close-Out Gate section exists');
+    assert.ok(manualIdx !== -1 && manualIdx < gateIdx, 'Close-Out Gate comes after Manual Verification');
+    assert.ok(completionIdx !== -1 && gateIdx < completionIdx, 'Close-Out Gate comes before Completion');
+  });
+
+  test('Close-Out Gate verifies merged/CI state and reconciles related tasks', () => {
+    const result = generatePrompt('review', mockIssue, mockContext);
+    assert.ok(/merged state is the hard close gate/i.test(result.prompt), 'merged state is the hard gate');
+    assert.ok(/only when it is observable/i.test(result.prompt), 'deploy verified only when observable');
+    assert.ok(/not closeable while CI is red/i.test(result.prompt), 'CI red blocks close');
+    assert.ok(/reconcile related linear tasks/i.test(result.prompt), 'related tasks reconciled');
+  });
+
+  test('Close-Out Gate cannot-close branch files a `blocks` ticket and routes to it, not another review', () => {
+    const result = generatePrompt('review', mockIssue, mockContext);
+    assert.ok(/cannot-close branch/i.test(result.prompt), 'names the cannot-close branch');
+    assert.ok(/do NOT loop back into another `review`/i.test(result.prompt), 'forbids looping back to review');
+    assert.ok(/as a `blocks` relation on the current task/i.test(result.prompt), 'files/links the blocker as `blocks`');
+    assert.ok(/A `blocks` relation does not make the engine descend/i.test(result.prompt),
+      'next action must be named explicitly because `blocks` does not drive descent');
+    assert.ok(/close it only once the blocker is resolved and CI is green/i.test(result.prompt),
+      'original closes only after blocker resolves and CI green');
+    assert.ok(/distinct from a plan-phase prerequisite-refactor subtask/i.test(result.prompt),
+      'closure blocker kept distinct from plan refactor-subtask');
+  });
+
+  test('review completion signals include merged/reconcile/blocker-routed close-out outcomes', () => {
+    const reviewSignal = COMPLETION_SIGNALS['review'];
+    assert.ok(
+      reviewSignal.signals.some(s => /merged state verified/i.test(s)),
+      'signals include merged-state verification'
+    );
+    assert.ok(
+      reviewSignal.signals.some(s => /related linear tasks reconciled/i.test(s)),
+      'signals include related-tasks reconciliation'
+    );
+    assert.ok(
+      reviewSignal.signals.some(s => /closure blocker filed\/linked as `blocks`/i.test(s)),
+      'signals include the blocker-filed-and-routed close-out outcome'
+    );
+  });
 });
 
 // =============================================================================
@@ -1482,6 +1532,44 @@ describe('meta-prompt Step 0: open parent, all subtasks complete (LIN-364)', () 
     assert.ok(/Step 0: The substantive work here is already complete/i.test(p), 'a terminal task gets the unified completion Step 0');
     assert.ok(/its state is already a terminal state/i.test(p), 'with the terminal-state clause');
     assert.ok(!/all \d+ of its subtasks are in a terminal state/i.test(p), 'and NOT the non-terminal all-subtasks-complete clause');
+  });
+});
+
+describe('meta-prompt review close-out gate + cannot-close routing (LIN-474)', () => {
+  const baseArgs = {
+    issueContext: 'CTX', identifier: 'LIN-900',
+    hasSubtasks: true, subtaskCount: 2, completedCount: 2, inProgressCount: 0, remainingCount: 0,
+    hasComments: true, commentCount: 2, aiHints: 'H', actionVocabulary: 'plan, review, implementation, bug',
+    completionSignals: 'S', focusedSubtaskId: null
+  };
+
+  test('the existing Review-prompts rule is EXTENDED with the close-out gate (no second rule)', () => {
+    const p = buildMetaPromptTemplate({ ...baseArgs, isTerminal: false, hasOpenChildren: true });
+    const matches = p.match(/\*\*Review prompts\*\* must:/g) || [];
+    assert.strictEqual(matches.length, 1, 'there is exactly one Review-prompts rule (extended, not duplicated)');
+    assert.ok(/include a close-out gate before deciding the outcome/i.test(p), 'the close-out gate is encoded');
+    assert.ok(/the hard close gate/i.test(p), 'merged is the hard close gate');
+    assert.ok(/must NOT loop back into another review/i.test(p), 'forbids looping back to review');
+    assert.ok(/as `blocks` the current task/i.test(p), 'files/links the blocker as `blocks`');
+    assert.ok(/a `blocks` relation alone does not make the engine descend/i.test(p),
+      'next action named because `blocks` does not drive descent');
+  });
+
+  test('Step 0 completion branch carries the cannot-close branch routing to a blocker', () => {
+    const p = buildMetaPromptTemplate({ ...baseArgs, isTerminal: true, hasOpenChildren: false });
+    assert.ok(/\*\*Cannot-close branch:\*\*/i.test(p), 'Step 0 names the cannot-close branch');
+    assert.ok(/do NOT keep routing to `?review`?/i.test(p), 'it must not keep routing to review on CI-red/blocker');
+    assert.ok(/route instead via Step 2 to the blocker/i.test(p), 'it routes to the blocker via Step 2');
+  });
+
+  test('Step 3 already-landed seam routes a CI-red / surfaced-blocker case to the blocker, not a repeated review', () => {
+    const p = buildMetaPromptTemplate({
+      ...baseArgs, hasSubtasks: false, subtaskCount: 0, completedCount: 0,
+      isTerminal: false, hasOpenChildren: false
+    });
+    assert.ok(/neither to `?implementation`? nor to a repeated `?review`?/i.test(p),
+      'Step 3 carries the cannot-close exception');
+    assert.ok(/route the next action to that blocker/i.test(p), 'it routes the next action to the blocker');
   });
 });
 
