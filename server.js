@@ -25,6 +25,7 @@ import { ForemanStore } from './lib/foreman-store.js'
 import { FreeTierStore } from './lib/free-tier-store.js'
 import { RecapCacheStore } from './lib/recap-cache.js'
 import { BriefCacheStore } from './lib/brief-cache.js'
+import { RunSummaryCacheStore } from './lib/run-summary-cache.js'
 import { ReportHistoryStore } from './lib/report-history-store.js'
 import { LlmCallLogStore } from './lib/llm-call-log.js'
 import { getProvider, getProviderForWorkspace } from './lib/providers/registry.js'
@@ -62,6 +63,8 @@ import { renderSwimPage } from './lib/render-swim.js'
 import { renderShipPage } from './lib/render-ship.js'
 import { createPipelineRoutes } from './routes/pipeline.js'
 import { createCollectiveRoutes } from './routes/collective.js'
+import { createDashboardRoutes } from './routes/dashboard.js'
+import { fetchIssueContext } from './lib/linear.js'
 import { createTaskChatRoutes } from './routes/task-chat.js'
 import { yapClientFromEnv } from './lib/yap-client.js'
 import { getLoopsForWorkspace } from './lib/pipeline-loops.js'
@@ -238,6 +241,13 @@ const recapCacheStore = new RecapCacheStore({
   collection: recapCacheCollection
 })
 
+// Run summary cache (LIN-509): AI-generated short summaries of autopilot runs
+// (Loops), keyed `${workspaceId}:${loopId}`. 30-day TTL matches loop retention.
+const runSummaryCacheCollection = db.collection('run-summary-cache')
+const runSummaryCacheStore = new RunSummaryCacheStore({
+  collection: runSummaryCacheCollection
+})
+
 // Brief cache: AI-generated current-state task briefs, keyed on context hash
 const briefCacheCollection = db.collection('brief-cache')
 const briefCacheStore = new BriefCacheStore({
@@ -303,7 +313,7 @@ app.use(session({
 // Test Mode Setup
 // =============================================================================
 if (process.env.NODE_ENV === 'test') {
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, briefCacheStore, reportHistoryStore, localStore, getWorkspaceAccessToken }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, briefCacheStore, runSummaryCacheStore, reportHistoryStore, localStore, getWorkspaceAccessToken }))
 }
 
 // =============================================================================
@@ -940,6 +950,11 @@ app.use(createPipelineRoutes({ workspaceFromUrl, getWorkspaceAccessToken, dispat
 // yapClient is null when YAP_BASE_URL is unset; the routes degrade gracefully.
 const yapClient = yapClientFromEnv()
 app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyTokenStore, yapClient, getOpenRouterSource, getDeployInfo }))
+
+// Mount dashboard routes (experimental combined realtime autopilot dashboard — LIN-509).
+// Merges Mongo-only Loop reads across session.workspaces; Linear is hydrated lazily
+// (drill-down only), never fanned out per poll.
+app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, foremanStore, runSummaryCacheStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, getOpenRouterSource, getDeployInfo }))
 
 // Mount task-chat routes (experimental "talk to a task" conversation).
 app.use(createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo }))
