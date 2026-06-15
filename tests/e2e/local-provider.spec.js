@@ -16,7 +16,9 @@ const DASHBOARD = localDashboardUrl(LOCAL_URL_KEY);
 
 test.describe('Local provider (no test-token mock)', () => {
   test.beforeEach(async ({ page }) => {
-    await seedLocalWorkspace(page);
+    // ship is gated behind its experimental flag (LIN-496); the ship test below
+    // navigates to /ship, so seed it on for this provider suite.
+    await seedLocalWorkspace(page, undefined, { features: { ship: true } });
     await page.goto(DASHBOARD);
     await page.waitForLoadState('networkidle');
   });

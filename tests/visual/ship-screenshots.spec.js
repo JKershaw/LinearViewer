@@ -17,7 +17,8 @@ test.describe.configure({ mode: 'serial' });
 
 test.describe('Ship Screenshots', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/test/set-session?swimSample=true');
+    // ship is gated behind its experimental flag (LIN-496) — seed it on.
+    await page.goto(`/test/set-session?swimSample=true&features=${encodeURIComponent('{"ship":true}')}`);
     await page.goto(SHIP_URL);
     await page.waitForLoadState('networkidle');
   });

@@ -9,7 +9,7 @@ const SHIP_URL = `/workspace/${LOCAL_WORKSPACE_URL_KEY}/ship`;
 
 test.describe('Ship Page', () => {
   test.beforeEach(async ({ page }) => {
-    await seedLocalWorkspace(page, swimLocalSeed);
+    await seedLocalWorkspace(page, swimLocalSeed, { features: { ship: true } });
     await page.goto(SHIP_URL);
     await page.waitForLoadState('networkidle');
   });
@@ -150,5 +150,17 @@ test.describe('Ship Page', () => {
       }))
     );
     expect(positions2).toEqual(positions1);
+  });
+});
+
+// LIN-496: ship is an experimental, in-development view surfaced via Settings.
+// With its flag off it must redirect to settings (mirrors collective), not render.
+test.describe('Ship Page — gating (LIN-496)', () => {
+  test('redirects to settings when the ship flag is off', async ({ page }) => {
+    await seedLocalWorkspace(page, swimLocalSeed); // no ship flag
+    await page.goto(SHIP_URL);
+    await page.waitForLoadState('networkidle');
+    await expect(page).toHaveURL(new RegExp(`/workspace/${LOCAL_WORKSPACE_URL_KEY}/settings$`));
+    await expect(page.locator('#ship-rect')).toHaveCount(0);
   });
 });
