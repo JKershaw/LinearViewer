@@ -951,7 +951,7 @@ const yapClient = yapClientFromEnv()
 app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyTokenStore, yapClient, getOpenRouterSource, getDeployInfo }))
 
 // Mount task-chat routes (experimental "talk to a task" conversation).
-app.use(createTaskChatRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, getDeployInfo }))
+app.use(createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo }))
 
 /**
  * Workspace project view - renders the interactive tree view.

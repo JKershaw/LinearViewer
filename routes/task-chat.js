@@ -20,7 +20,8 @@ import { renderTaskChatPage } from '../lib/render-task-chat.js';
 import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { buildTaskChatMessages } from '../lib/prompts/task-chat-template.js';
-import { DEFAULT_MODEL, streamChat, isRecommendationEnabled } from '../lib/openrouter.js';
+import { streamChat, isRecommendationEnabled } from '../lib/openrouter.js';
+import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { getWorkspaceToken, isValidIssueId } from '../lib/workspace.js';
 import { testMockData } from '../tests/fixtures/mock-data.js';
@@ -114,11 +115,12 @@ function buildMockAnswer(context, question) {
  * @param {Object} deps
  * @param {Function} deps.workspaceFromUrl    - middleware: session + req.workspace
  * @param {Object}   deps.freeTierStore       - free-tier usage store (tryUse)
+ * @param {Object}   deps.workspacePreferencesStore - workspace prefs store (model selection)
  * @param {Function} deps.getOpenRouterSource - (req) → 'oauth'|'env'|'free'|null
  * @param {Function} deps.getDeployInfo       - () → deploy metadata
  * @returns {Router}
  */
-export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, getDeployInfo }) {
+export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo }) {
   const router = Router();
 
   // ─── HTML page ──────────────────────────────────────────────────────────────
@@ -248,10 +250,11 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, getOpenR
         return res.end();
       }
 
+      const selectedModel = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore });
       const messages = buildTaskChatMessages(context.issue, context, question.trim(), safeHistory);
       await streamChat(
         messages,
-        { apiKey: apiKeyToUse, model: DEFAULT_MODEL, maxTokens: 1500 },
+        { apiKey: apiKeyToUse, model: selectedModel, maxTokens: 1500 },
         (type, data) => {
           sendSSE(res, type, data);
           if (type === 'done' || type === 'error') {
