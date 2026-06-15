@@ -61,6 +61,7 @@ import { renderSwimPage } from './lib/render-swim.js'
 import { renderShipPage } from './lib/render-ship.js'
 import { createPipelineRoutes } from './routes/pipeline.js'
 import { createCollectiveRoutes } from './routes/collective.js'
+import { createTaskChatRoutes } from './routes/task-chat.js'
 import { yapClientFromEnv } from './lib/yap-client.js'
 import { getLoopsForWorkspace } from './lib/pipeline-loops.js'
 import { buildSessionCounts } from './lib/sessions-view.js'
@@ -948,6 +949,9 @@ app.use(createPipelineRoutes({ workspaceFromUrl, getWorkspaceAccessToken, dispat
 // yapClient is null when YAP_BASE_URL is unset; the routes degrade gracefully.
 const yapClient = yapClientFromEnv()
 app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyTokenStore, yapClient, getOpenRouterSource, getDeployInfo }))
+
+// Mount task-chat routes (experimental "talk to a task" conversation).
+app.use(createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo }))
 
 /**
  * Workspace project view - renders the interactive tree view.

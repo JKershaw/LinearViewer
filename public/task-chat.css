@@ -1,0 +1,166 @@
+/**
+ * Task Chat Page Styles (experimental).
+ *
+ * CLI-aesthetic, light theme, on the shared design tokens. Two stacked boxed
+ * sections (Task / Conversation); the transcript is a monospace message log of
+ * the streamed conversation between "you" and the task.
+ */
+
+.task-chat-header h1 {
+  margin-bottom: var(--space-1);
+}
+
+.task-chat-subtitle {
+  color: var(--fg-dim);
+  font-size: var(--font-size-sm);
+  margin-top: 0;
+  margin-bottom: var(--space-4);
+}
+
+.task-chat-experimental {
+  color: var(--fg-dim);
+  font-size: var(--font-size-sm);
+  margin: 0 0 var(--space-3);
+}
+
+.task-chat-warning {
+  color: var(--accent);
+  font-size: var(--font-size-sm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  margin: 0 0 var(--space-3);
+}
+
+.task-chat-warning code {
+  font-family: var(--font-mono);
+}
+
+/* ── Fields ─────────────────────────────────────────────────────────────── */
+
+.task-chat-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.task-chat-label {
+  font-family: var(--font-mono);
+  color: var(--fg-dim);
+  min-width: 4rem;
+}
+
+.task-chat-input {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-base);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.task-chat-input-wide {
+  flex: 1;
+  min-width: 16rem;
+}
+
+/* ── Conversation ───────────────────────────────────────────────────────── */
+
+.task-chat-convo-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+}
+
+.task-chat-active-label {
+  color: var(--fg);
+  font-weight: 500;
+}
+
+.task-chat-reset-btn {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg-dim);
+  cursor: pointer;
+}
+
+.task-chat-reset-btn:hover {
+  background: var(--bg-muted);
+  color: var(--fg);
+}
+
+.task-chat-transcript {
+  list-style: none;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-height: 55vh;
+  overflow-y: auto;
+}
+
+.task-chat-msg {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.task-chat-msg-who {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--fg-dim);
+}
+
+.task-chat-msg-user .task-chat-msg-who {
+  color: var(--accent);
+}
+
+.task-chat-msg-body {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--fg);
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
+}
+
+.task-chat-msg-user .task-chat-msg-body {
+  color: var(--fg-dim);
+}
+
+.task-chat-streaming::after {
+  content: '▋';
+  color: var(--fg-vdim);
+  animation: task-chat-blink 1s step-start infinite;
+}
+
+@keyframes task-chat-blink {
+  50% { opacity: 0; }
+}
+
+.task-chat-empty {
+  color: var(--fg-vdim);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+}
+
+.task-chat-ask {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.hidden {
+  display: none !important;
+}
