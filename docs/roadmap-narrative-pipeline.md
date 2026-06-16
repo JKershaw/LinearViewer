@@ -191,20 +191,38 @@ Persona: an editor writing the lede that sits at the very top of the reading.
 Added after the original five-layer design, the digest is the answer to a
 structural problem the five layers created: five full-length, equal-weight
 sections in pipeline order, with the most actionable finding (the gap) buried
-last and no top-level read for someone who wants the picture in fifteen seconds.
-The digest reads *all* the layers above it and distils them into four tight
-slots:
+last and no top-level read for someone who wants the picture in under a minute.
+The digest reads *all* the layers above it and tells the story of where the
+project stands as a short connected narrative — a few flowing paragraphs, not a
+labelled form. It weaves five beats into one throughline:
 
-- **SHIPPED** — what was actually delivered (headline, not a list).
-- **WHERE WE ARE** — the current state of the work.
-- **THE RISK** — the single most important risk, deliberately *unifying* the two
-  notions of risk that otherwise live apart: delivery risk (blockers, stale or
-  unassigned critical-path work — surfaced in layer 1) and alignment risk (drift
-  — surfaced in layers 3b/4). It names which kind it is.
-- **THE DECISION** — the one open question the human must adjudicate, hoisted out
+- **what we shipped** — what was actually delivered (headline, not a list).
+- **where we are now** — the current state of the work.
+- **where this is heading** — the (hedged) direction of travel, drawn from the
+  trajectory layer; the one beat that answers "are we close / what's our
+  heading?" at the top of the page. Earned optimism about the far outlook is
+  allowed; dates and numeric forecasts are not.
+- **the one risk** — the single most important risk, deliberately *unifying* the
+  two notions of risk that otherwise live apart: delivery risk (blockers, stale
+  or unassigned critical-path work — surfaced in layer 1) and alignment risk
+  (drift — surfaced in layers 3b/4). It names which kind it is.
+- **the one decision** — the open question the human must adjudicate, hoisted out
   of the gap analysis's "questions this raises" (where it was a buried
   parenthetical) to the top of the page. It states the question; it does not
   answer it.
+
+> **Update (LIN-416): narrative lede, not a four-slot form.** The digest was
+> originally a rigid form emitting four verbatim labelled slots (`SHIPPED:` /
+> `WHERE WE ARE:` / `THE RISK:` / `THE DECISION:`). In use the result read formal
+> and un-narrative — a fill-in-the-blanks form rather than the story of progress
+> the surface is for, and it leaned on none of the model's reasoning. LIN-416
+> loosened *only this layer* (the five narrative layers are unchanged): the same
+> beats are now woven into flowing prose, a **heading** beat was added (the
+> ticket's "are we close / what's our heading?"), and the prompt asks the model
+> to reason over the layers internally before writing. Nothing downstream parsed
+> the slot labels, so the change is prompt-text only. The protected layer-1
+> empirical read is untouched; the digest just inherits trajectory's existing
+> aspirational license for the far outlook.
 
 Two deliberate differences from the other layers:
 
@@ -213,10 +231,11 @@ Two deliberate differences from the other layers:
   reading, and the client streams into it last. While the layers below generate,
   the top slot shows a "summarises once the reading below completes" pending
   state rather than sitting empty.
-- **No reasoning block.** Every other layer emits an internal REASONING section
-  before its prose. The digest does not — the reasoning already happened in
-  layers 1–4, and a reasoning dump at the very top of the page would defeat the
-  "legible at a glance" purpose. It emits only the four slots.
+- **No *visible* reasoning block.** Every other layer prints an internal
+  REASONING section before its prose. The digest does not — it is told to reason
+  over layers 1–4 internally (so the synthesis is genuinely reasoned, not
+  slot-filling) but to print only the lede, because a reasoning dump at the very
+  top of the page would defeat the "legible at a glance" purpose.
 
 Degradation: with no north star there is no ns_reading or gap, so THE RISK draws
 on delivery risk only and THE DECISION reports that no alignment decision is

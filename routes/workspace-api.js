@@ -2599,7 +2599,7 @@ ${goal}`
           // Digest — synthesises everything above (generates last, renders first).
           await runLayer({
             layer: 'digest', layerName: 'summary', maxTokens: 1200,
-            mockText: 'Mock summary: SHIPPED recent work. WHERE WE ARE on track. THE RISK is delivery. THE DECISION is for the human.',
+            mockText: 'Mock summary: recent work shipped and the work is on track; at this pace it points toward simpler onboarding. The main risk is delivery, and the open decision is for the human.',
             buildMessages: () => buildRoadmapDigestMessages({
               northStar: hasNorthStar ? northStar : '',
               technical: tech.text,

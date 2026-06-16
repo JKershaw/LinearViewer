@@ -503,18 +503,43 @@ describe('buildRoadmapDigestMessages (digest — synthesis layer)', () => {
     assert.strictEqual(messages[1].role, 'user');
   });
 
-  test('system prompt requires exactly the four slots in order', () => {
+  test('asks for a connected narrative lede, not a labelled four-slot form (LIN-416)', () => {
     const system = buildRoadmapDigestMessages(FULL_INPUTS)[0].content;
-    for (const slot of ['SHIPPED', 'WHERE WE ARE', 'THE RISK', 'THE DECISION']) {
-      assert.ok(system.includes(slot), `should require the ${slot} slot`);
-    }
-    // Order: SHIPPED < WHERE WE ARE < THE RISK < THE DECISION
-    assert.ok(
-      system.indexOf('SHIPPED') < system.indexOf('WHERE WE ARE') &&
-      system.indexOf('WHERE WE ARE') < system.indexOf('THE RISK') &&
-      system.indexOf('THE RISK') < system.indexOf('THE DECISION'),
-      'slots should be specified in reader-priority order'
-    );
+    // The story is told as flowing prose — the digest must NOT re-impose the old
+    // mandate to emit verbatim labelled slots. (The labels may still appear as
+    // *forbidden* examples, so assert on the mandate phrasing, not the substring.)
+    assert.ok(!/Emit EXACTLY the four labelled slots/i.test(system),
+      'digest must not mandate verbatim labelled slots');
+    assert.ok(/connected narrative|flowing prose|tell the story|throughline/i.test(system),
+      'digest should ask for a connected narrative, not a form');
+    assert.ok(/no field labels|not.*(a form|labelled)|no labelled slots/i.test(system),
+      'digest should explicitly forbid field labels in the output');
+  });
+
+  test('covers the five story beats including a heading/direction beat (LIN-416)', () => {
+    const system = buildRoadmapDigestMessages(FULL_INPUTS)[0].content;
+    assert.ok(/what we shipped|shipped/i.test(system), 'should cover what shipped');
+    assert.ok(/where we are/i.test(system), 'should cover where we are now');
+    assert.ok(/where this is heading|direction of travel|heading/i.test(system),
+      'should cover where the work is heading (the new beat)');
+    assert.ok(/the one risk|single most important risk/i.test(system), 'should cover the one risk');
+    assert.ok(/the one decision|single open question/i.test(system), 'should cover the one decision');
+  });
+
+  test('reasons internally but does not print the reasoning (LIN-416)', () => {
+    const system = buildRoadmapDigestMessages(FULL_INPUTS)[0].content;
+    assert.ok(/think first|work through the layers|reason/i.test(system),
+      'should instruct the model to reason over the layers before writing');
+    assert.ok(/do not print|no reasoning section/i.test(system),
+      'should keep that reasoning out of the visible output');
+  });
+
+  test('grants hedged optimism about the far outlook for the heading beat (LIN-416)', () => {
+    const system = buildRoadmapDigestMessages(FULL_INPUTS)[0].content;
+    assert.ok(/optimistic about the far outlook|permission to be optimistic/i.test(system),
+      'heading beat should allow earned optimism about the far outlook');
+    assert.ok(/hedged|at this pace|points toward/i.test(system),
+      'heading must stay hedged — direction, not forecast');
   });
 
   test('system prompt forbids a reasoning section and preamble (lede only)', () => {
