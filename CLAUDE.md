@@ -325,6 +325,13 @@ The Dispatch feature allows users to queue prompts for external consumers (AI ag
 Items expire after 24 hours. Tokens are workspace-scoped and never expire (but can be revoked).
 Feedback is append-only, inherits 30-day history TTL, and requires strict token ownership.
 
+A dispatch item may carry an optional `followUpTo` field (the `id` of an earlier dispatch) to resume that
+session as a follow-up instead of starting fresh (cli/web only, same workspace; LIN-415). LinearViewer
+stores and forwards the id blindly — the consumer owns session identity and liveness, and reports
+`[failed] no live session to resume` when the target session is gone. See the Follow-ups section of the
+integration guide; the autopilot's conservative "fresh by default, follow up only after a flawless,
+self-suggesting session" disposition lives in `docs/autopilot-operating-manual.md`.
+
 **See [docs/dispatch-integration.md](docs/dispatch-integration.md)** for the full consumer integration guide.
 
 ## Linear API Proxy

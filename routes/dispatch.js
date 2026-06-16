@@ -194,7 +194,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const { workspace } = req;
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo } = req.body;
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo } = req.body;
 
       // Validate required fields
       if (!prompt || typeof prompt !== 'string') {
@@ -259,6 +259,21 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         return res.status(400).json({ error: 'Invalid issueId format' });
       }
 
+      // Validate follow-up reference if provided. A follow-up resumes an
+      // existing session, so it carries the original dispatchId (a UUID).
+      // We store + forward it blindly — the downstream dispatcher owns session
+      // liveness — but the value must be well-formed. Follow-ups are cli/web
+      // only; resuming a Harbour/dash session is out of scope. See LIN-415.
+      if (followUpTo !== undefined && followUpTo !== null) {
+        if (!UUID_REGEX.test(followUpTo)) {
+          return res.status(400).json({ error: 'Invalid followUpTo format' });
+        }
+        const followUpTarget = target || 'cli';
+        if (!['cli', 'web'].includes(followUpTarget)) {
+          return res.status(400).json({ error: 'followUpTo is only supported for cli/web targets' });
+        }
+      }
+
       // Create dispatch item
       const item = await dispatchQueueStore.addItem(workspace.urlKey, {
         prompt,
@@ -270,7 +285,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         issueUrl: issueUrl || null,
         dispatchedBy: req.session.linearUserId || null,
         target: target || 'cli',
-        repo: repo || null
+        repo: repo || null,
+        followUpTo: followUpTo || null
       });
 
       // Spawn a Harbour Claude session when target is 'local' (the API value

@@ -126,6 +126,24 @@ mis-scoped, out of order, or resting on a question nobody has answered. Feeding 
 that just spends effort. That's your cue to pull up and flag *"this can't be done as posed, here's
 what's in the way"* — not to keep finding a cleaner worker for an unclean task.
 
+### The narrow exception: following up a clean session
+
+Your default is a fresh dispatch — a new session with no memory — and almost everything above assumes
+it. There is one deliberate exception. When a session ran **essentially flawlessly** and *itself*
+suggested the obvious next beat, you can dispatch a **follow-up** that resumes that same session rather
+than starting cold, by setting `followUpTo` to the original dispatch's id (cli/web only, same
+workspace). The fit is narrow on purpose: a clean session holds the context a fresh one would have to
+rebuild, so a small confirmatory nudge is cheaper than a re-dispatch. Good uses are tight and
+self-suggesting — *"confirm CI went green and report the run URL"*, *"the work's in; now update Linear
+and push the branch"*.
+
+This is an exception, not a new default, and it does **not** soften the rule that you can't coach the
+worker. The bar is *flawless and self-suggesting* — **any** wobble, ambiguity, or "while you're in
+there" temptation means a fresh session instead, because resuming a shaky session compounds its
+mistakes rather than correcting them. The session may also have been reaped; if the resume can't land
+the runner reports `[failed] no live session to resume`, which you treat like any other failed dispatch
+and re-dispatch fresh. When in doubt, fresh.
+
 ## The human's edge, and how to hand back
 
 Some moments are the human's, and there your job is to hand over cleanly. What's theirs: anything about

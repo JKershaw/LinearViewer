@@ -255,10 +255,54 @@ and is the recommended pattern for any consumer that posts foreman status.
 | `issueTitle` | string | Issue title (nullable) |
 | `issueUrl` | string | Full URL to the Linear issue (nullable) |
 | `target` | string | Dispatch target: `"cli"` (default), `"web"`, or `"dash"` |
+| `followUpTo` | string | The `id` of an earlier dispatch whose session this item should resume, or `null`. See [Follow-ups](#follow-ups) (nullable) |
 | `workspace.urlKey` | string | Workspace identifier |
 | `dispatchedAt` | string | ISO 8601 timestamp when item was queued |
 | `dispatchedBy` | string | Linear user ID who dispatched (nullable) |
 | `expiresAt` | string | ISO 8601 timestamp when item expires |
+
+## Follow-ups
+
+A **follow-up** resumes an existing session instead of starting a fresh one. It is an
+ordinary queue item that carries one extra field:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `followUpTo` | string (UUID) | No | The `id` of the original dispatch whose session should be resumed. |
+
+When set, `prompt` is delivered as a follow-up instruction to the session that handled
+the original dispatch. The dispatch store records and forwards `followUpTo` verbatim —
+it owns no session identity or liveness; the **consumer** maps `followUpTo` back to its
+live session (the dispatch runner keys this off the `id` it received from
+`POST /take/:itemId`).
+
+**Rules and constraints:**
+
+- **cli/web only.** Follow-ups are rejected (`400`) for `dash`/`local` targets — only
+  CLI and web consumers run resumable sessions. Omit `target` (defaults to `cli`) or set
+  it to `web`.
+- **Same workspace.** A follow-up must be dispatched to the same workspace as the
+  original; cross-workspace resume is undefined.
+- **Optional and validated.** `followUpTo` must be a well-formed UUID when present; it is
+  otherwise omitted. The store does **not** verify the referenced item still exists.
+- **The session can be gone.** Consumers reap terminal sessions, so the target may no
+  longer be live. When it cannot resume, the consumer posts terminal
+  `[failed] no live session to resume` feedback and the item leaves the queue — surface
+  this like any other failed dispatch rather than assuming success.
+
+**Sending a follow-up** (dispatch a custom item, then a second referencing its `id`):
+
+```bash
+# 1. Dispatch the original
+ORIG=$(curl -s -X POST "$BASE/api/proxy/dispatch" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"prompt": "Implement the thing", "target": "cli"}' | jq -r .id)
+
+# 2. Dispatch a follow-up to that session
+curl -s -X POST "$BASE/api/proxy/dispatch" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d "{\"prompt\": \"Now confirm CI is green and report the run URL\", \"followUpTo\": \"$ORIG\"}"
+```
 
 ## Target Routing
 

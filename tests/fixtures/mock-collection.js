@@ -2,14 +2,22 @@
  * Minimal in-memory mock of the MongoDB/MangoDB collection surface, shared by
  * store unit tests. Supports the operators the local-store relies on:
  * insertOne, findOne, find().toArray(), updateOne ($set + upsert), deleteOne,
- * deleteMany. Query matching is top-level field equality — enough for the
- * scope/kind/_id/identifier/parentId filters the stores use.
+ * deleteMany, findOneAndDelete. Query matching is top-level field equality, plus
+ * a `{ $gt: value }` operator (used by the dispatch store's expiresAt filter) —
+ * enough for the scope/kind/_id/identifier/parentId filters the stores use.
  */
 export function createMockCollection() {
   const docs = [];
 
+  const fieldMatches = (value, condition) => {
+    if (condition && typeof condition === 'object' && '$gt' in condition) {
+      return value > condition.$gt;
+    }
+    return value === condition;
+  };
+
   const matches = (doc, query) =>
-    Object.keys(query).every(key => doc[key] === query[key]);
+    Object.keys(query).every(key => fieldMatches(doc[key], query[key]));
 
   return {
     _docs: docs,
@@ -17,6 +25,13 @@ export function createMockCollection() {
     async insertOne(doc) {
       docs.push({ ...doc });
       return { insertedId: doc._id };
+    },
+
+    async findOneAndDelete(query) {
+      const idx = docs.findIndex(d => matches(d, query));
+      if (idx === -1) return null;
+      const [removed] = docs.splice(idx, 1);
+      return { ...removed };
     },
 
     async findOne(query) {

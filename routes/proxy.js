@@ -449,6 +449,7 @@ function formatDispatchWatch(item, meta = null) {
     issueIdentifier: item.issueIdentifier,
     issueUrl: item.issueUrl,
     target: item.target,
+    followUpTo: item.followUpTo || null,
     dispatchedAt: item.dispatchedAt,
     // resolvedAt is take/archive time (when the runner claimed the item), NOT
     // completion. completedAt is the real completion time, null until terminal.
@@ -1396,9 +1397,10 @@ POST ${baseUrl}/api/proxy/foreman/status
 ## Dispatch Endpoints
 
 POST ${baseUrl}/api/proxy/dispatch
-  Body: { "prompt": "...", "promptName": "...", "kind": "implementation", "issueId": "...", "issueIdentifier": "LIN-42", "issueTitle": "...", "issueUrl": "...", "target": "cli|web|dash", "repo": "...", "appendProxyContext": true }
+  Body: { "prompt": "...", "promptName": "...", "kind": "implementation", "issueId": "...", "issueIdentifier": "LIN-42", "issueTitle": "...", "issueUrl": "...", "target": "cli|web|dash", "repo": "...", "followUpTo": "...", "appendProxyContext": true }
   → Queue a prompt for the workspace's dispatch consumer (the runner). Only "prompt" is required; target defaults to "cli". ("local"/Harbour is not available to proxy consumers.)
   → "kind" is a stable task classification (research/plan/implementation/review/etc. — the prompt-template keys, plus "custom"). Optional: when omitted it is derived from "promptName", falling back to "custom". Read it instead of inferring the task type from promptName or the prompt body.
+  → "followUpTo" (optional) resumes an existing session: pass the "id" of an earlier dispatch and "prompt" becomes a follow-up instruction to that same session. cli/web only, same workspace. The runner owns session liveness — if the session is gone it posts terminal "[failed] no live session to resume". Use sparingly: only when the prior session ran cleanly and naturally suggests the next step (e.g. confirm CI is green, update Linear/git); any wobble → dispatch a fresh session instead.
   → By default a proxy-context block is appended to the prompt so the worker inherits Linear access for this workspace (the MCP replacement). Reporting is handled by the runner's Stop hook, not the prompt. Set "appendProxyContext": false to opt out.
   → { "id": "...", "status": "queued", "promptName": "...", "kind": "implementation", "issueIdentifier": "...", "target": "cli", "dispatchedAt": "..." }
 
@@ -3696,7 +3698,7 @@ One convention across every endpoint, so you can branch on the same fields every
     }
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo } = req.body || {};
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo } = req.body || {};
 
       if (!prompt || typeof prompt !== 'string') {
         logEvent(req, '/api/proxy/dispatch', 400);
@@ -3757,6 +3759,21 @@ One convention across every endpoint, so you can branch on the same fields every
         logEvent(req, '/api/proxy/dispatch', 400);
         return res.status(400).json({ error: 'Invalid issueId format' });
       }
+      // Follow-up reference (LIN-415): the original dispatchId whose session
+      // the downstream dispatcher should resume. Optional UUID; stored +
+      // forwarded blindly (no liveness check here). cli/web only — resuming a
+      // dash session is undefined.
+      if (followUpTo !== undefined && followUpTo !== null) {
+        if (!UUID_REGEX.test(followUpTo)) {
+          logEvent(req, '/api/proxy/dispatch', 400);
+          return res.status(400).json({ error: 'Invalid followUpTo format' });
+        }
+        const followUpTarget = target || 'cli';
+        if (!['cli', 'web'].includes(followUpTarget)) {
+          logEvent(req, '/api/proxy/dispatch', 400);
+          return res.status(400).json({ error: 'followUpTo is only supported for cli/web targets' });
+        }
+      }
 
       // Auto-append the proxy context (Linear access + reporting channel) by
       // default, so the worker can both read context and report its result.
@@ -3783,7 +3800,8 @@ One convention across every endpoint, so you can branch on the same fields every
         issueUrl: issueUrl || null,
         dispatchedBy: req.proxyCreatedBy || null,
         target: target || 'cli',
-        repo: repo || null
+        repo: repo || null,
+        followUpTo: followUpTo || null
       });
 
       logEvent(req, '/api/proxy/dispatch', 201);

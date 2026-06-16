@@ -707,6 +707,77 @@ test.describe('Dispatch API', () => {
     expect(data.item.kind).toBe('custom');
   });
 
+  // Follow-up dispatch plumbing (LIN-415): a follow-up is an ordinary item
+  // carrying followUpTo = the original dispatchId whose session to resume.
+  test('POST /api/dispatch follow-up: a second item references the first by id and surfaces followUpTo', async ({ request }) => {
+    await request.get('/test/set-session');
+
+    // 1. Dispatch a custom item.
+    const original = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: { prompt: 'Implement the thing', promptName: 'Custom', target: 'cli' }
+    });
+    expect(original.status()).toBe(201);
+    const originalId = (await original.json()).item.id;
+
+    // 2. Dispatch a follow-up pointing at the original item's id.
+    const followUp = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: {
+        prompt: 'Now confirm CI is green',
+        promptName: 'Custom',
+        target: 'cli',
+        followUpTo: originalId
+      }
+    });
+    expect(followUp.status()).toBe(201);
+
+    // The consumer-facing list projection carries followUpTo for the follow-up
+    // and null for the original.
+    const listData = await (await request.get(`${API_PREFIX}/api/dispatch`)).json();
+    const byPrompt = Object.fromEntries(listData.items.map(i => [i.prompt, i]));
+    expect(byPrompt['Now confirm CI is green'].followUpTo).toBe(originalId);
+    expect(byPrompt['Implement the thing'].followUpTo).toBeNull();
+  });
+
+  test('POST /api/dispatch rejects a non-UUID followUpTo', async ({ request }) => {
+    await request.get('/test/set-session');
+
+    const response = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: { prompt: 'Resume please', followUpTo: 'not-a-uuid' }
+    });
+
+    expect(response.status()).toBe(400);
+    const data = await response.json();
+    expect(data.error).toContain('followUpTo');
+  });
+
+  test('POST /api/dispatch rejects followUpTo for non-cli/web targets', async ({ request }) => {
+    await request.get('/test/set-session');
+
+    const response = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: {
+        prompt: 'Resume please',
+        target: 'dash',
+        followUpTo: '11111111-1111-4111-8111-111111111111'
+      }
+    });
+
+    expect(response.status()).toBe(400);
+    const data = await response.json();
+    expect(data.error).toContain('cli/web');
+  });
+
+  test('POST /api/dispatch without followUpTo stores null', async ({ request }) => {
+    await request.get('/test/set-session');
+
+    const response = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: { prompt: 'Fresh task', promptName: 'Custom' }
+    });
+    expect(response.status()).toBe(201);
+
+    const listData = await (await request.get(`${API_PREFIX}/api/dispatch`)).json();
+    expect(listData.items[0].followUpTo).toBeNull();
+  });
+
   test('POST /api/dispatch with invalid kind returns 400', async ({ request }) => {
     await request.get('/test/set-session');
 
