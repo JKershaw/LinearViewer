@@ -71,8 +71,9 @@ async function dispatchPageCustomPrompt({ urlKey, prompt, target, repo, kind, pr
 
   try {
     // Append proxy block if +proxy is on (maybeAppendProxyBlock provided by
-    // app.js). Inside the try so a failed token mint surfaces as "failed"
-    // instead of dispatching a bare prompt while the toggle still shows active.
+    // common.js / window.ProxyToggle). Inside the try so a failed token mint
+    // surfaces as "failed" instead of dispatching a bare prompt while the
+    // toggle still shows active.
     const finalPrompt = typeof maybeAppendProxyBlock === 'function'
       ? await maybeAppendProxyBlock(prompt, urlKey)
       : prompt
@@ -170,8 +171,8 @@ function initDispatchPagePrompt() {
 
   // Single delegated handler on the dispatch section
   section.addEventListener('click', async (e) => {
-    // Handle proxy toggle clicks (initProxyToggle in app.js handles these via document delegation,
-    // but we also need to stop propagation to avoid triggering other handlers)
+    // Handle proxy toggle clicks (window.ProxyToggle in common.js handles these
+    // via document delegation; bail here so this section's other handlers don't fire)
     if (e.target.closest('.prompt-proxy-toggle')) return
 
     // Handle "load Autopilot" clicks: fetch the general (stack-walk) kickoff and

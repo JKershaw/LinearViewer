@@ -208,6 +208,150 @@ window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
 };
 
 // =============================================================================
+// Proxy Toggle (append Linear API proxy instructions + token to prompts)
+// =============================================================================
+
+/**
+ * Single shared home for the `+proxy` toggle (LIN-525 #7). Previously this
+ * logic was copy-pasted into app.js and prompt-section.js and had already
+ * drifted; both now consume this one module. Lives in common.js because it is
+ * loaded on every authenticated surface (tree, dispatch, foreman, swipe, …).
+ *
+ * State model:
+ *  - The toggle's on/off lives in a single localStorage key.
+ *  - The *rendered* active look is driven by a `data-proxy-active` attribute on
+ *    <body> + CSS, NOT a per-button class — so buttons injected after load
+ *    (lazy issue-detail blocks, swipe re-renders) inherit it automatically and
+ *    can't "miss the restore" (LIN-525 #1).
+ *  - The proxy feature flag is per-user/per-workspace and known only to the
+ *    server; the page shell emits it as `data-proxy-feature` on <body>. When it
+ *    is absent/off the toggle is inert — no block appended, no token minted —
+ *    even if the global toggle key is on from a flag-on workspace (LIN-525 #2).
+ *  - Minted tokens are cached per workspace `urlKey` (LIN-525 #3) and can be
+ *    dropped via invalidate() after a revoke; a failed/401 mint never populates
+ *    the cache, so the next append re-mints (LIN-525 #4).
+ *
+ * @global
+ */
+window.ProxyToggle = (function () {
+  const TOGGLE_KEY = 'proxy-toggle-active';
+  // urlKey -> minted token string. Keyed by workspace so a page that dispatches
+  // to more than one workspace never embeds the first workspace's token.
+  const tokenCache = new Map();
+
+  function isActive() {
+    try {
+      return localStorage.getItem(TOGGLE_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  }
+
+  // The server-emitted proxy feature flag for the current workspace/user.
+  function isFeatureEnabled() {
+    return document.body && document.body.dataset.proxyFeature === 'true';
+  }
+
+  // Mirror the persisted toggle onto <body> so CSS styles every (current AND
+  // future-injected) +proxy button without per-button bookkeeping.
+  function syncBodyState() {
+    if (document.body) document.body.dataset.proxyActive = isActive() ? 'true' : 'false';
+  }
+
+  function setActive(active) {
+    try {
+      localStorage.setItem(TOGGLE_KEY, active ? 'true' : 'false');
+    } catch {
+      // ignore persistence failures (private mode etc.)
+    }
+    syncBodyState();
+  }
+
+  /**
+   * Get or create a proxy token for a workspace, cached per urlKey for the page
+   * session. on401:false — a failed mint (incl. 401 or token rate-limit) falls
+   * through to null so the caller surfaces it, rather than redirecting to
+   * /logout. A null result is never cached, so the next call re-mints.
+   * @param {string} urlKey
+   * @returns {Promise<string|null>}
+   */
+  async function getOrCreateToken(urlKey) {
+    if (!urlKey) return null;
+    if (tokenCache.has(urlKey)) return tokenCache.get(urlKey);
+    try {
+      const data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/proxy/tokens`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label: 'prompt-proxy', scope: 'readWrite', singleUse: false }),
+        on401: false
+      });
+      const token = (data && data.token) || null;
+      if (token) tokenCache.set(urlKey, token);
+      return token;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Drop cached token(s) so the next append re-mints. Called after a token is
+   * revoked in the Tokens UI (LIN-525 #4). With no urlKey, clears everything.
+   * @param {string} [urlKey]
+   */
+  function invalidate(urlKey) {
+    if (urlKey) tokenCache.delete(urlKey);
+    else tokenCache.clear();
+  }
+
+  function buildBlock(token) {
+    const baseUrl = window.location.origin;
+    return `\n\n## Linear API Proxy\n\nYou have access to a Linear API proxy. Use it to read and modify Linear issues, projects, and more.\n\nTo get started, fetch the full API documentation:\n\n  curl -H "Authorization: Bearer ${token}" ${baseUrl}/api/proxy/instructions\n\nThis will return all available endpoints with examples. Your token scope is: readWrite.`;
+  }
+
+  /**
+   * If +proxy is active AND the feature is enabled for this surface, append the
+   * proxy instructions block to a prompt. No-op when the toggle is off or the
+   * feature flag is off (LIN-525 #2). When active+enabled but the block cannot
+   * be produced (no workspace context, or the token mint fails/rate-limits) this
+   * THROWS, so callers surface the failure instead of silently copying or
+   * dispatching a bare prompt while the toggle still shows active.
+   * @param {string} text
+   * @param {string} urlKey
+   * @returns {Promise<string>}
+   * @throws {Error} when active+enabled but no block can be produced
+   */
+  async function maybeAppend(text, urlKey) {
+    if (!isActive()) return text;
+    if (!isFeatureEnabled()) return text;
+    if (!urlKey) throw new Error('Proxy is enabled but no workspace context was found for this prompt.');
+    const token = await getOrCreateToken(urlKey);
+    if (!token) throw new Error('Proxy is enabled but a proxy token could not be created — you may have hit the token rate limit; wait a minute and try again.');
+    return text + buildBlock(token);
+  }
+
+  /**
+   * Restore the rendered state and wire a single delegated click handler for
+   * every +proxy button on the page (current and future-injected).
+   */
+  function init() {
+    syncBodyState();
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('.prompt-proxy-toggle');
+      if (!btn) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setActive(!isActive());
+    });
+  }
+
+  return { isActive, isFeatureEnabled, getOrCreateToken, invalidate, buildBlock, maybeAppend, init, setActive };
+})();
+
+// Back-compat global consumed by app.js / dispatch.js / foreman.js call sites
+// (and their `typeof maybeAppendProxyBlock === 'function'` guards).
+window.maybeAppendProxyBlock = (text, urlKey) => window.ProxyToggle.maybeAppend(text, urlKey);
+
+// =============================================================================
 // Disclosure (collapsible options panels)
 // =============================================================================
 
@@ -642,4 +786,5 @@ document.addEventListener('DOMContentLoaded', () => {
   initDeployTime();
   initDisclosure();
   initNavBar();
+  window.ProxyToggle.init();
 });

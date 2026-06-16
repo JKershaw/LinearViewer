@@ -37,6 +37,7 @@ import { armKeepalive } from '../lib/http-keepalive.js';
 import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
 import { appendBlock, replace as replaceInDescription, DescriptionEditError } from '../lib/description-edit.js';
 import { workspaceUnavailableEnvelope } from '../lib/errors.js';
+import { getFeatureFlags } from '../lib/feature-defaults.js';
 
 /**
  * Resolve the OpenRouter credentials for a proxy LLM call, mirroring
@@ -234,6 +235,14 @@ const proxyTokenCreationLimiter = rateLimit({
 const MAX_NAME_LENGTH = 1000;
 const MAX_SEARCH_LENGTH = 500;
 const MAX_DESCRIPTION_LENGTH = 100000;
+
+// LIN-525 #5: the +proxy toggle auto-mints a 'prompt-proxy' readWrite token on
+// every page-load session that dispatches. To stop these standing credentials
+// from accumulating for the 90-day default TTL, give them a short TTL so they
+// self-prune. 48h comfortably outlives the 24h dispatch-queue item lifetime
+// plus the agent run that consumes the token, while bounding the exposure window.
+const PROMPT_PROXY_LABEL = 'prompt-proxy';
+const PROMPT_PROXY_TOKEN_TTL_SECONDS = 48 * 60 * 60;
 const MAX_COMMENT_LENGTH = 50000;
 
 // Dispatch input limits (mirror routes/dispatch.js, the session-auth twin).
@@ -1030,6 +1039,14 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanSto
   router.post('/workspace/:urlKey/api/proxy/tokens', proxyTokenCreationLimiter, workspaceFromUrl, async (req, res) => {
     const { workspace } = req;
 
+    // LIN-525 #2: token minting is gated on the proxy feature flag (defense in
+    // depth — independent of the UI). The proxy/foreman pages that mint tokens
+    // are themselves flag-gated, so a mint request on a flag-off session means a
+    // stale global +proxy toggle is trying to inject where no button is shown.
+    if (getFeatureFlags(req.session).proxy !== true) {
+      return res.status(403).json({ error: 'Proxy feature is not enabled for this workspace' });
+    }
+
     try {
       const { label, scope, singleUse } = req.body || {};
 
@@ -1041,11 +1058,16 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanSto
         return res.status(400).json({ error: 'scope must be "read" or "readWrite"' });
       }
 
+      // LIN-525 #5: short-TTL the auto-minted prompt-proxy tokens so they
+      // self-prune instead of standing for the 90-day default.
+      const isPromptProxy = (label || '') === PROMPT_PROXY_LABEL;
+
       const result = await proxyTokenStore.createToken(workspace.urlKey, {
         label: label || 'default',
         scope: scope || 'read',
         singleUse: singleUse === true || singleUse === 'true',
-        createdBy: req.session?.linearUserId || null
+        createdBy: req.session?.linearUserId || null,
+        ...(isPromptProxy ? { ttl: PROMPT_PROXY_TOKEN_TTL_SECONDS } : {})
       });
 
       res.status(201).json({

@@ -60,7 +60,9 @@ test.describe('+proxy copy/dispatch — dashboard (app.js)', () => {
 
     const container = await selectDashboardPrompt(page);
     await container.locator('.prompt-proxy-toggle').click();
-    await expect(container.locator('.prompt-proxy-toggle')).toHaveClass(/active/);
+    // LIN-525 #1: active state is a single body attribute (CSS-driven), not a
+    // per-button class — so injected buttons inherit it automatically.
+    await expect(page.locator('body')).toHaveAttribute('data-proxy-active', 'true');
 
     await container.locator('.prompt-copy').click();
     await expect(container.locator('.prompt-copy')).toHaveText('copied!');
@@ -93,7 +95,7 @@ test.describe('+proxy copy/dispatch — dashboard (app.js)', () => {
 
     const container = await selectDashboardPrompt(page);
     await container.locator('.prompt-proxy-toggle').click();
-    await expect(container.locator('.prompt-proxy-toggle')).toHaveClass(/active/);
+    await expect(page.locator('body')).toHaveAttribute('data-proxy-active', 'true');
 
     // Seed the clipboard so we can prove nothing was written on failure.
     await page.evaluate(() => navigator.clipboard.writeText('__SENTINEL__'));
@@ -147,5 +149,66 @@ test.describe('+proxy copy — swipe (prompt-section.js)', () => {
     await expect(copyBtn).toHaveText('failed');
     const clip = await page.evaluate(() => navigator.clipboard.readText());
     expect(clip).toBe('__SENTINEL__');
+  });
+});
+
+// LIN-525 #1: the persisted toggle state must survive DOM injection. The
+// dashboard ships collapsed lines and injects the issue-detail block (with the
+// +proxy button) on first expand (LIN-442); the button must reflect the
+// persisted ON state without a per-button class.
+test.describe('+proxy state — lazily-injected button reflects persisted toggle (LIN-525 #1)', () => {
+  test('persisted ON applies to a button injected after page load', async ({ page }) => {
+    // Simulate the toggle persisted ON from a previous session.
+    await page.addInitScript(() => localStorage.setItem('proxy-toggle-active', 'true'));
+    await page.goto(`/test/set-session?features=${PROXY_FEAT}`);
+    await page.goto(`/workspace/${URL_KEY}/`);
+    await page.waitForLoadState('networkidle');
+
+    // Reflected on <body> at load, before any issue (or its button) is expanded.
+    await expect(page.locator('body')).toHaveAttribute('data-proxy-active', 'true');
+
+    // Expand an issue: the +proxy button is injected lazily, yet inherits the
+    // active look from the body attribute (CSS) rather than a missed per-button
+    // class — the regression this fix removes.
+    const container = await selectDashboardPrompt(page);
+    const toggle = container.locator('.prompt-proxy-toggle');
+    await expect(toggle).toBeVisible();
+    await expect(toggle).not.toHaveClass(/active/);
+    await expect(page.locator('body')).toHaveAttribute('data-proxy-active', 'true');
+  });
+});
+
+// LIN-525 #2: with the proxy feature flag OFF, a stale global toggle (carried
+// over from a flag-on workspace) must NOT silently append a block or mint a
+// token — there is no +proxy button to turn it off on this surface.
+test.describe('+proxy gate — flag-off surface never injects (LIN-525 #2)', () => {
+  test.beforeEach(async ({ context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  });
+
+  test('copy does not append or mint when the feature is off, even with the toggle on', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('proxy-toggle-active', 'true'));
+
+    let mintAttempted = false;
+    await page.route('**/api/proxy/tokens', route => {
+      if (route.request().method() === 'POST') mintAttempted = true;
+      return route.continue();
+    });
+
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({}))}`);
+    await page.goto(`/workspace/${URL_KEY}/`);
+    await page.waitForLoadState('networkidle');
+
+    const container = await selectDashboardPrompt(page);
+    // No +proxy button renders when the feature is off.
+    await expect(container.locator('.prompt-proxy-toggle')).toHaveCount(0);
+
+    await container.locator('.prompt-copy').click();
+    await expect(container.locator('.prompt-copy')).toHaveText('copied!');
+
+    const clip = await page.evaluate(() => navigator.clipboard.readText());
+    expect(clip.length).toBeGreaterThan(0);
+    expect(clip).not.toContain(PROXY_MARKER);
+    expect(mintAttempted).toBe(false);
   });
 });

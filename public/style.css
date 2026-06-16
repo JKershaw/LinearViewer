@@ -1597,7 +1597,11 @@ button.nav-action {
   color: var(--fg-dim);
 }
 
-.prompt-proxy-toggle.active {
+/* LIN-525 #1: active look is driven by a single body attribute, not a per-button
+   class — so +proxy buttons injected after page load (lazy issue-detail blocks,
+   swipe re-renders) inherit the state automatically and can't render "off" while
+   the toggle is functionally on. */
+body[data-proxy-active="true"] .prompt-proxy-toggle {
   border-color: var(--green);
   color: var(--green);
 }

@@ -6,7 +6,7 @@
  * Visual language mirrors the swipe page for consistency.
  */
 
-/* global escapeHtml, maybeAppendProxyBlock */
+/* global escapeHtml */
 
 (function () {
   'use strict';
@@ -293,10 +293,12 @@
   async function copyPlaybook() {
     if (!currentPlaybook) return;
     try {
-      let text = currentPlaybook;
-      if (typeof maybeAppendProxyBlock === 'function') {
-        text = await maybeAppendProxyBlock(text, urlKey);
-      }
+      // LIN-525 #6: the playbook/kickoff ALREADY has a token spliced in
+      // (YOUR_TOKEN → currentToken), so we must NOT also append a +proxy block —
+      // that would embed a second token / second instruction block. Copy as-is.
+      // The page's +proxy button still toggles the global preference for other
+      // surfaces (tree/swipe/dispatch); it just no longer affects this copy.
+      const text = currentPlaybook;
       await navigator.clipboard.writeText(text);
       showFeedback(playbookFeedback, 'Copied \u2713', false);
       if (copyBtn) {

@@ -649,7 +649,8 @@ a.swipe-relation-issue:hover {
   align-items: center;
 }
 
-.prompt-section .prompt-proxy-toggle.active {
+/* LIN-525 #1: driven by the body attribute (see style.css), not a per-button class. */
+body[data-proxy-active="true"] .prompt-section .prompt-proxy-toggle {
   background: #eff4ff;
   color: var(--blue);
   border-color: var(--blue);
