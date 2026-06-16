@@ -2560,3 +2560,121 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 .brief-content p {
   margin: var(--space-1) 0 var(--space-2);
 }
+
+/* ==========================================================================
+   Dispatched Sessions section (LIN-522) — shared SessionsSection module.
+   Mirrors the swipe view's session styling (public/swipe.css) so the tree
+   view's on-card sessions list reads identically.
+   ========================================================================== */
+.sessions-section {
+  font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
+}
+
+.sessions-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-bottom: 0.4rem;
+  margin-bottom: 0.3rem;
+  border-bottom: 1px solid var(--fg-vdim);
+}
+
+.sessions-status-label {
+  font-weight: 500;
+  color: var(--fg);
+}
+
+.sessions-count-meta {
+  color: var(--fg-dim);
+}
+
+.sessions-refresh {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--fg-dim);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+  padding: 0;
+}
+
+.sessions-refresh:hover {
+  color: var(--fg);
+}
+
+.sessions-empty {
+  color: var(--fg-dim);
+  padding: var(--space-2) 0;
+}
+
+.sessions-error {
+  color: var(--red);
+}
+
+.session-entry {
+  border-bottom: 1px solid var(--fg-vdim);
+  padding: var(--space-2) 0;
+}
+
+.session-entry:last-child {
+  border-bottom: none;
+}
+
+.session-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.session-state {
+  flex-shrink: 0;
+}
+
+.session-state.state-queued { color: var(--fg-dim); }
+.session-state.state-running { color: var(--green); }
+.session-state.state-waiting { color: var(--yellow); }
+.session-state.state-complete { color: var(--green); }
+.session-state.state-error { color: var(--red); }
+
+.session-stage {
+  font-weight: 500;
+  color: var(--fg);
+}
+
+.session-prompt-name {
+  color: var(--fg-dim);
+}
+
+.session-iteration {
+  color: var(--fg-dim);
+}
+
+.session-time {
+  color: var(--fg-dim);
+  margin-left: auto;
+}
+
+.session-summary {
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  color: var(--fg);
+  padding: 0.3rem 0 0 1.25rem;
+  line-height: 1.4;
+}
+
+.session-feedback {
+  padding: var(--space-1) 0 0 1.25rem;
+}
+
+.session-feedback-entry {
+  color: var(--fg-dim);
+  padding: 0.1rem 0;
+}
+
+.session-feedback-time {
+  color: var(--fg-dim);
+  opacity: 0.7;
+}
