@@ -19,12 +19,12 @@ import { defaultLocalSeed, LOCAL_WORKSPACE_URL_KEY } from '../tests/fixtures/loc
  * @param {Object} options.userPreferencesStore - User preferences store
  * @param {Object} options.proxyTokenStore - Proxy token store
  * @param {Object} options.proxyEventStore - Proxy event store
- * @param {Object} options.foremanStore - Foreman status store
+ * @param {Object} options.agentStatusStore - Agent status store
  * @param {Object} options.localStore - Local provider's issue/project store (LIN-356)
  * @param {Function} options.getWorkspaceAccessToken - Function to look up workspace access token
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, briefCacheStore, runSummaryCacheStore, reportHistoryStore, localStore, getWorkspaceAccessToken }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, runSummaryCacheStore, reportHistoryStore, localStore, getWorkspaceAccessToken }) {
   const router = Router();
 
   // ── Mock Yap server (LIN-450) ─────────────────────────────────────────────
@@ -324,10 +324,10 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     }
   })
 
-  // Endpoint to clear foreman status for testing
-  router.get('/test/clear-foreman-status', async (req, res) => {
+  // Endpoint to clear agent status for testing
+  router.get('/test/clear-agent-status', async (req, res) => {
     try {
-      await foremanStore.clear(req.query.urlKey || 'test-workspace')
+      await agentStatusStore.clear(req.query.urlKey || 'test-workspace')
       res.send('ok')
     } catch (err) {
       res.status(500).json({ error: err.message })

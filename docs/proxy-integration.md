@@ -108,7 +108,7 @@ Issue-scoped endpoints are canonical under `/issues/{id}/...`, so the read and w
 - `GET  /issues/{id}/recommend`, `/issues/{id}/recap`, `/issues/{id}/brief` (issue-derived AI reads).
 - Cycle detail is canonical as the plural by-id form `GET /cycles/{cycleId}`, mirroring the `GET /cycles` list.
 
-For backward compatibility the proxy also accepts **forgiving aliases** for the obvious alternate guesses — the older flat forms `GET /relations/{id}`, `GET /recap/{id}`, `GET /brief/{id}`, `GET /recommend/{id}`, `POST /comments/{id}`, and the singular `GET /cycle/{cycleId}` all still resolve to the same handlers. They are intentionally undocumented going forward; prefer the canonical paths above. The RPC-style verbs (`/stack`, `/dispatch*`, `/recommend-and-dispatch`, `/foreman/*`, `/autopilot/*`) are not issue-scoped and are unchanged.
+For backward compatibility the proxy also accepts **forgiving aliases** for the obvious alternate guesses — the older flat forms `GET /relations/{id}`, `GET /recap/{id}`, `GET /brief/{id}`, `GET /recommend/{id}`, `POST /comments/{id}`, and the singular `GET /cycle/{cycleId}` all still resolve to the same handlers. They are intentionally undocumented going forward; prefer the canonical paths above. The RPC-style verbs (`/stack`, `/dispatch*`, `/recommend-and-dispatch`, `/agent/status` (deprecated alias `/foreman/status`), `/autopilot/*`) are not issue-scoped and are unchanged.
 
 #### Structured error envelope
 
@@ -480,7 +480,7 @@ With `?noRefresh=1` and no cache, `status` is `"missing"` (or `"stale"`) and the
 
 ### Task Automation Endpoints
 
-These endpoints back the task-automation workflow: pick the next task, generate a prompt for it, and record agent progress. The **recap** and **brief** endpoints above are part of this group too. All are read-scope except `POST /api/proxy/foreman/status`, which requires `readWrite`.
+These endpoints back the task-automation workflow: pick the next task, generate a prompt for it, and record agent progress. The **recap** and **brief** endpoints above are part of this group too. All are read-scope except `POST /api/proxy/agent/status` (deprecated alias: `POST /api/proxy/foreman/status`), which requires `readWrite`.
 
 #### Get Task Stack
 
@@ -625,14 +625,16 @@ engine routes into that child and the parent's work is unreachable through the v
 The non-descent is deterministic (the child is never fetched), so `identifier`
 returns the node you named and `deferredVia` is just `["ENG-42"]`.
 
-#### Record Foreman Status
+#### Record Agent Status
 
 ```
-POST /api/proxy/foreman/status
+POST /api/proxy/agent/status
 Content-Type: application/json
 
 { "taskIdentifier": "ENG-42", "action": "implement", "status": "done", "summary": "Landed the fix in PR #42", "dispatchId": "optional-correlation-id" }
 ```
+
+> **Canonical path:** `POST /api/proxy/agent/status`. The older `POST /api/proxy/foreman/status` remains a forgiving, deprecated alias (identical handler and payload) so existing consumers keep working — prefer `agent/status` going forward.
 
 **Requires `readWrite`.** Append-only progress log (30-day TTL). Each entry is attributed to the posting token so the UI can group entries into sessions.
 
@@ -646,11 +648,13 @@ Content-Type: application/json
 
 Returns `201 { "success": true }`.
 
-#### List Foreman Status
+#### List Agent Status
 
 ```
-GET /api/proxy/foreman/status?limit={n}&offset={n}&tokenId={id}&taskIdentifier={id}
+GET /api/proxy/agent/status?limit={n}&offset={n}&tokenId={id}&taskIdentifier={id}
 ```
+
+> **Canonical path:** `GET /api/proxy/agent/status`. The older `GET /api/proxy/foreman/status` remains a forgiving, deprecated alias going forward.
 
 Lists recent status entries, newest first. `limit` is 1-100 (default 20). Optional `tokenId` (filter to one session; use `__unattributed__` for entries with no token) and `taskIdentifier` (filter to one task thread).
 

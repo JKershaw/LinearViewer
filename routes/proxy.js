@@ -856,7 +856,7 @@ const UPDATE_ISSUE_LABELS_MUTATION = gql`
  * @param {Object} options - Dependencies
  * @param {Object} options.proxyTokenStore - Proxy token storage instance
  * @param {Object} options.proxyEventStore - Proxy event storage instance
- * @param {Object} options.foremanStore - Foreman status storage instance
+ * @param {Object} options.agentStatusStore - Agent status storage instance
  * @param {Object} options.recapCacheStore - Recap cache storage instance
  * @param {Object} options.briefCacheStore - Brief cache storage instance
  * @param {Function} options.workspaceFromUrl - Middleware to validate workspace
@@ -865,7 +865,7 @@ const UPDATE_ISSUE_LABELS_MUTATION = gql`
  * @param {Function} options.getWorkspaceOpenRouterKey - Function to get OpenRouter API key from workspace sessions
  * @returns {Router} Express router with proxy routes
  */
-export function createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, briefCacheStore, dispatchQueueStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, workspacePreferencesStore, freeTierStore }) {
+export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, dispatchQueueStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, workspacePreferencesStore, freeTierStore }) {
   const router = Router();
 
   // =========================================================================
@@ -1321,7 +1321,7 @@ GET ${baseUrl}/api/proxy/issues/{identifier}/brief
 POST ${baseUrl}/api/proxy/brief/{identifier}
   → Force-regenerate the brief and return the fresh result (same shape as GET above).
 
-GET ${baseUrl}/api/proxy/foreman/status
+GET ${baseUrl}/api/proxy/agent/status   (alias: /api/proxy/foreman/status — deprecated)
   → Recent agent status entries
   → { "items": [{ "id": "...", "taskIdentifier": "LIN-42", "action": "research",
                    "status": "completed", "summary": "...", "timestamp": "..." }], "total": 7 }
@@ -1392,10 +1392,11 @@ DELETE ${baseUrl}/api/proxy/issues/{issueId}/labels/{labelId}
   → { "success": true, "issue": { "id": "...", "identifier": "LIN-123", "labels": { "nodes": [...] } } }
   → When the label is not present: { "success": true, "message": "Label not present" }
 
-POST ${baseUrl}/api/proxy/foreman/status
+POST ${baseUrl}/api/proxy/agent/status   (alias: /api/proxy/foreman/status — deprecated)
   Body: { "taskIdentifier": "LIN-42", "action": "research", "status": "completed", "summary": "...", "dispatchId": "..." }
   → Record an agent status update (dispatchId optional: pass the dispatch-history item ID from /api/dispatch/take to enable exact loop-reconstruction join). Returns 201:
   → { "success": true }
+  → The legacy /api/proxy/foreman/status path remains a forgiving alias for existing consumers, but agent/status is canonical.
 
 ## Dispatch Endpoints
 
@@ -3490,34 +3491,35 @@ One convention across every endpoint, so you can branch on the same fields every
   });
 
   /**
-   * POST /api/proxy/foreman/status
-   * Record a foreman status update.
+   * POST /api/proxy/agent/status  (canonical)
+   * POST /api/proxy/foreman/status  (forgiving alias, deprecated — pre-LIN-533 name)
+   * Record an agent status update. Shared handler across both forms (LIN-528 pattern).
    */
-  router.post('/api/proxy/foreman/status', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
+  router.post(['/api/proxy/agent/status', '/api/proxy/foreman/status'], proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     const { taskIdentifier, action, status, summary, dispatchId } = req.body;
 
     if (!taskIdentifier || typeof taskIdentifier !== 'string') {
-      logEvent(req, '/api/proxy/foreman/status', 400);
+      logEvent(req, '/api/proxy/agent/status', 400);
       return res.status(400).json({ error: 'taskIdentifier is required' });
     }
     if (!action || typeof action !== 'string') {
-      logEvent(req, '/api/proxy/foreman/status', 400);
+      logEvent(req, '/api/proxy/agent/status', 400);
       return res.status(400).json({ error: 'action is required' });
     }
     if (!status || typeof status !== 'string') {
-      logEvent(req, '/api/proxy/foreman/status', 400);
+      logEvent(req, '/api/proxy/agent/status', 400);
       return res.status(400).json({ error: 'status is required' });
     }
     if (!summary || typeof summary !== 'string') {
-      logEvent(req, '/api/proxy/foreman/status', 400);
+      logEvent(req, '/api/proxy/agent/status', 400);
       return res.status(400).json({ error: 'summary is required' });
     }
     if (summary.length > 10000) {
-      logEvent(req, '/api/proxy/foreman/status', 400);
+      logEvent(req, '/api/proxy/agent/status', 400);
       return res.status(400).json({ error: 'summary exceeds max length (10000)' });
     }
     if (taskIdentifier.length > 200 || action.length > 200 || status.length > 200) {
-      logEvent(req, '/api/proxy/foreman/status', 400);
+      logEvent(req, '/api/proxy/agent/status', 400);
       return res.status(400).json({ error: 'Field exceeds max length (200)' });
     }
 
@@ -3526,27 +3528,27 @@ One convention across every endpoint, so you can branch on the same fields every
     // absence is back-compatible and consumers fall back to timestamp-window matching.
     if (dispatchId !== undefined && dispatchId !== null) {
       if (typeof dispatchId !== 'string' || dispatchId.length === 0) {
-        logEvent(req, '/api/proxy/foreman/status', 400);
+        logEvent(req, '/api/proxy/agent/status', 400);
         return res.status(400).json({ error: 'dispatchId must be a non-empty string' });
       }
       if (dispatchId.length > 200) {
-        logEvent(req, '/api/proxy/foreman/status', 400);
+        logEvent(req, '/api/proxy/agent/status', 400);
         return res.status(400).json({ error: 'Field exceeds max length (200)' });
       }
       if (DANGEROUS_CHARS_REGEX.test(dispatchId)) {
-        logEvent(req, '/api/proxy/foreman/status', 400);
+        logEvent(req, '/api/proxy/agent/status', 400);
         return res.status(400).json({ error: 'Input contains invalid characters' });
       }
     }
 
     if (DANGEROUS_CHARS_REGEX.test(taskIdentifier) || DANGEROUS_CHARS_REGEX.test(action) ||
         DANGEROUS_CHARS_REGEX.test(status) || DANGEROUS_CHARS_REGEX.test(summary)) {
-      logEvent(req, '/api/proxy/foreman/status', 400);
+      logEvent(req, '/api/proxy/agent/status', 400);
       return res.status(400).json({ error: 'Input contains invalid characters' });
     }
 
     try {
-      await foremanStore.recordStatus({
+      await agentStatusStore.recordStatus({
         urlKey: req.proxyUrlKey,
         taskIdentifier,
         action,
@@ -3559,21 +3561,22 @@ One convention across every endpoint, so you can branch on the same fields every
         ...(dispatchId ? { dispatchId } : {})
       });
 
-      logEvent(req, '/api/proxy/foreman/status', 201);
+      logEvent(req, '/api/proxy/agent/status', 201);
       res.status(201).json({ success: true });
     } catch (err) {
-      logEvent(req, '/api/proxy/foreman/status', 500);
-      console.error('Foreman status post error:', err.message);
+      logEvent(req, '/api/proxy/agent/status', 500);
+      console.error('Agent status post error:', err.message);
       res.status(500).json({ error: 'Failed to record status' });
     }
   });
 
   /**
-   * GET /api/proxy/foreman/status
-   * List recent foreman status entries. Optional filters: tokenId (session) +
-   * taskIdentifier (task thread).
+   * GET /api/proxy/agent/status  (canonical)
+   * GET /api/proxy/foreman/status  (forgiving alias, deprecated — pre-LIN-533 name)
+   * List recent agent status entries. Optional filters: tokenId (session) +
+   * taskIdentifier (task thread). Shared handler across both forms (LIN-528 pattern).
    */
-  router.get('/api/proxy/foreman/status', proxyLimiter, authenticateProxyToken, async (req, res) => {
+  router.get(['/api/proxy/agent/status', '/api/proxy/foreman/status'], proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
       const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
       const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
@@ -3582,7 +3585,7 @@ One convention across every endpoint, so you can branch on the same fields every
       if (req.query.tokenId) {
         const raw = String(req.query.tokenId);
         if (raw.length > MAX_NAME_LENGTH || DANGEROUS_CHARS_REGEX.test(raw)) {
-          logEvent(req, '/api/proxy/foreman/status', 400);
+          logEvent(req, '/api/proxy/agent/status', 400);
           return res.status(400).json({ error: 'Invalid tokenId' });
         }
         filters.tokenId = raw;
@@ -3590,19 +3593,19 @@ One convention across every endpoint, so you can branch on the same fields every
       if (req.query.taskIdentifier) {
         const raw = String(req.query.taskIdentifier);
         if (raw.length > MAX_NAME_LENGTH || DANGEROUS_CHARS_REGEX.test(raw)) {
-          logEvent(req, '/api/proxy/foreman/status', 400);
+          logEvent(req, '/api/proxy/agent/status', 400);
           return res.status(400).json({ error: 'Invalid taskIdentifier' });
         }
         filters.taskIdentifier = raw;
       }
 
-      const result = await foremanStore.listStatus(req.proxyUrlKey, { limit, offset, ...filters });
+      const result = await agentStatusStore.listStatus(req.proxyUrlKey, { limit, offset, ...filters });
 
-      logEvent(req, '/api/proxy/foreman/status', 200);
+      logEvent(req, '/api/proxy/agent/status', 200);
       res.json(result);
     } catch (err) {
-      logEvent(req, '/api/proxy/foreman/status', 500);
-      console.error('Foreman status list error:', err.message);
+      logEvent(req, '/api/proxy/agent/status', 500);
+      console.error('Agent status list error:', err.message);
       res.status(500).json({ error: 'Failed to list status' });
     }
   });

@@ -42,10 +42,10 @@ const MARKER_TO_AGENT_STATE = { done: 'complete', failed: 'error', aborted: 'err
  * Derive the *effective* agent state for a run.
  *
  * The Loop builder (lib/pipeline-loops.js) leaves a taken dispatch as 'running'
- * until a foreman 'completed'/'failed' entry decorates it. But the dispatch
+ * until a agent 'completed'/'failed' entry decorates it. But the dispatch
  * runner's own terminal signal is a "[done]"/"[failed]"/"[aborted]" feedback
  * marker (lib/dispatch-terminal.js — the same seam the proxy watch endpoint
- * reads). Without folding that in, every marker-but-no-foreman run shows
+ * reads). Without folding that in, every marker-but-no-agent run shows
  * "running" forever — the "all sessions appear in progress" report (LIN-509),
  * which also left the summary button permanently disabled. A terminal marker
  * therefore wins over a non-terminal derived state. Read-only; never mutates a
@@ -73,7 +73,7 @@ function isTerminalLoop(loop) {
  * @returns {number} epoch ms (0 when unknown)
  */
 function loopActivityMs(loop) {
-  const t = loop.completedAt || loop.foremanTimestamp || loop.resolvedAt || loop.dispatchedAt;
+  const t = loop.completedAt || loop.agentTimestamp || loop.resolvedAt || loop.dispatchedAt;
   const ms = t ? new Date(t).getTime() : 0;
   return Number.isFinite(ms) ? ms : 0;
 }
@@ -96,7 +96,7 @@ function enrichLoop(loop) {
  * @param {Object} deps
  * @param {Function} deps.workspaceFromUrl        - middleware: session + req.workspace
  * @param {Object}   deps.dispatchQueueStore       - dispatch store (listItems/listHistory)
- * @param {Object}   deps.foremanStore             - foreman status store
+ * @param {Object}   deps.agentStatusStore             - agent status store
  * @param {Object}   deps.runSummaryCacheStore     - run-summary cache store
  * @param {Object}   deps.freeTierStore            - free-tier usage store (rate limit)
  * @param {Function} deps.getWorkspaceAccessToken  - (urlKey) → token (lazy hydration only)
@@ -109,7 +109,7 @@ function enrichLoop(loop) {
 export function createDashboardRoutes({
   workspaceFromUrl,
   dispatchQueueStore,
-  foremanStore,
+  agentStatusStore,
   runSummaryCacheStore,
   freeTierStore,
   getWorkspaceAccessToken,
@@ -119,7 +119,7 @@ export function createDashboardRoutes({
   recentLimit = 120
 }) {
   const router = Router();
-  const loopDeps = { dispatchStore: dispatchQueueStore, foremanStore };
+  const loopDeps = { dispatchStore: dispatchQueueStore, agentStatusStore };
 
   /**
    * Merge Loops across every connected workspace, tagging each run with its
@@ -336,7 +336,7 @@ export function createDashboardRoutes({
 export function buildTestSummary(loop) {
   const what = [];
   if (loop.stage) what.push(`Ran the ${loop.stage} stage`);
-  if (loop.foremanSummary) what.push(String(loop.foremanSummary).slice(0, 120));
+  if (loop.agentSummary) what.push(String(loop.agentSummary).slice(0, 120));
   const fbCount = Array.isArray(loop.feedback) ? loop.feedback.length : 0;
   if (fbCount) what.push(`${fbCount} feedback message${fbCount === 1 ? '' : 's'} posted`);
   return parseRunSummaryResponse(JSON.stringify({

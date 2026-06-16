@@ -199,7 +199,7 @@ export function buildMockRecommendationHop(ctx) {
  * @param {Function} options.getOpenRouterSource - Helper to determine OpenRouter source
  * @returns {Router} Express router
  */
-export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, foremanStore }) {
+export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore }) {
   const router = Router();
 
   // ===========================================================================
@@ -1330,7 +1330,7 @@ ${goal}`
   /**
    * GET the dispatched sessions (pipeline Loops) for a single issue.
    *
-   * Reads the local dispatch + foreman stores only — no Linear call, no access
+   * Reads the local dispatch + agent stores only — no Linear call, no access
    * token — so it's cheap and works offline. The `:identifier` is the Linear
    * identifier (e.g. LIN-42), which is the join key the Swipe card already holds.
    * Returns newest-first so the most recent session is at the top.
@@ -1345,14 +1345,14 @@ ${goal}`
     if (!identifier || identifier.length > 100) {
       return res.status(400).json({ error: 'Invalid issue identifier' });
     }
-    if (!dispatchQueueStore || !foremanStore) {
+    if (!dispatchQueueStore || !agentStatusStore) {
       return res.status(503).json({ error: 'Sessions are not available' });
     }
 
     try {
       const loops = await getLoopsForIssue(workspace.urlKey, identifier, {
         dispatchStore: dispatchQueueStore,
-        foremanStore
+        agentStatusStore
       });
       // getLoopsForIssue returns oldest-first; reverse for newest-first display.
       const sessions = loops.map(toSessionView).reverse();

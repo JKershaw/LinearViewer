@@ -26,7 +26,7 @@ const LOOP = {
   promptText: 'do the thing',
   stage: 'implement',
   agentState: 'complete',
-  foremanSummary: 'done it',
+  agentSummary: 'done it',
   feedback: [{ message: 'pr opened' }]
 };
 
@@ -41,12 +41,12 @@ describe('stableStringify', () => {
 
 describe('hashLoop', () => {
   test('is stable across reordered fields', () => {
-    const reordered = { feedback: [{ message: 'pr opened' }], agentState: 'complete', loopId: 'd1', issueIdentifier: 'LIN-42', iteration: 2, promptName: 'implementation', promptText: 'do the thing', stage: 'implement', foremanSummary: 'done it' };
+    const reordered = { feedback: [{ message: 'pr opened' }], agentState: 'complete', loopId: 'd1', issueIdentifier: 'LIN-42', iteration: 2, promptName: 'implementation', promptText: 'do the thing', stage: 'implement', agentSummary: 'done it' };
     assert.equal(hashLoop(LOOP), hashLoop(reordered));
   });
 
   test('changes when a summarisable field changes', () => {
-    assert.notEqual(hashLoop(LOOP), hashLoop({ ...LOOP, foremanSummary: 'something else' }));
+    assert.notEqual(hashLoop(LOOP), hashLoop({ ...LOOP, agentSummary: 'something else' }));
   });
 
   test('ignores non-summarisable churn (e.g. workspace tag, timestamps)', () => {

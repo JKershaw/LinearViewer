@@ -4,7 +4,7 @@
  * Run with: node --test tests/unit/dashboard-routes.test.js
  *
  * Exercises the route handlers directly (bypassing the workspaceFromUrl
- * middleware) against mock dispatch/foreman stores, asserting the load-bearing
+ * middleware) against mock dispatch/agentStatus stores, asserting the load-bearing
  * contract: feature gating, cross-workspace merge + workspace tagging,
  * active/recent split, the terminal-only run-summary gate, and the deterministic
  * test-mode summary path with caching.
@@ -16,10 +16,10 @@ import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
 
 const NOW_ISO = new Date().toISOString();
 
-// ─── Mock dispatch/foreman stores ──────────────────────────────────────────────
+// ─── Mock dispatch/agentStatus stores ──────────────────────────────────────────────
 // Shaped to drive lib/pipeline-loops.getLoopsForWorkspace deterministically:
 //   - a live queue item  → agentState 'queued'  (active)
-//   - a taken history item + foreman 'completed' → agentState 'complete' (recent)
+//   - a taken history item + agentStatus 'completed' → agentState 'complete' (recent)
 
 function makeStores(perWorkspace) {
   return {
@@ -27,8 +27,8 @@ function makeStores(perWorkspace) {
       async listItems(urlKey) { return perWorkspace[urlKey]?.live || []; },
       async listHistory(urlKey) { return { items: perWorkspace[urlKey]?.history || [] }; }
     },
-    foremanStore: {
-      async listStatus(urlKey) { return { items: perWorkspace[urlKey]?.foreman || [] }; }
+    agentStatusStore: {
+      async listStatus(urlKey) { return { items: perWorkspace[urlKey]?.agentStatus || [] }; }
     }
   };
 }
@@ -39,11 +39,11 @@ function activeItem(id, identifier) {
 function historyItem(id, identifier) {
   return { id, issueIdentifier: identifier, issueTitle: `Title ${identifier}`, promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken', feedback: [{ message: 'pr opened' }] };
 }
-function foremanDone(dispatchId, identifier) {
+function agentStatusDone(dispatchId, identifier) {
   return { dispatchId, taskIdentifier: identifier, action: 'implementation', status: 'completed', summary: 'all done', timestamp: NOW_ISO };
 }
 // A taken run that the runner finished via a [done] feedback marker but with NO
-// foreman 'completed' entry — pipeline-loops alone derives 'running' for this.
+// agentStatus 'completed' entry — pipeline-loops alone derives 'running' for this.
 function markerDoneItem(id, identifier) {
   return { id, issueIdentifier: identifier, issueTitle: `Title ${identifier}`, promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken', feedback: [{ message: '[done] shipped it', timestamp: NOW_ISO }] };
 }
@@ -73,11 +73,11 @@ function makeReqRes({ session = {}, workspace = null, params = {}, query = {} } 
 }
 
 function makeRouter(perWorkspace, { runSummaryCacheStore } = {}) {
-  const { dispatchQueueStore, foremanStore } = makeStores(perWorkspace);
+  const { dispatchQueueStore, agentStatusStore } = makeStores(perWorkspace);
   return createDashboardRoutes({
     workspaceFromUrl: (req, res, next) => next(),
     dispatchQueueStore,
-    foremanStore,
+    agentStatusStore,
     runSummaryCacheStore: runSummaryCacheStore || new InMemoryRunSummaryCacheStore(),
     freeTierStore: { async tryUse() { return { allowed: true }; } },
     getWorkspaceAccessToken: async () => 'token',
@@ -102,8 +102,8 @@ describe('GET /api/dashboard/loops', () => {
 
   test('merges runs across workspaces, tags each, and splits active/recent', async () => {
     const perWorkspace = {
-      'ws-a': { live: [activeItem('a-live', 'LIN-1')], history: [historyItem('a-hist', 'LIN-2')], foreman: [foremanDone('a-hist', 'LIN-2')] },
-      'ws-b': { live: [], history: [historyItem('b-hist', 'LIN-3')], foreman: [foremanDone('b-hist', 'LIN-3')] }
+      'ws-a': { live: [activeItem('a-live', 'LIN-1')], history: [historyItem('a-hist', 'LIN-2')], agentStatus: [agentStatusDone('a-hist', 'LIN-2')] },
+      'ws-b': { live: [], history: [historyItem('b-hist', 'LIN-3')], agentStatus: [agentStatusDone('b-hist', 'LIN-3')] }
     };
     const router = makeRouter(perWorkspace);
     const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/loops');
@@ -128,7 +128,7 @@ describe('GET /api/dashboard/loops', () => {
     // Regression for "all sessions appear in progress" (LIN-509): without folding
     // the dispatch terminal marker in, this run would derive agentState 'running'
     // and never leave the active feed.
-    const router = makeRouter({ 'ws-a': { live: [], history: [markerDoneItem('m1', 'LIN-7')], foreman: [] } });
+    const router = makeRouter({ 'ws-a': { live: [], history: [markerDoneItem('m1', 'LIN-7')], agentStatus: [] } });
     const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/loops');
     const session = { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] };
     const { req, res } = makeReqRes({ session });
@@ -141,7 +141,7 @@ describe('GET /api/dashboard/loops', () => {
 
   test('a [failed] marker maps to an error (terminal) run', async () => {
     const failItem = { id: 'f1', issueIdentifier: 'LIN-8', issueTitle: 'T', promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken', feedback: [{ message: '[failed] broke', timestamp: NOW_ISO }] };
-    const router = makeRouter({ 'ws-a': { live: [], history: [failItem], foreman: [] } });
+    const router = makeRouter({ 'ws-a': { live: [], history: [failItem], agentStatus: [] } });
     const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/loops');
     const session = { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] };
     const { req, res } = makeReqRes({ session });
@@ -157,7 +157,7 @@ describe('GET /api/dashboard/loops', () => {
         async listItems(urlKey) { if (urlKey === 'bad') throw new Error('store down'); return []; },
         async listHistory(urlKey) { if (urlKey === 'bad') throw new Error('store down'); return { items: [historyItem('g', 'LIN-9')] }; }
       },
-      foremanStore: { async listStatus() { return { items: [foremanDone('g', 'LIN-9')] }; } },
+      agentStatusStore: { async listStatus() { return { items: [agentStatusDone('g', 'LIN-9')] }; } },
       runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
       freeTierStore: { async tryUse() { return { allowed: true }; } },
       getWorkspaceAccessToken: async () => 'token',
@@ -186,7 +186,7 @@ describe('run-summary endpoint', () => {
   });
 
   test('404 when the loop is not found', async () => {
-    const router = makeRouter({ 'ws-a': { history: [], live: [], foreman: [] } });
+    const router = makeRouter({ 'ws-a': { history: [], live: [], agentStatus: [] } });
     const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/run-summary/:loopId');
     const { req, res } = makeReqRes({ session: ENABLED, workspace: { urlKey: 'ws-a' }, params: { loopId: 'nope' } });
     await handler(req, res);
@@ -194,7 +194,7 @@ describe('run-summary endpoint', () => {
   });
 
   test('409 for a non-terminal (active) run', async () => {
-    const router = makeRouter({ 'ws-a': { live: [activeItem('a-live', 'LIN-1')], history: [], foreman: [] } });
+    const router = makeRouter({ 'ws-a': { live: [activeItem('a-live', 'LIN-1')], history: [], agentStatus: [] } });
     const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/run-summary/:loopId');
     const { req, res } = makeReqRes({ session: ENABLED, workspace: { urlKey: 'ws-a' }, params: { loopId: 'a-live' } });
     await handler(req, res);
@@ -206,7 +206,7 @@ describe('run-summary endpoint', () => {
     const prev = process.env.NODE_ENV;
     process.env.NODE_ENV = 'test';
     try {
-      const router = makeRouter({ 'ws-a': { history: [markerDoneItem('m9', 'LIN-7')], live: [], foreman: [] } });
+      const router = makeRouter({ 'ws-a': { history: [markerDoneItem('m9', 'LIN-7')], live: [], agentStatus: [] } });
       const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/run-summary/:loopId');
       const { req, res } = makeReqRes({ session: ENABLED, workspace: { urlKey: 'ws-a' }, params: { loopId: 'm9' } });
       await handler(req, res);
@@ -218,7 +218,7 @@ describe('run-summary endpoint', () => {
   });
 
   test('GET ?cachedOnly returns 204 on a cache miss (no generation)', async () => {
-    const router = makeRouter({ 'ws-a': { history: [historyItem('a-hist', 'LIN-2')], live: [], foreman: [foremanDone('a-hist', 'LIN-2')] } });
+    const router = makeRouter({ 'ws-a': { history: [historyItem('a-hist', 'LIN-2')], live: [], agentStatus: [agentStatusDone('a-hist', 'LIN-2')] } });
     const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/run-summary/:loopId');
     const { req, res } = makeReqRes({ session: ENABLED, workspace: { urlKey: 'ws-a' }, params: { loopId: 'a-hist' }, query: { cachedOnly: '1' } });
     await handler(req, res);
@@ -231,7 +231,7 @@ describe('run-summary endpoint', () => {
     try {
       const cache = new InMemoryRunSummaryCacheStore();
       const router = makeRouter(
-        { 'ws-a': { history: [historyItem('a-hist', 'LIN-2')], live: [], foreman: [foremanDone('a-hist', 'LIN-2')] } },
+        { 'ws-a': { history: [historyItem('a-hist', 'LIN-2')], live: [], agentStatus: [agentStatusDone('a-hist', 'LIN-2')] } },
         { runSummaryCacheStore: cache }
       );
       const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/run-summary/:loopId');
@@ -254,7 +254,7 @@ describe('run-summary endpoint', () => {
 
 describe('buildTestSummary', () => {
   test('reports completion and folds in summary + feedback', () => {
-    const s = buildTestSummary({ issueIdentifier: 'LIN-5', iteration: 3, agentState: 'complete', stage: 'review', foremanSummary: 'looked good', feedback: [{ message: 'a' }] });
+    const s = buildTestSummary({ issueIdentifier: 'LIN-5', iteration: 3, agentState: 'complete', stage: 'review', agentSummary: 'looked good', feedback: [{ message: 'a' }] });
     assert.match(s.outcome, /LIN-5/);
     assert.match(s.outcome, /completed/);
     assert.ok(s.whatHappened.length >= 1);

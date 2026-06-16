@@ -1,8 +1,8 @@
 /**
- * Pipeline Scenarios — E2E tests with real dispatch/foreman data.
+ * Pipeline Scenarios — E2E tests with real dispatch/agent data.
  *
  * These tests act as a fake dispatch consumer: queue prompts, take items,
- * post foreman status — then load the pipeline page and assert the UI
+ * post agent status — then load the pipeline page and assert the UI
  * renders correctly from the real data flow.
  *
  * Separate from pipeline.spec.js (which covers structure, gating, and
@@ -11,7 +11,7 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { seedLocalWorkspace, pipelineLocalSeed, LOCAL_WORKSPACE_URL_KEY } from '../fixtures/local-harness.js';
 
-// LIN-387: real dispatch→take→foreman flow runs against the local-provider
+// LIN-387: real dispatch→take→agent flow runs against the local-provider
 // workspace. Tokens/clears are scoped to LOCAL_WORKSPACE_URL_KEY via the
 // shared harness's `?urlKey=` param; the seed reuses testMockData so the
 // asserted identifiers/titles (TEST-14 'Add pagination to user list', TEST-15)
@@ -24,14 +24,14 @@ const FEATURES = { pipeline: true, dispatch: true, proxy: true };
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 /**
- * Clear all dispatch/foreman state and set session with required features.
+ * Clear all dispatch/agent state and set session with required features.
  */
 async function setupCleanSession(page) {
   await page.goto(`/test/clear-dispatch-queue?urlKey=${WS}`);
   await page.goto(`/test/clear-dispatch-history?urlKey=${WS}`);
   await page.goto(`/test/clear-dispatch-tokens?urlKey=${WS}`);
   await page.goto(`/test/clear-proxy-tokens?urlKey=${WS}`);
-  await page.goto(`/test/clear-foreman-status?urlKey=${WS}`);
+  await page.goto(`/test/clear-agent-status?urlKey=${WS}`);
   await seedLocalWorkspace(page, pipelineLocalSeed, { features: FEATURES });
 }
 
@@ -87,11 +87,11 @@ async function takeItem(page, itemId, consumerToken) {
 }
 
 /**
- * Post a foreman status for an issue (simulates agent completion/failure).
+ * Post a agent status for an issue (simulates agent completion/failure).
  * Proxy endpoints use Bearer token auth.
  */
-async function postForeman(page, proxyToken, { taskIdentifier, action, status, summary, dispatchId }) {
-  const resp = await page.request.post('/api/proxy/foreman/status', {
+async function postAgentStatus(page, proxyToken, { taskIdentifier, action, status, summary, dispatchId }) {
+  const resp = await page.request.post('/api/proxy/agent/status', {
     headers: {
       Authorization: `Bearer ${proxyToken}`,
       'Content-Type': 'application/json'
@@ -108,13 +108,13 @@ async function postForeman(page, proxyToken, { taskIdentifier, action, status, s
 }
 
 /**
- * Create a completed loop: dispatch → take → foreman completed.
+ * Create a completed loop: dispatch → take → agent completed.
  * Returns the dispatch item for chaining.
  */
 async function createCompletedLoop(page, consumerToken, proxyToken, { issueIdentifier, promptName, action }) {
   const item = await dispatchForIssue(page, { issueIdentifier, promptName: promptName || 'implementation' });
   await takeItem(page, item.id, consumerToken);
-  await postForeman(page, proxyToken, {
+  await postAgentStatus(page, proxyToken, {
     taskIdentifier: issueIdentifier,
     action: action || promptName || 'implementation',
     status: 'completed',
@@ -311,7 +311,7 @@ test.describe('Pipeline Scenarios', () => {
       const recentLoop = data.recent.find(l => l.issueIdentifier === 'TEST-14');
       expect(recentLoop).toBeTruthy();
       expect(recentLoop.agentState).toBe('complete');
-      expect(recentLoop.foremanStatus).toBe('completed');
+      expect(recentLoop.agentStatus).toBe('completed');
     });
   });
 
@@ -331,7 +331,7 @@ test.describe('Pipeline Scenarios', () => {
         promptName: 'implementation'
       });
       await takeItem(page, item.id, consumerToken);
-      await postForeman(page, proxyToken, {
+      await postAgentStatus(page, proxyToken, {
         taskIdentifier: 'TEST-14',
         action: 'implementation',
         status: 'failed',
@@ -355,7 +355,7 @@ test.describe('Pipeline Scenarios', () => {
         promptName: 'implementation'
       });
       await takeItem(page, item.id, consumerToken);
-      await postForeman(page, proxyToken, {
+      await postAgentStatus(page, proxyToken, {
         taskIdentifier: 'TEST-14',
         action: 'implementation',
         status: 'failed',
@@ -369,7 +369,7 @@ test.describe('Pipeline Scenarios', () => {
       const recentLoop = data.recent.find(l => l.issueIdentifier === 'TEST-14');
       expect(recentLoop).toBeTruthy();
       expect(recentLoop.agentState).toBe('error');
-      expect(recentLoop.foremanStatus).toBe('failed');
+      expect(recentLoop.agentStatus).toBe('failed');
     });
   });
 

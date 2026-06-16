@@ -91,6 +91,29 @@ const PAIRS = [
     alias: '/api/proxy/prompt/:identifier/:templateKey',
     probe: { canonical: '/api/proxy/issues/LIN-999999/prompt/implement', alias: '/api/proxy/prompt/LIN-999999/implement' },
     expectStatus: 404
+  },
+  // LIN-533: agent/status is canonical; foreman/status remains a forgiving deprecated
+  // alias for existing consumers (the autopilot runner). POST 400s on a missing
+  // taskIdentifier and GET 400s on an over-long tokenId — both before the store is hit,
+  // so the probe is deterministic and network-free.
+  {
+    name: 'agent status (write)',
+    method: 'post',
+    canonical: '/api/proxy/agent/status',
+    alias: '/api/proxy/foreman/status',
+    probe: { canonical: '/api/proxy/agent/status', alias: '/api/proxy/foreman/status' },
+    expectStatus: 400
+  },
+  {
+    name: 'agent status (read)',
+    method: 'get',
+    canonical: '/api/proxy/agent/status',
+    alias: '/api/proxy/foreman/status',
+    probe: {
+      canonical: '/api/proxy/agent/status?tokenId=' + 'x'.repeat(1001),
+      alias: '/api/proxy/foreman/status?tokenId=' + 'x'.repeat(1001)
+    },
+    expectStatus: 400
   }
 ];
 
@@ -109,7 +132,7 @@ function buildApp() {
     resolveWorkspaceAccess: async () => ({ token: 'test-token', reason: 'ok' }),
     getWorkspaceAccessToken: async () => 'test-token',
     getWorkspaceOpenRouterKey: async () => null,
-    foremanStore: {},
+    agentStatusStore: {},
     recapCacheStore: { get: async () => null, set: async () => {} },
     briefCacheStore: { get: async () => null, set: async () => {} },
     dispatchQueueStore: {},
@@ -150,7 +173,7 @@ describe('proxy route aliases — same handler (router stack)', () => {
     resolveWorkspaceAccess: async () => ({ token: null, reason: 'ok' }),
     getWorkspaceAccessToken: async () => null,
     getWorkspaceOpenRouterKey: async () => null,
-    foremanStore: {}, recapCacheStore: {}, briefCacheStore: {}, dispatchQueueStore: {},
+    agentStatusStore: {}, recapCacheStore: {}, briefCacheStore: {}, dispatchQueueStore: {},
     workspaceFromUrl: (req, res, next) => next(),
     workspacePreferencesStore: {}, freeTierStore: {}
   });

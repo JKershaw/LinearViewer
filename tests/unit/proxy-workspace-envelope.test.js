@@ -89,7 +89,7 @@ function buildApp(reason) {
     resolveWorkspaceAccess: async () => ({ token: null, reason }),
     getWorkspaceAccessToken: async () => null,
     // Unused on the failure path, but required by the factory signature.
-    foremanStore: {},
+    agentStatusStore: {},
     recapCacheStore: {},
     briefCacheStore: {},
     dispatchQueueStore: {},

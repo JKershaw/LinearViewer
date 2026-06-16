@@ -48,7 +48,7 @@ function buildCollections(overrides = {}) {
     dispatchTokens: empty(),
     proxyTokens: empty(),
     proxyEvents: empty(),
-    foremanStatus: empty(),
+    agentStatus: empty(),
     freeTier: empty(),
     recapCache: empty(),
     briefCache: empty(),
@@ -68,6 +68,10 @@ describe('categorizeProxyEvent', () => {
     assert.strictEqual(categorizeProxyEvent('POST', '/api/proxy/dispatch'), 'deciding');
     assert.strictEqual(categorizeProxyEvent('GET', '/api/proxy/dispatch/:id'), 'watching');
     assert.strictEqual(categorizeProxyEvent('GET', '/api/proxy/foreman/sessions'), 'watching');
+    // agent/status is canonical (LIN-533); foreman/status is the deprecated alias.
+    // Both classify the same — legacy audit events still carry the old path.
+    assert.strictEqual(categorizeProxyEvent('GET', '/api/proxy/agent/status'), 'watching');
+    assert.strictEqual(categorizeProxyEvent('POST', '/api/proxy/agent/status'), 'reporting');
     assert.strictEqual(categorizeProxyEvent('GET', '/api/proxy/foreman/status'), 'watching');
     assert.strictEqual(categorizeProxyEvent('POST', '/api/proxy/foreman/status'), 'reporting');
     assert.strictEqual(categorizeProxyEvent('POST', '/api/proxy/issues'), 'acting');
@@ -116,7 +120,7 @@ describe('collectKpiStats', () => {
     const collections = buildCollections({
       workspacePreferences: createMockCollection([{ _id: 'acme' }, { _id: 'globex' }]),
       proxyEvents: createMockCollection([{ urlKey: 'acme', endpoint: '/api/proxy/me', method: 'GET', status: 200, timestamp: daysAgo(1) }]),
-      foremanStatus: createMockCollection([{ urlKey: 'initech', action: 'review', timestamp: daysAgo(2) }]),
+      agentStatus: createMockCollection([{ urlKey: 'initech', action: 'review', timestamp: daysAgo(2) }]),
       freeTier: createMockCollection([
         { urlKey: 'hooli', date: '2026-06-09', count: 3 },
         { urlKey: null, date: '2026-06-09T11', count: 9 } // global hourly record: no workspace
@@ -273,7 +277,7 @@ describe('collectKpiStats', () => {
         // expired, never taken
         { _id: 'h4', kind: 'planning', status: 'expired', dispatchedAt: daysAgo(5) }
       ]),
-      foremanStatus: createMockCollection([
+      agentStatus: createMockCollection([
         { dispatchId: 'h1', action: 'implementation', status: 'completed', timestamp: daysAgo(1) },
         { dispatchId: 'h2', action: 'review', status: 'failed', timestamp: daysAgo(2) },
         { dispatchId: 'unknown-dispatch', action: 'review', status: 'completed', timestamp: daysAgo(2) }, // no matching dispatch → ignored
@@ -303,10 +307,10 @@ describe('collectKpiStats', () => {
     assert.strictEqual(stats.vanity.medianQueueToTakeMinutes, 30);
   });
 
-  test('buckets step outcomes from foreman-status, defaulting to other', async () => {
+  test('buckets step outcomes from agent-status, defaulting to other', async () => {
     const entry = (status) => ({ action: 'research', status, timestamp: daysAgo(1) });
     const collections = buildCollections({
-      foremanStatus: createMockCollection([
+      agentStatus: createMockCollection([
         entry('completed'),
         entry('Completed'),   // case-insensitive
         entry('failed'),
@@ -347,7 +351,7 @@ describe('collectKpiStats', () => {
         { method: 'GET', endpoint: '/api/proxy/me', status: 200, timestamp: at('2026-06-10T03:15:00Z') },
         { method: 'GET', endpoint: '/api/proxy/me', status: 200, timestamp: at('2026-06-09T03:45:00Z') }
       ]),
-      foremanStatus: createMockCollection([
+      agentStatus: createMockCollection([
         { action: 'review', status: 'completed', timestamp: at('2026-06-10T11:00:00Z') }
       ]),
       dispatchQueue: createMockCollection([
@@ -409,7 +413,7 @@ describe('collectKpiStats', () => {
         issueIdentifier: 'LIN-999',
         dispatchedAt: daysAgo(0)
       }]),
-      foremanStatus: createMockCollection([{
+      agentStatus: createMockCollection([{
         urlKey: 'secret-workspace',
         action: 'implementation',
         summary: 'CONFIDENTIAL-SUMMARY-CONTENT',
@@ -429,7 +433,7 @@ describe('collectKpiStats', () => {
     assert.ok(!serialized.includes('secret-workspace'), 'workspace urlKey leaked');
     assert.ok(!serialized.includes('TOP-SECRET-PROMPT-TEXT'), 'prompt text leaked');
     assert.ok(!serialized.includes('Confidential issue title'), 'issue title leaked');
-    assert.ok(!serialized.includes('CONFIDENTIAL-SUMMARY-CONTENT'), 'foreman summary leaked');
+    assert.ok(!serialized.includes('CONFIDENTIAL-SUMMARY-CONTENT'), 'agent summary leaked');
     assert.ok(!serialized.includes('LIN-999'), 'issue identifier leaked');
     assert.ok(!serialized.includes('SECRET_TOKEN'), 'session token leaked');
   });

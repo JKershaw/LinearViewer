@@ -1,7 +1,7 @@
 /**
- * Unit tests for foreman-store.js
+ * Unit tests for agent-status-store.js
  *
- * Run with: node --test tests/unit/foreman-store.test.js
+ * Run with: node --test tests/unit/agent-store.test.js
  *
  * Covers the store's listStatus contract — specifically the "no limit means
  * return everything" semantics added to avoid silent truncation for callers
@@ -9,7 +9,7 @@
  */
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert';
-import { ForemanStore } from '../../lib/foreman-store.js';
+import { AgentStatusStore } from '../../lib/agent-status-store.js';
 
 // Minimal in-memory mock of the MongoDB/MangoDB collection surface the store uses.
 function createMockCollection() {
@@ -49,13 +49,13 @@ function createMockCollection() {
   };
 }
 
-describe('ForemanStore.listStatus', () => {
+describe('AgentStatusStore.listStatus', () => {
   let store;
   let collection;
 
   beforeEach(() => {
     collection = createMockCollection();
-    store = new ForemanStore({ collection });
+    store = new AgentStatusStore({ collection });
   });
 
   async function seed(urlKey, count) {

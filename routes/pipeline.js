@@ -22,7 +22,7 @@ import { getProviderForWorkspace } from '../lib/providers/registry.js';
  * @param {Function} deps.workspaceFromUrl        - middleware: session + req.workspace
  * @param {Function} deps.getWorkspaceAccessToken  - (urlKey) → token
  * @param {Object}   deps.dispatchQueueStore       - dispatch store (listItems/listHistory)
- * @param {Object}   deps.foremanStore             - foreman status store
+ * @param {Object}   deps.agentStatusStore             - agent status store
  * @param {Function} deps.getOpenRouterSource      - (req) → 'oauth'|'env'|'free'|null
  * @param {Function} deps.getDeployInfo            - () → deploy metadata
  * @param {Function} deps.handleUnauthorizedError  - shared 401 handler
@@ -32,7 +32,7 @@ export function createPipelineRoutes({
   workspaceFromUrl,
   getWorkspaceAccessToken,
   dispatchQueueStore,
-  foremanStore,
+  agentStatusStore,
   getOpenRouterSource,
   getDeployInfo,
   handleUnauthorizedError
@@ -53,7 +53,7 @@ export function createPipelineRoutes({
     return {
       getWorkspaceAccessToken,
       dispatchStore: dispatchQueueStore,
-      foremanStore,
+      agentStatusStore,
       fetchProjects: (token) => provider.fetchProjects(token)
     };
   }

@@ -4,7 +4,7 @@ import { test, expect } from '../fixtures/test-base.js';
 // (/workspace/:urlKey/dashboard). Distinct from dashboard.spec.js, which covers
 // the unprefixed tree-view "dashboard". Like the Collective page it seeds via
 // /test/set-session — the page only needs a session with workspaces + the
-// per-user `dashboard` flag; the live feed reads dispatch/foreman stores
+// per-user `dashboard` flag; the live feed reads dispatch/agent-status stores
 // (Mongo-only), so we seed runs through the user dispatch API.
 
 const URL_KEY = 'test-workspace';
@@ -18,7 +18,7 @@ const ENABLED = featuresParam({ dashboard: true });
 async function clearRuns(page) {
   await page.goto(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
   await page.goto(`/test/clear-dispatch-history?urlKey=${URL_KEY}`);
-  await page.goto(`/test/clear-foreman-status?urlKey=${URL_KEY}`);
+  await page.goto(`/test/clear-agent-status?urlKey=${URL_KEY}`);
 }
 
 async function seedQueuedRun(page, { issueIdentifier, issueTitle, kind = 'plan' }) {

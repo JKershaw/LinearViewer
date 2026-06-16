@@ -21,7 +21,7 @@ import { DispatchTokenStore } from './lib/dispatch-tokens.js'
 import { HarbourFeedbackTokenStore } from './lib/harbour-feedback-tokens.js'
 import { ProxyTokenStore } from './lib/proxy-tokens.js'
 import { ProxyEventStore } from './lib/proxy-events.js'
-import { ForemanStore } from './lib/foreman-store.js'
+import { AgentStatusStore } from './lib/agent-status-store.js'
 import { FreeTierStore } from './lib/free-tier-store.js'
 import { RecapCacheStore } from './lib/recap-cache.js'
 import { BriefCacheStore } from './lib/brief-cache.js'
@@ -220,10 +220,10 @@ const proxyEventStore = new ProxyEventStore({
   collection: proxyEventsCollection
 })
 
-// Foreman status tracking
-const foremanStatusCollection = db.collection('foreman-status')
-const foremanStore = new ForemanStore({
-  collection: foremanStatusCollection
+// Agent status tracking
+const agentStatusCollection = db.collection('foreman-status')
+const agentStatusStore = new AgentStatusStore({
+  collection: agentStatusCollection
 })
 
 // Free tier usage tracking
@@ -312,7 +312,7 @@ app.use(session({
 // Test Mode Setup
 // =============================================================================
 if (process.env.NODE_ENV === 'test') {
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, briefCacheStore, runSummaryCacheStore, reportHistoryStore, localStore, getWorkspaceAccessToken }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, runSummaryCacheStore, reportHistoryStore, localStore, getWorkspaceAccessToken }))
 }
 
 // =============================================================================
@@ -773,7 +773,7 @@ app.get('/kpis', async (req, res) => {
         dispatchTokens: dispatchTokensCollection,
         proxyTokens: proxyTokensCollection,
         proxyEvents: proxyEventsCollection,
-        foremanStatus: foremanStatusCollection,
+        agentStatus: agentStatusCollection,
         freeTier: freeTierCollection,
         recapCache: recapCacheCollection,
         briefCache: briefCacheCollection,
@@ -937,13 +937,13 @@ async function getWorkspaceOpenRouterKey(urlKey, linearUserId) {
   }
 }
 
-app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, briefCacheStore, dispatchQueueStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, workspacePreferencesStore, freeTierStore }))
+app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, dispatchQueueStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, workspacePreferencesStore, freeTierStore }))
 
 // Mount workspace API routes (audit, prompts, recommendations, comments, images)
-app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, foremanStore }))
+app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore }))
 
 // Mount pipeline routes (page + JSON polling)
-app.use(createPipelineRoutes({ workspaceFromUrl, getWorkspaceAccessToken, dispatchQueueStore, foremanStore, getOpenRouterSource, getDeployInfo, handleUnauthorizedError }))
+app.use(createPipelineRoutes({ workspaceFromUrl, getWorkspaceAccessToken, dispatchQueueStore, agentStatusStore, getOpenRouterSource, getDeployInfo, handleUnauthorizedError }))
 
 // Mount collective routes (experimental cross-project discussion — LIN-450).
 // yapClient is null when YAP_BASE_URL is unset; the routes degrade gracefully.
@@ -953,7 +953,7 @@ app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyToke
 // Mount dashboard routes (experimental combined realtime autopilot dashboard — LIN-509).
 // Merges Mongo-only Loop reads across session.workspaces; Linear is hydrated lazily
 // (drill-down only), never fanned out per poll.
-app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, foremanStore, runSummaryCacheStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, getOpenRouterSource, getDeployInfo }))
+app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatusStore, runSummaryCacheStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, getOpenRouterSource, getDeployInfo }))
 
 // Mount task-chat routes (experimental "talk to a task" conversation).
 app.use(createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo }))
@@ -1044,7 +1044,7 @@ app.get('/workspace/:urlKey/swipe/:identifier?', workspaceFromUrl, async (req, r
     // to an empty map.
     const [{ trees, inProgressTrees, recentActivityTrees, organizationName }, allLoops] = await Promise.all([
       fetchAndPrepareProjects(workspace, teamId),
-      getLoopsForWorkspace(workspace.urlKey, { dispatchStore: dispatchQueueStore, foremanStore }).catch(() => [])
+      getLoopsForWorkspace(workspace.urlKey, { dispatchStore: dispatchQueueStore, agentStatusStore }).catch(() => [])
     ]);
     const sessionCounts = buildSessionCounts(allLoops);
     const isLocalhost = ['localhost', '127.0.0.1'].some(h => req.get('host')?.startsWith(h));
@@ -1623,12 +1623,12 @@ app.listen(PORT, () => {
       console.error('Proxy event cleanup error:', err)
     }
     try {
-      const removedCount = await foremanStore.cleanup()
+      const removedCount = await agentStatusStore.cleanup()
       if (removedCount > 0) {
-        console.log(`Foreman status cleanup: removed ${removedCount} expired entries`)
+        console.log(`Agent status cleanup: removed ${removedCount} expired entries`)
       }
     } catch (err) {
-      console.error('Foreman status cleanup error:', err)
+      console.error('Agent status cleanup error:', err)
     }
     try {
       const removedCount = await harbourFeedbackTokenStore.cleanup()

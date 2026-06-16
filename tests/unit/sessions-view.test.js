@@ -56,21 +56,21 @@ describe('toSessionView', () => {
       repo: 'org/repo',
       source: 'history',
       historyStatus: 'taken',
-      foremanSummary: 'done',
-      foremanStatus: 'completed',
+      agentSummary: 'done',
+      agentStatus: 'completed',
       feedback: []
     };
     const view = toSessionView(loop);
     assert.equal(view.promptText, undefined);
     assert.equal(view.issueId, undefined);
-    assert.equal(view.foremanStatus, undefined);
+    assert.equal(view.agentStatus, undefined);
     assert.equal(view.loopId, 'd1');
     assert.equal(view.iteration, 2);
     assert.equal(view.promptName, 'implementation');
     assert.equal(view.stage, 'implementation');
     assert.equal(view.agentState, 'complete');
     assert.equal(view.target, 'cli');
-    assert.equal(view.foremanSummary, 'done');
+    assert.equal(view.agentSummary, 'done');
     assert.deepEqual(view.feedback, []);
   });
 
@@ -98,7 +98,7 @@ describe('toSessionView', () => {
     assert.equal(view.promptName, null);
     assert.equal(view.stage, null);
     assert.equal(view.agentState, null);
-    assert.equal(view.foremanSummary, null);
+    assert.equal(view.agentSummary, null);
     assert.deepEqual(view.feedback, []);
   });
 });

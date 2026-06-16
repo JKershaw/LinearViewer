@@ -135,10 +135,10 @@ test.describe('Pipeline Page', () => {
 
   test.describe('Pipeline API', () => {
     test.beforeEach(async ({ page }) => {
-      // Clear dispatch/foreman state to prevent cross-test contamination
+      // Clear dispatch/agent-status state to prevent cross-test contamination
       await page.goto(`/test/clear-dispatch-queue?urlKey=${LOCAL_WORKSPACE_URL_KEY}`);
       await page.goto(`/test/clear-dispatch-history?urlKey=${LOCAL_WORKSPACE_URL_KEY}`);
-      await page.goto(`/test/clear-foreman-status?urlKey=${LOCAL_WORKSPACE_URL_KEY}`);
+      await page.goto(`/test/clear-agent-status?urlKey=${LOCAL_WORKSPACE_URL_KEY}`);
       await seedPipeline(page, { pipeline: true });
     });
 
@@ -380,7 +380,7 @@ test.describe('Pipeline Page', () => {
           dispatchedAt: new Date(Date.now() - i * 60000).toISOString(),
           stage: 'execute',
           promptName: `prompt-${i}`,
-          foremanSummary: `Loop ${i}: did a chunk of work that takes vertical space so the overlay scrolls and we can exercise scroll preservation across a poll tick.`,
+          agentSummary: `Loop ${i}: did a chunk of work that takes vertical space so the overlay scrolls and we can exercise scroll preservation across a poll tick.`,
           feedback: []
         });
       }
