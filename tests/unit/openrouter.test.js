@@ -976,7 +976,8 @@ describe('action vocabulary (kind derivation seam)', () => {
     const names = getAIRecommendationActionNames();
     assert.ok(names.includes('plan'));
     assert.ok(names.includes('implement'));
-    assert.ok(names.includes('code review'));
+    assert.ok(names.includes('review'));
+    assert.ok(!names.includes('code review'), 'code review was consolidated into review (LIN-523)');
     assert.ok(!names.includes('retro'), 'retro is excluded from AI recommendation');
   });
 
@@ -1132,7 +1133,7 @@ describe('parseRecommendedAction', () => {
   });
 
   test('extracts multi-word action names', () => {
-    assert.strictEqual(parseRecommendedAction('→ **code review**'), 'code review');
+    assert.strictEqual(parseRecommendedAction('→ **look into**'), 'look into');
   });
 
   test('matches the meta-prompt format with parenthetical examples after the line', () => {

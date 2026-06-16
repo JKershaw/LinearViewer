@@ -24,7 +24,7 @@ import { WORK_ISSUE_LABELS } from '../../lib/workflow-config.js';
 // All prompt/label types that should have completion signals defined.
 const ALL_SIGNAL_TYPES = [
   'blocked', 'bug',
-  'plan', 'code-review', 'look-into', 'triage', 'breakdown',
+  'plan', 'look-into', 'triage', 'breakdown',
   'research', 'scoping', 'design', 'spike', 'context', 'implementation', 'review', 'retro'
 ];
 
@@ -40,14 +40,14 @@ describe('COMPLETION_SIGNALS', () => {
 
   const expectedPromptTypes = [
     ...expectedLabelTypes,
-    'plan', 'code-review',
+    'plan',
     'look-into', 'triage', 'breakdown', 'research', 'scoping',
     'design', 'spike', 'context', 'implementation', 'review', 'retro'
   ];
 
-  test('has all 15 expected prompt types', () => {
+  test('has all 14 expected prompt types', () => {
     const keys = Object.keys(COMPLETION_SIGNALS);
-    assert.strictEqual(keys.length, 15, 'Should have exactly 15 prompt types');
+    assert.strictEqual(keys.length, 14, 'Should have exactly 14 prompt types');
     for (const type of expectedPromptTypes) {
       assert.ok(type in COMPLETION_SIGNALS, `Should have ${type} signal`);
     }
@@ -125,10 +125,10 @@ describe('Signal Content', () => {
 // =============================================================================
 
 describe('getDefinedSignalTypes', () => {
-  test('returns all 15 signal types', () => {
+  test('returns all 14 signal types', () => {
     const defined = getDefinedSignalTypes();
     assert.ok(Array.isArray(defined));
-    assert.strictEqual(defined.length, 15);
+    assert.strictEqual(defined.length, 14);
   });
 
   test('returns all expected types', () => {

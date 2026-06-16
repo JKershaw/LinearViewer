@@ -33,7 +33,6 @@ describe('WORK_ISSUE_LABELS', () => {
 describe('VIRTUAL_PROMPTS', () => {
   test('has expected virtual prompts', () => {
     assert.strictEqual(VIRTUAL_PROMPTS.PLAN, 'plan');
-    assert.strictEqual(VIRTUAL_PROMPTS.CODE_REVIEW, 'code-review');
     assert.strictEqual(VIRTUAL_PROMPTS.LOOK_INTO, 'look-into');
     assert.strictEqual(VIRTUAL_PROMPTS.TRIAGE, 'triage');
   });

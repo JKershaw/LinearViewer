@@ -400,13 +400,13 @@ test.describe('Prompt API', () => {
     expect(body.prompt).toContain('## Goal');
   });
 
-  test('returns code-review prompt', async ({ page }) => {
-    const response = await page.request.get(`${API_PREFIX}/api/prompt/${CODE_REVIEW_ISSUE_ID}/code-review`);
+  test('returns review prompt (code-review consolidated into review — LIN-523)', async ({ page }) => {
+    const response = await page.request.get(`${API_PREFIX}/api/prompt/${CODE_REVIEW_ISSUE_ID}/review`);
     expect(response.status()).toBe(200);
 
     const body = await response.json();
-    expect(body.label).toBe('code-review');
-    expect(body.promptName).toBe('code review');
+    expect(body.label).toBe('review');
+    expect(body.promptName).toBe('review');
     expect(body.prompt).toContain('# Review TEST-');
     expect(body.prompt).toContain('## Goal');
   });
@@ -494,8 +494,9 @@ test.describe('Multiple Promptable Labels UI', () => {
     await expect(promptContainer.locator('.prompt-text')).toContainText('Goal');
   });
 
-  test('renders code-review as clickable link in in-progress section', async ({ page }) => {
-    // Code-review issue is in "In Review" state (started), so it appears in In Progress section
+  test('renders review as clickable link in in-progress section', async ({ page }) => {
+    // Issue is in "In Review" state (started), so it appears in In Progress section.
+    // review is the universal quality gate (code-review was consolidated into it — LIN-523).
     const taskLine = page.locator('.in-progress-items .line:has-text("Refactor authentication module")');
     await expect(taskLine).toBeVisible();
     await taskLine.click();
@@ -503,24 +504,24 @@ test.describe('Multiple Promptable Labels UI', () => {
     // Expand Prompts section
     await expandPromptsSection(page, '.in-progress-items', CODE_REVIEW_ISSUE_ID);
 
-    // Reveal hidden prompts (code-review is behind "more")
+    // Reveal hidden prompts (review is behind "more")
     await clickMoreToggle(page, '.in-progress-items', CODE_REVIEW_ISSUE_ID);
 
-    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="code-review"][data-issue-id="${CODE_REVIEW_ISSUE_ID}"]`);
+    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="review"][data-issue-id="${CODE_REVIEW_ISSUE_ID}"]`);
     await expect(labelLink).toBeVisible();
   });
 
-  test('clicking code-review shows correct prompt', async ({ page }) => {
+  test('clicking review shows correct prompt', async ({ page }) => {
     const taskLine = page.locator('.in-progress-items .line:has-text("Refactor authentication module")');
     await taskLine.click();
 
     // Expand Prompts section
     await expandPromptsSection(page, '.in-progress-items', CODE_REVIEW_ISSUE_ID);
 
-    // Reveal hidden prompts (code-review is behind "more")
+    // Reveal hidden prompts (review is behind "more")
     await clickMoreToggle(page, '.in-progress-items', CODE_REVIEW_ISSUE_ID);
 
-    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="code-review"][data-issue-id="${CODE_REVIEW_ISSUE_ID}"]`);
+    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="review"][data-issue-id="${CODE_REVIEW_ISSUE_ID}"]`);
     await labelLink.click();
 
     // Use more specific locator since issue appears in both In Progress and Project sections
@@ -528,7 +529,7 @@ test.describe('Multiple Promptable Labels UI', () => {
     await expect(promptContainer).toBeVisible();
     await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
 
-    await expect(promptContainer.locator('.prompt-name')).toContainText('code review');
+    await expect(promptContainer.locator('.prompt-name')).toContainText('review');
     await expect(promptContainer.locator('.prompt-text')).toContainText('Goal');
   });
 });

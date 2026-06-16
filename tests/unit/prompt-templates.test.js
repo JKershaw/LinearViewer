@@ -7,7 +7,7 @@
  * - blocked: Work stuck on external dependency
  * - bug: Investigating unexpected behavior
  *
- * Plus virtual prompts: plan, code-review, look-into, triage
+ * Plus virtual prompts: plan, look-into, triage
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
@@ -30,7 +30,6 @@ describe('hasPrompt', () => {
 
   test('returns true for virtual prompts', () => {
     assert.strictEqual(hasPrompt('plan'), true);
-    assert.strictEqual(hasPrompt('code-review'), true);
     assert.strictEqual(hasPrompt('look-into'), true);
     assert.strictEqual(hasPrompt('triage'), true);
     assert.strictEqual(hasPrompt('breakdown'), true);
@@ -47,6 +46,10 @@ describe('hasPrompt', () => {
     assert.strictEqual(hasPrompt('feature'), false);
     assert.strictEqual(hasPrompt('urgent'), false);
     assert.strictEqual(hasPrompt('documentation'), false);
+  });
+
+  test('returns false for code-review (consolidated into review — LIN-523)', () => {
+    assert.strictEqual(hasPrompt('code-review'), false);
   });
 
   test('returns false for old in-X phase labels (removed format)', () => {
@@ -85,7 +88,6 @@ describe('getPromptLabels', () => {
   test('includes virtual prompts', () => {
     const labels = getPromptLabels();
     assert.ok(labels.includes('plan'));
-    assert.ok(labels.includes('code-review'));
     assert.ok(labels.includes('look-into'));
     assert.ok(labels.includes('triage'));
     assert.ok(labels.includes('breakdown'));
@@ -99,9 +101,9 @@ describe('getPromptLabels', () => {
     assert.ok(labels.includes('retro'));
   });
 
-  test('has exactly 15 templates', () => {
+  test('has exactly 14 templates', () => {
     const labels = getPromptLabels();
-    assert.strictEqual(labels.length, 15);
+    assert.strictEqual(labels.length, 14);
   });
 });
 
@@ -114,7 +116,7 @@ describe('defer recommend-meta action', () => {
     // The no-body cost contract is structural: defer has no PROMPT_TEMPLATES entry,
     // so it cannot produce a prompt and cannot inflate the template count.
     assert.ok(!('defer' in PROMPT_TEMPLATES), 'defer must not be a prompt template');
-    assert.strictEqual(getPromptLabels().length, 15, 'defer must not change the template count');
+    assert.strictEqual(getPromptLabels().length, 14, 'defer must not change the template count');
   });
 
   test('defer is registered in RECOMMEND_META_ACTIONS and the dispatch vocabulary', () => {
@@ -265,7 +267,6 @@ describe('PROMPT_TEMPLATES', () => {
       'blocked',
       'bug',
       'plan',
-      'code-review',
       'look-into',
       'triage',
       'breakdown',
@@ -594,18 +595,18 @@ describe('plan template', () => {
 });
 
 // =============================================================================
-// code-review Template Tests
+// code-review consolidation into review (LIN-523)
 // =============================================================================
 
-describe('code-review template', () => {
+describe('code-review consolidated into review (LIN-523)', () => {
   const mockIssue = {
     id: 'issue-review',
     identifier: 'TEST-CR1',
     title: 'Refactor authentication module',
     description: 'Extract auth logic into separate service for better testability',
     url: 'https://linear.app/test/issue/TEST-CR1',
-    state: { name: 'In Review', type: 'started' },
-    labels: ['code-review'],
+    state: { name: 'In Progress', type: 'started' },
+    labels: ['review'],
     assignee: { name: 'Alice' },
     estimate: 3
   };
@@ -618,29 +619,27 @@ describe('code-review template', () => {
     comments: []
   };
 
-  test('returns code review as name', () => {
-    const result = generatePrompt('code-review', mockIssue, mockContext);
-    assert.strictEqual(result.name, 'code review');
+  test('code-review template no longer exists', () => {
+    assert.strictEqual(PROMPT_TEMPLATES['code-review'], undefined);
+    assert.strictEqual(generatePrompt('code-review', mockIssue, mockContext), null);
   });
 
-  test('has READY category', () => {
-    const template = PROMPT_TEMPLATES['code-review'];
-    assert.strictEqual(template.category, PROMPT_CATEGORIES.READY);
-  });
-
-  test('includes goal with review concepts', () => {
-    const result = generatePrompt('code-review', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('## Goal'));
-    assert.ok(result.prompt.includes('correctness'));
-    assert.ok(result.prompt.includes('security'));
+  test('review carries the folded-in verdict and quality checklist items', () => {
+    const result = generatePrompt('review', mockIssue, mockContext);
+    // Explicit verdict (was code-review's distinctive output)
     assert.ok(result.prompt.includes('Approve'));
+    assert.ok(result.prompt.includes('Request Changes'));
+    assert.ok(result.prompt.includes('Needs Discussion'));
+    // code-review's distinctive checklist items now live in review
+    assert.ok(result.prompt.includes('security vulnerabilities'));
+    assert.ok(result.prompt.includes('Code style consistent'));
+    assert.ok(result.prompt.includes('performance regressions'));
   });
 
-  test('includes review checklist', () => {
-    const result = generatePrompt('code-review', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Review checklist'));
-    assert.ok(result.prompt.includes('Tests cover'));
-    assert.ok(result.prompt.includes('security vulnerabilities'));
+  test('review does not instruct merge or Done (close-out split at the merge line)', () => {
+    const result = generatePrompt('review', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('does NOT merge') || result.prompt.includes('not merge'));
+    assert.ok(result.prompt.includes('Do NOT mark this task Done') || result.prompt.includes('Do NOT mark the task Done'));
   });
 });
 
@@ -1161,12 +1160,24 @@ describe('review template', () => {
     assert.ok(completionIdx !== -1 && gateIdx < completionIdx, 'Close-Out Gate comes before Completion');
   });
 
-  test('Close-Out Gate verifies merged/CI state and reconciles related tasks', () => {
+  // LIN-523: review is the PRE-merge gate. It authorizes the close (verdict) but
+  // does not merge, mark Done, or verify/reconcile after a merge — those are the
+  // merger's (Autopilot/human). It confirms CI green on the PR and issues a verdict.
+  test('Close-Out Gate authorizes the merge but does not perform/verify it', () => {
     const result = generatePrompt('review', mockIssue, mockContext);
-    assert.ok(/merged state is the hard close gate/i.test(result.prompt), 'merged state is the hard gate');
-    assert.ok(/only when it is observable/i.test(result.prompt), 'deploy verified only when observable');
-    assert.ok(/not closeable while CI is red/i.test(result.prompt), 'CI red blocks close');
-    assert.ok(/reconcile related linear tasks/i.test(result.prompt), 'related tasks reconciled');
+    assert.ok(/AUTHORIZES the close, not the step that performs it/i.test(result.prompt), 'review authorizes, does not perform');
+    assert.ok(/CI is green on the PR/i.test(result.prompt), 'confirms CI green on the PR');
+    assert.ok(/do NOT mark this task Done/i.test(result.prompt), 'does not mark Done');
+    assert.ok(/belong to whoever merges/i.test(result.prompt) || /belong to the merger/i.test(result.prompt),
+      'merge/Done/reconcile belong to the merger');
+    // The retired merge-verification language must be gone
+    assert.ok(!/merged state is the hard close gate/i.test(result.prompt), 'no longer verifies a merge that has not happened');
+  });
+
+  test('review concludes with an explicit verdict (folded in from code-review)', () => {
+    const result = generatePrompt('review', mockIssue, mockContext);
+    assert.ok(/### Verdict/i.test(result.prompt), 'has a Verdict section');
+    assert.ok(/Approve.*Request Changes.*Needs Discussion/s.test(result.prompt), 'lists the three verdicts');
   });
 
   test('Close-Out Gate cannot-close branch files a `blocks` ticket and routes to it, not another review', () => {
@@ -1176,25 +1187,30 @@ describe('review template', () => {
     assert.ok(/as a `blocks` relation on the current task/i.test(result.prompt), 'files/links the blocker as `blocks`');
     assert.ok(/A `blocks` relation does not make the engine descend/i.test(result.prompt),
       'next action must be named explicitly because `blocks` does not drive descent');
-    assert.ok(/close it only once the blocker is resolved and CI is green/i.test(result.prompt),
+    assert.ok(/closes only once the blocker is resolved and CI is green/i.test(result.prompt),
       'original closes only after blocker resolves and CI green');
     assert.ok(/distinct from a plan-phase prerequisite-refactor subtask/i.test(result.prompt),
       'closure blocker kept distinct from plan refactor-subtask');
   });
 
-  test('review completion signals include merged/reconcile/blocker-routed close-out outcomes', () => {
+  test('review completion signals reflect verdict-based, pre-merge close-out (LIN-523)', () => {
     const reviewSignal = COMPLETION_SIGNALS['review'];
     assert.ok(
-      reviewSignal.signals.some(s => /merged state verified/i.test(s)),
-      'signals include merged-state verification'
+      reviewSignal.signals.some(s => /explicit verdict issued/i.test(s)),
+      'signals include an explicit verdict'
     );
     assert.ok(
-      reviewSignal.signals.some(s => /related linear tasks reconciled/i.test(s)),
-      'signals include related-tasks reconciliation'
+      reviewSignal.signals.some(s => /CI\/CD pipeline green on the PR/i.test(s)),
+      'signals include CI green on the PR'
     );
     assert.ok(
       reviewSignal.signals.some(s => /closure blocker filed\/linked as `blocks`/i.test(s)),
       'signals include the blocker-filed-and-routed close-out outcome'
+    );
+    // The retired post-merge signals must be gone
+    assert.ok(
+      !reviewSignal.signals.some(s => /merged state verified/i.test(s)),
+      'no longer claims to verify a merge'
     );
   });
 });
@@ -1204,14 +1220,16 @@ describe('review template', () => {
 // =============================================================================
 
 describe('getAvailablePrompts', () => {
-  test('returns both plan and code-review for eligible backlog issue', () => {
+  test('returns plan (and never the retired code-review) for eligible backlog issue', () => {
     const issue = {
       state: { type: 'backlog' },
       labels: { nodes: [] }
     };
     const available = getAvailablePrompts(issue);
     assert.ok(available.includes('plan'), 'Should include plan');
-    assert.ok(available.includes('code-review'), 'Should include code-review');
+    assert.ok(!available.includes('code-review'), 'code-review was consolidated into review (LIN-523)');
+    // review is universal, so it is always offered
+    assert.ok(available.includes('review'), 'Should include review (the single quality gate)');
   });
 
   test('returns universal prompts for all issues', () => {
@@ -1224,7 +1242,7 @@ describe('getAvailablePrompts', () => {
     assert.ok(available.includes('triage'), 'Should include triage');
   });
 
-  test('returns plan and code-review for completed issue (state as signal, not gate — LIN-353)', () => {
+  test('returns plan and review for completed issue (state as signal, not gate — LIN-353)', () => {
     const issue = {
       state: { type: 'completed' },
       labels: { nodes: [] }
@@ -1232,26 +1250,26 @@ describe('getAvailablePrompts', () => {
     const available = getAvailablePrompts(issue);
     // Terminal state no longer hard-excludes review/plan; it shapes the recommendation
     // (formatTerminalStateNote / meta-prompt Step 0) rather than removing the option.
-    assert.ok(available.includes('code-review'), 'Should include code-review on a Done ticket');
+    assert.ok(available.includes('review'), 'Should include review on a Done ticket');
     assert.ok(available.includes('plan'), 'Should include plan on a Done ticket');
+    assert.ok(!available.includes('code-review'), 'code-review retired (LIN-523)');
   });
 
-  test('returns plan and code-review for canceled and duplicate issues (all terminal states — LIN-353)', () => {
+  test('returns plan and review for canceled and duplicate issues (all terminal states — LIN-353)', () => {
     for (const type of ['canceled', 'duplicate']) {
       const available = getAvailablePrompts({ state: { type }, labels: { nodes: [] } });
-      assert.ok(available.includes('code-review'), `Should include code-review for ${type}`);
+      assert.ok(available.includes('review'), `Should include review for ${type}`);
       assert.ok(available.includes('plan'), `Should include plan for ${type}`);
     }
   });
 
-  test('returns plan and code-review regardless of labels (no preparing gating)', () => {
+  test('returns plan regardless of labels (no preparing gating)', () => {
     const issue = {
       state: { type: 'backlog' },
       labels: { nodes: [{ name: 'preparing' }] }
     };
     const available = getAvailablePrompts(issue);
     assert.ok(available.includes('plan'), 'Should include plan regardless of labels');
-    assert.ok(available.includes('code-review'), 'Should include code-review regardless of labels');
   });
 
   test('returns label-based prompts alongside state-based prompts', () => {
@@ -1262,7 +1280,7 @@ describe('getAvailablePrompts', () => {
     const available = getAvailablePrompts(issue);
     assert.ok(available.includes('bug'), 'Should include bug label prompt');
     assert.ok(available.includes('plan'), 'Should include plan');
-    assert.ok(available.includes('code-review'), 'Should include code-review');
+    assert.ok(available.includes('review'), 'Should include review');
   });
 });
 
@@ -1543,16 +1561,20 @@ describe('meta-prompt review close-out gate + cannot-close routing (LIN-474)', (
     completionSignals: 'S', focusedSubtaskId: null
   };
 
-  test('the existing Review-prompts rule is EXTENDED with the close-out gate (no second rule)', () => {
+  test('the existing Review-prompts rule is EXTENDED with the verdict + pre-merge close-out gate (no second rule)', () => {
     const p = buildMetaPromptTemplate({ ...baseArgs, isTerminal: false, hasOpenChildren: true });
     const matches = p.match(/\*\*Review prompts\*\* must:/g) || [];
     assert.strictEqual(matches.length, 1, 'there is exactly one Review-prompts rule (extended, not duplicated)');
-    assert.ok(/include a close-out gate before deciding the outcome/i.test(p), 'the close-out gate is encoded');
-    assert.ok(/the hard close gate/i.test(p), 'merged is the hard close gate');
+    assert.ok(/explicit verdict \(Approve \/ Request Changes \/ Needs Discussion\)/i.test(p), 'the verdict is encoded');
+    assert.ok(/PRE-MERGE close-out gate/i.test(p), 'the pre-merge close-out gate is encoded');
+    assert.ok(/must NOT instruct it to merge, to mark the task Done/i.test(p), 'review does not merge or mark Done');
+    assert.ok(/belong to the merger/i.test(p), 'merge/Done/reconcile belong to the merger');
     assert.ok(/must NOT loop back into another review/i.test(p), 'forbids looping back to review');
     assert.ok(/as `blocks` the current task/i.test(p), 'files/links the blocker as `blocks`');
     assert.ok(/a `blocks` relation alone does not make the engine descend/i.test(p),
       'next action named because `blocks` does not drive descent');
+    // The retired merge-verification language must be gone
+    assert.ok(!/the hard close gate/i.test(p), 'no longer claims to verify a merge that has not happened');
   });
 
   test('Step 0 completion branch carries the cannot-close branch routing to a blocker', () => {

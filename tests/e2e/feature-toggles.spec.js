@@ -393,17 +393,18 @@ test.describe('Feature Toggle Settings', () => {
     expect(data.prompt).toContain('CI/CD Check');
   });
 
-  test('code-review prompt does NOT get code review sections', async ({ page }) => {
+  test('review prompt does NOT get code review sections', async ({ page }) => {
     await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { codeReview: true, codeReviewCicd: true } });
 
     const response = await page.request.get(
-      `/workspace/${TEST_WORKSPACE_URL_KEY}/api/prompt/${TEST_ISSUE_ID}/code-review`
+      `/workspace/${TEST_WORKSPACE_URL_KEY}/api/prompt/${TEST_ISSUE_ID}/review`
     );
     expect(response.ok()).toBeTruthy();
     const data = await response.json();
-    // code-review template IS a review, should not get review instructions appended
-    expect(data.prompt).not.toContain('Self-Review');
-    expect(data.prompt).not.toContain('CI/CD Check');
+    // review IS a review (code-review was consolidated into it — LIN-523); the
+    // implementation-only codeReview flag sections must not be appended to it.
+    expect(data.prompt).not.toContain('## Self-Review');
+    expect(data.prompt).not.toContain('## CI/CD Check');
   });
 
   // =========================================================================
