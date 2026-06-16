@@ -45,8 +45,9 @@ import { workspaceUnavailableEnvelope } from '../lib/errors.js';
  * but `OPENROUTER_FREE_TIER_KEY` is set. `apiKey` is left undefined on the env-key
  * path so getRecommendation/generateRecap/generateBrief fall back to
  * `process.env.OPENROUTER_API_KEY` exactly as before — paid/OAuth/env behavior is
- * unchanged. Model resolution stays on resolveWorkspaceModel; the model clamp is
- * LIN-513, not this task.
+ * unchanged. Model resolution stays on resolveWorkspaceModel; the returned
+ * `isFreeTier` is threaded into resolveWorkspaceModel as `forceDefault` at each
+ * billed call site so free-tier requests clamp to DEFAULT_MODEL (LIN-513).
  * @param {string|null|undefined} sessionApiKey - Token-creator's OAuth key, if any.
  * @returns {{ apiKey: (string|undefined), isFreeTier: boolean }}
  */
@@ -2731,11 +2732,13 @@ One convention across every endpoint, so you can branch on the same fields every
     const context = await fetchWithTimeout((signal) => fetchRecommendationContext(accessToken, identifier, { signal, noDescend }), CONTEXT_FETCH_TIMEOUT_MS);
     const { issue, parent, siblings, project, children, comments, focusedChild } = context;
 
-    const selectedModel = await resolveWorkspaceModel({ urlKey, workspacePreferencesStore });
     // Resolve the effective key (free-tier when no session/env key) so both
     // recommend surfaces send a valid key. Metering is NOT done here — this runs
     // once per descent hop, so charging here would bill an N-hop descent N units.
-    const { apiKey: resolvedApiKey } = resolveProxyLLM(sessionApiKey);
+    // Resolved BEFORE the model so the free-tier clamp (LIN-513) can force the
+    // default model — a free-tier descent must never bill a workspace-preferred model.
+    const { apiKey: resolvedApiKey, isFreeTier } = resolveProxyLLM(sessionApiKey);
+    const selectedModel = await resolveWorkspaceModel({ urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
     // Cancel the in-flight LLM call when its deadline trips instead of racing and
     // leaving it running orphaned (fetchWithTimeout vs withTimeout, LIN-346 surface 5).
     // getRecommendation now honors options.signal (gap #2). The per-hop deadline guard
@@ -2998,7 +3001,7 @@ One convention across every endpoint, so you can branch on the same fields every
           }
         }
 
-        const selectedModel = await resolveWorkspaceModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore });
+        const selectedModel = await resolveWorkspaceModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore, forceDefault: isFreeTier });
         let recap;
         let modelUsed;
         if (isTestMode) {
@@ -3113,7 +3116,7 @@ One convention across every endpoint, so you can branch on the same fields every
         const canonicalId = context.issue?.id || identifier;
         const inputHash = hashContext(context);
 
-        const selectedModel = await resolveWorkspaceModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore });
+        const selectedModel = await resolveWorkspaceModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore, forceDefault: isFreeTier });
         let recap;
         let modelUsed;
         if (isTestMode) {
@@ -3265,7 +3268,7 @@ One convention across every endpoint, so you can branch on the same fields every
           }
         }
 
-        const selectedModel = await resolveWorkspaceModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore });
+        const selectedModel = await resolveWorkspaceModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore, forceDefault: isFreeTier });
         let brief;
         let modelUsed;
         if (isTestMode) {
@@ -3379,7 +3382,7 @@ One convention across every endpoint, so you can branch on the same fields every
         const canonicalId = context.issue?.id || identifier;
         const inputHash = hashContext(context);
 
-        const selectedModel = await resolveWorkspaceModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore });
+        const selectedModel = await resolveWorkspaceModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore, forceDefault: isFreeTier });
         let brief;
         let modelUsed;
         if (isTestMode) {
