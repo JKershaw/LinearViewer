@@ -102,10 +102,10 @@ function makeLoop(overrides = {}) {
     feedback: [],
     source: 'live',
     historyStatus: null,
-    foremanAction: null,
-    foremanStatus: null,
-    foremanSummary: null,
-    foremanTimestamp: null,
+    agentAction: null,
+    agentStatus: null,
+    agentSummary: null,
+    agentTimestamp: null,
     agentState: 'running',
     stage: 'implementation',
     ...overrides
@@ -123,7 +123,7 @@ function makeDeps({ projects = [], issues = [], loops = [], now = NOW_MS } = {})
       async listItems() { return []; },
       async listHistory() { return { items: [], total: 0 }; }
     },
-    foremanStore: {
+    agentStatusStore: {
       async listStatus() { return { items: [], total: 0 }; }
     },
     fetchProjects: async () => ({ projects, issues }),
@@ -782,12 +782,12 @@ describe('buildPipelineSnapshot — validation', () => {
     );
   });
 
-  test('missing dispatchStore/foremanStore → throws', async () => {
+  test('missing dispatchStore/agentStatusStore → throws', async () => {
     const deps = makeDeps({});
     delete deps.dispatchStore;
     await assert.rejects(
       () => buildPipelineSnapshot('ws', deps),
-      /dispatchStore and foremanStore must be injected/
+      /dispatchStore and agentStatusStore must be injected/
     );
   });
 });

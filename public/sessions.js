@@ -82,8 +82,8 @@
   function renderSession(s) {
     const si = stateIndicator(s.agentState);
     const time = relativeTime(s.dispatchedAt);
-    const summaryHtml = s.foremanSummary
-      ? `<div class="session-summary">${esc(s.foremanSummary)}</div>`
+    const summaryHtml = s.agentSummary
+      ? `<div class="session-summary">${esc(s.agentSummary)}</div>`
       : '';
     return `
       <div class="session-entry" data-agent-state="${esc(s.agentState || '')}">

@@ -77,7 +77,7 @@ function safeHealth(color) {
 }
 
 function progressSegClass(loop) {
-  const fs = loop.foremanStatus;
+  const fs = loop.agentStatus;
   if (fs === 'completed') return 'seg-complete';
   if (fs === 'failed') return 'seg-error';
   if (fs === 'blocked') return 'seg-waiting';
@@ -435,8 +435,8 @@ function renderLoopEntry(loop, isLatest) {
   }
 
   let summaryHtml = '';
-  if (loop.foremanSummary) {
-    summaryHtml = `<div class="loop-summary">${escapeHtml(loop.foremanSummary)}</div>`;
+  if (loop.agentSummary) {
+    summaryHtml = `<div class="loop-summary">${escapeHtml(loop.agentSummary)}</div>`;
   }
 
   return `

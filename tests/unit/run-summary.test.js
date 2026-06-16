@@ -25,7 +25,7 @@ const LOOP = {
   promptName: 'implementation',
   stage: 'implement',
   agentState: 'complete',
-  foremanSummary: 'Implemented the fix and added a test.',
+  agentSummary: 'Implemented the fix and added a test.',
   feedback: [{ message: 'opened PR #7' }, 'done'],
   promptText: 'Please implement the fix.'
 };

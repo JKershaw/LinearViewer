@@ -5,7 +5,7 @@
  *
  * Coverage:
  *   - Pure derivation helpers (_deriveAgentState, _deriveStage)
- *   - Join logic (_matchForemanToLoop)
+ *   - Join logic (_matchAgentStatusToLoop)
  *   - End-to-end _buildLoops fixture scenarios
  *   - Public API (getLoopsForIssue, getLoopsForWorkspace) with mock stores
  *   - Defensive checks (30d post-filter, malformed rows, listStatus call shape)
@@ -18,7 +18,7 @@ import {
   __internal
 } from '../../lib/pipeline-loops.js';
 
-const { _toDate, _deriveAgentState, _deriveStage, _matchForemanToLoop, _buildLoops, LOOKBACK_MS } = __internal;
+const { _toDate, _deriveAgentState, _deriveStage, _matchAgentStatusToLoop, _buildLoops, LOOKBACK_MS } = __internal;
 
 // ─── Test fixture helpers ────────────────────────────────────────────────────
 
@@ -67,7 +67,7 @@ function historyItem(overrides = {}) {
   };
 }
 
-function foremanEntry(overrides = {}) {
+function agentStatusEntry(overrides = {}) {
   return {
     id: 'fmn-1',
     taskIdentifier: ISSUE_A,
@@ -110,12 +110,12 @@ describe('_toDate', () => {
 // ─── _deriveAgentState ───────────────────────────────────────────────────────
 
 describe('_deriveAgentState', () => {
-  test('live source → queued (foreman irrelevant)', () => {
+  test('live source → queued (agentStatus irrelevant)', () => {
     assert.strictEqual(_deriveAgentState('live', null, null), 'queued');
     assert.strictEqual(_deriveAgentState('live', null, 'completed'), 'queued');
   });
 
-  test('history + expired → error (foreman irrelevant)', () => {
+  test('history + expired → error (agentStatus irrelevant)', () => {
     assert.strictEqual(_deriveAgentState('history', 'expired', null), 'error');
     assert.strictEqual(_deriveAgentState('history', 'expired', 'completed'), 'error');
   });
@@ -125,23 +125,23 @@ describe('_deriveAgentState', () => {
     assert.strictEqual(_deriveAgentState('history', 'cancelled', 'failed'), 'complete');
   });
 
-  test('history + taken + no foreman match → running', () => {
+  test('history + taken + no agentStatus match → running', () => {
     assert.strictEqual(_deriveAgentState('history', 'taken', null), 'running');
   });
 
-  test('history + taken + foreman completed → complete', () => {
+  test('history + taken + agentStatus completed → complete', () => {
     assert.strictEqual(_deriveAgentState('history', 'taken', 'completed'), 'complete');
   });
 
-  test('history + taken + foreman failed → error', () => {
+  test('history + taken + agentStatus failed → error', () => {
     assert.strictEqual(_deriveAgentState('history', 'taken', 'failed'), 'error');
   });
 
-  test('history + taken + foreman blocked → waiting', () => {
+  test('history + taken + agentStatus blocked → waiting', () => {
     assert.strictEqual(_deriveAgentState('history', 'taken', 'blocked'), 'waiting');
   });
 
-  test('history + taken + unknown free-form foreman status → running (fall-through)', () => {
+  test('history + taken + unknown free-form agentStatus status → running (fall-through)', () => {
     assert.strictEqual(_deriveAgentState('history', 'taken', 'in-progress'), 'running');
     assert.strictEqual(_deriveAgentState('history', 'taken', 'whatever'), 'running');
     assert.strictEqual(_deriveAgentState('history', 'taken', ''), 'running');
@@ -151,11 +151,11 @@ describe('_deriveAgentState', () => {
 // ─── _deriveStage ────────────────────────────────────────────────────────────
 
 describe('_deriveStage', () => {
-  test('foremanAction wins when both present', () => {
+  test('agentAction wins when both present', () => {
     assert.strictEqual(_deriveStage('review', 'plan'), 'review');
   });
 
-  test('promptName fallback when foremanAction is null', () => {
+  test('promptName fallback when agentAction is null', () => {
     assert.strictEqual(_deriveStage(null, 'plan'), 'plan');
   });
 
@@ -163,14 +163,14 @@ describe('_deriveStage', () => {
     assert.strictEqual(_deriveStage(null, null), 'unknown');
   });
 
-  test('empty-string foremanAction falls through to promptName', () => {
+  test('empty-string agentAction falls through to promptName', () => {
     assert.strictEqual(_deriveStage('', 'plan'), 'plan');
   });
 });
 
-// ─── _matchForemanToLoop ─────────────────────────────────────────────────────
+// ─── _matchAgentStatusToLoop ─────────────────────────────────────────────────────
 
-describe('_matchForemanToLoop', () => {
+describe('_matchAgentStatusToLoop', () => {
   function loop(overrides = {}) {
     return {
       loopId: 'hist-1',
@@ -181,72 +181,72 @@ describe('_matchForemanToLoop', () => {
     };
   }
 
-  test('returns null when foreman list is empty', () => {
-    assert.strictEqual(_matchForemanToLoop(loop(), [], NOW), null);
+  test('returns null when agentStatus list is empty', () => {
+    assert.strictEqual(_matchAgentStatusToLoop(loop(), [], NOW), null);
   });
 
-  test('returns null when foreman list is null', () => {
-    assert.strictEqual(_matchForemanToLoop(loop(), null, NOW), null);
+  test('returns null when agentStatus list is null', () => {
+    assert.strictEqual(_matchAgentStatusToLoop(loop(), null, NOW), null);
   });
 
   test('single in-window entry is picked', () => {
-    const f = foremanEntry({ timestamp: '2026-04-10T10:30:00.000Z' });
-    assert.strictEqual(_matchForemanToLoop(loop(), [f], NOW), f);
+    const f = agentStatusEntry({ timestamp: '2026-04-10T10:30:00.000Z' });
+    assert.strictEqual(_matchAgentStatusToLoop(loop(), [f], NOW), f);
   });
 
   test('multiple in-window entries → latest by timestamp wins', () => {
-    const earlier = foremanEntry({ id: 'f1', timestamp: '2026-04-10T10:10:00.000Z', status: 'blocked' });
-    const later   = foremanEntry({ id: 'f2', timestamp: '2026-04-10T10:50:00.000Z', status: 'completed' });
-    const result = _matchForemanToLoop(loop(), [earlier, later], NOW);
+    const earlier = agentStatusEntry({ id: 'f1', timestamp: '2026-04-10T10:10:00.000Z', status: 'blocked' });
+    const later   = agentStatusEntry({ id: 'f2', timestamp: '2026-04-10T10:50:00.000Z', status: 'completed' });
+    const result = _matchAgentStatusToLoop(loop(), [earlier, later], NOW);
     assert.strictEqual(result.id, 'f2');
   });
 
   test('entry before dispatchedAt is rejected', () => {
-    const f = foremanEntry({ timestamp: '2026-04-10T09:59:59.000Z' });
-    assert.strictEqual(_matchForemanToLoop(loop(), [f], NOW), null);
+    const f = agentStatusEntry({ timestamp: '2026-04-10T09:59:59.000Z' });
+    assert.strictEqual(_matchAgentStatusToLoop(loop(), [f], NOW), null);
   });
 
   test('entry after upper bound is rejected', () => {
-    const f = foremanEntry({ timestamp: '2026-04-10T11:00:01.000Z' });
-    assert.strictEqual(_matchForemanToLoop(loop(), [f], NOW), null);
+    const f = agentStatusEntry({ timestamp: '2026-04-10T11:00:01.000Z' });
+    assert.strictEqual(_matchAgentStatusToLoop(loop(), [f], NOW), null);
   });
 
   test('window bounds are inclusive on both ends', () => {
-    const fLower = foremanEntry({ id: 'f-lower', timestamp: '2026-04-10T10:00:00.000Z' });
-    const fUpper = foremanEntry({ id: 'f-upper', timestamp: '2026-04-10T11:00:00.000Z' });
-    assert.strictEqual(_matchForemanToLoop(loop(), [fLower], NOW).id, 'f-lower');
-    assert.strictEqual(_matchForemanToLoop(loop(), [fUpper], NOW).id, 'f-upper');
+    const fLower = agentStatusEntry({ id: 'f-lower', timestamp: '2026-04-10T10:00:00.000Z' });
+    const fUpper = agentStatusEntry({ id: 'f-upper', timestamp: '2026-04-10T11:00:00.000Z' });
+    assert.strictEqual(_matchAgentStatusToLoop(loop(), [fLower], NOW).id, 'f-lower');
+    assert.strictEqual(_matchAgentStatusToLoop(loop(), [fUpper], NOW).id, 'f-upper');
   });
 
   test('exact dispatchId match overrides window matching', () => {
     // The "matching" entry is OUTSIDE the timestamp window — would normally be
     // rejected. The exact-match branch must accept it anyway.
-    const exact = foremanEntry({
+    const exact = agentStatusEntry({
       id: 'f-exact',
       dispatchId: 'hist-1',
       timestamp: '2026-04-10T13:00:00.000Z' // outside window
     });
-    const result = _matchForemanToLoop(loop(), [exact], NOW);
+    const result = _matchAgentStatusToLoop(loop(), [exact], NOW);
     assert.strictEqual(result.id, 'f-exact');
   });
 
   test('exact dispatchId match — multiple → latest by timestamp', () => {
-    const earlier = foremanEntry({
+    const earlier = agentStatusEntry({
       id: 'f-exact-1', dispatchId: 'hist-1', timestamp: '2026-04-10T10:10:00.000Z'
     });
-    const later = foremanEntry({
+    const later = agentStatusEntry({
       id: 'f-exact-2', dispatchId: 'hist-1', timestamp: '2026-04-10T10:55:00.000Z'
     });
-    const result = _matchForemanToLoop(loop(), [earlier, later], NOW);
+    const result = _matchAgentStatusToLoop(loop(), [earlier, later], NOW);
     assert.strictEqual(result.id, 'f-exact-2');
   });
 
-  test('foreman entry with mismatched dispatchId falls through to window match', () => {
-    const wrongExact = foremanEntry({
+  test('agentStatus entry with mismatched dispatchId falls through to window match', () => {
+    const wrongExact = agentStatusEntry({
       id: 'f-wrong', dispatchId: 'some-other-id', timestamp: '2026-04-10T10:30:00.000Z'
     });
     // No exact match for our loopId, but it IS in window → window-match path picks it.
-    const result = _matchForemanToLoop(loop(), [wrongExact], NOW);
+    const result = _matchAgentStatusToLoop(loop(), [wrongExact], NOW);
     assert.strictEqual(result.id, 'f-wrong');
   });
 });
@@ -258,7 +258,7 @@ describe('_buildLoops', () => {
     assert.deepStrictEqual(_buildLoops({ now: NOW }), []);
   });
 
-  test('single live loop, no history, no foreman', () => {
+  test('single live loop, no history, no agentStatus', () => {
     const loops = _buildLoops({
       liveItems: [liveItem({ id: 'live-a', dispatchedAt: '2026-04-11T11:00:00.000Z' })],
       now: NOW
@@ -266,7 +266,7 @@ describe('_buildLoops', () => {
     assert.strictEqual(loops.length, 1);
     assert.strictEqual(loops[0].iteration, 1);
     assert.strictEqual(loops[0].agentState, 'queued');
-    assert.strictEqual(loops[0].foremanAction, null);
+    assert.strictEqual(loops[0].agentAction, null);
     assert.strictEqual(loops[0].stage, 'plan'); // promptName fallback
     assert.strictEqual(loops[0].source, 'live');
     assert.strictEqual(loops[0].resolvedAt, null);
@@ -295,28 +295,28 @@ describe('_buildLoops', () => {
     assert.strictEqual(loops[1].agentState, 'queued');
   });
 
-  test('history loop + completed foreman → agentState=complete, stage=foremanAction', () => {
+  test('history loop + completed agentStatus → agentState=complete, stage=agentAction', () => {
     const hist = historyItem({ id: 'h-1', promptName: 'plan' });
-    const fmn = foremanEntry({ action: 'review', status: 'completed' });
-    const loops = _buildLoops({ historyItems: [hist], foremanEntries: [fmn], now: NOW });
+    const fmn = agentStatusEntry({ action: 'review', status: 'completed' });
+    const loops = _buildLoops({ historyItems: [hist], agentStatusEntries: [fmn], now: NOW });
     assert.strictEqual(loops[0].agentState, 'complete');
     assert.strictEqual(loops[0].stage, 'review');
-    assert.strictEqual(loops[0].foremanAction, 'review');
-    assert.strictEqual(loops[0].foremanStatus, 'completed');
-    assert.strictEqual(loops[0].foremanSummary, 'Done.');
+    assert.strictEqual(loops[0].agentAction, 'review');
+    assert.strictEqual(loops[0].agentStatus, 'completed');
+    assert.strictEqual(loops[0].agentSummary, 'Done.');
   });
 
-  test('history loop with status:expired → agentState=error regardless of foreman', () => {
+  test('history loop with status:expired → agentState=error regardless of agentStatus', () => {
     const hist = historyItem({ status: 'expired' });
-    const fmn = foremanEntry({ status: 'completed' });
-    const loops = _buildLoops({ historyItems: [hist], foremanEntries: [fmn], now: NOW });
+    const fmn = agentStatusEntry({ status: 'completed' });
+    const loops = _buildLoops({ historyItems: [hist], agentStatusEntries: [fmn], now: NOW });
     assert.strictEqual(loops[0].agentState, 'error');
   });
 
-  test('history loop with status:cancelled → agentState=complete regardless of foreman', () => {
+  test('history loop with status:cancelled → agentState=complete regardless of agentStatus', () => {
     const hist = historyItem({ status: 'cancelled' });
-    const fmn = foremanEntry({ status: 'failed' });
-    const loops = _buildLoops({ historyItems: [hist], foremanEntries: [fmn], now: NOW });
+    const fmn = agentStatusEntry({ status: 'failed' });
+    const loops = _buildLoops({ historyItems: [hist], agentStatusEntries: [fmn], now: NOW });
     assert.strictEqual(loops[0].agentState, 'complete');
   });
 
@@ -375,18 +375,18 @@ describe('_buildLoops', () => {
     assert.strictEqual(r1[1].iteration, 2);
   });
 
-  test('live loop followed by another live loop on same issue → foreman after the next dispatch leaks to the next loop, not this one', () => {
+  test('live loop followed by another live loop on same issue → agentStatus after the next dispatch leaks to the next loop, not this one', () => {
     const live1 = liveItem({ id: 'l1', dispatchedAt: '2026-04-11T10:00:00.000Z' });
     const live2 = liveItem({ id: 'l2', dispatchedAt: '2026-04-11T11:00:00.000Z' });
-    // Foreman entry recorded between l1 and l2 — must decorate l1.
-    const between = foremanEntry({
+    // Agent entry recorded between l1 and l2 — must decorate l1.
+    const between = agentStatusEntry({
       id: 'f-between',
       action: 'plan',
       status: 'completed',
       timestamp: '2026-04-11T10:30:00.000Z'
     });
-    // Foreman entry recorded after l2 dispatch — must decorate l2.
-    const after = foremanEntry({
+    // Agent entry recorded after l2 dispatch — must decorate l2.
+    const after = agentStatusEntry({
       id: 'f-after',
       action: 'implementation',
       status: 'completed',
@@ -394,26 +394,26 @@ describe('_buildLoops', () => {
     });
     const loops = _buildLoops({
       liveItems: [live1, live2],
-      foremanEntries: [between, after],
+      agentStatusEntries: [between, after],
       now: NOW
     });
     const byId = Object.fromEntries(loops.map(l => [l.loopId, l]));
-    assert.strictEqual(byId.l1.foremanAction, 'plan');
-    assert.strictEqual(byId.l2.foremanAction, 'implementation');
+    assert.strictEqual(byId.l1.agentAction, 'plan');
+    assert.strictEqual(byId.l2.agentAction, 'implementation');
   });
 
   test('exact dispatchId match takes precedence over timestamp window', () => {
     const hist = historyItem({ id: 'h-target' });
-    // Foreman entry timestamped OUTSIDE the loop window but with matching dispatchId.
-    const exact = foremanEntry({
+    // Agent entry timestamped OUTSIDE the loop window but with matching dispatchId.
+    const exact = agentStatusEntry({
       id: 'f-exact',
       dispatchId: 'h-target',
       action: 'review',
       status: 'completed',
       timestamp: '2026-04-10T13:00:00.000Z' // way after resolvedAt 10:30
     });
-    const loops = _buildLoops({ historyItems: [hist], foremanEntries: [exact], now: NOW });
-    assert.strictEqual(loops[0].foremanAction, 'review');
+    const loops = _buildLoops({ historyItems: [hist], agentStatusEntries: [exact], now: NOW });
+    assert.strictEqual(loops[0].agentAction, 'review');
     assert.strictEqual(loops[0].agentState, 'complete');
   });
 
@@ -439,7 +439,7 @@ describe('_buildLoops', () => {
 
 // ─── Public API with mock stores ─────────────────────────────────────────────
 
-function makeMockStores({ live = [], history = [], foreman = [], capture = {} } = {}) {
+function makeMockStores({ live = [], history = [], agentStatus = [], capture = {} } = {}) {
   return {
     dispatchStore: {
       async listItems(urlKey) {
@@ -452,11 +452,11 @@ function makeMockStores({ live = [], history = [], foreman = [], capture = {} } 
         return { items: history, total: history.length };
       }
     },
-    foremanStore: {
+    agentStatusStore: {
       async listStatus(urlKey, options) {
         capture.listStatusUrlKey = urlKey;
         capture.listStatusOptions = options;
-        return { items: foreman, total: foreman.length };
+        return { items: agentStatus, total: agentStatus.length };
       }
     }
   };
@@ -472,7 +472,7 @@ describe('getLoopsForIssue', () => {
   test('throws when stores not injected', async () => {
     await assert.rejects(
       () => getLoopsForIssue('ws', 'LIN-1'),
-      /dispatchStore and foremanStore must be injected/
+      /dispatchStore and agentStatusStore must be injected/
     );
   });
 
@@ -485,9 +485,9 @@ describe('getLoopsForIssue', () => {
         historyItem({ id: 'h-a', issueIdentifier: ISSUE_A, dispatchedAt: recentDispatched, resolvedAt: recentResolved }),
         historyItem({ id: 'h-b', issueIdentifier: ISSUE_B, dispatchedAt: recentDispatched, resolvedAt: recentResolved })
       ],
-      foreman: [
-        foremanEntry({ id: 'f-a', taskIdentifier: ISSUE_A, timestamp: recentResolved }),
-        foremanEntry({ id: 'f-b', taskIdentifier: ISSUE_B, timestamp: recentResolved })
+      agentStatus: [
+        agentStatusEntry({ id: 'f-a', taskIdentifier: ISSUE_A, timestamp: recentResolved }),
+        agentStatusEntry({ id: 'f-b', taskIdentifier: ISSUE_B, timestamp: recentResolved })
       ]
     });
     const loops = await getLoopsForIssue('ws', ISSUE_A, stores);
@@ -513,7 +513,7 @@ describe('getLoopsForWorkspace', () => {
   test('throws when stores not injected', async () => {
     await assert.rejects(
       () => getLoopsForWorkspace('ws'),
-      /dispatchStore and foremanStore must be injected/
+      /dispatchStore and agentStatusStore must be injected/
     );
   });
 
@@ -533,7 +533,7 @@ describe('getLoopsForWorkspace', () => {
     assert.deepStrictEqual(ids, [ISSUE_A, ISSUE_B]);
   });
 
-  test('calls foremanStore.listStatus WITHOUT a limit option (regression guard for the pre-fixed truncation footgun)', async () => {
+  test('calls agentStatusStore.listStatus WITHOUT a limit option (regression guard for the pre-fixed truncation footgun)', async () => {
     const capture = {};
     const stores = makeMockStores({ capture });
     await getLoopsForWorkspace('ws', stores);
@@ -558,7 +558,7 @@ describe('getLoopsForWorkspace', () => {
         async listItems() { return [liveItem()]; },
         async listHistory() { throw new Error('boom'); }
       },
-      foremanStore: { async listStatus() { return { items: [], total: 0 }; } }
+      agentStatusStore: { async listStatus() { return { items: [], total: 0 }; } }
     };
     await assert.rejects(() => getLoopsForWorkspace('ws', stores), /boom/);
   });
@@ -569,7 +569,7 @@ describe('getLoopsForWorkspace', () => {
         async listItems() { return []; },
         async listHistory() { return { items: [], total: 0 }; }
       },
-      foremanStore: {
+      agentStatusStore: {
         async listStatus() { return { items: [], total: 0 }; }
       }
     };

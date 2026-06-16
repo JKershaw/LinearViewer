@@ -58,7 +58,7 @@ function relativeTime(value) {
 }
 
 function activityValue(run) {
-  return run.completedAt || run.foremanTimestamp || run.resolvedAt || run.dispatchedAt || '';
+  return run.completedAt || run.agentTimestamp || run.resolvedAt || run.dispatchedAt || '';
 }
 function activityMs(run) {
   const ms = new Date(activityValue(run)).getTime();
@@ -394,7 +394,7 @@ function renderEventRow(run) {
         <span class="dashboard-event-time">${escapeHtml(relativeTime(activityValue(run)))}</span>
       </button>
       <div class="dashboard-event-body" ${open ? '' : 'hidden'}>
-        ${run.foremanSummary ? `<div class="dashboard-block"><h4>Agent summary</h4><p>${escapeHtml(String(run.foremanSummary))}</p></div>` : ''}
+        ${run.agentSummary ? `<div class="dashboard-block"><h4>Agent summary</h4><p>${escapeHtml(String(run.agentSummary))}</p></div>` : ''}
         <div class="dashboard-block"><h4>Feedback</h4>${fbHtml}</div>
         ${run.issueUrl ? `<a class="dashboard-event-link" href="${escapeHtml(run.issueUrl)}" target="_blank" rel="noopener">open in Linear ↗</a>` : ''}
       </div>

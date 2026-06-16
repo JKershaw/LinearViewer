@@ -60,7 +60,7 @@
  *     dispatch Queue).
  *   - server.js:1331 (dispatch page) is pinned by dispatch.spec's Custom Prompt
  *     Dispatch case.
- *   - routes/proxy.js stays for the Linear API proxy + foreman contract (provider
+ *   - routes/proxy.js stays for the Linear API proxy + agent-status contract (provider
  *     re-point tracked under LIN-306).
  * `mock-data.js`/`testMockData` is therefore co-owned by proxy.spec + the boundary
  * E2E and is NOT retireable; `swim-sample-data.js` stays for the visual arm.

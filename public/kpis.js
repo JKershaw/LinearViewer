@@ -245,7 +245,7 @@
   }
 
   // --- Step outcomes doughnut ---
-  // Per-step results agents report to the foreman-status log.
+  // Per-step results agents report to the agent-status log.
   const stepOutcomes = data.stepOutcomes;
   const stepEntries = [
     ['completed', stepOutcomes.completed, COLORS.green],

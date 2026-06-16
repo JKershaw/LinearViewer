@@ -354,7 +354,7 @@ test.describe('Swipe Dispatched Sessions', () => {
   const API = `/workspace/${TEST_WORKSPACE_URL_KEY}`;
 
   // Acts as a dispatch consumer to seed real sessions, mirroring
-  // pipeline-scenarios.spec.js. Sessions come from the local dispatch/foreman
+  // pipeline-scenarios.spec.js. Sessions come from the local dispatch/agent-status
   // stores, so the session is a GENUINE local-provider session (the dispatch
   // feature flag is set via seedLocalWorkspace); clears are scoped to the local
   // workspace via `?urlKey=`.

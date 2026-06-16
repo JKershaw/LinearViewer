@@ -636,7 +636,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
 
       // Echo `dispatchId` as a top-level alias of `item.id` so consumers see it
       // without having to dig into the item shape. Forward this value as
-      // `dispatchId` when posting to /api/proxy/foreman/status to enable exact
+      // `dispatchId` when posting to /api/proxy/agent/status to enable exact
       // loop-reconstruction joins (see LIN-245). Purely additive — existing
       // consumers that destructure `{ item }` are unaffected.
       res.json({ item, dispatchId: item.id });

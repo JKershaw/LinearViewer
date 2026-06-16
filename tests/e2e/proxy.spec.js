@@ -1080,6 +1080,7 @@ test.describe('Proxy API - Dispatch', () => {
     // Reporting is the runner's Stop hook, not the prompt — but the evidence
     // discipline for the final summary is still taught at source.
     expect(item.prompt).toContain('evidence');
+    expect(item.prompt).not.toContain('/api/proxy/agent/status');
     expect(item.prompt).not.toContain('/api/proxy/foreman/status');
   });
 
