@@ -128,3 +128,59 @@
   padding: var(--space-3);
   border-radius: var(--radius-md);
 }
+
+/* Buttons & inputs — leaf-component catalog (rendered in the default theme) */
+.sg-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* Themes (LIN-484): each theme panel paints its own surface via the .theme-*
+   hook, so the same components below resolve their tokens to that theme. Laid
+   out side-by-side for at-a-glance comparison of theme impact. */
+.sg-theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: var(--space-4);
+}
+
+.sg-theme-panel {
+  /* bg/fg come from the .theme-* class (or :root for the default panel). */
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.sg-theme-label {
+  font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
+  color: var(--fg-dim);
+  margin: 0;
+}
+
+/* A compact swatch row inside each theme panel */
+.sg-theme-swatches {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.sg-theme-swatches > span {
+  flex: 1;
+  height: 1.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+}
+
+.sg-theme-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}

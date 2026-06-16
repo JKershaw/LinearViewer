@@ -75,6 +75,69 @@
 }
 
 /* =============================================================================
+   Theme hooks (LIN-484)
+   =============================================================================
+   The `<body>` (or any container) theme hook the UI-improvement strategy planned
+   as the "now-unlocked extra": alternate themes are pure overrides of the color
+   tokens above — the structural tokens (spacing/radius/font/z) are theme-neutral
+   and stay shared. The default light theme is `:root`, so applying NO class is
+   the light theme and every existing page renders byte-identically; only the
+   token *values* change under a theme class, so no new token names are
+   introduced. Each theme class is self-painting (sets bg/fg) so it can wrap any
+   subtree — a panel on /styleguide today, the whole `<body>` if a switcher lands
+   later. /styleguide renders these side-by-side so theme impact is at-a-glance. */
+.theme-dark {
+  --bg: #16181d;
+  --bg-muted: #1f222a;
+  --bg-alt: rgba(255, 255, 255, 0.05);
+  --fg: #e6e6e6;
+  --fg-dim: #9aa0a6;
+  --fg-vdim: #2c313a;        /* box-drawing / hairline structure on dark */
+  --green: #2ee6a6;
+  --yellow: #e6c14a;
+  --blue: #6ea8fe;
+  --purple: #b794f6;
+  --red: #ff6b6b;
+  --red-hover: #ff8787;
+  --accent: #ff6b6b;
+  --ok: #4ade80;
+  --border: #2c313a;
+  --border-subtle: rgba(255, 255, 255, 0.12);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
+  background: var(--bg);
+  color: var(--fg);
+}
+
+/* Amber-on-black: a monochrome terminal variant. Status hues stay legible but
+   the surface leans hard into the CLI/terminal aesthetic — the most dramatic
+   "impact of different themes" sample on /styleguide. */
+.theme-amber {
+  --bg: #160f02;
+  --bg-muted: #20180a;
+  --bg-alt: rgba(255, 176, 0, 0.07);
+  --fg: #ffb000;
+  --fg-dim: #b3820f;
+  --fg-vdim: #3a2b08;
+  --green: #8fdb5f;
+  --yellow: #ffcf4d;
+  --blue: #ffb000;           /* links read as amber, not blue, in this theme */
+  --purple: #d7a3ff;
+  --red: #ff5f56;
+  --red-hover: #ff8079;
+  --accent: #ff5f56;
+  --ok: #8fdb5f;
+  --border: #3a2b08;
+  --border-subtle: rgba(255, 176, 0, 0.18);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.7);
+  background: var(--bg);
+  color: var(--fg);
+}
+
+/* =============================================================================
    Base Reset & Typography
    ============================================================================= */
 * { box-sizing: border-box; margin: 0; padding: 0; }
