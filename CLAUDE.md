@@ -73,7 +73,7 @@ lib/
   swim-graph.js        Swim dependency-graph model (flow / side-rail view)
   prompt-templates.js  Prompt template query functions and main entry point
   prompt-formatters.js Shared formatting helpers for prompt templates
-  prompt-template-defs.js  Prompt template definitions (15 templates)
+  prompt-template-defs.js  Prompt template definitions (14 templates)
   completion-signals.js  Completion signals for prompt assessment
   custom-prompts-store.js  Custom prompt template storage (per workspace)
   prompts/
