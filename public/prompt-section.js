@@ -14,8 +14,6 @@
 
   const promptCache = new Map(); // `${issueId}:${label}` -> {label, name, raw, html, reasoning}
   const lastPromptLabel = new Map(); // issueId -> label
-  const PROXY_TOGGLE_KEY = 'proxy-toggle-active';
-  let cachedProxyToken = null;
 
   function esc(str) {
     return window.escapeHtml ? window.escapeHtml(str) : String(str == null ? '' : str)
@@ -46,45 +44,11 @@
     return renderMarkdown(text, { breaks: true });
   }
 
-  function isProxyActive() {
-    return localStorage.getItem(PROXY_TOGGLE_KEY) === 'true';
-  }
-
-  async function getOrCreateProxyToken(urlKey) {
-    if (cachedProxyToken) return cachedProxyToken;
-    if (!urlKey) return null;
-    try {
-      // Background token mint behind the +proxy toggle — on401:false so a stale
-      // session never bounces the page to /logout; any failure (incl. 401 or a
-      // token rate-limit) is swallowed to null and surfaced by the caller.
-      const data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/proxy/tokens`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label: 'prompt-proxy', scope: 'readWrite', singleUse: false }),
-        on401: false
-      });
-      cachedProxyToken = (data && data.token) || null;
-      return cachedProxyToken;
-    } catch { return null; }
-  }
-
-  function buildProxyBlock(token) {
-    const baseUrl = window.location.origin;
-    return `\n\n## Linear API Proxy\n\nYou have access to a Linear API proxy. Use it to read and modify Linear issues, projects, and more.\n\nTo get started, fetch the full API documentation:\n\n  curl -H "Authorization: Bearer ${token}" ${baseUrl}/api/proxy/instructions\n\nThis will return all available endpoints with examples. Your token scope is: readWrite.`;
-  }
-
-  // When the +proxy toggle is off this is a no-op. When it is on but the block
-  // cannot be produced (no workspace context, or the token mint fails /
-  // rate-limits) this THROWS, so handleCopy/handleDispatch surface the failure
-  // instead of silently copying or dispatching a bare prompt while the toggle
-  // still shows active (the +proxy silent-drop bug).
-  async function maybeAppendProxy(text, urlKey) {
-    if (!isProxyActive()) return text;
-    if (!urlKey) throw new Error('Proxy is enabled but no workspace context was found for this prompt.');
-    const token = await getOrCreateProxyToken(urlKey);
-    if (!token) throw new Error('Proxy is enabled but a proxy token could not be created — you may have hit the token rate limit; wait a minute and try again.');
-    return text + buildProxyBlock(token);
-  }
+  // Proxy-toggle logic is shared via window.ProxyToggle (common.js, LIN-525 #7).
+  // handleCopy/handleDownload/handleDispatch call ProxyToggle.maybeAppend; the
+  // +proxy button's click is handled by ProxyToggle's delegated listener and its
+  // active look is driven by the body[data-proxy-active] CSS rule, so this
+  // module no longer carries its own copy of the toggle state/mint/append.
 
   // Slugify + filename helpers mirror lib/prompt-formatters.js (and app.js) so a
   // downloaded prompt file is named consistently across every surface.
@@ -166,8 +130,10 @@
     html += '<button class="swipe-prompt-copy" data-action="copy">copy</button>';
     html += '<button class="swipe-prompt-download" data-action="download" title="Download prompt as a .md file">download</button>';
     if (proxyEnabled) {
-      const active = isProxyActive() ? ' active' : '';
-      html += `<button class="prompt-proxy-toggle${active}" data-action="proxy-toggle" title="Append proxy API instructions to prompt">+proxy</button>`;
+      // Active look is driven by the body[data-proxy-active] CSS rule (LIN-525
+      // #1), so no per-button class is rendered here. data-action is kept off
+      // the button: ProxyToggle's delegated listener (common.js) owns the click.
+      html += `<button class="prompt-proxy-toggle" title="Append proxy API instructions to prompt">+proxy</button>`;
     }
     if (dispatchEnabled) {
       // Collapse the dispatch targets behind a single "Dispatch ▾" trigger. The
@@ -538,12 +504,8 @@
         return;
       }
 
-      if (action === 'proxy-toggle') {
-        const now = !isProxyActive();
-        localStorage.setItem(PROXY_TOGGLE_KEY, now ? 'true' : 'false');
-        document.querySelectorAll('.prompt-proxy-toggle').forEach(b => b.classList.toggle('active', now));
-        return;
-      }
+      // +proxy toggle clicks are handled by ProxyToggle's delegated listener in
+      // common.js (LIN-525 #7) — no per-section handling needed here.
     }
 
     async function handleCopy(btn) {
@@ -552,7 +514,7 @@
       try {
         // Append the proxy block (if +proxy is on) inside the try so a failed
         // token mint surfaces as "failed" instead of copying a bare prompt.
-        const text = await maybeAppendProxy(raw, opts.urlKey);
+        const text = await window.ProxyToggle.maybeAppend(raw, opts.urlKey);
         await navigator.clipboard.writeText(text);
         btn.textContent = 'copied!';
         btn.classList.add('copied');
@@ -574,7 +536,7 @@
       const raw = state.result && state.result.raw;
       if (!raw) return;
       try {
-        const text = await maybeAppendProxy(raw, opts.urlKey);
+        const text = await window.ProxyToggle.maybeAppend(raw, opts.urlKey);
         const filename = buildPromptFilename(issue.identifier, (state.result && state.result.name) || 'prompt');
         downloadMarkdown(text, filename);
         btn.textContent = 'saved!';
@@ -600,7 +562,7 @@
       try {
         // Append the proxy block (if +proxy is on) inside the try so a failed
         // token mint surfaces as "err" instead of dispatching a bare prompt.
-        const prompt = await maybeAppendProxy(raw, opts.urlKey);
+        const prompt = await window.ProxyToggle.maybeAppend(raw, opts.urlKey);
         // `issue` is the full card object (id/identifier/title/url) \u2014 passing it
         // through is what ties Swipe-dispatched sessions back to their task.
         await window.dispatchPrompt({

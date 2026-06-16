@@ -1298,3 +1298,56 @@ test.describe('Proxy API - Recommend-and-Dispatch (fused verb, LIN-321)', () => 
     expect(text).toContain('/api/proxy/recommend-and-dispatch');
   });
 });
+
+// LIN-525 #2 (mint route is feature-gated) and #5 (prompt-proxy tokens get a
+// short TTL so they self-prune instead of accumulating as standing readWrite
+// credentials). Exercises the real session-auth mint route via page.request,
+// which shares the browser context's session cookie.
+test.describe('Proxy token mint — feature gate + prompt-proxy TTL (LIN-525)', () => {
+  const MINT_URL = `${API_PREFIX}/tokens`;
+
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/test/clear-proxy-tokens');
+  });
+
+  test('mint is rejected (403) when the proxy feature is disabled', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: false }))}`);
+    const resp = await page.request.post(MINT_URL, {
+      data: { label: 'prompt-proxy', scope: 'readWrite', singleUse: false }
+    });
+    expect(resp.status()).toBe(403);
+  });
+
+  // expiresAt isn't echoed in the create response, so read it back from the
+  // token list (which carries it) by label.
+  async function expiresAtFor(page, label) {
+    const listResp = await page.request.get(MINT_URL);
+    expect(listResp.status()).toBe(200);
+    const { tokens } = await listResp.json();
+    const match = tokens.find(t => t.label === label);
+    expect(match, `token labelled ${label} should be listed`).toBeTruthy();
+    return new Date(match.expiresAt).getTime();
+  }
+
+  test('prompt-proxy token is minted with a short (~48h) TTL', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
+    const resp = await page.request.post(MINT_URL, {
+      data: { label: 'prompt-proxy', scope: 'readWrite', singleUse: false }
+    });
+    expect(resp.status()).toBe(201);
+    const hours = (await expiresAtFor(page, 'prompt-proxy') - Date.now()) / (60 * 60 * 1000);
+    expect(hours).toBeGreaterThan(47);
+    expect(hours).toBeLessThan(49);
+  });
+
+  test('a normal (non prompt-proxy) token keeps the long default TTL', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
+    const resp = await page.request.post(MINT_URL, {
+      data: { label: 'manual-token', scope: 'readWrite' }
+    });
+    expect(resp.status()).toBe(201);
+    const days = (await expiresAtFor(page, 'manual-token') - Date.now()) / (24 * 60 * 60 * 1000);
+    // Default is 90 days; assert it is clearly far longer than the 2-day prompt-proxy TTL.
+    expect(days).toBeGreaterThan(30);
+  });
+});

@@ -7,70 +7,10 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 let queuePollIntervalId = null
 const QUEUE_POLL_INTERVAL_MS = 1000
 
-// ==========================================================================
-// Proxy Toggle (append proxy API instructions to prompts)
-// ==========================================================================
-
-const PROXY_TOGGLE_KEY = 'proxy-toggle-active'
-let cachedProxyToken = null
-
-function isProxyToggleActive() {
-  return localStorage.getItem(PROXY_TOGGLE_KEY) === 'true'
-}
-
-/**
- * Get or create a proxy token for the current workspace.
- * Caches the token for the session to avoid creating duplicates.
- * @param {string} urlKey - Workspace URL key
- * @returns {Promise<string|null>} Token string or null on failure
- */
-async function getOrCreateProxyToken(urlKey) {
-  if (cachedProxyToken) return cachedProxyToken
-
-  try {
-    // on401:false — a failed mint should fall through to the null return (the
-    // caller surfaces it), not redirect the whole page to /logout.
-    const data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/proxy/tokens`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ label: 'prompt-proxy', scope: 'readWrite', singleUse: false }),
-      on401: false
-    })
-    cachedProxyToken = data.token
-    return cachedProxyToken
-  } catch {
-    return null
-  }
-}
-
-/**
- * Build the proxy instructions block to append to a prompt.
- * @param {string} token - Proxy API token
- * @returns {string} Markdown proxy instructions
- */
-function buildProxyBlock(token) {
-  const baseUrl = window.location.origin
-  return `\n\n## Linear API Proxy\n\nYou have access to a Linear API proxy. Use it to read and modify Linear issues, projects, and more.\n\nTo get started, fetch the full API documentation:\n\n  curl -H "Authorization: Bearer ${token}" ${baseUrl}/api/proxy/instructions\n\nThis will return all available endpoints with examples. Your token scope is: readWrite.`
-}
-
-/**
- * If the +proxy toggle is active, append proxy instructions to the prompt.
- * When the toggle is off this is a no-op. When it is on but the block cannot be
- * produced (no workspace context, or the token mint fails / rate-limits) this
- * THROWS, so callers surface the failure instead of silently copying or
- * dispatching a bare prompt while the toggle still shows active.
- * @param {string} prompt - Original prompt text
- * @param {string} urlKey - Workspace URL key
- * @returns {Promise<string>} Prompt with proxy block appended (unchanged if toggle off)
- * @throws {Error} If proxy is enabled but the block cannot be appended
- */
-async function maybeAppendProxyBlock(prompt, urlKey) {
-  if (!isProxyToggleActive()) return prompt
-  if (!urlKey) throw new Error('Proxy is enabled but no workspace context was found for this prompt.')
-  const token = await getOrCreateProxyToken(urlKey)
-  if (!token) throw new Error('Proxy is enabled but a proxy token could not be created — you may have hit the token rate limit; wait a minute and try again.')
-  return prompt + buildProxyBlock(token)
-}
+// Proxy-toggle logic (state, token mint/cache, block append) now lives in a
+// single shared module: window.ProxyToggle in common.js (LIN-525 #7). The
+// copy/download/dispatch call sites below use the back-compat global
+// maybeAppendProxyBlock(text, urlKey) that common.js exposes.
 
 /**
  * Strip markdown code block fences from prompt text.
@@ -2074,36 +2014,6 @@ async function initFreeTierStatus() {
 }
 
 /**
- * Initialize proxy toggle buttons.
- * Restores active state from localStorage and handles click events.
- */
-function initProxyToggle() {
-  // Restore active state on existing buttons
-  if (isProxyToggleActive()) {
-    document.querySelectorAll('.prompt-proxy-toggle').forEach(btn => {
-      btn.classList.add('active')
-    })
-  }
-
-  // Handle clicks on proxy toggle buttons (delegated)
-  document.addEventListener('click', (e) => {
-    const btn = e.target.closest('.prompt-proxy-toggle')
-    if (!btn) return
-
-    e.preventDefault()
-    e.stopPropagation()
-
-    const nowActive = !isProxyToggleActive()
-    localStorage.setItem(PROXY_TOGGLE_KEY, nowActive ? 'true' : 'false')
-
-    // Update ALL proxy toggle buttons on the page
-    document.querySelectorAll('.prompt-proxy-toggle').forEach(b => {
-      b.classList.toggle('active', nowActive)
-    })
-  })
-}
-
-/**
  * Initialize the Foreman button. Parallel to initRecommendations() but fetches
  * a deterministic playbook (no streaming) and renders it inside the
  * .foreman-container using the same copy/dispatch affordances.
@@ -2329,5 +2239,5 @@ document.addEventListener('DOMContentLoaded', () => {
   initQueuePanel()
   initFeatureToggles()
   initFreeTierStatus()
-  initProxyToggle()
+  // +proxy toggle is wired by window.ProxyToggle.init() in common.js (LIN-525)
 })

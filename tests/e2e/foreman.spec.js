@@ -1332,6 +1332,41 @@ test.describe('Foreman Page UI', () => {
     await expect(page.locator('.prompt-proxy-toggle')).toBeVisible();
   });
 
+  test('copy playbook never embeds a second token when +proxy is on (LIN-525 #6)', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    // +proxy persisted ON (the setup panel auto-collapses once the playbook
+    // loads, so drive the state via storage rather than clicking the button).
+    await page.addInitScript(() => localStorage.setItem('proxy-toggle-active', 'true'));
+
+    // A readWrite token exists, so the page auto-loads the playbook with the
+    // token already spliced in (YOUR_TOKEN → currentToken).
+    await page.goto('/test/create-proxy-token?scope=readWrite&label=foreman-proxy6');
+    await page.goto('/workspace/test-workspace/foreman');
+    const output = page.locator('#foreman-playbook-output');
+    await expect(output).toHaveClass(/has-content/, { timeout: 10000 });
+    await expect(page.locator('body')).toHaveAttribute('data-proxy-active', 'true');
+
+    // With +proxy ON, the copy must neither mint a fresh token nor append a
+    // proxy block on top of the already-spliced one (historically it did both).
+    let mintAttempted = false;
+    await page.route('**/api/proxy/tokens', route => {
+      if (route.request().method() === 'POST') mintAttempted = true;
+      return route.continue();
+    });
+
+    // Re-open the setup panel (it auto-collapsed once the playbook loaded) so
+    // the copy button is interactable again.
+    await page.locator('#foreman-setup').evaluate(el => { el.open = true; });
+    await page.locator('#foreman-copy-btn').click();
+    const clip = await page.evaluate(() => navigator.clipboard.readText());
+
+    // The appended-block signature (from ProxyToggle.buildBlock) must be absent:
+    // the playbook itself never contains it, so its presence would mean a second
+    // block was glued on.
+    expect(clip).not.toContain('You have access to a Linear API proxy');
+    expect(mintAttempted).toBe(false);
+  });
+
   test('foreman page has token selector', async ({ page }) => {
     await page.goto('/workspace/test-workspace/foreman');
     await expect(page.locator('#foreman-token-select')).toBeVisible();
