@@ -17,6 +17,7 @@ import { GraphQLClient, gql } from 'graphql-request';
 import rateLimit from 'express-rate-limit';
 import { createProxyFetch } from '../lib/proxy-fetch.js';
 import { createDedupeCache, dedupeKey } from '../lib/proxy-dedupe.js';
+import { deriveTerminalStatus, deriveCompletedAt } from '../lib/dispatch-terminal.js';
 import { fetchProjects, fetchIssueContext, fetchRecommendationContext } from '../lib/linear.js';
 import { applyTrashedSignal, isTrashed } from '../lib/trashed-signal.js';
 import { isRecommendationEnabled, getRecommendation } from '../lib/openrouter.js';
@@ -383,60 +384,10 @@ function buildProxyContextPreamble({ baseUrl, token, issueIdentifier }) {
   ].join('\n');
 }
 
-// Terminal markers the dispatch runner prefixes onto its final feedback entry.
-// The runner posts completion as free-form text (e.g. "[done] Task completed in
-// 45s" / "[failed] remote-control never connected"), and the queue's lifecycle
-// status stays 'taken' — so without this an orchestrator has to parse prose to
-// know a dispatch finished. Map the marker → a terminal status the watch/list
-// endpoints can surface as a field. Derived on read only; the stored lifecycle
-// status is untouched (so feedback the runner posts after taking still applies).
-const TERMINAL_FEEDBACK_REGEX = /^\s*\[(done|complete|failed|aborted)\]/i;
-const TERMINAL_MARKER_TO_STATUS = { done: 'done', complete: 'done', failed: 'failed', aborted: 'aborted' };
-
-/**
- * Scans feedback entries for a terminal marker and returns the LAST one found
- * (the runner posts the terminal event last) as {entry, status}, or null if none.
- *
- * @param {Array<{message?: string, timestamp?: string}>} feedback
- * @returns {{entry: object, status: ('done'|'failed'|'aborted')}|null}
- */
-function findTerminalFeedback(feedback) {
-  if (!Array.isArray(feedback)) {
-    return null;
-  }
-  for (let i = feedback.length - 1; i >= 0; i--) {
-    const match = TERMINAL_FEEDBACK_REGEX.exec(feedback[i]?.message || '');
-    if (match) {
-      return { entry: feedback[i], status: TERMINAL_MARKER_TO_STATUS[match[1].toLowerCase()] };
-    }
-  }
-  return null;
-}
-
-/**
- * The terminal status derived from the feedback markers, or null if none.
- *
- * @param {Array<{message?: string}>} feedback
- * @returns {('done'|'failed'|'aborted')|null}
- */
-function deriveTerminalStatus(feedback) {
-  return findTerminalFeedback(feedback)?.status || null;
-}
-
-/**
- * The truthful task-completion time: the timestamp of the terminal feedback
- * entry (when the runner posted [done]/[failed]/[aborted]), or null until that
- * marker exists. Distinct from `resolvedAt`, which marks when the runner
- * *claimed* the item (take/archive time) — that lands seconds after enqueue
- * regardless of how long the work runs, so it must not be read as completion
- * (LIN-400). Derived on read; no schema/storage change.
- *
- * @param {Array<{message?: string, timestamp?: string}>} feedback
- * @returns {string|null}
- */
-function deriveCompletedAt(feedback) {
-  return findTerminalFeedback(feedback)?.entry?.timestamp || null;
-}
+// Terminal-marker detection (the runner prefixes "[done]"/"[failed]"/… onto its
+// final feedback entry while the queue status stays 'taken') lives in the shared
+// lib/dispatch-terminal.js so the dashboard Loop feed (LIN-509) derives the same
+// terminal truth from the same regex. Imported at the top of this file.
 
 // Long-poll tuning for GET /api/proxy/dispatch/:id?wait=Ns (LIN-392).
 // DISPATCH_WAIT_MAX_S caps the hold below the ~60s ceiling that armKeepalive

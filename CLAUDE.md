@@ -88,6 +88,7 @@ lib/
   recap-cache.js       Hash-based cache for AI recaps
   run-summary.js       On-demand short summary of a single autopilot run (Loop); mirrors recap.js (LIN-509)
   run-summary-cache.js Cache for AI run summaries, keyed ${workspaceId}:${loopId}, 30-day TTL (LIN-509)
+  dispatch-terminal.js Terminal-marker detection for dispatch runs ([done]/[failed]/… feedback → terminal status); shared by proxy watch endpoints + dashboard Loop feed (LIN-400/LIN-509)
   brief.js             Current-state task brief prompt + handling
   brief-cache.js       Hash-based cache for AI briefs
   recommend-recurse.js Server-side recommendation recursion (defer routing)
@@ -141,7 +142,7 @@ public/
   dispatch.css / dispatch.js    Dispatch page (prompt, queue, tokens, history)
   pipeline.css / pipeline.js    Pipeline floor view (polling, diffing, overlays)
   collective.css / collective.js  Collective page (setup, transcript poll, say box)
-  dashboard.css / dashboard.js  Autopilot dashboard (merged-loops poll + diff, filter chips, run drill-down, run-summary)
+  dashboard.css / dashboard.js  Autopilot dashboard (merged-loops poll, status banner, autopilot-scope + workspace filters, runs grouped into expandable task sessions, run-summary at top of each session)
   foreman.css / foreman.js      Foreman observation page
   roadmap.css / roadmap.js      Roadmap page
   ship.css / ship.js            Ship radial view

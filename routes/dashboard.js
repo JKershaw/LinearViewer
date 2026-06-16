@@ -21,6 +21,7 @@
 import { Router } from 'express';
 import { renderDashboardPage } from '../lib/render-dashboard.js';
 import { getLoopsForWorkspace } from '../lib/pipeline-loops.js';
+import { deriveTerminalStatus, deriveCompletedAt } from '../lib/dispatch-terminal.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import {
   generateRunSummary,
@@ -34,19 +35,61 @@ import { hashLoop } from '../lib/run-summary-cache.js';
 // the cache (keyed on the immutable run) would serve stale content.
 const TERMINAL_AGENT_STATES = new Set(['complete', 'error']);
 
+// Map a dispatch terminal-feedback marker → a Loop agentState.
+const MARKER_TO_AGENT_STATE = { done: 'complete', failed: 'error', aborted: 'error' };
+
+/**
+ * Derive the *effective* agent state for a run.
+ *
+ * The Loop builder (lib/pipeline-loops.js) leaves a taken dispatch as 'running'
+ * until a foreman 'completed'/'failed' entry decorates it. But the dispatch
+ * runner's own terminal signal is a "[done]"/"[failed]"/"[aborted]" feedback
+ * marker (lib/dispatch-terminal.js — the same seam the proxy watch endpoint
+ * reads). Without folding that in, every marker-but-no-foreman run shows
+ * "running" forever — the "all sessions appear in progress" report (LIN-509),
+ * which also left the summary button permanently disabled. A terminal marker
+ * therefore wins over a non-terminal derived state. Read-only; never mutates a
+ * stored record, and never downgrades a state the builder already called terminal.
+ *
+ * @param {Object} loop
+ * @returns {string} effective agentState
+ */
+function effectiveAgentState(loop) {
+  if (!loop) return 'running';
+  if (TERMINAL_AGENT_STATES.has(loop.agentState)) return loop.agentState;
+  const marker = deriveTerminalStatus(loop.feedback);
+  return marker ? MARKER_TO_AGENT_STATE[marker] : loop.agentState;
+}
+
 function isTerminalLoop(loop) {
   return !!loop && TERMINAL_AGENT_STATES.has(loop.agentState);
 }
 
 /**
  * Most-relevant activity timestamp for a run, used to sort the merged feed.
+ * Prefers the truthful completion time (terminal feedback marker) so a run that
+ * just finished sorts above an older still-running one.
  * @param {Object} loop
  * @returns {number} epoch ms (0 when unknown)
  */
 function loopActivityMs(loop) {
-  const t = loop.foremanTimestamp || loop.resolvedAt || loop.dispatchedAt;
+  const t = loop.completedAt || loop.foremanTimestamp || loop.resolvedAt || loop.dispatchedAt;
   const ms = t ? new Date(t).getTime() : 0;
   return Number.isFinite(ms) ? ms : 0;
+}
+
+/**
+ * Enrich a Loop with its effective (marker-aware) agentState and completion
+ * time. Returns a shallow copy; the stored record is never mutated.
+ * @param {Object} loop
+ * @returns {Object}
+ */
+function enrichLoop(loop) {
+  return {
+    ...loop,
+    agentState: effectiveAgentState(loop),
+    completedAt: deriveCompletedAt(loop.feedback) || (isTerminalLoop(loop) ? (loop.resolvedAt || null) : null)
+  };
 }
 
 /**
@@ -91,7 +134,7 @@ export function createDashboardRoutes({
       workspaces.map(async (ws) => {
         const loops = await getLoopsForWorkspace(ws.urlKey, loopDeps);
         return loops.map(loop => ({
-          ...loop,
+          ...enrichLoop(loop),
           workspaceUrlKey: ws.urlKey,
           workspaceName: ws.name || ws.urlKey
         }));
@@ -177,7 +220,8 @@ export function createDashboardRoutes({
     let loop;
     try {
       const loops = await getLoopsForWorkspace(workspace.urlKey, loopDeps);
-      loop = loops.find(l => String(l.loopId) === String(loopId));
+      const found = loops.find(l => String(l.loopId) === String(loopId));
+      loop = found ? enrichLoop(found) : null;
     } catch (error) {
       console.error('Dashboard run-summary lookup error:', error);
       return res.status(500).json({ error: 'Could not load the run' });
@@ -196,6 +240,12 @@ export function createDashboardRoutes({
       const cached = await runSummaryCacheStore.get(workspace.urlKey, loopId);
       if (cached && cached.inputHash === inputHash) {
         return res.json({ status: 'cached', loopId, summary: cached.summary, model: cached.model, generatedAt: cached.generatedAt });
+      }
+      // Peek mode: the overlay asks "is there a cached summary?" on open without
+      // paying to generate one. A miss is a 204, so the UI shows its button
+      // instead of silently spending an AI call on every drill-down (cost contract).
+      if (req.query.cachedOnly === '1' || req.query.cachedOnly === 'true') {
+        return res.status(204).end();
       }
     }
 

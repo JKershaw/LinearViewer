@@ -42,6 +42,11 @@ function historyItem(id, identifier) {
 function foremanDone(dispatchId, identifier) {
   return { dispatchId, taskIdentifier: identifier, action: 'implementation', status: 'completed', summary: 'all done', timestamp: NOW_ISO };
 }
+// A taken run that the runner finished via a [done] feedback marker but with NO
+// foreman 'completed' entry — pipeline-loops alone derives 'running' for this.
+function markerDoneItem(id, identifier) {
+  return { id, issueIdentifier: identifier, issueTitle: `Title ${identifier}`, promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken', feedback: [{ message: '[done] shipped it', timestamp: NOW_ISO }] };
+}
 
 // ─── Handler extraction ─────────────────────────────────────────────────────────
 
@@ -51,9 +56,9 @@ function getHandler(router, method, path) {
   return layer.route.stack[layer.route.stack.length - 1].handle;
 }
 
-function makeReqRes({ session = {}, workspace = null, params = {} } = {}) {
+function makeReqRes({ session = {}, workspace = null, params = {}, query = {} } = {}) {
   session.features = session.features || {};
-  const req = { session, workspace, params, body: {}, protocol: 'http', get: () => 'localhost' };
+  const req = { session, workspace, params, query, body: {}, protocol: 'http', get: () => 'localhost' };
   const res = {
     statusCode: 200,
     jsonBody: null,
@@ -61,7 +66,8 @@ function makeReqRes({ session = {}, workspace = null, params = {} } = {}) {
     status(code) { this.statusCode = code; return this; },
     json(b) { this.jsonBody = b; return this; },
     redirect(url) { this.redirectedTo = url; return this; },
-    send(b) { this.sentBody = b; return this; }
+    send(b) { this.sentBody = b; return this; },
+    end(b) { this.endedWith = b; return this; }
   };
   return { req, res };
 }
@@ -118,6 +124,32 @@ describe('GET /api/dashboard/loops', () => {
     assert.equal(body.counts.total, 3);
   });
 
+  test('a [done] feedback marker promotes a taken run to recent (not stuck "running")', async () => {
+    // Regression for "all sessions appear in progress" (LIN-509): without folding
+    // the dispatch terminal marker in, this run would derive agentState 'running'
+    // and never leave the active feed.
+    const router = makeRouter({ 'ws-a': { live: [], history: [markerDoneItem('m1', 'LIN-7')], foreman: [] } });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/loops');
+    const session = { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] };
+    const { req, res } = makeReqRes({ session });
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.active.length, 0, 'marker-done run is not active');
+    assert.equal(res.jsonBody.recent.length, 1, 'marker-done run is recent');
+    assert.equal(res.jsonBody.recent[0].agentState, 'complete');
+  });
+
+  test('a [failed] marker maps to an error (terminal) run', async () => {
+    const failItem = { id: 'f1', issueIdentifier: 'LIN-8', issueTitle: 'T', promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken', feedback: [{ message: '[failed] broke', timestamp: NOW_ISO }] };
+    const router = makeRouter({ 'ws-a': { live: [], history: [failItem], foreman: [] } });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/loops');
+    const session = { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] };
+    const { req, res } = makeReqRes({ session });
+    await handler(req, res);
+    assert.equal(res.jsonBody.recent.length, 1);
+    assert.equal(res.jsonBody.recent[0].agentState, 'error');
+  });
+
   test('one failing workspace store does not blank the whole feed', async () => {
     const router = createDashboardRoutes({
       workspaceFromUrl: (req, res, next) => next(),
@@ -168,6 +200,29 @@ describe('run-summary endpoint', () => {
     await handler(req, res);
     assert.equal(res.statusCode, 409);
     assert.equal(res.jsonBody.agentState, 'queued');
+  });
+
+  test('a [done]-marker run is summarisable (effective-terminal), not 409', async () => {
+    const prev = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'test';
+    try {
+      const router = makeRouter({ 'ws-a': { history: [markerDoneItem('m9', 'LIN-7')], live: [], foreman: [] } });
+      const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/run-summary/:loopId');
+      const { req, res } = makeReqRes({ session: ENABLED, workspace: { urlKey: 'ws-a' }, params: { loopId: 'm9' } });
+      await handler(req, res);
+      assert.equal(res.statusCode, 200);
+      assert.equal(res.jsonBody.status, 'fresh');
+    } finally {
+      process.env.NODE_ENV = prev;
+    }
+  });
+
+  test('GET ?cachedOnly returns 204 on a cache miss (no generation)', async () => {
+    const router = makeRouter({ 'ws-a': { history: [historyItem('a-hist', 'LIN-2')], live: [], foreman: [foremanDone('a-hist', 'LIN-2')] } });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/run-summary/:loopId');
+    const { req, res } = makeReqRes({ session: ENABLED, workspace: { urlKey: 'ws-a' }, params: { loopId: 'a-hist' }, query: { cachedOnly: '1' } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 204);
   });
 
   test('test-mode returns and caches a deterministic summary for a terminal run', async () => {
