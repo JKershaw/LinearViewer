@@ -912,7 +912,7 @@ ${goal}`
       // pinned is transparently resolved to its actionable descendant, with the
       // descent breadcrumb returned. Free-tier usage is charged once per request
       // (above, before this point), not per hop.
-      const selectedModel = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore })
+      const selectedModel = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier })
       const apiKeyToUse = sessionApiKey || (isFreeTier ? freeTierKey : undefined)
       const { recommendation: rec, deferredVia, deferTruncated, deferStopReason } = await resolveRecommendation({
         startIdentifier: issueId,
@@ -1211,7 +1211,7 @@ ${goal}`
 
       if (closed) return;
 
-      const selectedModel = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore });
+      const selectedModel = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
       const apiKeyToUse = sessionApiKey || (isFreeTier ? freeTierKey : undefined);
 
       // Node-shaped tasks (LIN-327): the first hop is a `defer` with no prompt body,
@@ -1663,7 +1663,7 @@ ${goal}`
 
       const canonicalId = context.issue?.id || issueId;
       const inputHash = hashContext(context);
-      const selectedModel = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore });
+      const selectedModel = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
 
       let recap;
       let modelUsed;
@@ -1836,7 +1836,7 @@ ${goal}`
 
       const canonicalId = context.issue?.id || issueId;
       const inputHash = hashContext(context);
-      const selectedModel = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore });
+      const selectedModel = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
 
       let brief;
       let modelUsed;
@@ -2385,7 +2385,7 @@ ${goal}`
       return null;
     }
 
-    const model = await resolveWorkspaceModel({ urlKey: req.workspace.urlKey, workspacePreferencesStore });
+    const model = await resolveWorkspaceModel({ urlKey: req.workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
     return { apiKey, model, isFreeTier };
   }
 
@@ -2885,7 +2885,7 @@ ${goal}`
       return res.status(500).json({ error: 'Failed to build chat prompt' });
     }
 
-    const selectedModel = await resolveWorkspaceModel({ urlKey: req.workspace.urlKey, workspacePreferencesStore });
+    const selectedModel = await resolveWorkspaceModel({ urlKey: req.workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
 
     // Start SSE
     res.set({

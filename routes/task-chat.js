@@ -250,7 +250,7 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
         return res.end();
       }
 
-      const selectedModel = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore });
+      const selectedModel = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
       const messages = buildTaskChatMessages(context.issue, context, question.trim(), safeHistory);
       await streamChat(
         messages,
