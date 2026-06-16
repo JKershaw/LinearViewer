@@ -1220,10 +1220,10 @@ GET ${baseUrl}/api/proxy/cycles?teamId={teamId}
   → Cycles (optional team filter)
   → { "cycles": [{ "id": "...", "number": 12, "startsAt": "...", "endsAt": "..." }] }
 
-GET ${baseUrl}/api/proxy/cycle/{cycleId}
+GET ${baseUrl}/api/proxy/cycles/{cycleId}
   → Cycle detail with issues, progress, and scope history
 
-GET ${baseUrl}/api/proxy/relations/{issueId}
+GET ${baseUrl}/api/proxy/issues/{issueId}/relations
   → Issue relations (blocks, blocked-by, related, duplicate)
   → { "trashed": false,
       "relations":        { "nodes": [{ "id": "...", "type": "blocks", "relatedIssue": { "id": "...", "identifier": "LIN-9" } }] },
@@ -1235,6 +1235,13 @@ GET ${baseUrl}/api/proxy/relations/{issueId}
     same as relations on /issue/{id}. \`relatedIssue\` is the target of an
     outgoing relation; \`issue\` is the source of an inverse (e.g. blocked-by) one.
     Each node's \`id\` is the relation id — pass it to DELETE .../relations/{id}.
+  → This pairs with POST/DELETE /issues/{issueId}/relations below, so the whole
+    relations surface (read + write) lives under one issue-scoped path.
+
+Issue-scoped paths are canonical as /issues/{id}/... — relations (above),
+recommend / recap / brief (below), and comments (write section) all nest under
+the issue. Legacy flat forms (e.g. /relations/{id}, /recap/{id}, /comments/{id})
+still resolve as forgiving aliases, but prefer the nested form shown here.
 
 ## Foreman Endpoints
 
@@ -1277,19 +1284,19 @@ GET ${baseUrl}/api/proxy/stack?limit={n}&view=digest
       "why": ["bug", "unblocks 6", "critical path 4", "held by LIN-412"],
       "parent": { "identifier": "LIN-295" }, "url": "..." }], "total": 98, "view": "digest" }
 
-GET ${baseUrl}/api/proxy/recommend/{identifier}
+GET ${baseUrl}/api/proxy/issues/{identifier}/recommend
   → AI-generated prompt recommendation (requires OpenRouter on the server; >25s responses
     stream whitespace-keepalive bytes inside a single 200 response, which JSON.parse ignores)
   → { "identifier": "LIN-123", "reasoning": "...", "prompt": "...", "truncated": false, "repo": "owner/name" }
   → Add ?format=md to download the bare prompt as a markdown file instead of JSON
     (Content-Type: text/markdown, Content-Disposition: attachment). Useful when the
     prompt is too large to paste — save it straight to a .md file:
-      curl -H "Authorization: Bearer YOUR_TOKEN" "${baseUrl}/api/proxy/recommend/LIN-123?format=md" -o LIN-123-recommend.md
+      curl -H "Authorization: Bearer YOUR_TOKEN" "${baseUrl}/api/proxy/issues/LIN-123/recommend?format=md" -o LIN-123-recommend.md
   → Add ?noDescend=1 to recommend the named issue's OWN next step WITHOUT descending into an
     open child. Use it to drive a parent whose work lives in its own description/checklist while
     a child stays open or is separately tracked (otherwise the engine routes into that child).
 
-GET ${baseUrl}/api/proxy/recap/{identifier}
+GET ${baseUrl}/api/proxy/issues/{identifier}/recap
   → Cached AI recap; auto-regenerates when stale. Pass \`?noRefresh=1\` to skip regeneration.
   → { "status": "fresh" | "stale" | "missing",
       "identifier": "LIN-123",
@@ -1300,7 +1307,7 @@ GET ${baseUrl}/api/proxy/recap/{identifier}
 POST ${baseUrl}/api/proxy/recap/{identifier}
   → Force-regenerate the recap and return the fresh result (same shape as GET above).
 
-GET ${baseUrl}/api/proxy/brief/{identifier}
+GET ${baseUrl}/api/proxy/issues/{identifier}/brief
   → Current-state task brief: a distilled, present-tense version of the task
     (Current / Constraints / Open questions / Changelog) for use as starting context.
     Auto-regenerates when stale. Pass \`?noRefresh=1\` to skip regeneration.
@@ -1375,7 +1382,7 @@ POST ${baseUrl}/api/proxy/issues/{issueId}/relations
 
 DELETE ${baseUrl}/api/proxy/issues/{issueId}/relations/{relationId}
   → Remove a relation. relationId is the relation's own id (the \`id\` field on
-    each node from GET /relations/{issueId} or GET /issue/{id}), NOT an issue id.
+    each node from GET /issues/{issueId}/relations or GET /issue/{id}), NOT an issue id.
   → { "success": true }
 
 POST ${baseUrl}/api/proxy/issues/{issueId}/labels
@@ -1455,7 +1462,7 @@ One convention across every endpoint, so you can branch on the same fields every
 - **Success is the HTTP status.** Any 2xx is success; any non-2xx is failure. There is no
   partial state — a write never returns 2xx with a falsy success flag.
 - **Reads** return the data directly: a single resource as the object itself
-  (e.g. GET /me, GET /issues/{id}, GET /cycle/{id}), a collection under a named key
+  (e.g. GET /me, GET /issues/{id}, GET /cycles/{id}), a collection under a named key
   (e.g. { "issues": [...] }, { "teams": [...] }).
 - **Writes** return { "success": true, ...} — Linear writes nest the affected entity under a
   named key ({ "success": true, "issue": {...} }); other writes (dispatch, token) carry their
@@ -1786,10 +1793,11 @@ One convention across every endpoint, so you can branch on the same fields every
   });
 
   /**
-   * GET /api/proxy/cycle/:cycleId
-   * Get cycle detail with issues.
+   * GET /api/proxy/cycles/:cycleId  (canonical — plural, mirrors the /cycles list)
+   * GET /api/proxy/cycle/:cycleId    (forgiving alias, singular)
+   * Get cycle detail with issues. Shared :cycleId param across both forms (LIN-528).
    */
-  router.get('/api/proxy/cycle/:cycleId', proxyLimiter, authenticateProxyToken, async (req, res) => {
+  router.get(['/api/proxy/cycles/:cycleId', '/api/proxy/cycle/:cycleId'], proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
       const { client, reason } = await getClient(req.proxyUrlKey);
       if (!client) {
@@ -1819,9 +1827,12 @@ One convention across every endpoint, so you can branch on the same fields every
   });
 
   /**
-   * GET /api/proxy/relations/:issueId
+   * GET /api/proxy/issues/:issueId/relations  (canonical — heals the read/write split-brain;
+   *     the write form already lives at POST /issues/:issueId/relations)
+   * GET /api/proxy/relations/:issueId           (forgiving alias, original flat form)
+   * Shared :issueId param across both forms (LIN-528).
    */
-  router.get('/api/proxy/relations/:issueId', proxyLimiter, authenticateProxyToken, async (req, res) => {
+  router.get(['/api/proxy/issues/:issueId/relations', '/api/proxy/relations/:issueId'], proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
       const { client, reason } = await getClient(req.proxyUrlKey);
       if (!client) {
@@ -2125,10 +2136,11 @@ One convention across every endpoint, so you can branch on the same fields every
   });
 
   /**
-   * POST /api/proxy/issues/:issueId/comments
-   * Add a comment to an issue.
+   * POST /api/proxy/issues/:issueId/comments  (canonical — nested issue-scoped form)
+   * POST /api/proxy/comments/:issueId           (forgiving alias, flat form)
+   * Add a comment to an issue. Shared :issueId param across both forms (LIN-528).
    */
-  router.post('/api/proxy/issues/:issueId/comments', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
+  router.post(['/api/proxy/issues/:issueId/comments', '/api/proxy/comments/:issueId'], proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
       const { client, reason } = await getClient(req.proxyUrlKey);
       if (!client) {
@@ -2566,10 +2578,12 @@ One convention across every endpoint, so you can branch on the same fields every
   });
 
   /**
-   * GET /api/proxy/prompt/:identifier/:templateKey
+   * GET /api/proxy/issues/:identifier/prompt/:templateKey  (canonical — nested issue-scoped)
+   * GET /api/proxy/prompt/:identifier/:templateKey           (forgiving alias, flat form)
    * Returns the generated prompt for a specific issue and template.
+   * Shared :identifier/:templateKey params across both forms (LIN-528).
    */
-  router.get('/api/proxy/prompt/:identifier/:templateKey', proxyLimiter, authenticateProxyToken, async (req, res) => {
+  router.get(['/api/proxy/issues/:identifier/prompt/:templateKey', '/api/proxy/prompt/:identifier/:templateKey'], proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
       const { token: accessToken, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
       if (!accessToken) {
@@ -2823,11 +2837,13 @@ One convention across every endpoint, so you can branch on the same fields every
   }
 
   /**
-   * GET /api/proxy/recommend/:identifier
+   * GET /api/proxy/issues/:identifier/recommend  (canonical — nested issue-scoped)
+   * GET /api/proxy/recommend/:identifier           (forgiving alias, flat form)
    * Returns an AI-generated prompt recommendation for an issue.
    * Uses the token creator's OAuth key (if available) or server-side OPENROUTER_API_KEY.
+   * Shared :identifier param across both forms (LIN-528).
    */
-  router.get('/api/proxy/recommend/:identifier', proxyLimiter, authenticateProxyToken, async (req, res) => {
+  router.get(['/api/proxy/issues/:identifier/recommend', '/api/proxy/recommend/:identifier'], proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
       const { token: accessToken, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
       if (!accessToken) {
@@ -2938,11 +2954,14 @@ One convention across every endpoint, so you can branch on the same fields every
   });
 
   /**
-   * GET /api/proxy/recap/:identifier
+   * GET /api/proxy/issues/:identifier/recap  (canonical — nested issue-scoped)
+   * GET /api/proxy/recap/:identifier           (forgiving alias, flat form)
    * Returns the AI-generated recap (done/pending/deviations) for an issue.
    * Auto-regenerates when missing or stale unless `?noRefresh=1` is passed.
+   * Shared :identifier param across both forms (LIN-528). POST /recap/:identifier
+   * (force-regenerate) is intentionally left flat-only — out of scope for LIN-528.
    */
-  router.get('/api/proxy/recap/:identifier', proxyLimiter, authenticateProxyToken, async (req, res) => {
+  router.get(['/api/proxy/issues/:identifier/recap', '/api/proxy/recap/:identifier'], proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
       const { token: accessToken, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
       if (!accessToken) {
@@ -3206,11 +3225,14 @@ One convention across every endpoint, so you can branch on the same fields every
   });
 
   /**
-   * GET /api/proxy/brief/:identifier
+   * GET /api/proxy/issues/:identifier/brief  (canonical — nested issue-scoped)
+   * GET /api/proxy/brief/:identifier           (forgiving alias, flat form)
    * Returns the current-state task brief (fixed-section Markdown) for an issue.
    * Auto-regenerates when missing or stale unless `?noRefresh=1` is passed.
+   * Shared :identifier param across both forms (LIN-528). POST /brief/:identifier
+   * (force-regenerate) is intentionally left flat-only — out of scope for LIN-528.
    */
-  router.get('/api/proxy/brief/:identifier', proxyLimiter, authenticateProxyToken, async (req, res) => {
+  router.get(['/api/proxy/issues/:identifier/brief', '/api/proxy/brief/:identifier'], proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
       const { token: accessToken, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
       if (!accessToken) {

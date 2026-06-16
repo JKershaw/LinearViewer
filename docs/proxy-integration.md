@@ -95,9 +95,20 @@ Authorization: Bearer YOUR_TOKEN
 One convention across every endpoint, so a consumer can branch on the same fields everywhere:
 
 - **Success is the HTTP status.** Any `2xx` is success; any non-`2xx` is failure. There is no partial state — a write never returns `2xx` with a falsy `success`.
-- **Reads** return the data directly: a single resource *is* the object (`GET /me`, `GET /issues/{id}`, `GET /cycle/{id}`); a collection comes under a named key (`{ "issues": [...] }`, `{ "teams": [...] }`).
+- **Reads** return the data directly: a single resource *is* the object (`GET /me`, `GET /issues/{id}`, `GET /cycles/{id}`); a collection comes under a named key (`{ "issues": [...] }`, `{ "teams": [...] }`).
 - **Writes** return `{ "success": true, ... }`. Linear writes nest the affected entity under a named key (`{ "success": true, "issue": {...} }`); other writes (dispatch, token) carry their fields alongside `"success": true`. A write that does not land is a non-`2xx` (typically `502`), never a `2xx`.
 - **Errors** are always `{ "error": "<message>", "detail"?: "<upstream detail>" }` with a non-`2xx` status. `detail` carries the Linear or AI upstream's own message when there is one.
+
+#### Path conventions
+
+Issue-scoped endpoints are canonical under `/issues/{id}/...`, so the read and write halves of a resource share one base. The documented forms below are the canonical ones:
+
+- `GET  /issues/{id}/relations` (read) pairs with `POST` / `DELETE /issues/{id}/relations[/{relationId}]` (write).
+- `POST /issues/{id}/comments` (write); reads of comments come back inside `GET /issues/{id}`.
+- `GET  /issues/{id}/recommend`, `/issues/{id}/recap`, `/issues/{id}/brief` (issue-derived AI reads).
+- Cycle detail is canonical as the plural by-id form `GET /cycles/{cycleId}`, mirroring the `GET /cycles` list.
+
+For backward compatibility the proxy also accepts **forgiving aliases** for the obvious alternate guesses — the older flat forms `GET /relations/{id}`, `GET /recap/{id}`, `GET /brief/{id}`, `GET /recommend/{id}`, `POST /comments/{id}`, and the singular `GET /cycle/{cycleId}` all still resolve to the same handlers. They are intentionally undocumented going forward; prefer the canonical paths above. The RPC-style verbs (`/stack`, `/dispatch*`, `/recommend-and-dispatch`, `/foreman/*`, `/autopilot/*`) are not issue-scoped and are unchanged.
 
 #### Structured error envelope
 
@@ -269,7 +280,7 @@ Key off `state.type` — `"canceled"` is terminal, so every consumer that alread
 
 The same asymmetry is handled on the other by-ID surfaces:
 
-- `GET /api/proxy/relations/{id}` returns a top-level `"trashed": true` (it has no root state to override); the relations are still returned so you can see what a now-deleted issue was related to.
+- `GET /api/proxy/issues/{id}/relations` returns a top-level `"trashed": true` (it has no root state to override); the relations are still returned so you can see what a now-deleted issue was related to.
 - The foreman context endpoints (`/recommend`, `/recap`, `/brief`, `/prompt`) **refuse** a trashed target with **`404`** rather than distilling or recommending work on a ghost.
 - The write endpoints (`PATCH /issues/{id}`, comments, relation-create, labels, description `append`/`replace`) **refuse** a trashed target with **`409`** rather than silently mutating a deleted issue.
 
@@ -353,7 +364,7 @@ Response:
 #### Get Cycle Detail
 
 ```
-GET /api/proxy/cycle/{cycleId}
+GET /api/proxy/cycles/{cycleId}
 ```
 
 Response includes issues, progress, and scope history:
@@ -379,7 +390,7 @@ Response includes issues, progress, and scope history:
 #### Get Issue Relations
 
 ```
-GET /api/proxy/relations/{issueId}
+GET /api/proxy/issues/{issueId}/relations
 ```
 
 Response:
@@ -403,14 +414,14 @@ Response:
 #### Get Task Recap
 
 ```
-GET  /api/proxy/recap/{identifier}
+GET  /api/proxy/issues/{identifier}/recap
 POST /api/proxy/recap/{identifier}
 ```
 
 An AI-generated progress summary (`done` / `pending` / `deviations`). `GET` returns
 the cached recap and auto-regenerates when it's missing or stale; pass `?noRefresh=1`
-to read without regenerating. `POST` force-regenerates. Both accept a UUID or an
-identifier (e.g. `ENG-42`). Read scope is sufficient.
+to read without regenerating. `POST` force-regenerates (it keeps the flat form). Both
+accept a UUID or an identifier (e.g. `ENG-42`). Read scope is sufficient.
 
 Response:
 ```json
@@ -429,7 +440,7 @@ With `?noRefresh=1` and no cache, `status` is `"missing"` (or `"stale"`) and the
 #### Get Task Brief
 
 ```
-GET  /api/proxy/brief/{identifier}
+GET  /api/proxy/issues/{identifier}/brief
 POST /api/proxy/brief/{identifier}
 ```
 
@@ -441,8 +452,8 @@ subtask state; on conflict the most recent/specific signal wins. Read it before
 trusting the raw description.
 
 `GET` returns the cached brief and auto-regenerates when missing or stale; pass
-`?noRefresh=1` to read without regenerating. `POST` force-regenerates. Both accept a
-UUID or an identifier. Read scope is sufficient.
+`?noRefresh=1` to read without regenerating. `POST` force-regenerates (it keeps the
+flat form). Both accept a UUID or an identifier. Read scope is sufficient.
 
 Unlike the other endpoints, `brief` is **fixed-section Markdown**, not structured
 fields. The headings are stable, so a consumer can recover individual sections
@@ -548,7 +559,7 @@ A compact orientation projection: each task drops the full `description` for a d
 #### Generate Prompt (deterministic)
 
 ```
-GET /api/proxy/prompt/{identifier}/{templateKey}
+GET /api/proxy/issues/{identifier}/prompt/{templateKey}
 ```
 
 Generates a deterministic, template-based prompt for an issue. `templateKey` must be a known template (e.g. `work-issue`, `plan`, `code-review`, `triage`, `breakdown`) — an unknown key returns `404`.
@@ -568,7 +579,7 @@ Generates a deterministic, template-based prompt for an issue. `templateKey` mus
 #### Recommend Prompt (AI)
 
 ```
-GET /api/proxy/recommend/{identifier}
+GET /api/proxy/issues/{identifier}/recommend
 ```
 
 Returns an AI-generated prompt recommendation. Requires an OpenRouter key (the token creator's OAuth connection, or the server's `OPENROUTER_API_KEY`); returns `503` when neither is configured. Like recap/brief, this calls an LLM and can exceed 25s — the server streams keepalive whitespace inside a single `200`, so don't set a client timeout below ~60s.
@@ -590,7 +601,7 @@ the escape hatch for prompts too large to paste — save straight to a `.md` fil
 
 ```bash
 curl -H "Authorization: Bearer YOUR_TOKEN" \
-  "https://your-host/api/proxy/recommend/ENG-42?format=md" -o ENG-42-recommend.md
+  "https://your-host/api/proxy/issues/ENG-42/recommend?format=md" -o ENG-42-recommend.md
 ```
 
 The markdown body is just the `prompt` string (no `reasoning`/`repo` envelope). On
@@ -605,7 +616,7 @@ issue's own next step instead**, without ever following into a child:
 
 ```bash
 curl -H "Authorization: Bearer YOUR_TOKEN" \
-  "https://your-host/api/proxy/recommend/ENG-42?noDescend=1"
+  "https://your-host/api/proxy/issues/ENG-42/recommend?noDescend=1"
 ```
 
 Use this when a parent's actual deliverables live in its own description/checklist
@@ -943,7 +954,7 @@ Returns `201`:
 DELETE /api/proxy/issues/{issueId}/relations/{relationId}
 ```
 
-Removes a relation. `relationId` is the relation's own `id` (the `id` field on each node returned by `GET /relations/{issueId}` or `GET /issues/{id}`), **not** an issue id.
+Removes a relation. `relationId` is the relation's own `id` (the `id` field on each node returned by `GET /issues/{issueId}/relations` or `GET /issues/{id}`), **not** an issue id.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -1169,7 +1180,7 @@ const issueRes = await fetch(`${API_BASE}/api/proxy/issues/${task.identifier}`, 
 const issue = await issueRes.json();
 
 // Get AI-generated prompt
-const promptRes = await fetch(`${API_BASE}/api/proxy/recommend/${task.identifier}`, { headers });
+const promptRes = await fetch(`${API_BASE}/api/proxy/issues/${task.identifier}/recommend`, { headers });
 const { prompt, reasoning } = await promptRes.json();
 
 console.log(`AI reasoning: ${reasoning}`);
@@ -1197,7 +1208,7 @@ echo "Active cycles:" && echo "$CYCLES" | jq '.cycles[] | .name'
 
 # Get issues in the current sprint
 CYCLE_ID=$(echo "$CYCLES" | jq -r '.cycles[0].id')
-CYCLE=$(curl -s -H "$AUTH" "$API_BASE/api/proxy/cycle/$CYCLE_ID")
+CYCLE=$(curl -s -H "$AUTH" "$API_BASE/api/proxy/cycles/$CYCLE_ID")
 echo "Issues in cycle:" && echo "$CYCLE" | jq '.issues.nodes[] | "\(.identifier): \(.title)"'
 
 # Create an issue and assign to a cycle

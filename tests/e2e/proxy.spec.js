@@ -548,8 +548,11 @@ test.describe('Proxy API - Consumer Endpoints', () => {
       headers: { Authorization: `Bearer ${readToken}` }
     });
     const text = await resp.text();
-    expect(text).toContain('/api/proxy/cycles');
-    expect(text).toContain('/api/proxy/cycle/');
+    // Canonical forms: the plural list and the plural by-id detail (LIN-528).
+    // The singular /cycle/{id} still resolves as a forgiving alias but is no
+    // longer documented in /instructions.
+    expect(text).toContain('/api/proxy/cycles?');
+    expect(text).toContain('/api/proxy/cycles/{cycleId}');
   });
 
   test('instructions include enhanced label info', async ({ request }) => {
@@ -560,6 +563,59 @@ test.describe('Proxy API - Consumer Endpoints', () => {
     // Label info is now surfaced via a sample JSON payload showing id/name/color fields.
     expect(text).toMatch(/labels.*\{.*id.*name.*color/s);
   });
+});
+
+// LIN-528 — Canonical nested issue-scoped routes plus forgiving flat aliases.
+// Exercised over real HTTP through the full app so route-ordering collisions
+// (a nested path shadowed by /issues/:issueId, or vice versa) would surface here
+// where the isolated-router unit test cannot see them. Each pair is driven down a
+// deterministic, network-free path so the assertion is stable: invalid-id 400s
+// for the GraphQL-backed endpoints, test-mode "not found" 404s for the LLM ones.
+test.describe('Proxy API - Route Aliases (LIN-528)', () => {
+  let readToken;
+  let writeToken;
+
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/test/clear-proxy-tokens');
+    const readResp = await page.goto('/test/create-proxy-token?scope=read&label=read-test');
+    readToken = (await readResp.json()).token;
+    const writeResp = await page.goto('/test/create-proxy-token?scope=readWrite&label=write-test');
+    writeToken = (await writeResp.json()).token;
+  });
+
+  // [canonical, alias] pairs with a probe URL each that short-circuits before any
+  // upstream call, plus the expected shared status.
+  const PAIRS = [
+    { name: 'relations (read)', method: 'get', token: () => readToken, status: 400,
+      canonical: '/api/proxy/issues/bad%20id/relations', alias: '/api/proxy/relations/bad%20id' },
+    { name: 'comments (write)', method: 'post', token: () => writeToken, status: 400, body: { body: 'hi' },
+      canonical: '/api/proxy/issues/bad%20id/comments', alias: '/api/proxy/comments/bad%20id' },
+    { name: 'cycle detail', method: 'get', token: () => readToken, status: 400,
+      canonical: '/api/proxy/cycles/not-a-uuid', alias: '/api/proxy/cycle/not-a-uuid' },
+    { name: 'recommend', method: 'get', token: () => readToken, status: 404,
+      canonical: '/api/proxy/issues/LIN-999999/recommend', alias: '/api/proxy/recommend/LIN-999999' },
+    { name: 'recap', method: 'get', token: () => readToken, status: 404,
+      canonical: '/api/proxy/issues/LIN-999999/recap', alias: '/api/proxy/recap/LIN-999999' },
+    { name: 'brief', method: 'get', token: () => readToken, status: 404,
+      canonical: '/api/proxy/issues/LIN-999999/brief', alias: '/api/proxy/brief/LIN-999999' },
+    { name: 'prompt', method: 'get', token: () => readToken, status: 404,
+      canonical: '/api/proxy/issues/LIN-999999/prompt/implement', alias: '/api/proxy/prompt/LIN-999999/implement' }
+  ];
+
+  for (const pair of PAIRS) {
+    test(`${pair.name}: canonical + alias resolve to the same handler`, async ({ request }) => {
+      const opts = { headers: { Authorization: `Bearer ${pair.token()}` } };
+      if (pair.body) opts.data = pair.body;
+      const canonical = await request[pair.method](pair.canonical, opts);
+      const alias = await request[pair.method](pair.alias, opts);
+
+      // Neither form may 404 at the routing layer — that would mean the path
+      // didn't register (the canonical 404s below are handler-level, with a body).
+      expect(canonical.status(), `canonical ${pair.canonical}`).toBe(pair.status);
+      expect(alias.status(), `alias ${pair.alias}`).toBe(canonical.status());
+      expect(await alias.json()).toEqual(await canonical.json());
+    });
+  }
 });
 
 test.describe('Proxy API - Single-Use Tokens', () => {
