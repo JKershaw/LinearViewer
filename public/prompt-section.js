@@ -84,18 +84,12 @@
    * Build the picker (idle state): prompt pill row.
    */
   function renderPicker(opts, state) {
-    const { hasAI, hasForeman, hasMiniForeman, hasAutopilot, defaultPromptKeys, morePromptKeys, promptMeta, customPrompts } = opts;
+    const { hasAI, hasAutopilot, defaultPromptKeys, morePromptKeys, promptMeta, customPrompts } = opts;
     const moreVisible = state.moreVisible;
     let html = '<div class="swipe-prompt-header"><span class="swipe-prompt-name">prompt</span></div>';
     html += '<div class="swipe-prompt-buttons">';
     if (hasAI) {
       html += `<button class="swipe-prompt-btn ai-btn" data-prompt="__ai__">\u2726 AI Recommend</button>`;
-    }
-    if (hasForeman) {
-      html += `<button class="swipe-prompt-btn foreman-btn" data-prompt="__foreman__" title="Foreman playbook pinned to this task">Foreman</button>`;
-    }
-    if (hasMiniForeman) {
-      html += `<button class="swipe-prompt-btn mini-foreman-btn" data-prompt="__mini-foreman__" title="One-step API fetch: agent pulls a fresh prompt from the proxy and runs it once">Mini-foreman</button>`;
     }
     if (hasAutopilot) {
       html += `<button class="swipe-prompt-btn autopilot-btn" data-prompt="__autopilot__" title="Run on autopilot until this task is done — dispatches work to a separate worker and watches the loop">Autopilot</button>`;
@@ -263,10 +257,6 @@
       state.activeLabel = label;
       if (label === '__ai__') {
         state.activeLabelName = 'AI Recommend';
-      } else if (label === '__foreman__') {
-        state.activeLabelName = 'Foreman';
-      } else if (label === '__mini-foreman__') {
-        state.activeLabelName = 'Mini-foreman';
       } else if (label === '__autopilot__') {
         state.activeLabelName = 'Autopilot';
       } else {
@@ -287,28 +277,6 @@
             throw new Error(error.error || 'Failed to load prompt');
           }
           await handleStreamingResponse(response, label, ac);
-        } else if (label === '__foreman__') {
-          // on401:false — a stale session surfaces in this section's own error
-          // state (the catch below), it does not bounce the page to /logout.
-          const result = await window.api(`${apiPrefix}/api/foreman-prompt/${issueId}`, { signal: ac.signal, on401: false });
-          if (abortController !== ac || destroyed) return;
-          const html = renderMarkdown(result.prompt);
-          const entry = { label, name: result.promptName || 'Foreman', raw: result.prompt, html };
-          promptCache.set(`${issueId}:${label}`, entry);
-          lastPromptLabel.set(issueId, label);
-          state.phase = 'fresh';
-          state.result = entry;
-          render();
-        } else if (label === '__mini-foreman__') {
-          const result = await window.api(`${apiPrefix}/api/mini-foreman-prompt/${issueId}`, { signal: ac.signal, on401: false });
-          if (abortController !== ac || destroyed) return;
-          const html = renderMarkdown(result.prompt);
-          const entry = { label, name: result.promptName || 'Mini-foreman', raw: result.prompt, html };
-          promptCache.set(`${issueId}:${label}`, entry);
-          lastPromptLabel.set(issueId, label);
-          state.phase = 'fresh';
-          state.result = entry;
-          render();
         } else if (label === '__autopilot__') {
           const result = await window.api(`${apiPrefix}/api/autopilot-prompt/${issueId}`, { signal: ac.signal, on401: false });
           if (abortController !== ac || destroyed) return;

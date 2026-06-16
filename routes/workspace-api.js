@@ -23,7 +23,6 @@ import { generatePrompt, generateCustomPrompt, hasPrompt, getAvailablePrompts } 
 import { renderDetailsContent } from '../lib/render.js';
 import { WORK_ISSUE_LABELS } from '../lib/workflow-config.js';
 import { parseRepoFromDescription, buildPromptFilename } from '../lib/prompt-formatters.js';
-import { buildForemanPlaybook, buildMiniForemanStep } from '../lib/prompts/foreman-playbook.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { isRecommendationEnabled, getRecommendation, getRecommendationStream, streamChat, getModelDisplayName } from '../lib/openrouter.js';
 import { resolveRecommendation, armHopSignal } from '../lib/recommend-recurse.js';
@@ -429,179 +428,6 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     }
   })
 
-  // ===========================================================================
-  // Foreman Prompt API
-  // ===========================================================================
-
-  /**
-   * Generate a foreman playbook pinned to a specific issue.
-   *
-   * The unparameterized playbook is still served at /api/proxy/foreman/playbook
-   * for external agents. This endpoint is the in-app entry point: it targets a
-   * single issue so the user can copy or dispatch a focused run.
-   *
-   * Gated on the proxy feature flag because the playbook instructs the agent
-   * to use proxy endpoints exclusively.
-   *
-   * @route GET /workspace/:urlKey/api/foreman-prompt/:issueId
-   * @param {string} issueId - The Linear issue ID (UUID)
-   * @returns {Object} { label, promptName, prompt, repo } or error
-   */
-  router.get('/workspace/:urlKey/api/foreman-prompt/:issueId', workspaceFromUrl, async (req, res) => {
-    const workspace = req.workspace
-    const { issueId } = req.params
-
-    const featureFlags = getFeatureFlags(req.session)
-    if (featureFlags.proxy !== true) {
-      return res.status(403).json({ error: 'Proxy feature is not enabled' })
-    }
-
-    if (!isValidIssueId(issueId)) {
-      return res.status(400).json({ error: 'Invalid issue ID format' })
-    }
-
-    const baseUrl = `${req.protocol}://${req.get('host')}`
-
-    try {
-      // Use mock data in test mode
-      if (process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token') {
-        const mockIssue = testMockData.issues.find(i => i.id === issueId)
-        if (!mockIssue) {
-          return res.status(404).json({ error: 'Issue not found' })
-        }
-        const identifier = mockIssue.url?.split('/').pop() || ''
-        const mockProject = testMockData.projects.find(p => p.id === mockIssue.project?.id)
-        const prompt = buildForemanPlaybook({
-          baseUrl,
-          issue: { identifier, title: mockIssue.title },
-          features: { linearMcp: featureFlags.linearMcp === true }
-        })
-        return sendPromptResult(req, res, {
-          identifier,
-          downloadName: 'foreman',
-          prompt,
-          json: {
-            label: 'foreman',
-            promptName: `Foreman run — ${identifier}`,
-            prompt,
-            repo: parseRepoFromDescription(mockProject?.content || null)
-          }
-        })
-      }
-
-      const { issue, project } = await getProviderForWorkspace(workspace).fetchIssueContext(getWorkspaceToken(workspace), issueId)
-      const prompt = buildForemanPlaybook({
-        baseUrl,
-        issue: { identifier: issue.identifier, title: issue.title },
-        features: { linearMcp: featureFlags.linearMcp === true }
-      })
-      sendPromptResult(req, res, {
-        identifier: issue.identifier,
-        downloadName: 'foreman',
-        prompt,
-        json: {
-          label: 'foreman',
-          promptName: `Foreman run — ${issue.identifier}`,
-          prompt,
-          repo: parseRepoFromDescription(project?.description)
-        }
-      })
-    } catch (error) {
-      console.error('Foreman prompt error:', error)
-      if (error.response?.status === 401) {
-        return res.status(401).json({ error: 'Token expired or invalid' })
-      }
-      if (error.message?.includes('not found')) {
-        return res.status(404).json({ error: error.message })
-      }
-      res.status(500).json({ error: 'Failed to generate foreman prompt', message: error.message })
-    }
-  })
-
-  /**
-   * Generate a mini-foreman step pinned to a specific issue.
-   *
-   * Mirrors /workspace/:urlKey/api/foreman-prompt/:issueId but returns a
-   * single-iteration instruction block that tells the agent to fetch the
-   * freshest /api/proxy/recommend/{identifier} response and execute it once.
-   * No loop, no role recitation — a one-shot variant of the foreman.
-   *
-   * Gated on the proxy feature flag because the block instructs the agent to
-   * use proxy endpoints.
-   *
-   * @route GET /workspace/:urlKey/api/mini-foreman-prompt/:issueId
-   * @param {string} issueId - The Linear issue ID (UUID)
-   * @returns {Object} { label, promptName, prompt, repo } or error
-   */
-  router.get('/workspace/:urlKey/api/mini-foreman-prompt/:issueId', workspaceFromUrl, async (req, res) => {
-    const workspace = req.workspace
-    const { issueId } = req.params
-
-    const featureFlags = getFeatureFlags(req.session)
-    if (featureFlags.proxy !== true) {
-      return res.status(403).json({ error: 'Proxy feature is not enabled' })
-    }
-
-    if (!isValidIssueId(issueId)) {
-      return res.status(400).json({ error: 'Invalid issue ID format' })
-    }
-
-    const baseUrl = `${req.protocol}://${req.get('host')}`
-
-    try {
-      // Use mock data in test mode
-      if (process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token') {
-        const mockIssue = testMockData.issues.find(i => i.id === issueId)
-        if (!mockIssue) {
-          return res.status(404).json({ error: 'Issue not found' })
-        }
-        const identifier = mockIssue.url?.split('/').pop() || ''
-        const mockProject = testMockData.projects.find(p => p.id === mockIssue.project?.id)
-        const prompt = buildMiniForemanStep({
-          baseUrl,
-          issue: { identifier, title: mockIssue.title }
-        })
-        return sendPromptResult(req, res, {
-          identifier,
-          downloadName: 'mini-foreman',
-          prompt,
-          json: {
-            label: 'mini-foreman',
-            promptName: `Mini-foreman — ${identifier}`,
-            prompt,
-            repo: parseRepoFromDescription(mockProject?.content || null)
-          }
-        })
-      }
-
-      const { issue, project } = await getProviderForWorkspace(workspace).fetchIssueContext(getWorkspaceToken(workspace), issueId)
-      const prompt = buildMiniForemanStep({
-        baseUrl,
-        issue: { identifier: issue.identifier, title: issue.title }
-      })
-      sendPromptResult(req, res, {
-        identifier: issue.identifier,
-        downloadName: 'mini-foreman',
-        prompt,
-        json: {
-          label: 'mini-foreman',
-          promptName: `Mini-foreman — ${issue.identifier}`,
-          prompt,
-          repo: parseRepoFromDescription(project?.description)
-        }
-      })
-    } catch (error) {
-      console.error('Mini-foreman prompt error:', error)
-      if (error.response?.status === 401) {
-        return res.status(401).json({ error: 'Token expired or invalid' })
-      }
-      if (error.message?.includes('not found')) {
-        return res.status(404).json({ error: error.message })
-      }
-      res.status(500).json({ error: 'Failed to generate mini-foreman prompt', message: error.message })
-    }
-  })
-
   /**
    * Generate an Autopilot kickoff prompt scoped to a specific issue — the
    * "run on autopilot until this task is done" instruction. Autopilot is a
@@ -611,7 +437,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
    * The general (stack-walk) kickoff is served at the issueless route below and
    * at /api/proxy/autopilot/kickoff for external agents.
    *
-   * Gated on the proxy feature flag (same as foreman) — the kickoff drives the
+   * Gated on the proxy feature flag — the kickoff drives the
    * proxy API exclusively. Optional `?mode=readonly` restricts the run to
    * investigation/research prompts; default is write (merge-gated).
    *

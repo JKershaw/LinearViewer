@@ -281,7 +281,7 @@ Key off `state.type` — `"canceled"` is terminal, so every consumer that alread
 The same asymmetry is handled on the other by-ID surfaces:
 
 - `GET /api/proxy/issues/{id}/relations` returns a top-level `"trashed": true` (it has no root state to override); the relations are still returned so you can see what a now-deleted issue was related to.
-- The foreman context endpoints (`/recommend`, `/recap`, `/brief`, `/prompt`) **refuse** a trashed target with **`404`** rather than distilling or recommending work on a ghost.
+- The task-automation context endpoints (`/recommend`, `/recap`, `/brief`, `/prompt`) **refuse** a trashed target with **`404`** rather than distilling or recommending work on a ghost.
 - The write endpoints (`PATCH /issues/{id}`, comments, relation-create, labels, description `append`/`replace`) **refuse** a trashed target with **`409`** rather than silently mutating a deleted issue.
 
 Collection endpoints (`/issues`, `/search`, `/stack`) and nested `children`/`parent`/relation lists are unaffected — Linear already excludes trash from those.
@@ -478,9 +478,9 @@ With `?noRefresh=1` and no cache, `status` is `"missing"` (or `"stale"`) and the
 > and can exceed 25s; the server streams whitespace keepalive bytes inside a single
 > `200` response, so don't set a client timeout below ~60s for these endpoints.
 
-### Foreman / Task Automation Endpoints
+### Task Automation Endpoints
 
-These endpoints back the "foreman" workflow: pick the next task, generate a prompt for it, and record agent progress. The **recap** and **brief** endpoints above are part of this group too. All are read-scope except `POST /api/proxy/foreman/status`, which requires `readWrite`.
+These endpoints back the task-automation workflow: pick the next task, generate a prompt for it, and record agent progress. The **recap** and **brief** endpoints above are part of this group too. All are read-scope except `POST /api/proxy/foreman/status`, which requires `readWrite`.
 
 #### Get Task Stack
 
@@ -675,63 +675,6 @@ Lists recent status entries, newest first. `limit` is 1-100 (default 20). Option
 
 `tokenId`, `tokenLabel`, and `dispatchId` appear only when they were recorded on the entry.
 
-#### List Foreman Sessions
-
-```
-GET /api/proxy/foreman/sessions
-```
-
-Groups status entries into sessions by posting token, so an observer can pick which agent to watch. Legacy entries without a token roll up into a synthetic `unattributed` session (`id` / `tokenId` of `__unattributed__` / `null`).
-
-```json
-{
-  "sessions": [
-    {
-      "id": "tokenId-or-__unattributed__",
-      "tokenId": "...",
-      "label": "My Agent",
-      "firstSeen": "2026-04-20T11:00:00.000Z",
-      "lastSeen": "2026-04-20T12:00:00.000Z",
-      "itemCount": 5,
-      "lastTaskIdentifier": "ENG-42",
-      "lastAction": "implement",
-      "lastStatus": "done"
-    }
-  ]
-}
-```
-
-#### List Foreman Task Threads
-
-```
-GET /api/proxy/foreman/tasks?tokenId={id}
-```
-
-Groups status entries by Linear task identifier ("what tasks have been touched?"). Optional `tokenId` narrows to a single session.
-
-```json
-{
-  "tasks": [
-    {
-      "taskIdentifier": "ENG-42",
-      "firstSeen": "2026-04-20T11:00:00.000Z",
-      "lastSeen": "2026-04-20T12:00:00.000Z",
-      "itemCount": 3,
-      "lastAction": "implement",
-      "lastStatus": "done"
-    }
-  ]
-}
-```
-
-#### Get Foreman Playbook
-
-```
-GET /api/proxy/foreman/playbook
-```
-
-Returns the foreman automation playbook as **plain text** (`text/plain`) — operating instructions for an agent orchestrating the stack → recommend → status loop.
-
 #### Get Autopilot Kickoff
 
 ```
@@ -739,7 +682,7 @@ GET /api/proxy/autopilot/kickoff
 GET /api/proxy/autopilot/kickoff?mode=readonly&goal=<text>
 ```
 
-Returns the **Autopilot kickoff** as **plain text** (`text/plain`) — the briefing that turns the receiving session into the *Autopilot orchestrator*. Unlike the foreman playbook (which works the stack in-session), Autopilot is a light orchestrator: it picks the next task, **dispatches the work to a separate worker** via `POST /api/proxy/dispatch`, watches the feedback, judges completion from external evidence, and decides continue / complete / pause-for-human.
+Returns the **Autopilot kickoff** as **plain text** (`text/plain`) — the briefing that turns the receiving session into the *Autopilot orchestrator*. Autopilot is a light orchestrator: it picks the next task, **dispatches the work to a separate worker** via `POST /api/proxy/dispatch`, watches the feedback, judges completion from external evidence, and decides continue / complete / pause-for-human.
 
 | Query param | Default | Description |
 |-------------|---------|-------------|
@@ -1147,7 +1090,7 @@ All query params optional. Merges the live queue and recent history, newest firs
 | 401 | `Missing or invalid Authorization header` | No Bearer token provided |
 | 401 | `Invalid, expired, or consumed token` | Token doesn't exist, expired, or was single-use and already used |
 | 403 | `This endpoint requires a read-write token` | Write endpoint called with read-only token |
-| 404 | `Issue not found` / `Cycle not found` | Resource doesn't exist — or, on the foreman context endpoints, the target is trashed |
+| 404 | `Issue not found` / `Cycle not found` | Resource doesn't exist — or, on the task-automation context endpoints, the target is trashed |
 | 409 | `Issue is trashed; refusing to modify a deleted issue` | Write target is a trashed (soft-deleted) issue |
 | 429 | `Too many proxy requests` | Rate limit exceeded (60/minute) |
 | 503 | `Workspace not available` | Workspace access token expired or unavailable |

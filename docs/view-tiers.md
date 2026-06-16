@@ -47,8 +47,7 @@ Mature, opt-in views for power users. A per-user feature flag (default off) in
 (`getFooterLinks` in `lib/components/footer.js`) and route gating. Unlike the
 experimental tier, these advertise themselves in the footer once enabled.
 
-- **roadmap**, **dispatch**, **proxy**, **foreman** (paired with proxy),
-  **pipeline**
+- **roadmap**, **dispatch**, **proxy**, **pipeline**
 
 ## Step 2 friction note (recorded for LIN-491 follow-up)
 

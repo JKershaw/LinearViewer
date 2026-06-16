@@ -31,7 +31,7 @@ const URL_KEY = 'test-workspace';
 const DIR = 'tests/screenshots/pages';
 
 // Pages live behind their feature flags; enable the ones whose pages we capture
-// (dispatch / roadmap / proxy + foreman). Encoded once for the set-session call.
+// (dispatch / roadmap / proxy). Encoded once for the set-session call.
 const FEATURES = encodeURIComponent(
   JSON.stringify({ dispatch: true, roadmap: true, proxy: true })
 );
@@ -116,10 +116,6 @@ test.describe('Authenticated pages', () => {
 
   test('proxy', async ({ page }) => {
     await capture(page, `/workspace/${URL_KEY}/proxy`, 'proxy');
-  });
-
-  test('foreman', async ({ page }) => {
-    await capture(page, `/workspace/${URL_KEY}/foreman`, 'foreman');
   });
 
   test('audit', async ({ page }) => {

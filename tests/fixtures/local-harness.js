@@ -18,8 +18,8 @@
  * on the Linear `test-token` path and must NOT be migrated here:
  *   - OAuth / PAT auth bootstrap        (auth.spec, pat-auth.spec, openrouter-auth.spec)
  *   - the Linear API proxy contract     (proxy.spec, proxy-toggle-copy.spec)
- *   - the foreman / dispatch API contracts (foreman.spec — proxy/foreman-prompt
- *     contract, provider re-point tracked under LIN-306; dispatch.spec)
+ *   - the dispatch API contract         (dispatch.spec; provider re-point of the
+ *     proxy data-fetch tracked under LIN-306)
  *   - cycles / teams / estimate-driven surfaces (the provider declares these off)
  *   - the boundary (pinned) cases of two mixed-harness specs (LIN-428): the
  *     Team-Filtering (teams off) + OAuth-error cases of error-handling.spec, and
@@ -47,7 +47,7 @@
  * surfaces that share the same endpoints:
  *   - free-tier suggest button + GET (free-tier.spec)  → recommend (stream + GET)
  *   - feature-toggles (feature-toggles.spec)           → prompt
- *   - foreman / mini-foreman / autopilot (foreman.spec)→ those prompt endpoints
+ *   - autopilot kickoff (proxy.spec)                   → autopilot prompt endpoint
  *   - roadmap generate (roadmap.spec)                  → roadmap data branch
  *   - audit (option b, LIN-412)                        → retained by design
  * The remaining cross-surface `testMockData` branches are now the PERMANENT

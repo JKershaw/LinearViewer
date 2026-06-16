@@ -1,7 +1,7 @@
 /**
  * Dashboard page styles (LIN-509).
  *
- * Mobile-first, modelled on Foreman/Swipe (single column, touch targets,
+ * Mobile-first, modelled on Swipe (single column, touch targets,
  * horizontal-scroll chips) rather than the Pipeline desktop floor. Tight padding
  * so the feed — not chrome — fills the small screen. Reuses the shared light
  * theme variables (--fg, --fg-dim, --fg-vdim, --bg, --bg-muted, green/yellow/red).

@@ -217,7 +217,7 @@ function loadLazySection(type, toggle, content) {
 /**
  * Load and inject an issue's detail block on first expand.
  * LIN-442: the dashboard ships collapsed lines only; the detail block
- * (description, metadata, comments shell, prompt/foreman/autopilot containers)
+ * (description, metadata, comments shell, prompt/autopilot containers)
  * is fetched here from /api/detail and injected into the empty `.details`
  * wrapper. Mirrors loadComments; guards against double-fetch via data-loaded.
  * @param {HTMLElement} details - The lazy `.details` wrapper element
@@ -834,18 +834,6 @@ function hideIssuePromptUI(detailsContainer, issueId) {
     recommendContainer.classList.add('hidden')
   }
 
-  // Hide foreman container
-  const foremanContainer = detailsContainer?.querySelector(`[data-foreman-for="${issueId}"]`)
-  if (foremanContainer) {
-    foremanContainer.classList.add('hidden')
-  }
-
-  // Hide mini-foreman container
-  const miniForemanContainer = detailsContainer?.querySelector(`[data-mini-foreman-for="${issueId}"]`)
-  if (miniForemanContainer) {
-    miniForemanContainer.classList.add('hidden')
-  }
-
   // Hide autopilot container
   const autopilotContainer = detailsContainer?.querySelector(`[data-autopilot-for="${issueId}"]`)
   if (autopilotContainer) {
@@ -872,7 +860,7 @@ function initPrompts() {
   // Handle clicks on promptable labels
   document.addEventListener('click', async (e) => {
     const labelLink = e.target.closest('.label-prompt')
-    if (!labelLink || labelLink.classList.contains('more-toggle') || labelLink.classList.contains('suggest-btn') || labelLink.classList.contains('foreman-btn') || labelLink.classList.contains('mini-foreman-btn')) return
+    if (!labelLink || labelLink.classList.contains('more-toggle') || labelLink.classList.contains('suggest-btn')) return
 
     e.preventDefault()
     e.stopPropagation()
@@ -1065,11 +1053,9 @@ function initPrompts() {
 
     // Get issue ID and workspace URL key. Each prompt-container variant anchors
     // its issue on a different data attribute (standard prompts use
-    // data-prompt-for; foreman/mini-foreman/autopilot each use their own), so
-    // check them all before falling back to the recommend container's wrapper.
+    // data-prompt-for; autopilot uses its own), so check them all before
+    // falling back to the recommend container's wrapper.
     const issueId = promptContainer.dataset.promptFor ||
-      promptContainer.dataset.foremanFor ||
-      promptContainer.dataset.miniForemanFor ||
       promptContainer.dataset.autopilotFor ||
       promptContainer.closest('[data-recommend-for]')?.dataset.recommendFor
     const urlKey = promptContainer.dataset.urlKey ||
@@ -2064,149 +2050,7 @@ async function initFreeTierStatus() {
 }
 
 /**
- * Initialize the Foreman button. Parallel to initRecommendations() but fetches
- * a deterministic playbook (no streaming) and renders it inside the
- * .foreman-container using the same copy/dispatch affordances.
- */
-function initForeman() {
-  let activeForemanFetch = null
-
-  document.addEventListener('click', async (e) => {
-    const foremanBtn = e.target.closest('.foreman-btn')
-    if (!foremanBtn) return
-
-    e.preventDefault()
-    e.stopPropagation()
-
-    const issueId = foremanBtn.dataset.issueId
-    const detailsContainer = foremanBtn.closest('.details')
-    const container = detailsContainer?.querySelector(`[data-foreman-for="${issueId}"]`)
-    if (!container) return
-
-    // Toggle off when already visible
-    if (!container.classList.contains('hidden')) {
-      container.classList.add('hidden')
-      return
-    }
-
-    if (activeForemanFetch) activeForemanFetch.abort()
-    const abortController = new AbortController()
-    activeForemanFetch = abortController
-
-    // Dismiss sibling prompt UI for this issue
-    hideIssuePromptUI(detailsContainer, issueId)
-
-    const promptText = container.querySelector('.prompt-text')
-    promptText.textContent = 'Loading...'
-    container.classList.remove('hidden')
-    setPromptActionsDisabled(container, true)
-
-    try {
-      const urlKey = container.dataset.urlKey
-      const apiPrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : ''
-      const data = await window.api(
-        `${apiPrefix}/api/foreman-prompt/${issueId}`,
-        { signal: abortController.signal }
-      )
-
-      if (activeForemanFetch === abortController) {
-        promptText.dataset.rawPrompt = data.prompt
-        promptText.innerHTML = renderMarkdown(data.prompt)
-        if (data.repo) {
-          container.dataset.repo = data.repo
-        } else {
-          delete container.dataset.repo
-        }
-        setPromptActionsDisabled(container, false)
-      }
-    } catch (error) {
-      if (error.name === 'AbortError') return
-      setPromptActionsDisabled(container, false)
-      promptText.textContent = `Error: ${error.message}`
-      console.error('Failed to fetch foreman prompt:', error)
-    } finally {
-      if (activeForemanFetch === abortController) {
-        activeForemanFetch = null
-      }
-    }
-  })
-}
-
-/**
- * Initialize the Mini-foreman button. Parallel to initForeman() but fetches a
- * short instruction-only block that tells the agent to call
- * /api/proxy/recommend/{identifier} at run time and execute the response once.
- * Reuses the same copy/dispatch/+proxy affordances.
- */
-function initMiniForeman() {
-  let activeMiniForemanFetch = null
-
-  document.addEventListener('click', async (e) => {
-    const btn = e.target.closest('.mini-foreman-btn')
-    if (!btn) return
-
-    e.preventDefault()
-    e.stopPropagation()
-
-    const issueId = btn.dataset.issueId
-    const detailsContainer = btn.closest('.details')
-    const container = detailsContainer?.querySelector(`[data-mini-foreman-for="${issueId}"]`)
-    if (!container) return
-
-    // Toggle off when already visible
-    if (!container.classList.contains('hidden')) {
-      container.classList.add('hidden')
-      return
-    }
-
-    if (activeMiniForemanFetch) activeMiniForemanFetch.abort()
-    const abortController = new AbortController()
-    activeMiniForemanFetch = abortController
-
-    // Dismiss sibling prompt UI for this issue
-    hideIssuePromptUI(detailsContainer, issueId)
-
-    const promptText = container.querySelector('.prompt-text')
-    promptText.textContent = 'Loading...'
-    container.classList.remove('hidden')
-    setPromptActionsDisabled(container, true)
-
-    // The block ships with YOUR_TOKEN as a placeholder. Users supply the real
-    // token via the +proxy toggle (same pattern as Foreman), which appends a
-    // proxy instructions block with a minted token at copy/dispatch time.
-    try {
-      const urlKey = container.dataset.urlKey
-      const apiPrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : ''
-      const data = await window.api(
-        `${apiPrefix}/api/mini-foreman-prompt/${issueId}`,
-        { signal: abortController.signal }
-      )
-
-      if (activeMiniForemanFetch === abortController) {
-        promptText.dataset.rawPrompt = data.prompt
-        promptText.innerHTML = renderMarkdown(data.prompt)
-        if (data.repo) {
-          container.dataset.repo = data.repo
-        } else {
-          delete container.dataset.repo
-        }
-        setPromptActionsDisabled(container, false)
-      }
-    } catch (error) {
-      if (error.name === 'AbortError') return
-      setPromptActionsDisabled(container, false)
-      promptText.textContent = `Error: ${error.message}`
-      console.error('Failed to fetch mini-foreman prompt:', error)
-    } finally {
-      if (activeMiniForemanFetch === abortController) {
-        activeMiniForemanFetch = null
-      }
-    }
-  })
-}
-
-/**
- * Initialize the Autopilot button. Parallel to initForeman(): fetches the
+ * Initialize the Autopilot button. Fetches the
  * task-scoped Autopilot kickoff ("run on autopilot until this task is done")
  * and renders it in the .autopilot-container with the same copy/dispatch/+proxy
  * affordances. The container carries data-kind="autopilot" so the shared
@@ -2283,8 +2127,6 @@ document.addEventListener('DOMContentLoaded', () => {
   initPrompts()
   initMorePrompts()
   initRecommendations()
-  initForeman()
-  initMiniForeman()
   initAutopilot()
   initQueuePanel()
   initFeatureToggles()
