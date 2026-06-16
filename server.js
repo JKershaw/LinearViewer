@@ -72,7 +72,6 @@ import { buildSessionCounts } from './lib/sessions-view.js'
 import { renderRoadmapPage } from './lib/render-roadmap.js'
 import { buildRoadmapModel } from './lib/roadmap.js'
 import { renderProxyPage } from './lib/render-proxy.js'
-import { renderForemanPage } from './lib/render-foreman.js'
 import { AVAILABLE_MODELS, setLlmCallRecorder } from './lib/openrouter.js'
 import { resolveWorkspaceModel, getWorkspaceFeatures, isWorkspaceFeatureEnabled, setWorkspaceFeature } from './lib/workspace-preferences.js'
 import { getFeatureFlags, isValidFeatureKey, isValidWorkspaceFeatureKey, WORKSPACE_FEATURES } from './lib/feature-defaults.js'
@@ -1405,31 +1404,6 @@ app.get('/workspace/:urlKey/proxy', workspaceFromUrl, (req, res) => {
     workspaces: req.session.workspaces,
     featureFlags,
     baseUrl: `${req.protocol}://${req.get('host')}`
-  });
-  res.send(html);
-});
-
-/**
- * Foreman page - requires authentication and proxy feature flag.
- * Displays foreman playbook, status log, and stack preview.
- */
-app.get('/workspace/:urlKey/foreman', workspaceFromUrl, (req, res) => {
-  const workspace = req.workspace;
-  const deployInfo = getDeployInfo();
-  const openRouterSource = getOpenRouterSource(req);
-  const featureFlags = getFeatureFlags(req.session);
-
-  // Guard: proxy feature must be enabled (foreman uses proxy tokens)
-  if (featureFlags.proxy !== true) {
-    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
-  }
-
-  const html = renderForemanPage(workspace.name || 'Workspace', {
-    deployInfo,
-    urlKey: workspace.urlKey,
-    openRouterSource,
-    workspaces: req.session.workspaces,
-    featureFlags
   });
   res.send(html);
 });

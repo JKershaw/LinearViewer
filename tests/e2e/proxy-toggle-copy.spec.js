@@ -31,7 +31,7 @@ async function selectDashboardPrompt(page) {
 /** Reveal a preexisting (template) prompt on the swipe view. */
 async function selectSwipePrompt(page) {
   await page.locator('.swipe-accordion-header[data-accordion="prompts"]').click();
-  const btn = page.locator('.swipe-prompt-buttons .swipe-prompt-btn:not(.ai-btn):not(.foreman-btn):not(.mini-foreman-btn):not(.autopilot-btn):not(.swipe-prompt-btn-more)').first();
+  const btn = page.locator('.swipe-prompt-buttons .swipe-prompt-btn:not(.ai-btn):not(.autopilot-btn):not(.swipe-prompt-btn-more)').first();
   await btn.click();
   const section = page.locator('.prompt-section');
   await expect(section).toHaveAttribute('data-phase', 'fresh', { timeout: 10000 });

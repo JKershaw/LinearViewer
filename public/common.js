@@ -215,7 +215,7 @@ window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
  * Single shared home for the `+proxy` toggle (LIN-525 #7). Previously this
  * logic was copy-pasted into app.js and prompt-section.js and had already
  * drifted; both now consume this one module. Lives in common.js because it is
- * loaded on every authenticated surface (tree, dispatch, foreman, swipe, …).
+ * loaded on every authenticated surface (tree, dispatch, swipe, …).
  *
  * State model:
  *  - The toggle's on/off lives in a single localStorage key.
@@ -347,7 +347,7 @@ window.ProxyToggle = (function () {
   return { isActive, isFeatureEnabled, getOrCreateToken, invalidate, buildBlock, maybeAppend, init, setActive };
 })();
 
-// Back-compat global consumed by app.js / dispatch.js / foreman.js call sites
+// Back-compat global consumed by app.js / dispatch.js call sites
 // (and their `typeof maybeAppendProxyBlock === 'function'` guards).
 window.maybeAppendProxyBlock = (text, urlKey) => window.ProxyToggle.maybeAppend(text, urlKey);
 
@@ -366,7 +366,7 @@ window.maybeAppendProxyBlock = (text, urlKey) => window.ProxyToggle.maybeAppend(
  *
  * Why delegated rather than per-element init:
  *  - The dashboard renders many triggers (one per issue × prompt/recommend/
- *    foreman), so a single shared listener avoids per-instance wiring and the
+ *    autopilot), so a single shared listener avoids per-instance wiring and the
  *    id-collision footgun — the panel is resolved relative to the clicked
  *    trigger, never by a global id lookup that could match the wrong instance.
  *  - The swipe view builds its trigger client-side and re-renders it on every

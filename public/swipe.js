@@ -25,8 +25,6 @@ const morePromptKeys = data.morePromptKeys || [];
 const customPrompts = data.customPrompts || [];
 const urlKey = data.urlKey || '';
 const hasAI = data.hasAI || false;
-const hasForeman = data.hasForeman || false;
-const hasMiniForeman = data.hasMiniForeman || false;
 const hasAutopilot = data.hasAutopilot || false;
 const dispatchEnabled = data.dispatchEnabled || false;
 const proxyEnabled = data.proxyEnabled || false;
@@ -742,8 +740,6 @@ function handleAccordionClick(e) {
           urlKey,
           issue,
           hasAI,
-          hasForeman,
-          hasMiniForeman,
           hasAutopilot,
           dispatchEnabled,
           proxyEnabled,

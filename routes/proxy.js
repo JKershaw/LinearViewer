@@ -30,7 +30,6 @@ import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActi
 import { flattenTrees, sortIssuesForSwipe, applyBlockingOrder, clusterByParent, computeGraphFeatures, computeOffPageBlockers, buildWhy } from '../lib/render-swipe.js';
 import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, DISPATCH_KINDS } from '../lib/prompt-templates.js';
 import { parseRepoFromDescription, buildPromptFilename } from '../lib/prompt-formatters.js';
-import { buildForemanPlaybook } from '../lib/prompts/foreman-playbook.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { buildAutopilotManual } from '../lib/prompts/autopilot-manual.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
@@ -1041,8 +1040,8 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanSto
     const { workspace } = req;
 
     // LIN-525 #2: token minting is gated on the proxy feature flag (defense in
-    // depth — independent of the UI). The proxy/foreman pages that mint tokens
-    // are themselves flag-gated, so a mint request on a flag-off session means a
+    // depth — independent of the UI). The proxy page that mints tokens
+    // is itself flag-gated, so a mint request on a flag-off session means a
     // stale global +proxy toggle is trying to inject where no button is shown.
     if (getFeatureFlags(req.session).proxy !== true) {
       return res.status(403).json({ error: 'Proxy feature is not enabled for this workspace' });
@@ -1201,7 +1200,7 @@ GET ${baseUrl}/api/proxy/issues/{issueId}
     { "name": "Trashed", "type": "canceled" } so you cannot mistake a deleted
     ghost for live work. Key off state.type ("canceled" ⇒ terminal, do not act)
     and read "trashed" to tell a deleted issue from a user-canceled one. The
-    foreman endpoints (recommend/recap/brief/prompt) refuse a trashed target
+    task-automation endpoints (recommend/recap/brief/prompt) refuse a trashed target
     with 404; the write endpoints refuse with 409.
 
 GET ${baseUrl}/api/proxy/search?q={query}
@@ -1243,7 +1242,7 @@ recommend / recap / brief (below), and comments (write section) all nest under
 the issue. Legacy flat forms (e.g. /relations/{id}, /recap/{id}, /comments/{id})
 still resolve as forgiving aliases, but prefer the nested form shown here.
 
-## Foreman Endpoints
+## Task Automation Endpoints
 
 GET ${baseUrl}/api/proxy/stack?limit={n}
   → Sorted task stack (default 5, max 50). Top-level shape:
@@ -1323,12 +1322,9 @@ POST ${baseUrl}/api/proxy/brief/{identifier}
   → Force-regenerate the brief and return the fresh result (same shape as GET above).
 
 GET ${baseUrl}/api/proxy/foreman/status
-  → Recent foreman status entries
+  → Recent agent status entries
   → { "items": [{ "id": "...", "taskIdentifier": "LIN-42", "action": "research",
                    "status": "completed", "summary": "...", "timestamp": "..." }], "total": 7 }
-
-GET ${baseUrl}/api/proxy/foreman/playbook
-  → Foreman playbook (plain text, not JSON)
 
 GET ${baseUrl}/api/proxy/autopilot/manual
   → Autopilot operating manual / handbook (plain text, not JSON) — the disposition
@@ -1398,7 +1394,7 @@ DELETE ${baseUrl}/api/proxy/issues/{issueId}/labels/{labelId}
 
 POST ${baseUrl}/api/proxy/foreman/status
   Body: { "taskIdentifier": "LIN-42", "action": "research", "status": "completed", "summary": "...", "dispatchId": "..." }
-  → Record a foreman status update (dispatchId optional: pass the dispatch-history item ID from /api/dispatch/take to enable exact loop-reconstruction join). Returns 201:
+  → Record an agent status update (dispatchId optional: pass the dispatch-history item ID from /api/dispatch/take to enable exact loop-reconstruction join). Returns 201:
   → { "success": true }
 
 ## Dispatch Endpoints
@@ -1475,7 +1471,7 @@ One convention across every endpoint, so you can branch on the same fields every
 400 - Validation error (bad/missing field, malformed ID)
 401 - Invalid, expired, or consumed token
 403 - Endpoint requires read-write token (yours is read-only)
-404 - Resource not found (includes a trashed target on the foreman endpoints)
+404 - Resource not found (includes a trashed target on the task-automation endpoints)
 409 - Refusing to modify a trashed (soft-deleted) issue (write endpoints)
 429 - Rate limited (max 60 requests/minute)
 500 - Internal server error
@@ -1484,7 +1480,7 @@ One convention across every endpoint, so you can branch on the same fields every
 
 ## Notes
 
-- All responses are JSON (except \`/api/proxy/foreman/playbook\`, \`/api/proxy/autopilot/manual\`, and \`/api/proxy/instructions\`, which are plain text).
+- All responses are JSON (except \`/api/proxy/autopilot/manual\` and \`/api/proxy/instructions\`, which are plain text).
 - Issue IDs can be UUIDs or identifiers (e.g., "LIN-123").
 - Dates are ISO 8601 format.
 - Rate limit: 60 requests per minute.
@@ -2400,12 +2396,12 @@ One convention across every endpoint, so you can branch on the same fields every
   });
 
   // =========================================================================
-  // Consumer API - Foreman Endpoints
+  // Consumer API - Task Automation Endpoints
   // =========================================================================
 
   /**
    * GET /api/proxy/stack
-   * Returns the sorted task stack for foreman use.
+   * Returns the sorted task stack for task-automation use.
    * Uses the same sort pipeline as the swipe view.
    */
   router.get('/api/proxy/stack', proxyLimiter, authenticateProxyToken, async (req, res) => {
@@ -3609,64 +3605,6 @@ One convention across every endpoint, so you can branch on the same fields every
       console.error('Foreman status list error:', err.message);
       res.status(500).json({ error: 'Failed to list status' });
     }
-  });
-
-  /**
-   * GET /api/proxy/foreman/sessions
-   * Lists foreman sessions for a workspace, keyed by posting token. Each
-   * session shows its most recent activity so observers can pick "which agent
-   * to watch" at a glance. Entries without a tokenId (legacy) roll up into a
-   * synthetic "unattributed" session.
-   */
-  router.get('/api/proxy/foreman/sessions', proxyLimiter, authenticateProxyToken, async (req, res) => {
-    try {
-      const result = await foremanStore.listSessions(req.proxyUrlKey);
-      logEvent(req, '/api/proxy/foreman/sessions', 200);
-      res.json(result);
-    } catch (err) {
-      logEvent(req, '/api/proxy/foreman/sessions', 500);
-      console.error('Foreman sessions list error:', err.message);
-      res.status(500).json({ error: 'Failed to list sessions' });
-    }
-  });
-
-  /**
-   * GET /api/proxy/foreman/tasks
-   * Lists task threads (groups of status entries by Linear identifier).
-   * Optional `tokenId` filter narrows to a single session.
-   */
-  router.get('/api/proxy/foreman/tasks', proxyLimiter, authenticateProxyToken, async (req, res) => {
-    try {
-      const filters = {};
-      if (req.query.tokenId) {
-        const raw = String(req.query.tokenId);
-        if (raw.length > MAX_NAME_LENGTH || DANGEROUS_CHARS_REGEX.test(raw)) {
-          logEvent(req, '/api/proxy/foreman/tasks', 400);
-          return res.status(400).json({ error: 'Invalid tokenId' });
-        }
-        filters.tokenId = raw;
-      }
-      const result = await foremanStore.listTaskThreads(req.proxyUrlKey, filters);
-      logEvent(req, '/api/proxy/foreman/tasks', 200);
-      res.json(result);
-    } catch (err) {
-      logEvent(req, '/api/proxy/foreman/tasks', 500);
-      console.error('Foreman tasks list error:', err.message);
-      res.status(500).json({ error: 'Failed to list tasks' });
-    }
-  });
-
-  /**
-   * GET /api/proxy/foreman/playbook
-   * Returns the foreman playbook prompt as plain text.
-   */
-  router.get('/api/proxy/foreman/playbook', proxyLimiter, authenticateProxyToken, async (req, res) => {
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
-
-    logEvent(req, '/api/proxy/foreman/playbook', 200);
-
-    const playbook = buildForemanPlaybook({ baseUrl });
-    res.type('text/plain').send(playbook);
   });
 
   /**
