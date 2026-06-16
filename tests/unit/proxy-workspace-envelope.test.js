@@ -95,7 +95,9 @@ function buildApp(reason) {
     dispatchQueueStore: {},
     workspaceFromUrl: (req, res, next) => next(),
     getWorkspaceOpenRouterKey: async () => null,
-    workspacePreferencesStore: {}
+    workspacePreferencesStore: {},
+    // Free-tier metering: a no-op stub; the failure paths under test never charge.
+    freeTierStore: { tryUse: async () => ({ allowed: true }) }
   }));
   return app;
 }

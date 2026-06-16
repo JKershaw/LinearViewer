@@ -38,6 +38,25 @@ import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
 import { appendBlock, replace as replaceInDescription, DescriptionEditError } from '../lib/description-edit.js';
 import { workspaceUnavailableEnvelope } from '../lib/errors.js';
 
+/**
+ * Resolve the OpenRouter credentials for a proxy LLM call, mirroring
+ * resolveRoadmapLLM (routes/workspace-api.js). Free tier is used ONLY when there
+ * is no token-creator OAuth key (`sessionApiKey`) and no server `OPENROUTER_API_KEY`,
+ * but `OPENROUTER_FREE_TIER_KEY` is set. `apiKey` is left undefined on the env-key
+ * path so getRecommendation/generateRecap/generateBrief fall back to
+ * `process.env.OPENROUTER_API_KEY` exactly as before — paid/OAuth/env behavior is
+ * unchanged. Model resolution stays on resolveWorkspaceModel; the model clamp is
+ * LIN-513, not this task.
+ * @param {string|null|undefined} sessionApiKey - Token-creator's OAuth key, if any.
+ * @returns {{ apiKey: (string|undefined), isFreeTier: boolean }}
+ */
+export function resolveProxyLLM(sessionApiKey) {
+  const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
+  const isFreeTier = !sessionApiKey && !process.env.OPENROUTER_API_KEY && !!freeTierKey;
+  const apiKey = sessionApiKey || (isFreeTier ? freeTierKey : undefined);
+  return { apiKey, isFreeTier };
+}
+
 // Lazy-load test fixtures only in test mode to avoid production dependency on test files
 let testMockData = null;
 async function getTestMockData() {
@@ -836,7 +855,7 @@ const UPDATE_ISSUE_LABELS_MUTATION = gql`
  * @param {Function} options.getWorkspaceOpenRouterKey - Function to get OpenRouter API key from workspace sessions
  * @returns {Router} Express router with proxy routes
  */
-export function createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, briefCacheStore, dispatchQueueStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, workspacePreferencesStore }) {
+export function createProxyRoutes({ proxyTokenStore, proxyEventStore, foremanStore, recapCacheStore, briefCacheStore, dispatchQueueStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, workspacePreferencesStore, freeTierStore }) {
   const router = Router();
 
   // =========================================================================
@@ -2607,6 +2626,22 @@ One convention across every endpoint, so you can branch on the same fields every
     }
   });
 
+  // Charge one free-tier unit for a proxy LLM request about to generate. Returns
+  // null when the request may proceed, or a { status, body } rejection carrying
+  // the standard 429 envelope when the limit is hit. Caller sends it via res or
+  // keepalive.send depending on whether the H12 keepalive is already armed.
+  async function chargeFreeTierOrReject(urlKey) {
+    const check = await freeTierStore.tryUse(urlKey);
+    if (check.allowed) return null;
+    return {
+      status: 429,
+      body: {
+        error: check.reason,
+        freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt }
+      }
+    };
+  }
+
   /**
    * Shared, test-mode-aware recommendation compute used by both GET /recommend
    * and the fused POST /recommend-and-dispatch verb. Returns
@@ -2697,6 +2732,10 @@ One convention across every endpoint, so you can branch on the same fields every
     const { issue, parent, siblings, project, children, comments, focusedChild } = context;
 
     const selectedModel = await resolveWorkspaceModel({ urlKey, workspacePreferencesStore });
+    // Resolve the effective key (free-tier when no session/env key) so both
+    // recommend surfaces send a valid key. Metering is NOT done here — this runs
+    // once per descent hop, so charging here would bill an N-hop descent N units.
+    const { apiKey: resolvedApiKey } = resolveProxyLLM(sessionApiKey);
     // Cancel the in-flight LLM call when its deadline trips instead of racing and
     // leaving it running orphaned (fetchWithTimeout vs withTimeout, LIN-346 surface 5).
     // getRecommendation now honors options.signal (gap #2). The per-hop deadline guard
@@ -2710,7 +2749,7 @@ One convention across every endpoint, so you can branch on the same fields every
           issue,
           { parent, siblings, project, children, comments, focusedChild },
           {
-            apiKey: sessionApiKey,
+            apiKey: resolvedApiKey,
             model: selectedModel,
             featureFlags: {},
             signal: AbortSignal.any([signal, hop.signal]),
@@ -2773,8 +2812,10 @@ One convention across every endpoint, so you can branch on the same fields every
       // Resolve OpenRouter API key: token creator's OAuth key or server env var
       const sessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
 
-      // Check if AI recommendations are available (skip in test mode)
-      if (!isTestMode && !isRecommendationEnabled(sessionApiKey)) {
+      // Check if AI recommendations are available (skip in test mode). A free-tier-only
+      // deployment (only OPENROUTER_FREE_TIER_KEY set) is accepted via isFreeTier.
+      const { isFreeTier } = resolveProxyLLM(sessionApiKey);
+      if (!isTestMode && !isRecommendationEnabled(sessionApiKey) && !isFreeTier) {
         logEvent(req, '/api/proxy/recommend', 503);
         return res.status(503).json({ error: 'AI recommendations not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.' });
       }
@@ -2785,6 +2826,17 @@ One convention across every endpoint, so you can branch on the same fields every
       if (!isValidIssueId(identifier)) {
         logEvent(req, '/api/proxy/recommend', 400);
         return res.status(400).json({ error: 'Invalid identifier format' });
+      }
+
+      // Charge one free-tier unit ONCE per request (not per descent hop — that
+      // would overbill a multi-hop container). resolveRecommendation does the
+      // generation below; charge before it so an exhausted user gets a clean 429.
+      if (isFreeTier && !isTestMode) {
+        const rejection = await chargeFreeTierOrReject(req.proxyUrlKey);
+        if (rejection) {
+          logEvent(req, '/api/proxy/recommend', 429);
+          return res.status(rejection.status).json(rejection.body);
+        }
       }
 
       // noDescend (LIN-365): recommend the named node's OWN work, never descend into
@@ -2926,10 +2978,24 @@ One convention across every endpoint, so you can branch on the same fields every
           });
         }
 
-        if (!isTestMode && !isRecommendationEnabled(sessionApiKey)) {
+        // A free-tier-only deployment is accepted via isFreeTier. The gate sits
+        // AFTER the cache-hit / noRefresh returns above, so a fresh-cache read
+        // never reaches it — and the charge below never bills a cache hit.
+        const { apiKey: resolvedApiKey, isFreeTier } = resolveProxyLLM(sessionApiKey);
+        if (!isTestMode && !isRecommendationEnabled(sessionApiKey) && !isFreeTier) {
           keepalive.stop();
           logEvent(req, '/api/proxy/recap', 503);
           return keepalive.send(503, { error: 'AI recap is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.' });
+        }
+
+        // Charge one free-tier unit only now that generation is guaranteed.
+        if (isFreeTier && !isTestMode) {
+          const rejection = await chargeFreeTierOrReject(req.proxyUrlKey);
+          if (rejection) {
+            keepalive.stop();
+            logEvent(req, '/api/proxy/recap', 429);
+            return keepalive.send(rejection.status, rejection.body);
+          }
         }
 
         const selectedModel = await resolveWorkspaceModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore });
@@ -2940,7 +3006,7 @@ One convention across every endpoint, so you can branch on the same fields every
           modelUsed = selectedModel;
         } else {
           const result = await withTimeout(
-            generateRecap(context.issue, context, { apiKey: sessionApiKey, model: selectedModel, callMeta: { urlKey: req.proxyUrlKey } }),
+            generateRecap(context.issue, context, { apiKey: resolvedApiKey, model: selectedModel, callMeta: { urlKey: req.proxyUrlKey } }),
             LLM_TIMEOUT_MS
           );
           recap = result.recap;
@@ -3012,9 +3078,21 @@ One convention across every endpoint, so you can branch on the same fields every
       const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
       const sessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
 
-      if (!isTestMode && !isRecommendationEnabled(sessionApiKey)) {
+      // A free-tier-only deployment is accepted via isFreeTier. POST always
+      // regenerates (no cache short-circuit), so charging right after the gate
+      // bills exactly one unit per generation.
+      const { apiKey: resolvedApiKey, isFreeTier } = resolveProxyLLM(sessionApiKey);
+      if (!isTestMode && !isRecommendationEnabled(sessionApiKey) && !isFreeTier) {
         logEvent(req, '/api/proxy/recap', 503);
         return res.status(503).json({ error: 'AI recap is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.' });
+      }
+
+      if (isFreeTier && !isTestMode) {
+        const rejection = await chargeFreeTierOrReject(req.proxyUrlKey);
+        if (rejection) {
+          logEvent(req, '/api/proxy/recap', 429);
+          return res.status(rejection.status).json(rejection.body);
+        }
       }
 
       // Force-regenerate always calls OpenRouter; arm a Heroku H12 guard.
@@ -3043,7 +3121,7 @@ One convention across every endpoint, so you can branch on the same fields every
           modelUsed = selectedModel;
         } else {
           const result = await withTimeout(
-            generateRecap(context.issue, context, { apiKey: sessionApiKey, model: selectedModel, callMeta: { urlKey: req.proxyUrlKey } }),
+            generateRecap(context.issue, context, { apiKey: resolvedApiKey, model: selectedModel, callMeta: { urlKey: req.proxyUrlKey } }),
             LLM_TIMEOUT_MS
           );
           recap = result.recap;
@@ -3168,10 +3246,23 @@ One convention across every endpoint, so you can branch on the same fields every
           });
         }
 
-        if (!isTestMode && !isRecommendationEnabled(sessionApiKey)) {
+        // Free-tier-only deployments accepted via isFreeTier. The gate sits after
+        // the cache-hit / noRefresh returns, so a fresh-cache read never charges.
+        const { apiKey: resolvedApiKey, isFreeTier } = resolveProxyLLM(sessionApiKey);
+        if (!isTestMode && !isRecommendationEnabled(sessionApiKey) && !isFreeTier) {
           keepalive.stop();
           logEvent(req, '/api/proxy/brief', 503);
           return keepalive.send(503, { error: 'AI brief is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.' });
+        }
+
+        // Charge one free-tier unit only now that generation is guaranteed.
+        if (isFreeTier && !isTestMode) {
+          const rejection = await chargeFreeTierOrReject(req.proxyUrlKey);
+          if (rejection) {
+            keepalive.stop();
+            logEvent(req, '/api/proxy/brief', 429);
+            return keepalive.send(rejection.status, rejection.body);
+          }
         }
 
         const selectedModel = await resolveWorkspaceModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore });
@@ -3182,7 +3273,7 @@ One convention across every endpoint, so you can branch on the same fields every
           modelUsed = selectedModel;
         } else {
           const result = await withTimeout(
-            generateBrief(context.issue, context, { apiKey: sessionApiKey, model: selectedModel, callMeta: { urlKey: req.proxyUrlKey } }),
+            generateBrief(context.issue, context, { apiKey: resolvedApiKey, model: selectedModel, callMeta: { urlKey: req.proxyUrlKey } }),
             LLM_TIMEOUT_MS
           );
           brief = result.brief;
@@ -3254,9 +3345,20 @@ One convention across every endpoint, so you can branch on the same fields every
       const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
       const sessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
 
-      if (!isTestMode && !isRecommendationEnabled(sessionApiKey)) {
+      // Free-tier-only deployments accepted via isFreeTier. POST always regenerates,
+      // so charging right after the gate bills exactly one unit per generation.
+      const { apiKey: resolvedApiKey, isFreeTier } = resolveProxyLLM(sessionApiKey);
+      if (!isTestMode && !isRecommendationEnabled(sessionApiKey) && !isFreeTier) {
         logEvent(req, '/api/proxy/brief', 503);
         return res.status(503).json({ error: 'AI brief is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.' });
+      }
+
+      if (isFreeTier && !isTestMode) {
+        const rejection = await chargeFreeTierOrReject(req.proxyUrlKey);
+        if (rejection) {
+          logEvent(req, '/api/proxy/brief', 429);
+          return res.status(rejection.status).json(rejection.body);
+        }
       }
 
       // Force-regenerate always calls OpenRouter; arm a Heroku H12 guard.
@@ -3285,7 +3387,7 @@ One convention across every endpoint, so you can branch on the same fields every
           modelUsed = selectedModel;
         } else {
           const result = await withTimeout(
-            generateBrief(context.issue, context, { apiKey: sessionApiKey, model: selectedModel, callMeta: { urlKey: req.proxyUrlKey } }),
+            generateBrief(context.issue, context, { apiKey: resolvedApiKey, model: selectedModel, callMeta: { urlKey: req.proxyUrlKey } }),
             LLM_TIMEOUT_MS
           );
           brief = result.brief;
@@ -3725,9 +3827,22 @@ One convention across every endpoint, so you can branch on the same fields every
       }
       const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
       const sessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
-      if (!isTestMode && !isRecommendationEnabled(sessionApiKey)) {
+      // A free-tier-only deployment is accepted via isFreeTier. computeRecommendation
+      // resolves the effective key per hop; here we only gate and meter.
+      const { isFreeTier } = resolveProxyLLM(sessionApiKey);
+      if (!isTestMode && !isRecommendationEnabled(sessionApiKey) && !isFreeTier) {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 503);
         return res.status(503).json({ error: 'AI recommendations not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.' });
+      }
+
+      // Charge one free-tier unit ONCE per request (not per descent hop). Charge
+      // before resolveRecommendation so an exhausted user gets a clean 429.
+      if (isFreeTier && !isTestMode) {
+        const rejection = await chargeFreeTierOrReject(req.proxyUrlKey);
+        if (rejection) {
+          logEvent(req, '/api/proxy/recommend-and-dispatch', 429);
+          return res.status(rejection.status).json(rejection.body);
+        }
       }
 
       // /recommend is slow (Linear + OpenRouter) — arm keepalive before computing.
