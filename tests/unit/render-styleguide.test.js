@@ -54,6 +54,45 @@ test('carries no deploy info (stable visual-regression baseline)', () => {
   assert.match(html, /github\.com\/JKershaw\/LinearViewer/);
 });
 
+test('renders the leaf button/input components with the shared stylesheet', () => {
+  const html = renderStyleguide();
+  // Real shared components must carry their live styles, so the page links the
+  // shared action/token stylesheet rather than re-encoding the button look.
+  assert.match(html, /<link rel="stylesheet" href="\/common-actions.css">/);
+  assert.match(html, /class="action-btn save"/);
+  assert.match(html, /class="action-btn disconnect"/);
+  assert.match(html, /class="token-label-input"/);
+});
+
+test('renders each theme side-by-side via the .theme-* hook', () => {
+  const html = renderStyleguide();
+  assert.match(html, /class="sg-theme-grid"/);
+  // The default (light) panel plus every alternate theme hook appear, so the
+  // page shows the impact of different themes at-a-glance.
+  assert.match(html, /class="sg-theme-panel theme-dark"/);
+  assert.match(html, /class="sg-theme-panel theme-amber"/);
+});
+
+test('alternate theme hooks exist in the stylesheet and only override tokens', () => {
+  const css = readFileSync(STYLE_CSS, 'utf8');
+  // The theme classes the page demonstrates must be real, reusable hooks.
+  assert.match(css, /\.theme-dark\s*\{/);
+  assert.match(css, /\.theme-amber\s*\{/);
+  // A theme may only restate EXISTING :root token names (no new tokens), so the
+  // "exercises EVERY :root token" guarantee and page byte-stability both hold.
+  const rootTokens = new Set(rootTokenNames());
+  for (const cls of ['.theme-dark', '.theme-amber']) {
+    const block = css.slice(css.indexOf(cls));
+    const body = block.slice(block.indexOf('{') + 1, block.indexOf('}'));
+    for (const m of body.matchAll(/(--[a-z0-9-]+)\s*:/gi)) {
+      assert.ok(
+        rootTokens.has(m[1]),
+        `${cls} declares ${m[1]} which is not a :root token — themes must only override existing tokens`
+      );
+    }
+  }
+});
+
 test('footer marks no current page action and hides authed nav', () => {
   const html = renderStyleguide();
   assert.match(html, /class="page-footer"/);
