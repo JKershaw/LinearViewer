@@ -210,7 +210,7 @@ export const swimSampleIssues = [
     dueDate: null, completedAt: null,
     url: 'https://linear.app/test/issue/API-5', parent: null,
     project: { id: 'proj-api' }, state: { name: 'Todo', type: 'unstarted' },
-    assignee: { name: 'Alice' }, labels: { nodes: [{ name: 'blocked' }, { name: 'launch' }] }, team: { id: TEAM_ENG },
+    assignee: { name: 'Alice' }, labels: { nodes: [{ name: 'launch' }] }, team: { id: TEAM_ENG },
     relations: { nodes: [] }
   },
 

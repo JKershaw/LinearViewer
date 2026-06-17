@@ -106,8 +106,11 @@ test.describe('Streaming AI Recommendations - API', () => {
     const reasoningText = reasoningDeltas.map(e => e.data.content).join('');
     const promptText = promptDeltas.map(e => e.data.content).join('');
 
-    // Verify content matches expected mock output
-    expect(reasoningText).toContain('blocked');
+    // Verify content matches expected mock output. (LIN-357: TEST-11's blocked
+    // LABEL was abolished and the local provider doesn't surface the blocking
+    // relationship to the curated issue, so the deterministic mock yields the
+    // generic overview reasoning — assert it streamed, not its keyword.)
+    expect(reasoningText.length).toBeGreaterThan(0);
     expect(promptText).toContain('Help me with task');
     expect(promptText).toContain('TEST-11');
   });
@@ -329,7 +332,8 @@ test.describe('Streaming AI Recommendations - UI', () => {
 
     const reasoning = recommendContainer.locator('.recommend-reasoning');
     await expect(reasoning).toBeVisible();
-    await expect(reasoning).toContainText('blocked');
+    // LIN-357: reasoning is the generic overview now (blocked label abolished); assert it streamed.
+    await expect(reasoning).not.toBeEmpty();
   });
 
   test('shows phase indicator during streaming', async ({ page }) => {

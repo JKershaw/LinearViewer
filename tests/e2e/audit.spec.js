@@ -108,8 +108,8 @@ test.describe('Operator Dashboard', () => {
       const queueSection = page.locator('.report-section:has(.section-header:has-text("Queue Readiness"))');
       await expect(queueSection).toBeVisible();
 
-      // Should show queue items (3 queues: Ready, In-Progress, Review)
-      await expect(queueSection.locator('.queue-item')).toHaveCount(3);
+      // Should show queue items (2 queues: Ready, In-Progress — Review removed, LIN-357)
+      await expect(queueSection.locator('.queue-item')).toHaveCount(2);
     });
 
     test('sections are collapsible', async ({ page }) => {
@@ -203,14 +203,14 @@ test.describe('Audit API', () => {
     expect(report.queues).toHaveProperty('readinessScore');
     expect(report.queues).toHaveProperty('isReady');
 
-    // Verify labels structure with workflow labels (simplified 3-label system)
+    // Verify labels structure with workflow labels (only `bug` remains — LIN-357)
     expect(report.labels).toHaveProperty('workflow');
     expect(report.labels.workflow).toHaveProperty('labels');
     expect(report.labels.workflow).toHaveProperty('presentCount');
     expect(report.labels.workflow).toHaveProperty('missingCount');
     expect(report.labels.workflow).toHaveProperty('totalCount');
-    expect(report.labels.workflow.labels).toHaveLength(2);
-    expect(report.labels.workflow.totalCount).toBe(2);
+    expect(report.labels.workflow.labels).toHaveLength(1);
+    expect(report.labels.workflow.totalCount).toBe(1);
     expect(report.labels).toHaveProperty('other');
     expect(report.labels).toHaveProperty('otherCount');
 

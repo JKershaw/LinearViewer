@@ -34,7 +34,8 @@ const ALL_SIGNAL_TYPES = [
 
 describe('COMPLETION_SIGNALS', () => {
   const expectedLabelTypes = [
-    WORK_ISSUE_LABELS.BLOCKED,
+    // `blocked` is keyed by the literal prompt name now (LIN-357: not a label)
+    'blocked',
     WORK_ISSUE_LABELS.BUG
   ];
 
@@ -106,7 +107,7 @@ describe('COMPLETION_SIGNALS', () => {
 
 describe('Signal Content', () => {
   test('blocked has appropriate signals', () => {
-    const signal = COMPLETION_SIGNALS[WORK_ISSUE_LABELS.BLOCKED];
+    const signal = COMPLETION_SIGNALS['blocked'];
     assert.ok(signal.coreOutcome.includes('forward') || signal.coreOutcome.includes('Path'));
     assert.ok(signal.signals.some(s => s.includes('Blocker') || s.includes('Root cause')));
     assert.ok(signal.readinessCheck.includes('resume'));

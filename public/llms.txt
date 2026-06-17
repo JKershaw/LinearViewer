@@ -131,28 +131,28 @@ Both In Progress and Projects sections use the same nested structure:
 
 ## Workflow Labels
 
-Tasks use 2 workflow labels:
-
-**`blocked`** - Work stuck on external dependency
-- Use when work cannot continue due to dependency, decision, or missing info
-- Analyze blockers and find resolution paths
-- Remove when blocker is resolved
+Tasks use 1 workflow label:
 
 **`bug`** - Investigating unexpected behavior
 - Use when investigating unexpected behavior
 - Document reproduction steps and hypotheses
 - Remove when bug is fixed
 
+Blocked-ness is NOT a label. A task is blocked when it has an incomplete
+`blocks`/`blocked-by` relationship to another task — record blockers as a
+relationship between the tasks, not as a label.
+
 ### Label Rules
 
-1. **Work issues can coexist**: `blocked` and `bug` can apply to the same task
-2. **Remove when done**: Remove labels when their purpose is complete
+1. **Remove when done**: Remove the `bug` label when its purpose is complete
+2. **Blocking is a relationship**: capture blockers via `blocks`/`blocked-by`
+   relations, never a label
 
 ### Typical Flow
 
 1. New task arrives → it is Ready once it's in a backlog/unstarted state
 2. Work begins → set status to "In Progress"
-3. If blocked → add `blocked` label
+3. If blocked → add a `blocks`/`blocked-by` relationship to the blocking task
 4. If bug found → add `bug` label
 5. Work complete → set status to "Done"
 

@@ -61,10 +61,11 @@ describe('selectFocusSubtask', () => {
     });
 
     test('fallback tie-break (all blocked) also picks lowest identifier', () => {
-      const blocked = { nodes: [{ name: 'blocked' }] };
+      // LIN-357: blocked-ness is the blocking relationship, not a label.
+      const blocked = { nodes: [{ type: 'blocks', issue: { id: 'x', state: { type: 'started' } } }] };
       const children = [
-        { id: 'b', identifier: 'LIN-30', state: { type: 'unstarted' }, labels: blocked },
-        { id: 'a', identifier: 'LIN-3', state: { type: 'unstarted' }, labels: blocked }
+        { id: 'b', identifier: 'LIN-30', state: { type: 'unstarted' }, inverseRelations: blocked },
+        { id: 'a', identifier: 'LIN-3', state: { type: 'unstarted' }, inverseRelations: blocked }
       ];
       assert.strictEqual(selectFocusSubtask(children).identifier, 'LIN-3');
     });
@@ -113,8 +114,9 @@ describe('selectFocusSubtask', () => {
       assert.strictEqual(result.id, '2');
     });
 
-    // BUG TEST: This test exposes the bug where blocked tasks are not filtered
-    // because labels are not fetched in the GraphQL query
+    // LIN-357: a task is blocked by an incomplete blocking RELATIONSHIP, not a label.
+    const blockingRelation = { nodes: [{ type: 'blocks', issue: { id: 'x', state: { type: 'started' } } }] };
+
     test('skips blocked task and selects next available todo', () => {
       const children = [
         { id: '1', identifier: 'LIN-1', state: { type: 'completed' } },
@@ -122,7 +124,7 @@ describe('selectFocusSubtask', () => {
           id: '2',
           identifier: 'LIN-2',
           state: { type: 'unstarted' },
-          labels: { nodes: [{ name: 'blocked' }] }
+          inverseRelations: blockingRelation
         },
         { id: '3', identifier: 'LIN-3', state: { type: 'unstarted' } }
       ];
@@ -131,33 +133,20 @@ describe('selectFocusSubtask', () => {
       assert.strictEqual(result.id, '3', 'Should skip blocked task and select non-blocked todo');
     });
 
-    test('skips blocked task with uppercase label', () => {
-      const children = [
-        {
-          id: '1',
-          identifier: 'LIN-1',
-          state: { type: 'unstarted' },
-          labels: { nodes: [{ name: 'Blocked' }] }
-        },
-        { id: '2', identifier: 'LIN-2', state: { type: 'unstarted' } }
-      ];
-      const result = selectFocusSubtask(children);
-      assert.strictEqual(result.id, '2', 'Should handle case-insensitive blocked label');
-    });
-
     test('skips multiple blocked tasks', () => {
       const children = [
         {
           id: '1',
           identifier: 'LIN-1',
           state: { type: 'unstarted' },
-          labels: { nodes: [{ name: 'blocked' }] }
+          inverseRelations: blockingRelation
         },
         {
           id: '2',
           identifier: 'LIN-2',
           state: { type: 'unstarted' },
-          labels: { nodes: [{ name: 'blocked' }, { name: 'bug' }] }
+          inverseRelations: blockingRelation,
+          labels: { nodes: [{ name: 'bug' }] }
         },
         { id: '3', identifier: 'LIN-3', state: { type: 'unstarted' } }
       ];
@@ -195,19 +184,20 @@ describe('selectFocusSubtask', () => {
   // Priority 3: Fallback to first incomplete
   describe('priority 3: fallback to first incomplete', () => {
     test('falls back to blocked task when all todos are blocked', () => {
+      const blockingRelation = { nodes: [{ type: 'blocks', issue: { id: 'x', state: { type: 'started' } } }] };
       const children = [
         { id: '1', identifier: 'LIN-1', state: { type: 'completed' } },
         {
           id: '2',
           identifier: 'LIN-2',
           state: { type: 'unstarted' },
-          labels: { nodes: [{ name: 'blocked' }] }
+          inverseRelations: blockingRelation
         },
         {
           id: '3',
           identifier: 'LIN-3',
           state: { type: 'unstarted' },
-          labels: { nodes: [{ name: 'blocked' }] }
+          inverseRelations: blockingRelation
         }
       ];
       const result = selectFocusSubtask(children);
@@ -235,42 +225,38 @@ describe('selectFocusSubtask', () => {
     });
   });
 
-  // Bug scenario: LIN-149 - labels not fetched for children
-  describe('LIN-149: blocked filter requires labels in data', () => {
-    test('BUG: without labels data, blocked filter is bypassed', () => {
-      // This simulates what happens when GraphQL doesn't fetch labels for children
-      // The first unstarted task is selected even if it would be blocked
-      const childrenWithoutLabels = [
+  // LIN-149 origin / LIN-357: blocked filter depends on blocking-relation data
+  describe('LIN-357: blocked filter requires relation data', () => {
+    test('without relation data, no task reads as blocked', () => {
+      // No blocking-relation data on any child → the first unstarted is selected.
+      const childrenWithoutRelations = [
         { id: '1', identifier: 'LIN-1', state: { type: 'completed' } },
-        { id: '2', identifier: 'LIN-2', state: { type: 'unstarted' } }, // Should be blocked, but no labels
+        { id: '2', identifier: 'LIN-2', state: { type: 'unstarted' } },
         { id: '3', identifier: 'LIN-3', state: { type: 'unstarted' } }
       ];
-      const result = selectFocusSubtask(childrenWithoutLabels);
-      // Without labels, LIN-2 is incorrectly selected (it should be blocked)
-      // This documents the bug behavior - after fix, GraphQL should provide labels
-      assert.strictEqual(result.id, '2', 'Without labels data, first unstarted is selected');
+      const result = selectFocusSubtask(childrenWithoutRelations);
+      assert.strictEqual(result.id, '2', 'Without relation data, first unstarted is selected');
     });
 
-    test('with labels data, blocked filter works correctly', () => {
-      // This is the expected behavior once GraphQL fetches labels
-      const childrenWithLabels = [
+    test('with relation data, blocked filter works correctly', () => {
+      const childrenWithRelations = [
         { id: '1', identifier: 'LIN-1', state: { type: 'completed' } },
         {
           id: '2',
           identifier: 'LIN-2',
           state: { type: 'unstarted' },
-          labels: { nodes: [{ name: 'blocked' }] }
+          inverseRelations: { nodes: [{ type: 'blocks', issue: { id: 'x', state: { type: 'started' } } }] }
         },
         {
           id: '3',
           identifier: 'LIN-3',
           state: { type: 'unstarted' },
-          labels: { nodes: [] }
+          inverseRelations: { nodes: [] }
         }
       ];
-      const result = selectFocusSubtask(childrenWithLabels);
-      // With labels, LIN-2 is correctly skipped
-      assert.strictEqual(result.id, '3', 'With labels data, blocked task is skipped');
+      const result = selectFocusSubtask(childrenWithRelations);
+      // LIN-2 is blocked by an incomplete blocker → correctly skipped
+      assert.strictEqual(result.id, '3', 'With relation data, blocked task is skipped');
     });
   });
 
@@ -369,13 +355,18 @@ describe('selectFocusSubtask', () => {
       assert.strictEqual(result.id, '1', 'Should ignore non-blocking relations');
     });
 
-    test('handles combination of label and relation blocking', () => {
+    test('skips multiple relation-blocked tasks', () => {
       const children = [
         {
           id: '1',
           identifier: 'LIN-1',
           state: { type: 'unstarted' },
-          labels: { nodes: [{ name: 'blocked' }] }
+          inverseRelations: {
+            nodes: [{
+              type: 'blocks',
+              issue: { id: 'blocker0', identifier: 'LIN-98', state: { type: 'unstarted' } }
+            }]
+          }
         },
         {
           id: '2',
@@ -391,7 +382,7 @@ describe('selectFocusSubtask', () => {
         { id: '3', identifier: 'LIN-3', state: { type: 'unstarted' } }
       ];
       const result = selectFocusSubtask(children);
-      assert.strictEqual(result.id, '3', 'Should skip both label-blocked and relation-blocked tasks');
+      assert.strictEqual(result.id, '3', 'Should skip relation-blocked tasks');
     });
   });
 
@@ -422,20 +413,17 @@ describe('selectFocusSubtask', () => {
 // =============================================================================
 
 describe('isBlocked', () => {
-  describe('label-based blocking', () => {
-    test('returns true for blocked label', () => {
+  // LIN-357: the `blocked` LABEL was abolished — a label is no longer a blocking
+  // signal. Blocked-ness is the incomplete blocking RELATIONSHIP only.
+  describe('labels are not a blocking signal (LIN-357)', () => {
+    test('returns false for the (abolished) blocked label', () => {
       const issue = { labels: { nodes: [{ name: 'blocked' }] } };
-      assert.strictEqual(isBlocked(issue), true);
+      assert.strictEqual(isBlocked(issue), false);
     });
 
-    test('returns true for Blocked label (case insensitive)', () => {
+    test('returns false for Blocked label (case variations)', () => {
       const issue = { labels: { nodes: [{ name: 'Blocked' }] } };
-      assert.strictEqual(isBlocked(issue), true);
-    });
-
-    test('returns true for BLOCKED label (case insensitive)', () => {
-      const issue = { labels: { nodes: [{ name: 'BLOCKED' }] } };
-      assert.strictEqual(isBlocked(issue), true);
+      assert.strictEqual(isBlocked(issue), false);
     });
 
     test('returns false for other labels', () => {
@@ -563,16 +551,16 @@ describe('isBlocked', () => {
     });
   });
 
-  describe('combined blocking', () => {
-    test('returns true for label even without relations', () => {
+  describe('label + relation interplay (LIN-357)', () => {
+    test('the abolished blocked label alone does NOT block', () => {
       const issue = {
         labels: { nodes: [{ name: 'blocked' }] },
         inverseRelations: { nodes: [] }
       };
-      assert.strictEqual(isBlocked(issue), true);
+      assert.strictEqual(isBlocked(issue), false);
     });
 
-    test('returns true for relation even without label', () => {
+    test('a blocking relation blocks regardless of labels', () => {
       const issue = {
         labels: { nodes: [] },
         inverseRelations: {

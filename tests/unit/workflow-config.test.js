@@ -4,8 +4,10 @@
  * Run with: node --test tests/unit/workflow-config.test.js
  *
  * Tests the workflow label system:
- * - blocked: Work stuck on external dependency
  * - bug: Investigating unexpected behavior
+ *
+ * Note: the `blocked` label was abolished (LIN-357) — blocked-ness is now the
+ * blocking `blocks`/`blocked-by` relationship, not a label.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
@@ -21,12 +23,15 @@ import {
 
 describe('WORK_ISSUE_LABELS', () => {
   test('has expected work issue labels', () => {
-    assert.strictEqual(WORK_ISSUE_LABELS.BLOCKED, 'blocked');
     assert.strictEqual(WORK_ISSUE_LABELS.BUG, 'bug');
   });
 
-  test('has exactly 2 labels', () => {
-    assert.strictEqual(Object.keys(WORK_ISSUE_LABELS).length, 2);
+  test('no longer carries a blocked label (LIN-357)', () => {
+    assert.strictEqual(WORK_ISSUE_LABELS.BLOCKED, undefined);
+  });
+
+  test('has exactly 1 label', () => {
+    assert.strictEqual(Object.keys(WORK_ISSUE_LABELS).length, 1);
   });
 });
 
@@ -46,13 +51,13 @@ describe('getWorkIssueLabels', () => {
   test('returns array of work issue label values', () => {
     const labels = getWorkIssueLabels();
     assert.ok(Array.isArray(labels));
-    assert.strictEqual(labels.length, 2);
+    assert.strictEqual(labels.length, 1);
   });
 
-  test('includes blocked and bug', () => {
+  test('includes bug but not blocked (LIN-357)', () => {
     const labels = getWorkIssueLabels();
-    assert.ok(labels.includes('blocked'));
     assert.ok(labels.includes('bug'));
+    assert.ok(!labels.includes('blocked'));
   });
 });
 
@@ -61,9 +66,9 @@ describe('getWorkIssueLabels', () => {
 // =============================================================================
 
 describe('Workflow label system', () => {
-  test('total workflow labels is 2', () => {
+  test('total workflow labels is 1', () => {
     const allLabels = [...getWorkIssueLabels()];
-    assert.strictEqual(allLabels.length, 2);
+    assert.strictEqual(allLabels.length, 1);
   });
 
   test('all labels are lowercase', () => {

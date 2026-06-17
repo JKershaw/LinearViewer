@@ -172,7 +172,7 @@ export const swimLocalSeed = localSeedFromLinearFixture({
  * `testMockData` the old `routes/pipeline.js` mock branch returned, so the
  * migrated pipeline specs assert on identical data — TEST-1 'Parent task in
  * progress' (started) parenting TEST-2 (unstarted) → parentChain, the started
- * leaves TEST-14 'Add pagination to user list' / TEST-15 (In Review), and the
+ * leaves TEST-14 'Add pagination to user list' / TEST-15 (started), and the
  * backlog/unstarted queue items (TEST-5/6/13) with priorities. Team is dropped
  * (local has no teams; pipeline does not filter by team) and URLs rewrite to
  * local paths (the overlay test asserts link *text*, not href).

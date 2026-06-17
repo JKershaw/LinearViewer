@@ -740,8 +740,12 @@ describe('buildMetaPromptTemplate single-action boundary (LIN-358)', () => {
   test('the blocked branch hands off rather than proceeding into the next phase', () => {
     const text = build();
     assert.ok(
-      /confirm unblocked, remove label, and recommend the next action/.test(text),
+      /confirm the task is unblocked and recommend the next action/.test(text),
       'the resolved-blocker shortcut must recommend the next action'
+    );
+    assert.ok(
+      !/remove label/.test(text),
+      'the abolished blocked-label mutation (LIN-357) must be gone from the meta-prompt'
     );
     assert.ok(
       !/proceed to the next phase/.test(text),

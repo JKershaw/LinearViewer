@@ -3,7 +3,7 @@
  *
  * Run with: node --test tests/unit/queue-config.test.js
  *
- * Tests the queue system (Ready / In-Progress / Review).
+ * Tests the queue system (Ready / In-Progress). (Review queue removed — LIN-357.)
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
@@ -87,12 +87,9 @@ describe('QUEUE_CONFIG', () => {
     assert.strictEqual(inProgress.required, true);
   });
 
-  test('has Review queue', () => {
+  test('has no Review queue (LIN-357: in-review state removed)', () => {
     const review = QUEUE_CONFIG.find(q => q.name === 'Review');
-    assert.ok(review);
-    assert.strictEqual(review.type, QUEUE_TYPES.STATE);
-    assert.ok(review.stateTypes.includes('review'));
-    assert.strictEqual(review.required, false);
+    assert.strictEqual(review, undefined);
   });
 
   test('all queues have required properties', () => {
@@ -104,8 +101,8 @@ describe('QUEUE_CONFIG', () => {
     }
   });
 
-  test('has exactly 3 queues', () => {
-    assert.strictEqual(QUEUE_CONFIG.length, 3);
+  test('has exactly 2 queues', () => {
+    assert.strictEqual(QUEUE_CONFIG.length, 2);
   });
 });
 
@@ -346,7 +343,7 @@ describe('getQueueNames', () => {
     const names = getQueueNames();
     assert.ok(names.includes('Ready'));
     assert.ok(names.includes('In-Progress'));
-    assert.ok(names.includes('Review'));
+    assert.ok(!names.includes('Review')); // LIN-357: in-review state removed
   });
 
   test('returns same count as QUEUE_CONFIG', () => {
@@ -413,11 +410,11 @@ describe('getStateBasedQueues', () => {
     }
   });
 
-  test('includes Ready, In-Progress, and Review queues', () => {
+  test('includes Ready and In-Progress queues (no Review — LIN-357)', () => {
     const queues = getStateBasedQueues();
     const names = queues.map(q => q.name);
     assert.ok(names.includes('Ready'));
     assert.ok(names.includes('In-Progress'));
-    assert.ok(names.includes('Review'));
+    assert.ok(!names.includes('Review'));
   });
 });

@@ -345,9 +345,9 @@ describe('blocked template', () => {
     assert.ok(result.prompt.includes('Root Cause'));
   });
 
-  test('has WORK_ISSUE category', () => {
+  test('has UNIVERSAL category (LIN-357: no longer label-triggered)', () => {
     const template = PROMPT_TEMPLATES['blocked'];
-    assert.strictEqual(template.category, PROMPT_CATEGORIES.WORK_ISSUE);
+    assert.strictEqual(template.category, PROMPT_CATEGORIES.UNIVERSAL);
   });
 });
 
@@ -1304,7 +1304,7 @@ describe('getPromptDescriptionsForAI', () => {
     assert.strictEqual(desc.name, 'blocked');
     assert.ok(typeof desc.description === 'string');
     assert.ok(desc.description.length > 0);
-    assert.strictEqual(desc.category, PROMPT_CATEGORIES.WORK_ISSUE);
+    assert.strictEqual(desc.category, PROMPT_CATEGORIES.UNIVERSAL);
   });
 
   test('filters out unknown keys', () => {
@@ -1665,8 +1665,9 @@ describe('FRONTIER FACTS fact-surfacing (LIN-433)', () => {
 
   test('handwritten path mirrors the same facts via formatSubtaskSummary', () => {
     const children = [
+      // LIN-357: blocked-ness is the incomplete blocking relation, not the label.
       { id: 'a', identifier: 'LIN-401', title: 't', state: { type: 'unstarted' },
-        labels: { nodes: [{ name: 'blocked' }] }, inverseRelations: { nodes: [] } },
+        labels: { nodes: [] }, inverseRelations: { nodes: [{ type: 'blocks', issue: { id: 'x', state: { type: 'started' } } }] } },
       { id: 'b', identifier: 'LIN-428', title: 't', state: { type: 'started' },
         labels: { nodes: [] }, inverseRelations: { nodes: [] } }
     ];
