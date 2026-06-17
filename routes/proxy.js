@@ -26,7 +26,7 @@ import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
 import { hashContext } from '../lib/recap-cache.js';
-import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, isTerminalState, NO_PROJECT_ID } from '../lib/tree.js';
+import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, isTerminalState, isBlocked, NO_PROJECT_ID } from '../lib/tree.js';
 import { flattenTrees, sortIssuesForSwipe, applyBlockingOrder, clusterByParent, computeGraphFeatures, computeOffPageBlockers, buildWhy } from '../lib/render-swipe.js';
 import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, DISPATCH_KINDS } from '../lib/prompt-templates.js';
 import { parseRepoFromDescription, buildPromptFilename } from '../lib/prompt-formatters.js';
@@ -113,7 +113,6 @@ async function buildMockRecapContextFromFixtures(issueId) {
  * Build a small deterministic recap for test mode.
  */
 function buildMockRecapFromContext(context) {
-  const labels = context.issue?.labels || [];
   const done = [];
   const pending = [];
   const deviations = [];
@@ -145,13 +144,6 @@ function buildMockRecapFromContext(context) {
       predicted: 'Pick up from current state'
     });
   }
-  if (labels.includes('blocked') || labels.includes('Blocked')) {
-    deviations.push({
-      item: 'Task is blocked',
-      type: 'blocker',
-      evidence: 'Blocked label applied'
-    });
-  }
   return { done, pending, deviations };
 }
 
@@ -163,7 +155,6 @@ function buildMockRecapFromContext(context) {
 function buildMockBriefFromContext(context) {
   const issue = context.issue || {};
   const remaining = (context.children || []).filter(c => !isTerminalState(c.state?.type));
-  const labels = issue.labels || [];
 
   const lines = [];
   lines.push('## Current');
@@ -175,11 +166,7 @@ function buildMockBriefFromContext(context) {
   lines.push('');
 
   lines.push('## Constraints');
-  if (labels.includes('blocked') || labels.includes('Blocked')) {
-    lines.push('- Task is blocked; resolve the blocker before proceeding.');
-  } else {
-    lines.push('- _None._');
-  }
+  lines.push('- _None._');
   lines.push('');
 
   lines.push('## Open questions');
@@ -2716,8 +2703,9 @@ One convention across every endpoint, so you can branch on the same fields every
 
       // A node with an incomplete child defers to it (LIN-327), so the recommend
       // recursion (resolveRecommendation) is exercised end-to-end in E2E: a parent
-      // resolves to its actionable descendant, not a parent-framed prompt. Labels
-      // (bug/blocked) still take precedence so the existing routes stay covered.
+      // resolves to its actionable descendant, not a parent-framed prompt. The `bug`
+      // label and a blocking RELATIONSHIP (LIN-357: blocked is the relationship, not a
+      // label) still take precedence so the existing routes stay covered.
       const mockChildren = mockData.issues.filter(i => i.parent?.id === mockIssue.id);
       const focusChild = mockChildren.find(c => c.state?.type !== 'completed' && c.state?.type !== 'canceled');
 
@@ -2725,7 +2713,7 @@ One convention across every endpoint, so you can branch on the same fields every
         reasoning = 'This is a bug. Investigating systematically will help find the root cause.';
         goal = 'Identify reproduction steps, hypothesize causes, and suggest a fix.';
         recommendedAction = 'bug';
-      } else if (labels.includes('blocked')) {
+      } else if (isBlocked(mockIssue)) {
         reasoning = 'This task is blocked. Analyzing the blocker to find a way forward.';
         goal = 'Identify the blocker and recommend how to unblock.';
         recommendedAction = 'blocked';

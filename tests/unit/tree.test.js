@@ -333,7 +333,8 @@ describe('isCompleted', () => {
  * Build a canonical child. `inverseBlocks` is a list of {identifier, type}
  * blockers — modelling "blocker blocks this child" via the child's inverse
  * `blocks` edge, which is how canonical children actually carry blocking data
- * (no forward blocksIds). `blockedLabel` adds the soft `blocked` label.
+ * (no forward blocksIds). `blockedLabel` adds the (abolished, LIN-357) `blocked`
+ * label — which no longer affects blocking, so it is only used to assert that.
  */
 function makeChild(identifier, type, { inverseBlocks = [], blockedLabel = false } = {}) {
   return {
@@ -438,18 +439,20 @@ describe('selectFocusSubtask', () => {
     assert.strictEqual(selectFocusSubtask(children).identifier, 'LIN-7');
   });
 
-  test('the `blocked` label alone excludes an in-progress child', () => {
+  test('the `blocked` label alone does NOT exclude an in-progress child (LIN-357)', () => {
+    // The label is abolished; only an incomplete blocking relation excludes. So the
+    // labelled-but-relation-free in-progress child is still chosen over the todo.
     const children = [
       makeChild('LIN-2', 'started', { blockedLabel: true }),
       makeChild('LIN-3', 'unstarted')
     ];
-    assert.strictEqual(selectFocusSubtask(children).identifier, 'LIN-3');
+    assert.strictEqual(selectFocusSubtask(children).identifier, 'LIN-2');
   });
 
   test('all candidates blocked → falls back to lowest-identifier non-terminal', () => {
     const children = [
-      makeChild('LIN-5', 'started', { blockedLabel: true }),
-      makeChild('LIN-3', 'unstarted', { blockedLabel: true })
+      makeChild('LIN-5', 'started', { inverseBlocks: [{ identifier: 'LIN-9', type: 'started' }] }),
+      makeChild('LIN-3', 'unstarted', { inverseBlocks: [{ identifier: 'LIN-9', type: 'started' }] })
     ];
     assert.strictEqual(selectFocusSubtask(children).identifier, 'LIN-3');
   });

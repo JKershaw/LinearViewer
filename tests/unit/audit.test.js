@@ -3,7 +3,7 @@
  *
  * Run with: node --test tests/unit/audit.test.js
  *
- * Tests the workflow label system (blocked, bug).
+ * Tests the workflow label system (bug). (`blocked` abolished — LIN-357.)
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
@@ -232,22 +232,21 @@ describe('Audit Computation', () => {
     // Workflow labels object should exist
     assert.ok(report.labels.workflow, 'Should have workflow labels analysis');
 
-    // Should have 2 workflow labels (blocked, bug)
-    assert.strictEqual(report.labels.workflow.labels.length, 2);
-    assert.strictEqual(report.labels.workflow.totalCount, 2);
+    // Should have 1 workflow label (bug) — `blocked` was abolished (LIN-357)
+    assert.strictEqual(report.labels.workflow.labels.length, 1);
+    assert.strictEqual(report.labels.workflow.totalCount, 1);
 
-    // blocked exists in mock data
+    // blocked is no longer a workflow label
     const blocked = report.labels.workflow.labels.find(l => l.name === 'blocked');
-    assert.ok(blocked, 'Should have blocked workflow label');
-    assert.strictEqual(blocked.exists, true);
+    assert.strictEqual(blocked, undefined, 'blocked is no longer a workflow label');
 
     // bug exists in mock data
     const bug = report.labels.workflow.labels.find(l => l.name === 'bug');
     assert.ok(bug, 'Should have bug workflow label');
     assert.strictEqual(bug.exists, true);
 
-    // Present count should be 2 (blocked, bug both exist)
-    assert.strictEqual(report.labels.workflow.presentCount, 2);
+    // Present count should be 1 (bug exists)
+    assert.strictEqual(report.labels.workflow.presentCount, 1);
     assert.strictEqual(report.labels.workflow.missingCount, 0);
   });
 
@@ -262,12 +261,13 @@ describe('Audit Computation', () => {
 
     const report = computeAuditFromData(dataWithCustomLabel);
 
-    // Other labels should only include non-workflow labels
-    assert.strictEqual(report.labels.otherCount, 1);
+    // Other labels include non-workflow labels: custom-label AND the abolished
+    // `blocked` (LIN-357 — it is no longer a workflow label).
+    assert.strictEqual(report.labels.otherCount, 2);
     assert.ok(report.labels.other.some(l => l.name === 'custom-label'));
+    assert.ok(report.labels.other.some(l => l.name === 'blocked'));
 
-    // Workflow labels (blocked, bug) should NOT appear in other
-    assert.ok(!report.labels.other.some(l => l.name === 'blocked'));
+    // The bug workflow label should NOT appear in other
     assert.ok(!report.labels.other.some(l => l.name === 'bug'));
   });
 

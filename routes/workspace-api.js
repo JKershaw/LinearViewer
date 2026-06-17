@@ -47,7 +47,7 @@ import { runAudit, computeAuditFromData } from '../lib/audit.js';
 import { UUID_REGEX, isValidIssueId, getWorkspaceToken } from '../lib/workspace.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
-import { isTerminalState } from '../lib/tree.js';
+import { isTerminalState, isBlocked } from '../lib/tree.js';
 import { testMockTeams, testMockData } from '../tests/fixtures/mock-data.js';
 
 /**
@@ -107,7 +107,7 @@ function sendPromptResult(req, res, { json, prompt, identifier, downloadName }) 
  * passed by the `isTestMode` stream / GET blocks. (LIN-413 verdict: those
  * blocks are RETAINED — free-tier.spec still drives the stream on the
  * test-token path and the recommend GET directly, so they are not orphaned.):
- *   - labels arrive either as a plain `['blocked']` array or as `{ nodes: [...] }`;
+ *   - labels arrive either as a plain `['bug']` array or as `{ nodes: [...] }`;
  *   - the identifier is read from `issue.identifier` (canonical urls end in a
  *     UUID, so the historic `url.split('/').pop()` is only a last-ditch fallback).
  * @param {Object} mockIssue - A canonical or Linear-shaped issue.
@@ -121,7 +121,8 @@ export function generateMockRecommendation(mockIssue) {
   let reasoning = 'Start by getting an overview of what this task involves before deciding on the next steps.';
   let goal = 'Summarize what this task involves and how it fits into the broader project context.';
 
-  if (labels.includes(WORK_ISSUE_LABELS.BLOCKED)) {
+  if (isBlocked(mockIssue)) {
+    // LIN-357: blocked-ness is the incomplete blocking relationship, not a label.
     reasoning = 'This task is blocked. Analyzing the blocker will help identify ways to unblock progress.';
     goal = 'Identify the blocker type and root cause, evaluate options to unblock, and recommend the best path.';
   } else if (labels.includes(WORK_ISSUE_LABELS.BUG)) {
@@ -680,8 +681,9 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         let reasoning = 'Start by getting an overview of what this task involves before deciding on the next steps.'
         let goal = 'Summarize what this task involves and how it fits into the broader project context.'
 
-        // Provide contextual mock prompts based on labels
-        if (labels.includes(WORK_ISSUE_LABELS.BLOCKED)) {
+        // Provide contextual mock prompts based on blocking relationship / labels
+        if (isBlocked(mockIssue)) {
+          // LIN-357: blocked-ness is the incomplete blocking relationship, not a label.
           reasoning = 'This task is blocked. Analyzing the blocker will help identify ways to unblock progress.'
           goal = 'Identify the blocker type and root cause, evaluate options to unblock, and recommend the best path.'
         } else if (labels.includes(WORK_ISSUE_LABELS.BUG)) {
@@ -1710,24 +1712,10 @@ ${goal}`
     }
   });
 
-  /**
-   * Issue labels as a flat name[] for the deterministic mocks (LIN-388).
-   * Tolerant of BOTH context shapes: the test-token mock context
-   * (buildMockRecapContext) supplies `labels` as a plain array, while the
-   * provider's canonical context supplies `{ nodes: [{ name }] }`. Normalizing
-   * here lets the same mock builder serve a local-provider session unchanged.
-   */
-  function mockContextLabels(issue) {
-    const raw = issue?.labels;
-    if (Array.isArray(raw)) return raw;
-    return (raw?.nodes || []).map(l => l.name);
-  }
-
   /** Build a small deterministic brief (Markdown) for test mode. */
   function buildMockBrief(context) {
     const issue = context.issue || {};
     const remaining = (context.children || []).filter(c => !isTerminalState(c.state?.type));
-    const labels = mockContextLabels(issue);
 
     const lines = [];
     lines.push('## Current');
@@ -1739,11 +1727,7 @@ ${goal}`
     lines.push('');
 
     lines.push('## Constraints');
-    if (labels.includes('blocked') || labels.includes('Blocked')) {
-      lines.push('- Task is blocked; resolve the blocker before proceeding.');
-    } else {
-      lines.push('- _None._');
-    }
+    lines.push('- _None._');
     lines.push('');
 
     lines.push('## Open questions');
@@ -1800,7 +1784,6 @@ ${goal}`
 
   /** Build a small deterministic recap for test mode. */
   function buildMockRecap(context) {
-    const labels = mockContextLabels(context.issue);
     const done = [];
     const pending = [];
     const deviations = [];
@@ -1830,13 +1813,6 @@ ${goal}`
       pending.push({
         item: 'Continue implementation',
         predicted: 'Pick up from current state'
-      });
-    }
-    if (labels.includes('blocked') || labels.includes('Blocked')) {
-      deviations.push({
-        item: 'Task is blocked',
-        type: 'blocker',
-        evidence: 'Blocked label applied'
       });
     }
     return { done, pending, deviations };

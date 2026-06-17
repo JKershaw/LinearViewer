@@ -19,44 +19,45 @@ import {
 test('generateMockRecommendation: canonical issue (labels.nodes shape, identifier)', () => {
   // Shape the local provider's _toCanonicalIssue emits: labels.nodes + a url that
   // ends in a UUID (so identifier must come from issue.identifier, not the url tail).
+  // Uses the `bug` label (LIN-357: `blocked` is no longer a label).
   const canonical = {
-    identifier: 'TEST-11',
-    url: '/workspace/local-workspace/issue/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    identifier: 'TEST-13',
+    url: '/workspace/local-workspace/issue/dddddddd-dddd-dddd-dddd-ddddddddddde',
     state: { name: 'In Progress', type: 'started' },
-    labels: { nodes: [{ name: 'blocked' }] },
+    labels: { nodes: [{ name: 'bug' }] },
   };
   const { reasoning, prompt, identifier } = generateMockRecommendation(canonical);
-  assert.equal(identifier, 'TEST-11');
-  assert.match(reasoning, /blocked/);
-  assert.match(prompt, /Help me with task TEST-11/);
-  assert.match(prompt, /\*\*Labels:\*\* blocked/);
+  assert.equal(identifier, 'TEST-13');
+  assert.match(reasoning, /bug/i);
+  assert.match(prompt, /Help me with task TEST-13/);
+  assert.match(prompt, /\*\*Labels:\*\* bug/);
 });
 
 test('generateMockRecommendation: plain-array labels are tolerated', () => {
   const canonical = {
-    identifier: 'TEST-11',
-    url: '/workspace/local-workspace/issue/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    identifier: 'TEST-13',
+    url: '/workspace/local-workspace/issue/dddddddd-dddd-dddd-dddd-ddddddddddde',
     state: { name: 'In Progress', type: 'started' },
-    labels: ['blocked'],
+    labels: ['bug'],
   };
   const { reasoning, prompt } = generateMockRecommendation(canonical);
-  assert.match(reasoning, /blocked/);
-  assert.match(prompt, /TEST-11/);
+  assert.match(reasoning, /bug/i);
+  assert.match(prompt, /TEST-13/);
 });
 
 test('generateMockRecommendation: Linear-shaped issue (url tail = identifier)', () => {
   // The testMockData shape: labels.nodes and a url whose tail IS the identifier.
   // identifier is still present, so it is preferred; the prompt must still carry it.
   const linearShaped = {
-    identifier: 'TEST-11',
-    url: 'https://linear.app/test/issue/TEST-11',
+    identifier: 'TEST-13',
+    url: 'https://linear.app/test/issue/TEST-13',
     state: { name: 'In Progress', type: 'started' },
-    labels: { nodes: [{ name: 'blocked' }] },
+    labels: { nodes: [{ name: 'bug' }] },
   };
   const { reasoning, prompt, identifier } = generateMockRecommendation(linearShaped);
-  assert.equal(identifier, 'TEST-11');
-  assert.match(reasoning, /blocked/);
-  assert.match(prompt, /TEST-11/);
+  assert.equal(identifier, 'TEST-13');
+  assert.match(reasoning, /bug/i);
+  assert.match(prompt, /TEST-13/);
 });
 
 test('generateMockRecommendation: identifier falls back to url tail when absent', () => {
@@ -81,10 +82,10 @@ test('generateMockRecommendation: bug label routes to the bug reasoning', () => 
 test('buildMockRecommendationHop: leaf returns a real (non-defer) action with a prompt', () => {
   const ctx = {
     issue: {
-      identifier: 'TEST-11',
-      url: '/workspace/local-workspace/issue/bbbb',
+      identifier: 'TEST-13',
+      url: '/workspace/local-workspace/issue/dddd',
       state: { name: 'In Progress', type: 'started' },
-      labels: { nodes: [{ name: 'blocked' }] },
+      labels: { nodes: [{ name: 'bug' }] },
     },
     project: { name: 'Local', description: null },
     children: [],
@@ -93,9 +94,9 @@ test('buildMockRecommendationHop: leaf returns a real (non-defer) action with a 
   const hop = buildMockRecommendationHop(ctx);
   assert.equal(hop.recommendedAction, 'recommend');
   assert.equal(hop.deferTo, null);
-  assert.equal(hop.identifier, 'TEST-11');
-  assert.match(hop.prompt, /TEST-11/);
-  assert.match(hop.reasoning, /blocked/);
+  assert.equal(hop.identifier, 'TEST-13');
+  assert.match(hop.prompt, /TEST-13/);
+  assert.match(hop.reasoning, /bug/i);
   assert.deepEqual(hop.children, []);
 });
 

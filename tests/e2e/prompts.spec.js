@@ -495,7 +495,7 @@ test.describe('Multiple Promptable Labels UI', () => {
   });
 
   test('renders review as clickable link in in-progress section', async ({ page }) => {
-    // Issue is in "In Review" state (started), so it appears in In Progress section.
+    // Issue is In Progress (started), so it appears in In Progress section.
     // review is the universal quality gate (code-review was consolidated into it — LIN-523).
     const taskLine = page.locator('.in-progress-items .line:has-text("Refactor authentication module")');
     await expect(taskLine).toBeVisible();
@@ -717,8 +717,9 @@ test.describe('AI Recommendations', () => {
     await expect(reasoning).toBeVisible();
     await expect(toggleBtn).toHaveText('hide reasoning');
 
-    // Should contain reasoning content
-    await expect(reasoning).toContainText('blocked');
+    // Should contain reasoning content (LIN-357: generic overview now that the
+    // blocked label is abolished and the local provider doesn't surface blocking).
+    await expect(reasoning).not.toBeEmpty();
   });
 
   test('recommendation shows generated prompt', async ({ page }) => {
@@ -846,14 +847,15 @@ test.describe('Recommendation API', () => {
   });
 
   test('returns contextual prompt based on labels', async ({ page }) => {
-    // Issue with blocked label
-    const response = await page.request.get(`${API_PREFIX}/api/recommend/${BLOCKED_ISSUE_ID}`);
+    // Bug-labelled issue — the label drives the contextual reasoning. (LIN-357:
+    // the `blocked` label was abolished, so `bug` is the remaining label signal.)
+    const response = await page.request.get(`${API_PREFIX}/api/recommend/${BUG_ISSUE_ID}`);
     const body = await response.json();
 
-    // Should mention blocked in reasoning
-    expect(body.reasoning.toLowerCase()).toContain('blocked');
+    // Should mention bug in reasoning
+    expect(body.reasoning.toLowerCase()).toContain('bug');
     // Prompt should include the issue identifier and goal section
-    expect(body.prompt).toContain('TEST-11');
+    expect(body.prompt).toContain('TEST-13');
     expect(body.prompt).toContain('Goal');
   });
 
