@@ -21,16 +21,31 @@ body:has(.ship-page) {
   cursor: grabbing;
 }
 
+/* While drag-panning, hold the grabbing cursor and suppress text selection so
+   the drag reads as a pan, not a selection. */
+.ship-page.ship-panning {
+  cursor: grabbing;
+  user-select: none;
+}
+
 /* ==========================================================================
    Canvas — radial coord space, larger than viewport so user can scroll around
    ========================================================================== */
 
-.ship-canvas {
+/* Stage owns the scrollable footprint (sized to canvas × zoom by client JS);
+   it is the element the page scrolls over. */
+.ship-stage {
   position: relative;
-  /* Sized by client JS based on outermost ring + buffer. */
   margin: 0 auto;
   min-width: 100%;
   min-height: 100%;
+}
+
+.ship-canvas {
+  position: relative;
+  /* Sized by client JS based on outermost ring + buffer. Zoom is applied as a
+     transform from the top-left so stage coordinates and scroll math line up. */
+  transform-origin: 0 0;
 }
 
 /* ==========================================================================
@@ -104,6 +119,20 @@ body:has(.ship-page) {
   max-width: 160px;
   font-size: 11px;
   z-index: 3;
+}
+
+/* Overlap recovery: orbit cards can still land on top of one another after the
+   collision pass in dense clusters. Hovering (or opening the popover for) a card
+   lifts it above its neighbours and gives it an opaque, shadowed surface so the
+   card underneath is never permanently buried or un-clickable. */
+.ship-orbit .swim-box:hover {
+  z-index: 40;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+}
+
+.ship-orbit .swim-box.ship-active {
+  z-index: 50;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.22);
 }
 
 /* Inside the ship rect, override the absolute positioning (cards flow in the grid). */
@@ -342,6 +371,64 @@ body:has(.ship-page) {
   opacity: 0.5;
   border-style: dashed;
   filter: grayscale(0.6);
+}
+
+/* ==========================================================================
+   Zoom control — pinned to the viewport bottom-left, mirrors the mode control's
+   monospace register. Out-of-stage so the zoom transform never reparents it.
+   ========================================================================== */
+
+.ship-zoom-control {
+  position: fixed;
+  bottom: 24px;
+  left: 16px;
+  z-index: 8; /* same band as the mode control */
+  display: flex;
+  align-items: stretch;
+  background: var(--bg);
+  border: 1px solid rgba(44, 62, 80, 0.25);
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.ship-zoom-btn {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 13px;
+  line-height: 1;
+  color: rgba(44, 62, 80, 0.7);
+  background: var(--bg);
+  border: none;
+  padding: 6px 11px;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.ship-zoom-btn + .ship-zoom-btn {
+  border-left: 1px solid rgba(44, 62, 80, 0.18);
+}
+
+.ship-zoom-btn:hover {
+  color: #2c3e50;
+  background: rgba(44, 62, 80, 0.04);
+}
+
+.ship-zoom-reset {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  min-width: 48px;
+  text-align: center;
+}
+
+/* ==========================================================================
+   Popover links — Linear + swipe destinations sit on one row.
+   ========================================================================== */
+
+.ship-popover-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
 }
 
 /* ==========================================================================

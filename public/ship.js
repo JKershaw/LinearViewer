@@ -940,6 +940,9 @@
     var canvas = document.getElementById('ship-canvas');
     canvas.style.width = canvasSize + 'px';
     canvas.style.height = canvasSize + 'px';
+    // Re-apply the current zoom: sizes #ship-stage to canvasSize × zoom and
+    // scales the canvas. Preserves zoom across re-renders (e.g. heading change).
+    applyZoomTransform();
 
     // Ship rect — set padding inline so CSS can't drift from the JS-computed
     // dimensions. Top padding includes label-area + grid-pad; the other three
@@ -999,8 +1002,8 @@
     renderModeControl(mode);
 
     if (pageEl) {
-      pageEl.scrollLeft = geom.centerX - viewportW / 2;
-      pageEl.scrollTop = geom.centerY - viewportH / 2;
+      pageEl.scrollLeft = geom.centerX * zoom - viewportW / 2;
+      pageEl.scrollTop = geom.centerY * zoom - viewportH / 2;
     }
   }
 
@@ -1421,6 +1424,116 @@
   }
 
   // =============================================================================
+  // Zoom + pan (LIN-535)
+  //
+  // The space can get large and spread out, so the user needs to scale it and
+  // move around freely. Zoom is a CSS transform on #ship-canvas (origin 0 0);
+  // #ship-stage carries the scaled footprint so the scroll container has a real
+  // extent to scroll over. Pan is drag-to-scroll on the page (desktop), on top
+  // of the native touch scrolling that already pans on mobile.
+  // =============================================================================
+
+  var MIN_ZOOM = 0.3;
+  var MAX_ZOOM = 2.5;
+  var zoom = 1;
+
+  // Push the current zoom into the DOM: stage gets the scaled footprint, canvas
+  // gets the scale transform. Reads viewState.canvasSize (set in render()).
+  function applyZoomTransform() {
+    var stage = document.getElementById('ship-stage');
+    var canvas = document.getElementById('ship-canvas');
+    if (!stage || !canvas) return;
+    var size = viewState.canvasSize || 0;
+    stage.style.width = (size * zoom) + 'px';
+    stage.style.height = (size * zoom) + 'px';
+    canvas.style.transform = 'scale(' + zoom + ')';
+    updateZoomLabel();
+  }
+
+  function updateZoomLabel() {
+    var reset = document.getElementById('ship-zoom-reset');
+    if (reset) reset.textContent = Math.round(zoom * 100) + '%';
+  }
+
+  // Set zoom, keeping the content point under (focalX, focalY) — viewport-
+  // relative client coords — stationary. Omitting the focal zooms about the
+  // viewport centre (used by the +/- buttons).
+  function setZoom(target, focalX, focalY) {
+    var page = document.querySelector('.ship-page');
+    if (!page) return;
+    var newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, target));
+    if (Math.abs(newZoom - zoom) < 1e-4) return;
+    var rect = page.getBoundingClientRect();
+    var fx = (focalX === undefined) ? rect.width / 2 : focalX - rect.left;
+    var fy = (focalY === undefined) ? rect.height / 2 : focalY - rect.top;
+    var contentX = page.scrollLeft + fx;
+    var contentY = page.scrollTop + fy;
+    var ratio = newZoom / zoom;
+    zoom = newZoom;
+    applyZoomTransform();
+    page.scrollLeft = contentX * ratio - fx;
+    page.scrollTop = contentY * ratio - fy;
+  }
+
+  // Reset zoom to 1 and recentre on the ship (mirrors render()'s initial centre).
+  function resetView() {
+    var page = document.querySelector('.ship-page');
+    zoom = 1;
+    applyZoomTransform();
+    if (page && viewState.geom) {
+      page.scrollLeft = viewState.geom.centerX - page.clientWidth / 2;
+      page.scrollTop = viewState.geom.centerY - page.clientHeight / 2;
+    }
+  }
+
+  function wireZoomControl() {
+    var inBtn = document.getElementById('ship-zoom-in');
+    var outBtn = document.getElementById('ship-zoom-out');
+    var resetBtn = document.getElementById('ship-zoom-reset');
+    if (inBtn) inBtn.addEventListener('click', function () { setZoom(zoom * 1.2); });
+    if (outBtn) outBtn.addEventListener('click', function () { setZoom(zoom / 1.2); });
+    if (resetBtn) resetBtn.addEventListener('click', resetView);
+
+    var page = document.querySelector('.ship-page');
+    if (!page) return;
+    // Pinch on a trackpad / ctrl+wheel zooms; a plain wheel keeps native pan.
+    page.addEventListener('wheel', function (e) {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      setZoom(zoom * Math.exp(-e.deltaY * 0.01), e.clientX, e.clientY);
+    }, { passive: false });
+  }
+
+  // Drag-to-pan for pointer devices. Native touch scrolling already pans on
+  // mobile, so this targets mouse drag in empty space; drags that start on a
+  // card or a control are ignored so clicks/selects still work.
+  function wirePan() {
+    var page = document.querySelector('.ship-page');
+    if (!page) return;
+    var dragging = false, startX = 0, startY = 0, startL = 0, startT = 0;
+    var IGNORE = '.swim-box, .ship-heading-control, .ship-mode-control, .ship-zoom-control, .swim-popover';
+
+    page.addEventListener('mousedown', function (e) {
+      if (e.button !== 0) return;
+      if (e.target.closest(IGNORE)) return;
+      dragging = true;
+      startX = e.clientX; startY = e.clientY;
+      startL = page.scrollLeft; startT = page.scrollTop;
+      page.classList.add('ship-panning');
+    });
+    window.addEventListener('mousemove', function (e) {
+      if (!dragging) return;
+      page.scrollLeft = startL - (e.clientX - startX);
+      page.scrollTop = startT - (e.clientY - startY);
+    });
+    window.addEventListener('mouseup', function () {
+      if (!dragging) return;
+      dragging = false;
+      page.classList.remove('ship-panning');
+    });
+  }
+
+  // =============================================================================
   // Popover (adapted from swim.js)
   // =============================================================================
 
@@ -1434,6 +1547,12 @@
 
   function openPopover(card, anchorEl) {
     var pop = document.getElementById('ship-popover');
+    // Lift the focused card above its neighbours for as long as it's open, so a
+    // card that landed underneath another stays fully visible while inspected.
+    var prevActive = document.querySelector('.swim-box.ship-active');
+    if (prevActive) prevActive.classList.remove('ship-active');
+    if (anchorEl) anchorEl.classList.add('ship-active');
+
     document.getElementById('ship-popover-id').textContent = card.identifier || '';
     document.getElementById('ship-popover-id').href = card.url || '#';
     document.getElementById('ship-popover-title').textContent = card.title || '';
@@ -1451,6 +1570,20 @@
     var link = document.getElementById('ship-popover-link');
     if (card.url) { link.href = card.url; link.style.display = ''; }
     else link.style.display = 'none';
+
+    // Second destination: open the task in the swipe view. Needs the workspace
+    // urlKey (absent on the landing/preview render) and an identifier.
+    var swipe = document.getElementById('ship-popover-swipe');
+    if (swipe) {
+      var data = window.__SHIP_DATA__ || {};
+      if (data.urlKey && card.identifier) {
+        swipe.href = '/workspace/' + encodeURIComponent(data.urlKey) +
+          '/swipe/' + encodeURIComponent(card.identifier);
+        swipe.style.display = '';
+      } else {
+        swipe.style.display = 'none';
+      }
+    }
 
     pop.classList.remove('hidden');
 
@@ -1471,6 +1604,8 @@
 
   function closePopover() {
     document.getElementById('ship-popover').classList.add('hidden');
+    var active = document.querySelector('.swim-box.ship-active');
+    if (active) active.classList.remove('ship-active');
   }
 
   function wirePopover() {
@@ -1512,5 +1647,7 @@
     wirePopover();
     wireHeadingControl();
     wireModeControl();
+    wireZoomControl();
+    wirePan();
   }
 })();

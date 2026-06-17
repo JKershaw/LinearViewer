@@ -132,6 +132,81 @@ test.describe('Ship Page', () => {
     await expect(page.locator('#ship-orbit .swim-box[data-sector="forward"]')).toHaveCount(0);
   });
 
+  // LIN-535: zoom, pan, overlap recovery, and a swipe destination link.
+  test('zoom controls scale the canvas and reset returns to 100%', async ({ page }) => {
+    const canvas = page.locator('#ship-canvas');
+    const transformOf = () => canvas.evaluate(n => n.style.transform);
+
+    // Starts unzoomed (no transform or scale(1)).
+    const initial = await transformOf();
+    expect(initial === '' || /scale\(1\)/.test(initial)).toBeTruthy();
+
+    await page.locator('#ship-zoom-in').click();
+    const zoomed = await transformOf();
+    const scaleIn = parseFloat(zoomed.match(/scale\(([\d.]+)\)/)[1]);
+    expect(scaleIn).toBeGreaterThan(1);
+    await expect(page.locator('#ship-zoom-reset')).not.toHaveText('100%');
+
+    // Stage footprint grows with zoom so the scroll extent follows.
+    const stageW = await page.locator('#ship-stage').evaluate(n => parseFloat(n.style.width));
+    const canvasW = await canvas.evaluate(n => parseFloat(n.style.width));
+    expect(stageW).toBeCloseTo(canvasW * scaleIn, 0);
+
+    await page.locator('#ship-zoom-out').click();
+    await page.locator('#ship-zoom-out').click();
+    const scaleOut = parseFloat((await transformOf()).match(/scale\(([\d.]+)\)/)[1]);
+    expect(scaleOut).toBeLessThan(1);
+
+    await page.locator('#ship-zoom-reset').click();
+    await expect(page.locator('#ship-zoom-reset')).toHaveText('100%');
+    expect(parseFloat((await transformOf()).match(/scale\(([\d.]+)\)/)[1])).toBeCloseTo(1, 5);
+  });
+
+  test('drag in empty space pans the canvas', async ({ page }) => {
+    const pageEl = page.locator('.ship-page');
+    const before = await pageEl.evaluate(n => n.scrollLeft);
+    const box = await pageEl.boundingBox();
+    // Drag from a corner (empty space, away from the central ship/cards).
+    await page.mouse.move(box.x + 30, box.y + 30);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 30 - 120, box.y + 30 - 80, { steps: 8 });
+    await page.mouse.up();
+    const after = await pageEl.evaluate(n => n.scrollLeft);
+    expect(after).toBeGreaterThan(before);
+  });
+
+  test('opening a card lifts it above its neighbours (overlap recovery)', async ({ page }) => {
+    const card = page.locator('#ship-orbit .swim-box').first();
+    await expect(card).not.toHaveClass(/ship-active/);
+    await card.click();
+    await expect(card).toHaveClass(/ship-active/);
+    const z = await card.evaluate(n => getComputedStyle(n).zIndex);
+    expect(Number(z)).toBeGreaterThan(3);
+    // Closing releases the lift so no card stays permanently raised.
+    await page.locator('#ship-popover-close').click();
+    await expect(card).not.toHaveClass(/ship-active/);
+  });
+
+  test('popover offers a swipe link alongside the Linear link', async ({ page }) => {
+    await page.locator('#ship-orbit .swim-box').first().click();
+    const swipe = page.locator('#ship-popover-swipe');
+    await expect(swipe).toBeVisible();
+    const href = await swipe.getAttribute('href');
+    expect(href).toMatch(
+      new RegExp(`/workspace/${LOCAL_WORKSPACE_URL_KEY}/swipe/[A-Za-z0-9-]+`)
+    );
+    // The Linear link is still present — the swipe link is additive.
+    await expect(page.locator('#ship-popover-link')).toBeVisible();
+  });
+
+  test('swipe link navigates to the task in the swipe view', async ({ page }) => {
+    await page.locator('#ship-orbit .swim-box').first().click();
+    const href = await page.locator('#ship-popover-swipe').getAttribute('href');
+    await page.goto(href);
+    await page.waitForLoadState('networkidle');
+    await expect(page).toHaveURL(new RegExp(`/workspace/${LOCAL_WORKSPACE_URL_KEY}/swipe/`));
+  });
+
   test('layout is deterministic across reloads', async ({ page }) => {
     const positions1 = await page.locator('#ship-orbit .swim-box').evaluateAll(
       nodes => nodes.map(n => ({
