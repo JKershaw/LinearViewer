@@ -9,18 +9,19 @@ import { PERIODICALS, getPeriodicals, buildPeriodicalNodes } from '../../lib/per
 import { PERIODICALS_PROJECT_ID } from '../../lib/tree.js';
 
 describe('periodicals registry', () => {
-  test('seeds the LIN-354 review set plus Drift & Coherence, Comprehension-Debt, Stability, and Dependency & Supply-Chain (9 templates)', () => {
-    assert.strictEqual(PERIODICALS.length, 9);
+  test('seeds the LIN-354 review set plus Drift & Coherence, Comprehension-Debt, Stability, Dependency & Supply-Chain, and Recent Headwinds (10 templates)', () => {
+    assert.strictEqual(PERIODICALS.length, 10);
     assert.strictEqual(getPeriodicals(), PERIODICALS);
   });
 
-  test('contains the eight corrective reviews plus the advisory Stability Review', () => {
+  test('contains the eight corrective reviews plus the advisory Stability Review and Recent Headwinds report', () => {
     // Assert by id/title/mode rather than position so the registry can grow.
     const byId = Object.fromEntries(PERIODICALS.map(t => [t.id, t]));
 
-    // id -> [title, mode]. The eight code-surface reviews are 'corrective'
-    // (they mint fix-tasks); the Stability Review (LIN-453) is the first
-    // 'advisory' entry — a governor that reports for a human to act on.
+    // id -> [title, mode]. The eight code-surface / supply-chain reviews are
+    // 'corrective' (they mint fix-tasks); the Stability Review (LIN-453) and the
+    // Recent Headwinds report (LIN-542) are the two 'advisory' entries —
+    // trajectory governors that report for a human to act on.
     const expected = {
       'documentation-review': ['Documentation Review', 'corrective'],
       'test-coverage-gap': ['Test Coverage Gap Review', 'corrective'],
@@ -30,7 +31,8 @@ describe('periodicals registry', () => {
       'drift-coherence': ['Drift & Coherence Review', 'corrective'],
       'comprehension-debt': ['Comprehension-Debt Review', 'corrective'],
       'stability-review': ['Stability Review', 'advisory'],
-      'dependency-supply-chain': ['Dependency & Supply-Chain Review', 'corrective']
+      'dependency-supply-chain': ['Dependency & Supply-Chain Review', 'corrective'],
+      'recent-headwinds': ['Recent Headwinds', 'advisory']
     };
 
     for (const [id, [title, mode]] of Object.entries(expected)) {
@@ -430,6 +432,72 @@ describe('Dependency & Supply-Chain Review specifics (LIN-371)', () => {
     assert.match(prompt, /manifest/i);
     assert.match(prompt, /lockfile/i);
     assert.doesNotMatch(prompt, /gitleaks|trufflehog|snyk|dependabot|renovate/i);
+  });
+});
+
+describe('Recent Headwinds specifics (LIN-542)', () => {
+  const template = PERIODICALS.find(t => t.id === 'recent-headwinds');
+  const prompt = template.generatePrompt();
+
+  test('is the advisory headwinds report (mode + deliverable framing)', () => {
+    assert.strictEqual(template.mode, 'advisory');
+    assert.match(prompt, /advisory/i);
+    assert.match(prompt, /headwind/i);
+    // The deliverable is the ranked remediable list + remediation options.
+    assert.match(prompt, /ranked list of remediable headwinds/i);
+    assert.match(prompt, /remediation option/i);
+    // Oriented to the project's stated direction.
+    assert.match(prompt, /north star/i);
+  });
+
+  test('covers the full headwind taxonomy (subsumes LIN-374 / LIN-291)', () => {
+    assert.match(prompt, /velocity/i);
+    assert.match(prompt, /throughput/i);
+    assert.match(prompt, /rework/i);
+    assert.match(prompt, /defect-escape/i);
+    assert.match(prompt, /distraction/i);
+    assert.match(prompt, /timeliness/i);
+    assert.match(prompt, /direction drift/i);
+  });
+
+  test('reports each headwind across nested, relative windows', () => {
+    assert.match(prompt, /nested/i);
+    assert.match(prompt, /immediate/i);
+    assert.match(prompt, /baseline/i);
+    // Windows are relative to now, never hard-coded dates.
+    assert.match(prompt, /relative to now/i);
+    assert.match(prompt, /never hard-coded dates/i);
+    // Each headwind carries a per-window trajectory.
+    assert.match(prompt, /worsening, steady, or easing/i);
+  });
+
+  test('runtime-discovers a velocity/roadmap instrument, named conceptually only', () => {
+    // The deterministic trajectory layer is described conceptually, never by symbol.
+    assert.match(prompt, /deterministic velocity\/roadmap layer/i);
+    assert.match(prompt, /run time/i);
+    assert.match(prompt, /fall back/i);
+    // The overfitting tripwire: no roadmap internals leak in.
+    assert.doesNotMatch(prompt, /buildRoadmapModel|analyzeRoadmap|assessRisks|calculateVelocity/);
+  });
+
+  test('trend-aware: delta framing, first-run baseline, trend ledger', () => {
+    assert.match(prompt, /trend-aware/i);
+    assert.match(prompt, /new, unchanged, improved, worsened, or resolved/i);
+    assert.match(prompt, /point-in-time snapshot/i);
+    assert.match(prompt, /baseline/i);
+    assert.match(prompt, /trend ledger/i);
+  });
+
+  test('advisory divergence: reports for a human decision, mints NO follow-up tasks', () => {
+    assert.match(prompt, /human decision|leave the decision|a human/i);
+    assert.match(prompt, /no follow-up|not create follow-up/i);
+    // Still self-concludes (the universal contract) — covered in the shared loop.
+  });
+
+  test('names the altitude difference from the Stability Review (no double-flagging churn)', () => {
+    assert.match(prompt, /Stability Review/);
+    assert.match(prompt, /do not double-flag|do not re-flag/i);
+    assert.match(prompt, /churn/i);
   });
 });
 
