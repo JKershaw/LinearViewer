@@ -73,46 +73,10 @@ function downloadMarkdown(text, filename) {
 // Markdown Rendering (using marked.js library)
 // ==========================================================================
 
-/**
- * Render markdown to HTML for display using marked.js
- * @param {string} markdown - Raw markdown text
- * @returns {string} HTML string (sanitized with DOMPurify for defense-in-depth)
- */
-function renderMarkdown(markdown) {
-  if (!markdown) return ''
-  // Use marked library for markdown parsing, then DOMPurify for XSS protection.
-  // While marked v17+ sanitizes by default and prompts are server-generated,
-  // DOMPurify provides defense-in-depth against any future changes.
-  const html = marked.parse(markdown)
-  // DOMPurify may not be loaded on all pages, check before using
-  return typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(html) : html
-}
-
-/**
- * Format a date as relative time (e.g., "2h ago", "yesterday")
- * LIN-156: Used for comment timestamps
- * @param {string} dateStr - ISO date string
- * @returns {string} Human-readable relative time
- */
-function formatRelativeTime(dateStr) {
-  if (!dateStr) return ''
-  const date = new Date(dateStr)
-  const now = new Date()
-  const diffMs = now - date
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMs / 3600000)
-  const diffDays = Math.floor(diffMs / 86400000)
-
-  if (diffMins < 1) return 'just now'
-  if (diffMins < 60) return `${diffMins}m ago`
-  if (diffHours < 24) return `${diffHours}h ago`
-  if (diffDays === 1) return 'yesterday'
-  if (diffDays < 7) return `${diffDays}d ago`
-
-  // Fallback to short date format
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-  return `${months[date.getMonth()]} ${date.getDate()}`
-}
+// renderMarkdown + relativeTime are canonical in common.js (window.*, LIN-421);
+// called here via the bare globals (same convention as escapeHtml). renderMarkdown
+// converges onto the superset (whole-string fence strip + marked-absent fallback);
+// relativeTime is the same "Behavior B" format this page's local copy seeded.
 
 /**
  * Load and render comments for an issue
@@ -156,7 +120,7 @@ async function loadComments(toggle, content) {
     } else {
       listEl.innerHTML = comments.map(comment => {
         const bodyHtml = renderMarkdown(comment.body)
-        const timeStr = formatRelativeTime(comment.createdAt)
+        const timeStr = relativeTime(comment.createdAt)
         return `<div class="comment">
           <div class="comment-meta">${escapeHtml(comment.user)} · ${timeStr}</div>
           <div class="comment-body">${bodyHtml}</div>

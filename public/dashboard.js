@@ -44,18 +44,9 @@ const STATE_RANK = { running: 4, waiting: 3, queued: 2, error: 1, complete: 0 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function relativeTime(value) {
-  if (!value) return '';
-  const ms = typeof value === 'number' ? value : new Date(value).getTime();
-  if (!Number.isFinite(ms) || ms <= 0) return '';
-  const sec = Math.floor((Date.now() - ms) / 1000);
-  if (sec < 60) return 'just now';
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  return new Date(ms).toLocaleDateString();
-}
+// relativeTime is canonical in common.js (window.relativeTime, LIN-421) — the
+// polymorphic (ISO string | ms number) "Behavior B" formatter this page's local
+// copy seeded; called here via the bare global (same convention as escapeHtml).
 
 function activityValue(run) {
   return run.completedAt || run.agentTimestamp || run.resolvedAt || run.dispatchedAt || '';

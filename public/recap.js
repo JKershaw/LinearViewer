@@ -22,16 +22,9 @@
       .replace(/'/g, '&#39;');
   }
 
-  function relativeTime(iso) {
-    if (!iso) return '';
-    const then = new Date(iso).getTime();
-    if (Number.isNaN(then)) return '';
-    const diffSec = Math.floor((Date.now() - then) / 1000);
-    if (diffSec < 60) return 'just now';
-    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
-    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
-    return `${Math.floor(diffSec / 86400)}d ago`;
-  }
+  // Canonical relative-time helper lives in common.js (window.relativeTime,
+  // LIN-421); converges onto the shared "Behavior B" formatter.
+  const relativeTime = window.relativeTime;
 
   function recapUrl(urlKey, identifier) {
     return `/workspace/${encodeURIComponent(urlKey)}/api/recap/${encodeURIComponent(identifier)}`;

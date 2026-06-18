@@ -69,45 +69,16 @@ const arrowRight = document.querySelector('.swipe-arrow-right');
 // Markdown Rendering
 // ==========================================================================
 
-function stripCodeBlockWrapper(text) {
-  if (!text) return text;
-  const m = text.match(/^\s*```[a-z]*\s*\n([\s\S]*?)\n\s*```\s*$/);
-  return m ? m[1] : text;
-}
-
-function renderMarkdown(text) {
-  if (!text) return '';
-  const cleaned = stripCodeBlockWrapper(text);
-  const html = typeof marked !== 'undefined' ? marked.parse(cleaned) : window.escapeHtml(cleaned);
-  return typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(html) : html;
-}
+// renderMarkdown + stripCodeBlockWrapper are canonical in common.js (window.*,
+// LIN-421); called here via the bare globals (same convention as escapeHtml).
 
 function _esc(str) {
   return window.escapeHtml(str);
 }
 
 // ==========================================================================
-// Relative Time
+// Relative Time — window.relativeTime (common.js, LIN-421)
 // ==========================================================================
-
-function formatRelativeTime(dateStr) {
-  if (!dateStr) return '';
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now - date;
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-
-  if (diffMins < 1) return 'just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays === 1) return 'yesterday';
-  if (diffDays < 7) return `${diffDays}d ago`;
-
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return `${months[date.getMonth()]} ${date.getDate()}`;
-}
 
 // ==========================================================================
 // URL Deep-Linking
@@ -253,14 +224,14 @@ function renderCard(direction) {
   if (issue.dueDate) {
     metaHtml += `<div class="swipe-card-meta-row">
       <span class="swipe-card-meta-label">Due</span>
-      <span class="swipe-card-meta-value">${formatRelativeTime(issue.dueDate)}</span>
+      <span class="swipe-card-meta-value">${relativeTime(issue.dueDate)}</span>
     </div>`;
   }
 
   if (issue.completedAt) {
     metaHtml += `<div class="swipe-card-meta-row">
       <span class="swipe-card-meta-label">Done</span>
-      <span class="swipe-card-meta-value">${formatRelativeTime(issue.completedAt)}</span>
+      <span class="swipe-card-meta-value">${relativeTime(issue.completedAt)}</span>
     </div>`;
   }
 
@@ -775,7 +746,7 @@ async function loadComments(container) {
       <div class="swipe-comment">
         <div class="swipe-comment-header">
           <span>${_esc(c.user || 'Unknown')}</span>
-          <span>${formatRelativeTime(c.createdAt)}</span>
+          <span>${relativeTime(c.createdAt)}</span>
         </div>
         <div class="swipe-comment-body">${renderMarkdown(c.body)}</div>
       </div>
