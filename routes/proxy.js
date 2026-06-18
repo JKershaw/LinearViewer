@@ -3920,7 +3920,11 @@ One convention across every endpoint, so you can branch on the same fields every
           issueUrl: null,
           dispatchedBy: req.proxyCreatedBy || null,
           target: target || 'cli',
-          repo: repo || null
+          // Inherit the server-resolved repo (terminal node's project `repo=`)
+          // when the caller omits one; an explicit caller repo still wins. repo
+          // is functional execution context (working directory), so this fused
+          // verb must propagate it, not just the display header fields (LIN-537).
+          repo: repo || rec.repo || null
         });
 
         keepalive.stop();
