@@ -35,7 +35,7 @@ import { buildAutopilotManual } from '../lib/prompts/autopilot-manual.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
 import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
 import { appendBlock, replace as replaceInDescription, DescriptionEditError } from '../lib/description-edit.js';
-import { workspaceUnavailableEnvelope } from '../lib/errors.js';
+import { badRequest, jsonError, notFound, unauthorized, workspaceUnavailableEnvelope } from '../lib/errors.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 
 /**
@@ -863,18 +863,18 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     const authHeader = req.headers.authorization;
 
     if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Missing or invalid Authorization header' });
+      return unauthorized.json(res, 'Missing or invalid Authorization header');
     }
 
     const token = authHeader.slice(7);
     if (!token) {
-      return res.status(401).json({ error: 'Empty token' });
+      return unauthorized.json(res, 'Empty token');
     }
 
     try {
       const result = await proxyTokenStore.validateToken(token);
       if (!result) {
-        return res.status(401).json({ error: 'Invalid, expired, or consumed token' });
+        return unauthorized.json(res, 'Invalid, expired, or consumed token');
       }
 
       req.proxyTokenId = result.tokenId;
@@ -885,7 +885,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       next();
     } catch (err) {
       console.error('Proxy token validation error:', err.message);
-      return res.status(500).json({ error: 'Authentication error' });
+      return jsonError(res, 500, 'Authentication error');
     }
   }
 
@@ -894,7 +894,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    */
   function requireWriteScope(req, res, next) {
     if (req.proxyTokenScope !== 'readWrite') {
-      return res.status(403).json({ error: 'This endpoint requires a read-write token' });
+      return jsonError(res, 403, 'This endpoint requires a read-write token');
     }
     next();
   }
@@ -1011,7 +1011,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   function writeRejected(req, res, endpoint, payload, errorMessage) {
     if (payload && payload.success === true) return false;
     logEvent(req, endpoint, 502);
-    res.status(502).json({ error: errorMessage, detail: payload || null });
+    jsonError(res, 502, errorMessage, { detail: payload || null });
     return true;
   }
 
@@ -1031,18 +1031,18 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     // is itself flag-gated, so a mint request on a flag-off session means a
     // stale global +proxy toggle is trying to inject where no button is shown.
     if (getFeatureFlags(req.session).proxy !== true) {
-      return res.status(403).json({ error: 'Proxy feature is not enabled for this workspace' });
+      return jsonError(res, 403, 'Proxy feature is not enabled for this workspace');
     }
 
     try {
       const { label, scope, singleUse } = req.body || {};
 
       if (label && label.length > MAX_NAME_LENGTH) {
-        return res.status(400).json({ error: `label exceeds maximum length of ${MAX_NAME_LENGTH}` });
+        return badRequest.json(res, `label exceeds maximum length of ${MAX_NAME_LENGTH}`);
       }
 
       if (scope && !['read', 'readWrite'].includes(scope)) {
-        return res.status(400).json({ error: 'scope must be "read" or "readWrite"' });
+        return badRequest.json(res, 'scope must be "read" or "readWrite"');
       }
 
       // LIN-525 #5: short-TTL the auto-minted prompt-proxy tokens so they
@@ -1068,7 +1068,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       });
     } catch (err) {
       console.error('Create proxy token error:', err.message);
-      res.status(500).json({ error: 'Failed to create token' });
+      jsonError(res, 500, 'Failed to create token');
     }
   });
 
@@ -1084,7 +1084,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       res.json({ tokens });
     } catch (err) {
       console.error('List proxy tokens error:', err.message);
-      res.status(500).json({ error: 'Failed to list tokens' });
+      jsonError(res, 500, 'Failed to list tokens');
     }
   });
 
@@ -1097,18 +1097,18 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     const { tokenId } = req.params;
 
     if (!UUID_REGEX.test(tokenId)) {
-      return res.status(400).json({ error: 'Invalid token ID format' });
+      return badRequest.json(res, 'Invalid token ID format');
     }
 
     try {
       const revoked = await proxyTokenStore.revokeToken(workspace.urlKey, tokenId);
       if (!revoked) {
-        return res.status(404).json({ error: 'Token not found' });
+        return notFound.json(res, 'Token not found');
       }
       res.json({ success: true });
     } catch (err) {
       console.error('Revoke proxy token error:', err.message);
-      res.status(500).json({ error: 'Failed to revoke token' });
+      jsonError(res, 500, 'Failed to revoke token');
     }
   });
 
@@ -1126,7 +1126,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       res.json(result);
     } catch (err) {
       console.error('List proxy events error:', err.message);
-      res.status(500).json({ error: 'Failed to list events' });
+      jsonError(res, 500, 'Failed to list events');
     }
   });
 
@@ -1523,7 +1523,7 @@ One convention across every endpoint, so you can branch on the same fields every
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/me', status);
       console.error('Proxy /me error:', err.message);
-      res.status(status).json({ error: 'Failed to fetch user info', detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to fetch user info', { detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -1544,7 +1544,7 @@ One convention across every endpoint, so you can branch on the same fields every
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/teams', status);
       console.error('Proxy /teams error:', err.message);
-      res.status(status).json({ error: 'Failed to fetch teams', detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to fetch teams', { detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -1565,7 +1565,7 @@ One convention across every endpoint, so you can branch on the same fields every
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/projects', status);
       console.error('Proxy /projects error:', err.message);
-      res.status(status).json({ error: 'Failed to fetch projects', detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to fetch projects', { detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -1584,7 +1584,7 @@ One convention across every endpoint, so you can branch on the same fields every
 
       if (teamId && !UUID_REGEX.test(teamId)) {
         logEvent(req, '/api/proxy/issues', 400);
-        return res.status(400).json({ error: 'Invalid teamId format' });
+        return badRequest.json(res, 'Invalid teamId format');
       }
 
       const query = teamId ? ISSUES_QUERY : ISSUES_QUERY_ALL;
@@ -1606,7 +1606,7 @@ One convention across every endpoint, so you can branch on the same fields every
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/issues', status);
       console.error('Proxy /issues error:', err.message);
-      res.status(status).json({ error: 'Failed to fetch issues', detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to fetch issues', { detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -1625,13 +1625,13 @@ One convention across every endpoint, so you can branch on the same fields every
       // Allow UUID or identifier (e.g., "LIN-123")
       if (!isValidIssueId(issueId)) {
         logEvent(req, '/api/proxy/issues/:id', 400);
-        return res.status(400).json({ error: 'Invalid issue ID format' });
+        return badRequest.json(res, 'Invalid issue ID format');
       }
 
       const data = await client.request(ISSUE_DETAIL_QUERY, { id: issueId });
       if (!data.issue) {
         logEvent(req, '/api/proxy/issues/:id', 404);
-        return res.status(404).json({ error: 'Issue not found' });
+        return notFound.json(res, 'Issue not found');
       }
 
       if (data.issue.comments?.nodes) {
@@ -1653,7 +1653,7 @@ One convention across every endpoint, so you can branch on the same fields every
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/issues/:id', status);
       console.error('Proxy /issue error:', err.message);
-      res.status(status).json({ error: 'Failed to fetch issue', detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to fetch issue', { detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -1670,12 +1670,12 @@ One convention across every endpoint, so you can branch on the same fields every
       const query = req.query.q;
       if (!query || typeof query !== 'string') {
         logEvent(req, '/api/proxy/search', 400);
-        return res.status(400).json({ error: 'q query parameter is required' });
+        return badRequest.json(res, 'q query parameter is required');
       }
 
       if (query.length > MAX_SEARCH_LENGTH) {
         logEvent(req, '/api/proxy/search', 400);
-        return res.status(400).json({ error: `Search query too long (max ${MAX_SEARCH_LENGTH})` });
+        return badRequest.json(res, `Search query too long (max ${MAX_SEARCH_LENGTH})`);
       }
 
       const data = await client.request(SEARCH_QUERY, { query, first: 50 });
@@ -1685,7 +1685,7 @@ One convention across every endpoint, so you can branch on the same fields every
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/search', status);
       console.error('Proxy /search error:', err.message);
-      res.status(status).json({ error: 'Failed to search issues', detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to search issues', { detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -1702,7 +1702,7 @@ One convention across every endpoint, so you can branch on the same fields every
       const { teamId } = req.params;
       if (!UUID_REGEX.test(teamId)) {
         logEvent(req, '/api/proxy/states', 400);
-        return res.status(400).json({ error: 'Invalid team ID format' });
+        return badRequest.json(res, 'Invalid team ID format');
       }
 
       const data = await client.request(STATES_QUERY, { teamId });
@@ -1713,7 +1713,7 @@ One convention across every endpoint, so you can branch on the same fields every
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/states', status);
       console.error('Proxy /states error:', err.message);
-      res.status(status).json({ error: 'Failed to fetch states', detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to fetch states', { detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -1730,7 +1730,7 @@ One convention across every endpoint, so you can branch on the same fields every
       const teamId = req.query.teamId;
       if (teamId && !UUID_REGEX.test(teamId)) {
         logEvent(req, '/api/proxy/labels', 400);
-        return res.status(400).json({ error: 'Invalid team ID format' });
+        return badRequest.json(res, 'Invalid team ID format');
       }
 
       const query = teamId ? LABELS_BY_TEAM_QUERY : LABELS_QUERY;
@@ -1742,7 +1742,7 @@ One convention across every endpoint, so you can branch on the same fields every
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/labels', status);
       console.error('Proxy /labels error:', err.message);
-      res.status(status).json({ error: 'Failed to fetch labels', detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to fetch labels', { detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -1760,7 +1760,7 @@ One convention across every endpoint, so you can branch on the same fields every
       const teamId = req.query.teamId;
       if (teamId && !UUID_REGEX.test(teamId)) {
         logEvent(req, '/api/proxy/cycles', 400);
-        return res.status(400).json({ error: 'Invalid team ID format' });
+        return badRequest.json(res, 'Invalid team ID format');
       }
 
       const query = teamId ? CYCLES_QUERY : CYCLES_QUERY_ALL;
@@ -1772,7 +1772,7 @@ One convention across every endpoint, so you can branch on the same fields every
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/cycles', status);
       console.error('Proxy /cycles error:', err.message);
-      res.status(status).json({ error: 'Failed to fetch cycles', detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to fetch cycles', { detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -1791,13 +1791,13 @@ One convention across every endpoint, so you can branch on the same fields every
       const { cycleId } = req.params;
       if (!UUID_REGEX.test(cycleId)) {
         logEvent(req, '/api/proxy/cycle', 400);
-        return res.status(400).json({ error: 'Invalid cycle ID format' });
+        return badRequest.json(res, 'Invalid cycle ID format');
       }
 
       const data = await client.request(CYCLE_DETAIL_QUERY, { id: cycleId });
       if (!data.cycle) {
         logEvent(req, '/api/proxy/cycle', 404);
-        return res.status(404).json({ error: 'Cycle not found' });
+        return notFound.json(res, 'Cycle not found');
       }
 
       logEvent(req, '/api/proxy/cycle', 200);
@@ -1806,7 +1806,7 @@ One convention across every endpoint, so you can branch on the same fields every
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/cycle', status);
       console.error('Proxy /cycle error:', err.message);
-      res.status(status).json({ error: 'Failed to fetch cycle', detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to fetch cycle', { detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -1826,13 +1826,13 @@ One convention across every endpoint, so you can branch on the same fields every
       const { issueId } = req.params;
       if (!isValidIssueId(issueId)) {
         logEvent(req, '/api/proxy/relations', 400);
-        return res.status(400).json({ error: 'Invalid issue ID format' });
+        return badRequest.json(res, 'Invalid issue ID format');
       }
 
       const data = await client.request(RELATIONS_QUERY, { issueId });
       if (!data.issue) {
         logEvent(req, '/api/proxy/relations', 404);
-        return res.status(404).json({ error: 'Issue not found' });
+        return notFound.json(res, 'Issue not found');
       }
 
       // LIN-401: this query selects only relations (no root state to override),
@@ -1852,7 +1852,7 @@ One convention across every endpoint, so you can branch on the same fields every
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/relations', status);
       console.error('Proxy /relations error:', err.message);
-      res.status(status).json({ error: 'Failed to fetch relations', detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to fetch relations', { detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -1875,28 +1875,28 @@ One convention across every endpoint, so you can branch on the same fields every
 
       if (!teamId || !UUID_REGEX.test(teamId)) {
         logEvent(req, '/api/proxy/issues', 400);
-        return res.status(400).json({ error: 'Valid teamId is required' });
+        return badRequest.json(res, 'Valid teamId is required');
       }
 
       if (!title || typeof title !== 'string') {
         logEvent(req, '/api/proxy/issues', 400);
-        return res.status(400).json({ error: 'title is required' });
+        return badRequest.json(res, 'title is required');
       }
 
       if (title.length > MAX_NAME_LENGTH) {
-        return res.status(400).json({ error: `title exceeds maximum length of ${MAX_NAME_LENGTH}` });
+        return badRequest.json(res, `title exceeds maximum length of ${MAX_NAME_LENGTH}`);
       }
 
       if (description && description.length > MAX_DESCRIPTION_LENGTH) {
-        return res.status(400).json({ error: 'description exceeds maximum length' });
+        return badRequest.json(res, 'description exceeds maximum length');
       }
 
       if (DANGEROUS_CHARS_REGEX.test(title)) {
-        return res.status(400).json({ error: 'title contains invalid characters' });
+        return badRequest.json(res, 'title contains invalid characters');
       }
 
       if (description && DANGEROUS_CHARS_REGEX.test(description)) {
-        return res.status(400).json({ error: 'description contains invalid characters' });
+        return badRequest.json(res, 'description contains invalid characters');
       }
 
       const input = { teamId, title };
@@ -1918,7 +1918,7 @@ One convention across every endpoint, so you can branch on the same fields every
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/issues', status);
       console.error('Proxy create issue error:', err.message);
-      res.status(status).json({ error: 'Failed to create issue', detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to create issue', { detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -1937,7 +1937,7 @@ One convention across every endpoint, so you can branch on the same fields every
     const data = await client.request(TRASHED_GUARD_QUERY, { id: issueId });
     if (isTrashed(data.issue)) {
       logEvent(req, endpoint, 409);
-      res.status(409).json({ error: 'Issue is trashed; refusing to modify a deleted issue' });
+      jsonError(res, 409, 'Issue is trashed; refusing to modify a deleted issue');
       return true;
     }
     return false;
@@ -1953,25 +1953,25 @@ One convention across every endpoint, so you can branch on the same fields every
       const { issueId } = req.params;
       if (!isValidIssueId(issueId)) {
         logEvent(req, '/api/proxy/issues/:id', 400);
-        return res.status(400).json({ error: 'Invalid issue ID format' });
+        return badRequest.json(res, 'Invalid issue ID format');
       }
 
       const { title, description, stateId, assigneeId, priority, projectId, parentId, cycleId } = req.body;
 
       if (title && title.length > MAX_NAME_LENGTH) {
-        return res.status(400).json({ error: `title exceeds maximum length of ${MAX_NAME_LENGTH}` });
+        return badRequest.json(res, `title exceeds maximum length of ${MAX_NAME_LENGTH}`);
       }
 
       if (title && DANGEROUS_CHARS_REGEX.test(title)) {
-        return res.status(400).json({ error: 'title contains invalid characters' });
+        return badRequest.json(res, 'title contains invalid characters');
       }
 
       if (description && description.length > MAX_DESCRIPTION_LENGTH) {
-        return res.status(400).json({ error: 'description exceeds maximum length' });
+        return badRequest.json(res, 'description exceeds maximum length');
       }
 
       if (description && DANGEROUS_CHARS_REGEX.test(description)) {
-        return res.status(400).json({ error: 'description contains invalid characters' });
+        return badRequest.json(res, 'description contains invalid characters');
       }
 
       const input = {};
@@ -1989,7 +1989,7 @@ One convention across every endpoint, so you can branch on the same fields every
 
       if (Object.keys(input).length === 0) {
         logEvent(req, '/api/proxy/issues/:id', 400);
-        return res.status(400).json({ error: 'No valid fields to update' });
+        return badRequest.json(res, 'No valid fields to update');
       }
 
       if (await refuseIfTrashed(client, issueId, req, res, '/api/proxy/issues/:id')) return;
@@ -2002,7 +2002,7 @@ One convention across every endpoint, so you can branch on the same fields every
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/issues/:id', status);
       console.error('Proxy update issue error:', err.message);
-      res.status(status).json({ error: 'Failed to update issue', detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to update issue', { detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -2021,7 +2021,7 @@ One convention across every endpoint, so you can branch on the same fields every
     const { issueId } = req.params;
     if (!isValidIssueId(issueId)) {
       logEvent(req, endpoint, 400);
-      return res.status(400).json({ error: 'Invalid issue ID format' });
+      return badRequest.json(res, 'Invalid issue ID format');
     }
 
     let newDescription;
@@ -2029,31 +2029,31 @@ One convention across every endpoint, so you can branch on the same fields every
       const data = await client.request(ISSUE_DESCRIPTION_QUERY, { id: issueId });
       if (!data.issue) {
         logEvent(req, endpoint, 404);
-        return res.status(404).json({ error: 'Issue not found' });
+        return notFound.json(res, 'Issue not found');
       }
       if (isTrashed(data.issue)) {
         logEvent(req, endpoint, 409);
-        return res.status(409).json({ error: 'Issue is trashed; refusing to modify a deleted issue' });
+        return jsonError(res, 409, 'Issue is trashed; refusing to modify a deleted issue');
       }
       newDescription = merge(data.issue.description || '');
     } catch (err) {
       if (err instanceof DescriptionEditError) {
         logEvent(req, endpoint, 422);
-        return res.status(422).json({ error: err.message, code: err.code, matchCount: err.matchCount });
+        return jsonError(res, 422, err.message, { code: err.code, matchCount: err.matchCount });
       }
       const status = graphqlErrorStatus(err);
       logEvent(req, endpoint, status);
       console.error('Proxy description edit (read) error:', err.message);
-      return res.status(status).json({ error: 'Failed to read issue description', detail: graphqlErrorDetail(err) });
+      return jsonError(res, status, 'Failed to read issue description', { detail: graphqlErrorDetail(err) });
     }
 
     if (newDescription.length > MAX_DESCRIPTION_LENGTH) {
       logEvent(req, endpoint, 400);
-      return res.status(400).json({ error: 'resulting description exceeds maximum length' });
+      return badRequest.json(res, 'resulting description exceeds maximum length');
     }
     if (DANGEROUS_CHARS_REGEX.test(newDescription)) {
       logEvent(req, endpoint, 400);
-      return res.status(400).json({ error: 'resulting description contains invalid characters' });
+      return badRequest.json(res, 'resulting description contains invalid characters');
     }
 
     try {
@@ -2064,7 +2064,7 @@ One convention across every endpoint, so you can branch on the same fields every
       const status = graphqlErrorStatus(err);
       logEvent(req, endpoint, status);
       console.error('Proxy description edit (write) error:', err.message);
-      res.status(status).json({ error: 'Failed to update description', detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to update description', { detail: graphqlErrorDetail(err) });
     }
   }
 
@@ -2078,15 +2078,15 @@ One convention across every endpoint, so you can branch on the same fields every
     const { block } = req.body;
     if (!block || typeof block !== 'string') {
       logEvent(req, endpoint, 400);
-      return res.status(400).json({ error: 'block is required' });
+      return badRequest.json(res, 'block is required');
     }
     if (block.length > MAX_DESCRIPTION_LENGTH) {
       logEvent(req, endpoint, 400);
-      return res.status(400).json({ error: 'block exceeds maximum length' });
+      return badRequest.json(res, 'block exceeds maximum length');
     }
     if (DANGEROUS_CHARS_REGEX.test(block)) {
       logEvent(req, endpoint, 400);
-      return res.status(400).json({ error: 'block contains invalid characters' });
+      return badRequest.json(res, 'block contains invalid characters');
     }
     return applyDescriptionEdit(req, res, endpoint, (current) => appendBlock(current, block));
   });
@@ -2102,19 +2102,19 @@ One convention across every endpoint, so you can branch on the same fields every
     const { oldString, newString } = req.body;
     if (!oldString || typeof oldString !== 'string') {
       logEvent(req, endpoint, 400);
-      return res.status(400).json({ error: 'oldString is required' });
+      return badRequest.json(res, 'oldString is required');
     }
     if (typeof newString !== 'string') {
       logEvent(req, endpoint, 400);
-      return res.status(400).json({ error: 'newString is required' });
+      return badRequest.json(res, 'newString is required');
     }
     if (newString.length > MAX_DESCRIPTION_LENGTH) {
       logEvent(req, endpoint, 400);
-      return res.status(400).json({ error: 'newString exceeds maximum length' });
+      return badRequest.json(res, 'newString exceeds maximum length');
     }
     if (DANGEROUS_CHARS_REGEX.test(newString)) {
       logEvent(req, endpoint, 400);
-      return res.status(400).json({ error: 'newString contains invalid characters' });
+      return badRequest.json(res, 'newString contains invalid characters');
     }
     return applyDescriptionEdit(req, res, endpoint, (current) => replaceInDescription(current, oldString, newString));
   });
@@ -2133,21 +2133,21 @@ One convention across every endpoint, so you can branch on the same fields every
 
       const { issueId } = req.params;
       if (!isValidIssueId(issueId)) {
-        return res.status(400).json({ error: 'Invalid issue ID format' });
+        return badRequest.json(res, 'Invalid issue ID format');
       }
 
       const { body } = req.body;
       if (!body || typeof body !== 'string') {
         logEvent(req, '/api/proxy/issues/comments', 400);
-        return res.status(400).json({ error: 'body is required' });
+        return badRequest.json(res, 'body is required');
       }
 
       if (body.length > MAX_COMMENT_LENGTH) {
-        return res.status(400).json({ error: `body exceeds maximum length of ${MAX_COMMENT_LENGTH}` });
+        return badRequest.json(res, `body exceeds maximum length of ${MAX_COMMENT_LENGTH}`);
       }
 
       if (DANGEROUS_CHARS_REGEX.test(body)) {
-        return res.status(400).json({ error: 'body contains invalid characters' });
+        return badRequest.json(res, 'body contains invalid characters');
       }
 
       if (await refuseIfTrashed(client, issueId, req, res, '/api/proxy/issues/comments')) return;
@@ -2176,7 +2176,7 @@ One convention across every endpoint, so you can branch on the same fields every
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/issues/comments', status);
       console.error('Proxy create comment error:', err.message);
-      res.status(status).json({ error: 'Failed to create comment', detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to create comment', { detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -2193,18 +2193,18 @@ One convention across every endpoint, so you can branch on the same fields every
 
       const { issueId } = req.params;
       if (!isValidIssueId(issueId)) {
-        return res.status(400).json({ error: 'Invalid issue ID format' });
+        return badRequest.json(res, 'Invalid issue ID format');
       }
 
       const { type, relatedIssueId } = req.body;
       const validTypes = ['blocks', 'blocked-by', 'duplicate', 'related'];
       if (!type || !validTypes.includes(type)) {
         logEvent(req, '/api/proxy/issues/relations', 400);
-        return res.status(400).json({ error: `type must be one of: ${validTypes.join(', ')}` });
+        return badRequest.json(res, `type must be one of: ${validTypes.join(', ')}`);
       }
 
       if (!relatedIssueId || !isValidIssueId(relatedIssueId)) {
-        return res.status(400).json({ error: 'Valid relatedIssueId is required' });
+        return badRequest.json(res, 'Valid relatedIssueId is required');
       }
 
       if (await refuseIfTrashed(client, issueId, req, res, '/api/proxy/issues/relations')) return;
@@ -2225,7 +2225,7 @@ One convention across every endpoint, so you can branch on the same fields every
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/issues/relations', status);
       console.error('Proxy create relation error:', err.message);
-      res.status(status).json({ error: 'Failed to create relation', detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to create relation', { detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -2248,11 +2248,11 @@ One convention across every endpoint, so you can branch on the same fields every
 
       const { issueId, relationId } = req.params;
       if (!isValidIssueId(issueId)) {
-        return res.status(400).json({ error: 'Invalid issue ID format' });
+        return badRequest.json(res, 'Invalid issue ID format');
       }
       if (!UUID_REGEX.test(relationId)) {
         logEvent(req, '/api/proxy/issues/relations', 400);
-        return res.status(400).json({ error: 'Invalid relation ID format' });
+        return badRequest.json(res, 'Invalid relation ID format');
       }
 
       const data = await client.request(DELETE_RELATION_MUTATION, { id: relationId });
@@ -2263,7 +2263,7 @@ One convention across every endpoint, so you can branch on the same fields every
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/issues/relations', status);
       console.error('Proxy delete relation error:', err.message);
-      res.status(status).json({ error: 'Failed to delete relation', detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to delete relation', { detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -2286,24 +2286,24 @@ One convention across every endpoint, so you can branch on the same fields every
 
       const { issueId } = req.params;
       if (!isValidIssueId(issueId)) {
-        return res.status(400).json({ error: 'Invalid issue ID format' });
+        return badRequest.json(res, 'Invalid issue ID format');
       }
 
       const { labelId } = req.body;
       if (!labelId || !UUID_REGEX.test(labelId)) {
         logEvent(req, '/api/proxy/issues/labels', 400);
-        return res.status(400).json({ error: 'Valid labelId is required' });
+        return badRequest.json(res, 'Valid labelId is required');
       }
 
       // Fetch current labels
       const issueData = await client.request(ISSUE_LABELS_QUERY, { issueId });
       if (!issueData.issue) {
         logEvent(req, '/api/proxy/issues/labels', 404);
-        return res.status(404).json({ error: 'Issue not found' });
+        return notFound.json(res, 'Issue not found');
       }
       if (isTrashed(issueData.issue)) {
         logEvent(req, '/api/proxy/issues/labels', 409);
-        return res.status(409).json({ error: 'Issue is trashed; refusing to modify a deleted issue' });
+        return jsonError(res, 409, 'Issue is trashed; refusing to modify a deleted issue');
       }
 
       const currentLabelIds = (issueData.issue.labels?.nodes || []).map(l => l.id);
@@ -2323,7 +2323,7 @@ One convention across every endpoint, so you can branch on the same fields every
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/issues/labels', status);
       console.error('Proxy add label error:', err.message);
-      res.status(status).json({ error: 'Failed to add label', detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to add label', { detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -2343,21 +2343,21 @@ One convention across every endpoint, so you can branch on the same fields every
 
       const { issueId, labelId } = req.params;
       if (!isValidIssueId(issueId)) {
-        return res.status(400).json({ error: 'Invalid issue ID format' });
+        return badRequest.json(res, 'Invalid issue ID format');
       }
       if (!UUID_REGEX.test(labelId)) {
-        return res.status(400).json({ error: 'Invalid label ID format' });
+        return badRequest.json(res, 'Invalid label ID format');
       }
 
       // Fetch current labels
       const issueData = await client.request(ISSUE_LABELS_QUERY, { issueId });
       if (!issueData.issue) {
         logEvent(req, '/api/proxy/issues/labels', 404);
-        return res.status(404).json({ error: 'Issue not found' });
+        return notFound.json(res, 'Issue not found');
       }
       if (isTrashed(issueData.issue)) {
         logEvent(req, '/api/proxy/issues/labels', 409);
-        return res.status(409).json({ error: 'Issue is trashed; refusing to modify a deleted issue' });
+        return jsonError(res, 409, 'Issue is trashed; refusing to modify a deleted issue');
       }
 
       const currentLabelIds = (issueData.issue.labels?.nodes || []).map(l => l.id);
@@ -2379,7 +2379,7 @@ One convention across every endpoint, so you can branch on the same fields every
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/issues/labels', status);
       console.error('Proxy remove label error:', err.message);
-      res.status(status).json({ error: 'Failed to remove label', detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to remove label', { detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -2557,7 +2557,7 @@ One convention across every endpoint, so you can branch on the same fields every
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/stack', status);
       console.error('Proxy /stack error:', err.message);
-      res.status(status).json({ error: 'Failed to fetch task stack', detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to fetch task stack', { detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -2579,13 +2579,13 @@ One convention across every endpoint, so you can branch on the same fields every
       // Validate identifier format (UUID or LIN-123 pattern)
       if (!isValidIssueId(identifier)) {
         logEvent(req, '/api/proxy/prompt', 400);
-        return res.status(400).json({ error: 'Invalid identifier format' });
+        return badRequest.json(res, 'Invalid identifier format');
       }
 
       // Validate template key
       if (!hasPrompt(templateKey)) {
         logEvent(req, '/api/proxy/prompt', 404);
-        return res.status(404).json({ error: `No prompt template for key: ${templateKey}` });
+        return notFound.json(res, `No prompt template for key: ${templateKey}`);
       }
 
       // Fetch issue context (use mock data in test mode)
@@ -2598,7 +2598,7 @@ One convention across every endpoint, so you can branch on the same fields every
         );
         if (!mockIssue) {
           logEvent(req, '/api/proxy/prompt', 404);
-          return res.status(404).json({ error: 'Issue not found' });
+          return notFound.json(res, 'Issue not found');
         }
         const mockProject = mockData.projects.find(p => p.id === mockIssue.project?.id);
         issue = {
@@ -2626,7 +2626,7 @@ One convention across every endpoint, so you can branch on the same fields every
 
       if (!result) {
         logEvent(req, '/api/proxy/prompt', 500);
-        return res.status(500).json({ error: 'Failed to generate prompt' });
+        return jsonError(res, 500, 'Failed to generate prompt');
       }
 
       logEvent(req, '/api/proxy/prompt', 200);
@@ -2640,12 +2640,12 @@ One convention across every endpoint, so you can branch on the same fields every
     } catch (err) {
       if (err.message?.includes('not found')) {
         logEvent(req, '/api/proxy/prompt', 404);
-        return res.status(404).json({ error: 'Issue not found' });
+        return notFound.json(res, 'Issue not found');
       }
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/prompt', status);
       console.error('Proxy /prompt error:', err.message);
-      res.status(status).json({ error: 'Failed to generate prompt', detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to generate prompt', { detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -2845,7 +2845,7 @@ One convention across every endpoint, so you can branch on the same fields every
       const { isFreeTier } = resolveProxyLLM(sessionApiKey);
       if (!isTestMode && !isRecommendationEnabled(sessionApiKey) && !isFreeTier) {
         logEvent(req, '/api/proxy/recommend', 503);
-        return res.status(503).json({ error: 'AI recommendations not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.' });
+        return jsonError(res, 503, 'AI recommendations not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.');
       }
 
       const { identifier } = req.params;
@@ -2853,7 +2853,7 @@ One convention across every endpoint, so you can branch on the same fields every
       // Validate identifier format (UUID or LIN-123 pattern)
       if (!isValidIssueId(identifier)) {
         logEvent(req, '/api/proxy/recommend', 400);
-        return res.status(400).json({ error: 'Invalid identifier format' });
+        return badRequest.json(res, 'Invalid identifier format');
       }
 
       // Charge one free-tier unit ONCE per request (not per descent hop — that
@@ -2954,13 +2954,13 @@ One convention across every endpoint, so you can branch on the same fields every
       }
       if (!recapCacheStore) {
         logEvent(req, '/api/proxy/recap', 503);
-        return res.status(503).json({ error: 'Recap cache not configured' });
+        return jsonError(res, 503, 'Recap cache not configured');
       }
 
       const { identifier } = req.params;
       if (!isValidIssueId(identifier)) {
         logEvent(req, '/api/proxy/recap', 400);
-        return res.status(400).json({ error: 'Invalid identifier format' });
+        return badRequest.json(res, 'Invalid identifier format');
       }
 
       const noRefresh = req.query.noRefresh === '1' || req.query.noRefresh === 'true';
@@ -3081,7 +3081,7 @@ One convention across every endpoint, so you can branch on the same fields every
     } catch (err) {
       logEvent(req, '/api/proxy/recap', 500);
       console.error('Proxy /recap outer error:', err.message);
-      res.status(500).json({ error: 'Failed to fetch recap', detail: err.message });
+      jsonError(res, 500, 'Failed to fetch recap', { detail: err.message });
     }
   });
 
@@ -3097,13 +3097,13 @@ One convention across every endpoint, so you can branch on the same fields every
       }
       if (!recapCacheStore) {
         logEvent(req, '/api/proxy/recap', 503);
-        return res.status(503).json({ error: 'Recap cache not configured' });
+        return jsonError(res, 503, 'Recap cache not configured');
       }
 
       const { identifier } = req.params;
       if (!isValidIssueId(identifier)) {
         logEvent(req, '/api/proxy/recap', 400);
-        return res.status(400).json({ error: 'Invalid identifier format' });
+        return badRequest.json(res, 'Invalid identifier format');
       }
 
       const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
@@ -3115,7 +3115,7 @@ One convention across every endpoint, so you can branch on the same fields every
       const { apiKey: resolvedApiKey, isFreeTier } = resolveProxyLLM(sessionApiKey);
       if (!isTestMode && !isRecommendationEnabled(sessionApiKey) && !isFreeTier) {
         logEvent(req, '/api/proxy/recap', 503);
-        return res.status(503).json({ error: 'AI recap is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.' });
+        return jsonError(res, 503, 'AI recap is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.');
       }
 
       if (isFreeTier && !isTestMode) {
@@ -3196,16 +3196,16 @@ One convention across every endpoint, so you can branch on the same fields every
     } catch (err) {
       if (err.message?.includes('not found')) {
         logEvent(req, '/api/proxy/recap', 404);
-        return res.status(404).json({ error: 'Issue not found' });
+        return notFound.json(res, 'Issue not found');
       }
       if (err.message?.includes('OpenRouter')) {
         logEvent(req, '/api/proxy/recap', 503);
-        return res.status(503).json({ error: 'AI service temporarily unavailable', detail: err.message });
+        return jsonError(res, 503, 'AI service temporarily unavailable', { detail: err.message });
       }
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/recap', status);
       console.error('Proxy /recap POST error:', err.message);
-      res.status(status).json({ error: 'Failed to generate recap', detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to generate recap', { detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -3225,13 +3225,13 @@ One convention across every endpoint, so you can branch on the same fields every
       }
       if (!briefCacheStore) {
         logEvent(req, '/api/proxy/brief', 503);
-        return res.status(503).json({ error: 'Brief cache not configured' });
+        return jsonError(res, 503, 'Brief cache not configured');
       }
 
       const { identifier } = req.params;
       if (!isValidIssueId(identifier)) {
         logEvent(req, '/api/proxy/brief', 400);
-        return res.status(400).json({ error: 'Invalid identifier format' });
+        return badRequest.json(res, 'Invalid identifier format');
       }
 
       const noRefresh = req.query.noRefresh === '1' || req.query.noRefresh === 'true';
@@ -3351,7 +3351,7 @@ One convention across every endpoint, so you can branch on the same fields every
     } catch (err) {
       logEvent(req, '/api/proxy/brief', 500);
       console.error('Proxy /brief outer error:', err.message);
-      res.status(500).json({ error: 'Failed to fetch brief', detail: err.message });
+      jsonError(res, 500, 'Failed to fetch brief', { detail: err.message });
     }
   });
 
@@ -3367,13 +3367,13 @@ One convention across every endpoint, so you can branch on the same fields every
       }
       if (!briefCacheStore) {
         logEvent(req, '/api/proxy/brief', 503);
-        return res.status(503).json({ error: 'Brief cache not configured' });
+        return jsonError(res, 503, 'Brief cache not configured');
       }
 
       const { identifier } = req.params;
       if (!isValidIssueId(identifier)) {
         logEvent(req, '/api/proxy/brief', 400);
-        return res.status(400).json({ error: 'Invalid identifier format' });
+        return badRequest.json(res, 'Invalid identifier format');
       }
 
       const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
@@ -3384,7 +3384,7 @@ One convention across every endpoint, so you can branch on the same fields every
       const { apiKey: resolvedApiKey, isFreeTier } = resolveProxyLLM(sessionApiKey);
       if (!isTestMode && !isRecommendationEnabled(sessionApiKey) && !isFreeTier) {
         logEvent(req, '/api/proxy/brief', 503);
-        return res.status(503).json({ error: 'AI brief is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.' });
+        return jsonError(res, 503, 'AI brief is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.');
       }
 
       if (isFreeTier && !isTestMode) {
@@ -3465,16 +3465,16 @@ One convention across every endpoint, so you can branch on the same fields every
     } catch (err) {
       if (err.message?.includes('not found')) {
         logEvent(req, '/api/proxy/brief', 404);
-        return res.status(404).json({ error: 'Issue not found' });
+        return notFound.json(res, 'Issue not found');
       }
       if (err.message?.includes('OpenRouter')) {
         logEvent(req, '/api/proxy/brief', 503);
-        return res.status(503).json({ error: 'AI service temporarily unavailable', detail: err.message });
+        return jsonError(res, 503, 'AI service temporarily unavailable', { detail: err.message });
       }
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/brief', status);
       console.error('Proxy /brief POST error:', err.message);
-      res.status(status).json({ error: 'Failed to generate brief', detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to generate brief', { detail: graphqlErrorDetail(err) });
     }
   });
 
@@ -3488,27 +3488,27 @@ One convention across every endpoint, so you can branch on the same fields every
 
     if (!taskIdentifier || typeof taskIdentifier !== 'string') {
       logEvent(req, '/api/proxy/agent/status', 400);
-      return res.status(400).json({ error: 'taskIdentifier is required' });
+      return badRequest.json(res, 'taskIdentifier is required');
     }
     if (!action || typeof action !== 'string') {
       logEvent(req, '/api/proxy/agent/status', 400);
-      return res.status(400).json({ error: 'action is required' });
+      return badRequest.json(res, 'action is required');
     }
     if (!status || typeof status !== 'string') {
       logEvent(req, '/api/proxy/agent/status', 400);
-      return res.status(400).json({ error: 'status is required' });
+      return badRequest.json(res, 'status is required');
     }
     if (!summary || typeof summary !== 'string') {
       logEvent(req, '/api/proxy/agent/status', 400);
-      return res.status(400).json({ error: 'summary is required' });
+      return badRequest.json(res, 'summary is required');
     }
     if (summary.length > 10000) {
       logEvent(req, '/api/proxy/agent/status', 400);
-      return res.status(400).json({ error: 'summary exceeds max length (10000)' });
+      return badRequest.json(res, 'summary exceeds max length (10000)');
     }
     if (taskIdentifier.length > 200 || action.length > 200 || status.length > 200) {
       logEvent(req, '/api/proxy/agent/status', 400);
-      return res.status(400).json({ error: 'Field exceeds max length (200)' });
+      return badRequest.json(res, 'Field exceeds max length (200)');
     }
 
     // dispatchId is optional. When present it must be a non-empty string ≤200 chars
@@ -3517,22 +3517,22 @@ One convention across every endpoint, so you can branch on the same fields every
     if (dispatchId !== undefined && dispatchId !== null) {
       if (typeof dispatchId !== 'string' || dispatchId.length === 0) {
         logEvent(req, '/api/proxy/agent/status', 400);
-        return res.status(400).json({ error: 'dispatchId must be a non-empty string' });
+        return badRequest.json(res, 'dispatchId must be a non-empty string');
       }
       if (dispatchId.length > 200) {
         logEvent(req, '/api/proxy/agent/status', 400);
-        return res.status(400).json({ error: 'Field exceeds max length (200)' });
+        return badRequest.json(res, 'Field exceeds max length (200)');
       }
       if (DANGEROUS_CHARS_REGEX.test(dispatchId)) {
         logEvent(req, '/api/proxy/agent/status', 400);
-        return res.status(400).json({ error: 'Input contains invalid characters' });
+        return badRequest.json(res, 'Input contains invalid characters');
       }
     }
 
     if (DANGEROUS_CHARS_REGEX.test(taskIdentifier) || DANGEROUS_CHARS_REGEX.test(action) ||
         DANGEROUS_CHARS_REGEX.test(status) || DANGEROUS_CHARS_REGEX.test(summary)) {
       logEvent(req, '/api/proxy/agent/status', 400);
-      return res.status(400).json({ error: 'Input contains invalid characters' });
+      return badRequest.json(res, 'Input contains invalid characters');
     }
 
     try {
@@ -3554,7 +3554,7 @@ One convention across every endpoint, so you can branch on the same fields every
     } catch (err) {
       logEvent(req, '/api/proxy/agent/status', 500);
       console.error('Agent status post error:', err.message);
-      res.status(500).json({ error: 'Failed to record status' });
+      jsonError(res, 500, 'Failed to record status');
     }
   });
 
@@ -3574,7 +3574,7 @@ One convention across every endpoint, so you can branch on the same fields every
         const raw = String(req.query.tokenId);
         if (raw.length > MAX_NAME_LENGTH || DANGEROUS_CHARS_REGEX.test(raw)) {
           logEvent(req, '/api/proxy/agent/status', 400);
-          return res.status(400).json({ error: 'Invalid tokenId' });
+          return badRequest.json(res, 'Invalid tokenId');
         }
         filters.tokenId = raw;
       }
@@ -3582,7 +3582,7 @@ One convention across every endpoint, so you can branch on the same fields every
         const raw = String(req.query.taskIdentifier);
         if (raw.length > MAX_NAME_LENGTH || DANGEROUS_CHARS_REGEX.test(raw)) {
           logEvent(req, '/api/proxy/agent/status', 400);
-          return res.status(400).json({ error: 'Invalid taskIdentifier' });
+          return badRequest.json(res, 'Invalid taskIdentifier');
         }
         filters.taskIdentifier = raw;
       }
@@ -3594,7 +3594,7 @@ One convention across every endpoint, so you can branch on the same fields every
     } catch (err) {
       logEvent(req, '/api/proxy/agent/status', 500);
       console.error('Agent status list error:', err.message);
-      res.status(500).json({ error: 'Failed to list status' });
+      jsonError(res, 500, 'Failed to list status');
     }
   });
 
@@ -3645,7 +3645,7 @@ One convention across every endpoint, so you can branch on the same fields every
   router.post('/api/proxy/dispatch', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     if (!dispatchQueueStore) {
       logEvent(req, '/api/proxy/dispatch', 503);
-      return res.status(503).json({ error: 'Dispatch is not available' });
+      return jsonError(res, 503, 'Dispatch is not available');
     }
 
     try {
@@ -3653,62 +3653,62 @@ One convention across every endpoint, so you can branch on the same fields every
 
       if (!prompt || typeof prompt !== 'string') {
         logEvent(req, '/api/proxy/dispatch', 400);
-        return res.status(400).json({ error: 'prompt is required and must be a string' });
+        return badRequest.json(res, 'prompt is required and must be a string');
       }
       if (target !== undefined && !VALID_PROXY_DISPATCH_TARGETS.includes(target)) {
         logEvent(req, '/api/proxy/dispatch', 400);
-        return res.status(400).json({ error: `target must be one of: ${VALID_PROXY_DISPATCH_TARGETS.join(', ')}` });
+        return badRequest.json(res, `target must be one of: ${VALID_PROXY_DISPATCH_TARGETS.join(', ')}`);
       }
       // Validate kind if provided; when omitted it is derived from promptName below.
       if (kind !== undefined && !isValidDispatchKind(kind)) {
         logEvent(req, '/api/proxy/dispatch', 400);
-        return res.status(400).json({ error: `kind must be one of: ${DISPATCH_KINDS.join(', ')}` });
+        return badRequest.json(res, `kind must be one of: ${DISPATCH_KINDS.join(', ')}`);
       }
 
       if (prompt.length > MAX_PROMPT_LENGTH) {
         logEvent(req, '/api/proxy/dispatch', 400);
-        return res.status(400).json({ error: `prompt exceeds maximum length of ${MAX_PROMPT_LENGTH}` });
+        return badRequest.json(res, `prompt exceeds maximum length of ${MAX_PROMPT_LENGTH}`);
       }
       if (promptName && promptName.length > MAX_NAME_LENGTH) {
         logEvent(req, '/api/proxy/dispatch', 400);
-        return res.status(400).json({ error: `promptName exceeds maximum length of ${MAX_NAME_LENGTH}` });
+        return badRequest.json(res, `promptName exceeds maximum length of ${MAX_NAME_LENGTH}`);
       }
       if (issueIdentifier && issueIdentifier.length > MAX_IDENTIFIER_LENGTH) {
         logEvent(req, '/api/proxy/dispatch', 400);
-        return res.status(400).json({ error: `issueIdentifier exceeds maximum length of ${MAX_IDENTIFIER_LENGTH}` });
+        return badRequest.json(res, `issueIdentifier exceeds maximum length of ${MAX_IDENTIFIER_LENGTH}`);
       }
       if (issueTitle && issueTitle.length > MAX_NAME_LENGTH) {
         logEvent(req, '/api/proxy/dispatch', 400);
-        return res.status(400).json({ error: `issueTitle exceeds maximum length of ${MAX_NAME_LENGTH}` });
+        return badRequest.json(res, `issueTitle exceeds maximum length of ${MAX_NAME_LENGTH}`);
       }
       if (issueUrl && issueUrl.length > MAX_URL_LENGTH) {
         logEvent(req, '/api/proxy/dispatch', 400);
-        return res.status(400).json({ error: `issueUrl exceeds maximum length of ${MAX_URL_LENGTH}` });
+        return badRequest.json(res, `issueUrl exceeds maximum length of ${MAX_URL_LENGTH}`);
       }
       if (repo && repo.length > MAX_NAME_LENGTH) {
         logEvent(req, '/api/proxy/dispatch', 400);
-        return res.status(400).json({ error: `repo exceeds maximum length of ${MAX_NAME_LENGTH}` });
+        return badRequest.json(res, `repo exceeds maximum length of ${MAX_NAME_LENGTH}`);
       }
 
       if (DANGEROUS_CHARS_REGEX.test(prompt)) {
         logEvent(req, '/api/proxy/dispatch', 400);
-        return res.status(400).json({ error: 'prompt contains invalid characters' });
+        return badRequest.json(res, 'prompt contains invalid characters');
       }
       if (promptName && DANGEROUS_CHARS_REGEX.test(promptName)) {
         logEvent(req, '/api/proxy/dispatch', 400);
-        return res.status(400).json({ error: 'promptName contains invalid characters' });
+        return badRequest.json(res, 'promptName contains invalid characters');
       }
       if (issueTitle && DANGEROUS_CHARS_REGEX.test(issueTitle)) {
         logEvent(req, '/api/proxy/dispatch', 400);
-        return res.status(400).json({ error: 'issueTitle contains invalid characters' });
+        return badRequest.json(res, 'issueTitle contains invalid characters');
       }
       if (repo && DANGEROUS_CHARS_REGEX.test(repo)) {
         logEvent(req, '/api/proxy/dispatch', 400);
-        return res.status(400).json({ error: 'repo contains invalid characters' });
+        return badRequest.json(res, 'repo contains invalid characters');
       }
       if (issueId && !UUID_REGEX.test(issueId)) {
         logEvent(req, '/api/proxy/dispatch', 400);
-        return res.status(400).json({ error: 'Invalid issueId format' });
+        return badRequest.json(res, 'Invalid issueId format');
       }
       // Follow-up reference (LIN-415): the original dispatchId whose session
       // the downstream dispatcher should resume. Optional UUID; stored +
@@ -3717,12 +3717,12 @@ One convention across every endpoint, so you can branch on the same fields every
       if (followUpTo !== undefined && followUpTo !== null) {
         if (!UUID_REGEX.test(followUpTo)) {
           logEvent(req, '/api/proxy/dispatch', 400);
-          return res.status(400).json({ error: 'Invalid followUpTo format' });
+          return badRequest.json(res, 'Invalid followUpTo format');
         }
         const followUpTarget = target || 'cli';
         if (!['cli', 'web'].includes(followUpTarget)) {
           logEvent(req, '/api/proxy/dispatch', 400);
-          return res.status(400).json({ error: 'followUpTo is only supported for cli/web targets' });
+          return badRequest.json(res, 'followUpTo is only supported for cli/web targets');
         }
       }
 
@@ -3769,7 +3769,7 @@ One convention across every endpoint, so you can branch on the same fields every
     } catch (err) {
       logEvent(req, '/api/proxy/dispatch', 500);
       console.error('Proxy dispatch error:', err.message);
-      res.status(500).json({ error: 'Failed to dispatch prompt' });
+      jsonError(res, 500, 'Failed to dispatch prompt');
     }
   });
 
@@ -3785,7 +3785,7 @@ One convention across every endpoint, so you can branch on the same fields every
   router.post('/api/proxy/recommend-and-dispatch', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     if (!dispatchQueueStore) {
       logEvent(req, '/api/proxy/recommend-and-dispatch', 503);
-      return res.status(503).json({ error: 'Dispatch is not available' });
+      return jsonError(res, 503, 'Dispatch is not available');
     }
 
     try {
@@ -3795,23 +3795,23 @@ One convention across every endpoint, so you can branch on the same fields every
       // the dangerous-char/length checks — see the dispatch step below.)
       if (!issueIdentifier || typeof issueIdentifier !== 'string') {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-        return res.status(400).json({ error: 'issueIdentifier is required and must be a string' });
+        return badRequest.json(res, 'issueIdentifier is required and must be a string');
       }
       if (!isValidIssueId(issueIdentifier)) {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-        return res.status(400).json({ error: 'Invalid identifier format' });
+        return badRequest.json(res, 'Invalid identifier format');
       }
       if (target !== undefined && !VALID_PROXY_DISPATCH_TARGETS.includes(target)) {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-        return res.status(400).json({ error: `target must be one of: ${VALID_PROXY_DISPATCH_TARGETS.join(', ')}` });
+        return badRequest.json(res, `target must be one of: ${VALID_PROXY_DISPATCH_TARGETS.join(', ')}`);
       }
       if (noDescend !== undefined && typeof noDescend !== 'boolean') {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-        return res.status(400).json({ error: 'noDescend must be a boolean' });
+        return badRequest.json(res, 'noDescend must be a boolean');
       }
       if (repo !== undefined && (typeof repo !== 'string' || repo.length > MAX_NAME_LENGTH || DANGEROUS_CHARS_REGEX.test(repo))) {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-        return res.status(400).json({ error: 'repo is invalid' });
+        return badRequest.json(res, 'repo is invalid');
       }
 
       // Recommendation preconditions — identical to GET /recommend.
@@ -3826,7 +3826,7 @@ One convention across every endpoint, so you can branch on the same fields every
       const { isFreeTier } = resolveProxyLLM(sessionApiKey);
       if (!isTestMode && !isRecommendationEnabled(sessionApiKey) && !isFreeTier) {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 503);
-        return res.status(503).json({ error: 'AI recommendations not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.' });
+        return jsonError(res, 503, 'AI recommendations not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.');
       }
 
       // Charge one free-tier unit ONCE per request (not per descent hop). Charge
@@ -3955,7 +3955,7 @@ One convention across every endpoint, so you can branch on the same fields every
     } catch (err) {
       logEvent(req, '/api/proxy/recommend-and-dispatch', 500);
       console.error('Proxy recommend-and-dispatch error:', err.message);
-      res.status(500).json({ error: 'Failed to dispatch prompt' });
+      jsonError(res, 500, 'Failed to dispatch prompt');
     }
   });
 
@@ -3972,7 +3972,7 @@ One convention across every endpoint, so you can branch on the same fields every
   router.get('/api/proxy/dispatch', proxyLimiter, authenticateProxyToken, async (req, res) => {
     if (!dispatchQueueStore) {
       logEvent(req, '/api/proxy/dispatch', 503);
-      return res.status(503).json({ error: 'Dispatch is not available' });
+      return jsonError(res, 503, 'Dispatch is not available');
     }
 
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
@@ -3982,7 +3982,7 @@ One convention across every endpoint, so you can branch on the same fields every
       issueIdentifier = String(req.query.issueIdentifier);
       if (issueIdentifier.length > MAX_IDENTIFIER_LENGTH || DANGEROUS_CHARS_REGEX.test(issueIdentifier)) {
         logEvent(req, '/api/proxy/dispatch', 400);
-        return res.status(400).json({ error: 'Invalid issueIdentifier' });
+        return badRequest.json(res, 'Invalid issueIdentifier');
       }
     }
 
@@ -3991,7 +3991,7 @@ One convention across every endpoint, so you can branch on the same fields every
       statusFilter = String(req.query.status);
       if (statusFilter.length > MAX_NAME_LENGTH || DANGEROUS_CHARS_REGEX.test(statusFilter)) {
         logEvent(req, '/api/proxy/dispatch', 400);
-        return res.status(400).json({ error: 'Invalid status' });
+        return badRequest.json(res, 'Invalid status');
       }
     }
 
@@ -4042,7 +4042,7 @@ One convention across every endpoint, so you can branch on the same fields every
     } catch (err) {
       logEvent(req, '/api/proxy/dispatch', 500);
       console.error('Proxy dispatch list error:', err.message);
-      res.status(500).json({ error: 'Failed to list dispatch items' });
+      jsonError(res, 500, 'Failed to list dispatch items');
     }
   });
 
@@ -4065,13 +4065,13 @@ One convention across every endpoint, so you can branch on the same fields every
   router.get('/api/proxy/dispatch/:id', proxyLimiter, authenticateProxyToken, async (req, res) => {
     if (!dispatchQueueStore) {
       logEvent(req, '/api/proxy/dispatch/:id', 503);
-      return res.status(503).json({ error: 'Dispatch is not available' });
+      return jsonError(res, 503, 'Dispatch is not available');
     }
 
     const { id } = req.params;
     if (!id || id.length > MAX_IDENTIFIER_LENGTH || DANGEROUS_CHARS_REGEX.test(id)) {
       logEvent(req, '/api/proxy/dispatch/:id', 400);
-      return res.status(400).json({ error: 'Invalid dispatch id' });
+      return badRequest.json(res, 'Invalid dispatch id');
     }
 
     // Parse + clamp ?wait. Garbage / non-positive → 0 → unchanged short-poll.
@@ -4084,7 +4084,7 @@ One convention across every endpoint, so you can branch on the same fields every
       const item = await dispatchQueueStore.getItemStatus(req.proxyUrlKey, id);
       if (!item) {
         logEvent(req, '/api/proxy/dispatch/:id', 404);
-        return res.status(404).json({ error: 'Dispatch item not found' });
+        return notFound.json(res, 'Dispatch item not found');
       }
 
       // First read short-circuits: no wait requested, or already terminal.
@@ -4135,7 +4135,7 @@ One convention across every endpoint, so you can branch on the same fields every
     } catch (err) {
       logEvent(req, '/api/proxy/dispatch/:id', 500);
       console.error('Proxy dispatch watch error:', err.message);
-      res.status(500).json({ error: 'Failed to read dispatch item' });
+      jsonError(res, 500, 'Failed to read dispatch item');
     }
   });
 

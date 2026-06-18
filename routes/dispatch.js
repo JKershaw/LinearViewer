@@ -15,6 +15,7 @@
  */
 
 import { Router } from 'express';
+import { badRequest, jsonError, notFound, unauthorized } from '../lib/errors.js';
 import rateLimit from 'express-rate-limit';
 import fs from 'fs';
 import path from 'path';
@@ -118,20 +119,20 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const authHeader = req.headers.authorization;
 
     if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Missing or invalid Authorization header' });
+      return unauthorized.json(res, 'Missing or invalid Authorization header');
     }
 
     const token = authHeader.slice(7);
 
     if (!token) {
-      return res.status(401).json({ error: 'Empty token' });
+      return unauthorized.json(res, 'Empty token');
     }
 
     try {
       const result = await dispatchTokenStore.validateToken(token);
 
       if (!result) {
-        return res.status(401).json({ error: 'Invalid or expired token' });
+        return unauthorized.json(res, 'Invalid or expired token');
       }
 
       req.dispatchUrlKey = result.urlKey;
@@ -139,7 +140,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       next();
     } catch (err) {
       console.error('Token validation error:', err.message);
-      return res.status(500).json({ error: 'Authentication error' });
+      return jsonError(res, 500, 'Authentication error');
     }
   }
 
@@ -157,11 +158,11 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
   async function authenticateFeedbackToken(req, res, next) {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Missing or invalid Authorization header' });
+      return unauthorized.json(res, 'Missing or invalid Authorization header');
     }
     const token = authHeader.slice(7);
     if (!token) {
-      return res.status(401).json({ error: 'Empty token' });
+      return unauthorized.json(res, 'Empty token');
     }
 
     if (harbourFeedbackTokenStore) {
@@ -198,65 +199,65 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
 
       // Validate required fields
       if (!prompt || typeof prompt !== 'string') {
-        return res.status(400).json({ error: 'prompt is required and must be a string' });
+        return badRequest.json(res, 'prompt is required and must be a string');
       }
 
       // Validate target if provided
       const VALID_TARGETS = ['cli', 'web', 'dash', 'local'];
       if (target !== undefined && !VALID_TARGETS.includes(target)) {
-        return res.status(400).json({ error: `target must be one of: ${VALID_TARGETS.join(', ')}` });
+        return badRequest.json(res, `target must be one of: ${VALID_TARGETS.join(', ')}`);
       }
 
       // Validate kind if provided; when omitted it is derived from promptName below.
       if (kind !== undefined && !isValidDispatchKind(kind)) {
-        return res.status(400).json({ error: `kind must be one of: ${DISPATCH_KINDS.join(', ')}` });
+        return badRequest.json(res, `kind must be one of: ${DISPATCH_KINDS.join(', ')}`);
       }
 
       // Reject local target from non-localhost requests
       if (target === 'local') {
         const host = (req.get('host') || '').split(':')[0];
         if (!['localhost', '127.0.0.1'].includes(host)) {
-          return res.status(400).json({ error: 'local target is only available on localhost' });
+          return badRequest.json(res, 'local target is only available on localhost');
         }
       }
 
       // Validate input lengths to prevent database bloat
       if (prompt.length > MAX_PROMPT_LENGTH) {
-        return res.status(400).json({ error: `prompt exceeds maximum length of ${MAX_PROMPT_LENGTH}` });
+        return badRequest.json(res, `prompt exceeds maximum length of ${MAX_PROMPT_LENGTH}`);
       }
       if (promptName && promptName.length > MAX_NAME_LENGTH) {
-        return res.status(400).json({ error: `promptName exceeds maximum length of ${MAX_NAME_LENGTH}` });
+        return badRequest.json(res, `promptName exceeds maximum length of ${MAX_NAME_LENGTH}`);
       }
       if (issueIdentifier && issueIdentifier.length > MAX_IDENTIFIER_LENGTH) {
-        return res.status(400).json({ error: `issueIdentifier exceeds maximum length of ${MAX_IDENTIFIER_LENGTH}` });
+        return badRequest.json(res, `issueIdentifier exceeds maximum length of ${MAX_IDENTIFIER_LENGTH}`);
       }
       if (issueTitle && issueTitle.length > MAX_NAME_LENGTH) {
-        return res.status(400).json({ error: `issueTitle exceeds maximum length of ${MAX_NAME_LENGTH}` });
+        return badRequest.json(res, `issueTitle exceeds maximum length of ${MAX_NAME_LENGTH}`);
       }
       if (issueUrl && issueUrl.length > MAX_URL_LENGTH) {
-        return res.status(400).json({ error: `issueUrl exceeds maximum length of ${MAX_URL_LENGTH}` });
+        return badRequest.json(res, `issueUrl exceeds maximum length of ${MAX_URL_LENGTH}`);
       }
       if (repo && repo.length > MAX_NAME_LENGTH) {
-        return res.status(400).json({ error: `repo exceeds maximum length of ${MAX_NAME_LENGTH}` });
+        return badRequest.json(res, `repo exceeds maximum length of ${MAX_NAME_LENGTH}`);
       }
 
       // Reject null bytes and dangerous control characters
       if (DANGEROUS_CHARS_REGEX.test(prompt)) {
-        return res.status(400).json({ error: 'prompt contains invalid characters' });
+        return badRequest.json(res, 'prompt contains invalid characters');
       }
       if (promptName && DANGEROUS_CHARS_REGEX.test(promptName)) {
-        return res.status(400).json({ error: 'promptName contains invalid characters' });
+        return badRequest.json(res, 'promptName contains invalid characters');
       }
       if (issueTitle && DANGEROUS_CHARS_REGEX.test(issueTitle)) {
-        return res.status(400).json({ error: 'issueTitle contains invalid characters' });
+        return badRequest.json(res, 'issueTitle contains invalid characters');
       }
       if (repo && DANGEROUS_CHARS_REGEX.test(repo)) {
-        return res.status(400).json({ error: 'repo contains invalid characters' });
+        return badRequest.json(res, 'repo contains invalid characters');
       }
 
       // Validate issueId format if provided
       if (issueId && !UUID_REGEX.test(issueId)) {
-        return res.status(400).json({ error: 'Invalid issueId format' });
+        return badRequest.json(res, 'Invalid issueId format');
       }
 
       // Validate follow-up reference if provided. A follow-up resumes an
@@ -266,11 +267,11 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       // only; resuming a Harbour/dash session is out of scope. See LIN-415.
       if (followUpTo !== undefined && followUpTo !== null) {
         if (!UUID_REGEX.test(followUpTo)) {
-          return res.status(400).json({ error: 'Invalid followUpTo format' });
+          return badRequest.json(res, 'Invalid followUpTo format');
         }
         const followUpTarget = target || 'cli';
         if (!['cli', 'web'].includes(followUpTarget)) {
-          return res.status(400).json({ error: 'followUpTo is only supported for cli/web targets' });
+          return badRequest.json(res, 'followUpTo is only supported for cli/web targets');
         }
       }
 
@@ -353,7 +354,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       });
     } catch (err) {
       console.error('Dispatch error:', err.message);
-      res.status(500).json({ error: 'Failed to dispatch prompt' });
+      jsonError(res, 500, 'Failed to dispatch prompt');
     }
   });
 
@@ -369,7 +370,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       res.json({ items });
     } catch (err) {
       console.error('List dispatch items error:', err.message);
-      res.status(500).json({ error: 'Failed to list dispatch items' });
+      jsonError(res, 500, 'Failed to list dispatch items');
     }
   });
 
@@ -385,7 +386,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       res.json({ count });
     } catch (err) {
       console.error('Count dispatch items error:', err.message);
-      res.status(500).json({ error: 'Failed to count dispatch items' });
+      jsonError(res, 500, 'Failed to count dispatch items');
     }
   });
 
@@ -404,7 +405,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       res.json(result);
     } catch (err) {
       console.error('List dispatch history error:', err.message);
-      res.status(500).json({ error: 'Failed to list dispatch history' });
+      jsonError(res, 500, 'Failed to list dispatch history');
     }
   });
 
@@ -422,7 +423,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
   router.get('/workspace/:urlKey/api/dispatch/recent-prompts', workspaceFromUrl, async (req, res) => {
     const linearUserId = req.session.linearUserId;
     if (!linearUserId) {
-      return res.status(401).json({ error: 'Authentication required' });
+      return unauthorized.json(res, 'Authentication required');
     }
     if (!userPreferencesStore) {
       return res.json({ prompts: [] });
@@ -446,22 +447,22 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
   router.post('/workspace/:urlKey/api/dispatch/recent-prompts', workspaceFromUrl, async (req, res) => {
     const linearUserId = req.session.linearUserId;
     if (!linearUserId) {
-      return res.status(401).json({ error: 'Authentication required' });
+      return unauthorized.json(res, 'Authentication required');
     }
     if (!userPreferencesStore) {
-      return res.status(503).json({ error: 'Service unavailable' });
+      return jsonError(res, 503, 'Service unavailable');
     }
 
     const { prompt: rawPrompt } = req.body;
     const prompt = typeof rawPrompt === 'string' ? rawPrompt.trim() : rawPrompt;
     if (!prompt || typeof prompt !== 'string') {
-      return res.status(400).json({ error: 'prompt is required and must be a string' });
+      return badRequest.json(res, 'prompt is required and must be a string');
     }
     if (prompt.length > MAX_CUSTOM_PROMPT_LENGTH) {
-      return res.status(400).json({ error: `prompt exceeds maximum length of ${MAX_CUSTOM_PROMPT_LENGTH}` });
+      return badRequest.json(res, `prompt exceeds maximum length of ${MAX_CUSTOM_PROMPT_LENGTH}`);
     }
     if (DANGEROUS_CHARS_REGEX.test(prompt)) {
-      return res.status(400).json({ error: 'prompt contains invalid characters' });
+      return badRequest.json(res, 'prompt contains invalid characters');
     }
 
     try {
@@ -486,7 +487,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       res.json({ success: true });
     } catch (err) {
       console.error('Failed to save recent prompt:', err.message);
-      res.status(500).json({ error: 'Failed to save recent prompt' });
+      jsonError(res, 500, 'Failed to save recent prompt');
     }
   });
 
@@ -500,20 +501,20 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
 
     // Validate itemId format
     if (!UUID_REGEX.test(itemId)) {
-      return res.status(400).json({ error: 'Invalid item ID format' });
+      return badRequest.json(res, 'Invalid item ID format');
     }
 
     try {
       const removed = await dispatchQueueStore.removeItem(workspace.urlKey, itemId);
 
       if (!removed) {
-        return res.status(404).json({ error: 'Item not found' });
+        return notFound.json(res, 'Item not found');
       }
 
       res.json({ success: true });
     } catch (err) {
       console.error('Remove dispatch item error:', err.message);
-      res.status(500).json({ error: 'Failed to remove item' });
+      jsonError(res, 500, 'Failed to remove item');
     }
   });
 
@@ -534,7 +535,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
 
       // Validate label length
       if (label && label.length > MAX_NAME_LENGTH) {
-        return res.status(400).json({ error: `label exceeds maximum length of ${MAX_NAME_LENGTH}` });
+        return badRequest.json(res, `label exceeds maximum length of ${MAX_NAME_LENGTH}`);
       }
 
       const result = await dispatchTokenStore.createToken(workspace.urlKey, label || 'default');
@@ -547,7 +548,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       });
     } catch (err) {
       console.error('Create token error:', err.message);
-      res.status(500).json({ error: 'Failed to create token' });
+      jsonError(res, 500, 'Failed to create token');
     }
   });
 
@@ -563,7 +564,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       res.json({ tokens });
     } catch (err) {
       console.error('List tokens error:', err.message);
-      res.status(500).json({ error: 'Failed to list tokens' });
+      jsonError(res, 500, 'Failed to list tokens');
     }
   });
 
@@ -577,20 +578,20 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
 
     // Validate tokenId format
     if (!UUID_REGEX.test(tokenId)) {
-      return res.status(400).json({ error: 'Invalid token ID format' });
+      return badRequest.json(res, 'Invalid token ID format');
     }
 
     try {
       const revoked = await dispatchTokenStore.revokeToken(workspace.urlKey, tokenId);
 
       if (!revoked) {
-        return res.status(404).json({ error: 'Token not found' });
+        return notFound.json(res, 'Token not found');
       }
 
       res.json({ success: true });
     } catch (err) {
       console.error('Revoke token error:', err.message);
-      res.status(500).json({ error: 'Failed to revoke token' });
+      jsonError(res, 500, 'Failed to revoke token');
     }
   });
 
@@ -609,7 +610,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       res.json({ items });
     } catch (err) {
       console.error('Poll error:', err.message);
-      res.status(500).json({ error: 'Failed to poll dispatch queue' });
+      jsonError(res, 500, 'Failed to poll dispatch queue');
     }
   });
 
@@ -623,7 +624,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
 
     // Validate itemId format
     if (!UUID_REGEX.test(itemId)) {
-      return res.status(400).json({ error: 'Invalid item ID format' });
+      return badRequest.json(res, 'Invalid item ID format');
     }
 
     try {
@@ -631,7 +632,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       const item = await dispatchQueueStore.takeItem(itemId, req.dispatchUrlKey, req.dispatchTokenLabel);
 
       if (!item) {
-        return res.status(404).json({ error: 'Item not found or already taken' });
+        return notFound.json(res, 'Item not found or already taken');
       }
 
       // Echo `dispatchId` as a top-level alias of `item.id` so consumers see it
@@ -642,7 +643,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       res.json({ item, dispatchId: item.id });
     } catch (err) {
       console.error('Take error:', err.message);
-      res.status(500).json({ error: 'Failed to take item' });
+      jsonError(res, 500, 'Failed to take item');
     }
   });
 
@@ -657,33 +658,33 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
 
     // Validate itemId format
     if (!UUID_REGEX.test(itemId)) {
-      return res.status(400).json({ error: 'Invalid item ID format' });
+      return badRequest.json(res, 'Invalid item ID format');
     }
 
     const { message, url, urlLabel } = req.body;
 
     // Validate required fields
     if (!message || typeof message !== 'string') {
-      return res.status(400).json({ error: 'message is required and must be a string' });
+      return badRequest.json(res, 'message is required and must be a string');
     }
 
     // Validate lengths
     if (message.length > MAX_FEEDBACK_MESSAGE_LENGTH) {
-      return res.status(400).json({ error: `message exceeds maximum length of ${MAX_FEEDBACK_MESSAGE_LENGTH}` });
+      return badRequest.json(res, `message exceeds maximum length of ${MAX_FEEDBACK_MESSAGE_LENGTH}`);
     }
     if (url && url.length > MAX_URL_LENGTH) {
-      return res.status(400).json({ error: `url exceeds maximum length of ${MAX_URL_LENGTH}` });
+      return badRequest.json(res, `url exceeds maximum length of ${MAX_URL_LENGTH}`);
     }
     if (urlLabel && urlLabel.length > MAX_NAME_LENGTH) {
-      return res.status(400).json({ error: `urlLabel exceeds maximum length of ${MAX_NAME_LENGTH}` });
+      return badRequest.json(res, `urlLabel exceeds maximum length of ${MAX_NAME_LENGTH}`);
     }
 
     // Reject dangerous characters
     if (DANGEROUS_CHARS_REGEX.test(message)) {
-      return res.status(400).json({ error: 'message contains invalid characters' });
+      return badRequest.json(res, 'message contains invalid characters');
     }
     if (urlLabel && DANGEROUS_CHARS_REGEX.test(urlLabel)) {
-      return res.status(400).json({ error: 'urlLabel contains invalid characters' });
+      return badRequest.json(res, 'urlLabel contains invalid characters');
     }
 
     // Block javascript: and other dangerous URL schemes
@@ -691,10 +692,10 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       try {
         const parsed = new URL(url);
         if (!['http:', 'https:'].includes(parsed.protocol)) {
-          return res.status(400).json({ error: 'url must use http or https protocol' });
+          return badRequest.json(res, 'url must use http or https protocol');
         }
       } catch {
-        return res.status(400).json({ error: 'url must be a valid URL' });
+        return badRequest.json(res, 'url must be a valid URL');
       }
     }
 
@@ -707,13 +708,13 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       );
 
       if (!result) {
-        return res.status(404).json({ error: 'Item not found or feedback not allowed' });
+        return notFound.json(res, 'Item not found or feedback not allowed');
       }
 
       res.json(result);
     } catch (err) {
       console.error('Feedback error:', err.message);
-      res.status(500).json({ error: 'Failed to post feedback' });
+      jsonError(res, 500, 'Failed to post feedback');
     }
   });
 

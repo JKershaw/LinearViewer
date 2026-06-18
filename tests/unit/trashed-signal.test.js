@@ -142,7 +142,7 @@ describe('REFUSE: write endpoints reject a trashed target with 409 (surfaces 3, 
     assert.match(proxySource, /async function refuseIfTrashed/);
     const start = proxySource.indexOf('async function refuseIfTrashed');
     const body = proxySource.slice(start, start + 400);
-    assert.match(body, /status\(409\)/, 'refusal must be a 409');
+    assert.match(body, /status\(409\)|jsonError\(res, 409/, 'refusal must be a 409');
     assert.match(body, /isTrashed\(data\.issue\)/);
   });
 
