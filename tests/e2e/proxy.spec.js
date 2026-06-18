@@ -1259,6 +1259,50 @@ test.describe('Proxy API - Recommend-and-Dispatch (fused verb, LIN-321)', () => 
     expect(watched.issueIdentifier).toBe('TEST-14');
   });
 
+  test('inherits the server-resolved repo when the caller omits repo (LIN-537)', async ({ request }) => {
+    // TEST-14 lives in proj-alpha, whose description carries `repo=test-repo`.
+    // The fused verb resolves that repo server-side (rec.repo) and must stamp it
+    // on the dispatched item so the worker runs in the right folder.
+    const resp = await request.post('/api/proxy/recommend-and-dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { issueIdentifier: 'TEST-14' }
+    });
+    expect(resp.status()).toBe(201);
+    const created = await resp.json();
+
+    // Read the queued item back via the consumer poll, which surfaces repo.
+    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const { token: dispatchToken } = await tokenResponse.json();
+    const pollResp = await request.get('/api/dispatch/poll', {
+      headers: { Authorization: `Bearer ${dispatchToken}` }
+    });
+    const { items } = await pollResp.json();
+    const queued = items.find(i => i.id === created.id);
+    expect(queued).toBeTruthy();
+    expect(queued.repo).toBe('test-repo');
+  });
+
+  test('an explicit caller repo overrides the resolved repo (LIN-537)', async ({ request }) => {
+    // Caller precedence must be preserved: an explicit repo wins over the
+    // project-resolved repo (test-repo), it is not silently overwritten.
+    const resp = await request.post('/api/proxy/recommend-and-dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { issueIdentifier: 'TEST-14', repo: 'caller-override' }
+    });
+    expect(resp.status()).toBe(201);
+    const created = await resp.json();
+
+    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const { token: dispatchToken } = await tokenResponse.json();
+    const pollResp = await request.get('/api/dispatch/poll', {
+      headers: { Authorization: `Bearer ${dispatchToken}` }
+    });
+    const { items } = await pollResp.json();
+    const queued = items.find(i => i.id === created.id);
+    expect(queued).toBeTruthy();
+    expect(queued.repo).toBe('caller-override');
+  });
+
   test('kind reflects the recommendation action (started issue → implementation)', async ({ request }) => {
     // TEST-14 has no labels and is In Progress → mock recommendedAction 'implement'
     // → deriveDispatchKind('implement') === 'implementation'.
