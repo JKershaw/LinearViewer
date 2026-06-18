@@ -1418,6 +1418,33 @@ button.nav-action {
   line-height: 1.5;
 }
 
+/* Self-diagnosing detail block (reason/type/code/time) on error pages. Subdued,
+   monospace, terminal-aesthetic — safe to quote in a bug report. */
+.error-details {
+  text-align: left;
+  display: inline-block;
+  margin: 0 auto var(--space-5);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-subtle, rgba(0, 0, 0, 0.02));
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--fg-dim);
+}
+
+.error-detail-key {
+  display: inline-block;
+  min-width: 4.5rem;
+  color: var(--fg-muted, var(--fg-dim));
+  opacity: 0.8;
+}
+
+.error-detail-value {
+  color: var(--fg);
+}
+
 .error-home-link {
   display: block;
   margin-top: var(--space-3);

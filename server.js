@@ -35,7 +35,7 @@ import { LocalStore } from './lib/local-store.js'
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID, PERIODICALS_PROJECT_ID } from './lib/tree.js'
 import { buildPeriodicalNodes } from './lib/periodicals.js'
 import { parseRepoFromDescription } from './lib/prompt-formatters.js'
-import { renderPage, renderErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
+import { renderPage, renderErrorPage, renderUpstreamAwareErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken } from './lib/token-refresh.js'
 import { UUID_REGEX, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, updateWorkspaceTokens, getWorkspaceToken } from './lib/workspace.js'
@@ -1004,9 +1004,12 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
       return handleUnauthorizedError(workspace, req.session, teamId, openRouterSource, res);
     }
 
-    // Generic error - show error page
+    // Generic error - show a classified, self-diagnosing error page so an
+    // upstream Linear-connectivity blip reads as transient ("try again"),
+    // distinct from an internal bug, and carries a safe diagnostic to quote.
     console.error('Main route error:', error);
-    const html = renderErrorPage('Something Went Wrong', 'Could not load your projects. Please try again or re-authenticate.', {
+    const html = renderUpstreamAwareErrorPage(error, {
+      defaultMessage: 'Could not load your projects. Please try again or re-authenticate.',
       action: 'Try again',
       actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/`
     });
@@ -1070,7 +1073,8 @@ app.get('/workspace/:urlKey/swipe/:identifier?', workspaceFromUrl, async (req, r
       return handleUnauthorizedError(workspace, req.session, teamId, openRouterSource, res);
     }
 
-    const html = renderErrorPage('Something Went Wrong', 'Could not load your tasks. Please try again.', {
+    const html = renderUpstreamAwareErrorPage(error, {
+      defaultMessage: 'Could not load your tasks. Please try again.',
       action: 'Try again',
       actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/swipe`
     });
@@ -1112,7 +1116,8 @@ app.get('/workspace/:urlKey/swim', workspaceFromUrl, async (req, res) => {
       return handleUnauthorizedError(workspace, req.session, teamId, openRouterSource, res);
     }
 
-    const html = renderErrorPage('Something Went Wrong', 'Could not load your tasks. Please try again.', {
+    const html = renderUpstreamAwareErrorPage(error, {
+      defaultMessage: 'Could not load your tasks. Please try again.',
       action: 'Try again',
       actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/swim`
     });
@@ -1175,7 +1180,8 @@ app.get('/workspace/:urlKey/ship', workspaceFromUrl, async (req, res) => {
       return handleUnauthorizedError(workspace, req.session, teamId, openRouterSource, res);
     }
 
-    const html = renderErrorPage('Something Went Wrong', 'Could not load your tasks. Please try again.', {
+    const html = renderUpstreamAwareErrorPage(error, {
+      defaultMessage: 'Could not load your tasks. Please try again.',
       action: 'Try again',
       actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/ship`
     });
@@ -1226,7 +1232,8 @@ app.get('/workspace/:urlKey/roadmap', workspaceFromUrl, async (req, res) => {
       return handleUnauthorizedError(workspace, req.session, teamId, openRouterSource, res);
     }
 
-    const html = renderErrorPage('Something Went Wrong', 'Could not load your roadmap. Please try again.', {
+    const html = renderUpstreamAwareErrorPage(error, {
+      defaultMessage: 'Could not load your roadmap. Please try again.',
       action: 'Try again',
       actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/roadmap`
     });
