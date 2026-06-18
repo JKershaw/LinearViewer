@@ -9,6 +9,7 @@
  * - Images: Proxy Linear-hosted images with auth
  */
 import { Router } from 'express';
+import { badRequest, jsonError, notFound, unauthorized } from '../lib/errors.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import '../lib/providers/linear/index.js'; // side effect: self-registers the Linear provider into the registry
 import { buildRoadmapModel } from '../lib/roadmap.js';
@@ -253,10 +254,10 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
 
       // Handle 401 from Linear API
       if (error.response?.status === 401) {
-        return res.status(401).json({ error: 'Token expired or invalid' });
+        return unauthorized.json(res, 'Token expired or invalid');
       }
 
-      res.status(500).json({ error: 'Audit failed', message: error.message });
+      jsonError(res, 500, 'Audit failed', { message: error.message });
     }
   });
 
@@ -279,7 +280,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     const { issueId, labelName } = req.params
 
     if (!isValidIssueId(issueId)) {
-      return res.status(400).json({ error: 'Invalid issue ID format' })
+      return badRequest.json(res, 'Invalid issue ID format')
     }
 
     // Check if this is a custom prompt request (format: custom:promptId)
@@ -287,7 +288,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
 
     // Check if label has a prompt template (unless it's a custom prompt)
     if (!isCustomPrompt && !hasPrompt(labelName)) {
-      return res.status(404).json({ error: `No prompt template for label: ${labelName}` })
+      return notFound.json(res, `No prompt template for label: ${labelName}`)
     }
 
     // Capability-aware prompt generation (LIN-177 S4/S5): thread the active
@@ -301,7 +302,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       if (process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token') {
         const mockIssue = testMockData.issues.find(i => i.id === issueId)
         if (!mockIssue) {
-          return res.status(404).json({ error: 'Issue not found' })
+          return notFound.json(res, 'Issue not found')
         }
 
         // Extract identifier from URL (e.g., https://linear.app/test/issue/TEST-6 -> TEST-6)
@@ -360,7 +361,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
           const customPromptId = labelName.slice('custom:'.length);
           const customPromptDef = await customPromptsStore.get(req.workspace.urlKey, customPromptId);
           if (!customPromptDef) {
-            return res.status(404).json({ error: 'Custom prompt not found' });
+            return notFound.json(res, 'Custom prompt not found');
           }
           result = generateCustomPrompt(customPromptDef, issueObj, mockContext, getFeatureFlags(req.session), providerUi);
         } else {
@@ -390,7 +391,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         const customPromptId = labelName.slice('custom:'.length);
         const customPromptDef = await customPromptsStore.get(req.workspace.urlKey, customPromptId);
         if (!customPromptDef) {
-          return res.status(404).json({ error: 'Custom prompt not found' });
+          return notFound.json(res, 'Custom prompt not found');
         }
         result = generateCustomPrompt(customPromptDef, issue, { parent, siblings, project, children, comments }, getFeatureFlags(req.session), providerUi);
       } else {
@@ -398,7 +399,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       }
 
       if (!result) {
-        return res.status(500).json({ error: 'Failed to generate prompt' })
+        return jsonError(res, 500, 'Failed to generate prompt')
       }
 
       sendPromptResult(req, res, {
@@ -417,15 +418,15 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
 
       // Handle 401 from Linear API
       if (error.response?.status === 401) {
-        return res.status(401).json({ error: 'Token expired or invalid' })
+        return unauthorized.json(res, 'Token expired or invalid')
       }
 
       // Handle issue not found
       if (error.message?.includes('not found')) {
-        return res.status(404).json({ error: error.message })
+        return notFound.json(res, error.message)
       }
 
-      res.status(500).json({ error: 'Failed to generate prompt', message: error.message })
+      jsonError(res, 500, 'Failed to generate prompt', { message: error.message })
     }
   })
 
@@ -452,11 +453,11 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
 
     const featureFlags = getFeatureFlags(req.session)
     if (featureFlags.proxy !== true) {
-      return res.status(403).json({ error: 'Proxy feature is not enabled' })
+      return jsonError(res, 403, 'Proxy feature is not enabled')
     }
 
     if (!isValidIssueId(issueId)) {
-      return res.status(400).json({ error: 'Invalid issue ID format' })
+      return badRequest.json(res, 'Invalid issue ID format')
     }
 
     const mode = AUTOPILOT_MODES.includes(req.query.mode) ? req.query.mode : AUTOPILOT_MODE_DEFAULT
@@ -467,7 +468,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       if (process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token') {
         const mockIssue = testMockData.issues.find(i => i.id === issueId)
         if (!mockIssue) {
-          return res.status(404).json({ error: 'Issue not found' })
+          return notFound.json(res, 'Issue not found')
         }
         const identifier = mockIssue.url?.split('/').pop() || ''
         const mockProject = testMockData.projects.find(p => p.id === mockIssue.project?.id)
@@ -511,12 +512,12 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     } catch (error) {
       console.error('Autopilot prompt error:', error)
       if (error.response?.status === 401) {
-        return res.status(401).json({ error: 'Token expired or invalid' })
+        return unauthorized.json(res, 'Token expired or invalid')
       }
       if (error.message?.includes('not found')) {
-        return res.status(404).json({ error: error.message })
+        return notFound.json(res, error.message)
       }
-      res.status(500).json({ error: 'Failed to generate autopilot prompt', message: error.message })
+      jsonError(res, 500, 'Failed to generate autopilot prompt', { message: error.message })
     }
   })
 
@@ -532,7 +533,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
   router.get('/workspace/:urlKey/api/autopilot-prompt', workspaceFromUrl, async (req, res) => {
     const featureFlags = getFeatureFlags(req.session)
     if (featureFlags.proxy !== true) {
-      return res.status(403).json({ error: 'Proxy feature is not enabled' })
+      return jsonError(res, 403, 'Proxy feature is not enabled')
     }
 
     const mode = AUTOPILOT_MODES.includes(req.query.mode) ? req.query.mode : AUTOPILOT_MODE_DEFAULT
@@ -554,7 +555,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       })
     } catch (error) {
       console.error('Autopilot kickoff error:', error)
-      res.status(500).json({ error: 'Failed to generate autopilot kickoff', message: error.message })
+      jsonError(res, 500, 'Failed to generate autopilot kickoff', { message: error.message })
     }
   })
 
@@ -608,7 +609,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     const { issueId } = req.params
 
     if (!isValidIssueId(issueId)) {
-      return res.status(400).json({ error: 'Invalid issue ID format' })
+      return badRequest.json(res, 'Invalid issue ID format')
     }
 
     // Check if feature is enabled (except in test mode)
@@ -627,22 +628,14 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     const testIsFreeTier = req.session.freeTierEnabled && !sessionApiKey && !process.env.OPENROUTER_API_KEY
     const surfaceFreeTier = !isTestMode && (mockAi ? testIsFreeTier : isFreeTier)
     if (!mockAi && !isRecommendationEnabled(sessionApiKey) && !freeTierKey) {
-      return res.status(503).json({ error: 'AI recommendation feature is not configured. Connect your OpenRouter account or set OPENROUTER_API_KEY.' })
+      return jsonError(res, 503, 'AI recommendation feature is not configured. Connect your OpenRouter account or set OPENROUTER_API_KEY.')
     }
 
     // Atomically check rate limits and record usage before proceeding
     if (surfaceFreeTier) {
       const check = await freeTierStore.tryUse(workspace.urlKey)
       if (!check.allowed) {
-        return res.status(429).json({
-          error: check.reason,
-          freeTier: {
-            used: true,
-            remaining: check.remaining,
-            limit: check.limit,
-            resetsAt: check.resetsAt
-          }
-        })
+        return jsonError(res, 429, check.reason, { freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } })
       }
     }
 
@@ -850,7 +843,7 @@ ${goal}`
     // --- Pre-flight validation (regular HTTP errors) ---
 
     if (!isValidIssueId(issueId)) {
-      return res.status(400).json({ error: 'Invalid issue ID format' });
+      return badRequest.json(res, 'Invalid issue ID format');
     }
 
     // See the GET handler: `isTestMode` gates the DATA mock; `mockAi` fires the
@@ -864,7 +857,7 @@ ${goal}`
     const surfaceFreeTier = !isTestMode && (mockAi ? testIsFreeTier : isFreeTier);
 
     if (!mockAi && !isRecommendationEnabled(sessionApiKey) && !freeTierKey) {
-      return res.status(503).json({ error: 'AI recommendation feature is not configured.' });
+      return jsonError(res, 503, 'AI recommendation feature is not configured.');
     }
 
     // AI-mock local path: a missing issue must 404 with a real HTTP status BEFORE
@@ -877,7 +870,7 @@ ${goal}`
         await getProviderForWorkspace(workspace).fetchRecommendationContext(getWorkspaceToken(workspace), issueId);
       } catch (err) {
         if (/not found/i.test(err?.message)) {
-          return res.status(404).json({ error: 'Issue not found' });
+          return notFound.json(res, 'Issue not found');
         }
         throw err;
       }
@@ -887,10 +880,7 @@ ${goal}`
     if (surfaceFreeTier) {
       const check = await freeTierStore.tryUse(workspace.urlKey);
       if (!check.allowed) {
-        return res.status(429).json({
-          error: check.reason,
-          freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt }
-        });
+        return jsonError(res, 429, check.reason, { freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } });
       }
     }
 
@@ -899,7 +889,7 @@ ${goal}`
     if (isTestMode) {
       const mockIssue = testMockData.issues.find(i => i.id === issueId);
       if (!mockIssue) {
-        return res.status(404).json({ error: 'Issue not found' });
+        return notFound.json(res, 'Issue not found');
       }
 
       // Free tier check in test mode
@@ -907,10 +897,7 @@ ${goal}`
       if (testIsFreeTier) {
         const check = await freeTierStore.tryUse(workspace.urlKey);
         if (!check.allowed) {
-          return res.status(429).json({
-            error: check.reason,
-            freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt }
-          });
+          return jsonError(res, 429, check.reason, { freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } });
         }
       }
 
@@ -1226,7 +1213,7 @@ ${goal}`
     const { issueId } = req.params
 
     if (!isValidIssueId(issueId)) {
-      return res.status(400).json({ error: 'Invalid issue ID format' })
+      return badRequest.json(res, 'Invalid issue ID format')
     }
 
     try {
@@ -1240,14 +1227,14 @@ ${goal}`
       console.error('Comments fetch error:', error)
 
       if (error.response?.status === 401) {
-        return res.status(401).json({ error: 'Token expired or invalid' })
+        return unauthorized.json(res, 'Token expired or invalid')
       }
 
       if (error.message?.includes('not found')) {
-        return res.status(404).json({ error: error.message })
+        return notFound.json(res, error.message)
       }
 
-      res.status(500).json({ error: 'Failed to fetch comments', message: error.message })
+      jsonError(res, 500, 'Failed to fetch comments', { message: error.message })
     }
   })
 
@@ -1273,7 +1260,7 @@ ${goal}`
     const { issueId } = req.params
 
     if (!isValidIssueId(issueId)) {
-      return res.status(400).json({ error: 'Invalid issue ID format' })
+      return badRequest.json(res, 'Invalid issue ID format')
     }
 
     try {
@@ -1287,7 +1274,7 @@ ${goal}`
       if (process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token') {
         issue = testMockData.issues.find(i => i.id === issueId)
         if (!issue) {
-          return res.status(404).json({ error: 'Issue not found' })
+          return notFound.json(res, 'Issue not found')
         }
       } else {
         issue = await provider.fetchIssueFields(getWorkspaceToken(workspace), issueId)
@@ -1316,12 +1303,12 @@ ${goal}`
       console.error('Detail fetch error:', error)
 
       if (error.response?.status === 401) {
-        return res.status(401).json({ error: 'Token expired or invalid' })
+        return unauthorized.json(res, 'Token expired or invalid')
       }
       if (error.message?.includes('not found')) {
-        return res.status(404).json({ error: error.message })
+        return notFound.json(res, error.message)
       }
-      res.status(500).json({ error: 'Failed to fetch detail', message: error.message })
+      jsonError(res, 500, 'Failed to fetch detail', { message: error.message })
     }
   })
 
@@ -1345,10 +1332,10 @@ ${goal}`
     const { identifier } = req.params;
 
     if (!identifier || identifier.length > 100) {
-      return res.status(400).json({ error: 'Invalid issue identifier' });
+      return badRequest.json(res, 'Invalid issue identifier');
     }
     if (!dispatchQueueStore || !agentStatusStore) {
-      return res.status(503).json({ error: 'Sessions are not available' });
+      return jsonError(res, 503, 'Sessions are not available');
     }
 
     try {
@@ -1361,7 +1348,7 @@ ${goal}`
       res.json({ sessions });
     } catch (error) {
       console.error('Sessions GET error:', error);
-      res.status(500).json({ error: 'Failed to fetch sessions', message: error.message });
+      jsonError(res, 500, 'Failed to fetch sessions', { message: error.message });
     }
   });
 
@@ -1380,10 +1367,10 @@ ${goal}`
     const { issueId } = req.params;
 
     if (!isValidIssueId(issueId)) {
-      return res.status(400).json({ error: 'Invalid issue ID format' });
+      return badRequest.json(res, 'Invalid issue ID format');
     }
     if (!recapCacheStore) {
-      return res.status(503).json({ error: 'Recap cache not configured' });
+      return jsonError(res, 503, 'Recap cache not configured');
     }
 
     try {
@@ -1391,7 +1378,7 @@ ${goal}`
       let context;
       if (isTestMode) {
         context = await buildMockRecapContext(issueId);
-        if (!context) return res.status(404).json({ error: 'Issue not found' });
+        if (!context) return notFound.json(res, 'Issue not found');
       } else {
         context = await getProviderForWorkspace(workspace).fetchRecommendationContext(getWorkspaceToken(workspace), issueId);
       }
@@ -1419,12 +1406,12 @@ ${goal}`
     } catch (error) {
       console.error('Recap GET error:', error);
       if (error.response?.status === 401) {
-        return res.status(401).json({ error: 'Token expired or invalid' });
+        return unauthorized.json(res, 'Token expired or invalid');
       }
       if (error.message?.includes('not found')) {
-        return res.status(404).json({ error: error.message });
+        return notFound.json(res, error.message);
       }
-      res.status(500).json({ error: 'Failed to fetch recap status', message: error.message });
+      jsonError(res, 500, 'Failed to fetch recap status', { message: error.message });
     }
   });
 
@@ -1440,10 +1427,10 @@ ${goal}`
     const { issueId } = req.params;
 
     if (!isValidIssueId(issueId)) {
-      return res.status(400).json({ error: 'Invalid issue ID format' });
+      return badRequest.json(res, 'Invalid issue ID format');
     }
     if (!recapCacheStore) {
-      return res.status(503).json({ error: 'Recap cache not configured' });
+      return jsonError(res, 503, 'Recap cache not configured');
     }
 
     // `isTestMode` (test-token) gates the DATA mock; `mockAi` additionally fires
@@ -1457,21 +1444,13 @@ ${goal}`
     const isFreeTier = !sessionApiKey && !process.env.OPENROUTER_API_KEY && !!freeTierKey;
 
     if (!mockAi && !isRecommendationEnabled(sessionApiKey) && !freeTierKey) {
-      return res.status(503).json({ error: 'AI recap is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.' });
+      return jsonError(res, 503, 'AI recap is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.');
     }
 
     if (!mockAi && isFreeTier) {
       const check = await freeTierStore.tryUse(workspace.urlKey);
       if (!check.allowed) {
-        return res.status(429).json({
-          error: check.reason,
-          freeTier: {
-            used: true,
-            remaining: check.remaining,
-            limit: check.limit,
-            resetsAt: check.resetsAt
-          }
-        });
+        return jsonError(res, 429, check.reason, { freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } });
       }
     }
 
@@ -1555,10 +1534,10 @@ ${goal}`
     const { issueId } = req.params;
 
     if (!isValidIssueId(issueId)) {
-      return res.status(400).json({ error: 'Invalid issue ID format' });
+      return badRequest.json(res, 'Invalid issue ID format');
     }
     if (!briefCacheStore) {
-      return res.status(503).json({ error: 'Brief cache not configured' });
+      return jsonError(res, 503, 'Brief cache not configured');
     }
 
     try {
@@ -1566,7 +1545,7 @@ ${goal}`
       let context;
       if (isTestMode) {
         context = await buildMockRecapContext(issueId);
-        if (!context) return res.status(404).json({ error: 'Issue not found' });
+        if (!context) return notFound.json(res, 'Issue not found');
       } else {
         context = await getProviderForWorkspace(workspace).fetchRecommendationContext(getWorkspaceToken(workspace), issueId);
       }
@@ -1594,12 +1573,12 @@ ${goal}`
     } catch (error) {
       console.error('Brief GET error:', error);
       if (error.response?.status === 401) {
-        return res.status(401).json({ error: 'Token expired or invalid' });
+        return unauthorized.json(res, 'Token expired or invalid');
       }
       if (error.message?.includes('not found')) {
-        return res.status(404).json({ error: error.message });
+        return notFound.json(res, error.message);
       }
-      res.status(500).json({ error: 'Failed to fetch brief status', message: error.message });
+      jsonError(res, 500, 'Failed to fetch brief status', { message: error.message });
     }
   });
 
@@ -1615,10 +1594,10 @@ ${goal}`
     const { issueId } = req.params;
 
     if (!isValidIssueId(issueId)) {
-      return res.status(400).json({ error: 'Invalid issue ID format' });
+      return badRequest.json(res, 'Invalid issue ID format');
     }
     if (!briefCacheStore) {
-      return res.status(503).json({ error: 'Brief cache not configured' });
+      return jsonError(res, 503, 'Brief cache not configured');
     }
 
     // See the recap POST note: `isTestMode` gates the DATA mock, `mockAi` the AI
@@ -1630,21 +1609,13 @@ ${goal}`
     const isFreeTier = !sessionApiKey && !process.env.OPENROUTER_API_KEY && !!freeTierKey;
 
     if (!mockAi && !isRecommendationEnabled(sessionApiKey) && !freeTierKey) {
-      return res.status(503).json({ error: 'AI brief is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.' });
+      return jsonError(res, 503, 'AI brief is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.');
     }
 
     if (!mockAi && isFreeTier) {
       const check = await freeTierStore.tryUse(workspace.urlKey);
       if (!check.allowed) {
-        return res.status(429).json({
-          error: check.reason,
-          freeTier: {
-            used: true,
-            remaining: check.remaining,
-            limit: check.limit,
-            resetsAt: check.resetsAt
-          }
-        });
+        return jsonError(res, 429, check.reason, { freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } });
       }
     }
 
@@ -1836,12 +1807,12 @@ ${goal}`
 
     // Validate URL
     if (!imageUrl) {
-      return res.status(400).json({ error: 'Missing url parameter' })
+      return badRequest.json(res, 'Missing url parameter')
     }
 
     // Only allow HTTPS URLs (security)
     if (!imageUrl.startsWith('https://')) {
-      return res.status(400).json({ error: 'Invalid image URL: must be HTTPS' })
+      return badRequest.json(res, 'Invalid image URL: must be HTTPS')
     }
 
     // Only allow Linear-hosted images (security - prevent SSRF)
@@ -1851,14 +1822,14 @@ ${goal}`
     try {
       urlObj = new URL(imageUrl)
       if (!allowedHosts.has(urlObj.hostname)) {
-        return res.status(400).json({ error: 'Invalid image URL: must be from Linear' })
+        return badRequest.json(res, 'Invalid image URL: must be from Linear')
       }
       // Prevent path traversal attacks
       if (urlObj.pathname.includes('..')) {
-        return res.status(400).json({ error: 'Invalid image URL: path traversal not allowed' })
+        return badRequest.json(res, 'Invalid image URL: path traversal not allowed')
       }
     } catch {
-      return res.status(400).json({ error: 'Invalid image URL format' })
+      return badRequest.json(res, 'Invalid image URL format')
     }
 
     // Max image size: 10MB to prevent memory exhaustion
@@ -1874,25 +1845,25 @@ ${goal}`
       })
 
       if (!response.ok) {
-        return res.status(response.status).json({ error: 'Failed to fetch image' })
+        return jsonError(res, response.status, 'Failed to fetch image')
       }
 
       // Validate content-type is an image (prevent serving HTML/JS through proxy)
       const contentType = response.headers.get('content-type') || ''
       if (!contentType.startsWith('image/')) {
-        return res.status(400).json({ error: 'Invalid response: not an image' })
+        return badRequest.json(res, 'Invalid response: not an image')
       }
 
       // Check content-length if available
       const contentLength = parseInt(response.headers.get('content-length') || '0', 10)
       if (contentLength > MAX_IMAGE_SIZE) {
-        return res.status(413).json({ error: 'Image too large' })
+        return jsonError(res, 413, 'Image too large')
       }
 
       // Read response with size limit
       const arrayBuffer = await response.arrayBuffer()
       if (arrayBuffer.byteLength > MAX_IMAGE_SIZE) {
-        return res.status(413).json({ error: 'Image too large' })
+        return jsonError(res, 413, 'Image too large')
       }
 
       res.set('Content-Type', contentType)
@@ -1901,10 +1872,10 @@ ${goal}`
     } catch (error) {
       // Handle redirect errors specifically
       if (error.cause?.code === 'ERR_FR_TOO_MANY_REDIRECTS' || error.message?.includes('redirect')) {
-        return res.status(400).json({ error: 'Redirects not allowed' })
+        return badRequest.json(res, 'Redirects not allowed')
       }
       console.error('Image proxy error:', error)
-      res.status(500).json({ error: 'Failed to fetch image' })
+      jsonError(res, 500, 'Failed to fetch image')
     }
   })
 
@@ -1922,7 +1893,7 @@ ${goal}`
       res.json({ prompts });
     } catch (error) {
       console.error('Custom prompts list error:', error);
-      res.status(500).json({ error: 'Failed to list custom prompts' });
+      jsonError(res, 500, 'Failed to list custom prompts');
     }
   });
 
@@ -1939,7 +1910,7 @@ ${goal}`
     } catch (error) {
       console.error('Custom prompt create error:', error);
       const status = error.message.includes('required') || error.message.includes('maximum') || error.message.includes('characters') ? 400 : 500;
-      res.status(status).json({ error: error.message || 'Failed to create custom prompt' });
+      jsonError(res, status, error.message || 'Failed to create custom prompt');
     }
   });
 
@@ -1952,22 +1923,22 @@ ${goal}`
     const { name, template } = req.body;
 
     if (name !== undefined && (typeof name !== 'string' || !name.trim())) {
-      return res.status(400).json({ error: 'Name cannot be empty' });
+      return badRequest.json(res, 'Name cannot be empty');
     }
     if (template !== undefined && (typeof template !== 'string' || !template.trim())) {
-      return res.status(400).json({ error: 'Template cannot be empty' });
+      return badRequest.json(res, 'Template cannot be empty');
     }
 
     try {
       const updated = await customPromptsStore.update(req.workspace.urlKey, id, { name, template });
       if (!updated) {
-        return res.status(404).json({ error: 'Custom prompt not found' });
+        return notFound.json(res, 'Custom prompt not found');
       }
       res.json({ prompt: updated });
     } catch (error) {
       console.error('Custom prompt update error:', error);
       const status = error.message.includes('characters') ? 400 : 500;
-      res.status(status).json({ error: error.message || 'Failed to update custom prompt' });
+      jsonError(res, status, error.message || 'Failed to update custom prompt');
     }
   });
 
@@ -1981,12 +1952,12 @@ ${goal}`
     try {
       const deleted = await customPromptsStore.delete(req.workspace.urlKey, id);
       if (!deleted) {
-        return res.status(404).json({ error: 'Custom prompt not found' });
+        return notFound.json(res, 'Custom prompt not found');
       }
       res.json({ ok: true });
     } catch (error) {
       console.error('Custom prompt delete error:', error);
-      res.status(500).json({ error: 'Failed to delete custom prompt' });
+      jsonError(res, 500, 'Failed to delete custom prompt');
     }
   });
 
@@ -2004,7 +1975,7 @@ ${goal}`
   router.get('/workspace/:urlKey/api/roadmap/north-star', workspaceFromUrl, (req, res) => {
     const featureFlags = getFeatureFlags(req.session);
     if (!featureFlags.roadmap) {
-      return res.status(403).json({ error: 'Roadmap feature is not enabled' });
+      return jsonError(res, 403, 'Roadmap feature is not enabled');
     }
     const byWorkspace = req.session.northStarByWorkspace || {};
     const northStar = byWorkspace[req.workspace.urlKey] || '';
@@ -2020,15 +1991,15 @@ ${goal}`
   router.put('/workspace/:urlKey/api/roadmap/north-star', workspaceFromUrl, async (req, res) => {
     const featureFlags = getFeatureFlags(req.session);
     if (!featureFlags.roadmap) {
-      return res.status(403).json({ error: 'Roadmap feature is not enabled' });
+      return jsonError(res, 403, 'Roadmap feature is not enabled');
     }
 
     const { northStar } = req.body || {};
     if (typeof northStar !== 'string') {
-      return res.status(400).json({ error: 'northStar must be a string' });
+      return badRequest.json(res, 'northStar must be a string');
     }
     if (northStar.length > NORTH_STAR_MAX_CHARS) {
-      return res.status(400).json({ error: `northStar must be ${NORTH_STAR_MAX_CHARS} characters or fewer` });
+      return badRequest.json(res, `northStar must be ${NORTH_STAR_MAX_CHARS} characters or fewer`);
     }
 
     if (!req.session.northStarByWorkspace) {
@@ -2076,21 +2047,21 @@ ${goal}`
   router.post('/workspace/:urlKey/api/roadmap/reports', workspaceFromUrl, async (req, res) => {
     const featureFlags = getFeatureFlags(req.session);
     if (!featureFlags.roadmap) {
-      return res.status(403).json({ error: 'Roadmap feature is not enabled' });
+      return jsonError(res, 403, 'Roadmap feature is not enabled');
     }
     if (!reportHistoryStore) {
-      return res.status(503).json({ error: 'Report history not configured' });
+      return jsonError(res, 503, 'Report history not configured');
     }
 
     const { northStar, narrative, orientation } = req.body || {};
     if (!narrative || typeof narrative !== 'object' || Array.isArray(narrative)) {
-      return res.status(400).json({ error: 'narrative object is required' });
+      return badRequest.json(res, 'narrative object is required');
     }
     if (northStar !== undefined && typeof northStar !== 'string') {
-      return res.status(400).json({ error: 'northStar must be a string' });
+      return badRequest.json(res, 'northStar must be a string');
     }
     if (orientation !== undefined && !Array.isArray(orientation)) {
-      return res.status(400).json({ error: 'orientation must be an array' });
+      return badRequest.json(res, 'orientation must be an array');
     }
 
     try {
@@ -2104,7 +2075,7 @@ ${goal}`
       res.status(201).json({ report });
     } catch (error) {
       console.error('Report save error:', error);
-      res.status(500).json({ error: 'Failed to save report' });
+      jsonError(res, 500, 'Failed to save report');
     }
   });
 
@@ -2115,10 +2086,10 @@ ${goal}`
   router.get('/workspace/:urlKey/api/roadmap/reports', workspaceFromUrl, async (req, res) => {
     const featureFlags = getFeatureFlags(req.session);
     if (!featureFlags.roadmap) {
-      return res.status(403).json({ error: 'Roadmap feature is not enabled' });
+      return jsonError(res, 403, 'Roadmap feature is not enabled');
     }
     if (!reportHistoryStore) {
-      return res.status(503).json({ error: 'Report history not configured' });
+      return jsonError(res, 503, 'Report history not configured');
     }
 
     let limit;
@@ -2132,7 +2103,7 @@ ${goal}`
       res.json({ reports: items, total });
     } catch (error) {
       console.error('Report list error:', error);
-      res.status(500).json({ error: 'Failed to list reports' });
+      jsonError(res, 500, 'Failed to list reports');
     }
   });
 
@@ -2145,21 +2116,21 @@ ${goal}`
   router.get('/workspace/:urlKey/api/roadmap/reports/:id', workspaceFromUrl, async (req, res) => {
     const featureFlags = getFeatureFlags(req.session);
     if (!featureFlags.roadmap) {
-      return res.status(403).json({ error: 'Roadmap feature is not enabled' });
+      return jsonError(res, 403, 'Roadmap feature is not enabled');
     }
     if (!reportHistoryStore) {
-      return res.status(503).json({ error: 'Report history not configured' });
+      return jsonError(res, 503, 'Report history not configured');
     }
 
     try {
       const report = await reportHistoryStore.get(req.workspace.urlKey, req.params.id);
       if (!report) {
-        return res.status(404).json({ error: 'Report not found' });
+        return notFound.json(res, 'Report not found');
       }
       res.json({ report });
     } catch (error) {
       console.error('Report get error:', error);
-      res.status(500).json({ error: 'Failed to fetch report' });
+      jsonError(res, 500, 'Failed to fetch report');
     }
   });
 
@@ -2174,7 +2145,7 @@ ${goal}`
   async function resolveRoadmapLLM(req, res) {
     const featureFlags = getFeatureFlags(req.session);
     if (!featureFlags.roadmap) {
-      res.status(403).json({ error: 'Roadmap feature is not enabled' });
+      jsonError(res, 403, 'Roadmap feature is not enabled');
       return null;
     }
 
@@ -2183,7 +2154,7 @@ ${goal}`
     const isFreeTier = !sessionApiKey && !process.env.OPENROUTER_API_KEY && !!freeTierKey;
     const apiKey = sessionApiKey || process.env.OPENROUTER_API_KEY || freeTierKey;
     if (!apiKey) {
-      res.status(503).json({ error: 'AI not configured. Connect OpenRouter or set OPENROUTER_API_KEY.' });
+      jsonError(res, 503, 'AI not configured. Connect OpenRouter or set OPENROUTER_API_KEY.');
       return null;
     }
 
@@ -2476,24 +2447,16 @@ ${goal}`
     } catch (error) {
       console.error('Roadmap generate fetch error:', error);
       if (error.response?.status === 401) {
-        return res.status(401).json({ error: 'Unauthorized' });
+        return unauthorized.json(res, 'Unauthorized');
       }
-      return res.status(500).json({ error: 'Failed to load roadmap data' });
+      return jsonError(res, 500, 'Failed to load roadmap data');
     }
 
     // Reserve the first free-tier unit before streaming so an already-exhausted
     // free user gets a clean 429 rather than a 200 stream that errors instantly.
     const firstCharge = await chargeRoadmapLayer(req, llm.isFreeTier);
     if (!firstCharge.allowed) {
-      return res.status(429).json({
-        error: firstCharge.reason,
-        freeTier: {
-          used: true,
-          remaining: firstCharge.remaining,
-          limit: firstCharge.limit,
-          resetsAt: firstCharge.resetsAt
-        }
-      });
+      return jsonError(res, 429, firstCharge.reason, { freeTier: { used: true, remaining: firstCharge.remaining, limit: firstCharge.limit, resetsAt: firstCharge.resetsAt } });
     }
 
     res.set({
@@ -2631,7 +2594,7 @@ ${goal}`
   router.post('/workspace/:urlKey/api/roadmap/chat', workspaceFromUrl, async (req, res) => {
     const featureFlags = getFeatureFlags(req.session);
     if (!featureFlags.roadmap) {
-      return res.status(403).json({ error: 'Roadmap feature is not enabled' });
+      return jsonError(res, 403, 'Roadmap feature is not enabled');
     }
 
     const sessionApiKey = req.session.openRouterApiKey;
@@ -2639,34 +2602,26 @@ ${goal}`
     const isFreeTier = !sessionApiKey && !process.env.OPENROUTER_API_KEY && !!freeTierKey;
     const apiKeyToUse = sessionApiKey || process.env.OPENROUTER_API_KEY || freeTierKey;
     if (!apiKeyToUse) {
-      return res.status(503).json({ error: 'AI not configured. Connect OpenRouter or set OPENROUTER_API_KEY.' });
+      return jsonError(res, 503, 'AI not configured. Connect OpenRouter or set OPENROUTER_API_KEY.');
     }
 
     // Atomically check rate limits for free tier users
     if (isFreeTier) {
       const check = await freeTierStore.tryUse(req.workspace.urlKey);
       if (!check.allowed) {
-        return res.status(429).json({
-          error: check.reason,
-          freeTier: {
-            used: true,
-            remaining: check.remaining,
-            limit: check.limit,
-            resetsAt: check.resetsAt
-          }
-        });
+        return jsonError(res, 429, check.reason, { freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } });
       }
     }
 
     const { question, roadmapModel, history } = req.body;
     if (!question || typeof question !== 'string' || !question.trim()) {
-      return res.status(400).json({ error: 'question is required and must be a non-empty string' });
+      return badRequest.json(res, 'question is required and must be a non-empty string');
     }
     if (question.length > 2000) {
-      return res.status(400).json({ error: 'question must be 2000 characters or fewer' });
+      return badRequest.json(res, 'question must be 2000 characters or fewer');
     }
     if (!roadmapModel) {
-      return res.status(400).json({ error: 'question and roadmapModel are required' });
+      return badRequest.json(res, 'question and roadmapModel are required');
     }
 
     // Sanitize history: only allow user/assistant roles with string content
@@ -2684,7 +2639,7 @@ ${goal}`
       messages = buildRoadmapChatMessages(roadmapModel, question.trim(), safeHistory);
     } catch (error) {
       console.error('Roadmap chat build error:', error);
-      return res.status(500).json({ error: 'Failed to build chat prompt' });
+      return jsonError(res, 500, 'Failed to build chat prompt');
     }
 
     const selectedModel = await resolveWorkspaceModel({ urlKey: req.workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
