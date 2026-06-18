@@ -16,6 +16,7 @@ import { Router } from 'express';
 import { GraphQLClient, gql } from 'graphql-request';
 import rateLimit from 'express-rate-limit';
 import { createProxyFetch } from '../lib/proxy-fetch.js';
+import { createLinearFetch } from '../lib/linear-fetch.js';
 import { createDedupeCache, dedupeKey } from '../lib/proxy-dedupe.js';
 import { deriveTerminalStatus, deriveCompletedAt } from '../lib/dispatch-terminal.js';
 import { fetchProjects, fetchIssueContext, fetchRecommendationContext } from '../lib/linear.js';
@@ -901,8 +902,18 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
 
   /**
    * Helper to create a Linear GraphQL client for the workspace.
-   * Includes an AbortSignal timeout so the proxy fails fast instead of
-   * hanging silently (which causes "stream idle timeout" in CLI callers).
+   *
+   * `signal: AbortSignal.timeout(timeoutMs)` is the OVERALL deadline shared
+   * across attempts, so the proxy still fails fast instead of hanging silently
+   * (which causes "stream idle timeout" in CLI callers).
+   *
+   * On the plain-egress path (no HTTP_PROXY — e.g. Heroku) the request goes
+   * through createLinearFetch, which adds bounded retries on transient Linear
+   * connection drops ("Premature close" / ECONNRESET) within that deadline:
+   * a fast drop is retried on a fresh connection instead of failing the
+   * consumer's call, while writes are never replayed (LIN-399) and a hit on the
+   * overall deadline stops retrying. When an egress proxy IS configured,
+   * lib/proxy-fetch.js already owns the retry, so we use it unwrapped.
    */
   async function getClient(urlKey, { timeoutMs = GRAPHQL_TIMEOUT_MS } = {}) {
     const { token, reason } = await resolveWorkspaceAccess(urlKey);
@@ -912,8 +923,8 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     const clientOptions = {
       headers: { Authorization: token },
       signal: AbortSignal.timeout(timeoutMs),
+      fetch: proxyFetch || createLinearFetch(globalThis.fetch, { timeoutMs }),
     };
-    if (proxyFetch) clientOptions.fetch = proxyFetch;
     return { client: new GraphQLClient(LINEAR_API_ENDPOINT, clientOptions), reason };
   }
 
