@@ -21,18 +21,10 @@
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
-  function stripCodeBlockWrapper(text) {
-    if (!text) return text;
-    const m = text.match(/^\s*```[a-z]*\s*\n([\s\S]*?)\n\s*```\s*$/);
-    return m ? m[1] : text;
-  }
-
-  function renderMarkdown(text, opts) {
-    if (!text) return '';
-    const cleaned = stripCodeBlockWrapper(text);
-    const html = typeof marked !== 'undefined' ? marked.parse(cleaned, opts) : esc(cleaned);
-    return typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(html) : html;
-  }
+  // Canonical markdown helpers live in common.js (window.*, LIN-421). This file
+  // was the superset source for renderMarkdown; alias to the shared copies.
+  const stripCodeBlockWrapper = window.stripCodeBlockWrapper;
+  const renderMarkdown = window.renderMarkdown;
 
   // The reasoning section is line-oriented (assessment bullets, the → action line,
   // Next/DeferTo, and the ↳ descent breadcrumbs). Default GFM collapses single

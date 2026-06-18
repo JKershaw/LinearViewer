@@ -23,22 +23,11 @@
       .replace(/'/g, '&#39;');
   }
 
-  function renderMarkdown(md) {
-    const text = String(md == null ? '' : md);
-    const html = typeof marked !== 'undefined' ? marked.parse(text) : esc(text);
-    return typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(html) : html;
-  }
-
-  function relativeTime(iso) {
-    if (!iso) return '';
-    const then = new Date(iso).getTime();
-    if (Number.isNaN(then)) return '';
-    const diffSec = Math.floor((Date.now() - then) / 1000);
-    if (diffSec < 60) return 'just now';
-    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
-    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
-    return `${Math.floor(diffSec / 86400)}d ago`;
-  }
+  // Canonical markdown + relative-time helpers live in common.js (window.*,
+  // LIN-421). Alias to the shared copies — relativeTime converges onto the
+  // friendlier shared "Behavior B" (yesterday/<7d/short-date) formatter.
+  const renderMarkdown = window.renderMarkdown;
+  const relativeTime = window.relativeTime;
 
   function briefUrl(urlKey, identifier) {
     return `/workspace/${encodeURIComponent(urlKey)}/api/brief/${encodeURIComponent(identifier)}`;

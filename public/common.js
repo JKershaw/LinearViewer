@@ -27,6 +27,88 @@ window.escapeHtml = function(str) {
 };
 
 // =============================================================================
+// Markdown Rendering
+// =============================================================================
+
+/**
+ * Strip a whole-string Markdown code-fence wrapper.
+ *
+ * When a model returns its entire output wrapped in a single ```lang … ```
+ * fence, we want the inner content rendered as Markdown, not as one code block.
+ * Only strips when the fence wraps the ENTIRE string; inline/partial fences are
+ * left untouched. Byte-identical to the prior copies in prompt-section.js and
+ * swipe.js (LIN-421).
+ *
+ * @global
+ * @param {string} text
+ * @returns {string} The unwrapped inner text, or the original text unchanged.
+ */
+window.stripCodeBlockWrapper = function(text) {
+  if (!text) return text;
+  const m = text.match(/^\s*```[a-z]*\s*\n([\s\S]*?)\n\s*```\s*$/);
+  return m ? m[1] : text;
+};
+
+/**
+ * Render Markdown to sanitized HTML.
+ *
+ * Canonical superset hoisted from prompt-section.js (LIN-421): strips a
+ * whole-string fence wrapper, renders with `marked.parse(cleaned, opts)` when
+ * marked is available (falling back to escaped text when it isn't), then
+ * sanitizes with DOMPurify when available. Returns '' for falsy input.
+ *
+ * @global
+ * @param {string} text            Markdown source
+ * @param {Object} [opts]          Passed through to `marked.parse` (e.g. {breaks:true})
+ * @returns {string} Sanitized HTML (or escaped text when marked is absent).
+ */
+window.renderMarkdown = function(text, opts) {
+  if (!text) return '';
+  const cleaned = window.stripCodeBlockWrapper(text);
+  const html = typeof marked !== 'undefined' ? marked.parse(cleaned, opts) : window.escapeHtml(cleaned);
+  return typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(html) : html;
+};
+
+// =============================================================================
+// Relative Time Formatting
+// =============================================================================
+
+/**
+ * Format a timestamp as friendly relative time (LIN-421 canonical, "Behavior B").
+ *
+ * Standardizes the previously divergent per-page formatters onto one behavior:
+ * `just now` / `Nm ago` / `Nh ago` / `yesterday` / `Nd ago` (<7d) / short date
+ * ("Jan 5"). Polymorphic input: accepts either an ISO/parseable date string or a
+ * millisecond-epoch number. Returns '' for falsy or unparseable input.
+ *
+ * Note: pipeline.js deliberately keeps its own 30-day-cap variant and is NOT a
+ * consumer of this helper.
+ *
+ * @global
+ * @param {string|number} value  ISO date string or millisecond epoch
+ * @returns {string} Human-readable relative time, or '' when input is empty/invalid.
+ */
+window.relativeTime = function(value) {
+  if (!value) return '';
+  const ms = typeof value === 'number' ? value : new Date(value).getTime();
+  if (!Number.isFinite(ms)) return '';
+  const date = new Date(ms);
+  const diffMs = Date.now() - ms;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return 'just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays === 1) return 'yesterday';
+  if (diffDays < 7) return `${diffDays}d ago`;
+
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${months[date.getMonth()]} ${date.getDate()}`;
+};
+
+// =============================================================================
 // Deploy Time Formatting
 // =============================================================================
 

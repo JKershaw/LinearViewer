@@ -22,17 +22,9 @@ const seenIds = new Set();
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function relativeTime(ms) {
-  if (!ms) return '';
-  const diff = Date.now() - ms;
-  const sec = Math.floor(diff / 1000);
-  if (sec < 60) return 'just now';
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  return new Date(ms).toLocaleDateString();
-}
+// relativeTime is canonical in common.js (window.relativeTime, LIN-421) and is
+// polymorphic over ISO strings / millisecond numbers; called here via the bare
+// global (msg.timestamp is ms). Converges onto the shared "Behavior B" format.
 
 function setStartStatus(text, isError) {
   const el = document.getElementById('collective-start-status');
