@@ -28,6 +28,8 @@ import { BriefCacheStore } from './lib/brief-cache.js'
 import { RunSummaryCacheStore } from './lib/run-summary-cache.js'
 import { ReportHistoryStore } from './lib/report-history-store.js'
 import { LlmCallLogStore } from './lib/llm-call-log.js'
+import { LinearCallLogStore } from './lib/linear-call-log.js'
+import { setLinearCallRecorder } from './lib/providers/linear/index.js'
 import { getProvider, getProviderForWorkspace } from './lib/providers/registry.js'
 import './lib/providers/linear/index.js' // side effect: self-registers the Linear provider into the registry
 import { localProvider } from './lib/providers/local/index.js' // side effect: self-registers the Local provider; store injected below
@@ -267,6 +269,16 @@ const llmCallLogStore = new LlmCallLogStore({
   collection: llmCallLogCollection
 })
 setLlmCallRecorder((call) => llmCallLogStore.record(call))
+
+// Linear call log (LIN-538): one row per outbound Linear GraphQL request with its
+// outcome, so request volume and failure rate are visible on /kpis. Registered as
+// the Linear provider's recorder hook so the client stays store-free (mirrors the
+// LLM-call recorder above).
+const linearCallLogCollection = db.collection('linear-call-log')
+const linearCallLogStore = new LinearCallLogStore({
+  collection: linearCallLogCollection
+})
+setLinearCallRecorder((call) => linearCallLogStore.record(call))
 
 // =============================================================================
 // Express App Configuration
@@ -777,7 +789,8 @@ app.get('/kpis', async (req, res) => {
         freeTier: freeTierCollection,
         recapCache: recapCacheCollection,
         briefCache: briefCacheCollection,
-        reportHistory: reportHistoryCollection
+        reportHistory: reportHistoryCollection,
+        linearCalls: linearCallLogCollection
       }, { dbBackend: process.env.MONGODB_URI ? 'mongodb' : 'mangodb' })
       kpiCache = { at: Date.now(), stats }
     }

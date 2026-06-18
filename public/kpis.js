@@ -306,6 +306,34 @@
     });
   }
 
+  // --- Linear API calls, last 24h: stacked ok vs failed per hour (LIN-538) ---
+  // A request burst and a failure spike (e.g. "Premature close") show up side by
+  // side here — on a page that does not itself depend on Linear.
+  const linear = data.linearCalls;
+  if (linear && linear.hourly) {
+    const hourly = linear.hourly;
+    const linearTotal = sum(hourly.ok) + sum(hourly.failed);
+    if (!emptyUnless('chart-linear-calls', linearTotal)) {
+      new Chart(document.getElementById('chart-linear-calls'), {
+        type: 'bar',
+        data: {
+          labels: hourly.hours.map(function (h) { return h.slice(11, 13) + 'h'; }),
+          datasets: [
+            { label: 'ok', data: hourly.ok, backgroundColor: COLORS.green },
+            { label: 'failed', data: hourly.failed, backgroundColor: COLORS.red }
+          ]
+        },
+        options: {
+          plugins: { legend: { position: 'bottom' } },
+          scales: {
+            x: { stacked: true, grid: { display: false }, ticks: { maxTicksLimit: 12 } },
+            y: { stacked: true, beginAtZero: true, grid: { color: COLORS.grid }, ticks: { precision: 0 } }
+          }
+        }
+      });
+    }
+  }
+
   // Render the generated-at timestamp in the viewer's local timezone.
   const generated = document.querySelector('.kpi-generated');
   if (generated && generated.dataset.timestamp) {
