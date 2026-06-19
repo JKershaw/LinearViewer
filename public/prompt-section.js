@@ -15,11 +15,9 @@
   const promptCache = new Map(); // `${issueId}:${label}` -> {label, name, raw, html, reasoning}
   const lastPromptLabel = new Map(); // issueId -> label
 
-  function esc(str) {
-    return window.escapeHtml ? window.escapeHtml(str) : String(str == null ? '' : str)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-  }
+  // Canonical client escaper lives in common.js (window.escapeHtml, LIN-422),
+  // guaranteed loaded before this file wherever it runs (swipe page).
+  const esc = window.escapeHtml;
 
   // Canonical markdown helpers live in common.js (window.*, LIN-421). This file
   // was the superset source for renderMarkdown; alias to the shared copies.

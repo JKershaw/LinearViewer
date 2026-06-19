@@ -11,13 +11,17 @@
 
 /**
  * Escapes HTML special characters to prevent XSS.
- * Matches server-side implementation in lib/utils/html.js.
+ * Canonical client-side escaper (LIN-422) — the single implementation used
+ * across every page; page-specific copies/fallbacks delegate here.
+ * Mirrors the server-side escaper in lib/utils/html.js, except this guards
+ * only null/undefined so a legitimate `0` renders as "0" rather than being
+ * silently dropped (the more careful guard reconciled from the ship-page copy).
  * @global
  * @param {string} str - String to escape
  * @returns {string} Escaped string safe for HTML insertion
  */
 window.escapeHtml = function(str) {
-  if (!str) return '';
+  if (str === undefined || str === null) return '';
   return String(str)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')

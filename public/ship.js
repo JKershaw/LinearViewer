@@ -676,15 +676,9 @@
   // Card markup (matches swim's .swim-box)
   // =============================================================================
 
-  function escapeHtml(str) {
-    if (str === undefined || str === null) return '';
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
+  // Canonical client escaper lives in common.js (window.escapeHtml, LIN-422),
+  // loaded before this file on the ship page.
+  const escapeHtml = window.escapeHtml;
 
   function stateIndicator(stateType) {
     if (isTerminalState(stateType)) return '<span class="swim-box-state done status-pill__char status-pill--done">✓</span>';
