@@ -190,6 +190,8 @@
     }
 
     if (deleteBtn) {
+      // Native confirm() is the ratified destructive-action primitive (LIN-511);
+      // see docs/ui-divergences.md.
       if (!confirm('Delete this custom prompt?')) return;
       const card = deleteBtn.closest('.custom-prompt-card');
       const id = card.dataset.promptId;
