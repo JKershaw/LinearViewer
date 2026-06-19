@@ -34,11 +34,9 @@
     bug: 'bug'
   };
 
-  function esc(str) {
-    return window.escapeHtml ? window.escapeHtml(str) : String(str == null ? '' : str)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-  }
+  // Canonical client escaper lives in common.js (window.escapeHtml, LIN-422),
+  // guaranteed loaded before this file wherever it runs (swipe + main tree).
+  const esc = window.escapeHtml;
 
   function stageLabel(stage) {
     return STAGE_LABELS[stage] || stage || '—';
