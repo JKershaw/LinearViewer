@@ -577,6 +577,8 @@ function initDispatchTokenManagement() {
 
       e.preventDefault()
       const tokenId = revokeBtn.dataset.tokenId
+      // Native confirm() is the ratified destructive-action primitive (LIN-511);
+      // see docs/ui-divergences.md.
       if (confirm('Revoke this token? It will immediately stop working.')) {
         await revokeDispatchToken(urlKey, tokenId)
       }

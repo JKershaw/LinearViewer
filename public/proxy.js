@@ -203,6 +203,8 @@ This will return all available endpoints with examples. Your token scope is: ${s
     tokenList.querySelectorAll('.token-revoke').forEach(btn => {
       btn.addEventListener('click', async () => {
         const tokenId = btn.dataset.tokenId;
+        // Native confirm() is the ratified destructive-action primitive (LIN-511);
+        // see docs/ui-divergences.md.
         if (!confirm('Revoke this token?')) return;
 
         try {

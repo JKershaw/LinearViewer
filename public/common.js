@@ -789,6 +789,9 @@ function initNavBar() {
   // Handle forms with confirmation dialogs (replaces inline onsubmit)
   document.addEventListener('submit', (e) => {
     const form = e.target.closest('form[data-confirm]')
+    // Native confirm() is the ratified destructive-action primitive (LIN-511):
+    // accessible/focus-trapped/keyboard-ready for free, and showModal is
+    // display-only. See docs/ui-divergences.md.
     if (form && !confirm(form.dataset.confirm)) {
       e.preventDefault()
     }
