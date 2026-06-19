@@ -18,7 +18,7 @@
   padding: var(--space-2) 0.75rem;
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
   font-size: 13px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--bg);
   color: var(--fg);
@@ -49,7 +49,7 @@
 .swipe-arrow {
   width: 32px;
   height: 32px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border);
   border-radius: 50%;
   background: var(--bg);
   color: var(--fg-dim);
@@ -65,7 +65,7 @@
 .swipe-arrow:hover:not(:disabled) {
   background: var(--bg-muted);
   color: var(--fg);
-  border-color: #ccc;
+  border-color: var(--border-strong);
 }
 
 .swipe-arrow:disabled {
@@ -81,7 +81,7 @@
 
 /* Card */
 .swipe-card {
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 0;
   background: var(--bg);
@@ -235,7 +235,7 @@
   padding: 0.15rem 0.45rem;
   font-size: 11px;
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border);
   border-radius: 10px;
   color: var(--fg-dim);
   background: var(--bg-muted);
@@ -253,7 +253,7 @@
 
 .swipe-meta-blocked {
   background: var(--bg-muted);
-  border: 1px solid #e8e8e8;
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 0.3rem var(--space-2);
   margin-top: 0.15rem;
@@ -280,7 +280,7 @@ a.swipe-blocking-issue:hover {
 /* Parent/Subtask Relationship Rows */
 .swipe-meta-parent {
   background: var(--bg-muted);
-  border: 1px solid #e8e8e8;
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 0.3rem var(--space-2);
   margin-top: 0.15rem;
@@ -289,7 +289,7 @@ a.swipe-blocking-issue:hover {
 
 .swipe-meta-subtasks {
   background: var(--bg-muted);
-  border: 1px solid #e8e8e8;
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 0.3rem var(--space-2);
   margin-top: 0.15rem;
@@ -322,7 +322,7 @@ a.swipe-relation-issue:hover {
 /* Expandable Accordion Sections */
 .swipe-card-accordion {
   margin-top: var(--space-1);
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid var(--fg-vdim);
 }
 
 .swipe-card-accordion:first-of-type {
@@ -406,7 +406,7 @@ a.swipe-relation-issue:hover {
 
 .swipe-comment {
   padding: var(--space-2) 0;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--fg-vdim);
 }
 
 .swipe-comment:last-child {
@@ -462,7 +462,7 @@ a.swipe-relation-issue:hover {
   display: block;
   margin-top: var(--space-2);
   padding-top: 0.4rem;
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid var(--fg-vdim);
   font-size: 11px;
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
 }
@@ -507,7 +507,7 @@ a.swipe-relation-issue:hover {
   justify-content: center;
   padding: 0.45rem 0.75rem;
   min-height: 36px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border);
   border-radius: 18px;
   background: var(--bg);
   color: var(--fg-dim);
@@ -523,12 +523,12 @@ a.swipe-relation-issue:hover {
 
 .swipe-prompt-btn:hover {
   background: var(--bg-muted);
-  border-color: #ccc;
+  border-color: var(--border-strong);
   color: var(--fg);
 }
 
 .swipe-prompt-btn:active {
-  background: #f0f0f0;
+  background: var(--bg-muted);
 }
 
 .swipe-prompt-btn.active {
@@ -595,7 +595,7 @@ a.swipe-relation-issue:hover {
 }
 
 .prompt-section[data-phase="idle"] .swipe-prompt-header {
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--fg-vdim);
 }
 
 .prompt-section[data-phase="fresh"] .swipe-prompt-header,
