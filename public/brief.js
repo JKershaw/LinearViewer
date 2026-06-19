@@ -14,14 +14,10 @@
 (function () {
   'use strict';
 
-  function esc(str) {
-    return String(str == null ? '' : str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
+  // Canonical HTML-escape helper lives in common.js (window.escapeHtml,
+  // LIN-422). Alias to the shared copy — behaviour-neutral (&#039; renders
+  // identically to the old &#39;, and the nullish guard is preserved).
+  const esc = window.escapeHtml;
 
   // Canonical markdown + relative-time helpers live in common.js (window.*,
   // LIN-421). Alias to the shared copies — relativeTime converges onto the
