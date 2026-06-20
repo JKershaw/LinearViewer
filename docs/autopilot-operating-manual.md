@@ -144,6 +144,18 @@ mistakes rather than correcting them. The session may also have been reaped; if 
 the runner reports `[failed] no live session to resume`, which you treat like any other failed dispatch
 and re-dispatch fresh. When in doubt, fresh.
 
+There is a second, unrelated use of the same `followUpTo` wire that isn't coaching at all. A worker
+can also finish *while a thing it started is still in flight* — it posts `done` with its last words
+saying *"e2e running"* or *"CI kicked off"* — or it can simply go **silent**, the completion signal
+never arriving. Neither is a finish: a `done`-while-waiting is a *not-yet* (the green run doesn't exist
+yet), and a long silence is a session that may be wedged or dead. In both, the move is the same and it
+isn't a course-correction — it's a *probe*: confirm the in-flight thing, or ask whether anyone's home
+(*"still working? report where things stand"*). A liveness probe doesn't breach the no-coaching line,
+because you're not redirecting the work, only asking what state it's in. And the redundancy still holds
+— if the probe can't land or the silence outlasts it, that's a dead session, so re-dispatch fresh.
+(Your briefing carries the concrete quiet-threshold and the polling mechanics; the disposition is just:
+don't read "done" as "finished," and don't wait on silence forever.)
+
 ## The human's edge, and how to hand back
 
 Some moments are the human's, and there your job is to hand over cleanly. What's theirs: anything about

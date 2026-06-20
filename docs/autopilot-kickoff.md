@@ -103,11 +103,24 @@ loop that follow are the machinery you run *through* that lens. (The same handbo
    `do { r = GET .../dispatch/{id}?wait=50 } while (!terminal(r))`. Read the **`status` field**
    for the terminal signal — not prose. `reason` (`change` | `timeout` | `terminal`) and
    `waitedMs` tell you *why* it returned: a `timeout` with `waitedMs` near 50000 means the call
-   held the whole window and nothing changed — the worker's just quiet. (The poll's known quirks,
-   and the rest of your instruments, are under *Your instruments* below — including why `done`
-   means "go look," not "finished.")
+   held the whole window and nothing changed — the worker's just quiet. Quiet has a ceiling, though:
+   track the time since the *last new activity* (new feedback or a tool event), not since the last
+   poll — a string of quiet 50s holds is healthy, but once **~30 min** pass with zero new activity
+   the hold has stopped meaning "working" and started meaning "wedged or dead." Don't poll a silent
+   session forever: send it a one-line liveness follow-up (`followUpTo` the dispatch id — *"still
+   working? report where things stand"*), and if it can't resume (`[failed] no live session to
+   resume`) or stays silent after the nudge, re-dispatch fresh or hand back. (The poll's known
+   quirks, and the rest of your instruments, are under *Your instruments* below — including why
+   `done` means "go look," not "finished.")
 
-4. **Cross-check — the step that earns its keep.** On `done`, take the `[evidence]` URLs
+4. **Cross-check — the step that earns its keep.** First read the worker's last message or two:
+   `status` tells you the session *ended*, but the closing lines tell you in *what state* — and a
+   `done` whose final words say it's *waiting* on something it kicked off (e2e running, CI in
+   flight, a deploy settling) ended **while that's still in the air**, so the deliverable (the green
+   run) doesn't exist yet. That's a *not-yet*, not a done: keep watching the artifact, or — if the
+   session itself has ended — send the small confirmatory follow-up (*"confirm CI went green and
+   report the run URL"*) rather than advancing on a finish line that hasn't landed. Otherwise, on a
+   clean `done`, take the `[evidence]` URLs
    and any IDs and **fetch them**. Confirm the **deliverable this task was meant to produce**
    actually exists as a real *change* — and let the task's kind tell you what that deliverable
    is: a plan in the description, a findings comment, a commit/PR, a green CI run, a state
@@ -154,12 +167,16 @@ becoming a halt you didn't need — recognise these known quirks, don't debug th
 
 - **`done` is a session boundary, not proof.** A terminal `done` means *the session ended*, not
   that the task succeeded — a worker can background a long command, exit, and post `done` before
-  the work lands (or never does). Treat `done` as "go look" (step 4), never "it's finished."
+  the work lands (or never does). Treat `done` as "go look" (step 4), never "it's finished." A
+  `done` whose final lines say it's *waiting* on e2e/CI/a deploy is the common shape of this: it
+  ended mid-flight, so confirm the run yourself or follow up to confirm it — don't advance on it.
 - **`[stalled?] … (last tool: Bash)`** with no new tool calls is *usually one long command
   running* — a test suite, not a dead session. Check before you re-dispatch.
 - **The watch poll holds open ~50s.** `GET /dispatch/{id}?wait=50` returns the moment something
   changes, else at the cap — a long quiet call is the hold working, not a hang. Expect ~one 50s
-  call per quiet minute and trust it; no `sleep`, no backoff.
+  call per quiet minute and trust it; no `sleep`, no backoff. Trust the quiet only up to a ceiling,
+  though: ~30 min with zero new activity is a wedged session, not a working one — your cue to nudge
+  then re-dispatch (step 3), not to poll on forever.
 - **Shell loops: don't name the variable `status`.** zsh reserves it as a read-only alias for
   `$?` and the assignment aborts. Use `dispatch_status`, or run the loop under `bash`.
 - **`/recommend` can run past 25s** behind whitespace keepalives that `JSON.parse` ignores —
