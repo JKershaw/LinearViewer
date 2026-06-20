@@ -74,6 +74,23 @@ const todo = { name: 'Todo', type: 'unstarted' };
 
 // Render a leaf-task context block in the SAME shape lib/openrouter.js
 // formatIssueContext produces, so the snapshot + context is faithful.
+//
+// Comments matter for the LOOP cases (LIN-555): the prior-attempt trail is the
+// ONLY window the recommender has onto past work, so a loop fixture encodes its
+// recaps in issue.comments and we render them exactly as the leaf branch of
+// formatIssueContext does — `**Discussion History:** N comment(s)` followed by
+// `\n**<user>** (Mon D, YYYY):` + body per comment (oldest-first). Dates go
+// through the same en-US toLocaleDateString shape formatCommentsForPrompt uses.
+function renderComments(comments) {
+  const L = [`**Discussion History:** ${comments.length} comment(s)`];
+  for (const c of comments) {
+    const date = new Date(c.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    L.push(`\n**${c.user}** (${date}):`);
+    L.push(c.body);
+  }
+  return L.join('\n');
+}
+
 function renderContext(issue, project = 'Product') {
   const L = [];
   L.push(`**Issue:** ${issue.identifier} - ${issue.title}`);
@@ -82,6 +99,7 @@ function renderContext(issue, project = 'Product') {
   if (issue.description) L.push(`**Description:** ${issue.description}`);
   if (issue.labels?.length) L.push(`**Labels:** ${issue.labels.join(', ')}`);
   if (project) L.push(`**Project:** ${project}`);
+  if (issue.comments?.length) L.push(renderComments(issue.comments));
   return L.join('\n');
 }
 
@@ -310,6 +328,99 @@ Arrows: server wiring depends on the store rewrite; migration depends on both.
 ## Scope
 Needs multiple sessions — migration + rollback alone is its own focused pass; the three call sites each carry distinct edges.`
     }
+  },
+
+  // ---- HAPPY/TYPICAL: review (completes the common-action regression net) ----
+  // The suite already covers research/plan/implement/blocked/bug/breakdown happy
+  // cases; review was the gap. Comment-driven (landed-evidence in the trail), so it
+  // also exercises the Step-3 already-landed guard reading the comment recap.
+  {
+    id: 'happy: landed work awaiting review (comments)',
+    expect: ['review'], researchWrong: true,
+    why: 'Implementation has demonstrably landed per the completion recap (PR open, CI green) but is not yet reviewed → confirm-and-close, not re-implement. Real shape: LIN-420/LIN-542 pre-merge state.',
+    issue: {
+      identifier: 'SYN-16', createdAt: '2026-06-10T00:00:00Z', state: inProgress, labels: [],
+      title: 'Adopt the shared error-envelope helpers in the three largest route files',
+      description: 'Replace the ad-hoc `res.status(...).json({error})` blocks in the three largest route files with the shared envelope helpers. Net-additive, no behaviour change.',
+      comments: [
+        { user: 'agent', createdAt: '2026-06-10T09:10:00Z',
+          body: 'Implemented — adopted the envelope helpers across all three route files. PR open (#505, commit 7f790dc). CI green: unit + all 4 E2E shards + ci-success. Scope held to exactly the named files; no behaviour change. Ready for review.' }
+      ]
+    }
+  },
+
+  // ---- LOOP / STUCK edge cases (LIN-555) ----
+  // The prior-attempt trail lives ONLY in `comments` (the recommender's sole window
+  // onto past work — mirrors reality, since agents post recaps). Expected action =
+  // do NOT repeat the looping action; break the loop (escalate / review / fix the
+  // blocker). `loop:true` + `avoid` make the forbidden repeat explicit so the summary
+  // can report a loop-repeat rate. This is the cheap test of the bigger idea: if the
+  // engine breaks these loops FROM THE COMMENT TRAIL, structured prior-session input
+  // is unnecessary; if it can't even with the trail in front of it, that earns a
+  // follow-up (richer session context) with evidence rather than speculation.
+  {
+    id: 'loop: review stuck — 3× Request Changes, unchanged (real LIN-510)',
+    expect: ['implement', 'blocked', 'plan', 'bug'], loop: true, avoid: 'review', researchWrong: true,
+    why: 'REAL loop (LIN-510): three consecutive reviews all Request-Changes on the SAME unaddressed blocker (dishonest visual baselines, no acknowledgment commit) against an unchanged commit. A 4th review repeats the loop; the correct break is to route to the blocker fix (regenerate the baselines) — Step-3 already-landed guard: "if review would surface a blocker that must be fixed first, route the next action to that blocker, not a repeated review".',
+    issue: {
+      identifier: 'SYN-17', createdAt: '2026-06-19T07:00:00Z', state: inProgress, labels: [],
+      title: 'Converge the near-gray neutral values onto design tokens (intended visual delta)',
+      description: 'Wire the residual near-gray hexes that are close-but-not-equal to a token onto that token, accepting the small intended visual delta. Two stylesheet files only.',
+      comments: [
+        { user: 'agent', createdAt: '2026-06-19T07:38:00Z',
+          body: 'Implemented — converged the near-gray neutrals onto tokens in the two stylesheets (commit 0ba8f61). PR open, CI green.' },
+        { user: 'agent', createdAt: '2026-06-19T07:46:00Z',
+          body: 'Review — Request Changes. Code is approve-ready and matches the plan, but the visual-regression baselines were committed as-is and now bake in the OLD colours, so they are dishonest — they must be regenerated against the intended delta and an acknowledgment commit added before this can approve. No code change needed, only the baselines.' },
+        { user: 'agent', createdAt: '2026-06-19T07:52:00Z',
+          body: 'Review #2 — Request Changes (unchanged). State is identical to the prior review: still commit 0ba8f61, no acknowledgment commit, baselines still dishonest. Nothing has addressed the prior finding.' },
+        { user: 'agent', createdAt: '2026-06-19T08:49:00Z',
+          body: 'Review #3 — Request Changes (unchanged). Independent re-verification from scratch: still 0ba8f61, baselines still not regenerated. Same blocker as Review #1 and #2; no progress between attempts.' }
+      ]
+    }
+  },
+  {
+    id: 'loop: bug already investigated — root cause + fix in comments (real LIN-537)',
+    expect: ['implement', 'plan'], loop: true, avoid: 'bug', researchWrong: true,
+    why: 'REAL shape (LIN-537): `bug` label, but the comment trail already records a code-grounded investigation naming the root cause AND a minimal fix approach. Step-2 bug guard: the label marks unexpected behavior, not investigation still owed — advance to the fix, do not re-investigate. Tests the loop guard reading the trail from comments, not the description.',
+    issue: {
+      identifier: 'SYN-18', createdAt: '2026-06-18T07:00:00Z', state: inProgress, labels: ['bug'],
+      title: 'Dispatched tasks via autopilot ignore the resolved repo',
+      description: 'The fused autopilot dispatch verb does not respect the resolved repo for the task — dispatched items land against the wrong repo.',
+      comments: [
+        { user: 'agent', createdAt: '2026-06-18T07:38:00Z',
+          body: 'Investigation — root cause found (isolated). The fused verb builds the dispatched item with `repo: repo || itemRepo` but the server-resolved repo was discarded one layer up, so the fallback always wins. Confirmed at HEAD by reading the handler and tracing the resolved value. Minimal fix: thread the resolved repo into the item build at that call site. Checked for siblings — this is the only call site with the pattern (isolated, not a class).' }
+      ]
+    }
+  },
+  {
+    id: 'loop: implementation stuck — 2× same wall, approach is wrong (authored)',
+    expect: ['plan', 'research', 'blocked'], loop: true, avoid: 'implement', researchWrong: true,
+    why: 'Two implementation recaps both hit the SAME wall: the chosen approach rests on an assumption the code contradicts, and each attempt patches-then-reverts with no forward progress. Repeating implementation repeats the loop; the honest break is to re-ground the approach (plan/research) or surface that it is genuinely blocked — not a third identical attempt.',
+    issue: {
+      identifier: 'SYN-19', createdAt: '2026-06-12T00:00:00Z', state: inProgress, labels: [],
+      title: 'Make the queue consumer process items strictly in dispatch order',
+      description: 'Items should be consumed in the order they were dispatched. Update the consumer so ordering is guaranteed end-to-end.',
+      comments: [
+        { user: 'agent', createdAt: '2026-06-12T10:00:00Z',
+          body: 'Attempt 1 — implemented a sort on the consumer side, but the ordering integration test still fails intermittently. The poll endpoint returns items in an order the consumer cannot fully control; sorting after the fact does not hold under concurrent takes. Reverted the sort.' },
+        { user: 'agent', createdAt: '2026-06-12T14:30:00Z',
+          body: 'Attempt 2 — tried a per-item sequence stamp on the consumer, same failing test. Root issue is upstream: the claim/take step is not itself ordered, so no consumer-side change can guarantee order. The approach in the ticket (fix it "on the consumer") rests on an assumption the take path contradicts. Patched and reverted again — no net progress across either attempt.' }
+      ]
+    }
+  },
+  {
+    id: 'loop: research redo — findings + approach already in comments (comment-driven trap)',
+    expect: ['plan', 'implement'], loop: true, avoid: 'research', researchWrong: true,
+    why: 'Comment-driven version of the "research already done" trap: a prior research recap in the trail establishes the findings AND a chosen, validated approach. Re-recommending research loops it; the work should move forward. Proves the engine reads completion evidence from the comment trail, not only from a description block.',
+    issue: {
+      identifier: 'SYN-20', createdAt: '2026-06-08T00:00:00Z', state: inProgress, labels: [],
+      title: 'Cache the recommendation responses to cut latency',
+      description: 'Recommendation responses are slow. Reduce the latency.',
+      comments: [
+        { user: 'agent', createdAt: '2026-06-08T11:00:00Z',
+          body: 'Research complete. Traced the latency: the model-generation leg dominates; the data fetch is fast. Considered an in-memory LRU vs reusing the existing hash-keyed cache store. Chosen approach (validated with a spike): reuse the existing recap-style cache keyed by issue id + updatedAt, 10-minute TTL. Feasibility confirmed. Findings and the chosen approach are settled; this just needs building.' }
+      ]
+    }
   }
 ];
 
@@ -351,7 +462,10 @@ console.log(`model=${GEN_MODEL}  K=${K}  arms=${armList.join('+')}  cases=${case
 console.log(`vocab(${VOCAB.size}): ${[...VOCAB].join(', ')}\n`);
 
 const armName = { A: 'baseline', B: 'candidate' };
-const stats = { A: { hit: 0, n: 0, rr: 0, rrN: 0, of: 0, ofN: 0, ov: 0 }, B: { hit: 0, n: 0, rr: 0, rrN: 0, of: 0, ofN: 0, ov: 0 } };
+// lp/lpN = loop-repeat: on a `loop` case, how often the model chose the forbidden
+// `avoid` action (i.e. repeated the loop) out of all loop-case runs. Lower is better.
+const mk = () => ({ hit: 0, n: 0, rr: 0, rrN: 0, of: 0, ofN: 0, ov: 0, lp: 0, lpN: 0 });
+const stats = { A: mk(), B: mk() };
 
 for (const c of cases) {
   const accept = new Set(c.expect.map(norm));
@@ -370,6 +484,8 @@ for (const c of cases) {
     // (auto-derived from expect; subsumes the old manual researchWrong flag, which
     // had a blind spot: it didn't count plan-expected cases pulled into research).
     else { s.of += choseResearch; s.ofN += K; }
+    // Loop-repeat: count how often the model chose the forbidden repeat action.
+    if (c.loop && c.avoid) { s.lp += res.filter(a => a === norm(c.avoid)).length; s.lpN += K; }
     const distStr = Object.entries(dist).sort((a, b) => b[1] - a[1]).map(([a, n]) => `${a}×${n}`).join(', ');
     const tag = hits === K ? 'ok ' : hits > 0 ? 'mix' : 'MISS';
     line.push(`    ${arm}(${armName[arm]}) [${tag}] ${hits}/${K}  ${distStr}`);
@@ -393,4 +509,5 @@ console.log(row('routing accuracy', (s, raw) => raw ? s.hit / s.n * 100 : `${s.h
 console.log(row('research RECALL', (s, raw) => raw ? (s.rrN ? s.rr / s.rrN * 100 : 0) : `${s.rr}/${s.rrN} (${pct(s.rr, s.rrN)})`));
 console.log(row('research OVER-FIRE', (s, raw) => raw ? (s.ofN ? s.of / s.ofN * 100 : 0) : `${s.of}/${s.ofN} (${pct(s.of, s.ofN)})`));
 console.log(row('off-vocabulary', (s, raw) => raw ? s.ov / s.n * 100 : `${s.ov}/${s.n} (${pct(s.ov, s.n)})`));
-console.log('\nrecall↑ over-fire↓ off-vocab↓ is better. (Δ shown only in AB mode.)');
+console.log(row('loop-REPEAT', (s, raw) => raw ? (s.lpN ? s.lp / s.lpN * 100 : 0) : `${s.lp}/${s.lpN} (${pct(s.lp, s.lpN)})`));
+console.log('\nrecall↑ over-fire↓ off-vocab↓ loop-repeat↓ is better. (Δ shown only in AB mode.)');
