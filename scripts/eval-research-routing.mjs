@@ -338,7 +338,10 @@ async function routeOnce(arm, issue) {
   return m ? norm(m[1]) : '(unparsed)';
 }
 
-const cases = CASES.filter(c => !ONLY || c.id.includes(ONLY));
+// ONLY accepts a comma-separated list of substrings (match ANY) for cheap focused
+// A/B runs over a hand-picked subset, e.g. ONLY=LIN-551,multi-surface,trap
+const onlyTerms = ONLY ? ONLY.split(',').map(s => s.trim()).filter(Boolean) : null;
+const cases = CASES.filter(c => !onlyTerms || onlyTerms.some(t => c.id.includes(t)));
 const armList = ARMS === 'A' ? ['A'] : ARMS === 'B' ? ['B'] : ['A', 'B'];
 console.log(`model=${GEN_MODEL}  K=${K}  arms=${armList.join('+')}  cases=${cases.length}  (n=${K}/arm/case)`);
 console.log(`vocab(${VOCAB.size}): ${[...VOCAB].join(', ')}\n`);
