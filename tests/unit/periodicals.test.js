@@ -557,6 +557,34 @@ describe('Design & Interface Review specifics (LIN-520)', () => {
     assert.match(prompt, /advisory tail/i);
   });
 
+  test('assesses how the UI looks across the six design-quality finding classes (LIN-567)', () => {
+    // Beyond breakage: visual craft is a first-class review dimension, framed
+    // within the minimal CLI/terminal aesthetic, never toward generic chrome.
+    assert.match(prompt, /visual hierarchy and emphasis/i);
+    assert.match(prompt, /layout, spacing and alignment rhythm/i);
+    assert.match(prompt, /typography/i);
+    assert.match(prompt, /colour and palette as design/i);
+    assert.match(prompt, /visual polish and craft details/i);
+    assert.match(prompt, /aesthetic coherence and first-impression/i);
+    // Judged within the deliberate minimal aesthetic, not against it.
+    assert.match(prompt, /minimal CLI\/terminal aesthetic|monospace/i);
+    assert.doesNotMatch(prompt, /generic chrome.{0,40}target/i);
+  });
+
+  test('advisory tail is a ranked before→after shortlist, with "looks good as-is" valid (LIN-567)', () => {
+    // Upgraded from loose taste notes to an actionable, ordered proposal.
+    assert.match(prompt, /ranked shortlist of the highest-impact visual improvements/i);
+    assert.match(prompt, /before\s*→\s*after/i);
+    // Grounded against the shipped design-system baseline, conceptually.
+    assert.match(prompt, /design-system reference page the app ships/i);
+    // Minimalism-is-working stays a valid explicit verdict.
+    assert.match(prompt, /looks good as-is|minimalism is working/i);
+    // The design-quality dimensions never mint fix-tasks — advisory only, cap unchanged.
+    assert.match(prompt, /advisory half hands these judgement calls to a maintainer and mints nothing/i);
+    assert.match(prompt, /objective breakage only|objective breakage/i);
+    assert.match(prompt, /top ~3 by severity/i);
+  });
+
   test('stays general: no file literals, route names, or tool names leak in', () => {
     // The shared .js guard already runs; reinforce that no rendering artifact /
     // route / tool name leaks (capabilities are named conceptually).
