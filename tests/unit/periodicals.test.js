@@ -9,19 +9,21 @@ import { PERIODICALS, getPeriodicals, buildPeriodicalNodes } from '../../lib/per
 import { PERIODICALS_PROJECT_ID } from '../../lib/tree.js';
 
 describe('periodicals registry', () => {
-  test('seeds the LIN-354 review set plus Drift & Coherence, Comprehension-Debt, Stability, Dependency & Supply-Chain, and Recent Headwinds (10 templates)', () => {
-    assert.strictEqual(PERIODICALS.length, 10);
+  test('seeds the LIN-354 review set plus Drift & Coherence, Comprehension-Debt, Stability, Dependency & Supply-Chain, Recent Headwinds, and Design & Interface (11 templates)', () => {
+    assert.strictEqual(PERIODICALS.length, 11);
     assert.strictEqual(getPeriodicals(), PERIODICALS);
   });
 
-  test('contains the eight corrective reviews plus the advisory Stability Review and Recent Headwinds report', () => {
+  test('contains the nine corrective reviews plus the advisory Stability Review and Recent Headwinds report', () => {
     // Assert by id/title/mode rather than position so the registry can grow.
     const byId = Object.fromEntries(PERIODICALS.map(t => [t.id, t]));
 
-    // id -> [title, mode]. The eight code-surface / supply-chain reviews are
-    // 'corrective' (they mint fix-tasks); the Stability Review (LIN-453) and the
-    // Recent Headwinds report (LIN-542) are the two 'advisory' entries —
-    // trajectory governors that report for a human to act on.
+    // id -> [title, mode]. The nine code-surface / supply-chain / interface
+    // reviews are 'corrective' (they mint fix-tasks); the Stability Review
+    // (LIN-453) and the Recent Headwinds report (LIN-542) are the two 'advisory'
+    // entries — trajectory governors that report for a human to act on. The
+    // Design & Interface Review (LIN-520) is corrective with an advisory tail:
+    // it mints fix-tasks for objective breakage only.
     const expected = {
       'documentation-review': ['Documentation Review', 'corrective'],
       'test-coverage-gap': ['Test Coverage Gap Review', 'corrective'],
@@ -32,7 +34,8 @@ describe('periodicals registry', () => {
       'comprehension-debt': ['Comprehension-Debt Review', 'corrective'],
       'stability-review': ['Stability Review', 'advisory'],
       'dependency-supply-chain': ['Dependency & Supply-Chain Review', 'corrective'],
-      'recent-headwinds': ['Recent Headwinds', 'advisory']
+      'recent-headwinds': ['Recent Headwinds', 'advisory'],
+      'design-review': ['Design & Interface Review', 'corrective']
     };
 
     for (const [id, [title, mode]] of Object.entries(expected)) {
@@ -498,6 +501,67 @@ describe('Recent Headwinds specifics (LIN-542)', () => {
     assert.match(prompt, /Stability Review/);
     assert.match(prompt, /do not double-flag|do not re-flag/i);
     assert.match(prompt, /churn/i);
+  });
+});
+
+describe('Design & Interface Review specifics (LIN-520)', () => {
+  const template = PERIODICALS.find(t => t.id === 'design-review');
+  const prompt = template.generatePrompt();
+
+  test('renders the product rather than reading source, never trusting stale baselines', () => {
+    // The first periodical whose evidence is the rendered product.
+    assert.match(prompt, /rendered product/i);
+    assert.match(prompt, /render, don't read|Render, don't read/i);
+    // Fresh desktop + mobile renders, regenerated at run time.
+    assert.match(prompt, /desktop and mobile/i);
+    assert.match(prompt, /never trust any committed reference renders/i);
+    // Capability expressed conceptually, not by artifact/route/tool name.
+    assert.match(prompt, /visual-capture mechanism/i);
+    // Measured against the shipped design system (named conceptually, not by route).
+    assert.match(prompt, /design system the app itself ships/i);
+    // Accessibility / performance pass.
+    assert.match(prompt, /accessibility and performance pass|accessibility\/performance pass/i);
+  });
+
+  test('carries a required first-experience section (John\'s explicit ask)', () => {
+    assert.match(prompt, /required first-experience section/i);
+    assert.match(prompt, /onboarding/i);
+    assert.match(prompt, /empty states/i);
+    assert.match(prompt, /primary call-to-action/i);
+  });
+
+  test('covers the interface finding classes', () => {
+    assert.match(prompt, /visual consistency/i);
+    assert.match(prompt, /accessibility/i);
+    assert.match(prompt, /responsive and mobile|responsive\/mobile/i);
+    assert.match(prompt, /affordance and discoverability|affordance\/discoverability/i);
+    assert.match(prompt, /information hierarchy/i);
+    assert.match(prompt, /copy and labeling|copy\/labeling/i);
+  });
+
+  test('owns the rendered product and defers to the sibling reviews (no double-flag)', () => {
+    assert.match(prompt, /Code Quality Review/);
+    assert.match(prompt, /API Quality Review/);
+    assert.match(prompt, /Documentation Review/);
+    assert.match(prompt, /do not double-flag|do not re-flag/i);
+  });
+
+  test('corrective with an advisory tail: fix-tasks for objective breakage, subjective stays advisory', () => {
+    assert.strictEqual(template.mode, 'corrective');
+    // Fix-tasks only for objective breakage.
+    assert.match(prompt, /objective breakage/i);
+    assert.match(prompt, /contrast failure/i);
+    assert.match(prompt, /mobile overflow/i);
+    // Subjective design direction is recorded as an advisory tail, not minted.
+    assert.match(prompt, /subjective design/i);
+    assert.match(prompt, /advisory tail/i);
+  });
+
+  test('stays general: no file literals, route names, or tool names leak in', () => {
+    // The shared .js guard already runs; reinforce that no rendering artifact /
+    // route / tool name leaks (capabilities are named conceptually).
+    assert.doesNotMatch(prompt, /playwright|lighthouse|styleguide\b/i);
+    assert.doesNotMatch(prompt, /\/styleguide|set-session|screenshots/i);
   });
 });
 
