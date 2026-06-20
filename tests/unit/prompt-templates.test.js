@@ -420,7 +420,7 @@ describe('bug template', () => {
       '4. Widen the model — isolated, or one of a class? Once the root cause is in hand, check whether the same pattern produces siblings: search for the pattern itself (the failure mode, a shared helper, a parallel code path), not only the symptom the ticket cites. A genuinely isolated issue is a valid answer — state it explicitly.',
       '5. Propose fix with minimal scope. If step 4 found a class, the fix stays minimal — name the class and list the unhandled instances in your findings comment instead of silently widening the fix.',
       '6. Verify fix doesn\'t introduce regressions',
-      '**When fixed**: Remove the `bug` label in Linear'
+      '**When fixed**: Leave the `bug` label in place — moving the task to Done marks it resolved. The label is the lasting record that this was a bug (used by reports and prioritization), so do not remove it.'
     ].join('\n');
     assert.ok(
       result.prompt.includes(expectedGoalBlock),
