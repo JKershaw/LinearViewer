@@ -24,7 +24,9 @@ Match the size of the generated prompt to the task's ACTUAL scale — not to the
 
 You must recommend exactly ONE action. Follow this decision tree IN ORDER:
 
-**Priority when multiple conditions apply:** blocked > bug > preparation > implementation. Address the highest-priority condition first.
+Keep the generated prompt inside the single action you recommended: its steps produce that action's deliverable, and its final step names the follow-up action. The handoff is a recommendation the system acts on later — each action gets its own prompt, generated fresh when it starts.
+
+**Priority when multiple conditions apply:** already-complete (→ `review`) > blocked > bug > preparation > implementation. Address the highest-priority condition first.
 
 ### Step 1: Does the task need research or preparation?
 
@@ -54,21 +56,24 @@ Signals that knowledge is ungathered (non-exhaustive — apply the core test, do
 ### Step 2: Is the task blocked or has a bug?
 
 Check if task has blockers or bugs that need addressing first:
-- `blocked` label: Work is stuck on external dependency, decision, or missing info
+- Blocked: work is stuck on an external dependency, decision, or missing info — detect this from the blocking relationship (an incomplete `blocks`/`blocked-by` relation, or the frontier facts above showing the task/its children blocked), NOT from a label.
 - `bug` label: Unexpected behavior that needs investigation
 
-If blocked → First check if blocking dependencies are already resolved (e.g., blocking issue is Done). If so, the generated prompt should skip full analysis — just confirm unblocked, remove label, and proceed to the next phase. Only recommend full blocker analysis if the blocker is still active.
-If bug → Recommend bug investigation
+If blocked → First check if blocking dependencies are already resolved (e.g., the blocking issue is Done). If so, the generated prompt should skip full analysis — just confirm the task is unblocked and recommend the next action. Only recommend full blocker analysis if the blocker is still active.
+If bug → **First check whether the bug has already been investigated — do NOT loop research.** A `bug` label marks *unexpected behavior*, not *investigation still owed*; its mere presence is NOT a reason to investigate again. If the comments or description already already contain a code-grounded investigation that identifies the root cause AND a fix approach (the `bug` completion signal — "issue understood well enough to fix" — is met), the investigation is **done**. Recommend `implementation` (or `plan` if the fix needs sequencing across surfaces) to apply the fix, or `review` if the fix is already applied and you are only confirming it. Re-investigate ONLY when no prior investigation exists, the prior findings are incomplete or contradicted by the current code, or the observed behavior has changed since they were written. Otherwise → Recommend bug investigation.
 
 ### Step 3: Is the task ready for planning or implementation?
 
-**Check if a plan exists.** Read the issue description for an implementation plan (files to modify, approach, testing strategy) and a clear answer to whether the work fits one focused session. A complete plan documents both — the plan phase enumerates surfaces with any dependency arrows between them, then commits to a session-fit answer of either "fits one session" or "needs multiple sessions."
+**FIRST — before the plan check below — check whether the implementation has ALREADY landed.** This already-landed guard applies to EVERY task that reaches Step 3, regardless of whether it has a formal plan and regardless of whether the change looks "simple enough to implement directly." Read the comments and description against the implementation completion signals (code committed, a PR opened or merged, tests passing, a summary comment recorded) — the same kind of soft, evidence-based check used for bugs in Step 2. There is no deterministic "landed" marker (this coordinator does not see git, PRs, or CI), so judge it from the recorded evidence, not a checkbox; when that evidence is thin or absent, the work is NOT done — continue to the plan check below.
+- Implementation already landed (the surfaces are built AND a completion summary, or a committed-and-tested signal such as a "PR merged" comment, is recorded) → Recommend `review` — verify the finished work holds up and close it out. This fires for a plan-less `research → implementation` leaf exactly as it does for a planned task: a leaf that reached implementation directly (no `plan` step, so no `## Implementation Plan` block and no session-fit answer in its description) still routes to `review` once its work has demonstrably landed — do NOT let the absence of a formal plan, or a present-tense "Next step:" directive left over from research, send it back to `implementation`. Do NOT re-recommend `implementation` on work that is already done; an In Progress state is NOT by itself evidence the work is unfinished, and "the change is small enough to just do it" is NOT a reason to skip this landed-evidence check. One exception that routes neither to `implementation` nor to a repeated `review`: if the work landed but CI is red, or review would surface a blocker that must be fixed first, route the next action to that blocker (via Step 2 — `blocked`/`bug`/`plan`/`implementation`); the review prompt files or links it as `blocks`, and `review` re-runs to close the original once the blocker is resolved and CI is green.
+
+**If the work has not landed, check whether a plan exists.** Read the issue description for an implementation plan (files to modify, approach, testing strategy) and a clear answer to whether the work fits one focused session. A complete plan documents both — the plan phase enumerates surfaces with any dependency arrows between them, then commits to a session-fit answer of either "fits one session" or "needs multiple sessions."
 
 **If no plan exists, or the plan has not committed to a session-fit answer → Recommend `plan`.**
 
-**If a complete plan exists, route on the session-fit answer:**
-- Plan says "fits one session" → Recommend `implementation`
+**Otherwise route on the session-fit answer:**
 - Plan says "needs multiple sessions" → Recommend `breakdown` (the breakdown phase creates subtasks by copying the plan's dependency arrows into `blocked-by` relations)
+- Plan says "fits one session" and the implementation is not yet done → Recommend `implementation`
 
 **Implementation readiness:**
 Only recommend implementation if:
@@ -93,12 +98,6 @@ Generate a prompt following this structure. The prompt is an INSTRUCTION that re
 
 Always include the "Start" step to ensure work visibility.
 
-## Re-ground the Ticket (staleness check)
-Treat this ticket as a hypothesis about the codebase, not ground truth — its description may have been accurate when written but invalidated by later commits. Before relying on what it says about the code:
-1. List the files and symbols the ticket references.
-2. Check whether any have changed since the ticket was created (use the **Created** date from the Task Context): run `git log --since="[ticket created date]" -- <paths>` for those paths.
-3. If any have changed, re-read that source at HEAD (not your own notes or the ticket prose) and reconcile any discrepancies before trusting the ticket's description of the codebase.
-
 ## Context
 Reference the task rather than restating it. Do NOT copy {{IDENTIFIER}}'s description or comment thread into the prompt — the consumer reads the live task (its brief, or Linear) directly, so a baked-in copy only bloats the prompt and risks going stale. Include only: (a) the lightweight relational pointers that orient the work — project, parent, siblings — as one line each; and (b) any task-specific fact the consumer genuinely needs to act on that is NOT already obvious from the ticket, and only when it is present in the Task Context above.
 
@@ -112,19 +111,19 @@ Reference the task rather than restating it. Do NOT copy {{IDENTIFIER}}'s descri
 
 ### Quality rules for generated prompts
 
-- **Every generated prompt** must include the "Re-ground the Ticket (staleness check)" section verbatim in spirit: it must tell the agent to list the referenced files/symbols, run `git log --since="<the ticket's Created date>"` to detect changes since creation, and — if any changed — **re-read that source at HEAD** (not the agent's notes or the ticket prose) and reconcile discrepancies, treating the ticket as a hypothesis rather than ground truth. Substitute the actual **Created** date from the Task Context into the `--since` argument; do not leave a placeholder.
 - **Blocked prompts** must front-load a status check on blocking dependencies — if the blocker is already resolved, skip the full analysis and recommend the next action.
-- **Research prompts** must end with a Surface Assessment: state explicitly whether the implementation can land cleanly on the current code, or whether a specific minimal refactor would make it land better. Format: "Surface Assessment: [yes, implementation can land cleanly] / [refactor needed: describe the minimal scoped change]". The answer must be explicit — not implied — so the plan step can act on it. Describe what needs changing (not a general tidy-up), or state clearly that no preparation is needed.
-- **Plan prompts** must include a cross-cutting concerns check: after listing changes, ask whether any requirements share the same code path, state, or interface — and if so, document the expected interaction explicitly. Plan prompts for tasks touching high-churn files must include a history-reading step — high-churn means the same file has 3+ commits in recent history; the plan should document what those changes were protecting against. If a Surface Assessment in prior research comments identifies a prerequisite refactor, the plan prompt must encode it as a separate blocking subtask using the assessment's description directly — do not absorb the refactor into implementation steps, as that loses the sequencing guarantee. **Plan prompts must also contain a Strategy Framing block placed BEFORE the Scope Assessment / session-fit step** (see `lib/prompt-template-defs.js` for the canonical example of this ordering). The Strategy Framing block must: (a) instruct the consumer to score viable strategies on *cost-of-doing* (current-ticket session size, blast radius, risk to high-churn files) vs *cost-of-not-doing* (named contract gap left unsolved, plus the workaround tax — dialect-island / per-runtime branch / duplicated abstraction — paid on every future change); (b) when a cheaper strategy routes around a tracked contract gap, instruct the consumer to NAME that gap explicitly (ticket identifier or "none identified") — a bare description is not enough; (c) for migration / convergence / pre-launch parent epics, default to closing the gap unless cost-of-doing is prohibitively higher. Ordering is non-negotiable: Strategy Framing → Scope Assessment → session-fit answer. Reversing it produces post-hoc justification of the cheap default. **Plan prompts must also include a completeness check on the surface list:** instruct the consumer to confirm the list is complete (not just correct) by searching for the concept or behavior itself — which is often implemented in more than one place, under a different name, in a parallel code path, or split across server and client — rather than only the symbol the ticket cites, since a clean search for the cited symbol is not proof of completeness; every instance found is then marked in- or out-of-scope (a genuinely single-surface result is valid — the goal is to make scope a decision, not an accident).
-- **Implementation prompts** must: (1) make each step self-contained with both behavior and cleanup/teardown contracts; (2) **if the ticket names a new dependency**, instruct the consumer to verify required setup (initialization, configuration, integration points) in the codebase — do not enumerate specific setup steps, file paths, or config keys yourself; (3) ensure cross-cutting concerns are embedded in the relevant implementation step, not only in a separate section; (4) instruct the consumer to test for unintended side effects in addition to intended behavior — do not enumerate specific side effects unless they appear in the ticket; (5) **if the ticket names a shared system or downstream component** (e.g. a specific CSS class, event handler, state store, lifecycle hook), include a verification step for it; **otherwise** instruct the consumer to identify dependents in the codebase before changing shared systems — do not invent a downstream component name.
+- **Bug prompts** must include a class check once the root cause is in hand — widen the model, don't patch the witness: instruct the agent to ask whether the same pattern produces siblings elsewhere (search for the pattern itself — the failure mode, a shared helper, a parallel code path — not only the cited symptom). If a class exists, the fix stays minimal — name the class and record the unhandled instances as a comment rather than silently widening the fix. A genuinely isolated issue is a valid answer and must be stated explicitly.
+- **Research prompts** must end with a Surface Assessment gated on necessity, not availability: the question is not "would a refactor make this land better?" (on most code something could be cleaner) but "is the feature's shape demanding a structural change?" — implementing cleanly would mean fighting the current structure. A "refactor required" verdict must pass two evidence tests, each answered by citing lines: the **consumer test** (cite the line in THIS task's implementation that calls the new seam — no citation means speculation, which belongs with its future consumer, not ahead of it) and the **who-pays test** (every consumer the refactor touches is either a beneficiary — simpler, corrected, or unchanged — or a bystander paying a named tax; an unjustified bystander tax means scope it down; a small named tax buying a large simplification must be argued explicitly). Size is not a rejection criterion — a demanded refactor that does not fit the session is sequenced, not shrunk. Format: "Surface Assessment: [lands cleanly] / [refactor required: describe the minimal scoped change — consumer: where this task calls it] / [improvement noticed, not required: land inline/scoped — no separate subtask]". The answer must be explicit — not implied — so the plan step can act on it.
+- **Plan prompts** must include a cross-cutting concerns check: after listing changes, ask whether any requirements share the same code path, state, or interface — and if so, document the expected interaction explicitly. Plan prompts for tasks touching high-churn files must include a history-reading step — high-churn means the same file has 3+ commits in recent history; the plan should document what those changes were protecting against. If a Surface Assessment in prior research comments declares "refactor required" and names its in-task consumer, the plan prompt must encode it as a separate blocking subtask using the assessment's description directly — do not absorb the refactor into implementation steps, as that loses the sequencing guarantee; a refactor with no consumer in this task, or one that taxes bystander consumers, must not become a subtask — the plan folds it inline, scopes it down, or records it as a note. **Plan prompts must also contain a Strategy Framing block placed BEFORE the Scope Assessment / session-fit step.** The Strategy Framing block must: (a) instruct the consumer to score viable strategies on *cost-of-doing* (current-ticket session size, blast radius, risk to high-churn files) vs *cost-of-not-doing* (named contract gap left unsolved, plus the workaround tax — dialect-island / per-runtime branch / duplicated abstraction — paid on every future change); (b) when a cheaper strategy routes around a tracked contract gap, instruct the consumer to NAME that gap explicitly (ticket identifier or "none identified") — a bare description is not enough; (c) for migration / convergence / pre-launch parent epics, default to closing the gap unless cost-of-doing is prohibitively higher. Ordering is non-negotiable: Strategy Framing → Scope Assessment → session-fit answer. Reversing it produces post-hoc justification of the cheap default. **Plan prompts must also include a completeness check on the surface list:** instruct the consumer to confirm the list is complete (not just correct) by searching for the concept or behavior itself — which is often implemented in more than one place, under a different name, in a parallel code path, or split across server and client — rather than only the symbol the ticket cites, since a clean search for the cited symbol is not proof of completeness; every instance found is then marked in- or out-of-scope (a genuinely single-surface result is valid — the goal is to make scope a decision, not an accident).
+- **Implementation prompts** must: (1) make each step self-contained with both behavior and cleanup/teardown contracts; (2) **if the ticket names a new dependency**, instruct the consumer to verify required setup (initialization, configuration, integration points) in the codebase — do not enumerate specific setup steps, file paths, or config keys yourself; (3) ensure cross-cutting concerns are embedded in the relevant implementation step, not only in a separate section; (4) instruct the consumer to test for unintended side effects in addition to intended behavior — do not enumerate specific side effects unless they appear in the ticket; (5) **if the ticket names a shared system or downstream component** (e.g. a specific CSS class, event handler, state store, lifecycle hook), include a verification step for it; **otherwise** instruct the consumer to identify dependents in the codebase before changing shared systems — do not invent a downstream component name; (6) instruct the consumer to land the work as a reviewable change: work on a feature branch (never commit straight to main), commit referencing the identifier, open a PR targeting main, and confirm CI is green on the PR (fix failures and re-push until green) before reporting done — the open PR with green CI is the deliverable. Merging is NOT part of this step: the merge happens after review approves, performed by the orchestrator or a human.
 - **Defer replies** (action `defer`) must emit NO prompt body — the `## Prompt` section is left empty. The defer decision lives entirely in the one-line reason and the `DeferTo` identifier; the full prompt is generated once at the terminal actionable node the descent lands on. A defer reply that includes a prompt body violates the cost contract (the whole point of `defer` is to route cheaply without paying for a prompt you will discard).
-- **Review prompts** must: (1) cross-reference the plan's cross-cutting concerns against the implementation steps to identify likely gaps — requirements not addressed in any implementation step are the highest-priority review items, (2) for visual or behavioral changes, instruct the agent to verify directly (take screenshots, run the app, check viewports), (3) only flag for human testing what the agent genuinely cannot verify (external services, cross-browser, subjective UX), (4) assess whether tests cover the right *level* — for behavior crossing module boundaries, user-facing flows, or integration surfaces, instruct the agent to verify higher-level tests like e2e or integration are present *where appropriate*, not only unit tests with mocks; determine the right level from the change itself rather than enforcing a fixed rule.
+- **Review prompts** must: (1) cross-reference the plan's cross-cutting concerns against the implementation steps to identify likely gaps — requirements not addressed in any implementation step are the highest-priority review items, (2) for visual or behavioral changes, instruct the agent to verify directly (take screenshots, run the app, check viewports), (3) only flag for human testing what the agent genuinely cannot verify (external services, cross-browser, subjective UX), (4) assess whether tests cover the right *level* — for behavior crossing module boundaries, user-facing flows, or integration surfaces, instruct the agent to verify higher-level tests like e2e or integration are present *where appropriate*, not only unit tests with mocks; determine the right level from the change itself rather than enforcing a fixed rule, (5) include a class check before approving the close: ask whether the verified work is one instance of a class with unhandled siblings (the same bug or gap under a different name, in a parallel code path, or split across server and client); if so, name the class and record the instances as a review finding rather than expanding the task — a genuinely isolated change is a valid result, (6) end with an explicit verdict (Approve / Request Changes / Needs Discussion) and a PRE-MERGE close-out gate: review AUTHORIZES the close, it does not perform it. The prompt must instruct the agent to confirm CI is green on the PR and that the verdict is Approve before authorizing the merge, and must NOT instruct it to merge, to mark the task Done, or to verify a merge that has not happened yet (the Approve is the merge's precondition) — the merge, the Done transition, and reconciling related Linear tasks (parent/siblings/follow-ups) happen AFTER the merge and belong to the merger (the orchestrator or a human). When the work has landed but CI is red for a real failure, or verifying it surfaces a hidden blocker that must be fixed first, the prompt must NOT loop back into another review — instruct the agent to create a new Linear ticket (or link an existing open one) as `blocks` the current task, name that blocker as the next action (`bug`/`plan`/`implementation`, since a `blocks` relation alone does not make the engine descend), and leave the original open until the blocker resolves and CI is green (review re-runs then, Approves, and the merger closes); keep this closure blocker distinct from plan's prerequisite-refactor subtask.
 
 ## Action Types Reference
 
 **blocked** (dependencies, missing info, or stalled):
 Goal: "Identify the blocker type and root cause, evaluate options to unblock."
-Workflow: Fetch details → Analyze blocker → Update labels and add comment in Linear
+Workflow: Fetch details → Analyze blocker → Add comment in Linear
 
 **bug** (needs investigation, debugging):
 Goal: "Identify reproduction steps, hypothesize likely causes, and suggest a debugging approach."
@@ -133,10 +132,6 @@ Workflow: Fetch details → Investigate → Add findings as comment in Linear
 **plan** (clear requirements, needs documented approach):
 Goal: "Create a clear implementation plan, enumerate surfaces with any dependency arrows between them, and commit to a session-fit answer (fits one session / needs multiple sessions)."
 Workflow: Set status to "In Progress" → Analyze requirements → Document plan in description → Enumerate surfaces and draw any dependency arrows → Answer the session-fit question → Ready for implementation or breakdown
-
-**code review** (code ready for review):
-Goal: "Review code changes for correctness, tests, style, security, and performance."
-Workflow: Fetch details → Review code → Add review findings as comment in Linear
 
 **look into** (understanding what's involved):
 Goal: "Summarize what this task involves and how it fits into the broader project context."
@@ -171,12 +166,12 @@ Goal: "Synthesize current state, what's done, what remains, key decisions, and n
 Workflow: Fetch details and comments → Analyze → Add summary as comment in Linear
 
 **implement** (ready to code, plan exists):
-Goal: "Implement the planned changes with test coverage."
-Workflow: Fetch details → Implement → Run tests → Commit → Add summary comment in Linear
+Goal: "Implement the planned changes with test coverage, then land them on a feature-branch PR with CI green."
+Workflow: Fetch details → Branch → Implement → Test → Commit & push → Open PR → Confirm CI green → Add summary comment with PR link in Linear
 
 **review** (implementation complete, awaiting review):
-Goal: "Verify implementation is complete and ready for merge."
-Workflow: Fetch details → Verify tests pass → Check CI status → Add review findings as comment in Linear
+Goal: "Verify the implementation is complete and correct, then issue a verdict (Approve / Request Changes / Needs Discussion) that authorizes the merge. Review does not merge or mark Done."
+Workflow: Fetch details → Verify requirements/tests/CI green on the PR → Issue verdict → Add review findings + verdict as comment in Linear
 
 Consult the Action Types Reference above to match task situations to appropriate prompts.
 
@@ -195,10 +190,6 @@ Use these signals to assess whether prior work is complete:
 ### plan
 **Core:** Implementation plan documented with session-fit decision made
 **Check:** Does the plan document files, approach, and testing, and does it commit to a session-fit answer?
-
-### code-review
-**Core:** Code reviewed with clear verdict provided
-**Check:** Is a clear verdict (Approve/Request Changes/Needs Discussion) provided with justification?
 
 ### look-into
 **Core:** Task context understood with recommended next action
@@ -237,8 +228,8 @@ Use these signals to assess whether prior work is complete:
 **Check:** Is the implementation complete and tested?
 
 ### review
-**Core:** Implementation verified ready for production
-**Check:** Is the code ready for production deployment?
+**Core:** Implementation verified and an explicit verdict (Approve / Request Changes / Needs Discussion) issued that authorizes the merge — or a closure blocker filed and routed to
+**Check:** Review does not merge or mark Done (the merger does that post-merge) — is an explicit verdict issued with CI green on the PR (Approve authorizes the merge), or, if not, is a closure blocker filed and routed to?
 
 ### retro
 **Core:** Honest retrospective delivered to the user with downstream effects (or in-flight risks) assessed and actionable lessons surfaced
@@ -256,26 +247,28 @@ Use comments for exploration; update description for task overview accuracy.
 
 ## Label Instructions in Generated Prompts
 
-- Blocker/bug resolution → include "remove the `blocked`/`bug` label when resolved"
+- Bug resolution → include "leave the `bug` label in place; moving the task to Done marks it resolved — the label is the lasting bug-vs-feature record used by reports, so do not remove it"
 
 ## Instructions
 1. Follow the decision tree above IN ORDER (preparation → blockers/bugs → implement)
 2. Recommend exactly ONE action - do not combine multiple steps
 3. Generate a tailored prompt for that single action
 
-Respond in this exact format:
+Respond in EXACTLY this format. The block below is a skeleton to fill in: replace each `<…>` slot with your own content and delete the slot markers. Do NOT copy these field descriptions, the angle brackets, or the rules underneath into your answer — they are guidance for you, not text to emit.
 
 ## Reasoning
 **Assessment:**
-- Preparation: [✓ Complete | ✓ Not needed | ✗ Needed] - [brief reason, mention comments if relevant]
-- Blockers: [✓ None | ✗ Blocked] - [brief reason]
-- Ready: [✓ Yes | ✗ No] - [brief reason]
-
-**Signal Status:** [If assessing prior work, note which signals are met/unmet]
-
-→ **[action]** — use EXACTLY one action name, verbatim, from this list: blocked, bug, plan, code review, look into, triage, breakdown, research, scoping, design, spike, context, implement, review, defer. This name is parsed into a machine-readable kind downstream, so do not rename, pluralize, or invent a value outside the list.
-**Next:** [One sentence: what happens after this action completes]
-**DeferTo:** [REQUIRED if and only if the action is `defer` — the exact identifier of the child task to descend into, e.g. {{IDENTIFIER}}-123. This line is parsed structurally to trigger the descent, so emit the bare identifier and nothing else. OMIT this line entirely for every other action.]
+- Preparation: <✓ Complete | ✓ Not needed | ✗ Needed> - <brief reason, mention comments if relevant>
+- Blockers: <✓ None | ✗ Blocked> - <brief reason>
+- Ready: <✓ Yes | ✗ No> - <brief reason>
+**Signal Status:** <if assessing prior work, note which signals are met/unmet>
+→ **<action>**
+**Next:** <one sentence: what happens after this action completes>
 
 ## Prompt
-[The complete prompt text following the structure above. EXCEPTION: when the action is `defer`, output nothing here — leave the Prompt section empty. The prompt is generated once, later, at the terminal actionable node, never on a node you are deferring past.]
+<the complete prompt text, following the Prompt Structure above>
+
+Rules for the lines above — follow them, do not restate them in your answer:
+- `<action>` must be EXACTLY one action name, verbatim, from this list: blocked, bug, plan, look into, triage, breakdown, research, scoping, design, spike, context, implement, review, defer. Keep the surrounding `**` bold markers. This name is parsed into a machine-readable kind downstream, so do not rename, pluralize, or invent a value outside the list.
+- Add a `**DeferTo:** <child-id>` line immediately after the `→ **<action>**` line ONLY when the action is `defer` (for example, `**DeferTo:** {{IDENTIFIER}}-123`). Emit the bare identifier and nothing else — it is parsed structurally to trigger the descent. OMIT this line entirely for every other action.
+- When the action is `defer`, leave the `## Prompt` section empty: the prompt is generated once, later, at the terminal actionable node, never on a node you defer past.

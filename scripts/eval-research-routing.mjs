@@ -131,6 +131,22 @@ Supersedes LIN-289.`
     }
   },
   {
+    id: 'LIN-551 verbatim (real under-fire case, LIN-557)',
+    expect: ['research'],
+    why: 'REAL case behind LIN-557 ("research too easily skipped"). Clear intent, but the ' +
+         'deliverable depends on code that must be discovered first — where merge-strategy ' +
+         'wording lives across the prompt surfaces and where the settings value is stored/threaded. ' +
+         'Knowledge is ungathered, so research is the honest next action (triage/look-into are no ' +
+         'longer in the AI action vocab, so grounding here is research-or-nothing); live production ' +
+         'routes it to plan/implementation instead. Baseline gpt-5.4-mini K=6: research 1/6 — grades ' +
+         'the under-fire direction.',
+    issue: {
+      identifier: 'LIN-551', createdAt: '2026-06-20T07:12:25.604Z', state: todo, labels: [],
+      title: 'Branch base / merge strategy needs to be a system guarantee',
+      description: 'Users should set their strategy in settings (default to standard merge, not squash and merge), and this is carried into prompts which deal with merging branches.'
+    }
+  },
+  {
     id: 'external dependency (unpinned 3rd-party API)',
     expect: ['research'],
     why: 'Integration depends on an external API whose contract is not pinned down.',
