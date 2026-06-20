@@ -87,6 +87,26 @@
   flex-wrap: wrap;
 }
 
+/* LIN-564: free-text Autopilot goal, sits beside the "load Autopilot" button.
+   Matches the repo selector's compact, terminal-flavoured input look. */
+.dispatch-autopilot-goal {
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  padding: var(--space-1) 0.4rem;
+  border: 1px solid var(--fg-vdim);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+  min-width: 12rem;
+  flex: 1 1 12rem;
+  max-width: 22rem;
+}
+
+.dispatch-autopilot-goal:focus {
+  outline: none;
+  border-color: var(--blue);
+}
+
 /* Disclosure trigger reuses the .action-btn / .action-btn.save look */
 .dispatch-toggle {
   user-select: none;
