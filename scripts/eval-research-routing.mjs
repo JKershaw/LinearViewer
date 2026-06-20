@@ -233,7 +233,7 @@ Supersedes LIN-289.`
   // ---- IMPLEMENT-expected (research here would be over-firing) ----
   {
     id: 'trivial one-liner',
-    expect: ['implement'], researchWrong: true,
+    expect: ['implement'],
     why: 'Obvious, tiny, no unknowns.',
     issue: {
       identifier: 'SYN-7', createdAt: '2026-06-01T00:00:00Z', state: todo, labels: [],
@@ -243,7 +243,7 @@ Supersedes LIN-289.`
   },
   {
     id: 'plan already documented (fits one session)',
-    expect: ['implement'], researchWrong: true,
+    expect: ['implement'],
     why: 'Complete plan in description, commits to "fits one session".',
     issue: {
       identifier: 'SYN-8', createdAt: '2026-06-01T00:00:00Z', state: inProgress, labels: [],
@@ -260,7 +260,7 @@ Single surface. Fits one session.`
   },
   {
     id: 'simple well-scoped',
-    expect: ['implement', 'plan'], researchWrong: true,
+    expect: ['implement', 'plan'],
     why: 'Single-surface, approach obvious; readiness check should skip prep.',
     issue: {
       identifier: 'SYN-9', createdAt: '2026-06-01T00:00:00Z', state: todo, labels: [],
@@ -272,7 +272,7 @@ Single surface. Fits one session.`
   // ---- OVER-FIRE TRAPS: mention unknowns/research but should NOT route to research ----
   {
     id: 'trap: research already done, now ready',
-    expect: ['plan', 'implement'], researchWrong: true,
+    expect: ['plan', 'implement'],
     why: 'Findings + chosen approach already in the description — research is complete, do not loop it.',
     issue: {
       identifier: 'SYN-14', createdAt: '2026-06-01T00:00:00Z', state: inProgress, labels: [],
@@ -285,7 +285,7 @@ Approach is settled; just needs building.`
   },
   {
     id: 'trap: mentions unknown but trivially answerable',
-    expect: ['implement', 'plan'], researchWrong: true,
+    expect: ['implement', 'plan'],
     why: 'A passing "not sure which file" is resolved by a grep, not a research phase.',
     issue: {
       identifier: 'SYN-15', createdAt: '2026-06-01T00:00:00Z', state: todo, labels: [],
@@ -297,7 +297,7 @@ Approach is settled; just needs building.`
   // ---- WORKFLOW routes (tree sanity) ----
   {
     id: 'blocked label',
-    expect: ['blocked'], researchWrong: true,
+    expect: ['blocked'],
     why: 'Blocked label + external dependency.',
     issue: {
       identifier: 'SYN-10', createdAt: '2026-06-01T00:00:00Z', state: inProgress, labels: ['blocked'],
@@ -307,7 +307,7 @@ Approach is settled; just needs building.`
   },
   {
     id: 'bug label',
-    expect: ['bug'], researchWrong: true,
+    expect: ['bug'],
     why: 'Bug label + unexpected behavior to investigate.',
     issue: {
       identifier: 'SYN-11', createdAt: '2026-06-01T00:00:00Z', state: inProgress, labels: ['bug'],
@@ -317,7 +317,7 @@ Approach is settled; just needs building.`
   },
   {
     id: 'plan says needs multiple sessions',
-    expect: ['breakdown'], researchWrong: true,
+    expect: ['breakdown'],
     why: 'Complete plan that explicitly needs multiple sessions.',
     issue: {
       identifier: 'SYN-12', createdAt: '2026-06-01T00:00:00Z', state: inProgress, labels: [],
@@ -336,7 +336,7 @@ Needs multiple sessions — migration + rollback alone is its own focused pass; 
   // also exercises the Step-3 already-landed guard reading the comment recap.
   {
     id: 'happy: landed work awaiting review (comments)',
-    expect: ['review'], researchWrong: true,
+    expect: ['review'],
     why: 'Implementation has demonstrably landed per the completion recap (PR open, CI green) but is not yet reviewed → confirm-and-close, not re-implement. Real shape: LIN-420/LIN-542 pre-merge state.',
     issue: {
       identifier: 'SYN-16', createdAt: '2026-06-10T00:00:00Z', state: inProgress, labels: [],
@@ -360,7 +360,7 @@ Needs multiple sessions — migration + rollback alone is its own focused pass; 
   // follow-up (richer session context) with evidence rather than speculation.
   {
     id: 'loop: review stuck — 3× Request Changes, unchanged (real LIN-510)',
-    expect: ['implement', 'blocked', 'plan', 'bug'], loop: true, avoid: 'review', researchWrong: true,
+    expect: ['implement', 'blocked', 'plan', 'bug'], loop: true, avoid: 'review',
     why: 'REAL loop (LIN-510): three consecutive reviews all Request-Changes on the SAME unaddressed blocker (dishonest visual baselines, no acknowledgment commit) against an unchanged commit. A 4th review repeats the loop; the correct break is to route to the blocker fix (regenerate the baselines) — Step-3 already-landed guard: "if review would surface a blocker that must be fixed first, route the next action to that blocker, not a repeated review".',
     issue: {
       identifier: 'SYN-17', createdAt: '2026-06-19T07:00:00Z', state: inProgress, labels: [],
@@ -380,7 +380,7 @@ Needs multiple sessions — migration + rollback alone is its own focused pass; 
   },
   {
     id: 'loop: bug already investigated — root cause + fix in comments (real LIN-537)',
-    expect: ['implement', 'plan'], loop: true, avoid: 'bug', researchWrong: true,
+    expect: ['implement', 'plan'], loop: true, avoid: 'bug',
     why: 'REAL shape (LIN-537): `bug` label, but the comment trail already records a code-grounded investigation naming the root cause AND a minimal fix approach. Step-2 bug guard: the label marks unexpected behavior, not investigation still owed — advance to the fix, do not re-investigate. Tests the loop guard reading the trail from comments, not the description.',
     issue: {
       identifier: 'SYN-18', createdAt: '2026-06-18T07:00:00Z', state: inProgress, labels: ['bug'],
@@ -394,7 +394,7 @@ Needs multiple sessions — migration + rollback alone is its own focused pass; 
   },
   {
     id: 'loop: implementation stuck — 2× same wall, approach is wrong (authored)',
-    expect: ['plan', 'research', 'blocked'], loop: true, avoid: 'implement', researchWrong: true,
+    expect: ['plan', 'research', 'blocked'], loop: true, avoid: 'implement',
     why: 'Two implementation recaps both hit the SAME wall: the chosen approach rests on an assumption the code contradicts, and each attempt patches-then-reverts with no forward progress. Repeating implementation repeats the loop; the honest break is to re-ground the approach (plan/research) or surface that it is genuinely blocked — not a third identical attempt.',
     issue: {
       identifier: 'SYN-19', createdAt: '2026-06-12T00:00:00Z', state: inProgress, labels: [],
@@ -410,7 +410,7 @@ Needs multiple sessions — migration + rollback alone is its own focused pass; 
   },
   {
     id: 'loop: research redo — findings + approach already in comments (comment-driven trap)',
-    expect: ['plan', 'implement'], loop: true, avoid: 'research', researchWrong: true,
+    expect: ['plan', 'implement'], loop: true, avoid: 'research',
     why: 'Comment-driven version of the "research already done" trap: a prior research recap in the trail establishes the findings AND a chosen, validated approach. Re-recommending research loops it; the work should move forward. Proves the engine reads completion evidence from the comment trail, not only from a description block.',
     issue: {
       identifier: 'SYN-20', createdAt: '2026-06-08T00:00:00Z', state: inProgress, labels: [],
@@ -480,9 +480,9 @@ for (const c of cases) {
     const s = stats[arm];
     s.hit += hits; s.n += K; s.ov += res.filter(isOffVocab).length;
     if (wantsResearch) { s.rr += choseResearch; s.rrN += K; }
-    // Over-fire = chose research on ANY case where research is not acceptable
-    // (auto-derived from expect; subsumes the old manual researchWrong flag, which
-    // had a blind spot: it didn't count plan-expected cases pulled into research).
+    // Over-fire = chose research on ANY case where research is not acceptable,
+    // auto-derived from `expect` (this also catches plan-expected cases pulled
+    // into research, which a manual per-fixture flag would miss).
     else { s.of += choseResearch; s.ofN += K; }
     // Loop-repeat: count how often the model chose the forbidden repeat action.
     if (c.loop && c.avoid) { s.lp += res.filter(a => a === norm(c.avoid)).length; s.lpN += K; }
