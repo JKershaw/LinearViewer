@@ -843,4 +843,49 @@ test.describe('Dispatch Page', () => {
       await expect(page.locator('[data-feature="dispatch"]')).toBeVisible();
     });
   });
+
+  // LIN-564: a free-text goal typed before "load Autopilot" must reach the
+  // general kickoff (?goal=) so the loaded prompt is scoped to it and named
+  // after it. The goal control + load button are proxy-gated, so seed proxy on.
+  test.describe('Autopilot Goal', () => {
+    test.beforeEach(async ({ page }) => {
+      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true, proxy: true } });
+      await page.goto(DISPATCH_URL);
+      await page.waitForLoadState('networkidle');
+    });
+
+    test('goal input and load button are present when proxy is enabled', async ({ page }) => {
+      await expect(page.locator('.dispatch-autopilot-goal')).toBeVisible();
+      await expect(page.locator('.dispatch-load-autopilot')).toBeVisible();
+    });
+
+    test('typed goal reaches the loaded kickoff text and prompt name', async ({ page }) => {
+      const goal = 'Ship the billing migration';
+      await page.locator('.dispatch-autopilot-goal').fill(goal);
+      await page.locator('.dispatch-load-autopilot').click();
+
+      const loadBtn = page.locator('.dispatch-load-autopilot');
+      await expect(loadBtn).toHaveText('loaded ✓');
+
+      const textarea = page.locator('.dispatch-prompt-input');
+      // The goal is embedded in the kickoff body by buildAutopilotKickoff...
+      await expect(textarea).toHaveValue(new RegExp(`Goal from the human:\\*\\* ${goal}`));
+      // ...and the dispatch is tagged so it carries kind=autopilot named after the goal.
+      await expect(textarea).toHaveAttribute('data-kind', 'autopilot');
+      await expect(textarea).toHaveAttribute('data-prompt-name', `Autopilot — ${goal}`);
+    });
+
+    test('loading with no goal yields the stack-walk kickoff (no goal line)', async ({ page }) => {
+      await page.locator('.dispatch-load-autopilot').click();
+
+      const loadBtn = page.locator('.dispatch-load-autopilot');
+      await expect(loadBtn).toHaveText('loaded ✓');
+
+      const textarea = page.locator('.dispatch-prompt-input');
+      // With no goal the kickoff falls back to the stack-walk wording (not a
+      // user-supplied goal) and is named accordingly.
+      await expect(textarea).toHaveValue(/Goal from the human:\*\* none this run/);
+      await expect(textarea).toHaveAttribute('data-prompt-name', 'Autopilot (stack walk)');
+    });
+  });
 });

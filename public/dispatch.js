@@ -184,9 +184,16 @@ function initDispatchPagePrompt() {
       loadBtn.disabled = true
       loadBtn.textContent = 'loading...'
       try {
+        // A free-text goal (optional) focuses the general kickoff. It must be
+        // baked into the fetched prompt — the textarea's input listener strips
+        // dataset.kind/promptName on any keystroke, so it can't be hand-typed in
+        // after loading. Append it as ?goal= for buildAutopilotKickoff to embed.
+        const goalInput = section.querySelector('.dispatch-autopilot-goal')
+        const goal = goalInput ? goalInput.value.trim() : ''
+        const query = goal ? `?goal=${encodeURIComponent(goal)}` : ''
         // on401:false — failures surface on the bespoke inline feedback el below
         // (the catch), so a 401 must not redirect out from under it.
-        const data = await api(`/workspace/${encodeURIComponent(urlKey)}/api/autopilot-prompt`, { on401: false })
+        const data = await api(`/workspace/${encodeURIComponent(urlKey)}/api/autopilot-prompt${query}`, { on401: false })
         textarea.value = data.prompt
         textarea.dataset.kind = data.kind || 'autopilot'
         textarea.dataset.promptName = data.promptName || 'Autopilot (stack walk)'
