@@ -9,6 +9,12 @@ import { isValidFeatureKey, isValidWorkspaceFeatureKey } from '../lib/feature-de
 import { setWorkspaceFeature } from '../lib/workspace-preferences.js';
 import { getProvider } from '../lib/providers/registry.js';
 import { defaultLocalSeed, LOCAL_WORKSPACE_URL_KEY } from '../tests/fixtures/local-harness.js';
+// Importing the GitHub provider module self-registers it under 'github' (see
+// registry.js lifecycle), so the read seam can resolve a `provider: 'github'`
+// workspace. The fake client backs the E2E with no network/auth (LIN-178).
+import '../lib/providers/github/index.js';
+import { createFakeGitHubClient } from '../lib/providers/github/fake-client.js';
+import { defaultGitHubSeed, GITHUB_WORKSPACE_URL_KEY, GITHUB_REPO } from '../tests/fixtures/github-harness.js';
 
 /**
  * Create test routes with required dependencies.
@@ -564,6 +570,79 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     try {
       const removed = localStore ? await localStore.clear(LOCAL_WS_URL_KEY) : 0;
       res.json({ ok: true, removed });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  })
+
+  // ---------------------------------------------------------------------------
+  // GitHub provider harness (LIN-178) — the abstraction's first FOREIGN backend.
+  // Configures the registered `github` singleton with an in-memory fake GitHub
+  // client (no network, no auth) and establishes a `provider: 'github'` session
+  // whose credential is the REPO SLUG. The dashboard then renders from the fake
+  // backend via the real getProviderForWorkspace + getWorkspaceToken read seam —
+  // proving the canonical model survives GitHub's hostile schema end-to-end.
+  // ---------------------------------------------------------------------------
+  const GITHUB_WS_UUID = '44444444-4444-4444-4444-444444444444';
+
+  // POST → seeds a custom GitHub-REST-shaped `{ issues, milestones, labels }`
+  //        body (falls back to defaultGitHubSeed). GET → seeds the default.
+  const setGitHubSession = async (req, res) => {
+    try {
+      const body = req.body || {};
+      const seed = (Array.isArray(body.issues) || Array.isArray(body.milestones))
+        ? { issues: body.issues || [], milestones: body.milestones || [], labels: body.labels || [] }
+        : defaultGitHubSeed;
+
+      if (body.features && typeof body.features === 'object') {
+        const validated = {}
+        for (const [key, value] of Object.entries(body.features)) {
+          if (isValidFeatureKey(key)) validated[key] = value
+        }
+        req.session.features = validated
+      }
+
+      // Inject a fresh fake backend for this repo + the default repo for the
+      // "+ Add task" deep link (getCreateTaskUrl).
+      const provider = getProvider('github');
+      if (!provider) throw new Error('github provider not registered');
+      provider.configure({ client: createFakeGitHubClient({ [GITHUB_REPO]: seed }), repo: GITHUB_REPO });
+
+      // Token === repo slug: carries no auth, only selects the repo. Not
+      // 'test-token', so the mock short-circuit never fires.
+      req.session.workspaces = [{
+        id: GITHUB_WS_UUID,
+        name: 'GitHub Workspace',
+        urlKey: GITHUB_WORKSPACE_URL_KEY,
+        provider: 'github',
+        credentials: { token: GITHUB_REPO },
+        accessToken: GITHUB_REPO,
+        tokenExpiresAt: Number.MAX_SAFE_INTEGER,
+        addedAt: Date.now(),
+      }];
+      req.session.activeWorkspaceId = GITHUB_WS_UUID;
+      req.session.linearUserId = 'test-github-user-id';
+
+      req.session.save(() => res.json({ ok: true, urlKey: GITHUB_WORKSPACE_URL_KEY, repo: GITHUB_REPO }));
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  };
+  router.get('/test/set-github-session', setGitHubSession);
+  router.post('/test/set-github-session', setGitHubSession);
+
+  // Exercise the GitHub provider WRITE path directly (createIssue → fake backend),
+  // so a subsequent dashboard load proves the no-proxy write round-trip.
+  router.get('/test/github-create-issue', async (req, res) => {
+    try {
+      const provider = getProvider('github');
+      if (!provider) throw new Error('github provider not registered');
+      const created = await provider.createIssue(GITHUB_REPO, {
+        title: req.query.title || 'Created via GitHub provider',
+        description: 'created in test',
+        labels: [],
+      });
+      res.json({ ok: true, issue: { id: created.id, identifier: created.identifier, title: created.title } });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
