@@ -901,6 +901,13 @@ button.nav-action {
   cursor: pointer;
 }
 
+/* LIN-566: visible keyboard focus for expandable rows (WCAG 2.4.7). These rows
+   are role=button + tabindex=0 controls, so keyboard users need a focus cue. */
+.line.expandable:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: -2px;
+}
+
 .line.expandable:hover .title {
   text-decoration: underline;
   text-decoration-color: var(--fg-dim);
