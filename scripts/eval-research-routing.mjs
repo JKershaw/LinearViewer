@@ -58,7 +58,12 @@ const PROMPTS = {
 // means off-vocabulary detection tracks exactly what the prompt told the model,
 // with no lib import. Falls back to a known set if the marker moves.
 function vocabFrom(text) {
-  const m = text.match(/from this list:\s*([^.]+?)\.\s*This name/i);
+  // Capture the list up to the FIRST period after "from this list:". The list
+  // contains no periods, so this is the full vocab. (Earlier this anchored on
+  // ". This name", but a ". Keep the surrounding ..." clause was later inserted
+  // between the list and "This name", breaking the match and silently falling
+  // back to a 7-action subset — masking the real 14-action vocab.)
+  const m = text.match(/from this list:\s*([^.]+?)\./i);
   const list = m ? m[1] : 'plan, research, implement, review, breakdown, blocked, bug';
   return new Set(list.split(',').map(s => s.trim().toLowerCase()).filter(Boolean));
 }
@@ -136,10 +141,9 @@ Supersedes LIN-289.`
     why: 'REAL case behind LIN-557 ("research too easily skipped"). Clear intent, but the ' +
          'deliverable depends on code that must be discovered first — where merge-strategy ' +
          'wording lives across the prompt surfaces and where the settings value is stored/threaded. ' +
-         'Knowledge is ungathered, so research is the honest next action (triage/look-into are no ' +
-         'longer in the AI action vocab, so grounding here is research-or-nothing); live production ' +
-         'routes it to plan/implementation instead. Baseline gpt-5.4-mini K=6: research 1/6 — grades ' +
-         'the under-fire direction.',
+         'Knowledge is ungathered, so research is the honest next action; live production routes it ' +
+         'to plan/implementation instead. Baseline gpt-5.4-mini K=12: research 0/12 (plan-heavy) — ' +
+         'grades the under-fire direction.',
     issue: {
       identifier: 'LIN-551', createdAt: '2026-06-20T07:12:25.604Z', state: todo, labels: [],
       title: 'Branch base / merge strategy needs to be a system guarantee',
