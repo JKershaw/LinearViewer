@@ -34,7 +34,7 @@
 Issues are wrapped in nested `.node` containers:
 ```
 .node[data-id="{id}"]           - node container
-  .line[data-id="{id}"]         - task row (clickable)
+  .line[data-id="{id}"]         - task row (keyboard-operable: role=button, tabindex=0, aria-expanded)
   .details[data-details-for]    - details panel (hidden by default)
     .detail-toggle[data-toggle="details"] - "Details ▶" toggle
     .detail-content[data-content="details"] - description + metadata (hidden)
@@ -73,7 +73,7 @@ Both In Progress and Projects sections use the same nested structure:
 - `[data-section="in-progress|project"]` - scope to section (expand state is independent per section)
 - `[data-parent="{id}"]` - parent ID (on .line element)
 - `[data-depth="{n}"]` - nesting level (0 = top-level, on .line element)
-- `.expandable` - tasks that can be clicked to expand
+- `.expandable` - tasks that can be expanded; keyboard-operable controls (role=button, tabindex=0, Enter/Space to toggle, aria-expanded reflects state)
 - `.in-progress-project` - project name badge shown in brackets for In Progress items
 
 ### Traversing the Tree

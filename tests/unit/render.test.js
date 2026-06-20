@@ -375,6 +375,71 @@ describe('lazy detail rendering (LIN-442)', () => {
 });
 
 // =============================================================================
+// Keyboard-operable expandable rows (LIN-566)
+//
+// The shared `.line.expandable` primitive must be a real control: role=button,
+// tabindex=0, and aria-expanded so keyboard/SR users can expand it. This is the
+// markup half of the fix (the toggleItem aria sync + keydown handler is client
+// behaviour, covered by the e2e landing focus-order probe).
+// =============================================================================
+
+describe('expandable row accessibility markup (LIN-566)', () => {
+  const expandableIssue = {
+    id: 'issue-a11y',
+    identifier: 'TEST-566',
+    title: 'A row with details to expand',
+    description: 'Some description so the row is expandable',
+    state: { type: 'started' },
+    labels: { nodes: [] },
+    url: 'https://linear.app/test/issue/TEST-566'
+  };
+  function tree(issue) {
+    return {
+      project: { id: 'project-1', name: 'Test Project', content: null, url: null },
+      incomplete: [{ issue, children: [], depth: 0 }],
+      completed: [],
+      completedCount: 0
+    };
+  }
+
+  test('expandable rows are keyboard-operable controls (role/tabindex/aria-expanded)', () => {
+    const result = renderPage([tree(expandableIssue)], [], [], 'Test', { isLanding: true });
+    const lineMatch = result.match(/<div class="line[^"]*expandable[^"]*"[^>]*>/);
+    assert.ok(lineMatch, 'an expandable line row is present');
+    const line = lineMatch[0];
+    assert.ok(line.includes('role="button"'), 'expandable row has role=button');
+    assert.ok(line.includes('tabindex="0"'), 'expandable row is focusable');
+    assert.ok(line.includes('aria-expanded="false"'), 'expandable row starts not-expanded');
+  });
+
+  test('non-expandable rows are not made focusable controls', () => {
+    const bareIssue = {
+      id: 'issue-bare',
+      title: 'Nothing to expand',
+      state: { type: 'started' },
+      labels: { nodes: [] }
+    };
+    const result = renderPage([tree(bareIssue)], [], [], 'Test', { isLanding: true });
+    const lineMatch = result.match(/<div class="line(?![^"]*expandable)[^"]*"[^>]*>/);
+    assert.ok(lineMatch, 'a non-expandable line row is present');
+    assert.ok(!lineMatch[0].includes('role="button"'), 'non-expandable row is not a button control');
+    assert.ok(!lineMatch[0].includes('tabindex'), 'non-expandable row is not focusable');
+  });
+
+  test('periodical rows are keyboard-operable controls', () => {
+    const result = renderPage([testMockPeriodicalsTree], [], [], 'Test', {
+      isLanding: false,
+      urlKey: 'test-workspace'
+    });
+    const lineMatch = result.match(/<div class="line expandable"[^>]*data-status="periodical"?[^>]*>|<div class="line expandable"[^>]*>/);
+    assert.ok(lineMatch, 'a periodical expandable row is present');
+    assert.ok(lineMatch[0].includes('role="button"'), 'periodical row has role=button');
+    assert.ok(lineMatch[0].includes('tabindex="0"'), 'periodical row is focusable');
+    assert.ok(lineMatch[0].includes('aria-expanded="false"'), 'periodical row starts not-expanded');
+  });
+});
+
+// =============================================================================
 // Add-task link guard for synthetic project ids (LIN-341)
 // =============================================================================
 

@@ -417,6 +417,11 @@ function applyState(state) {
     document.querySelectorAll(`[data-section="${section}"][data-id="${id}"] .toggle`).forEach(toggle => {
       toggle.textContent = '▼'
     })
+
+    // LIN-566: keep aria-expanded in sync when restoring persisted state on load
+    document.querySelectorAll(`[data-section="${section}"][data-id="${id}"].line[aria-expanded]`).forEach(row => {
+      row.setAttribute('aria-expanded', 'true')
+    })
   })
 
   // Show completed sections
@@ -515,6 +520,12 @@ function init() {
 
     const toggle = line.querySelector('.toggle')
     if (toggle) toggle.textContent = nowExpanded ? '▼' : '▶'
+
+    // LIN-566: aria-expanded is owned here so mouse click, arrow click, and
+    // keyboard activation all announce the same state.
+    if (line.hasAttribute('aria-expanded')) {
+      line.setAttribute('aria-expanded', String(nowExpanded))
+    }
   }
 
   // Handle project header collapse/expand
@@ -766,6 +777,22 @@ function init() {
       setArrow(recentActivityHeader, !state.recentActivityCollapsed)
       return
     }
+  })
+
+  // LIN-566: keyboard activation for expandable rows. Mirrors the click
+  // delegation above — Enter/Space on a focused .line.expandable (or its .toggle
+  // arrow) routes through the same toggleItem path, so all input modalities stay
+  // in sync. Space is prevented from scrolling the page.
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return
+
+    const row = e.target.closest('.line.expandable')
+    if (!row) return
+    // Let links and form controls inside the row handle their own keys.
+    if (e.target.closest('a, button, input, textarea, select')) return
+
+    e.preventDefault()
+    toggleItem(row)
   })
 }
 

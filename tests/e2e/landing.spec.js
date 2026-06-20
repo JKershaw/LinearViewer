@@ -135,6 +135,62 @@ test.describe('Landing Page', () => {
     await expect(collapsedProjects).toHaveCount(3);
   });
 
+  // LIN-566: the sign-in CTA must be reachable for keyboard/screen-reader users.
+  // The "Connect with Linear" row is the shared .line.expandable primitive; it
+  // must be a focusable role=button that expands on Enter/Space and reveals the
+  // /auth/linear link back into the tab order.
+  test('sign-in row is a keyboard-operable control (LIN-566)', async ({ page }) => {
+    await page.goto('/');
+
+    const signInRow = page.locator('.line.expandable:has-text("Connect with Linear")');
+    await expect(signInRow).toBeVisible();
+
+    // It is announced as a control and starts collapsed.
+    await expect(signInRow).toHaveAttribute('role', 'button');
+    await expect(signInRow).toHaveAttribute('tabindex', '0');
+    await expect(signInRow).toHaveAttribute('aria-expanded', 'false');
+
+    // The login link is out of the tab order until the row is expanded.
+    const loginLink = page.locator('a[href="/auth/linear"]');
+    await expect(loginLink).not.toBeVisible();
+
+    // Keyboard activation: focus the row and press Enter.
+    await signInRow.focus();
+    await expect(signInRow).toBeFocused();
+    await page.keyboard.press('Enter');
+
+    // State is announced as expanded and the login link is now reachable.
+    await expect(signInRow).toHaveAttribute('aria-expanded', 'true');
+    await expect(loginLink).toBeVisible();
+
+    // The revealed anchor is a real, keyboard-focusable link (back in tab order).
+    await loginLink.focus();
+    await expect(loginLink).toBeFocused();
+  });
+
+  test('sign-in row toggles with Space and Space does not scroll (LIN-566)', async ({ page }) => {
+    await page.goto('/');
+
+    const signInRow = page.locator('.line.expandable:has-text("Connect with Linear")');
+    const loginLink = page.locator('a[href="/auth/linear"]');
+
+    await signInRow.focus();
+    const scrollBefore = await page.evaluate(() => window.scrollY);
+    await page.keyboard.press(' ');
+
+    // Space expands the row (single source of truth: aria-expanded flips)...
+    await expect(signInRow).toHaveAttribute('aria-expanded', 'true');
+    await expect(loginLink).toBeVisible();
+    // ...and is prevented from scrolling the page.
+    const scrollAfter = await page.evaluate(() => window.scrollY);
+    expect(scrollAfter).toBe(scrollBefore);
+
+    // Space again collapses it (round-trips through the same toggle path).
+    await page.keyboard.press(' ');
+    await expect(signInRow).toHaveAttribute('aria-expanded', 'false');
+    await expect(loginLink).not.toBeVisible();
+  });
+
   test('page reload resets to default state', async ({ page }) => {
     await page.goto('/');
 
