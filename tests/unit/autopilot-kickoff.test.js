@@ -48,6 +48,21 @@ describe('buildAutopilotKickoff (shared guide)', () => {
     assert.ok(text.includes('natural give'));
     assert.ok(text.includes('not churn or a stall'));
   });
+
+  test('caps the watch on silence — a ~30-min zero-activity ceiling, then a liveness follow-up', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
+    // The watch loop must have a terminal escape: silence is not trusted forever.
+    assert.ok(text.includes('Quiet has a ceiling'));
+    assert.ok(text.includes('30 min'));
+    assert.ok(text.includes('followUpTo'));
+  });
+
+  test('reads a done-while-waiting (e2e/CI/deploy in flight) as a not-yet, not a finish', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
+    assert.ok(text.includes('not-yet'));
+    // The blessed confirmatory follow-up is the resolution for a done posted mid-flight.
+    assert.ok(text.includes('confirm CI went green and report the run URL'));
+  });
 });
 
 describe('buildAutopilotKickoff (inline handbook / disposition layer)', () => {
