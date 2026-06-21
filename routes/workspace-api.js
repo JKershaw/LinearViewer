@@ -295,7 +295,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
 
   /**
    * Generate a prompt for a specific issue and label.
-   * Returns a prompt that can be copied and used with Claude Code + Linear MCP.
+   * Returns a prompt that can be copied and used with Claude Code and the workspace API.
    *
    * @route GET /workspace/:urlKey/api/prompt/:issueId/:labelName
    * @param {string} issueId - The Linear issue ID
