@@ -29,7 +29,8 @@ import { RunSummaryCacheStore } from './lib/run-summary-cache.js'
 import { ReportHistoryStore } from './lib/report-history-store.js'
 import { LlmCallLogStore } from './lib/llm-call-log.js'
 import { PromptTraceStore } from './lib/prompt-trace-store.js'
-import { getProvider, getProviderForWorkspace } from './lib/providers/registry.js'
+import { getProvider, getProviderForWorkspace, getAllProviders } from './lib/providers/registry.js'
+import { NotImplementedError } from './lib/providers/interface.js'
 import './lib/providers/linear/index.js' // side effect: self-registers the Linear provider into the registry
 import { localProvider } from './lib/providers/local/index.js' // side effect: self-registers the Local provider; store injected below
 import { LocalStore } from './lib/local-store.js'
@@ -455,7 +456,20 @@ app.use((req, res, next) => {
 // Route Mounting
 // =============================================================================
 // Mount extracted route modules
-app.use(getProvider('linear').getAuthRouter({ sessionStore, userPreferencesStore }))
+// LIN-561: mount every registered provider's auth router, not just Linear's.
+// Providers that don't implement getAuthRouter (the base throws
+// NotImplementedError) are skipped — so today, with only Linear providing one,
+// this mounts exactly the Linear OAuth router as before (behaviour-identical).
+for (const provider of getAllProviders()) {
+  let authRouter
+  try {
+    authRouter = provider.getAuthRouter({ sessionStore, userPreferencesStore })
+  } catch (err) {
+    if (err instanceof NotImplementedError) continue
+    throw err
+  }
+  app.use(authRouter)
+}
 app.use(createWorkspaceRoutes({ localStore }))
 app.use(createOpenRouterAuthRoutes({ userPreferencesStore }))
 // Note: Dispatch routes mounted after workspaceFromUrl middleware is defined

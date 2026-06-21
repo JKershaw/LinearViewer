@@ -17,9 +17,12 @@ import { applyUserPreferencesToSession } from '../lib/user-preferences.js'
  * @param {Object} options
  * @param {Object} options.sessionStore - Session store with cleanup() method
  * @param {Object} options.userPreferencesStore - User preferences store for loading saved preferences
+ * @param {Object} [options.provider] - The provider this auth router serves. Injected by the
+ *   mounting provider (LinearProvider.getAuthRouter passes `this`); falls back to the Linear
+ *   provider as a documented legacy default for direct constructions (LIN-561).
  * @returns {Router} Express router
  */
-export function createAuthRoutes({ sessionStore, userPreferencesStore }) {
+export function createAuthRoutes({ sessionStore, userPreferencesStore, provider }) {
   const router = Router()
 
   const OAUTH_ENV_VARS = ['LINEAR_CLIENT_ID', 'LINEAR_CLIENT_SECRET', 'LINEAR_REDIRECT_URI'];
@@ -136,13 +139,15 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore }) {
         return res.status(400).send(html)
       }
 
-      // Fetch organization info and current user in parallel
+      // Fetch organization info and current user in parallel.
+      // LIN-561: use the provider this router was mounted for, not a hardcoded
+      // getProvider('linear'); fall back to Linear as the documented legacy default.
       let org, viewer
       try {
-        const provider = getProvider('linear');
+        const authProvider = provider || getProvider('linear');
         [org, viewer] = await Promise.all([
-          provider.fetchOrganization(data.access_token),
-          provider.fetchViewer(data.access_token)
+          authProvider.fetchOrganization(data.access_token),
+          authProvider.fetchViewer(data.access_token)
         ])
       } catch (fetchError) {
         console.error('Failed to fetch from Linear:', fetchError)
