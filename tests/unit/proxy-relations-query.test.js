@@ -99,14 +99,16 @@ describe('proxy relationship queries', () => {
     assert.match(block, /DELETE_RELATION_MUTATION/, 'must call the delete mutation');
   });
 
-  test('/relations handler wraps relations in the {nodes} shape', () => {
-    // The handler must return relations/inverseRelations as { nodes: [...] },
-    // matching /issue and the rest of the read surface (labels/children/
-    // comments). A flat-array response would reintroduce the inconsistency.
+  test('/relations handler returns flat arrays, not the {nodes} shape (LIN-310)', () => {
+    // The neutral wire contract returns relations/inverseRelations as plain
+    // arrays, matching /issues/{id} and the rest of the read surface after the
+    // LIN-310 flatten. Re-wrapping in { nodes: [...] } would reintroduce the
+    // source-revealing GraphQL shape the contract neutralization removed.
     const handlerStart = proxySource.indexOf("logEvent(req, '/api/proxy/relations', 200)");
     assert.ok(handlerStart !== -1, '/relations 200 handler not found');
     const block = proxySource.slice(handlerStart, handlerStart + 600);
-    assert.match(block, /relations:\s*\{\s*nodes:/, 'relations must be wrapped as { nodes: [...] }');
-    assert.match(block, /inverseRelations:\s*\{\s*nodes:/, 'inverseRelations must be wrapped as { nodes: [...] }');
+    assert.match(block, /\.\.\.flattenRelations\(data\.issue\)/, 'must spread the flattened relations payload');
+    assert.doesNotMatch(block, /relations:\s*\{\s*nodes:/, 'relations must NOT be wrapped as { nodes: [...] }');
+    assert.doesNotMatch(block, /inverseRelations:\s*\{\s*nodes:/, 'inverseRelations must NOT be wrapped as { nodes: [...] }');
   });
 });
