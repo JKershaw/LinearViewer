@@ -962,7 +962,7 @@ Content-Type: application/json
 | `issueId` / `issueIdentifier` / `issueTitle` / `issueUrl` | string | No | Optional linkage to a Linear issue |
 | `target` | string | No | `cli` \| `web` \| `dash` (default `cli`). `local`/Harbour is **not** available to proxy consumers |
 | `repo` | string | No | Optional repository hint |
-| `appendProxyContext` | bool | No | Default `true`: append a proxy-context block to the prompt so the worker inherits Linear access for this workspace (the MCP replacement). Set `false` to send the prompt verbatim |
+| `appendProxyContext` | bool | No | Default `true`: append a proxy-context block to the prompt so the worker inherits Linear access for this workspace. Set `false` to send the prompt verbatim |
 
 Returns `201`:
 ```json

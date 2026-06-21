@@ -1444,7 +1444,7 @@ POST ${baseUrl}/api/proxy/dispatch
   → Queue a prompt for the workspace's dispatch consumer (the runner). Only "prompt" is required; target defaults to "cli". ("local"/Harbour is not available to proxy consumers.)
   → "kind" is a stable task classification (research/plan/implementation/review/etc. — the prompt-template keys, plus "custom"). Optional: when omitted it is derived from "promptName", falling back to "custom". Read it instead of inferring the task type from promptName or the prompt body.
   → "followUpTo" (optional) resumes an existing session: pass the "id" of an earlier dispatch and "prompt" becomes a follow-up instruction to that same session. cli/web only, same workspace. The runner owns session liveness — if the session is gone it posts terminal "[failed] no live session to resume". Use sparingly: only when the prior session ran cleanly and naturally suggests the next step (e.g. confirm CI is green, update Linear/git); any wobble → dispatch a fresh session instead.
-  → By default a proxy-context block is appended to the prompt so the worker inherits Linear access for this workspace (the MCP replacement). Reporting is handled by the runner's Stop hook, not the prompt. Set "appendProxyContext": false to opt out.
+  → By default a proxy-context block is appended to the prompt so the worker inherits Linear access for this workspace. Reporting is handled by the runner's Stop hook, not the prompt. Set "appendProxyContext": false to opt out.
   → { "id": "...", "status": "queued", "promptName": "...", "kind": "implementation", "issueIdentifier": "...", "target": "cli", "dispatchedAt": "..." }
 
 POST ${baseUrl}/api/proxy/recommend-and-dispatch
