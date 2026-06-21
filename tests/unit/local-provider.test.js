@@ -83,6 +83,7 @@ describe('LocalProvider reads', () => {
     assert.deepEqual(projects[0], { id: 'p1', name: 'Alpha', content: 'a', url: null, sortOrder: 1 });
     assert.equal(issues.length, 2);
     const parent = issues.find(i => i.id === 'i1');
+    assert.equal(parent.source, 'local');       // provenance stamp (LIN-561)
     assert.equal(parent.project.name, 'Alpha');
     assert.deepEqual(parent.labels, { nodes: [{ name: 'bug' }] });
     assert.equal(parent.parent, null);

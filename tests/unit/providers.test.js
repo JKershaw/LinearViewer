@@ -30,6 +30,13 @@ import {
   getProviderForWorkspace,
 } from '../../lib/providers/registry.js';
 import { getStateDisplay, getStateOrder } from '../../lib/providers/state-map.js';
+import {
+  issueSource,
+  DEFAULT_SOURCE,
+  SOURCE_LINEAR,
+  SOURCE_GITHUB,
+  SOURCE_LOCAL,
+} from '../../lib/providers/models.js';
 import { LinearProvider, linearProvider } from '../../lib/providers/linear/index.js';
 import * as shim from '../../lib/linear.js';
 import * as provider from '../../lib/providers/linear/index.js';
@@ -96,6 +103,37 @@ describe('ProviderInterface', () => {
       const expected = { ...getStateDisplay(type), order: getStateOrder(type) };
       assert.deepStrictEqual(base.mapState(type), expected);
     }
+  });
+});
+
+// =============================================================================
+// Canonical issue provenance (LIN-561)
+// =============================================================================
+
+describe('issue source provenance (LIN-561)', () => {
+  test('source constants are the provider registry names', () => {
+    assert.strictEqual(SOURCE_LINEAR, 'linear');
+    assert.strictEqual(SOURCE_GITHUB, 'github');
+    assert.strictEqual(SOURCE_LOCAL, 'local');
+    // The constants equal each provider's registry .name, so the stamp matches
+    // the identity downstream getProviderForWorkspace resolves on.
+    assert.strictEqual(SOURCE_LINEAR, linearProvider.name);
+  });
+
+  test('DEFAULT_SOURCE is the legacy Linear default', () => {
+    assert.strictEqual(DEFAULT_SOURCE, SOURCE_LINEAR);
+  });
+
+  test('issueSource returns a stamped source verbatim', () => {
+    assert.strictEqual(issueSource({ source: 'github' }), 'github');
+    assert.strictEqual(issueSource({ source: 'local' }), 'local');
+  });
+
+  test('issueSource defaults an un-stamped / missing issue to Linear (back-compat)', () => {
+    assert.strictEqual(issueSource({ id: 'x' }), 'linear');
+    assert.strictEqual(issueSource({}), 'linear');
+    assert.strictEqual(issueSource(undefined), 'linear');
+    assert.strictEqual(issueSource(null), 'linear');
   });
 });
 

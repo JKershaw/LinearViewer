@@ -18,6 +18,10 @@ import assert from 'node:assert';
 import { GraphQLClient } from 'graphql-request';
 
 import {
+  fetchProjects,
+  fetchIssueFields,
+  issues,
+  issueDetail,
   search,
   states,
   labels,
@@ -57,6 +61,53 @@ afterEach(() => {
   if (restore) restore();
   restore = undefined;
   mock.reset();
+});
+
+// =============================================================================
+// Source provenance stamping (LIN-561)
+// =============================================================================
+//
+// The dashboard canonical-issue reads stamp `source: 'linear'`, so the internal
+// model records provenance. The route-internal API-surface reads (issues /
+// issueDetail / search) that feed the source-neutral proxy wire are deliberately
+// left UN-stamped, keeping that contract byte-identical.
+
+describe('Linear source provenance (LIN-561)', () => {
+  test('fetchProjects stamps source: linear on every issue', async () => {
+    stub(async (query) => {
+      if (/projects\(/.test(query)) {
+        return { organization: { name: 'Acme' }, projects: { nodes: [{ id: 'p1', name: 'P' }] } };
+      }
+      return {
+        issues: {
+          nodes: [{ id: 'i1', identifier: 'LIN-1' }, { id: 'i2', identifier: 'LIN-2' }],
+          pageInfo: { hasNextPage: false, endCursor: null },
+        },
+      };
+    });
+    const { issues: result } = await fetchProjects(API_KEY);
+    assert.deepStrictEqual(result.map(i => i.source), ['linear', 'linear']);
+  });
+
+  test('fetchIssueFields stamps source: linear on the single issue', async () => {
+    stub(async () => ({ issue: { id: 'i1', identifier: 'LIN-1', title: 'T' } }));
+    const issue = await fetchIssueFields(API_KEY, 'LIN-1');
+    assert.strictEqual(issue.source, 'linear');
+  });
+
+  test('API-surface reads stay un-stamped (source-neutral wire byte-identical)', async () => {
+    stub(async () => ({
+      issues: { nodes: [{ id: 'i1', identifier: 'LIN-1' }], pageInfo: {} },
+      issue: { id: 'i1', identifier: 'LIN-1' },
+      searchIssues: { nodes: [{ id: 'i1', identifier: 'LIN-1' }] },
+    }));
+    const list = await issues(API_KEY, {});
+    const detail = await issueDetail(API_KEY, 'LIN-1');
+    const found = await search(API_KEY, 'x');
+    assert.ok(!('source' in list.nodes[0]), 'list read must not carry source');
+    assert.ok(!('source' in detail), 'detail read must not carry source');
+    assert.ok(!('source' in found[0]), 'search read must not carry source');
+  });
 });
 
 // =============================================================================

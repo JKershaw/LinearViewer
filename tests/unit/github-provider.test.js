@@ -149,6 +149,7 @@ describe('GitHubProvider reads', () => {
 
     const open = issues.find(i => i.id === '1');
     assert.equal(open.identifier, '#1');
+    assert.equal(open.source, 'github');        // provenance stamp (LIN-561)
     assert.deepEqual(open.state, { name: 'Open', type: 'unstarted' });
     assert.deepEqual(open.labels, { nodes: [{ name: 'bug' }] });
     assert.deepEqual(open.project, { id: '1', name: 'v1.0' });
