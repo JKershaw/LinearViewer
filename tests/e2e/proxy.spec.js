@@ -233,7 +233,7 @@ test.describe('Proxy API - Consumer Endpoints', () => {
     });
     expect(resp.status()).toBe(200);
     const text = await resp.text();
-    expect(text).toContain('Linear API Proxy');
+    expect(text).toContain('Workspace API Proxy');
     expect(text).toContain('/api/proxy/me');
     expect(text).toContain('/api/proxy/teams');
     expect(text).toContain('read');
