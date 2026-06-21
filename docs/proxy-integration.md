@@ -999,8 +999,19 @@ Runs `/recommend` and forwards the recommended prompt straight into a dispatch �
 | `repo` | string | No | Optional repository hint |
 | `appendProxyContext` | bool | No | Default `true`: append a proxy-context block so the worker inherits Linear access for this workspace |
 | `noDescend` | bool | No | Default `false`. When `true`, recommend and dispatch the **named issue's own** next step and never descend into an open child (see below) |
+| `kind` | string | No | **Verb override.** A prompt template key (e.g. `review`, `plan`, `implementation`). When supplied, the LLM recommendation + descent is bypassed and the body is generated deterministically for the **named issue** with that template (see below) |
 
 `kind` is derived server-side from the recommendation's own action signal, falling back to `custom` when the action can't be parsed. There is no `prompt` field to send (it is generated) and none in the response (it is withheld by design).
+
+**`kind` — pin the verb when the engine is wrong.** The recommendation engine is ~90% right but occasionally picks the wrong step (e.g. refuses to hand you a `review` for a task that is plainly ready for one). Rather than hand-writing the prompt that broken verb would have produced — which violates the server-side-only invariant — pass `kind` to **pin the step**. The server still **writes the body**; you only choose the verb. You pick the verb, never the words.
+
+When `kind` is present the verb:
+- **bypasses the LLM** recommendation and descent entirely (no OpenRouter call, no free-tier charge);
+- generates the body for the **named issue with no descent** (the wobble is the verb, not the target);
+- accepts only real prompt-template keys — `plan`, `implementation`, `review`, `research`, `design`, `breakdown`, `look-into`, `triage`, `scoping`, `spike`, `context`, `retro`, `blocked`. Meta-kinds (`defer`, `custom`, `autopilot`, `periodical`) and any unknown key are rejected with `400`, because they have no template body and would dispatch an empty prompt;
+- returns the same headers-only response plus `"override": true`.
+
+Use it **sparingly and only on a demonstrable engine miss** — each override is recorded so the recommendation heuristic can be improved. It is not the everyday path; the LLM-driven verb (no `kind`) remains the default. The caller still never supplies prompt text — only the verb key.
 
 **`noDescend` — dispatch the parent's own work.** By default this verb descends a
 container to its actionable child and dispatches *that* child (so the returned
@@ -1016,6 +1027,11 @@ through the verb.
 Returns `201`:
 ```json
 { "id": "uuid", "status": "queued", "kind": "plan", "promptName": "plan", "issueIdentifier": "LIN-42", "target": "cli", "dispatchedAt": "2026-06-06T11:32:25.111Z" }
+```
+
+With a `kind` override the response also carries `"override": true` and omits the descent fields (`deferredVia`/`descent`), since the override does not descend:
+```json
+{ "id": "uuid", "status": "queued", "kind": "review", "promptName": "code review", "issueIdentifier": "LIN-42", "target": "cli", "dispatchedAt": "2026-06-06T11:32:25.111Z", "override": true }
 ```
 
 `/recommend` can be slow (Linear + OpenRouter); the same whitespace-keepalive behaviour as `GET /recommend` applies, so don't set a client timeout below ~60s. Watch the returned `id` with `GET /api/proxy/dispatch/{id}` exactly as for a plain dispatch.

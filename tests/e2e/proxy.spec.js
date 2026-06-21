@@ -1439,6 +1439,128 @@ test.describe('Proxy API - Recommend-and-Dispatch (fused verb, LIN-321)', () => 
     const text = await resp.text();
     expect(text).toContain('/api/proxy/recommend-and-dispatch');
   });
+
+  // ── Verb override (LIN-573): caller pins `kind`, server still writes the body ──
+
+  test('kind override pins the verb and dispatches a server-generated body (LIN-573)', async ({ request }) => {
+    // TEST-14 is In Progress (the LLM-driven path picks 'implement' → kind
+    // 'implementation', see above). With kind='review' the caller pins the verb;
+    // the engine is bypassed and the dispatched item carries kind 'review'.
+    const resp = await request.post('/api/proxy/recommend-and-dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { issueIdentifier: 'TEST-14', target: 'cli', kind: 'review' }
+    });
+    expect(resp.status()).toBe(201);
+    const created = await resp.json();
+
+    expect(created.id).toBeTruthy();
+    expect(created.status).toBe('queued');
+    expect(created.kind).toBe('review');          // the override, not 'implementation'
+    expect(created.override).toBe(true);          // signals the deterministic path
+    expect(created.issueIdentifier).toBe('TEST-14');
+    expect(created.prompt).toBeUndefined();       // body still never returns to the caller
+
+    // The body is server-generated and matches the deterministic /prompt seam.
+    const promptResp = await request.get('/api/proxy/issues/TEST-14/prompt/review', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(promptResp.status()).toBe(200);
+    const { prompt: expectedBody } = await promptResp.json();
+    expect(expectedBody).toBeTruthy();
+
+    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const { token: dispatchToken } = await tokenResponse.json();
+    const pollResp = await request.get('/api/dispatch/poll', {
+      headers: { Authorization: `Bearer ${dispatchToken}` }
+    });
+    const { items } = await pollResp.json();
+    const queued = items.find(i => i.id === created.id);
+    expect(queued).toBeTruthy();
+    // The dispatched prompt is the /prompt body (with the proxy-context preamble
+    // appended) — proving the override reused the server-side generation seam.
+    expect(queued.prompt.startsWith(expectedBody)).toBe(true);
+  });
+
+  test('kind override rejects body-less meta-kinds with 400 (LIN-573)', async ({ request }) => {
+    // hasPrompt(), NOT isValidDispatchKind(), gates the override — so meta-kinds
+    // that have no template body (defer/custom/autopilot/periodical) are refused
+    // rather than dispatching an empty prompt.
+    for (const badKind of ['defer', 'custom', 'autopilot', 'periodical', 'not-a-real-kind']) {
+      const resp = await request.post('/api/proxy/recommend-and-dispatch', {
+        headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+        data: { issueIdentifier: 'TEST-14', kind: badKind }
+      });
+      expect(resp.status(), `kind='${badKind}' must be rejected`).toBe(400);
+      const body = await resp.json();
+      expect(body.error).toContain('kind');
+    }
+  });
+
+  test('kind override bypasses descent — pins the named container, not its child (LIN-573)', async ({ request }) => {
+    // TEST-1 is the container that the LLM-driven path descends into TEST-2.
+    // The override pins the NAMED issue with no descent: the dispatched item
+    // references TEST-1 and carries no descent breadcrumb.
+    const resp = await request.post('/api/proxy/recommend-and-dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { issueIdentifier: 'TEST-1', kind: 'plan' }
+    });
+    expect(resp.status()).toBe(201);
+    const created = await resp.json();
+
+    expect(created.issueIdentifier).toBe('TEST-1');   // no descent into TEST-2
+    expect(created.kind).toBe('plan');
+    expect(created.override).toBe(true);
+    expect(created.deferredVia).toBeUndefined();        // engine bypassed → no descent path
+    expect(created.descent).toBeUndefined();
+    expect(created.prompt).toBeUndefined();
+  });
+
+  test('kind override still requires write scope (403) and rejects unknown issues (404) (LIN-573)', async ({ request }) => {
+    const forbidden = await request.post('/api/proxy/recommend-and-dispatch', {
+      headers: { Authorization: `Bearer ${readToken}`, 'Content-Type': 'application/json' },
+      data: { issueIdentifier: 'TEST-14', kind: 'review' }
+    });
+    expect(forbidden.status()).toBe(403);
+
+    const missing = await request.post('/api/proxy/recommend-and-dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { issueIdentifier: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', kind: 'review' }
+    });
+    expect(missing.status()).toBe(404);
+  });
+
+  test('kind override honours explicit repo over the resolved project repo (LIN-573)', async ({ request }) => {
+    // Caller precedence (LIN-537) must survive on the override path too.
+    const resp = await request.post('/api/proxy/recommend-and-dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { issueIdentifier: 'TEST-14', kind: 'review', repo: 'caller-override' }
+    });
+    expect(resp.status()).toBe(201);
+    const created = await resp.json();
+
+    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const { token: dispatchToken } = await tokenResponse.json();
+    const pollResp = await request.get('/api/dispatch/poll', {
+      headers: { Authorization: `Bearer ${dispatchToken}` }
+    });
+    const { items } = await pollResp.json();
+    const queued = items.find(i => i.id === created.id);
+    expect(queued).toBeTruthy();
+    expect(queued.repo).toBe('caller-override');
+  });
+
+  test('omitting kind preserves the LLM-driven path unchanged (LIN-573)', async ({ request }) => {
+    // The no-override path must remain byte-identical: TEST-14 → engine picks
+    // 'implement' → kind 'implementation', with no `override` flag on the body.
+    const resp = await request.post('/api/proxy/recommend-and-dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { issueIdentifier: 'TEST-14', target: 'cli' }
+    });
+    expect(resp.status()).toBe(201);
+    const created = await resp.json();
+    expect(created.kind).toBe('implementation');
+    expect(created.override).toBeUndefined();
+  });
 });
 
 // LIN-525 #2 (mint route is feature-gated) and #5 (prompt-proxy tokens get a

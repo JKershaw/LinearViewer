@@ -29,7 +29,7 @@ import { generateBrief } from '../lib/brief.js';
 import { hashContext } from '../lib/recap-cache.js';
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, isTerminalState, isBlocked, NO_PROJECT_ID } from '../lib/tree.js';
 import { flattenTrees, sortIssuesForSwipe, applyBlockingOrder, clusterByParent, computeGraphFeatures, computeOffPageBlockers, buildWhy } from '../lib/render-swipe.js';
-import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, DISPATCH_KINDS } from '../lib/prompt-templates.js';
+import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, getPromptDisplayName, PROMPT_TEMPLATES, DISPATCH_KINDS } from '../lib/prompt-templates.js';
 import { parseRepoFromDescription, buildPromptFilename } from '../lib/prompt-formatters.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { buildAutopilotManual } from '../lib/prompts/autopilot-manual.js';
@@ -67,6 +67,47 @@ async function getTestMockData() {
     testMockData = mod.testMockData;
   }
   return testMockData;
+}
+
+/**
+ * Resolve the issue + prompt context for deterministic, server-side prompt
+ * generation. This is the shared seam behind both GET .../prompt/:templateKey
+ * and the recommend-and-dispatch `kind` override (LIN-573): the caller picks the
+ * verb, the server writes the body via generatePrompt(...) over this context.
+ *
+ * Returns { issue, parent, siblings, project, children, comments } shaped exactly
+ * as the /prompt handler expects, or null when the issue can't be found in test
+ * mode. In live mode fetchIssueContext throws on a missing issue; callers map
+ * that to a 404.
+ */
+async function resolvePromptIssueContext(accessToken, identifier, isTestMode) {
+  if (isTestMode) {
+    const mockData = await getTestMockData();
+    const mockIssue = mockData.issues.find(i =>
+      i.id === identifier || i.identifier === identifier
+    );
+    if (!mockIssue) return null;
+    const mockProject = mockData.projects.find(p => p.id === mockIssue.project?.id);
+    return {
+      issue: {
+        id: mockIssue.id,
+        identifier: mockIssue.identifier || 'TEST-1',
+        title: mockIssue.title,
+        description: mockIssue.description || '',
+        state: mockIssue.state || { name: 'Todo', type: 'unstarted' },
+        labels: (mockIssue.labels?.nodes || []).map(l => l.name),
+        url: mockIssue.url || ''
+      },
+      parent: null,
+      siblings: [],
+      project: mockProject ? { name: mockProject.name, description: mockProject.content } : null,
+      children: mockData.issues.filter(i => i.parent?.id === mockIssue.id).map(i => ({
+        id: i.id, identifier: i.identifier, title: i.title, state: i.state
+      })),
+      comments: []
+    };
+  }
+  return await withTimeout(fetchIssueContext(accessToken, identifier), GRAPHQL_TIMEOUT_MS);
 }
 
 /**
@@ -1407,11 +1448,12 @@ POST ${baseUrl}/api/proxy/dispatch
   → { "id": "...", "status": "queued", "promptName": "...", "kind": "implementation", "issueIdentifier": "...", "target": "cli", "dispatchedAt": "..." }
 
 POST ${baseUrl}/api/proxy/recommend-and-dispatch
-  Body: { "issueIdentifier": "LIN-42", "target": "cli|web|dash", "repo": "...", "appendProxyContext": true, "noDescend": false }
+  Body: { "issueIdentifier": "LIN-42", "target": "cli|web|dash", "repo": "...", "appendProxyContext": true, "noDescend": false, "kind": "review" }
   → Fused verb: runs /recommend and forwards the recommended prompt straight into a dispatch, server-side. "issueIdentifier" is required; target defaults to "cli".
   → The prompt body NEVER returns to you — you only get the task header. This keeps the prompt out of your context (the point of the verb); learn what was chosen from "kind"/"promptName", then watch the item via GET /dispatch/{id}.
   → "kind" is derived from the recommendation's own action signal (falling back to "custom") — no need to read the prompt to classify the task.
   → Set "noDescend": true to dispatch the named issue's OWN next step and NOT descend into an open child (deterministic). Use it to drive a parent whose deliverables live in its own description while a child is out of scope / separately tracked; the dispatched item then references the parent, and "deferredVia" is just [parent].
+  → VERB OVERRIDE — pass "kind" (a prompt template key: plan, implementation, review, research, design, breakdown, look-into, triage, scoping, spike, context, retro, blocked) to PIN the step when the engine's chosen verb is demonstrably wrong. The server still WRITES the body — you pick the verb, never the words. Override pins the NAMED issue with NO descent and skips the LLM entirely; response carries "override": true. Use sparingly and only on a clear engine miss (see the autopilot manual); it is not the everyday path. Invalid keys (incl. defer/custom/autopilot/periodical) get a 400.
   → { "id": "...", "status": "queued", "kind": "plan", "promptName": "plan", "issueIdentifier": "...", "target": "cli", "dispatchedAt": "..." }
 
 GET ${baseUrl}/api/proxy/dispatch?issueIdentifier={LIN-42}&status={queued|taken|done|failed|aborted}&limit={n}
@@ -2601,36 +2643,12 @@ One convention across every endpoint, so you can branch on the same fields every
 
       // Fetch issue context (use mock data in test mode)
       const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
-      let issue, parent, siblings, project, children, comments;
-      if (isTestMode) {
-        const mockData = await getTestMockData();
-        const mockIssue = mockData.issues.find(i =>
-          i.id === identifier || i.identifier === identifier
-        );
-        if (!mockIssue) {
-          logEvent(req, '/api/proxy/prompt', 404);
-          return notFound.json(res, 'Issue not found');
-        }
-        const mockProject = mockData.projects.find(p => p.id === mockIssue.project?.id);
-        issue = {
-          id: mockIssue.id,
-          identifier: mockIssue.identifier || 'TEST-1',
-          title: mockIssue.title,
-          description: mockIssue.description || '',
-          state: mockIssue.state || { name: 'Todo', type: 'unstarted' },
-          labels: (mockIssue.labels?.nodes || []).map(l => l.name),
-          url: mockIssue.url || ''
-        };
-        parent = null;
-        siblings = [];
-        project = mockProject ? { name: mockProject.name, description: mockProject.content } : null;
-        children = mockData.issues.filter(i => i.parent?.id === mockIssue.id).map(i => ({
-          id: i.id, identifier: i.identifier, title: i.title, state: i.state
-        }));
-        comments = [];
-      } else {
-        ({ issue, parent, siblings, project, children, comments } = await withTimeout(fetchIssueContext(accessToken, identifier), GRAPHQL_TIMEOUT_MS));
+      const ctx = await resolvePromptIssueContext(accessToken, identifier, isTestMode);
+      if (!ctx) {
+        logEvent(req, '/api/proxy/prompt', 404);
+        return notFound.json(res, 'Issue not found');
       }
+      const { issue, parent, siblings, project, children, comments } = ctx;
 
       // Generate the prompt
       const result = generatePrompt(templateKey, issue, { parent, siblings, project, children, comments }, {});
@@ -3792,6 +3810,13 @@ One convention across every endpoint, so you can branch on the same fields every
    * economy rule (autopilot invariant 4) becomes mechanical instead of a rule
    * it must remember. `kind` is derived from the recommendation's own action
    * signal — no need to read the prompt to classify the task.
+   *
+   * Optional verb override (LIN-573): when the caller supplies `kind` (a
+   * PROMPT_TEMPLATES key), the LLM recommendation + descent is bypassed and the
+   * body is generated deterministically for the NAMED issue with that template —
+   * "autopilot picks the verb, never the words." The body is still server-
+   * generated and never returned; only the verb key is caller-supplied. Omitting
+   * `kind` leaves the original LLM-driven behaviour byte-identical.
    */
   router.post('/api/proxy/recommend-and-dispatch', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     if (!dispatchQueueStore) {
@@ -3800,7 +3825,7 @@ One convention across every endpoint, so you can branch on the same fields every
     }
 
     try {
-      const { issueIdentifier, target, repo, appendProxyContext, noDescend } = req.body || {};
+      const { issueIdentifier, target, repo, appendProxyContext, noDescend, kind } = req.body || {};
 
       // Validate caller-supplied inputs. (Only the server-generated prompt skips
       // the dangerous-char/length checks — see the dispatch step below.)
@@ -3824,6 +3849,16 @@ One convention across every endpoint, so you can branch on the same fields every
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
         return badRequest.json(res, 'repo is invalid');
       }
+      // Optional verb override (LIN-573). When present, the caller pins the step
+      // and the server still writes the body — "autopilot picks the verb, never
+      // the words." Validate with hasPrompt() (PROMPT_TEMPLATES keys only), NOT
+      // isValidDispatchKind(): the latter admits body-less meta-kinds (defer/
+      // custom/autopilot/periodical) that have no generate() and would dispatch
+      // an empty prompt. The caller never supplies prompt text — only the key.
+      if (kind !== undefined && (typeof kind !== 'string' || !hasPrompt(kind))) {
+        logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
+        return badRequest.json(res, `kind must be a valid prompt template key: ${Object.keys(PROMPT_TEMPLATES).join(', ')}`);
+      }
 
       // Recommendation preconditions — identical to GET /recommend.
       const { token: accessToken, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
@@ -3831,6 +3866,93 @@ One convention across every endpoint, so you can branch on the same fields every
         return workspaceUnavailable(req, res, '/api/proxy/recommend-and-dispatch', reason);
       }
       const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
+
+      // ── Verb-override path (LIN-573) ──────────────────────────────────────
+      // When the caller pins `kind`, skip the LLM recommendation + descent
+      // entirely: fetch the named issue's context, generate the body
+      // deterministically with the chosen template key, and dispatch with that
+      // override kind. The wobble this fixes is the *verb*, not the *target*, so
+      // the override pins the named issue with NO descent. It is purely
+      // deterministic (no OpenRouter call), so it bypasses the LLM-config gate
+      // and free-tier metering below. Linear output stays byte-identical to the
+      // /prompt endpoint by passing `{}` for provider.ui.
+      if (kind !== undefined) {
+        let ctx;
+        try {
+          ctx = await resolvePromptIssueContext(accessToken, issueIdentifier, isTestMode);
+        } catch (err) {
+          if (err.message?.includes('not found')) {
+            logEvent(req, '/api/proxy/recommend-and-dispatch', 404);
+            return notFound.json(res, 'Issue not found');
+          }
+          throw err;
+        }
+        if (!ctx) {
+          logEvent(req, '/api/proxy/recommend-and-dispatch', 404);
+          return notFound.json(res, 'Issue not found');
+        }
+
+        const { issue, parent, siblings, project, children, comments } = ctx;
+        const generated = generatePrompt(kind, issue, { parent, siblings, project, children, comments }, {});
+        if (!generated) {
+          logEvent(req, '/api/proxy/recommend-and-dispatch', 500);
+          return jsonError(res, 500, 'Failed to generate prompt');
+        }
+
+        // The body is server-generated/trusted, so it skips the dangerous-char /
+        // length checks the caller-supplied POST /dispatch path runs, and is
+        // never returned to the caller — same contract as the LLM-driven path.
+        let finalPrompt = generated.prompt;
+        if (appendProxyContext !== false) {
+          const baseUrl = `${req.protocol}://${req.get('host')}`;
+          const bearerToken = (req.headers.authorization || '').slice(7);
+          finalPrompt = generated.prompt + buildProxyContextPreamble({
+            baseUrl,
+            token: bearerToken,
+            issueIdentifier
+          });
+        }
+
+        try {
+          const item = await dispatchQueueStore.addItem(req.proxyUrlKey, {
+            prompt: finalPrompt,
+            promptName: generated.name || getPromptDisplayName(kind),
+            kind,
+            issueId: null,
+            issueIdentifier,
+            issueTitle: null,
+            issueUrl: null,
+            dispatchedBy: req.proxyCreatedBy || null,
+            target: target || 'cli',
+            // Mirror /prompt's repo resolution: project `repo=` from the
+            // description, with an explicit caller repo winning (LIN-537).
+            repo: repo || parseRepoFromDescription(project?.description) || null
+          });
+
+          // Record the override so it can feed heuristic improvement — the
+          // engine's verb was demonstrably wrong here (LIN-573). The distinct
+          // endpoint tag keeps these auditable in the proxy event log.
+          logEvent(req, `/api/proxy/recommend-and-dispatch (override:${kind})`, 201);
+          return res.status(201).json({
+            success: true,
+            id: item._id,
+            status: 'queued',
+            kind: item.kind,
+            promptName: item.promptName,
+            issueIdentifier: item.issueIdentifier,
+            target: item.target,
+            dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt,
+            // The override pins the named issue with no descent — surface that
+            // explicitly so callers can distinguish it from the LLM-driven path.
+            override: true
+          });
+        } catch (err) {
+          logEvent(req, '/api/proxy/recommend-and-dispatch', 500);
+          console.error('Proxy recommend-and-dispatch override error:', err.message);
+          return jsonError(res, 500, 'Failed to dispatch prompt');
+        }
+      }
+
       const sessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
       // A free-tier-only deployment is accepted via isFreeTier. computeRecommendation
       // resolves the effective key per hop; here we only gate and meter.
