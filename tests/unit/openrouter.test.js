@@ -17,6 +17,7 @@ import {
   getRecommendationStream,
   getRecommendation,
   setLlmCallRecorder,
+  setPromptTraceRecorder,
   getModelDisplayName,
   DEFAULT_MODEL,
   EPIC_CHILD_THRESHOLD,
@@ -1387,6 +1388,118 @@ describe('LLM call recorder (LIN-418)', () => {
     assert.strictEqual(records.length, 1);
     assert.strictEqual(records[0].feature, 'task-chat');
     assert.strictEqual(records[0].cost, 0.00042);
+  });
+});
+
+// ===========================================================================
+// Prompt trace recorder (LIN-578) — content-bearing capture at the two
+// recommendation seams only. Verifies traces are captured WITHOUT changing the
+// user-facing recommendation result, and that the generic chat path is NOT captured.
+// ===========================================================================
+describe('prompt trace recorder (LIN-578)', () => {
+  let originalFetch;
+  let savedProxyEnv;
+  const ISSUE = {
+    identifier: 'LIN-1', title: 'A leaf task', description: 'Do the thing.',
+    url: 'https://linear.app/test/issue/LIN-1', state: { name: 'In Progress', type: 'started' },
+    createdAt: '2026-01-01T00:00:00.000Z'
+  };
+  const CONTEXT = { parent: null, siblings: [], project: { description: '' }, children: [], comments: [], focusedChild: null };
+
+  beforeEach(() => {
+    originalFetch = global.fetch;
+    savedProxyEnv = {
+      HTTPS_PROXY: process.env.HTTPS_PROXY, HTTP_PROXY: process.env.HTTP_PROXY,
+      https_proxy: process.env.https_proxy, http_proxy: process.env.http_proxy
+    };
+    delete process.env.HTTPS_PROXY; delete process.env.HTTP_PROXY;
+    delete process.env.https_proxy; delete process.env.http_proxy;
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    setLlmCallRecorder(null);
+    setPromptTraceRecorder(null);
+    for (const [k, v] of Object.entries(savedProxyEnv)) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+  });
+
+  // Streaming SSE response (matches the metadata-recorder block's mock shape).
+  function mockStreamResponse(pieces, { provider = 'OpenAI', model = 'openai/gpt-5.4-mini', finishReason = 'stop' } = {}) {
+    const enc = new TextEncoder();
+    const blocks = pieces.map(p => `data: ${JSON.stringify({ provider, model, choices: [{ delta: { content: p }, finish_reason: null }] })}\n\n`);
+    blocks.push(`data: ${JSON.stringify({ provider, model, choices: [{ delta: {}, finish_reason: finishReason }], usage: { prompt_tokens: 1200, completion_tokens: 30, total_tokens: 1230, cost: 0.00042 } })}\n\n`);
+    blocks.push('data: [DONE]\n\n');
+    return { ok: true, body: (async function* () { for (const b of blocks) yield enc.encode(b); })() };
+  }
+
+  // Note on the non-stream seam (getRecommendation): it issues its request through
+  // the module-level `customFetch`, which is bound to native fetch at import time
+  // (and only re-pointed when a proxy is configured), so a `global.fetch` mock can't
+  // intercept it the way it does the streaming path. The non-stream seam wires the
+  // SAME recordPromptTrace(...) call over locals proven by parseRecommendationResponse
+  // / applyGroundingToRecommendation tests; the streaming test below exercises the
+  // recorder end-to-end. Mocking the non-stream HTTP would require a production
+  // refactor (out of scope for LIN-578).
+
+  test('getRecommendationStream records a content-bearing trace and returns the same result', async () => {
+    const pieces = ['## Reasoning\n→ **research**\nLook into it.\n## Prompt\nGo research.'];
+    global.fetch = mock.fn(async () => mockStreamResponse(pieces));
+
+    const traces = [];
+    setPromptTraceRecorder((t) => traces.push(t));
+
+    const result = await getRecommendationStream(
+      ISSUE, CONTEXT,
+      { apiKey: 'test-key', callMeta: { urlKey: 'acme', feature: 'recommend', issueIdentifier: 'LIN-1' } },
+      () => {}
+    );
+
+    // User-facing result unchanged.
+    assert.strictEqual(result.recommendedAction, 'research');
+    assert.ok(result.prompt.startsWith('Go research.'));
+
+    // Exactly one trace, carrying input + output + attribution.
+    assert.strictEqual(traces.length, 1);
+    const t = traces[0];
+    assert.strictEqual(t.urlKey, 'acme');
+    assert.strictEqual(t.feature, 'recommend');
+    assert.strictEqual(t.issueIdentifier, 'LIN-1');
+    assert.ok(typeof t.metaPrompt === 'string' && t.metaPrompt.length > 0); // rendered input
+    assert.strictEqual(t.model, 'openai/gpt-5.4-mini');
+    assert.strictEqual(t.rawContent, pieces[0]);
+    assert.strictEqual(t.reasoning, '→ **research**\nLook into it.');
+    assert.strictEqual(t.prompt, 'Go research.'); // parsed, pre-grounding
+    assert.strictEqual(t.finalPrompt, result.prompt); // post-grounding == what the user receives
+    assert.strictEqual(t.finishReason, 'stop');
+    assert.strictEqual(t.truncated, false);
+  });
+
+  test('a throwing trace recorder never breaks the call', async () => {
+    const pieces = ['## Reasoning\n→ **research**\nx.\n## Prompt\ny.'];
+    global.fetch = mock.fn(async () => mockStreamResponse(pieces));
+    setPromptTraceRecorder(() => { throw new Error('trace boom'); });
+
+    const result = await getRecommendationStream(ISSUE, CONTEXT, { apiKey: 'test-key' }, () => {});
+    assert.strictEqual(result.recommendedAction, 'research');
+  });
+
+  test('the generic chat path (streamChat) does NOT record a trace (scoped to recommendations)', async () => {
+    const pieces = ['Hello ', 'world.'];
+    global.fetch = mock.fn(async () => mockStreamResponse(pieces));
+
+    const traces = [];
+    setPromptTraceRecorder((t) => traces.push(t));
+
+    const { streamChat } = await import('../../lib/openrouter.js');
+    await streamChat(
+      [{ role: 'user', content: 'hi' }],
+      { apiKey: 'test-key', callMeta: { urlKey: 'acme', feature: 'task-chat' } },
+      () => {}
+    );
+
+    assert.strictEqual(traces.length, 0); // generic chat must never be trace-captured
   });
 });
 

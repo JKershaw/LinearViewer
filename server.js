@@ -28,6 +28,7 @@ import { BriefCacheStore } from './lib/brief-cache.js'
 import { RunSummaryCacheStore } from './lib/run-summary-cache.js'
 import { ReportHistoryStore } from './lib/report-history-store.js'
 import { LlmCallLogStore } from './lib/llm-call-log.js'
+import { PromptTraceStore } from './lib/prompt-trace-store.js'
 import { getProvider, getProviderForWorkspace } from './lib/providers/registry.js'
 import './lib/providers/linear/index.js' // side effect: self-registers the Linear provider into the registry
 import { localProvider } from './lib/providers/local/index.js' // side effect: self-registers the Local provider; store injected below
@@ -72,7 +73,7 @@ import { buildSessionCounts } from './lib/sessions-view.js'
 import { renderRoadmapPage } from './lib/render-roadmap.js'
 import { buildRoadmapModel } from './lib/roadmap.js'
 import { renderProxyPage } from './lib/render-proxy.js'
-import { AVAILABLE_MODELS, setLlmCallRecorder } from './lib/openrouter.js'
+import { AVAILABLE_MODELS, setLlmCallRecorder, setPromptTraceRecorder } from './lib/openrouter.js'
 import { resolveWorkspaceModel, getWorkspaceFeatures, isWorkspaceFeatureEnabled, setWorkspaceFeature } from './lib/workspace-preferences.js'
 import { getFeatureFlags, isValidFeatureKey, isValidWorkspaceFeatureKey, WORKSPACE_FEATURES } from './lib/feature-defaults.js'
 
@@ -267,6 +268,17 @@ const llmCallLogStore = new LlmCallLogStore({
   collection: llmCallLogCollection
 })
 setLlmCallRecorder((call) => llmCallLogStore.record(call))
+
+// Prompt traces (LIN-578): content-bearing sibling of the metadata log above.
+// Captures the full AI recommendation generation (rendered input + output) for
+// debug/eval. Registered as the openrouter client's trace recorder hook so both
+// recommendation seams persist a trace without the client importing the store.
+// Session-auth read only — NEVER exposed on the proxy token-auth surface or /kpis.
+const promptTraceCollection = db.collection('prompt-traces')
+const promptTraceStore = new PromptTraceStore({
+  collection: promptTraceCollection
+})
+setPromptTraceRecorder((trace) => promptTraceStore.record(trace))
 
 // =============================================================================
 // Express App Configuration
@@ -940,7 +952,7 @@ async function getWorkspaceOpenRouterKey(urlKey, linearUserId) {
 app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, dispatchQueueStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, workspacePreferencesStore, freeTierStore }))
 
 // Mount workspace API routes (audit, prompts, recommendations, comments, images)
-app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore }))
+app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore }))
 
 // Mount pipeline routes (page + JSON polling)
 app.use(createPipelineRoutes({ workspaceFromUrl, getWorkspaceAccessToken, dispatchQueueStore, agentStatusStore, getOpenRouterSource, getDeployInfo, handleUnauthorizedError }))

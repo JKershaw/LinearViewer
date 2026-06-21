@@ -202,8 +202,35 @@ export function buildMockRecommendationHop(ctx) {
  * @param {Function} options.getOpenRouterSource - Helper to determine OpenRouter source
  * @returns {Router} Express router
  */
-export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore }) {
+export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore }) {
   const router = Router();
+
+  // ===========================================================================
+  // Prompt traces API (LIN-578)
+  // ===========================================================================
+
+  /**
+   * List recent AI recommendation prompt traces for a workspace.
+   *
+   * Session-auth only (behind workspaceFromUrl) and workspace-scoped — these are
+   * content-bearing records (rendered ticket content + model output) captured for
+   * debug/eval. Deliberately NOT exposed on the proxy token-auth surface and never
+   * fed to /kpis. Minimal read path for the eval harness / a quick curl; no UI.
+   */
+  router.get('/workspace/:urlKey/api/prompt-traces', workspaceFromUrl, async (req, res) => {
+    if (!promptTraceStore) {
+      return res.json({ items: [], total: 0 });
+    }
+    try {
+      const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
+      const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+      const result = await promptTraceStore.listTraces(req.workspace.urlKey, { limit, offset });
+      res.json(result);
+    } catch (err) {
+      console.error('Error listing prompt traces:', err);
+      res.status(500).json({ error: 'Failed to list prompt traces' });
+    }
+  });
 
   // ===========================================================================
   // Audit API
