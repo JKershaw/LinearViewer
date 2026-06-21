@@ -13,17 +13,19 @@
  */
 
 import { Router } from 'express';
-import { GraphQLClient, gql } from 'graphql-request';
 import rateLimit from 'express-rate-limit';
-import { createProxyFetch } from '../lib/proxy-fetch.js';
-import { createLinearFetch } from '../lib/linear-fetch.js';
 import { createDedupeCache, dedupeKey } from '../lib/proxy-dedupe.js';
 import { deriveTerminalStatus, deriveCompletedAt } from '../lib/dispatch-terminal.js';
-import { fetchProjects, fetchIssueContext, fetchRecommendationContext } from '../lib/linear.js';
-// API-surface reads live on the provider (LIN-307/LIN-308) and are imported
-// directly — the lib/linear.js shim is the frozen back-compat surface for the
-// dashboard fetchers only, not the consumer-API read surface.
-import { fetchTeams, search, states, labels, cycles, cycleDetail, relations, viewer, projects, issues, issueDetail } from '../lib/providers/linear/index.js';
+// The entire consumer-API surface — reads (LIN-308), writes + write-guard reads
+// (LIN-309), and the compute-endpoint fetchers — sources through the Linear
+// provider directly; the route owns no GraphQL. `linearProvider` is the default
+// write provider (capability-gated; injectable for tests). The lib/linear.js
+// shim stays the frozen back-compat surface for the dashboard fetchers only.
+import {
+  fetchTeams, search, states, labels, cycles, cycleDetail, relations, viewer, projects, issues, issueDetail,
+  fetchProjects, fetchIssueContext, fetchRecommendationContext,
+  linearProvider,
+} from '../lib/providers/linear/index.js';
 import { applyTrashedSignal, isTrashed } from '../lib/trashed-signal.js';
 import { flattenIssue, neutralizeProject, flattenCycle, flattenRelations } from '../lib/proxy-wire.js';
 import { isRecommendationEnabled, getRecommendation } from '../lib/openrouter.js';
@@ -229,12 +231,6 @@ function buildMockBriefFromContext(context) {
 
   return lines.join('\n');
 }
-
-const LINEAR_API_ENDPOINT = 'https://api.linear.app/graphql';
-
-// Proxy-aware fetch for environments behind an HTTP proxy (e.g. corporate networks).
-// graphql-request's default fetch doesn't respect HTTP_PROXY/HTTPS_PROXY env vars.
-const proxyFetch = await createProxyFetch();
 
 // Short-window dedupe for non-idempotent comment creates (LIN-399). An
 // identical (workspace + issue + body) create arriving within the window
@@ -516,115 +512,10 @@ function dispatchWatchChanged(baseline, item) {
 // =============================================================================
 // GraphQL Queries
 //
-// Read queries now live in the Linear provider (lib/providers/linear/index.js)
-// and the read endpoints call provider methods (LIN-308). The write/compute
-// mutations + helper reads below stay inline until LIN-309 re-points them too.
+// The route owns no GraphQL: read queries moved to the Linear provider in
+// LIN-308, and the write mutations + write-guard reads moved there in LIN-309.
+// The endpoints call provider methods (capability-gated for writes) instead.
 // =============================================================================
-
-// Write mutations
-const CREATE_ISSUE_MUTATION = gql`
-  mutation($input: IssueCreateInput!) {
-    issueCreate(input: $input) {
-      success
-      issue {
-        id identifier title url
-        state { name type }
-      }
-    }
-  }
-`;
-
-const UPDATE_ISSUE_MUTATION = gql`
-  mutation($id: String!, $input: IssueUpdateInput!) {
-    issueUpdate(id: $id, input: $input) {
-      success
-      issue {
-        id identifier title url
-        state { name type }
-      }
-    }
-  }
-`;
-
-// Lightweight read for description edits — the full issue-detail read is far
-// heavier than a read-modify-write of the body needs.
-const ISSUE_DESCRIPTION_QUERY = gql`
-  query($id: String!) {
-    issue(id: $id) {
-      id
-      description
-      trashed
-    }
-  }
-`;
-
-const CREATE_COMMENT_MUTATION = gql`
-  mutation($input: CommentCreateInput!) {
-    commentCreate(input: $input) {
-      success
-      comment {
-        id body createdAt
-        user { name }
-      }
-    }
-  }
-`;
-
-const CREATE_RELATION_MUTATION = gql`
-  mutation($input: IssueRelationCreateInput!) {
-    issueRelationCreate(input: $input) {
-      success
-      issueRelation {
-        type
-        issue { id identifier }
-        relatedIssue { id identifier }
-      }
-    }
-  }
-`;
-
-const DELETE_RELATION_MUTATION = gql`
-  mutation($id: String!) {
-    issueRelationDelete(id: $id) {
-      success
-    }
-  }
-`;
-
-const ISSUE_LABELS_QUERY = gql`
-  query($issueId: String!) {
-    issue(id: $issueId) {
-      id
-      trashed
-      labels { nodes { id name } }
-    }
-  }
-`;
-
-// LIN-401: a lightweight trashed-only probe for write handlers that don't
-// otherwise read the issue (PATCH, comments, relation create). Linear still
-// resolves trashed issues by ID, so without this a write would silently mutate
-// a soft-deleted ghost.
-const TRASHED_GUARD_QUERY = gql`
-  query($id: String!) {
-    issue(id: $id) {
-      id
-      trashed
-    }
-  }
-`;
-
-const UPDATE_ISSUE_LABELS_MUTATION = gql`
-  mutation($id: String!, $input: IssueUpdateInput!) {
-    issueUpdate(id: $id, input: $input) {
-      success
-      issue {
-        id identifier
-        labels { nodes { id name } }
-      }
-    }
-  }
-`;
 
 /**
  * Creates proxy routes with injected dependencies.
@@ -639,9 +530,12 @@ const UPDATE_ISSUE_LABELS_MUTATION = gql`
  * @param {Function} options.getWorkspaceAccessToken - Function to get workspace access token by urlKey (token-only)
  * @param {Function} options.resolveWorkspaceAccess - Function returning { token, reason } for actionable error envelopes (LIN-417)
  * @param {Function} options.getWorkspaceOpenRouterKey - Function to get OpenRouter API key from workspace sessions
+ * @param {Object} [options.provider] - Issue-tracker provider backing the consumer-API writes
+ *   (LIN-309). Defaults to the Linear provider; capability-gated so an unsupported write returns a
+ *   clean 4xx rather than a 500. Injectable so tests can exercise the unsupported-capability path.
  * @returns {Router} Express router with proxy routes
  */
-export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, dispatchQueueStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, workspacePreferencesStore, freeTierStore }) {
+export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, dispatchQueueStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, workspacePreferencesStore, freeTierStore, provider = linearProvider }) {
   const router = Router();
 
   // =========================================================================
@@ -689,31 +583,26 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   }
 
   /**
-   * Helper to create a Linear GraphQL client for the workspace.
+   * Capability gate for the consumer-API writes (LIN-309). Consults the active
+   * provider's capability descriptor BEFORE the write so an unsupported provider
+   * declines cleanly (422 + machine-readable code) instead of bubbling the
+   * provider's NotImplementedError up to an opaque 500. `provider.supports(...)`
+   * is the "never 500" path the provider interface documents.
    *
-   * `signal: AbortSignal.timeout(timeoutMs)` is the OVERALL deadline shared
-   * across attempts, so the proxy still fails fast instead of hanging silently
-   * (which causes "stream idle timeout" in CLI callers).
+   * For Linear (every write supported) this is always a pass — a no-op gate that
+   * keeps behaviour byte-identical, mirroring the LIN-308 read re-pointing.
    *
-   * On the plain-egress path (no HTTP_PROXY — e.g. Heroku) the request goes
-   * through createLinearFetch, which adds bounded retries on transient Linear
-   * connection drops ("Premature close" / ECONNRESET) within that deadline:
-   * a fast drop is retried on a fresh connection instead of failing the
-   * consumer's call, while writes are never replayed (LIN-399) and a hit on the
-   * overall deadline stops retrying. When an egress proxy IS configured,
-   * lib/proxy-fetch.js already owns the retry, so we use it unwrapped.
+   * @returns {boolean} true if a capability-decline response was sent (caller returns early)
    */
-  async function getClient(urlKey, { timeoutMs = GRAPHQL_TIMEOUT_MS } = {}) {
-    const { token, reason } = await resolveWorkspaceAccess(urlKey);
-    if (!token) {
-      return { client: null, reason };
-    }
-    const clientOptions = {
-      headers: { Authorization: token },
-      signal: AbortSignal.timeout(timeoutMs),
-      fetch: proxyFetch || createLinearFetch(globalThis.fetch, { timeoutMs }),
-    };
-    return { client: new GraphQLClient(LINEAR_API_ENDPOINT, clientOptions), reason };
+  function denyIfUnsupported(method, req, res, endpoint) {
+    if (provider.supports(method)) return false;
+    logEvent(req, endpoint, 422);
+    jsonError(res, 422, `This workspace's provider does not support this write`, {
+      code: 'CAPABILITY_NOT_SUPPORTED',
+      capability: method,
+      provider: provider.name,
+    });
+    return true;
   }
 
   /**
@@ -735,8 +624,8 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    * Status stays 503; the body carries code/category/retryable/detail and a
    * safe `context` (public workspace slug only) so an automated caller can
    * decide whether to back off (retryable) or escalate (auth/config).
-   * `reason` is threaded unmodified from resolveWorkspaceAccess via both the
-   * getClient path and the raw-token path.
+   * `reason` is threaded unmodified from resolveWorkspaceAccess at every read,
+   * write, and compute endpoint (all now share the single raw-token path).
    */
   function workspaceUnavailable(req, res, endpoint, reason) {
     logEvent(req, endpoint, 503);
@@ -1656,8 +1545,9 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.post('/api/proxy/issues', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      const { client, reason } = await getClient(req.proxyUrlKey);
-      if (!client) {
+      if (denyIfUnsupported('createIssue', req, res, '/api/proxy/issues')) return;
+      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues', reason);
       }
 
@@ -1700,11 +1590,11 @@ One convention across every endpoint, so you can branch on the same fields every
         input.priority = priority;
       }
 
-      const data = await client.request(CREATE_ISSUE_MUTATION, { input });
-      if (writeRejected(req, res, '/api/proxy/issues', data.issueCreate, 'Issue was not created')) return;
-      flattenIssue(data.issueCreate.issue);
+      const issueCreate = await provider.createIssue(token, input);
+      if (writeRejected(req, res, '/api/proxy/issues', issueCreate, 'Issue was not created')) return;
+      flattenIssue(issueCreate.issue);
       logEvent(req, '/api/proxy/issues', 201);
-      res.status(201).json(data.issueCreate);
+      res.status(201).json(issueCreate);
     } catch (err) {
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/issues', status);
@@ -1724,9 +1614,9 @@ One convention across every endpoint, so you can branch on the same fields every
    * (null) is NOT refused here — the mutation proceeds and Linear's own
    * not-found error maps to the usual status, preserving existing behaviour.
    */
-  async function refuseIfTrashed(client, issueId, req, res, endpoint) {
-    const data = await client.request(TRASHED_GUARD_QUERY, { id: issueId });
-    if (isTrashed(data.issue)) {
+  async function refuseIfTrashed(token, issueId, req, res, endpoint) {
+    const issue = await provider.issueWriteGuard(token, issueId);
+    if (isTrashed(issue)) {
       logEvent(req, endpoint, 409);
       jsonError(res, 409, 'Issue is trashed; refusing to modify a deleted issue');
       return true;
@@ -1736,8 +1626,9 @@ One convention across every endpoint, so you can branch on the same fields every
 
   router.patch('/api/proxy/issues/:issueId', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      const { client, reason } = await getClient(req.proxyUrlKey);
-      if (!client) {
+      if (denyIfUnsupported('updateIssue', req, res, '/api/proxy/issues/:id')) return;
+      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/:id', reason);
       }
 
@@ -1783,13 +1674,13 @@ One convention across every endpoint, so you can branch on the same fields every
         return badRequest.json(res, 'No valid fields to update');
       }
 
-      if (await refuseIfTrashed(client, issueId, req, res, '/api/proxy/issues/:id')) return;
+      if (await refuseIfTrashed(token, issueId, req, res, '/api/proxy/issues/:id')) return;
 
-      const data = await client.request(UPDATE_ISSUE_MUTATION, { id: issueId, input });
-      if (writeRejected(req, res, '/api/proxy/issues/:id', data.issueUpdate, 'Issue was not updated')) return;
-      flattenIssue(data.issueUpdate.issue);
+      const issueUpdate = await provider.updateIssue(token, issueId, input);
+      if (writeRejected(req, res, '/api/proxy/issues/:id', issueUpdate, 'Issue was not updated')) return;
+      flattenIssue(issueUpdate.issue);
       logEvent(req, '/api/proxy/issues/:id', 200);
-      res.json(data.issueUpdate);
+      res.json(issueUpdate);
     } catch (err) {
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/issues/:id', status);
@@ -1805,8 +1696,9 @@ One convention across every endpoint, so you can branch on the same fields every
    * recur. `merge` may throw DescriptionEditError for a loud 422.
    */
   async function applyDescriptionEdit(req, res, endpoint, merge) {
-    const { client, reason } = await getClient(req.proxyUrlKey);
-    if (!client) {
+    if (denyIfUnsupported('updateIssue', req, res, endpoint)) return;
+    const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+    if (!token) {
       return workspaceUnavailable(req, res, endpoint, reason);
     }
 
@@ -1818,16 +1710,16 @@ One convention across every endpoint, so you can branch on the same fields every
 
     let newDescription;
     try {
-      const data = await client.request(ISSUE_DESCRIPTION_QUERY, { id: issueId });
-      if (!data.issue) {
+      const issue = await provider.issueDescription(token, issueId);
+      if (!issue) {
         logEvent(req, endpoint, 404);
         return notFound.json(res, 'Issue not found');
       }
-      if (isTrashed(data.issue)) {
+      if (isTrashed(issue)) {
         logEvent(req, endpoint, 409);
         return jsonError(res, 409, 'Issue is trashed; refusing to modify a deleted issue');
       }
-      newDescription = merge(data.issue.description || '');
+      newDescription = merge(issue.description || '');
     } catch (err) {
       if (err instanceof DescriptionEditError) {
         logEvent(req, endpoint, 422);
@@ -1849,10 +1741,10 @@ One convention across every endpoint, so you can branch on the same fields every
     }
 
     try {
-      const data = await client.request(UPDATE_ISSUE_MUTATION, { id: issueId, input: { description: newDescription } });
-      flattenIssue(data.issueUpdate.issue);
+      const issueUpdate = await provider.updateIssue(token, issueId, { description: newDescription });
+      flattenIssue(issueUpdate.issue);
       logEvent(req, endpoint, 200);
-      res.json(data.issueUpdate);
+      res.json(issueUpdate);
     } catch (err) {
       const status = graphqlErrorStatus(err);
       logEvent(req, endpoint, status);
@@ -1919,8 +1811,9 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.post(['/api/proxy/issues/:issueId/comments', '/api/proxy/comments/:issueId'], proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      const { client, reason } = await getClient(req.proxyUrlKey);
-      if (!client) {
+      if (denyIfUnsupported('createComment', req, res, '/api/proxy/issues/comments')) return;
+      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/comments', reason);
       }
 
@@ -1943,7 +1836,7 @@ One convention across every endpoint, so you can branch on the same fields every
         return badRequest.json(res, 'body contains invalid characters');
       }
 
-      if (await refuseIfTrashed(client, issueId, req, res, '/api/proxy/issues/comments')) return;
+      if (await refuseIfTrashed(token, issueId, req, res, '/api/proxy/issues/comments')) return;
 
       // Deterministic dedupe (LIN-399): if an identical comment was just
       // created for this issue, return that one instead of minting a duplicate.
@@ -1954,17 +1847,15 @@ One convention across every endpoint, so you can branch on the same fields every
         return res.status(200).json({ ...prior, deduped: true });
       }
 
-      const data = await client.request(CREATE_COMMENT_MUTATION, {
-        input: { issueId, body }
-      });
+      const commentCreate = await provider.createComment(token, issueId, body);
 
       // Surface a clear failure instead of a misleading 201 when Linear
       // reports the write did not land.
-      if (writeRejected(req, res, '/api/proxy/issues/comments', data.commentCreate, 'Comment was not created')) return;
+      if (writeRejected(req, res, '/api/proxy/issues/comments', commentCreate, 'Comment was not created')) return;
 
-      commentDedupe.set(key, data.commentCreate);
+      commentDedupe.set(key, commentCreate);
       logEvent(req, '/api/proxy/issues/comments', 201);
-      res.status(201).json(data.commentCreate);
+      res.status(201).json(commentCreate);
     } catch (err) {
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/issues/comments', status);
@@ -1979,8 +1870,9 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.post('/api/proxy/issues/:issueId/relations', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      const { client, reason } = await getClient(req.proxyUrlKey);
-      if (!client) {
+      if (denyIfUnsupported('createRelation', req, res, '/api/proxy/issues/relations')) return;
+      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/relations', reason);
       }
 
@@ -2000,20 +1892,13 @@ One convention across every endpoint, so you can branch on the same fields every
         return badRequest.json(res, 'Valid relatedIssueId is required');
       }
 
-      if (await refuseIfTrashed(client, issueId, req, res, '/api/proxy/issues/relations')) return;
+      if (await refuseIfTrashed(token, issueId, req, res, '/api/proxy/issues/relations')) return;
 
-      // Handle blocked-by as inverse blocks
-      let input;
-      if (type === 'blocked-by') {
-        input = { issueId: relatedIssueId, relatedIssueId: issueId, type: 'blocks' };
-      } else {
-        input = { issueId, relatedIssueId, type };
-      }
-
-      const data = await client.request(CREATE_RELATION_MUTATION, { input });
-      if (writeRejected(req, res, '/api/proxy/issues/relations', data.issueRelationCreate, 'Relation was not created')) return;
+      // The provider owns the blocked-by → inverse-blocks sugar (ids swapped).
+      const issueRelationCreate = await provider.createRelation(token, issueId, { type, relatedIssueId });
+      if (writeRejected(req, res, '/api/proxy/issues/relations', issueRelationCreate, 'Relation was not created')) return;
       logEvent(req, '/api/proxy/issues/relations', 201);
-      res.status(201).json(data.issueRelationCreate);
+      res.status(201).json(issueRelationCreate);
     } catch (err) {
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/issues/relations', status);
@@ -2034,8 +1919,9 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.delete('/api/proxy/issues/:issueId/relations/:relationId', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      const { client, reason } = await getClient(req.proxyUrlKey);
-      if (!client) {
+      if (denyIfUnsupported('deleteRelation', req, res, '/api/proxy/issues/relations')) return;
+      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/relations', reason);
       }
 
@@ -2048,10 +1934,10 @@ One convention across every endpoint, so you can branch on the same fields every
         return badRequest.json(res, 'Invalid relation ID format');
       }
 
-      const data = await client.request(DELETE_RELATION_MUTATION, { id: relationId });
-      if (writeRejected(req, res, '/api/proxy/issues/relations', data.issueRelationDelete, 'Relation was not removed')) return;
+      const issueRelationDelete = await provider.deleteRelation(token, relationId);
+      if (writeRejected(req, res, '/api/proxy/issues/relations', issueRelationDelete, 'Relation was not removed')) return;
       logEvent(req, '/api/proxy/issues/relations', 200);
-      res.json(data.issueRelationDelete);
+      res.json(issueRelationDelete);
     } catch (err) {
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/issues/relations', status);
@@ -2072,8 +1958,9 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.post('/api/proxy/issues/:issueId/labels', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      const { client, reason } = await getClient(req.proxyUrlKey);
-      if (!client) {
+      if (denyIfUnsupported('addLabel', req, res, '/api/proxy/issues/labels')) return;
+      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/labels', reason);
       }
 
@@ -2088,31 +1975,28 @@ One convention across every endpoint, so you can branch on the same fields every
         return badRequest.json(res, 'Valid labelId is required');
       }
 
-      // Fetch current labels
-      const issueData = await client.request(ISSUE_LABELS_QUERY, { issueId });
-      if (!issueData.issue) {
+      // Fetch current labels (the read half of the label read-modify-write).
+      const issue = await provider.issueLabels(token, issueId);
+      if (!issue) {
         logEvent(req, '/api/proxy/issues/labels', 404);
         return notFound.json(res, 'Issue not found');
       }
-      if (isTrashed(issueData.issue)) {
+      if (isTrashed(issue)) {
         logEvent(req, '/api/proxy/issues/labels', 409);
         return jsonError(res, 409, 'Issue is trashed; refusing to modify a deleted issue');
       }
 
-      const currentLabelIds = (issueData.issue.labels?.nodes || []).map(l => l.id);
+      const currentLabelIds = (issue.labels?.nodes || []).map(l => l.id);
       if (currentLabelIds.includes(labelId)) {
         logEvent(req, '/api/proxy/issues/labels', 200);
         return res.json({ success: true, message: 'Label already present' });
       }
 
-      const data = await client.request(UPDATE_ISSUE_LABELS_MUTATION, {
-        id: issueId,
-        input: { labelIds: [...currentLabelIds, labelId] }
-      });
-      if (writeRejected(req, res, '/api/proxy/issues/labels', data.issueUpdate, 'Label was not added')) return;
-      flattenIssue(data.issueUpdate.issue);
+      const issueUpdate = await provider.updateIssueLabels(token, issueId, [...currentLabelIds, labelId]);
+      if (writeRejected(req, res, '/api/proxy/issues/labels', issueUpdate, 'Label was not added')) return;
+      flattenIssue(issueUpdate.issue);
       logEvent(req, '/api/proxy/issues/labels', 200);
-      res.json(data.issueUpdate);
+      res.json(issueUpdate);
     } catch (err) {
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/issues/labels', status);
@@ -2130,8 +2014,9 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.delete('/api/proxy/issues/:issueId/labels/:labelId', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      const { client, reason } = await getClient(req.proxyUrlKey);
-      if (!client) {
+      if (denyIfUnsupported('removeLabel', req, res, '/api/proxy/issues/labels')) return;
+      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/labels', reason);
       }
 
@@ -2143,18 +2028,18 @@ One convention across every endpoint, so you can branch on the same fields every
         return badRequest.json(res, 'Invalid label ID format');
       }
 
-      // Fetch current labels
-      const issueData = await client.request(ISSUE_LABELS_QUERY, { issueId });
-      if (!issueData.issue) {
+      // Fetch current labels (the read half of the label read-modify-write).
+      const issue = await provider.issueLabels(token, issueId);
+      if (!issue) {
         logEvent(req, '/api/proxy/issues/labels', 404);
         return notFound.json(res, 'Issue not found');
       }
-      if (isTrashed(issueData.issue)) {
+      if (isTrashed(issue)) {
         logEvent(req, '/api/proxy/issues/labels', 409);
         return jsonError(res, 409, 'Issue is trashed; refusing to modify a deleted issue');
       }
 
-      const currentLabelIds = (issueData.issue.labels?.nodes || []).map(l => l.id);
+      const currentLabelIds = (issue.labels?.nodes || []).map(l => l.id);
       const filtered = currentLabelIds.filter(id => id !== labelId);
 
       if (filtered.length === currentLabelIds.length) {
@@ -2162,14 +2047,11 @@ One convention across every endpoint, so you can branch on the same fields every
         return res.json({ success: true, message: 'Label not present' });
       }
 
-      const data = await client.request(UPDATE_ISSUE_LABELS_MUTATION, {
-        id: issueId,
-        input: { labelIds: filtered }
-      });
-      if (writeRejected(req, res, '/api/proxy/issues/labels', data.issueUpdate, 'Label was not removed')) return;
-      flattenIssue(data.issueUpdate.issue);
+      const issueUpdate = await provider.updateIssueLabels(token, issueId, filtered);
+      if (writeRejected(req, res, '/api/proxy/issues/labels', issueUpdate, 'Label was not removed')) return;
+      flattenIssue(issueUpdate.issue);
       logEvent(req, '/api/proxy/issues/labels', 200);
-      res.json(data.issueUpdate);
+      res.json(issueUpdate);
     } catch (err) {
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/issues/labels', status);

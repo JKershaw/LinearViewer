@@ -8,15 +8,15 @@
  *     code/category/retryable, and `context` carries ONLY the public workspace
  *     slug — never tokens/secrets/content (the kpi-stats privacy discipline).
  *
- *  2. The dual-shape threading in routes/proxy.js: the recovered `reason` must
- *     reach the envelope through BOTH proxy call shapes — the `getClient` path
- *     (Shape A, e.g. the write endpoint POST /issues) and the raw-token path
- *     (Shape B, e.g. /stack). Since LIN-308 re-pointed the read endpoints onto
- *     the raw-token provider path, the write/compute endpoints are the remaining
- *     getClient consumers, so Shape A drives one of those. A forced-reason stub
- *     of `resolveWorkspaceAccess` drives each shape and the test asserts the 503
- *     body is the structured envelope. The HTTP status stays 503 in every case;
- *     only the body gains structure.
+ *  2. The reason threading in routes/proxy.js: the recovered `reason` must reach
+ *     the envelope from every endpoint that resolves workspace access. Since
+ *     LIN-308 (reads) and LIN-309 (writes + compute) re-pointed the whole
+ *     surface onto the provider, all endpoints now share the single
+ *     `resolveWorkspaceAccess` → `workspaceUnavailable` path; a write (POST
+ *     /issues, Shape A) and a compute endpoint (/stack, Shape B) are exercised
+ *     here as representatives. A forced-reason stub of `resolveWorkspaceAccess`
+ *     drives each and the test asserts the 503 body is the structured envelope.
+ *     The HTTP status stays 503 in every case; only the body gains structure.
  *
  * The e2e suite can't cover this: in test mode `resolveWorkspaceAccess`
  * short-circuits `test-workspace`→`test-token` (reason `ok`), so the null /
@@ -126,10 +126,11 @@ async function requestJson(app, path, { method = 'GET', body } = {}) {
 
 const getJson = (app, path) => requestJson(app, path);
 
-test('Shape A (write endpoint POST /issues, via getClient): 503 with structured envelope', async () => {
-  // POST /issues calls getClient() before any body validation, so the forced
-  // null token short-circuits to the envelope (the readWrite stub satisfies the
-  // write-scope guard). This is the remaining getClient call shape post-LIN-308.
+test('Shape A (write endpoint POST /issues): 503 with structured envelope', async () => {
+  // POST /issues resolves workspace access before any body validation, so the
+  // forced null token short-circuits to the envelope (the readWrite stub
+  // satisfies the write-scope guard, and Linear supports createIssue so the
+  // capability gate is a pass). This is the write shape post-LIN-309.
   const { status, body } = await requestJson(buildApp('store_unreachable'), '/api/proxy/issues', {
     method: 'POST',
     body: { teamId: '00000000-0000-0000-0000-000000000000', title: 'x' }

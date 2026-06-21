@@ -16,9 +16,10 @@
  * LIN-308 re-pointed the read endpoints onto the provider, so these read
  * queries now live in lib/providers/linear/index.js (RELATIONS_QUERY unchanged;
  * the by-id detail query is API_ISSUE_DETAIL_QUERY, relocated verbatim from the
- * route's old ISSUE_DETAIL_QUERY). The shape guards follow the code there. The
- * write mutation + handler-contract assertions below still target routes/proxy.js,
- * where the write/compute surface stays inline until LIN-309.
+ * route's old ISSUE_DETAIL_QUERY). LIN-309 then re-pointed the write endpoints,
+ * relocating the write mutations there too (DELETE_RELATION_MUTATION et al.), so
+ * the shape guards follow the code into the provider. The handler-contract
+ * assertions still target routes/proxy.js, which now calls provider.* (no gql).
  *
  * Run with: node --test tests/unit/proxy-relations-query.test.js
  */
@@ -88,7 +89,8 @@ describe('proxy relationship queries', () => {
   });
 
   test('DELETE_RELATION_MUTATION deletes by relation id', () => {
-    const q = extractQuery('DELETE_RELATION_MUTATION');
+    // Relocated to the provider in LIN-309.
+    const q = extractQuery('DELETE_RELATION_MUTATION', providerSource);
     assert.match(q, /issueRelationDelete\s*\(\s*id:\s*\$id\s*\)/, 'must call issueRelationDelete(id: $id)');
     assert.match(q, /\$id:\s*String!/, 'id must be String!');
   });
@@ -102,9 +104,12 @@ describe('proxy relationship queries', () => {
       'DELETE relations route must exist and require write scope'
     );
     const handlerStart = proxySource.indexOf("'/api/proxy/issues/:issueId/relations/:relationId'");
-    const block = proxySource.slice(handlerStart, handlerStart + 800);
+    const block = proxySource.slice(handlerStart, handlerStart + 1100);
     assert.match(block, /UUID_REGEX\.test\(relationId\)/, 'must validate relationId as UUID');
-    assert.match(block, /DELETE_RELATION_MUTATION/, 'must call the delete mutation');
+    // Post-LIN-309 the handler calls the provider, capability-gated, instead of
+    // owning the delete mutation.
+    assert.match(block, /provider\.deleteRelation\(/, 'must call provider.deleteRelation');
+    assert.match(block, /denyIfUnsupported\('deleteRelation'/, 'must capability-gate the write');
   });
 
   test('/relations handler returns flat arrays, not the {nodes} shape (LIN-310)', () => {

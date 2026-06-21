@@ -33,6 +33,10 @@ import {
   deleteRelation,
   addLabel,
   removeLabel,
+  issueWriteGuard,
+  issueDescription,
+  issueLabels,
+  updateIssueLabels,
   linearProvider,
 } from '../../lib/providers/linear/index.js';
 
@@ -296,6 +300,59 @@ describe('Linear provider label RMW (LIN-307)', () => {
     restore(); restore = undefined;
     stub(async () => ({ issue: null }));
     await assert.rejects(() => removeLabel(API_KEY, 'nope', 'x'), /Issue not found/);
+  });
+});
+
+// =============================================================================
+// Write-path guard reads + label-write primitive (LIN-309)
+// =============================================================================
+
+describe('Linear provider write-guard reads (LIN-309)', () => {
+  test('issueWriteGuard returns the trashed probe, or null when unresolved', async () => {
+    stub(async (q, v) => ({ issue: { id: v.id, trashed: true } }));
+    assert.deepStrictEqual(await issueWriteGuard(API_KEY, 'LIN-1'), { id: 'LIN-1', trashed: true });
+    restore(); restore = undefined;
+    stub(async () => ({ issue: null }));
+    assert.strictEqual(await issueWriteGuard(API_KEY, 'nope'), null);
+  });
+
+  test('issueDescription returns { description, trashed }, or null when unresolved', async () => {
+    stub(async (q, v) => ({ issue: { id: v.id, description: 'body', trashed: false } }));
+    assert.deepStrictEqual(await issueDescription(API_KEY, 'LIN-1'), { id: 'LIN-1', description: 'body', trashed: false });
+    restore(); restore = undefined;
+    stub(async () => ({ issue: null }));
+    assert.strictEqual(await issueDescription(API_KEY, 'nope'), null);
+  });
+
+  test('issueLabels returns the current label set, or null when unresolved', async () => {
+    stub(async (q, v) => ({ issue: { id: v.issueId, trashed: false, labels: { nodes: [{ id: 'a', name: 'bug' }] } } }));
+    const issue = await issueLabels(API_KEY, 'LIN-1');
+    assert.deepStrictEqual(issue.labels.nodes, [{ id: 'a', name: 'bug' }]);
+    restore(); restore = undefined;
+    stub(async () => ({ issue: null }));
+    assert.strictEqual(await issueLabels(API_KEY, 'nope'), null);
+  });
+
+  test('updateIssueLabels writes the full label-id set and returns issueUpdate', async () => {
+    let written;
+    const m = stub(async (q, v) => { written = v; return { issueUpdate: { success: true, issue: { id: v.id } } }; });
+    const result = await updateIssueLabels(API_KEY, 'LIN-1', ['a', 'b']);
+    assert.strictEqual(result.success, true);
+    assert.deepStrictEqual(written, { id: 'LIN-1', input: { labelIds: ['a', 'b'] } });
+    assert.strictEqual(m.mock.calls.length, 1);
+  });
+
+  test('the class delegates the guard reads + label write to the same boundary', async () => {
+    stub(async (q, v) => ({ issue: { id: v.id, trashed: false } }));
+    assert.deepStrictEqual(await linearProvider.issueWriteGuard(API_KEY, 'LIN-1'), { id: 'LIN-1', trashed: false });
+  });
+
+  test('the guard reads stay OFF the declared capability surface', () => {
+    // Like the LIN-308 api reads, these are route-internal data-fetch, not
+    // first-class capabilities — so they must not appear as supported writes.
+    for (const m of ['issueWriteGuard', 'issueDescription', 'issueLabels', 'updateIssueLabels']) {
+      assert.strictEqual(linearProvider.supports(m), false, `${m} must not be a declared capability`);
+    }
   });
 });
 
