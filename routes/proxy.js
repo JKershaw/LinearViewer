@@ -1110,9 +1110,9 @@ When posting bodies with markdown (backticks, quotes, special chars), use a file
   PAYLOAD
   curl -X POST -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d @/tmp/body.json URL` : '';
 
-    const text = `# Linear API Proxy
+    const text = `# Workspace API Proxy
 
-Use this proxy to interact with Linear on behalf of the workspace that issued your token.
+Use this proxy to read and modify the issues, projects, and related data of the workspace that issued your token. The API is source-neutral — one contract across providers; this workspace is currently backed by Linear.
 
 ## Authentication
 
@@ -1143,7 +1143,7 @@ One convention across every endpoint, so you can branch on the same fields every
   (dispatch, token) carry their fields alongside "success": true. A write that does not land
   is a non-2xx, never a 2xx.
 - **Errors** are always { "error": "<message>", "detail"?: "<upstream detail>" } with a non-2xx
-  status. "detail" carries the Linear or AI upstream's own message when there is one.
+  status. "detail" carries the provider or AI upstream's own message when there is one.
 
 ## Error Codes
 

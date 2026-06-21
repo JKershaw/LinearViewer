@@ -1,16 +1,18 @@
 # Proxy API Integration Guide
 
-This guide explains how to build a consumer that interacts with a Linear workspace through the Linear Viewer proxy API.
+This guide explains how to build a consumer that interacts with a workspace's issues and projects through the Linear Viewer proxy API.
 
 ## Overview
 
-The Proxy API allows external consumers (AI agents, automation tools, custom services) to read and write Linear data on behalf of a workspace. Users create proxy tokens from the web interface, and consumers use those tokens to query issues, create tasks, manage labels, view cycles, and more.
+The Proxy API allows external consumers (AI agents, automation tools, custom services) to read and write workspace data (issues, projects, comments, relations, labels, cycles) on behalf of a workspace. Users create proxy tokens from the web interface, and consumers use those tokens to query issues, create tasks, manage labels, view cycles, and more.
+
+The API is **source-neutral**: it exposes one provider-backed contract (flat shapes, no provider-specific URLs) rather than a passthrough to any single backend. Workspaces are currently backed by Linear, but consumers should code to the documented shapes here, not to Linear specifics.
 
 **Key features:**
 - Token-based authentication (Bearer tokens)
 - Read/write scope separation (`read` for queries, `readWrite` for mutations)
 - Single-use token support (consumed after first request)
-- Full Linear CRUD: issues, comments, relations, labels, cycles
+- Full CRUD: issues, comments, relations, labels, cycles
 - Event audit logging (all API calls tracked with 30-day retention)
 - Rate limiting (60 requests/minute per IP)
 - Workspace isolation (tokens are scoped to a single workspace)
@@ -96,8 +98,8 @@ One convention across every endpoint, so a consumer can branch on the same field
 
 - **Success is the HTTP status.** Any `2xx` is success; any non-`2xx` is failure. There is no partial state — a write never returns `2xx` with a falsy `success`.
 - **Reads** return the data directly: a single resource *is* the object (`GET /me`, `GET /issues/{id}`, `GET /cycles/{id}`); a collection comes under a named key (`{ "issues": [...] }`, `{ "teams": [...] }`).
-- **Writes** return `{ "success": true, ... }`. Linear writes nest the affected entity under a named key (`{ "success": true, "issue": {...} }`); other writes (dispatch, token) carry their fields alongside `"success": true`. A write that does not land is a non-`2xx` (typically `502`), never a `2xx`.
-- **Errors** are always `{ "error": "<message>", "detail"?: "<upstream detail>" }` with a non-`2xx` status. `detail` carries the Linear or AI upstream's own message when there is one.
+- **Writes** return `{ "success": true, ... }`. Issue/comment/relation/label writes nest the affected entity under a named key (`{ "success": true, "issue": {...} }`); other writes (dispatch, token) carry their fields alongside `"success": true`. A write that does not land is a non-`2xx` (typically `502`), never a `2xx`.
+- **Errors** are always `{ "error": "<message>", "detail"?: "<upstream detail>" }` with a non-`2xx` status. `detail` carries the provider or AI upstream's own message when there is one.
 
 #### Path conventions
 
@@ -630,7 +632,7 @@ Content-Type: application/json
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `taskIdentifier` | string | Yes | Linear identifier (max 200 chars) |
+| `taskIdentifier` | string | Yes | Issue identifier (max 200 chars) |
 | `action` | string | Yes | What the agent did (max 200 chars) |
 | `status` | string | Yes | Outcome, e.g. `done` / `blocked` (max 200 chars) |
 | `summary` | string | Yes | Human-readable detail (max 10000 chars) |
@@ -680,7 +682,7 @@ Returns the **Autopilot kickoff** as **plain text** (`text/plain`) — the brief
 
 | Query param | Default | Description |
 |-------------|---------|-------------|
-| `mode` | `write` | `write` allows implementation/review kinds and an evidence-gated merge; `readonly` restricts dispatched work to investigation/research/planning/retro (no code, PRs, or Linear writes). |
+| `mode` | `write` | `write` allows implementation/review kinds and an evidence-gated merge; `readonly` restricts dispatched work to investigation/research/planning/retro (no code, PRs, or issue writes). |
 | `goal` | _(none)_ | Optional free-text focus for the run. Omitted ⇒ walk the stack under the precedence policy. |
 
 The body embeds `YOUR_TOKEN` as a placeholder; substitute the consumer's `readWrite` token (Autopilot reuses it for the prompts it dispatches). A read-scope token can fetch the kickoff, but running it needs `readWrite` (Autopilot dispatches). The general (stack-walk) kickoff is what this endpoint serves; the in-app per-task variant ("run on autopilot until this task is done") is generated at `/workspace/:urlKey/api/autopilot-prompt/:issueId`.
@@ -813,7 +815,7 @@ Content-Type: application/json
 | `newString` | string | Yes | Replacement (may be empty to delete the span) |
 
 Surgical, single-occurrence edit with the same `old_string`/`new_string`
-semantics as a code editor. Matching is **normalised**: Linear stores markdown
+semantics as a code editor. Matching is **normalised**: the backing store (currently Linear) stores markdown
 punctuation backslash-escaped (e.g. `\#\#`, `\*\*`), so quoting either the
 escaped bytes returned by GET or the rendered text both work.
 
@@ -944,7 +946,7 @@ These endpoints let a consumer (e.g. an autopilot orchestrator) hand a prompt to
 
 The runner reports progress back as **free-form feedback entries** (it owns the return leg via its own lifecycle; you do not poll it to run). Across a normal run the feedback stream carries, in order: phase tags (`[started]`/`[working]`), periodic **heartbeats** with activity telemetry, the session's final **recap** (`(recap 1/2)` …), structured **`[evidence]`** entries (each with a populated `url`), and a terminal **`[done]`** / **`[failed]`** / **`[aborted]`** marker. The watch/list endpoints derive a terminal `status` from that marker, so you can poll a field instead of parsing prose.
 
-> **Judge from evidence, not self-report.** The recap is the runner's own narration of what it did. Treat it as descriptive detail; confirm completion against the `[evidence]` URLs (PR/CI/commit/Linear) and Linear/git state. A `done` status with no corroborating artifact is "claimed, unverified."
+> **Judge from evidence, not self-report.** The recap is the runner's own narration of what it did. Treat it as descriptive detail; confirm completion against the `[evidence]` URLs (PR/CI/commit/issue) and issue-tracker/git state. A `done` status with no corroborating artifact is "claimed, unverified."
 
 #### Enqueue a Dispatch
 
@@ -959,10 +961,10 @@ Content-Type: application/json
 |-------|------|----------|-------------|
 | `prompt` | string | Yes | The prompt to run (max ~10MB) |
 | `promptName` | string | No | Short label for the dispatch (max 100 chars) |
-| `issueId` / `issueIdentifier` / `issueTitle` / `issueUrl` | string | No | Optional linkage to a Linear issue |
+| `issueId` / `issueIdentifier` / `issueTitle` / `issueUrl` | string | No | Optional linkage to an issue |
 | `target` | string | No | `cli` \| `web` \| `dash` (default `cli`). `local`/Harbour is **not** available to proxy consumers |
 | `repo` | string | No | Optional repository hint |
-| `appendProxyContext` | bool | No | Default `true`: append a proxy-context block to the prompt so the worker inherits Linear access for this workspace. Set `false` to send the prompt verbatim |
+| `appendProxyContext` | bool | No | Default `true`: append a proxy-context block to the prompt so the worker inherits workspace access via this proxy. Set `false` to send the prompt verbatim |
 
 Returns `201`:
 ```json
@@ -985,7 +987,7 @@ Runs `/recommend` and forwards the recommended prompt straight into a dispatch �
 | `issueIdentifier` | string | Yes | The issue to recommend a next step for (UUID or `LIN-123`) |
 | `target` | string | No | `cli` \| `web` \| `dash` (default `cli`). `local`/Harbour is **not** available to proxy consumers |
 | `repo` | string | No | Optional repository hint |
-| `appendProxyContext` | bool | No | Default `true`: append a proxy-context block so the worker inherits Linear access for this workspace |
+| `appendProxyContext` | bool | No | Default `true`: append a proxy-context block so the worker inherits workspace access via this proxy |
 | `noDescend` | bool | No | Default `false`. When `true`, recommend and dispatch the **named issue's own** next step and never descend into an open child (see below) |
 | `kind` | string | No | **Verb override.** A prompt template key (e.g. `review`, `plan`, `implementation`). When supplied, the LLM recommendation + descent is bypassed and the body is generated deterministically for the **named issue** with that template (see below) |
 
@@ -1022,7 +1024,7 @@ With a `kind` override the response also carries `"override": true` and omits th
 { "id": "uuid", "status": "queued", "kind": "review", "promptName": "code review", "issueIdentifier": "LIN-42", "target": "cli", "dispatchedAt": "2026-06-06T11:32:25.111Z", "override": true }
 ```
 
-`/recommend` can be slow (Linear + OpenRouter); the same whitespace-keepalive behaviour as `GET /recommend` applies, so don't set a client timeout below ~60s. Watch the returned `id` with `GET /api/proxy/dispatch/{id}` exactly as for a plain dispatch.
+`/recommend` can be slow (provider fetch + OpenRouter); the same whitespace-keepalive behaviour as `GET /recommend` applies, so don't set a client timeout below ~60s. Watch the returned `id` with `GET /api/proxy/dispatch/{id}` exactly as for a plain dispatch.
 
 #### Watch a Dispatch
 
