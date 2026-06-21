@@ -177,21 +177,26 @@ describe('Linear provider through lib/linear.js shim', () => {
     }
   });
 
-  test('provider wires the dashboard reads, declines writes + headroom reads', () => {
+  test('provider wires the FULL surface: dashboard reads + API reads + writes (LIN-307)', () => {
+    // LIN-176 left the headroom reads and writes declared-only; LIN-307 wires
+    // them on the Linear provider, so the entire declared surface is now
+    // implemented and supported (capability-gated for non-Linear providers).
     const caps = linearProvider.capabilities;
-    for (const m of PROVIDER_SURFACE.reads) {
-      assert.strictEqual(caps[m], true, `read ${m} must be implemented`);
-    }
-    for (const m of [...PROVIDER_SURFACE.readsHeadroom, ...PROVIDER_SURFACE.writes]) {
-      assert.strictEqual(caps[m], false, `${m} must remain unimplemented this phase`);
-      assert.throws(() => linearProvider[m](), NotImplementedError);
+    const all = [...PROVIDER_SURFACE.reads, ...PROVIDER_SURFACE.readsHeadroom, ...PROVIDER_SURFACE.writes];
+    for (const m of all) {
+      assert.strictEqual(typeof linearProvider[m], 'function', `${m} must be a function`);
+      assert.strictEqual(caps[m], true, `${m} must be implemented`);
+      assert.strictEqual(linearProvider.supports(m), true, `${m} must report supported`);
     }
   });
 
-  test('writes are first-class declared methods (present, gated, not 500-prone)', () => {
-    for (const w of PROVIDER_SURFACE.writes) {
-      assert.strictEqual(typeof linearProvider[w], 'function');
-      assert.strictEqual(linearProvider.supports(w), false);
+  test('LIN-307 additions (deleteRelation, comment edit/delete) are declared writes', () => {
+    // The three methods LIN-307 adds beyond LIN-176's declared surface.
+    for (const m of ['deleteRelation', 'updateComment', 'deleteComment']) {
+      assert.ok(PROVIDER_SURFACE.writes.includes(m), `${m} must be a declared write`);
+      assert.strictEqual(linearProvider.supports(m), true, `Linear must implement ${m}`);
+      // Non-Linear providers opt out by inheriting the base decline.
+      assert.throws(() => new ProviderInterface()[m](), NotImplementedError);
     }
   });
 
@@ -301,10 +306,18 @@ describe('provider.ui surface (LIN-332)', () => {
   });
 
   test('regression guard: ui.write is decoupled from supports("createIssue")', () => {
-    // The entire reason this surface exists: supports('createIssue') is
-    // intentionally false this phase, yet "+ Add task" (ui.write) must stay on
-    // for Linear. Gating ui.write on supports('createIssue') would regress S3.
-    assert.strictEqual(linearProvider.supports('createIssue'), false);
+    // The entire reason this surface exists (LIN-332): ui.write derives from
+    // getCreateTaskUrl, NOT from supports('createIssue'). LIN-176 demonstrated
+    // this when createIssue was unimplemented; LIN-307 now implements it, so the
+    // decoupling is proven structurally instead — a provider that overrides ONLY
+    // getCreateTaskUrl gets ui.write === true while createIssue stays declined.
+    class WriteUrlOnly extends ProviderInterface {
+      getCreateTaskUrl() { return 'https://example.test/new'; }
+    }
+    const p = new WriteUrlOnly();
+    assert.strictEqual(p.supports('createIssue'), false); // createIssue NOT overridden
+    assert.strictEqual(p.ui.write, true);                  // yet "+ Add task" is on
+    // And for Linear (where LIN-307 now wires createIssue) ui.write is still on.
     assert.strictEqual(linearProvider.ui.write, true);
   });
 
