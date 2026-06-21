@@ -20,6 +20,10 @@ import { createLinearFetch } from '../lib/linear-fetch.js';
 import { createDedupeCache, dedupeKey } from '../lib/proxy-dedupe.js';
 import { deriveTerminalStatus, deriveCompletedAt } from '../lib/dispatch-terminal.js';
 import { fetchProjects, fetchIssueContext, fetchRecommendationContext } from '../lib/linear.js';
+// API-surface reads live on the provider (LIN-307/LIN-308) and are imported
+// directly — the lib/linear.js shim is the frozen back-compat surface for the
+// dashboard fetchers only, not the consumer-API read surface.
+import { fetchTeams, search, states, labels, cycles, cycleDetail, relations, viewer, projects, issues, issueDetail } from '../lib/providers/linear/index.js';
 import { applyTrashedSignal, isTrashed } from '../lib/trashed-signal.js';
 import { flattenIssue, neutralizeProject, flattenCycle, flattenRelations } from '../lib/proxy-wire.js';
 import { isRecommendationEnabled, getRecommendation } from '../lib/openrouter.js';
@@ -511,269 +515,11 @@ function dispatchWatchChanged(baseline, item) {
 
 // =============================================================================
 // GraphQL Queries
+//
+// Read queries now live in the Linear provider (lib/providers/linear/index.js)
+// and the read endpoints call provider methods (LIN-308). The write/compute
+// mutations + helper reads below stay inline until LIN-309 re-points them too.
 // =============================================================================
-
-const VIEWER_QUERY = gql`
-  query {
-    viewer {
-      id
-      name
-      email
-    }
-  }
-`;
-
-const TEAMS_QUERY = gql`
-  query {
-    teams {
-      nodes {
-        id
-        name
-        key
-      }
-    }
-  }
-`;
-
-const PROJECTS_QUERY = gql`
-  query {
-    projects(filter: { state: { eq: "started" } }) {
-      nodes {
-        id
-        name
-        content
-        url
-      }
-    }
-  }
-`;
-
-const ISSUES_QUERY = gql`
-  query($first: Int!, $after: String, $teamId: ID) {
-    issues(first: $first, after: $after, filter: { team: { id: { eq: $teamId } } }) {
-      nodes {
-        id
-        identifier
-        title
-        description
-        url
-        state { name type }
-        assignee { name }
-        labels { nodes { id name color } }
-        priority
-        dueDate
-        parent { id identifier }
-        project { id name }
-        cycle { id name number }
-      }
-      pageInfo { hasNextPage endCursor }
-    }
-  }
-`;
-
-const ISSUES_QUERY_ALL = gql`
-  query($first: Int!, $after: String) {
-    issues(first: $first, after: $after) {
-      nodes {
-        id
-        identifier
-        title
-        description
-        url
-        state { name type }
-        assignee { name }
-        labels { nodes { id name color } }
-        priority
-        dueDate
-        parent { id identifier }
-        project { id name }
-        cycle { id name number }
-      }
-      pageInfo { hasNextPage endCursor }
-    }
-  }
-`;
-
-const ISSUE_DETAIL_QUERY = gql`
-  query($id: String!) {
-    issue(id: $id) {
-      id
-      identifier
-      title
-      description
-      url
-      state { name type }
-      trashed
-      assignee { name }
-      labels { nodes { id name color } }
-      priority
-      estimate
-      dueDate
-      createdAt
-      completedAt
-      project { id name }
-      cycle { id name number startsAt endsAt }
-      parent { id identifier title }
-      children {
-        nodes {
-          id identifier title
-          state { name type }
-        }
-      }
-      comments {
-        nodes {
-          id body createdAt
-          user { name }
-        }
-      }
-      relations {
-        nodes {
-          id
-          type
-          relatedIssue { id identifier title state { name type } }
-        }
-      }
-      inverseRelations {
-        nodes {
-          id
-          type
-          issue { id identifier title state { name type } }
-        }
-      }
-    }
-  }
-`;
-
-const SEARCH_QUERY = gql`
-  query($query: String!, $first: Int) {
-    searchIssues(term: $query, first: $first) {
-      nodes {
-        id
-        identifier
-        title
-        description
-        url
-        state { name type }
-        assignee { name }
-        labels { nodes { id name color } }
-        project { id name }
-        cycle { id name number }
-        parent { id identifier }
-      }
-    }
-  }
-`;
-
-const STATES_QUERY = gql`
-  query($teamId: ID!) {
-    workflowStates(filter: { team: { id: { eq: $teamId } } }) {
-      nodes {
-        id name type position
-      }
-    }
-  }
-`;
-
-const CYCLES_QUERY = gql`
-  query($teamId: ID) {
-    cycles(filter: { team: { id: { eq: $teamId } } }) {
-      nodes {
-        id
-        name
-        number
-        startsAt
-        endsAt
-        team { id name }
-      }
-    }
-  }
-`;
-
-const CYCLES_QUERY_ALL = gql`
-  query {
-    cycles {
-      nodes {
-        id
-        name
-        number
-        startsAt
-        endsAt
-        team { id name }
-      }
-    }
-  }
-`;
-
-const CYCLE_DETAIL_QUERY = gql`
-  query($id: String!) {
-    cycle(id: $id) {
-      id
-      name
-      number
-      description
-      startsAt
-      endsAt
-      completedAt
-      progress
-      scopeHistory
-      completedScopeHistory
-      team { id name }
-      issues {
-        nodes {
-          id
-          identifier
-          title
-          state { name type }
-          assignee { name }
-          priority
-        }
-      }
-    }
-  }
-`;
-
-const LABELS_QUERY = gql`
-  query {
-    issueLabels {
-      nodes {
-        id name color
-        team { id name }
-      }
-    }
-  }
-`;
-
-const LABELS_BY_TEAM_QUERY = gql`
-  query($teamId: ID!) {
-    issueLabels(filter: { team: { id: { eq: $teamId } } }) {
-      nodes {
-        id name color
-      }
-    }
-  }
-`;
-
-const RELATIONS_QUERY = gql`
-  query($issueId: String!) {
-    issue(id: $issueId) {
-      trashed
-      relations {
-        nodes {
-          id
-          type
-          relatedIssue { id identifier title state { name type } }
-        }
-      }
-      inverseRelations {
-        nodes {
-          id
-          type
-          issue { id identifier title state { name type } }
-        }
-      }
-    }
-  }
-`;
 
 // Write mutations
 const CREATE_ISSUE_MUTATION = gql`
@@ -800,7 +546,7 @@ const UPDATE_ISSUE_MUTATION = gql`
   }
 `;
 
-// Lightweight read for description edits — the full ISSUE_DETAIL_QUERY is far
+// Lightweight read for description edits — the full issue-detail read is far
 // heavier than a read-modify-write of the body needs.
 const ISSUE_DESCRIPTION_QUERY = gql`
   query($id: String!) {
@@ -1567,14 +1313,14 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/me', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { client, reason } = await getClient(req.proxyUrlKey);
-      if (!client) {
+      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/me', reason);
       }
 
-      const data = await client.request(VIEWER_QUERY);
+      const user = await viewer(token);
       logEvent(req, '/api/proxy/me', 200);
-      res.json(data.viewer);
+      res.json(user);
     } catch (err) {
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/me', status);
@@ -1588,14 +1334,14 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/teams', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { client, reason } = await getClient(req.proxyUrlKey);
-      if (!client) {
+      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/teams', reason);
       }
 
-      const data = await client.request(TEAMS_QUERY);
+      const teams = await fetchTeams(token);
       logEvent(req, '/api/proxy/teams', 200);
-      res.json({ teams: data.teams?.nodes || [] });
+      res.json({ teams });
     } catch (err) {
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/teams', status);
@@ -1609,14 +1355,14 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/projects', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { client, reason } = await getClient(req.proxyUrlKey);
-      if (!client) {
+      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/projects', reason);
       }
 
-      const data = await client.request(PROJECTS_QUERY);
+      const projectList = await projects(token);
       logEvent(req, '/api/proxy/projects', 200);
-      res.json({ projects: (data.projects?.nodes || []).map(neutralizeProject) });
+      res.json({ projects: projectList.map(neutralizeProject) });
     } catch (err) {
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/projects', status);
@@ -1630,8 +1376,8 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/issues', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { client, reason } = await getClient(req.proxyUrlKey);
-      if (!client) {
+      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues', reason);
       }
 
@@ -1643,16 +1389,10 @@ One convention across every endpoint, so you can branch on the same fields every
         return badRequest.json(res, 'Invalid teamId format');
       }
 
-      const query = teamId ? ISSUES_QUERY : ISSUES_QUERY_ALL;
-      const variables = teamId
-        ? { first: limit, after: null, teamId }
-        : { first: limit, after: null };
-
-      const data = await client.request(query, variables);
+      const { nodes, pageInfo } = await issues(token, { teamId: teamId || null, first: limit, after: null });
       logEvent(req, '/api/proxy/issues', 200);
-      const pageInfo = data.issues?.pageInfo || {};
       res.json({
-        issues: (data.issues?.nodes || []).map(flattenIssue),
+        issues: nodes.map(flattenIssue),
         pageInfo: {
           hasNextPage: pageInfo.hasNextPage || false,
           endCursor: pageInfo.endCursor || null
@@ -1671,8 +1411,8 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/issues/:issueId', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { client, reason } = await getClient(req.proxyUrlKey);
-      if (!client) {
+      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/:id', reason);
       }
 
@@ -1684,14 +1424,14 @@ One convention across every endpoint, so you can branch on the same fields every
         return badRequest.json(res, 'Invalid issue ID format');
       }
 
-      const data = await client.request(ISSUE_DETAIL_QUERY, { id: issueId });
-      if (!data.issue) {
+      const issue = await issueDetail(token, issueId);
+      if (!issue) {
         logEvent(req, '/api/proxy/issues/:id', 404);
         return notFound.json(res, 'Issue not found');
       }
 
-      if (data.issue.comments?.nodes) {
-        data.issue.comments.nodes.sort((a, b) => {
+      if (issue.comments?.nodes) {
+        issue.comments.nodes.sort((a, b) => {
           const ta = new Date(a.createdAt).getTime();
           const tb = new Date(b.createdAt).getTime();
           return (isNaN(ta) ? 0 : ta) - (isNaN(tb) ? 0 : tb);
@@ -1701,10 +1441,10 @@ One convention across every endpoint, so you can branch on the same fields every
       // LIN-401: a trashed issue still resolves by ID with a stale pre-deletion
       // state. Override it to a terminal Trashed/canceled state + trashed flag so
       // a consumer cannot mistake the ghost for live work.
-      applyTrashedSignal(data.issue);
+      applyTrashedSignal(issue);
 
       logEvent(req, '/api/proxy/issues/:id', 200);
-      res.json(flattenIssue(data.issue));
+      res.json(flattenIssue(issue));
     } catch (err) {
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/issues/:id', status);
@@ -1718,8 +1458,8 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/search', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { client, reason } = await getClient(req.proxyUrlKey);
-      if (!client) {
+      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/search', reason);
       }
 
@@ -1734,9 +1474,9 @@ One convention across every endpoint, so you can branch on the same fields every
         return badRequest.json(res, `Search query too long (max ${MAX_SEARCH_LENGTH})`);
       }
 
-      const data = await client.request(SEARCH_QUERY, { query, first: 50 });
+      const results = await search(token, query, { first: 50 });
       logEvent(req, '/api/proxy/search', 200);
-      res.json({ issues: (data.searchIssues?.nodes || []).map(flattenIssue) });
+      res.json({ issues: results.map(flattenIssue) });
     } catch (err) {
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/search', status);
@@ -1750,8 +1490,8 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/states/:teamId', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { client, reason } = await getClient(req.proxyUrlKey);
-      if (!client) {
+      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/states', reason);
       }
 
@@ -1761,10 +1501,10 @@ One convention across every endpoint, so you can branch on the same fields every
         return badRequest.json(res, 'Invalid team ID format');
       }
 
-      const data = await client.request(STATES_QUERY, { teamId });
-      const states = (data.workflowStates?.nodes || []).sort((a, b) => a.position - b.position);
+      // Provider already sorts by board position (drop the route's duplicate sort).
+      const stateList = await states(token, teamId);
       logEvent(req, '/api/proxy/states', 200);
-      res.json({ states });
+      res.json({ states: stateList });
     } catch (err) {
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/states', status);
@@ -1778,8 +1518,8 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/labels', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { client, reason } = await getClient(req.proxyUrlKey);
-      if (!client) {
+      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/labels', reason);
       }
 
@@ -1789,11 +1529,9 @@ One convention across every endpoint, so you can branch on the same fields every
         return badRequest.json(res, 'Invalid team ID format');
       }
 
-      const query = teamId ? LABELS_BY_TEAM_QUERY : LABELS_QUERY;
-      const variables = teamId ? { teamId } : {};
-      const data = await client.request(query, variables);
+      const labelList = await labels(token, teamId || null);
       logEvent(req, '/api/proxy/labels', 200);
-      res.json({ labels: data.issueLabels?.nodes || [] });
+      res.json({ labels: labelList });
     } catch (err) {
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/labels', status);
@@ -1808,8 +1546,8 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/cycles', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { client, reason } = await getClient(req.proxyUrlKey);
-      if (!client) {
+      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/cycles', reason);
       }
 
@@ -1819,11 +1557,9 @@ One convention across every endpoint, so you can branch on the same fields every
         return badRequest.json(res, 'Invalid team ID format');
       }
 
-      const query = teamId ? CYCLES_QUERY : CYCLES_QUERY_ALL;
-      const variables = teamId ? { teamId } : {};
-      const data = await client.request(query, variables);
+      const cycleList = await cycles(token, teamId || null);
       logEvent(req, '/api/proxy/cycles', 200);
-      res.json({ cycles: data.cycles?.nodes || [] });
+      res.json({ cycles: cycleList });
     } catch (err) {
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/cycles', status);
@@ -1839,8 +1575,8 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get(['/api/proxy/cycles/:cycleId', '/api/proxy/cycle/:cycleId'], proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { client, reason } = await getClient(req.proxyUrlKey);
-      if (!client) {
+      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/cycle', reason);
       }
 
@@ -1850,14 +1586,14 @@ One convention across every endpoint, so you can branch on the same fields every
         return badRequest.json(res, 'Invalid cycle ID format');
       }
 
-      const data = await client.request(CYCLE_DETAIL_QUERY, { id: cycleId });
-      if (!data.cycle) {
+      const cycle = await cycleDetail(token, cycleId);
+      if (!cycle) {
         logEvent(req, '/api/proxy/cycle', 404);
         return notFound.json(res, 'Cycle not found');
       }
 
       logEvent(req, '/api/proxy/cycle', 200);
-      res.json(flattenCycle(data.cycle));
+      res.json(flattenCycle(cycle));
     } catch (err) {
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/cycle', status);
@@ -1874,8 +1610,8 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get(['/api/proxy/issues/:issueId/relations', '/api/proxy/relations/:issueId'], proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { client, reason } = await getClient(req.proxyUrlKey);
-      if (!client) {
+      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/relations', reason);
       }
 
@@ -1885,8 +1621,8 @@ One convention across every endpoint, so you can branch on the same fields every
         return badRequest.json(res, 'Invalid issue ID format');
       }
 
-      const data = await client.request(RELATIONS_QUERY, { issueId });
-      if (!data.issue) {
+      const issueRelations = await relations(token, issueId);
+      if (!issueRelations) {
         logEvent(req, '/api/proxy/relations', 404);
         return notFound.json(res, 'Issue not found');
       }
@@ -1899,8 +1635,8 @@ One convention across every endpoint, so you can branch on the same fields every
       // Plain arrays (no {nodes} wrapper) to match /issues/{id} and the rest of
       // the read surface — one flat convention across every endpoint (LIN-310).
       res.json({
-        trashed: isTrashed(data.issue),
-        ...flattenRelations(data.issue)
+        trashed: isTrashed(issueRelations),
+        ...flattenRelations(issueRelations)
       });
     } catch (err) {
       const status = graphqlErrorStatus(err);

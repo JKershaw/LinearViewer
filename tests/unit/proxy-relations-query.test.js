@@ -1,17 +1,24 @@
 /**
  * Regression tests for the proxy's relationship GraphQL queries.
  *
- * These pin the *shape* of two queries in routes/proxy.js that the e2e suite
- * cannot exercise: in test mode there is no mock Linear server, so consumer
- * read endpoints short-circuit at upstream auth and the GraphQL is never run
- * against a schema. Both bugs below were therefore invisible to e2e:
+ * These pin the *shape* of two read queries the e2e suite cannot exercise: in
+ * test mode there is no mock Linear server, so consumer read endpoints
+ * short-circuit at upstream auth and the GraphQL is never run against a schema.
+ * Both bugs below were therefore invisible to e2e:
  *
  *  - RELATIONS_QUERY declared `$issueId: ID!`, but Linear's `issue(id:)`
  *    argument is `String!`. The type mismatch fails validation for every
  *    input, so GET /api/proxy/relations/:issueId 500'd on every call.
- *  - ISSUE_DETAIL_QUERY fetched only `relations` (outgoing), omitting
+ *  - the by-id detail query fetched only `relations` (outgoing), omitting
  *    `inverseRelations`, so GET /api/proxy/issues/:issueId could not surface
  *    blocked-by relationships.
+ *
+ * LIN-308 re-pointed the read endpoints onto the provider, so these read
+ * queries now live in lib/providers/linear/index.js (RELATIONS_QUERY unchanged;
+ * the by-id detail query is API_ISSUE_DETAIL_QUERY, relocated verbatim from the
+ * route's old ISSUE_DETAIL_QUERY). The shape guards follow the code there. The
+ * write mutation + handler-contract assertions below still target routes/proxy.js,
+ * where the write/compute surface stays inline until LIN-309.
  *
  * Run with: node --test tests/unit/proxy-relations-query.test.js
  */
@@ -23,26 +30,27 @@ import { dirname, join } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const proxySource = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8');
+const providerSource = readFileSync(join(__dirname, '../../lib/providers/linear/index.js'), 'utf8');
 
-// Pull a named gql`...` template literal out of the source by its const name.
-function extractQuery(name) {
-  const start = proxySource.indexOf(`const ${name} = gql\``);
-  assert.ok(start !== -1, `${name} not found in routes/proxy.js`);
-  const open = proxySource.indexOf('`', start);
-  const close = proxySource.indexOf('`', open + 1);
+// Pull a named gql`...` template literal out of a source by its const name.
+function extractQuery(name, source = proxySource) {
+  const start = source.indexOf(`const ${name} = gql\``);
+  assert.ok(start !== -1, `${name} not found in source`);
+  const open = source.indexOf('`', start);
+  const close = source.indexOf('`', open + 1);
   assert.ok(close !== -1, `Could not find end of ${name} template literal`);
-  return proxySource.slice(open + 1, close);
+  return source.slice(open + 1, close);
 }
 
 describe('proxy relationship queries', () => {
   test('RELATIONS_QUERY types issueId as String! (matches Linear schema)', () => {
-    const q = extractQuery('RELATIONS_QUERY');
+    const q = extractQuery('RELATIONS_QUERY', providerSource);
     assert.match(q, /\$issueId:\s*String!/, 'issueId must be String!, not ID!');
     assert.doesNotMatch(q, /\$issueId:\s*ID!/, 'issueId must not be ID!');
   });
 
   test('RELATIONS_QUERY fetches both directions', () => {
-    const q = extractQuery('RELATIONS_QUERY');
+    const q = extractQuery('RELATIONS_QUERY', providerSource);
     assert.match(q, /relations\s*\{/, 'must fetch outgoing relations');
     assert.match(q, /inverseRelations\s*\{/, 'must fetch inverseRelations');
   });
@@ -52,7 +60,7 @@ describe('proxy relationship queries', () => {
     // the relationId to pass to DELETE .../relations/:relationId. Scope the
     // assertion to the node fields BEFORE the nested relatedIssue/issue blocks,
     // so a nested `id` (relatedIssue { id }) can't satisfy it by accident.
-    const q = extractQuery('RELATIONS_QUERY');
+    const q = extractQuery('RELATIONS_QUERY', providerSource);
     const relBlock = q.match(/relations\s*\{\s*nodes\s*\{([^}]*relatedIssue)/s);
     const invBlock = q.match(/inverseRelations\s*\{\s*nodes\s*\{([^}]*issue)/s);
     assert.ok(relBlock, 'outgoing relations node block not found');
@@ -61,14 +69,14 @@ describe('proxy relationship queries', () => {
     assert.match(invBlock[1], /\bid\b/, 'inverse relation node must select id');
   });
 
-  test('ISSUE_DETAIL_QUERY includes inverseRelations (blocked-by)', () => {
-    const q = extractQuery('ISSUE_DETAIL_QUERY');
+  test('API_ISSUE_DETAIL_QUERY includes inverseRelations (blocked-by)', () => {
+    const q = extractQuery('API_ISSUE_DETAIL_QUERY', providerSource);
     assert.match(q, /relations\s*\{/, 'must fetch outgoing relations');
     assert.match(q, /inverseRelations\s*\{/, 'must fetch inverseRelations so agents can see blockers');
   });
 
-  test('ISSUE_DETAIL_QUERY selects relation id on relation nodes', () => {
-    const q = extractQuery('ISSUE_DETAIL_QUERY');
+  test('API_ISSUE_DETAIL_QUERY selects relation id on relation nodes', () => {
+    const q = extractQuery('API_ISSUE_DETAIL_QUERY', providerSource);
     // Isolate the two relation node blocks (relatedIssue = outgoing,
     // issue-keyed = inverse) and confirm both carry id.
     const relBlock = q.match(/relations\s*\{\s*nodes\s*\{([^}]*relatedIssue)/s);
@@ -107,7 +115,7 @@ describe('proxy relationship queries', () => {
     const handlerStart = proxySource.indexOf("logEvent(req, '/api/proxy/relations', 200)");
     assert.ok(handlerStart !== -1, '/relations 200 handler not found');
     const block = proxySource.slice(handlerStart, handlerStart + 600);
-    assert.match(block, /\.\.\.flattenRelations\(data\.issue\)/, 'must spread the flattened relations payload');
+    assert.match(block, /\.\.\.flattenRelations\(issueRelations\)/, 'must spread the flattened relations payload');
     assert.doesNotMatch(block, /relations:\s*\{\s*nodes:/, 'relations must NOT be wrapped as { nodes: [...] }');
     assert.doesNotMatch(block, /inverseRelations:\s*\{\s*nodes:/, 'inverseRelations must NOT be wrapped as { nodes: [...] }');
   });

@@ -10,10 +10,13 @@
  *
  *  2. The dual-shape threading in routes/proxy.js: the recovered `reason` must
  *     reach the envelope through BOTH proxy call shapes — the `getClient` path
- *     (Shape A, e.g. /me) and the raw-token path (Shape B, e.g. /stack). A
- *     forced-reason stub of `resolveWorkspaceAccess` drives each shape and the
- *     test asserts the 503 body is the structured envelope. The HTTP status
- *     stays 503 in every case; only the body gains structure.
+ *     (Shape A, e.g. the write endpoint POST /issues) and the raw-token path
+ *     (Shape B, e.g. /stack). Since LIN-308 re-pointed the read endpoints onto
+ *     the raw-token provider path, the write/compute endpoints are the remaining
+ *     getClient consumers, so Shape A drives one of those. A forced-reason stub
+ *     of `resolveWorkspaceAccess` drives each shape and the test asserts the 503
+ *     body is the structured envelope. The HTTP status stays 503 in every case;
+ *     only the body gains structure.
  *
  * The e2e suite can't cover this: in test mode `resolveWorkspaceAccess`
  * short-circuits `test-workspace`→`test-token` (reason `ok`), so the null /
@@ -102,13 +105,18 @@ function buildApp(reason) {
   return app;
 }
 
-async function getJson(app, path) {
+async function requestJson(app, path, { method = 'GET', body } = {}) {
   const server = app.listen(0);
   await new Promise(resolve => server.once('listening', resolve));
   const { port } = server.address();
   try {
     const res = await fetch(`http://127.0.0.1:${port}${path}`, {
-      headers: { Authorization: 'Bearer anything' }
+      method,
+      headers: {
+        Authorization: 'Bearer anything',
+        ...(body ? { 'Content-Type': 'application/json' } : {})
+      },
+      ...(body ? { body: JSON.stringify(body) } : {})
     });
     return { status: res.status, body: await res.json() };
   } finally {
@@ -116,8 +124,16 @@ async function getJson(app, path) {
   }
 }
 
-test('Shape A (/me, via getClient): 503 with structured envelope', async () => {
-  const { status, body } = await getJson(buildApp('store_unreachable'), '/api/proxy/me');
+const getJson = (app, path) => requestJson(app, path);
+
+test('Shape A (write endpoint POST /issues, via getClient): 503 with structured envelope', async () => {
+  // POST /issues calls getClient() before any body validation, so the forced
+  // null token short-circuits to the envelope (the readWrite stub satisfies the
+  // write-scope guard). This is the remaining getClient call shape post-LIN-308.
+  const { status, body } = await requestJson(buildApp('store_unreachable'), '/api/proxy/issues', {
+    method: 'POST',
+    body: { teamId: '00000000-0000-0000-0000-000000000000', title: 'x' }
+  });
   assert.equal(status, 503);
   assert.equal(body.error, 'Workspace not available');
   assert.equal(body.code, 'WORKSPACE_STORE_UNAVAILABLE');

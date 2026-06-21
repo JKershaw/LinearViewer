@@ -87,11 +87,14 @@ describe('applyTrashedSignal / isTrashed (shared SIGNAL helper)', () => {
 });
 
 describe('by-ID queries select the trashed field', () => {
-  test('proxy ISSUE_DETAIL_QUERY selects trashed', () => {
-    assert.match(extractQuery(proxySource, 'ISSUE_DETAIL_QUERY'), /\btrashed\b/);
+  // The API-surface by-id read + relations queries moved to the provider in
+  // LIN-308 (API_ISSUE_DETAIL_QUERY / RELATIONS_QUERY); the trashed-field guard
+  // follows them there. The write/helper queries below stay inline in the route.
+  test('provider API_ISSUE_DETAIL_QUERY selects trashed', () => {
+    assert.match(extractQuery(providerSource, 'API_ISSUE_DETAIL_QUERY'), /\btrashed\b/);
   });
-  test('proxy RELATIONS_QUERY selects trashed on the root', () => {
-    assert.match(extractQuery(proxySource, 'RELATIONS_QUERY'), /\btrashed\b/);
+  test('provider RELATIONS_QUERY selects trashed on the root', () => {
+    assert.match(extractQuery(providerSource, 'RELATIONS_QUERY'), /\btrashed\b/);
   });
   test('proxy ISSUE_LABELS_QUERY selects trashed', () => {
     assert.match(extractQuery(proxySource, 'ISSUE_LABELS_QUERY'), /\btrashed\b/);
@@ -116,10 +119,10 @@ describe('by-ID queries select the trashed field', () => {
 
 describe('SIGNAL: raw by-ID reads override state / flag the ghost', () => {
   test('/issues/:id handler applies the trashed signal', () => {
-    assert.match(proxySource, /applyTrashedSignal\(data\.issue\)/);
+    assert.match(proxySource, /applyTrashedSignal\(issue\)/);
   });
   test('/relations/:id handler returns a top-level trashed flag', () => {
-    assert.match(proxySource, /trashed:\s*isTrashed\(data\.issue\)/);
+    assert.match(proxySource, /trashed:\s*isTrashed\(issueRelations\)/);
   });
   test('CLI issue output runs through applyTrashedSignal', () => {
     assert.match(cliSource, /applyTrashedSignal\(/);
