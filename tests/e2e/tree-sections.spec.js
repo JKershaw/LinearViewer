@@ -118,6 +118,64 @@ test.describe('Tree view: Brief / Recap sections (LIN-522)', () => {
 });
 
 // ============================================================================
+// Context section (LIN-572) — relationship diagram, nested inside Details.
+// Reuses the same lazy-toggle plumbing as Brief/Recap; the section is
+// deterministic (no AI), so it settles directly to data-state="loaded".
+// LOCAL-1 (the first project issue) is the parent of LOCAL-2, so the diagram
+// renders the root node and a Children lane.
+// ============================================================================
+test.describe('Tree view: Context section (LIN-572)', () => {
+  test.beforeEach(async ({ page }) => {
+    await seedLocalWorkspace(page);
+    await page.goto(WORKSPACE_URL);
+    await page.evaluate(() => localStorage.clear());
+  });
+
+  test('context toggle appears nested inside Details', async ({ page }) => {
+    const details = await openIssueDetails(page);
+    const toggle = details.locator('.detail-toggle[data-toggle="context"]');
+    await expect(toggle).toBeVisible();
+    await expect(toggle).toContainText('Context');
+  });
+
+  test('context content starts hidden and lazy-mounts the diagram on first expand', async ({ page }) => {
+    const details = await openIssueDetails(page);
+    const toggle = details.locator('.detail-toggle[data-toggle="context"]');
+    const content = details.locator('.detail-content[data-content="context"]');
+    const sectionEl = content.locator('.context-section');
+
+    await expect(content).toHaveClass(/hidden/);
+    await expect(sectionEl).toHaveAttribute('data-context-placeholder', '1');
+    await expect(sectionEl).not.toHaveAttribute('data-state', /.+/);
+
+    await toggle.click();
+    await expect(content).not.toHaveClass(/hidden/);
+    await expect(toggle).toContainText('▼');
+    await expect(sectionEl).not.toHaveAttribute('data-context-placeholder', '1');
+    await expect(sectionEl).toHaveAttribute('data-state', 'loaded', { timeout: 5000 });
+
+    // The root node always renders; LOCAL-1's child LOCAL-2 appears as a node.
+    await expect(sectionEl.locator('.context-node--root')).toBeVisible();
+    await expect(sectionEl.locator('.context-node[data-context-nav="LOCAL-2"]')).toBeVisible();
+  });
+
+  test('context mounts only once (cached across collapse/expand)', async ({ page }) => {
+    const details = await openIssueDetails(page);
+    const toggle = details.locator('.detail-toggle[data-toggle="context"]');
+    const content = details.locator('.detail-content[data-content="context"]');
+    const sectionEl = content.locator('.context-section');
+
+    await toggle.click();
+    await expect(sectionEl).toHaveAttribute('data-state', 'loaded', { timeout: 5000 });
+    await toggle.click();
+    await expect(content).toHaveClass(/hidden/);
+    await expect(content).toHaveAttribute('data-loaded', 'true');
+    await toggle.click();
+    await expect(content).not.toHaveClass(/hidden/);
+  });
+});
+
+// ============================================================================
 // Dispatched Sessions — gated behind the dispatch feature flag.
 // Seeds real sessions by acting as a dispatch consumer (mirrors swipe.spec.js).
 // ============================================================================

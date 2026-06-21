@@ -41,6 +41,7 @@ Issues are wrapped in nested `.node` containers:
       .detail-toggle[data-toggle="comments"] - "Comments ▶" toggle (auth only, nested)
       .detail-toggle[data-toggle="brief"]    - "Brief ▶" toggle (auth only, nested; lazy AI brief)
       .detail-toggle[data-toggle="recap"]    - "Recap ▶" toggle (auth only, nested; lazy AI recap)
+      .detail-toggle[data-toggle="context"] - "Context ▶" toggle (auth only, nested; lazy relationship diagram)
       .detail-toggle[data-toggle="sessions"] - "Dispatched Sessions ▶" toggle (nested; dispatch flag only)
     .detail-toggle[data-toggle="prompts"]  - "Prompts ▶" toggle (auth only)
     .detail-content[data-content="prompts"] - prompt buttons (hidden)
@@ -125,6 +126,7 @@ Both In Progress and Projects sections use the same nested structure:
 - `.detail-toggle[data-toggle="comments"]` - Comments toggle (nested in Details, lazy-loaded on first expand)
 - `.detail-toggle[data-toggle="brief"]` - Brief toggle (nested in Details, lazy AI current-state brief)
 - `.detail-toggle[data-toggle="recap"]` - Recap toggle (nested in Details, lazy AI progress recap)
+- `.detail-toggle[data-toggle="context"]` - Context toggle (nested in Details, lazy relationship diagram: blockers/blocked/parent/children/related). Each task node is `.context-node` with `data-context-nav="LIN-123"`.
 - `.detail-toggle[data-toggle="sessions"]` - Dispatched Sessions toggle (nested in Details, dispatch flag only)
 - `.detail-content[data-content="prompts"]` - Prompts section content (hidden by default)
 - `.in-progress-header` - collapsible section header

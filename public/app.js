@@ -175,6 +175,12 @@ function loadLazySection(type, toggle, content) {
       placeholder.removeAttribute('data-sessions-placeholder')
       window.SessionsSection.init(placeholder, { urlKey, identifier })
     }
+  } else if (type === 'context') {
+    const placeholder = content.querySelector('[data-context-placeholder="1"]')
+    if (placeholder && window.ContextSection) {
+      placeholder.removeAttribute('data-context-placeholder')
+      window.ContextSection.init(placeholder, { urlKey, identifier })
+    }
   }
 }
 
@@ -709,7 +715,7 @@ function init() {
         // LIN-522: Lazy-mount the shared Brief / Recap / Sessions sections on
         // first expand (mirrors the swipe accordion's placeholder pattern).
         if (
-          (toggleType === 'brief' || toggleType === 'recap' || toggleType === 'sessions') &&
+          (toggleType === 'brief' || toggleType === 'recap' || toggleType === 'context' || toggleType === 'sessions') &&
           !isHidden &&
           !content.dataset.loaded
         ) {

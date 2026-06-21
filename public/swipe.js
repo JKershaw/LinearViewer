@@ -355,6 +355,19 @@ function renderCard(direction) {
   </div>`;
   }
 
+  // Context accordion (lazy loaded) — relationship diagram, only when authenticated
+  if (urlKey) {
+    accordionHtml += `
+  <div class="swipe-card-accordion">
+    <div class="swipe-accordion-header" data-accordion="context">
+      <span class="swipe-accordion-toggle">▶</span> Context
+    </div>
+    <div class="swipe-accordion-body" data-accordion-body="context">
+      <div class="context-section" data-context-placeholder="1"></div>
+    </div>
+  </div>`;
+  }
+
   // Dispatched Sessions accordion (lazy loaded) — only when dispatch is enabled,
   // since no dispatch means no sessions can exist. Header shows the count baked
   // in server-side, so "[N]" is visible at a glance without opening.
@@ -675,6 +688,23 @@ function handleAccordionClick(e) {
         window.BriefSection.init(placeholder, {
           urlKey,
           identifier: issue.identifier || issue.id
+        });
+      }
+    }
+  }
+
+  if (type === 'context' && !isOpen) {
+    const placeholder = body.querySelector('[data-context-placeholder="1"]');
+    if (placeholder && window.ContextSection) {
+      placeholder.removeAttribute('data-context-placeholder');
+      const issue = filteredIssues[currentIndex];
+      if (issue && urlKey) {
+        window.ContextSection.init(placeholder, {
+          urlKey,
+          identifier: issue.identifier || issue.id,
+          // Jump to the task within the deck when it's present; otherwise fall
+          // through to the node's link (the task's provider URL).
+          onNavigate: (identifier) => navigateToIdentifier(identifier)
         });
       }
     }
