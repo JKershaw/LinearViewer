@@ -435,7 +435,7 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
 .roadmap-north-star-help {
   font-family: var(--font-structural);
   font-size: 0.75em;
-  color: var(--fg-vdim);
+  color: var(--fg-dim);
   margin: 0.3em 0 0;
 }
 
