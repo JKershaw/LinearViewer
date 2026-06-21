@@ -130,6 +130,27 @@ mis-scoped, out of order, or resting on a question nobody has answered. Feeding 
 that just spends effort. That's your cue to pull up and flag *"this can't be done as posed, here's
 what's in the way"* — not to keep finding a cleaner worker for an unclean task.
 
+### When the engine picks the wrong verb
+
+A different failure: not the worker, not your instruments — the *recommendation* itself. The engine that
+chooses the next step is right most of the time, but it occasionally lands on the wrong verb — refuses
+the `review` a task is plainly ready for, keeps offering `look-into` on something already investigated.
+The old trap was to route around it by hand-writing the prompt the right verb would have produced and
+firing it through raw `POST /dispatch` — which is exactly the forbidden move, because *the prompt is
+generated server-side and never passes through you*.
+
+The sanctioned fix is the **verb override**: pass `kind` to `POST /recommend-and-dispatch` (a template
+key — `review`, `plan`, `implementation`, …). That **pins the step you know is right while the server
+still writes the body.** You pick the verb, never the words — the invariant holds. The override targets
+the named issue with no descent and skips the engine entirely.
+
+Use it the way you'd use any override: rarely, and only on a *demonstrable* miss. The bar is "the engine's
+verb is clearly wrong and I can say why," not "I'd have chosen differently." Every override is recorded
+so the heuristic can be improved — so when you reach for it, leave a one-line note (a Linear comment) on
+*why* the engine's pick was wrong; that note is the raw material for closing the 10% gap. If you find
+yourself overriding the same task repeatedly, that's no longer a verb wobble — it's a task problem, and
+the move is to pull up and flag it, not to keep pinning verbs.
+
 ### The narrow exception: following up a clean session
 
 Your default is a fresh dispatch — a new session with no memory — and almost everything above assumes
