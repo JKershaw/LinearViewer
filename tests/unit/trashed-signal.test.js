@@ -88,22 +88,23 @@ describe('applyTrashedSignal / isTrashed (shared SIGNAL helper)', () => {
 
 describe('by-ID queries select the trashed field', () => {
   // The API-surface by-id read + relations queries moved to the provider in
-  // LIN-308 (API_ISSUE_DETAIL_QUERY / RELATIONS_QUERY); the trashed-field guard
-  // follows them there. The write/helper queries below stay inline in the route.
+  // LIN-308 (API_ISSUE_DETAIL_QUERY / RELATIONS_QUERY); the write-guard reads
+  // followed in LIN-309 (ISSUE_LABELS_QUERY / ISSUE_DESCRIPTION_QUERY /
+  // TRASHED_GUARD_QUERY). The trashed-field guard follows them to the provider.
   test('provider API_ISSUE_DETAIL_QUERY selects trashed', () => {
     assert.match(extractQuery(providerSource, 'API_ISSUE_DETAIL_QUERY'), /\btrashed\b/);
   });
   test('provider RELATIONS_QUERY selects trashed on the root', () => {
     assert.match(extractQuery(providerSource, 'RELATIONS_QUERY'), /\btrashed\b/);
   });
-  test('proxy ISSUE_LABELS_QUERY selects trashed', () => {
-    assert.match(extractQuery(proxySource, 'ISSUE_LABELS_QUERY'), /\btrashed\b/);
+  test('provider ISSUE_LABELS_QUERY selects trashed', () => {
+    assert.match(extractQuery(providerSource, 'ISSUE_LABELS_QUERY'), /\btrashed\b/);
   });
-  test('proxy ISSUE_DESCRIPTION_QUERY selects trashed', () => {
-    assert.match(extractQuery(proxySource, 'ISSUE_DESCRIPTION_QUERY'), /\btrashed\b/);
+  test('provider ISSUE_DESCRIPTION_QUERY selects trashed', () => {
+    assert.match(extractQuery(providerSource, 'ISSUE_DESCRIPTION_QUERY'), /\btrashed\b/);
   });
-  test('proxy TRASHED_GUARD_QUERY exists for writes that do not otherwise read', () => {
-    assert.match(extractQuery(proxySource, 'TRASHED_GUARD_QUERY'), /\btrashed\b/);
+  test('provider TRASHED_GUARD_QUERY exists for writes that do not otherwise read', () => {
+    assert.match(extractQuery(providerSource, 'TRASHED_GUARD_QUERY'), /\btrashed\b/);
   });
   test('provider ISSUE_DETAIL_QUERY selects trashed', () => {
     assert.match(extractQuery(providerSource, 'ISSUE_DETAIL_QUERY'), /\btrashed\b/);
@@ -146,7 +147,7 @@ describe('REFUSE: write endpoints reject a trashed target with 409 (surfaces 3, 
     const start = proxySource.indexOf('async function refuseIfTrashed');
     const body = proxySource.slice(start, start + 400);
     assert.match(body, /status\(409\)|jsonError\(res, 409/, 'refusal must be a 409');
-    assert.match(body, /isTrashed\(data\.issue\)/);
+    assert.match(body, /isTrashed\(issue\)/);
   });
 
   test('PATCH, comments, and relation-create call refuseIfTrashed before mutating', () => {
@@ -159,7 +160,7 @@ describe('REFUSE: write endpoints reject a trashed target with 409 (surfaces 3, 
   test('label and description-edit handlers refuse trashed inline with 409', () => {
     // These already read the issue, so they branch on the in-hand flag rather
     // than paying a second round-trip.
-    const inline409 = (proxySource.match(/isTrashed\((?:issueData|data)\.issue\)\) \{\s*\n\s*logEvent\([^\n]*409\)/g) || []).length;
+    const inline409 = (proxySource.match(/isTrashed\(issue\)\) \{\s*\n\s*logEvent\([^\n]*409\)/g) || []).length;
     assert.ok(inline409 >= 3, `expected >=3 inline 409 refusals (2 label + 1 description), found ${inline409}`);
   });
 });
