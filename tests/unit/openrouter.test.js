@@ -343,8 +343,8 @@ describe('formatIssueContext siblings', () => {
     // Positive assertion on the instruction string
     assert.ok(result.includes('7 siblings not shown.'), 'must report exact N not shown');
     assert.ok(
-      result.includes('fetch the parent epic\'s full child list via Linear MCP'),
-      'must include explicit MCP-fetch instruction'
+      result.includes('fetch the parent epic\'s full child list via the API'),
+      'must include explicit API-fetch instruction'
     );
     assert.ok(
       result.includes('Strategy Framing'),
@@ -355,7 +355,7 @@ describe('formatIssueContext siblings', () => {
     assert.ok(!result.match(/siblings.*and \d+ more/), 'must NOT use bare "and N more"');
   });
 
-  test('when truncation does NOT fire: MCP-fetch nudge is absent', () => {
+  test('when truncation does NOT fire: API-fetch nudge is absent', () => {
     const context = {
       parent: { id: 'p1', identifier: 'LIN-50', title: 'Migration Epic', state: { name: 'In Progress', type: 'started' } },
       parentChildCount: 4,
@@ -369,7 +369,7 @@ describe('formatIssueContext siblings', () => {
     const result = formatIssueContext(baseIssue, context);
     assert.ok(result.includes('**Sibling Tasks:**'));
     assert.ok(!result.includes('siblings not shown'), 'nudge must be absent when not truncated');
-    assert.ok(!result.includes('full child list via Linear MCP'), 'MCP-fetch instruction absent when not truncated');
+    assert.ok(!result.includes('full child list via the API'), 'API-fetch instruction absent when not truncated');
   });
 });
 
@@ -456,8 +456,8 @@ describe('formatIssueContext cousins', () => {
     // Positive assertion on the instruction string
     assert.ok(result.includes('5 cousins not shown.'), 'must report exact N not shown');
     assert.ok(
-      result.includes('fetch the parent epic\'s full descendant tree via Linear MCP'),
-      'must include explicit MCP-fetch instruction'
+      result.includes('fetch the parent epic\'s full descendant tree via the API'),
+      'must include explicit API-fetch instruction'
     );
     assert.ok(
       result.includes('Strategy Framing'),
@@ -468,7 +468,7 @@ describe('formatIssueContext cousins', () => {
     assert.ok(!result.match(/and \d+ more/), 'must NOT use bare "and N more"');
   });
 
-  test('when truncation does NOT fire: MCP-fetch nudge is absent', () => {
+  test('when truncation does NOT fire: API-fetch nudge is absent', () => {
     const context = {
       parent: { id: 'p1', identifier: 'LIN-50', title: 'Migration Epic', state: { name: 'In Progress', type: 'started' } },
       parentChildCount: 5,
@@ -481,7 +481,7 @@ describe('formatIssueContext cousins', () => {
     const result = formatIssueContext(baseIssue, context);
     assert.ok(result.includes('Related work in the parent epic'));
     assert.ok(!result.includes('cousins not shown'), 'nudge must be absent when not truncated');
-    assert.ok(!result.includes('via Linear MCP'), 'MCP-fetch instruction absent when not truncated');
+    assert.ok(!result.includes('via the API'), 'API-fetch instruction absent when not truncated');
   });
 
   test('cousins section appears AFTER Sibling Tasks and BEFORE Existing Subtasks', () => {
