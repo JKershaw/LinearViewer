@@ -41,6 +41,7 @@ const CONTEXT_FETCH_TIMEOUT_MS = 45_000;
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
+import { buildContextGraph } from '../lib/context-graph.js';
 import { hashContext } from '../lib/recap-cache.js';
 import { getLoopsForIssue } from '../lib/pipeline-loops.js';
 import { toSessionView } from '../lib/sessions-view.js';
@@ -1516,6 +1517,65 @@ ${goal}`
         return keepalive.send(503, { error: 'AI service temporarily unavailable', message: error.message });
       }
       keepalive.send(500, { error: 'Failed to generate recap', message: error.message });
+    }
+  });
+
+  // ===========================================================================
+  // Context API (LIN-572) — relationship neighborhood for the Context section.
+  //
+  // Deterministic, not AI: it resolves the issue's blocker chains, parent/child
+  // links, and related tasks against the workspace's loaded issue set (the same
+  // universe the dashboard renders), so there is nothing to cache or regenerate.
+  // One read of fetchProjects feeds buildContextGraph; transitive chains fall out
+  // of the in-set graph traversal — no per-hop API calls. Shared by both the main
+  // project page and the swipe view via the public/context.js client module.
+  // ===========================================================================
+
+  /**
+   * GET the relationship neighborhood (blockers, blocked, parent/child, related)
+   * of an issue, ready to render as a context diagram.
+   *
+   * @route GET /workspace/:urlKey/api/context/:issueId
+   * @returns {Object} The context graph (see lib/context-graph.js), or 404 when
+   *   the issue is absent from the loaded set.
+   */
+  router.get('/workspace/:urlKey/api/context/:issueId', workspaceFromUrl, async (req, res) => {
+    const workspace = req.workspace;
+    const { issueId } = req.params;
+
+    if (!isValidIssueId(issueId)) {
+      return badRequest.json(res, 'Invalid issue ID format');
+    }
+
+    try {
+      const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
+      const issues = isTestMode
+        ? testMockData.issues
+        : (await getProviderForWorkspace(workspace).fetchProjects(getWorkspaceToken(workspace))).issues;
+
+      // Resolve the root by canonical id or human identifier (LIN-123), since the
+      // section mounts with whichever the surface has to hand.
+      const needle = issueId.toLowerCase();
+      const root = (issues || []).find(i =>
+        i.id === issueId || (i.identifier || '').toLowerCase() === needle);
+      if (!root) {
+        return notFound.json(res, 'Issue not found');
+      }
+
+      const graph = buildContextGraph(issues, root.id);
+      if (!graph) {
+        return notFound.json(res, 'Issue not found');
+      }
+      return res.json(graph);
+    } catch (error) {
+      console.error('Context GET error:', error);
+      if (error.response?.status === 401) {
+        return unauthorized.json(res, 'Token expired or invalid');
+      }
+      if (error.message?.includes('not found')) {
+        return notFound.json(res, error.message);
+      }
+      jsonError(res, 500, 'Failed to build context', { message: error.message });
     }
   });
 

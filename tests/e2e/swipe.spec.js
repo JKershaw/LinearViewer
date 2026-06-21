@@ -562,3 +562,30 @@ test.describe('Brief UI — Swipe', () => {
     await expect(section.locator('.brief-content')).toBeVisible();
   });
 });
+
+test.describe('Context UI — Swipe (LIN-572)', () => {
+  test.beforeEach(async ({ page }) => {
+    await seedLocalWorkspace(page, workspaceApiLocalSeed);
+    await page.goto(SWIPE_URL);
+    await page.waitForLoadState('networkidle');
+  });
+
+  test('swipe card renders the context accordion', async ({ page }) => {
+    const accordion = page.locator('.swipe-accordion-header[data-accordion="context"]').first();
+    await expect(accordion).toBeVisible();
+    await expect(accordion).toContainText(/Context/i);
+  });
+
+  test('opening the context accordion lazy-mounts the deterministic diagram', async ({ page }) => {
+    const accordion = page.locator('.swipe-accordion-header[data-accordion="context"]').first();
+    await accordion.click();
+
+    const body = page.locator('.swipe-accordion-body[data-accordion-body="context"]').first();
+    await expect(body).toHaveClass(/open/);
+
+    const section = body.locator('.context-section').first();
+    // No AI, no cache: it settles directly to loaded with the root node rendered.
+    await expect(section).toHaveAttribute('data-state', 'loaded', { timeout: 5000 });
+    await expect(section.locator('.context-node--root')).toBeVisible();
+  });
+});

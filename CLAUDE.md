@@ -37,6 +37,7 @@ lib/
   bash-tool.js         Safe bash executor with data/code separation (stdin + argv modes)
   tree.js              Transforms flat issues → nested tree structure (frontier ranking in selectFocusSubtask)
   graph-features.js    Network-free blocking-graph / critical-path primitives (shared by swipe + frontier ranking)
+  context-graph.js     Network-free relationship-neighborhood builder for the Context section (blockers/blocked/parent/children/related; LIN-572)
   openrouter.js        OpenRouter API client for AI recommendations
   providers/           Provider abstraction (decouples views from Linear specifics)
     interface.js       Provider interface contract
@@ -146,7 +147,7 @@ public/
   swim.css / swim.js            Swim lanes view
   swipe.css / swipe.js          Swipe (mobile) view
   proxy.css / proxy.js          Proxy token management page
-  prompt-section.js, brief.js, recap.js, sessions.js  Shared client section renderers
+  prompt-section.js, brief.js, recap.js, context.js, sessions.js  Shared client section renderers (context.js = Context relationship diagram, LIN-572)
 tests/
   unit/                Node test runner unit tests (lib modules, renderers, stores)
   e2e/                 Playwright E2E specs (landing, dashboard, auth, dispatch, proxy, …)

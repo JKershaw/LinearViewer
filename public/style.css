@@ -2487,6 +2487,205 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 }
 
 /* =========================================================================
+   Context Section (LIN-572)
+   Relationship diagram: blocker chains, parent/child, related. Custom
+   box-drawing layout (not Mermaid) to match the CLI aesthetic. Shared by the
+   main project page and the swipe view.
+   ========================================================================= */
+.context-section {
+  font-family: var(--font-content);
+  color: var(--fg);
+  font-size: 0.9em;
+}
+
+.context-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75ch;
+  flex-wrap: wrap;
+  margin-bottom: var(--space-2);
+}
+
+.context-status-label {
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.context-hint {
+  color: var(--fg-dim);
+  font-size: var(--font-size-sm);
+}
+
+.context-refresh {
+  margin-left: auto;
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  padding: 0.15rem 0.6rem;
+  background: transparent;
+  border: 1px solid var(--fg-dim);
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.context-refresh:hover { border-color: var(--fg); background: var(--bg-alt); }
+
+.context-placeholder {
+  color: var(--fg-dim);
+  font-style: italic;
+  padding: 0.35rem 0;
+}
+
+.context-error { color: var(--red); font-style: normal; }
+
+.context-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5ch;
+  font-style: normal;
+}
+
+.context-spinner {
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  border: 2px solid var(--fg-dim);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: recap-spin 0.9s linear infinite;
+}
+
+/* Flow row: blockers → root → blocked. Wraps to stacked lanes on narrow screens. */
+.context-flow {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.context-lane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.context-lane-label {
+  color: var(--fg-dim);
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.context-lane-nodes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.context-flow-arrow {
+  align-self: center;
+  color: var(--fg-dim);
+  font-weight: 600;
+  padding: 0 0.25ch;
+}
+
+/* A task node. Anchors so they're focusable + degrade to a real link. */
+a.context-node { text-decoration: none; }
+
+.context-node {
+  display: block;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.3rem 0.55rem;
+  background: var(--bg-alt);
+  color: var(--fg);
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+a.context-node:hover { border-color: var(--fg); background: var(--bg); }
+
+.context-node-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6ch;
+}
+
+.context-node-id {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+}
+
+.context-node-title {
+  display: block;
+  color: var(--fg-dim);
+  font-size: var(--font-size-sm);
+  margin-top: 0.1rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 28ch;
+}
+
+.context-node--root {
+  border-color: var(--fg);
+  border-width: 2px;
+  background: var(--bg);
+}
+
+.context-node--start {
+  border-color: var(--green);
+}
+
+.context-node-tag {
+  font-size: 0.7em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--green);
+  border: 1px solid var(--green);
+  border-radius: var(--radius-sm);
+  padding: 0 0.4ch;
+}
+
+.context-truncated {
+  color: var(--fg-dim);
+  font-size: var(--font-size-sm);
+  font-style: italic;
+  margin-top: var(--space-1);
+}
+
+/* Hierarchy + related bands below the flow. */
+.context-hierarchy,
+.context-related {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.context-rel-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.context-rel-nodes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.context-sep { color: var(--fg-dim); padding: 0 0.25ch; }
+
+@media (max-width: 600px) {
+  .context-flow { flex-direction: column; align-items: stretch; }
+  .context-flow-arrow { transform: rotate(90deg); align-self: flex-start; }
+  .context-node-title { max-width: 100%; white-space: normal; }
+}
+
+/* =========================================================================
    Brief Section
    Current-state task brief (Markdown). Shares the recap header/spinner look.
    ========================================================================= */
