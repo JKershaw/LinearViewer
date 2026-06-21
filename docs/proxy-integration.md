@@ -193,7 +193,7 @@ Response:
 ```json
 {
   "projects": [
-    { "id": "uuid", "name": "Project Alpha", "content": "Description...", "url": "https://linear.app/..." }
+    { "id": "uuid", "name": "Project Alpha", "content": "Description..." }
   ]
 }
 ```
@@ -218,10 +218,9 @@ Response includes pagination:
       "identifier": "ENG-42",
       "title": "Fix login bug",
       "description": "...",
-      "url": "https://linear.app/...",
       "state": { "name": "In Progress", "type": "started" },
       "assignee": { "name": "Alice" },
-      "labels": { "nodes": [{ "id": "uuid", "name": "bug", "color": "#eb5757" }] },
+      "labels": ["bug"],
       "priority": 1,
       "dueDate": "2024-03-01",
       "parent": { "id": "uuid", "identifier": "ENG-40" },
@@ -252,26 +251,25 @@ Response includes full context: description, comments, children, parent, relatio
   "identifier": "ENG-42",
   "title": "Fix login bug",
   "description": "Markdown content...",
-  "url": "https://linear.app/...",
   "state": { "name": "In Progress", "type": "started" },
   "trashed": false,
   "assignee": { "name": "Alice" },
-  "labels": { "nodes": [{ "id": "uuid", "name": "bug", "color": "#eb5757" }] },
+  "labels": ["bug"],
   "priority": 1,
   "dueDate": "2024-03-01",
   "project": { "id": "uuid", "name": "Project Alpha" },
   "cycle": { "id": "uuid", "name": "Sprint 5", "number": 5 },
   "parent": { "id": "uuid", "identifier": "ENG-40", "title": "Auth overhaul" },
-  "children": { "nodes": [{ "id": "uuid", "identifier": "ENG-43", "title": "Sub-task", "state": { "name": "Todo", "type": "unstarted" } }] },
-  "comments": { "nodes": [{ "id": "uuid", "body": "Fixed in PR #12.", "createdAt": "2024-02-28T10:00:00.000Z", "user": { "name": "Bob" } }] }
+  "children": [{ "id": "uuid", "identifier": "ENG-43", "title": "Sub-task", "state": { "name": "Todo", "type": "unstarted" } }],
+  "comments": [{ "id": "uuid", "body": "Fixed in PR #12.", "createdAt": "2024-02-28T10:00:00.000Z", "user": { "name": "Bob" } }]
 }
 ```
 
-`parent` is `null` when the issue has no parent. `children.nodes` is empty (`[]`) when there are no sub-issues. `labels`, `children`, and `comments` use Linear's `{ nodes: [...] }` wrapper.
+`parent` is `null` when the issue has no parent. `children` is empty (`[]`) when there are no sub-issues. `labels`, `children`, `comments`, and `relations` are always plain arrays (never a `{ nodes: [...] }` wrapper), and `labels` is a plain array of name strings.
 
 ##### Trashed (soft-deleted) issues
 
-Linear soft-deletes: a deleted issue goes to trash for ~30 days and disappears from every list, search result, and parent/child collection — but it **still resolves when fetched by ID**, carrying whatever workflow state it had at deletion. To stop consumers reasoning from these ghosts, a by-ID read of a trashed issue:
+Deleted issues are soft-deleted: a deleted issue goes to trash for ~30 days and disappears from every list, search result, and parent/child collection — but it **still resolves when fetched by ID**, carrying whatever workflow state it had at deletion. To stop consumers reasoning from these ghosts, a by-ID read of a trashed issue:
 
 - sets a top-level **`"trashed": true`**, and
 - **overrides** the reported state to **`{ "name": "Trashed", "type": "canceled" }`** (the pre-deletion state is the misleading datum, so it is replaced, not merely flagged).
@@ -284,7 +282,7 @@ The same asymmetry is handled on the other by-ID surfaces:
 - The task-automation context endpoints (`/recommend`, `/recap`, `/brief`, `/prompt`) **refuse** a trashed target with **`404`** rather than distilling or recommending work on a ghost.
 - The write endpoints (`PATCH /issues/{id}`, comments, relation-create, labels, description `append`/`replace`) **refuse** a trashed target with **`409`** rather than silently mutating a deleted issue.
 
-Collection endpoints (`/issues`, `/search`, `/stack`) and nested `children`/`parent`/relation lists are unaffected — Linear already excludes trash from those.
+Collection endpoints (`/issues`, `/search`, `/stack`) and nested `children`/`parent`/relation lists are unaffected — trash is already excluded from those.
 
 #### Search Issues
 
@@ -379,11 +377,9 @@ Response includes issues, progress, and scope history:
   "completedAt": null,
   "progress": 0.6,
   "team": { "id": "uuid", "name": "Engineering" },
-  "issues": {
-    "nodes": [
-      { "id": "uuid", "identifier": "ENG-42", "title": "Fix login", "state": { "name": "Done", "type": "completed" }, "assignee": { "name": "Alice" }, "priority": 1 }
-    ]
-  }
+  "issues": [
+    { "id": "uuid", "identifier": "ENG-42", "title": "Fix login", "state": { "name": "Done", "type": "completed" }, "assignee": { "name": "Alice" }, "priority": 1 }
+  ]
 }
 ```
 
@@ -396,20 +392,16 @@ GET /api/proxy/issues/{issueId}/relations
 Response:
 ```json
 {
-  "relations": {
-    "nodes": [
-      { "id": "rel-uuid", "type": "blocks", "relatedIssue": { "id": "uuid", "identifier": "ENG-43", "title": "...", "state": { "name": "Todo", "type": "unstarted" } } }
-    ]
-  },
-  "inverseRelations": {
-    "nodes": [
-      { "id": "rel-uuid", "type": "blocks", "issue": { "id": "uuid", "identifier": "ENG-41", "title": "...", "state": { "name": "Done", "type": "completed" } } }
-    ]
-  }
+  "relations": [
+    { "id": "rel-uuid", "type": "blocks", "relatedIssue": { "id": "uuid", "identifier": "ENG-43", "title": "...", "state": { "name": "Todo", "type": "unstarted" } } }
+  ],
+  "inverseRelations": [
+    { "id": "rel-uuid", "type": "blocks", "issue": { "id": "uuid", "identifier": "ENG-41", "title": "...", "state": { "name": "Done", "type": "completed" } } }
+  ]
 }
 ```
 
-`relations` and `inverseRelations` use Linear's `{nodes: [...]}` wrapper, the same convention as `relations` on `/issues/{id}` and `labels`/`children`/`comments` across the read endpoints. `relatedIssue` is the target of an outgoing relation; `issue` is the source of an inverse one (e.g. the issue that blocks this one). Each node's `id` is the relation's own id — pass it to the delete-relation endpoint below.
+`relations` and `inverseRelations` are plain arrays — the same flat convention as `relations` on `/issues/{id}` and `labels`/`children`/`comments` across the read endpoints. `relatedIssue` is the target of an outgoing relation; `issue` is the source of an inverse one (e.g. the issue that blocks this one). Each entry's `id` is the relation's own id — pass it to the delete-relation endpoint below.
 
 #### Get Task Recap
 
@@ -503,7 +495,6 @@ Returns a prioritized, deduplicated task list using the same ordering as the in-
       "title": "Fix login bug",
       "description": "...",
       "priority": 1,
-      "url": "https://linear.app/...",
       "state": { "name": "In Progress", "type": "started" },
       "labels": [],
       "project": { "name": "Project Alpha" },
@@ -545,8 +536,7 @@ A compact orientation projection: each task drops the full `description` for a d
       "criticalPathLen": 4,
       "heldBy": ["ENG-50"],
       "why": ["bug", "unblocks 6", "critical path 4", "held by ENG-50"],
-      "parent": { "identifier": "ENG-40" },
-      "url": "https://linear.app/..."
+      "parent": { "identifier": "ENG-40" }
     }
   ],
   "total": 98,
@@ -740,7 +730,6 @@ Returns `201`:
     "id": "uuid",
     "identifier": "LIN-123",
     "title": "Fix authentication bug",
-    "url": "https://linear.app/...",
     "state": { "name": "Backlog", "type": "backlog" }
   }
 }
@@ -780,7 +769,6 @@ Response:
     "id": "uuid",
     "identifier": "LIN-123",
     "title": "Updated title",
-    "url": "https://linear.app/...",
     "state": { "name": "In Progress", "type": "started" }
   }
 }
@@ -924,7 +912,7 @@ Content-Type: application/json
 
 Uses the label UUID (get from `GET /api/proxy/labels`). Idempotent — returns success if label is already present.
 
-Note: Uses Read-Modify-Write internally. Concurrent label modifications may overwrite each other (Linear API limitation).
+Note: Uses Read-Modify-Write internally. Concurrent label modifications may overwrite each other (backend label-API limitation — there is no atomic add/remove).
 
 Response:
 ```json
@@ -933,7 +921,7 @@ Response:
   "issue": {
     "id": "uuid",
     "identifier": "LIN-123",
-    "labels": { "nodes": [{ "id": "uuid", "name": "bug" }] }
+    "labels": ["bug"]
   }
 }
 ```
@@ -948,7 +936,7 @@ DELETE /api/proxy/issues/{issueId}/labels/{labelId}
 
 Idempotent — returns success if label was not present.
 
-Response: same shape as Add Label (the issue with its remaining `labels.nodes`). When the label was not present: `{ "success": true, "message": "Label not present" }`.
+Response: same shape as Add Label (the issue with its remaining `labels` array). When the label was not present: `{ "success": true, "message": "Label not present" }`.
 
 ### Dispatch Endpoints
 
@@ -1172,7 +1160,7 @@ echo "Active cycles:" && echo "$CYCLES" | jq '.cycles[] | .name'
 # Get issues in the current sprint
 CYCLE_ID=$(echo "$CYCLES" | jq -r '.cycles[0].id')
 CYCLE=$(curl -s -H "$AUTH" "$API_BASE/api/proxy/cycles/$CYCLE_ID")
-echo "Issues in cycle:" && echo "$CYCLE" | jq '.issues.nodes[] | "\(.identifier): \(.title)"'
+echo "Issues in cycle:" && echo "$CYCLE" | jq '.issues[] | "\(.identifier): \(.title)"'
 
 # Create an issue and assign to a cycle
 curl -s -X POST -H "$AUTH" -H "Content-Type: application/json" \

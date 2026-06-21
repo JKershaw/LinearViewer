@@ -21,6 +21,7 @@ import { createDedupeCache, dedupeKey } from '../lib/proxy-dedupe.js';
 import { deriveTerminalStatus, deriveCompletedAt } from '../lib/dispatch-terminal.js';
 import { fetchProjects, fetchIssueContext, fetchRecommendationContext } from '../lib/linear.js';
 import { applyTrashedSignal, isTrashed } from '../lib/trashed-signal.js';
+import { flattenIssue, neutralizeProject, flattenCycle, flattenRelations } from '../lib/proxy-wire.js';
 import { isRecommendationEnabled, getRecommendation } from '../lib/openrouter.js';
 import { resolveRecommendation, describeDescent, armHopSignal } from '../lib/recommend-recurse.js';
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
@@ -1210,15 +1211,14 @@ GET ${baseUrl}/api/proxy/teams
 
 GET ${baseUrl}/api/proxy/projects
   → List active projects
-  → { "projects": [{ "id": "...", "name": "...", "url": "https://linear.app/..." }] }
+  → { "projects": [{ "id": "...", "name": "..." }] }
 
 GET ${baseUrl}/api/proxy/issues?teamId={teamId}&limit={n}
   → List issues (optionally filter by team, default limit 50, max 250)
   → { "issues": [{ "id": "...", "identifier": "LIN-1", "title": "...",
                    "state": { "name": "In Progress", "type": "started" },
-                   "labels": { "nodes": [{ "id": "...", "name": "bug", "color": "#f00" }] },
+                   "labels": ["bug"],
                    "cycle": { "id": "...", "number": 12 } }] }
-  → Note: labels arrive as {nodes: [...]} (Linear GraphQL shape).
 
 GET ${baseUrl}/api/proxy/issues/{issueId}
   → Full issue detail; issueId: UUID or identifier like "LIN-123"
@@ -1226,14 +1226,15 @@ GET ${baseUrl}/api/proxy/issues/{issueId}
       "id": "...", "identifier": "LIN-123", "title": "...", "description": "...",
       "state": { "name": "In Progress", "type": "started" },
       "trashed": false,
-      "labels":   { "nodes": [{ "name": "bug" }] },
-      "children": { "nodes": [{ "id": "...", "identifier": "LIN-124", "title": "..." }] },
+      "labels":   ["bug"],
+      "children": [{ "id": "...", "identifier": "LIN-124", "title": "..." }],
       "parent":   { "id": "...", "identifier": "LIN-100", "title": "..." },
-      "comments": { "nodes": [{ "id": "...", "body": "...", "createdAt": "..." }] }
+      "comments": [{ "id": "...", "body": "...", "createdAt": "..." }]
     }
-  → Note: labels / children / comments use Linear's {nodes: [...]} wrapper.
-  → TRASHED ISSUES: Linear soft-deletes (trash for ~30 days). A deleted issue
-    vanishes from every list/search/child collection but STILL resolves by ID,
+  → labels / children / comments / relations are plain arrays (never wrapped);
+    labels are plain name strings. The same flat convention holds everywhere.
+  → TRASHED ISSUES: deleted issues are soft-deleted (recoverable for ~30 days).
+    A deleted issue vanishes from every list/search/child collection but STILL resolves by ID,
     carrying its stale pre-deletion state. When that happens this endpoint sets
     "trashed": true AND overrides the reported state to
     { "name": "Trashed", "type": "canceled" } so you cannot mistake a deleted
@@ -1264,15 +1265,15 @@ GET ${baseUrl}/api/proxy/cycles/{cycleId}
 GET ${baseUrl}/api/proxy/issues/{issueId}/relations
   → Issue relations (blocks, blocked-by, related, duplicate)
   → { "trashed": false,
-      "relations":        { "nodes": [{ "id": "...", "type": "blocks", "relatedIssue": { "id": "...", "identifier": "LIN-9" } }] },
-      "inverseRelations": { "nodes": [{ "id": "...", "type": "blocks", "issue": { "id": "...", "identifier": "LIN-7" } }] } }
+      "relations":        [{ "id": "...", "type": "blocks", "relatedIssue": { "id": "...", "identifier": "LIN-9" } }],
+      "inverseRelations": [{ "id": "...", "type": "blocks", "issue": { "id": "...", "identifier": "LIN-7" } }] }
   → "trashed": true means the issue itself has been soft-deleted (this query has
     no root state to override, so the flag is the only signal). Relations are
     still returned so you can see what a now-deleted issue was related to.
-  → Note: relations / inverseRelations use Linear's {nodes: [...]} wrapper,
-    same as relations on /issue/{id}. \`relatedIssue\` is the target of an
-    outgoing relation; \`issue\` is the source of an inverse (e.g. blocked-by) one.
-    Each node's \`id\` is the relation id — pass it to DELETE .../relations/{id}.
+  → relations / inverseRelations are plain arrays, same flat convention as
+    relations on /issue/{id}. \`relatedIssue\` is the target of an outgoing
+    relation; \`issue\` is the source of an inverse (e.g. blocked-by) one.
+    Each entry's \`id\` is the relation id — pass it to DELETE .../relations/{id}.
   → This pairs with POST/DELETE /issues/{issueId}/relations below, so the whole
     relations surface (read + write) lives under one issue-scoped path.
 
@@ -1286,7 +1287,7 @@ still resolve as forgiving aliases, but prefer the nested form shown here.
 GET ${baseUrl}/api/proxy/stack?limit={n}
   → Sorted task stack (default 5, max 50). Top-level shape:
   → { "tasks": [...], "total": 98 }
-  → Each task has a FLAT Linear-native shape. Expect \`state.name\`, \`parent.identifier\`,
+  → Each task has a FLAT shape. Expect \`state.name\`, \`parent.identifier\`,
     \`children\` (NOT \`subtasks\`), and \`labels\` as a plain string array:
   → {
       "id": "...",
@@ -1294,7 +1295,6 @@ GET ${baseUrl}/api/proxy/stack?limit={n}
       "title": "...",
       "description": "...",
       "priority": 1,
-      "url": "https://linear.app/...",
       "state":    { "name": "In Progress", "type": "started" },
       "labels":   ["milestone-x"],
       "project":  { "name": "Safety & Security" },
@@ -1320,7 +1320,7 @@ GET ${baseUrl}/api/proxy/stack?limit={n}&view=digest
       "labels": [...], "priority": 1, "section": "in-progress", "blocks": 0, "children": 2,
       "downstreamUnblocks": 6, "criticalPathLen": 4, "heldBy": ["LIN-412"],
       "why": ["bug", "unblocks 6", "critical path 4", "held by LIN-412"],
-      "parent": { "identifier": "LIN-295" }, "url": "..." }], "total": 98, "view": "digest" }
+      "parent": { "identifier": "LIN-295" } }], "total": 98, "view": "digest" }
 
 GET ${baseUrl}/api/proxy/issues/{identifier}/recommend
   → AI-generated prompt recommendation (requires OpenRouter on the server; >25s responses
@@ -1385,12 +1385,12 @@ short window: a repeat of the same (issue + body) returns the original comment w
 POST ${baseUrl}/api/proxy/issues
   Body: { "teamId": "...", "title": "...", "description": "...", "projectId": "...", "stateId": "...", "assigneeId": "...", "priority": 0-4, "cycleId": "...", "parentId": "..." }
   → Create a new issue; set parentId (UUID) to create as a sub-issue. Returns 201:
-  → { "success": true, "issue": { "id": "...", "identifier": "LIN-123", "title": "...", "url": "...", "state": { "name": "Backlog", "type": "backlog" } } }
+  → { "success": true, "issue": { "id": "...", "identifier": "LIN-123", "title": "...", "state": { "name": "Backlog", "type": "backlog" } } }
 
 PATCH ${baseUrl}/api/proxy/issues/{issueId}
   Body: { "title": "...", "description": "...", "stateId": "...", "assigneeId": "...", "priority": 0-4, "cycleId": "...", "parentId": "...|null" }
   → Update an existing issue; set cycleId to assign/move to a cycle; set parentId to a UUID to re-parent, or null to promote to top-level
-  → { "success": true, "issue": { "id": "...", "identifier": "LIN-123", "title": "...", "url": "...", "state": { "name": "In Progress", "type": "started" } } }
+  → { "success": true, "issue": { "id": "...", "identifier": "LIN-123", "title": "...", "state": { "name": "In Progress", "type": "started" } } }
   → Passing "description" here REPLACES the whole body. For anything other than a deliberate full rewrite, prefer the two splice endpoints below — they let you supply only the new content, so you never re-emit (and risk corrupting) the existing body.
 
 POST ${baseUrl}/api/proxy/issues/{issueId}/description/append
@@ -1423,12 +1423,12 @@ DELETE ${baseUrl}/api/proxy/issues/{issueId}/relations/{relationId}
 POST ${baseUrl}/api/proxy/issues/{issueId}/labels
   Body: { "labelId": "..." }
   → Add a label to an issue (idempotent)
-  → { "success": true, "issue": { "id": "...", "identifier": "LIN-123", "labels": { "nodes": [{ "id": "...", "name": "bug" }] } } }
+  → { "success": true, "issue": { "id": "...", "identifier": "LIN-123", "labels": ["bug"] } }
   → When the label is already present: { "success": true, "message": "Label already present" }
 
 DELETE ${baseUrl}/api/proxy/issues/{issueId}/labels/{labelId}
   → Remove a label from an issue (idempotent)
-  → { "success": true, "issue": { "id": "...", "identifier": "LIN-123", "labels": { "nodes": [...] } } }
+  → { "success": true, "issue": { "id": "...", "identifier": "LIN-123", "labels": [...] } }
   → When the label is not present: { "success": true, "message": "Label not present" }
 
 POST ${baseUrl}/api/proxy/agent/status   (alias: /api/proxy/foreman/status — deprecated)
@@ -1500,10 +1500,13 @@ One convention across every endpoint, so you can branch on the same fields every
   partial state — a write never returns 2xx with a falsy success flag.
 - **Reads** return the data directly: a single resource as the object itself
   (e.g. GET /me, GET /issues/{id}, GET /cycles/{id}), a collection under a named key
-  (e.g. { "issues": [...] }, { "teams": [...] }).
-- **Writes** return { "success": true, ...} — Linear writes nest the affected entity under a
-  named key ({ "success": true, "issue": {...} }); other writes (dispatch, token) carry their
-  fields alongside "success": true. A write that does not land is a non-2xx, never a 2xx.
+  (e.g. { "issues": [...] }, { "teams": [...] }). Nested collections (labels,
+  children, comments, relations) are always plain arrays — never a {nodes:[...]}
+  wrapper — and labels are plain name strings.
+- **Writes** return { "success": true, ...} — issue/comment/relation/label writes nest the
+  affected entity under a named key ({ "success": true, "issue": {...} }); other writes
+  (dispatch, token) carry their fields alongside "success": true. A write that does not land
+  is a non-2xx, never a 2xx.
 - **Errors** are always { "error": "<message>", "detail"?: "<upstream detail>" } with a non-2xx
   status. "detail" carries the Linear or AI upstream's own message when there is one.
 
@@ -1547,9 +1550,9 @@ One convention across every endpoint, so you can branch on the same fields every
   committed as 200; any error is conveyed in the body as
   \`{ "error": "...", "statusCode": 5xx }\`. Check for an \`error\` key
   before trusting \`200\`.
-- **\`/stack\` uses a flat Linear-native shape.** Use \`task.state.name\`,
-  \`task.parent?.identifier\`, and \`task.children\` — do NOT expect
-  \`state.nodes\`, \`parentIdentifier\`, or \`subtasks\`.
+- **\`/stack\` uses a flat shape — the same one every endpoint now uses.** Use
+  \`task.state.name\`, \`task.parent?.identifier\`, and \`task.children\` — do NOT
+  expect \`state.nodes\`, \`parentIdentifier\`, or \`subtasks\`.
 `;
 
     res.type('text/plain').send(text);
@@ -1613,7 +1616,7 @@ One convention across every endpoint, so you can branch on the same fields every
 
       const data = await client.request(PROJECTS_QUERY);
       logEvent(req, '/api/proxy/projects', 200);
-      res.json({ projects: data.projects?.nodes || [] });
+      res.json({ projects: (data.projects?.nodes || []).map(neutralizeProject) });
     } catch (err) {
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/projects', status);
@@ -1649,7 +1652,7 @@ One convention across every endpoint, so you can branch on the same fields every
       logEvent(req, '/api/proxy/issues', 200);
       const pageInfo = data.issues?.pageInfo || {};
       res.json({
-        issues: data.issues?.nodes || [],
+        issues: (data.issues?.nodes || []).map(flattenIssue),
         pageInfo: {
           hasNextPage: pageInfo.hasNextPage || false,
           endCursor: pageInfo.endCursor || null
@@ -1701,7 +1704,7 @@ One convention across every endpoint, so you can branch on the same fields every
       applyTrashedSignal(data.issue);
 
       logEvent(req, '/api/proxy/issues/:id', 200);
-      res.json(data.issue);
+      res.json(flattenIssue(data.issue));
     } catch (err) {
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/issues/:id', status);
@@ -1733,7 +1736,7 @@ One convention across every endpoint, so you can branch on the same fields every
 
       const data = await client.request(SEARCH_QUERY, { query, first: 50 });
       logEvent(req, '/api/proxy/search', 200);
-      res.json({ issues: data.searchIssues?.nodes || [] });
+      res.json({ issues: (data.searchIssues?.nodes || []).map(flattenIssue) });
     } catch (err) {
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/search', status);
@@ -1854,7 +1857,7 @@ One convention across every endpoint, so you can branch on the same fields every
       }
 
       logEvent(req, '/api/proxy/cycle', 200);
-      res.json(data.cycle);
+      res.json(flattenCycle(data.cycle));
     } catch (err) {
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/cycle', status);
@@ -1893,13 +1896,11 @@ One convention across every endpoint, so you can branch on the same fields every
       // The relations themselves are still returned — a consumer may legitimately
       // want to see what a now-deleted issue was related to.
       logEvent(req, '/api/proxy/relations', 200);
-      // Wrap in Linear's {nodes:[...]} shape to match /issue and the rest of
-      // the raw-read surface (labels/children/comments), so consumers see a
-      // single consistent convention across endpoints.
+      // Plain arrays (no {nodes} wrapper) to match /issues/{id} and the rest of
+      // the read surface — one flat convention across every endpoint (LIN-310).
       res.json({
         trashed: isTrashed(data.issue),
-        relations: { nodes: data.issue.relations?.nodes || [] },
-        inverseRelations: { nodes: data.issue.inverseRelations?.nodes || [] }
+        ...flattenRelations(data.issue)
       });
     } catch (err) {
       const status = graphqlErrorStatus(err);
@@ -1965,6 +1966,7 @@ One convention across every endpoint, so you can branch on the same fields every
 
       const data = await client.request(CREATE_ISSUE_MUTATION, { input });
       if (writeRejected(req, res, '/api/proxy/issues', data.issueCreate, 'Issue was not created')) return;
+      flattenIssue(data.issueCreate.issue);
       logEvent(req, '/api/proxy/issues', 201);
       res.status(201).json(data.issueCreate);
     } catch (err) {
@@ -2049,6 +2051,7 @@ One convention across every endpoint, so you can branch on the same fields every
 
       const data = await client.request(UPDATE_ISSUE_MUTATION, { id: issueId, input });
       if (writeRejected(req, res, '/api/proxy/issues/:id', data.issueUpdate, 'Issue was not updated')) return;
+      flattenIssue(data.issueUpdate.issue);
       logEvent(req, '/api/proxy/issues/:id', 200);
       res.json(data.issueUpdate);
     } catch (err) {
@@ -2111,6 +2114,7 @@ One convention across every endpoint, so you can branch on the same fields every
 
     try {
       const data = await client.request(UPDATE_ISSUE_MUTATION, { id: issueId, input: { description: newDescription } });
+      flattenIssue(data.issueUpdate.issue);
       logEvent(req, endpoint, 200);
       res.json(data.issueUpdate);
     } catch (err) {
@@ -2370,6 +2374,7 @@ One convention across every endpoint, so you can branch on the same fields every
         input: { labelIds: [...currentLabelIds, labelId] }
       });
       if (writeRejected(req, res, '/api/proxy/issues/labels', data.issueUpdate, 'Label was not added')) return;
+      flattenIssue(data.issueUpdate.issue);
       logEvent(req, '/api/proxy/issues/labels', 200);
       res.json(data.issueUpdate);
     } catch (err) {
@@ -2426,6 +2431,7 @@ One convention across every endpoint, so you can branch on the same fields every
         input: { labelIds: filtered }
       });
       if (writeRejected(req, res, '/api/proxy/issues/labels', data.issueUpdate, 'Label was not removed')) return;
+      flattenIssue(data.issueUpdate.issue);
       logEvent(req, '/api/proxy/issues/labels', 200);
       res.json(data.issueUpdate);
     } catch (err) {
@@ -2504,8 +2510,8 @@ One convention across every endpoint, so you can branch on the same fields every
         if (!seenIds.has(issue.id)) { seenIds.add(issue.id); allIssues.push(issue); }
       }
 
-      // Build parent/child relationships (kept flat internally; transformed at
-      // the response boundary into Linear-native shape).
+      // Build parent/child relationships (flat throughout; this is already the
+      // neutral flat wire shape the rest of the API now aligns onto).
       const cardById = new Map(allIssues.map(i => [i.id, i]));
       const childrenMap = new Map();
       for (const issue of allIssues) {
@@ -2535,7 +2541,7 @@ One convention across every endpoint, so you can branch on the same fields every
       sortIssuesForSwipe(allIssues);
       const sortedIssues = clusterByParent(applyBlockingOrder(allIssues));
 
-      // Trim to limit and transform to Linear-native shape. Agents assume
+      // Trim to limit and project to the neutral flat wire shape. Agents assume
       // `state.name`, `parent.identifier`, `children` (not `subtasks`), so we
       // expose that shape uniformly here. Internal flat fields remain
       // available only to this handler.
@@ -2576,8 +2582,7 @@ One convention across every endpoint, so you can branch on the same fields every
               downstreamUnblocks: issue.downstreamUnblocks || 0,
               criticalPathLen: issue.criticalPathLen || 0,
               ...(heldBy.length > 0 ? { heldBy } : {}),
-              why: buildWhy(issue, heldBy),
-              url: issue.url
+              why: buildWhy(issue, heldBy)
             };
           })
         : sliced.map(issue => {
@@ -2588,7 +2593,6 @@ One convention across every endpoint, so you can branch on the same fields every
               title: issue.title,
               description: issue.description,
               priority: issue.priority,
-              url: issue.url,
               state: { name: issue.stateName, type: issue.stateType },
               labels: issue.labels || [],
               project: issue.projectName ? { name: issue.projectName } : null,
