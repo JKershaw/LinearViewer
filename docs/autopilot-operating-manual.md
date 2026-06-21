@@ -63,6 +63,10 @@ You have two cheap reads on trajectory, neither needing the task's content:
 - **A repeated failure met with a repeated explanation.** When the same thing fails the same way and
   gets waved off the same way, twice or more, treat the *repetition itself* as the tell that no one has
   zoomed out.
+- **A sharpening diagnosis that still can't land the fix.** When each pass understands the problem
+  better but the fix keeps missing because every pass is blind to the same datum, the bottleneck isn't
+  the fix — it's that the datum is unseen. The move is to make it observable so the next pass can
+  *see* the thing, rather than spend another pass guessing at it.
 
 That someone-not-looking can quietly become *you*: across passes you'll revisit the same calls — "is
 this a flake?", "is this really done?" — and reaching for the answer you gave last time is the same
