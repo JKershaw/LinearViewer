@@ -421,6 +421,66 @@ Needs multiple sessions — migration + rollback alone is its own focused pass; 
           body: 'Research complete. Traced the latency: the model-generation leg dominates; the data fetch is fast. Considered an in-memory LRU vs reusing the existing hash-keyed cache store. Chosen approach (validated with a spike): reuse the existing recap-style cache keyed by issue id + updatedAt, 10-minute TTL. Feasibility confirmed. Findings and the chosen approach are settled; this just needs building.' }
       ]
     }
+  },
+
+  // ---- DIVERGENT-BUG / FIX-BEFORE-VALIDATE (HAR-697 mechanism D) ----------------------
+  // The MISSING POLE of the SYN-18 "bug already investigated → advance to the fix" case.
+  // The trail ALSO carries a code-grounded root cause + a fix direction (the same surface
+  // signal that makes the engine want `implement`), but a later live test in the SAME trail
+  // REFUTED that cause and relocated it, and the decisive experiment that would confirm the
+  // new cause was never run. Advancing to `implement` builds a fix against an unvalidated,
+  // contradicted cause — the field-report "diverging-but-correct" failure. Step-2's OWN
+  // clause already covers it ("re-investigate ... when prior findings are ... contradicted by
+  // the current code"), so a correct engine runs the decisive experiment / re-investigates;
+  // the live prod engine instead reads "investigation-shaped comments exist → complete enough
+  // to fix" and picks implement. avoid:'implement' → loop-repeat measures the trap rate.
+  // This pole is what the current suite cannot see: it grades the action LABEL, never the
+  // EVIDENCE STANDARD behind a "done" investigation (the subtlety this session adds).
+  {
+    id: 'diverge: bug root-cause REFUTED across the trail, fix not validated (real HAR-697)',
+    expect: ['bug', 'research'], loop: true, avoid: 'implement',
+    why: 'REAL shape (HAR-697). Comment 1 proposes a code-grounded root cause (serialized-fs ' +
+         'module-load stall) + a fix direction but states the live repro was NOT run. Comment 2 ' +
+         '(live capture) REFUTES that cause — the wedge is upstream, the proposed cause does not ' +
+         'fire — and the decisive install→render experiment still has not produced a pass. The ' +
+         'cause is contradicted and unvalidated, so the honest next action is to run the decisive ' +
+         'experiment / re-investigate, NOT to implement a fix against a refuted cause. The live ' +
+         'engine picks implement ("investigation complete enough to fix") — the fix-before-validate trap.',
+    issue: {
+      identifier: 'SYN-21', createdAt: '2026-06-20T07:00:00Z', state: inProgress, labels: ['bug'],
+      title: 'App worker wedges at startup (loadedModules:0) on the live runtime — never renders',
+      description: 'Installing + opening the real app on the live runtime wedges at `loadedModules:0` — the worker never finishes startup, so it never renders. Acceptance (real substrate): a real install→open reaches `loadedModules > 0` and renders styled; capture a render screenshot. CI/synthetic green is NOT sufficient.',
+      comments: [
+        { user: 'agent', createdAt: '2026-06-21T07:45:00Z',
+          body: 'Investigation (static, codebase + history). Root cause: every worker funnels synchronous fs through a single serialized helper with an unbounded `Atomics.wait` (no timeout / no fairness) — opfs-sync-bridge.js:892, module-loader.js:273. A heavy install saturates that one loop so the first module read never returns → loadedModules stays 0. Recommended fix (implementation): bound the boot-critical wait + add fairness. NOTE: I did NOT run the live repro — this is a static hypothesis; the acceptance capture (real install→render) is still owed.' },
+        { user: 'agent', createdAt: '2026-06-21T11:32:00Z',
+          body: 'Live capture — REFUTES the module-load-stall cause. loadedModules stuck at 0 but NO module-load frame is ever emitted and lastSpecifier=null, so the wedge is UPSTREAM of the read path: the nested install child exits 0 while persisting nothing, and launch dies before any module loads. The bounded-wait/fairness fix would NOT have fired here — the proposed cause does not fire. Reclassified to a nested-child silent zero-write install. The decisive live install→render experiment has still NOT produced a `loadedModules > 0` styled render; the new cause is unvalidated.' }
+      ]
+    }
+  },
+
+  // ---- ACCEPTANCE-WITNESS UNRELIABLE (HAR-697 mechanism E) ----------------------------
+  // The acceptance signal itself was proven unreliable mid-investigation. Optimizing toward
+  // it (build a fix / close against the metric) is chasing a bad goalpost; the honest next
+  // step is to validate/pin the witness before chasing the defect. No current case covers
+  // this — "validate the measurement before chasing the defect" is unmeasured today.
+  {
+    id: 'diverge: acceptance witness proven unreliable mid-investigation (real HAR-697)',
+    expect: ['bug', 'research'], loop: true, avoid: 'implement',
+    why: 'REAL shape (HAR-697 mechanism E). The acceptance proxy (`loadedModules > 0`) was shown ' +
+         'unreliable: it stayed 0 in a run where the app in fact rendered fully styled, and no ' +
+         'boot-progress frame is emitted, so the signal does not track the real outcome. Building ' +
+         'a fix that optimizes against an unconfirmed measurement chases a wrong goalpost — the ' +
+         'witness must be pinned first. The trap is advancing to implement (or close) against the bad metric.',
+    issue: {
+      identifier: 'SYN-22', createdAt: '2026-06-20T07:00:00Z', state: inProgress, labels: ['bug'],
+      title: 'Live-app render gate flaps: `loadedModules` acceptance proxy is unreliable',
+      description: 'The `loadedModules > 0` acceptance check for the live-app render is the goalpost, but it is suspected not to track the real outcome (styled render in the iframe). Determine whether the witness is sound before chasing the render defect against it.',
+      comments: [
+        { user: 'agent', createdAt: '2026-06-21T11:40:00Z',
+          body: 'Signal audit. `loadedModules` stayed at 0 in a run where the app actually rendered the full styled UI in the iframe — so the metric is a FALSE NEGATIVE, not a reliable acceptance proxy. Separately, on a re-launch with deps pre-present the app boots to listening and renders styled, yet the gate still reads red. The measurement does not track the real outcome; chasing the defect against this metric optimizes a wrong goalpost. The witness must be pinned (what real signal = "rendered styled") before any fix is built against it.' }
+      ]
+    }
   }
 ];
 
