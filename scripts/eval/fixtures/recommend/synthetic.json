@@ -2,7 +2,7 @@
   "name": "Synthetic",
   "note": "Deliberately-synthetic fixture (LIN-448) — no real equivalent reproduces this shape in isolation, so it is constructed by hand and kept synthetic on purpose. The LIN-390 shape that looped `implementation` x3: reached implementation via research (NO `plan` step), description ends in a present-tense research 'Next step:' imperative, and a 'PR merged' completion comment sits in the thread. Expected routing: `review`. Honest scope: this is live SHAPE-COVERAGE, not a self-reproducing red test — the authoritative red->green guard is the deterministic structural test in tests/unit/openrouter.test.js ('plan-less landed leaf (LIN-448)'). This target keeps the shape under continuous live measurement so a future prompt edit cannot regress it silently.",
   "targets": [
-    { "id": "FIX-448-leaf", "role": "plan-less research->implementation leaf, merged but In Progress (expect -> review)" }
+    { "id": "FIX-448-leaf", "role": "plan-less research->implementation leaf, merged but In Progress (expect -> review)", "expect": ["review"], "descentExpect": "FIX-448-leaf" }
   ],
   "bundles": {
     "FIX-448-leaf": {
