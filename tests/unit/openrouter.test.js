@@ -701,6 +701,58 @@ describe('buildMetaPromptTemplate review routing for a plan-less landed leaf (LI
 });
 
 // =============================================================================
+// Over-advance guard (LIN-597) — the engine's dominant front-half miss is reaching
+// too far down-lifecycle (e.g. `implement`) on a task with too little COMMITTED
+// SCOPE to act. Step 3 now makes the rule explicit and one-directional: absent
+// committed scope is itself the signal to plan/research, never implement — without
+// touching the clearly-planned `implement` case or the genuinely-small direct path.
+// =============================================================================
+describe('buildMetaPromptTemplate over-advance guard (LIN-597)', () => {
+  function build(overrides = {}) {
+    return buildMetaPromptTemplate({
+      issueContext: 'Test context', identifier: 'LIN-1', hasSubtasks: false,
+      subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
+      hasComments: true, commentCount: 1, aiHints: 'hints',
+      actionVocabulary: getAIRecommendationActionNames().join(', '), ...overrides
+    });
+  }
+
+  test('Step 3 states the no-committed-scope rule explicitly', () => {
+    const text = build();
+    assert.ok(/no committed scope ⇒ never \`implement\`/i.test(text),
+      'Step 3 must carry the explicit "no committed scope ⇒ never implement" rule');
+  });
+
+  test('the rule is one-directional — resolve DOWN to plan/research when scope is weak/absent', () => {
+    const text = build();
+    assert.ok(/one-directional/i.test(text) && /resolve DOWN/i.test(text),
+      'the rule must name the one-directional bias and steer toward plan/research, not implement');
+  });
+
+  test('a rich-but-unscoped description is NOT treated as scoped', () => {
+    const text = build();
+    assert.ok(/NOT scoped merely because its intent is legible|rich-but-unscoped/i.test(text),
+      'the rule must reject legible-intent / long-description as a substitute for committed scope');
+  });
+
+  test('an existing plan still routes on its session-fit answer — the guard does not override it', () => {
+    const text = build();
+    // The no-scope guard must explicitly preserve BOTH committed-plan routes so it
+    // cannot erode the multi-session → breakdown branch (LIN-385@breakdown regression).
+    assert.ok(/never overrides a plan that exists/i.test(text),
+      'the guard must state it fires only when scope is absent, never overriding an existing plan');
+    assert.ok(/fits one session.*\`implementation\`.*needs multiple sessions.*\`breakdown\`/is.test(text),
+      'both session-fit routes (implementation AND breakdown) must be preserved against the guard');
+  });
+
+  test('"simple enough to implement directly" requires concrete in-hand small scope', () => {
+    const text = build();
+    assert.ok(/concrete, in-hand small scope — NOT by a legible intent on an unscoped/is.test(text),
+      'the direct-implement readiness path must require in-hand small scope, not just legible intent');
+  });
+});
+
+// =============================================================================
 // Single-action boundary (LIN-358) — the generated prompt body must stay within
 // the one recommended action and hand off by naming the follow-up, rather than
 // carrying the work into the next phase. The reported symptom was an "unblock"
