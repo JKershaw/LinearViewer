@@ -746,6 +746,30 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     return true;
   }
 
+  /**
+   * Normalize a provider write result into the `{ success, <entityKey> }`
+   * envelope the route echoes and `writeRejected` guards (LIN-584).
+   *
+   * Linear's mutation methods already return that envelope (Linear's
+   * *Create/*Update payloads carry a `success` boolean), so they pass through
+   * BYTE-IDENTICAL — the Linear proxy path is unchanged. Providers whose write
+   * methods return the bare canonical entity instead (LocalProvider's LIN-356
+   * create/update methods, which stay bare for their non-proxy callers; the
+   * GitHub provider) are wrapped here: a truthy entity is a landed write, a
+   * null/undefined one (e.g. updateIssue on a missing target) is a rejected
+   * write that `writeRejected` will surface as a 502. This keeps the proxy
+   * write path provider-agnostic without forcing every provider onto Linear's
+   * payload shape.
+   *
+   * @param {*} result - the provider's write return value
+   * @param {string} entityKey - the payload key Linear uses ('issue'|'comment'|'issueRelation')
+   * @returns {{success: boolean}} the normalized envelope
+   */
+  function normalizeWritePayload(result, entityKey) {
+    if (result && typeof result === 'object' && 'success' in result) return result;
+    return { success: !!result, [entityKey]: result ?? null };
+  }
+
   // =========================================================================
   // User-Facing API (Session Auth) - Token Management
   // =========================================================================
@@ -1633,7 +1657,7 @@ One convention across every endpoint, so you can branch on the same fields every
         input.priority = priority;
       }
 
-      const issueCreate = await provider.createIssue(token, input);
+      const issueCreate = normalizeWritePayload(await provider.createIssue(token, input), 'issue');
       if (writeRejected(req, res, '/api/proxy/issues', issueCreate, 'Issue was not created')) return;
       flattenIssue(issueCreate.issue);
       logEvent(req, '/api/proxy/issues', 201);
@@ -1719,7 +1743,7 @@ One convention across every endpoint, so you can branch on the same fields every
 
       if (await refuseIfTrashed(provider, token, issueId, req, res, '/api/proxy/issues/:id')) return;
 
-      const issueUpdate = await provider.updateIssue(token, issueId, input);
+      const issueUpdate = normalizeWritePayload(await provider.updateIssue(token, issueId, input), 'issue');
       if (writeRejected(req, res, '/api/proxy/issues/:id', issueUpdate, 'Issue was not updated')) return;
       flattenIssue(issueUpdate.issue);
       logEvent(req, '/api/proxy/issues/:id', 200);
@@ -1784,7 +1808,7 @@ One convention across every endpoint, so you can branch on the same fields every
     }
 
     try {
-      const issueUpdate = await provider.updateIssue(token, issueId, { description: newDescription });
+      const issueUpdate = normalizeWritePayload(await provider.updateIssue(token, issueId, { description: newDescription }), 'issue');
       flattenIssue(issueUpdate.issue);
       logEvent(req, endpoint, 200);
       res.json(issueUpdate);
@@ -1890,7 +1914,7 @@ One convention across every endpoint, so you can branch on the same fields every
         return res.status(200).json({ ...prior, deduped: true });
       }
 
-      const commentCreate = await provider.createComment(token, issueId, body);
+      const commentCreate = normalizeWritePayload(await provider.createComment(token, issueId, body), 'comment');
 
       // Surface a clear failure instead of a misleading 201 when Linear
       // reports the write did not land.
@@ -1938,7 +1962,7 @@ One convention across every endpoint, so you can branch on the same fields every
       if (await refuseIfTrashed(provider, token, issueId, req, res, '/api/proxy/issues/relations')) return;
 
       // The provider owns the blocked-by → inverse-blocks sugar (ids swapped).
-      const issueRelationCreate = await provider.createRelation(token, issueId, { type, relatedIssueId });
+      const issueRelationCreate = normalizeWritePayload(await provider.createRelation(token, issueId, { type, relatedIssueId }), 'issueRelation');
       if (writeRejected(req, res, '/api/proxy/issues/relations', issueRelationCreate, 'Relation was not created')) return;
       logEvent(req, '/api/proxy/issues/relations', 201);
       res.status(201).json(issueRelationCreate);

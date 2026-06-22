@@ -125,25 +125,27 @@ test('GET /api/proxy/cycles is canonical-empty (local has no cycles)', async () 
   assert.deepEqual(body, { cycles: [] });
 });
 
-// KNOWN BOUNDARY for B2 (LIN-584): the proxy's write *mutations* (create issue/
-// comment/relation, update issue) reuse the LIN-356 LocalProvider methods, which
-// return a bare canonical object rather than the Linear `{ success, … }` mutation
-// payload the route's `writeRejected` requires — so they currently surface a 502
-// on local. B1 deliberately does NOT reshape those shared methods (they are a
-// real contract for the non-proxy local write path: /test/local-create-issue +
-// the LIN-356 write unit tests). Aligning the local write-mutation return shape
-// to the provider write contract is B2/follow-up work. The relation DELETE +
-// label-RMW guard methods this ticket DID add already return `{ success, … }`
-// (see the test below + the unit suite).
-test('POST comment is reachable on local but not yet proxy-shaped (B2 boundary)', async () => {
+// CLOSED in B2 (LIN-584): the proxy's write *mutations* (create issue/comment/
+// relation, update issue) reuse the LIN-356 LocalProvider methods, which return a
+// bare canonical object rather than the Linear `{ success, … }` mutation payload
+// the route's `writeRejected` requires. B1 left this as a 502 boundary; B2 closes
+// it WITHOUT reshaping those shared methods (they stay a real contract for the
+// non-proxy local write path: /test/local-create-issue + the LIN-356 write unit
+// tests) by normalizing the write result into the `{ success, … }` envelope at
+// the route boundary (`normalizeWritePayload`). So a comment now LANDS on local
+// and comes back proxy-shaped. The relation DELETE + label-RMW guard methods
+// already returned `{ success, … }` directly (see the test below + the unit suite).
+test('POST comment lands on local and returns the proxy { success, comment } shape', async () => {
   const { app } = await buildLocalApp();
-  const { status } = await request(app, '/api/proxy/issues/i1/comments', {
+  const { status, body } = await request(app, '/api/proxy/issues/i1/comments', {
     method: 'POST',
     body: { body: 'hello from the proxy' },
   });
-  // It REACHES local (not a 503 workspace-unavailable nor a 422 capability
-  // decline) — it falls at the response-shape contract, which B2 will close.
-  assert.equal(status, 502);
+  // Reaches local (not a 503 workspace-unavailable nor a 422 capability decline)
+  // AND the route-level normalization gives it the `{ success, comment }` envelope.
+  assert.equal(status, 201);
+  assert.equal(body.success, true);
+  assert.equal(body.comment.body, 'hello from the proxy');
 });
 
 test('unknown issue id still validates format before the provider (400)', async () => {
