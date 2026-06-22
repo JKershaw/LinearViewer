@@ -2648,6 +2648,24 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
   padding: 0 0.4ch;
 }
 
+/* Session-context provenance tags (LIN-593): seed / descended / spun-off. */
+.context-node-tag--seed { color: var(--green); border-color: var(--green); }
+.context-node-tag--descended { color: var(--fg-dim); border-color: var(--fg-dim); }
+.context-node-tag--spun-off { color: var(--yellow); border-color: var(--yellow); }
+
+/* Session view: a stack of touched-task blocks, each its own bordered panel. */
+.context-session {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.context-session-task {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+}
+
 .context-truncated {
   color: var(--fg-dim);
   font-size: var(--font-size-sm);

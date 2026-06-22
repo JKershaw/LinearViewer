@@ -43,16 +43,20 @@
     }
   }
 
-  function nodeHtml(node, { isRoot = false } = {}) {
+  function nodeHtml(node, { isRoot = false, provenance = null } = {}) {
     const g = stateGlyph(node.stateType);
     const cls = [
       'context-node',
       `context-node--${g.cls}`,
       isRoot ? 'context-node--root' : '',
       node.isStart ? 'context-node--start' : '',
+      provenance ? `context-node--${provenance}` : '',
     ].filter(Boolean).join(' ');
     const title = node.title ? `<span class="context-node-title">${esc(node.title)}</span>` : '';
-    const startTag = node.isStart ? '<span class="context-node-tag">start here</span>' : '';
+    // Provenance tag (session view) mirrors the single-root "start here" tag. Only
+    // one tag shows; the start-here cue is single-root-only so they never collide.
+    const startTag = node.isStart ? '<span class="context-node-tag">start here</span>'
+      : provenance ? `<span class="context-node-tag context-node-tag--${provenance}">${esc(provenance)}</span>` : '';
     const inner = `
       <span class="context-node-head">
         <span class="state ${g.cls} status-pill__char status-pill--${g.cls}">${g.char}</span>
@@ -163,6 +167,117 @@
       ${empty ? '<div class="context-placeholder">No linked tasks yet — no blockers, sub-tasks, or related issues.</div>' : ''}`;
   }
 
+  // ─── Session context (LIN-593) ───────────────────────────────────────────────
+  // A session touches a SET of tasks; render each touched task as a node carrying
+  // a provenance tag (seed / descended / spun-off) plus its neighborhood, reusing
+  // the same node/lane/truncation vocabulary as the single-root diagram. Aligned
+  // with, not identical to, the per-task Context section.
+
+  const PROVENANCE_LABEL = { seed: 'seed', descended: 'descended', 'spun-off': 'spun-off' };
+
+  // One touched task: its node (tagged with provenance) flanked by its blocker /
+  // blocked lanes, with a parent/children/related band below. `touched` marks
+  // neighbors that are themselves in the session (the "merged" cue) — for now a
+  // class hook; the data is carried so a surface can highlight overlaps.
+  function sessionTaskHtml(task) {
+    const blockers = task.blockers || [];
+    const blocked = task.blocked || [];
+    const arrow = '<div class="context-flow-arrow">→</div>';
+    const flowParts = [];
+    if (blockers.length) {
+      flowParts.push(laneHtml('Blocked by', blockers, 'context-lane--blockers') + truncationNote(task.blockersTruncated, 'blockers'));
+      flowParts.push(arrow);
+    }
+    flowParts.push(`
+      <div class="context-lane context-lane--root">
+        <div class="context-lane-nodes">${nodeHtml(task.root, { isRoot: true, provenance: task.provenance })}</div>
+      </div>`);
+    if (blocked.length) {
+      flowParts.push(arrow);
+      flowParts.push(laneHtml('Blocks', blocked, 'context-lane--blocked') + truncationNote(task.blockedTruncated, 'blocked tasks'));
+    }
+
+    const bands = [];
+    const parentChain = task.parentChain || [];
+    if (parentChain.length) {
+      const lineage = parentChain.slice().reverse().map(n => nodeHtml(n)).join('<span class="context-sep">›</span>');
+      bands.push(`<div class="context-rel-group"><div class="context-lane-label">Parent</div><div class="context-rel-nodes">${lineage}</div></div>`);
+    }
+    const children = task.children || [];
+    if (children.length) {
+      bands.push(`<div class="context-rel-group"><div class="context-lane-label">Children</div><div class="context-rel-nodes">${children.map(n => nodeHtml(n)).join('')}${truncationNote(task.childrenTruncated, 'children')}</div></div>`);
+    }
+    const related = task.related || [];
+    if (related.length) {
+      bands.push(`<div class="context-rel-group"><div class="context-lane-label">Related</div><div class="context-rel-nodes">${related.map(n => nodeHtml(n)).join('')}</div></div>`);
+    }
+    const bandHtml = bands.length ? `<div class="context-hierarchy">${bands.join('')}</div>` : '';
+
+    return `
+      <div class="context-session-task" data-provenance="${esc(task.provenance || '')}">
+        <div class="context-flow">${flowParts.join('')}</div>
+        ${bandHtml}
+      </div>`;
+  }
+
+  function renderSession(payload) {
+    const graph = (payload && payload.graph) || payload || {};
+    const tasks = graph.tasks || [];
+    const seed = graph.seedIssue ? esc(graph.seedIssue) : null;
+
+    if (!tasks.length) {
+      return `
+        <div class="context-header"><span class="context-status-label">session context</span></div>
+        <div class="context-placeholder">No touched tasks recorded for this session.</div>`;
+    }
+
+    const counts = tasks.reduce((acc, t) => { acc[t.provenance] = (acc[t.provenance] || 0) + 1; return acc; }, {});
+    const summaryBits = ['seed', 'descended', 'spun-off']
+      .filter(k => counts[k])
+      .map(k => `${counts[k]} ${PROVENANCE_LABEL[k]}`)
+      .join(' · ');
+    const hint = `${tasks.length} task${tasks.length === 1 ? '' : 's'} touched${summaryBits ? ` — ${summaryBits}` : ''}${seed ? ` · seed ${seed}` : ''}`;
+
+    const body = tasks.map(sessionTaskHtml).join('');
+    return `
+      <div class="context-header">
+        <span class="context-status-label">session context</span>
+        <span class="context-hint">${hint}</span>
+      </div>
+      <div class="context-session">${body}</div>`;
+  }
+
+  function sessionContextUrl(urlKey, sessionId) {
+    return `/workspace/${encodeURIComponent(urlKey)}/api/dashboard/session-context/${encodeURIComponent(sessionId)}`;
+  }
+
+  /**
+   * Mount a SESSION context section: the relationship shape of every task an
+   * autopilot session touched, provenance-tagged.
+   *
+   * @param {HTMLElement} container
+   * @param {Object} opts
+   * @param {string} opts.urlKey - Workspace url key.
+   * @param {string} opts.sessionId - Autopilot session id.
+   * @param {Function} [opts.onNavigate] - (identifier, event) => boolean (in-surface nav).
+   */
+  async function initSession(container, opts) {
+    if (!container || !opts || !opts.urlKey || !opts.sessionId) return;
+    container.classList.add('context-section');
+    container.innerHTML = renderLoading();
+    container.setAttribute('data-state', 'loading');
+
+    try {
+      const payload = await window.api(sessionContextUrl(opts.urlKey, opts.sessionId), { on401: false });
+      container.innerHTML = renderSession(payload);
+      container.setAttribute('data-state', 'loaded');
+    } catch (err) {
+      container.innerHTML = renderError(err && err.message);
+      container.setAttribute('data-state', 'error');
+    }
+    wire(container, opts);
+  }
+
   function renderLoading() {
     return `
       <div class="context-header"><span class="context-status-label">context · loading…</span></div>
@@ -219,5 +334,5 @@
     wire(container, opts);
   }
 
-  window.ContextSection = { init };
+  window.ContextSection = { init, initSession, renderSession };
 })();

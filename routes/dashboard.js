@@ -21,7 +21,8 @@
 
 import { Router } from 'express';
 import { renderDashboardPage } from '../lib/render-dashboard.js';
-import { getLoopsForWorkspace, getSessionsForWorkspace } from '../lib/pipeline-loops.js';
+import { getLoopsForWorkspace, getSessionsForWorkspace, deriveIssueGraph } from '../lib/pipeline-loops.js';
+import { buildSessionContextGraph } from '../lib/context-graph.js';
 import { deriveTerminalStatus, deriveCompletedAt } from '../lib/dispatch-terminal.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import {
@@ -111,6 +112,7 @@ function enrichLoop(loop) {
  * @param {Object}   deps.freeTierStore            - free-tier usage store (rate limit)
  * @param {Function} deps.getWorkspaceAccessToken  - (urlKey) → token (lazy hydration only)
  * @param {Function} deps.fetchIssueContext        - (token, identifier) → issue context (lazy hydration)
+ * @param {Function} deps.fetchWorkspaceIssues     - (workspace) → canonical issue set (session-context; LIN-593)
  * @param {Function} deps.getOpenRouterSource      - (req) → 'oauth'|'env'|'free'|null
  * @param {Function} deps.getDeployInfo            - () → deploy metadata
  * @param {number}   [deps.recentLimit=120]        - cap on terminal runs returned by /loops
@@ -125,6 +127,7 @@ export function createDashboardRoutes({
   freeTierStore,
   getWorkspaceAccessToken,
   fetchIssueContext,
+  fetchWorkspaceIssues,
   getOpenRouterSource,
   getDeployInfo,
   recentLimit = 120
@@ -458,6 +461,57 @@ export function createDashboardRoutes({
 
   router.post('/workspace/:urlKey/api/dashboard/session-summary/:sessionId', workspaceFromUrl, (req, res) =>
     handleSessionSummary(req, res, { force: true }));
+
+  // ─── Session context graph (deterministic; LIN-593) ───────────────────────────
+  //
+  // The relationship shape of everything a session touched: each touched task's
+  // neighborhood (parent/children/epic/blocks/related, reusing buildContextGraph)
+  // tagged with provenance (seed / descended / spun-off). No AI, nothing cached —
+  // it resolves entirely against the workspace's loaded issue set, the same as
+  // /api/context/:issueId. Loading that set also lets us derive the issueGraph the
+  // session inference fallback needs, repairing the degraded reconstruction the
+  // /loops + /session-summary paths run without (they pass no issueGraph).
+
+  router.get('/workspace/:urlKey/api/dashboard/session-context/:sessionId', workspaceFromUrl, async (req, res) => {
+    if (getFeatureFlags(req.session).dashboard !== true) {
+      return res.status(403).json({ error: 'Dashboard feature is not enabled' });
+    }
+
+    const workspace = req.workspace;
+    const { sessionId } = req.params;
+    if (!sessionId) return res.status(400).json({ error: 'sessionId is required' });
+
+    try {
+      // One issue read feeds both the issueGraph (for accurate session inference)
+      // and the session-context graph.
+      const issues = fetchWorkspaceIssues ? (await fetchWorkspaceIssues(workspace)) || [] : [];
+      const issueGraph = deriveIssueGraph(issues);
+
+      const sessions = await getSessionsForWorkspace(workspace.urlKey, { ...loopDeps, issueGraph });
+      const session = sessions.find(s => String(s.sessionId) === String(sessionId)) || null;
+      if (!session) return res.status(404).json({ error: 'Session not found' });
+
+      const graph = buildSessionContextGraph(issues, session.tasksTouched, {
+        seedIssue: session.seedIssue,
+        window: { start: session.dispatchedAt, end: session.completedAt }
+      });
+
+      return res.json({
+        sessionId,
+        seedIssue: session.seedIssue,
+        tasksTouched: session.tasksTouched,
+        window: { dispatchedAt: session.dispatchedAt, completedAt: session.completedAt },
+        graph,
+        generatedAt: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Dashboard session-context error:', error);
+      if (error.response?.status === 401) {
+        return res.status(401).json({ error: 'Token expired or invalid' });
+      }
+      return res.status(500).json({ error: 'Could not build session context' });
+    }
+  });
 
   // ─── Lazy Linear hydration (drill-down only) ──────────────────────────────────
   // Best-effort: fetch live state/labels for ONE issue in ONE workspace, using
