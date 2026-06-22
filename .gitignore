@@ -3,5 +3,9 @@ node_modules/
 data/
 test-results/
 
-# Real proxy task fixtures — contain live Linear task text; never commit to this public repo
-scripts/eval/fixtures/
+# Bulk auto-fetched proxy task fixtures (fetch-proxy-tasks.mjs writes per-epic subdirs of
+# live Linear text) stay out of this public repo. Exception: curated, deliberately-committed
+# red-baseline fixtures (e.g. the HAR-697 divergence case — Harbour is a public pet project)
+# are checked in so the eval's realistic red bar runs on any clone / in CI.
+scripts/eval/fixtures/*
+!scripts/eval/fixtures/HAR-697-red.json
