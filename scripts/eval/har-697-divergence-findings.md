@@ -96,19 +96,22 @@ ONLY=HAR-697,already ARMS=AB K=10 GEN_MODEL=openai/gpt-5.4-mini node scripts/eva
 once Arm B beats Arm A here. Regenerate Arm A with `node scripts/eval/regen-baseline.mjs`
 after any live-template edit.)
 
-## Regenerating the real fixture (gitignored — privacy boundary)
+## The real fixture (committed) + how to refresh it
 
-`scripts/eval/fixtures/HAR-697-red.json` is **not committed**: it holds real Harbour task
-text and this is a public repo (`.gitignore:6`). It is regenerated locally from the proxy by
-the committed recipe `scripts/eval/build-har697-red.mjs` (which holds no body text):
+`scripts/eval/fixtures/HAR-697-red.json` **is committed** (Harbour is a public pet project, so
+its task text is fine to include) — so the realistic red bar runs on any clone / in CI without a
+token. The bulk auto-fetched fixtures (`fetch-proxy-tasks.mjs` epic subdirs) stay gitignored; this
+one curated red fixture is the explicit exception (`.gitignore` negation).
+
+Refresh it from the proxy with the committed recipe (`scripts/eval/build-har697-red.mjs`, no body
+text in the script itself):
 
 ```
 HARBOUR_PROXY_TOKEN=<harbour read token> node scripts/eval/build-har697-red.mjs
 ```
 
-The harness loads any `scripts/eval/fixtures/*.json` (graded-leaf shape) automatically; when the
-fixture is absent the `[real]` case is simply skipped, so the synthetic suite still runs. The
-script freezes the **red moment** by keeping the first `KEEP=3` comments (investigation +
-HAR-705 refutation + addendum) and dropping the later override note + review verdict that filed
-HAR-707 — so the fixture stays a clean divergence test rather than a post-correction "implement
-HAR-707 is now correct" state.
+The harness loads any `scripts/eval/fixtures/*.json` (graded-leaf shape) automatically. The script
+freezes the **red moment** by keeping the first `KEEP=3` comments (investigation + HAR-705
+refutation + addendum) and dropping the later override note + review verdict that filed HAR-707 —
+so the fixture stays a clean divergence test rather than a post-correction "implement HAR-707 is
+now correct" state.
