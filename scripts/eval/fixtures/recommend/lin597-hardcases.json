@@ -1,0 +1,89 @@
+{
+  "name": "LIN-597-hardcases",
+  "_note": "Three NEW genuinely-ambiguous large-task leaf fixtures at varied front-half freeze points, on three DISTINCT real LinearViewer tasks (LIN-215, LIN-202, LIN-489) — built to break the LIN-385 single-epic dependence the ticket flags (n=1). Each isolates the plan<->implement/decompose boundary at one node (no descent). Faithful real text frozen at the stated moment. See LIN-597.",
+  "targets": [
+    {
+      "id": "LIN-215@plan",
+      "role": "OVER-advance probe — broad multi-surface E2E maintainability, nothing done, 'Proposed Changes' list reads plan-ish but NO committed scope/session-fit, no plan, no code -> expect plan/research/breakdown; a miss to implement is the over-keen direction",
+      "expect": ["plan", "research", "breakdown"],
+      "descentExpect": "LIN-215"
+    },
+    {
+      "id": "LIN-202@research",
+      "role": "OVER-advance probe (extreme) — broad migration, empty/unscoped description, nothing to act on -> expect research/plan; anything downstream (implement/breakdown) is the over-keen miss",
+      "expect": ["research", "plan"],
+      "descentExpect": "LIN-202"
+    },
+    {
+      "id": "LIN-489@implement",
+      "role": "UNDER-advance / plan-detection probe — research done (codebase Findings) + committed phasing plan + comment 'Planning complete, fits one focused session, ready for implementation', no code -> expect implement (breakdown defensible); a miss to plan/research is the re-deliberate / doesn't-detect-planning-is-done direction (fresh non-LIN-596 task for hypothesis 2)",
+      "expect": ["implement", "breakdown"],
+      "descentExpect": "LIN-489"
+    }
+  ],
+  "bundles": {
+    "LIN-215@plan": {
+      "issue": {
+        "id": "e5e2610d-9b32-4142-aa87-d2cb6abc97df",
+        "identifier": "LIN-215",
+        "title": "Improve E2E test maintainability: helpers, data-testid, and parallelism",
+        "description": "## Problem\n\nOur E2E test suite (578 tests, 21 spec files) has several maintainability issues that slow down development and make tests brittle:\n\n1. **Brittle selectors** — Tests rely heavily on `:has-text()`, CSS classes, and exact `href` values. Any text or class rename breaks multiple tests.\n2. **Duplicated boilerplate** — `TEST_WORKSPACE_URL_KEY`, `beforeEach` session setup, and common locators are copy-pasted across every file.\n3. **No test helpers or page objects** — Selectors are inline strings; common flows (login, navigate, toggle feature) are reimplemented per file.\n4. **Sequential execution only** — `workers: 1` because tests share a single session/port, making the full suite take 20-30 minutes.\n\n## Proposed Changes\n\n### 1. Add `data-testid` attributes to rendered HTML\n\nAdd stable `data-testid` attributes to key elements in render files (`render.js`, `render-swipe.js`, `render-swim.js`, `render-settings.js`, etc.). Tests should prefer these over CSS classes or text matching.\n\n### 2. Create `tests/helpers.js`\n\nExtract shared utilities:\n\n* `createSession(page, overrides)` — wraps `/test/set-session` with query params\n* Common selectors as constants (e.g., `SELECTORS.footer.link(name)`, `SELECTORS.issue(id)`)\n* `TEST_WORKSPACE_URL_KEY` and other shared constants\n* Fixture builder functions for custom mock data scenarios\n\n### 3. Introduce lightweight page objects\n\nThin wrappers for common page interactions:\n\n* `footer.getLink(name)` instead of raw locator strings\n* `settings.toggleFeature(name)` instead of repeated form submission logic\n* `dashboard.getProject(name)` instead of `:has-text()` selectors\n\n### 4. Enable parallel test execution\n\nInvestigate per-test session isolation (unique workspace IDs per worker) to allow `workers > 1` in Playwright config. This could cut CI time from 20-30 min to ~5 min.\n\n## Acceptance Criteria\n\n- [ ] Key UI elements have `data-testid` attributes\n- [ ] `tests/helpers.js` exists with session setup and common selectors\n- [ ] At least one spec file refactored to use helpers (as proof of pattern)\n- [ ] All existing tests still pass\n- [ ] Document the pattern in CLAUDE.md for future test authors",
+        "state": { "name": "In Progress", "type": "started" },
+        "createdAt": "2026-03-18T09:18:35.488Z",
+        "labels": []
+      },
+      "parent": null,
+      "siblings": [],
+      "siblingsTotal": 0,
+      "project": { "name": "Test Infrastructure: Local-Provider Migration", "description": null },
+      "children": [],
+      "comments": [],
+      "focusedChild": null
+    },
+    "LIN-202@research": {
+      "issue": {
+        "id": "bc7973d7-26da-41a6-8f60-01fbe01465c6",
+        "identifier": "LIN-202",
+        "title": "Migrate to Railway",
+        "description": "",
+        "state": { "name": "In Progress", "type": "started" },
+        "createdAt": "2026-03-07T22:55:15.023Z",
+        "labels": []
+      },
+      "parent": null,
+      "siblings": [],
+      "siblingsTotal": 0,
+      "project": { "name": "DevOps & Tooling", "description": null },
+      "children": [],
+      "comments": [],
+      "focusedChild": null
+    },
+    "LIN-489@implement": {
+      "issue": {
+        "id": "8b0e1d19-01ae-4a53-be50-daac6e4cea56",
+        "identifier": "LIN-489",
+        "title": "Tool-calling integration for AI surfaces (Task Chat as first consumer)",
+        "description": "Add tool/function-calling support so AI chat surfaces can fetch data mid-conversation — e.g. answer a Task Chat question that needs information from *other* tasks. Experimental Task Chat is the first consumer.\n\n## Why now\n\nTask Chat (experimental, behind the per-user `taskChat` flag) currently answers only from a single task's pre-loaded context (`formatIssueContext`). Real questions often need related tasks (\"what's blocking the thing this depends on?\"). The data is already reachable; the missing piece is letting the model *ask* for it.\n\n## Findings (from codebase research)\n\n* `lib/openrouter.js` `streamChat` has **no** tool-calling: the request body is `{model, messages, temperature, max_tokens, stream}` and the stream parser handles content deltas only. No function-calling exists anywhere in the code today — this is the one genuinely new primitive.\n* Read operations already exist: the Linear provider implements `fetchIssueContext` / `fetchRecommendationContext` (get-task-by-id); `search` and `relations` exist in `lib/linear.js` + `lib/linear-cli.js` and as proxy read endpoints, though the Linear provider's `search()` / `relations()` are declared-but-unimplemented headroom (`lib/providers/interface.js`).\n* The task-chat route already fetches a task with a workspace-scoped token, so the tool path inherits workspace isolation for free.\n\n## Implementation Plan\n\n1. **Tool-loop primitive** — `chatWithTools` in `lib/openrouter.js`: send `tools` + `tool_choice` → handle `tool_calls` → execute the read fn → append results as `role:\"tool\"` messages → loop until `finish_reason !== tool_calls` (cap ~4 hops) → stream the final turn. Simplest first cut: non-streaming tool hops, stream only the final answer. (~150–250 LOC + tests)\n2. **Read-only tool catalog** — `get_task(identifier)`, `search_tasks(query)`, `get_relations(identifier)`, backed by existing functions; wire the Linear provider's `search()`.\n3. **Wire into Task Chat** — add the tools + loop behind the `taskChat` flag; emit `tool_call` SSE breadcrumbs so the UI shows `↳ looked up LIN-45…`.\n\nFiles to modify: `lib/openrouter.js` (new `chatWithTools` + tool catalog), `routes/` task-chat handler (wire tools behind flag), tests in `tests/unit/`. Testing strategy: unit-test the loop (iteration cap + tool-error path); one E2E that asks a cross-task question behind the flag.\n\n**Session fit: fits one focused session.** The only genuinely new primitive is the tool loop in `lib/openrouter.js`; the catalog and the wire-in are thin wrappers over functions that already exist.\n\n## Risks / constraints\n\n* **Model support:** tool-calling needs a tool-capable model — guard/fallback when `resolveWorkspaceModel` returns a non-tool model.\n* **Free tier:** count the whole tool turn as one quota unit.\n* **Safety:** tools strictly **read-only** for V1; validate identifiers (`isValidIssueId`); scope every tool to the workspace.\n\n## Done when\n\n* A reusable tool-calling primitive exists in `lib/openrouter.js` with unit tests for the loop (incl. the iteration cap and a tool-error path).\n* Task Chat can answer a question that requires another task's data, read-only, behind the flag, with tool-use breadcrumbs.",
+        "state": { "name": "In Progress", "type": "started" },
+        "createdAt": "2026-06-15T08:14:44.579Z",
+        "labels": []
+      },
+      "parent": null,
+      "siblings": [],
+      "siblingsTotal": 0,
+      "project": { "name": "Autopilot, Recommendation & Prompt Engine", "description": null },
+      "children": [],
+      "comments": [
+        {
+          "body": "Codebase research complete (see Findings in the description): `streamChat` has no tool-calling — that loop is the one new primitive; reads (`get_task`/`search`/`relations`) already exist and just need wiring.",
+          "createdAt": "2026-06-16T09:00:00.000Z"
+        },
+        {
+          "body": "Planning complete — phasing locked and written into the description as the Implementation Plan, with files-to-modify and testing strategy. **Fits one focused session.** Ready for implementation. No code written yet.",
+          "createdAt": "2026-06-16T10:30:00.000Z"
+        }
+      ],
+      "focusedChild": null
+    }
+  }
+}
