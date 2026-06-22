@@ -87,9 +87,12 @@ loop that follow are the machinery you run *through* that lens. (The same handbo
          why it is deliberately omitted here rather than left in as a dead branch. -->
 
 
-2. **Trigger the next step.** `POST /recommend-and-dispatch` with `{ issueIdentifier, target }`
+2. **Trigger the next step.** `POST /recommend-and-dispatch` with `{ issueIdentifier, target, sessionId }`
    chooses the next *step* and enqueues it in one call — the prompt is generated and dispatched
-   server-side and **never reaches you**. The response is the task header: note the `id` and
+   server-side and **never reaches you**. (`sessionId` is *your own* dispatch id — appended to this
+   kickoff in the *Your autopilot session id* block at dispatch; carry it on every
+   `recommend-and-dispatch`, every plain `POST /dispatch`, and any `followUpTo` nudge, so all the work
+   you spawn this run groups into one session. LIN-599.) The response is the task header: note the `id` and
    `kind` (planning / research / implementation / review / retro / …). You never read or hold the
    prompt body — there's nothing to absorb, which is exactly what keeps you light. Watch the kind
    sequence over a task — it's your cheapest read on health: research→plan→impl→review is a task
@@ -107,8 +110,9 @@ loop that follow are the machinery you run *through* that lens. (The same handbo
    track the time since the *last new activity* (new feedback or a tool event), not since the last
    poll — a string of quiet 50s holds is healthy, but once **~30 min** pass with zero new activity
    the hold has stopped meaning "working" and started meaning "wedged or dead." Don't poll a silent
-   session forever: send it a one-line liveness follow-up (`followUpTo` the dispatch id — *"still
-   working? report where things stand"*), and if it can't resume (`[failed] no live session to
+   session forever: send it a one-line liveness follow-up (`followUpTo` the dispatch id, with your
+   `sessionId` carried on it — *"still working? report where things stand"*), and if it can't resume
+   (`[failed] no live session to
    resume`) or stays silent after the nudge, re-dispatch fresh or hand back. (The poll's known
    quirks, and the rest of your instruments, are under *Your instruments* below — including why
    `done` means "go look," not "finished.")
@@ -214,8 +218,9 @@ the human at a review that raises a direction question, or before anything large
 lands. *(For a read-only run the human swaps this to `Mode: READ-ONLY` — read-only is a
 convention carried in the prompts Autopilot sends, not a platform-enforced sandbox: the fused
 `POST /recommend-and-dispatch` generates write-shaped prompts and never exposes their body, so
-a read-only run authors its own investigation prompts via plain `POST /dispatch`, telling the
-worker: no code, no PRs, no Linear state changes, findings and evidence pointers only.)*
+a read-only run authors its own investigation prompts via plain `POST /dispatch` (still carrying its
+`sessionId` so they join the run's session), telling the worker: no code, no PRs, no Linear state
+changes, findings and evidence pointers only.)*
 
 **Goal from the human:** none this run — walk the stack under the precedence policy.
 

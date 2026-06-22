@@ -315,7 +315,10 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       let spawn = undefined;
       if (target === 'local') {
         try {
-          const stagingFilePath = writeHarbourStagingFile(item._id, prompt);
+          // Use item.prompt (not the request-body `prompt`): addItem may have
+          // amended it — e.g. the LIN-599 autopilot session-id block — and the
+          // spawned session must see exactly what cli/web consumers receive.
+          const stagingFilePath = writeHarbourStagingFile(item._id, item.prompt);
 
           let feedbackUrl;
           let mintedToken;
@@ -325,7 +328,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
             mintedToken = minted.token;
           }
 
-          spawn = spawnClaudeSession(prompt, {
+          spawn = spawnClaudeSession(item.prompt, {
             repo: item.repo || undefined,
             dispatchId: item._id,
             feedbackUrl,
