@@ -299,33 +299,38 @@ main.collective-page[data-url-key]      - page container
 - `POST /workspace/{urlKey}/api/collective/say` — `{ channel, message }`
 - `window.__COLLECTIVE_DATA__` carries `{ urlKey, defaultChannel, yapConfigured }`
 
-## Autopilot Dashboard (experimental)
+## Autopilot Observation (first-class)
 
-The Autopilot Dashboard (`/workspace/{urlKey}/dashboard`) is a realtime, mobile-first feed of autopilot runs merged across ALL connected workspaces. Requires the per-user `dashboard` feature flag; surfaced only via a link in Settings. NOTE: distinct from the first-class project tree view (the "dashboard" at `/workspace/{urlKey}/`); this is the separate experimental autopilot view. A "run" is a derived Loop record (dispatch + foreman); the live feed reads Mongo only (no Linear calls per poll). Runs are grouped client-side into **sessions** (one per task = workspace + issue); the feed defaults to **autopilot-only** scope (sessions containing an `autopilot`-kind orchestrator run) and can be relaxed to "All runs". A taken run with a terminal feedback marker (`[done]`/`[failed]`/…, lib/dispatch-terminal.js) is treated as complete/error, so finished runs leave the Active feed.
+The Autopilot Observation page (`/workspace/{urlKey}/observation`) is a realtime, mobile-first feed of autopilot **sessions** merged across ALL connected workspaces. First-class: a footer link, no feature flag (it superseded the retired experimental `dashboard` flag/view; `/workspace/{urlKey}/dashboard` now 302-redirects here). NOTE: distinct from the first-class project tree view (the "dashboard" at `/workspace/{urlKey}/`). A **session** is the LIN-591 reconstructed `sessionId` spine — an autopilot orchestrator dispatch plus every worker it spawned across the seed/epic's descended + spun-off tasks — NOT a per-task grouping. The live feed reads Mongo only (no Linear calls per poll, no LLM per poll). Session terminality follows the anchor autopilot loop (a `[done]`/`[failed]`/… feedback marker, lib/dispatch-terminal.js, folds in), so finished sessions leave the Active feed for the collapsible Completed archive.
 
-### Autopilot Dashboard DOM Structure
+### Autopilot Observation DOM Structure
 ```
-main.dashboard-page[data-url-key]       - page container
-  #dashboard-banner / #dashboard-banner-line  - at-a-glance counts (active/done/errors)
-  #dashboard-poll-status                 - live poll status line
-  #dashboard-scope                       - scope toggle (group)
-    .dashboard-scope-btn[data-scope].is-on   - "autopilot" (default) | "all"
-  #dashboard-chips                       - workspace filter chips (group)
-    .dashboard-chip[data-ws].is-on       - one per workspace (data-ws = urlKey); .is-on when shown
-  #dashboard-active / #dashboard-active-empty   - active sessions feed (ul) + empty state
-  #dashboard-recent / #dashboard-recent-empty   - recent sessions feed (ul) + empty state
-    li.dashboard-session[data-key][data-state][data-autopilot]  - one task session
-      button.dashboard-session-head      - click to expand/collapse the session
-      .dashboard-session-body            - (when open) AI run summary at TOP, then events
-        .dashboard-summary-block / .dashboard-summary-btn  - on-demand run summary + refresh
-        ul.dashboard-runs > li.dashboard-event[data-loop-id]  - nested run; head click expands feedback
+main.obs-page[data-url-key]             - page container
+  #obs-banner / #obs-banner-line        - at-a-glance counts (active/done/errors)
+  #obs-poll-status                      - live poll status line
+  #obs-chips                            - workspace filter chips (group)
+    .obs-chip[data-ws].is-on            - one per workspace (data-ws = urlKey); .is-on when shown
+  #obs-active / #obs-active-empty       - active sessions feed (ul) + empty state
+  #obs-archive-toggle / #obs-archive-count  - collapsible completed archive header + count
+  #obs-archive-body                     - (when open) the completed archive body
+    #obs-recent / #obs-recent-empty     - completed sessions feed (ul) + empty state
+      li.obs-session[data-session][data-status]  - one autopilot session
+        button.obs-session-head         - click to expand/collapse the session
+          .obs-pill[data-status]        - status pill (◐ in-progress / ✓ done / ✕ error)
+          .obs-session-summary          - one-sentence session summary (LIN-592)
+          .obs-progress > .obs-seg[data-state][data-live]  - per-worker-run progress bar (live segment pulses)
+          .obs-summary-gen              - (terminal, uncached) explicit "summarise this session" button
+        .obs-session-body               - (when open) status line + tasks + run list
 ```
 
-### Autopilot Dashboard Endpoints
-- `GET  /workspace/{urlKey}/api/dashboard/loops` — merged cross-workspace runs → `{ workspaces[], active[], recent[], counts, generatedAt }`; each run is workspace-tagged (`workspaceUrlKey`, `workspaceName`). Polled every 5s (visibility-gated).
-- `GET|POST /workspace/{urlKey}/api/dashboard/run-summary/{loopId}` — cached short summary `{ outcome, whatHappened[], blockers[], next }`. POST forces regeneration. `GET ?cachedOnly=1` peeks the cache without generating (204 on a miss — the overlay uses it to auto-show a cached summary for free). 409 if the run is still active (terminal-only), 404 if unknown.
-- `GET  /workspace/{urlKey}/api/dashboard/hydrate/{wsUrlKey}/{identifier}` — best-effort live Linear state/labels for a run's issue (drill-down only); returns `{ hydrated: false }` rather than erroring on an expired token.
-- `window.__DASHBOARD_DATA__` carries `{ urlKey, workspaces }`.
+### Autopilot Observation Endpoints
+- `GET  /workspace/{urlKey}/api/dashboard/sessions` — merged cross-workspace sessionId-grouped feed → `{ workspaces[], active[], recent[], counts, generatedAt }`; each session is workspace-tagged (`workspaceUrlKey`, `workspaceName`) and carries `{ sessionId, seedIssue, seedTitle, tasksTouched[], status, terminal, runCount, runs[], runtime, model, lastActivity }`. Polled every 5s (visibility-gated). Mongo-only, no LLM.
+- `GET  /workspace/{urlKey}/api/dashboard/loops` — merged cross-workspace flat runs → `{ workspaces[], active[], recent[], counts, generatedAt }`; each run is workspace-tagged. Polled at 5s.
+- `GET|POST /workspace/{urlKey}/api/dashboard/run-summary/{loopId}` — cached short run summary `{ outcome, whatHappened[], blockers[], next }`. POST forces regeneration. `GET ?cachedOnly=1` peeks the cache without generating (204 on a miss). 409 if the run is still active (terminal-only), 404 if unknown.
+- `GET|POST /workspace/{urlKey}/api/dashboard/session-summary/{sessionId}` — cached one-sentence session rollup (terminal-gated). A live session returns a cheap `live:true` status-line proxy (no generation). `GET ?cachedOnly=1` peeks without spending.
+- `GET  /workspace/{urlKey}/api/dashboard/session-context/{sessionId}` — deterministic tasks-touched + relationship graph (lazy Linear hydration on drill-down).
+- `GET  /workspace/{urlKey}/api/dashboard/hydrate/{wsUrlKey}/{identifier}` — best-effort live Linear state/labels for a session's issue (drill-down only); returns `{ hydrated: false }` rather than erroring on an expired token.
+- `window.__OBSERVATION_DATA__` carries `{ urlKey, workspaces }`.
 
 ## Task Chat (experimental)
 

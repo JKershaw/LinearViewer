@@ -1,13 +1,16 @@
 /**
- * Unit tests for routes/dashboard.js (LIN-509).
+ * Unit tests for routes/dashboard.js (LIN-509 / LIN-595).
  *
  * Run with: node --test tests/unit/dashboard-routes.test.js
  *
  * Exercises the route handlers directly (bypassing the workspaceFromUrl
  * middleware) against mock dispatch/agentStatus stores, asserting the load-bearing
- * contract: feature gating, cross-workspace merge + workspace tagging,
- * active/recent split, the terminal-only run-summary gate, and the deterministic
- * test-mode summary path with caching.
+ * contract: cross-workspace merge + workspace tagging, active/recent split, the
+ * sessionId-grouped Observation feed (LIN-595), the terminal-only run-summary
+ * gate, and the deterministic test-mode summary path with caching.
+ *
+ * NOTE: the experimental `dashboard` feature flag was retired in LIN-595 (the page
+ * is first-class), so these endpoints are session-authed only — no flag gate.
  */
 import { test, describe, before } from 'node:test';
 import assert from 'node:assert';
@@ -104,17 +107,21 @@ function workerHistoryItem(id, identifier, sessionId) {
   return { id, sessionId, issueIdentifier: identifier, issueTitle: `Title ${identifier}`, promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken', feedback: [{ message: 'pr opened' }] };
 }
 
-const ENABLED = { features: { dashboard: true } };
+// The page is first-class (LIN-595): no feature flag is required. ENABLED is kept
+// as an empty session so the existing spreads (`{ ...ENABLED, workspaces }`) read
+// naturally and document that no flag is needed.
+const ENABLED = {};
 
 // ─── /loops ────────────────────────────────────────────────────────────────────
 
 describe('GET /api/dashboard/loops', () => {
-  test('403 when the feature flag is off', async () => {
-    const router = makeRouter({});
+  test('serves the feed without a feature flag (first-class)', async () => {
+    const router = makeRouter({ 'ws-a': { live: [activeItem('a-live', 'LIN-1')], history: [], agentStatus: [] } });
     const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/loops');
-    const { req, res } = makeReqRes({ session: { workspaces: [] } });
+    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
     await handler(req, res);
-    assert.equal(res.statusCode, 403);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.active.length, 1);
   });
 
   test('merges runs across workspaces, tags each, and splits active/recent', async () => {
@@ -191,17 +198,105 @@ describe('GET /api/dashboard/loops', () => {
   });
 });
 
+// ─── /sessions (Observation feed; LIN-595) ───────────────────────────────────
+
+describe('GET /api/dashboard/sessions', () => {
+  test('groups loops into sessions, splits active/recent, and tags each', async () => {
+    const perWorkspace = {
+      // Terminal session: completed autopilot anchor + one completed worker.
+      'ws-a': {
+        live: [],
+        history: [autopilotHistoryItem('sess-1', 'LIN-100'), workerHistoryItem('w-1', 'LIN-101', 'sess-1')],
+        agentStatus: [agentStatusDone('sess-1', 'LIN-100'), agentStatusDone('w-1', 'LIN-101')]
+      },
+      // Live session: queued autopilot anchor (not terminal).
+      'ws-b': {
+        live: [autopilotLiveItem('sess-2', 'LIN-200')],
+        history: [],
+        agentStatus: []
+      }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const session = { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }, { urlKey: 'ws-b', name: 'Beta' }] };
+    const { req, res } = makeReqRes({ session });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const body = res.jsonBody;
+    assert.equal(body.active.length, 1, 'the live session is active');
+    assert.equal(body.recent.length, 1, 'the terminal session is recent');
+
+    const live = body.active[0];
+    assert.equal(live.sessionId, 'sess-2');
+    assert.equal(live.status, 'in-progress');
+    assert.equal(live.terminal, false);
+    assert.equal(live.workspaceUrlKey, 'ws-b');
+    assert.equal(live.workspaceName, 'Beta');
+
+    const done = body.recent[0];
+    assert.equal(done.sessionId, 'sess-1');
+    assert.equal(done.status, 'done');
+    assert.equal(done.terminal, true);
+    assert.equal(done.seedIssue, 'LIN-100');
+    assert.deepEqual(done.tasksTouched, ['LIN-100', 'LIN-101']);
+    // One worker run → one progress-bar segment (the anchor is excluded).
+    assert.equal(done.runCount, 1);
+    assert.equal(done.runs[0].issueIdentifier, 'LIN-101');
+    // Telemetry runtime is attached (LIN-594).
+    assert.ok(done.runtime, 'session carries a runtime telemetry block');
+    assert.equal(body.counts.total, 2);
+  });
+
+  test('a [failed] worker yields an error-status session', async () => {
+    const failWorker = { id: 'wf', sessionId: 'sess-9', issueIdentifier: 'LIN-301', issueTitle: 'T', promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken', feedback: [{ message: '[failed] broke', timestamp: NOW_ISO }] };
+    const perWorkspace = {
+      'ws-a': {
+        live: [],
+        history: [autopilotHistoryItem('sess-9', 'LIN-300'), failWorker],
+        agentStatus: [agentStatusDone('sess-9', 'LIN-300')]
+      }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const session = { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] };
+    const { req, res } = makeReqRes({ session });
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    const s = res.jsonBody.recent.find(x => x.sessionId === 'sess-9');
+    assert.ok(s, 'terminal session is recent');
+    assert.equal(s.status, 'error');
+  });
+
+  test('one failing workspace store does not blank the whole feed', async () => {
+    const router = createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore: {
+        async listItems(urlKey) { if (urlKey === 'bad') throw new Error('store down'); return []; },
+        async listHistory(urlKey) { if (urlKey === 'bad') throw new Error('store down'); return { items: [autopilotHistoryItem('sess-x', 'LIN-400')] }; }
+      },
+      agentStatusStore: { async listStatus() { return { items: [agentStatusDone('sess-x', 'LIN-400')] }; } },
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      fetchWorkspaceIssues: async () => [],
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({})
+    });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const session = { ...ENABLED, workspaces: [{ urlKey: 'bad', name: 'Bad' }, { urlKey: 'good', name: 'Good' }] };
+    const { req, res } = makeReqRes({ session });
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.counts.total, 1, 'good workspace still contributes its session');
+  });
+});
+
 // ─── run-summary ─────────────────────────────────────────────────────────────
 
 describe('run-summary endpoint', () => {
-  test('403 when the feature flag is off', async () => {
-    const router = makeRouter({});
-    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/run-summary/:loopId');
-    const { req, res } = makeReqRes({ session: {}, workspace: { urlKey: 'ws-a' }, params: { loopId: 'x' } });
-    await handler(req, res);
-    assert.equal(res.statusCode, 403);
-  });
-
   test('404 when the loop is not found', async () => {
     const router = makeRouter({ 'ws-a': { history: [], live: [], agentStatus: [] } });
     const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/run-summary/:loopId');
@@ -298,14 +393,6 @@ describe('session-summary endpoint', () => {
       }
     };
   }
-
-  test('403 when the feature flag is off', async () => {
-    const router = makeRouter({});
-    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/session-summary/:sessionId');
-    const { req, res } = makeReqRes({ session: {}, workspace: { urlKey: 'ws-a' }, params: { sessionId: 'sess-1' } });
-    await handler(req, res);
-    assert.equal(res.statusCode, 403);
-  });
 
   test('404 when the session is not found', async () => {
     const router = makeRouter({ 'ws-a': { history: [], live: [], agentStatus: [] } });
@@ -426,14 +513,6 @@ describe('session-context endpoint', () => {
       mk('LIN-101', 'LIN-101', 'LIN-100', NOW_ISO)                    // spun-off in window
     ];
   }
-
-  test('403 when the feature flag is off', async () => {
-    const router = makeRouter({});
-    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/session-context/:sessionId');
-    const { req, res } = makeReqRes({ session: {}, workspace: { urlKey: 'ws-a' }, params: { sessionId: 'sess-1' } });
-    await handler(req, res);
-    assert.equal(res.statusCode, 403);
-  });
 
   test('404 when the session is not found', async () => {
     const router = makeRouter({ 'ws-a': { history: [], live: [], agentStatus: [] } }, { issues: issueSet() });

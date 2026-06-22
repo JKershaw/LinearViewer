@@ -27,7 +27,7 @@ routes/
   proxy.js             Linear API proxy (token auth, read/write endpoints, cycles, labels, task automation)
   pipeline.js          Pipeline page and JSON polling routes
   collective.js        Collective experiment (experimental): page, multi-workspace dispatch fan-out, Yap state/say proxy (LIN-450)
-  dashboard.js         Autopilot dashboard (experimental): page, merged cross-workspace Loop feed, on-demand run-summary, lazy Linear hydration (LIN-509)
+  dashboard.js         Autopilot Observation page (first-class, LIN-595): /observation page + sessionId-grouped sessions feed + merged cross-workspace Loop feed, on-demand run-/session-summary, session-context, lazy Linear hydration (LIN-509). /dashboard 302s to /observation; data endpoints keep their /api/dashboard/* paths
   workspace-api.js     Workspace API routes (prompts, recommendations, audit, comments, images)
   test.js              Test-only routes for E2E tests (mock sessions, fixtures)
   legacy-redirects.js  Backward-compatible redirects for old URLs
@@ -55,7 +55,7 @@ lib/
   render-dispatch.js   Dispatch page renderer (prompt, queue, tokens, history)
   render-pipeline.js   Pipeline page renderer (floor view shell)
   render-collective.js Collective page renderer (experimental discussion shell)
-  render-dashboard.js  Autopilot dashboard page renderer (experimental; mobile-first feed shell, Swipe-modeled)
+  render-observation.js Autopilot Observation page renderer (first-class; mobile-first feed shell + collapsible completed archive, Swipe-modeled; LIN-595)
   render-roadmap.js    Roadmap page renderer (delivery-focused)
   render-ship.js       Ship page renderer (radial view shell)
   render-swim.js       Swim lanes page renderer
@@ -142,7 +142,7 @@ public/
   dispatch.css / dispatch.js    Dispatch page (prompt, queue, tokens, history)
   pipeline.css / pipeline.js    Pipeline floor view (polling, diffing, overlays)
   collective.css / collective.js  Collective page (setup, transcript poll, say box)
-  dashboard.css / dashboard.js  Autopilot dashboard (merged-loops poll, status banner, autopilot-scope + workspace filters, runs grouped into expandable task sessions, run-summary at top of each session)
+  observation.css / observation.js  Autopilot Observation page (sessionId-grouped sessions poll, status banner, workspace filters, Level-1 active feed + collapsible completed archive, Level-2 session cards with status pill / one-sentence summary / runtime+model / per-worker-run progress bar; LIN-595)
   roadmap.css / roadmap.js      Roadmap page
   ship.css / ship.js            Ship radial view
   swim.css / swim.js            Swim lanes view
@@ -188,7 +188,7 @@ When changing prompt behavior, see **[docs/prompt-change-validation.md](docs/pro
 
 ### View Tiers
 
-Views are surfaced in one of three deliberate tiers (LIN-496). **First-class** (dashboard / swipe / swim / settings) — always-on footer links, no flag. **Experimental** (collective / taskChat / ship / dashboard) — per-user flag (default off) in `lib/feature-defaults.js`, listed in `EXPERIMENTAL_FEATURES` in `lib/render-settings.js`, surfaced **only** via a Settings link when on, and route-gated to redirect to `/settings` when off. (Naming note: the **first-class** "dashboard" is the unprefixed project tree view at `/workspace/:urlKey/`; the **experimental** `dashboard` flag/view is the separate realtime, cross-workspace *autopilot* dashboard at `/workspace/:urlKey/dashboard` — LIN-509. Same word, two surfaces.) **Flagged power-user** (roadmap / dispatch / proxy / pipeline) — per-user flag plus a conditional footer link in `lib/components/footer.js`. `/ship` is a key in-development experiment (radial dependency layout), not a retirement candidate; its radial layout is the protected experiment and its token wiring is LIN-500. Full model + the Step-2 "new canvas/radial concept doesn't fit the section/card/token model" friction note: **[docs/view-tiers.md](docs/view-tiers.md)**.
+Views are surfaced in one of three deliberate tiers (LIN-496). **First-class** (dashboard / observation / swipe / swim / settings) — always-on footer links, no flag. **Experimental** (collective / taskChat / ship) — per-user flag (default off) in `lib/feature-defaults.js`, listed in `EXPERIMENTAL_FEATURES` in `lib/render-settings.js`, surfaced **only** via a Settings link when on, and route-gated to redirect to `/settings` when off. (Naming note: the **first-class** "dashboard" is the unprefixed project tree view at `/workspace/:urlKey/`; the separate realtime, cross-workspace *autopilot* dashboard — formerly the experimental `dashboard` flag/view at `/workspace/:urlKey/dashboard`, LIN-509 — was promoted to the first-class **Observation** page at `/workspace/:urlKey/observation` and its flag retired (LIN-595); `/dashboard` now 302s to `/observation`.) **Flagged power-user** (roadmap / dispatch / proxy / pipeline) — per-user flag plus a conditional footer link in `lib/components/footer.js`. `/ship` is a key in-development experiment (radial dependency layout), not a retirement candidate; its radial layout is the protected experiment and its token wiring is LIN-500. Full model + the Step-2 "new canvas/radial concept doesn't fit the section/card/token model" friction note: **[docs/view-tiers.md](docs/view-tiers.md)**.
 
 ## Code Style
 

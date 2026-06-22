@@ -1,26 +1,35 @@
 /**
- * Dashboard routes — the experimental combined, realtime autopilot dashboard (LIN-509).
+ * Observation routes — the first-class autopilot Observation page (LIN-595),
+ * which supersedes the experimental autopilot dashboard (LIN-509).
  *
- * Anchored at /workspace/:urlKey/dashboard (reusing workspaceFromUrl + the
- * pipeline feature-gate-redirect-to-settings pattern), the page is *anchored* to
- * one workspace for auth/navbar/gate but *operates* over every connected workspace
- * in `session.workspaces`: it merges the cheap per-workspace Loop reads
- * (getLoopsForWorkspace — pure Mongo, no Linear API) into one cross-workspace feed.
+ * The page is *anchored* to one workspace for auth/navbar but *operates* over
+ * every connected workspace in `session.workspaces`: it merges the cheap
+ * per-workspace Loop / session reads (pure Mongo, no Linear API) into one
+ * cross-workspace feed.
  *
- *   GET      /workspace/:urlKey/dashboard                          — page shell (gated)
- *   GET      /workspace/:urlKey/api/dashboard/loops                — merged cross-workspace runs (poll source)
+ *   GET      /workspace/:urlKey/observation                        — page shell (first-class, no flag)
+ *   GET      /workspace/:urlKey/dashboard                          — 302 → /observation (retired flag)
+ *   GET      /workspace/:urlKey/api/dashboard/sessions             — sessionId-grouped feed (observation poll source; LIN-595)
+ *   GET      /workspace/:urlKey/api/dashboard/loops                — merged cross-workspace runs (flat poll source)
  *   GET|POST /workspace/:urlKey/api/dashboard/run-summary/:loopId  — cached, on-demand short run summary
  *   GET|POST /workspace/:urlKey/api/dashboard/session-summary/:sessionId — cached session rollup (terminal); cheap latest-child statusLine proxy when live (LIN-592)
+ *   GET      /workspace/:urlKey/api/dashboard/session-context/:sessionId — deterministic tasks-touched + relationship graph (LIN-593)
  *   GET      /workspace/:urlKey/api/dashboard/hydrate/:urlKey2/:identifier — lazy Linear hydration (drill-down only)
  *
- * Performance rule (LIN-509): the live feed reads Loops from Mongo only — it never
- * fans buildPipelineSnapshot/fetchProjects out per poll. Linear issue metadata is
+ * Performance rule (LIN-509/595): the live feed reads Loops from Mongo only — it
+ * never fans buildPipelineSnapshot/fetchProjects out per poll, and never spends an
+ * LLM call per poll (summaries are on-demand + cached). Linear issue metadata is
  * hydrated lazily, only inside an open drill-down, for that one workspace's token,
  * best-effort (an expired-token workspace still lists its runs from Mongo).
+ *
+ * Tier note (LIN-595): the `/api/dashboard/*` endpoints are kept under their
+ * original paths (the data layer the observation page reuses unchanged), but are
+ * no longer gated by the retired experimental `dashboard` feature flag — the page
+ * is first-class, so its data endpoints are session-authed only.
  */
 
 import { Router } from 'express';
-import { renderDashboardPage } from '../lib/render-dashboard.js';
+import { renderObservationPage } from '../lib/render-observation.js';
 import { getLoopsForWorkspace, getSessionsForWorkspace, deriveIssueGraph } from '../lib/pipeline-loops.js';
 import { buildSessionContextGraph } from '../lib/context-graph.js';
 import { deriveTerminalStatus, deriveCompletedAt } from '../lib/dispatch-terminal.js';
@@ -164,18 +173,98 @@ export function createDashboardRoutes({
     return merged;
   }
 
+  // ─── Session payload builders (observation feed; LIN-595) ─────────────────────
+
+  // Most-recent activity across a session's (enriched) loops — the observation
+  // feed sort key. Falls back to the session's own completion/dispatch time.
+  function sessionActivityMs(enrichedLoops, session) {
+    let max = 0;
+    for (const l of enrichedLoops) max = Math.max(max, loopActivityMs(l));
+    if (!max && session.completedAt) max = new Date(session.completedAt).getTime() || 0;
+    if (!max && session.dispatchedAt) max = new Date(session.dispatchedAt).getTime() || 0;
+    return Number.isFinite(max) ? max : 0;
+  }
+
+  // Shape one reconstructed session for the observation feed. Loops are enriched
+  // (marker-aware agentState/completedAt) so a marker-done run doesn't look live
+  // forever; terminality follows the ANCHOR loop (LIN-592), not completedAt.
+  function buildSessionPayload(session, ws) {
+    const anchor = findAnchorLoop(session);
+    const enriched = (Array.isArray(session.loops) ? session.loops : []).map(enrichLoop);
+    const children = childLoops(session).map(enrichLoop);
+    const terminal = sessionIsTerminal(session);
+    const status = !terminal
+      ? 'in-progress'
+      : (enriched.some(l => l.agentState === 'error') ? 'error' : 'done');
+
+    // One segment per worker run for the progress bar (state-colored; the live
+    // one pulses client-side).
+    const runs = children.map(l => ({
+      loopId: l.loopId,
+      issueIdentifier: l.issueIdentifier || null,
+      issueTitle: l.issueTitle || '',
+      agentState: l.agentState,
+      stage: l.stage || null,
+      promptName: l.promptName || null,
+      kind: l.kind || null,
+      iteration: l.iteration ?? null
+    }));
+
+    const telemetry = session.telemetry || {};
+    const lastActivityMs = sessionActivityMs(enriched, session);
+
+    return {
+      sessionId: session.sessionId,
+      workspaceUrlKey: ws.urlKey,
+      workspaceName: ws.name || ws.urlKey,
+      seedIssue: session.seedIssue || null,
+      seedTitle: (anchor && anchor.issueTitle) || (session.loops?.[0]?.issueTitle) || session.seedIssue || '',
+      tasksTouched: Array.isArray(session.tasksTouched) ? session.tasksTouched : [],
+      status,
+      terminal,
+      runCount: runs.length,
+      runs,
+      dispatchedAt: session.dispatchedAt || null,
+      completedAt: session.completedAt || null,
+      lastActivity: lastActivityMs ? new Date(lastActivityMs).toISOString() : null,
+      runtime: telemetry.runtime || null,
+      model: telemetry.model || null
+    };
+  }
+
+  /**
+   * Merge reconstructed autopilot sessions across every connected workspace,
+   * newest activity first. Pure Mongo reads (no Linear, no LLM — the per-poll
+   * cost contract). No issueGraph is injected here: lazy Linear hydration is a
+   * drill-down concern (session-context), so explicit `sessionId` grouping
+   * (forward-stamped runs, LIN-599) carries the feed and the inference fallback
+   * degrades to each seed's own loops. One bad store degrades to empty.
+   *
+   * @param {Array<{urlKey: string, name: string}>} workspaces
+   * @returns {Promise<Array<Object>>}
+   */
+  async function mergeSessions(workspaces) {
+    const settled = await Promise.allSettled(
+      workspaces.map(async (ws) => {
+        const sessions = await getSessionsForWorkspace(ws.urlKey, loopDeps);
+        return sessions.map(s => buildSessionPayload(s, ws));
+      })
+    );
+    const merged = [];
+    for (const r of settled) {
+      if (r.status === 'fulfilled') merged.push(...r.value);
+      else console.error('Observation: session read failed for a workspace:', r.reason?.message);
+    }
+    merged.sort((a, b) => (new Date(b.lastActivity || 0).getTime()) - (new Date(a.lastActivity || 0).getTime()));
+    return merged;
+  }
+
   // ─── HTML page ──────────────────────────────────────────────────────────────
 
-  router.get('/workspace/:urlKey/dashboard', workspaceFromUrl, (req, res) => {
+  // First-class observation page (LIN-595): no feature flag (mirrors swim).
+  router.get('/workspace/:urlKey/observation', workspaceFromUrl, (req, res) => {
     const workspace = req.workspace;
-    const featureFlags = getFeatureFlags(req.session);
-
-    // Gate: experimental feature must be enabled (mirrors pipeline/collective).
-    if (featureFlags.dashboard !== true) {
-      return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
-    }
-
-    const html = renderDashboardPage(
+    const html = renderObservationPage(
       {
         workspaces: (req.session.workspaces || []).map(w => ({ urlKey: w.urlKey, name: w.name }))
       },
@@ -184,19 +273,43 @@ export function createDashboardRoutes({
         urlKey: workspace.urlKey,
         openRouterSource: getOpenRouterSource(req),
         workspaces: req.session.workspaces,
-        featureFlags
+        featureFlags: getFeatureFlags(req.session)
       }
     );
     res.send(html);
   });
 
-  // ─── Merged cross-workspace loops (poll source) ───────────────────────────────
+  // Retired experimental dashboard (LIN-509) → 302 to the first-class page.
+  router.get('/workspace/:urlKey/dashboard', workspaceFromUrl, (req, res) => {
+    res.redirect(`/workspace/${encodeURIComponent(req.workspace.urlKey)}/observation`);
+  });
+
+  // ─── Sessions feed (observation poll source; LIN-595) ─────────────────────────
+
+  router.get('/workspace/:urlKey/api/dashboard/sessions', workspaceFromUrl, async (req, res) => {
+    const workspaces = (req.session.workspaces || []).map(w => ({ urlKey: w.urlKey, name: w.name }));
+
+    try {
+      const merged = await mergeSessions(workspaces);
+      const active = merged.filter(s => !s.terminal);
+      const recent = merged.filter(s => s.terminal).slice(0, recentLimit);
+
+      res.json({
+        workspaces,
+        active,
+        recent,
+        counts: { active: active.length, recent: recent.length, total: merged.length },
+        generatedAt: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Observation sessions error:', error);
+      res.status(500).json({ error: 'Could not load sessions' });
+    }
+  });
+
+  // ─── Merged cross-workspace loops (flat poll source) ──────────────────────────
 
   router.get('/workspace/:urlKey/api/dashboard/loops', workspaceFromUrl, async (req, res) => {
-    if (getFeatureFlags(req.session).dashboard !== true) {
-      return res.status(403).json({ error: 'Dashboard feature is not enabled' });
-    }
-
     const workspaces = (req.session.workspaces || []).map(w => ({ urlKey: w.urlKey, name: w.name }));
 
     try {
@@ -220,9 +333,6 @@ export function createDashboardRoutes({
   // ─── On-demand short run summary (cached) ─────────────────────────────────────
 
   async function handleRunSummary(req, res, { force }) {
-    if (getFeatureFlags(req.session).dashboard !== true) {
-      return res.status(403).json({ error: 'Dashboard feature is not enabled' });
-    }
     if (!runSummaryCacheStore) {
       return res.status(503).json({ error: 'Run summary store unavailable' });
     }
@@ -371,9 +481,6 @@ export function createDashboardRoutes({
   }
 
   async function handleSessionSummary(req, res, { force }) {
-    if (getFeatureFlags(req.session).dashboard !== true) {
-      return res.status(403).json({ error: 'Dashboard feature is not enabled' });
-    }
     if (!sessionSummaryCacheStore) {
       return res.status(503).json({ error: 'Session summary store unavailable' });
     }
@@ -473,10 +580,6 @@ export function createDashboardRoutes({
   // /loops + /session-summary paths run without (they pass no issueGraph).
 
   router.get('/workspace/:urlKey/api/dashboard/session-context/:sessionId', workspaceFromUrl, async (req, res) => {
-    if (getFeatureFlags(req.session).dashboard !== true) {
-      return res.status(403).json({ error: 'Dashboard feature is not enabled' });
-    }
-
     const workspace = req.workspace;
     const { sessionId } = req.params;
     if (!sessionId) return res.status(400).json({ error: 'sessionId is required' });
@@ -519,10 +622,6 @@ export function createDashboardRoutes({
   // null hydration — the run detail still renders from the Mongo Loop data.
 
   router.get('/workspace/:urlKey/api/dashboard/hydrate/:wsUrlKey/:identifier', workspaceFromUrl, async (req, res) => {
-    if (getFeatureFlags(req.session).dashboard !== true) {
-      return res.status(403).json({ error: 'Dashboard feature is not enabled' });
-    }
-
     const { wsUrlKey, identifier } = req.params;
     // Only hydrate workspaces the user is actually connected to (never trust the path).
     const connected = (req.session.workspaces || []).some(w => w.urlKey === wsUrlKey);
