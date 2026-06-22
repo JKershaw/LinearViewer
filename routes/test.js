@@ -30,7 +30,7 @@ import { defaultGitHubSeed, GITHUB_WORKSPACE_URL_KEY, GITHUB_REPO } from '../tes
  * @param {Function} options.getWorkspaceAccessToken - Function to look up workspace access token
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, runSummaryCacheStore, reportHistoryStore, localStore, getWorkspaceAccessToken }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, localStore, getWorkspaceAccessToken }) {
   const router = Router();
 
   // ── Mock Yap server (LIN-450) ─────────────────────────────────────────────
@@ -391,6 +391,22 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
         return res.status(400).json({ error: 'loopId required' });
       }
       if (runSummaryCacheStore) await runSummaryCacheStore.delete(urlKey, loopId);
+      res.send('ok');
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Endpoint to clear a specific session-summary cache entry for tests (LIN-592).
+  // Query params: ?urlKey=...&sessionId=...
+  router.get('/test/clear-session-summary-cache', async (req, res) => {
+    try {
+      const urlKey = req.query.urlKey || 'test-workspace';
+      const sessionId = req.query.sessionId;
+      if (!sessionId) {
+        return res.status(400).json({ error: 'sessionId required' });
+      }
+      if (sessionSummaryCacheStore) await sessionSummaryCacheStore.delete(urlKey, sessionId);
       res.send('ok');
     } catch (err) {
       res.status(500).json({ error: err.message });

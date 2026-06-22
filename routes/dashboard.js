@@ -10,6 +10,7 @@
  *   GET      /workspace/:urlKey/dashboard                          — page shell (gated)
  *   GET      /workspace/:urlKey/api/dashboard/loops                — merged cross-workspace runs (poll source)
  *   GET|POST /workspace/:urlKey/api/dashboard/run-summary/:loopId  — cached, on-demand short run summary
+ *   GET|POST /workspace/:urlKey/api/dashboard/session-summary/:sessionId — cached session rollup (terminal); cheap latest-child statusLine proxy when live (LIN-592)
  *   GET      /workspace/:urlKey/api/dashboard/hydrate/:urlKey2/:identifier — lazy Linear hydration (drill-down only)
  *
  * Performance rule (LIN-509): the live feed reads Loops from Mongo only — it never
@@ -20,7 +21,7 @@
 
 import { Router } from 'express';
 import { renderDashboardPage } from '../lib/render-dashboard.js';
-import { getLoopsForWorkspace } from '../lib/pipeline-loops.js';
+import { getLoopsForWorkspace, getSessionsForWorkspace } from '../lib/pipeline-loops.js';
 import { deriveTerminalStatus, deriveCompletedAt } from '../lib/dispatch-terminal.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import {
@@ -29,6 +30,14 @@ import {
   DEFAULT_RUN_SUMMARY_MODEL
 } from '../lib/run-summary.js';
 import { hashLoop } from '../lib/run-summary-cache.js';
+import {
+  generateSessionSummary,
+  parseSessionSummaryResponse,
+  findAnchorLoop,
+  childLoops,
+  DEFAULT_SESSION_SUMMARY_MODEL
+} from '../lib/session-summary.js';
+import { hashSession } from '../lib/session-summary-cache.js';
 
 // A run is summarisable only once it is immutable. agentState is terminal at
 // 'complete'/'error'; until then a summary would snapshot a moving target and
@@ -98,6 +107,7 @@ function enrichLoop(loop) {
  * @param {Object}   deps.dispatchQueueStore       - dispatch store (listItems/listHistory)
  * @param {Object}   deps.agentStatusStore             - agent status store
  * @param {Object}   deps.runSummaryCacheStore     - run-summary cache store
+ * @param {Object}   deps.sessionSummaryCacheStore - session-summary cache store (LIN-592)
  * @param {Object}   deps.freeTierStore            - free-tier usage store (rate limit)
  * @param {Function} deps.getWorkspaceAccessToken  - (urlKey) → token (lazy hydration only)
  * @param {Function} deps.fetchIssueContext        - (token, identifier) → issue context (lazy hydration)
@@ -111,6 +121,7 @@ export function createDashboardRoutes({
   dispatchQueueStore,
   agentStatusStore,
   runSummaryCacheStore,
+  sessionSummaryCacheStore,
   freeTierStore,
   getWorkspaceAccessToken,
   fetchIssueContext,
@@ -289,6 +300,165 @@ export function createDashboardRoutes({
   router.post('/workspace/:urlKey/api/dashboard/run-summary/:loopId', workspaceFromUrl, (req, res) =>
     handleRunSummary(req, res, { force: true }));
 
+  // ─── On-demand session rollup summary (cached; LIN-592) ───────────────────────
+  //
+  // Rolls a whole autopilot session (orchestrator + spawned workers across one or
+  // more tasks) into a one-sentence outcome + present-tense statusLine. Mirrors
+  // handleRunSummary, with two session-specific decisions:
+  //
+  //   (a) Terminal-session gate. The session record carries no terminal flag and
+  //       completedAt is non-null as soon as ANY loop is terminal — not "the
+  //       session is done." Terminality is derived from the ANCHOR loop
+  //       (kind:'autopilot', loopId===sessionId) via the same marker-aware
+  //       isTerminalLoop used for runs; an anchorless/orphan session requires ALL
+  //       its loops terminal. Only a terminal session is generated and cached.
+  //
+  //   (b) Live statusLine honesty. A live session is NEVER generated or cached.
+  //       Instead it returns a cheap proxy: the latest *terminal* child's cached
+  //       run-summary.outcome (run-summary exists only for terminal children, so
+  //       the truly-latest in-flight child usually has none). This lags the
+  //       in-flight child — a named, accepted proxy, surfaced as live:true +
+  //       statusLineSource:'latest-completed-child', not misrepresented as live.
+
+  // Marker-aware terminal check for a raw session loop (loops from
+  // getSessionsForWorkspace are not pre-enriched).
+  function loopIsTerminal(loop) {
+    return isTerminalLoop(enrichLoop(loop));
+  }
+
+  // Is the whole session terminal (cacheable)? Anchor-loop terminality, with an
+  // all-loops-terminal fallback for anchorless/orphan sessions.
+  function sessionIsTerminal(session) {
+    const anchor = findAnchorLoop(session);
+    if (anchor) return loopIsTerminal(anchor);
+    const loops = Array.isArray(session.loops) ? session.loops : [];
+    return loops.length > 0 && loops.every(loopIsTerminal);
+  }
+
+  // The cheap live proxy: latest terminal child's cached run-summary.outcome.
+  async function liveStatusLine(session, urlKey) {
+    const terminalChildren = childLoops(session)
+      .filter(loopIsTerminal)
+      .map(enrichLoop)
+      .sort((a, b) => loopActivityMs(b) - loopActivityMs(a));
+    const latest = terminalChildren[0];
+    if (!latest) return { statusLine: '', loopId: null };
+    let outcome = '';
+    if (runSummaryCacheStore) {
+      const cached = await runSummaryCacheStore.get(urlKey, latest.loopId);
+      outcome = cached?.summary?.outcome || '';
+    }
+    // No cached run-summary for the latest completed child → fall back to its own
+    // agent summary (still no LLM call). Empty when nothing is recorded.
+    if (!outcome) outcome = latest.agentSummary ? String(latest.agentSummary) : '';
+    return { statusLine: outcome.slice(0, 200), loopId: latest.loopId };
+  }
+
+  // Cached child run-summary outcomes for the generation context (no per-child
+  // generation — only what is already cached for terminal children).
+  async function gatherChildOutcomes(session, urlKey) {
+    const out = {};
+    if (!runSummaryCacheStore) return out;
+    for (const loop of childLoops(session)) {
+      if (!loopIsTerminal(loop)) continue;
+      const cached = await runSummaryCacheStore.get(urlKey, loop.loopId);
+      if (cached?.summary?.outcome) out[loop.loopId] = cached.summary.outcome;
+    }
+    return out;
+  }
+
+  async function handleSessionSummary(req, res, { force }) {
+    if (getFeatureFlags(req.session).dashboard !== true) {
+      return res.status(403).json({ error: 'Dashboard feature is not enabled' });
+    }
+    if (!sessionSummaryCacheStore) {
+      return res.status(503).json({ error: 'Session summary store unavailable' });
+    }
+
+    const workspace = req.workspace;
+    const { sessionId } = req.params;
+    if (!sessionId) return res.status(400).json({ error: 'sessionId is required' });
+
+    let session;
+    try {
+      const sessions = await getSessionsForWorkspace(workspace.urlKey, loopDeps);
+      session = sessions.find(s => String(s.sessionId) === String(sessionId)) || null;
+    } catch (error) {
+      console.error('Dashboard session-summary lookup error:', error);
+      return res.status(500).json({ error: 'Could not load the session' });
+    }
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+
+    // Live session: cheap proxy statusLine only, no generation, no caching.
+    if (!sessionIsTerminal(session)) {
+      const { statusLine, loopId } = await liveStatusLine(session, workspace.urlKey);
+      return res.json({
+        status: 'live',
+        sessionId,
+        live: true,
+        summary: { outcome: '', statusLine, highlights: [] },
+        statusLineSource: loopId ? 'latest-completed-child' : 'none',
+        statusLineLoopId: loopId,
+        model: null,
+        generatedAt: null
+      });
+    }
+
+    const inputHash = hashSession(session);
+
+    // Cache check (skip on force/POST).
+    if (!force) {
+      const cached = await sessionSummaryCacheStore.get(workspace.urlKey, sessionId);
+      if (cached && cached.inputHash === inputHash) {
+        return res.json({ status: 'cached', sessionId, live: false, summary: cached.summary, model: cached.model, generatedAt: cached.generatedAt });
+      }
+      // Peek mode: "is there a cached session summary?" without paying to generate.
+      if (req.query.cachedOnly === '1' || req.query.cachedOnly === 'true') {
+        return res.status(204).end();
+      }
+    }
+
+    // Test mode: deterministic summary, no OpenRouter call (keeps E2E offline).
+    if (process.env.NODE_ENV === 'test') {
+      const summary = buildTestSessionSummary(session);
+      await sessionSummaryCacheStore.put(workspace.urlKey, sessionId, { inputHash, summary, model: 'test-mock' });
+      return res.json({ status: 'fresh', sessionId, live: false, summary, model: 'test-mock', generatedAt: new Date().toISOString() });
+    }
+
+    // Resolve the OpenRouter key: user OAuth → env (via streamChat default) → free tier.
+    const sessionApiKey = req.session.openRouterApiKey;
+    const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
+    const useFreeTier = !sessionApiKey && !process.env.OPENROUTER_API_KEY && !!freeTierKey;
+
+    if (!sessionApiKey && !process.env.OPENROUTER_API_KEY && !freeTierKey) {
+      return res.status(503).json({ error: 'AI summaries are not configured' });
+    }
+
+    if (useFreeTier && freeTierStore) {
+      const check = await freeTierStore.tryUse(workspace.urlKey);
+      if (!check.allowed) {
+        return res.status(429).json({ error: check.reason, freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } });
+      }
+    }
+
+    try {
+      const apiKey = sessionApiKey || (useFreeTier ? freeTierKey : undefined);
+      const childOutcomes = await gatherChildOutcomes(session, workspace.urlKey);
+      const { summary, model } = await generateSessionSummary(session, { apiKey, model: DEFAULT_SESSION_SUMMARY_MODEL, childOutcomes });
+      await sessionSummaryCacheStore.put(workspace.urlKey, sessionId, { inputHash, summary, model });
+      res.json({ status: 'fresh', sessionId, live: false, summary, model, generatedAt: new Date().toISOString() });
+    } catch (error) {
+      console.error('Dashboard session-summary generation error:', error);
+      res.status(502).json({ error: 'Could not generate the session summary' });
+    }
+  }
+
+  router.get('/workspace/:urlKey/api/dashboard/session-summary/:sessionId', workspaceFromUrl, (req, res) =>
+    handleSessionSummary(req, res, { force: false }));
+
+  router.post('/workspace/:urlKey/api/dashboard/session-summary/:sessionId', workspaceFromUrl, (req, res) =>
+    handleSessionSummary(req, res, { force: true }));
+
   // ─── Lazy Linear hydration (drill-down only) ──────────────────────────────────
   // Best-effort: fetch live state/labels for ONE issue in ONE workspace, using
   // that workspace's own token. Failure (expired token, not found) degrades to a
@@ -344,5 +514,20 @@ export function buildTestSummary(loop) {
     whatHappened: what.length ? what : ['No additional run detail recorded'],
     blockers: loop.agentState === 'error' ? ['Run reported an error state'] : [],
     next: ''
+  }));
+}
+
+/**
+ * Deterministic session summary for test mode — derived from the session record,
+ * no AI. Exported for unit tests (LIN-592).
+ */
+export function buildTestSessionSummary(session) {
+  const tasks = Array.isArray(session?.tasksTouched) ? session.tasksTouched : [];
+  const n = tasks.length;
+  const plural = n === 1 ? '' : 's';
+  return parseSessionSummaryResponse(JSON.stringify({
+    outcome: `Session ${session?.sessionId || 'unknown'} completed across ${n} task${plural}${tasks.length ? ` (${tasks.join(', ')})` : ''}`,
+    statusLine: `Wrapping up ${n} task${plural}`,
+    highlights: tasks.slice(0, 4).map(t => `Touched ${t}`)
   }));
 }
