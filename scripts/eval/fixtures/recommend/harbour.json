@@ -1,0 +1,1153 @@
+{
+  "name": "Harbour",
+  "note": "Committed context-bundle fixtures for eval-recommend-baseline.mjs (LIN-587). Real task text captured at HEAD; chain nodes forced to `started` to reconstruct the epic→mid→leaf descent as it appeared when live (the real tasks have since closed). Non-chain siblings are frozen terminal so the descent has one unambiguous frontier (the chain child) and resolves deterministically. Regenerate with scripts/eval/build-recommend-fixtures.mjs.",
+  "targets": [
+    {
+      "id": "HAR-149",
+      "role": "epic"
+    },
+    {
+      "id": "HAR-545",
+      "role": "mid"
+    },
+    {
+      "id": "HAR-616",
+      "role": "leaf"
+    }
+  ],
+  "bundles": {
+    "HAR-149": {
+      "issue": {
+        "id": "4c55e8ad-5ef0-4ce1-b95b-e509a0282d36",
+        "identifier": "HAR-149",
+        "title": "Harbour Runtime — self-hosted Node.js runtime for the browser",
+        "description": "**Status: In Progress — Phase E (migration) in flight.** Research (HAR-371) + contract closure (HAR-370) and **Phases A–D (HAR-440 → HAR-443) are Done.** Phase E (HAR-444) is decomposed E1/E2/E3: **E1 wire+validate (HAR-490) Done**; **E2 flip-default (HAR-491) Done — the boot default is now** `harbour` **as of 2026-05-25 (commit** `91c8038`**,** `src/runtime/index.js:14`**)**; **E3 retire-WC (HAR-492) Todo** — the only remaining concrete step, gated on a stability window from the (not-yet-cut) `harbour-runtime-default-v1` release tag. Gate-discovered hardening is tracked under HAR-589 / HAR-545 / HAR-497, not by reopening phase tickets.\n\nThis is an **epic** — the actual work lives in the five phase subtasks. This issue's body documents the current strategy, architecture, and constraints. Per-phase design happens inside each subtask when it's picked up.\n\n---\n\n## TL;DR\n\nReplace `@webcontainer/api` with a self-hosted Node.js-compatible runtime built on **Web Workers + OPFS + a Service Worker networking bridge**, hidden behind a `HARBOUR_RUNTIME` selector flag so the migration is reversible. The boot default flipped to `harbour` on 2026-05-25 (HAR-491 / Phase E2) after Harbour-real cleared the \"Claude Code boots and runs\" bar; `HARBOUR_RUNTIME=webcontainers` remains a fully-supported rollback opt-out until WC is retired in E3 (HAR-492).\n\nThe strategy moved three times before settling — see **Historical context** at the bottom. The current position (post HAR-371 research, May 2026) is **build from scratch, conformance-driven, peers as design references not bases**.\n\n## Why\n\n* **No CDN dependency at boot.** Eliminates StackBlitz multi-MB WASM fetch.\n* **\\~100ms cold-start** vs 2–5s with WebContainers — near-instant restart, dissolves HAR-146-class cold-boot problems.\n* **Full ownership.** Debuggable in DevTools, no vendor pricing risk, no proprietary lock-in.\n* **Broader browser support.** Removes SharedArrayBuffer / COOP / COEP requirement → Safari and static-hosting unblocked.\n* **Harbour's accumulated shim/shell knowledge is reusable as-is.** The shims patch Node, not WebContainers (see 2026-04-21 comment *Runtime abstraction*).\n\n## Architecture\n\n```\nsrc/core/runtime-adapter.ts                 # Typed contract — HAR-371 / HAR-438 deliverable\nsrc/runtime/\n  index.js                                  # Selector — reads HARBOUR_RUNTIME at boot\n  webcontainers/index.js                    # createAdapter() — wraps @webcontainer/api  (current default)\n  harbour/index.js                          # createAdapter() — Workers + OPFS + SW       (HAR-149 deliverable)\ntest/fixtures/fake-runtime.ts               # Third adapter — conformance-tested baseline\ntest/unit/runtime-adapter-conformance.test.ts   # Parameterised over all three adapters\n```\n\n### Selection — boot-time, one runtime per session\n\n`HARBOUR_RUNTIME` is a migration flag, not a per-call switch. The default is now `harbour` (flipped in HAR-491 / E2, 2026-05-25); `webcontainers` is the reversible rollback opt-out, preserved verbatim until E3 (HAR-492) retires it.\n\n```js\n// vite.config.js\nexport default defineConfig({\n  envPrefix: ['VITE_', 'HARBOUR_'],\n  // ...\n});\n\n// src/runtime/index.js\nconst name = import.meta.env.HARBOUR_RUNTIME ?? 'harbour'; // default flipped to harbour in HAR-491 (E2)\n```\n\n## Phases\n\nDetailed design happens inside each subtask. The phases are deliberately the shape of the original proposal (March 2026) — the work decomposes cleanly along these boundaries. Every phase is gated by the conformance suite (`test/unit/runtime-adapter-conformance.test.ts`).\n\n| Phase | Subtask | Exit criterion |\n| -- | -- | -- |\n| **A — Foundation** | HAR-440 | `require('express')` resolves inside a Worker |\n| **B — Networking** | HAR-441 | Iframe loads an Express app via the SW bridge |\n| **C — Build tools** | HAR-442 | `npx vite` boots a React dev server |\n| **D — Package management** | HAR-443 | `npm install express` succeeds in-runtime |\n| **E — Migration** | HAR-444 | Default flag = `harbour`, `@webcontainer/api` removed |\n\n## Constraints (probe-confirmed)\n\nFrom HAR-437 (`docs/wc-probe-report.md`). These are the load-bearing WC behaviours Harbour-real must reproduce — or explicitly fix and paper over inside the WC adapter:\n\n* **inv #4** Bare spawns inherit `HOME=/home`, `PATH=/bin:/usr/bin:/usr/local/bin`, `COLORTERM=truecolor`.\n* **inv #6** `proc.input.getWriter().close()` does **not** propagate EOF — embed payloads in argv when EOF matters.\n* **inv #15** `proc.input.getWriter()` holds an exclusive lock — share one writer across the process lifetime.\n* **inv #23** Exit codes 0 and 143 are \"clean\"; everything else is a crash.\n* **inv #24** Drain `proc.output` before awaiting `proc.exit` or the process deadlocks under backpressure.\n* **Probe finding** Mount-tree top-level keys resolve under `/home/<workdirName>/`.\n* **Probe finding** `proc.kill()` (no signal) resolves with exit **127**; `proc.kill('SIGKILL')` with **143**.\n* **Probe finding** `port` close fires *before* `proc.exit` resolves for the owning process.\n* **Probe finding** The `wc.mount(tree, { mountPoint })` option is non-functional in WC ^1.5.1.\n\nSix **other** HAR-435 invariants were contradicted by the probe (env replace, argv newline, mount-after-spawn invisibility, `wc.fs.writeFile` host-only, mount clobber, `fs.watch` sync ENOENT). Harbour-real **does not need to reproduce** any of them. Their cleanup in current code is tracked separately — see HAR-445.\n\n## Match-or-fix decisions (deferred to per-phase tickets)\n\nFor each probe-confirmed wart, Harbour-real picks: inherit (smaller contract) or fix (cleaner DX, but the WC adapter must paper over). The interesting cases:\n\n| WC behaviour | Match → cheaper | Fix → stronger |\n| -- | -- | -- |\n| `writer.close()` no EOF | Argv-only workaround (HAR-325) survives | Delete the inline-script gymnastics across `wc-fs-helpers`, `auth-config`, `FileBrowser`, `shim-log-poller` |\n| `proc.output` backpressure | Drain-before-await rule everywhere | Bounded async streams; drain-or-await orthogonal |\n| `proc.kill()` default → 127 | Capture as-observed | Surface a sensible default (SIGTERM=143) |\n| `port` close before `proc.exit` | Preserve (ProcessManager depends on it) | Same — must preserve or UI breaks |\n| Mount-tree home-prefix | Inherit the implicit resolution | Explicit `bindWorkspace(uuid)` — HAR-436 decomp #10 |\n| `workdirName` not enforced across boots (HAR-336) | Same — identity by convention | **First-class snapshot identity** — UUID as primary key. The one place Harbour-real is genuinely stronger than WC. |\n\n## Acceptance criteria\n\n* All five phase subtasks (HAR-440 → HAR-444) complete.\n* `runtime-adapter-conformance.test.ts` passes for both `webcontainers` and `harbour` factories simultaneously.\n* Full bundled-app suite passes against `HARBOUR_RUNTIME=harbour`.\n* **Claude Code boots, completes a non-trivial agent task, and the user can't tell which runtime they're on.** This was the gating bar for the default flip (done 2026-05-25, HAR-491/E2). It now gates E3 (WC retirement) and the cutting of the `harbour-runtime-default-v1` stability tag, not the flip itself.\n* `@webcontainer/api` removed from `package.json`.\n* Documentation (`docs/architecture.md`, `harbour-os/CLAUDE.md`) updated to reflect the new runtime as default.\n\n## Nested Harbour OS — design implications\n\n(Full mapping in the 2026-04-19 comment.) HAR-149 dissolves three WC-imposed blockers (single-instance, page-level COI, COEP iframe partitioning) and introduces/leaves three others to design in:\n\n1. **Service Worker scope collision** — outer SW intercepts nested fetches unless routes carry a frame/instance token (e.g. `/__hr/<instance-id>/...`). Design in during Phase B.\n2. **Origin/opener leakage** — OAuth popup flow, proxy URL resolution, broker channels all currently assume single-tenant.\n3. **OPFS partitioning** — each Harbour instance needs a virtual FS root scoped by frame identity. Design in during Phase A.\n\nThese are not Phase A–E blockers but should be designed in early. File follow-up tickets as they surface.\n\n## Follow-ups (filed separately)\n\n* **HAR-445** — Delete the 6 dead WC workarounds surfaced by HAR-437 probe (cleanup, not a HAR-149 phase — applicable against current WC or opportunistically during Phase E).\n\n## Out of scope\n\n* Multi-runtime per session (one runtime per page).\n* Native modules / N-API (out of scope for any browser runtime).\n* Backwards compatibility with WC-only public APIs not on the adapter contract (`wc.export` snapshot blobs, recursive `wc.fs.watch`) — replaced by OPFS-native equivalents in Phase A.\n\n---\n\n## Historical context\n\nThe strategy moved three times. Preserving the trajectory so the rationale isn't lost — and so a future reader knows why the description doesn't say \"fork almostnode\" anymore.\n\n### 2026-03-31 — Original proposal: build from scratch\n\nWeb Workers + Service Worker bridge + in-memory FS persisted to IndexedDB. Tiered module strategy (Tier 1 pure-JS as-is, Tier 2 polyfills, Tier 3 stubs, Tier 4 build). Phases A–E. Justification: full ownership, no CDN, ~100ms boot, Safari support, no COOP/COEP. Full design doc at `docs/harbour-runtime.md`.\n\n### 2026-04-19 — Landscape review: fork-and-extend\n\nTwo viable MIT-licensed bases surfaced (almostnode 1.1k★, Lifo 485★). OPFS sync access handles became universally supported. Reframe: \"~90% of the benefits for a fraction of the effort. Harbour's moat is the agent-native OS, not the runtime.\"\n\n### 2026-04-20 — Recalibration: build from scratch with peers as references\n\nHands-on review against the \"Claude Code boots\" bar disqualified both candidate bases. almostnode stubs `child_process`; Lifo claims it but doesn't solve shell-level semantics Harbour has already fixed (HAR-242 / HAR-236 / HAR-259 / HAR-306 / HAR-257). Forking either means inheriting their gaps + porting Harbour's shell/shim lineage on top — not obviously cheaper than starting from a cleaner foundation.\n\n### 2026-05-23 — Strategic synthesis after HAR-371 phase 4\n\nContract surface is ~10–12 primitives, not 21. Lifo is the constraining shape, not WC — designing for Lifo gives Harbour-real generous headroom. Six HAR-435 invariants don't actually hold in WC ^1.5.1 (probe-confirmed) — fewer workarounds to reproduce. Conformance suite (HAR-438) is the development truth-table from day one.\n\n---\n\n## Phases F + G added (2026-06-18)\n\nPhase E (HAR-444) bundled flag-flip + validation + retire-WC. Flip+validation are done (E1/E2); the remaining work was split into two new phases so each has one crisp goal:\n\n* **Phase F (HAR-676)** — real apps run on real Harbour end-to-end via any install mechanism (App Store, URL, CLI, git, npm, upload). Gate: HAR-554. Owns the product acceptance bar. In Progress.\n* **Phase G (HAR-677)** — retire & remove WebContainers (delete `@webcontainer/api` + importers + WC adapter + conformance row + docs). Owns the original E3 (HAR-492). **Blocked by Phase F** + the stability window.\n\nPhase sequence is now A–G.",
+        "state": {
+          "name": "In Progress",
+          "type": "started"
+        },
+        "createdAt": "2026-03-31T08:37:19.982Z",
+        "labels": []
+      },
+      "parent": null,
+      "siblings": [],
+      "siblingsTotal": 0,
+      "project": {
+        "name": "Runtime",
+        "description": null
+      },
+      "children": [
+        {
+          "id": "55c56fc2-50da-460e-9fb1-4bed1a2c92e1",
+          "identifier": "HAR-677",
+          "title": "HAR-149-G: Phase G — Retire & remove WebContainers",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "c1473c3e-daf5-41c1-8b18-a17c4d6a8270",
+          "identifier": "HAR-676",
+          "title": "HAR-149-F: Phase F — Real apps run on real Harbour (any install mechanism: App Store, URL, CLI, git, npm, upload)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "2a5fcc17-06f0-41c1-9a78-0b51887221b6",
+          "identifier": "HAR-589",
+          "title": "GATE: run real bundled npm + npx end-to-end under harbour (runtime-completeness forcing function)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "7f55c047-ae36-45a2-a62c-1d7439859f4a",
+          "identifier": "HAR-545",
+          "title": "Runtime integration gaps (gate-discovered)",
+          "state": {
+            "name": "In Progress",
+            "type": "started"
+          }
+        },
+        {
+          "id": "ca4dee50-d583-4802-a1fb-44f19bf15bfc",
+          "identifier": "HAR-544",
+          "title": "Runtime integration gaps (gate-discovered)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "baf3f802-9ccf-494e-a4e9-ffaf1667d4a5",
+          "identifier": "HAR-528",
+          "title": "harbour-runtime: collapse OPFS handle ownership into the helper Worker (end the cross-Worker contention class)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "2295bae4-4fa8-4a37-9c99-40544b57cb53",
+          "identifier": "HAR-523",
+          "title": "Harbour worker keepalive: per-Worker OPFS sync handles held across spawn boundaries block subsequent prewarms",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "ffdb9e43-020d-4b11-a4b9-1e2bf119d686",
+          "identifier": "HAR-518",
+          "title": "harbour-install-gates Gate 1: App Store npm search returns 503 — test mock doesn't cover the search endpoint",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "8283e5de-1e11-42d9-b3ed-80aacf464d27",
+          "identifier": "HAR-517",
+          "title": "Harbour worker spawn: OPFS sync handles held by prior workers block prewarmPaths warming on new spawns",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "75f6e1ac-b4b1-41e4-9198-d5ee928544ce",
+          "identifier": "HAR-516",
+          "title": "Harbour http builtin: res.write/res.end stringify Uint8Array bodies as decimal-CSV bytes",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "fefa5abb-41e3-4d87-a836-dc7aff0ddcd4",
+          "identifier": "HAR-515",
+          "title": "Harbour http builtin: server.listen() doesn't coerce string ports (welcome registers as port=0)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "b601c8b7-bc94-4ef5-8504-ab8b4741203a",
+          "identifier": "HAR-514",
+          "title": "Harbour worker: stdin frames arriving during start-frame opfsBind window silently dropped",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "df5a25b0-3cd4-46a8-ae7d-4bc53fb79442",
+          "identifier": "HAR-511",
+          "title": "Harbour: retire tier4 directory-metadata shadow in favour of OPFS bridge queries",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "6c97ac78-919a-408b-840f-b9404364fdab",
+          "identifier": "HAR-510",
+          "title": "Harbour: tier4 statSync size + appendFileSync / truncateSync via OPFS bridge (HAR-507 follow-up)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "33a9b96a-15ea-4630-81b4-32f60ee2c7ff",
+          "identifier": "HAR-509",
+          "title": "Harbour: tier3 http.request / https.request polyfill on fetch (HAR-492 retirement prereq)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "113626d4-f7e8-4c2c-8f19-19ecb46aa207",
+          "identifier": "HAR-506",
+          "title": "Harbour: tighten tier4 chmodSync to Node-faithful ENOENT once the pre-warm gap closes",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "a8a7691c-a8dd-414c-a02a-d43799ff0344",
+          "identifier": "HAR-505",
+          "title": "Harbour: tier4 writeFileSync pre-warm gap blocks provisioner / installer write destinations",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "038d9402-3709-4564-8797-8fd1c6e2de90",
+          "identifier": "HAR-504",
+          "title": "Harbour Service Worker doesn't register/claim under headless Playwright — blocks HAR-498 install-pipeline tripwires",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "480b8e1d-bf22-4af9-8f59-915d7ab46e1b",
+          "identifier": "HAR-503",
+          "title": "Harbour fs tier4 builtin missing `chmodSync` / `cpSync` — shim provisioner crashes at boot under harbour",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "ebe0e37d-840d-40cc-9416-6eb1da5d1bed",
+          "identifier": "HAR-497",
+          "title": "GATE: JSX-app install path never completes under harbour runtime",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "6ff3443d-bac3-491a-a3ef-3b09bc2ce569",
+          "identifier": "HAR-496",
+          "title": "Harbour: interactive `jsh` REPL (stdin-driven dispatch loop)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "46eccac7-4dbb-4fb6-a793-0a39668f8679",
+          "identifier": "HAR-477",
+          "title": "Cross-thread live source updates: OPFS exclusivity + fs.watch gap",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "d2b1b8cb-8fd6-4041-a865-5fa941ecc962",
+          "identifier": "HAR-472",
+          "title": "Real-browser e2e gate for the harbour runtime",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "da453ba7-1b4e-42ae-b21d-6f4baa238103",
+          "identifier": "HAR-444",
+          "title": "HAR-149-E: Phase E — Migration (flag wired + flipped, dual-conformance green)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "084557af-84fa-4613-ba4d-da47aa96c3ec",
+          "identifier": "HAR-443",
+          "title": "HAR-149-D: Phase D — Package management (npm install in-runtime)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "f866ec8a-956b-4454-9b17-9eaa39f2af06",
+          "identifier": "HAR-442",
+          "title": "HAR-149-C: Phase C — Build tools (child_process via Workers)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "84b6445a-3000-48ef-ae60-01189007c06c",
+          "identifier": "HAR-441",
+          "title": "HAR-149-B: Phase B — Networking (Service Worker bridge + virtual http)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "53e4c516-5a75-4bc6-8d7b-718b3b41fca5",
+          "identifier": "HAR-440",
+          "title": "HAR-149-A: Phase A — Foundation (process model, OPFS fs, module loader)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "6fd5f37a-a6b2-4393-af6d-1386fd98877d",
+          "identifier": "HAR-439",
+          "title": "_test_ parent linking probe (canceled — test)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "aa1e8853-912a-4d6b-bfa0-de2ce07bbebd",
+          "identifier": "HAR-371",
+          "title": "RuntimeAdapter contract — research, type, conformance suite",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "7ce9fd5e-05e2-4c1a-973f-06882afa1671",
+          "identifier": "HAR-370",
+          "title": "Define RuntimeAdapter interface and close ProcessManager leaks",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        }
+      ],
+      "comments": [
+        {
+          "body": "## Nested Harbour OS — feasibility mapping\n\nFeasibility check on running Harbour OS inside Harbour OS today (on WebContainers) surfaced six gaps. HAR-149 dissolves the three platform-level hard blockers but introduces/leaves three others that should be designed-in.\n\n### What HAR-149 resolves\n\n| Gap (on WebContainers) | Why it goes away |\n| --- | --- |\n| Single WebContainer instance per page (`@webcontainer/api` constraint) | Apps already run per-Worker; nothing limits runtime-per-page |\n| Cross-origin isolation not per-iframe (`crossOriginIsolated` inherits from top) | Explicitly in scope — \"removes SharedArrayBuffer requirement\" |\n| `COEP: credentialless` partitions nested iframe storage | Goes away with COI removal |\n\n### What HAR-149 does **not** resolve (or makes worse)\n\n**1. Service Worker scope collision (worse).** HAR-149 relies on a Service Worker as the virtual-networking bridge. Browsers allow one active SW per scope, so a nested Harbour OS at the same origin cannot register its own — the outer SW intercepts all nested fetches.\n\n*Design implication:* the SW needs to multiplex by frame identity. Routes should carry a frame/instance token (e.g. `/__hr/<instance-id>/...`) and dispatch to the right handler table. The outer OS mints the token when creating the nested iframe, and the inner OS registers its virtual servers under that namespace.\n\n**2. Origin/opener leakage.** OAuth popup flow (`github-auth-bridge.js`), proxy URL resolution (`boot-provisioning.js:25-29`), and anything keying off `window.location.origin` / `window.opener` assume top-level frame semantics. A nested frame at the same origin collides with the parent.\n\n*Design implication:* frame-scoped identity instead of origin-scoped identity for auth callbacks, proxy routing, and postMessage targets.\n\n**3. Boot provisioning is single-tenant.** Hardcoded workdir pinning, single MCP bridge polling `~/.harbour-os/mcp-requests/`, and shared auth config would corrupt shared state across nested instances.\n\n*Design implication:* per-instance virtual FS root and per-instance MCP bridge paths. HAR-149's in-memory FS tree + IDB persistence makes this easier than today — each instance can hold its own tree.\n\n### Suggested addition to scope\n\nA \"Nested instances\" sub-section in the design doc covering:\n- SW route namespacing by frame/instance token\n- Per-instance FS root (already natural with HAR-149's architecture)\n- Frame-scoped OAuth + MCP bridge paths\n\nNone of these are large, but they're easy to bake in early and hard to retrofit.",
+          "createdAt": "2026-04-19T08:31:09.445Z",
+          "user": "John “Sausage Roller” Kershaw"
+        },
+        {
+          "body": "## Follow-up — recalibration after hands-on review\n\nSpent time with Lifo and almostnode. The landscape review above overweighted star counts as a maturity signal; the real picture is narrower.\n\n### Running Claude Code is the actual bar, and neither passes it\n\nalmostnode stubs `child_process` outright — Claude Code can't spawn `node`/`npx`/`rg`/`git`, so it won't boot. Lifo claims `child_process` but doesn't appear to have solved shell-level semantics that Harbour has already fixed: stable `cd` across chained commands (HAR-242), correct `$?` propagation (HAR-236), `>&2` redirects (HAR-259), escape marker reassembly across stream chunks (HAR-306, still open here too), `.harbour-apps/bin/` PATH discovery (HAR-257). A real agent workload hits these within minutes.\n\nThis reframes the competitive map. The set of browser runtimes that actually run production agent workloads is currently Harbour + WebContainers — not the 2,000+ combined stars implied.\n\n### What this changes for this issue\n\nThe fork-and-extend framing above was too optimistic:\n\n* **Both candidate bases are thinner than their star counts suggest.** Forking either one means inheriting their gaps while also needing to port Harbour's accumulated shell/shim knowledge on top. That's not obviously cheaper than starting from a cleaner foundation.\n* **Harbour's shim + shell bug lineage is a compounding asset.** Every HAR-23x/24x/25x/30x fix is a specific thing an alternative base will re-encounter. That knowledge belongs in the Workers/OPFS core we build, not grafted onto a fork that hasn't learned it.\n* **almostnode and Lifo are better treated as design references than forks.** Study their Service Worker bridge, module loader wiring, and OPFS usage. Don't inherit their stubs or their unsolved shell bugs.\n\n### Revised direction\n\nBuild our own, slowly closing the gap against WebContainers — not a big-bang replacement. The path:\n\n1. **Start narrow.** Workers + OPFS + Service Worker bridge + module loader, sized to run one known-good bundled app end-to-end (Vite + React preview in an iframe).\n2. **Port shim knowledge directly** — the HAR-23x/24x/25x/30x fixes go into the runtime's core as it lands, not retrofitted later.\n3. **Keep the feature flag migration path.** `HarbourRuntime.boot()` and `WebContainer.boot()` live side-by-side behind ProcessManager. Apps migrate one at a time.\n4. **Let Claude Code run be the acceptance test** — not module coverage percentages. If the bundled agent boots, does tool calls, and completes a real task against the new runtime, we're shipping.\n\nThis keeps HAR-149's original ambition intact — full ownership, no CDN, debuggability, Safari support — while accepting that the work is genuinely ours to do rather than mostly-done-by-someone-else.\n",
+          "createdAt": "2026-04-20T06:46:54.130Z",
+          "user": "John “Sausage Roller” Kershaw"
+        },
+        {
+          "body": "**Suggestion: add `@mariozechner/pi-coding-agent` to the Step 1 bundled-app boot test.**\n\nContext: investigating an install failure today on `pi-coding-agent@0.68.0` inside WebContainer. The package installs fine but crashes on first run with:\n\n```\nSyntaxError: The requested module './core/sdk.js' does not provide an export named 'AgentSessionRuntime'\n  at ModuleJob._instantiate (builtins.*.js) — WebContainer internal\n```\n\nThe package itself is valid — it runs cleanly on native Node 22 (its declared engine is `>=20.6.0`). The failure is in WebContainer's ESM linker. Tracing the module graph in `dist/`:\n\n- `index.js:16` → `export { AgentSessionRuntime, … } from './core/sdk.js'` (named re-export)\n- `core/sdk.js:17` → `export * from './agent-session-runtime.js'` (star re-export — where the class actually lives)\n- `core/extensions/loader.js:23` → `import * as _bundledPiCodingAgent from '../../index.js'` — closes the cycle\n\nFull cycle: `sdk.js` → `agent-session.js` → `extensions/index.js` → `loader.js` → `index.js` → `sdk.js`. V8 resolves `AgentSessionRuntime` through the star chain correctly; WebContainer's linker doesn't. Same class of failure as pi-mono #2452 (`@mariozechner/pi-tui` — `getEditorKeybindings`), since fixed upstream by expanding the star.\n\n**Why this is worth including in the spike:**\n\nPi is built with the modern TS-barrel output pattern that stresses every major part of an ESM linker in one package — cyclic imports, `export * from` re-exports, `import * as ns`, and dynamic `jiti`-based extension loading. It's deliberately aggressive about the module graph. Passing the bundled-app suite tells you the happy path works; passing Pi tells you the linker is probably done.\n\nConcrete asks on this ticket:\n\n1. Add `npm i -g @mariozechner/pi-coding-agent && pi --help` to the Step 1 boot test matrix (almostnode and Lifo).\n2. If either fails, capture the exact linker-resolution step that breaks — that's the diff-vs-V8 to characterise.\n3. If both pass, it's a strong signal the fork's module loader handles real-world TS barrel code without further work.\n\nShort-term workaround (separate from HAR-149) is an upstream PR on `badlogic/pi-mono` expanding the `export *` in `src/core/sdk.ts` — same shape as the pi-tui #2452 fix. Noting here for completeness; unblocks users today regardless of runtime timeline.",
+          "createdAt": "2026-04-21T12:37:47.808Z",
+          "user": "John “Sausage Roller” Kershaw"
+        },
+        {
+          "body": "## Runtime abstraction — notes from codebase analysis\n\nDeep-dive into the current codebase surfaces several findings that aren't yet captured in this issue.\n\n### The minimal runtime contract\n\nThe issue identifies ProcessManager as the swap point but doesn't define exactly what the runtime needs to expose. From examining every call site, Harbour's actual usage is:\n\n```\ninterface Runtime {\n  spawn(cmd, args, { env, cwd }) → { input, output, exit, kill, resize }\n  fs.readFile / writeFile / readdir / rm / watch\n  mount(tree)             // batch write shortcut\n  on('server-ready', …)  // port detection\n  on('port', …)\n  on('error', …)\n}\n```\n\nThat's the complete surface. WebContainers provides a full POSIX kernel (fork, signals, `/proc`, libuv, the works) and Harbour uses almost none of it. The custom runtime only needs to be this interface — not a Linux kernel.\n\n### Shim portability\n\nThe shims patch Node.js APIs, not WebContainers APIs — they are runtime-agnostic. On a custom runtime:\n\n**Shims that survive unchanged:**\n- `network-shim` — patches `fetch`/`http.request`, routes via CORS proxy, enforces domain consent\n- `env-shim` — proxies `process.env`, enforces per-key consent\n- All bin shims (`bash`, `git`, `npm`, `curl`, `grep`, etc.) — pure JS, no WC dependency\n\n**Shims that disappear entirely:**\n- `spawn-shim` — exists solely to fix two WebContainers bugs (vendored ELF binary redirection, broken FD stdio arrays). On a runtime we control, these are implemented correctly from the start.\n- `fs-monitor` — patches fs writes to detect changes for persistence. On a custom runtime, this belongs in the fs layer directly.\n\nThis means the shim surface *shrinks* with a custom runtime, not grows.\n\n### The three abstraction leaks\n\nProcessManager is described as the swap point, but three places currently bypass it and call `getWebContainer()` directly:\n\n1. `network-consent-store.js` + `env-consent-store.js` — write policy decisions via a spawned Node process\n2. `FileBrowser.jsx` — `readdir`, `readFile`, `rm` calls\n3. `provision.mjs` + `provision-bundled-apps.mjs` — provisioning scripts\n\nThese need routing through the RuntimeAdapter before any swap is viable. Scoped change — all four call sites are straightforward.\n\n### The one WC-specific gap\n\n`fs-persistence.js` uses `wc.export('.', { format: 'binary' })` for snapshot export — a WebContainers-specific API with no generic equivalent. On a custom runtime, snapshots come from OPFS directly (which is actually simpler). This needs an explicit plan before Phase E (migration).\n\n### Recommended prerequisite: RuntimeAdapter interface\n\nBefore the empirical spikes (almostnode/Lifo), worth defining a `RuntimeAdapter` duck-type (~20 lines) and closing the three leaks. This:\n- Makes the spike results directly comparable (both adapters implement the same contract)\n- Bounds the migration blast radius precisely\n- Confirms ProcessManager really is the complete swap point\n\nNo implementation risk — it's naming what already exists and patching three call sites.",
+          "createdAt": "2026-04-21T19:48:27.664Z",
+          "user": "John “Sausage Roller” Kershaw"
+        },
+        {
+          "body": "## Strategy synthesis & entry-point confirmation (2026-05-23)\n\nResearch pass over the description (2026-03-31), the four comments (Apr 19 → Apr 21), and the two subtasks (HAR-371, HAR-370). This issue's framing has moved twice; documenting the trajectory here so the next action is unambiguous.\n\n### 1. Strategy evolution — three distinct positions\n\n| # | Date | Position | Rationale | What changed next |\n| -- | -- | -- | -- | -- |\n| **1. Original proposal** | 2026-03-31 (description body, *Original proposal* section) | **Build from scratch.** Phases A–E. Web Workers + Service Worker bridge + in-memory FS persisted to IndexedDB. | Full ownership, no CDN, ~100ms boot, Safari support, no COOP/COEP. | Three weeks later a landscape review surfaced two viable forkable bases. |\n| **2. Landscape review** | 2026-04-19 (description body, *Update — April 2026* section) | **Fork-and-extend.** Prefer almostnode (250KB, 40+ shims, no `child_process`) or Lifo (15 shims *including* `child_process`, but less mature). OPFS now universally supported. | \"~90% of the benefits for a fraction of the effort. Harbour's moat is the agent-native OS, not the runtime.\" | Hands-on review against the \"run Claude Code\" bar disqualified both. |\n| **3. Recalibration** | 2026-04-20 (comment: *Follow-up — recalibration after hands-on review*), reinforced 2026-04-21 (comments on `pi-coding-agent` boot test + Runtime abstraction analysis) | **Build from scratch — peers as design references, not bases.** Workers + OPFS + Service Worker bridge + module loader, narrow start (one bundled app end-to-end), port Harbour's HAR-23x/24x/25x/30x shell/shim fixes directly into the core. Acceptance = Claude Code (and pi-coding-agent) boots and completes a real task. | This is the current strategy. The description body still reflects position #2 and is now stale. |\n\n**What flipped between #2 and #3:** the landscape review weighted star counts as a maturity signal. Hands-on confirmed almostnode stubs `child_process` outright (Claude Code can't spawn `node`/`npx`/`rg`/`git`) and Lifo hasn't solved shell-level semantics Harbour has already fixed (HAR-242 chained `cd`, HAR-236 `$?`, HAR-259 `>&2`, HAR-306 escape-marker reassembly, HAR-257 PATH). Forking either base means inheriting their gaps *and* re-porting Harbour's accumulated shell knowledge on top — not obviously cheaper than building on a cleaner foundation. The HAR-23x/24x/25x/30x lineage is reframed as a *compounding asset* that belongs in the runtime core, not as something to graft onto someone else's fork.\n\n**What survived all three positions:** the original motivation (full ownership, no CDN, debuggability, Safari support) and ProcessManager as the swap point.\n\n### 2. Entry-point confirmation: HAR-371 is the unblock\n\nThe Apr 21 *Runtime abstraction* comment identified the minimal runtime contract Harbour actually consumes (spawn / fs.{read,write,readdir,rm,watch} / mount / on('server-ready'|'port'|'error')) — much smaller than WebContainers' full POSIX kernel — and flagged three abstraction leaks where call sites bypass ProcessManager:\n\n1. `src/stores/network-consent-store.js` — `getWebContainer()` for consent/policy writes\n2. `src/stores/env-consent-store.js` — same shape\n3. `src/components/FileBrowser.jsx` — `manager._wc` for readdir/readFile/rm\n4. `src/system-tools/provision.mjs` (+ `provision-bundled-apps.mjs`) — raw `wc` parameter\n\nThe original Apr 21 recommendation was a ~20-line duck-typed `RuntimeAdapter`. HAR-370's planning session (see its Apr 22 comments) then rescoped: a 20-line structural seam is **not** a behavioural contract — at least 9 implicit contracts live outside the signatures (process shape, event signatures, mount-tree grammar, FS-layer semantics, jsh assumption, NODE_OPTIONS shims, port→iframe wiring, filesystem conventions, env-replace-not-merge). A spike against a thin seam would \"work\" for a near-clone of WC and fail silently for anything genuinely different.\n\nThat insight produced **HAR-371** — research + typed contract + conformance suite + FakeRuntime + behavioural probe of WC. HAR-370 was rescoped to leak closure *only*, blocked by HAR-371.\n\n**Confirmed sequencing:**\n\n```\nHAR-371 (contract + conformance + WC probe)\n   ↓ blocks\nHAR-370 (leak closure — applies typed contract from HAR-371)\n   ↓ unblocks\nHAR-149 (build the runtime against the contract, peer-runtimes as design references)\n```\n\nHAR-371 is correctly the entry point. It is well-scoped (4 phases, ~3 days of focused work, natural commit-worthy split points), already has acceptance criteria, and produces deliverables (`docs/runtime-contract-inventory.md`, `docs/runtime-contract-invariants.md`, `docs/runtime-peer-gap.md`, `tools/wc-probe.ts`, `src/core/runtime-adapter.ts`, conformance suite, FakeRuntime) that directly de-risk both HAR-370 and HAR-149.\n\n### 3. Task-readiness assessment — stale/conflicting statements in HAR-149\n\nThe description body still reflects position #2 (landscape review) and pre-dates the recalibration in the comments. Specific stale statements:\n\n| Location | Current text | Status | Fix |\n| -- | -- | -- | -- |\n| Top of description | *\"...suggests **reframing from 'build from scratch' to 'fork-and-extend'**\"* | **Stale.** Apr 20 recalibration reverted this. | Replace with \"Build from scratch on Workers + OPFS; almostnode/Lifo as design references only.\" |\n| *Reframed options* table | Implies fork-almostnode or fork-Lifo are the recommended options | **Stale.** Both disqualified Apr 20. | Either delete the table or annotate both fork rows as \"disqualified — see Apr 20 comment.\" |\n| *Proposed next steps* §1 | *\"Empirical spike — boot Harbour's bundled apps against almostnode and Lifo in a scratch branch.\"* | **Stale as primary next step.** The spike is now downstream of HAR-371's behavioural probe (which captures WC behaviour and peer-gap analysis as a deliverable). | Replace §1 with \"Complete HAR-371 (typed RuntimeAdapter contract + conformance suite + WC probe). Then HAR-370 (leak closure). Empirical peer probes happen *inside* HAR-371 Phase 3 against the typed contract.\" |\n| *Proposed next steps* §4 | *\"Update `docs/harbour-runtime.md` to reflect the fork-and-extend strategy once a base is chosen.\"* | **Stale.** No base will be chosen — build is the path. | Replace with \"Update `docs/harbour-runtime.md` to reflect the build-from-scratch + design-references strategy, and to incorporate HAR-371's contract inventory + invariants.\" |\n| Module Strategy / Phase A–E | Largely intact, but in-memory FS persisted to IndexedDB is superseded by OPFS (already noted parenthetically). | **Mostly accurate.** | Promote the OPFS note from a parenthetical to first-class; the IndexedDB tree design can be dropped. |\n| Original proposal Phase E (\"Swap WebContainers behind feature flag\") | Now matches Apr 20 §3 (\"Keep the feature flag migration path. `HarbourRuntime.boot()` and `WebContainer.boot()` live side-by-side behind ProcessManager. Apps migrate one at a time.\") | **Accurate.** | No change. |\n| Subtask list (HAR-371, HAR-370) | Both Todo. Sequencing implied by HAR-370's Apr 22 rescope comment, not visible from the HAR-149 view. | **Sequencing correct, but not surfaced on the parent.** | Add explicit \"Subtask sequencing: HAR-371 → HAR-370 → HAR-149 implementation work\" to HAR-149 description. |\n\nSubtask entry criteria check:\n- **HAR-371:** has 8 explicit acceptance criteria. Self-contained. **Ready to start.** No additional planning/scoping needed.\n- **HAR-370:** has 4 acceptance criteria. Blocked by HAR-371 (waiting on `src/core/runtime-adapter.ts` + conformance suite). Will be ready once HAR-371 completes.\n- **HAR-149 implementation:** not ready. Depends on both HAR-371 and HAR-370 landing, plus the description update above.\n\nNot a subtask but worth surfacing in HAR-149's scope eventually: the Apr 19 *Nested Harbour OS* comment identifies three design-in-early concerns (SW route namespacing by frame/instance token, frame-scoped OAuth + MCP bridge paths, per-instance VFS root). These belong in HAR-149's design doc, not HAR-371. Easy to bake in early, hard to retrofit.\n\n### 4. Recommended next action\n\n**Two steps, in order:**\n\n1. **Update HAR-149's description** to reflect the Apr 20 recalibration before the team picks up HAR-371. Specifically:\n   - Rewrite the *Update — April 2026: Landscape review* section header & opening paragraph to say \"strategy is build-from-scratch; peers are design references.\"\n   - Annotate or remove the *Reframed options* fork rows.\n   - Rewrite *Proposed next steps* §1 to point to HAR-371 → HAR-370 → empirical work, not fork spikes.\n   - Rewrite §4 to drop \"once a base is chosen.\"\n   - Promote OPFS from parenthetical to primary in the *Architecture* / Tier 4 sections; drop the IndexedDB-tree FS design.\n   - Add a *Nested Harbour OS — design-in-early* sub-section pulling forward the Apr 19 comment's three items.\n   - Add explicit subtask sequencing: HAR-371 → HAR-370 → HAR-149 implementation.\n\n2. **Start HAR-371 with a `plan` action** (not `research`, not `implement` directly). HAR-371 is already well-scoped with 4 explicit phases and 8 acceptance criteria, but Phase 1 (call-site inventory) is the kind of work a plan action will tighten before grep'ing — and the CLAUDE.md TypeScript carve-out should be confirmed with the team before Phase 4 lands `.ts` files in the repo. After plan, Phases 1–2 can run as `research`, then Phases 3–4 + the contract artifacts as `implement` across multiple sessions (per HAR-371's own *Session-fit* note).\n\n**Do not** start HAR-370 yet — it is explicitly blocked by HAR-371 per the Apr 22 rescope.\n\n**Do not** start any HAR-149 implementation work yet — both subtasks need to land first.\n\n*Output: research only. No code changes in this pass.*\n",
+          "createdAt": "2026-05-23T07:22:35.746Z",
+          "user": "John “Sausage Roller” Kershaw"
+        },
+        {
+          "body": "## Architecture refinement — `src/runtime/` folder + `HARBOUR_RUNTIME` flag (2026-05-23)\n\nSmall but load-bearing structural decision from discussion today. Folding it in so HAR-371's contract lands in a shape already organised for multiple runtimes, and HAR-149's implementation slots in without touching boot wiring.\n\n### Layout\n\n```\nsrc/core/runtime-adapter.ts        # typed contract (HAR-371 deliverable)\nsrc/runtime/\n  index.js                         # selector — reads HARBOUR_RUNTIME\n  webcontainers/index.js           # createAdapter() — wraps @webcontainer/api\n  harbour/index.js                 # createAdapter() — Workers + OPFS + SW bridge (HAR-149)\ntest/fixtures/fake-runtime.ts      # third adapter, conformance-tested (HAR-371)\n```\n\nContract lives in `src/core/` (where consumers import the type). Implementations live in `src/runtime/` (where the selector picks one). FakeRuntime stays under `test/fixtures/` as HAR-371 plans, but conceptually it's a third adapter and the conformance suite parameterises over all three.\n\n### Selection — boot-time, one runtime per session\n\nThis is a feature flag for the migration window, not a per-call or per-process runtime-tuning surface. The Apr 20 §3 \"feature flag migration path\" gets a concrete shape:\n\n```js\n// src/runtime/index.js\nconst name = import.meta.env.HARBOUR_RUNTIME ?? 'webcontainers';\n```\n\n```js\n// vite.config.js\nexport default defineConfig({\n  envPrefix: ['VITE_', 'HARBOUR_'],\n  // ...\n});\n```\n\n**`HARBOUR_RUNTIME`, not `VITE_HARBOUR_RUNTIME`** — product-named, exposed to the client via the explicit `envPrefix` opt-in. Default `webcontainers` until the new runtime passes the Claude Code acceptance test (Apr 20 §4); flip the default once it does.\n\n### Knock-on for HAR-370\n\n`src/stores/process-store.js` should call `createAdapter()` from `src/runtime/index.js` (the selector) rather than importing the WC adapter directly. That way HAR-149 adds `src/runtime/harbour/` without touching boot. Trivial change to HAR-370's surface enumeration — the file at row 3 (`process-store.js`) imports from `src/runtime/` instead of constructing the WC adapter inline.\n\n### Knock-on for HAR-149's description update\n\nAdd a *Runtime selection — folder layout + feature flag* sub-section to the description update I recommended earlier, so this is discoverable without scrolling comments. It belongs next to the *Migration Path* paragraph (which currently says \"single import change behind the ProcessManager abstraction\" — that becomes \"`HARBOUR_RUNTIME=harbour` flips the selector\").\n",
+          "createdAt": "2026-05-23T08:03:42.851Z",
+          "user": "John “Sausage Roller” Kershaw"
+        },
+        {
+          "body": "## Strategic synthesis after HAR-371 phase 4 (2026-05-23)\n\nThe four research phases (HAR-434 inventory, HAR-435 invariants, HAR-436 peer-gap, HAR-437 probe — all Done) sharpen the picture of what \"build our own runtime\" actually entails. Folding the load-bearing implications into this ticket so HAR-149's design pressure is captured explicitly rather than living only in chat.\n\n### 1. The contract surface is smaller than it looks\n\n74 inventory rows collapse to 21 unique primitives. 10 are flagged for decomposition. Strip the optional capabilities (symlink, `preview-message`, `resize`, snapshot-blob extraction) and the **minimum required surface for HAR-149 is ~10–12 primitives**. That's a tractable target — and it's bounded by the contract (HAR-438), not by HAR-149's ambition.\n\n### 2. Lifo is the constraining shape, not WC\n\nOf 21 primitives, **13 are `✗ missing` on Lifo's host SDK** (per `docs/runtime-peer-gap.md`). WC and almostnode are close to each other shape-wise; Lifo is fundamentally different — buffered exec, no streaming output, no host-side stdin, no kill, no `fs.watch`, no `mkdir/rm/readdir`, no port events.\n\nIf the contract must accommodate Lifo (the explicit research goal), it has to sit at a very low layer. **This means HAR-149 gets the easy job:** if we design for Lifo, every primitive Lifo can't do, our runtime can. The contract's lowest common denominator is generous to anyone building above it. The hard work is on HAR-438 (contract author), not on us when we build HAR-149.\n\n### 3. Six \"load-bearing\" invariants are folklore in this WC build\n\nThe probe (HAR-437) revealed that **6 of the 29 invariants enumerated in `docs/runtime-contract-invariants.md` don't actually hold against `@webcontainer/api` ^1.5.1**:\n\n- inv #1 (mount-after-spawn invisible) — process **DID** see the late mount\n- inv #2 (`wc.fs.writeFile` host-only) — process **DID** read the host write\n- inv #3 (mount clobber) — re-mount **composes** at per-file level, doesn't clobber siblings\n- inv #5 (env replaces wholesale) — env **merges** with WC defaults\n- inv #19 (argv `\\n` becomes `'n'`) — newline **preserved** verbatim\n- inv #14 (`fs.watch` ENOENT sync throw) — returns handle, **async** error\n\nSee `docs/wc-probe-report.md` §6 for full evidence. The probe confirmed the other 5 load-bearing invariants (#4, #6, #15, #23, #24).\n\n**The implication for HAR-149 is liberating, not constraining.** Half the workarounds in `process-manager.js` are coding around behaviours WC either never had or no longer has. Our runtime doesn't need to reproduce them. The strict list of constraints HAR-149 **must** preserve is what the probe **confirmed**, not what HAR-435 documented.\n\n### 4. Some warts are real — match or fix is HAR-149's call\n\nFor each WC behaviour the probe **confirmed**, HAR-149 gets to pick — match (inherit the wart, simplest contract) or fix (cleaner DX, but WC adapter + FakeRuntime must paper over):\n\n| WC behaviour | Match (inherit) | Fix (HAR-149 stronger) |\n|---|---|---|\n| `writer.close()` doesn't propagate EOF (inv #6, confirmed) | argv-only workaround pattern (HAR-325) survives | Delete HAR-325 inline-script gymnastics across `wc-fs-helpers`, `auth-config`, `FileBrowser`, `shim-log-poller` |\n| `proc.output` backpressure deadlocks `proc.exit` (inv #24, confirmed) | Drain-before-await rule everywhere | Bounded async streams — drain-or-await orthogonal |\n| `proc.kill()` default → exit 127, `kill('SIGKILL')` → 143 (new, from probe) | Capture as-observed in contract | Surface a sensible default (SIGTERM=143) |\n| `port` close fires *before* `proc.exit` resolves (new, from probe) | Preserve order (ProcessManager depends on it) | Same — must preserve or UI breaks (URL revert) |\n| Mount-tree rooted at `/home/<workdirName>/`, with auto-home-prefix on `wc.fs.*` | Inherit the implicit resolution | Explicit `bindWorkspace(uuid)` (HAR-436 decomp #10) — cleaner semantics |\n| `workdirName` not enforced across boots (HAR-336) | Same — workspace identity is by convention | **First-class snapshot identity** — UUID is a primary key; HAR-149 enforces what WC merely allows |\n\nThe last row is the most interesting: it's a place where HAR-149 is genuinely **stronger** than WC, not just substitutable. Worth designing in early.\n\n### 5. The conformance suite is HAR-149's development truth-table\n\nHAR-438 produces `test/unit/runtime-adapter-conformance.test.ts` parameterised over adapter factories. The probe report (`docs/wc-probe-report.md` §8) names the verbatim assertions. **HAR-149 should develop against the conformance suite from day one** — every primitive we land, we run conformance against, and we know we're compatible. The same suite that gates WC, almostnode, and Lifo gates Harbour-real.\n\nCorollary: the probe is pinned to `@webcontainer/api` ^1.5.1. **HAR-149's contract is versioned**, not \"whatever WC happens to do today.\" When StackBlitz ships a minor with breaking semantics, conformance catches it — and we get to decide whether to update the contract or stay pinned.\n\n### 6. Two open questions before HAR-149 commits to specifics\n\n- **`workdirName` cold-boot stability (HAR-336, inv #8) — unconfirmed.** Needs a multi-boot fixture in HAR-438. Worth doing before HAR-149 commits to the snapshot-identity model in §4 above.\n- **`wc.mount(tree, { mountPoint })` silently rejected** in this WC build. Either SDK bug, types/docs drift, or always advisory. Worth investigating against the upstream changelog before HAR-149 models its own mount API — but the working pattern is \"tree top-level keys, no mountPoint,\" which is also the cleaner API.\n\n### 7. Sequencing implication\n\nHAR-371's research changes the ordering pressure on HAR-149:\n\n- **HAR-438 first** (lands the contract + conformance suite + FakeRuntime — already next-up).\n- **HAR-370 second** (closes ProcessManager leaks against the contract — currently Todo, waiting on HAR-371; the probe surfaced that several \"leak\" workarounds may also be removable scar tissue, see the HAR-370 follow-up comment).\n- **HAR-149 third** (builds Harbour-real against the conformance suite, with the match-or-fix decisions in §4 explicit).\n\nNet: HAR-149's scope is **clearer, smaller, and more opinionated** than it was three weeks ago.\n",
+          "createdAt": "2026-05-23T10:10:22.163Z",
+          "user": "John “Sausage Roller” Kershaw"
+        },
+        {
+          "body": "# Current state — post Phase C\n\n## Current State\n\n**Phase C (HAR-442) is Done.** All seven planned sub-subtasks (HAR-465..HAR-471) plus the transitive-ESM follow-up (HAR-473) are completed; HAR-464 was the canceled breakdown probe. HAR-442 itself was still flagged In Progress despite the May 24 \"Phase C complete\" comment — I've just flipped it to Done.\n\n**Phase tree after the flip:**\n\n| Subtask | Title | State |\n| -- | -- | -- |\n| HAR-370 | RuntimeAdapter interface + ProcessManager leak closure | Done |\n| HAR-371 | RuntimeAdapter contract research + conformance | Done |\n| HAR-440 | Phase A — Foundation | Done |\n| HAR-441 | Phase B — Networking | Done |\n| **HAR-442** | **Phase C — Build tools** | **Done** (just updated) |\n| HAR-472 | Real-browser e2e gate (cross-cutting) | Todo |\n| HAR-443 | Phase D — Package management | Todo |\n| HAR-444 | Phase E — Migration | Todo |\n\n**HAR-472 is not a phase** — it's cross-cutting Playwright e2e infrastructure that runs each phase's exit criterion against the real substrate (real `new Worker`, real OPFS, real `?worker` rewrite, real `navigator.serviceWorker`, real SAB-under-COEP) instead of the jsdom stubs the phase fixtures use. Its description explicitly states it is *related* (not *blocks*) to HAR-442, and that its scaffolding plus Phase A/B specs can land independently of any phase. The Phase C spec (`phase-c-vite.spec.js`) was framed as \"the natural gate alongside HAR-471\" — HAR-471 is Done, so that spec is now timely.\n\n## Next Subtask\n\n**Recommendation: HAR-472 next, then HAR-443.**\n\nReasoning:\n\n* Phase D (HAR-443) is *not* blocked by HAR-472 — its dependencies are Phase A (fs/loader), Phase B (HTTPS), Phase C (spawn), all Done. Strict phase sequencing alone would point at HAR-443.\n* But HAR-472 was filed precisely to avoid the failure mode of stacking four phases of additive change before any of them hits a real Worker / real OPFS / real SW. Landing the e2e gate before Phase D means any Phase A/B/C regression surfaces against the real substrate *now*, while attribution is still cheap; doing Phase D first defers four phases of debt onto Phase E's flag-flip.\n* HAR-472's own scheduling supports landing it next: scaffolding + `phase-a-express.spec.js` + `phase-b-networking.spec.js` are ready to ship immediately, and `phase-c-vite.spec.js` is overdue per its own description.\n* If parallel-tracking is available, HAR-472 and HAR-443 can run concurrently — they touch disjoint directories (`test/e2e/runtime-harbour/` vs `src/runtime/harbour/npm/`). But if it's one ticket at a time, HAR-472 is the higher-leverage pick.\n\n**If you'd prefer to stay in strict phase order, HAR-443 (Phase D) is the correct next phase** — exit criterion: `npm install express` succeeds in-runtime; lands in `src/runtime/harbour/npm/` + `src/system-tools/bin/npm.mjs` + `src/core/app-installer.js`. No new contract-surface assertions.\n\n## Carry-Forward Items from Phase C\n\nThree deviations were noted on HAR-471. None are tracked as their own ticket yet:\n\n| Deviation | Owner candidate | Status |\n| -- | -- | -- |\n| **Real Vite not booted in jsdom fixture** (esbuild native binary, ESM-first dynamic imports, sync `require()` boundary) | HAR-472 `phase-c-vite.spec.js` — real Worker + real fs naturally lifts the jsdom-only constraints | Implicitly covered if HAR-472's Phase C spec asserts real `npx vite`. The HAR-471 comment tagged this \"Phase D / E scope\" — if HAR-472 is taken first, the tag becomes obsolete. |\n| **Single-Worker shim instead of nested-Worker boot path** (FakeWorker shares `globalThis`; parent teardown clears child's OPFS handles) | HAR-472 (production Workers have isolated `globalThis`, so this is a test-substrate-only artifact) | Covered the moment HAR-472's real-Worker substrate runs — HAR-470's stubbed four-hop chain becomes a real four-hop chain for free. |\n| **HMR detection via query parameter, not `fs.watch`** (runtime has no `fs.watch`; worker-entry teardown invalidates fs handles for long-lived servers) | Not tracked. Either a HAR-472 phase-c-vite spec concern (if HMR-real is required) or a new follow-up ticket. | **Action: decide whether to fold `fs.watch` into HAR-472's `phase-c-vite.spec.js` acceptance, or file a new ticket.** Worth doing before HAR-444 — Claude Code's dev-loop UX hinges on HMR feel. |\n\n**Recommend:** when HAR-472 is picked up, add a one-line scope note to its `phase-c-vite.spec.js` acceptance — \"HMR via real `fs.watch` round-trip, not query-param probe\" — so deviation 3 doesn't get rediscovered at Phase E.\n\n## Test Baseline\n\n**2847/2847 unit + integration tests passing** (vitest, post-HAR-471, commit `d4b67dc` on `claude/vite-fixture-e2e-gate-o3j9w`). This is the regression baseline for HAR-472 and HAR-443.\n\nNo Playwright e2e baseline yet against `HARBOUR_RUNTIME=harbour` — establishing one is HAR-472's first deliverable.",
+          "createdAt": "2026-05-24T20:22:29.104Z",
+          "user": "John “Sausage Roller” Kershaw"
+        },
+        {
+          "body": "## E2E wire-up surfaced two runtime gaps (as expected)\n\nHAR-498's install-pipeline tripwires + HAR-500's installer unwind, when first exercised end-to-end against the real harbour substrate, surfaced two pre-existing runtime defects that the unit + jsdom layers couldn't catch. Both are now tickets under this tree.\n\n## Recommended order (one-at-a-time)\n\n1. **HAR-503** — `chmodSync` / `cpSync` missing from harbour `fs` tier4 builtin. Fix first: shim provisioner crashes at boot today, which silently degrades almost everything downstream (`ls`/`grep`/`bash`/`curl`/network shim/playwright shim never get written). HAR-460 explicitly scoped tier4 fs to Express's conformance set — these are the next two.\n2. **HAR-504** — Service Worker doesn't register/claim under headless Playwright. Without it, HAR-441's `/__hr/<instanceId>/<port>/*` routing is dead → iframe content tripwires can't pass regardless of installer correctness. The `chromium-harbour` project under `test/e2e/runtime-harbour/` already gets this right (HAR-472); the fix is likely converging the default `chromium` project on the same setup, or moving the install-gate specs over.\n3. **HAR-500** — installer ESM unwind. Implementation is already on `claude/blissful-brahmagupta-U4EI1` (3 commits: S1 mount-tree expansion, S2-S4b consolidated ESM unwind, keepalive-sentinel fix). The `test.fail()` marker removal was reverted; with HAR-503 + HAR-504 fixed the markers can be removed and the gates flip green for real.\n4. **HAR-501** — bin-shim runtime `spawnSync` gap (independent of HAR-503/504; the shim itself is CJS by convention, the issue is the shim's runtime path).\n5. **HAR-502** — JSX app launch verification. Depends on HAR-500 landing.\n6. **HAR-498** — closes once tripwires #3 and #4 are green (mechanical, no new work).\n7. **HAR-492** — WC retirement. Blocked by HAR-498.\n8. **HAR-493** + **HAR-494** — Phase E post-cleanup and stubbed-lane evaluation. Land after the WC retirement so the cleanup walk has the final state to compare against.\n\nHAR-503 + HAR-504 are the rate-limiting step — every gate downstream depends on at least one of them. Worth pulling both forward.",
+          "createdAt": "2026-05-26T12:03:22.109Z",
+          "user": "John “Sausage Roller” Kershaw"
+        },
+        {
+          "body": "## Recommended completion order for remaining HAR-149 work\n\n_Generated from a relationship pass over the open subtasks. The blockers below are documented in each issue's description (the Linear `relations` graph is currently empty), so this comment captures the derived ordering._\n\nAll textual prerequisites are already **Done**: HAR-505 (pre-warm), HAR-507 (OPFS bridge), HAR-508 (content cutover), HAR-499 (ESM in `node.js`). Nothing is hard-blocked by unfinished foundation work — the gating is now internal to the remaining set.\n\n### Phase 1 — Close the install/launch runtime gaps (unblocks the migration gate)\nThese are HAR-497's two open children and map 1:1 onto HAR-498's two unit tripwires.\n1. **HAR-501** — app-bin shim `spawnSync` (Gap B)\n2. **HAR-502** — JSX app launch `server.js` ESM execution (Gap A; reduces to verification now that HAR-499 landed)\n   - ⇒ closes parent **HAR-497**\n\n### Phase 2 — tier4 fs hardening (parallelizable with Phase 1; must precede WC retirement)\nInternal order matters: HAR-506 reads the shadow, HAR-510 adds the `OP_STAT` bridge op, HAR-511 retires the shadow and folds metadata onto the bridge.\n3. **HAR-506** — tighten `chmodSync` to throw ENOENT (smallest; land before the shadow is removed)\n4. **HAR-510** — `statSync` size + `appendFileSync` / `truncateSync` via OPFS bridge (establishes `OP_STAT`)\n5. **HAR-511** — retire the directory-metadata shadow in favour of OPFS bridge queries (builds on HAR-510's `OP_STAT`; supersedes HAR-506's shadow check)\n\n### Phase 3 — Lock in the migration\n6. **HAR-498** — install-pipeline test gates: flip the four `it.fails`/`test.fail` tripwires red (requires HAR-501 + HAR-502; runtime should be hardened first)\n7. **HAR-492** — Retire `@webcontainer/api` (blocked by HAR-498 + stability window). Point of no return — do only after the fs cluster and HAR-497 are solid.\n\n### Phase 4 — Post-retirement follow-ups (both explicitly blocked by HAR-492)\n8. **HAR-494** — evaluate collapsing the stubbed-substrate e2e lane into `chromium-harbour`\n9. **HAR-493** — post-HAR-444 cleanup umbrella (walk `harbour-runtime-followup.md`, split into tickets)\n   - ⇒ closes parent **HAR-444**, and with it the **HAR-149** epic\n\n### Critical path\n`HAR-501 + HAR-502 → HAR-498 → HAR-492 → {HAR-494, HAR-493}`\nThe fs cluster (HAR-506 → HAR-510 → HAR-511) runs in parallel but must merge before HAR-492 removes the WC fallback.",
+          "createdAt": "2026-05-30T08:44:58.146Z",
+          "user": "John “Sausage Roller” Kershaw"
+        },
+        {
+          "body": "## Working convention adopted\n\nNew sub-epic **HAR-545 — Runtime integration gaps (gate-discovered)** now holds the \"go back and add X\" work that integration surfaces after a phase ships. The convention:\n\n- Phases stay **Done** once they deliver planned scope — they are not reopened.\n- Gate-discovered gaps live in **HAR-545** with a `blocks` edge to their gate (e.g. HAR-498), never back under a phase.\n- The **relation graph is the source of truth**; roadmaps are derived from it, not hand-maintained in comments.\n\n**First application:** HAR-539 + HAR-537 (Gap B) moved out of Phase C (HAR-442, now correctly **Done**) into HAR-545.\n\n**Also applied this pass:** FS-hardening now gates WC retirement (HAR-510 → HAR-511 → HAR-492); HAR-506 canceled as throwaway (folded into HAR-511); HAR-502 confirmed **unblocked** (verification work remains).\n\n_Note: the Linear `/relations` API was returning errors during this review and has since been fixed — the dependency graph is now trustworthy and queryable._\n",
+          "createdAt": "2026-05-31T13:56:26.288Z",
+          "user": "John “Sausage Roller” Kershaw"
+        },
+        {
+          "body": "## Research pass — staleness reconciliation against HEAD (2026-06-14)\n\nRe-grounded the description against the codebase at HEAD (not against the prose). The fork-vs-build correction the 2026-05-23 synthesis recommended **has already been applied** — the body reads build-from-scratch and the fork-and-extend language now survives only intentionally under *Historical context*. So the original framing concern for this ticket is closed.\n\nWhat had gone stale since is **temporal**, not strategic. Corrected in-place via surgical splices:\n\n| Was (stale) | Now (HEAD truth) | Evidence |\n|---|---|---|\n| \"runtime implementation pending across five phases\" | Phases A–D **Done** (HAR-440→443); Phase E in flight | children states |\n| \"Default stays `webcontainers` until Harbour-real passes the bar\" | **Default is now `harbour`** — flipped 2026-05-25 | commit `91c8038` (HAR-491/E2); `src/runtime/index.js:14` `?? 'harbour'` |\n| Selection snippet `?? 'webcontainers'` | `?? 'harbour'` | `src/runtime/index.js` |\n| \"gating bar for flipping the default flag\" | flip already done; bar now gates **E3 / stability tag** | HAR-491 commit msg |\n\n### Phase E is decomposed E1/E2/E3 (not visible from the parent's phase table)\n- **HAR-490 (E1 — wire + validate):** Done\n- **HAR-491 (E2 — flip default to `harbour`):** Done — boot default flipped 2026-05-25\n- **HAR-492 (E3 — retire WC):** **Todo — the only remaining concrete step.** Deletes `@webcontainer/api` (still at `package.json:31`, `^1.5.1`), the WC adapter, its conformance row, and the WC-as-canonical docs. Gated on a stability window measured from the `harbour-runtime-default-v1` release tag — which **does not yet exist** (`git tag` shows no `harbour-runtime-default*`).\n- Follow-ups HAR-493 (followup-doc walk) and HAR-494 (retire stubbed-substrate e2e) are Todo, post-E3.\n\n### The clean A–E table no longer models how the work actually went\nThe default was flipped (E2) **while** a large body of gate-discovered hardening is still open — **HAR-589** (GATE: real bundled npm+npx e2e), **HAR-545** (integration gaps), **HAR-497** (GATE: JSX-app install) are all *In Progress* — sitting on top of ~20 Done runtime tickets (HAR-503…HAR-528: fs tier3/4, http builtin, worker OPFS handle ownership, jsh REPL, etc.). The acceptance bar (\"can't tell which runtime\") is being driven through these gates in parallel with/after the flip, not strictly before it. Per the constraints, these correctly do **not** reopen completed phase tickets. Left the A–E table intact (it documents the original decomposition) and carried the real status in the corrected top-line Status block.\n\n### One code-level nit (out of scope for this Linear pass, flagging for whoever picks up E3)\n`src/runtime/index.js:30-32` still comments the harbour slot as *\"Reserved slot for HAR-149. Currently absent — fail loudly\"* — but the harbour adapter exists (`src/runtime/harbour/index.js`, ~27KB) and is the default. Stale code comment; trivial to fix when E3 touches the selector.\n\n### Recommended next action\n**Dispatch HAR-492 (E3 — retire WC)** as the epic's next concrete step — but **first confirm the gate close-out**: HAR-589 / HAR-497 (the install/launch acceptance gates) and HAR-545 should be green, and the `harbour-runtime-default-v1` tag cut to start the stability window, before WC removal lands. If the stability window hasn't opened, the correct next move is closing those gates, not E3. HAR-149 itself stays In Progress until E3 + the doc catch-up complete; no description rewrite is needed beyond the splices above.",
+          "createdAt": "2026-06-14T10:22:34.992Z",
+          "user": "John “Sausage Roller” Kershaw"
+        },
+        {
+          "body": "**HAR-149 status check (2026-06-14) — E3 gate-blocked; one safe staleness fix landed.**\n\nConfirmed the epic is in E3-only territory (Phases A–D done; E1/E2 done; default = `harbour` since 2026-05-25). The single remaining concrete migration step, **HAR-492 (E3 — retire WC)**, is **gate-blocked and was not executed** — full evidence in the HAR-492 comment. Summary: the `harbour-runtime-default-v1` stability tag was never cut (no git tags exist), and HAR-554/HAR-497/HAR-589/HAR-545 are all still open. Removing `@webcontainer/api` now would violate the epic's own acceptance gate, so WC was left fully intact (fallback branch + conformance row + dep all preserved).\n\n**What did land** (the only gate-independent, in-scope cleanup): corrected the stale `case 'harbour'` comment in `src/runtime/index.js` that claimed the harbour slot was *\"Reserved … Currently absent\"* — it has been the default runtime and imports `./harbour/index.js` (`createHarbourAdapter`) two lines below. Both this brief and `harbour-os/CLAUDE.md` flagged that comment as not-to-be-relied-on. Comment-only; no behavioural change to the selector, fallback, or loud-fail-on-unknown.\n\n- Branch: `chore/har-149-selector-comment-staleness`\n- Commit: `d3cade6`\n- Verification: `git diff` confirms the change is the comment block only (no logic touched); the `webcontainers`/`harbour`/`default` branch structure is unchanged.\n\nNo follow-up beyond the already-tracked unblock chain: HAR-497 / HAR-589 / HAR-545 → HAR-554 → cut `harbour-runtime-default-v1` → stability window → HAR-492.\n",
+          "createdAt": "2026-06-14T12:07:24.468Z",
+          "user": "John “Sausage Roller” Kershaw"
+        },
+        {
+          "body": "## Autopilot checkpoint — 2026-06-14 (paused at milestone by maintainer)\n\n**Both install acceptance gates are now closed; HAR-149 paused here for a deliberate human checkpoint before the Phase-E retirement stretch.**\n\n### Landed this session (main `53412c6`)\n- **HAR-640** (#560) — PATH-floor shim dirs anchored to `$HOME` so the npm-exec `sh -c` subshell resolves `sh`.\n- **HAR-641** (#561) — `readFileSync` follows leaf symlinks + `node` realpaths main module; **promoted the leg-3 `npx semver`→exit-0 witness from `test.fixme` to a hard assertion**.\n- **HAR-642** (#562) — `IDLE_CONFIRM_TURNS=3` bounded multi-turn idle confirmation kills the bare-install early-exit flake.\n- **HAR-643** (#563) — proved a model-precise liveness handle is **not constructible** (continuation lives in un-owned vendored `make-fetch-happen`/`cacache`); pinned K=3 as the permanent accepted design + mechanism test.\n- **Gates closed:** HAR-589 (Done — 4/4 legs green), HAR-497 (Done — superseded by HAR-499/500 ESM restore), HAR-545 (Done — its forcing gate HAR-589 is green; all 50 children terminal).\n- **Epic description reconciled** (default already flipped to `harbour` since HAR-491/E2; E3 is the only remaining concrete phase).\n\n### Remaining path to HAR-149 Done\n1. **HAR-502** (In Progress) — JSX app *launch*: generated `server.js` ESM execution. Live frontier.\n2. **HAR-554** (Todo) — Phase E final runtime acceptance gate (real end-to-end). Explicitly blocks WC retirement.\n3. **Cut `harbour-runtime-default-v1` stability tag** — does not exist yet (`git tag -l` empty). **Maintainer decision** (is harbour stable enough?).\n4. **HAR-492 / E3** — retire WC: delete `@webcontainer/api` (`package.json:31`), 17 importers, fallback branch, conformance row. One-commit, gated on (3). **Maintainer decision.** Full unblock evidence in HAR-492 comment `a78bfd81`.\n5. Doc catch-up.\n\n### Loose end\n- Trivial comment-only fix correcting the stale `case harbour` selector comment in `src/runtime/index.js` exists local-only as commit `d3cade6` (branch `chore/har-149-selector-comment-staleness`), **not pushed** — no PR opened. Re-do or push as desired.\n\nNo open code PRs. All merges were squash + branch-deleted with 10/10 CI green on the landed commit.",
+          "createdAt": "2026-06-14T13:25:27.045Z",
+          "user": "John “Sausage Roller” Kershaw"
+        }
+      ],
+      "focusedChild": {
+        "issue": {
+          "id": "7f55c047-ae36-45a2-a62c-1d7439859f4a",
+          "identifier": "HAR-545",
+          "title": "Runtime integration gaps (gate-discovered)",
+          "description": "Container for **gaps discovered by gate checks** during the HAR-149 runtime migration — the \"oh, we actually need X, go back and add it\" work that integration surfaces after a phase has shipped its planned scope.\n\n## Why this exists\n\nThe phases (A–E) are a *plan* — a forward decomposition written before building. Gaps are *discoveries* — things integration teaches us that the plan couldn't know. Filing discoveries back into the phase tree (reopening a \"complete\" phase, scattering one gap's fix across three subtrees) is what made the board hard to read. A plan is a tree; discovered dependencies are a graph that overlays it. Don't force the graph into the tree.\n\n## Convention\n\n1. **A gate-discovered gap lives here**, parented to the epic — never back under a phase, regardless of which subsystem it touches.\n2. **It carries a real** `blocks` **edge to the gate that found it** (e.g. the install-pipeline gate HAR-498), so \"what's blocking the gate?\" is a query, not an archaeology dig.\n3. **The phase that shipped stays Done.** \"Done\" means *delivered the planned scope against then-current knowledge* — not *perfect forever*. New integration debt is a new gap here, not a reopened phase.\n4. **A gap can be a mini-epic** (break it down under itself); because it sits at epic level, the depth stays legible.\n5. **Supersession is explicit and terminal** — the superseded ticket is Canceled with a `duplicate` edge to its heir, its body reconciled.\n6. **The relation graph is the source of truth**; prose roadmaps are derived from it, never hand-maintained alongside it.\n\nFirst residents (re-parented from HAR-442 Phase C): HAR-539 (+ its HAR-540→543 chain) and HAR-537 — the Gap-B fix.",
+          "state": {
+            "name": "In Progress",
+            "type": "started"
+          },
+          "createdAt": "2026-05-31T13:54:10.974Z",
+          "labels": []
+        },
+        "comments": [
+          {
+            "body": "**Keystone landed.** HAR-606 (PR #527) merged → `npm --version` prints **11.12.1** on the real harbour substrate. Assessment HAR-608 closed clean-to-merge.\n\nRemaining under this epic:\n- **HAR-603** — real `npm install <pkg>` → node_modules (was blocked by HAR-606, now unblocked).\n- **HAR-604** — child_process (spawn/spawnSync) in `node -e`.\n- **HAR-609** — follow-up: async-io keepalive mechanism test (tidy-up from the HAR-606 assessment).\n",
+            "createdAt": "2026-06-10T09:18:47.768Z",
+            "user": "John “Sausage Roller” Kershaw"
+          },
+          {
+            "body": "## Structure update (2026-06-10) — npm-install frontier reorganised after HAR-611 research\n\nThe HAR-611 research (real-substrate-validated) split the remaining npm-install work into two parallel fix tracks, a convergence witness, and two class-hardening tickets:\n\n```\nHAR-611 (agent layer: tls, timers/promises, http2, v8.getHeapStatistics, process.umask) ──┐\n                                                                                          ├─▶ HAR-613 (e2e witness: node_modules materialises) ─▶ HAR-589 (gate)\nHAR-612 (cacache layer: crypto.createHash / Vite-externalized stream)  ───────────────────┘\n\nHAR-614 (class: subpath builtin namespace — dns/promises, stream/promises, path/win32, …)   [related, non-blocking]\nHAR-615 (class: deferred builtins as HAR-600 refusals — vm, readline, inspector, …)         [related, non-blocking]\n```\n\n* **HAR-611 and HAR-612 are independent** — work them in parallel. HAR-612's root cause reproduces with a direct `cacache.put`, no agent fixes needed.\n* **HAR-613** holds the real-path e2e witness deferred since HAR-603 (install exit 0 + `node_modules/left-pad` + `require` exits 0); it is the gate's acceptance evidence and captures any post-packument blocker (tar extract / reify / bin-links) as a new sibling rather than widening itself.\n* **HAR-614/HAR-615 do not block the gate** — nothing on the plain install path hits them once HAR-611 lands. They are the durable record of the classes the research identified; pull forward on first real hit (HAR-615: `npm init`/auth flows) or per the second-firing rule (HAR-614 has already fired twice: fs/promises → timers/promises).\n* Operating principle from the research, applies to all of these: npm's require graph **loads** far more than it **executes** — the runtime needs near-total loadability of Node's builtin namespace, while functionality tiers as real implementation / fetch-backed / loud refusal. Narrow fixes are fine for unblocking IF each touched module lands contract-complete (HAR-603's full `path` port precedent), so the class tickets are pure extension, never rework.",
+            "createdAt": "2026-06-10T14:08:45.701Z",
+            "user": "John “Sausage Roller” Kershaw"
+          },
+          {
+            "body": "## Review: HAR-545 close-out readiness (code-reviewer pass)\n\n**Verdict: recorded state is fully consistent — but hold close. The epic's gate is still open.**\n\n### What checks out ✅\n- **All 50 children terminal** — 48 Done, 2 Canceled (HAR-588, HAR-610). No open child remains to descend into.\n- **Backed by the commit record** — children map to merged PRs #525–#563 in `main`; the most recent frontier fixes (HAR-640 #560, HAR-641 #561, HAR-642 #562, HAR-643 #563, HAR-636 #559) are at HEAD. The recorded Done states are internally consistent with git.\n- **Stale comment reconciled** — the 2026-06-10 keystone comment named HAR-603 / HAR-604 / HAR-609 as the items still remaining under the epic; all three are now Done. The npm-install-frontier reorg (HAR-611/612/613 + class records HAR-614/615) it described is likewise fully terminal.\n\n### Why I'm NOT closing it yet ⛔ (primary finding)\nHAR-545 is, by its own charter, the **live receptacle for gate-discovered gaps** — \"keep filing each newly discovered blocker here as its own sibling.\" Its lifecycle is bound to the gate, not to a fixed scope. That gate, **HAR-589, is still In Progress**, and its brief reports **Leg 3 (`npx <bin>` end-to-end) not yet green** — the npx-exec PATH/sh frontier is the open edge.\n\nClosing the bucket while the forcing-function gate is still live is exactly the \"force the graph into the tree\" anti-pattern this epic was created to avoid: the next gap the gate surfaces would have no home, and convention #3 forbids reopening shipped phases to absorb it. **Recommended close-condition for HAR-545 = HAR-589 goes green**, not \"current children all terminal.\"\n\nNote: this is NOT a request to file new work now. The most recent frontier fixes (HAR-640 sh-resolution, HAR-641 npx `.bin` end-to-end, HAR-642/643 manifest-install liveness) have already landed in `main`. The residual is HAR-589's own leg-3 acceptance re-run/witness — that belongs to the gate, not to a new HAR-545 child. So: leave HAR-545 In Progress, no new sibling required at this moment.\n\n### Secondary findings (graph hygiene, non-blocking)\nThe epic states \"the relation graph is the source of truth\" and convention #5 requires a superseded ticket be \"Canceled with a `duplicate` edge to its heir.\" Two Canceled children don't satisfy this:\n- **HAR-610** (Canceled) has the *identical title* to **HAR-609** (Done) — clearly its heir — but carries **zero relations**; no `duplicate` edge to HAR-609.\n- **HAR-588** (Canceled — \"bare `npm install` installs nothing\") carries only a `related` edge to the gate HAR-589; no `duplicate` edge to the heir that superseded it (the HAR-603/611–613 install frontier).\n\nNeither blocks anything functionally, but both leave the graph not self-describing. Recommend adding HAR-610→HAR-609 and HAR-588→(its heir) `duplicate` edges. Recorded as findings rather than fixed here, to avoid mutating finished siblings outside this review's scope.\n\n_Reviewed against HEAD (53412c6). No code change in this pass — verification + graph-consistency review only._",
+            "createdAt": "2026-06-14T12:03:10.257Z",
+            "user": "John “Sausage Roller” Kershaw"
+          },
+          {
+            "body": "Closing per the HAR-545 review (comment `056f284d`) close-condition: **HAR-545 closes when its forcing gate HAR-589 goes green.** HAR-589 was reviewed and moved to Done at HEAD `53412c6` (all four acceptance legs green — install→require, bare-install manifest/lockfile, real-path `npx semver 1.2.3`→exit 0, documented refusals). All 50 children are terminal (48 Done, 2 Canceled) and consistent with merged PRs. The gate-discovered-gap bucket has served its purpose for the npx/install/liveness frontier (HAR-636/640/641/642/643 all landed).\n\nNon-blocking graph-hygiene nits noted by the review remain (HAR-610 missing duplicate edge to HAR-609; HAR-588 missing duplicate edge to its heir) — cosmetic, left for a future tidy.",
+            "createdAt": "2026-06-14T13:25:06.055Z",
+            "user": "John “Sausage Roller” Kershaw"
+          }
+        ]
+      }
+    },
+    "HAR-545": {
+      "issue": {
+        "id": "7f55c047-ae36-45a2-a62c-1d7439859f4a",
+        "identifier": "HAR-545",
+        "title": "Runtime integration gaps (gate-discovered)",
+        "description": "Container for **gaps discovered by gate checks** during the HAR-149 runtime migration — the \"oh, we actually need X, go back and add it\" work that integration surfaces after a phase has shipped its planned scope.\n\n## Why this exists\n\nThe phases (A–E) are a *plan* — a forward decomposition written before building. Gaps are *discoveries* — things integration teaches us that the plan couldn't know. Filing discoveries back into the phase tree (reopening a \"complete\" phase, scattering one gap's fix across three subtrees) is what made the board hard to read. A plan is a tree; discovered dependencies are a graph that overlays it. Don't force the graph into the tree.\n\n## Convention\n\n1. **A gate-discovered gap lives here**, parented to the epic — never back under a phase, regardless of which subsystem it touches.\n2. **It carries a real** `blocks` **edge to the gate that found it** (e.g. the install-pipeline gate HAR-498), so \"what's blocking the gate?\" is a query, not an archaeology dig.\n3. **The phase that shipped stays Done.** \"Done\" means *delivered the planned scope against then-current knowledge* — not *perfect forever*. New integration debt is a new gap here, not a reopened phase.\n4. **A gap can be a mini-epic** (break it down under itself); because it sits at epic level, the depth stays legible.\n5. **Supersession is explicit and terminal** — the superseded ticket is Canceled with a `duplicate` edge to its heir, its body reconciled.\n6. **The relation graph is the source of truth**; prose roadmaps are derived from it, never hand-maintained alongside it.\n\nFirst residents (re-parented from HAR-442 Phase C): HAR-539 (+ its HAR-540→543 chain) and HAR-537 — the Gap-B fix.",
+        "state": {
+          "name": "In Progress",
+          "type": "started"
+        },
+        "createdAt": "2026-05-31T13:54:10.974Z",
+        "labels": []
+      },
+      "parent": {
+        "id": "4c55e8ad-5ef0-4ce1-b95b-e509a0282d36",
+        "identifier": "HAR-149",
+        "title": "Harbour Runtime — self-hosted Node.js runtime for the browser"
+      },
+      "siblings": [
+        {
+          "id": "55c56fc2-50da-460e-9fb1-4bed1a2c92e1",
+          "identifier": "HAR-677",
+          "title": "HAR-149-G: Phase G — Retire & remove WebContainers",
+          "state": {
+            "name": "Todo",
+            "type": "unstarted"
+          }
+        },
+        {
+          "id": "c1473c3e-daf5-41c1-8b18-a17c4d6a8270",
+          "identifier": "HAR-676",
+          "title": "HAR-149-F: Phase F — Real apps run on real Harbour (any install mechanism: App Store, URL, CLI, git, npm, upload)",
+          "state": {
+            "name": "In Progress",
+            "type": "started"
+          }
+        },
+        {
+          "id": "2a5fcc17-06f0-41c1-9a78-0b51887221b6",
+          "identifier": "HAR-589",
+          "title": "GATE: run real bundled npm + npx end-to-end under harbour (runtime-completeness forcing function)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "ca4dee50-d583-4802-a1fb-44f19bf15bfc",
+          "identifier": "HAR-544",
+          "title": "Runtime integration gaps (gate-discovered)",
+          "state": {
+            "name": "Duplicate",
+            "type": "duplicate"
+          }
+        },
+        {
+          "id": "baf3f802-9ccf-494e-a4e9-ffaf1667d4a5",
+          "identifier": "HAR-528",
+          "title": "harbour-runtime: collapse OPFS handle ownership into the helper Worker (end the cross-Worker contention class)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        }
+      ],
+      "siblingsTotal": 30,
+      "project": {
+        "name": "Runtime",
+        "description": null
+      },
+      "children": [
+        {
+          "id": "e824718c-711e-4289-acad-8e5322a3f2b6",
+          "identifier": "HAR-643",
+          "title": "Replace HAR-642 K=3 idle-confirmation margin with a model-precise liveness fix for the manifest-install drain",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "15726181-6786-49cd-b6e6-10737660077f",
+          "identifier": "HAR-642",
+          "title": "Manifest-driven `npm install` intermittently exits 0 before reify (nothing installed) — HAR-616-residue liveness early-exit",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "1b238340-715a-49c2-940d-a1cb2fc3e012",
+          "identifier": "HAR-641",
+          "title": "npx exec: locally-installed `.bin` not resolved on $PATH inside the npm-spawned subshell — `semver: not found` (exit 127)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "a371d6fb-0efe-4c23-8527-7f7f13a56b6c",
+          "identifier": "HAR-640",
+          "title": "npm exec (npx <bin> / run-script) spawns `sh -c` but harbour registers no `sh` — exit 127 'sh: not found'",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "c3a4fabd-b442-44c3-aa69-1af190377e98",
+          "identifier": "HAR-639",
+          "title": "fs.promises.open / FileHandle absent — npm bin-links (cmd-shim isWindowsHashbangFile) crashes installing any package with a bin",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "acacfe98-f2d8-409b-afa8-44f724f4ba3b",
+          "identifier": "HAR-638",
+          "title": "Flaky/failing os-test-e2e (6): vitest 4.x rolldown native binding (@rolldown/binding-linux-x64-gnu) missing on live npm install — phase-d Case 2 (npm/cli#4828)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "35e75c99-d6a3-40b2-adbc-8d315670ceb6",
+          "identifier": "HAR-637",
+          "title": "worker-entry.js formatOne() collapses Error to {\"cause\":{}} — process-console diagnostics blindness (HAR-626 sibling)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "2f661e0b-1fb2-4aca-bfac-69ff79873279",
+          "identifier": "HAR-636",
+          "title": "Outer runtime-fs.js#resolved() owes the same string|Buffer|URL path contract as tier4 fs (HAR-626 sibling, latent)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "4270181b-a053-44a9-ba1b-d94599c61ea7",
+          "identifier": "HAR-635",
+          "title": "Flaky os-test-e2e (5): har563 COI-reload race + har613 live-registry network dependency",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "fdc72251-8914-471c-811b-5bf2575d8a72",
+          "identifier": "HAR-626",
+          "title": "phase-d Case 2: vitest live install fails on ERR_MODULE_NOT_FOUND (module-resolution gap, separate from HAR-625 util shim)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "b9b03f66-4fd2-44a6-a3fc-56e19cf281e7",
+          "identifier": "HAR-620",
+          "title": "Real npm-cli.js install: tarball gunzip throws `Compression method not supported: Unzip` (harbour zlib lacks minizlib streaming Unzip) — reify cannot extract node_modules",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "ad78ce7f-151e-4ff4-9f40-8f2d83bb6af3",
+          "identifier": "HAR-619",
+          "title": "Real npm-cli.js install: npm-install-checks platform-check reads undefined `process.report.excludeNetwork` (harbour process-global missing process.report)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "5f5d5b9c-e059-4a33-aab1-893706218756",
+          "identifier": "HAR-618",
+          "title": "Real npm-cli.js install: minipass-fetch cannot consume registry response body over the http.request polyfill (FETCH_ERROR)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "8fb642bb-62f7-4780-b442-14a8ec30a3f2",
+          "identifier": "HAR-617",
+          "title": "jsh per-command process is a hand-rolled partial of the canonical proc — drops the HAR-602 EventEmitter surface (crashes interactive npm)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "888d4e16-59d3-44a7-acd4-129a12d4ac4f",
+          "identifier": "HAR-616",
+          "title": "Worker liveness model misses untracked deferred continuations (npm `process/` nextTick on cached native setTimeout) — `node -e` exits 0 before awaited stream/cacache completions",
+          "state": {
+            "name": "In Progress",
+            "type": "started"
+          }
+        },
+        {
+          "id": "761e550e-a502-4590-916a-1f0dba123555",
+          "identifier": "HAR-615",
+          "title": "Class: register remaining deferred builtins as loadable HAR-600 refusal modules (vm, readline, inspector, repl, trace_events, diagnostics_channel)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "84ce581b-a748-43c4-83e2-896932bbc82e",
+          "identifier": "HAR-614",
+          "title": "Class: register Node subpath builtin names systematically (dns/promises, stream/promises, path/win32, util/types, …)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "32ce6aff-96ad-46f5-8ecd-9daf5a3dd0c5",
+          "identifier": "HAR-613",
+          "title": "Real-path e2e witness: vendored `npm-cli.js install left-pad` materialises node_modules + require() exits 0 (HAR-589 acceptance evidence)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "855ded42-6936-4d33-946a-e7dcfd92cf27",
+          "identifier": "HAR-612",
+          "title": "crypto.createHash broken on real substrate (Vite-externalized `stream` in crypto-browserify) — blocks cacache write, npm packument caching, node_modules materialisation",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "81270a77-cd19-4ae6-9693-2242c69ca9fa",
+          "identifier": "HAR-611",
+          "title": "Real `npm install` aborts at `Cannot find module 'tls'` from http-proxy-agent (missing tls/net network builtin)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "c7ea72d9-3b9a-4185-919e-be2f39825fa2",
+          "identifier": "HAR-610",
+          "title": "Mechanism test: trackAsyncOp keepalive holds activeCount >= 1 across sequential async ops (HAR-606 follow-up)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "8c1875e4-c701-4417-975d-61500ad77c1f",
+          "identifier": "HAR-609",
+          "title": "Mechanism test: trackAsyncOp keepalive holds activeCount >= 1 across sequential async ops (HAR-606 follow-up)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "21e875c7-a741-47c5-8ef8-0647a543c54f",
+          "identifier": "HAR-608",
+          "title": "Assess PR #527 (HAR-606 keystone): clean-to-merge, tidy-ups, or roll-back-and-redo?",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "3b6d6a04-0cdb-4100-b113-9ec44260489c",
+          "identifier": "HAR-607",
+          "title": "Inventory: vendored npm 11.12.1 runtime-dependency surface (bounded gap list before more piecemeal fixes)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "77175c1f-da49-464b-88d2-8c715ada7730",
+          "identifier": "HAR-606",
+          "title": "Dynamic import() of bare-specifier ESM packages unresolved under harbour (npm.load blocker, unmasked by HAR-605)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "7f0b0448-dc75-4fa1-906b-240cfd2cb6f2",
+          "identifier": "HAR-605",
+          "title": "Register `node:fs/promises` builtin (npm.load blocker, unmasked by HAR-602)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "52147f32-3589-4655-af20-022004387907",
+          "identifier": "HAR-604",
+          "title": "child_process (spawn/spawnSync) unwired in `node -e` eval processes",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "1d231f1d-edc8-450b-9913-536375eea532",
+          "identifier": "HAR-603",
+          "title": "Real `npm install <pkg>` materialises no node_modules under harbour",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "f85580ea-d374-4900-8ccf-5d8d81fb735a",
+          "identifier": "HAR-602",
+          "title": "Vendored npm produces no stdout under harbour (npm output/flush gap)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "52517388-f67b-44e4-9a93-64221137c183",
+          "identifier": "HAR-594",
+          "title": "Align HOME/TMPDIR env to per-workspace paths (diverges from os.homedir() since HAR-591)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "7015cd32-5ee9-4af7-babf-e27a92873ff2",
+          "identifier": "HAR-593",
+          "title": "Node-faithful directory rename — atomicity + replace/ENOTEMPTY semantics (residual of HAR-582, file rename done)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "5d0b7a1c-130c-45f0-a713-ddc9538bc304",
+          "identifier": "HAR-592",
+          "title": "Honor the executable bit / file modes — make chmod +x real where bin-links and tar-extract-with-modes depend on it",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "e29d54f1-33af-46e8-81bc-632d36c743dc",
+          "identifier": "HAR-591",
+          "title": "os/process builtin completeness for npm load — os.arch/cpus/type/userInfo/networkInterfaces + process.arch + per-workspace homedir/tmpdir",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "e4ff154a-0b91-482f-96b8-1bd35ad158c8",
+          "identifier": "HAR-590",
+          "title": "OPFS symlink emulation layer — metadata sidecar for symlink/readlink/lstat/realpath (HAR-589 crux)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "6c577b4f-fe5e-46a5-ae5d-7713a36f9205",
+          "identifier": "HAR-588",
+          "title": "Harbour npm: bare `npm install` (and the package.json-manifest install surface) installs nothing under harbour",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "9de225ff-0e47-497f-abb4-7c7587d173ad",
+          "identifier": "HAR-587",
+          "title": "E2e gate: A↔B named ESM cycle live-binding in a real Worker (HAR-570 surface 5)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "ad3e2598-29cf-4fb5-963d-aad8dfa0eebd",
+          "identifier": "HAR-572",
+          "title": "Host the shim/shell layer on the harbour runtime",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "0cd6cbb9-885b-4fe2-b16c-202f3fdf6038",
+          "identifier": "HAR-570",
+          "title": "Walker cycle stub is default-only — named live bindings for genuine ESM import cycles",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "3f10b8fb-5c67-4057-9bc7-5147a7a678ad",
+          "identifier": "HAR-569",
+          "title": "Walker CJS→ESM interop stub is default-only — synthesize named exports (cjs-module-lexer)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "308616a0-a715-4f87-83b9-1cf6e1b753b8",
+          "identifier": "HAR-568",
+          "title": "Walker splices default-only cycle stub for non-cyclic ESM children — breaks ESM→ESM named imports",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "3b5f0f79-14ee-4a39-929c-9c9f0b508701",
+          "identifier": "HAR-567",
+          "title": "Node-faithful resolution: CJS/ESM algorithm split + typed resolution errors",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "2586aa1b-9d62-4c7c-80b0-3dbbd160c732",
+          "identifier": "HAR-566",
+          "title": "Node-faithful resolution: determine module kind during resolution (demote content-sniff)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "5e6c6a0a-f90c-4e3e-aabd-d311535944cb",
+          "identifier": "HAR-565",
+          "title": "Node-faithful resolution: `imports` map (`#` specifiers) + self-reference resolution",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "60ec93ef-2782-433a-b1cd-35310ac46b06",
+          "identifier": "HAR-564",
+          "title": "Node-faithful package resolution: exports subpaths/wildcards/encapsulation + threaded conditions",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "e212c60a-d47e-490b-9aa2-a03ced889231",
+          "identifier": "HAR-563",
+          "title": "Nested child_process stdio:'inherit' does not forward child output to the grandparent stream",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "d7f7cfab-70fd-4b6b-a377-3991badd47b6",
+          "identifier": "HAR-562",
+          "title": "Complete the harbour exec/command-resolution model (Node/POSIX-faithful path + interpreter + execPath)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "c15d6410-9c3c-4c69-9bba-f43757a67948",
+          "identifier": "HAR-561",
+          "title": "Harbour tier4 fs: relative paths must resolve against process.cwd(), not the workspace home (Node-faithful cwd-relative resolution)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "f55b00cc-8433-407a-9b13-5ef26a05d134",
+          "identifier": "HAR-560",
+          "title": "Harbour fd-fs ABI: Node-faithful ENOENT for ancestor-dir walk above the workspace root (esbuild resolver os.Open(\"../../..\"))",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "929560eb-a893-4b7c-b7bb-e315fc4362bb",
+          "identifier": "HAR-559",
+          "title": "Complete the OPFS sync bridge: cold-shadow path-fs ops (readdir/stat/mkdir/rmdir/unlink)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "6c2972d7-e657-44ab-96e2-2129eead18bc",
+          "identifier": "HAR-558",
+          "title": "Harbour worker global parity: expose globalThis.Buffer (Node global surface, round 2)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        }
+      ],
+      "comments": [
+        {
+          "body": "**Keystone landed.** HAR-606 (PR #527) merged → `npm --version` prints **11.12.1** on the real harbour substrate. Assessment HAR-608 closed clean-to-merge.\n\nRemaining under this epic:\n- **HAR-603** — real `npm install <pkg>` → node_modules (was blocked by HAR-606, now unblocked).\n- **HAR-604** — child_process (spawn/spawnSync) in `node -e`.\n- **HAR-609** — follow-up: async-io keepalive mechanism test (tidy-up from the HAR-606 assessment).\n",
+          "createdAt": "2026-06-10T09:18:47.768Z",
+          "user": "John “Sausage Roller” Kershaw"
+        },
+        {
+          "body": "## Structure update (2026-06-10) — npm-install frontier reorganised after HAR-611 research\n\nThe HAR-611 research (real-substrate-validated) split the remaining npm-install work into two parallel fix tracks, a convergence witness, and two class-hardening tickets:\n\n```\nHAR-611 (agent layer: tls, timers/promises, http2, v8.getHeapStatistics, process.umask) ──┐\n                                                                                          ├─▶ HAR-613 (e2e witness: node_modules materialises) ─▶ HAR-589 (gate)\nHAR-612 (cacache layer: crypto.createHash / Vite-externalized stream)  ───────────────────┘\n\nHAR-614 (class: subpath builtin namespace — dns/promises, stream/promises, path/win32, …)   [related, non-blocking]\nHAR-615 (class: deferred builtins as HAR-600 refusals — vm, readline, inspector, …)         [related, non-blocking]\n```\n\n* **HAR-611 and HAR-612 are independent** — work them in parallel. HAR-612's root cause reproduces with a direct `cacache.put`, no agent fixes needed.\n* **HAR-613** holds the real-path e2e witness deferred since HAR-603 (install exit 0 + `node_modules/left-pad` + `require` exits 0); it is the gate's acceptance evidence and captures any post-packument blocker (tar extract / reify / bin-links) as a new sibling rather than widening itself.\n* **HAR-614/HAR-615 do not block the gate** — nothing on the plain install path hits them once HAR-611 lands. They are the durable record of the classes the research identified; pull forward on first real hit (HAR-615: `npm init`/auth flows) or per the second-firing rule (HAR-614 has already fired twice: fs/promises → timers/promises).\n* Operating principle from the research, applies to all of these: npm's require graph **loads** far more than it **executes** — the runtime needs near-total loadability of Node's builtin namespace, while functionality tiers as real implementation / fetch-backed / loud refusal. Narrow fixes are fine for unblocking IF each touched module lands contract-complete (HAR-603's full `path` port precedent), so the class tickets are pure extension, never rework.",
+          "createdAt": "2026-06-10T14:08:45.701Z",
+          "user": "John “Sausage Roller” Kershaw"
+        },
+        {
+          "body": "## Review: HAR-545 close-out readiness (code-reviewer pass)\n\n**Verdict: recorded state is fully consistent — but hold close. The epic's gate is still open.**\n\n### What checks out ✅\n- **All 50 children terminal** — 48 Done, 2 Canceled (HAR-588, HAR-610). No open child remains to descend into.\n- **Backed by the commit record** — children map to merged PRs #525–#563 in `main`; the most recent frontier fixes (HAR-640 #560, HAR-641 #561, HAR-642 #562, HAR-643 #563, HAR-636 #559) are at HEAD. The recorded Done states are internally consistent with git.\n- **Stale comment reconciled** — the 2026-06-10 keystone comment named HAR-603 / HAR-604 / HAR-609 as the items still remaining under the epic; all three are now Done. The npm-install-frontier reorg (HAR-611/612/613 + class records HAR-614/615) it described is likewise fully terminal.\n\n### Why I'm NOT closing it yet ⛔ (primary finding)\nHAR-545 is, by its own charter, the **live receptacle for gate-discovered gaps** — \"keep filing each newly discovered blocker here as its own sibling.\" Its lifecycle is bound to the gate, not to a fixed scope. That gate, **HAR-589, is still In Progress**, and its brief reports **Leg 3 (`npx <bin>` end-to-end) not yet green** — the npx-exec PATH/sh frontier is the open edge.\n\nClosing the bucket while the forcing-function gate is still live is exactly the \"force the graph into the tree\" anti-pattern this epic was created to avoid: the next gap the gate surfaces would have no home, and convention #3 forbids reopening shipped phases to absorb it. **Recommended close-condition for HAR-545 = HAR-589 goes green**, not \"current children all terminal.\"\n\nNote: this is NOT a request to file new work now. The most recent frontier fixes (HAR-640 sh-resolution, HAR-641 npx `.bin` end-to-end, HAR-642/643 manifest-install liveness) have already landed in `main`. The residual is HAR-589's own leg-3 acceptance re-run/witness — that belongs to the gate, not to a new HAR-545 child. So: leave HAR-545 In Progress, no new sibling required at this moment.\n\n### Secondary findings (graph hygiene, non-blocking)\nThe epic states \"the relation graph is the source of truth\" and convention #5 requires a superseded ticket be \"Canceled with a `duplicate` edge to its heir.\" Two Canceled children don't satisfy this:\n- **HAR-610** (Canceled) has the *identical title* to **HAR-609** (Done) — clearly its heir — but carries **zero relations**; no `duplicate` edge to HAR-609.\n- **HAR-588** (Canceled — \"bare `npm install` installs nothing\") carries only a `related` edge to the gate HAR-589; no `duplicate` edge to the heir that superseded it (the HAR-603/611–613 install frontier).\n\nNeither blocks anything functionally, but both leave the graph not self-describing. Recommend adding HAR-610→HAR-609 and HAR-588→(its heir) `duplicate` edges. Recorded as findings rather than fixed here, to avoid mutating finished siblings outside this review's scope.\n\n_Reviewed against HEAD (53412c6). No code change in this pass — verification + graph-consistency review only._",
+          "createdAt": "2026-06-14T12:03:10.257Z",
+          "user": "John “Sausage Roller” Kershaw"
+        },
+        {
+          "body": "Closing per the HAR-545 review (comment `056f284d`) close-condition: **HAR-545 closes when its forcing gate HAR-589 goes green.** HAR-589 was reviewed and moved to Done at HEAD `53412c6` (all four acceptance legs green — install→require, bare-install manifest/lockfile, real-path `npx semver 1.2.3`→exit 0, documented refusals). All 50 children are terminal (48 Done, 2 Canceled) and consistent with merged PRs. The gate-discovered-gap bucket has served its purpose for the npx/install/liveness frontier (HAR-636/640/641/642/643 all landed).\n\nNon-blocking graph-hygiene nits noted by the review remain (HAR-610 missing duplicate edge to HAR-609; HAR-588 missing duplicate edge to its heir) — cosmetic, left for a future tidy.",
+          "createdAt": "2026-06-14T13:25:06.055Z",
+          "user": "John “Sausage Roller” Kershaw"
+        }
+      ],
+      "focusedChild": {
+        "issue": {
+          "id": "888d4e16-59d3-44a7-acd4-129a12d4ac4f",
+          "identifier": "HAR-616",
+          "title": "Worker liveness model misses untracked deferred continuations (npm `process/` nextTick on cached native setTimeout) — `node -e` exits 0 before awaited stream/cacache completions",
+          "description": "> ## ✅ Planner finalized (verified at HEAD `283bde8`, 2026-06-11)\n>\n> **Session-fit: NEEDS MULTIPLE SESSIONS** (no structural refactor; 3 independently-verifiable units).\n> Full plan + dependency arrows + regression constraints in the planner comment dated 2026-06-11.\n>\n> **Prerequisite (blocks this issue): HAR-621** — export the shared non-shimmed macrotask scheduler from `async-io.js` (currently module-private). Both #1 and #2 build on it.\n>\n> **Order:** HAR-621 → (#1 shim+alias, additive) ‖ (#2 liveness-seam deferral, core exit path) → remove HAR-612 keepalive (acceptance gate, only after both green).\n>\n> **Correction to edit-site list:** #2's REPL mirror is `commands/jsh.js:299` (synchronous `activeCount()` read in `runCommand`), NOT `process-global.js`. The three #2 edit sites are `worker-entry.js:961`, `event-loop.js notifyIfDrained` (microtask→macrotask, shared by BOTH loops), and `jsh.js:299`.\n>\n> **#1 alias gotcha:** existing aliases are bare-name anchored; readable-stream does `require('process/')` WITH a slash — the find must be `/^process\\/?$/`, verify it intercepts the trailing-slash specifier.\n>\n> ---\n\n## Worker liveness misses untracked deferred continuations — two DIFFERENT root primitives\n\n> **Research (2026-06-11, verified at HEAD** `283bde8`**).** Both manifestations exit 0 with empty output before an awaited continuation completes, but they escape through **different** primitives in **different bundling domains**. The ticket's original 'one shared hop, fix npm-`process` nextTick' framing is corrected below. Full trace in the research comment.\n\n### Liveness model (confirmed at HEAD)\n\n`event-loop.js` is an active-handle refcount; a process stays alive while `activeCount()>0`. `worker-entry.js:961` makes the idle-exit decision **synchronously** after `await handler(proc)`. Handles come from the per-spawn timer shim (`timers.js`), fetch tracking, and async-fs ops (`asAsync`→`trackAsyncOp`: synchronous retain, **macrotask** release via `MessageChannel`, HAR-606). `node -e` runs the body synchronously, so an async IIFE kicks off and the check decides exit on what holds a handle.\n\n### #1 — readable-stream deferred `'end'` — PINNED\n\n`readable-stream@4` (Vite-bundled tier2 builtin) → `require('process/')` → npm `process@0.11.10 browser.js`. Its `nextTick` queue is drained by `runTimeout`, which uses `cachedSetTimeout` captured by an IIFE **at module-eval (Worker import phase, before** `handleStart` **installs the timer shim)** = the **native** Worker `setTimeout`. At call time `runTimeout` falls through to `cachedSetTimeout(fun,0)` (browser.js:50) — the **untracked native macrotask**. The deferred `'end'` emission holds no handle; as the only pending work, `activeCount===0` → premature exit. → **untracked NATIVE MACROTASK.**\n\n### #2 — vendored cacache `put` — DIFFERENT root\n\nThe **entire** buffer-`put` tree (`cacache`/`minipass@7.1.3`/`minipass-pipeline·flush·collect`/`ssri`/`@npmcli/fs`) has **zero** `setTimeout`**/**`setImmediate`**/**`process.nextTick`; `ssri.fromData` is sync; minipass defers only via `Promise.resolve().then` (**microtask**). Every fs op is individually tracked (`asAsync`, sync retain) and `fs.promises.*` forward to them. So #2 is a **timing race inside harbour's own keepalive bridge** (HAR-606 `MessageChannel` release vs the microtask-dense cacache chain), **not** the npm-`process` mechanism. The exact dipping hop needs runtime counter-instrumentation on the chromium-harbour lane (the implementer's first task). → **internal MICROTASK-bridge race.**\n\n**Bundling separator:** readable-stream is Vite-bundled (alias-reachable); cacache is `require`d from OPFS at runtime (`~/.harbour/vendor/npm/node_modules/cacache`) — **not Vite-bundled**, so a `resolve.alias` cannot reach it. A single bundler/alias fix cannot cover both.\n\n### Substrate witness (already in repo)\n\n`test/e2e/runtime-harbour/har612-crypto-cipherbase.spec.js`: header §2 excludes the `'end'`-await shape (cites this ticket); the cacache section (line 214) carries a load-bearing `setInterval` keepalive commented *'remove when HAR-616 closes.'*\n\n## Recommended approach (TWO coordinated changes)\n\n1. **#1 (additive):** new \\~30-line harbour `process` shim + `resolve.alias` (`vite.config.js`) mapping npm `process` → it; `nextTick` retains an event-loop handle, releases on a tracked macrotask (reuse `getActiveEventLoop()`; export `scheduleMacrotask` from `async-io.js` or use `trackAsyncOp`). Mirrors the tier2 alias pattern. **Verify** the alias catches trailing-slash `require('process/')`.\n2. **#2 (scoped, liveness seam):** defer the idle-exit *decision* by a full macrotask turn so the cacache chain re-arms its next tracked fs handle before exit is concluded — `worker-entry.js` post-handler check + `event-loop.js notifyIfDrained` (today `queueMicrotask`) + HAR-617 REPL mirror in `process-global.js`. Preserve HAR-606 sync-mode `await` and the green synchronous `crypto.createHash` shapes (they exit synchronously → unaffected). A `MessageChannel`-deferred drain fixes #2 but **not** #1 (ordering), confirming the levers are independent.\n\n**Surface Assessment: implementation can land cleanly on the current code — no structural refactor — but it is two coordinated, independently-verifiable changes, not one. #2 is not a one-liner.**\n\n## Acceptance\n\n* HAR-612 cacache keepalive removed; cacache section stays green.\n* Mechanism test: `activeCount` never dips across the `cacache.put` chain; AND awaiting a readable-stream `'end'` as the only pending work exits 0 WITH output.\n* No decoy/keepalive patterns (CLAUDE.md liveness lineage: HAR-553/609).\n\n## Provenance\n\nSplit from HAR-612 (2026-06-10). Parent HAR-545. Related HAR-553/609/589. Blocks HAR-613. Research verified at HEAD 2026-06-11 (post HAR-617/619).",
+          "state": {
+            "name": "In Progress",
+            "type": "started"
+          },
+          "createdAt": "2026-06-10T17:05:42.964Z",
+          "labels": []
+        },
+        "comments": [
+          {
+            "body": "## Research finding — mechanism pinned; the two manifestations are NOT one bug\n\n**Re-grounding (staleness):** ticket created 2026-06-10; since then HAR-617 (`a676258`) + HAR-619 (`283bde8`) landed. HAR-617 added `native-timers.js`, the `getActiveEventLoop()` getter in `async-io.js`, and a 211-line per-command-proc liveness path in `process-global.js` (REPL mirror of worker-entry's drain-then-decide). Re-read all referenced files at HEAD — the ticket's diagnosis of #1 holds; its framing of #2 as 'one shared hop' does **not** (see below).\n\n### Liveness model (HEAD, confirmed)\n`event-loop.js` is an active-handle refcount; a process stays alive while `activeCount() > 0`. `worker-entry.handleStart` runs the handler, then makes the idle-exit decision **synchronously** after `await handler(proc)` (worker-entry.js:961): if `activeCount()>0` it arms `onIdle`, else `proc.exit()`. Handles are registered by: the timer shim (`timers.js`, installed per-spawn inside `handleStart`), fetch tracking, and async-fs ops (`asAsync` → `trackAsyncOp`, **synchronous retain**, **macrotask release** via `MessageChannel` — HAR-606). `node -e` runs the script body synchronously (CJS `new Function`), so a `(async()=>{…})()` IIFE kicks off and `wrapped()` returns; the liveness check then decides exit based on what holds a handle.\n\n### Manifestation 1 — readable-stream deferred `'end'` — FULLY PINNED ✅\nreadable-stream@4 (Vite-bundled tier2 builtin) does `require('process/')` → npm `process@0.11.10` `browser.js`. Its `nextTick` drains a queue scheduled by `runTimeout(drainQueue)`. `runTimeout` (browser.js:38) uses `cachedSetTimeout`, captured by an IIFE **at module-evaluation time** (browser.js:18-37) — which for the Vite worker bundle is the **Worker import phase, BEFORE `handleStart` installs the per-spawn timer shim**. So `cachedSetTimeout` = the **native** Worker `setTimeout`. At call time `runTimeout` does `if (cachedSetTimeout === setTimeout) return setTimeout(fun,0)` — native ≠ the now-installed shim, so it falls through to `return cachedSetTimeout(fun, 0)` (browser.js:50): **calls the cached native `setTimeout` directly, bypassing the tracked shim.** The macrotask that drains the nextTick queue (and emits the deferred `'end'`) therefore holds **no event-loop handle**. With the `'end'` await as the only pending work, `activeCount()===0` at the check → exit 0, empty output. → **untracked NATIVE MACROTASK.**\n\n### Manifestation 2 — vendored cacache `put` — DIFFERENT root, NOT a shared hop ❗\nGrepped the **entire** buffer-`put` dependency tree (`cacache`, `minipass@7.1.3`, `minipass-pipeline/flush/collect`, `ssri`, `@npmcli/fs`, `unique-filename/slug`): **zero `setTimeout` / `setImmediate` / `process.nextTick`.** `ssri.fromData` is synchronous. minipass defers only via `defer = (fn)=>Promise.resolve().then(fn)` — a **microtask**. The buffer form (`cacache.put(path,key,Buffer)`) routes through `content/write.js` → `await fs.mkdir` → `await fs.writeFile` → `moveToDestination` (`fs.mkdir`+`@npmcli/fs moveFile`: `access`/`mkdir`/`rename`) → `entry-index.insert` (`fs.mkdir`+`appendFile`). **Every fs op is individually tracked** (`asAsync`, synchronous retain), and `fs.promises.*` all forward to those tracked fns. So #2 has **no external scheduler** — its dip is a **timing race inside harbour's OWN keepalive bridge** (the HAR-606 `MessageChannel` macrotask-release vs the microtask-dense cacache promise chain), not the npm-`process` mechanism of #1. → **internal MICROTASK-bridge race.**\n\n**Decisive separator:** readable-stream is **Vite-bundled** (alias-reachable); the vendored cacache is `require`d from OPFS at runtime by absolute path (`~/.harbour/vendor/npm/node_modules/cacache`) through the harbour module-loader — **not Vite-bundled, so a `resolve.alias` cannot reach it.** The two live in different bundling domains.\n\n### Substrate evidence\nThe real-substrate witnesses already exist on the `chromium-harbour` lane: `har612-crypto-cipherbase.spec.js` excludes the `'end'`-await shape by design (header §2, citing this ticket) and its cacache section (line 214) carries a load-bearing `setInterval` keepalive explicitly commented *'remove this interval when HAR-616 closes.'* That keepalive is the standing proof #2 dips without an unrelated handle held.\n\n### Consequence for the planner\nThe ticket's preferred single fix — **option 1, patch npm-`process` nextTick to a tracked scheduler — fixes ONLY #1** (and only because readable-stream is bundled). It cannot touch cacache. Option 2 (wrap native `setTimeout` earlier) also only addresses #1, and is fragile: `runTimeout` calls the *cached reference directly* when it differs from the live global, so re-wrapping the global afterward doesn't help unless the global identity is a stable trampoline captured before the worker imports. **#2 requires a change in the harbour liveness bridge itself**, independent of #1.\n\n### Surface Assessment: **implementation can land cleanly — no structural refactor — but it is TWO coordinated changes, not one.**\n1. **#1 (additive):** new ~30-line harbour `process` shim + `resolve.alias` in `vite.config.js` mapping the npm `process` package to it; its `nextTick` retains an event-loop handle and releases on a tracked macrotask (reuse `getActiveEventLoop()`; `scheduleMacrotask` is currently module-private in `async-io.js` and would need exporting, or use `trackAsyncOp`). Mirrors the existing tier2 builtin-alias pattern. **Verify:** the alias intercepts the trailing-slash `require('process/')` specifier (existing aliases match bare names only).\n2. **#2 (scoped, liveness seam):** defer the idle-exit *decision* by a full macrotask turn so the microtask-dense cacache chain re-arms the next tracked fs handle before exit is concluded — touching `worker-entry.js`'s post-handler check, `event-loop.js notifyIfDrained` (today defers via `queueMicrotask`), and the HAR-617 REPL mirror in `process-global.js`. Must preserve HAR-606 sync-mode `await` and the green synchronous `crypto.createHash` shapes (they exit synchronously, `exitObserved` before the check, so unaffected). Not a one-liner; not a refactor. NB: a `MessageChannel`-deferred drain check fixes #2 but does **not** fix #1 (MessageChannel macrotasks pre-empt native-`setTimeout(0)` ordering) — confirming the two levers are independent.\n\n**Acceptance unchanged:** remove the HAR-612 cacache keepalive and keep it green; add a mechanism test asserting `activeCount` never dips across the cacache `put` chain, plus the `'end'`-await witness (exit 0 WITH output). No decoy/keepalive patterns (CLAUDE.md liveness lineage).",
+            "createdAt": "2026-06-11T08:03:08.162Z",
+            "user": "John “Sausage Roller” Kershaw"
+          },
+          {
+            "body": "## Implementation plan — verified against HEAD `283bde8` (planner role)\n\nRe-grounded all referenced surfaces at HEAD. `git log --since=2026-06-11` on the cited paths = **0 commits**, so the source matches the 2026-06-11 research comment's verification point; its diagnosis holds. Two corrections / additions below, then the surface map, dependency order, cross-cutting interaction, and the session-fit call.\n\n### Verification of the two root causes (confirmed in code)\n\n- **#1 native-macrotask escape — CONFIRMED.** `node_modules/process/browser.js`: `cachedSetTimeout` is captured by the eval-time IIFE (l.18-37). `runTimeout` (l.38) does `if (cachedSetTimeout === setTimeout) return setTimeout(...)`; since the cached **native** ≠ the later-installed shim, that guard fails, the `defaultSetTimout` guard fails (cached is truthy + not the default), and it falls through to `return cachedSetTimeout(fun, 0)` (l.50) — **the cached native `setTimeout`, untracked.** This also proves the brief's constraint: a post-import global wrapper cannot help, because `runTimeout` calls the cached reference directly. Fix must replace the package (alias→shim), not wrap the global.\n- **#2 internal microtask-bridge race — CONFIRMED structurally.** `event-loop.js notifyIfDrained` (l.49-66) defers via `queueMicrotask`; `async-io.js trackAsyncOp` releases handles on a **macrotask** (`scheduleMacrotask`, l.86). The exact dipping hop in the cacache `put` chain is still NOT pinned in code — **the implementer's first task is runtime counter-instrumentation on the `chromium-harbour` lane** to capture where `activeCount` reads 0.\n\n### Correction to the brief's edit-site list (matters for the implementer)\n\nThe brief says #2's REPL mirror is in `process-global.js`. It is **not**: `process-global.js` only holds the per-command proc, its `_eventLoop`, and `nextTick`→`queueMicrotask` (l.921). **The REPL's synchronous idle decision is `commands/jsh.js:299`** (`runCommand`: `if (!lineProc._exited && lineProc._eventLoop.activeCount() > 0)`). That is the third edit site for #2, alongside `worker-entry.js:961` and `event-loop.js notifyIfDrained`.\n\n### Prerequisite refactor → split out as blocking subtask **HAR-621**\n\nBoth fixes need the same non-shimmed macrotask primitive. `async-io.js` already has it (`scheduleMacrotask`, l.55-76) but it is **module-private** (exports today: `setActiveEventLoop`, `getActiveEventLoop`, `trackAsyncOp`, `installFetchTracking`). Hand-rolling deferral with the installed `setTimeout` would register a second, never-draining handle (the shim-on-shim trap `native-timers.js` + the HAR-606 comment warn about). **HAR-621 (created, blocks HAR-616): export the shared scheduler first.** It is a minimal extraction, not absorbed into either implementation step.\n\n### Surfaces & dependency order\n\n```\nHAR-621 (export non-shimmed macrotask scheduler)   [PREREQ — blocks both]\n        |\n        +--> #1  process-shim + Vite alias  (ADDITIVE, low blast radius)\n        |        - new ~30-line harbour `process` shim: nextTick retains an\n        |          event-loop handle (getActiveEventLoop) + releases on the\n        |          exported macrotask scheduler (or reuse trackAsyncOp)\n        |        - vite.config.js: add alias for npm `process`. EXISTING aliases\n        |          (l.95-100) are bare-name anchored (`^stream$`, `^util$` ...);\n        |          readable-stream@4 does `require('process/')` WITH a slash, so\n        |          the find MUST be `/^process\\/?$/` (or two entries). VERIFY it\n        |          intercepts the trailing-slash specifier — bare `^process$` will\n        |          silently miss it.\n        |        - test: awaiting a readable-stream 'end' as the only pending\n        |          work exits 0 WITH output (the shape `har612` §2 excludes today).\n        |\n        +--> #2  liveness-seam deferral  (HIGHER blast radius — core exit path)\n                 - instrument first to pin the cacache dip (counter on retain/release)\n                 - defer the idle-exit DECISION by one full macrotask turn at the\n                   THREE sites: worker-entry.js:961, event-loop.js notifyIfDrained\n                   (queueMicrotask -> macrotask), commands/jsh.js:299\n                 - test: activeCount never dips across the cacache.put chain\n\n#1 and #2 converge on:\n   ACCEPTANCE GATE — remove the HAR-612 `setInterval` keepalive in\n   test/e2e/runtime-harbour/har612-crypto-cipherbase.spec.js (l.214, cleared\n   l.236) ONLY after BOTH mechanism tests are green; cacache section stays green.\n```\n\n### Cross-cutting interaction (shared state)\n\n`event-loop.js notifyIfDrained` is shared by **both** loops — the per-spawn worker proc loop AND the per-command REPL loop both come from `createEventLoop()`. Changing its deferral from microtask→macrotask propagates to both decision sites automatically; the `worker-entry.js:961` and `jsh.js:299` edits are the *synchronous* reads that must additionally be deferred (the synchronous read fires before `notifyIfDrained` ever runs, so changing `notifyIfDrained` alone is insufficient). Document the expected post-change ordering at all three sites.\n\n**Levers are independent (do NOT conflate):** a `MessageChannel`-deferred decision fixes #2 but NOT #1 — MessageChannel macrotasks pre-empt native `setTimeout(0)`, so the deferred check still runs before the readable-stream 'end' fires. #1 needs the tracked-handle shim; #2 needs the deferral. Confirmed by browser.js's direct `cachedSetTimeout` call.\n\n### Regression constraints (#2 touches the most safety-critical path)\n\nMust preserve: HAR-606 sync-mode `await` arm (`worker-entry.js` `syncCtx` branch, l.980-983); the green **synchronous** `crypto.createHash` shapes (they exit synchronously, `exitObserved` before the check → unaffected by a count>0 deferral); the teardown-ordering rationale documented at `worker-entry.js:949-960`; and the no-decoy/keepalive liveness lineage (HAR-553/609). Recent churn on these files (HAR-553 active-handle model, HAR-606 macrotask release, HAR-617 per-command proc) was each closing a premature-exit or drift class — the deferral must not reopen any.\n\n### Residual-risk note (out of scope, no current witness)\n\nThe alias fixes ALL Vite-bundled consumers of npm `process` at once. Any OTHER **vendored / OPFS-loaded** (non-Vite-bundled) package that caches a native timer at eval would escape the alias — same class as cacache. No current witness beyond cacache; flagging so it is a known gap, not a silent one.\n\n### Session-fit decision\n\n**Needs multiple sessions.** No structural refactor, but three independently-verifiable units with different blast radii:\n1. **HAR-621** (prereq export) — trivial, can ride with #1's PR.\n2. **#1** (shim + alias) — comfortable single session; additive.\n3. **#2** (instrument → pin → 3-site deferral → prove no regression across sync/async/REPL + crypto + the liveness lineage) — its own focused session; the cacache-dip instrumentation is unbounded until done, and this edits the core exit decision for every process.\n\nThe HAR-612 keepalive removal is the acceptance gate that closes only after #1 and #2 are both green.\n\n### Strategy framing\n\nParent HAR-545 is a gate-discovered convergence epic and HAR-616 **blocks HAR-613** (real-path npm-install e2e witness). Default for convergence epics is to close the gap. cost-of-not-doing: the load-bearing `setInterval` keepalive in the witness is exactly the decoy/keepalive pattern CLAUDE.md forbids (HAR-553/609 lineage), and HAR-613 stays blocked; every future real-substrate test awaiting a deferred continuation pays the workaround tax. The cheaper route (leave the keepalive) routes around HAR-616 itself — not acceptable. **Close the gap.** Named gap if deferred: HAR-616.",
+            "createdAt": "2026-06-11T08:14:13.293Z",
+            "user": "John “Sausage Roller” Kershaw"
+          },
+          {
+            "body": "## Plan decomposed into subtasks (re-grounded at HEAD `1a61d45`)\n\nStaleness check: `git log --since=2026-06-10` on the cited paths shows only HAR-612/617/619/**621** landing — no churn that invalidates the diagnosis. HAR-621's `scheduleMacrotask` export is confirmed in code (`async-io.js:82`). All edit-site line numbers verified at HEAD (`jsh.js:299`, `event-loop.js notifyIfDrained:49/queueMicrotask:59`, `worker-entry.js` post-handler decision ~l.950 after `await handler` l.934, `vite.config.js` aliases l.95-97 with no `process` entry yet, keepalive `har612-…spec.js:214`/clear:236). Ticket is **fresh** — diagnosis holds.\n\n### New subtasks (the two-surface split + close-out gate)\n\n| Subtask | Surface | Blast radius | Initial state |\n|---|---|---|---|\n| **HAR-622** | #1 — harbour `process` shim + Vite alias (`/^process\\/?$/`); tracked `nextTick` for readable-stream's `require('process/')` | additive, low | Todo |\n| **HAR-623** | #2 — instrument → pin cacache dip → defer idle-exit decision one macrotask turn at 3 sites (`worker-entry.js`, `event-loop.js notifyIfDrained`, `jsh.js:299`) | high (core exit path) | Todo |\n| **HAR-624** | acceptance gate — remove HAR-612 `setInterval` keepalive; both mechanism tests green, no keepalive | close-out | Backlog |\n\n### Dependency arrows (preserved exactly from the plan)\n\n```\nHAR-621 (Done) ──blocks──> HAR-622 (#1, additive)  ┐\n                ──blocks──> HAR-623 (#2, liveness)  ┘ (#1 ‖ #2, parallel)\n                                                       │\n                       HAR-622 ──blocks──┐             │\n                       HAR-623 ──blocks──┴──> HAR-624 (acceptance gate)\n```\n\nRelations created: `HAR-621 blocks HAR-622`, `HAR-621 blocks HAR-623`, `HAR-622 blocks HAR-624`, `HAR-623 blocks HAR-624`.\n\n### Acceptance gate (HAR-624) — must stay deferred\nThe HAR-612 keepalive removal is **not** to be touched until BOTH HAR-622 and HAR-623 mechanism tests are green:\n- #1 witness: awaiting a readable-stream `'end'` as the only pending work exits 0 **WITH** output (the shape this spec's §2 excludes today).\n- #2 witness: `activeCount` never dips across the `cacache.put` chain.\n- No decoy/keepalive patterns remain anywhere (CLAUDE.md liveness lineage HAR-553/609).\n\nThe levers are independent and must not be conflated: a `MessageChannel`-deferred decision fixes #2 but NOT #1 (ordering); #1's tracked-handle shim does nothing for the non-Vite-bundled OPFS-loaded cacache. HAR-621 is **not** to be reworked.\n\nHAR-616 stays **open / In Progress** as the convergence point; it unblocks HAR-613 once HAR-624 closes.",
+            "createdAt": "2026-06-11T08:46:17.367Z",
+            "user": "John “Sausage Roller” Kershaw"
+          },
+          {
+            "body": "## Decomposition verified complete — re-grounded at HEAD `e1f35bb` (decomposer role)\n\nRan the staleness check and the codebase-completeness pass for the remaining-subtask creation. **Finding: the decomposition is already fully in place and correct — no new subtasks were needed.** Details and the verification evidence below.\n\n### Subtask set (matches the plan's two-surface split + acceptance gate, exactly)\n\n| Subtask | Surface | Blast radius | State |\n|---|---|---|---|\n| **HAR-621** | prereq — export shared non-shimmed macrotask scheduler (`async-io.js`) | trivial | **Done** |\n| **HAR-622** | #1 — harbour `process` shim + Vite alias (`/^process\\/?$/`); tracked `nextTick` for readable-stream's `require('process/')` | additive, low | In Progress (impl merged — see note) |\n| **HAR-623** | #2 — instrument → pin cacache dip → defer idle-exit decision one macrotask turn at the 3 sites | high (core exit path) | Todo |\n| **HAR-624** | acceptance gate — remove HAR-612 `setInterval` keepalive; both mechanism tests green | close-out | Backlog |\n\n### Dependency arrows — verified present in Linear (not just claimed in plan prose)\n\nQueried `/relations` on each subtask. All four arrows exist and exactly match the documented order:\n\n```\nHAR-621 (Done) ──blocks──> HAR-622 (#1)  ┐\n                ──blocks──> HAR-623 (#2)  ┘  (#1 ‖ #2, parallel)\n                        HAR-622 ──blocks──┐\n                        HAR-623 ──blocks──┴──> HAR-624 (acceptance gate)\n```\n\nConfirmed relation ids: HAR-621→HAR-622, HAR-621→HAR-623, HAR-622→HAR-624, HAR-623→HAR-624. The prerequisite ordering (HAR-621 blocks both) and the acceptance-gate ordering (gate blocked-by BOTH mechanism subtasks) are both encoded.\n\n### Codebase completeness pass (searched behaviors, not only cited symbols)\n\nVerified at HEAD `e1f35bb` (`git log --since=2026-06-10` on the runtime paths shows only HAR-612/617/619/621/**622** landing — no churn that invalidates the diagnosis):\n\n- **#2's idle-exit decision sites are exactly the three enumerated — no hidden fourth site.** `grep -rn 'activeCount()' src/runtime` finds only the synchronous decision reads at `worker-entry.js:963` and `commands/jsh.js:299`, plus the shared `event-loop.js notifyIfDrained` (`queueMicrotask` at :59). The brief's earlier `process-global.js` location is superseded — confirmed, the REPL read lives at `jsh.js:299`.\n- **#1 (HAR-622) is already implemented at HEAD.** `src/runtime/harbour/process-shim.js` exists; `vite.config.js:111` carries the trailing-slash-safe alias `{ find: /^process\\/?$/, replacement: …/process-shim.js }` with the documented `require('process/')` gotcha noted inline.\n- **Acceptance-gate target confirmed:** the load-bearing `setInterval` keepalive at `test/e2e/runtime-harbour/har612-crypto-cipherbase.spec.js:214` (cleared :236), commented 'remove this interval when HAR-616 closes'.\n- **Residual-risk class has a concrete, named instance:** `node_modules/pngjs/browser.js` (line ~12545) carries its OWN *inlined* copy of the npm `process` `cachedSetTimeout` polyfill. Because it is inlined (not `require('process')`), the HAR-622 `resolve.alias` cannot reach it — exactly the #1-class escape the planner flagged as out-of-scope residual risk. **No current witness, so correctly NOT spun into a subtask** (a witness-less surface is not an independently-verifiable unit). Flagging it as a named gap, not a silent one — if a pngjs stream-`end`-await witness ever appears, it belongs in a new HAR-616 sibling, not in HAR-622/623.\n\n### Status-lag note (for the human, not a decomposition change)\n\nHAR-622 is still **In Progress** in Linear, but its implementation merged as PR #538 (`e1f35bb`, the current HEAD). I did **not** change its state — that is the implementer's/reviewer's call (acceptance test verification may be pending). Surfacing the lag so HAR-616's gate ordering is read against reality: #1 is effectively landed; #2 (HAR-623) is the remaining mechanism work, after which HAR-624 can close the gate.\n\n### Net\n\nNo subtasks created — the existing HAR-621/622/623/624 set, the two-surface split, and all dependency arrows already match the finalized plan and survive the HEAD re-grounding. HAR-616 stays **open / In Progress** as the convergence point; it unblocks HAR-613 once HAR-624 closes. HAR-621 is not to be reworked; the levers (#1 tracked-handle shim vs #2 macrotask deferral) remain independent and must not be conflated.",
+            "createdAt": "2026-06-11T09:12:32.021Z",
+            "user": "John “Sausage Roller” Kershaw"
+          },
+          {
+            "body": "## HAR-616 status — 3 of 4 landed; #2 parked pending a spike\n\n- **HAR-621** (export shared `scheduleMacrotask`) — ✅ merged #537\n- **HAR-622 / #1** (process-shim + Vite alias, tracked nextTick for readable-stream's `require('process/')`) — ✅ merged #538, main green\n- **HAR-623 / #2** (defer idle-exit one macrotask, cacache `put` race) — 🟡 **PARKED.** PR #539 reviewed-correct but red on one deterministic e2e failure (vitest ESM pre-warm: `util.stripVTControlCharacters` not provided, in `esm-walker.js`). Per human direction we are NOT merging on an unconfirmed attribution. Full evidence + a suggested research spike (regression vs. bug vs. expected gap; first step = current-main baseline) are on HAR-623.\n- **HAR-624** (acceptance gate: remove HAR-612 `setInterval` keepalive) — ⬜ blocked on #2.\n\nThe HAR-612 keepalive workaround stays in place until #2 lands. Resume the chain once HAR-623's attribution is settled.\n\n*— Autopilot, run paused here.*",
+            "createdAt": "2026-06-11T10:28:13.533Z",
+            "user": "John “Sausage Roller” Kershaw"
+          },
+          {
+            "body": "**Scope decision (human owner) — 2026-06-12.** HAR-616 is finalized at the **mechanism-test bar**, not the full phase-d Case 2 e2e gate.\n\n**Done & verified:**\n- #1 path: HAR-621 (shared macrotask scheduler) + HAR-622 (process shim + Vite alias) — merged.\n- #2 liveness fix: HAR-623, PR #539 (commit `3cccf5c`) — mechanism test passes on `scheduleMacrotask`.\n- util-shim fix: HAR-625, PR #540 (commit `2bea048`) — `stripVTControlCharacters` export error gone for good; mechanism test green.\n\n**Out of scope (tracked separately):** the remaining phase-d Case 2 `ERR_MODULE_NOT_FOUND` (vitest module-resolution gap) is now **HAR-626**. Case 2 exiting 0 is NOT required for HAR-616.\n\n**Remaining steps to close HAR-616:**\n1. Merge PR #539 and PR #540 at the mechanism-test bar (mechanism tests green; do not require Case 2 exit 0).\n2. Run the **HAR-624** acceptance gate: remove the HAR-612 `setInterval` keepalive now that both #2 and util mechanism tests are green; confirm no regression.",
+            "createdAt": "2026-06-12T08:16:10.850Z",
+            "user": "John “Sausage Roller” Kershaw"
+          },
+          {
+            "body": "**Main recovery + reconciliation (revert landed).**\n\nThe autopilot comments asserting #1/#2 were \"merged at the mechanism bar\" need correcting against CI reality:\n\n- PRs **#539** (HAR-623, `e5c3416`) and **#540** (HAR-625, `ce8787d`) were merged directly to `main` **while their own CI was red**, turning `main` red and halting all deploys/dev. #540 was unreviewed; #539 was a draft marked ready then merged.\n- The red was **a regression these merges introduced**, not a pre-existing gap that was split out: the failing spec (`phase-d-npm-install.spec.js:252`, Case 2) is **byte-for-byte unchanged since the last green main `e1f35bb`**, which passed shard `os-test-e2e (6)`. Only the 4 runtime files in #539/#540 changed between green and red.\n- Both reverted via **PR #541** (squash `189367e`). `main` is green again and **tree-identical to `e1f35bb`** (empty diff).\n\nFollow-up state:\n- **HAR-623 / HAR-625** reopened (Done -> Todo) and marked **blocked by HAR-626**.\n- **HAR-624** (keepalive-removal acceptance proof) still outstanding.\n- This issue stays **In Progress**: the liveness work isn't complete until #1+#2 re-land green + reviewed and HAR-624 proves the spec passes without the HAR-612 `setInterval` keepalive.\n\nProcess gap: the repo has **no branch protection / required status checks** (private/free plan), which is what mechanically allowed red->`main`. Worth a plan (eligibility for protection, a pre-merge guard, or a merge convention) if green-`main` is to be guaranteed.",
+            "createdAt": "2026-06-12T09:18:11.080Z",
+            "user": "John “Sausage Roller” Kershaw"
+          },
+          {
+            "body": "**Blocker analysis (workflow-analyst pass, 2026-06-13) — blocker RESOLVED, route to next action.**\n\nHAR-623 (#2 idle-exit deferral) is the actionable child and is **no longer blocked**. All three of its blocking dependencies are Done and merged to `main`:\n\n- **HAR-621** (shared macrotask scheduler) — Done · `1a61d45` (#537)\n- **HAR-622** (#1 process shim + Vite alias) — Done · `e1f35bb` (#538), *not* reverted\n- **HAR-625** (util `stripVTControlCharacters` shim) — Done · re-landed `8366afb` (#552)\n- **HAR-626** (phase-d Case 2 `ERR_MODULE_NOT_FOUND` module-resolution gap) — Done · `a76ab94` (#551)\n\n**What the blocker actually was:** PR #539 (HAR-623 #2) was merged with red CI bundled alongside #540 (HAR-625) and regressed `os-test-e2e (6)` (phase-d Case 2 `ERR_MODULE_NOT_FOUND`). Both were reverted together in **`189367e` (#541)** \"to recover main to green.\" That revert's own follow-up plan was: *\"HAR-626 (root fix), re-land HAR-623/HAR-625 green+reviewed, HAR-624 outstanding.\"* Both gating follow-ups are now complete (HAR-626 #551, HAR-625 #552), so the red-CI cause that forced the revert is cleared.\n\n**Codebase state (verified at HEAD, not from ticket prose):** the #2 fix is currently **absent from `main`** — `event-loop.js:59` `notifyIfDrained` still re-checks via `queueMicrotask` (the exact line HAR-623 must change to a tracked macrotask), and `commands/jsh.js:299` still does the synchronous `activeCount() > 0` read. So HAR-623 is real, remaining, **unblocked** codebase work: re-land the three-site deferral (`event-loop.js` notifyIfDrained microtask→tracked macrotask, `jsh.js:299` REPL mirror, `worker-entry.js` terminal `count===0` path only).\n\n**Re-land hazard (not a clean revert-of-the-revert):** `worker-entry.js` has changed since #539 — **HAR-637** `e6a00c2` (#553, formatOne Error serialization) plus HAR-614/630/631 commits touched it post-revert. The #2 fix must be re-applied/rebased on current HEAD, not restored by reverting `189367e`.\n\n**Child actionability:** HAR-623 → ready to start now. HAR-624 (keepalive-removal acceptance gate) correctly stays gated behind HAR-623 — it must not land until #2 is green (HAR-622/#1 is already green).\n\nNo `blocked` label present on this issue to remove. HAR-616 stays **In Progress**; next action is HAR-623 re-land.\n",
+            "createdAt": "2026-06-13T19:53:17.469Z",
+            "user": "John “Sausage Roller” Kershaw"
+          },
+          {
+            "body": "## Review — HAR-616 liveness work verified complete & ready to close (code-reviewer pass, 2026-06-13)\n\n**Re-grounded at HEAD `31c2ef1`** (not ticket prose). The last status comment (19:53) said the #2 fix was *absent from main* — that is now **stale**: HAR-623 (#555) and HAR-624 (#556) landed at ~21:06 / ~21:21. Verified the actual source + CI, not the comments.\n\n### #2 fix present and correct at all three decision sites\n- **`event-loop.js notifyIfDrained` (l.50-82):** deferred re-check moved from `queueMicrotask` → tracked `scheduleMacrotask` (HAR-621). Shared by worker + REPL loops via `createEventLoop()`, so the change propagates to both. ✅\n- **`commands/jsh.js:310-315`:** REPL mirror — `await scheduleMacrotask` before the synchronous `activeCount()` read. Unconditional defer is justified inline (no serialized follow-up frame to stall). ✅\n- **`worker-entry.js:1011-1053`:** count>0 arm stays synchronous (can't be the transient-zero gap); **only** the terminal count===0 read defers one awaited macrotask, then re-guards `!exitObserved && activeProc===proc` and re-reads. Awaited (not detached) so the exit precedes the `finally` OPFS teardown — correctly scoped to avoid the count>0 conformance-gate hang the unconditional defer caused. ✅\n\n### Mechanism test is behaviour-level, not witness-shaped\n`runtime-harbour-event-loop.test.js` adds a test that reproduces the exact race — `release(a)` → microtask hop → `retain()` (op N+1 re-arms a few microtasks later) → assert `onIdle` did **not** fire. It asserts the count-never-dips mechanism directly, with the prior microtask behaviour proven red. This satisfies the CLAUDE.md 'widen the model, don't add the narrow patch' bar. Ran locally: **78/78 pass** (`runtime-harbour-event-loop` + `runtime-harbour-worker-entry`).\n\n### HAR-624 acceptance gate genuinely satisfied\nThe `setInterval(()=>{},250)` / `clearInterval` keepalive pair is **deleted** from `har612-crypto-cipherbase.spec.js` (the exact HAR-553/609 forbidden pattern). The cacache integrity + stream-round-trip assertions and `process.exit(0)` remain — so the section stays green relying on the liveness model alone, which is the standing proof #2 holds with no unrelated handle held.\n\n### CI — both merges fully green\n- PR **#555** (HAR-623, `ea062a8`): unit/node/integration/apps + e2e shards (1-6) all SUCCESS.\n- PR **#556** (HAR-624, `31c2ef1`): unit/node/integration/apps + e2e shards (1-6) all SUCCESS.\nThis is the same `os-test-e2e (6)` shard whose regression forced the earlier revert (#541) — now green with the fix re-landed on top of the HAR-626 root fix. No red-to-main recurrence.\n\n### Class-check — no unhandled sibling left behind\n- **#2 (check-side microtask-bridge) class:** `grep activeCount() src/runtime` finds exactly the three decision sites above — no hidden fourth. All covered.\n- **#1 (eval-cached native-timer escape) class:** the residual sibling `pngjs/browser.js` (inlined `process` polyfill, alias-unreachable) remains correctly **witness-less → not a subtask** (a witness-less surface is not an independently-verifiable unit; flagged, not silent).\n- **nextTick deferral taxonomy:** `process-global.js:807-821` (HAR-629) documents the 3-nextTick model (untracked-microtask vs tracked-macrotask vs import-phase) with an explicit 'do NOT unify — witness-shaped fix' guard. The broader liveness class is being widened at the model level, not patched per-witness. ✅\n\n### Verdict\nAll 5 subtasks terminal (HAR-621/622/623/624/625 Done); #1 + #2 both green + reviewed; acceptance gate proven without the keepalive. The work satisfies the stated acceptance bar (mechanism-test bar per the 2026-06-12 scope decision; phase-d Case 2 is HAR-626, out of scope). **Closing HAR-616 → Done.** It unblocks HAR-613 (real-path npm-install e2e witness).",
+            "createdAt": "2026-06-13T20:28:42.403Z",
+            "user": "John “Sausage Roller” Kershaw"
+          }
+        ]
+      }
+    },
+    "HAR-616": {
+      "issue": {
+        "id": "888d4e16-59d3-44a7-acd4-129a12d4ac4f",
+        "identifier": "HAR-616",
+        "title": "Worker liveness model misses untracked deferred continuations (npm `process/` nextTick on cached native setTimeout) — `node -e` exits 0 before awaited stream/cacache completions",
+        "description": "> ## ✅ Planner finalized (verified at HEAD `283bde8`, 2026-06-11)\n>\n> **Session-fit: NEEDS MULTIPLE SESSIONS** (no structural refactor; 3 independently-verifiable units).\n> Full plan + dependency arrows + regression constraints in the planner comment dated 2026-06-11.\n>\n> **Prerequisite (blocks this issue): HAR-621** — export the shared non-shimmed macrotask scheduler from `async-io.js` (currently module-private). Both #1 and #2 build on it.\n>\n> **Order:** HAR-621 → (#1 shim+alias, additive) ‖ (#2 liveness-seam deferral, core exit path) → remove HAR-612 keepalive (acceptance gate, only after both green).\n>\n> **Correction to edit-site list:** #2's REPL mirror is `commands/jsh.js:299` (synchronous `activeCount()` read in `runCommand`), NOT `process-global.js`. The three #2 edit sites are `worker-entry.js:961`, `event-loop.js notifyIfDrained` (microtask→macrotask, shared by BOTH loops), and `jsh.js:299`.\n>\n> **#1 alias gotcha:** existing aliases are bare-name anchored; readable-stream does `require('process/')` WITH a slash — the find must be `/^process\\/?$/`, verify it intercepts the trailing-slash specifier.\n>\n> ---\n\n## Worker liveness misses untracked deferred continuations — two DIFFERENT root primitives\n\n> **Research (2026-06-11, verified at HEAD** `283bde8`**).** Both manifestations exit 0 with empty output before an awaited continuation completes, but they escape through **different** primitives in **different bundling domains**. The ticket's original 'one shared hop, fix npm-`process` nextTick' framing is corrected below. Full trace in the research comment.\n\n### Liveness model (confirmed at HEAD)\n\n`event-loop.js` is an active-handle refcount; a process stays alive while `activeCount()>0`. `worker-entry.js:961` makes the idle-exit decision **synchronously** after `await handler(proc)`. Handles come from the per-spawn timer shim (`timers.js`), fetch tracking, and async-fs ops (`asAsync`→`trackAsyncOp`: synchronous retain, **macrotask** release via `MessageChannel`, HAR-606). `node -e` runs the body synchronously, so an async IIFE kicks off and the check decides exit on what holds a handle.\n\n### #1 — readable-stream deferred `'end'` — PINNED\n\n`readable-stream@4` (Vite-bundled tier2 builtin) → `require('process/')` → npm `process@0.11.10 browser.js`. Its `nextTick` queue is drained by `runTimeout`, which uses `cachedSetTimeout` captured by an IIFE **at module-eval (Worker import phase, before** `handleStart` **installs the timer shim)** = the **native** Worker `setTimeout`. At call time `runTimeout` falls through to `cachedSetTimeout(fun,0)` (browser.js:50) — the **untracked native macrotask**. The deferred `'end'` emission holds no handle; as the only pending work, `activeCount===0` → premature exit. → **untracked NATIVE MACROTASK.**\n\n### #2 — vendored cacache `put` — DIFFERENT root\n\nThe **entire** buffer-`put` tree (`cacache`/`minipass@7.1.3`/`minipass-pipeline·flush·collect`/`ssri`/`@npmcli/fs`) has **zero** `setTimeout`**/**`setImmediate`**/**`process.nextTick`; `ssri.fromData` is sync; minipass defers only via `Promise.resolve().then` (**microtask**). Every fs op is individually tracked (`asAsync`, sync retain) and `fs.promises.*` forward to them. So #2 is a **timing race inside harbour's own keepalive bridge** (HAR-606 `MessageChannel` release vs the microtask-dense cacache chain), **not** the npm-`process` mechanism. The exact dipping hop needs runtime counter-instrumentation on the chromium-harbour lane (the implementer's first task). → **internal MICROTASK-bridge race.**\n\n**Bundling separator:** readable-stream is Vite-bundled (alias-reachable); cacache is `require`d from OPFS at runtime (`~/.harbour/vendor/npm/node_modules/cacache`) — **not Vite-bundled**, so a `resolve.alias` cannot reach it. A single bundler/alias fix cannot cover both.\n\n### Substrate witness (already in repo)\n\n`test/e2e/runtime-harbour/har612-crypto-cipherbase.spec.js`: header §2 excludes the `'end'`-await shape (cites this ticket); the cacache section (line 214) carries a load-bearing `setInterval` keepalive commented *'remove when HAR-616 closes.'*\n\n## Recommended approach (TWO coordinated changes)\n\n1. **#1 (additive):** new \\~30-line harbour `process` shim + `resolve.alias` (`vite.config.js`) mapping npm `process` → it; `nextTick` retains an event-loop handle, releases on a tracked macrotask (reuse `getActiveEventLoop()`; export `scheduleMacrotask` from `async-io.js` or use `trackAsyncOp`). Mirrors the tier2 alias pattern. **Verify** the alias catches trailing-slash `require('process/')`.\n2. **#2 (scoped, liveness seam):** defer the idle-exit *decision* by a full macrotask turn so the cacache chain re-arms its next tracked fs handle before exit is concluded — `worker-entry.js` post-handler check + `event-loop.js notifyIfDrained` (today `queueMicrotask`) + HAR-617 REPL mirror in `process-global.js`. Preserve HAR-606 sync-mode `await` and the green synchronous `crypto.createHash` shapes (they exit synchronously → unaffected). A `MessageChannel`-deferred drain fixes #2 but **not** #1 (ordering), confirming the levers are independent.\n\n**Surface Assessment: implementation can land cleanly on the current code — no structural refactor — but it is two coordinated, independently-verifiable changes, not one. #2 is not a one-liner.**\n\n## Acceptance\n\n* HAR-612 cacache keepalive removed; cacache section stays green.\n* Mechanism test: `activeCount` never dips across the `cacache.put` chain; AND awaiting a readable-stream `'end'` as the only pending work exits 0 WITH output.\n* No decoy/keepalive patterns (CLAUDE.md liveness lineage: HAR-553/609).\n\n## Provenance\n\nSplit from HAR-612 (2026-06-10). Parent HAR-545. Related HAR-553/609/589. Blocks HAR-613. Research verified at HEAD 2026-06-11 (post HAR-617/619).",
+        "state": {
+          "name": "In Progress",
+          "type": "started"
+        },
+        "createdAt": "2026-06-10T17:05:42.964Z",
+        "labels": []
+      },
+      "parent": {
+        "id": "7f55c047-ae36-45a2-a62c-1d7439859f4a",
+        "identifier": "HAR-545",
+        "title": "Runtime integration gaps (gate-discovered)"
+      },
+      "siblings": [
+        {
+          "id": "e824718c-711e-4289-acad-8e5322a3f2b6",
+          "identifier": "HAR-643",
+          "title": "Replace HAR-642 K=3 idle-confirmation margin with a model-precise liveness fix for the manifest-install drain",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "15726181-6786-49cd-b6e6-10737660077f",
+          "identifier": "HAR-642",
+          "title": "Manifest-driven `npm install` intermittently exits 0 before reify (nothing installed) — HAR-616-residue liveness early-exit",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "1b238340-715a-49c2-940d-a1cb2fc3e012",
+          "identifier": "HAR-641",
+          "title": "npx exec: locally-installed `.bin` not resolved on $PATH inside the npm-spawned subshell — `semver: not found` (exit 127)",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "a371d6fb-0efe-4c23-8527-7f7f13a56b6c",
+          "identifier": "HAR-640",
+          "title": "npm exec (npx <bin> / run-script) spawns `sh -c` but harbour registers no `sh` — exit 127 'sh: not found'",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "c3a4fabd-b442-44c3-aa69-1af190377e98",
+          "identifier": "HAR-639",
+          "title": "fs.promises.open / FileHandle absent — npm bin-links (cmd-shim isWindowsHashbangFile) crashes installing any package with a bin",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        }
+      ],
+      "siblingsTotal": 49,
+      "project": null,
+      "children": [],
+      "comments": [
+        {
+          "body": "## Research finding — mechanism pinned; the two manifestations are NOT one bug\n\n**Re-grounding (staleness):** ticket created 2026-06-10; since then HAR-617 (`a676258`) + HAR-619 (`283bde8`) landed. HAR-617 added `native-timers.js`, the `getActiveEventLoop()` getter in `async-io.js`, and a 211-line per-command-proc liveness path in `process-global.js` (REPL mirror of worker-entry's drain-then-decide). Re-read all referenced files at HEAD — the ticket's diagnosis of #1 holds; its framing of #2 as 'one shared hop' does **not** (see below).\n\n### Liveness model (HEAD, confirmed)\n`event-loop.js` is an active-handle refcount; a process stays alive while `activeCount() > 0`. `worker-entry.handleStart` runs the handler, then makes the idle-exit decision **synchronously** after `await handler(proc)` (worker-entry.js:961): if `activeCount()>0` it arms `onIdle`, else `proc.exit()`. Handles are registered by: the timer shim (`timers.js`, installed per-spawn inside `handleStart`), fetch tracking, and async-fs ops (`asAsync` → `trackAsyncOp`, **synchronous retain**, **macrotask release** via `MessageChannel` — HAR-606). `node -e` runs the script body synchronously (CJS `new Function`), so a `(async()=>{…})()` IIFE kicks off and `wrapped()` returns; the liveness check then decides exit based on what holds a handle.\n\n### Manifestation 1 — readable-stream deferred `'end'` — FULLY PINNED ✅\nreadable-stream@4 (Vite-bundled tier2 builtin) does `require('process/')` → npm `process@0.11.10` `browser.js`. Its `nextTick` drains a queue scheduled by `runTimeout(drainQueue)`. `runTimeout` (browser.js:38) uses `cachedSetTimeout`, captured by an IIFE **at module-evaluation time** (browser.js:18-37) — which for the Vite worker bundle is the **Worker import phase, BEFORE `handleStart` installs the per-spawn timer shim**. So `cachedSetTimeout` = the **native** Worker `setTimeout`. At call time `runTimeout` does `if (cachedSetTimeout === setTimeout) return setTimeout(fun,0)` — native ≠ the now-installed shim, so it falls through to `return cachedSetTimeout(fun, 0)` (browser.js:50): **calls the cached native `setTimeout` directly, bypassing the tracked shim.** The macrotask that drains the nextTick queue (and emits the deferred `'end'`) therefore holds **no event-loop handle**. With the `'end'` await as the only pending work, `activeCount()===0` at the check → exit 0, empty output. → **untracked NATIVE MACROTASK.**\n\n### Manifestation 2 — vendored cacache `put` — DIFFERENT root, NOT a shared hop ❗\nGrepped the **entire** buffer-`put` dependency tree (`cacache`, `minipass@7.1.3`, `minipass-pipeline/flush/collect`, `ssri`, `@npmcli/fs`, `unique-filename/slug`): **zero `setTimeout` / `setImmediate` / `process.nextTick`.** `ssri.fromData` is synchronous. minipass defers only via `defer = (fn)=>Promise.resolve().then(fn)` — a **microtask**. The buffer form (`cacache.put(path,key,Buffer)`) routes through `content/write.js` → `await fs.mkdir` → `await fs.writeFile` → `moveToDestination` (`fs.mkdir`+`@npmcli/fs moveFile`: `access`/`mkdir`/`rename`) → `entry-index.insert` (`fs.mkdir`+`appendFile`). **Every fs op is individually tracked** (`asAsync`, synchronous retain), and `fs.promises.*` all forward to those tracked fns. So #2 has **no external scheduler** — its dip is a **timing race inside harbour's OWN keepalive bridge** (the HAR-606 `MessageChannel` macrotask-release vs the microtask-dense cacache promise chain), not the npm-`process` mechanism of #1. → **internal MICROTASK-bridge race.**\n\n**Decisive separator:** readable-stream is **Vite-bundled** (alias-reachable); the vendored cacache is `require`d from OPFS at runtime by absolute path (`~/.harbour/vendor/npm/node_modules/cacache`) through the harbour module-loader — **not Vite-bundled, so a `resolve.alias` cannot reach it.** The two live in different bundling domains.\n\n### Substrate evidence\nThe real-substrate witnesses already exist on the `chromium-harbour` lane: `har612-crypto-cipherbase.spec.js` excludes the `'end'`-await shape by design (header §2, citing this ticket) and its cacache section (line 214) carries a load-bearing `setInterval` keepalive explicitly commented *'remove this interval when HAR-616 closes.'* That keepalive is the standing proof #2 dips without an unrelated handle held.\n\n### Consequence for the planner\nThe ticket's preferred single fix — **option 1, patch npm-`process` nextTick to a tracked scheduler — fixes ONLY #1** (and only because readable-stream is bundled). It cannot touch cacache. Option 2 (wrap native `setTimeout` earlier) also only addresses #1, and is fragile: `runTimeout` calls the *cached reference directly* when it differs from the live global, so re-wrapping the global afterward doesn't help unless the global identity is a stable trampoline captured before the worker imports. **#2 requires a change in the harbour liveness bridge itself**, independent of #1.\n\n### Surface Assessment: **implementation can land cleanly — no structural refactor — but it is TWO coordinated changes, not one.**\n1. **#1 (additive):** new ~30-line harbour `process` shim + `resolve.alias` in `vite.config.js` mapping the npm `process` package to it; its `nextTick` retains an event-loop handle and releases on a tracked macrotask (reuse `getActiveEventLoop()`; `scheduleMacrotask` is currently module-private in `async-io.js` and would need exporting, or use `trackAsyncOp`). Mirrors the existing tier2 builtin-alias pattern. **Verify:** the alias intercepts the trailing-slash `require('process/')` specifier (existing aliases match bare names only).\n2. **#2 (scoped, liveness seam):** defer the idle-exit *decision* by a full macrotask turn so the microtask-dense cacache chain re-arms the next tracked fs handle before exit is concluded — touching `worker-entry.js`'s post-handler check, `event-loop.js notifyIfDrained` (today defers via `queueMicrotask`), and the HAR-617 REPL mirror in `process-global.js`. Must preserve HAR-606 sync-mode `await` and the green synchronous `crypto.createHash` shapes (they exit synchronously, `exitObserved` before the check, so unaffected). Not a one-liner; not a refactor. NB: a `MessageChannel`-deferred drain check fixes #2 but does **not** fix #1 (MessageChannel macrotasks pre-empt native-`setTimeout(0)` ordering) — confirming the two levers are independent.\n\n**Acceptance unchanged:** remove the HAR-612 cacache keepalive and keep it green; add a mechanism test asserting `activeCount` never dips across the cacache `put` chain, plus the `'end'`-await witness (exit 0 WITH output). No decoy/keepalive patterns (CLAUDE.md liveness lineage).",
+          "createdAt": "2026-06-11T08:03:08.162Z",
+          "user": "John “Sausage Roller” Kershaw"
+        },
+        {
+          "body": "## Implementation plan — verified against HEAD `283bde8` (planner role)\n\nRe-grounded all referenced surfaces at HEAD. `git log --since=2026-06-11` on the cited paths = **0 commits**, so the source matches the 2026-06-11 research comment's verification point; its diagnosis holds. Two corrections / additions below, then the surface map, dependency order, cross-cutting interaction, and the session-fit call.\n\n### Verification of the two root causes (confirmed in code)\n\n- **#1 native-macrotask escape — CONFIRMED.** `node_modules/process/browser.js`: `cachedSetTimeout` is captured by the eval-time IIFE (l.18-37). `runTimeout` (l.38) does `if (cachedSetTimeout === setTimeout) return setTimeout(...)`; since the cached **native** ≠ the later-installed shim, that guard fails, the `defaultSetTimout` guard fails (cached is truthy + not the default), and it falls through to `return cachedSetTimeout(fun, 0)` (l.50) — **the cached native `setTimeout`, untracked.** This also proves the brief's constraint: a post-import global wrapper cannot help, because `runTimeout` calls the cached reference directly. Fix must replace the package (alias→shim), not wrap the global.\n- **#2 internal microtask-bridge race — CONFIRMED structurally.** `event-loop.js notifyIfDrained` (l.49-66) defers via `queueMicrotask`; `async-io.js trackAsyncOp` releases handles on a **macrotask** (`scheduleMacrotask`, l.86). The exact dipping hop in the cacache `put` chain is still NOT pinned in code — **the implementer's first task is runtime counter-instrumentation on the `chromium-harbour` lane** to capture where `activeCount` reads 0.\n\n### Correction to the brief's edit-site list (matters for the implementer)\n\nThe brief says #2's REPL mirror is in `process-global.js`. It is **not**: `process-global.js` only holds the per-command proc, its `_eventLoop`, and `nextTick`→`queueMicrotask` (l.921). **The REPL's synchronous idle decision is `commands/jsh.js:299`** (`runCommand`: `if (!lineProc._exited && lineProc._eventLoop.activeCount() > 0)`). That is the third edit site for #2, alongside `worker-entry.js:961` and `event-loop.js notifyIfDrained`.\n\n### Prerequisite refactor → split out as blocking subtask **HAR-621**\n\nBoth fixes need the same non-shimmed macrotask primitive. `async-io.js` already has it (`scheduleMacrotask`, l.55-76) but it is **module-private** (exports today: `setActiveEventLoop`, `getActiveEventLoop`, `trackAsyncOp`, `installFetchTracking`). Hand-rolling deferral with the installed `setTimeout` would register a second, never-draining handle (the shim-on-shim trap `native-timers.js` + the HAR-606 comment warn about). **HAR-621 (created, blocks HAR-616): export the shared scheduler first.** It is a minimal extraction, not absorbed into either implementation step.\n\n### Surfaces & dependency order\n\n```\nHAR-621 (export non-shimmed macrotask scheduler)   [PREREQ — blocks both]\n        |\n        +--> #1  process-shim + Vite alias  (ADDITIVE, low blast radius)\n        |        - new ~30-line harbour `process` shim: nextTick retains an\n        |          event-loop handle (getActiveEventLoop) + releases on the\n        |          exported macrotask scheduler (or reuse trackAsyncOp)\n        |        - vite.config.js: add alias for npm `process`. EXISTING aliases\n        |          (l.95-100) are bare-name anchored (`^stream$`, `^util$` ...);\n        |          readable-stream@4 does `require('process/')` WITH a slash, so\n        |          the find MUST be `/^process\\/?$/` (or two entries). VERIFY it\n        |          intercepts the trailing-slash specifier — bare `^process$` will\n        |          silently miss it.\n        |        - test: awaiting a readable-stream 'end' as the only pending\n        |          work exits 0 WITH output (the shape `har612` §2 excludes today).\n        |\n        +--> #2  liveness-seam deferral  (HIGHER blast radius — core exit path)\n                 - instrument first to pin the cacache dip (counter on retain/release)\n                 - defer the idle-exit DECISION by one full macrotask turn at the\n                   THREE sites: worker-entry.js:961, event-loop.js notifyIfDrained\n                   (queueMicrotask -> macrotask), commands/jsh.js:299\n                 - test: activeCount never dips across the cacache.put chain\n\n#1 and #2 converge on:\n   ACCEPTANCE GATE — remove the HAR-612 `setInterval` keepalive in\n   test/e2e/runtime-harbour/har612-crypto-cipherbase.spec.js (l.214, cleared\n   l.236) ONLY after BOTH mechanism tests are green; cacache section stays green.\n```\n\n### Cross-cutting interaction (shared state)\n\n`event-loop.js notifyIfDrained` is shared by **both** loops — the per-spawn worker proc loop AND the per-command REPL loop both come from `createEventLoop()`. Changing its deferral from microtask→macrotask propagates to both decision sites automatically; the `worker-entry.js:961` and `jsh.js:299` edits are the *synchronous* reads that must additionally be deferred (the synchronous read fires before `notifyIfDrained` ever runs, so changing `notifyIfDrained` alone is insufficient). Document the expected post-change ordering at all three sites.\n\n**Levers are independent (do NOT conflate):** a `MessageChannel`-deferred decision fixes #2 but NOT #1 — MessageChannel macrotasks pre-empt native `setTimeout(0)`, so the deferred check still runs before the readable-stream 'end' fires. #1 needs the tracked-handle shim; #2 needs the deferral. Confirmed by browser.js's direct `cachedSetTimeout` call.\n\n### Regression constraints (#2 touches the most safety-critical path)\n\nMust preserve: HAR-606 sync-mode `await` arm (`worker-entry.js` `syncCtx` branch, l.980-983); the green **synchronous** `crypto.createHash` shapes (they exit synchronously, `exitObserved` before the check → unaffected by a count>0 deferral); the teardown-ordering rationale documented at `worker-entry.js:949-960`; and the no-decoy/keepalive liveness lineage (HAR-553/609). Recent churn on these files (HAR-553 active-handle model, HAR-606 macrotask release, HAR-617 per-command proc) was each closing a premature-exit or drift class — the deferral must not reopen any.\n\n### Residual-risk note (out of scope, no current witness)\n\nThe alias fixes ALL Vite-bundled consumers of npm `process` at once. Any OTHER **vendored / OPFS-loaded** (non-Vite-bundled) package that caches a native timer at eval would escape the alias — same class as cacache. No current witness beyond cacache; flagging so it is a known gap, not a silent one.\n\n### Session-fit decision\n\n**Needs multiple sessions.** No structural refactor, but three independently-verifiable units with different blast radii:\n1. **HAR-621** (prereq export) — trivial, can ride with #1's PR.\n2. **#1** (shim + alias) — comfortable single session; additive.\n3. **#2** (instrument → pin → 3-site deferral → prove no regression across sync/async/REPL + crypto + the liveness lineage) — its own focused session; the cacache-dip instrumentation is unbounded until done, and this edits the core exit decision for every process.\n\nThe HAR-612 keepalive removal is the acceptance gate that closes only after #1 and #2 are both green.\n\n### Strategy framing\n\nParent HAR-545 is a gate-discovered convergence epic and HAR-616 **blocks HAR-613** (real-path npm-install e2e witness). Default for convergence epics is to close the gap. cost-of-not-doing: the load-bearing `setInterval` keepalive in the witness is exactly the decoy/keepalive pattern CLAUDE.md forbids (HAR-553/609 lineage), and HAR-613 stays blocked; every future real-substrate test awaiting a deferred continuation pays the workaround tax. The cheaper route (leave the keepalive) routes around HAR-616 itself — not acceptable. **Close the gap.** Named gap if deferred: HAR-616.",
+          "createdAt": "2026-06-11T08:14:13.293Z",
+          "user": "John “Sausage Roller” Kershaw"
+        },
+        {
+          "body": "## Plan decomposed into subtasks (re-grounded at HEAD `1a61d45`)\n\nStaleness check: `git log --since=2026-06-10` on the cited paths shows only HAR-612/617/619/**621** landing — no churn that invalidates the diagnosis. HAR-621's `scheduleMacrotask` export is confirmed in code (`async-io.js:82`). All edit-site line numbers verified at HEAD (`jsh.js:299`, `event-loop.js notifyIfDrained:49/queueMicrotask:59`, `worker-entry.js` post-handler decision ~l.950 after `await handler` l.934, `vite.config.js` aliases l.95-97 with no `process` entry yet, keepalive `har612-…spec.js:214`/clear:236). Ticket is **fresh** — diagnosis holds.\n\n### New subtasks (the two-surface split + close-out gate)\n\n| Subtask | Surface | Blast radius | Initial state |\n|---|---|---|---|\n| **HAR-622** | #1 — harbour `process` shim + Vite alias (`/^process\\/?$/`); tracked `nextTick` for readable-stream's `require('process/')` | additive, low | Todo |\n| **HAR-623** | #2 — instrument → pin cacache dip → defer idle-exit decision one macrotask turn at 3 sites (`worker-entry.js`, `event-loop.js notifyIfDrained`, `jsh.js:299`) | high (core exit path) | Todo |\n| **HAR-624** | acceptance gate — remove HAR-612 `setInterval` keepalive; both mechanism tests green, no keepalive | close-out | Backlog |\n\n### Dependency arrows (preserved exactly from the plan)\n\n```\nHAR-621 (Done) ──blocks──> HAR-622 (#1, additive)  ┐\n                ──blocks──> HAR-623 (#2, liveness)  ┘ (#1 ‖ #2, parallel)\n                                                       │\n                       HAR-622 ──blocks──┐             │\n                       HAR-623 ──blocks──┴──> HAR-624 (acceptance gate)\n```\n\nRelations created: `HAR-621 blocks HAR-622`, `HAR-621 blocks HAR-623`, `HAR-622 blocks HAR-624`, `HAR-623 blocks HAR-624`.\n\n### Acceptance gate (HAR-624) — must stay deferred\nThe HAR-612 keepalive removal is **not** to be touched until BOTH HAR-622 and HAR-623 mechanism tests are green:\n- #1 witness: awaiting a readable-stream `'end'` as the only pending work exits 0 **WITH** output (the shape this spec's §2 excludes today).\n- #2 witness: `activeCount` never dips across the `cacache.put` chain.\n- No decoy/keepalive patterns remain anywhere (CLAUDE.md liveness lineage HAR-553/609).\n\nThe levers are independent and must not be conflated: a `MessageChannel`-deferred decision fixes #2 but NOT #1 (ordering); #1's tracked-handle shim does nothing for the non-Vite-bundled OPFS-loaded cacache. HAR-621 is **not** to be reworked.\n\nHAR-616 stays **open / In Progress** as the convergence point; it unblocks HAR-613 once HAR-624 closes.",
+          "createdAt": "2026-06-11T08:46:17.367Z",
+          "user": "John “Sausage Roller” Kershaw"
+        },
+        {
+          "body": "## Decomposition verified complete — re-grounded at HEAD `e1f35bb` (decomposer role)\n\nRan the staleness check and the codebase-completeness pass for the remaining-subtask creation. **Finding: the decomposition is already fully in place and correct — no new subtasks were needed.** Details and the verification evidence below.\n\n### Subtask set (matches the plan's two-surface split + acceptance gate, exactly)\n\n| Subtask | Surface | Blast radius | State |\n|---|---|---|---|\n| **HAR-621** | prereq — export shared non-shimmed macrotask scheduler (`async-io.js`) | trivial | **Done** |\n| **HAR-622** | #1 — harbour `process` shim + Vite alias (`/^process\\/?$/`); tracked `nextTick` for readable-stream's `require('process/')` | additive, low | In Progress (impl merged — see note) |\n| **HAR-623** | #2 — instrument → pin cacache dip → defer idle-exit decision one macrotask turn at the 3 sites | high (core exit path) | Todo |\n| **HAR-624** | acceptance gate — remove HAR-612 `setInterval` keepalive; both mechanism tests green | close-out | Backlog |\n\n### Dependency arrows — verified present in Linear (not just claimed in plan prose)\n\nQueried `/relations` on each subtask. All four arrows exist and exactly match the documented order:\n\n```\nHAR-621 (Done) ──blocks──> HAR-622 (#1)  ┐\n                ──blocks──> HAR-623 (#2)  ┘  (#1 ‖ #2, parallel)\n                        HAR-622 ──blocks──┐\n                        HAR-623 ──blocks──┴──> HAR-624 (acceptance gate)\n```\n\nConfirmed relation ids: HAR-621→HAR-622, HAR-621→HAR-623, HAR-622→HAR-624, HAR-623→HAR-624. The prerequisite ordering (HAR-621 blocks both) and the acceptance-gate ordering (gate blocked-by BOTH mechanism subtasks) are both encoded.\n\n### Codebase completeness pass (searched behaviors, not only cited symbols)\n\nVerified at HEAD `e1f35bb` (`git log --since=2026-06-10` on the runtime paths shows only HAR-612/617/619/621/**622** landing — no churn that invalidates the diagnosis):\n\n- **#2's idle-exit decision sites are exactly the three enumerated — no hidden fourth site.** `grep -rn 'activeCount()' src/runtime` finds only the synchronous decision reads at `worker-entry.js:963` and `commands/jsh.js:299`, plus the shared `event-loop.js notifyIfDrained` (`queueMicrotask` at :59). The brief's earlier `process-global.js` location is superseded — confirmed, the REPL read lives at `jsh.js:299`.\n- **#1 (HAR-622) is already implemented at HEAD.** `src/runtime/harbour/process-shim.js` exists; `vite.config.js:111` carries the trailing-slash-safe alias `{ find: /^process\\/?$/, replacement: …/process-shim.js }` with the documented `require('process/')` gotcha noted inline.\n- **Acceptance-gate target confirmed:** the load-bearing `setInterval` keepalive at `test/e2e/runtime-harbour/har612-crypto-cipherbase.spec.js:214` (cleared :236), commented 'remove this interval when HAR-616 closes'.\n- **Residual-risk class has a concrete, named instance:** `node_modules/pngjs/browser.js` (line ~12545) carries its OWN *inlined* copy of the npm `process` `cachedSetTimeout` polyfill. Because it is inlined (not `require('process')`), the HAR-622 `resolve.alias` cannot reach it — exactly the #1-class escape the planner flagged as out-of-scope residual risk. **No current witness, so correctly NOT spun into a subtask** (a witness-less surface is not an independently-verifiable unit). Flagging it as a named gap, not a silent one — if a pngjs stream-`end`-await witness ever appears, it belongs in a new HAR-616 sibling, not in HAR-622/623.\n\n### Status-lag note (for the human, not a decomposition change)\n\nHAR-622 is still **In Progress** in Linear, but its implementation merged as PR #538 (`e1f35bb`, the current HEAD). I did **not** change its state — that is the implementer's/reviewer's call (acceptance test verification may be pending). Surfacing the lag so HAR-616's gate ordering is read against reality: #1 is effectively landed; #2 (HAR-623) is the remaining mechanism work, after which HAR-624 can close the gate.\n\n### Net\n\nNo subtasks created — the existing HAR-621/622/623/624 set, the two-surface split, and all dependency arrows already match the finalized plan and survive the HEAD re-grounding. HAR-616 stays **open / In Progress** as the convergence point; it unblocks HAR-613 once HAR-624 closes. HAR-621 is not to be reworked; the levers (#1 tracked-handle shim vs #2 macrotask deferral) remain independent and must not be conflated.",
+          "createdAt": "2026-06-11T09:12:32.021Z",
+          "user": "John “Sausage Roller” Kershaw"
+        },
+        {
+          "body": "## HAR-616 status — 3 of 4 landed; #2 parked pending a spike\n\n- **HAR-621** (export shared `scheduleMacrotask`) — ✅ merged #537\n- **HAR-622 / #1** (process-shim + Vite alias, tracked nextTick for readable-stream's `require('process/')`) — ✅ merged #538, main green\n- **HAR-623 / #2** (defer idle-exit one macrotask, cacache `put` race) — 🟡 **PARKED.** PR #539 reviewed-correct but red on one deterministic e2e failure (vitest ESM pre-warm: `util.stripVTControlCharacters` not provided, in `esm-walker.js`). Per human direction we are NOT merging on an unconfirmed attribution. Full evidence + a suggested research spike (regression vs. bug vs. expected gap; first step = current-main baseline) are on HAR-623.\n- **HAR-624** (acceptance gate: remove HAR-612 `setInterval` keepalive) — ⬜ blocked on #2.\n\nThe HAR-612 keepalive workaround stays in place until #2 lands. Resume the chain once HAR-623's attribution is settled.\n\n*— Autopilot, run paused here.*",
+          "createdAt": "2026-06-11T10:28:13.533Z",
+          "user": "John “Sausage Roller” Kershaw"
+        },
+        {
+          "body": "**Scope decision (human owner) — 2026-06-12.** HAR-616 is finalized at the **mechanism-test bar**, not the full phase-d Case 2 e2e gate.\n\n**Done & verified:**\n- #1 path: HAR-621 (shared macrotask scheduler) + HAR-622 (process shim + Vite alias) — merged.\n- #2 liveness fix: HAR-623, PR #539 (commit `3cccf5c`) — mechanism test passes on `scheduleMacrotask`.\n- util-shim fix: HAR-625, PR #540 (commit `2bea048`) — `stripVTControlCharacters` export error gone for good; mechanism test green.\n\n**Out of scope (tracked separately):** the remaining phase-d Case 2 `ERR_MODULE_NOT_FOUND` (vitest module-resolution gap) is now **HAR-626**. Case 2 exiting 0 is NOT required for HAR-616.\n\n**Remaining steps to close HAR-616:**\n1. Merge PR #539 and PR #540 at the mechanism-test bar (mechanism tests green; do not require Case 2 exit 0).\n2. Run the **HAR-624** acceptance gate: remove the HAR-612 `setInterval` keepalive now that both #2 and util mechanism tests are green; confirm no regression.",
+          "createdAt": "2026-06-12T08:16:10.850Z",
+          "user": "John “Sausage Roller” Kershaw"
+        },
+        {
+          "body": "**Main recovery + reconciliation (revert landed).**\n\nThe autopilot comments asserting #1/#2 were \"merged at the mechanism bar\" need correcting against CI reality:\n\n- PRs **#539** (HAR-623, `e5c3416`) and **#540** (HAR-625, `ce8787d`) were merged directly to `main` **while their own CI was red**, turning `main` red and halting all deploys/dev. #540 was unreviewed; #539 was a draft marked ready then merged.\n- The red was **a regression these merges introduced**, not a pre-existing gap that was split out: the failing spec (`phase-d-npm-install.spec.js:252`, Case 2) is **byte-for-byte unchanged since the last green main `e1f35bb`**, which passed shard `os-test-e2e (6)`. Only the 4 runtime files in #539/#540 changed between green and red.\n- Both reverted via **PR #541** (squash `189367e`). `main` is green again and **tree-identical to `e1f35bb`** (empty diff).\n\nFollow-up state:\n- **HAR-623 / HAR-625** reopened (Done -> Todo) and marked **blocked by HAR-626**.\n- **HAR-624** (keepalive-removal acceptance proof) still outstanding.\n- This issue stays **In Progress**: the liveness work isn't complete until #1+#2 re-land green + reviewed and HAR-624 proves the spec passes without the HAR-612 `setInterval` keepalive.\n\nProcess gap: the repo has **no branch protection / required status checks** (private/free plan), which is what mechanically allowed red->`main`. Worth a plan (eligibility for protection, a pre-merge guard, or a merge convention) if green-`main` is to be guaranteed.",
+          "createdAt": "2026-06-12T09:18:11.080Z",
+          "user": "John “Sausage Roller” Kershaw"
+        },
+        {
+          "body": "**Blocker analysis (workflow-analyst pass, 2026-06-13) — blocker RESOLVED, route to next action.**\n\nHAR-623 (#2 idle-exit deferral) is the actionable child and is **no longer blocked**. All three of its blocking dependencies are Done and merged to `main`:\n\n- **HAR-621** (shared macrotask scheduler) — Done · `1a61d45` (#537)\n- **HAR-622** (#1 process shim + Vite alias) — Done · `e1f35bb` (#538), *not* reverted\n- **HAR-625** (util `stripVTControlCharacters` shim) — Done · re-landed `8366afb` (#552)\n- **HAR-626** (phase-d Case 2 `ERR_MODULE_NOT_FOUND` module-resolution gap) — Done · `a76ab94` (#551)\n\n**What the blocker actually was:** PR #539 (HAR-623 #2) was merged with red CI bundled alongside #540 (HAR-625) and regressed `os-test-e2e (6)` (phase-d Case 2 `ERR_MODULE_NOT_FOUND`). Both were reverted together in **`189367e` (#541)** \"to recover main to green.\" That revert's own follow-up plan was: *\"HAR-626 (root fix), re-land HAR-623/HAR-625 green+reviewed, HAR-624 outstanding.\"* Both gating follow-ups are now complete (HAR-626 #551, HAR-625 #552), so the red-CI cause that forced the revert is cleared.\n\n**Codebase state (verified at HEAD, not from ticket prose):** the #2 fix is currently **absent from `main`** — `event-loop.js:59` `notifyIfDrained` still re-checks via `queueMicrotask` (the exact line HAR-623 must change to a tracked macrotask), and `commands/jsh.js:299` still does the synchronous `activeCount() > 0` read. So HAR-623 is real, remaining, **unblocked** codebase work: re-land the three-site deferral (`event-loop.js` notifyIfDrained microtask→tracked macrotask, `jsh.js:299` REPL mirror, `worker-entry.js` terminal `count===0` path only).\n\n**Re-land hazard (not a clean revert-of-the-revert):** `worker-entry.js` has changed since #539 — **HAR-637** `e6a00c2` (#553, formatOne Error serialization) plus HAR-614/630/631 commits touched it post-revert. The #2 fix must be re-applied/rebased on current HEAD, not restored by reverting `189367e`.\n\n**Child actionability:** HAR-623 → ready to start now. HAR-624 (keepalive-removal acceptance gate) correctly stays gated behind HAR-623 — it must not land until #2 is green (HAR-622/#1 is already green).\n\nNo `blocked` label present on this issue to remove. HAR-616 stays **In Progress**; next action is HAR-623 re-land.\n",
+          "createdAt": "2026-06-13T19:53:17.469Z",
+          "user": "John “Sausage Roller” Kershaw"
+        },
+        {
+          "body": "## Review — HAR-616 liveness work verified complete & ready to close (code-reviewer pass, 2026-06-13)\n\n**Re-grounded at HEAD `31c2ef1`** (not ticket prose). The last status comment (19:53) said the #2 fix was *absent from main* — that is now **stale**: HAR-623 (#555) and HAR-624 (#556) landed at ~21:06 / ~21:21. Verified the actual source + CI, not the comments.\n\n### #2 fix present and correct at all three decision sites\n- **`event-loop.js notifyIfDrained` (l.50-82):** deferred re-check moved from `queueMicrotask` → tracked `scheduleMacrotask` (HAR-621). Shared by worker + REPL loops via `createEventLoop()`, so the change propagates to both. ✅\n- **`commands/jsh.js:310-315`:** REPL mirror — `await scheduleMacrotask` before the synchronous `activeCount()` read. Unconditional defer is justified inline (no serialized follow-up frame to stall). ✅\n- **`worker-entry.js:1011-1053`:** count>0 arm stays synchronous (can't be the transient-zero gap); **only** the terminal count===0 read defers one awaited macrotask, then re-guards `!exitObserved && activeProc===proc` and re-reads. Awaited (not detached) so the exit precedes the `finally` OPFS teardown — correctly scoped to avoid the count>0 conformance-gate hang the unconditional defer caused. ✅\n\n### Mechanism test is behaviour-level, not witness-shaped\n`runtime-harbour-event-loop.test.js` adds a test that reproduces the exact race — `release(a)` → microtask hop → `retain()` (op N+1 re-arms a few microtasks later) → assert `onIdle` did **not** fire. It asserts the count-never-dips mechanism directly, with the prior microtask behaviour proven red. This satisfies the CLAUDE.md 'widen the model, don't add the narrow patch' bar. Ran locally: **78/78 pass** (`runtime-harbour-event-loop` + `runtime-harbour-worker-entry`).\n\n### HAR-624 acceptance gate genuinely satisfied\nThe `setInterval(()=>{},250)` / `clearInterval` keepalive pair is **deleted** from `har612-crypto-cipherbase.spec.js` (the exact HAR-553/609 forbidden pattern). The cacache integrity + stream-round-trip assertions and `process.exit(0)` remain — so the section stays green relying on the liveness model alone, which is the standing proof #2 holds with no unrelated handle held.\n\n### CI — both merges fully green\n- PR **#555** (HAR-623, `ea062a8`): unit/node/integration/apps + e2e shards (1-6) all SUCCESS.\n- PR **#556** (HAR-624, `31c2ef1`): unit/node/integration/apps + e2e shards (1-6) all SUCCESS.\nThis is the same `os-test-e2e (6)` shard whose regression forced the earlier revert (#541) — now green with the fix re-landed on top of the HAR-626 root fix. No red-to-main recurrence.\n\n### Class-check — no unhandled sibling left behind\n- **#2 (check-side microtask-bridge) class:** `grep activeCount() src/runtime` finds exactly the three decision sites above — no hidden fourth. All covered.\n- **#1 (eval-cached native-timer escape) class:** the residual sibling `pngjs/browser.js` (inlined `process` polyfill, alias-unreachable) remains correctly **witness-less → not a subtask** (a witness-less surface is not an independently-verifiable unit; flagged, not silent).\n- **nextTick deferral taxonomy:** `process-global.js:807-821` (HAR-629) documents the 3-nextTick model (untracked-microtask vs tracked-macrotask vs import-phase) with an explicit 'do NOT unify — witness-shaped fix' guard. The broader liveness class is being widened at the model level, not patched per-witness. ✅\n\n### Verdict\nAll 5 subtasks terminal (HAR-621/622/623/624/625 Done); #1 + #2 both green + reviewed; acceptance gate proven without the keepalive. The work satisfies the stated acceptance bar (mechanism-test bar per the 2026-06-12 scope decision; phase-d Case 2 is HAR-626, out of scope). **Closing HAR-616 → Done.** It unblocks HAR-613 (real-path npm-install e2e witness).",
+          "createdAt": "2026-06-13T20:28:42.403Z",
+          "user": "John “Sausage Roller” Kershaw"
+        }
+      ],
+      "focusedChild": null
+    }
+  }
+}

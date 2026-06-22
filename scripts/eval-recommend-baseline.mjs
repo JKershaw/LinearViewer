@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Recommendation-engine baseline eval harness (LIN-432 — the "red test").
+ * Recommendation-engine baseline eval harness (LIN-432 — the "red test"; LIN-587 — fixtures-only).
  *
  * The safety net every later subtask of LIN-431 measures against. It exercises the
  * LOCAL recommendation pipeline — `resolveRecommendation` (lib/recommend-recurse.js)
@@ -9,59 +9,48 @@
  * would not see later branch changes, so it can only ever be reference data; the
  * committed output of THIS harness is the baseline subtasks 2–5 compare against.
  *
- * How it stays workspace-agnostic with only a PROXY READ token (no Linear API key):
- * per descent hop it fetches the node from the proxy read endpoints
- * (`GET /api/proxy/issues/{id}`) and reshapes that JSON into the context object
- * `getRecommendation` consumes ({parent, siblings, project, children, comments,
- * focusedChild}) — re-creating the live branch of the proxy's inner
- * `computeRecommendation` (routes/proxy.js) entirely here in scripts/, touching zero
- * production code. `focusedChild` is LOAD-BEARING: descent only fires when the prompt
- * carries the SUGGESTED-NEXT pointer derived from it, so an epic without it would be
- * mis-framed as a leaf and never descend.
+ * LIN-587 — fixtures only, no proxy. The harness used to fetch each descent node from
+ * the proxy and reshape it into context. That coupled it to a live token AND to the
+ * proxy wire shape (which has since flattened — the old `{nodes:[]}` reshape went
+ * stale, building empty context). It now runs purely on COMMITTED context-bundle
+ * fixtures under `scripts/eval/fixtures/recommend/*.json`, so it needs no token, no
+ * network for context, and runs identically on any clone / in CI. Only the LLM leg
+ * (`getRecommendation`, the thing under test) hits the network — `OPENROUTER_API_KEY`.
  *
- * Fidelity notes (the harness is internally consistent — all subtasks use it, so the
- * baseline is defined BY this harness, not by production parity):
- *   - Context assembly reuses the exact production constants/helpers where exported
- *     (`SIBLING_CAP`, `getStateOrder`, `selectFocusSubtask`).
- *   - The proxy `/issues/{id}` shape omits a few fields the Linear GraphQL fetch has:
- *     `parent.state` (absent), `project.content`/repo (absent → repo null), child
- *     labels/relations (so child `isBlocked` is effectively false), and cousins (would
- *     need a fetch per sibling). These are secondary context; their omission is noted
- *     here and held constant across every run so comparisons stay apples-to-apples.
- *   - Proxy GETs are cached for the whole invocation: context is deterministic, only
- *     the LLM sampling varies between the K repeats, so caching cuts proxy load (and
- *     the 60 req/min limiter) without changing what any run sees.
+ * Each fixture file is a workspace:
+ *   { name, targets: [{ id, role }], bundles: { <identifier>: <contextBundle> } }
+ * where a contextBundle is the exact object getRecommendation consumes:
+ *   { issue, parent, siblings, siblingsTotal, project, children, comments, focusedChild }
+ * `computeOne` resolves an identifier straight out of `bundles` (a missing id throws
+ * "not found", which resolveRecommendation surfaces as an `unresolved` descent stop —
+ * never a crash). Descent works because each non-leaf bundle carries a `focusedChild`
+ * and a matching `children` entry; the leaf bundle has neither, so the descent ends.
  *
- * Parameterised so adding the Harbour targets is CONFIG, not code: each workspace
- * carries its own proxy base + token (from env); a workspace with no token is skipped
- * with a logged "deferred" line (never silently dropped). The LinearViewer proxy token
- * is workspace-isolated, so HAR-149/545/616 stay blocked until a read-scope Harbour
- * token + base URL are provided via HARBOUR_PROXY_TOKEN / HARBOUR_PROXY_BASE.
+ * The real-task fixtures are curated, committed real text (Harbour is a public pet
+ * project; LinearViewer is this repo's own public tracker) — regenerated, text-free,
+ * by `scripts/eval/build-recommend-fixtures.mjs`. The synthetic FIX-448-leaf fixture
+ * is deliberately constructed (no real equivalent reproduces its loop in isolation;
+ * the authoritative guard is the unit test — see synthetic.json's note).
  *
  * Usage:
- *   PROXY_TOKEN=... OPENROUTER_API_KEY=... node scripts/eval-recommend-baseline.mjs
+ *   OPENROUTER_API_KEY=... node scripts/eval-recommend-baseline.mjs
  *   (OPENROUTER_API_KEY is also picked up from .env via dotenv.)
  *
  * Env knobs:
- *   PROXY_TOKEN          LinearViewer proxy READ token            (required for LinearViewer)
- *   PROXY_BASE           LinearViewer proxy base URL              (default https://projects.jkershaw.com/api/proxy)
- *   HARBOUR_PROXY_TOKEN  Harbour proxy READ token                 (optional — unblocks HAR targets)
- *   HARBOUR_PROXY_BASE   Harbour proxy base URL                   (optional)
  *   OPENROUTER_API_KEY   OpenRouter key for the local LLM call    (required; from env or .env)
  *   MODEL                model id                                 (default openai/gpt-5.4-mini — the prod default)
  *   K                    repeats per target                       (default 6)
- *   ONLY                 substring filter on target id            (e.g. ONLY=LIN-428)
+ *   ONLY                 substring filter on target id            (e.g. ONLY=HAR-149)
+ *   FIXTURES_DIR         fixtures dir override                    (default scripts/eval/fixtures/recommend)
  *   OUT_DIR              output dir override                      (default scripts/eval/recommend-baseline/<DATE>)
  *   DATE                 baseline date stamp                      (default 2026-06-12 — passed in; no clock in-script)
  */
 import 'dotenv/config';
-import { writeFileSync, mkdirSync } from 'fs';
+import { writeFileSync, mkdirSync, readFileSync, readdirSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { getRecommendation, SIBLING_CAP } from '../lib/openrouter.js';
+import { getRecommendation } from '../lib/openrouter.js';
 import { resolveRecommendation } from '../lib/recommend-recurse.js';
-import { selectFocusSubtask } from '../lib/tree.js';
-import { getStateOrder } from '../lib/providers/state-map.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -71,279 +60,63 @@ const MODEL = process.env.MODEL || 'openai/gpt-5.4-mini';
 const K = Number(process.env.K) || 6;
 const ONLY = process.env.ONLY;
 const DATE = process.env.DATE || '2026-06-12';
+const FIXTURES_DIR = process.env.FIXTURES_DIR || join(HERE, 'eval', 'fixtures', 'recommend');
 const OUT_DIR = process.env.OUT_DIR || join(HERE, 'eval', 'recommend-baseline', DATE);
 
-/**
- * Target catalogue — config, not code. Add Harbour by supplying its token/base via
- * env; a workspace whose token is absent is skipped + logged, never silently dropped.
- *
- * role is descriptive only (epic/mid/leaf); every target is driven by starting
- * `resolveRecommendation` at its own id, so the captured descent path + terminal give
- * the LIN-428 direct-vs-descent cross-check (compare LIN-428 as a direct start node
- * against its appearance as the terminal of any epic/mid descent).
- */
-const WORKSPACES = [
-  {
-    name: 'LinearViewer',
-    base: process.env.PROXY_BASE || 'https://projects.jkershaw.com/api/proxy',
-    token: process.env.PROXY_TOKEN,
-    targets: [
-      { id: 'LIN-385', role: 'epic' },
-      { id: 'LIN-389', role: 'mid' },
-      { id: 'LIN-428', role: 'leaf (direct cross-check)' }
-    ]
-  },
-  {
-    name: 'Harbour',
-    base: process.env.HARBOUR_PROXY_BASE,
-    token: process.env.HARBOUR_PROXY_TOKEN,
-    targets: [
-      { id: 'HAR-149', role: 'epic' },
-      { id: 'HAR-545', role: 'mid' },
-      { id: 'HAR-616', role: 'leaf' }
-    ]
-  },
-  // Synthetic workspace (LIN-448) — network-free fixtures, no token needed (the
-  // sentinel token keeps the workspace from being skip-gated). Each target's context
-  // is pre-built in `fixtures` and short-circuits the proxy in computeOne.
-  {
-    name: 'Synthetic',
-    base: null,
-    token: 'fixture',
-    targets: [
-      { id: 'FIX-448-leaf', role: 'plan-less research→implementation leaf, merged but In Progress (expect → review)' }
-    ],
-    fixtures: {
-      // The LIN-390 shape that looped `implementation` x3: reached implementation via
-      // research (NO `plan` step → no `## Implementation Plan`, no session-fit answer),
-      // description ends in a present-tense "Next step:" imperative left over from
-      // research, and a "PR merged" completion comment sits in the thread. Expected
-      // routing: `review`.
-      //
-      // Honest scope (LIN-448): this is live SHAPE-COVERAGE, not a self-reproducing red
-      // test. On gpt-5.4-mini this minimal reconstruction routes to `review` 4/4 with
-      // AND without the Step-3 hoist (the model already weighs the merged comment), so
-      // it does not reproduce the loop in isolation — the AUTHORITATIVE red→green guard
-      // is the deterministic structural test in tests/unit/openrouter.test.js
-      // ('plan-less landed leaf (LIN-448)'), which is 3/4 red on the pre-hoist prompt.
-      // This target keeps the shape under continuous live measurement so a future prompt
-      // edit that re-buries the guard (combined with a weaker model) cannot regress it
-      // silently.
-      'FIX-448-leaf': {
-        issue: {
-          id: 'fix-448-leaf-uuid',
-          identifier: 'FIX-448-leaf',
-          title: 'Delete orphaned roadmap test-mode branch; finalize harness boundary header',
-          description: [
-            '## Research findings',
-            '',
-            'The orphaned `test-mode` branch in `server.js:1177` is dead — no caller reaches it',
-            'since the harness boundary moved. The harness header is the canonical seam now.',
-            '',
-            '**Next step:** delete `server.js:1177` only; finalize the harness header; verify the',
-            'roadmap + error-handling specs stay green.'
-          ].join('\n'),
-          url: 'https://linear.app/linearviewer/issue/FIX-448-leaf',
-          state: { name: 'In Progress', type: 'started' },
-          createdAt: '2026-06-13T00:00:00.000Z',
-          labels: []
-        },
-        parent: null,
-        siblings: [],
-        siblingsTotal: 0,
-        project: { name: 'Autopilot, Recommendation & Prompt Engine', description: null },
-        children: [],
-        comments: [
-          {
-            body: '## S4 implemented — PR #442 merged ✅\n\nDeleted the orphaned branch and finalized the harness boundary header. CI green on `main`; commit landed.',
-            createdAt: '2026-06-13T01:00:00.000Z',
-            user: 'engineer'
-          }
-        ],
-        focusedChild: null
-      }
-    }
-  }
-];
-
-const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-const byStateOrder = (a, b) => (getStateOrder(a.state?.type) ?? 2) - (getStateOrder(b.state?.type) ?? 2);
-
-/**
- * Cached proxy GET (context is deterministic across the K repeats). Retries on
- * 429/5xx with backoff so the 60 req/min limiter doesn't fail a run.
- */
-function makeProxyGet(base, token) {
-  const cache = new Map();
-  return async function proxyGet(path) {
-    if (cache.has(path)) return cache.get(path);
-    let lastErr = '';
-    for (let attempt = 0; attempt < 5; attempt++) {
-      if (attempt) await sleep(1000 * 2 ** (attempt - 1)); // 1s,2s,4s,8s
-      try {
-        const r = await fetch(`${base}${path}`, { headers: { Authorization: `Bearer ${token}` } });
-        if (r.status === 429 || r.status >= 500) { lastErr = `HTTP ${r.status}`; continue; }
-        if (r.status === 404) throw new Error(`not found: ${path}`);
-        if (!r.ok) throw new Error(`proxy ${r.status} on ${path}`);
-        const j = await r.json();
-        cache.set(path, j);
-        return j;
-      } catch (e) {
-        if (/not found/i.test(e.message)) throw e;
-        lastErr = e.message;
-      }
-    }
-    throw new Error(`proxy GET failed (${lastErr}) on ${path}`);
-  };
-}
-
-/** Reshape a proxy `/issues/{id}` payload into the issue slice getRecommendation reads. */
-function reshapeIssue(raw) {
-  return {
-    id: raw.id,
-    identifier: raw.identifier,
-    title: raw.title,
-    description: raw.description,
-    url: raw.url,
-    state: raw.state,
-    createdAt: raw.createdAt,
-    labels: (raw.labels?.nodes || []).map(l => l.name)
-  };
-}
-
-/**
- * LIN-444 Part B (harness enrichment): attach the blocked-ness signal that
- * selectFocusSubtask / hasOpenFrontier read to an in-set child. The proxy
- * `/issues/{id}` children list carries only {id,identifier,title,state}, so
- * `isBlocked()` and the transitive dead-end guard are BLIND — every child reads as a
- * non-blocked leaf, ranking degrades to identifier order, and HAR-149 would
- * FALSE-RED (the wrong child looks just as open as the right one). Fetch the child's
- * own `/issues/{id}` for its `labels` + `inverseRelations`, and one level deeper
- * attach each grandchild's blocked-ness too, so the harness reproduces the real
- * subtree frontier (HAR-497 → blocked HAR-502 dead branch vs HAR-545 → open
- * HAR-616). This mirrors the depth the enriched Linear query now fetches; it changes
- * only what the harness can SEE, never production behavior.
- */
-async function enrichChildBlockedness(proxyGet, basic, depth) {
-  let raw;
-  try { raw = await proxyGet(`/issues/${basic.identifier}`); }
-  catch { return { id: basic.id, identifier: basic.identifier, title: basic.title, state: basic.state }; }
-  const node = {
-    id: raw.id,
-    identifier: raw.identifier,
-    title: raw.title,
-    state: raw.state,
-    labels: { nodes: raw.labels?.nodes || [] },
-    inverseRelations: { nodes: raw.inverseRelations?.nodes || [] }
-  };
-  if (depth > 0) {
-    const grandkids = raw.children?.nodes || [];
-    node.children = {
-      nodes: await Promise.all(grandkids.map(gc => enrichChildBlockedness(proxyGet, gc, depth - 1)))
-    };
-  }
-  return node;
-}
-
-/** Build the full context object for one node from proxy reads (mirrors fetchRecommendationContext). */
-async function fetchContext(proxyGet, identifier) {
-  const raw = await proxyGet(`/issues/${identifier}`);
-  const issue = reshapeIssue(raw);
-
-  // Enrich each child with subtree blocked-ness (one level deep) so the transitive
-  // dead-end guard (LIN-444) can see what production now sees; then state-sort.
-  const children = (await Promise.all(
-    (raw.children?.nodes || []).map(c => enrichChildBlockedness(proxyGet, c, 1))
-  )).sort(byStateOrder);
-
-  const comments = (raw.comments?.nodes || [])
-    .map(c => ({ body: c.body, createdAt: c.createdAt, user: c.user?.name || 'Unknown' }))
-    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-
-  const parent = raw.parent
-    ? { id: raw.parent.id, identifier: raw.parent.identifier, title: raw.parent.title, state: raw.parent.state }
-    : null;
-
-  const project = raw.project ? { name: raw.project.name, description: raw.project.content } : null;
-
-  // Siblings via one parent fetch (proxy issue carries no sibling list itself).
-  let siblings = [];
-  let siblingsTotal = 0;
-  if (parent) {
-    try {
-      const parentRaw = await proxyGet(`/issues/${parent.identifier}`);
-      const all = (parentRaw.children?.nodes || [])
-        .filter(c => c.id !== issue.id)
-        .map(c => ({ id: c.id, identifier: c.identifier, title: c.title, state: c.state }))
-        .sort(byStateOrder);
-      siblingsTotal = all.length;
-      siblings = all.slice(0, SIBLING_CAP);
-    } catch { /* parent unreadable — leaf-grade context, acceptable */ }
-  }
-
-  // focusedChild (LOAD-BEARING for descent): pick the focus child and fetch its detail.
-  let focusedChild = null;
-  if (children.length) {
-    const focus = selectFocusSubtask(children);
-    if (focus) {
-      const childRaw = await proxyGet(`/issues/${focus.identifier}`);
-      focusedChild = {
-        issue: {
-          id: childRaw.id,
-          identifier: childRaw.identifier,
-          title: childRaw.title,
-          description: childRaw.description,
-          url: childRaw.url,
-          state: childRaw.state,
-          labels: (childRaw.labels?.nodes || []).map(l => l.name)
-        },
-        comments: (childRaw.comments?.nodes || [])
-          .map(c => ({ body: c.body, createdAt: c.createdAt, user: c.user?.name || 'Unknown' }))
-          .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
-      };
-    }
-  }
-
-  return { issue, parent, siblings, siblingsTotal, project, children, comments, focusedChild };
+/** Load each committed fixture file as a workspace ({ name, targets, bundles }). */
+function loadWorkspaces(dir) {
+  if (!existsSync(dir)) { console.error(`No fixtures dir: ${dir} (run scripts/eval/build-recommend-fixtures.mjs)`); process.exit(1); }
+  const files = readdirSync(dir).filter(f => f.endsWith('.json')).sort();
+  return files.map(f => {
+    const ws = JSON.parse(readFileSync(join(dir, f), 'utf8'));
+    if (!ws.bundles || !ws.targets) throw new Error(`fixture ${f} missing targets/bundles`);
+    return { name: ws.name || f.replace(/\.json$/, ''), file: f, targets: ws.targets, bundles: ws.bundles };
+  });
 }
 
 /**
  * One recommend hop — the harness's own `computeOne`, mirroring routes/proxy.js's
  * inner computeRecommendation live branch (the shape resolveRecommendation needs:
  * recommendedAction + deferTo drive descent; state + children arm the LIN-353 guards).
+ * Context comes straight from the committed bundle — no network, no proxy reshape.
  */
-function makeComputeOne(proxyGet, fixtures = {}) {
+function makeComputeOne(bundles) {
   return async function computeOne(identifier) {
-    // Synthetic targets (LIN-448) carry their own pre-built context and never touch
-    // the proxy: the merged-but-In-Progress leaf they reproduce was flipped to Done by
-    // the run's workaround, so its live state no longer exercises the loop. The fixture
-    // pins the exact shape — plan-less research→implementation leaf, In Progress, with a
-    // "PR merged" comment — so the LLM-level routing stays measurable as a red test.
-    const { issue, parent, siblings, siblingsTotal, project, children, comments, focusedChild } =
-      fixtures[identifier] || await fetchContext(proxyGet, identifier);
+    const b = bundles[identifier];
+    // A missing bundle is "not found" — resolveRecommendation turns that into an
+    // `unresolved` descent stop rather than crashing the run.
+    if (!b) throw new Error(`not found: ${identifier}`);
 
     const recommendation = await getRecommendation(
-      issue,
-      { parent, siblings, siblingsTotal, project, children, comments, focusedChild },
+      b.issue,
+      {
+        parent: b.parent,
+        siblings: b.siblings || [],
+        siblingsTotal: b.siblingsTotal || 0,
+        project: b.project,
+        children: b.children || [],
+        comments: b.comments || [],
+        focusedChild: b.focusedChild || null
+      },
       { apiKey: OPENROUTER_API_KEY, model: MODEL, featureFlags: {} }
     );
 
     return {
-      identifier: issue.identifier,
+      identifier: b.issue.identifier,
       reasoning: recommendation.reasoning,
       prompt: recommendation.prompt,
       truncated: recommendation.truncated,
       recommendedAction: recommendation.recommendedAction,
       deferTo: recommendation.deferTo || null,
-      state: issue.state,
-      children
+      state: b.issue.state,
+      children: b.children || []
     };
   };
 }
 
 /** Run one target K times through resolveRecommendation, capturing each run. */
-async function runTarget(workspace, target, proxyGet) {
-  const computeOne = makeComputeOne(proxyGet, workspace.fixtures);
+async function runTarget(workspace, target) {
+  const computeOne = makeComputeOne(workspace.bundles);
   const runs = [];
   for (let i = 0; i < K; i++) {
     try {
@@ -371,36 +144,30 @@ async function runTarget(workspace, target, proxyGet) {
 }
 
 // ---- main ----
+const workspaces = loadWorkspaces(FIXTURES_DIR);
 const results = [];
-const skipped = [];
 
-for (const ws of WORKSPACES) {
+for (const ws of workspaces) {
   const targets = ws.targets.filter(t => !ONLY || t.id.includes(ONLY));
   if (!targets.length) continue;
-  if (!ws.token) {
-    skipped.push({ workspace: ws.name, reason: 'no proxy token (deferred — supply token+base via env)', targets: targets.map(t => t.id) });
-    console.log(`\n[${ws.name}] DEFERRED — no proxy token. Targets blocked: ${targets.map(t => t.id).join(', ')}`);
-    continue;
-  }
-  const proxyGet = makeProxyGet(ws.base, ws.token);
-  console.log(`\n[${ws.name}] base=${ws.base}  model=${MODEL}  K=${K}  targets=${targets.map(t => t.id).join(', ')}`);
+  console.log(`\n[${ws.name}] fixtures=${ws.file}  model=${MODEL}  K=${K}  targets=${targets.map(t => t.id).join(', ')}`);
   for (const t of targets) {
     console.log(`  ${t.id} (${t.role})`);
-    results.push(await runTarget(ws, t, proxyGet));
+    results.push(await runTarget(ws, t));
   }
 }
 
 // ---- write artifacts ----
 mkdirSync(OUT_DIR, { recursive: true });
 
-const meta = { date: DATE, model: MODEL, repeats: K, generatedBy: 'scripts/eval-recommend-baseline.mjs (LIN-432)' };
-writeFileSync(join(OUT_DIR, 'run.json'), JSON.stringify({ meta, results, skipped }, null, 2));
+const meta = { date: DATE, model: MODEL, repeats: K, generatedBy: 'scripts/eval-recommend-baseline.mjs (LIN-432; fixtures-only, LIN-587)' };
+writeFileSync(join(OUT_DIR, 'run.json'), JSON.stringify({ meta, results }, null, 2));
 
 // Compact per-run table: descent path / terminal / action / prompt length.
 const tableLines = [
   `# Recommendation baseline — ${DATE}`,
   '',
-  `model: \`${MODEL}\` · repeats: ${K} · harness: \`scripts/eval-recommend-baseline.mjs\` (local pipeline, NOT deployed proxy)`,
+  `model: \`${MODEL}\` · repeats: ${K} · harness: \`scripts/eval-recommend-baseline.mjs\` (local pipeline, fixtures-only — NOT deployed proxy)`,
   '',
   '| target | role | run | descent path | terminal | action | prompt len | stop |',
   '|---|---|---|---|---|---|---|---|'
@@ -415,10 +182,6 @@ for (const r of results) {
     tableLines.push(`| ${r.id} | ${r.role} | ${run.run} | ${path} | ${run.terminal || '—'} | ${run.action || '—'} | ${run.promptLength} | ${run.deferStopReason || ''} |`);
   }
 }
-if (skipped.length) {
-  tableLines.push('', '## Deferred (config-blocked)', '');
-  for (const s of skipped) tableLines.push(`- **${s.workspace}**: ${s.reason} — ${s.targets.join(', ')}`);
-}
 writeFileSync(join(OUT_DIR, 'table.md'), tableLines.join('\n') + '\n');
 
 // Stable pointer file (the documented "red baseline" entry point).
@@ -429,6 +192,13 @@ const pointer = [
   `LOCAL recommendation pipeline via \`scripts/eval-recommend-baseline.mjs\` — never the`,
   `deployed \`/api/proxy/recommend\` (which runs production and won't see branch changes).`,
   '',
+  `**Fixtures-only (LIN-587):** context comes from committed bundles under`,
+  `\`scripts/eval/fixtures/recommend/*.json\` — no proxy token, no network for context.`,
+  `Only the LLM leg needs \`OPENROUTER_API_KEY\`. Real-task fixtures (Harbour HAR-149/545/616,`,
+  `LinearViewer LIN-385/389/428) are curated real text; the descent chains are reconstructed`,
+  `to \`started\` (the real tasks have since closed). Synthetic FIX-448-leaf is deliberately`,
+  `constructed (see its note). Regenerate real fixtures with \`scripts/eval/build-recommend-fixtures.mjs\`.`,
+  '',
   `**Latest baseline:** \`scripts/eval/recommend-baseline/${DATE}/\``,
   `- \`table.md\` — compact per-run table (descent path / terminal / action / prompt length)`,
   `- \`run.json\` — full capture incl. every prompt + reasoning`,
@@ -436,11 +206,13 @@ const pointer = [
   '## Regenerate',
   '',
   '```',
-  'PROXY_TOKEN=<linearviewer read token> OPENROUTER_API_KEY=<key> \\',
-  '  node scripts/eval-recommend-baseline.mjs',
-  '```',
+  '# the eval itself (context from committed fixtures; only the LLM call needs a key):',
+  'OPENROUTER_API_KEY=<key> node scripts/eval-recommend-baseline.mjs',
   '',
-  'Add Harbour by supplying `HARBOUR_PROXY_TOKEN` + `HARBOUR_PROXY_BASE` (config, not code).',
+  '# refresh the real-task fixtures from the proxy (text-free recipe; needs read tokens):',
+  'PROXY_TOKEN=<linearviewer read> HARBOUR_PROXY_TOKEN=<harbour read> \\',
+  '  node scripts/eval/build-recommend-fixtures.mjs',
+  '```',
   ''
 ].join('\n');
 writeFileSync(join(HERE, 'eval', 'recommend-baseline.md'), pointer);
@@ -449,4 +221,3 @@ console.log(`\nBaseline written:`);
 console.log(`  ${join(OUT_DIR, 'table.md')}`);
 console.log(`  ${join(OUT_DIR, 'run.json')}`);
 console.log(`  ${join(HERE, 'eval', 'recommend-baseline.md')} (pointer)`);
-if (skipped.length) console.log(`  (${skipped.length} workspace(s) deferred — see table.md)`);

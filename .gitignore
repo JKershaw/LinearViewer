@@ -9,3 +9,8 @@ test-results/
 # are checked in so the eval's realistic red bar runs on any clone / in CI.
 scripts/eval/fixtures/*
 !scripts/eval/fixtures/HAR-697-red.json
+# Curated recommend-baseline context bundles (real Harbour + LinearViewer task text,
+# both public) are committed so eval-recommend-baseline.mjs runs token-free (LIN-587).
+!scripts/eval/fixtures/recommend/
+scripts/eval/fixtures/recommend/*
+!scripts/eval/fixtures/recommend/*.json

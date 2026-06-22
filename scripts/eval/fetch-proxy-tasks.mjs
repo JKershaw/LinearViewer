@@ -73,7 +73,7 @@ const reshapeIssue = (raw) => ({
   labels: (raw.labels?.nodes || []).map(l => l.name)
 });
 
-/** Full context bundle for one node (mirrors eval-recommend-baseline fetchContext). */
+/** Full context bundle for one node (same bundle shape build-recommend-fixtures.mjs writes). */
 async function fetchBundle(identifier) {
   const raw = await proxyGet(`/issues/${identifier}`);
   const issue = reshapeIssue(raw);
