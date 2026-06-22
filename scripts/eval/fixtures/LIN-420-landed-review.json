@@ -1,0 +1,25 @@
+{
+  "identifier": "LIN-420",
+  "state": {
+    "name": "In Progress",
+    "type": "started"
+  },
+  "labels": [],
+  "createdAt": "2026-06-11T20:57:43.546Z",
+  "title": "Adopt lib/errors.js in the three largest route files (proxy, workspace-api, dispatch)",
+  "description": "From the 2026-06-11 Drift & Coherence Review (LIN-419, Finding 1, medium).\n\n`lib/errors.js` is the canonical error-envelope module (LIN-36) but only `routes/workspace.js` and now `routes/proxy.js` (LIN-417) import it; every other route hand-rolls inline `res.status(4xx).json({ error })` — 246 inline 4xx sites across routes/, concentrated in proxy.js (106), workspace-api.js (80), dispatch.js (42).\n\nScope: in those three files only, replace inline `res.status(4xx).json({ error })` with `jsonError`/`badRequest`/`notFound`/`unauthorized` from lib/errors.js. The shapes are already wire-compatible (`{ error, ...extra }`), so assert no behavior change with existing tests. NOT a fleet-wide sweep — touch only these three files. Leaves the LIN-417 structured envelope as the model for richer cases.",
+  "comments": [
+    {
+      "user": "John “Sausage Roller” Kershaw",
+      "createdAt": "2026-06-18T08:18:43.557Z",
+      "body": "Adopted `lib/errors.js` helpers across the three largest route files.\n\n**PR:** https://github.com/JKershaw/LinearViewer/pull/505\n**Commit:** 7f790dc\n**CI:** green (unit + all 4 E2E shards + ci-success all pass)\n\n**What changed:** Replaced inline `res.status(...).json({ error })` in `routes/proxy.js`, `routes/workspace-api.js`, `routes/dispatch.js` with `badRequest`/`notFound`/`unauthorized` (plain 4xx bodies) and `jsonError` (status+extra-field bodies, plus 5xx/403/413/429 with no named helper). Net 335 insertions / 379 deletions.\n\n**Wire-compatible:** every response keeps its exact `{ error, ...extra }` shape and status code. Multi-field bodies (`detail`, `code`, `matchCount`, `freeTier`, `message`) preserved via `jsonError`'s extra arg. Verified zero remaining inline `res.status(4xx).json({error})` sites in the three files.\n\n**Scope held:** only the three named files. The LIN-417 structured envelope (`workspaceUnavailableEnvelope`) left in place as the richer model. The `trashed-signal` unit test's source-shape assertion was widened to accept the `jsonError(res, 409, …)` form. Full unit suite: 1815 pass / 0 fail.\n\nReady for review."
+    }
+  ],
+  "expect": [
+    "review"
+  ],
+  "loop": false,
+  "avoid": null,
+  "scale": "real (frozen at landed-awaiting-review: PR open + CI green, before the approve/merge)",
+  "why": "REAL LIN-420 landed-awaiting-review (real counterpart to synthetic SYN-16). The single kept comment is the completion recap (envelope helpers adopted across the three route files, PR open, CI green). Work has demonstrably landed but is not yet reviewed → confirm-and-close (review), not re-implement. Frozen before the approve + merge comments."
+}

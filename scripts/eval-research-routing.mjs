@@ -335,9 +335,11 @@ Needs multiple sessions — migration + rollback alone is its own focused pass; 
   // cases; review was the gap. Comment-driven (landed-evidence in the trail), so it
   // also exercises the Step-3 already-landed guard reading the comment recap.
   {
-    id: 'happy: landed work awaiting review (comments)',
+    id: 'happy: landed work awaiting review (synthetic pre-check; real → [real] LIN-420)',
     expect: ['review'],
-    why: 'Implementation has demonstrably landed per the completion recap (PR open, CI green) but is not yet reviewed → confirm-and-close, not re-implement. Real shape: LIN-420/LIN-542 pre-merge state.',
+    why: 'SYNTHETIC cheap pre-check — the committed real counterpart is [real] LIN-420 (fixtures/LIN-420-landed-review.json). '
+       + 'Implementation has demonstrably landed per the completion recap (PR open, CI green) but is not yet reviewed → '
+       + 'confirm-and-close, not re-implement. Real shape: LIN-420/LIN-542 pre-merge state.',
     issue: {
       identifier: 'SYN-16', createdAt: '2026-06-10T00:00:00Z', state: inProgress, labels: [],
       title: 'Adopt the shared error-envelope helpers in the three largest route files',
@@ -359,9 +361,13 @@ Needs multiple sessions — migration + rollback alone is its own focused pass; 
   // is unnecessary; if it can't even with the trail in front of it, that earns a
   // follow-up (richer session context) with evidence rather than speculation.
   {
-    id: 'loop: review stuck — 3× Request Changes, unchanged (real LIN-510)',
+    id: 'loop: review stuck — 3× Request Changes (synthetic pre-check; real → [real] LIN-510)',
     expect: ['implement', 'blocked', 'plan', 'bug'], loop: true, avoid: 'review',
-    why: 'REAL loop (LIN-510): three consecutive reviews all Request-Changes on the SAME unaddressed blocker (dishonest visual baselines, no acknowledgment commit) against an unchanged commit. A 4th review repeats the loop; the correct break is to route to the blocker fix (regenerate the baselines) — Step-3 already-landed guard: "if review would surface a blocker that must be fixed first, route the next action to that blocker, not a repeated review".',
+    why: 'SYNTHETIC cheap pre-check — the committed real counterpart is [real] LIN-510 (fixtures/LIN-510-review-loop.json), '
+       + 'which carries the same loop at real scale. Three consecutive reviews all Request-Changes on the SAME unaddressed '
+       + 'blocker (dishonest visual baselines, no acknowledgment commit) against an unchanged commit. A 4th review repeats '
+       + 'the loop; the correct break is to route to the blocker fix (regenerate the baselines) — Step-3 already-landed guard: '
+       + '"if review would surface a blocker that must be fixed first, route the next action to that blocker, not a repeated review".',
     issue: {
       identifier: 'SYN-17', createdAt: '2026-06-19T07:00:00Z', state: inProgress, labels: [],
       title: 'Converge the near-gray neutral values onto design tokens (intended visual delta)',
@@ -379,9 +385,12 @@ Needs multiple sessions — migration + rollback alone is its own focused pass; 
     }
   },
   {
-    id: 'loop: bug already investigated — root cause + fix in comments (real LIN-537)',
+    id: 'loop: bug already investigated — root cause + fix in comments (synthetic pre-check; real → [real] LIN-537)',
     expect: ['implement', 'plan'], loop: true, avoid: 'bug',
-    why: 'REAL shape (LIN-537): `bug` label, but the comment trail already records a code-grounded investigation naming the root cause AND a minimal fix approach. Step-2 bug guard: the label marks unexpected behavior, not investigation still owed — advance to the fix, do not re-investigate. Tests the loop guard reading the trail from comments, not the description.',
+    why: 'SYNTHETIC cheap pre-check — the committed real counterpart is [real] LIN-537 (fixtures/LIN-537-bug-investigated.json). '
+       + 'This synthetic ADDS a `bug` label the real task lacked, so it (not the real fixture) is the bug-LABEL-specific test: '
+       + 'the label marks unexpected behavior, not investigation still owed — advance to the fix, do not re-investigate. The '
+       + 'comment trail already records a code-grounded investigation naming the root cause AND a minimal fix approach.',
     issue: {
       identifier: 'SYN-18', createdAt: '2026-06-18T07:00:00Z', state: inProgress, labels: ['bug'],
       title: 'Dispatched tasks via autopilot ignore the resolved repo',
@@ -437,9 +446,12 @@ Needs multiple sessions — migration + rollback alone is its own focused pass; 
   // This pole is what the current suite cannot see: it grades the action LABEL, never the
   // EVIDENCE STANDARD behind a "done" investigation (the subtlety this session adds).
   {
-    id: 'diverge: bug root-cause REFUTED across the trail, fix not validated (real HAR-697)',
+    id: 'diverge: bug root-cause REFUTED across the trail (synthetic pre-check; real anchor → [real] HAR-697)',
     expect: ['bug', 'research'], loop: true, avoid: 'implement',
-    why: 'REAL shape (HAR-697). Comment 1 proposes a code-grounded root cause (serialized-fs ' +
+    why: 'SYNTHETIC cheap pre-check (mechanism D) — the committed real anchor is [real] HAR-697 '
+       + '(fixtures/HAR-697-red.json), which is ~10x scale and the honest red bar; this small case is '
+       + 'directional only (the findings doc measures it ~4-5x more forgiving). '
+       + 'Comment 1 proposes a code-grounded root cause (serialized-fs ' +
          'module-load stall) + a fix direction but states the live repro was NOT run. Comment 2 ' +
          '(live capture) REFUTES that cause — the wedge is upstream, the proposed cause does not ' +
          'fire — and the decisive install→render experiment still has not produced a pass. The ' +
@@ -465,9 +477,12 @@ Needs multiple sessions — migration + rollback alone is its own focused pass; 
   // step is to validate/pin the witness before chasing the defect. No current case covers
   // this — "validate the measurement before chasing the defect" is unmeasured today.
   {
-    id: 'diverge: acceptance witness proven unreliable mid-investigation (real HAR-697)',
+    id: 'diverge: acceptance witness proven unreliable mid-investigation (synthetic; mech-E not isolatable as a real slice)',
     expect: ['bug', 'research'], loop: true, avoid: 'implement',
-    why: 'REAL shape (HAR-697 mechanism E). The acceptance proxy (`loadedModules > 0`) was shown ' +
+    why: 'SYNTHETIC cheap pre-check (mechanism E). Kept synthetic on purpose: in the real HAR-697 trail the '
+       + 'witness-unreliability signal is entangled with the mechanism-D refutation already frozen in '
+       + 'fixtures/HAR-697-red.json, so it does not isolate cleanly as a separate real slice. The acceptance '
+       + 'proxy (`loadedModules > 0`) was shown ' +
          'unreliable: it stayed 0 in a run where the app in fact rendered fully styled, and no ' +
          'boot-progress frame is emitted, so the signal does not track the real outcome. Building ' +
          'a fix that optimizes against an unconfirmed measurement chases a wrong goalpost — the ' +
@@ -484,14 +499,19 @@ Needs multiple sessions — migration + rollback alone is its own focused pass; 
   }
 ];
 
-// Real-scale fixtures (scripts/eval/fixtures/*.json) — frozen REAL task context, kept as
-// data because the verbatim trails are large (~10k chars) and full of backticks/quotes that
-// do not inline cleanly. Each fixture carries the same grading sidecar a case does
-// (expect / loop / avoid / why) plus the issue fields (identifier, state, labels, createdAt,
-// title, description, comments). They are the high-fidelity counterpart to the small synthetic
-// cases above: synthetic = cheap/forgiving directional guard, real fixture = true scale + the
-// real distractors (a refutation buried after a 5.7k-char investigation), which is where the
-// "synthetic is more forgiving" gap shows up. id is tagged `[real]` so it reads distinctly.
+// Real-task fixtures (scripts/eval/fixtures/*.json) — frozen REAL task context, kept as
+// data because the verbatim trails are large and full of backticks/quotes that do not inline
+// cleanly. Committed + regenerated text-free by build-har697-red.mjs / build-routing-fixtures.mjs
+// (LIN-587). Each fixture carries the same grading sidecar a case does (expect / loop / avoid /
+// why / scale) plus the issue fields (identifier, state, labels, createdAt, title, description,
+// comments). They are the high-fidelity counterparts to the small synthetic cases above:
+//   [real] HAR-697  — divergent-bug fix-before-validate (real anchor for synthetic SYN-21/22)
+//   [real] LIN-510  — stuck review loop                 (real anchor for synthetic SYN-17)
+//   [real] LIN-537  — bug already investigated           (real anchor for synthetic SYN-18)
+//   [real] LIN-420  — landed awaiting review             (real anchor for synthetic SYN-16)
+// synthetic = cheap/forgiving directional pre-check; real fixture = true scale + the real
+// distractors, which is where the "synthetic is more forgiving" gap shows up. id is tagged
+// `[real]` so it reads distinctly.
 const FIX_DIR = join(HERE, 'eval', 'fixtures');
 const FIXTURE_CASES = existsSync(FIX_DIR)
   ? readdirSync(FIX_DIR).filter(f => f.endsWith('.json')).map(f => {

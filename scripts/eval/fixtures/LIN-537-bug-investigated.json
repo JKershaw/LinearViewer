@@ -1,0 +1,26 @@
+{
+  "identifier": "LIN-537",
+  "state": {
+    "name": "In Progress",
+    "type": "started"
+  },
+  "labels": [],
+  "createdAt": "2026-06-17T14:18:09.495Z",
+  "title": "Bug: Dispatched tasks via autopilot don't respect \"repo\" description comment",
+  "description": "Currently when autopilot dispatches, it uses the default repo. Where we override the default via \"repo=\" in a project description, this isn't carried by the dispatched prompts, causing them to run in the wrong folder.\n\nDispatched prompts should inherit the autopilot's folder/repo.",
+  "comments": [
+    {
+      "user": "John “Sausage Roller” Kershaw",
+      "createdAt": "2026-06-18T07:38:47.760Z",
+      "body": "## Investigation — root cause found (isolated)\n\n**Root cause:** the fused autopilot verb `POST /api/proxy/recommend-and-dispatch` discards the server-resolved repo. At `routes/proxy.js:3923` the dispatched item is built with `repo: repo || null`, where `repo` is **only** the caller-supplied `req.body.repo` (destructured at `routes/proxy.js:3792`). The recommendation object `rec` already carries the correct repo — `computeRecommendation` sets `repo: parseRepoFromDescription(project?.description)` for the *terminal* node (`routes/proxy.js:2796`) — but `rec.repo` is never read on the dispatch path. So when autopilot fires this verb without an explicit `repo` (the normal case — the whole point of the fused verb is that the server resolves prompt + context), the queued item gets `repo: null` and the worker falls back to the default repo, ignoring the `repo=` line in the project description.\n\nContrast `GET /api/proxy/recommend`, which correctly surfaces the resolved repo (`repo: rec.repo`, `routes/proxy.js:2921`). The fused verb is the only seam that resolves repo server-side and then drops it.\n\n**Smallest viable fix:** at `routes/proxy.js:3923`, change\n```js\nrepo: repo || null\n```\nto\n```js\nrepo: repo || rec.repo || null\n```\nThis preserves an explicit caller override (constraint: keep the `repo=` override winning) while inheriting the recommendation's resolved repo when the caller omits it. Because the dispatched item references the *terminal* node (`rec.identifier`), `rec.repo` is the terminal node's project repo — the correct working directory after any defer descent.\n\n**Isolated vs class:** Isolated to the fused verb. The two-step paths are correct/by-design:\n- `POST /api/proxy/dispatch` (`routes/proxy.js:3754`) and the user-facing `routes/dispatch.js:288` take a caller-supplied prompt, so the caller is responsible for forwarding `repo` (it got it from `GET /recommend`). There is no server-side `rec` to inherit from in those flows.\n- `GET /recommend` already returns `rec.repo` correctly.\n\nThe underlying *pattern* worth a one-line guard in review: \"a fused/server-side verb must propagate every functional context field it resolves (repo = working directory), not just the display header fields.\" In this verb `issueId/issueTitle/issueUrl` are intentionally nulled (header-only response), but `repo` is functional context and must not be.\n\n**Staleness check:** `routes/proxy.js`, `lib/prompt-formatters.js`, `lib/dispatch-store.js` are unchanged since this ticket was created (2026-06-17); only `routes/dispatch.js` changed (LIN-357, `blocked`-label removal — unrelated to repo). Ticket description holds at HEAD `386e330`.\n\n_No code shipped — investigation only; leaving the `bug` label in place._"
+    }
+  ],
+  "expect": [
+    "implement",
+    "plan"
+  ],
+  "loop": true,
+  "avoid": "bug",
+  "scale": "real (frozen after the investigation comment, before the fix landed)",
+  "why": "REAL LIN-537 bug-already-investigated (real counterpart to synthetic SYN-18). The single kept comment is a code-grounded investigation naming the root cause AND a minimal fix (isolated, not a class). The honest next action is to advance to the fix, NOT to re-investigate. Frozen before the fix/review/close comments. NOTE: the real task carries no `bug` label (its title/description are the bug signal), so this measures the investigation-done advance; SYN-18 retains the bug-LABEL test."
+}
