@@ -74,6 +74,19 @@ function loadWorkspaces(dir) {
   });
 }
 
+// ---- deterministic grader (LIN-596) -----------------------------------------------
+// Mirrors scripts/eval-research-routing.mjs: grade off the terminal action label, no
+// LLM judge. Each target carries an `expect` (acceptable terminal action[s]) and a
+// `descentExpect` (the identifier the descent should terminate on; defaults to the
+// target id for leaf-only fixtures). A run is:
+//   • terminal-action correct  — its terminal action ∈ expect
+//   • descent correct          — its terminal id === descentExpect
+const norm = s => (s || '').toLowerCase().trim();
+function acceptSet(target) {
+  const e = Array.isArray(target.expect) ? target.expect : (target.expect ? [target.expect] : []);
+  return new Set(e.map(norm));
+}
+
 /**
  * One recommend hop — the harness's own `computeOne`, mirroring routes/proxy.js's
  * inner computeRecommendation live branch (the shape resolveRecommendation needs:
@@ -140,7 +153,9 @@ async function runTarget(workspace, target) {
     }
   }
   process.stdout.write('\n');
-  return { id: target.id, role: target.role, workspace: workspace.name, runs };
+  const descentExpect = target.descentExpect || target.id;
+  const expect = Array.isArray(target.expect) ? target.expect : (target.expect ? [target.expect] : []);
+  return { id: target.id, role: target.role, workspace: workspace.name, expect, descentExpect, runs };
 }
 
 // ---- main ----
@@ -160,26 +175,79 @@ for (const ws of workspaces) {
 // ---- write artifacts ----
 mkdirSync(OUT_DIR, { recursive: true });
 
-const meta = { date: DATE, model: MODEL, repeats: K, generatedBy: 'scripts/eval-recommend-baseline.mjs (LIN-432; fixtures-only, LIN-587)' };
-writeFileSync(join(OUT_DIR, 'run.json'), JSON.stringify({ meta, results }, null, 2));
+// ---- grade every run (LIN-596): terminal-action accuracy + descent-correct rate ----
+// Mirrors eval-research-routing's deterministic grading. A run with an error counts as a
+// miss on both metrics (it produced no usable terminal decision).
+const grade = { actionHit: 0, descentHit: 0, n: 0 };
+const perAction = {}; // expected-action → { hit, n } (recall breakdown, like routing)
+for (const r of results) {
+  const accept = new Set((r.expect || []).map(norm));
+  const expectKey = (r.expect || []).map(norm).sort().join('|') || '—';
+  perAction[expectKey] = perAction[expectKey] || { hit: 0, n: 0, descentExpect: r.descentExpect };
+  for (const run of r.runs) {
+    grade.n += 1; perAction[expectKey].n += 1;
+    if (run.error) continue;
+    const actionOk = accept.size ? accept.has(norm(run.action)) : false;
+    const descentOk = norm(run.terminal) === norm(r.descentExpect);
+    run.actionCorrect = actionOk;
+    run.descentCorrect = descentOk;
+    if (actionOk) { grade.actionHit += 1; perAction[expectKey].hit += 1; }
+    if (descentOk) grade.descentHit += 1;
+  }
+}
+const pct = (x, n) => n ? (x / n * 100).toFixed(0) + '%' : '-';
 
-// Compact per-run table: descent path / terminal / action / prompt length.
+const summary = {
+  terminalActionAccuracy: { hit: grade.actionHit, n: grade.n, pct: pct(grade.actionHit, grade.n) },
+  descentCorrectRate: { hit: grade.descentHit, n: grade.n, pct: pct(grade.descentHit, grade.n) },
+  distinctExpectedActions: new Set(results.flatMap(r => (r.expect || []).map(norm))).size,
+  perExpectedAction: perAction
+};
+const meta = { date: DATE, model: MODEL, repeats: K, generatedBy: 'scripts/eval-recommend-baseline.mjs (LIN-432; fixtures-only LIN-587; scored re-freeze LIN-596)' };
+writeFileSync(join(OUT_DIR, 'run.json'), JSON.stringify({ meta, summary, results }, null, 2));
+
+// Compact per-run table: descent path / terminal / action (graded) / prompt length.
 const tableLines = [
   `# Recommendation baseline — ${DATE}`,
   '',
   `model: \`${MODEL}\` · repeats: ${K} · harness: \`scripts/eval-recommend-baseline.mjs\` (local pipeline, fixtures-only — NOT deployed proxy)`,
   '',
-  '| target | role | run | descent path | terminal | action | prompt len | stop |',
-  '|---|---|---|---|---|---|---|---|'
+  '## Scored summary (LIN-596)',
+  '',
+  `Deterministic grader (no LLM judge): terminal action ∈ \`expect\`; descent terminal id === \`descentExpect\`.`,
+  '',
+  '| metric | value |',
+  '|---|---|',
+  `| terminal-action accuracy | ${grade.actionHit}/${grade.n} (${pct(grade.actionHit, grade.n)}) |`,
+  `| descent-correct rate | ${grade.descentHit}/${grade.n} (${pct(grade.descentHit, grade.n)}) |`,
+  `| distinct expected next-actions | ${new Set(results.flatMap(r => (r.expect || []).map(norm))).size} |`,
+  '',
+  '### Per expected-action recall',
+  '',
+  '| expect | descentExpect | accuracy |',
+  '|---|---|---|'
 ];
+for (const [key, v] of Object.entries(perAction)) {
+  tableLines.push(`| ${key} | ${v.descentExpect} | ${v.hit}/${v.n} (${pct(v.hit, v.n)}) |`);
+}
+tableLines.push(
+  '',
+  '## Per-run capture',
+  '',
+  '| target | role | run | descent path | terminal | action | expect | ✓action | ✓descent | prompt len | stop |',
+  '|---|---|---|---|---|---|---|---|---|---|---|'
+);
 for (const r of results) {
+  const expectStr = (r.expect || []).join('/') || '—';
   for (const run of r.runs) {
     if (run.error) {
-      tableLines.push(`| ${r.id} | ${r.role} | ${run.run} | — | — | ERROR | — | ${run.error.slice(0, 40)} |`);
+      tableLines.push(`| ${r.id} | ${r.role} | ${run.run} | — | — | ERROR | ${expectStr} | ✗ | ✗ | — | ${run.error.slice(0, 40)} |`);
       continue;
     }
     const path = (run.descentPath || []).join(' → ');
-    tableLines.push(`| ${r.id} | ${r.role} | ${run.run} | ${path} | ${run.terminal || '—'} | ${run.action || '—'} | ${run.promptLength} | ${run.deferStopReason || ''} |`);
+    const a = run.actionCorrect ? '✓' : '✗';
+    const d = run.descentCorrect ? '✓' : '✗';
+    tableLines.push(`| ${r.id} | ${r.role} | ${run.run} | ${path} | ${run.terminal || '—'} | ${run.action || '—'} | ${expectStr} | ${a} | ${d} | ${run.promptLength} | ${run.deferStopReason || ''} |`);
   }
 }
 writeFileSync(join(OUT_DIR, 'table.md'), tableLines.join('\n') + '\n');
@@ -195,13 +263,19 @@ const pointer = [
   `**Fixtures-only (LIN-587):** context comes from committed bundles under`,
   `\`scripts/eval/fixtures/recommend/*.json\` — no proxy token, no network for context.`,
   `Only the LLM leg needs \`OPENROUTER_API_KEY\`. Real-task fixtures (Harbour HAR-149/545/616,`,
-  `LinearViewer LIN-385/389/428) are curated real text; the descent chains are reconstructed`,
-  `to \`started\` (the real tasks have since closed). Synthetic FIX-448-leaf is deliberately`,
-  `constructed (see its note). Regenerate real fixtures with \`scripts/eval/build-recommend-fixtures.mjs\`.`,
+  `LinearViewer LIN-385/389/428) are curated real text, re-frozen at key in-progress moments`,
+  `(LIN-596) — each node keeps its first \`keep\` comments so \`state\` and the trimmed trail`,
+  `agree. Graded leaf-only targets re-use one real leaf at several decision moments to cover a`,
+  `spread of next-actions. Synthetic FIX-448-leaf is deliberately constructed (see its note).`,
+  `Regenerate from the committed \`_source/\` captures with \`scripts/eval/build-recommend-fixtures.mjs\`.`,
+  '',
+  `**Scored (LIN-596):** each target carries \`expect\` (acceptable terminal action[s]) +`,
+  `\`descentExpect\` (terminal id the descent should reach). The harness grades deterministically`,
+  `(no LLM judge) and emits **terminal-action accuracy** + **descent-correct rate**.`,
   '',
   `**Latest baseline:** \`scripts/eval/recommend-baseline/${DATE}/\``,
-  `- \`table.md\` — compact per-run table (descent path / terminal / action / prompt length)`,
-  `- \`run.json\` — full capture incl. every prompt + reasoning`,
+  `- \`table.md\` — scored summary + per-run capture (descent path / terminal / action / grade)`,
+  `- \`run.json\` — full capture incl. every prompt + reasoning + the scored summary`,
   '',
   '## Regenerate',
   '',
@@ -217,6 +291,10 @@ const pointer = [
 ].join('\n');
 writeFileSync(join(HERE, 'eval', 'recommend-baseline.md'), pointer);
 
+console.log(`\nScored summary (LIN-596):`);
+console.log(`  terminal-action accuracy: ${grade.actionHit}/${grade.n} (${pct(grade.actionHit, grade.n)})`);
+console.log(`  descent-correct rate:     ${grade.descentHit}/${grade.n} (${pct(grade.descentHit, grade.n)})`);
+console.log(`  distinct expected actions: ${summary.distinctExpectedActions}`);
 console.log(`\nBaseline written:`);
 console.log(`  ${join(OUT_DIR, 'table.md')}`);
 console.log(`  ${join(OUT_DIR, 'run.json')}`);

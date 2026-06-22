@@ -2,76 +2,163 @@
 /**
  * Build the committed context-bundle fixtures for the recommendation baseline eval.
  *
- * LIN-587: eval-recommend-baseline.mjs no longer talks to the proxy at all — it runs
- * purely on committed fixtures. This is the reproducible, text-free recipe that
- * regenerates those fixtures from the live proxy; the script holds no task body text
- * itself (only ids + the descent/state overrides), matching build-har697-red.mjs.
+ * LIN-587 froze the descent targets to `started` but kept the FULL, untrimmed comment
+ * trails — so every leaf still carried completion evidence ("PR merged / CI green /
+ * approved / closed"). A `started` task whose trail says it is done correctly routes to
+ * `review`, so every target collapsed to the same answer (40/42 runs `review` at K=6) and
+ * the eval stopped discriminating next-action quality.
  *
- * Why overrides: the original baseline targets were epic→mid→leaf DESCENT chains, but
- * the real tasks have since closed (HAR-149→545→616 and LIN-385→389→428 are now Done).
- * To keep the realistic descent coverage the eval is for, we capture the real text at
- * HEAD and force the chain nodes back to `started` — our best estimate of how the tree
- * appeared when it was live work. The edit is encoded here as code (forceStarted +
- * the chain definition) so it is reproducible, not a hand-edit lost on regeneration.
+ * LIN-596 re-freezes the fixtures at KEY HISTORICAL IN-PROGRESS MOMENTS so the eval
+ * exercises a spread of next-actions. The recipe (mirroring build-routing-fixtures.mjs):
+ * keep each node's first `keep` comments (oldest-first) — the decision moment, before the
+ * close-out — so `state` AND the trimmed trail are mutually consistent. Two underlying
+ * causes are addressed:
+ *
+ *   1. Untrimmed trails (LIN-587) → trim each node's `comments` to its `keep`.
+ *   2. STRUCTURAL single-leaf convergence: both chains descend to the SAME leaf
+ *      (…→HAR-616, …→LIN-428), so only two distinct leaves are ever graded — trimming
+ *      alone tops out at two expected actions. We re-use one real leaf at several decision
+ *      moments as distinct GRADED leaf-only targets (the ticket's explicit allowance),
+ *      reaching ≥3 distinct expected next-actions.
+ *
+ * Re-grounding note (LIN-596): HAR-616's and LIN-428's DESCRIPTIONS are themselves
+ * plan-seeded (they embed a finalized plan), so they are poor `plan`/`research` sources —
+ * trimming comments cannot undo a plan baked into the description. LIN-385's description is
+ * a broad multi-spec migration epic with a scope checklist and NO plan, so it is the clean
+ * `plan`/`breakdown` source; LIN-428 is the clean `implement`/`review` source.
+ *
+ * Two kinds of target:
+ *   • DESCENT CHAINS  — epic→mid→leaf, every node trimmed to a coherent pre-close arc.
+ *     Graded on descent-correctness (did the descent reach `descentExpect`?) + the leaf's
+ *     terminal action. Each non-leaf carries `children` + `focusedChild` so the descent
+ *     resolves; the leaf has neither, so the descent ends there.
+ *   • GRADED LEAF-ONLY — one real leaf re-used at several decision moments (distinct bundle
+ *     keys like `LIN-385@plan`). No `focusedChild`/`children`, so they stay trivially
+ *     self-consistent and `started`, and the descent terminates immediately at the leaf
+ *     (terminal id == the leaf's own identifier). Graded on terminal action.
+ *
+ * Cross-cutting trim seam: a chain node appears BOTH as its own bundle and as its parent's
+ * `focusedChild`. Both copies must use the IDENTICAL `keep` (keyed by node id) or the
+ * parent's context contradicts the child. `trimComments(sort-oldest-first → slice(0,keep))`
+ * is the single seam applied in both places.
+ *
+ * Source of truth: the committed full-trail captures under `fixtures/recommend/_source/`.
+ * They hold the real, untrimmed text, so this builder (and the eval) run token-free on a
+ * fresh clone. To REFRESH the captures from the live proxy (the only step that needs a
+ * token), run with REFRESH_SOURCE=1 and the proxy read tokens — it rewrites `_source/*`
+ * in the same bundle shape, then the trim/freeze pass below runs over the fresh capture.
  *
  * Output shape (one file per workspace) matches the harness's fixtures loader:
- *   { name, targets: [{ id, role }], bundles: { <identifier>: <contextBundle> } }
+ *   { name, note, targets: [{ id, role, expect, descentExpect }], bundles: { <key>: <contextBundle> } }
  * where each contextBundle is the exact object getRecommendation consumes:
  *   { issue, parent, siblings, siblingsTotal, project, children, comments, focusedChild }
  *
  * Usage:
- *   PROXY_TOKEN=<linearviewer read token> HARBOUR_PROXY_TOKEN=<harbour read token> \
- *     node scripts/eval/build-recommend-fixtures.mjs
+ *   node scripts/eval/build-recommend-fixtures.mjs                 # token-free: trim from _source
+ *   REFRESH_SOURCE=1 PROXY_TOKEN=<lv read> HARBOUR_PROXY_TOKEN=<harbour read> \
+ *     node scripts/eval/build-recommend-fixtures.mjs               # refresh _source from the proxy, then trim
  *
  * Env knobs:
- *   PROXY_TOKEN          LinearViewer proxy READ token   (skips LinearViewer if absent)
+ *   REFRESH_SOURCE       when set, re-capture _source/* from the proxy before trimming
+ *   PROXY_TOKEN          LinearViewer proxy READ token   (refresh only)
  *   PROXY_BASE           LinearViewer proxy base URL     (default https://projects.jkershaw.com/api/proxy)
- *   HARBOUR_PROXY_TOKEN  Harbour proxy READ token        (skips Harbour if absent)
+ *   HARBOUR_PROXY_TOKEN  Harbour proxy READ token        (refresh only)
  *   HARBOUR_PROXY_BASE   Harbour proxy base URL          (default https://projects.jkershaw.com/api/proxy)
  *   ONLY                 substring filter on workspace name (e.g. ONLY=Harbour)
  *
  * Context hygiene: prints only a metadata table (no body text) to stdout — the bulk
- * task text goes to the fixture files only.
+ * task text lives in the fixture files only.
  */
 import 'dotenv/config';
-import { writeFileSync, mkdirSync } from 'fs';
+import { writeFileSync, mkdirSync, readFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { SIBLING_CAP } from '../../lib/openrouter.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = join(HERE, 'fixtures', 'recommend');
+const SOURCE_DIR = join(OUT_DIR, '_source');
 const ONLY = process.env.ONLY;
+const REFRESH_SOURCE = !!process.env.REFRESH_SOURCE;
 const STARTED = { name: 'In Progress', type: 'started' };
 
 /**
- * Workspace config — ids + descent chains + the baseline-reconstruction override.
- * `chain` is the epic→mid→leaf descent order; `forceStarted` flips every chain node
- * (and its appearance in the parent's children list) back to `started`, and the last
- * chain node is frozen as a leaf (no children / no focusedChild) so the descent ends
- * there. roles are descriptive (carried into the fixture's targets list).
+ * Workspace freeze config (LIN-596).
+ *
+ * `chain`        the epic→mid→leaf descent order (descent-coverage targets).
+ * `keep`         per-node count of OLDEST comments to retain at the frozen moment.
+ *                Applied to a node's own `comments` AND its copy as a parent's
+ *                `focusedChild` (the shared trim seam).
+ * `descentExpect`the leaf the chain should descend to (terminal id the grader checks).
+ * `chainExpect`  acceptable terminal action(s) at that leaf (given its trimmed trail).
+ * `gradedLeaves` leaf-only targets re-using a real leaf at several decision moments.
+ *                Each: { key, source, keep, expect, role }.
  */
 const WORKSPACES = [
   {
     name: 'LinearViewer', file: 'linearviewer.json',
-    base: process.env.PROXY_BASE || 'https://projects.jkershaw.com/api/proxy',
-    token: process.env.PROXY_TOKEN,
     chain: ['LIN-385', 'LIN-389', 'LIN-428'],
-    roles: { 'LIN-385': 'epic', 'LIN-389': 'mid', 'LIN-428': 'leaf (direct cross-check)' },
-    forceStarted: true
+    keep: { 'LIN-385': 1, 'LIN-389': 2, 'LIN-428': 1 },
+    roles: { 'LIN-385': 'epic', 'LIN-389': 'mid', 'LIN-428': 'leaf' },
+    descentExpect: 'LIN-428',
+    // LIN-428 keep=1: one-session impl plan in the description + comment[0] "Plan ready",
+    // no code landed yet → the honest next action at the leaf is implement.
+    chainExpect: ['implement'],
+    gradedLeaves: [
+      {
+        key: 'LIN-385@plan', source: 'LIN-385', keep: 0, expect: ['plan', 'research'],
+        role: 'leaf @ nothing-done — broad multi-spec migration epic, scope checklist, no plan → plan/research'
+      },
+      {
+        key: 'LIN-385@breakdown', source: 'LIN-385', keep: 1, expect: ['breakdown'],
+        role: 'leaf @ plan-committed (comment[0]), multi-session migration across files → breakdown'
+      },
+      {
+        key: 'LIN-428@implement', source: 'LIN-428', keep: 1, expect: ['implement'],
+        role: 'leaf @ plan-ready — one-session impl plan in desc + comment[0] "Plan ready", before code → implement'
+      },
+      {
+        key: 'LIN-428@review', source: 'LIN-428', keep: 2, expect: ['review'],
+        role: 'leaf @ landed — comment[1] implemented + PR open + CI green, before approve/merge → review'
+      }
+    ]
   },
   {
     name: 'Harbour', file: 'harbour.json',
-    base: process.env.HARBOUR_PROXY_BASE || 'https://projects.jkershaw.com/api/proxy',
-    token: process.env.HARBOUR_PROXY_TOKEN,
     chain: ['HAR-149', 'HAR-545', 'HAR-616'],
+    // Trim the epic/mid to a pre-close arc (drop the 2026-06-14 staleness/paused and
+    // HAR-545 close-out comments) so the whole chain reads as one coherent in-progress
+    // arc. The leaf is frozen at keep=8: through comment[7] ("blocker RESOLVED, route to
+    // next action" on the still-actionable child #2 / HAR-623), BEFORE comment[8] (the
+    // review that verifies it complete). With the blocker cleared and work still owed on
+    // #2, the honest next action is to proceed — implement — NOT review (review is the
+    // dropped comment[8]; freezing before it is the whole point). Verified from the trail,
+    // not assumed: do not overfit `expect` toward the comment we deliberately trimmed off.
+    keep: { 'HAR-149': 11, 'HAR-545': 2, 'HAR-616': 8 },
     roles: { 'HAR-149': 'epic', 'HAR-545': 'mid', 'HAR-616': 'leaf' },
-    forceStarted: true
+    descentExpect: 'HAR-616',
+    chainExpect: ['implement'],
+    // HAR-616's description is plan-finalized + decomposed, so it is not a clean
+    // plan/research/breakdown source — kept as a descent-coverage chain only. The
+    // LinearViewer leaves already supply 4 distinct graded actions.
+    gradedLeaves: []
   }
 ];
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
+// ---- trim seam (LIN-596) ----------------------------------------------------------
+/** Sort oldest-first, then keep the first `keep` comments (the frozen decision moment). */
+function trimComments(comments, keep) {
+  return (comments || [])
+    .slice()
+    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+    .slice(0, keep);
+}
+
+const clone = (x) => JSON.parse(JSON.stringify(x));
+
+// ---- proxy refresh (optional; the only token-needing step) ------------------------
 /** Proxy GET with cache + 429/5xx backoff (the 60/min limiter must not fail a run). */
 function makeProxyGet(base, token) {
   const cache = new Map();
@@ -94,63 +181,47 @@ function makeProxyGet(base, token) {
 }
 
 /** Reshape a flat proxy /issues/{id} payload into the issue slice getRecommendation reads. */
-function reshapeIssue(raw, { forceStarted } = {}) {
+function reshapeIssue(raw) {
   return {
     id: raw.id,
     identifier: raw.identifier,
     title: raw.title,
     description: raw.description,
     url: raw.url,
-    state: forceStarted ? STARTED : raw.state,
+    state: STARTED, // captures are always forced `started` (the real tasks have since closed)
     createdAt: raw.createdAt,
-    // Flat contract: labels are a plain string array (was raw.labels.nodes pre-LIN-306).
     labels: Array.isArray(raw.labels) ? raw.labels : []
   };
 }
 
-/**
- * Map flat proxy children → the {id,identifier,title,state} the descent guard reads.
- *
- * Frontier reconstruction: an epic with dozens of real children gives the model many
- * non-chain children to defer into — and those have no frozen bundle, so the descent
- * dead-ends "unresolved". To make the descent deterministic we present an unambiguous
- * frontier: the chain (focus) child is `started`, every other child is frozen terminal
- * (`completed`). Then the descent lands on the chain child whether the model defers to
- * it directly OR defers elsewhere (the LIN-353 terminal-edge guard redirects a terminal
- * deferTo to selectFocusSubtask, which now has exactly one non-terminal pick).
- */
 const DONE = { name: 'Done', type: 'completed' };
-function mapChildren(raw, { focusId } = {}) {
+/** Present an unambiguous descent frontier: the chain child `started`, every other `completed`. */
+function mapChildren(raw, focusId) {
   return (raw.children || []).map(c => ({
-    id: c.id,
-    identifier: c.identifier,
-    title: c.title,
+    id: c.id, identifier: c.identifier, title: c.title,
     state: focusId && c.identifier === focusId ? STARTED : DONE
   }));
 }
 
-function mapComments(raw) {
+/** All comments, oldest-first (untrimmed — trimming happens in the freeze pass). */
+function rawComments(raw) {
   return (raw.comments || [])
     .map(c => ({ body: c.body, createdAt: c.createdAt, user: (c.user && c.user.name) || 'Unknown' }))
     .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 }
 
-async function buildWorkspace(ws) {
+/** Capture a workspace's full-trail bundles from the proxy → _source/<file>. */
+async function refreshSource(ws) {
   const proxyGet = makeProxyGet(ws.base, ws.token);
   const bundles = {};
-  const meta = [];
-
   for (let i = 0; i < ws.chain.length; i++) {
     const id = ws.chain[i];
     const nextId = ws.chain[i + 1] || null;
-    const isLeaf = !nextId;
     const raw = await proxyGet(id);
-
-    const issue = reshapeIssue(raw, { forceStarted: ws.forceStarted });
+    const issue = reshapeIssue(raw);
     const project = raw.project ? { name: raw.project.name, description: raw.project.content || raw.project.description || null } : null;
-    const comments = mapComments(raw);
+    const comments = rawComments(raw);
 
-    // Parent + siblings (the parent is the previous chain node, already reachable).
     let parent = null, siblings = [], siblingsTotal = 0;
     if (raw.parent) {
       parent = { id: raw.parent.id, identifier: raw.parent.identifier, title: raw.parent.title, state: raw.parent.state };
@@ -162,32 +233,81 @@ async function buildWorkspace(ws) {
       siblings = all.slice(0, SIBLING_CAP);
     }
 
-    // Leaf: frozen with no open frontier so the descent ends here. Node: children carry
-    // the next chain node forced started, and focusedChild is that node's detail.
-    let children = [];
-    let focusedChild = null;
-    if (!isLeaf) {
-      children = mapChildren(raw, { focusId: nextId });
+    let children = [], focusedChild = null;
+    if (nextId) {
+      children = mapChildren(raw, nextId);
       const nextRaw = await proxyGet(nextId);
-      focusedChild = {
-        issue: reshapeIssue(nextRaw, { forceStarted: ws.forceStarted }),
-        comments: mapComments(nextRaw)
-      };
+      focusedChild = { issue: reshapeIssue(nextRaw), comments: rawComments(nextRaw) };
     }
-
     bundles[id] = { issue, parent, siblings, siblingsTotal, project, children, comments, focusedChild };
-    meta.push({ id, role: ws.roles[id], state: issue.state.type, children: children.length, comments: comments.length, descLen: (issue.description || '').length });
+  }
+  const out = { name: ws.name, bundles };
+  mkdirSync(SOURCE_DIR, { recursive: true });
+  writeFileSync(join(SOURCE_DIR, ws.file), JSON.stringify(out, null, 2) + '\n');
+  console.log(`[${ws.name}] refreshed _source/${ws.file} (${ws.chain.length} nodes)`);
+}
+
+// ---- freeze pass (always) ---------------------------------------------------------
+function loadSource(ws) {
+  const p = join(SOURCE_DIR, ws.file);
+  if (!existsSync(p)) {
+    throw new Error(`missing source capture ${p} — run with REFRESH_SOURCE=1 + proxy tokens to create it`);
+  }
+  return JSON.parse(readFileSync(p, 'utf8'));
+}
+
+/** Build the trimmed, frozen harness fixture for one workspace from its _source capture. */
+function buildWorkspace(ws) {
+  const src = loadSource(ws);
+  const bundles = {};
+  const targets = [];
+  const meta = [];
+
+  // 1) Descent chains — every node trimmed to its `keep`; the focusedChild copy of the
+  //    NEXT chain node trimmed to that node's `keep` (the shared trim seam).
+  for (let i = 0; i < ws.chain.length; i++) {
+    const id = ws.chain[i];
+    const nextId = ws.chain[i + 1] || null;
+    const b = clone(src.bundles[id]);
+    b.comments = trimComments(b.comments, ws.keep[id]);
+    if (b.focusedChild && nextId) {
+      b.focusedChild.comments = trimComments(b.focusedChild.comments, ws.keep[nextId]);
+    }
+    bundles[id] = b;
+    targets.push({ id, role: `${ws.roles[id]} (descent → ${ws.descentExpect})`, expect: ws.chainExpect, descentExpect: ws.descentExpect });
+    meta.push({ id, role: ws.roles[id], keep: ws.keep[id], kept: b.comments.length, expect: ws.chainExpect.join('|'), descent: ws.descentExpect });
+  }
+
+  // 2) Graded leaf-only targets — one real leaf re-used at several moments. No
+  //    focusedChild/children, so they stay self-consistent and the descent terminates
+  //    immediately (terminal id == the leaf's own identifier). descentExpect is the
+  //    leaf's real identifier (so terminal == descentExpect for a clean leaf).
+  for (const g of ws.gradedLeaves) {
+    const s = src.bundles[g.source];
+    if (!s) throw new Error(`graded leaf ${g.key} references unknown source ${g.source}`);
+    bundles[g.key] = {
+      issue: clone(s.issue),
+      parent: null,
+      siblings: [],
+      siblingsTotal: 0,
+      project: s.project ? clone(s.project) : null,
+      children: [],
+      comments: trimComments(s.comments, g.keep),
+      focusedChild: null
+    };
+    targets.push({ id: g.key, role: g.role, expect: g.expect, descentExpect: s.issue.identifier });
+    meta.push({ id: g.key, role: g.source, keep: g.keep, kept: bundles[g.key].comments.length, expect: g.expect.join('|'), descent: s.issue.identifier });
   }
 
   const fixture = {
     name: ws.name,
-    note: 'Committed context-bundle fixtures for eval-recommend-baseline.mjs (LIN-587). '
-      + 'Real task text captured at HEAD; chain nodes forced to `started` to reconstruct '
-      + 'the epic→mid→leaf descent as it appeared when live (the real tasks have since closed). '
-      + 'Non-chain siblings are frozen terminal so the descent has one unambiguous frontier '
-      + '(the chain child) and resolves deterministically. Regenerate with '
-      + 'scripts/eval/build-recommend-fixtures.mjs.',
-    targets: ws.chain.map(id => ({ id, role: ws.roles[id] })),
+    note: 'Committed context-bundle fixtures for eval-recommend-baseline.mjs (LIN-596 re-freeze). '
+      + 'Real task text captured at HEAD (see _source/), frozen at key historical IN-PROGRESS moments: '
+      + 'each node keeps its first `keep` comments (oldest-first), before the close-out, so `state` and the '
+      + 'trimmed trail are mutually consistent. Descent chains (epic→mid→leaf) grade descent-correctness + '
+      + 'leaf terminal action; graded leaf-only targets re-use one real leaf at several decision moments to '
+      + 'cover a spread of next-actions. Regenerate with scripts/eval/build-recommend-fixtures.mjs.',
+    targets,
     bundles
   };
 
@@ -197,15 +317,26 @@ async function buildWorkspace(ws) {
   return { path, meta };
 }
 
-// ---- main ----
-const targets = WORKSPACES.filter(w => !ONLY || w.name.includes(ONLY));
-for (const ws of targets) {
-  if (!ws.token) { console.log(`[${ws.name}] SKIPPED — no token (set ${ws.name === 'Harbour' ? 'HARBOUR_PROXY_TOKEN' : 'PROXY_TOKEN'})`); continue; }
-  const { path, meta } = await buildWorkspace(ws);
-  console.log(`\n[${ws.name}] wrote ${path}`);
-  console.log('  id        role                       state    children comments descLen');
-  for (const m of meta) {
-    console.log(`  ${m.id.padEnd(9)} ${String(m.role).padEnd(26)} ${m.state.padEnd(8)} ${String(m.children).padStart(8)} ${String(m.comments).padStart(8)} ${String(m.descLen).padStart(7)}`);
+// ---- main -------------------------------------------------------------------------
+const selected = WORKSPACES.filter(w => !ONLY || w.name.includes(ONLY));
+
+if (REFRESH_SOURCE) {
+  for (const ws of selected) {
+    ws.base = ws.name === 'Harbour'
+      ? (process.env.HARBOUR_PROXY_BASE || 'https://projects.jkershaw.com/api/proxy')
+      : (process.env.PROXY_BASE || 'https://projects.jkershaw.com/api/proxy');
+    ws.token = ws.name === 'Harbour' ? process.env.HARBOUR_PROXY_TOKEN : process.env.PROXY_TOKEN;
+    if (!ws.token) { console.log(`[${ws.name}] REFRESH SKIPPED — no token (set ${ws.name === 'Harbour' ? 'HARBOUR_PROXY_TOKEN' : 'PROXY_TOKEN'})`); continue; }
+    await refreshSource(ws);
   }
 }
-console.log('\nDone. Fixtures are committed (curated real text); harness runs token-free.');
+
+for (const ws of selected) {
+  const { path, meta } = buildWorkspace(ws);
+  console.log(`\n[${ws.name}] wrote ${path}`);
+  console.log('  target              source/keep  kept  expect                 descentExpect');
+  for (const m of meta) {
+    console.log(`  ${m.id.padEnd(19)} ${(`keep=${m.keep}`).padEnd(11)} ${String(m.kept).padStart(4)}  ${m.expect.padEnd(22)} ${m.descent}`);
+  }
+}
+console.log('\nDone. Fixtures are committed (trimmed real text); harness runs token-free.');
