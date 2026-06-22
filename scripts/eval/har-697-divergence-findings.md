@@ -39,36 +39,57 @@ legitimate advance-to-fix case.
 ## Red baseline
 
 `ARMS=A` (live prompt, snapshot in sync with `lib/prompts/meta-prompt-template.js`),
-`GEN_MODEL=openai/gpt-5.4-mini` (prod default).
+`GEN_MODEL=openai/gpt-5.4-mini` (prod default), K=10.
 
-| case | K | result | trap (`implement`) |
+| case | scale | result | `implement` trap |
 |---|---|---|---|
-| `SYN-21` refuted cause | 10 | 7/10 `bug`, 3/10 `implement` | **30%** |
-| `SYN-22` unreliable witness | 10 | 9/10 (`research`/`bug`), 1/10 `plan` | 10% (1 off to `plan`) |
-| `SYN-18` settled bug (contrast) | 5 | 5/5 `implement` | n/a (correct) |
+| `SYN-21` refuted cause (synthetic) | ~350 tok, 2 clean comments | 7–8/10 `bug` | **~20–30%** |
+| `SYN-22` unreliable witness (synthetic) | ~190 tok | 9–10/10 (`research`/`bug`) | ~0–10% |
+| **`[real] HAR-697` frozen red moment** | **~2,600 tok, real trail** | **0/10 — `implement×10`** | **100%** |
+| `SYN-18` settled bug (contrast pole) | ~440 tok | 5/5 `implement` | n/a (correct) |
 
-Diverge-only summary (K=10): routing accuracy **80%**, loop-REPEAT **15%** (3/20 advanced
-to a fix against a refuted/unreliable cause).
+The settled-bug pole (`SYN-18`) is 5/5 correct; the engine is reliable when an investigation
+is genuinely settled and unreliable when it has *diverged*, because the prompt offers no robust
+signal to stay in investigation once a cause is contradicted (even though Step-2 already says to
+re-investigate when "prior findings are … contradicted by the current code").
 
-The clean signal is `SYN-21`: a **30% fix-before-validate rate** on a bug whose cause was
-explicitly refuted in the trail — while the settled-bug pole (`SYN-18`) is 5/5 correct. The
-engine is reliable when the investigation is settled and unreliable when it has diverged,
-because the prompt offers no robust signal to stay in investigation once a cause is
-contradicted (even though Step-2 already says to re-investigate when "prior findings are …
-contradicted by the current code").
+## Scale realism (the synthetic is more forgiving — measured)
+
+The synthetic `SYN-21` and the real, full-scale `HAR-697` fixture encode the **same** divergence
+(a code-grounded root cause, refuted later in the trail, decisive experiment never passed). They
+disagree sharply:
+
+- **Synthetic `SYN-21`: ~20–30% trap.** Real **`HAR-697`: 100% trap** (`implement×10`), which
+  matches the live prod `/recommend` on the real ticket.
+- Drivers of the gap (≈10× scale, plus structure):
+  1. **Scale/authority** — a 5,709-char investigation reads as far more "done" than two clean
+     sentences; the 1,865-char refutation is *buried after* it.
+  2. **Distractors** — the real trail is dense with fix-oriented prose ("ready to hand to an
+     implementation task", "the durability fix must cover …") wrapped around the refutation.
+  3. The synthetic strips all of that, making the refutation easy to see.
+
+**Lesson for this eval:** the small synthetic cases are a cheap *directional* guard but
+**under-state severity ~4–5×**. The frozen real fixture
+(`scripts/eval/fixtures/HAR-697-red.json`) is the honest red baseline — real scale, real
+distractors, and reproducible (network-free) after the live ticket moves on. New divergence
+coverage should be **anchored on the real fixture**, with the synthetic cases kept only as cheap
+pre-checks. A fix is not proven on the synthetic alone — it must move `[real] HAR-697` off
+`implement×10`.
 
 ## Acceptance for the fixes (this is the judge)
 
 A prompt/selector change is proven when, **without regressing** `SYN-18` (stays `implement`)
 or the other loop/over-fire cases:
 
-- `SYN-21` loop-REPEAT (`implement`) → **0** at K≥10 (routing accuracy → 10/10 on `bug`/`research`).
-- `SYN-22` routing accuracy → 10/10.
+- **`[real] HAR-697`** moves off `implement×10` → `bug`/`research` ≥ 8/10 at K=10. **This is the
+  primary bar** — the synthetic alone is not sufficient (it is already near-passing while the
+  real case is 0/10).
+- `SYN-21` loop-REPEAT (`implement`) → 0; `SYN-22` routing accuracy → 10/10 (cheap pre-checks).
 
-Run:
+Run (real fixture + synthetic poles + contrast, all share the HAR-697 / `already` tags):
 
 ```
-ONLY=diverge,already ARMS=AB K=10 GEN_MODEL=openai/gpt-5.4-mini node scripts/eval-research-routing.mjs
+ONLY=HAR-697,already ARMS=AB K=10 GEN_MODEL=openai/gpt-5.4-mini node scripts/eval-research-routing.mjs
 ```
 
 (Edit `scripts/eval/meta-prompt.candidate.txt` as Arm B; ship to the live template only
