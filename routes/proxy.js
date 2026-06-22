@@ -496,6 +496,7 @@ function formatDispatchWatch(item, meta = null) {
     issueUrl: item.issueUrl,
     target: item.target,
     followUpTo: item.followUpTo || null,
+    sessionId: item.sessionId || null,
     dispatchedAt: item.dispatchedAt,
     // resolvedAt is take/archive time (when the runner claimed the item), NOT
     // completion. completedAt is the real completion time, null until terminal.
@@ -1142,21 +1143,23 @@ POST ${baseUrl}/api/proxy/agent/status   (alias: /api/proxy/foreman/status — d
 ## Dispatch Endpoints
 
 POST ${baseUrl}/api/proxy/dispatch
-  Body: { "prompt": "...", "promptName": "...", "kind": "implementation", "issueId": "...", "issueIdentifier": "LIN-42", "issueTitle": "...", "issueUrl": "...", "target": "cli|web|dash", "repo": "...", "followUpTo": "...", "appendProxyContext": true }
+  Body: { "prompt": "...", "promptName": "...", "kind": "implementation", "issueId": "...", "issueIdentifier": "LIN-42", "issueTitle": "...", "issueUrl": "...", "target": "cli|web|dash", "repo": "...", "followUpTo": "...", "sessionId": "...", "appendProxyContext": true }
   → Queue a prompt for the workspace's dispatch consumer (the runner). Only "prompt" is required; target defaults to "cli". ("local"/Harbour is not available to proxy consumers.)
   → "kind" is a stable task classification (research/plan/implementation/review/etc. — the prompt-template keys, plus "custom"). Optional: when omitted it is derived from "promptName", falling back to "custom". Read it instead of inferring the task type from promptName or the prompt body.
   → "followUpTo" (optional) resumes an existing session: pass the "id" of an earlier dispatch and "prompt" becomes a follow-up instruction to that same session. cli/web only, same workspace. The runner owns session liveness — if the session is gone it posts terminal "[failed] no live session to resume". Use sparingly: only when the prior session ran cleanly and naturally suggests the next step (e.g. confirm CI is green, update Linear/git); any wobble → dispatch a fresh session instead.
+  → "sessionId" (optional) is the autopilot dispatch id that spawned this worker. Pass it on every worker dispatch the autopilot fans out so the run reconstructs as one session across all touched tasks (incl. epic descent / breakdown spin-offs). UUID, stored + forwarded blindly, ANY target (unlike followUpTo). See LIN-591.
   → By default a proxy-context block is appended to the prompt so the worker inherits Linear access for this workspace. Reporting is handled by the runner's Stop hook, not the prompt. Set "appendProxyContext": false to opt out.
-  → { "id": "...", "status": "queued", "promptName": "...", "kind": "implementation", "issueIdentifier": "...", "target": "cli", "dispatchedAt": "..." }
+  → { "id": "...", "status": "queued", "promptName": "...", "kind": "implementation", "issueIdentifier": "...", "target": "cli", "sessionId": null, "dispatchedAt": "..." }
 
 POST ${baseUrl}/api/proxy/recommend-and-dispatch
-  Body: { "issueIdentifier": "LIN-42", "target": "cli|web|dash", "repo": "...", "appendProxyContext": true, "noDescend": false, "kind": "review" }
+  Body: { "issueIdentifier": "LIN-42", "target": "cli|web|dash", "repo": "...", "appendProxyContext": true, "noDescend": false, "kind": "review", "sessionId": "..." }
   → Fused verb: runs /recommend and forwards the recommended prompt straight into a dispatch, server-side. "issueIdentifier" is required; target defaults to "cli".
+  → "sessionId" (optional) is the autopilot dispatch id driving this run; stamp it on every fan-out so the whole multi-task run reconstructs as one session. UUID, any target. See LIN-591.
   → The prompt body NEVER returns to you — you only get the task header. This keeps the prompt out of your context (the point of the verb); learn what was chosen from "kind"/"promptName", then watch the item via GET /dispatch/{id}.
   → "kind" is derived from the recommendation's own action signal (falling back to "custom") — no need to read the prompt to classify the task.
   → Set "noDescend": true to dispatch the named issue's OWN next step and NOT descend into an open child (deterministic). Use it to drive a parent whose deliverables live in its own description while a child is out of scope / separately tracked; the dispatched item then references the parent, and "deferredVia" is just [parent].
   → VERB OVERRIDE — pass "kind" (a prompt template key: plan, implementation, review, research, design, breakdown, look-into, triage, scoping, spike, context, retro, blocked) to PIN the step when the engine's chosen verb is demonstrably wrong. The server still WRITES the body — you pick the verb, never the words. Override pins the NAMED issue with NO descent and skips the LLM entirely; response carries "override": true. Use sparingly and only on a clear engine miss (see the autopilot manual); it is not the everyday path. Invalid keys (incl. defer/custom/autopilot/periodical) get a 400.
-  → { "id": "...", "status": "queued", "kind": "plan", "promptName": "plan", "issueIdentifier": "...", "target": "cli", "dispatchedAt": "..." }
+  → { "id": "...", "status": "queued", "kind": "plan", "promptName": "plan", "issueIdentifier": "...", "target": "cli", "sessionId": null, "dispatchedAt": "..." }
 
 GET ${baseUrl}/api/proxy/dispatch?issueIdentifier={LIN-42}&status={queued|taken|done|failed|aborted}&limit={n}
   → List your dispatch items (live queue + recent history), newest first. All query params optional. Use this to find an item's id when you only know the issue.
@@ -3367,7 +3370,7 @@ One convention across every endpoint, so you can branch on the same fields every
     }
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo } = req.body || {};
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo, sessionId } = req.body || {};
 
       if (!prompt || typeof prompt !== 'string') {
         logEvent(req, '/api/proxy/dispatch', 400);
@@ -3444,6 +3447,17 @@ One convention across every endpoint, so you can branch on the same fields every
         }
       }
 
+      // Autopilot session reference (LIN-591): the autopilot dispatchId that
+      // spawned this worker, used to group workers into one session. Optional
+      // UUID; stored + forwarded blindly. Unlike followUpTo there is NO target
+      // restriction — sessions span all targets.
+      if (sessionId !== undefined && sessionId !== null) {
+        if (!UUID_REGEX.test(sessionId)) {
+          logEvent(req, '/api/proxy/dispatch', 400);
+          return badRequest.json(res, 'Invalid sessionId format');
+        }
+      }
+
       // Auto-append the proxy context (Linear access + reporting channel) by
       // default, so the worker can both read context and report its result.
       // Opt out with appendProxyContext:false (e.g. a self-contained prompt).
@@ -3470,7 +3484,8 @@ One convention across every endpoint, so you can branch on the same fields every
         dispatchedBy: req.proxyCreatedBy || null,
         target: target || 'cli',
         repo: repo || null,
-        followUpTo: followUpTo || null
+        followUpTo: followUpTo || null,
+        sessionId: sessionId || null
       });
 
       logEvent(req, '/api/proxy/dispatch', 201);
@@ -3482,6 +3497,7 @@ One convention across every endpoint, so you can branch on the same fields every
         kind: item.kind,
         issueIdentifier: item.issueIdentifier,
         target: item.target,
+        sessionId: item.sessionId || null,
         dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt
       });
     } catch (err) {
@@ -3514,7 +3530,7 @@ One convention across every endpoint, so you can branch on the same fields every
     }
 
     try {
-      const { issueIdentifier, target, repo, appendProxyContext, noDescend, kind } = req.body || {};
+      const { issueIdentifier, target, repo, appendProxyContext, noDescend, kind, sessionId } = req.body || {};
 
       // Validate caller-supplied inputs. (Only the server-generated prompt skips
       // the dangerous-char/length checks — see the dispatch step below.)
@@ -3547,6 +3563,15 @@ One convention across every endpoint, so you can branch on the same fields every
       if (kind !== undefined && (typeof kind !== 'string' || !hasPrompt(kind))) {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
         return badRequest.json(res, `kind must be a valid prompt template key: ${Object.keys(PROMPT_TEMPLATES).join(', ')}`);
+      }
+      // Autopilot session reference (LIN-591): the autopilot dispatchId that is
+      // driving this run, stamped onto the spawned worker so the dashboard can
+      // reconstruct the session. This is the verb the autopilot actually drives,
+      // so it is the important one. Optional UUID; stored + forwarded blindly,
+      // no target restriction (sessions span all targets).
+      if (sessionId !== undefined && sessionId !== null && !UUID_REGEX.test(sessionId)) {
+        logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
+        return badRequest.json(res, 'Invalid sessionId format');
       }
 
       // Recommendation preconditions — identical to GET /recommend.
@@ -3615,7 +3640,8 @@ One convention across every endpoint, so you can branch on the same fields every
             target: target || 'cli',
             // Mirror /prompt's repo resolution: project `repo=` from the
             // description, with an explicit caller repo winning (LIN-537).
-            repo: repo || parseRepoFromDescription(project?.description) || null
+            repo: repo || parseRepoFromDescription(project?.description) || null,
+            sessionId: sessionId || null
           });
 
           // Record the override so it can feed heuristic improvement — the
@@ -3630,6 +3656,7 @@ One convention across every endpoint, so you can branch on the same fields every
             promptName: item.promptName,
             issueIdentifier: item.issueIdentifier,
             target: item.target,
+            sessionId: item.sessionId || null,
             dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt,
             // The override pins the named issue with no descent — surface that
             // explicitly so callers can distinguish it from the LLM-driven path.
@@ -3746,7 +3773,8 @@ One convention across every endpoint, so you can branch on the same fields every
           // when the caller omits one; an explicit caller repo still wins. repo
           // is functional execution context (working directory), so this fused
           // verb must propagate it, not just the display header fields (LIN-537).
-          repo: repo || rec.repo || null
+          repo: repo || rec.repo || null,
+          sessionId: sessionId || null
         });
 
         keepalive.stop();
@@ -3763,6 +3791,7 @@ One convention across every endpoint, so you can branch on the same fields every
           promptName: item.promptName,
           issueIdentifier: item.issueIdentifier,
           target: item.target,
+          sessionId: item.sessionId || null,
           dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt,
           deferredVia,
           deferTruncated,
