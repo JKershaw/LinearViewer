@@ -256,6 +256,7 @@ and is the recommended pattern for any consumer that posts foreman status.
 | `issueUrl` | string | Full URL to the Linear issue (nullable) |
 | `target` | string | Dispatch target: `"cli"` (default), `"web"`, or `"dash"` |
 | `followUpTo` | string | The `id` of an earlier dispatch whose session this item should resume, or `null`. See [Follow-ups](#follow-ups) (nullable) |
+| `sessionId` | string | The `id` of the autopilot dispatch that spawned this worker, or `null`. Groups worker dispatches into one autopilot session (any target). See [Autopilot sessions](#autopilot-sessions) (nullable) |
 | `workspace.urlKey` | string | Workspace identifier |
 | `dispatchedAt` | string | ISO 8601 timestamp when item was queued |
 | `dispatchedBy` | string | Linear user ID who dispatched (nullable) |
@@ -303,6 +304,31 @@ curl -s -X POST "$BASE/api/proxy/dispatch" \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d "{\"prompt\": \"Now confirm CI is green and report the run URL\", \"followUpTo\": \"$ORIG\"}"
 ```
+
+## Autopilot sessions
+
+An autopilot run is a single orchestrator dispatch that fans out many **worker**
+dispatches (one per task it works). Because a run that descends into an epic or spawns
+new issues via `breakdown` spreads its workers across many `issueIdentifier`s, the
+workers cannot be regrouped into one run by issue alone. `sessionId` carries that link:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `sessionId` | string (UUID) | No | The `id` of the autopilot dispatch that spawned this worker. |
+
+The autopilot stamps its own dispatch id as `sessionId` on every worker it dispatches;
+the dashboard then reconstructs the run as one **session** (the autopilot dispatch plus
+all dispatches sharing its `sessionId`). The store records and forwards `sessionId`
+verbatim — it owns no grouping logic.
+
+**Rules and constraints (note the contrast with `followUpTo`):**
+
+- **Any target.** Unlike `followUpTo`, `sessionId` has **no** `cli`/`web` restriction —
+  a session groups workers regardless of target.
+- **Optional and validated.** `sessionId` must be a well-formed UUID when present; the
+  store does **not** verify the referenced autopilot dispatch exists.
+- **Independent of `followUpTo`.** The two are orthogonal: a worker may both resume a
+  session (`followUpTo`) and belong to an autopilot run (`sessionId`).
 
 ## Target Routing
 

@@ -195,7 +195,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const { workspace } = req;
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo } = req.body;
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo, sessionId } = req.body;
 
       // Validate required fields
       if (!prompt || typeof prompt !== 'string') {
@@ -275,6 +275,16 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         }
       }
 
+      // Validate autopilot session reference if provided. Unlike followUpTo,
+      // sessionId carries NO target restriction — it groups worker dispatches
+      // into one autopilot session regardless of target. Store + forward it
+      // blindly; only the UUID format is enforced here. See LIN-591.
+      if (sessionId !== undefined && sessionId !== null) {
+        if (!UUID_REGEX.test(sessionId)) {
+          return badRequest.json(res, 'Invalid sessionId format');
+        }
+      }
+
       // Create dispatch item
       const item = await dispatchQueueStore.addItem(workspace.urlKey, {
         prompt,
@@ -287,7 +297,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         dispatchedBy: req.session.linearUserId || null,
         target: target || 'cli',
         repo: repo || null,
-        followUpTo: followUpTo || null
+        followUpTo: followUpTo || null,
+        sessionId: sessionId || null
       });
 
       // Spawn a Harbour Claude session when target is 'local' (the API value

@@ -954,7 +954,7 @@ The runner reports progress back as **free-form feedback entries** (it owns the 
 POST /api/proxy/dispatch
 Content-Type: application/json
 
-{ "prompt": "...", "promptName": "...", "issueId": "...", "issueIdentifier": "LIN-42", "issueTitle": "...", "issueUrl": "...", "target": "cli", "repo": "...", "appendProxyContext": true }
+{ "prompt": "...", "promptName": "...", "issueId": "...", "issueIdentifier": "LIN-42", "issueTitle": "...", "issueUrl": "...", "target": "cli", "repo": "...", "sessionId": "...", "appendProxyContext": true }
 ```
 
 | Field | Type | Required | Description |
@@ -964,11 +964,12 @@ Content-Type: application/json
 | `issueId` / `issueIdentifier` / `issueTitle` / `issueUrl` | string | No | Optional linkage to an issue |
 | `target` | string | No | `cli` \| `web` \| `dash` (default `cli`). `local`/Harbour is **not** available to proxy consumers |
 | `repo` | string | No | Optional repository hint |
+| `sessionId` | string (UUID) | No | The autopilot dispatch id that spawned this worker. Stamp it on every worker an autopilot run fans out so the whole run (incl. epic descent / `breakdown` spin-offs) reconstructs as one session. Stored and forwarded verbatim; unlike `followUpTo` it carries **no target restriction**. See LIN-591 |
 | `appendProxyContext` | bool | No | Default `true`: append a proxy-context block to the prompt so the worker inherits workspace access via this proxy. Set `false` to send the prompt verbatim |
 
 Returns `201`:
 ```json
-{ "id": "uuid", "status": "queued", "promptName": "...", "issueIdentifier": "LIN-42", "target": "cli", "dispatchedAt": "2026-06-06T11:32:25.111Z" }
+{ "id": "uuid", "status": "queued", "promptName": "...", "issueIdentifier": "LIN-42", "target": "cli", "sessionId": null, "dispatchedAt": "2026-06-06T11:32:25.111Z" }
 ```
 
 #### Recommend and Dispatch (fused)
@@ -977,7 +978,7 @@ Returns `201`:
 POST /api/proxy/recommend-and-dispatch
 Content-Type: application/json
 
-{ "issueIdentifier": "LIN-42", "target": "cli", "repo": "...", "appendProxyContext": true }
+{ "issueIdentifier": "LIN-42", "target": "cli", "repo": "...", "sessionId": "...", "appendProxyContext": true }
 ```
 
 Runs `/recommend` and forwards the recommended prompt straight into a dispatch — **server-side, in one call**. The prompt body never returns to you: you receive only the task header. This keeps the recommended prompt out of the orchestrator's context (autopilot invariant 4 — see `docs/autopilot.md` §8) and lets you read the task's `kind` without ever reading the prompt to classify it. Requires `readWrite`.
@@ -990,6 +991,7 @@ Runs `/recommend` and forwards the recommended prompt straight into a dispatch �
 | `appendProxyContext` | bool | No | Default `true`: append a proxy-context block so the worker inherits workspace access via this proxy |
 | `noDescend` | bool | No | Default `false`. When `true`, recommend and dispatch the **named issue's own** next step and never descend into an open child (see below) |
 | `kind` | string | No | **Verb override.** A prompt template key (e.g. `review`, `plan`, `implementation`). When supplied, the LLM recommendation + descent is bypassed and the body is generated deterministically for the **named issue** with that template (see below) |
+| `sessionId` | string (UUID) | No | The autopilot dispatch id driving this run. Stamp it on every fan-out so the whole multi-task run reconstructs as one session. Any target; stored and forwarded verbatim. See LIN-591 |
 
 `kind` is derived server-side from the recommendation's own action signal, falling back to `custom` when the action can't be parsed. There is no `prompt` field to send (it is generated) and none in the response (it is withheld by design).
 
@@ -1016,12 +1018,12 @@ through the verb.
 
 Returns `201`:
 ```json
-{ "id": "uuid", "status": "queued", "kind": "plan", "promptName": "plan", "issueIdentifier": "LIN-42", "target": "cli", "dispatchedAt": "2026-06-06T11:32:25.111Z" }
+{ "id": "uuid", "status": "queued", "kind": "plan", "promptName": "plan", "issueIdentifier": "LIN-42", "target": "cli", "sessionId": null, "dispatchedAt": "2026-06-06T11:32:25.111Z" }
 ```
 
 With a `kind` override the response also carries `"override": true` and omits the descent fields (`deferredVia`/`descent`), since the override does not descend:
 ```json
-{ "id": "uuid", "status": "queued", "kind": "review", "promptName": "code review", "issueIdentifier": "LIN-42", "target": "cli", "dispatchedAt": "2026-06-06T11:32:25.111Z", "override": true }
+{ "id": "uuid", "status": "queued", "kind": "review", "promptName": "code review", "issueIdentifier": "LIN-42", "target": "cli", "sessionId": null, "dispatchedAt": "2026-06-06T11:32:25.111Z", "override": true }
 ```
 
 `/recommend` can be slow (provider fetch + OpenRouter); the same whitespace-keepalive behaviour as `GET /recommend` applies, so don't set a client timeout below ~60s. Watch the returned `id` with `GET /api/proxy/dispatch/{id}` exactly as for a plain dispatch.
@@ -1063,6 +1065,8 @@ Notes:
   "issueIdentifier": "LIN-42",
   "issueUrl": "...",
   "target": "cli",
+  "followUpTo": null,
+  "sessionId": null,
   "dispatchedAt": "...",
   "resolvedAt": "...",
   "completedAt": "...",
