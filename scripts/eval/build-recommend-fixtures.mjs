@@ -60,6 +60,10 @@
  *
  * Env knobs:
  *   REFRESH_SOURCE       when set, re-capture _source/* from the proxy before trimming
+ *   SOURCES              comma-separated identifiers to (re)capture on refresh; MERGES into
+ *                        the existing _source and leaves all other bundles intact. Use to
+ *                        add/update one node (e.g. SOURCES=LIN-596) without drifting the
+ *                        committed chain. Unset = capture the full chain + extraSources.
  *   PROXY_TOKEN          LinearViewer proxy READ token   (refresh only)
  *   PROXY_BASE           LinearViewer proxy base URL     (default https://projects.jkershaw.com/api/proxy)
  *   HARBOUR_PROXY_TOKEN  Harbour proxy READ token        (refresh only)
@@ -92,7 +96,10 @@ const STARTED = { name: 'In Progress', type: 'started' };
  * `descentExpect`the leaf the chain should descend to (terminal id the grader checks).
  * `chainExpect`  acceptable terminal action(s) at that leaf (given its trimmed trail).
  * `gradedLeaves` leaf-only targets re-using a real leaf at several decision moments.
- *                Each: { key, source, keep, expect, role }.
+ *                Each: { key, source, keep, expect, role }. `source` may be a chain node
+ *                OR an `extraSources` identifier.
+ * `extraSources` real leaves to capture as standalone bundles (no descent) so they can
+ *                source graded leaves that aren't on the descent chain (e.g. LIN-596).
  */
 const WORKSPACES = [
   {
@@ -104,6 +111,9 @@ const WORKSPACES = [
     // LIN-428 keep=1: one-session impl plan in the description + comment[0] "Plan ready",
     // no code landed yet → the honest next action at the leaf is implement.
     chainExpect: ['implement'],
+    // Real leaves captured as standalone bundles (no descent) purely to source graded
+    // leaf-only targets that aren't on the descent chain. See gradedLeaves below.
+    extraSources: ['LIN-596'],
     gradedLeaves: [
       {
         key: 'LIN-385@plan', source: 'LIN-385', keep: 0, expect: ['plan', 'research'],
@@ -120,6 +130,18 @@ const WORKSPACES = [
       {
         key: 'LIN-428@review', source: 'LIN-428', keep: 2, expect: ['review'],
         role: 'leaf @ landed — comment[1] implemented + PR open + CI green, before approve/merge → review'
+      },
+      {
+        // LIN-596 keep=3: full multi-section plan baked into the description (with "open
+        // questions (carry into implementation)") + comment[2] "Planning complete — ready
+        // for implementation (one session)", NO code landed → the honest next action is
+        // implement. Reproduces the live LIN-596 autopilot run (2026-06-22) where the
+        // engine returned `plan` twice on this already-planned task — the over-keen /
+        // doesn't-detect-planning-is-done failure tracked in LIN-597. keep=3 stops before
+        // comment[4] (the override note, which states the answer) and the later
+        // implement/review/merge trail, so no completion evidence leaks.
+        key: 'LIN-596@implement', source: 'LIN-596', keep: 3, expect: ['implement'],
+        role: 'leaf @ plan-committed — full plan in desc (open questions deferred to impl) + comment[2] "Planning complete — ready for implementation", no code → implement; reproduces the live re-plan miss (LIN-597)'
       }
     ]
   },
@@ -210,28 +232,54 @@ function rawComments(raw) {
     .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 }
 
-/** Capture a workspace's full-trail bundles from the proxy → _source/<file>. */
+/** Resolve a node's parent/siblings slice from a raw proxy payload (shared by chain + leaf). */
+async function captureParent(proxyGet, raw, selfId) {
+  if (!raw.parent) return { parent: null, siblings: [], siblingsTotal: 0 };
+  const parent = { id: raw.parent.id, identifier: raw.parent.identifier, title: raw.parent.title, state: raw.parent.state };
+  const parentRaw = await proxyGet(raw.parent.identifier);
+  const all = (parentRaw.children || [])
+    .filter(c => c.id !== selfId)
+    .map(c => ({ id: c.id, identifier: c.identifier, title: c.title, state: c.state }));
+  return { parent, siblings: all.slice(0, SIBLING_CAP), siblingsTotal: all.length };
+}
+
+/**
+ * Capture one standalone leaf bundle (no descent) — for `extraSources`: real leaves that
+ * aren't on a descent chain but are re-used as graded leaf-only targets (e.g. LIN-596).
+ * Shape matches a graded-leaf bundle: children: [] and focusedChild: null.
+ */
+async function captureLeaf(proxyGet, id) {
+  const raw = await proxyGet(id);
+  const issue = reshapeIssue(raw);
+  const project = raw.project ? { name: raw.project.name, description: raw.project.content || raw.project.description || null } : null;
+  const { parent, siblings, siblingsTotal } = await captureParent(proxyGet, raw, issue.id);
+  return { issue, parent, siblings, siblingsTotal, project, children: [], comments: rawComments(raw), focusedChild: null };
+}
+
+/**
+ * Capture a workspace's full-trail bundles from the proxy → _source/<file>.
+ * MERGES into any existing capture, so a targeted `SOURCES=LIN-596` refresh adds/updates
+ * only those identifiers and leaves the rest of the file byte-for-byte intact (avoids
+ * drifting the committed chain when you only want to add one new leaf).
+ */
 async function refreshSource(ws) {
   const proxyGet = makeProxyGet(ws.base, ws.token);
-  const bundles = {};
+  const p = join(SOURCE_DIR, ws.file);
+  const bundles = existsSync(p) ? (JSON.parse(readFileSync(p, 'utf8')).bundles || {}) : {};
+  const want = process.env.SOURCES ? new Set(process.env.SOURCES.split(',').map(s => s.trim())) : null;
+  const include = (id) => !want || want.has(id);
+  const captured = [];
+
+  // Descent chain — each node with its frontier child + trimmed focusedChild seam.
   for (let i = 0; i < ws.chain.length; i++) {
     const id = ws.chain[i];
+    if (!include(id)) continue;
     const nextId = ws.chain[i + 1] || null;
     const raw = await proxyGet(id);
     const issue = reshapeIssue(raw);
     const project = raw.project ? { name: raw.project.name, description: raw.project.content || raw.project.description || null } : null;
     const comments = rawComments(raw);
-
-    let parent = null, siblings = [], siblingsTotal = 0;
-    if (raw.parent) {
-      parent = { id: raw.parent.id, identifier: raw.parent.identifier, title: raw.parent.title, state: raw.parent.state };
-      const parentRaw = await proxyGet(raw.parent.identifier);
-      const all = (parentRaw.children || [])
-        .filter(c => c.id !== issue.id)
-        .map(c => ({ id: c.id, identifier: c.identifier, title: c.title, state: c.state }));
-      siblingsTotal = all.length;
-      siblings = all.slice(0, SIBLING_CAP);
-    }
+    const { parent, siblings, siblingsTotal } = await captureParent(proxyGet, raw, issue.id);
 
     let children = [], focusedChild = null;
     if (nextId) {
@@ -240,11 +288,20 @@ async function refreshSource(ws) {
       focusedChild = { issue: reshapeIssue(nextRaw), comments: rawComments(nextRaw) };
     }
     bundles[id] = { issue, parent, siblings, siblingsTotal, project, children, comments, focusedChild };
+    captured.push(id);
   }
+
+  // Extra leaf sources — real leaves re-used as graded leaf-only targets (no descent).
+  for (const id of (ws.extraSources || [])) {
+    if (!include(id)) continue;
+    bundles[id] = await captureLeaf(proxyGet, id);
+    captured.push(id);
+  }
+
   const out = { name: ws.name, bundles };
   mkdirSync(SOURCE_DIR, { recursive: true });
   writeFileSync(join(SOURCE_DIR, ws.file), JSON.stringify(out, null, 2) + '\n');
-  console.log(`[${ws.name}] refreshed _source/${ws.file} (${ws.chain.length} nodes)`);
+  console.log(`[${ws.name}] refreshed _source/${ws.file} (${captured.length} node(s): ${captured.join(', ') || 'none'}${want ? ' [SOURCES filter]' : ''})`);
 }
 
 // ---- freeze pass (always) ---------------------------------------------------------
