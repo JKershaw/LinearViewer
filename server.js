@@ -26,6 +26,7 @@ import { FreeTierStore } from './lib/free-tier-store.js'
 import { RecapCacheStore } from './lib/recap-cache.js'
 import { BriefCacheStore } from './lib/brief-cache.js'
 import { RunSummaryCacheStore } from './lib/run-summary-cache.js'
+import { SessionSummaryCacheStore } from './lib/session-summary-cache.js'
 import { ReportHistoryStore } from './lib/report-history-store.js'
 import { LlmCallLogStore } from './lib/llm-call-log.js'
 import { PromptTraceStore } from './lib/prompt-trace-store.js'
@@ -249,6 +250,14 @@ const runSummaryCacheStore = new RunSummaryCacheStore({
   collection: runSummaryCacheCollection
 })
 
+// Session summary cache (LIN-592): AI-generated one-sentence rollups of whole
+// autopilot sessions (orchestrator + spawned workers), keyed
+// `${workspaceId}:${sessionId}`. 30-day TTL matches loop/run-summary retention.
+const sessionSummaryCacheCollection = db.collection('session-summary-cache')
+const sessionSummaryCacheStore = new SessionSummaryCacheStore({
+  collection: sessionSummaryCacheCollection
+})
+
 // Brief cache: AI-generated current-state task briefs, keyed on context hash
 const briefCacheCollection = db.collection('brief-cache')
 const briefCacheStore = new BriefCacheStore({
@@ -325,7 +334,7 @@ app.use(session({
 // Test Mode Setup
 // =============================================================================
 if (process.env.NODE_ENV === 'test') {
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, runSummaryCacheStore, reportHistoryStore, localStore, getWorkspaceAccessToken }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, localStore, getWorkspaceAccessToken }))
 }
 
 // =============================================================================
@@ -979,7 +988,7 @@ app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyToke
 // Mount dashboard routes (experimental combined realtime autopilot dashboard — LIN-509).
 // Merges Mongo-only Loop reads across session.workspaces; Linear is hydrated lazily
 // (drill-down only), never fanned out per poll.
-app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatusStore, runSummaryCacheStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, getOpenRouterSource, getDeployInfo }))
+app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatusStore, runSummaryCacheStore, sessionSummaryCacheStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, getOpenRouterSource, getDeployInfo }))
 
 // Mount task-chat routes (experimental "talk to a task" conversation).
 app.use(createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo }))

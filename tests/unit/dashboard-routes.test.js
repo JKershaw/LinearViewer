@@ -11,8 +11,9 @@
  */
 import { test, describe, before } from 'node:test';
 import assert from 'node:assert';
-import { createDashboardRoutes, buildTestSummary } from '../../routes/dashboard.js';
+import { createDashboardRoutes, buildTestSummary, buildTestSessionSummary } from '../../routes/dashboard.js';
 import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
+import { InMemorySessionSummaryCacheStore } from '../../lib/session-summary-cache.js';
 
 const NOW_ISO = new Date().toISOString();
 
@@ -72,19 +73,34 @@ function makeReqRes({ session = {}, workspace = null, params = {}, query = {} } 
   return { req, res };
 }
 
-function makeRouter(perWorkspace, { runSummaryCacheStore } = {}) {
+function makeRouter(perWorkspace, { runSummaryCacheStore, sessionSummaryCacheStore } = {}) {
   const { dispatchQueueStore, agentStatusStore } = makeStores(perWorkspace);
   return createDashboardRoutes({
     workspaceFromUrl: (req, res, next) => next(),
     dispatchQueueStore,
     agentStatusStore,
     runSummaryCacheStore: runSummaryCacheStore || new InMemoryRunSummaryCacheStore(),
+    sessionSummaryCacheStore: sessionSummaryCacheStore || new InMemorySessionSummaryCacheStore(),
     freeTierStore: { async tryUse() { return { allowed: true }; } },
     getWorkspaceAccessToken: async () => 'token',
     fetchIssueContext: async () => ({ issue: { state: { name: 'Done', type: 'completed' }, labels: { nodes: [] } } }),
     getOpenRouterSource: () => 'env',
     getDeployInfo: () => ({})
   });
+}
+
+// ─── Session fixtures (drive lib/pipeline-loops.getSessionsForWorkspace) ─────────
+// An autopilot orchestrator dispatch (kind:'autopilot') anchors a session; its
+// session id is the orchestrator's own dispatch id. Workers carry that id as
+// `sessionId`. Terminality is folded in via agentStatus 'completed' / [done].
+function autopilotHistoryItem(id, identifier) {
+  return { id, kind: 'autopilot', issueIdentifier: identifier, issueTitle: `Title ${identifier}`, promptName: 'autopilot', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken' };
+}
+function autopilotLiveItem(id, identifier) {
+  return { id, kind: 'autopilot', issueIdentifier: identifier, issueTitle: `Title ${identifier}`, promptName: 'autopilot', prompt: 'p', dispatchedAt: NOW_ISO };
+}
+function workerHistoryItem(id, identifier, sessionId) {
+  return { id, sessionId, issueIdentifier: identifier, issueTitle: `Title ${identifier}`, promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken', feedback: [{ message: 'pr opened' }] };
 }
 
 const ENABLED = { features: { dashboard: true } };
@@ -265,5 +281,133 @@ describe('buildTestSummary', () => {
     const s = buildTestSummary({ issueIdentifier: 'LIN-6', iteration: 1, agentState: 'error', feedback: [] });
     assert.match(s.outcome, /error/);
     assert.equal(s.blockers.length, 1);
+  });
+});
+
+// ─── session-summary ─────────────────────────────────────────────────────────
+
+describe('session-summary endpoint', () => {
+  // A terminal session: completed autopilot anchor + one completed worker.
+  function terminalSessionWorkspace() {
+    return {
+      'ws-a': {
+        live: [],
+        history: [autopilotHistoryItem('sess-1', 'LIN-100'), workerHistoryItem('w-1', 'LIN-101', 'sess-1')],
+        agentStatus: [agentStatusDone('sess-1', 'LIN-100'), agentStatusDone('w-1', 'LIN-101')]
+      }
+    };
+  }
+
+  test('403 when the feature flag is off', async () => {
+    const router = makeRouter({});
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/session-summary/:sessionId');
+    const { req, res } = makeReqRes({ session: {}, workspace: { urlKey: 'ws-a' }, params: { sessionId: 'sess-1' } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 403);
+  });
+
+  test('404 when the session is not found', async () => {
+    const router = makeRouter({ 'ws-a': { history: [], live: [], agentStatus: [] } });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/session-summary/:sessionId');
+    const { req, res } = makeReqRes({ session: ENABLED, workspace: { urlKey: 'ws-a' }, params: { sessionId: 'nope' } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 404);
+  });
+
+  test('test-mode returns and caches a deterministic rollup for a terminal session', async () => {
+    const prev = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'test';
+    try {
+      const cache = new InMemorySessionSummaryCacheStore();
+      const router = makeRouter(terminalSessionWorkspace(), { sessionSummaryCacheStore: cache });
+      const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/session-summary/:sessionId');
+      const { req, res } = makeReqRes({ session: ENABLED, workspace: { urlKey: 'ws-a' }, params: { sessionId: 'sess-1' } });
+      await handler(req, res);
+      assert.equal(res.statusCode, 200);
+      assert.equal(res.jsonBody.status, 'fresh');
+      assert.equal(res.jsonBody.live, false);
+      assert.match(res.jsonBody.summary.outcome, /sess-1/);
+      assert.match(res.jsonBody.summary.statusLine, /task/);
+      // Highlights name the tasks touched (seed first).
+      assert.ok(res.jsonBody.summary.highlights.some(h => /LIN-100/.test(h)));
+      // Cached for next time.
+      const cached = await cache.get('ws-a', 'sess-1');
+      assert.ok(cached, 'session summary is cached');
+      assert.deepEqual(cached.summary, res.jsonBody.summary);
+    } finally {
+      process.env.NODE_ENV = prev;
+    }
+  });
+
+  test('GET returns the cached rollup on a hit (no regeneration)', async () => {
+    const prev = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'test';
+    try {
+      const cache = new InMemorySessionSummaryCacheStore();
+      const router = makeRouter(terminalSessionWorkspace(), { sessionSummaryCacheStore: cache });
+      const post = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/session-summary/:sessionId');
+      const r1 = makeReqRes({ session: ENABLED, workspace: { urlKey: 'ws-a' }, params: { sessionId: 'sess-1' } });
+      await post(r1.req, r1.res);
+      const get = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/session-summary/:sessionId');
+      const r2 = makeReqRes({ session: ENABLED, workspace: { urlKey: 'ws-a' }, params: { sessionId: 'sess-1' } });
+      await get(r2.req, r2.res);
+      assert.equal(r2.res.statusCode, 200);
+      assert.equal(r2.res.jsonBody.status, 'cached');
+      assert.deepEqual(r2.res.jsonBody.summary, r1.res.jsonBody.summary);
+    } finally {
+      process.env.NODE_ENV = prev;
+    }
+  });
+
+  test('GET ?cachedOnly returns 204 on a cache miss (no generation)', async () => {
+    const router = makeRouter(terminalSessionWorkspace());
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/session-summary/:sessionId');
+    const { req, res } = makeReqRes({ session: ENABLED, workspace: { urlKey: 'ws-a' }, params: { sessionId: 'sess-1' }, query: { cachedOnly: '1' } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 204);
+  });
+
+  test('a live session is not cached and returns the latest-completed-child statusLine proxy', async () => {
+    // Live anchor (queued) + one completed worker child with a cached run-summary.
+    const runCache = new InMemoryRunSummaryCacheStore();
+    await runCache.put('ws-a', 'w-1', { inputHash: 'x', summary: { outcome: 'Implemented LIN-101 and opened a PR', whatHappened: [], blockers: [], next: '' }, model: 'm' });
+    const sessCache = new InMemorySessionSummaryCacheStore();
+    const perWorkspace = {
+      'ws-a': {
+        live: [autopilotLiveItem('sess-2', 'LIN-200')],
+        history: [workerHistoryItem('w-1', 'LIN-101', 'sess-2')],
+        agentStatus: [agentStatusDone('w-1', 'LIN-101')]
+      }
+    };
+    const router = makeRouter(perWorkspace, { runSummaryCacheStore: runCache, sessionSummaryCacheStore: sessCache });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/session-summary/:sessionId');
+    const { req, res } = makeReqRes({ session: ENABLED, workspace: { urlKey: 'ws-a' }, params: { sessionId: 'sess-2' } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.status, 'live');
+    assert.equal(res.jsonBody.live, true);
+    assert.equal(res.jsonBody.summary.outcome, '', 'no outcome is asserted for a live session');
+    assert.match(res.jsonBody.summary.statusLine, /Implemented LIN-101/);
+    assert.equal(res.jsonBody.statusLineSource, 'latest-completed-child');
+    assert.equal(res.jsonBody.statusLineLoopId, 'w-1');
+    // Nothing was cached for the live session.
+    assert.equal(await sessCache.get('ws-a', 'sess-2'), null);
+  });
+});
+
+// ─── buildTestSessionSummary (pure) ───────────────────────────────────────────
+
+describe('buildTestSessionSummary', () => {
+  test('rolls tasks into a present-tense status line and highlights', () => {
+    const s = buildTestSessionSummary({ sessionId: 'sess-9', tasksTouched: ['LIN-1', 'LIN-2'] });
+    assert.match(s.outcome, /sess-9/);
+    assert.match(s.outcome, /2 tasks/);
+    assert.match(s.statusLine, /2 tasks/);
+    assert.deepEqual(s.highlights, ['Touched LIN-1', 'Touched LIN-2']);
+  });
+
+  test('handles a single task and a missing task list', () => {
+    assert.match(buildTestSessionSummary({ sessionId: 's', tasksTouched: ['LIN-1'] }).outcome, /1 task\b/);
+    assert.match(buildTestSessionSummary({ sessionId: 's' }).outcome, /0 tasks/);
   });
 });
