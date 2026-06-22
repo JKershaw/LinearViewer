@@ -139,5 +139,57 @@ test.describe('Autopilot Observation page (first-class)', () => {
       await card.locator('.obs-session-head').click();
       await expect(card.locator('.obs-session-body')).toBeVisible();
     });
+
+    test('the expanded body drills into the tasks the session touched (Level 3)', async ({ page }) => {
+      await page.goto('/test/set-session');
+      await clearRuns(page);
+      await seedQueuedRun(page, { issueIdentifier: 'LIN-906', issueTitle: 'Drill-down session' });
+
+      await page.goto(OBSERVATION_URL);
+      await page.waitForLoadState('networkidle');
+      const card = page.locator('.obs-session').filter({ hasText: 'Drill-down session' });
+      await expect(card).toBeVisible();
+      await card.locator('.obs-session-head').click();
+      // The Level-3 body renders a per-task block for the seed task, even with no
+      // worker runs under it yet.
+      const body = card.locator('.obs-session-body');
+      await expect(body.locator('.obs-tasks')).toBeVisible();
+      await expect(body.locator('.obs-task-ident').filter({ hasText: 'LIN-906' })).toBeVisible();
+    });
+  });
+
+  test.describe('Level 3 drill-down (worker tree)', () => {
+    // Seed an autopilot session (orchestrator anchor + one worker stamped with the
+    // anchor's id as sessionId — the LIN-591 spine) so the body renders a per-task
+    // worker-session node that expands to its detail.
+    async function seedSessionWithWorker(page) {
+      const anchor = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+        data: { prompt: 'orchestrate', promptName: 'autopilot', kind: 'autopilot', issueIdentifier: 'LIN-910', issueTitle: 'Worker-tree seed', target: 'cli' }
+      });
+      expect(anchor.status()).toBe(201);
+      const anchorId = (await anchor.json()).item.id;
+      const worker = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+        data: { prompt: 'implement', promptName: 'implementation', kind: 'implementation', issueIdentifier: 'LIN-911', issueTitle: 'Worker child', target: 'cli', sessionId: anchorId }
+      });
+      expect(worker.status(), `worker seed failed: ${await worker.text()}`).toBe(201);
+    }
+
+    test('a worker node renders under its task and expands to a detail block', async ({ page }) => {
+      await page.goto('/test/set-session');
+      await clearRuns(page);
+      await seedSessionWithWorker(page);
+
+      await page.goto(OBSERVATION_URL);
+      await page.waitForLoadState('networkidle');
+      const card = page.locator('.obs-session').filter({ hasText: 'Worker-tree seed' }).first();
+      await expect(card).toBeVisible();
+      await card.locator('.obs-session-head').first().click();
+
+      // The worker tree carries the implementation worker as its own node.
+      const worker = card.locator('.obs-worker').filter({ hasText: 'implementation' }).first();
+      await expect(worker).toBeVisible();
+      await worker.locator('.obs-worker-head').click();
+      await expect(worker.locator('.obs-worker-body')).toBeVisible();
+    });
   });
 });

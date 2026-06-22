@@ -198,16 +198,26 @@ export function createDashboardRoutes({
       : (enriched.some(l => l.agentState === 'error') ? 'error' : 'done');
 
     // One segment per worker run for the progress bar (state-colored; the live
-    // one pulses client-side).
+    // one pulses client-side). Each run also carries the Level-3 drill-down
+    // payload — its per-run telemetry (runtime / activity metrics / produced
+    // artifacts, already computed read-only in pipeline-loops, LIN-594), its
+    // agent summary, and its issueUrl. This stays inside the per-poll cost
+    // contract: it is pure Mongo, no Linear call and no LLM (the on-demand
+    // run-summary recap is fetched lazily, per node, by the client; LIN-595).
     const runs = children.map(l => ({
       loopId: l.loopId,
       issueIdentifier: l.issueIdentifier || null,
       issueTitle: l.issueTitle || '',
+      issueUrl: l.issueUrl || null,
       agentState: l.agentState,
       stage: l.stage || null,
       promptName: l.promptName || null,
       kind: l.kind || null,
-      iteration: l.iteration ?? null
+      iteration: l.iteration ?? null,
+      agentSummary: l.agentSummary || null,
+      runtime: l.telemetry?.runtime || null,
+      metrics: Array.isArray(l.telemetry?.metrics) ? l.telemetry.metrics : [],
+      producedArtifacts: Array.isArray(l.telemetry?.producedArtifacts) ? l.telemetry.producedArtifacts : []
     }));
 
     const telemetry = session.telemetry || {};

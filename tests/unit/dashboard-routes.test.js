@@ -248,6 +248,45 @@ describe('GET /api/dashboard/sessions', () => {
     assert.equal(body.counts.total, 2);
   });
 
+  test('each run carries its Level-3 drill-down payload (telemetry + recap), Mongo-only', async () => {
+    // A worker whose feedback carries a heartbeat (metrics) and an [evidence]
+    // marker (produced artifact) — the read-only telemetry the drill-down renders.
+    const richWorker = {
+      id: 'w-rich', sessionId: 'sess-r', issueIdentifier: 'LIN-501', issueTitle: 'Rich worker',
+      promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken',
+      feedback: [
+        { message: '[working] 6 tools/32s · alive', timestamp: NOW_ISO },
+        { message: '[evidence] PR opened https://github.com/x/y/pull/1', url: 'https://github.com/x/y/pull/1', urlLabel: 'PR #1', timestamp: NOW_ISO },
+        { message: '[done] shipped it', timestamp: NOW_ISO }
+      ]
+    };
+    const perWorkspace = {
+      'ws-a': {
+        live: [],
+        history: [autopilotHistoryItem('sess-r', 'LIN-500'), richWorker],
+        agentStatus: [agentStatusDone('sess-r', 'LIN-500'), agentStatusDone('w-rich', 'LIN-501')]
+      }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const session = { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] };
+    const { req, res } = makeReqRes({ session });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const sess = res.jsonBody.recent.find(s => s.sessionId === 'sess-r');
+    assert.ok(sess, 'session is recent');
+    const run = sess.runs.find(r => r.loopId === 'w-rich');
+    assert.ok(run, 'worker run is present');
+    // Recap fallback + evidence/metrics for the Level-3 node.
+    assert.equal(run.agentSummary, 'all done');
+    assert.ok(run.runtime && typeof run.runtime === 'object', 'run carries runtime telemetry');
+    assert.ok(run.metrics.length >= 1, 'run carries activity metrics');
+    assert.equal(run.metrics[0].toolCount, 6);
+    assert.equal(run.producedArtifacts.length, 1, 'run carries produced artifacts');
+    assert.equal(run.producedArtifacts[0].url, 'https://github.com/x/y/pull/1');
+  });
+
   test('a [failed] worker yields an error-status session', async () => {
     const failWorker = { id: 'wf', sessionId: 'sess-9', issueIdentifier: 'LIN-301', issueTitle: 'T', promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken', feedback: [{ message: '[failed] broke', timestamp: NOW_ISO }] };
     const perWorkspace = {

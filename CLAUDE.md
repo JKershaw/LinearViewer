@@ -142,7 +142,7 @@ public/
   dispatch.css / dispatch.js    Dispatch page (prompt, queue, tokens, history)
   pipeline.css / pipeline.js    Pipeline floor view (polling, diffing, overlays)
   collective.css / collective.js  Collective page (setup, transcript poll, say box)
-  observation.css / observation.js  Autopilot Observation page (sessionId-grouped sessions poll, status banner, workspace filters, Level-1 active feed + collapsible completed archive, Level-2 session cards with status pill / one-sentence summary / runtime+model / per-worker-run progress bar; LIN-595)
+  observation.css / observation.js  Autopilot Observation page (sessionId-grouped sessions poll, status banner, workspace filters, Level-1 active feed + collapsible completed archive, Level-2 session cards with status pill / one-sentence summary / runtime+model / per-worker-run progress bar, Level-3 drill-down: tasks-touched + relationships (session-context) with lazy Linear hydration, per-task worker-session tree with phase/recap/metric-chips, per-node activity log + produced-artifact links + on-demand run-summary next steps; LIN-595)
   roadmap.css / roadmap.js      Roadmap page
   ship.css / ship.js            Ship radial view
   swim.css / swim.js            Swim lanes view
