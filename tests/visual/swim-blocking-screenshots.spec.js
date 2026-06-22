@@ -19,10 +19,16 @@ test.describe.configure({ mode: 'serial' });
 
 test.describe('Swim Blocking Screenshots', () => {
   test.beforeEach(async ({ page }) => {
+    // Flow is the default layout; this maker captures the horizontal lane view
+    // (lanes, max-lanes, blocker connectors), so pin orientation to horizontal
+    // before navigation. Without this, the baselines silently track the default
+    // layout (see LIN-547). addInitScript persists across navigations, so don't
+    // clear swim-settings afterwards or the pin would be wiped.
+    await page.addInitScript(() => {
+      localStorage.setItem('swim-settings', JSON.stringify({ orientation: 'horizontal' }));
+    });
     // Use swim sample data (includes cross-project blocking edges)
     await page.goto('/test/set-session?swimSample=true');
-    // Clear persisted settings for clean screenshots
-    await page.evaluate(() => localStorage.removeItem('swim-settings'));
     await page.goto(SWIM_URL);
     await page.waitForLoadState('networkidle');
   });
