@@ -11,7 +11,7 @@ LinearViewer LIN-385/389/428) are curated real text; the descent chains are reco
 to `started` (the real tasks have since closed). Synthetic FIX-448-leaf is deliberately
 constructed (see its note). Regenerate real fixtures with `scripts/eval/build-recommend-fixtures.mjs`.
 
-**Latest baseline:** `scripts/eval/recommend-baseline/2026-06-12/`
+**Latest baseline:** `scripts/eval/recommend-baseline/2026-06-22/`
 - `table.md` — compact per-run table (descent path / terminal / action / prompt length)
 - `run.json` — full capture incl. every prompt + reasoning
 
