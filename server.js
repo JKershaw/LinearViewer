@@ -945,6 +945,17 @@ async function getWorkspaceAccessToken(urlKey) {
   return (await resolveWorkspaceAccess(urlKey)).token;
 }
 
+// Load a workspace's canonical issue set (the dashboard session-context endpoint,
+// LIN-593). Mirrors the Context API's data path: test-token workspaces read the
+// Linear-shaped mock, real ones read through the provider. Returns [] defensively.
+async function fetchWorkspaceIssues(workspace) {
+  if (!workspace) return [];
+  const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
+  if (isTestMode) return testMockData.issues;
+  const { issues } = await getProviderForWorkspace(workspace).fetchProjects(getWorkspaceToken(workspace));
+  return issues || [];
+}
+
 // getWorkspaceOpenRouterKey: resolves the token creator's OpenRouter API key for
 // proxy consumers. The key is read directly from the durable per-user preferences
 // store (LIN-498), keyed by the token creator's linearUserId — the single source
@@ -988,7 +999,7 @@ app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyToke
 // Mount dashboard routes (experimental combined realtime autopilot dashboard — LIN-509).
 // Merges Mongo-only Loop reads across session.workspaces; Linear is hydrated lazily
 // (drill-down only), never fanned out per poll.
-app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatusStore, runSummaryCacheStore, sessionSummaryCacheStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, getOpenRouterSource, getDeployInfo }))
+app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatusStore, runSummaryCacheStore, sessionSummaryCacheStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo }))
 
 // Mount task-chat routes (experimental "talk to a task" conversation).
 app.use(createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo }))

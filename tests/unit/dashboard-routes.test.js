@@ -73,7 +73,7 @@ function makeReqRes({ session = {}, workspace = null, params = {}, query = {} } 
   return { req, res };
 }
 
-function makeRouter(perWorkspace, { runSummaryCacheStore, sessionSummaryCacheStore } = {}) {
+function makeRouter(perWorkspace, { runSummaryCacheStore, sessionSummaryCacheStore, issues } = {}) {
   const { dispatchQueueStore, agentStatusStore } = makeStores(perWorkspace);
   return createDashboardRoutes({
     workspaceFromUrl: (req, res, next) => next(),
@@ -84,6 +84,7 @@ function makeRouter(perWorkspace, { runSummaryCacheStore, sessionSummaryCacheSto
     freeTierStore: { async tryUse() { return { allowed: true }; } },
     getWorkspaceAccessToken: async () => 'token',
     fetchIssueContext: async () => ({ issue: { state: { name: 'Done', type: 'completed' }, labels: { nodes: [] } } }),
+    fetchWorkspaceIssues: async () => issues || [],
     getOpenRouterSource: () => 'env',
     getDeployInfo: () => ({})
   });
@@ -392,6 +393,82 @@ describe('session-summary endpoint', () => {
     assert.equal(res.jsonBody.statusLineLoopId, 'w-1');
     // Nothing was cached for the live session.
     assert.equal(await sessCache.get('ws-a', 'sess-2'), null);
+  });
+});
+
+// ─── session-context ───────────────────────────────────────────────────────────
+
+describe('session-context endpoint', () => {
+  // Same terminal session as session-summary: autopilot anchor 'sess-1' on LIN-100
+  // (seed) + worker 'w-1' on LIN-101. So tasksTouched = [LIN-100, LIN-101].
+  function terminalSessionWorkspace() {
+    return {
+      'ws-a': {
+        live: [],
+        history: [autopilotHistoryItem('sess-1', 'LIN-100'), workerHistoryItem('w-1', 'LIN-101', 'sess-1')],
+        agentStatus: [agentStatusDone('sess-1', 'LIN-100'), agentStatusDone('w-1', 'LIN-101')]
+      }
+    };
+  }
+
+  // An issue set where LIN-101 is a breakdown child of the seed LIN-100, created
+  // in the run window (createdAt === dispatchedAt = NOW_ISO) → spun-off.
+  function issueSet() {
+    const mk = (id, identifier, parentIdent, createdAt) => ({
+      id, identifier, title: `Title ${identifier}`, url: `https://x/${identifier}`,
+      state: { name: 'In Progress', type: 'started' },
+      parent: parentIdent ? { id: parentIdent } : null,
+      createdAt,
+      relations: { nodes: [] }, inverseRelations: { nodes: [] }
+    });
+    return [
+      mk('LIN-100', 'LIN-100', null, '2020-01-01T00:00:00.000Z'),     // seed, pre-existing
+      mk('LIN-101', 'LIN-101', 'LIN-100', NOW_ISO)                    // spun-off in window
+    ];
+  }
+
+  test('403 when the feature flag is off', async () => {
+    const router = makeRouter({});
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/session-context/:sessionId');
+    const { req, res } = makeReqRes({ session: {}, workspace: { urlKey: 'ws-a' }, params: { sessionId: 'sess-1' } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 403);
+  });
+
+  test('404 when the session is not found', async () => {
+    const router = makeRouter({ 'ws-a': { history: [], live: [], agentStatus: [] } }, { issues: issueSet() });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/session-context/:sessionId');
+    const { req, res } = makeReqRes({ session: ENABLED, workspace: { urlKey: 'ws-a' }, params: { sessionId: 'nope' } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 404);
+  });
+
+  test('returns a provenance-tagged session graph for the touched tasks', async () => {
+    const router = makeRouter(terminalSessionWorkspace(), { issues: issueSet() });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/session-context/:sessionId');
+    const { req, res } = makeReqRes({ session: ENABLED, workspace: { urlKey: 'ws-a' }, params: { sessionId: 'sess-1' } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const body = res.jsonBody;
+    assert.equal(body.sessionId, 'sess-1');
+    assert.equal(body.seedIssue, 'LIN-100');
+    assert.deepEqual(body.tasksTouched, ['LIN-100', 'LIN-101']);
+    // The graph carries one node per touched task, seed first, each tagged.
+    const tags = Object.fromEntries(body.graph.tasks.map(t => [t.root.identifier, t.provenance]));
+    assert.equal(tags['LIN-100'], 'seed');
+    assert.equal(tags['LIN-101'], 'spun-off', 'breakdown child created in-window is spun-off');
+    // LIN-101's neighborhood shows its parent is the seed (parent/children edge).
+    const child = body.graph.tasks.find(t => t.root.identifier === 'LIN-101');
+    assert.equal(child.parent.identifier, 'LIN-100');
+  });
+
+  test('400 when sessionId is missing', async () => {
+    const router = makeRouter(terminalSessionWorkspace(), { issues: issueSet() });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/session-context/:sessionId');
+    const { req, res } = makeReqRes({ session: ENABLED, workspace: { urlKey: 'ws-a' }, params: {} });
+    await handler(req, res);
+    assert.equal(res.statusCode, 400);
   });
 });
 
