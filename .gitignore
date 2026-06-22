@@ -5,7 +5,10 @@ test-results/
 
 # Bulk auto-fetched proxy task fixtures (fetch-proxy-tasks.mjs writes per-epic subdirs of
 # live Linear text) stay out of this public repo. Exception: curated, deliberately-committed
-# red-baseline fixtures (e.g. the HAR-697 divergence case — Harbour is a public pet project)
-# are checked in so the eval's realistic red bar runs on any clone / in CI.
+# fixtures — the flat *.json files here (routing graded-leaf cases) and the recommend/ context
+# bundles — are checked in (Harbour is a public pet project; LinearViewer is this public repo's
+# own tracker) so the evals' realistic bars run on any clone / in CI without a token (LIN-587).
 scripts/eval/fixtures/*
-!scripts/eval/fixtures/HAR-697-red.json
+!scripts/eval/fixtures/*.json
+!scripts/eval/fixtures/recommend/
+!scripts/eval/fixtures/recommend/*.json

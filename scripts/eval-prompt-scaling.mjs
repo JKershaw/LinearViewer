@@ -121,6 +121,13 @@ const DEEP_RESEARCH = `## Research findings
 
 I traced the dispatch expiry end to end. The TTL constant DISPATCH_TTL_MS lives in lib/dispatch-store.js line 14 (\`24 * 60 * 60 * 1000\`). It is read in three places: the sweep in pruneExpired() (line 88), the poll filter in listAvailable() (line 131), and the expiry stamp written at enqueue() (line 52). The MangoDB file store persists items with an \`expiresAt\` absolute timestamp computed at write time, NOT a relative TTL — so changing the constant only affects items enqueued AFTER the change; existing rows keep their old expiry. There is a unit test tests/unit/dispatch-store.test.js that asserts \`expiresAt - createdAt === 86400000\` (line 41) and an e2e test tests/e2e/dispatch.spec.js that waits on a 24h boundary via a clock mock (line 210). The consumer docs docs/dispatch-integration.md state "Items expire after 24 hours" in two places (the overview and the poll-endpoint section). The proxy events log records an \`expired\` event type that downstream dashboards group by; no schema change needed there. Recommended approach: lift the constant to a named export, update both tests' expected value, update both doc mentions, and add a migration note that in-flight items keep the old expiry. Surface Assessment: [refactor needed: extract DISPATCH_TTL_MS to a single named export consumed by the three call sites before changing the value, so the change lands in one place].`;
 
+// PER-CASE REALITY (LIN-587): every case here is DELIBERATELY SYNTHETIC — there is no
+// real-task equivalent to freeze, because the cases are constructed *scale contrasts*, not
+// routing snapshots. The lower/upper-bound bands, the inflation pair (same task thin vs deep),
+// and the two deceptive guards (terse-but-large / wall-of-context-but-trivial) only exist as
+// matched pairs engineered to isolate one length variable. A committed real fixture cannot
+// provide that controlled contrast, so these stay synthetic by necessity (cf. the routing eval,
+// which DOES freeze real tasks where a real shape exists).
 const CASES = [
   // ---- genuinely small (arm B must shrink) ----
   { id: 'SYN-7 typo', group: 'small', expectScale: 'small',

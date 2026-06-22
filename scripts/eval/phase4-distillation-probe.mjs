@@ -2,6 +2,10 @@
 // the load-bearing constraint? Generates the INF-1 plan prompt under three upstream
 // conditions — thin / raw-deep / distilled-deep — and measures word count + a
 // constraint-recall judge. Proves the structural cut BEFORE building the async seam.
+//
+// LIN-587 audit: one-off mechanism probe (Class B — not a maintained harness; already ran).
+// INF-1 + its raw/distilled upstreams are DELIBERATELY SYNTHETIC — the probe needs a matched
+// thin-vs-deep pair on the same task to isolate inflation, which a real fixture cannot provide.
 import { formatIssueContext } from '../../lib/openrouter.js';
 import { formatAIHintsForMetaPrompt, getAIRecommendationActionNames } from '../../lib/prompt-templates.js';
 import { formatAllSignalsForMetaPrompt } from '../../lib/completion-signals.js';

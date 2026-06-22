@@ -1,0 +1,34 @@
+{
+  "name": "Synthetic",
+  "note": "Deliberately-synthetic fixture (LIN-448) — no real equivalent reproduces this shape in isolation, so it is constructed by hand and kept synthetic on purpose. The LIN-390 shape that looped `implementation` x3: reached implementation via research (NO `plan` step), description ends in a present-tense research 'Next step:' imperative, and a 'PR merged' completion comment sits in the thread. Expected routing: `review`. Honest scope: this is live SHAPE-COVERAGE, not a self-reproducing red test — the authoritative red->green guard is the deterministic structural test in tests/unit/openrouter.test.js ('plan-less landed leaf (LIN-448)'). This target keeps the shape under continuous live measurement so a future prompt edit cannot regress it silently.",
+  "targets": [
+    { "id": "FIX-448-leaf", "role": "plan-less research->implementation leaf, merged but In Progress (expect -> review)" }
+  ],
+  "bundles": {
+    "FIX-448-leaf": {
+      "issue": {
+        "id": "fix-448-leaf-uuid",
+        "identifier": "FIX-448-leaf",
+        "title": "Delete orphaned roadmap test-mode branch; finalize harness boundary header",
+        "description": "## Research findings\n\nThe orphaned `test-mode` branch in `server.js:1177` is dead — no caller reaches it\nsince the harness boundary moved. The harness header is the canonical seam now.\n\n**Next step:** delete `server.js:1177` only; finalize the harness header; verify the\nroadmap + error-handling specs stay green.",
+        "url": "https://linear.app/linearviewer/issue/FIX-448-leaf",
+        "state": { "name": "In Progress", "type": "started" },
+        "createdAt": "2026-06-13T00:00:00.000Z",
+        "labels": []
+      },
+      "parent": null,
+      "siblings": [],
+      "siblingsTotal": 0,
+      "project": { "name": "Autopilot, Recommendation & Prompt Engine", "description": null },
+      "children": [],
+      "comments": [
+        {
+          "body": "## S4 implemented — PR #442 merged ✅\n\nDeleted the orphaned branch and finalized the harness boundary header. CI green on `main`; commit landed.",
+          "createdAt": "2026-06-13T01:00:00.000Z",
+          "user": "engineer"
+        }
+      ],
+      "focusedChild": null
+    }
+  }
+}

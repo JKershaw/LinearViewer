@@ -36,6 +36,11 @@
  *   ONLY        substring case filter  (e.g. ONLY=review)
  *   MAX_TOKENS  output cap             (default 600 — only need through the action line)
  *   OUT_DIR     output dir override    (default scripts/eval/assessment-scaffold-out)
+ *
+ * LIN-587 audit: one-off scaffold spike (Class B — not a maintained harness; already ran).
+ * The default CASES are DELIBERATELY SYNTHETIC (constructed minimal shapes per routing branch);
+ * a real-task path already exists via REAL_DIR mode (committed bundles + gold.json from
+ * fetch-proxy-tasks.mjs), so no re-fixturing is owed here.
  */
 import 'dotenv/config';
 import { writeFileSync, mkdirSync, readFileSync, existsSync } from 'fs';
