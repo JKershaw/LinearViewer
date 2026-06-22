@@ -320,11 +320,21 @@ main.obs-page[data-url-key]             - page container
           .obs-session-summary          - one-sentence session summary (LIN-592)
           .obs-progress > .obs-seg[data-state][data-live]  - per-worker-run progress bar (live segment pulses)
           .obs-summary-gen              - (terminal, uncached) explicit "summarise this session" button
-        .obs-session-body               - (when open) status line + tasks + run list
+        .obs-session-body               - (when open) status line + Level-3 drill-down
+          .obs-tasks > .obs-task        - one block per touched task (seed-first)
+            .obs-task-head              - provenance tag + identifier (link when hydrated) + title + live state/labels
+            .obs-rels > .obs-rel        - relationship neighborhood (parent/children/blocked by/blocks/related)
+            .obs-worker-tree > li.obs-worker[data-state][data-open]  - worker-session nodes
+              button.obs-worker-head[data-loop]  - click to expand a worker run
+                .obs-worker-phase       - #iteration · phase (research/plan/implement/review…)
+                .obs-chips-metric > .obs-chip-metric  - runtime / tool activity / artifact-count chips
+                .obs-worker-recap       - one-line recap (cached run-summary or agent summary)
+              .obs-worker-body          - (when open) ran activity log + produced-artifact links + next
+                .obs-run-gen[data-loop] - (terminal, uncached) explicit "summarise this run" button
 ```
 
 ### Autopilot Observation Endpoints
-- `GET  /workspace/{urlKey}/api/dashboard/sessions` — merged cross-workspace sessionId-grouped feed → `{ workspaces[], active[], recent[], counts, generatedAt }`; each session is workspace-tagged (`workspaceUrlKey`, `workspaceName`) and carries `{ sessionId, seedIssue, seedTitle, tasksTouched[], status, terminal, runCount, runs[], runtime, model, lastActivity }`. Polled every 5s (visibility-gated). Mongo-only, no LLM.
+- `GET  /workspace/{urlKey}/api/dashboard/sessions` — merged cross-workspace sessionId-grouped feed → `{ workspaces[], active[], recent[], counts, generatedAt }`; each session is workspace-tagged (`workspaceUrlKey`, `workspaceName`) and carries `{ sessionId, seedIssue, seedTitle, tasksTouched[], status, terminal, runCount, runs[], runtime, model, lastActivity }`. Each `runs[]` entry carries its Level-3 drill-down payload too — `{ loopId, issueIdentifier, issueTitle, issueUrl, agentState, stage, promptName, kind, iteration, agentSummary, runtime, metrics[], producedArtifacts[] }` (all read-only telemetry, LIN-594). Polled every 5s (visibility-gated). Mongo-only, no LLM.
 - `GET  /workspace/{urlKey}/api/dashboard/loops` — merged cross-workspace flat runs → `{ workspaces[], active[], recent[], counts, generatedAt }`; each run is workspace-tagged. Polled at 5s.
 - `GET|POST /workspace/{urlKey}/api/dashboard/run-summary/{loopId}` — cached short run summary `{ outcome, whatHappened[], blockers[], next }`. POST forces regeneration. `GET ?cachedOnly=1` peeks the cache without generating (204 on a miss). 409 if the run is still active (terminal-only), 404 if unknown.
 - `GET|POST /workspace/{urlKey}/api/dashboard/session-summary/{sessionId}` — cached one-sentence session rollup (terminal-gated). A live session returns a cheap `live:true` status-line proxy (no generation). `GET ?cachedOnly=1` peeks without spending.

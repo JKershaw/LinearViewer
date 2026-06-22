@@ -11,14 +11,20 @@
  *   (with a count) below. Both sorted by most-recent activity (server-sorted).
  * - Level 2 session card (collapsed): status pill, run id + seed task title, the
  *   one-sentence summary (LIN-592), runtime + model (LIN-594), and a per-worker-run
- *   progress bar (the live segment pulses). Expanding shows a status line + the run
- *   list (Level 3 worker-tree drill-down is a later session).
+ *   progress bar (the live segment pulses). Expanding shows a status line + the
+ *   Level-3 body.
+ * - Level 3 body (drill-down): the tasks the session touched, each with its
+ *   relationship neighborhood (session-context, LIN-593) and best-effort live
+ *   Linear state (lazy hydration); under each task its worker-session tree, where
+ *   a node shows phase / recap / metric chips and expands to the activity log,
+ *   produced-artifact links, and next steps (run-summary + telemetry, LIN-594).
  * - Workspace chips: pure client-side filter over already-merged data (no refetch).
  *
- * Cost contract (LIN-595): the poll never spends an LLM call. Session summaries are
- * fetched lazily, once per session, and never auto-generated for a terminal session
- * (we peek `?cachedOnly=1`); a live session's status line is the endpoint's cheap,
- * generation-free proxy. Generation only happens on an explicit button.
+ * Cost contract (LIN-595): the poll never spends an LLM call. Session AND per-run
+ * summaries are fetched lazily, once each, and never auto-generated (we peek
+ * `?cachedOnly=1`); a live session's status line is the endpoint's cheap,
+ * generation-free proxy. LLM generation happens only on an explicit button. Linear
+ * hydration and the relationship graph are drill-down-only — never on the feed poll.
  *
  * Loaded only on the /observation page. Requires common.js (escapeHtml, window.api,
  * relativeTime).
@@ -43,6 +49,18 @@ const expandedSessions = new Set();        // sessionId
 const summaryState = new Map();            // sessionId → { live, outcome, statusLine, pending }
 const summaryFetched = new Set();          // sessionId already peeked/fetched this session sig
 const knownSessions = new Set();           // sessionId (for new-row animation)
+
+// ─── Level-3 drill-down state (LIN-595 Session B) ───────────────────────────────
+// All lazy and drill-down-only: nothing here is fetched until a session is opened.
+const contextState = new Map();            // sessionId → { pending, graph, error }
+const contextFetched = new Set();          // sessionId (context fetched once per drill-in)
+const hydrationState = new Map();          // `${wsUrlKey}::${identifier}` → { state, labels, url, hydrated }
+const hydrationFetched = new Set();        // `${wsUrlKey}::${identifier}` (one Linear hit per task per drill-in)
+const runSummaryState = new Map();         // loopId → { pending, outcome, next, error }
+const runSummaryFetched = new Set();       // loopId (peeked once per run signature)
+const expandedRuns = new Set();            // loopId (worker-node drill-down)
+
+const PROVENANCE_LABEL = { seed: 'seed', descended: 'descended', 'spun-off': 'spun-off' };
 
 const STATUS_ICON = { 'in-progress': '◐', done: '✓', error: '✕' };
 const STATE_ICON = { complete: '✓', error: '✕', running: '◐', waiting: '◌', queued: '○' };
@@ -180,6 +198,14 @@ function makeSessionCard(s) {
     if (e.target.closest('.obs-summary-gen')) return;
     toggleSession(s.sessionId);
   });
+  // Delegated Level-3 interactions inside the body (re-rendered on every poll, so
+  // per-node listeners would leak — delegate once on the stable body element).
+  body.addEventListener('click', (e) => {
+    const gen = e.target.closest('.obs-run-gen');
+    if (gen) { e.stopPropagation(); generateRunSummary(s.sessionId, gen.dataset.loop); return; }
+    const workerHead = e.target.closest('.obs-worker-head');
+    if (workerHead) { toggleRun(s.sessionId, workerHead.dataset.loop); }
+  });
   return li;
 }
 
@@ -237,35 +263,243 @@ function renderFeeds() {
   renderBanner();
 }
 
-// ─── Session body (expanded) ──────────────────────────────────────────────────
+// ─── Session body (expanded — Level 3 drill-down) ───────────────────────────────
+//
+// Composes three reused, drill-down-only sources into the progressive-disclosure
+// spec (LIN-595): the deterministic session-context relationship graph (tasks
+// touched + their neighborhood, LIN-593), best-effort live Linear state (lazy
+// hydration), and per-task worker-run nodes — each carrying its read-only
+// telemetry evidence (LIN-594) and an on-demand run-summary recap. No parallel
+// data path: every fetch targets an endpoint Session A already shipped.
 
 function renderSessionBody(body, s) {
   body.dataset.sig = sessionSignature(s);
   const st = summaryState.get(s.sessionId);
   const statusLine = st && (st.statusLine || st.outcome);
-  const tasksHtml = s.tasksTouched.length
-    ? `<p class="obs-body-tasks"><span class="obs-body-lbl">tasks</span> ${s.tasksTouched.map(t => escapeHtml(t)).join(' · ')}</p>`
-    : '';
-
-  const runsHtml = s.runs.length
-    ? `<ul class="obs-runs">${s.runs.map(renderRunRow).join('')}</ul>`
-    : `<p class="obs-dim">No worker runs recorded yet.</p>`;
 
   body.innerHTML = `
     ${statusLine ? `<p class="obs-body-status"><span class="obs-body-lbl">status</span> ${escapeHtml(statusLine)}</p>` : ''}
-    ${tasksHtml}
-    ${runsHtml}`;
+    ${renderTasks(s)}`;
 }
 
-function renderRunRow(run) {
+// Group a session's worker runs by the task they ran against.
+function runsByTask(s) {
+  const groups = new Map();
+  for (const r of s.runs) {
+    const key = r.issueIdentifier || '—';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(r);
+  }
+  return groups;
+}
+
+// Task display order: tasksTouched first (seed-first, as the server emits), then
+// any run-only task not already covered.
+function taskOrder(s, groups) {
+  const order = [];
+  const seen = new Set();
+  for (const t of s.tasksTouched) { if (!seen.has(t)) { seen.add(t); order.push(t); } }
+  for (const k of groups.keys()) { if (!seen.has(k)) { seen.add(k); order.push(k); } }
+  return order;
+}
+
+function renderTasks(s) {
+  const ctx = contextState.get(s.sessionId);
+  const groups = runsByTask(s);
+  const order = taskOrder(s, groups);
+  if (!order.length) return `<p class="obs-dim">No tasks recorded for this session yet.</p>`;
+
+  // Index context task-nodes by identifier (case-insensitive) for the merge.
+  const ctxByIdent = new Map();
+  if (ctx && ctx.graph && Array.isArray(ctx.graph.tasks)) {
+    for (const t of ctx.graph.tasks) {
+      if (t.root && t.root.identifier) ctxByIdent.set(String(t.root.identifier).toLowerCase(), t);
+    }
+  }
+
+  const ctxNote = ctx && ctx.pending
+    ? `<p class="obs-context-note obs-dim">loading relationships…</p>`
+    : (ctx && ctx.error ? `<p class="obs-context-note obs-dim">relationships unavailable</p>` : '');
+
+  const blocks = order.map(ident => {
+    const node = ctxByIdent.get(String(ident).toLowerCase()) || null;
+    return renderTaskBlock(s, ident, node, groups.get(ident) || []);
+  }).join('');
+
+  return `<div class="obs-tasks">${ctxNote}${blocks}</div>`;
+}
+
+function renderTaskBlock(s, ident, node, runs) {
+  const root = node && node.root;
+  const title = (root && root.title) || (runs[0] && runs[0].issueTitle) || '';
+  const provenance = node && node.provenance;
+  const prov = provenance
+    ? `<span class="obs-prov" data-prov="${escapeHtml(provenance)}">${escapeHtml(PROVENANCE_LABEL[provenance] || provenance)}</span>`
+    : '';
+
+  // Live Linear state/labels win when hydrated; otherwise fall back to the
+  // deterministic context node's state (still no network on the feed path).
+  const hydration = hydrationState.get(`${s.workspaceUrlKey}::${ident}`);
+  const state = (hydration && hydration.state) || (root ? { name: root.stateName, type: root.stateType } : null);
+  const stateChip = state && state.name
+    ? `<span class="obs-task-state" data-type="${escapeHtml(state.type || '')}">${escapeHtml(state.name)}</span>` : '';
+  const labels = hydration && Array.isArray(hydration.labels) ? hydration.labels : [];
+  const labelChips = labels.slice(0, 4).map(l => `<span class="obs-task-label">${escapeHtml(l)}</span>`).join('');
+  const url = (hydration && hydration.url) || (root && root.url) || null;
+  const identHtml = url
+    ? `<a class="obs-task-ident" href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(ident)}</a>`
+    : `<span class="obs-task-ident">${escapeHtml(ident)}</span>`;
+
+  const runsHtml = runs.length
+    ? `<ul class="obs-worker-tree">${runs.map(renderWorkerNode).join('')}</ul>`
+    : `<p class="obs-dim obs-worker-empty">No worker runs under this task.</p>`;
+
+  return `<div class="obs-task">
+      <div class="obs-task-head">
+        ${prov}${identHtml}
+        <span class="obs-task-title">${escapeHtml(String(title))}</span>
+        ${stateChip}${labelChips}
+      </div>
+      ${node ? renderRelationships(node) : ''}
+      ${runsHtml}
+    </div>`;
+}
+
+function relList(nodes, max = 3) {
+  const ids = nodes.map(n => n.identifier);
+  const shown = ids.slice(0, max).map(escapeHtml).join(', ');
+  return shown + (ids.length > max ? ` +${ids.length - max}` : '');
+}
+
+function renderRelationships(node) {
+  const bits = [];
+  if (node.parent && node.parent.identifier) {
+    bits.push(`<span class="obs-rel"><span class="obs-rel-k">parent</span> ${escapeHtml(node.parent.identifier)}</span>`);
+  }
+  if (Array.isArray(node.children) && node.children.length) {
+    const n = node.children.length + (node.childrenTruncated || 0);
+    bits.push(`<span class="obs-rel"><span class="obs-rel-k">children</span> ${n}</span>`);
+  }
+  if (Array.isArray(node.blockers) && node.blockers.length) {
+    bits.push(`<span class="obs-rel obs-rel-block"><span class="obs-rel-k">blocked by</span> ${relList(node.blockers)}</span>`);
+  }
+  if (Array.isArray(node.blocked) && node.blocked.length) {
+    bits.push(`<span class="obs-rel"><span class="obs-rel-k">blocks</span> ${relList(node.blocked)}</span>`);
+  }
+  if (Array.isArray(node.related) && node.related.length) {
+    bits.push(`<span class="obs-rel"><span class="obs-rel-k">related</span> ${relList(node.related)}</span>`);
+  }
+  return bits.length ? `<div class="obs-rels">${bits.join('')}</div>` : '';
+}
+
+// ─── Worker-session node (one run) ──────────────────────────────────────────────
+
+function workerPhase(run) {
+  if (run.kind === 'autopilot') return 'autopilot';
+  return run.stage || run.promptName || run.kind || 'run';
+}
+
+function isTerminalRun(run) {
+  return run.agentState === 'complete' || run.agentState === 'error';
+}
+
+// Pick the richest tool-activity figure across a run's heartbeats.
+function toolActivity(metrics) {
+  if (!Array.isArray(metrics) || !metrics.length) return null;
+  let best = null;
+  for (const m of metrics) {
+    const v = m.total != null ? m.total : m.toolCount;
+    if (v != null && (best == null || v > best)) best = v;
+  }
+  return best;
+}
+
+function renderChips(run) {
+  const chips = [];
+  const rt = formatRuntime(run.runtime);
+  if (rt) chips.push(`<span class="obs-chip-metric">${escapeHtml(rt)}</span>`);
+  const tools = toolActivity(run.metrics);
+  if (tools != null) chips.push(`<span class="obs-chip-metric">${tools} tool${tools === 1 ? '' : 's'}</span>`);
+  const arts = Array.isArray(run.producedArtifacts) ? run.producedArtifacts.length : 0;
+  if (arts) chips.push(`<span class="obs-chip-metric">${arts} link${arts === 1 ? '' : 's'}</span>`);
+  return chips.length ? `<span class="obs-chips-metric">${chips.join('')}</span>` : '';
+}
+
+function renderRecapLine(run) {
+  const rs = runSummaryState.get(run.loopId);
+  if (rs && rs.pending) return `<span class="obs-worker-recap obs-dim">summarising…</span>`;
+  if (rs && rs.outcome) return `<span class="obs-worker-recap">${escapeHtml(rs.outcome)}</span>`;
+  if (run.agentSummary) return `<span class="obs-worker-recap">${escapeHtml(run.agentSummary)}</span>`;
+  if (!isTerminalRun(run)) return `<span class="obs-worker-recap obs-dim">◐ running…</span>`;
+  return `<span class="obs-worker-recap obs-dim">—</span>`;
+}
+
+function renderWorkerNode(run) {
   const icon = STATE_ICON[run.agentState] || '○';
-  const label = run.kind === 'autopilot' ? 'autopilot' : (run.promptName || run.stage || 'run');
-  return `<li class="obs-run" data-state="${escapeHtml(run.agentState || '')}">
-      <span class="obs-run-icon" data-state="${escapeHtml(run.agentState || '')}">${escapeHtml(icon)}</span>
-      <span class="obs-run-label">${run.iteration != null ? '#' + run.iteration + ' · ' : ''}${escapeHtml(label)}</span>
-      <span class="obs-run-id">${escapeHtml(run.issueIdentifier || '')}</span>
+  const expanded = expandedRuns.has(run.loopId);
+  const detail = expanded ? renderWorkerDetail(run) : '';
+  const loop = escapeHtml(String(run.loopId));
+  return `<li class="obs-worker" data-state="${escapeHtml(run.agentState || '')}"${expanded ? ' data-open="1"' : ''}>
+      <button type="button" class="obs-worker-head" data-loop="${loop}" aria-expanded="${expanded ? 'true' : 'false'}">
+        <span class="obs-worker-icon" data-state="${escapeHtml(run.agentState || '')}">${escapeHtml(icon)}</span>
+        <span class="obs-worker-main">
+          <span class="obs-worker-line">
+            <span class="obs-worker-phase">${run.iteration != null ? '#' + run.iteration + ' · ' : ''}${escapeHtml(workerPhase(run))}</span>
+            ${renderChips(run)}
+          </span>
+          ${renderRecapLine(run)}
+        </span>
+        <span class="obs-worker-caret" aria-hidden="true">▸</span>
+      </button>
+      ${detail ? `<div class="obs-worker-body">${detail}</div>` : ''}
     </li>`;
 }
+
+function renderActivityLog(run) {
+  const metrics = Array.isArray(run.metrics) ? run.metrics : [];
+  if (metrics.length) {
+    const lines = metrics.slice(-6).map(m => {
+      const parts = [];
+      if (m.toolCount != null) parts.push(`${m.toolCount} tool${m.toolCount === 1 ? '' : 's'}`);
+      if (m.elapsedSeconds != null) parts.push(formatRuntime({ ms: m.elapsedSeconds * 1000 }));
+      if (m.breakdown) parts.push(Object.entries(m.breakdown).map(([k, v]) => `${k}×${v}`).join(' '));
+      return `<li class="obs-act">${escapeHtml(parts.join(' · ') || m.raw || 'activity')}</li>`;
+    }).join('');
+    return `<div class="obs-detail-block"><span class="obs-body-lbl">ran</span><ul class="obs-acts">${lines}</ul></div>`;
+  }
+  if (run.agentSummary) {
+    return `<div class="obs-detail-block"><span class="obs-body-lbl">ran</span> <span class="obs-detail-text">${escapeHtml(run.agentSummary)}</span></div>`;
+  }
+  return `<div class="obs-detail-block obs-dim"><span class="obs-body-lbl">ran</span> no activity recorded</div>`;
+}
+
+function renderArtifacts(run) {
+  const arts = Array.isArray(run.producedArtifacts) ? run.producedArtifacts : [];
+  if (!arts.length) return '';
+  const items = arts.map(a =>
+    `<li><a class="obs-artifact" href="${escapeHtml(a.url)}" target="_blank" rel="noopener">${escapeHtml(a.label || a.url)}</a></li>`
+  ).join('');
+  return `<div class="obs-detail-block"><span class="obs-body-lbl">produced</span><ul class="obs-artifacts">${items}</ul></div>`;
+}
+
+function renderNext(run) {
+  const rs = runSummaryState.get(run.loopId);
+  if (rs && rs.next) {
+    return `<div class="obs-detail-block"><span class="obs-body-lbl">next</span> <span class="obs-detail-text">${escapeHtml(rs.next)}</span></div>`;
+  }
+  // A terminal run with no cached recap → offer an explicit, cost-aware generate
+  // (a poll/drill-in never auto-spends an LLM call).
+  if (isTerminalRun(run) && !(rs && (rs.outcome || rs.next || rs.pending))) {
+    return `<div class="obs-detail-block"><button type="button" class="obs-run-gen" data-loop="${escapeHtml(String(run.loopId))}">summarise this run</button></div>`;
+  }
+  return '';
+}
+
+function renderWorkerDetail(run) {
+  return `${renderActivityLog(run)}${renderArtifacts(run)}${renderNext(run)}`;
+}
+
+// ─── Expand / collapse + lazy drill-down loaders ────────────────────────────────
 
 function toggleSession(sessionId) {
   if (expandedSessions.has(sessionId)) expandedSessions.delete(sessionId);
@@ -273,6 +507,115 @@ function toggleSession(sessionId) {
   const el = activeCards.get(sessionId) || recentCards.get(sessionId);
   const s = sessionIndex.get(sessionId);
   if (el && s) applySessionState(el, s);
+  if (s && expandedSessions.has(sessionId)) ensureSessionDetail(s);
+}
+
+function toggleRun(sessionId, loopId) {
+  if (expandedRuns.has(loopId)) expandedRuns.delete(loopId);
+  else expandedRuns.add(loopId);
+  const s = sessionIndex.get(sessionId);
+  if (!s) return;
+  if (expandedRuns.has(loopId)) {
+    const run = s.runs.find(r => String(r.loopId) === String(loopId));
+    if (run) ensureRunSummary(s, run);
+  }
+  repaintSessionBody(sessionId);
+}
+
+// Re-render only an open session's body from current state (after a lazy fetch).
+function repaintSessionBody(sessionId) {
+  const s = sessionIndex.get(sessionId);
+  const el = activeCards.get(sessionId) || recentCards.get(sessionId);
+  if (!s || !el) return;
+  const body = el.querySelector('.obs-session-body');
+  if (body && !body.hidden) renderSessionBody(body, s);
+}
+
+// On drill-in: lazily load the relationship graph + best-effort live Linear
+// state. Both are drill-down-only (never on the feed poll) and fetched once.
+function ensureSessionDetail(s) {
+  ensureSessionContext(s);
+  ensureHydration(s);
+}
+
+async function ensureSessionContext(s) {
+  if (contextFetched.has(s.sessionId)) return;
+  contextFetched.add(s.sessionId);
+  const urlKey = observationData?.urlKey;
+  if (!urlKey) return;
+  contextState.set(s.sessionId, { pending: true, graph: null, error: false });
+  repaintSessionBody(s.sessionId);
+  try {
+    const res = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dashboard/session-context/${encodeURIComponent(s.sessionId)}`);
+    if (!res.ok) throw new Error('context ' + res.status);
+    const data = await res.json();
+    contextState.set(s.sessionId, { pending: false, graph: data.graph || null, error: false });
+  } catch {
+    contextState.set(s.sessionId, { pending: false, graph: null, error: true });
+    contextFetched.delete(s.sessionId); // allow a retry on the next drill-in
+  }
+  repaintSessionBody(s.sessionId);
+}
+
+async function ensureHydration(s) {
+  const urlKey = observationData?.urlKey;
+  if (!urlKey) return;
+  const wsKey = s.workspaceUrlKey;
+  for (const ident of s.tasksTouched) {
+    const key = `${wsKey}::${ident}`;
+    if (hydrationFetched.has(key)) continue;
+    hydrationFetched.add(key);
+    try {
+      const res = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dashboard/hydrate/${encodeURIComponent(wsKey)}/${encodeURIComponent(ident)}`);
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (data && data.hydrated) {
+        hydrationState.set(key, { hydrated: true, state: data.state || null, labels: data.labels || [], url: data.url || null });
+        repaintSessionBody(s.sessionId);
+      }
+    } catch { /* best-effort: a hydration miss still leaves the Mongo-sourced detail */ }
+  }
+}
+
+// Peek a terminal worker run's cached run-summary (outcome + next) without
+// spending — mirrors the session-summary cost contract. Active runs are skipped
+// (the endpoint 409s; the recap falls back to the run's own agentSummary).
+async function ensureRunSummary(s, run) {
+  const loopId = run.loopId;
+  if (!isTerminalRun(run) || runSummaryFetched.has(loopId)) return;
+  runSummaryFetched.add(loopId);
+  const urlKey = observationData?.urlKey;
+  if (!urlKey) return;
+  try {
+    const res = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dashboard/run-summary/${encodeURIComponent(loopId)}?cachedOnly=1`);
+    if (res.status !== 200) return; // 204 miss → leave the "summarise this run" affordance
+    const data = await res.json();
+    storeRunSummary(loopId, data);
+    repaintSessionBody(s.sessionId);
+  } catch { /* best-effort */ }
+}
+
+function storeRunSummary(loopId, data) {
+  const summary = (data && data.summary) || {};
+  runSummaryState.set(loopId, { pending: false, outcome: summary.outcome || '', next: summary.next || '', error: false });
+}
+
+async function generateRunSummary(sessionId, loopId) {
+  const urlKey = observationData?.urlKey;
+  if (!urlKey) return;
+  runSummaryState.set(loopId, { pending: true, outcome: '', next: '', error: false });
+  repaintSessionBody(sessionId);
+  try {
+    const data = await window.api(
+      `/workspace/${encodeURIComponent(urlKey)}/api/dashboard/run-summary/${encodeURIComponent(loopId)}`,
+      { method: 'POST', on401: false }
+    );
+    storeRunSummary(loopId, data);
+  } catch {
+    runSummaryState.delete(loopId);
+    runSummaryFetched.delete(loopId);
+  }
+  repaintSessionBody(sessionId);
 }
 
 // ─── Session summary (lazy, cost-aware) ───────────────────────────────────────
