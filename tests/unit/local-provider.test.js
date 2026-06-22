@@ -13,6 +13,7 @@
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert';
 import { LocalProvider, localProvider } from '../../lib/providers/local/index.js';
+import { NotImplementedError } from '../../lib/providers/interface.js';
 import { getProvider } from '../../lib/providers/registry.js';
 import { createLocalProvider } from '../fixtures/local-harness.js';
 
@@ -333,5 +334,235 @@ describe('LocalProvider writes', () => {
   test('unconfigured provider throws a clear error', async () => {
     const bare = new LocalProvider();
     await assert.rejects(() => bare.fetchProjects(SCOPE), /store not configured/);
+  });
+});
+
+// ===========================================================================
+// LIN-582 Phase A — comprehensive contract coverage against LocalProvider.
+//
+// Fills the read/write/edge-case gaps the earlier slices left open so the
+// provider-contract suite exercises EVERY listed seam against a genuine store
+// (no mock short-circuit). New ground here:
+//   - fetchProjectsList (the issues-free read);
+//   - fetchIssueComments as a direct read (sort order + user fallback);
+//   - the no-soft-delete boundary ("trashed issue" — always trashed:false);
+//   - capability declines (supports() === false → NotImplementedError, the
+//     provider-level root the proxy maps to 422 CAPABILITY_NOT_SUPPORTED);
+//   - scope/partition isolation across two store partitions.
+// ===========================================================================
+
+describe('LocalProvider fetchProjectsList (LIN-582)', () => {
+  let provider, store;
+  beforeEach(async () => {
+    ({ provider, store } = makeProvider());
+    await store.seed(SCOPE, {
+      projects: [
+        { id: 'p2', name: 'Beta', content: 'b', url: '/b', sortOrder: 2 },
+        { id: 'p1', name: 'Alpha', content: 'a', url: '/a', sortOrder: 1 },
+      ],
+      issues: [{ id: 'i1', identifier: 'LOCAL-1', title: 'T', projectId: 'p1' }],
+    });
+  });
+
+  test('returns canonical projects only (no issues), sorted by sortOrder', async () => {
+    const projects = await provider.fetchProjectsList(SCOPE);
+    // listProjects sorts by sortOrder, so Alpha (1) precedes Beta (2).
+    assert.deepEqual(projects, [
+      { id: 'p1', name: 'Alpha', content: 'a', url: '/a', sortOrder: 1 },
+      { id: 'p2', name: 'Beta', content: 'b', url: '/b', sortOrder: 2 },
+    ]);
+  });
+
+  test('returns [] for an empty partition', async () => {
+    assert.deepEqual(await provider.fetchProjectsList('empty-scope'), []);
+  });
+});
+
+describe('LocalProvider fetchIssueComments direct read (LIN-582)', () => {
+  let provider, store;
+  beforeEach(async () => {
+    ({ provider, store } = makeProvider());
+    await store.seed(SCOPE, {
+      projects: [{ id: 'p1', name: 'Alpha', sortOrder: 1 }],
+      issues: [
+        { id: 'i1', identifier: 'LOCAL-1', title: 'Has comments', projectId: 'p1', comments: [
+          // Seeded out of order + one with no `user` to prove the sort + fallback.
+          { id: 'c2', body: 'second', createdAt: '2024-02-02T00:00:00Z', user: 'Bob' },
+          { id: 'c1', body: 'first', createdAt: '2024-01-01T00:00:00Z' },
+        ] },
+        { id: 'i2', identifier: 'LOCAL-2', title: 'No comments', projectId: 'p1' },
+      ],
+    });
+  });
+
+  test('returns comments oldest-first with a user fallback of "Local"', async () => {
+    const comments = await provider.fetchIssueComments(SCOPE, 'i1');
+    assert.deepEqual(comments, [
+      { id: 'c1', body: 'first', createdAt: '2024-01-01T00:00:00Z', user: 'Local' },
+      { id: 'c2', body: 'second', createdAt: '2024-02-02T00:00:00Z', user: 'Bob' },
+    ]);
+  });
+
+  test('returns [] for an issue with no comments', async () => {
+    assert.deepEqual(await provider.fetchIssueComments(SCOPE, 'i2'), []);
+  });
+
+  test('throws for a missing issue', async () => {
+    await assert.rejects(() => provider.fetchIssueComments(SCOPE, 'nope'), /Issue not found/);
+  });
+});
+
+describe('LocalProvider search edge cases (LIN-582)', () => {
+  let provider, store;
+  beforeEach(async () => {
+    ({ provider, store } = makeProvider());
+    await store.seed(SCOPE, {
+      projects: [{ id: 'p1', name: 'Alpha', sortOrder: 1 }],
+      issues: [
+        { id: 'i1', identifier: 'LOCAL-1', title: 'Authentication bug', description: 'login fails', projectId: 'p1' },
+        { id: 'i2', identifier: 'LOCAL-2', title: 'Unrelated', description: 'something else', projectId: 'p1' },
+      ],
+    });
+  });
+
+  test('matches title OR description, case-insensitively', async () => {
+    assert.deepEqual((await provider.search(SCOPE, 'AUTHENTICATION')).map(i => i.id), ['i1']);
+    assert.deepEqual((await provider.search(SCOPE, 'LOGIN')).map(i => i.id), ['i1']);
+  });
+
+  test('empty query returns every issue; a no-match query returns []', async () => {
+    assert.equal((await provider.search(SCOPE, '')).length, 2);
+    assert.deepEqual(await provider.search(SCOPE, 'zzzznope'), []);
+  });
+});
+
+// "Trashed issue" edge case: the local store models NO soft-delete (see
+// local-store.js — deleteIssue hard-removes; there is no trashed flag). The
+// honest contract is therefore that every proxy-surface read reports
+// trashed:false, and a genuinely deleted issue simply vanishes (resolves to
+// null), never returning as a stale "ghost" the way a Linear soft-delete can.
+// Pinning this guards the boundary the provider header documents.
+describe('LocalProvider no-soft-delete boundary (LIN-582)', () => {
+  let provider, store;
+  beforeEach(async () => {
+    ({ provider, store } = makeProvider());
+    await store.seed(SCOPE, {
+      projects: [{ id: 'p1', name: 'Alpha', sortOrder: 1 }],
+      issues: [{ id: 'i1', identifier: 'LOCAL-1', title: 'Live', description: 'd', projectId: 'p1', labels: ['bug'] }],
+    });
+  });
+
+  test('proxy-surface reads always report trashed:false for a live issue', async () => {
+    assert.equal((await provider.issueDetail(SCOPE, 'i1')).trashed, false);
+    assert.deepEqual(await provider.issueWriteGuard(SCOPE, 'i1'), { id: 'i1', trashed: false });
+    assert.equal((await provider.issueDescription(SCOPE, 'i1')).trashed, false);
+    assert.equal((await provider.issueLabels(SCOPE, 'i1')).trashed, false);
+    assert.equal((await provider.relations(SCOPE, 'i1')).trashed, false);
+  });
+
+  test('a deleted issue vanishes (null), never a stale trashed ghost', async () => {
+    assert.equal(await store.deleteIssue(SCOPE, 'i1'), true);
+    // No ghost: every resolve-by-id surface reports "gone", not a trashed record.
+    assert.equal(await provider.issueDetail(SCOPE, 'i1'), null);
+    assert.equal(await provider.issueWriteGuard(SCOPE, 'i1'), null);
+    assert.equal(await provider.issueDescription(SCOPE, 'i1'), null);
+    assert.equal(await provider.issueLabels(SCOPE, 'i1'), null);
+    assert.equal(await provider.relations(SCOPE, 'i1'), null);
+    await assert.rejects(() => provider.fetchIssueContext(SCOPE, 'i1'), /Issue not found/);
+  });
+});
+
+// Capability declines — the provider-level root of the consumer proxy's 422
+// CAPABILITY_NOT_SUPPORTED (routes/proxy.js denyIfUnsupported gates on exactly
+// this supports() result before the write, so an unsupported op declines cleanly
+// instead of bubbling NotImplementedError into a 500). LocalProvider deliberately
+// leaves part of the declared surface unimplemented; this pins which.
+describe('LocalProvider capability declines (LIN-582)', () => {
+  const { provider } = makeProvider();
+
+  // Surface methods LocalProvider does NOT override → inherit the base throw.
+  const DECLINED = ['fetchOrganization', 'fetchViewer', 'fetchFocusedChild', 'updateComment', 'deleteComment'];
+
+  test('supports() is false for the unimplemented surface methods', () => {
+    for (const m of DECLINED) {
+      assert.equal(provider.supports(m), false, `expected supports('${m}') === false`);
+    }
+  });
+
+  test('calling a declined method throws NotImplementedError (code NOT_IMPLEMENTED, named provider)', () => {
+    // The base stubs throw synchronously (not rejected promises), so assert.throws.
+    for (const m of DECLINED) {
+      assert.throws(() => provider[m]('scope'), (err) => {
+        assert.ok(err instanceof NotImplementedError, `${m} should throw NotImplementedError`);
+        assert.equal(err.code, 'NOT_IMPLEMENTED');
+        assert.equal(err.method, m);
+        assert.equal(err.provider, 'local');
+        return true;
+      });
+    }
+  });
+
+  test('getCapabilities() reports the declined methods under `declared`, not `implemented`', () => {
+    const { implemented, declared } = provider.getCapabilities();
+    for (const m of DECLINED) {
+      assert.ok(declared.includes(m), `${m} should be declared-only`);
+      assert.ok(!implemented.includes(m), `${m} should not be implemented`);
+    }
+    // Sanity floor: the writes the suite above exercises ARE implemented.
+    for (const m of ['createIssue', 'updateIssue', 'createComment', 'createRelation', 'addLabel', 'removeLabel']) {
+      assert.ok(implemented.includes(m), `${m} should be implemented`);
+    }
+  });
+});
+
+// Scope/partition isolation — `token` is the store partition key (the workspace
+// urlKey). Two workspaces sharing one collection must not see each other's data
+// across any read, search, label, or write surface.
+describe('LocalProvider scope/partition isolation (LIN-582)', () => {
+  let provider, store;
+  const A = 'ws-a';
+  const B = 'ws-b';
+  beforeEach(async () => {
+    ({ provider, store } = makeProvider()); // one store/collection, two scopes
+    await store.seed(A, {
+      projects: [{ id: 'pa', name: 'Alpha-A', sortOrder: 1 }],
+      issues: [{ id: 'ia', identifier: 'A-1', title: 'A issue', description: 'shared-word', projectId: 'pa', labels: ['a-label'] }],
+    });
+    await store.seed(B, {
+      projects: [{ id: 'pb', name: 'Beta-B', sortOrder: 1 }],
+      issues: [{ id: 'ib', identifier: 'B-1', title: 'B issue', description: 'shared-word', projectId: 'pb', labels: ['b-label'] }],
+    });
+  });
+
+  test('reads only return the queried partition', async () => {
+    const a = await provider.fetchProjects(A);
+    assert.deepEqual(a.projects.map(p => p.id), ['pa']);
+    assert.deepEqual(a.issues.map(i => i.id), ['ia']);
+
+    assert.deepEqual((await provider.fetchProjectsList(B)).map(p => p.id), ['pb']);
+    assert.deepEqual(await provider.labels(A), [{ id: 'a-label', name: 'a-label', color: null }]);
+    // Same search term lives in both partitions, yet each scope sees only its own.
+    assert.deepEqual((await provider.search(A, 'shared-word')).map(i => i.id), ['ia']);
+    assert.deepEqual((await provider.search(B, 'shared-word')).map(i => i.id), ['ib']);
+  });
+
+  test('an id from another partition does not resolve', async () => {
+    assert.equal(await provider.issueDetail(A, 'ib'), null);
+    await assert.rejects(() => provider.fetchIssueContext(A, 'ib'), /Issue not found/);
+    assert.equal(await provider.issueWriteGuard(B, 'ia'), null);
+  });
+
+  test('writes land in the target partition only', async () => {
+    const created = await provider.createIssue(A, { title: 'A-only' });
+    // A grew; B is untouched.
+    assert.equal((await store.listIssues(A)).length, 2);
+    assert.equal((await store.listIssues(B)).length, 1);
+    // The new issue is invisible from B.
+    assert.equal(await provider.issueDetail(B, created.id), null);
+
+    // A label written into A must not appear in B's distinct-label set.
+    await provider.addLabel(A, 'ia', 'a-exclusive');
+    assert.ok((await provider.labels(A)).some(l => l.name === 'a-exclusive'));
+    assert.ok(!(await provider.labels(B)).some(l => l.name === 'a-exclusive'));
   });
 });
