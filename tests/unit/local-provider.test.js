@@ -14,7 +14,6 @@ import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert';
 import { LocalProvider, localProvider } from '../../lib/providers/local/index.js';
 import { getProvider } from '../../lib/providers/registry.js';
-import { NotImplementedError } from '../../lib/providers/interface.js';
 import { createLocalProvider } from '../fixtures/local-harness.js';
 
 const SCOPE = 'ws-1'; // token == store partition key for the local provider
@@ -44,10 +43,15 @@ describe('LocalProvider capability profile (LIN-356 step D)', () => {
     }
   });
 
-  test('leaves cycles/cycleDetail declined (cycles:false)', () => {
-    assert.equal(provider.supports('cycles'), false);
-    assert.equal(provider.supports('cycleDetail'), false);
-    assert.throws(() => provider.cycles(), NotImplementedError);
+  // LIN-583: cycles()/cycleDetail() now return canonical-empty so the consumer
+  // proxy's /cycles surface answers `{ cycles: [] }` for a local workspace
+  // instead of a 500. The local harness still has no cycle CONCEPT — empty is the
+  // honest answer (originally left as the base throw under LIN-356).
+  test('models cycles/cycleDetail as canonical-empty (LIN-583)', async () => {
+    assert.equal(provider.supports('cycles'), true);
+    assert.equal(provider.supports('cycleDetail'), true);
+    assert.deepEqual(await provider.cycles(SCOPE), []);
+    assert.equal(await provider.cycleDetail(SCOPE, 'any'), null);
   });
 
   test('getCreateTaskUrl returns a local deep link', () => {
@@ -179,6 +183,96 @@ describe('LocalProvider reads', () => {
     assert.deepEqual(states.map(s => s.type),
       ['backlog', 'unstarted', 'started', 'completed', 'canceled']);
     assert.deepEqual(await provider.labels(SCOPE), [{ id: 'bug', name: 'bug', color: null }]);
+  });
+});
+
+// The consumer-proxy read + write-guard surface (LIN-583). These methods back
+// the Linear API proxy's data path through the injectable provider, so they must
+// emit the nested-canonical shape the shared proxy-wire flatten helpers expect.
+describe('LocalProvider proxy surface (LIN-583)', () => {
+  let provider, store;
+  beforeEach(async () => {
+    ({ provider, store } = makeProvider());
+    await store.seed(SCOPE, {
+      projects: [{ id: 'p1', name: 'Alpha', content: 'a', sortOrder: 1, url: '/x' }],
+      issues: [
+        { id: 'i1', identifier: 'LOCAL-1', title: 'Blocker', description: 'd1', projectId: 'p1', state: { name: 'In Progress', type: 'started' }, labels: ['bug'], relations: [{ id: 'rel-1', type: 'blocks', relatedIssueId: 'i2' }], comments: [{ id: 'c1', body: 'hi', createdAt: '2024-01-01T00:00:00Z', user: 'Alice' }] },
+        { id: 'i2', identifier: 'LOCAL-2', title: 'Blocked', projectId: 'p1', parentId: 'i1', state: { name: 'Todo', type: 'unstarted' } },
+      ],
+    });
+  });
+
+  test('viewer returns a synthetic local user', async () => {
+    assert.deepEqual(await provider.viewer(SCOPE), { id: 'local-user', name: 'Local User', email: 'local@localhost' });
+  });
+
+  test('projects returns the started-projects field shape (no sortOrder to leak)', async () => {
+    const projects = await provider.projects(SCOPE);
+    assert.deepEqual(projects, [{ id: 'p1', name: 'Alpha', content: 'a', url: '/x' }]);
+  });
+
+  test('issues returns { nodes, pageInfo } with offset pagination', async () => {
+    const page1 = await provider.issues(SCOPE, { first: 1 });
+    assert.equal(page1.nodes.length, 1);
+    assert.equal(page1.pageInfo.hasNextPage, true);
+    assert.equal(page1.pageInfo.endCursor, '1');
+    const page2 = await provider.issues(SCOPE, { first: 1, after: page1.pageInfo.endCursor });
+    assert.equal(page2.nodes.length, 1);
+    assert.equal(page2.pageInfo.hasNextPage, false);
+    // A team filter resolves to empty (local has no teams).
+    assert.deepEqual((await provider.issues(SCOPE, { teamId: 't1' })).nodes, []);
+  });
+
+  test('issueDetail returns nested {nodes} children/comments/relations/inverseRelations', async () => {
+    const issue = await provider.issueDetail(SCOPE, 'LOCAL-1');
+    assert.equal(issue.identifier, 'LOCAL-1');
+    assert.equal(issue.trashed, false);
+    assert.deepEqual(issue.labels, { nodes: [{ name: 'bug' }] });
+    assert.equal(issue.children.nodes.length, 1);
+    assert.equal(issue.children.nodes[0].identifier, 'LOCAL-2');
+    assert.equal(issue.comments.nodes[0].user.name, 'Alice');
+    assert.deepEqual(issue.relations.nodes, [{ id: 'rel-1', type: 'blocks', relatedIssue: { id: 'i2', identifier: 'LOCAL-2', title: 'Blocked', state: { name: 'Todo', type: 'unstarted' } } }]);
+    // i2 is the target of i1's blocks relation → it shows up as an inverse.
+    const blocked = await provider.issueDetail(SCOPE, 'i2');
+    assert.equal(blocked.inverseRelations.nodes.length, 1);
+    assert.equal(blocked.inverseRelations.nodes[0].issue.id, 'i1');
+  });
+
+  test('issueDetail returns null for a missing issue', async () => {
+    assert.equal(await provider.issueDetail(SCOPE, 'nope'), null);
+  });
+
+  test('relations returns { trashed, relations, inverseRelations } / null', async () => {
+    const rel = await provider.relations(SCOPE, 'i1');
+    assert.equal(rel.trashed, false);
+    assert.deepEqual(rel.relations.nodes, [{ id: 'rel-1', type: 'blocks', relatedIssue: { id: 'i2', identifier: 'LOCAL-2', title: 'Blocked', state: { name: 'Todo', type: 'unstarted' } } }]);
+    assert.deepEqual(rel.inverseRelations.nodes, []);
+    assert.equal(await provider.relations(SCOPE, 'nope'), null);
+  });
+
+  test('cycles/cycleDetail are canonical-empty', async () => {
+    assert.deepEqual(await provider.cycles(SCOPE), []);
+    assert.equal(await provider.cycleDetail(SCOPE, 'any'), null);
+  });
+
+  test('write-guard reads (issueWriteGuard/issueDescription/issueLabels)', async () => {
+    assert.deepEqual(await provider.issueWriteGuard(SCOPE, 'i1'), { id: 'i1', trashed: false });
+    assert.equal(await provider.issueWriteGuard(SCOPE, 'nope'), null);
+    assert.deepEqual(await provider.issueDescription(SCOPE, 'i1'), { id: 'i1', description: 'd1', trashed: false });
+    assert.deepEqual(await provider.issueLabels(SCOPE, 'i1'), { id: 'i1', trashed: false, labels: { nodes: [{ id: 'bug', name: 'bug' }] } });
+  });
+
+  test('updateIssueLabels writes the full label set and echoes { success, issue }', async () => {
+    const res = await provider.updateIssueLabels(SCOPE, 'i1', ['bug', 'urgent']);
+    assert.equal(res.success, true);
+    assert.deepEqual(res.issue.labels, { nodes: [{ name: 'bug' }, { name: 'urgent' }] });
+    assert.deepEqual((await store.getIssue(SCOPE, 'i1')).labels, ['bug', 'urgent']);
+  });
+
+  test('deleteRelation removes by relation id and echoes { success }', async () => {
+    assert.deepEqual(await provider.deleteRelation(SCOPE, 'rel-1'), { success: true });
+    assert.deepEqual((await store.getIssue(SCOPE, 'i1')).relations, []);
+    assert.deepEqual(await provider.deleteRelation(SCOPE, 'missing'), { success: false });
   });
 });
 

@@ -17,15 +17,24 @@ import rateLimit from 'express-rate-limit';
 import { createDedupeCache, dedupeKey } from '../lib/proxy-dedupe.js';
 import { deriveTerminalStatus, deriveCompletedAt } from '../lib/dispatch-terminal.js';
 // The entire consumer-API surface — reads (LIN-308), writes + write-guard reads
-// (LIN-309), and the compute-endpoint fetchers — sources through the Linear
-// provider directly; the route owns no GraphQL. `linearProvider` is the default
-// write provider (capability-gated; injectable for tests). The lib/linear.js
-// shim stays the frozen back-compat surface for the dashboard fetchers only.
+// (LIN-309), and the compute-endpoint fetchers — sources through a provider; the
+// route owns no GraphQL. `linearProvider` is the default provider for the
+// consumer read + write data API (capability-gated; the injectable `provider`
+// param). The read/write data endpoints route through that injectable provider
+// (LIN-583), so the route holds NO Linear-bound read imports on its data path —
+// `localProvider` can back `/api/proxy/*` for a local workspace (see
+// resolveProviderAccess). The lib/linear.js shim stays the frozen back-compat
+// surface for the dashboard fetchers only.
+//
+// The compute/task-automation fetchers (fetchProjects/fetchIssueContext/
+// fetchRecommendationContext) remain statically Linear-bound: they feed the
+// LLM-driven stack/recommend/recap/brief/prompt endpoints, not the read data
+// path, and are out of scope for the local-targeting work (LIN-583).
 import {
-  fetchTeams, search, states, labels, cycles, cycleDetail, relations, viewer, projects, issues, issueDetail,
   fetchProjects, fetchIssueContext, fetchRecommendationContext,
   linearProvider,
 } from '../lib/providers/linear/index.js';
+import { localProvider } from '../lib/providers/local/index.js';
 import { applyTrashedSignal, isTrashed } from '../lib/trashed-signal.js';
 import { flattenIssue, neutralizeProject, flattenCycle, flattenRelations } from '../lib/proxy-wire.js';
 import { isRecommendationEnabled, getRecommendation } from '../lib/openrouter.js';
@@ -264,6 +273,14 @@ const proxyTokenCreationLimiter = rateLimit({
 const MAX_NAME_LENGTH = 1000;
 const MAX_SEARCH_LENGTH = 500;
 const MAX_DESCRIPTION_LENGTH = 100000;
+
+// LIN-583 test-only local-targeting seam. A proxy token minted for this urlKey
+// resolves to the LocalProvider (reached with the urlKey as the store partition
+// key), so the consumer `/api/proxy/*` data API can run against a local
+// workspace for the B2 e2e (LIN-584). Mirrors LOCAL_WORKSPACE_URL_KEY in
+// tests/fixtures/local-harness.js; kept inline (not imported) so production code
+// never depends on a test fixture. Only consulted under NODE_ENV==='test'.
+const TEST_LOCAL_URL_KEY = 'local-workspace';
 
 // LIN-525 #5: the +proxy toggle auto-mints a 'prompt-proxy' readWrite token on
 // every page-load session that dispatches. To stop these standing credentials
@@ -583,24 +600,50 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   }
 
   /**
-   * Capability gate for the consumer-API writes (LIN-309). Consults the active
+   * Per-request provider + token resolution for the consumer data API (reads +
+   * writes). Default: the injectable `provider` (Linear) reached with the
+   * session-derived OAuth access token from `resolveWorkspaceAccess`. Test-only
+   * seam (LIN-583): a proxy token minted for the known local workspace resolves
+   * to the LocalProvider, reached with the urlKey itself as the store partition
+   * key ("the token IS the urlKey" for local) — this is what lets `/api/proxy/*`
+   * target a local workspace for the B2 e2e (LIN-584). Never fires in
+   * production, so the Linear path is byte-identical.
+   *
+   * The session-less, per-workspace consumer-path provider resolution (reading
+   * `workspace.provider` without a session) is the broader deferred goal
+   * (LIN-306); this seam intentionally does only what B1 needs.
+   *
+   * @returns {Promise<{provider: Object, token: (string|null), reason: string}>}
+   */
+  async function resolveProviderAccess(urlKey) {
+    if (process.env.NODE_ENV === 'test' && urlKey === TEST_LOCAL_URL_KEY) {
+      return { provider: localProvider, token: urlKey, reason: 'ok' };
+    }
+    const { token, reason } = await resolveWorkspaceAccess(urlKey);
+    return { provider, token, reason };
+  }
+
+  /**
+   * Capability gate for the consumer-API writes (LIN-309). Consults the resolved
    * provider's capability descriptor BEFORE the write so an unsupported provider
    * declines cleanly (422 + machine-readable code) instead of bubbling the
    * provider's NotImplementedError up to an opaque 500. `provider.supports(...)`
-   * is the "never 500" path the provider interface documents.
+   * is the "never 500" path the provider interface documents. The provider is
+   * passed in (not the closure default) so the gate reflects the workspace the
+   * write will actually hit (LIN-583).
    *
    * For Linear (every write supported) this is always a pass — a no-op gate that
    * keeps behaviour byte-identical, mirroring the LIN-308 read re-pointing.
    *
    * @returns {boolean} true if a capability-decline response was sent (caller returns early)
    */
-  function denyIfUnsupported(method, req, res, endpoint) {
-    if (provider.supports(method)) return false;
+  function denyIfUnsupported(activeProvider, method, req, res, endpoint) {
+    if (activeProvider.supports(method)) return false;
     logEvent(req, endpoint, 422);
     jsonError(res, 422, `This workspace's provider does not support this write`, {
       code: 'CAPABILITY_NOT_SUPPORTED',
       capability: method,
-      provider: provider.name,
+      provider: activeProvider.name,
     });
     return true;
   }
@@ -1202,12 +1245,12 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/me', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey);
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/me', reason);
       }
 
-      const user = await viewer(token);
+      const user = await provider.viewer(token);
       logEvent(req, '/api/proxy/me', 200);
       res.json(user);
     } catch (err) {
@@ -1223,12 +1266,12 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/teams', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey);
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/teams', reason);
       }
 
-      const teams = await fetchTeams(token);
+      const teams = await provider.fetchTeams(token);
       logEvent(req, '/api/proxy/teams', 200);
       res.json({ teams });
     } catch (err) {
@@ -1244,12 +1287,12 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/projects', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey);
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/projects', reason);
       }
 
-      const projectList = await projects(token);
+      const projectList = await provider.projects(token);
       logEvent(req, '/api/proxy/projects', 200);
       res.json({ projects: projectList.map(neutralizeProject) });
     } catch (err) {
@@ -1265,7 +1308,7 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/issues', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey);
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues', reason);
       }
@@ -1278,7 +1321,7 @@ One convention across every endpoint, so you can branch on the same fields every
         return badRequest.json(res, 'Invalid teamId format');
       }
 
-      const { nodes, pageInfo } = await issues(token, { teamId: teamId || null, first: limit, after: null });
+      const { nodes, pageInfo } = await provider.issues(token, { teamId: teamId || null, first: limit, after: null });
       logEvent(req, '/api/proxy/issues', 200);
       res.json({
         issues: nodes.map(flattenIssue),
@@ -1300,7 +1343,7 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/issues/:issueId', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey);
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/:id', reason);
       }
@@ -1313,7 +1356,7 @@ One convention across every endpoint, so you can branch on the same fields every
         return badRequest.json(res, 'Invalid issue ID format');
       }
 
-      const issue = await issueDetail(token, issueId);
+      const issue = await provider.issueDetail(token, issueId);
       if (!issue) {
         logEvent(req, '/api/proxy/issues/:id', 404);
         return notFound.json(res, 'Issue not found');
@@ -1347,7 +1390,7 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/search', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey);
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/search', reason);
       }
@@ -1363,7 +1406,7 @@ One convention across every endpoint, so you can branch on the same fields every
         return badRequest.json(res, `Search query too long (max ${MAX_SEARCH_LENGTH})`);
       }
 
-      const results = await search(token, query, { first: 50 });
+      const results = await provider.search(token, query, { first: 50 });
       logEvent(req, '/api/proxy/search', 200);
       res.json({ issues: results.map(flattenIssue) });
     } catch (err) {
@@ -1379,7 +1422,7 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/states/:teamId', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey);
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/states', reason);
       }
@@ -1391,7 +1434,7 @@ One convention across every endpoint, so you can branch on the same fields every
       }
 
       // Provider already sorts by board position (drop the route's duplicate sort).
-      const stateList = await states(token, teamId);
+      const stateList = await provider.states(token, teamId);
       logEvent(req, '/api/proxy/states', 200);
       res.json({ states: stateList });
     } catch (err) {
@@ -1407,7 +1450,7 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/labels', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey);
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/labels', reason);
       }
@@ -1418,7 +1461,7 @@ One convention across every endpoint, so you can branch on the same fields every
         return badRequest.json(res, 'Invalid team ID format');
       }
 
-      const labelList = await labels(token, teamId || null);
+      const labelList = await provider.labels(token, teamId || null);
       logEvent(req, '/api/proxy/labels', 200);
       res.json({ labels: labelList });
     } catch (err) {
@@ -1435,7 +1478,7 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/cycles', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey);
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/cycles', reason);
       }
@@ -1446,7 +1489,7 @@ One convention across every endpoint, so you can branch on the same fields every
         return badRequest.json(res, 'Invalid team ID format');
       }
 
-      const cycleList = await cycles(token, teamId || null);
+      const cycleList = await provider.cycles(token, teamId || null);
       logEvent(req, '/api/proxy/cycles', 200);
       res.json({ cycles: cycleList });
     } catch (err) {
@@ -1464,7 +1507,7 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get(['/api/proxy/cycles/:cycleId', '/api/proxy/cycle/:cycleId'], proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey);
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/cycle', reason);
       }
@@ -1475,7 +1518,7 @@ One convention across every endpoint, so you can branch on the same fields every
         return badRequest.json(res, 'Invalid cycle ID format');
       }
 
-      const cycle = await cycleDetail(token, cycleId);
+      const cycle = await provider.cycleDetail(token, cycleId);
       if (!cycle) {
         logEvent(req, '/api/proxy/cycle', 404);
         return notFound.json(res, 'Cycle not found');
@@ -1499,7 +1542,7 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get(['/api/proxy/issues/:issueId/relations', '/api/proxy/relations/:issueId'], proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey);
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/relations', reason);
       }
@@ -1510,7 +1553,7 @@ One convention across every endpoint, so you can branch on the same fields every
         return badRequest.json(res, 'Invalid issue ID format');
       }
 
-      const issueRelations = await relations(token, issueId);
+      const issueRelations = await provider.relations(token, issueId);
       if (!issueRelations) {
         logEvent(req, '/api/proxy/relations', 404);
         return notFound.json(res, 'Issue not found');
@@ -1545,8 +1588,8 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.post('/api/proxy/issues', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      if (denyIfUnsupported('createIssue', req, res, '/api/proxy/issues')) return;
-      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey);
+      if (denyIfUnsupported(provider, 'createIssue', req, res, '/api/proxy/issues')) return;
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues', reason);
       }
@@ -1614,8 +1657,8 @@ One convention across every endpoint, so you can branch on the same fields every
    * (null) is NOT refused here — the mutation proceeds and Linear's own
    * not-found error maps to the usual status, preserving existing behaviour.
    */
-  async function refuseIfTrashed(token, issueId, req, res, endpoint) {
-    const issue = await provider.issueWriteGuard(token, issueId);
+  async function refuseIfTrashed(activeProvider, token, issueId, req, res, endpoint) {
+    const issue = await activeProvider.issueWriteGuard(token, issueId);
     if (isTrashed(issue)) {
       logEvent(req, endpoint, 409);
       jsonError(res, 409, 'Issue is trashed; refusing to modify a deleted issue');
@@ -1626,8 +1669,8 @@ One convention across every endpoint, so you can branch on the same fields every
 
   router.patch('/api/proxy/issues/:issueId', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      if (denyIfUnsupported('updateIssue', req, res, '/api/proxy/issues/:id')) return;
-      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey);
+      if (denyIfUnsupported(provider, 'updateIssue', req, res, '/api/proxy/issues/:id')) return;
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/:id', reason);
       }
@@ -1674,7 +1717,7 @@ One convention across every endpoint, so you can branch on the same fields every
         return badRequest.json(res, 'No valid fields to update');
       }
 
-      if (await refuseIfTrashed(token, issueId, req, res, '/api/proxy/issues/:id')) return;
+      if (await refuseIfTrashed(provider, token, issueId, req, res, '/api/proxy/issues/:id')) return;
 
       const issueUpdate = await provider.updateIssue(token, issueId, input);
       if (writeRejected(req, res, '/api/proxy/issues/:id', issueUpdate, 'Issue was not updated')) return;
@@ -1696,8 +1739,8 @@ One convention across every endpoint, so you can branch on the same fields every
    * recur. `merge` may throw DescriptionEditError for a loud 422.
    */
   async function applyDescriptionEdit(req, res, endpoint, merge) {
-    if (denyIfUnsupported('updateIssue', req, res, endpoint)) return;
-    const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+    const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey);
+    if (denyIfUnsupported(provider, 'updateIssue', req, res, endpoint)) return;
     if (!token) {
       return workspaceUnavailable(req, res, endpoint, reason);
     }
@@ -1811,8 +1854,8 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.post(['/api/proxy/issues/:issueId/comments', '/api/proxy/comments/:issueId'], proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      if (denyIfUnsupported('createComment', req, res, '/api/proxy/issues/comments')) return;
-      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey);
+      if (denyIfUnsupported(provider, 'createComment', req, res, '/api/proxy/issues/comments')) return;
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/comments', reason);
       }
@@ -1836,7 +1879,7 @@ One convention across every endpoint, so you can branch on the same fields every
         return badRequest.json(res, 'body contains invalid characters');
       }
 
-      if (await refuseIfTrashed(token, issueId, req, res, '/api/proxy/issues/comments')) return;
+      if (await refuseIfTrashed(provider, token, issueId, req, res, '/api/proxy/issues/comments')) return;
 
       // Deterministic dedupe (LIN-399): if an identical comment was just
       // created for this issue, return that one instead of minting a duplicate.
@@ -1870,8 +1913,8 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.post('/api/proxy/issues/:issueId/relations', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      if (denyIfUnsupported('createRelation', req, res, '/api/proxy/issues/relations')) return;
-      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey);
+      if (denyIfUnsupported(provider, 'createRelation', req, res, '/api/proxy/issues/relations')) return;
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/relations', reason);
       }
@@ -1892,7 +1935,7 @@ One convention across every endpoint, so you can branch on the same fields every
         return badRequest.json(res, 'Valid relatedIssueId is required');
       }
 
-      if (await refuseIfTrashed(token, issueId, req, res, '/api/proxy/issues/relations')) return;
+      if (await refuseIfTrashed(provider, token, issueId, req, res, '/api/proxy/issues/relations')) return;
 
       // The provider owns the blocked-by → inverse-blocks sugar (ids swapped).
       const issueRelationCreate = await provider.createRelation(token, issueId, { type, relatedIssueId });
@@ -1919,8 +1962,8 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.delete('/api/proxy/issues/:issueId/relations/:relationId', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      if (denyIfUnsupported('deleteRelation', req, res, '/api/proxy/issues/relations')) return;
-      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey);
+      if (denyIfUnsupported(provider, 'deleteRelation', req, res, '/api/proxy/issues/relations')) return;
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/relations', reason);
       }
@@ -1958,8 +2001,8 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.post('/api/proxy/issues/:issueId/labels', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      if (denyIfUnsupported('addLabel', req, res, '/api/proxy/issues/labels')) return;
-      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey);
+      if (denyIfUnsupported(provider, 'addLabel', req, res, '/api/proxy/issues/labels')) return;
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/labels', reason);
       }
@@ -2014,8 +2057,8 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.delete('/api/proxy/issues/:issueId/labels/:labelId', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      if (denyIfUnsupported('removeLabel', req, res, '/api/proxy/issues/labels')) return;
-      const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey);
+      if (denyIfUnsupported(provider, 'removeLabel', req, res, '/api/proxy/issues/labels')) return;
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/labels', reason);
       }

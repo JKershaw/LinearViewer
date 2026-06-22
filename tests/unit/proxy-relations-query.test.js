@@ -109,7 +109,9 @@ describe('proxy relationship queries', () => {
     // Post-LIN-309 the handler calls the provider, capability-gated, instead of
     // owning the delete mutation.
     assert.match(block, /provider\.deleteRelation\(/, 'must call provider.deleteRelation');
-    assert.match(block, /denyIfUnsupported\('deleteRelation'/, 'must capability-gate the write');
+    // LIN-583: the gate takes the per-request provider (the workspace the write
+    // will actually hit) as its first arg.
+    assert.match(block, /denyIfUnsupported\(provider, 'deleteRelation'/, 'must capability-gate the write');
   });
 
   test('/relations handler returns flat arrays, not the {nodes} shape (LIN-310)', () => {
