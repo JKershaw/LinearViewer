@@ -12,11 +12,27 @@ Stable, generally-useful views. Always present as footer links for every
 authenticated user; no flag, no gate.
 
 - **dashboard** (`/`) — the project/issue tree (the root surface)
+- **observation** (`/workspace/:urlKey/observation`) — the autopilot Observation
+  page: a sessionId-grouped feed of autopilot work you watch live (LIN-595).
+  Promoted from the experimental `dashboard` tier (see retirement note below).
 - **swipe** — mobile-first task triage
 - **swim** — dependency swim lanes
 - **settings** — per-user configuration
 
 Wired in `lib/components/footer.js` (`getFooterLinks` base links).
+
+### Retired: the experimental `dashboard` flag/view (LIN-509 → LIN-595)
+
+The experimental, realtime *autopilot dashboard* (per-user `dashboard` flag,
+Settings-only discovery, `/workspace/:urlKey/dashboard`) was **promoted** to the
+first-class Observation page above and the flag was **retired**. `/dashboard` now
+302-redirects to `/observation`; the `dashboard` key is gone from
+`lib/feature-defaults.js` and `EXPERIMENTAL_FEATURES`. Its data layer
+(`/api/dashboard/*` — loops, run-/session-summary, session-context, hydrate) was
+kept under its original paths and reused by the new page (no flag gate), with one
+additive seam: `GET /api/dashboard/sessions` (the sessionId-grouped poll source).
+The old view shell/client (`render-dashboard.js`, `public/dashboard.{js,css}`)
+was deleted so there are not two equivalent views side by side (LIN-590).
 
 ## 2. Experimental (Settings-only, flag-gated)
 

@@ -1,0 +1,321 @@
+/**
+ * Observation page styles (LIN-595).
+ *
+ * Mobile-first, CLI/terminal aesthetic — modelled on the retired experimental
+ * dashboard / Swipe (single column, touch targets, horizontal-scroll chips)
+ * rather than the Pipeline desktop floor. Reuses the shared light-theme
+ * variables (--fg, --fg-dim, --fg-vdim, --bg, --bg-muted, green/yellow/red).
+ */
+
+.obs-page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 0.6rem;
+}
+
+.obs-header h1 {
+  margin: 0.4rem 0 0.3rem;
+  font-size: 1.4rem;
+}
+
+/* ─── Status banner (the at-a-glance story) ───────────────────────────────── */
+
+.obs-banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 0.6rem;
+  font-size: 0.9rem;
+}
+
+.obs-banner-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.obs-stat { color: var(--fg-dim); white-space: nowrap; }
+.obs-stat-active { color: var(--fg); }
+.obs-stat-done { color: var(--green); }
+.obs-stat-error { color: var(--red); font-weight: 600; }
+.obs-stat-sep { color: var(--fg-vdim); }
+
+.obs-poll-status {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--fg-dim);
+}
+
+/* ─── Sections ────────────────────────────────────────────────────────────── */
+
+.obs-section { margin-bottom: 0.8rem; }
+
+.obs-controls { display: flex; flex-direction: column; gap: 0.5rem; }
+
+.obs-chips {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.obs-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.obs-chip.is-on { color: var(--fg); border-color: var(--border-strong); }
+
+.obs-chip-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--fg-vdim);
+}
+
+.obs-chip.is-on .obs-chip-dot { background: var(--green); }
+
+/* ─── Feed + session cards ────────────────────────────────────────────────── */
+
+.obs-feed { list-style: none; margin: 0; padding: 0; }
+
+.obs-feed-empty { color: var(--fg-dim); font-size: 0.85rem; padding: 0.4rem 0; }
+.obs-feed-empty.hidden { display: none; }
+
+.obs-session {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 0.45rem;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.obs-session.is-open { border-color: var(--border-strong); }
+
+.obs-session-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.55rem 0.6rem;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  color: var(--fg);
+}
+
+.obs-session-head:hover { background: var(--bg-muted); }
+
+/* Status pill (◐ / ✓ / ✕) */
+.obs-pill {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  font-size: 0.85rem;
+  background: var(--bg-muted);
+}
+.obs-pill[data-status="in-progress"] { color: var(--yellow); }
+.obs-pill[data-status="done"] { color: var(--green); }
+.obs-pill[data-status="error"] { color: var(--red); }
+
+.obs-session-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.obs-session-title {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.obs-session-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.obs-session-seed {
+  font-size: 0.72rem;
+  color: var(--fg-dim);
+  font-family: var(--mono, monospace);
+}
+
+.obs-session-summary {
+  font-size: 0.82rem;
+  color: var(--fg-dim);
+  line-height: 1.3;
+}
+.obs-summary-line { display: inline; }
+.obs-summary-status { font-style: italic; }
+.obs-summary-dim { color: var(--fg-vdim); }
+.obs-summary-pending { color: var(--fg-dim); }
+
+.obs-summary-gen {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.78rem;
+  color: var(--yellow);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* Per-worker-run progress bar */
+.obs-progress {
+  display: flex;
+  gap: 2px;
+  height: 6px;
+  margin: 0.15rem 0;
+}
+
+.obs-progress-empty {
+  background: var(--fg-vdim);
+  border-radius: 3px;
+  opacity: 0.6;
+}
+
+.obs-seg {
+  flex: 1 1 auto;
+  min-width: 4px;
+  border-radius: 2px;
+  background: var(--fg-vdim);
+}
+.obs-seg[data-state="complete"] { background: var(--green); }
+.obs-seg[data-state="error"] { background: var(--red); }
+.obs-seg[data-state="running"],
+.obs-seg[data-state="waiting"] { background: var(--yellow); }
+.obs-seg[data-state="queued"] { background: var(--fg-mid); }
+
+.obs-seg[data-live="1"] { animation: obs-pulse 1.3s ease-in-out infinite; }
+
+@keyframes obs-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .obs-seg[data-live="1"] { animation: none; }
+}
+
+.obs-session-sub {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.72rem;
+  color: var(--fg-dim);
+}
+
+.obs-session-ws { color: var(--fg); }
+.obs-session-meta { font-family: var(--mono, monospace); }
+
+.obs-session-time {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  color: var(--fg-dim);
+  white-space: nowrap;
+}
+
+.obs-session-caret {
+  flex: 0 0 auto;
+  color: var(--fg-dim);
+  transition: transform 0.12s ease;
+}
+.obs-session.is-open .obs-session-caret { transform: rotate(90deg); }
+
+/* ─── Session body (expanded) ─────────────────────────────────────────────── */
+
+.obs-session-body {
+  padding: 0.4rem 0.7rem 0.6rem;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 0.82rem;
+}
+
+.obs-body-lbl {
+  color: var(--fg-dim);
+  text-transform: uppercase;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  margin-right: 0.35rem;
+}
+
+.obs-body-status, .obs-body-tasks { margin: 0.3rem 0; }
+.obs-body-tasks { font-family: var(--mono, monospace); }
+
+.obs-runs { list-style: none; margin: 0.4rem 0 0; padding: 0; }
+
+.obs-run {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.2rem 0;
+}
+
+.obs-run-icon { flex: 0 0 auto; }
+.obs-run-icon[data-state="complete"] { color: var(--green); }
+.obs-run-icon[data-state="error"] { color: var(--red); }
+.obs-run-icon[data-state="running"],
+.obs-run-icon[data-state="waiting"] { color: var(--yellow); }
+
+.obs-run-label { flex: 1 1 auto; }
+.obs-run-id { color: var(--fg-dim); font-family: var(--mono, monospace); font-size: 0.74rem; }
+
+.obs-dim { color: var(--fg-dim); }
+
+/* ─── Completed archive ───────────────────────────────────────────────────── */
+
+.obs-archive-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0.3rem 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.obs-archive-caret { color: var(--fg-dim); transition: transform 0.12s ease; }
+.obs-archive-toggle.is-open .obs-archive-caret { transform: rotate(90deg); }
+
+.obs-archive-label { font-weight: 600; }
+
+.obs-archive-count {
+  font-size: 0.72rem;
+  color: var(--fg-dim);
+  background: var(--bg-muted);
+  border-radius: 999px;
+  padding: 0.05rem 0.45rem;
+}
+
+.obs-archive-body[hidden] { display: none; }
+
+/* New-row arrival pulse (shared idiom with pipeline/dashboard). */
+.obs-session.cell-new { animation: obs-cell-new 1.2s ease-out; }
+@keyframes obs-cell-new {
+  0% { background: var(--bg-alt); }
+  100% { background: var(--bg); }
+}
