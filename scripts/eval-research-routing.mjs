@@ -35,7 +35,7 @@
  * Cost note: input (~5k-tok meta-prompt) dominates. Iterate cheaply with a small
  * ONLY subset + K=1 to get a directional read before running the full suite.
  */
-import { readFileSync } from 'fs';
+import { readFileSync, readdirSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -483,6 +483,31 @@ Needs multiple sessions — migration + rollback alone is its own focused pass; 
     }
   }
 ];
+
+// Real-scale fixtures (scripts/eval/fixtures/*.json) — frozen REAL task context, kept as
+// data because the verbatim trails are large (~10k chars) and full of backticks/quotes that
+// do not inline cleanly. Each fixture carries the same grading sidecar a case does
+// (expect / loop / avoid / why) plus the issue fields (identifier, state, labels, createdAt,
+// title, description, comments). They are the high-fidelity counterpart to the small synthetic
+// cases above: synthetic = cheap/forgiving directional guard, real fixture = true scale + the
+// real distractors (a refutation buried after a 5.7k-char investigation), which is where the
+// "synthetic is more forgiving" gap shows up. id is tagged `[real]` so it reads distinctly.
+const FIX_DIR = join(HERE, 'eval', 'fixtures');
+const FIXTURE_CASES = existsSync(FIX_DIR)
+  ? readdirSync(FIX_DIR).filter(f => f.endsWith('.json')).map(f => {
+      const fx = JSON.parse(readFileSync(join(FIX_DIR, f), 'utf8'));
+      return {
+        id: `[real] ${fx.identifier} ${fx.scale ? `(${fx.scale})` : ''}`.trim(),
+        expect: fx.expect, why: fx.why, loop: fx.loop, avoid: fx.avoid,
+        issue: {
+          identifier: fx.identifier, createdAt: fx.createdAt, state: fx.state,
+          labels: fx.labels || [], title: fx.title, description: fx.description,
+          comments: fx.comments || []
+        }
+      };
+    })
+  : [];
+CASES.push(...FIXTURE_CASES);
 
 const norm = s => (s || '').toLowerCase().trim();
 const isOffVocab = a => a && !a.startsWith('__err') && a !== '(unparsed)' && !VOCAB.has(a);
