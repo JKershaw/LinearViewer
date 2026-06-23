@@ -522,9 +522,14 @@ describe('getLoopsForIssue', () => {
     const stores = makeMockStores({ capture });
     await getLoopsForIssue('ws', ISSUE_A, stores);
 
+    // Live queue stays issue-only (it is small/current, not windowed); the two
+    // archive reads carry both the issue filter AND the 30-day since window
+    // (LIN-622). Both are selective predicates — never a `limit` cap.
     assert.deepStrictEqual(capture.listItemsOptions, { issueIdentifier: ISSUE_A });
-    assert.deepStrictEqual(capture.listHistoryOptions, { issueIdentifier: ISSUE_A });
-    assert.deepStrictEqual(capture.listStatusOptions, { taskIdentifier: ISSUE_A });
+    assert.strictEqual(capture.listHistoryOptions.issueIdentifier, ISSUE_A);
+    assert.ok(capture.listHistoryOptions.since instanceof Date);
+    assert.strictEqual(capture.listStatusOptions.taskIdentifier, ISSUE_A);
+    assert.ok(capture.listStatusOptions.since instanceof Date);
   });
 
   test('does NOT re-add a blanket limit when scoping (filter-pushdown, not a cap)', async () => {
@@ -569,20 +574,28 @@ describe('getLoopsForWorkspace', () => {
     assert.deepStrictEqual(ids, [ISSUE_A, ISSUE_B]);
   });
 
-  test('calls agentStatusStore.listStatus WITHOUT a limit option (regression guard for the pre-fixed truncation footgun)', async () => {
+  test('calls agentStatusStore.listStatus WITHOUT a limit option but WITH the 30-day since window (regression guard for the pre-fixed truncation footgun; LIN-622 windowing)', async () => {
     const capture = {};
     const stores = makeMockStores({ capture });
     await getLoopsForWorkspace('ws', stores);
-    // The library must not pass any options to listStatus — it relies on the
-    // store's "no limit means everything" contract.
-    assert.strictEqual(capture.listStatusOptions, undefined);
+    // The library must never pass a `limit`/cap — that truncated reconstruction
+    // (the pre-fixed footgun). It DOES pass a `since` predicate (a selective
+    // window, not a cap) so rows outside the 30-day lookback are never loaded.
+    assert.strictEqual(capture.listStatusOptions?.limit, undefined);
+    assert.ok(capture.listStatusOptions?.since instanceof Date, 'expected a since window');
+    // The window is ~30 days back (LOOKBACK_MS), matching the _buildLoops cutoff.
+    const ageMs = Date.now() - capture.listStatusOptions.since.getTime();
+    assert.ok(Math.abs(ageMs - 30 * 24 * 60 * 60 * 1000) < 60 * 1000, 'since ≈ now − 30d');
   });
 
-  test('calls dispatchStore.listHistory WITHOUT a limit option', async () => {
+  test('calls dispatchStore.listHistory WITHOUT a limit option but WITH the 30-day since window (LIN-622 windowing)', async () => {
     const capture = {};
     const stores = makeMockStores({ capture });
     await getLoopsForWorkspace('ws', stores);
-    assert.strictEqual(capture.listHistoryOptions, undefined);
+    assert.strictEqual(capture.listHistoryOptions?.limit, undefined);
+    assert.ok(capture.listHistoryOptions?.since instanceof Date, 'expected a since window');
+    const ageMs = Date.now() - capture.listHistoryOptions.since.getTime();
+    assert.ok(Math.abs(ageMs - 30 * 24 * 60 * 60 * 1000) < 60 * 1000, 'since ≈ now − 30d');
   });
 
   test('survives when listHistory rejects but listItems succeeds', async () => {
@@ -663,5 +676,57 @@ describe('lean projection (LIN-622)', () => {
     for (const loop of allLoops) {
       assert.ok(!('promptText' in loop), `session loop ${loop.loopId} must not carry promptText`);
     }
+  });
+
+  // ── Option 2: drop retained feedback[] in lean, pre-deriving terminal facts ──
+
+  const TERMINAL_TS = '2026-04-10T10:45:00.000Z';
+  function feedbackWithTerminal() {
+    return [
+      { message: '[working] 6 tools/32s · alive', timestamp: '2026-04-10T10:20:00.000Z' },
+      { message: '[evidence] PR opened · https://example.com/pr/1', timestamp: '2026-04-10T10:40:00.000Z' },
+      { message: '[done] Task completed in 45s', timestamp: TERMINAL_TS }
+    ];
+  }
+
+  test('_buildLoops pre-derives terminalStatus + terminalCompletedAt on every loop (lean and default)', () => {
+    const hist = historyItem({ feedback: feedbackWithTerminal() });
+    const full = _buildLoops({ historyItems: [hist], now: NOW });
+    const lean = _buildLoops({ historyItems: [hist], now: NOW, lean: true });
+    for (const [label, loop] of [['default', full[0]], ['lean', lean[0]]]) {
+      assert.strictEqual(loop.terminalStatus, 'done', `${label}: terminalStatus`);
+      assert.strictEqual(loop.terminalCompletedAt, TERMINAL_TS, `${label}: terminalCompletedAt`);
+    }
+  });
+
+  test('_buildLoops drops raw feedback[] when lean but keeps it (and telemetry) by default', () => {
+    const hist = historyItem({ feedback: feedbackWithTerminal() });
+    const full = _buildLoops({ historyItems: [hist], now: NOW });
+    const lean = _buildLoops({ historyItems: [hist], now: NOW, lean: true });
+    // Default keeps the full witness; lean drops it to bound memory.
+    assert.strictEqual(full[0].feedback.length, 3, 'default retains raw feedback');
+    assert.deepStrictEqual(lean[0].feedback, [], 'lean must not retain raw feedback');
+    // Telemetry is built BEFORE the drop, so the feed keeps its metric chips.
+    assert.ok(lean[0].telemetry, 'lean loop still carries telemetry');
+    assert.ok(Array.isArray(lean[0].telemetry.metrics) && lean[0].telemetry.metrics.length >= 1,
+      'lean telemetry retains the parsed heartbeat metrics');
+  });
+
+  test('lean session completedAt is identical to default — the derived terminal time survives the feedback drop', async () => {
+    const dispatchedAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const resolvedAt = new Date(Date.now() - 50 * 60 * 1000).toISOString();
+    const completedTs = new Date(Date.now() - 40 * 60 * 1000).toISOString();
+    const feedback = [{ message: `[done] finished in 5m`, timestamp: completedTs }];
+    const makeStores = () => makeMockStores({
+      history: [
+        historyItem({ id: 'sess-1', kind: 'autopilot', dispatchedAt, resolvedAt, feedback }),
+        historyItem({ id: 'w-1', sessionId: 'sess-1', dispatchedAt, resolvedAt, feedback })
+      ]
+    });
+    const full = await getSessionsForWorkspace('ws', makeStores());
+    const lean = await getSessionsForWorkspace('ws', { ...makeStores(), lean: true });
+    assert.strictEqual(lean.length, full.length);
+    assert.strictEqual(lean[0].completedAt, full[0].completedAt, 'session completedAt must not regress under lean');
+    assert.strictEqual(lean[0].completedAt, completedTs);
   });
 });

@@ -30,6 +30,8 @@ function createMockCollection() {
         // Honour top-level equality on taskIdentifier so this mock mirrors real
         // MangoDB/MongoDB query matching (LIN-613 pushes this filter into the query).
         if (query.taskIdentifier && doc.taskIdentifier !== query.taskIdentifier) return false;
+        // Honour the 30-day `since` window (LIN-622) the feed read pushes down.
+        if (query.timestamp?.$gte && !(doc.timestamp >= query.timestamp.$gte)) return false;
         return true;
       });
       return {
@@ -113,6 +115,24 @@ describe('AgentStatusStore.listStatus', () => {
     const page3 = await store.listStatus('ws-1', { limit: 10, offset: 20 });
     assert.strictEqual(page3.total, 25);
     assert.strictEqual(page3.items.length, 5);
+  });
+
+  test('windows by a since predicate, pushed into the query, excluding older entries (LIN-622)', async () => {
+    const base = Date.now();
+    const expiresAt = new Date(base + 1000 * 60 * 60 * 24 * 30);
+    collection._docs.push(
+      { _id: 'recent', urlKey: 'ws-1', taskIdentifier: 'LIN-1', action: 'research', status: 'completed', summary: 'r', timestamp: new Date(base), expiresAt },
+      { _id: 'old', urlKey: 'ws-1', taskIdentifier: 'LIN-1', action: 'research', status: 'completed', summary: 'o', timestamp: new Date(base - 1000 * 60 * 60 * 24 * 45), expiresAt }
+    );
+    const since = new Date(base - 1000 * 60 * 60 * 24 * 30);
+
+    const result = await store.listStatus('ws-1', { since });
+
+    const query = collection._queries[collection._queries.length - 1];
+    assert.deepStrictEqual(query.timestamp, { $gte: since },
+      'the since window must ride into the query so a real DB filters server-side');
+    assert.strictEqual(result.total, 1, 'only the in-window entry is materialised');
+    assert.strictEqual(result.items[0].id, 'recent');
   });
 
   test('isolates entries per urlKey', async () => {

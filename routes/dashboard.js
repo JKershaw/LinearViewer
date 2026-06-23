@@ -120,7 +120,11 @@ async function settleWithConcurrency(items, limit, mapper) {
 function effectiveAgentState(loop) {
   if (!loop) return 'running';
   if (TERMINAL_AGENT_STATES.has(loop.agentState)) return loop.agentState;
-  const marker = deriveTerminalStatus(loop.feedback);
+  // Prefer the terminal status pipeline-loops pre-derived at build time (present
+  // on every reconstructed loop); fall back to scanning raw feedback for loops
+  // built elsewhere. The lean feed drops raw feedback[], so this read must not
+  // depend on it (LIN-622).
+  const marker = loop.terminalStatus !== undefined ? loop.terminalStatus : deriveTerminalStatus(loop.feedback);
   return marker ? MARKER_TO_AGENT_STATE[marker] : loop.agentState;
 }
 
@@ -148,10 +152,16 @@ function loopActivityMs(loop) {
  * @returns {Object}
  */
 function enrichLoop(loop) {
+  // Prefer the build-time terminal completion (present on every reconstructed
+  // loop); fall back to scanning raw feedback for loops built elsewhere. The
+  // lean feed drops raw feedback[], so this must not depend on it (LIN-622).
+  const terminalCompletedAt = loop.terminalCompletedAt !== undefined
+    ? loop.terminalCompletedAt
+    : deriveCompletedAt(loop.feedback);
   return {
     ...loop,
     agentState: effectiveAgentState(loop),
-    completedAt: deriveCompletedAt(loop.feedback) || (isTerminalLoop(loop) ? (loop.resolvedAt || null) : null)
+    completedAt: terminalCompletedAt || (isTerminalLoop(loop) ? (loop.resolvedAt || null) : null)
   };
 }
 

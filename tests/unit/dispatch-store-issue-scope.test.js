@@ -101,3 +101,30 @@ test('listHistory without an issueIdentifier returns the whole workspace history
   assert.ok(!('issueIdentifier' in historyQueries[0]));
   assert.equal(result.total, 2);
 });
+
+// LIN-622: the feed read windows history to the 30-day lookback with a `since`
+// predicate, pushed into the query so rows older than the window (and any
+// cleanup-lag backlog) are never materialised — bounding peak memory.
+test('listHistory pushes a since window into the query and excludes older rows', async () => {
+  const history = capturing(createMockCollection());
+  const store = new DispatchQueueStore({
+    collection: createMockCollection(),
+    historyCollection: history.collection
+  });
+  const recent = new Date('2026-06-20T00:00:00.000Z');
+  const ancient = new Date('2026-01-01T00:00:00.000Z'); // cleanup-lag backlog
+  // Insert history docs directly so we control dispatchedAt (addItem stamps now).
+  history.collection._docs.push(
+    { _id: 'r', urlKey: 'acme', issueIdentifier: 'LIN-1', dispatchedAt: recent, resolvedAt: recent, status: 'taken', feedback: [] },
+    { _id: 'o', urlKey: 'acme', issueIdentifier: 'LIN-1', dispatchedAt: ancient, resolvedAt: ancient, status: 'taken', feedback: [] }
+  );
+
+  const since = new Date('2026-05-24T00:00:00.000Z');
+  const result = await store.listHistory('acme', { since });
+
+  assert.equal(history.queries.length, 1);
+  assert.deepEqual(history.queries[0].dispatchedAt, { $gte: since },
+    'the since window must ride into the query so a real DB filters server-side');
+  assert.equal(result.total, 1, 'only the in-window row is materialised');
+  assert.equal(result.items[0].id, 'r');
+});
