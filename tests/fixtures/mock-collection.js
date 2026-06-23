@@ -44,8 +44,22 @@ export function createMockCollection() {
       return found ? { ...found } : null;
     },
 
-    find(query) {
-      const results = docs.filter(d => matches(d, query)).map(d => ({ ...d }));
+    find(query, options = {}) {
+      let results = docs.filter(d => matches(d, query)).map(d => ({ ...d }));
+      // Honour exclusion projections (`{ field: 0 }`) — the only form the stores
+      // use (the lean feed's `{ prompt: 0 }`, LIN-623). Mirrors MangoDB/Mongo so
+      // projection-pushdown tests see fields actually dropped.
+      const projection = options && options.projection;
+      if (projection) {
+        const excluded = Object.keys(projection).filter(k => projection[k] === 0);
+        if (excluded.length) {
+          results = results.map(d => {
+            const copy = { ...d };
+            for (const k of excluded) delete copy[k];
+            return copy;
+          });
+        }
+      }
       return { async toArray() { return results; } };
     },
 

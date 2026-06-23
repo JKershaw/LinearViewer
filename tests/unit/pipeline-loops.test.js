@@ -730,3 +730,70 @@ describe('lean projection (LIN-622)', () => {
     assert.strictEqual(lean[0].completedAt, completedTs);
   });
 });
+
+// ── LIN-623: push the lean intent into the cold history READ (projection) ──────
+// LIN-622 dropped `prompt`/`feedback` from OUTPUT loops; the cold read still
+// fetched them. These pin that the lean feed now projects `prompt` out of the
+// Mongo read (the cold-start latency win) while leaving non-lean reads — and the
+// retained `feedback` the feed still derives telemetry from — untouched.
+describe('lean read projection (LIN-623)', () => {
+  test('getSessionsForWorkspace lean projects `prompt` out of the history read', async () => {
+    const capture = {};
+    const stores = makeMockStores({ capture });
+    await getSessionsForWorkspace('ws', { ...stores, lean: true });
+    assert.deepStrictEqual(capture.listHistoryOptions.projection, { prompt: 0 },
+      'the lean feed read must exclude `prompt` at the query so a real DB never transfers it');
+    // It is a column exclusion, NOT a row cap — the truncation-footgun guard stays.
+    assert.ok(!('limit' in capture.listHistoryOptions), 'projection must not become a row cap');
+  });
+
+  test('lean read projects ONLY `prompt` — feedback (telemetry source) is retained', async () => {
+    const capture = {};
+    const stores = makeMockStores({ capture });
+    await getSessionsForWorkspace('ws', { ...stores, lean: true });
+    assert.ok(!('feedback' in capture.listHistoryOptions.projection),
+      'feedback must NOT be projected away — terminal/telemetry facts are derived from it');
+  });
+
+  test('getLoopsForWorkspace lean also projects `prompt` out of the read', async () => {
+    const capture = {};
+    const stores = makeMockStores({ capture });
+    await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    assert.deepStrictEqual(capture.listHistoryOptions.projection, { prompt: 0 });
+  });
+
+  test('non-lean reads carry NO projection (byte-identical full documents)', async () => {
+    const capture = {};
+    const stores = makeMockStores({ capture });
+    await getSessionsForWorkspace('ws', stores);
+    assert.ok(!('projection' in capture.listHistoryOptions),
+      'full paths (run-summary/pipeline/single-session) must read the whole document');
+  });
+
+  test('issue-scoped reads carry NO projection (drill-down reads the prompt body)', async () => {
+    const capture = {};
+    const stores = makeMockStores({ capture });
+    await getLoopsForIssue('ws', ISSUE_A, stores);
+    assert.ok(!('projection' in capture.listHistoryOptions),
+      'getLoopsForIssue is not lean — it keeps the full document');
+  });
+
+  test('lean session still reconstructs terminal facts despite the projected read', async () => {
+    // The projection drops `prompt` (unused), not `feedback`; terminal derivation
+    // must survive end-to-end through the lean session path.
+    const dispatchedAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const resolvedAt = new Date(Date.now() - 50 * 60 * 1000).toISOString();
+    const completedTs = new Date(Date.now() - 40 * 60 * 1000).toISOString();
+    const feedback = [{ message: '[done] finished in 5m', timestamp: completedTs }];
+    const stores = makeMockStores({
+      history: [
+        historyItem({ id: 'sess-1', kind: 'autopilot', dispatchedAt, resolvedAt, feedback }),
+        historyItem({ id: 'w-1', sessionId: 'sess-1', dispatchedAt, resolvedAt, feedback })
+      ]
+    });
+    const sessions = await getSessionsForWorkspace('ws', { ...stores, lean: true });
+    assert.strictEqual(sessions.length, 1);
+    assert.strictEqual(sessions[0].completedAt, completedTs,
+      'derived terminal time survives the projected lean read');
+  });
+});
