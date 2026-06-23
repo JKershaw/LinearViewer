@@ -27,6 +27,7 @@ routes/
   proxy.js             Linear API proxy (token auth, read/write endpoints, cycles, labels, task automation)
   pipeline.js          Pipeline page and JSON polling routes
   collective.js        Collective experiment (experimental): page, multi-workspace dispatch fan-out, Yap state/say proxy (LIN-450)
+  task-chat.js         Task Chat routes (experimental "talk to a task" page + chat API)
   dashboard.js         Autopilot Observation page (first-class, LIN-595): /observation page + sessionId-grouped sessions feed + merged cross-workspace Loop feed, on-demand run-/session-summary, session-context, lazy Linear hydration (LIN-509). /dashboard 302s to /observation; data endpoints keep their /api/dashboard/* paths
   workspace-api.js     Workspace API routes (prompts, recommendations, audit, comments, images)
   test.js              Test-only routes for E2E tests (mock sessions, fixtures)
@@ -46,6 +47,7 @@ lib/
     state-map.js       Maps provider states → canonical model
     linear/index.js    Linear provider adapter
     local/index.js     Local provider adapter (writable, Mongo/Mango-backed; LIN-356)
+    github/index.js    GitHub Issues provider adapter (first foreign backend; capability-gated, LIN-178)
   render.js            Dashboard page renderer (tree view, sections)
   render-pages.js      Standalone page renderers (login, error, workspace-not-found)
   render-audit.js      Operator dashboard page renderer
@@ -60,6 +62,8 @@ lib/
   render-ship.js       Ship page renderer (radial view shell)
   render-swim.js       Swim lanes page renderer
   render-swipe.js      Swipe page renderer (mobile-first task swipe)
+  render-task-chat.js  Task Chat page renderer (experimental "talk to a task" shell)
+  render-styleguide.js Style-guide page renderer (public design-token reference; LIN-457)
   render-proxy.js      Proxy token management UI
   render-legal.js      Privacy Policy / Terms of Service renderers
   render-kpis.js       Public /kpis instance stats page renderer
@@ -81,18 +85,23 @@ lib/
     autopilot-kickoff.js     Autopilot kickoff briefing template
     autopilot-manual.js      Autopilot operating manual ("handbook")
     collective-participant.js  Collective discussion participant prompt (experimental, LIN-450)
+    task-chat-template.js    Task chat prompt template (experimental)
     roadmap-*.js             Roadmap narrative-pipeline templates (orientation,
                              trajectory, north-star, product, gap, narrative, digest, chat)
   recap.js             Task recap prompt + response handling
   recap-cache.js       Hash-based cache for AI recaps
   run-summary.js       On-demand short summary of a single autopilot run (Loop); mirrors recap.js (LIN-509)
   run-summary-cache.js Cache for AI run summaries, keyed ${workspaceId}:${loopId}, 30-day TTL (LIN-509)
+  session-summary.js   On-demand summary of a whole autopilot session (orchestrator + worker dispatches); mirrors recap.js (LIN-592)
+  session-summary-cache.js  Cache for AI session summaries (LIN-592)
   dispatch-terminal.js Terminal-marker detection for dispatch runs ([done]/[failed]/… feedback → terminal status); shared by proxy watch endpoints + dashboard Loop feed (LIN-400/LIN-509)
   session-telemetry.js Pure read-only telemetry parser over loop feedback[] → { runtime, metrics[], producedArtifacts[], model? }; runtime from dispatchedAt→completedAt (terminal duration cross-check only), heartbeat + [evidence] parsing, model omitted until runner emits it; attached per-run/per-session in pipeline-loops (LIN-594)
   brief.js             Current-state task brief prompt + handling
   brief-cache.js       Hash-based cache for AI briefs
   recommend-recurse.js Server-side recommendation recursion (defer routing)
   recommendation-facts.js  Deterministic, network-free per-node fact assembly (assembleNodeFacts) — single fact seam for both prompt paths
+  description-edit.js  Pure, network-free helpers to edit an issue description by supplying only the new content (read live body, splice, write back)
+  linear-fetch.js      Resilient fetch for the Linear GraphQL boundary (dashboard read path)
   session-store.js     MongoDB/MangoDB session store
   user-preferences.js  Cross-device preference storage (MongoDB)
   workspace-preferences.js  Workspace-level preference storage
@@ -100,13 +109,17 @@ lib/
   local-store.js       Local provider's issue/project store (scope-partitioned collection)
   dispatch-store.js    Dispatch queue storage
   dispatch-tokens.js   Consumer API token management
-  foreman-store.js     Agent status append-only log storage (Tier C substrate; loop reconstruction)
+  agent-status-store.js  Agent status append-only log storage (Tier C substrate; loop reconstruction). Backs the canonical `/api/proxy/agent/status` endpoint (`/foreman/status` is a deprecated alias; LIN-533)
   report-history-store.js  Durable per-workspace roadmap report runs
   llm-call-log.js      Append-only per-LLM-call metadata log (model, provider, tokens, cost, time; LIN-418)
+  prompt-trace-store.js  Content-bearing sibling of llm-call-log.js: stores full prompt/response trace content (LIN-578)
   free-tier-store.js   Free tier usage tracking and rate limiting
   proxy-tokens.js      Proxy token hashing and validation
   proxy-events.js      Proxy event audit logging
   proxy-fetch.js       Proxy-aware fetch for HTTP_PROXY environments
+  proxy-wire.js        Source-neutral wire-contract neutralization for the consumer proxy API (LIN-310)
+  proxy-dedupe.js      Deterministic short-window dedupe for non-idempotent proxy creates (LIN-399)
+  trashed-signal.js    Trashed-issue (Linear soft-delete) detection signal (LIN-401)
   periodicals.js       Periodicals registry (scheduled task generation)
   queue-config.js      Maps internal queue model → Linear states/labels
   workflow-config.js   Centralized workflow label configuration
@@ -147,6 +160,8 @@ public/
   ship.css / ship.js            Ship radial view
   swim.css / swim.js            Swim lanes view
   swipe.css / swipe.js          Swipe (mobile) view
+  task-chat.css / task-chat.js  Task Chat page (experimental "talk to a task")
+  styleguide.css                Style-guide page (public design-token reference; LIN-457)
   proxy.css / proxy.js          Proxy token management page
   prompt-section.js, brief.js, recap.js, context.js, sessions.js  Shared client section renderers (context.js = Context relationship diagram, LIN-572)
 tests/
@@ -273,6 +288,8 @@ MONGODB_URI             MongoDB connection string (optional, uses file storage i
 OPENROUTER_API_KEY      Server-side OpenRouter API key (optional, users can connect via OAuth)
 OPENROUTER_REDIRECT_URI Callback URL for OpenRouter OAuth (optional, defaults to /auth/openrouter/callback)
 OPENROUTER_FREE_TIER_KEY Server-side API key for free tier users (optional, enables rate-limited free prompts)
+FREE_TIER_DAILY_LIMIT   Per-workspace daily free-prompt limit (optional, default: 20)
+FREE_TIER_HOURLY_LIMIT  Global hourly free-prompt limit across all workspaces (optional, default: 50)
 YAP_BASE_URL            Yap chat server base URL for the experimental Collective live view (optional, defaults to https://yap.jkershaw.com)
 YAP_PASSWORD            Yap server password (optional, sent as Bearer auth on Yap calls)
 ```
