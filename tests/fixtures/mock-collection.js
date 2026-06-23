@@ -10,8 +10,13 @@ export function createMockCollection() {
   const docs = [];
 
   const fieldMatches = (value, condition) => {
-    if (condition && typeof condition === 'object' && '$gt' in condition) {
-      return value > condition.$gt;
+    if (condition && typeof condition === 'object' &&
+        ('$gt' in condition || '$gte' in condition || '$lt' in condition || '$lte' in condition)) {
+      if ('$gt' in condition && !(value > condition.$gt)) return false;
+      if ('$gte' in condition && !(value >= condition.$gte)) return false;
+      if ('$lt' in condition && !(value < condition.$lt)) return false;
+      if ('$lte' in condition && !(value <= condition.$lte)) return false;
+      return true;
     }
     return value === condition;
   };

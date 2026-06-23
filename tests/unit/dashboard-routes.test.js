@@ -201,7 +201,7 @@ describe('GET /api/dashboard/loops', () => {
 // ─── Feed memory: lean projection + bounded fan-out (LIN-622) ─────────────────
 
 describe('feed memory (LIN-622)', () => {
-  test('/api/dashboard/loops payload carries no promptText (lean reconstruction)', async () => {
+  test('/api/dashboard/loops payload carries no promptText nor retained feedback[] (lean reconstruction)', async () => {
     const perWorkspace = {
       'ws-a': { live: [activeItem('a-live', 'LIN-1')], history: [historyItem('a-hist', 'LIN-2')], agentStatus: [agentStatusDone('a-hist', 'LIN-2')] }
     };
@@ -214,6 +214,11 @@ describe('feed memory (LIN-622)', () => {
     assert.ok(all.length > 0, 'expected at least one run in the feed');
     for (const run of all) {
       assert.ok(!('promptText' in run), `feed run ${run.loopId} must not carry promptText`);
+      // The raw heartbeat/[evidence] log — the dominant per-row bytes — must not
+      // be retained on the lean feed; its derived facts ride telemetry + the
+      // pre-derived terminal fields instead (LIN-622).
+      assert.ok(!Array.isArray(run.feedback) || run.feedback.length === 0,
+        `feed run ${run.loopId} must not retain raw feedback[]`);
     }
   });
 

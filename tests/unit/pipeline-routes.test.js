@@ -93,10 +93,14 @@ describe('GET /api/pipeline/task/:identifier — issue-scoped store pushdown (LI
 
     assert.equal(res.statusCode, 200);
     assert.equal(res.jsonBody.identifier, 'LIN-1');
-    // The selective predicate reached every store read — no unscoped fetch.
+    // The selective predicate reached every store read — no unscoped fetch. The
+    // archive reads also carry the 30-day `since` window (LIN-622); the live
+    // queue stays issue-only.
     assert.deepEqual(seen.itemOpts, { issueIdentifier: 'LIN-1' });
-    assert.deepEqual(seen.historyOpts, { issueIdentifier: 'LIN-1' });
-    assert.deepEqual(seen.statusOpts, { taskIdentifier: 'LIN-1' });
+    assert.equal(seen.historyOpts.issueIdentifier, 'LIN-1');
+    assert.ok(seen.historyOpts.since instanceof Date);
+    assert.equal(seen.statusOpts.taskIdentifier, 'LIN-1');
+    assert.ok(seen.statusOpts.since instanceof Date);
   });
 });
 
