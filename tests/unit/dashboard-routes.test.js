@@ -287,6 +287,82 @@ describe('GET /api/dashboard/sessions', () => {
     assert.equal(run.producedArtifacts[0].url, 'https://github.com/x/y/pull/1');
   });
 
+  test('a live session carries a deterministic statusLine from its latest child (no per-poll summary fetch needed)', async () => {
+    // A running worker decorated with an agent-status summary, under a live
+    // (queued) autopilot anchor — i.e. a non-terminal session. The feed must
+    // surface that summary as `statusLine` so the client renders it directly
+    // instead of polling /session-summary every 5s (the OOM path).
+    const runningWorker = { id: 'w-run', sessionId: 'sess-live', issueIdentifier: 'LIN-811', issueTitle: 'Worker', promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO };
+    const runningStatus = { dispatchId: 'w-run', taskIdentifier: 'LIN-811', action: 'implementation', status: 'working', summary: 'wiring the new route', timestamp: NOW_ISO };
+    const perWorkspace = {
+      'ws-a': {
+        live: [autopilotLiveItem('sess-live', 'LIN-810'), runningWorker],
+        history: [],
+        agentStatus: [runningStatus]
+      }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const s = res.jsonBody.active.find(x => x.sessionId === 'sess-live');
+    assert.ok(s, 'live session is active');
+    assert.equal(s.terminal, false);
+    assert.equal(s.statusLine, 'wiring the new route', 'live status line is served on the feed');
+  });
+
+  test('a terminal session serves no statusLine (uses its cached AI summary instead)', async () => {
+    const perWorkspace = {
+      'ws-a': {
+        live: [],
+        history: [autopilotHistoryItem('sess-t', 'LIN-820'), workerHistoryItem('w-t', 'LIN-821', 'sess-t')],
+        agentStatus: [agentStatusDone('sess-t', 'LIN-820'), agentStatusDone('w-t', 'LIN-821')]
+      }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const s = res.jsonBody.recent.find(x => x.sessionId === 'sess-t');
+    assert.ok(s, 'terminal session is recent');
+    assert.equal(s.terminal, true);
+    assert.equal(s.statusLine, null, 'terminal sessions carry no feed status line');
+  });
+
+  test('runs ship a bounded metrics tail plus a precomputed tool peak (not every heartbeat)', async () => {
+    // 10 heartbeats with rising tool counts: the feed must trim to the last 6 and
+    // expose the peak (10) so a long run cannot bloat the per-poll payload.
+    const beats = [];
+    for (let i = 1; i <= 10; i++) beats.push({ message: `[working] ${i} tools/${i}s · alive`, timestamp: NOW_ISO });
+    const longWorker = {
+      id: 'w-long', sessionId: 'sess-long', issueIdentifier: 'LIN-831', issueTitle: 'Long worker',
+      promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken',
+      feedback: [...beats, { message: '[done] shipped it', timestamp: NOW_ISO }]
+    };
+    const perWorkspace = {
+      'ws-a': {
+        live: [],
+        history: [autopilotHistoryItem('sess-long', 'LIN-830'), longWorker],
+        agentStatus: [agentStatusDone('sess-long', 'LIN-830'), agentStatusDone('w-long', 'LIN-831')]
+      }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const sess = res.jsonBody.recent.find(s => s.sessionId === 'sess-long');
+    const run = sess.runs.find(r => r.loopId === 'w-long');
+    assert.ok(run, 'worker run present');
+    assert.equal(run.metrics.length, 6, 'metrics trimmed to the recent tail');
+    assert.equal(run.toolPeak, 10, 'peak tool count precomputed across ALL heartbeats');
+  });
+
   test('a [failed] worker yields an error-status session', async () => {
     const failWorker = { id: 'wf', sessionId: 'sess-9', issueIdentifier: 'LIN-301', issueTitle: 'T', promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken', feedback: [{ message: '[failed] broke', timestamp: NOW_ISO }] };
     const perWorkspace = {

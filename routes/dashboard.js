@@ -118,6 +118,47 @@ function enrichLoop(loop) {
 }
 
 /**
+ * Peak tool-activity figure across a run's heartbeats — the single number the
+ * feed's metric chip renders. Pre-computing it lets the feed ship only the
+ * recent metrics tail instead of every heartbeat (an unbounded list on a long
+ * run), which was pure per-poll waste (LIN-608 memory follow-up).
+ * @param {Array<Object>} metrics
+ * @returns {number|null}
+ */
+function peakToolCount(metrics) {
+  if (!Array.isArray(metrics)) return null;
+  let best = null;
+  for (const m of metrics) {
+    const v = m && m.total != null ? m.total : (m ? m.toolCount : null);
+    if (v != null && (best == null || v > best)) best = v;
+  }
+  return best;
+}
+
+/**
+ * Deterministic, cache-free live status line for a session's feed payload: the
+ * most-recently-active child's own agent summary (capped). This is the SAME
+ * fallback `liveStatusLine` derives, lifted onto the feed so a RUNNING session's
+ * status needs no extra per-poll workspace scan — the client renders
+ * `s.statusLine` directly instead of polling /session-summary every 5s. That
+ * per-poll re-scan (its gate churns on every heartbeat), multiplied by every
+ * active session, was the out-of-memory crash (LIN-608 memory follow-up).
+ * @param {Array<Object>} children - enriched child loops
+ * @returns {string}
+ */
+function deriveFeedStatusLine(children) {
+  if (!Array.isArray(children) || !children.length) return '';
+  let best = null;
+  let bestMs = -Infinity;
+  for (const c of children) {
+    const ms = loopActivityMs(c);
+    if (ms >= bestMs) { bestMs = ms; best = c; }
+  }
+  const text = best && best.agentSummary ? String(best.agentSummary) : '';
+  return text.slice(0, 200);
+}
+
+/**
  * @param {Object} deps
  * @param {Function} deps.workspaceFromUrl        - middleware: session + req.workspace
  * @param {Object}   deps.dispatchQueueStore       - dispatch store (listItems/listHistory)
@@ -219,21 +260,29 @@ export function createDashboardRoutes({
     // agent summary, and its issueUrl. This stays inside the per-poll cost
     // contract: it is pure Mongo, no Linear call and no LLM (the on-demand
     // run-summary recap is fetched lazily, per node, by the client; LIN-595).
-    const runs = children.map(l => ({
-      loopId: l.loopId,
-      issueIdentifier: l.issueIdentifier || null,
-      issueTitle: l.issueTitle || '',
-      issueUrl: l.issueUrl || null,
-      agentState: l.agentState,
-      stage: l.stage || null,
-      promptName: l.promptName || null,
-      kind: l.kind || null,
-      iteration: l.iteration ?? null,
-      agentSummary: l.agentSummary || null,
-      runtime: l.telemetry?.runtime || null,
-      metrics: Array.isArray(l.telemetry?.metrics) ? l.telemetry.metrics : [],
-      producedArtifacts: Array.isArray(l.telemetry?.producedArtifacts) ? l.telemetry.producedArtifacts : []
-    }));
+    const runs = children.map(l => {
+      const metrics = Array.isArray(l.telemetry?.metrics) ? l.telemetry.metrics : [];
+      return {
+        loopId: l.loopId,
+        issueIdentifier: l.issueIdentifier || null,
+        issueTitle: l.issueTitle || '',
+        issueUrl: l.issueUrl || null,
+        agentState: l.agentState,
+        stage: l.stage || null,
+        promptName: l.promptName || null,
+        kind: l.kind || null,
+        iteration: l.iteration ?? null,
+        agentSummary: l.agentSummary || null,
+        runtime: l.telemetry?.runtime || null,
+        // The feed renders only the recent activity tail (last few beats) and the
+        // single peak tool count — NOT the full heartbeat history, which on a long
+        // run is unbounded. Shipping all of it on every poll was waste that scaled
+        // with run length (LIN-608 memory follow-up).
+        metrics: metrics.slice(-6),
+        toolPeak: peakToolCount(metrics),
+        producedArtifacts: Array.isArray(l.telemetry?.producedArtifacts) ? l.telemetry.producedArtifacts : []
+      };
+    });
 
     const telemetry = session.telemetry || {};
 
@@ -253,7 +302,11 @@ export function createDashboardRoutes({
       completedAt: session.completedAt || null,
       lastActivity: lastActivityMs ? new Date(lastActivityMs).toISOString() : null,
       runtime: telemetry.runtime || null,
-      model: telemetry.model || null
+      model: telemetry.model || null,
+      // Live status line served on the feed (deterministic, cache-free) so the
+      // client never issues a per-poll /session-summary scan for a running
+      // session. Null for terminal sessions — they render their cached AI summary.
+      statusLine: terminal ? null : deriveFeedStatusLine(children)
     };
   }
 
