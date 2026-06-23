@@ -17,6 +17,7 @@ installAsyncErrorForwarding()
 import session from 'express-session'
 import { MongoClient } from 'mongodb'
 import { MangoClient } from '@jkershaw/mangodb'
+import { ensureIndexes } from './lib/db-indexes.js'
 import { MongoSessionStore } from './lib/session-store.js'
 import { UserPreferencesStore } from './lib/user-preferences.js'
 import { WorkspacePreferencesStore } from './lib/workspace-preferences.js'
@@ -157,6 +158,11 @@ const dbClient = process.env.MONGODB_URI
 
 await dbClient.connect()
 const db = dbClient.db('linear-viewer')
+
+// Boot-time index creation (LIN-610). Idempotent — running on every boot is the
+// deploy mechanism (no migration framework). Best-effort per index, so a failed
+// build can never wedge startup. Must run after connect and before app.listen.
+await ensureIndexes(db)
 const sessionsCollection = db.collection('sessions')
 const userPreferencesCollection = db.collection('user-preferences')
 
