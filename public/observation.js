@@ -127,6 +127,8 @@ function renderSummaryLine(s) {
   // not shown as a live one (Bug 3, LIN-608).
   if (s.stale) return `<span class="obs-summary-line obs-summary-dim">○ idle — no activity for over a day</span>`;
   if (st && st.statusLine) return `<span class="obs-summary-line obs-summary-status">${escapeHtml(st.statusLine)}</span>`;
+  // Live status line served on the feed itself (no per-poll backend fetch).
+  if (s.statusLine) return `<span class="obs-summary-line obs-summary-status">${escapeHtml(s.statusLine)}</span>`;
   if (!s.terminal) return `<span class="obs-summary-line obs-summary-dim">◐ working…</span>`;
   // Terminal but no cached summary → offer to generate (explicit spend only).
   return `<button type="button" class="obs-summary-gen" data-session="${escapeHtml(s.sessionId)}">summarise this session</button>`;
@@ -256,7 +258,7 @@ function renderFeeds() {
 function renderSessionBody(body, s) {
   body.dataset.sig = sessionSignature(s);
   const st = summaryState.get(s.sessionId);
-  const statusLine = st && (st.statusLine || st.outcome);
+  const statusLine = (st && (st.statusLine || st.outcome)) || s.statusLine;
 
   body.innerHTML = `
     ${statusLine ? `<p class="obs-body-status"><span class="obs-body-lbl">status</span> ${escapeHtml(statusLine)}</p>` : ''}
@@ -399,7 +401,9 @@ function renderChips(run) {
   const chips = [];
   const rt = formatRuntime(run.runtime);
   if (rt) chips.push(`<span class="obs-chip-metric">${escapeHtml(rt)}</span>`);
-  const tools = toolActivity(run.metrics);
+  // Prefer the server-precomputed peak (the feed ships only the metrics tail now);
+  // fall back to scanning the tail for older payloads.
+  const tools = run.toolPeak != null ? run.toolPeak : toolActivity(run.metrics);
   if (tools != null) chips.push(`<span class="obs-chip-metric">${tools} tool${tools === 1 ? '' : 's'}</span>`);
   const arts = Array.isArray(run.producedArtifacts) ? run.producedArtifacts.length : 0;
   if (arts) chips.push(`<span class="obs-chip-metric">${arts} link${arts === 1 ? '' : 's'}</span>`);
@@ -601,20 +605,25 @@ async function generateRunSummary(sessionId, loopId) {
 
 // ─── Session summary (lazy, cost-aware) ───────────────────────────────────────
 
-// Fetch a session's one-sentence summary once per session signature. Live
-// sessions get the endpoint's free status-line proxy; terminal sessions are only
-// PEEKED (?cachedOnly=1) so a poll never auto-spends an LLM call.
+// Peek a TERMINAL session's cached one-sentence summary, once. Live/stale
+// sessions are deliberately NOT fetched here: their status line is served on the
+// feed (s.statusLine), so there is no per-poll request for them. This was the
+// memory crash — a running session's signature changes every poll (lastActivity
+// advances on each heartbeat), so the old code re-fetched every 5s and each
+// fetch re-scanned the whole workspace; multiplied by every active session it
+// exhausted memory within minutes. Terminal sessions don't churn, so the peek
+// fires once and never auto-spends an LLM call (?cachedOnly=1).
 async function maybeFetchSummary(s) {
+  if (!s.terminal) return;
+
   const sig = s.sessionId + '|' + sessionSignature(s);
   if (summaryFetched.has(sig)) return;
   summaryFetched.add(sig);
 
   const urlKey = observationData?.urlKey;
   if (!urlKey) return;
-  const base = `/workspace/${encodeURIComponent(urlKey)}/api/dashboard/session-summary/${encodeURIComponent(s.sessionId)}`;
-  const url = s.terminal ? `${base}?cachedOnly=1` : base;
   try {
-    const res = await fetch(url);
+    const res = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dashboard/session-summary/${encodeURIComponent(s.sessionId)}?cachedOnly=1`);
     if (res.status !== 200) return; // 204 = terminal but uncached → leave the affordance
     const data = await res.json();
     storeSummary(s.sessionId, data);
@@ -693,9 +702,15 @@ async function pollSessions() {
 }
 
 function startPolling() {
-  if (pollId) clearInterval(pollId);
-  pollSessions();
-  pollId = setInterval(() => { if (!document.hidden) pollSessions(); }, POLL_MS);
+  if (pollId) { clearTimeout(pollId); pollId = null; }
+  // Self-scheduling loop: wait for each poll to finish before queuing the next,
+  // so a slow backend can never stack overlapping /sessions scans (each reads the
+  // whole workspace). Request pile-up was a memory-pressure path.
+  const tick = async () => {
+    if (!document.hidden) await pollSessions();
+    pollId = setTimeout(tick, POLL_MS);
+  };
+  tick();
   if (!visibilityHandler) {
     visibilityHandler = () => { if (!document.hidden) pollSessions(); };
     document.addEventListener('visibilitychange', visibilityHandler);
@@ -739,7 +754,7 @@ function init() {
 }
 
 window.addEventListener('beforeunload', () => {
-  if (pollId) { clearInterval(pollId); pollId = null; }
+  if (pollId) { clearTimeout(pollId); pollId = null; }
   if (visibilityHandler) { document.removeEventListener('visibilitychange', visibilityHandler); visibilityHandler = null; }
 });
 
