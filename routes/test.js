@@ -30,7 +30,7 @@ import { defaultGitHubSeed, GITHUB_WORKSPACE_URL_KEY, GITHUB_REPO } from '../tes
  * @param {Function} options.getWorkspaceAccessToken - Function to look up workspace access token
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, localStore, getWorkspaceAccessToken }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, localStore, getWorkspaceAccessToken }) {
   const router = Router();
 
   // ── Mock Yap server (LIN-450) ─────────────────────────────────────────────
@@ -286,6 +286,19 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   router.get('/test/clear-dispatch-history', async (req, res) => {
     try {
       await dispatchQueueStore.clearHistory(req.query.urlKey || 'test-workspace')
+      res.send('ok')
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
+
+  // Endpoint to clear the materialized Observation sessions read-model for testing
+  // (LIN-623). The derived projection and its source dispatch/agent-status logs are
+  // a unit: a test that wipes the source logs must wipe the projection too, else a
+  // stale derived doc + backfill marker would mask freshly-seeded runs.
+  router.get('/test/clear-observation-sessions', async (req, res) => {
+    try {
+      if (observationSessionsStore) await observationSessionsStore.clear(req.query.urlKey || 'test-workspace')
       res.send('ok')
     } catch (err) {
       res.status(500).json({ error: err.message })
