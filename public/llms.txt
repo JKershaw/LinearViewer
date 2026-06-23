@@ -305,7 +305,7 @@ The Autopilot Observation page (`/workspace/{urlKey}/observation`) is a realtime
 ### Autopilot Observation DOM Structure
 ```
 main.obs-page[data-url-key]             - page container
-  #obs-banner / #obs-banner-line        - at-a-glance counts (active/done/errors)
+  #obs-banner                           - status bar (holds the live poll status)
   #obs-poll-status                      - live poll status line
   #obs-chips                            - workspace filter chips (group)
     .obs-chip[data-ws].is-on            - one per workspace (data-ws = urlKey); .is-on when shown
@@ -315,7 +315,7 @@ main.obs-page[data-url-key]             - page container
     #obs-recent / #obs-recent-empty     - completed sessions feed (ul) + empty state
       li.obs-session[data-session][data-status]  - one autopilot session
         button.obs-session-head         - click to expand/collapse the session
-          .obs-pill[data-status]        - status pill (◐ in-progress / ✓ done / ✕ error)
+          .obs-pill[data-status]        - status pill (◐ in-progress / ✓ done / ✕ error / ○ stale)
           .obs-session-summary          - one-sentence session summary (LIN-592)
           .obs-progress > .obs-seg[data-state][data-live]  - per-worker-run progress bar (live segment pulses)
           .obs-summary-gen              - (terminal, uncached) explicit "summarise this session" button

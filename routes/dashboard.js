@@ -57,6 +57,12 @@ const TERMINAL_AGENT_STATES = new Set(['complete', 'error']);
 // Map a dispatch terminal-feedback marker → a Loop agentState.
 const MARKER_TO_AGENT_STATE = { done: 'complete', failed: 'error', aborted: 'error' };
 
+// A non-terminal session whose last activity is older than this is considered
+// "stale" — a worker that died without emitting a terminal marker would otherwise
+// sit in the Active feed forever (Bug 3, LIN-608). Derived only: the stored record
+// is never mutated, so a later heartbeat (which advances lastActivity) un-stales it.
+const STALE_AFTER_MS = 24 * 60 * 60 * 1000; // 24h ("after a day")
+
 /**
  * Derive the *effective* agent state for a run.
  *
@@ -193,9 +199,18 @@ export function createDashboardRoutes({
     const enriched = (Array.isArray(session.loops) ? session.loops : []).map(enrichLoop);
     const children = childLoops(session).map(enrichLoop);
     const terminal = sessionIsTerminal(session);
-    const status = !terminal
-      ? 'in-progress'
-      : (enriched.some(l => l.agentState === 'error') ? 'error' : 'done');
+    const lastActivityMs = sessionActivityMs(enriched, session);
+
+    // Derived staleness (Bug 3): a non-terminal session with no activity for >24h
+    // is bucketed out of Active. Purely derived from lastActivityMs — never a
+    // mutation — so a later heartbeat advances lastActivity and un-stales it.
+    const stale = !terminal && lastActivityMs > 0 && (Date.now() - lastActivityMs) > STALE_AFTER_MS;
+
+    const status = stale
+      ? 'stale'
+      : (!terminal
+        ? 'in-progress'
+        : (enriched.some(l => l.agentState === 'error') ? 'error' : 'done'));
 
     // One segment per worker run for the progress bar (state-colored; the live
     // one pulses client-side). Each run also carries the Level-3 drill-down
@@ -221,7 +236,6 @@ export function createDashboardRoutes({
     }));
 
     const telemetry = session.telemetry || {};
-    const lastActivityMs = sessionActivityMs(enriched, session);
 
     return {
       sessionId: session.sessionId,
@@ -232,6 +246,7 @@ export function createDashboardRoutes({
       tasksTouched: Array.isArray(session.tasksTouched) ? session.tasksTouched : [],
       status,
       terminal,
+      stale,
       runCount: runs.length,
       runs,
       dispatchedAt: session.dispatchedAt || null,
@@ -301,8 +316,10 @@ export function createDashboardRoutes({
 
     try {
       const merged = await mergeSessions(workspaces);
-      const active = merged.filter(s => !s.terminal);
-      const recent = merged.filter(s => s.terminal).slice(0, recentLimit);
+      // Stale (>24h idle, non-terminal) sessions are bucketed with the archive, not
+      // Active — derived, never mutated (Bug 3, LIN-608).
+      const active = merged.filter(s => !s.terminal && !s.stale);
+      const recent = merged.filter(s => s.terminal || s.stale).slice(0, recentLimit);
 
       res.json({
         workspaces,
@@ -417,11 +434,17 @@ export function createDashboardRoutes({
     }
   }
 
-  router.get('/workspace/:urlKey/api/dashboard/run-summary/:loopId', workspaceFromUrl, (req, res) =>
-    handleRunSummary(req, res, { force: false }));
+  // The summary routes are async handlers invoked as `(req, res) => handleX(...)`.
+  // Express does not await the returned promise, so any rejection (e.g. a store
+  // read inside liveStatusLine/gatherChildOutcomes, or a cache get/put outside the
+  // inner try) would escape as an unhandled rejection and could crash the dyno
+  // (LIN-608). `.catch(next)` routes it to the global error middleware → a visible
+  // 500 instead of a crash.
+  router.get('/workspace/:urlKey/api/dashboard/run-summary/:loopId', workspaceFromUrl, (req, res, next) =>
+    handleRunSummary(req, res, { force: false }).catch(next));
 
-  router.post('/workspace/:urlKey/api/dashboard/run-summary/:loopId', workspaceFromUrl, (req, res) =>
-    handleRunSummary(req, res, { force: true }));
+  router.post('/workspace/:urlKey/api/dashboard/run-summary/:loopId', workspaceFromUrl, (req, res, next) =>
+    handleRunSummary(req, res, { force: true }).catch(next));
 
   // ─── On-demand session rollup summary (cached; LIN-592) ───────────────────────
   //
@@ -458,23 +481,34 @@ export function createDashboardRoutes({
     return loops.length > 0 && loops.every(loopIsTerminal);
   }
 
-  // The cheap live proxy: latest terminal child's cached run-summary.outcome.
+  // The cheap live proxy for an in-progress session's status line. Deterministic:
+  // never an LLM call (the cost contract). Bug 2 (LIN-608): a freshly-started
+  // session has no terminal child and no cached run-summary, so the old
+  // terminal-only filter returned '' forever and the card showed a permanent
+  // "◐ working…" placeholder. We now fall back to the latest child's own
+  // agentSummary/heartbeat — including a still-running child — so live work shows
+  // real status. The richest signal is still preferred: the latest *terminal*
+  // child's cached run-summary outcome wins when present.
   async function liveStatusLine(session, urlKey) {
-    const terminalChildren = childLoops(session)
-      .filter(loopIsTerminal)
+    const children = childLoops(session)
       .map(enrichLoop)
       .sort((a, b) => loopActivityMs(b) - loopActivityMs(a));
-    const latest = terminalChildren[0];
-    if (!latest) return { statusLine: '', loopId: null };
+    if (!children.length) return { statusLine: '', loopId: null };
+
+    // Best signal: the latest completed child's cached run-summary outcome.
+    const latestTerminal = children.find(isTerminalLoop);
     let outcome = '';
-    if (runSummaryCacheStore) {
-      const cached = await runSummaryCacheStore.get(urlKey, latest.loopId);
+    if (latestTerminal && runSummaryCacheStore) {
+      const cached = await runSummaryCacheStore.get(urlKey, latestTerminal.loopId);
       outcome = cached?.summary?.outcome || '';
     }
-    // No cached run-summary for the latest completed child → fall back to its own
-    // agent summary (still no LLM call). Empty when nothing is recorded.
-    if (!outcome) outcome = latest.agentSummary ? String(latest.agentSummary) : '';
-    return { statusLine: outcome.slice(0, 200), loopId: latest.loopId };
+
+    // Fall back to the most-relevant child's own agent summary/heartbeat,
+    // regardless of terminal state — this is what surfaces a running child's live
+    // status. Attribute the line to the child it actually came from.
+    const source = (latestTerminal && outcome) ? latestTerminal : children[0];
+    if (!outcome) outcome = source.agentSummary ? String(source.agentSummary) : '';
+    return { statusLine: outcome.slice(0, 200), loopId: source.loopId };
   }
 
   // Cached child run-summary outcomes for the generation context (no per-child
@@ -573,11 +607,11 @@ export function createDashboardRoutes({
     }
   }
 
-  router.get('/workspace/:urlKey/api/dashboard/session-summary/:sessionId', workspaceFromUrl, (req, res) =>
-    handleSessionSummary(req, res, { force: false }));
+  router.get('/workspace/:urlKey/api/dashboard/session-summary/:sessionId', workspaceFromUrl, (req, res, next) =>
+    handleSessionSummary(req, res, { force: false }).catch(next));
 
-  router.post('/workspace/:urlKey/api/dashboard/session-summary/:sessionId', workspaceFromUrl, (req, res) =>
-    handleSessionSummary(req, res, { force: true }));
+  router.post('/workspace/:urlKey/api/dashboard/session-summary/:sessionId', workspaceFromUrl, (req, res, next) =>
+    handleSessionSummary(req, res, { force: true }).catch(next));
 
   // ─── Session context graph (deterministic; LIN-593) ───────────────────────────
   //

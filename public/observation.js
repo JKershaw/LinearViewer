@@ -62,7 +62,7 @@ const expandedRuns = new Set();            // loopId (worker-node drill-down)
 
 const PROVENANCE_LABEL = { seed: 'seed', descended: 'descended', 'spun-off': 'spun-off' };
 
-const STATUS_ICON = { 'in-progress': '◐', done: '✓', error: '✕' };
+const STATUS_ICON = { 'in-progress': '◐', done: '✓', error: '✕', stale: '○' };
 const STATE_ICON = { complete: '✓', error: '✕', running: '◐', waiting: '◌', queued: '○' };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -105,29 +105,6 @@ function sessionSignature(s) {
     s.runs.map(r => `${r.loopId}:${r.agentState}`).join(',')].join('|');
 }
 
-// ─── Status banner ────────────────────────────────────────────────────────────
-
-function renderBanner() {
-  const line = document.getElementById('obs-banner-line');
-  const banner = document.getElementById('obs-banner');
-  if (!line) return;
-
-  let active = 0, done = 0, errors = 0;
-  for (const s of sessionIndex.values()) {
-    if (!passesFilter(s)) continue;
-    if (!s.terminal) active += 1;
-    else if (s.status === 'error') errors += 1;
-    else done += 1;
-  }
-
-  const parts = [];
-  parts.push(`<span class="obs-stat obs-stat-active">◐ ${active} active</span>`);
-  parts.push(`<span class="obs-stat obs-stat-done">✓ ${done} done</span>`);
-  if (errors > 0) parts.push(`<span class="obs-stat obs-stat-error">✕ ${errors} error${errors === 1 ? '' : 's'}</span>`);
-  line.innerHTML = parts.join('<span class="obs-stat-sep">·</span>');
-  if (banner) banner.classList.toggle('has-error', errors > 0);
-}
-
 // ─── Session cards (Level 2) ──────────────────────────────────────────────────
 
 function renderProgressBar(s) {
@@ -146,6 +123,9 @@ function renderSummaryLine(s) {
   const st = summaryState.get(s.sessionId);
   if (st && st.pending) return `<span class="obs-summary-line obs-summary-pending">summarising…</span>`;
   if (st && st.outcome) return `<span class="obs-summary-line">${escapeHtml(st.outcome)}</span>`;
+  // Staleness takes precedence over the "live" status line so a day-dead session is
+  // not shown as a live one (Bug 3, LIN-608).
+  if (s.stale) return `<span class="obs-summary-line obs-summary-dim">○ idle — no activity for over a day</span>`;
   if (st && st.statusLine) return `<span class="obs-summary-line obs-summary-status">${escapeHtml(st.statusLine)}</span>`;
   if (!s.terminal) return `<span class="obs-summary-line obs-summary-dim">◐ working…</span>`;
   // Terminal but no cached summary → offer to generate (explicit spend only).
@@ -253,14 +233,15 @@ function diffSessionList(listId, emptyId, cardMap, sessions) {
 
 function renderFeeds() {
   const sessions = [...sessionIndex.values()].filter(passesFilter);
-  const active = sessions.filter(s => !s.terminal);
-  const recent = sessions.filter(s => s.terminal);
+  // Stale sessions (derived server-side, >24h idle) drop out of Active into the
+  // completed archive (Bug 3, LIN-608) — they are no longer "live".
+  const active = sessions.filter(s => !s.terminal && !s.stale);
+  const recent = sessions.filter(s => s.terminal || s.stale);
   diffSessionList('obs-active', 'obs-active-empty', activeCards, active);
   diffSessionList('obs-recent', 'obs-recent-empty', recentCards, recent);
 
   const count = document.getElementById('obs-archive-count');
   if (count) count.textContent = String(recent.length);
-  renderBanner();
 }
 
 // ─── Session body (expanded — Level 3 drill-down) ───────────────────────────────

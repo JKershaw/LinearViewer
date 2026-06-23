@@ -291,6 +291,25 @@ const promptTraceStore = new PromptTraceStore({
 setPromptTraceRecorder((trace) => promptTraceStore.record(trace))
 
 // =============================================================================
+// Process-level safety net (LIN-608)
+// =============================================================================
+// On modern Node an unhandled promise rejection (or an uncaught exception) can
+// terminate the process — on Heroku the dyno dies and the next requests get the
+// generic "Application error" page until it restarts. Async route handlers that
+// are invoked as `(req, res) => handleX(...)` are the main escape hatch: Express
+// never awaits the returned promise, so a rejection there is "unhandled". We log
+// it loudly (so failures surface) and keep the process alive rather than letting
+// one bad request take down the whole server. Route-level errors are still routed
+// to the Express error middleware below via `.catch(next)`; this is the backstop
+// for anything that slips past that.
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled promise rejection:', reason)
+})
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception:', err)
+})
+
+// =============================================================================
 // Express App Configuration
 // =============================================================================
 const app = express()
@@ -1632,6 +1651,27 @@ app.post('/workspace/:urlKey/settings/features', workspaceFromUrl, async (req, r
 // Legacy Route Redirects
 // =============================================================================
 app.use(createLegacyRedirects())
+
+// =============================================================================
+// Global Error Handler (LIN-608)
+// =============================================================================
+// Final 4-arg Express error-handling middleware. Any error passed to next(err) —
+// including a rejected promise from an async handler wrapped with `.catch(next)`
+// (see routes/dashboard.js) — lands here and surfaces as a visible 500 instead of
+// crashing the dyno or silently hanging the request. Must be registered last,
+// after every route.
+app.use((err, req, res, next) => {
+  console.error('Unhandled route error:', req.method, req.originalUrl, '-', err?.stack || err)
+  if (res.headersSent) return next(err)
+  const wantsJson = req.path.includes('/api/') ||
+    req.xhr ||
+    (req.headers.accept || '').includes('application/json')
+  if (wantsJson) {
+    res.status(500).json({ error: 'Internal server error' })
+  } else {
+    res.status(500).send('Internal server error')
+  }
+})
 
 // =============================================================================
 // Server Startup

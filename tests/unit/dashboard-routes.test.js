@@ -307,6 +307,43 @@ describe('GET /api/dashboard/sessions', () => {
     assert.equal(s.status, 'error');
   });
 
+  test('a non-terminal session idle > 24h is derived stale and bucketed out of Active', async () => {
+    // Worker that died without a terminal marker, last seen 2 days ago (Bug 3).
+    const OLD_ISO = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+    const staleAnchor = { id: 'sess-stale', kind: 'autopilot', issueIdentifier: 'LIN-700', issueTitle: 'Stale session', promptName: 'autopilot', prompt: 'p', dispatchedAt: OLD_ISO };
+    const router = makeRouter({ 'ws-a': { live: [staleAnchor], history: [], agentStatus: [] } });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const session = { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] };
+    const { req, res } = makeReqRes({ session });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const s = res.jsonBody.recent.find(x => x.sessionId === 'sess-stale');
+    assert.ok(s, 'stale session lands in the archive, not Active');
+    assert.equal(s.stale, true);
+    assert.equal(s.status, 'stale');
+    assert.equal(s.terminal, false, 'stale is derived, never a terminal mutation');
+    assert.ok(!res.jsonBody.active.some(x => x.sessionId === 'sess-stale'), 'stale session is not in Active');
+  });
+
+  test('recent child activity un-stales an otherwise-old session (stays Active)', async () => {
+    const OLD_ISO = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+    const oldAnchor = { id: 'sess-fresh', kind: 'autopilot', issueIdentifier: 'LIN-710', issueTitle: 'Fresh session', promptName: 'autopilot', prompt: 'p', dispatchedAt: OLD_ISO };
+    // A worker dispatched just now → recent activity advances the session's clock.
+    const liveWorker = { id: 'w-fresh', sessionId: 'sess-fresh', issueIdentifier: 'LIN-711', issueTitle: 'Worker', promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO };
+    const router = makeRouter({ 'ws-a': { live: [oldAnchor, liveWorker], history: [], agentStatus: [] } });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const session = { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] };
+    const { req, res } = makeReqRes({ session });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const s = res.jsonBody.active.find(x => x.sessionId === 'sess-fresh');
+    assert.ok(s, 'a later heartbeat keeps the session in Active');
+    assert.equal(s.stale, false);
+    assert.equal(s.status, 'in-progress');
+  });
+
   test('one failing workspace store does not blank the whole feed', async () => {
     const router = createDashboardRoutes({
       workspaceFromUrl: (req, res, next) => next(),
@@ -519,6 +556,31 @@ describe('session-summary endpoint', () => {
     assert.equal(res.jsonBody.statusLineLoopId, 'w-1');
     // Nothing was cached for the live session.
     assert.equal(await sessCache.get('ws-a', 'sess-2'), null);
+  });
+
+  test('a live session with only a RUNNING child surfaces that child\'s live summary (Bug 2)', async () => {
+    // Regression for "tasks in progress don't get summaries" (LIN-608): before the
+    // fix, liveStatusLine filtered to terminal children only, so a session whose
+    // latest child is still running returned an empty status line forever (the UI
+    // showed a permanent "◐ working…"). It must now fall back to the running
+    // child's own agentSummary — deterministically, no LLM call.
+    const runningWorker = { dispatchId: 'w-run', taskIdentifier: 'LIN-801', action: 'implementation', status: 'working', summary: 'Refactoring the parser', timestamp: NOW_ISO };
+    const perWorkspace = {
+      'ws-a': {
+        live: [autopilotLiveItem('sess-live', 'LIN-800')],
+        history: [workerHistoryItem('w-run', 'LIN-801', 'sess-live')],
+        agentStatus: [runningWorker]
+      }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/session-summary/:sessionId');
+    const { req, res } = makeReqRes({ session: ENABLED, workspace: { urlKey: 'ws-a' }, params: { sessionId: 'sess-live' } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.status, 'live');
+    assert.equal(res.jsonBody.live, true);
+    assert.match(res.jsonBody.summary.statusLine, /Refactoring the parser/, 'running child summary is surfaced');
+    assert.equal(res.jsonBody.statusLineLoopId, 'w-run');
   });
 });
 
