@@ -15,6 +15,7 @@ import assert from 'node:assert';
 import {
   getLoopsForIssue,
   getLoopsForWorkspace,
+  getSessionsForWorkspace,
   __internal
 } from '../../lib/pipeline-loops.js';
 
@@ -610,5 +611,57 @@ describe('getLoopsForWorkspace', () => {
     };
     const loops = await getLoopsForWorkspace('ws', stores);
     assert.deepStrictEqual(loops, []);
+  });
+});
+
+// ─── Lean projection (feed memory; LIN-622) ──────────────────────────────────
+//
+// The Observation feed reconstructs every workspace's full 30-day history on a
+// 5s poll. `promptText` (5–30 KB/loop) is the dominant avoidable allocation and
+// is never read by the feed, so the feed consumers pass `lean: true` to omit it.
+// The run-summary path still needs it, so the DEFAULT must keep it.
+describe('lean projection (LIN-622)', () => {
+  function recentHistoryStore() {
+    const dispatchedAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const resolvedAt = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    return makeMockStores({
+      history: [historyItem({ id: 'h-a', dispatchedAt, resolvedAt, prompt: 'a very large prompt body' })]
+    });
+  }
+
+  test('_buildLoops omits promptText when lean, keeps it by default', () => {
+    const hist = historyItem({ prompt: 'big prompt body' });
+    const full = _buildLoops({ historyItems: [hist], now: NOW });
+    const lean = _buildLoops({ historyItems: [hist], now: NOW, lean: true });
+    assert.strictEqual(full[0].promptText, 'big prompt body');
+    assert.ok(!('promptText' in lean[0]), 'lean loop must not carry a promptText key');
+  });
+
+  test('getLoopsForWorkspace lean omits promptText; default carries it', async () => {
+    const full = await getLoopsForWorkspace('ws', recentHistoryStore());
+    assert.strictEqual(full.length, 1);
+    assert.strictEqual(full[0].promptText, 'a very large prompt body');
+
+    const lean = await getLoopsForWorkspace('ws', { ...recentHistoryStore(), lean: true });
+    assert.strictEqual(lean.length, 1);
+    assert.ok(!('promptText' in lean[0]), 'feed reconstruction must not carry promptText');
+  });
+
+  test('getSessionsForWorkspace lean: no loop in any session carries promptText', async () => {
+    // A session needs an autopilot orchestrator + a worker carrying its sessionId.
+    const dispatchedAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const resolvedAt = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    const stores = makeMockStores({
+      history: [
+        historyItem({ id: 'sess-1', kind: 'autopilot', dispatchedAt, resolvedAt, prompt: 'orchestrator prompt body' }),
+        historyItem({ id: 'w-1', sessionId: 'sess-1', dispatchedAt, resolvedAt, prompt: 'worker prompt body' })
+      ]
+    });
+    const sessions = await getSessionsForWorkspace('ws', { ...stores, lean: true });
+    const allLoops = sessions.flatMap(s => s.loops || []);
+    assert.ok(allLoops.length > 0, 'expected at least one reconstructed loop');
+    for (const loop of allLoops) {
+      assert.ok(!('promptText' in loop), `session loop ${loop.loopId} must not carry promptText`);
+    }
   });
 });
