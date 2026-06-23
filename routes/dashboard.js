@@ -34,6 +34,7 @@ import { getLoopsForWorkspace, getSessionsForWorkspace, deriveIssueGraph } from 
 import { buildSessionContextGraph } from '../lib/context-graph.js';
 import { deriveTerminalStatus, deriveCompletedAt } from '../lib/dispatch-terminal.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
+import { createSessionsFeedCache } from '../lib/sessions-feed-cache.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import {
   generateRunSummary,
@@ -173,6 +174,7 @@ function deriveFeedStatusLine(children) {
  * @param {Function} deps.getOpenRouterSource      - (req) → 'oauth'|'env'|'free'|null
  * @param {Function} deps.getDeployInfo            - () → deploy metadata
  * @param {number}   [deps.recentLimit=120]        - cap on terminal runs returned by /loops
+ * @param {Object}   [deps.sessionsFeedCache]      - short-TTL SWR cache for the /sessions feed (LIN-617)
  * @returns {Router}
  */
 export function createDashboardRoutes({
@@ -187,7 +189,8 @@ export function createDashboardRoutes({
   fetchWorkspaceIssues,
   getOpenRouterSource,
   getDeployInfo,
-  recentLimit = 120
+  recentLimit = 120,
+  sessionsFeedCache = createSessionsFeedCache()
 }) {
   const router = Router();
   const loopDeps = { dispatchStore: dispatchQueueStore, agentStatusStore };
@@ -374,7 +377,15 @@ export function createDashboardRoutes({
     // branch of _fetchWorkspaceData stays option-free; truncation-footgun guard).
     const keepalive = armKeepalive(res);
     try {
-      const merged = await mergeSessions(workspaces);
+      // Short-TTL stale-while-revalidate cache (LIN-617): only the first poll for
+      // this workspace set pays the full scan/reconstruction; later polls are
+      // served instantly (refreshed in the background) so the banner stops
+      // sitting on its initial "loading…" placeholder. Caches the merged OUTPUT,
+      // not the store reads, so the truncation-footgun guard above is untouched.
+      const merged = await sessionsFeedCache.get(
+        sessionsFeedCache.keyFor(workspaces),
+        () => mergeSessions(workspaces)
+      );
       // Stale (>24h idle, non-terminal) sessions are bucketed with the archive, not
       // Active — derived, never mutated (Bug 3, LIN-608).
       const active = merged.filter(s => !s.terminal && !s.stale);
