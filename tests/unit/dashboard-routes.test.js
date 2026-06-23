@@ -728,6 +728,103 @@ describe('session-context endpoint', () => {
   });
 });
 
+// ─── Request-layer keepalive on the workspace-wide reads (LIN-615) ────────────
+// The /loops and /sessions feeds (and session-context) read the whole-workspace
+// loop log with no selective predicate to push down. Instead of capping the
+// store read (which the truncation-footgun guard forbids), the handlers arm a
+// keepalive heartbeat so a slow bounded request survives Heroku's 30s H12 router
+// timeout. These tests drive a deliberately-stalled store with mocked timers and
+// assert the heartbeat fires, then the real JSON body still lands.
+
+describe('workspace-wide reads arm a keepalive heartbeat (LIN-615)', () => {
+  // A res that records the flushed-heartbeat path (status/setHeader/flushHeaders/
+  // write/end) as well as the fast json() path.
+  function makeFlushRes() {
+    return {
+      statusCode: 200,
+      headers: {},
+      flushedHeaders: false,
+      writes: [],
+      endedWith: undefined,
+      jsonBody: null,
+      writableEnded: false,
+      destroyed: false,
+      status(code) { this.statusCode = code; return this; },
+      setHeader(k, v) { this.headers[k] = v; return this; },
+      flushHeaders() { this.flushedHeaders = true; return this; },
+      write(chunk) { this.writes.push(chunk); return true; },
+      json(b) { this.jsonBody = b; return this; },
+      end(b) { this.endedWith = b; this.writableEnded = true; return this; }
+    };
+  }
+
+  // A dispatch store whose listHistory hangs on an externally-resolved promise,
+  // so the handler stays pending until we both advance timers AND release it.
+  function stallableStores() {
+    let release;
+    const gate = new Promise((resolve) => { release = resolve; });
+    return {
+      release: () => release(),
+      stores: {
+        dispatchQueueStore: {
+          async listItems() { return []; },
+          async listHistory() { await gate; return { items: [] }; }
+        },
+        agentStatusStore: { async listStatus() { return { items: [] }; } }
+      }
+    };
+  }
+
+  async function runStalledFeed(t, path) {
+    t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
+    const { release, stores } = stallableStores();
+    const router = createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      ...stores,
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      fetchWorkspaceIssues: async () => [],
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({})
+    });
+    const handler = getHandler(router, 'get', path);
+    const req = { session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] }, params: {}, query: {}, protocol: 'http', get: () => 'localhost' };
+    const res = makeFlushRes();
+
+    const done = handler(req, res);
+    // Past the 25s flush threshold: headers committed as 200 + JSON, no body yet.
+    t.mock.timers.tick(25_000);
+    assert.equal(res.flushedHeaders, true, 'keepalive flushed headers before the slow read finished');
+    assert.equal(res.statusCode, 200);
+    assert.match(res.headers['Content-Type'], /application\/json/);
+    // One heartbeat interval later: a single whitespace byte (JSON-safe).
+    t.mock.timers.tick(15_000);
+    assert.ok(res.writes.includes(' '), 'a keepalive heartbeat space was written');
+
+    release();
+    await done;
+
+    // The real payload still lands, serialized into res.end (committed status path).
+    assert.ok(res.endedWith, 'final JSON body delivered via res.end after the heartbeat');
+    return JSON.parse(res.endedWith);
+  }
+
+  test('/api/dashboard/loops arms keepalive and still returns the feed', async (t) => {
+    const body = await runStalledFeed(t, '/workspace/:urlKey/api/dashboard/loops');
+    assert.ok(Array.isArray(body.active) && Array.isArray(body.recent));
+    assert.ok(body.counts && typeof body.counts.total === 'number');
+  });
+
+  test('/api/dashboard/sessions arms keepalive and still returns the feed', async (t) => {
+    const body = await runStalledFeed(t, '/workspace/:urlKey/api/dashboard/sessions');
+    assert.ok(Array.isArray(body.active) && Array.isArray(body.recent));
+    assert.ok(body.counts && typeof body.counts.total === 'number');
+  });
+});
+
 // ─── buildTestSessionSummary (pure) ───────────────────────────────────────────
 
 describe('buildTestSessionSummary', () => {

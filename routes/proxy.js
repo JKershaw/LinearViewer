@@ -3848,9 +3848,13 @@ One convention across every endpoint, so you can branch on the same fields every
 
     try {
       // Live queue (still 'queued') + resolved history (with feedback), merged.
+      // When scoped to one issue, push `issueIdentifier` into both store reads
+      // (LIN-613/LIN-615 index-backed predicate) instead of fetching the whole
+      // workspace and filtering in JS. The 200-history bound is preserved.
+      const scopeOpts = issueIdentifier ? { issueIdentifier } : undefined;
       const [queued, history] = await Promise.all([
-        dispatchQueueStore.listItems(req.proxyUrlKey),
-        dispatchQueueStore.listHistory(req.proxyUrlKey, { limit: 200 })
+        dispatchQueueStore.listItems(req.proxyUrlKey, scopeOpts),
+        dispatchQueueStore.listHistory(req.proxyUrlKey, { limit: 200, ...scopeOpts })
       ]);
 
       const merged = [
@@ -3862,8 +3866,9 @@ One convention across every endpoint, so you can branch on the same fields every
       // aborted, else the lifecycle status) so filtering and the response agree.
       const resolved = merged.map(i => ({ ...i, status: deriveTerminalStatus(i.feedback) || i.status }));
 
+      // `status` is derived from feedback (not stored), so it stays a JS filter;
+      // `issueIdentifier` is already enforced at the store layer above.
       const filtered = resolved.filter(i =>
-        (!issueIdentifier || i.issueIdentifier === issueIdentifier) &&
         (!statusFilter || i.status === statusFilter)
       );
 

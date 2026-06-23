@@ -113,8 +113,12 @@ function makeLoop(overrides = {}) {
 }
 
 /**
- * Construct a deps object that injects fake fetchProjects/getLoopsForWorkspace
- * plus no-op stores and a deterministic `now`.
+ * Construct a deps object that injects fake fetchProjects plus the two loop
+ * readers (`getLoopsForWorkspace` for the snapshot, `getLoopsForIssue` for the
+ * single-task rollup — issue-scoped per LIN-615), no-op stores, and a
+ * deterministic `now`. `getLoopsForIssue` mirrors the real store pushdown by
+ * returning only the requested issue's loops, so a whole-workspace read + JS
+ * filter would be a bug, not a no-op.
  */
 function makeDeps({ projects = [], issues = [], loops = [], now = NOW_MS } = {}) {
   return {
@@ -128,6 +132,8 @@ function makeDeps({ projects = [], issues = [], loops = [], now = NOW_MS } = {})
     },
     fetchProjects: async () => ({ projects, issues }),
     getLoopsForWorkspace: async () => loops,
+    getLoopsForIssue: async (_urlKey, identifier) =>
+      loops.filter(l => l.issueIdentifier === identifier),
     now
   };
 }
@@ -526,6 +532,31 @@ describe('buildPipelineSnapshot — plan scenarios', () => {
     assert.strictEqual(task.loopCount, 1);
     assert.strictEqual(task.currentStage, 'breakdown');
     assert.strictEqual(task.agentState, 'complete');
+  });
+
+  test('(8b) getTaskForIssue pushes the issue scope down — calls getLoopsForIssue, never getLoopsForWorkspace (LIN-615)', async () => {
+    const issue = makeIssue({ id: 'a', identifier: 'LIN-42', title: 'Scoped' });
+    const loop = makeLoop({ issueIdentifier: 'LIN-42', agentState: 'running' });
+
+    let workspaceCalls = 0;
+    const issueCalls = [];
+    const deps = {
+      ...makeDeps({ projects: [makeProject()], issues: [issue], loops: [loop] }),
+      getLoopsForWorkspace: async () => { workspaceCalls++; return [loop]; },
+      getLoopsForIssue: async (urlKey, identifier, d) => {
+        issueCalls.push({ urlKey, identifier, deps: d });
+        return [loop];
+      }
+    };
+
+    const task = await getTaskForIssue('ws', 'LIN-42', deps);
+
+    assert.strictEqual(workspaceCalls, 0, 'must NOT read the whole workspace log');
+    assert.strictEqual(issueCalls.length, 1, 'must read via the issue-scoped reader');
+    assert.strictEqual(issueCalls[0].identifier, 'LIN-42', 'identifier predicate is pushed down');
+    assert.ok(issueCalls[0].deps.dispatchStore, 'stores threaded to the issue-scoped reader');
+    assert.ok(issueCalls[0].deps.agentStatusStore, 'stores threaded to the issue-scoped reader');
+    assert.strictEqual(task.loopCount, 1);
   });
 
   test('(9) parentChain walk across 3 levels returns [mid, root]', async () => {
