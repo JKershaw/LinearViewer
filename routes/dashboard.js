@@ -211,6 +211,8 @@ function deriveFeedStatusLine(children) {
  * @param {Function} deps.workspaceFromUrl        - middleware: session + req.workspace
  * @param {Object}   deps.dispatchQueueStore       - dispatch store (listItems/listHistory)
  * @param {Object}   deps.agentStatusStore             - agent status store
+ * @param {Object}   [deps.observationSessionsStore]   - durable materialized sessions read-model (LIN-623); when present the feed reads it instead of replaying logs. Null ⇒ live path (byte-identical legacy behaviour).
+ * @param {Object}   [deps.observationMaterializer]    - materializer used to backfill a workspace on a read-miss (LIN-623)
  * @param {Object}   deps.runSummaryCacheStore     - run-summary cache store
  * @param {Object}   deps.sessionSummaryCacheStore - session-summary cache store (LIN-592)
  * @param {Object}   deps.freeTierStore            - free-tier usage store (rate limit)
@@ -227,6 +229,8 @@ export function createDashboardRoutes({
   workspaceFromUrl,
   dispatchQueueStore,
   agentStatusStore,
+  observationSessionsStore = null,
+  observationMaterializer = null,
   runSummaryCacheStore,
   sessionSummaryCacheStore,
   freeTierStore,
@@ -374,12 +378,34 @@ export function createDashboardRoutes({
    * @returns {Promise<Array<Object>>}
    */
   async function mergeSessions(workspaces) {
-    // Lean reconstruction (no promptText — buildSessionPayload never reads it) +
-    // bounded fan-out so peak memory tracks a couple of workspaces, not all
-    // (LIN-622). issueGraph is still omitted here (drill-down concern).
+    // Per-workspace source of the session objects (LIN-623): the durable
+    // `observation-sessions` read-model when present, else the live 30-day
+    // reconstruction. The read swap changes ONLY where the session objects come
+    // from — `buildSessionPayload` runs byte-identical at read time over either,
+    // so the now-relative status/stale/statusLine stay live. issueGraph is still
+    // omitted here (a drill-down concern); the materializer matches that by
+    // building with no graph too.
+    const sessionsForWorkspace = async (ws) => {
+      if (observationSessionsStore) {
+        const { sessions, backfilledAt } = await observationSessionsStore.findByWorkspace(ws.urlKey);
+        // Hit: derived docs exist, OR the workspace was backfilled and is genuinely
+        // empty (so we don't re-fan to the live path on every 5s poll forever).
+        if (sessions.length > 0 || backfilledAt) return sessions;
+        // Miss (pre-backfill): serve the correct live reconstruction now and kick a
+        // one-time background build→persist so subsequent polls are cheap. The
+        // derived path is thus a pure optimization that always degrades to live.
+        if (observationMaterializer) {
+          Promise.resolve(observationMaterializer.backfillWorkspace(ws.urlKey)).catch(() => {});
+        }
+      }
+      return getSessionsForWorkspace(ws.urlKey, { ...loopDeps, lean: true });
+    };
+
+    // Bounded fan-out so peak memory tracks a couple of workspaces, not all
+    // (LIN-622); the derived read makes each workspace cheap.
     const settled = await settleWithConcurrency(workspaces, WORKSPACE_FANOUT_CONCURRENCY,
       async (ws) => {
-        const sessions = await getSessionsForWorkspace(ws.urlKey, { ...loopDeps, lean: true });
+        const sessions = await sessionsForWorkspace(ws);
         return sessions.map(s => buildSessionPayload(s, ws));
       }
     );

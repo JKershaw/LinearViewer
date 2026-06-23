@@ -546,6 +546,101 @@ describe('GET /api/dashboard/sessions', () => {
   });
 });
 
+// ─── Materialized read-model swap (LIN-623) ───────────────────────────────────
+
+describe('GET /api/dashboard/sessions — materialized read-model (LIN-623)', () => {
+  // The session objects the derived store holds are exactly the lean
+  // getSessionsForWorkspace output, so produce them from a fixture once.
+  async function realSessions(perWorkspace, urlKey) {
+    const { getSessionsForWorkspace } = await import('../../lib/pipeline-loops.js');
+    const { dispatchQueueStore, agentStatusStore } = makeStores(perWorkspace);
+    return getSessionsForWorkspace(urlKey, { dispatchStore: dispatchQueueStore, agentStatusStore, lean: true });
+  }
+  const throwingStores = {
+    dispatchQueueStore: {
+      async listItems() { throw new Error('live path must not be read on a derived hit'); },
+      async listHistory() { throw new Error('live path must not be read on a derived hit'); }
+    },
+    agentStatusStore: { async listStatus() { throw new Error('live path must not be read on a derived hit'); } }
+  };
+
+  test('serves the derived read-model and never touches the live reconstruction on a hit', async () => {
+    const perWorkspace = { 'ws-a': { live: [], history: [autopilotHistoryItem('sess-a', 'LIN-1'), workerHistoryItem('w-a', 'LIN-2', 'sess-a')], agentStatus: [agentStatusDone('w-a', 'LIN-2')] } };
+    const sessions = await realSessions(perWorkspace, 'ws-a');
+
+    const router = createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      ...throwingStores,
+      observationSessionsStore: { async findByWorkspace(urlKey) { return urlKey === 'ws-a' ? { sessions, backfilledAt: new Date() } : { sessions: [], backfilledAt: null }; } },
+      observationMaterializer: { backfillWorkspace() { throw new Error('no backfill on a hit'); } },
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token', fetchIssueContext: async () => ({}), fetchWorkspaceIssues: async () => [], getOpenRouterSource: () => 'env', getDeployInfo: () => ({})
+    });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.counts.total, 1, 'served the derived session without reading the live stores');
+    const all = [...res.jsonBody.active, ...res.jsonBody.recent];
+    assert.equal(all[0].sessionId, 'sess-a');
+    assert.equal(all[0].workspaceUrlKey, 'ws-a');
+  });
+
+  test('read-miss falls back to the live path AND kicks a one-time background backfill', async () => {
+    const perWorkspace = { 'ws-a': { live: [], history: [autopilotHistoryItem('sess-a', 'LIN-1')], agentStatus: [agentStatusDone('sess-a', 'LIN-1')] } };
+    const { dispatchQueueStore, agentStatusStore } = makeStores(perWorkspace);
+    const backfilled = [];
+    const router = createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore, agentStatusStore,
+      observationSessionsStore: { async findByWorkspace() { return { sessions: [], backfilledAt: null }; } }, // miss: empty + unbackfilled
+      observationMaterializer: { backfillWorkspace(urlKey) { backfilled.push(urlKey); return Promise.resolve(); } },
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token', fetchIssueContext: async () => ({}), fetchWorkspaceIssues: async () => [], getOpenRouterSource: () => 'env', getDeployInfo: () => ({})
+    });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.counts.total, 1, 'fell back to the correct live reconstruction');
+    assert.deepEqual(backfilled, ['ws-a'], 'kicked the background backfill exactly once for the missed workspace');
+  });
+
+  test('a backfilled-but-empty workspace serves empty WITHOUT re-fanning to the live path', async () => {
+    const router = createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      ...throwingStores, // proves the live path is never read
+      observationSessionsStore: { async findByWorkspace() { return { sessions: [], backfilledAt: new Date() }; } }, // empty, but backfilled
+      observationMaterializer: { backfillWorkspace() { throw new Error('no re-backfill for a known-empty workspace'); } },
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token', fetchIssueContext: async () => ({}), fetchWorkspaceIssues: async () => [], getOpenRouterSource: () => 'env', getDeployInfo: () => ({})
+    });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.counts.total, 0);
+  });
+
+  test('with no observationSessionsStore wired, the feed is byte-identical to the live path (default)', async () => {
+    const perWorkspace = { 'ws-a': { live: [], history: [autopilotHistoryItem('sess-a', 'LIN-1')], agentStatus: [agentStatusDone('sess-a', 'LIN-1')] } };
+    const router = makeRouter(perWorkspace); // no observation deps
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.counts.total, 1);
+  });
+});
+
 // ─── run-summary ─────────────────────────────────────────────────────────────
 
 describe('run-summary endpoint', () => {

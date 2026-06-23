@@ -28,6 +28,8 @@ import { HarbourFeedbackTokenStore } from './lib/harbour-feedback-tokens.js'
 import { ProxyTokenStore } from './lib/proxy-tokens.js'
 import { ProxyEventStore } from './lib/proxy-events.js'
 import { AgentStatusStore } from './lib/agent-status-store.js'
+import { ObservationSessionsStore } from './lib/observation-sessions-store.js'
+import { createObservationMaterializer } from './lib/observation-sessions-materializer.js'
 import { FreeTierStore } from './lib/free-tier-store.js'
 import { RecapCacheStore } from './lib/recap-cache.js'
 import { BriefCacheStore } from './lib/brief-cache.js'
@@ -240,6 +242,27 @@ const agentStatusStore = new AgentStatusStore({
   collection: agentStatusCollection
 })
 
+// Observation sessions read-model (LIN-623): a durable, materialized projection of
+// the autopilot sessions the Observation feed renders, so the hot poll is a cheap
+// per-workspace lookup that survives deploys instead of replaying 30 days of logs.
+// The materializer keeps it current via the stores' onWrite hooks. The hook is
+// assigned AFTER the materializer is built (it depends on both stores) — `onWrite`
+// is read at call time, so late assignment closes the dependency cycle cleanly.
+const observationSessionsCollection = db.collection('observation-sessions')
+const observationSessionsStore = new ObservationSessionsStore({
+  collection: observationSessionsCollection
+})
+const observationMaterializer = createObservationMaterializer({
+  dispatchStore: dispatchQueueStore,
+  agentStatusStore,
+  observationSessionsStore
+})
+// Fire-and-forget recompute on every feed-relevant dispatch/status write.
+dispatchQueueStore.onWrite = ({ urlKey, sessionId, issueIdentifier }) =>
+  observationMaterializer.rebuildForWrite(urlKey, { sessionId, issueIdentifier })
+agentStatusStore.onWrite = ({ urlKey, issueIdentifier }) =>
+  observationMaterializer.rebuildForWrite(urlKey, { issueIdentifier })
+
 // Free tier usage tracking
 const freeTierCollection = db.collection('free-tier-usage')
 const freeTierStore = new FreeTierStore({
@@ -364,7 +387,7 @@ app.use(session({
 // Test Mode Setup
 // =============================================================================
 if (process.env.NODE_ENV === 'test') {
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, localStore, getWorkspaceAccessToken }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, localStore, getWorkspaceAccessToken }))
 }
 
 // =============================================================================
@@ -1067,7 +1090,7 @@ app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyToke
 // Mount dashboard routes (experimental combined realtime autopilot dashboard — LIN-509).
 // Merges Mongo-only Loop reads across session.workspaces; Linear is hydrated lazily
 // (drill-down only), never fanned out per poll.
-app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatusStore, runSummaryCacheStore, sessionSummaryCacheStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo }))
+app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, runSummaryCacheStore, sessionSummaryCacheStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo }))
 
 // Mount task-chat routes (experimental "talk to a task" conversation).
 app.use(createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo }))
@@ -1776,6 +1799,14 @@ app.listen(PORT, () => {
       }
     } catch (err) {
       console.error('Agent status cleanup error:', err)
+    }
+    try {
+      const removedCount = await observationSessionsStore.cleanup()
+      if (removedCount > 0) {
+        console.log(`Observation sessions cleanup: removed ${removedCount} expired derived docs`)
+      }
+    } catch (err) {
+      console.error('Observation sessions cleanup error:', err)
     }
     try {
       const removedCount = await harbourFeedbackTokenStore.cleanup()

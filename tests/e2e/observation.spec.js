@@ -18,6 +18,10 @@ async function clearRuns(page) {
   await page.goto(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
   await page.goto(`/test/clear-dispatch-history?urlKey=${URL_KEY}`);
   await page.goto(`/test/clear-agent-status?urlKey=${URL_KEY}`);
+  // The materialized Observation read-model (LIN-623) is a projection of the logs
+  // above — clear it too, or a stale derived doc + backfill marker would mask the
+  // freshly-seeded run and the live fallback would never engage.
+  await page.goto(`/test/clear-observation-sessions?urlKey=${URL_KEY}`);
 }
 
 async function seedQueuedRun(page, { issueIdentifier, issueTitle, kind = 'autopilot' }) {
