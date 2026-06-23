@@ -444,6 +444,47 @@ describe('GET /api/dashboard/sessions', () => {
     assert.equal(res.statusCode, 200);
     assert.equal(res.jsonBody.counts.total, 1, 'good workspace still contributes its session');
   });
+
+  test('a second poll within the cache TTL is served without re-reading the stores (LIN-617)', async () => {
+    // Count how often the slow whole-workspace read actually runs. With the
+    // short-TTL feed cache, only the FIRST poll for this workspace set pays it;
+    // the second poll is served from the cached merged feed.
+    let historyReads = 0;
+    const router = createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore: {
+        async listItems() { return []; },
+        async listHistory() { historyReads++; return { items: [autopilotHistoryItem('sess-c', 'LIN-617')] }; }
+      },
+      agentStatusStore: { async listStatus() { return { items: [agentStatusDone('sess-c', 'LIN-617')] }; } },
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      fetchWorkspaceIssues: async () => [],
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({})
+    });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const session = { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] };
+
+    const first = makeReqRes({ session });
+    await handler(first.req, first.res);
+    assert.equal(first.res.statusCode, 200);
+    assert.equal(first.res.jsonBody.counts.total, 1);
+    assert.equal(historyReads, 1, 'first poll pays the whole-workspace read');
+
+    const second = makeReqRes({ session });
+    await handler(second.req, second.res);
+    assert.equal(second.res.statusCode, 200);
+    assert.deepEqual(
+      second.res.jsonBody.recent.map(s => s.sessionId),
+      first.res.jsonBody.recent.map(s => s.sessionId),
+      'second poll returns the same feed'
+    );
+    assert.equal(historyReads, 1, 'second poll within TTL is served from cache (no re-scan)');
+  });
 });
 
 // ─── run-summary ─────────────────────────────────────────────────────────────
