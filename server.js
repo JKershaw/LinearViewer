@@ -9,6 +9,11 @@
  */
 import 'dotenv/config'
 import express from 'express'
+import { installAsyncErrorForwarding } from './lib/async-errors.js'
+
+// Make Express 4 forward async-handler rejections to the error middleware
+// (LIN-609). Must run before any route/Layer is created. See lib/async-errors.js.
+installAsyncErrorForwarding()
 import session from 'express-session'
 import { MongoClient } from 'mongodb'
 import { MangoClient } from '@jkershaw/mangodb'
@@ -1669,7 +1674,12 @@ app.use((err, req, res, next) => {
   if (wantsJson) {
     res.status(500).json({ error: 'Internal server error' })
   } else {
-    res.status(500).send('Internal server error')
+    // Helpful themed fallback page instead of a raw host crash / plain text (LIN-609).
+    res.status(500).send(renderErrorPage(
+      'Something went wrong',
+      'An unexpected error occurred while handling your request. This has been logged. Please try again.',
+      { action: 'Try again', actionUrl: req.originalUrl || '/' }
+    ))
   }
 })
 
