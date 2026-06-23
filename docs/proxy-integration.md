@@ -687,6 +687,14 @@ Returns the **Autopilot kickoff** as **plain text** (`text/plain`) — the brief
 
 The body embeds `YOUR_TOKEN` as a placeholder; substitute the consumer's `readWrite` token (Autopilot reuses it for the prompts it dispatches). A read-scope token can fetch the kickoff, but running it needs `readWrite` (Autopilot dispatches). The general (stack-walk) kickoff is what this endpoint serves; the in-app per-task variant ("run on autopilot until this task is done") is generated at `/workspace/:urlKey/api/autopilot-prompt/:issueId`.
 
+#### Autopilot Manual
+
+```
+GET /api/proxy/autopilot/manual
+```
+
+Returns the **Autopilot operating manual** (the "handbook") as **plain text** (`text/plain`) — the portable senior-lead disposition that sits beside the kickoff's mechanics. The kickoff composes this same text inline, so this endpoint is for re-reading a part mid-run (and for humans or other consumers). `read`-scope is sufficient.
+
 ### Write Endpoints
 
 All write endpoints require a `readWrite` scoped token. Read-only tokens receive `403`.
@@ -954,22 +962,24 @@ The runner reports progress back as **free-form feedback entries** (it owns the 
 POST /api/proxy/dispatch
 Content-Type: application/json
 
-{ "prompt": "...", "promptName": "...", "issueId": "...", "issueIdentifier": "LIN-42", "issueTitle": "...", "issueUrl": "...", "target": "cli", "repo": "...", "sessionId": "...", "appendProxyContext": true }
+{ "prompt": "...", "promptName": "...", "kind": "implementation", "issueId": "...", "issueIdentifier": "LIN-42", "issueTitle": "...", "issueUrl": "...", "target": "cli", "repo": "...", "followUpTo": "...", "sessionId": "...", "appendProxyContext": true }
 ```
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `prompt` | string | Yes | The prompt to run (max ~10MB) |
 | `promptName` | string | No | Short label for the dispatch (max 100 chars) |
+| `kind` | string | No | Stable task classification — one of the `DISPATCH_KINDS` (the prompt-template keys, plus `custom`; see `lib/prompt-templates.js`). When omitted it is derived from `promptName`, falling back to `custom`. Read it instead of inferring the task type from `promptName` or the prompt body |
 | `issueId` / `issueIdentifier` / `issueTitle` / `issueUrl` | string | No | Optional linkage to an issue |
 | `target` | string | No | `cli` \| `web` \| `dash` (default `cli`). `local`/Harbour is **not** available to proxy consumers |
 | `repo` | string | No | Optional repository hint |
+| `followUpTo` | string (UUID) | No | Resume an existing session: pass the `id` of an earlier dispatch and `prompt` becomes a follow-up instruction to that same session. `cli`/`web` only, same workspace. The runner owns session liveness — if the session is gone it posts a terminal `[failed] no live session to resume`. Use sparingly (see the dispatch guide's [Follow-ups](dispatch-integration.md#follow-ups) section); any wobble → dispatch a fresh session instead |
 | `sessionId` | string (UUID) | No | The autopilot dispatch id that spawned this worker. Stamp it on every worker an autopilot run fans out so the whole run (incl. epic descent / `breakdown` spin-offs) reconstructs as one session. Stored and forwarded verbatim; unlike `followUpTo` it carries **no target restriction**. See LIN-591 |
 | `appendProxyContext` | bool | No | Default `true`: append a proxy-context block to the prompt so the worker inherits workspace access via this proxy. Set `false` to send the prompt verbatim |
 
 Returns `201`:
 ```json
-{ "id": "uuid", "status": "queued", "promptName": "...", "issueIdentifier": "LIN-42", "target": "cli", "sessionId": null, "dispatchedAt": "2026-06-06T11:32:25.111Z" }
+{ "id": "uuid", "status": "queued", "promptName": "...", "kind": "implementation", "issueIdentifier": "LIN-42", "target": "cli", "sessionId": null, "dispatchedAt": "2026-06-06T11:32:25.111Z" }
 ```
 
 #### Recommend and Dispatch (fused)
@@ -1107,8 +1117,9 @@ All query params optional. Merges the live queue and recent history, newest firs
 | 404 | `Issue not found` / `Cycle not found` | Resource doesn't exist — or, on the task-automation context endpoints, the target is trashed |
 | 409 | `Issue is trashed; refusing to modify a deleted issue` | Write target is a trashed (soft-deleted) issue |
 | 429 | `Too many proxy requests` | Rate limit exceeded (60/minute) |
-| 503 | `Workspace not available` | Workspace access token expired or unavailable |
 | 500 | `Failed to ...` | Server error |
+| 503 | `Workspace not available` | Workspace access token expired or unavailable |
+| 504 | `...timed out` | Upstream provider request timed out or was aborted (mapped from a `TimeoutError`/`AbortError`) |
 
 ## Building a Consumer
 

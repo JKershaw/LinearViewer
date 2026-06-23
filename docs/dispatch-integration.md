@@ -11,7 +11,7 @@ The Dispatch API allows external consumers (AI agents, automation tools, custom 
 - Atomic take/claim operations (prevents duplicate processing)
 - 24-hour TTL with automatic cleanup
 - Workspace isolation (tokens are scoped to a single workspace)
-- Target-based routing (`cli`, `web`, or `dash`) so consumers only process items meant for them
+- Target-based routing (`cli`, `web`, `dash`, or `local`) so consumers only process items meant for them
 
 ## Quick Start
 
@@ -174,7 +174,7 @@ Content-Type: application/json
 **Constraints:**
 - Only the token that took the item can post feedback (strict ownership)
 - Only items with `status: 'taken'` accept feedback
-- Rate limited to ~100 requests per minute per token
+- Rate limited to 100 requests per minute per IP
 
 **Success Response (200):**
 ```json
@@ -192,6 +192,25 @@ Content-Type: application/json
 ```
 
 Feedback entries are displayed in the dispatch history UI and inherit the 30-day history TTL.
+
+### Signaling Completion (terminal markers)
+
+A taken item's lifecycle `status` stays `'taken'` while the consumer runs — there is no
+separate "complete" call. Instead, **signal completion by prefixing a feedback message
+with a terminal marker**. The server derives a terminal status from the last feedback
+entry whose `message` begins with one of these markers (case-insensitive):
+
+| Marker | Derived status | Meaning |
+|--------|----------------|---------|
+| `[done]` | `done` | Work finished |
+| `[complete]` | `done` | Alias for `[done]` |
+| `[failed]` | `failed` | Work could not be completed |
+| `[aborted]` | `aborted` | Run was abandoned (e.g. no live session to resume) |
+
+For example, a final feedback `message` of `"[done] Landed the fix in PR #42"` marks the
+item `done`. Until such a marker is posted the item reads as `taken`. Watchers (the proxy
+watch/list endpoints and the dashboard Loop feed) read this derived status so they can poll
+a field instead of parsing prose — so always end a run with exactly one terminal marker.
 
 ### Forwarding `dispatchId` to foreman status
 
@@ -254,7 +273,8 @@ and is the recommended pattern for any consumer that posts foreman status.
 | `issueIdentifier` | string | Human-readable issue ID, e.g., "LIN-42" (nullable) |
 | `issueTitle` | string | Issue title (nullable) |
 | `issueUrl` | string | Full URL to the Linear issue (nullable) |
-| `target` | string | Dispatch target: `"cli"` (default), `"web"`, or `"dash"` |
+| `target` | string | Dispatch target: `"cli"` (default), `"web"`, `"dash"`, or `"local"`. See [Target Routing](#target-routing) |
+| `repo` | string | Repository hint (e.g. `"owner/name"`) for the consumer to operate in, or `null` (nullable) |
 | `followUpTo` | string | The `id` of an earlier dispatch whose session this item should resume, or `null`. See [Follow-ups](#follow-ups) (nullable) |
 | `sessionId` | string | The `id` of the autopilot dispatch that spawned this worker, or `null`. Groups worker dispatches into one autopilot session (any target). See [Autopilot sessions](#autopilot-sessions) (nullable) |
 | `workspace.urlKey` | string | Workspace identifier |
@@ -339,6 +359,9 @@ Each dispatch item has a `target` field indicating which type of consumer should
 | `cli` | Default. Intended for CLI-based consumers (e.g., Claude Code) |
 | `web` | Intended for web-based consumers (e.g., Claude on the Web) |
 | `dash` | Intended for dashboard-based consumers (e.g., Dash agent) |
+| `local` | Spawns a local Harbour Claude session on the server host. Localhost-only: a `local` dispatch from a non-localhost request is rejected with `400` |
+
+> **Proxy consumers cannot use `local`.** The four targets above are the dispatch consumer API's full set, but the [Workspace API Proxy](proxy-integration.md) twin (`POST /api/proxy/dispatch`) explicitly bars `local` — proxy-issued dispatches may only target `cli`/`web`/`dash`. Keep this asymmetry in mind when porting a flow between the two surfaces.
 
 The UI provides a grouped button bar: **Dispatch: [cli] [web] [dash] [copy]**
 - **"cli"** — sends with `target: "cli"`
@@ -362,16 +385,15 @@ Each dispatch item carries a `kind` — a stable, machine-readable classificatio
 dispatches) read `kind` directly instead of inferring the task type from `promptName`
 (a free-form display name) or the prompt body.
 
-The vocabulary is the set of prompt-template keys the system already owns
-(`lib/prompt-template-defs.js`) plus a neutral fallback:
+The vocabulary is **not** a fixed literal list — it is `DISPATCH_KINDS`, derived in
+`lib/prompt-templates.js` from the prompt-template keys the system already owns plus a
+neutral `custom` fallback (and a few meta-kinds). Treat `lib/prompt-templates.js` as the
+source of truth rather than hard-coding the set; the server validates against
+`DISPATCH_KINDS` and a rejected value reports the current list in its `400` message.
 
-```
-blocked, bug, plan, code-review, look-into, triage, breakdown,
-research, scoping, design, spike, context, implementation, review, custom
-```
-
-- **Optional on dispatch.** Callers may pass an explicit `kind`; it must be one of the
-  values above or the request is rejected with `400`.
+- **Optional on dispatch.** Callers may pass an explicit `kind`; it must be one of
+  `DISPATCH_KINDS` or the request is rejected with `400` (the error message lists the
+  accepted values).
 - **Derived when omitted.** If `kind` is not supplied it is derived from `promptName`
   (matching the template key or its display name, case-insensitive) — e.g. `promptName`
   `"implement"` → `kind` `"implementation"`, `"code review"` → `"code-review"`.
@@ -530,11 +552,14 @@ done
 - Only the SHA-256 hash is stored server-side
 - Tokens never expire but can be revoked
 - Each token is scoped to a single workspace
-- Token validation uses timing-safe comparison
+- Validation hashes the presented token and looks the hash up in the database (an exact-match query). There is no constant-time string compare — timing is a non-concern because the lookup keys off the hash, not a byte-by-byte comparison of the raw token
 
 ## Rate Limits
 
-Currently no rate limits are enforced, but consumers should:
+Some endpoints are rate-limited per IP: feedback (`POST /api/dispatch/feedback/:itemId`) is
+capped at 100 requests/minute, and the user-facing queue and token-creation endpoints have
+their own limits. The consumer poll/take endpoints are not currently rate-limited, but
+consumers should still:
 - Poll at reasonable intervals (5-30 seconds recommended)
 - Avoid aggressive retry loops on errors
 - Consider implementing circuit breakers for resilience
