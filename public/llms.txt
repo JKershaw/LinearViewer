@@ -113,7 +113,7 @@ Both In Progress and Projects sections use the same nested structure:
 - `.footer-deploy` - deploy information container
 - `.footer-link` - link within deploy info (commit hash or GitHub repo)
 - `.footer-ai-status` - AI connection status indicator
-- `.footer-ai-status.free` - free tier status (yellow, shows "ai: ● free (N/5)")
+- `.footer-ai-status.free` - free tier status (yellow, shows "ai: ● free (N/20)")
 - `[data-ai-source]` - AI source attribute on footer status (`oauth`, `env`, `free`)
 - `.footer-ai-model` / `[data-ai-model]` - workspace LLM model name, filled client-side from `/api/recommend/status`
 
@@ -181,7 +181,6 @@ relationship between the tasks, not as a label.
 **More Prompts** (behind "more" toggle):
 - `blocked` - blocked: Analyze and resolve blockers
 - `bug` - bug: Find root cause and potential fixes
-- `code-review` - code review: Review code for correctness, tests, and quality
 - `triage` - triage: Review and update metadata (labels, priority)
 - `breakdown` - breakdown: Break large tasks into actionable subtasks
 - `scoping` - scoping: Define boundaries and success criteria
@@ -372,7 +371,7 @@ main.task-chat-page[data-url-key]      - page container
 6. **Open in provider**: Expand task, click the "View in {provider} →" link (text is dynamic, e.g. "View in Linear")
 7. **View task details**: Expand task, click "Details ▶" to show description and metadata
 8. **Generate prompt for task**: Expand task, click "Prompts ▶" to reveal prompt buttons, click a prompt button, copy the generated prompt
-9. **Get AI recommendation**: Expand task, click "Prompts ▶", click "AI suggest" button (free tier: 5/day per workspace)
+9. **Get AI recommendation**: Expand task, click "Prompts ▶", click "AI suggest" button (free tier: 20/day per workspace)
 
 ## Limitations
 
