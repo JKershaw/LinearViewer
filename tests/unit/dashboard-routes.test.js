@@ -198,6 +198,60 @@ describe('GET /api/dashboard/loops', () => {
   });
 });
 
+// ─── Feed memory: lean projection + bounded fan-out (LIN-622) ─────────────────
+
+describe('feed memory (LIN-622)', () => {
+  test('/api/dashboard/loops payload carries no promptText (lean reconstruction)', async () => {
+    const perWorkspace = {
+      'ws-a': { live: [activeItem('a-live', 'LIN-1')], history: [historyItem('a-hist', 'LIN-2')], agentStatus: [agentStatusDone('a-hist', 'LIN-2')] }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/loops');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    const all = [...res.jsonBody.active, ...res.jsonBody.recent];
+    assert.ok(all.length > 0, 'expected at least one run in the feed');
+    for (const run of all) {
+      assert.ok(!('promptText' in run), `feed run ${run.loopId} must not carry promptText`);
+    }
+  });
+
+  test('cross-workspace fan-out reconstructs at most 2 workspaces concurrently', async () => {
+    let inFlight = 0;
+    let peak = 0;
+    const router = createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore: {
+        async listItems() { return []; },
+        async listHistory() {
+          inFlight++;
+          peak = Math.max(peak, inFlight);
+          await new Promise(resolve => setTimeout(resolve, 5));
+          inFlight--;
+          return { items: [] };
+        }
+      },
+      agentStatusStore: { async listStatus() { return { items: [] }; } },
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      fetchWorkspaceIssues: async () => [],
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({})
+    });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const workspaces = Array.from({ length: 6 }, (_, i) => ({ urlKey: `ws-${i}`, name: `W${i}` }));
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    assert.ok(peak <= 2, `peak concurrent workspace reads ${peak} must be <= 2 (bounded fan-out)`);
+    assert.ok(peak > 1, `expected some concurrency, got ${peak}`);
+  });
+});
+
 // ─── /sessions (Observation feed; LIN-595) ───────────────────────────────────
 
 describe('GET /api/dashboard/sessions', () => {

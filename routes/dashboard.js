@@ -65,6 +65,42 @@ const MARKER_TO_AGENT_STATE = { done: 'complete', failed: 'error', aborted: 'err
 // is never mutated, so a later heartbeat (which advances lastActivity) un-stales it.
 const STALE_AFTER_MS = 24 * 60 * 60 * 1000; // 24h ("after a day")
 
+// Max workspace histories reconstructed concurrently in the cross-workspace
+// fan-out. The old unbounded `Promise.allSettled` over every connected workspace
+// made peak memory = the SUM of every workspace's full 30-day Loop graph
+// materialised at once — the second amplifier behind the Observation memory
+// spike (LIN-622). Capping it keeps peak at ~this many workspaces, not all.
+const WORKSPACE_FANOUT_CONCURRENCY = 2;
+
+/**
+ * Run `mapper` over `items` with at most `limit` in flight, returning
+ * `Promise.allSettled`-shaped results so a single workspace's failure is
+ * isolated to its own slot (same degradation contract the feed already relies
+ * on). Bounds the fan-out's peak memory (LIN-622).
+ * @template T
+ * @param {T[]} items
+ * @param {number} limit
+ * @param {(item: T) => Promise<any>} mapper
+ * @returns {Promise<Array<{status:'fulfilled',value:any}|{status:'rejected',reason:any}>>}
+ */
+async function settleWithConcurrency(items, limit, mapper) {
+  const results = new Array(items.length);
+  let cursor = 0;
+  const runNext = async () => {
+    while (cursor < items.length) {
+      const i = cursor++;
+      try {
+        results[i] = { status: 'fulfilled', value: await mapper(items[i]) };
+      } catch (reason) {
+        results[i] = { status: 'rejected', reason };
+      }
+    }
+  };
+  const workers = Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, runNext);
+  await Promise.all(workers);
+  return results;
+}
+
 /**
  * Derive the *effective* agent state for a run.
  *
@@ -204,15 +240,17 @@ export function createDashboardRoutes({
    * @returns {Promise<Array<Object>>} workspace-tagged Loop records, newest first
    */
   async function mergeLoops(workspaces) {
-    const settled = await Promise.allSettled(
-      workspaces.map(async (ws) => {
-        const loops = await getLoopsForWorkspace(ws.urlKey, loopDeps);
+    // Lean reconstruction (no promptText — the feed never reads it) + bounded
+    // fan-out so peak memory tracks a couple of workspaces, not all (LIN-622).
+    const settled = await settleWithConcurrency(workspaces, WORKSPACE_FANOUT_CONCURRENCY,
+      async (ws) => {
+        const loops = await getLoopsForWorkspace(ws.urlKey, { ...loopDeps, lean: true });
         return loops.map(loop => ({
           ...enrichLoop(loop),
           workspaceUrlKey: ws.urlKey,
           workspaceName: ws.name || ws.urlKey
         }));
-      })
+      }
     );
 
     const merged = [];
@@ -326,11 +364,14 @@ export function createDashboardRoutes({
    * @returns {Promise<Array<Object>>}
    */
   async function mergeSessions(workspaces) {
-    const settled = await Promise.allSettled(
-      workspaces.map(async (ws) => {
-        const sessions = await getSessionsForWorkspace(ws.urlKey, loopDeps);
+    // Lean reconstruction (no promptText — buildSessionPayload never reads it) +
+    // bounded fan-out so peak memory tracks a couple of workspaces, not all
+    // (LIN-622). issueGraph is still omitted here (drill-down concern).
+    const settled = await settleWithConcurrency(workspaces, WORKSPACE_FANOUT_CONCURRENCY,
+      async (ws) => {
+        const sessions = await getSessionsForWorkspace(ws.urlKey, { ...loopDeps, lean: true });
         return sessions.map(s => buildSessionPayload(s, ws));
-      })
+      }
     );
     const merged = [];
     for (const r of settled) {
