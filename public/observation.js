@@ -63,6 +63,7 @@ const expandedRuns = new Set();            // loopId (worker-node drill-down)
 const PROVENANCE_LABEL = { seed: 'seed', descended: 'descended', 'spun-off': 'spun-off' };
 
 const STATUS_ICON = { 'in-progress': '◐', done: '✓', error: '✕', stale: '○' };
+const STATUS_LABEL = { 'in-progress': 'in progress', done: 'done', error: 'error', stale: 'stale' };
 const STATE_ICON = { complete: '✓', error: '✕', running: '◐', waiting: '◌', queued: '○' };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -109,14 +110,20 @@ function sessionSignature(s) {
 
 function renderProgressBar(s) {
   if (!s.runs.length) {
-    return `<div class="obs-progress obs-progress-empty" aria-label="no worker runs yet"></div>`;
+    return `<div class="obs-progress-row"><div class="obs-progress obs-progress-empty" aria-label="no worker runs yet"></div></div>`;
   }
   const segs = s.runs.map(r => {
     const live = r.agentState === 'running' || r.agentState === 'waiting' || r.agentState === 'queued';
     const title = `${r.issueIdentifier || 'run'}${r.stage ? ' · ' + r.stage : ''} — ${r.agentState}`;
     return `<span class="obs-seg" data-state="${escapeHtml(r.agentState || '')}"${live ? ' data-live="1"' : ''} title="${escapeHtml(title)}"></span>`;
   }).join('');
-  return `<div class="obs-progress" aria-label="${s.runCount} worker run${s.runCount === 1 ? '' : 's'}">${segs}</div>`;
+  // N/M count beside the bar (mockup): finished worker runs over total (LIN-608).
+  const total = s.runCount || s.runs.length;
+  const done = s.runs.filter(r => r.agentState === 'complete' || r.agentState === 'error').length;
+  return `<div class="obs-progress-row">
+      <div class="obs-progress" aria-label="${s.runCount} worker run${s.runCount === 1 ? '' : 's'}">${segs}</div>
+      <span class="obs-progress-count">${done}/${total}</span>
+    </div>`;
 }
 
 function renderSummaryLine(s) {
@@ -136,30 +143,30 @@ function renderSummaryLine(s) {
 
 function fillSessionHead(li, s) {
   const icon = STATUS_ICON[s.status] || '○';
+  const label = STATUS_LABEL[s.status] || s.status || '';
   const title = s.seedTitle || s.seedIssue || 'autopilot session';
+  const ident = s.seedIssue || `run ${shortSessionId(s.sessionId)}`;
   const runtime = formatRuntime(s.runtime);
 
-  const metaBits = [`run ${escapeHtml(shortSessionId(s.sessionId))}`];
-  if (s.tasksTouched.length > 1) metaBits.push(`${s.tasksTouched.length} tasks`);
-  if (runtime) metaBits.push(escapeHtml(runtime));
-  if (s.model) metaBits.push(escapeHtml(String(s.model)));
+  // Prominent labelled meta line (mockup): runtime / model, with workspace + task
+  // count kept as trailing context so multi-workspace info is not lost (LIN-608).
+  const metaBits = [];
+  if (runtime) metaBits.push(`<span class="obs-meta"><span class="obs-meta-k">runtime</span> <span class="obs-meta-v">${escapeHtml(runtime)}</span></span>`);
+  if (s.model) metaBits.push(`<span class="obs-meta"><span class="obs-meta-k">model</span> <span class="obs-meta-v">${escapeHtml(String(s.model))}</span></span>`);
+  if (s.workspaceName) metaBits.push(`<span class="obs-meta obs-meta-ws">${escapeHtml(s.workspaceName)}</span>`);
+  if (s.tasksTouched.length > 1) metaBits.push(`<span class="obs-meta">${s.tasksTouched.length} tasks</span>`);
 
   li.querySelector('.obs-session-head').innerHTML = `
-    <span class="obs-pill" data-status="${escapeHtml(s.status)}">${escapeHtml(icon)}</span>
-    <span class="obs-session-main">
-      <span class="obs-session-title">
-        <span class="obs-session-name">${escapeHtml(String(title))}</span>
-        ${s.seedIssue ? `<span class="obs-session-seed">${escapeHtml(s.seedIssue)}</span>` : ''}
-      </span>
-      <span class="obs-session-summary">${renderSummaryLine(s)}</span>
-      ${renderProgressBar(s)}
-      <span class="obs-session-sub">
-        <span class="obs-session-ws">${escapeHtml(s.workspaceName)}</span>
-        <span class="obs-session-meta">${metaBits.join(' · ')}</span>
-      </span>
+    <span class="obs-session-topline">
+      <span class="obs-session-caret" aria-hidden="true">▸</span>
+      <span class="obs-session-ident">${escapeHtml(String(ident))}</span>
+      <span class="obs-pill" data-status="${escapeHtml(s.status)}">${escapeHtml(icon)} ${escapeHtml(label)}</span>
+      <span class="obs-session-time">updated ${escapeHtml(relativeTime(s.lastActivity))}</span>
     </span>
-    <span class="obs-session-time">${escapeHtml(relativeTime(s.lastActivity))}</span>
-    <span class="obs-session-caret" aria-hidden="true">▸</span>`;
+    <span class="obs-session-name">${escapeHtml(String(title))}</span>
+    <span class="obs-session-summary">${renderSummaryLine(s)}</span>
+    ${metaBits.length ? `<span class="obs-session-meta-line">${metaBits.join('')}</span>` : ''}
+    ${renderProgressBar(s)}`;
 }
 
 function makeSessionCard(s) {
@@ -429,7 +436,8 @@ function renderWorkerNode(run) {
         <span class="obs-worker-icon" data-state="${escapeHtml(run.agentState || '')}">${escapeHtml(icon)}</span>
         <span class="obs-worker-main">
           <span class="obs-worker-line">
-            <span class="obs-worker-phase">${run.iteration != null ? '#' + run.iteration + ' · ' : ''}${escapeHtml(workerPhase(run))}</span>
+            ${run.iteration != null ? `<span class="obs-worker-iter">#${run.iteration}</span>` : ''}
+            <span class="obs-worker-phase">${escapeHtml(workerPhase(run))}</span>
             ${renderChips(run)}
           </span>
           ${renderRecapLine(run)}

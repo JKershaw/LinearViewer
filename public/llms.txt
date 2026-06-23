@@ -315,9 +315,14 @@ main.obs-page[data-url-key]             - page container
     #obs-recent / #obs-recent-empty     - completed sessions feed (ul) + empty state
       li.obs-session[data-session][data-status]  - one autopilot session
         button.obs-session-head         - click to expand/collapse the session
-          .obs-pill[data-status]        - status pill (◐ in-progress / ✓ done / ✕ error / ○ stale)
+          .obs-session-topline          - caret + .obs-session-ident + status pill + updated time
+          .obs-pill[data-status]        - bordered text status pill (◐ in progress / ✓ done / ✕ error / ○ stale)
+          .obs-session-name             - bold session/seed title
           .obs-session-summary          - one-sentence session summary (LIN-592)
-          .obs-progress > .obs-seg[data-state][data-live]  - per-worker-run progress bar (live segment pulses)
+          .obs-session-meta-line        - labelled runtime / model (+ workspace, task count)
+          .obs-progress-row             - per-worker-run progress bar + N/M count
+            .obs-progress > .obs-seg[data-state][data-live]  - progress segments (live segment pulses)
+            .obs-progress-count         - finished/total worker-run count (N/M)
           .obs-summary-gen              - (terminal, uncached) explicit "summarise this session" button
         .obs-session-body               - (when open) status line + Level-3 drill-down
           .obs-tasks > .obs-task        - one block per touched task (seed-first)
@@ -325,8 +330,9 @@ main.obs-page[data-url-key]             - page container
             .obs-rels > .obs-rel        - relationship neighborhood (parent/children/blocked by/blocks/related)
             .obs-worker-tree > li.obs-worker[data-state][data-open]  - worker-session nodes
               button.obs-worker-head[data-loop]  - click to expand a worker run
-                .obs-worker-phase       - #iteration · phase (research/plan/implement/review…)
-                .obs-chips-metric > .obs-chip-metric  - runtime / tool activity / artifact-count chips
+                .obs-worker-iter        - #iteration marker
+                .obs-worker-phase       - bordered phase tag (research/plan/implement/review…)
+                .obs-chips-metric > .obs-chip-metric  - bordered runtime / tool activity / artifact-count chips
                 .obs-worker-recap       - one-line recap (cached run-summary or agent summary)
               .obs-worker-body          - (when open) ran activity log + produced-artifact links + next
                 .obs-run-gen[data-loop] - (terminal, uncached) explicit "summarise this run" button
