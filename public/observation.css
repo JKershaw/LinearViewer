@@ -83,6 +83,8 @@
 
 .obs-session {
   border: 1px solid var(--border);
+  /* Coloured left accent bar per status (mockup, LIN-608); status hue set below. */
+  border-left: 4px solid var(--border);
   border-radius: 6px;
   margin-bottom: 0.45rem;
   background: var(--bg);
@@ -90,13 +92,18 @@
 }
 
 .obs-session.is-open { border-color: var(--border-strong); }
+.obs-session[data-status="in-progress"] { border-left-color: var(--yellow); }
+.obs-session[data-status="done"] { border-left-color: var(--green); }
+.obs-session[data-status="error"] { border-left-color: var(--red); }
+.obs-session[data-status="stale"] { border-left-color: var(--fg-mid); }
 
 .obs-session-head {
   display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.3rem;
   width: 100%;
-  padding: 0.55rem 0.6rem;
+  padding: 0.55rem 0.7rem;
   border: 0;
   background: none;
   font: inherit;
@@ -107,49 +114,56 @@
 
 .obs-session-head:hover { background: var(--bg-muted); }
 
-/* Status pill (◐ / ✓ / ✕) */
+/* Header top line: caret · identifier · status pill · updated time */
+.obs-session-topline {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.obs-session-ident {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.82rem;
+  color: var(--fg-dim);
+}
+
+/* Bordered text status pill (◐ in progress) — mockup treatment (LIN-608). */
 .obs-pill {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 1.4rem;
-  height: 1.4rem;
-  border-radius: 50%;
-  font-size: 0.85rem;
-  background: var(--bg-muted);
+  gap: 0.3rem;
+  padding: 0.08rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.74rem;
+  line-height: 1.4;
+  color: var(--fg-dim);
+  white-space: nowrap;
 }
-.obs-pill[data-status="in-progress"] { color: var(--yellow); }
-.obs-pill[data-status="done"] { color: var(--green); }
-.obs-pill[data-status="error"] { color: var(--red); }
-.obs-pill[data-status="stale"] { color: var(--fg-dim); }
-
-.obs-session-main {
-  flex: 1 1 auto;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-}
-
-.obs-session-title {
-  display: flex;
-  align-items: baseline;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-}
+.obs-pill[data-status="in-progress"] { color: var(--yellow); border-color: var(--yellow); }
+.obs-pill[data-status="done"] { color: var(--green); border-color: var(--green); }
+.obs-pill[data-status="error"] { color: var(--red); border-color: var(--red); }
+.obs-pill[data-status="stale"] { color: var(--fg-dim); border-color: var(--border-strong); }
 
 .obs-session-name {
   font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 0.95rem;
+  line-height: 1.25;
 }
 
-.obs-session-seed {
-  font-size: 0.72rem;
-  color: var(--fg-dim);
-  font-family: var(--mono, monospace);
+/* Labelled runtime / model meta line (mockup). */
+.obs-session-meta-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.9rem;
+  font-size: 0.78rem;
+  font-family: var(--font-mono, monospace);
 }
+.obs-meta-k { color: var(--fg-dim); }
+.obs-meta-v { color: var(--fg); }
+.obs-meta-ws { color: var(--fg-dim); }
 
 .obs-session-summary {
   font-size: 0.82rem;
@@ -172,12 +186,26 @@
   cursor: pointer;
 }
 
-/* Per-worker-run progress bar */
+/* Per-worker-run progress bar + N/M count (mockup, LIN-608) */
+.obs-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.15rem 0;
+}
+
 .obs-progress {
+  flex: 1 1 auto;
   display: flex;
   gap: 2px;
   height: 6px;
-  margin: 0.15rem 0;
+}
+
+.obs-progress-count {
+  flex: 0 0 auto;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.74rem;
+  color: var(--fg-dim);
 }
 
 .obs-progress-empty {
@@ -209,19 +237,9 @@
   .obs-seg[data-live="1"] { animation: none; }
 }
 
-.obs-session-sub {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  font-size: 0.72rem;
-  color: var(--fg-dim);
-}
-
-.obs-session-ws { color: var(--fg); }
-.obs-session-meta { font-family: var(--mono, monospace); }
-
 .obs-session-time {
   flex: 0 0 auto;
+  margin-left: auto;
   font-size: 0.72rem;
   color: var(--fg-dim);
   white-space: nowrap;
@@ -375,19 +393,33 @@ a.obs-task-ident:hover { text-decoration: underline; }
   flex-wrap: wrap;
   gap: 0.4rem;
 }
-.obs-worker-phase {
+.obs-worker-iter {
   font-family: var(--font-mono, monospace);
-  font-size: 0.74rem;
-  color: var(--fg);
+  font-size: 0.7rem;
+  color: var(--fg-dim);
 }
 
+/* Bordered box phase tag (RESEARCH / PLAN …) — mockup treatment (LIN-608). */
+.obs-worker-phase {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fg-dim);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.04rem 0.4rem;
+}
+
+/* Bordered rounded metric chips (14 call sites …) — mockup treatment (LIN-608). */
 .obs-chips-metric { display: inline-flex; gap: 0.3rem; flex-wrap: wrap; }
 .obs-chip-metric {
   font-size: 0.66rem;
   color: var(--fg-dim);
-  background: var(--bg-muted);
-  border-radius: 3px;
-  padding: 0.02rem 0.3rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.04rem 0.4rem;
   font-family: var(--font-mono, monospace);
 }
 
