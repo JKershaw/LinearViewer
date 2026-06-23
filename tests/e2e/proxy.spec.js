@@ -882,6 +882,60 @@ test.describe('Proxy API - Dispatch', () => {
     expect(listed.completedAt).toBe(terminalEntry.timestamp);
   });
 
+  test('list endpoint scopes by issueIdentifier (store pushdown, LIN-615)', async ({ request }) => {
+    // Two queued items on different issues + one on the target with history.
+    const targetIssue = 'LIN-6150';
+    const otherIssue = 'LIN-6151';
+
+    const a = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'work the target', promptName: 'plan', issueIdentifier: targetIssue, target: 'cli' }
+    });
+    expect(a.status()).toBe(201);
+
+    const b = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'work elsewhere', promptName: 'plan', issueIdentifier: otherIssue, target: 'cli' }
+    });
+    expect(b.status()).toBe(201);
+
+    // A third on the target, driven to terminal history so the history read is
+    // exercised by the scope too (the queued + history merge both filter).
+    const c = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'finish the target', promptName: 'implementation', issueIdentifier: targetIssue, target: 'cli' }
+    });
+    const cId = (await c.json()).id;
+    await request.post(`/api/dispatch/take/${cId}`, { headers: { Authorization: `Bearer ${consumerToken}` } });
+    await request.post(`/api/dispatch/feedback/${cId}`, {
+      headers: { Authorization: `Bearer ${consumerToken}`, 'Content-Type': 'application/json' },
+      data: { message: '[done] shipped the target' }
+    });
+
+    // Scoped read: only the target issue's items come back.
+    const scoped = await (await request.get(`/api/proxy/dispatch?issueIdentifier=${targetIssue}`, {
+      headers: { Authorization: `Bearer ${readToken}` }
+    })).json();
+    expect(scoped.items.length).toBe(2);
+    expect(scoped.items.every(i => i.issueIdentifier === targetIssue)).toBe(true);
+    expect(scoped.items.some(i => i.issueIdentifier === otherIssue)).toBe(false);
+
+    // The derived status filter still composes with the issue scope.
+    const scopedDone = await (await request.get(`/api/proxy/dispatch?issueIdentifier=${targetIssue}&status=done`, {
+      headers: { Authorization: `Bearer ${readToken}` }
+    })).json();
+    expect(scopedDone.items.length).toBe(1);
+    expect(scopedDone.items[0].id).toBe(cId);
+    expect(scopedDone.items[0].status).toBe('done');
+
+    // Unscoped read still sees everything (no accidental global narrowing).
+    const all = await (await request.get('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    })).json();
+    expect(all.items.some(i => i.issueIdentifier === otherIssue)).toBe(true);
+    expect(all.items.length).toBeGreaterThanOrEqual(3);
+  });
+
   test('watch surfaces a failed status from the [failed] feedback marker', async ({ request }) => {
     const enqueue = await request.post('/api/proxy/dispatch', {
       headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },

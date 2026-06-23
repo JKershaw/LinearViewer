@@ -33,6 +33,7 @@ import { renderObservationPage } from '../lib/render-observation.js';
 import { getLoopsForWorkspace, getSessionsForWorkspace, deriveIssueGraph } from '../lib/pipeline-loops.js';
 import { buildSessionContextGraph } from '../lib/context-graph.js';
 import { deriveTerminalStatus, deriveCompletedAt } from '../lib/dispatch-terminal.js';
+import { armKeepalive } from '../lib/http-keepalive.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import {
   generateRunSummary,
@@ -367,6 +368,11 @@ export function createDashboardRoutes({
   router.get('/workspace/:urlKey/api/dashboard/sessions', workspaceFromUrl, async (req, res) => {
     const workspaces = (req.session.workspaces || []).map(w => ({ urlKey: w.urlKey, name: w.name }));
 
+    // Workspace-wide read fanned across every connected workspace (LIN-615). It
+    // has no selective predicate to push down, so we bound the *request* with a
+    // keepalive heartbeat rather than capping the store read (the workspace
+    // branch of _fetchWorkspaceData stays option-free; truncation-footgun guard).
+    const keepalive = armKeepalive(res);
     try {
       const merged = await mergeSessions(workspaces);
       // Stale (>24h idle, non-terminal) sessions are bucketed with the archive, not
@@ -374,7 +380,8 @@ export function createDashboardRoutes({
       const active = merged.filter(s => !s.terminal && !s.stale);
       const recent = merged.filter(s => s.terminal || s.stale).slice(0, recentLimit);
 
-      res.json({
+      keepalive.stop();
+      keepalive.send(200, {
         workspaces,
         active,
         recent,
@@ -383,7 +390,8 @@ export function createDashboardRoutes({
       });
     } catch (error) {
       console.error('Observation sessions error:', error);
-      res.status(500).json({ error: 'Could not load sessions' });
+      keepalive.stop();
+      keepalive.send(500, { error: 'Could not load sessions' });
     }
   });
 
@@ -392,12 +400,16 @@ export function createDashboardRoutes({
   router.get('/workspace/:urlKey/api/dashboard/loops', workspaceFromUrl, async (req, res) => {
     const workspaces = (req.session.workspaces || []).map(w => ({ urlKey: w.urlKey, name: w.name }));
 
+    // Workspace-wide read fanned across every connected workspace (LIN-615);
+    // bound the request with a keepalive heartbeat, not a blanket store limit.
+    const keepalive = armKeepalive(res);
     try {
       const merged = await mergeLoops(workspaces);
       const active = merged.filter(l => !isTerminalLoop(l));
       const recent = merged.filter(isTerminalLoop).slice(0, recentLimit);
 
-      res.json({
+      keepalive.stop();
+      keepalive.send(200, {
         workspaces,
         active,
         recent,
@@ -406,7 +418,8 @@ export function createDashboardRoutes({
       });
     } catch (error) {
       console.error('Dashboard loops error:', error);
-      res.status(500).json({ error: 'Could not load runs' });
+      keepalive.stop();
+      keepalive.send(500, { error: 'Could not load runs' });
     }
   });
 
@@ -681,6 +694,9 @@ export function createDashboardRoutes({
     const { sessionId } = req.params;
     if (!sessionId) return res.status(400).json({ error: 'sessionId is required' });
 
+    // Workspace-wide getSessionsForWorkspace read (by-id lookup); bound the
+    // request with a keepalive heartbeat (LIN-615).
+    const keepalive = armKeepalive(res);
     try {
       // One issue read feeds both the issueGraph (for accurate session inference)
       // and the session-context graph.
@@ -689,14 +705,18 @@ export function createDashboardRoutes({
 
       const sessions = await getSessionsForWorkspace(workspace.urlKey, { ...loopDeps, issueGraph });
       const session = sessions.find(s => String(s.sessionId) === String(sessionId)) || null;
-      if (!session) return res.status(404).json({ error: 'Session not found' });
+      if (!session) {
+        keepalive.stop();
+        return keepalive.send(404, { error: 'Session not found' });
+      }
 
       const graph = buildSessionContextGraph(issues, session.tasksTouched, {
         seedIssue: session.seedIssue,
         window: { start: session.dispatchedAt, end: session.completedAt }
       });
 
-      return res.json({
+      keepalive.stop();
+      return keepalive.send(200, {
         sessionId,
         seedIssue: session.seedIssue,
         tasksTouched: session.tasksTouched,
@@ -706,10 +726,11 @@ export function createDashboardRoutes({
       });
     } catch (error) {
       console.error('Dashboard session-context error:', error);
+      keepalive.stop();
       if (error.response?.status === 401) {
-        return res.status(401).json({ error: 'Token expired or invalid' });
+        return keepalive.send(401, { error: 'Token expired or invalid' });
       }
-      return res.status(500).json({ error: 'Could not build session context' });
+      return keepalive.send(500, { error: 'Could not build session context' });
     }
   });
 

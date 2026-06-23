@@ -14,6 +14,7 @@ import { Router } from 'express';
 import { renderPipelinePage } from '../lib/render-pipeline.js';
 import { renderErrorPage } from '../lib/render.js';
 import { buildPipelineSnapshot, getTaskForIssue } from '../lib/pipeline-state.js';
+import { armKeepalive } from '../lib/http-keepalive.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
 
@@ -105,17 +106,23 @@ export function createPipelineRoutes({
   router.get('/workspace/:urlKey/api/pipeline/state', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
 
+    // buildPipelineSnapshot reads the whole-workspace loop log; there is no
+    // selective predicate to push down, so bound the request with a keepalive
+    // heartbeat rather than capping the store read (LIN-615).
+    const keepalive = armKeepalive(res);
     try {
       const snapshot = await buildPipelineSnapshot(workspace.urlKey, stateDeps(workspace));
-      res.json(snapshot);
+      keepalive.stop();
+      keepalive.send(200, snapshot);
     } catch (error) {
       console.error('Pipeline state error:', error);
+      keepalive.stop();
 
       if (error.response?.status === 401) {
-        return res.status(401).json({ error: 'Unauthorized' });
+        return keepalive.send(401, { error: 'Unauthorized' });
       }
 
-      res.status(500).json({ error: 'Could not build pipeline snapshot' });
+      keepalive.send(500, { error: 'Could not build pipeline snapshot' });
     }
   });
 
@@ -125,22 +132,28 @@ export function createPipelineRoutes({
     const workspace = req.workspace;
     const { identifier } = req.params;
 
+    // Issue-scoped after LIN-615 (getTaskForIssue → getLoopsForIssue pushdown),
+    // but still pairs an issue read with a fetchProjects call; keep the request
+    // bounded with a keepalive heartbeat.
+    const keepalive = armKeepalive(res);
     try {
       const task = await getTaskForIssue(workspace.urlKey, identifier, stateDeps(workspace));
-      res.json(task);
+      keepalive.stop();
+      keepalive.send(200, task);
     } catch (error) {
       console.error('Pipeline task detail error:', error);
+      keepalive.stop();
 
       // error.status: manually set by pipeline-state.js (e.g. 404)
       // error.response?.status: graphql-request error shape (e.g. 401)
       if (error.status === 404) {
-        return res.status(404).json({ error: 'Issue not found' });
+        return keepalive.send(404, { error: 'Issue not found' });
       }
       if (error.response?.status === 401) {
-        return res.status(401).json({ error: 'Unauthorized' });
+        return keepalive.send(401, { error: 'Unauthorized' });
       }
 
-      res.status(500).json({ error: 'Could not fetch task detail' });
+      keepalive.send(500, { error: 'Could not fetch task detail' });
     }
   });
 
