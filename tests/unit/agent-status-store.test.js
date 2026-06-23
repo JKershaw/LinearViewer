@@ -14,16 +14,22 @@ import { AgentStatusStore } from '../../lib/agent-status-store.js';
 // Minimal in-memory mock of the MongoDB/MangoDB collection surface the store uses.
 function createMockCollection() {
   const docs = [];
+  const capturedQueries = [];
   return {
     _docs: docs,
+    _queries: capturedQueries,
     async insertOne(doc) {
       docs.push(doc);
       return { insertedId: doc._id };
     },
     find(query) {
+      capturedQueries.push(query);
       const results = docs.filter(doc => {
         if (query.urlKey && doc.urlKey !== query.urlKey) return false;
         if (query.expiresAt?.$gt && !(doc.expiresAt > query.expiresAt.$gt)) return false;
+        // Honour top-level equality on taskIdentifier so this mock mirrors real
+        // MangoDB/MongoDB query matching (LIN-613 pushes this filter into the query).
+        if (query.taskIdentifier && doc.taskIdentifier !== query.taskIdentifier) return false;
         return true;
       });
       return {
@@ -167,5 +173,62 @@ describe('AgentStatusStore.listStatus', () => {
     const result = await store.listStatus('ws-1');
     assert.strictEqual(result.total, 1);
     assert.strictEqual(result.items[0].taskIdentifier, 'LIN-live');
+  });
+
+  // LIN-613: opening "Dispatched Sessions" for ONE issue must not pull the whole
+  // workspace's 30-day status log and filter in JS — that full read is what timed
+  // out on large workspaces. The per-task filter must ride into the query so the
+  // {urlKey, taskIdentifier} index bounds the read.
+  describe('taskIdentifier pushdown', () => {
+    test('pushes taskIdentifier into the collection query (not a JS post-filter)', async () => {
+      await seed('ws-1', 5);
+      collection._queries.length = 0;
+
+      await store.listStatus('ws-1', { taskIdentifier: 'LIN-3' });
+
+      assert.strictEqual(collection._queries.length, 1, 'exactly one query issued');
+      assert.strictEqual(
+        collection._queries[0].taskIdentifier,
+        'LIN-3',
+        'the per-task filter must be in the query sent to the store, so a real DB ' +
+        'uses the {urlKey, taskIdentifier} index instead of scanning the workspace'
+      );
+    });
+
+    test('returns only the requested issue’s entries', async () => {
+      await seed('ws-1', 5); // LIN-0..LIN-4
+      const result = await store.listStatus('ws-1', { taskIdentifier: 'LIN-2' });
+      assert.strictEqual(result.total, 1);
+      assert.strictEqual(result.items.length, 1);
+      assert.strictEqual(result.items[0].taskIdentifier, 'LIN-2');
+    });
+
+    test('omitting taskIdentifier leaves it out of the query (workspace-wide read)', async () => {
+      await seed('ws-1', 3);
+      collection._queries.length = 0;
+
+      await store.listStatus('ws-1');
+
+      assert.strictEqual(collection._queries.length, 1);
+      assert.ok(
+        !('taskIdentifier' in collection._queries[0]),
+        'unscoped reads must not carry a taskIdentifier predicate'
+      );
+    });
+
+    test('still respects the unattributed tokenId post-filter alongside the query', async () => {
+      // tokenId stays a JS post-filter (its __unattributed__ sentinel has no
+      // query equivalent); it must compose with the pushed-down taskIdentifier.
+      await store.recordStatus({ urlKey: 'ws-1', taskIdentifier: 'LIN-9', action: 'a', status: 'completed', summary: 's', tokenId: 'tok-1' });
+      await store.recordStatus({ urlKey: 'ws-1', taskIdentifier: 'LIN-9', action: 'a', status: 'completed', summary: 's' }); // unattributed
+
+      const attributed = await store.listStatus('ws-1', { taskIdentifier: 'LIN-9', tokenId: 'tok-1' });
+      assert.strictEqual(attributed.total, 1);
+      assert.strictEqual(attributed.items[0].tokenId, 'tok-1');
+
+      const unattributed = await store.listStatus('ws-1', { taskIdentifier: 'LIN-9', tokenId: '__unattributed__' });
+      assert.strictEqual(unattributed.total, 1);
+      assert.strictEqual(unattributed.items[0].tokenId, undefined);
+    });
   });
 });

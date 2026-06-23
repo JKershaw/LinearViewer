@@ -439,24 +439,34 @@ describe('_buildLoops', () => {
 
 // ─── Public API with mock stores ─────────────────────────────────────────────
 
+// Mock stores that HONOUR the issue-scope filters (LIN-613). The real stores
+// push the predicate into the DB query; modelling that here means the
+// issue-scoped tests genuinely prove the store narrowed the read, rather than
+// passing only because the caller re-filtered in JS (the behaviour we removed).
 function makeMockStores({ live = [], history = [], agentStatus = [], capture = {} } = {}) {
   return {
     dispatchStore: {
-      async listItems(urlKey) {
+      async listItems(urlKey, options) {
         capture.listItemsUrlKey = urlKey;
-        return live;
+        capture.listItemsOptions = options;
+        const id = options?.issueIdentifier;
+        return id ? live.filter(x => x.issueIdentifier === id) : live;
       },
       async listHistory(urlKey, options) {
         capture.listHistoryUrlKey = urlKey;
         capture.listHistoryOptions = options;
-        return { items: history, total: history.length };
+        const id = options?.issueIdentifier;
+        const items = id ? history.filter(x => x.issueIdentifier === id) : history;
+        return { items, total: items.length };
       }
     },
     agentStatusStore: {
       async listStatus(urlKey, options) {
         capture.listStatusUrlKey = urlKey;
         capture.listStatusOptions = options;
-        return { items: agentStatus, total: agentStatus.length };
+        const id = options?.taskIdentifier;
+        const items = id ? agentStatus.filter(x => x.taskIdentifier === id) : agentStatus;
+        return { items, total: items.length };
       }
     }
   };
@@ -501,6 +511,31 @@ describe('getLoopsForIssue', () => {
     });
     const loops = await getLoopsForIssue('ws', ISSUE_A, stores);
     assert.deepStrictEqual(loops, []);
+  });
+
+  // LIN-613: the single-issue read must push the issue filter DOWN into every
+  // store read, so a busy workspace's 30-day log is never downloaded just to
+  // serve one issue's accordion. These pin the call shape, not just the result.
+  test('pushes the issue filter down into all three store reads (no whole-workspace scan)', async () => {
+    const capture = {};
+    const stores = makeMockStores({ capture });
+    await getLoopsForIssue('ws', ISSUE_A, stores);
+
+    assert.deepStrictEqual(capture.listItemsOptions, { issueIdentifier: ISSUE_A });
+    assert.deepStrictEqual(capture.listHistoryOptions, { issueIdentifier: ISSUE_A });
+    assert.deepStrictEqual(capture.listStatusOptions, { taskIdentifier: ISSUE_A });
+  });
+
+  test('does NOT re-add a blanket limit when scoping (filter-pushdown, not a cap)', async () => {
+    const capture = {};
+    const stores = makeMockStores({ capture });
+    await getLoopsForIssue('ws', ISSUE_A, stores);
+
+    // The prior blanket cap (truncation footgun) must not return via the scoped
+    // path — the only options passed are selective predicates, never a `limit`.
+    assert.ok(!('limit' in capture.listStatusOptions), 'no limit on listStatus');
+    assert.ok(!('limit' in capture.listHistoryOptions), 'no limit on listHistory');
+    assert.ok(!('limit' in capture.listItemsOptions), 'no limit on listItems');
   });
 });
 
