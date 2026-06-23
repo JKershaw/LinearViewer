@@ -7,8 +7,12 @@
  * privacy guarantee: no workspace urlKey, prompt text, or summary content
  * may appear anywhere in the collected stats (the page is public).
  */
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { MangoClient } from '@jkershaw/mangodb';
 import {
   collectKpiStats, categorizeProxyEvent, PROXY_PHASES,
   ACTIVITY_WINDOW_DAYS, HOURLY_WINDOW_HOURS, FREE_TIER_WINDOW_DAYS, WEEKLY_WINDOW_WEEKS
@@ -436,5 +440,175 @@ describe('collectKpiStats', () => {
     assert.ok(!serialized.includes('CONFIDENTIAL-SUMMARY-CONTENT'), 'agent summary leaked');
     assert.ok(!serialized.includes('LIN-999'), 'issue identifier leaked');
     assert.ok(!serialized.includes('SECRET_TOKEN'), 'session token leaked');
+  });
+});
+
+// The production read path runs DB-side aggregation (group proxy events by
+// method/endpoint/status/UTC-hour; drop dispatch feedback[] to a count) instead
+// of pulling whole collections into memory — that full read is what pushed
+// /kpis past the 30s router timeout. The mock above exercises the find()
+// fallback; these tests run the SAME assertions against a real MangoDB instance
+// so the aggregation pipelines are proven to produce identical results.
+describe('collectKpiStats (aggregation path, real MangoDB)', () => {
+  let client;
+  let dbDir;
+  let counter = 0;
+
+  before(async () => {
+    dbDir = mkdtempSync(join(tmpdir(), 'kpi-agg-'));
+    client = new MangoClient(dbDir);
+    await client.connect();
+  });
+
+  after(async () => {
+    if (client) await client.close();
+    if (dbDir) rmSync(dbDir, { recursive: true, force: true });
+  });
+
+  // Build a real, isolated collection set seeded with the given docs. Only the
+  // collections under test need real data; the rest are empty real collections.
+  async function realCollections(seed = {}) {
+    const db = client.db(`kpi_${counter++}`);
+    const names = [
+      'sessions', 'userPreferences', 'workspacePreferences', 'customPrompts',
+      'localIssues', 'dispatchQueue', 'dispatchHistory', 'dispatchTokens',
+      'proxyTokens', 'proxyEvents', 'agentStatus', 'freeTier', 'recapCache',
+      'briefCache', 'reportHistory'
+    ];
+    const collections = {};
+    for (const name of names) {
+      const col = db.collection(name);
+      const docs = seed[name];
+      if (Array.isArray(docs) && docs.length) await col.insertMany(docs);
+      collections[name] = col;
+    }
+    return collections;
+  }
+
+  test('proxy day/hour buckets, read:write ratio and totals match the find path', async () => {
+    const event = (method, endpoint, days) => ({ method, endpoint, status: 200, timestamp: daysAgo(days) });
+    const collections = await realCollections({
+      proxyEvents: [
+        event('GET', '/api/proxy/stack', 0),
+        event('GET', '/api/proxy/issues/:id', 0),
+        event('POST', '/api/proxy/recommend-and-dispatch', 0),
+        event('GET', '/api/proxy/dispatch/:id', 0),
+        event('POST', '/api/proxy/foreman/status', 3),
+        event('PATCH', '/api/proxy/issues/:id', 3),
+        event('GET', '/api/proxy/me', 45) // outside window: totals only, not buckets
+      ]
+    });
+
+    const stats = await collectKpiStats(collections, { now: NOW });
+    const last = ACTIVITY_WINDOW_DAYS - 1;
+
+    assert.strictEqual(stats.proxyCategories.orienting[last], 2);
+    assert.strictEqual(stats.proxyCategories.deciding[last], 1);
+    assert.strictEqual(stats.proxyCategories.watching[last], 1);
+    assert.strictEqual(stats.proxyCategories.reporting[last - 3], 1);
+    assert.strictEqual(stats.proxyCategories.acting[last - 3], 1);
+    assert.strictEqual(stats.totals.agentActions, 7); // includes the out-of-window event
+    assert.strictEqual(stats.vanity.readsPerWrite, 1.3);
+    assert.strictEqual(stats.vanity.busiestDay.count, 4);
+  });
+
+  test('proxy hourly buckets and UTC-hour key match the find path', async () => {
+    const hoursAgo = (n) => new Date(NOW.getTime() - n * 60 * 60 * 1000);
+    const event = (method, endpoint, hours) => ({ method, endpoint, status: 200, timestamp: hoursAgo(hours) });
+    const collections = await realCollections({
+      proxyEvents: [
+        event('GET', '/api/proxy/stack', 0),
+        event('GET', '/api/proxy/issues/:id', 0),
+        event('POST', '/api/proxy/foreman/status', 5),
+        event('PATCH', '/api/proxy/issues/:id', 30) // outside 24h window
+      ]
+    });
+
+    const stats = await collectKpiStats(collections, { now: NOW });
+    const lastHour = HOURLY_WINDOW_HOURS - 1;
+    assert.strictEqual(stats.proxyCategoriesHourly.orienting[lastHour], 2);
+    assert.strictEqual(stats.proxyCategoriesHourly.reporting[lastHour - 5], 1);
+    assert.strictEqual(stats.proxyCategoriesHourly.hours[lastHour], '2026-06-10T12');
+    assert.strictEqual(stats.proxyCategories.acting[ACTIVITY_WINDOW_DAYS - 2], 1);
+  });
+
+  test('proxy status classes and top endpoints match the find path', async () => {
+    const event = (endpoint, status) => ({ endpoint, method: 'GET', status, timestamp: daysAgo(1) });
+    const collections = await realCollections({
+      proxyEvents: [
+        event('/api/proxy/me', 200),
+        event('/api/proxy/me', 200),
+        event('/api/proxy/issues/:id', 404),
+        event('/api/proxy/recommend', 500),
+        event('/api/proxy/issues/:id', 200)
+      ]
+    });
+
+    const stats = await collectKpiStats(collections, { now: NOW });
+    assert.deepStrictEqual(stats.proxyStatus, { ok: 3, clientError: 1, serverError: 1 });
+    assert.deepStrictEqual(stats.topEndpoints[0], { label: '/api/proxy/issues/:id', count: 2 });
+    assert.deepStrictEqual(stats.topEndpoints[1], { label: '/api/proxy/me', count: 2 });
+    assert.deepStrictEqual(stats.topEndpoints[2], { label: '/api/proxy/recommend', count: 1 });
+  });
+
+  test('hour-of-day histogram and workspace union match the find path', async () => {
+    const at = (iso) => new Date(iso);
+    const collections = await realCollections({
+      proxyEvents: [
+        { method: 'GET', endpoint: '/api/proxy/me', status: 200, timestamp: at('2026-06-10T03:15:00Z'), urlKey: 'acme' },
+        { method: 'GET', endpoint: '/api/proxy/me', status: 200, timestamp: at('2026-06-09T03:45:00Z'), urlKey: 'globex' }
+      ],
+      agentStatus: [
+        { dispatchId: 'h1', action: 'review', status: 'completed', timestamp: at('2026-06-10T11:00:00Z'), urlKey: 'initech' }
+      ],
+      dispatchQueue: [
+        { _id: 'q1', kind: 'research', dispatchedAt: at('2026-06-10T03:59:00Z') }
+      ]
+    });
+
+    const stats = await collectKpiStats(collections, { now: NOW });
+    assert.strictEqual(stats.hourOfDay[3], 3);
+    assert.strictEqual(stats.hourOfDay[11], 1);
+    assert.strictEqual(stats.hourOfDay.reduce((a, b) => a + b, 0), 4);
+    assert.strictEqual(stats.totals.workspaces, 3); // acme, globex, initech
+  });
+
+  test('work funnel and feedback notes survive the feedback[] → count projection', async () => {
+    const collections = await realCollections({
+      dispatchQueue: [
+        { _id: 'q1', kind: 'research', dispatchedAt: daysAgo(0) }
+      ],
+      dispatchHistory: [
+        { _id: 'h1', kind: 'implementation', status: 'taken', dispatchedAt: daysAgo(2), resolvedAt: daysAgo(1), feedback: [{ note: 'a' }, { note: 'b' }] },
+        { _id: 'h2', kind: 'review', status: 'taken', dispatchedAt: daysAgo(3), resolvedAt: daysAgo(2), feedback: [] },
+        { _id: 'h3', kind: 'research', status: 'taken', dispatchedAt: daysAgo(4), resolvedAt: daysAgo(3) }, // no feedback field
+        { _id: 'h4', kind: 'planning', status: 'expired', dispatchedAt: daysAgo(5) }
+      ],
+      agentStatus: [
+        { dispatchId: 'h1', action: 'implementation', status: 'completed', timestamp: daysAgo(1) },
+        { dispatchId: 'h2', action: 'review', status: 'failed', timestamp: daysAgo(2) }
+      ]
+    });
+
+    const stats = await collectKpiStats(collections, { now: NOW });
+    // h1 reported (2 feedback) + h2 reported (linked step) → reported: 2
+    assert.deepStrictEqual(stats.funnel, { dispatched: 5, taken: 3, reported: 2, completed: 1 });
+    assert.strictEqual(stats.totals.feedbackNotes, 2); // only h1's two notes, counted via $size
+  });
+
+  test('does not leak workspace keys or feedback content through aggregation', async () => {
+    const collections = await realCollections({
+      proxyEvents: [
+        { method: 'GET', endpoint: '/api/proxy/me', status: 200, timestamp: daysAgo(0), urlKey: 'secret-workspace' }
+      ],
+      dispatchHistory: [
+        { _id: 'h1', urlKey: 'secret-workspace', kind: 'implementation', status: 'taken', dispatchedAt: daysAgo(1), feedback: [{ body: 'CONFIDENTIAL-FEEDBACK-BODY' }] }
+      ]
+    });
+
+    const stats = await collectKpiStats(collections, { now: NOW });
+    const serialized = JSON.stringify(stats);
+    assert.ok(!serialized.includes('secret-workspace'), 'workspace urlKey leaked');
+    assert.ok(!serialized.includes('CONFIDENTIAL-FEEDBACK-BODY'), 'feedback content leaked');
   });
 });

@@ -813,37 +813,75 @@ app.get('/styleguide', (req, res) => {
 // KPIs Page (public, no auth required, intentionally unlinked)
 // =============================================================================
 // Instance-wide aggregate stats. collectKpiStats() is the privacy boundary —
-// it returns only counts and app-defined labels, never workspace data. The
-// 60-second cache keeps the public route from hammering the DB.
+// it returns only counts and app-defined labels, never workspace data.
+//
+// The collection is served stale-while-revalidate behind a single-flight lock:
+// once warmed, the route ALWAYS responds instantly from cache and refreshes in
+// the background, so a slow DB read can never block the request or trip the 30s
+// router timeout (the old behaviour: a >30s read died before it could fill the
+// cache, so every request re-ran the read and timed out — a death spiral). Only
+// a cold cache (process just booted) awaits the first computation. The
+// single-flight lock collapses concurrent refreshes into one DB read.
 const KPI_CACHE_MS = 60 * 1000
 let kpiCache = { at: 0, stats: null }
+let kpiInflight = null
+
+async function refreshKpiStats() {
+  const startedAt = Date.now()
+  const stats = await collectKpiStats({
+    sessions: sessionsCollection,
+    userPreferences: userPreferencesCollection,
+    workspacePreferences: workspacePreferencesCollection,
+    customPrompts: customPromptsCollection,
+    localIssues: localIssuesCollection,
+    dispatchQueue: dispatchQueueCollection,
+    dispatchHistory: dispatchHistoryCollection,
+    dispatchTokens: dispatchTokensCollection,
+    proxyTokens: proxyTokensCollection,
+    proxyEvents: proxyEventsCollection,
+    agentStatus: agentStatusCollection,
+    freeTier: freeTierCollection,
+    recapCache: recapCacheCollection,
+    briefCache: briefCacheCollection,
+    reportHistory: reportHistoryCollection
+  }, { dbBackend: process.env.MONGODB_URI ? 'mongodb' : 'mangodb' })
+  const ms = Date.now() - startedAt
+  if (ms > 5000) console.warn(`KPI stats collection slow: ${ms}ms`)
+  else console.log(`KPI stats collected in ${ms}ms`)
+  kpiCache = { at: Date.now(), stats }
+  return stats
+}
+
+// Single-flight: collapse concurrent (re)fills into one in-flight DB read.
+function refreshKpiStatsOnce() {
+  if (!kpiInflight) {
+    kpiInflight = refreshKpiStats().finally(() => { kpiInflight = null })
+  }
+  return kpiInflight
+}
 
 app.get('/kpis', async (req, res) => {
   try {
-    if (!kpiCache.stats || Date.now() - kpiCache.at > KPI_CACHE_MS) {
-      const stats = await collectKpiStats({
-        sessions: sessionsCollection,
-        userPreferences: userPreferencesCollection,
-        workspacePreferences: workspacePreferencesCollection,
-        customPrompts: customPromptsCollection,
-        localIssues: localIssuesCollection,
-        dispatchQueue: dispatchQueueCollection,
-        dispatchHistory: dispatchHistoryCollection,
-        dispatchTokens: dispatchTokensCollection,
-        proxyTokens: proxyTokensCollection,
-        proxyEvents: proxyEventsCollection,
-        agentStatus: agentStatusCollection,
-        freeTier: freeTierCollection,
-        recapCache: recapCacheCollection,
-        briefCache: briefCacheCollection,
-        reportHistory: reportHistoryCollection
-      }, { dbBackend: process.env.MONGODB_URI ? 'mongodb' : 'mangodb' })
-      kpiCache = { at: Date.now(), stats }
+    const fresh = kpiCache.stats && Date.now() - kpiCache.at <= KPI_CACHE_MS
+    if (!fresh) {
+      if (kpiCache.stats) {
+        // Warm but stale: serve the last good snapshot now, refresh in the
+        // background. Never await — the request must not block on the DB read.
+        refreshKpiStatsOnce().catch(err => console.error('KPI background refresh failed:', err))
+      } else {
+        // Cold cache (fresh boot): nothing to serve yet, so await the first fill.
+        await refreshKpiStatsOnce()
+      }
     }
     res.send(renderKpisPage(kpiCache.stats, { deployInfo: getDeployInfo() }))
   } catch (error) {
     console.error('Failed to render KPIs page:', error)
-    res.status(500).send(renderErrorPage('Error', 'Could not load instance KPIs. Please try again.'))
+    if (kpiCache.stats) {
+      // Degrade to the last good snapshot rather than erroring the whole page.
+      res.send(renderKpisPage(kpiCache.stats, { deployInfo: getDeployInfo() }))
+    } else {
+      res.status(500).send(renderErrorPage('Error', 'Could not load instance KPIs. Please try again.'))
+    }
   }
 })
 
