@@ -5,31 +5,42 @@ import { test, expect } from '../fixtures/test-base.js';
 // it does not fetch provider data). Yap is not configured in the test env, so
 // the live state/say endpoints return 503 — asserted below.
 
-const URL_KEY = 'test-workspace';
-const COLLECTIVE_URL = `/workspace/${URL_KEY}/collective`;
-const SETTINGS_URL = `/workspace/${URL_KEY}/settings`;
-const API_PREFIX = `/workspace/${URL_KEY}`;
+// Bound per-test from the per-worker key (LIN-628) so the session, nav, the
+// start fan-out's workspaceUrlKeys, and the say/state proxy calls all address
+// this worker's partition. Playwright workers are separate processes, so these
+// module-scoped lets are per-worker state.
+let URL_KEY;
+let COLLECTIVE_URL;
+let SETTINGS_URL;
+let API_PREFIX;
+
+test.beforeEach(({ workerUrlKey }) => {
+  URL_KEY = workerUrlKey;
+  COLLECTIVE_URL = `/workspace/${URL_KEY}/collective`;
+  SETTINGS_URL = `/workspace/${URL_KEY}/settings`;
+  API_PREFIX = `/workspace/${URL_KEY}`;
+});
 
 const featuresParam = (obj) => `features=${encodeURIComponent(JSON.stringify(obj))}`;
 
 test.describe('Collective Page (experimental)', () => {
   test.describe('Feature Flag Gating', () => {
     test('redirects to settings when the flag is off', async ({ page }) => {
-      await page.goto('/test/set-session');
+      await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       await page.goto(COLLECTIVE_URL);
       await page.waitForLoadState('networkidle');
       expect(page.url()).toContain('/settings');
     });
 
     test('loads when the flag is on', async ({ page }) => {
-      await page.goto(`/test/set-session?${featuresParam({ collective: true })}`);
+      await page.goto(`/test/set-session?urlKey=${URL_KEY}&${featuresParam({ collective: true })}`);
       await page.goto(COLLECTIVE_URL);
       await page.waitForLoadState('networkidle');
       await expect(page.locator('.collective-header h1')).toHaveText('Collective');
     });
 
     test('toggle lives in the Experimental section and defaults off', async ({ page }) => {
-      await page.goto('/test/set-session');
+      await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
 
@@ -40,12 +51,12 @@ test.describe('Collective Page (experimental)', () => {
     });
 
     test('settings link to the page appears only when the flag is on', async ({ page }) => {
-      await page.goto('/test/set-session');
+      await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
       await expect(page.locator('.settings-action:has-text("open the discussion page")')).toHaveCount(0);
 
-      await page.goto(`/test/set-session?${featuresParam({ collective: true })}`);
+      await page.goto(`/test/set-session?urlKey=${URL_KEY}&${featuresParam({ collective: true })}`);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
       await expect(page.locator('.settings-action:has-text("open the discussion page")')).toBeVisible();
@@ -54,7 +65,7 @@ test.describe('Collective Page (experimental)', () => {
 
   test.describe('Page Structure', () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto(`/test/set-session?multiWorkspace=true&${featuresParam({ collective: true })}`);
+      await page.goto(`/test/set-session?multiWorkspace=true&urlKey=${URL_KEY}&${featuresParam({ collective: true })}`);
       await page.goto(COLLECTIVE_URL);
       await page.waitForLoadState('networkidle');
     });
@@ -111,11 +122,11 @@ test.describe('Collective Page (experimental)', () => {
   });
 
   test.describe('Start fan-out', () => {
-    test('dispatches a participant prompt to each selected workspace', async ({ page }) => {
-      await page.goto(`/test/set-session?multiWorkspace=true&${featuresParam({ collective: true })}`);
+    test('dispatches a participant prompt to each selected workspace', async ({ page, secondWorkerUrlKey }) => {
+      await page.goto(`/test/set-session?multiWorkspace=true&urlKey=${URL_KEY}&${featuresParam({ collective: true })}`);
 
       const res = await page.request.post(`${API_PREFIX}/collective/start`, {
-        data: { workspaceUrlKeys: ['test-workspace', 'second-workspace'], channel: '#Collective', target: 'cli' },
+        data: { workspaceUrlKeys: [URL_KEY, secondWorkerUrlKey], channel: '#Collective', target: 'cli' },
       });
       expect(res.status()).toBe(201);
       const body = await res.json();
@@ -133,7 +144,7 @@ test.describe('Collective Page (experimental)', () => {
     });
 
     test('rejects an unconnected workspace in the selection', async ({ page }) => {
-      await page.goto(`/test/set-session?${featuresParam({ collective: true })}`);
+      await page.goto(`/test/set-session?urlKey=${URL_KEY}&${featuresParam({ collective: true })}`);
       const res = await page.request.post(`${API_PREFIX}/collective/start`, {
         data: { workspaceUrlKeys: ['nope-workspace'], target: 'cli' },
       });
@@ -141,9 +152,9 @@ test.describe('Collective Page (experimental)', () => {
     });
 
     test('rejects the dash target', async ({ page }) => {
-      await page.goto(`/test/set-session?${featuresParam({ collective: true })}`);
+      await page.goto(`/test/set-session?urlKey=${URL_KEY}&${featuresParam({ collective: true })}`);
       const res = await page.request.post(`${API_PREFIX}/collective/start`, {
-        data: { workspaceUrlKeys: ['test-workspace'], target: 'dash' },
+        data: { workspaceUrlKeys: [URL_KEY], target: 'dash' },
       });
       expect(res.status()).toBe(400);
     });
@@ -153,7 +164,7 @@ test.describe('Collective Page (experimental)', () => {
     // YAP_BASE_URL points at the in-process mock Yap (routes/test.js), so the
     // poll/say plumbing round-trips deterministically without real egress.
     test('say then state round-trips a message through Yap', async ({ page }) => {
-      await page.goto(`/test/set-session?${featuresParam({ collective: true })}`);
+      await page.goto(`/test/set-session?urlKey=${URL_KEY}&${featuresParam({ collective: true })}`);
       await page.request.get('/test/yap/clear');
       const channel = '#e2e-roundtrip-2026-06-13';
 
@@ -172,7 +183,7 @@ test.describe('Collective Page (experimental)', () => {
 
     test('the say box posts the human input and it appears in the transcript', async ({ page }) => {
       await page.request.get('/test/yap/clear');
-      await page.goto(`/test/set-session?${featuresParam({ collective: true })}`);
+      await page.goto(`/test/set-session?urlKey=${URL_KEY}&${featuresParam({ collective: true })}`);
       await page.goto(COLLECTIVE_URL);
       await page.waitForLoadState('networkidle');
 

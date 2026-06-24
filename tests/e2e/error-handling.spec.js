@@ -10,10 +10,6 @@ import { localDashboardUrl } from '../fixtures/local-harness.js';
 //     provider declares OFF, and OAuth callbacks are the auth bootstrap the
 //     local harness deliberately does not model.
 
-// Workspace URL key used in the PINNED (test-token) sessions below.
-const TEST_WORKSPACE_URL_KEY = 'test-workspace';
-const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;
-
 test.describe('Input Validation', () => {
   test.beforeEach(async ({ seedLocal }) => {
     await seedLocal();
@@ -66,9 +62,13 @@ test.describe('Session State', () => {
 });
 
 test.describe('Team Filtering', () => {
-  // PINNED: needs full team data the local provider declares OFF.
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/test/set-session');
+  // PINNED: needs full team data the local provider declares OFF. Driven off the
+  // per-worker key (LIN-628) so session + nav address this worker's partition.
+  let WORKSPACE_URL;
+
+  test.beforeEach(async ({ page, workerUrlKey }) => {
+    WORKSPACE_URL = `/workspace/${workerUrlKey}/`;
+    await page.goto(`/test/set-session?urlKey=${workerUrlKey}`);
   });
 
   test('team selector shows all teams', async ({ page }) => {

@@ -1,36 +1,44 @@
 import { test, expect } from '../fixtures/test-base.js';
 
-// Experimental "talk to a task" page. Seeds via /test/set-session (the default
-// session is the `test-workspace` / `test-token` workspace, so the AI mock fires
-// and the chat streams a deterministic answer without an OpenRouter key). The
-// page itself fetches no provider data; the chat endpoint resolves the task from
-// the data fixtures (TEST-1 etc.) in test mode.
+// Experimental "talk to a task" page. Seeds via /test/set-session (the test-token
+// workspace, so the AI mock fires and the chat streams a deterministic answer
+// without an OpenRouter key). The page itself fetches no provider data; the chat
+// endpoint resolves the task from the data fixtures (TEST-1 etc.) in test mode.
 
-const URL_KEY = 'test-workspace';
-const PAGE_URL = `/workspace/${URL_KEY}/task-chat`;
-const SETTINGS_URL = `/workspace/${URL_KEY}/settings`;
-const CHAT_API = `/workspace/${URL_KEY}/api/task-chat`;
+// Bound per-test from the per-worker key (LIN-628) so session + nav + chat API
+// all address this worker's partition.
+let URL_KEY;
+let PAGE_URL;
+let SETTINGS_URL;
+let CHAT_API;
 
 const featuresParam = (obj) => `features=${encodeURIComponent(JSON.stringify(obj))}`;
+
+test.beforeEach(({ workerUrlKey }) => {
+  URL_KEY = workerUrlKey;
+  PAGE_URL = `/workspace/${URL_KEY}/task-chat`;
+  SETTINGS_URL = `/workspace/${URL_KEY}/settings`;
+  CHAT_API = `/workspace/${URL_KEY}/api/task-chat`;
+});
 
 test.describe('Task Chat Page (experimental)', () => {
   test.describe('Feature Flag Gating', () => {
     test('redirects to settings when the flag is off', async ({ page }) => {
-      await page.goto('/test/set-session');
+      await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       await page.goto(PAGE_URL);
       await page.waitForLoadState('networkidle');
       expect(page.url()).toContain('/settings');
     });
 
     test('loads when the flag is on', async ({ page }) => {
-      await page.goto(`/test/set-session?${featuresParam({ taskChat: true })}`);
+      await page.goto(`/test/set-session?${featuresParam({ taskChat: true })}&urlKey=${URL_KEY}`);
       await page.goto(PAGE_URL);
       await page.waitForLoadState('networkidle');
       await expect(page.locator('.task-chat-header h1')).toHaveText('Task Chat');
     });
 
     test('toggle lives in the Experimental section and defaults off', async ({ page }) => {
-      await page.goto('/test/set-session');
+      await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
 
@@ -41,12 +49,12 @@ test.describe('Task Chat Page (experimental)', () => {
     });
 
     test('settings link to the page appears only when the flag is on', async ({ page }) => {
-      await page.goto('/test/set-session');
+      await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
       await expect(page.locator('.settings-action:has-text("open the task chat page")')).toHaveCount(0);
 
-      await page.goto(`/test/set-session?${featuresParam({ taskChat: true })}`);
+      await page.goto(`/test/set-session?${featuresParam({ taskChat: true })}&urlKey=${URL_KEY}`);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
       await expect(page.locator('.settings-action:has-text("open the task chat page")')).toBeVisible();
@@ -55,7 +63,7 @@ test.describe('Task Chat Page (experimental)', () => {
 
   test.describe('Page Structure', () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto(`/test/set-session?${featuresParam({ taskChat: true })}`);
+      await page.goto(`/test/set-session?${featuresParam({ taskChat: true })}&urlKey=${URL_KEY}`);
       await page.goto(PAGE_URL);
       await page.waitForLoadState('networkidle');
     });
@@ -82,7 +90,7 @@ test.describe('Task Chat Page (experimental)', () => {
 
   test.describe('Conversation', () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto(`/test/set-session?${featuresParam({ taskChat: true })}`);
+      await page.goto(`/test/set-session?${featuresParam({ taskChat: true })}&urlKey=${URL_KEY}`);
       await page.goto(PAGE_URL);
       await page.waitForLoadState('networkidle');
     });
@@ -125,7 +133,7 @@ test.describe('Task Chat Page (experimental)', () => {
 
   test.describe('Chat endpoint', () => {
     test('returns 403 when the feature flag is off', async ({ page }) => {
-      await page.goto('/test/set-session');
+      await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       const res = await page.request.post(`${CHAT_API}/TEST-1`, {
         data: { question: 'hi', history: [] },
       });
@@ -133,7 +141,7 @@ test.describe('Task Chat Page (experimental)', () => {
     });
 
     test('returns 400 for an empty question when the flag is on', async ({ page }) => {
-      await page.goto(`/test/set-session?${featuresParam({ taskChat: true })}`);
+      await page.goto(`/test/set-session?${featuresParam({ taskChat: true })}&urlKey=${URL_KEY}`);
       const res = await page.request.post(`${CHAT_API}/TEST-1`, {
         data: { question: '   ', history: [] },
       });
@@ -141,7 +149,7 @@ test.describe('Task Chat Page (experimental)', () => {
     });
 
     test('returns 404 for an unknown task when the flag is on', async ({ page }) => {
-      await page.goto(`/test/set-session?${featuresParam({ taskChat: true })}`);
+      await page.goto(`/test/set-session?${featuresParam({ taskChat: true })}&urlKey=${URL_KEY}`);
       const res = await page.request.post(`${CHAT_API}/TEST-9999`, {
         data: { question: 'hi', history: [] },
       });

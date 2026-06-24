@@ -1,8 +1,4 @@
-import { test, expect } from '@playwright/test';
-
-// Workspace URL key used in test session
-const TEST_WORKSPACE_URL_KEY = 'test-workspace';
-const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;
+import { test, expect } from '../fixtures/test-base.js';
 
 test.describe('Authentication Flow', () => {
   test.beforeEach(async ({ page }) => {
@@ -46,10 +42,10 @@ test.describe('Authentication Flow', () => {
     await expect(loginLink).toContainText('Login with Linear');
   });
 
-  test('authenticated users see dashboard with navigation', async ({ page }) => {
+  test('authenticated users see dashboard with navigation', async ({ page, workerUrlKey }) => {
     // Set up authenticated session
-    await page.goto('/test/set-session');
-    await page.goto(WORKSPACE_URL);
+    await page.goto(`/test/set-session?urlKey=${workerUrlKey}`);
+    await page.goto(`/workspace/${workerUrlKey}/`);
 
     // Should see dashboard (no is-landing class)
     await expect(page.locator('body')).not.toHaveClass(/is-landing/);
@@ -59,9 +55,9 @@ test.describe('Authentication Flow', () => {
     await expect(page.locator('.reset-view')).toBeVisible();
   });
 
-  test('authenticated users see workspace selector', async ({ page }) => {
-    await page.goto('/test/set-session');
-    await page.goto(WORKSPACE_URL);
+  test('authenticated users see workspace selector', async ({ page, workerUrlKey }) => {
+    await page.goto(`/test/set-session?urlKey=${workerUrlKey}`);
+    await page.goto(`/workspace/${workerUrlKey}/`);
 
     // Should see workspace selector
     const workspaceToggle = page.locator('#workspace-toggle');
@@ -71,13 +67,13 @@ test.describe('Authentication Flow', () => {
 });
 
 test.describe('Logout Flow', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, workerUrlKey }) => {
     // Set up authenticated session
-    await page.goto('/test/set-session');
+    await page.goto(`/test/set-session?urlKey=${workerUrlKey}`);
   });
 
-  test('logout link destroys session and shows landing page', async ({ page }) => {
-    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/settings`);
+  test('logout link destroys session and shows landing page', async ({ page, workerUrlKey }) => {
+    await page.goto(`/workspace/${workerUrlKey}/settings`);
 
     // Verify we're authenticated
     await expect(page.locator('.nav-bar')).toBeVisible();
@@ -92,8 +88,8 @@ test.describe('Logout Flow', () => {
     await expect(page.locator('body')).toHaveClass(/is-landing/);
   });
 
-  test('after logout, navigating to home shows landing page', async ({ page }) => {
-    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/settings`);
+  test('after logout, navigating to home shows landing page', async ({ page, workerUrlKey }) => {
+    await page.goto(`/workspace/${workerUrlKey}/settings`);
 
     // Click logout on settings page and wait for redirect
     await Promise.all([

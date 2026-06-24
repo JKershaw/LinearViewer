@@ -78,15 +78,25 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   //   ?maxWorkspaces=true       - Set up 10 workspaces (at limit)
   //   ?openRouterConnected=true - Set up OpenRouter API key in session
   //   ?freeTierEnabled=true     - Simulate free tier mode (no OAuth, no env key)
-  //   ?urlKey=<workspace>       - Per-worker urlKey for the single default workspace
+  //   ?urlKey=<workspace>       - Per-worker urlKey for the FIRST workspace
   //                               (LIN-625 S1). Defaults to 'test-workspace' for
-  //                               back-compat; the multiWorkspace / maxWorkspaces
-  //                               branches keep their fixed second-/workspace-N keys.
+  //                               back-compat. The multiWorkspace / maxWorkspaces
+  //                               branches derive their sibling keys from the
+  //                               per-worker suffix carried by this key (LIN-628),
+  //                               so every workspace in the session is partition-
+  //                               distinct per worker once workers>1 (S3); without
+  //                               a `-wN` suffix the siblings stay second-workspace
+  //                               / workspace-N, keeping the default byte-identical.
   router.get('/test/set-session', (req, res) => {
     const { tokenExpired, noRefreshToken, multiWorkspace, maxWorkspaces, openRouterConnected, freeTierEnabled, features, swimSample, shipSample, patMode } = req.query
-    // Per-worker key for the single default workspace; same `?urlKey=` interface
-    // the teardown endpoints already use, with the identical 'test-workspace' default.
+    // Per-worker key for the first workspace; same `?urlKey=` interface the
+    // teardown endpoints already use, with the identical 'test-workspace' default.
     const singleUrlKey = req.query.urlKey || 'test-workspace'
+    // The per-worker discriminator (`-w<parallelIndex>`, set by the workerUrlKey
+    // fixture) that the multi-workspace siblings inherit so they don't collide
+    // across parallel workers. Empty for the bare 'test-workspace' default or any
+    // custom key, so the multiWorkspace / maxWorkspaces output is unchanged then.
+    const workerSuffix = (singleUrlKey.match(/-w\d+$/) || [''])[0]
 
     // Base workspace configuration - IDs must be valid UUIDs to pass validation
     const createWorkspace = (id, name, urlKey) => ({
@@ -112,14 +122,15 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
         createWorkspace(
           `${i}${i}${i}${i}${i}${i}${i}${i}-${i}${i}${i}${i}-${i}${i}${i}${i}-${i}${i}${i}${i}-${i}${i}${i}${i}${i}${i}${i}${i}${i}${i}${i}${i}`,
           `Workspace ${i}`,
-          `workspace-${i}`
+          `workspace-${i}${workerSuffix}`
         )
       )
     } else if (multiWorkspace) {
-      // Create 2 workspaces for switching tests
+      // Create 2 workspaces for switching tests. The first uses the per-worker
+      // key verbatim; the second inherits the same worker suffix (LIN-628).
       workspaces = [
-        createWorkspace(TEST_UUID_1, 'Test Workspace', 'test-workspace'),
-        createWorkspace(TEST_UUID_2, 'Second Workspace', 'second-workspace')
+        createWorkspace(TEST_UUID_1, 'Test Workspace', singleUrlKey),
+        createWorkspace(TEST_UUID_2, 'Second Workspace', `second-workspace${workerSuffix}`)
       ]
     } else {
       // Default: single workspace (urlKey is per-worker-aware; LIN-625 S1)

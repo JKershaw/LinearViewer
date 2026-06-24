@@ -4,7 +4,7 @@ import { seedLocalWorkspace } from '../fixtures/local-harness.js';
 // Migrated onto a GENUINE `provider: 'local'` session (LIN-425, parent S3). The
 // dispatch queue/tokens/history stores stay store-backed (urlKey-scoped), NOT
 // provider-backed — so every `/test/*` cleanup/create route must carry
-// `?urlKey=local-workspace` (they default to `test-workspace`). The repo selector
+// `?urlKey=local-workspace` (they default to the test-token workspace). The repo selector
 // reads the provider's projects, so we seed exactly ONE project carrying
 // `repo=test-repo` (→ "none" + one repo option, matching the old testMockData set).
 // Per-worker key + nav/API URLs are bound before every test by the top-level

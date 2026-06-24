@@ -1,14 +1,24 @@
 import { test, expect } from '../fixtures/test-base.js';
 
-const TEST_WORKSPACE_URL_KEY = 'test-workspace';
-const PROXY_PAGE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/proxy`;
-const API_PREFIX = `/workspace/${TEST_WORKSPACE_URL_KEY}/api/proxy`;
+// Bound per-test from the per-worker key (LIN-628) so the session, the proxy
+// page / API URLs, and every /test/* seam query param all address this worker's
+// partition. Playwright workers are separate processes, so these module-scoped
+// lets are per-worker state.
+let URL_KEY;
+let PROXY_PAGE_URL;
+let API_PREFIX;
+
+test.beforeEach(({ workerUrlKey }) => {
+  URL_KEY = workerUrlKey;
+  PROXY_PAGE_URL = `/workspace/${URL_KEY}/proxy`;
+  API_PREFIX = `/workspace/${URL_KEY}/api/proxy`;
+});
 
 test.describe('Proxy Page', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/test/clear-proxy-tokens');
-    await page.goto('/test/clear-proxy-events');
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
+    await page.goto(`/test/clear-proxy-tokens?urlKey=${URL_KEY}`);
+    await page.goto(`/test/clear-proxy-events?urlKey=${URL_KEY}`);
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}&urlKey=${URL_KEY}`);
   });
 
   test('proxy page loads with all sections', async ({ page }) => {
@@ -26,7 +36,7 @@ test.describe('Proxy Page', () => {
   });
 
   test('proxy page redirects to settings when feature is disabled', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: false }))}`);
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: false }))}&urlKey=${URL_KEY}`);
     await page.goto(PROXY_PAGE_URL);
     await expect(page).toHaveURL(/\/settings$/);
   });
@@ -75,9 +85,9 @@ test.describe('Proxy Page', () => {
   test('tokens section shows show-more when more than 5 tokens exist', async ({ page }) => {
     // Seed 7 tokens via the test endpoint
     for (let i = 0; i < 7; i++) {
-      await page.goto(`/test/create-proxy-token?label=seed-${i}`);
+      await page.goto(`/test/create-proxy-token?label=seed-${i}&urlKey=${URL_KEY}`);
     }
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}&urlKey=${URL_KEY}`);
 
     await page.goto(PROXY_PAGE_URL);
     await page.waitForLoadState('networkidle');
@@ -106,14 +116,14 @@ test.describe('Proxy Page', () => {
 
 test.describe('Proxy API - Token Management', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/test/clear-proxy-tokens');
-    await page.goto('/test/clear-proxy-events');
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
+    await page.goto(`/test/clear-proxy-tokens?urlKey=${URL_KEY}`);
+    await page.goto(`/test/clear-proxy-events?urlKey=${URL_KEY}`);
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}&urlKey=${URL_KEY}`);
   });
 
   test('create, list, and revoke tokens via API', async ({ request, page }) => {
     // Need session first
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}&urlKey=${URL_KEY}`);
     const cookies = await page.context().cookies();
     const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
 
@@ -151,7 +161,7 @@ test.describe('Proxy API - Token Management', () => {
   });
 
   test('created tokens get a default expiry', async ({ request, page }) => {
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}&urlKey=${URL_KEY}`);
     const cookies = await page.context().cookies();
     const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
 
@@ -175,7 +185,7 @@ test.describe('Proxy API - Token Management', () => {
   });
 
   test('tokens list is sorted newest-first', async ({ request, page }) => {
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}&urlKey=${URL_KEY}`);
     const cookies = await page.context().cookies();
     const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
 
@@ -201,16 +211,16 @@ test.describe('Proxy API - Consumer Endpoints', () => {
   let writeToken;
 
   test.beforeEach(async ({ page }) => {
-    await page.goto('/test/clear-proxy-tokens');
-    await page.goto('/test/clear-proxy-events');
+    await page.goto(`/test/clear-proxy-tokens?urlKey=${URL_KEY}`);
+    await page.goto(`/test/clear-proxy-events?urlKey=${URL_KEY}`);
 
     // Create read-only token
-    const readResp = await page.goto('/test/create-proxy-token?scope=read&label=read-test');
+    const readResp = await page.goto(`/test/create-proxy-token?scope=read&label=read-test&urlKey=${URL_KEY}`);
     const readData = await readResp.json();
     readToken = readData.token;
 
     // Create read-write token
-    const writeResp = await page.goto('/test/create-proxy-token?scope=readWrite&label=write-test');
+    const writeResp = await page.goto(`/test/create-proxy-token?scope=readWrite&label=write-test&urlKey=${URL_KEY}`);
     const writeData = await writeResp.json();
     writeToken = writeData.token;
   });
@@ -607,10 +617,10 @@ test.describe('Proxy API - Route Aliases (LIN-528)', () => {
   let writeToken;
 
   test.beforeEach(async ({ page }) => {
-    await page.goto('/test/clear-proxy-tokens');
-    const readResp = await page.goto('/test/create-proxy-token?scope=read&label=read-test');
+    await page.goto(`/test/clear-proxy-tokens?urlKey=${URL_KEY}`);
+    const readResp = await page.goto(`/test/create-proxy-token?scope=read&label=read-test&urlKey=${URL_KEY}`);
     readToken = (await readResp.json()).token;
-    const writeResp = await page.goto('/test/create-proxy-token?scope=readWrite&label=write-test');
+    const writeResp = await page.goto(`/test/create-proxy-token?scope=readWrite&label=write-test&urlKey=${URL_KEY}`);
     writeToken = (await writeResp.json()).token;
   });
 
@@ -651,8 +661,8 @@ test.describe('Proxy API - Route Aliases (LIN-528)', () => {
 
 test.describe('Proxy API - Single-Use Tokens', () => {
   test('single-use token is consumed after first use', async ({ page, request }) => {
-    await page.goto('/test/clear-proxy-tokens');
-    const resp = await page.goto('/test/create-proxy-token?scope=read&singleUse=true&label=single');
+    await page.goto(`/test/clear-proxy-tokens?urlKey=${URL_KEY}`);
+    const resp = await page.goto(`/test/create-proxy-token?scope=read&singleUse=true&label=single&urlKey=${URL_KEY}`);
     const data = await resp.json();
     const token = data.token;
 
@@ -672,11 +682,11 @@ test.describe('Proxy API - Single-Use Tokens', () => {
 
 test.describe('Proxy API - Event Logging', () => {
   test('proxy calls create events visible in event log', async ({ page, request }) => {
-    await page.goto('/test/clear-proxy-tokens');
-    await page.goto('/test/clear-proxy-events');
+    await page.goto(`/test/clear-proxy-tokens?urlKey=${URL_KEY}`);
+    await page.goto(`/test/clear-proxy-events?urlKey=${URL_KEY}`);
 
     // Create token
-    const tokenResp = await page.goto('/test/create-proxy-token?scope=read&label=events-test');
+    const tokenResp = await page.goto(`/test/create-proxy-token?scope=read&label=events-test&urlKey=${URL_KEY}`);
     const { token } = await tokenResp.json();
 
     // Make a proxy call to generate an event
@@ -685,7 +695,7 @@ test.describe('Proxy API - Event Logging', () => {
     });
 
     // Set session and check events API
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}&urlKey=${URL_KEY}`);
     const cookies = await page.context().cookies();
     const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
 
@@ -701,14 +711,14 @@ test.describe('Proxy API - Event Logging', () => {
 });
 
 test.describe('Proxy API - Session Token Lookup', () => {
-  test('getWorkspaceAccessToken finds token from session store', async ({ page }) => {
-    // Set up a multi-workspace session so "second-workspace" exists
-    // This bypasses the test-mode shortcut (which only handles "test-workspace")
+  test('getWorkspaceAccessToken finds token from session store', async ({ page, secondWorkerUrlKey }) => {
+    // Set up a multi-workspace session so the per-worker second workspace exists.
+    // This bypasses the test-mode shortcut (which only handles the first workspace)
     // and exercises the real session-scanning code path in getWorkspaceAccessToken
-    await page.goto('/test/set-session?multiWorkspace=true');
+    await page.goto(`/test/set-session?multiWorkspace=true&urlKey=${URL_KEY}`);
 
-    // Look up the token for second-workspace via the real session scan
-    const resp = await page.goto('/test/workspace-token/second-workspace');
+    // Look up the token for the second workspace via the real session scan
+    const resp = await page.goto(`/test/workspace-token/${secondWorkerUrlKey}`);
     const data = await resp.json();
 
     // Should find the access token stored by set-session
@@ -716,7 +726,7 @@ test.describe('Proxy API - Session Token Lookup', () => {
   });
 
   test('getWorkspaceAccessToken returns null for unknown workspace', async ({ page }) => {
-    await page.goto('/test/set-session');
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
 
     const resp = await page.goto('/test/workspace-token/nonexistent-workspace');
     const data = await resp.json();
@@ -731,18 +741,18 @@ test.describe('Proxy API - Dispatch', () => {
   let consumerToken;
 
   test.beforeEach(async ({ page }) => {
-    await page.goto('/test/clear-proxy-tokens');
-    await page.goto('/test/clear-dispatch-queue');
-    await page.goto('/test/clear-dispatch-history');
+    await page.goto(`/test/clear-proxy-tokens?urlKey=${URL_KEY}`);
+    await page.goto(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
+    await page.goto(`/test/clear-dispatch-history?urlKey=${URL_KEY}`);
 
-    const readResp = await page.goto('/test/create-proxy-token?scope=read&label=dispatch-read');
+    const readResp = await page.goto(`/test/create-proxy-token?scope=read&label=dispatch-read&urlKey=${URL_KEY}`);
     readToken = (await readResp.json()).token;
 
-    const writeResp = await page.goto('/test/create-proxy-token?scope=readWrite&label=dispatch-write');
+    const writeResp = await page.goto(`/test/create-proxy-token?scope=readWrite&label=dispatch-write&urlKey=${URL_KEY}`);
     writeToken = (await writeResp.json()).token;
 
     // A consumer dispatch token lets the test play the runner (take + feedback).
-    const consumerResp = await page.goto('/test/create-dispatch-token?label=runner');
+    const consumerResp = await page.goto(`/test/create-dispatch-token?label=runner&urlKey=${URL_KEY}`);
     consumerToken = (await consumerResp.json()).token;
   });
 
@@ -1280,14 +1290,14 @@ test.describe('Proxy API - Recommend-and-Dispatch (fused verb, LIN-321)', () => 
   let writeToken;
 
   test.beforeEach(async ({ page }) => {
-    await page.goto('/test/clear-proxy-tokens');
-    await page.goto('/test/clear-dispatch-queue');
-    await page.goto('/test/clear-dispatch-history');
+    await page.goto(`/test/clear-proxy-tokens?urlKey=${URL_KEY}`);
+    await page.goto(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
+    await page.goto(`/test/clear-dispatch-history?urlKey=${URL_KEY}`);
 
-    const readResp = await page.goto('/test/create-proxy-token?scope=read&label=fused-read');
+    const readResp = await page.goto(`/test/create-proxy-token?scope=read&label=fused-read&urlKey=${URL_KEY}`);
     readToken = (await readResp.json()).token;
 
-    const writeResp = await page.goto('/test/create-proxy-token?scope=readWrite&label=fused-write');
+    const writeResp = await page.goto(`/test/create-proxy-token?scope=readWrite&label=fused-write&urlKey=${URL_KEY}`);
     writeToken = (await writeResp.json()).token;
   });
 
@@ -1356,7 +1366,7 @@ test.describe('Proxy API - Recommend-and-Dispatch (fused verb, LIN-321)', () => 
     const created = await resp.json();
 
     // Read the queued item back via the consumer poll, which surfaces repo.
-    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${URL_KEY}`);
     const { token: dispatchToken } = await tokenResponse.json();
     const pollResp = await request.get('/api/dispatch/poll', {
       headers: { Authorization: `Bearer ${dispatchToken}` }
@@ -1377,7 +1387,7 @@ test.describe('Proxy API - Recommend-and-Dispatch (fused verb, LIN-321)', () => 
     expect(resp.status()).toBe(201);
     const created = await resp.json();
 
-    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${URL_KEY}`);
     const { token: dispatchToken } = await tokenResponse.json();
     const pollResp = await request.get('/api/dispatch/poll', {
       headers: { Authorization: `Bearer ${dispatchToken}` }
@@ -1553,7 +1563,7 @@ test.describe('Proxy API - Recommend-and-Dispatch (fused verb, LIN-321)', () => 
     const { prompt: expectedBody } = await promptResp.json();
     expect(expectedBody).toBeTruthy();
 
-    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${URL_KEY}`);
     const { token: dispatchToken } = await tokenResponse.json();
     const pollResp = await request.get('/api/dispatch/poll', {
       headers: { Authorization: `Bearer ${dispatchToken}` }
@@ -1623,7 +1633,7 @@ test.describe('Proxy API - Recommend-and-Dispatch (fused verb, LIN-321)', () => 
     expect(resp.status()).toBe(201);
     const created = await resp.json();
 
-    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${URL_KEY}`);
     const { token: dispatchToken } = await tokenResponse.json();
     const pollResp = await request.get('/api/dispatch/poll', {
       headers: { Authorization: `Bearer ${dispatchToken}` }
@@ -1653,14 +1663,14 @@ test.describe('Proxy API - Autopilot kickoff (fused launch verb, LIN-569)', () =
   let writeToken;
 
   test.beforeEach(async ({ page }) => {
-    await page.goto('/test/clear-proxy-tokens');
-    await page.goto('/test/clear-dispatch-queue');
-    await page.goto('/test/clear-dispatch-history');
+    await page.goto(`/test/clear-proxy-tokens?urlKey=${URL_KEY}`);
+    await page.goto(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
+    await page.goto(`/test/clear-dispatch-history?urlKey=${URL_KEY}`);
 
-    const readResp = await page.goto('/test/create-proxy-token?scope=read&label=autopilot-read');
+    const readResp = await page.goto(`/test/create-proxy-token?scope=read&label=autopilot-read&urlKey=${URL_KEY}`);
     readToken = (await readResp.json()).token;
 
-    const writeResp = await page.goto('/test/create-proxy-token?scope=readWrite&label=autopilot-write');
+    const writeResp = await page.goto(`/test/create-proxy-token?scope=readWrite&label=autopilot-write&urlKey=${URL_KEY}`);
     writeToken = (await writeResp.json()).token;
   });
 
@@ -1726,7 +1736,7 @@ test.describe('Proxy API - Autopilot kickoff (fused launch verb, LIN-569)', () =
     expect(resp.status()).toBe(201);
     const created = await resp.json();
 
-    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${URL_KEY}`);
     const { token: dispatchToken } = await tokenResponse.json();
     const pollResp = await request.get('/api/dispatch/poll', {
       headers: { Authorization: `Bearer ${dispatchToken}` }
@@ -1755,7 +1765,7 @@ test.describe('Proxy API - Autopilot kickoff (fused launch verb, LIN-569)', () =
     expect(created.issueIdentifier).toBe('TEST-14');
     expect(created.promptName).toContain('TEST-14');
 
-    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${URL_KEY}`);
     const { token: dispatchToken } = await tokenResponse.json();
     const pollResp = await request.get('/api/dispatch/poll', {
       headers: { Authorization: `Bearer ${dispatchToken}` }
@@ -1774,7 +1784,7 @@ test.describe('Proxy API - Autopilot kickoff (fused launch verb, LIN-569)', () =
     expect(resp.status()).toBe(201);
     const created = await resp.json();
 
-    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${URL_KEY}`);
     const { token: dispatchToken } = await tokenResponse.json();
     const pollResp = await request.get('/api/dispatch/poll', {
       headers: { Authorization: `Bearer ${dispatchToken}` }
@@ -1808,15 +1818,18 @@ test.describe('Proxy API - Autopilot kickoff (fused launch verb, LIN-569)', () =
 // credentials). Exercises the real session-auth mint route via page.request,
 // which shares the browser context's session cookie.
 test.describe('Proxy token mint — feature gate + prompt-proxy TTL (LIN-525)', () => {
-  const MINT_URL = `${API_PREFIX}/tokens`;
+  // Computed at call time: API_PREFIX is bound per-worker by the file-level
+  // beforeEach (LIN-628), so the mint URL must be read inside the test bodies,
+  // not captured at describe-eval time.
+  const mintUrl = () => `${API_PREFIX}/tokens`;
 
   test.beforeEach(async ({ page }) => {
-    await page.goto('/test/clear-proxy-tokens');
+    await page.goto(`/test/clear-proxy-tokens?urlKey=${URL_KEY}`);
   });
 
   test('mint is rejected (403) when the proxy feature is disabled', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: false }))}`);
-    const resp = await page.request.post(MINT_URL, {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: false }))}&urlKey=${URL_KEY}`);
+    const resp = await page.request.post(mintUrl(), {
       data: { label: 'prompt-proxy', scope: 'readWrite', singleUse: false }
     });
     expect(resp.status()).toBe(403);
@@ -1825,7 +1838,7 @@ test.describe('Proxy token mint — feature gate + prompt-proxy TTL (LIN-525)', 
   // expiresAt isn't echoed in the create response, so read it back from the
   // token list (which carries it) by label.
   async function expiresAtFor(page, label) {
-    const listResp = await page.request.get(MINT_URL);
+    const listResp = await page.request.get(mintUrl());
     expect(listResp.status()).toBe(200);
     const { tokens } = await listResp.json();
     const match = tokens.find(t => t.label === label);
@@ -1834,8 +1847,8 @@ test.describe('Proxy token mint — feature gate + prompt-proxy TTL (LIN-525)', 
   }
 
   test('prompt-proxy token is minted with a short (~48h) TTL', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
-    const resp = await page.request.post(MINT_URL, {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}&urlKey=${URL_KEY}`);
+    const resp = await page.request.post(mintUrl(), {
       data: { label: 'prompt-proxy', scope: 'readWrite', singleUse: false }
     });
     expect(resp.status()).toBe(201);
@@ -1845,8 +1858,8 @@ test.describe('Proxy token mint — feature gate + prompt-proxy TTL (LIN-525)', 
   });
 
   test('a normal (non prompt-proxy) token keeps the long default TTL', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`);
-    const resp = await page.request.post(MINT_URL, {
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}&urlKey=${URL_KEY}`);
+    const resp = await page.request.post(mintUrl(), {
       data: { label: 'manual-token', scope: 'readWrite' }
     });
     expect(resp.status()).toBe(201);
