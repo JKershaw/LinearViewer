@@ -5,7 +5,11 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: 1, // Run sequentially to avoid session conflicts
+  // Parallel by file (per-worker urlKey isolation, LIN-625/LIN-629). fullyParallel
+  // stays false so each spec file is worker-atomic — proxy-local.spec.js (fixed
+  // 'local-workspace' key) and free-tier.spec.js (process-global hourly counter)
+  // are safe only while their file runs on a single worker.
+  workers: process.env.CI ? 2 : 4,
   reporter: 'list',
   use: {
     baseURL: 'http://localhost:3001',
