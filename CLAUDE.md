@@ -220,6 +220,17 @@ Views are surfaced in one of three deliberate tiers (LIN-496). **First-class** (
 - Mobile-responsive layout
 - Keep it minimal - no frameworks, no build step
 
+## E2E Testing Pattern (LIN-215)
+
+E2E specs live in `tests/e2e/` (Playwright) with unit tests in `tests/unit/` (`node --test`). Two test-side seams keep specs maintainable — keep them **separate**:
+
+- **`tests/fixtures/local-harness.js` — the provider SEEDING seam.** `seedLocalWorkspace(page, seed?, options?)` POSTs to `/test/set-local-session`, seeds the real LocalStore, and establishes a `provider: 'local'` session. It returns `{ urlKey, dashboard }`. Use it whenever a spec needs backing data. Do **not** add selector/session helpers here.
+- **`tests/helpers.js` — the SESSION + SELECTOR seam.** Shared `TEST_WORKSPACE_URL_KEY` + `featuresParam()`, `createSession(page, overrides)` (wraps the Linear test-token `/test/set-session` path), the `SELECTORS` stable-selector factory, and thin page objects (`footer`, `settings`, `dashboard`). Do **not** put provider seeding here.
+
+**Prefer `data-testid` over brittle selectors.** Render files emit `data-testid="<surface>-<element>"` (footer links/ai-status, settings sections/toggles/logout, `render.js` project + issue rows, swipe, swim). In specs, select through `SELECTORS`/page objects (`settings(page).section('account')`, `footer(page).getLink('swipe')`) instead of `:has-text()`, CSS classes, or exact `href` values. `tests/e2e/settings.spec.js` is the proof-of-pattern refactor.
+
+**Parallel-aware caller discipline.** A spec's workspace `urlKey` is one value with three consumers — the session endpoint, the `/workspace/${urlKey}/…` navigation URLs, and the teardown/seed query params — so always drive navigation off the `urlKey` a session helper returns, never a hard-coded literal. `createSession`/`seedLocalWorkspace` return the key for this reason. Parallel execution itself (`workers > 1`) is **not** enabled yet: it needs per-worker `urlKey` isolation threaded server-side and is owned by **LIN-625**. Do not raise `workers` in `playwright.config.js` without that isolation — the historical flakiness came from shared server-side store partition keys, not Playwright context sharing.
+
 ## Authentication
 
 ### Linear OAuth 2.0
