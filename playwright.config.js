@@ -5,7 +5,14 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: 1, // Run sequentially to avoid session conflicts
+  // Test-level parallelism is safe now that every e2e spec consumes the
+  // per-worker urlKey seam (LIN-625 S1/S2a/S2b: `${base}-w${parallelIndex}`,
+  // worker scope). Playwright still assigns whole *files* to workers because
+  // `fullyParallel` stays false — that file-atomicity is what keeps specs on
+  // non-partition global state (proxy-local's fixed `local-workspace`,
+  // free-tier's process-global hourly counter) collision-free. Enabling
+  // `fullyParallel` is a deferred follow-up gated on sweeping those.
+  workers: process.env.CI ? 2 : 4,
   reporter: 'list',
   use: {
     baseURL: 'http://localhost:3001',
