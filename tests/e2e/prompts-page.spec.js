@@ -12,15 +12,8 @@
  * mock harness.
  */
 import { test, expect } from '../fixtures/test-base.js';
-import {
-  seedLocalWorkspace,
-  LOCAL_WORKSPACE_URL_KEY,
-} from '../fixtures/local-harness.js';
 
 // Local-provider workspace seeded via /test/set-local-session (LIN-407).
-const URL_KEY = LOCAL_WORKSPACE_URL_KEY;
-const WORKSPACE_URL = `/workspace/${URL_KEY}/`;
-const PROMPTS_URL = `/workspace/${URL_KEY}/prompts`;
 
 test.describe('Prompts Page', () => {
   test.describe('Unauthenticated', () => {
@@ -37,14 +30,14 @@ test.describe('Prompts Page', () => {
   });
 
   test.describe('Authenticated', () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ seedLocal }) => {
       // Prompts page is template-driven and reads only workspace config, so a
       // plain local session suffices — no issue/AI/flag seeding (LIN-407).
-      await seedLocalWorkspace(page);
+      await seedLocal();
     });
 
-    test('renders prompts page', async ({ page }) => {
-      await page.goto(PROMPTS_URL);
+    test('renders prompts page', async ({ page, localWorkerUrlKey }) => {
+      await page.goto(`/workspace/${localWorkerUrlKey}/prompts`);
 
       // Should show prompts header
       await expect(page.locator('h1')).toContainText('Prompts');
@@ -53,8 +46,8 @@ test.describe('Prompts Page', () => {
       await expect(page.locator('.prompts-subtitle')).toContainText('Prompt templates');
     });
 
-    test('shows workspace dropdown in navigation', async ({ page }) => {
-      await page.goto(PROMPTS_URL);
+    test('shows workspace dropdown in navigation', async ({ page, localWorkerUrlKey }) => {
+      await page.goto(`/workspace/${localWorkerUrlKey}/prompts`);
 
       // Should show workspace dropdown with workspace name
       const workspaceToggle = page.locator('#workspace-toggle');
@@ -62,24 +55,24 @@ test.describe('Prompts Page', () => {
       await expect(workspaceToggle).toContainText('Local Workspace');
     });
 
-    test('has back link to projects', async ({ page }) => {
-      await page.goto(PROMPTS_URL);
+    test('has back link to projects', async ({ page, localWorkerUrlKey }) => {
+      await page.goto(`/workspace/${localWorkerUrlKey}/prompts`);
 
       // Should have link back to workspace projects page
-      const projectsLink = page.locator(`.nav-action[href="${WORKSPACE_URL}"]`);
+      const projectsLink = page.locator(`.nav-action[href="/workspace/${localWorkerUrlKey}/"]`);
       await expect(projectsLink).toBeVisible();
       await expect(projectsLink).toContainText('projects');
     });
 
-    test('does not have logout link in navbar', async ({ page }) => {
-      await page.goto(PROMPTS_URL);
+    test('does not have logout link in navbar', async ({ page, localWorkerUrlKey }) => {
+      await page.goto(`/workspace/${localWorkerUrlKey}/prompts`);
 
       // Logout moved to settings page
       await expect(page.locator('.nav-action[href="/logout"]')).not.toBeVisible();
     });
 
-    test('shows summary stats', async ({ page }) => {
-      await page.goto(PROMPTS_URL);
+    test('shows summary stats', async ({ page, localWorkerUrlKey }) => {
+      await page.goto(`/workspace/${localWorkerUrlKey}/prompts`);
 
       // Should show summary with template count and total chars
       const summaryStats = page.locator('.prompts-summary .stat');
@@ -92,16 +85,16 @@ test.describe('Prompts Page', () => {
       await expect(page.locator('.prompts-summary')).toContainText('total chars');
     });
 
-    test('shows template categories', async ({ page }) => {
-      await page.goto(PROMPTS_URL);
+    test('shows template categories', async ({ page, localWorkerUrlKey }) => {
+      await page.goto(`/workspace/${localWorkerUrlKey}/prompts`);
 
       // Should show category headers
       await expect(page.locator('.prompt-category')).not.toHaveCount(0);
       await expect(page.locator('.category-header')).not.toHaveCount(0);
     });
 
-    test('shows template cards', async ({ page }) => {
-      await page.goto(PROMPTS_URL);
+    test('shows template cards', async ({ page, localWorkerUrlKey }) => {
+      await page.goto(`/workspace/${localWorkerUrlKey}/prompts`);
 
       // Should show prompt cards
       const promptCards = page.locator('.prompt-card');
@@ -114,8 +107,8 @@ test.describe('Prompts Page', () => {
       await expect(firstCard.locator('.prompt-chars')).toBeVisible();
     });
 
-    test('can expand prompt details', async ({ page }) => {
-      await page.goto(PROMPTS_URL);
+    test('can expand prompt details', async ({ page, localWorkerUrlKey }) => {
+      await page.goto(`/workspace/${localWorkerUrlKey}/prompts`);
 
       // Find a prompt card with details
       const promptDetails = page.locator('.prompt-details').first();
@@ -130,27 +123,27 @@ test.describe('Prompts Page', () => {
       await expect(promptDetails.locator('.prompt-text')).toBeVisible();
     });
 
-    test('shows meta-prompt section', async ({ page }) => {
-      await page.goto(PROMPTS_URL);
+    test('shows meta-prompt section', async ({ page, localWorkerUrlKey }) => {
+      await page.goto(`/workspace/${localWorkerUrlKey}/prompts`);
 
       // Should show meta-prompt section
       await expect(page.locator('.meta-prompt-section')).toBeVisible();
       await expect(page.locator('.meta-prompt-section .section-header')).toContainText('Meta-Prompt');
     });
 
-    test('has footer with navigation links', async ({ page }) => {
-      await page.goto(PROMPTS_URL);
+    test('has footer with navigation links', async ({ page, localWorkerUrlKey }) => {
+      await page.goto(`/workspace/${localWorkerUrlKey}/prompts`);
 
       // Should have footer
       await expect(page.locator('.page-footer')).toBeVisible();
 
       // Should have settings link with workspace prefix
-      const settingsLink = page.locator(`.footer-action[href="/workspace/${URL_KEY}/settings"]`);
+      const settingsLink = page.locator(`.footer-action[href="/workspace/${localWorkerUrlKey}/settings"]`);
       await expect(settingsLink).toBeVisible();
       await expect(settingsLink).toContainText('settings');
 
       // Should have swim link with workspace prefix
-      const swimLink = page.locator(`.footer-action[href="/workspace/${URL_KEY}/swim"]`);
+      const swimLink = page.locator(`.footer-action[href="/workspace/${localWorkerUrlKey}/swim"]`);
       await expect(swimLink).toBeVisible();
     });
   });

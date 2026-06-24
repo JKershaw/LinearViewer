@@ -1,43 +1,49 @@
 import { test, expect } from '../fixtures/test-base.js';
-import { seedLocalWorkspace, pipelineLocalSeed, LOCAL_WORKSPACE_URL_KEY } from '../fixtures/local-harness.js';
+import { pipelineLocalSeed } from '../fixtures/local-harness.js';
 
-// LIN-387: this spec rides the local-provider harness (seedLocalWorkspace +
+// LIN-387: this spec rides the local-provider harness (seedLocal +
 // pipelineLocalSeed) instead of the deleted `test-token` mock branch. The seed
 // is the SAME testMockData the mock used to return, so identifiers/titles the
 // assertions reference (TEST-1/2/14) are unchanged.
-const PIPELINE_URL = `/workspace/${LOCAL_WORKSPACE_URL_KEY}/pipeline`;
-const SETTINGS_URL = `/workspace/${LOCAL_WORKSPACE_URL_KEY}/settings`;
-const API_PREFIX = `/workspace/${LOCAL_WORKSPACE_URL_KEY}`;
 
-// Seed the local workspace; pipeline flag optional per-test.
-const seedPipeline = (page, features) =>
-  seedLocalWorkspace(page, pipelineLocalSeed, features ? { features } : undefined);
+// Seed the local workspace via the per-worker `seedLocal` fixture; pipeline flag
+// optional per-test.
+const seedPipeline = (seedLocal, features) =>
+  seedLocal(pipelineLocalSeed, features ? { features } : undefined);
 
 test.describe('Pipeline Page', () => {
+  // Nav/API URLs are computed per-test from the worker key (LIN-627); a
+  // top-level beforeEach binds them before every test (and nested beforeEach).
+  let PIPELINE_URL, SETTINGS_URL, API_PREFIX;
+  test.beforeEach(({ localWorkerUrlKey }) => {
+    PIPELINE_URL = `/workspace/${localWorkerUrlKey}/pipeline`;
+    SETTINGS_URL = `/workspace/${localWorkerUrlKey}/settings`;
+    API_PREFIX = `/workspace/${localWorkerUrlKey}`;
+  });
   test.describe('Feature Flag Gating', () => {
-    test('pipeline page redirects to settings when feature flag is disabled', async ({ page }) => {
-      await seedPipeline(page);
+    test('pipeline page redirects to settings when feature flag is disabled', async ({ page, seedLocal }) => {
+      await seedPipeline(seedLocal);
       await page.goto(PIPELINE_URL);
       await page.waitForLoadState('networkidle');
 
       expect(page.url()).toContain('/settings');
     });
 
-    test('pipeline page loads when feature flag is enabled', async ({ page }) => {
+    test('pipeline page loads when feature flag is enabled', async ({ page, seedLocal }) => {
       // Intercept pipeline polling to avoid networkidle issues
       await page.route('**/api/pipeline/state', route =>
         route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ fetchedAt: new Date().toISOString(), active: [], queue: [], recent: [] }) })
       );
 
-      await seedPipeline(page, { pipeline: true });
+      await seedPipeline(seedLocal, { pipeline: true });
       await page.goto(PIPELINE_URL);
       await page.waitForLoadState('networkidle');
 
       await expect(page.locator('.pipeline-header-title')).toContainText('pipeline');
     });
 
-    test('pipeline toggle defaults to off in settings', async ({ page }) => {
-      await seedPipeline(page);
+    test('pipeline toggle defaults to off in settings', async ({ page, seedLocal }) => {
+      await seedPipeline(seedLocal);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
 
@@ -47,8 +53,8 @@ test.describe('Pipeline Page', () => {
       await expect(state).toContainText('off');
     });
 
-    test('pipeline footer link visible when flag is on', async ({ page }) => {
-      await seedPipeline(page, { pipeline: true });
+    test('pipeline footer link visible when flag is on', async ({ page, seedLocal }) => {
+      await seedPipeline(seedLocal, { pipeline: true });
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
 
@@ -56,8 +62,8 @@ test.describe('Pipeline Page', () => {
       await expect(pipelineLink).toBeVisible();
     });
 
-    test('pipeline footer link hidden when flag is off', async ({ page }) => {
-      await seedPipeline(page);
+    test('pipeline footer link hidden when flag is off', async ({ page, seedLocal }) => {
+      await seedPipeline(seedLocal);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
 
@@ -67,13 +73,13 @@ test.describe('Pipeline Page', () => {
   });
 
   test.describe('Page Structure', () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page, seedLocal }) => {
       // Intercept pipeline polling to stabilise networkidle
       await page.route('**/api/pipeline/state', route =>
         route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ fetchedAt: new Date().toISOString(), active: [], queue: [], recent: [] }) })
       );
 
-      await seedPipeline(page, { pipeline: true });
+      await seedPipeline(seedLocal, { pipeline: true });
       await page.goto(PIPELINE_URL);
       await page.waitForLoadState('networkidle');
     });
@@ -134,12 +140,12 @@ test.describe('Pipeline Page', () => {
   });
 
   test.describe('Pipeline API', () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
       // Clear dispatch/agent-status state to prevent cross-test contamination
-      await page.goto(`/test/clear-dispatch-queue?urlKey=${LOCAL_WORKSPACE_URL_KEY}`);
-      await page.goto(`/test/clear-dispatch-history?urlKey=${LOCAL_WORKSPACE_URL_KEY}`);
-      await page.goto(`/test/clear-agent-status?urlKey=${LOCAL_WORKSPACE_URL_KEY}`);
-      await seedPipeline(page, { pipeline: true });
+      await page.goto(`/test/clear-dispatch-queue?urlKey=${localWorkerUrlKey}`);
+      await page.goto(`/test/clear-dispatch-history?urlKey=${localWorkerUrlKey}`);
+      await page.goto(`/test/clear-agent-status?urlKey=${localWorkerUrlKey}`);
+      await seedPipeline(seedLocal, { pipeline: true });
     });
 
     test('state endpoint returns JSON snapshot', async ({ page }) => {
@@ -211,8 +217,8 @@ test.describe('Pipeline Page', () => {
   });
 
   test.describe('Client-Side Rendering', () => {
-    test('hydrates queue from embedded data', async ({ page }) => {
-      await seedPipeline(page, { pipeline: true });
+    test('hydrates queue from embedded data', async ({ page, seedLocal }) => {
+      await seedPipeline(seedLocal, { pipeline: true });
 
       // Let the real page load with mock data (no polling intercept for initial load)
       await page.route('**/api/pipeline/state', route =>
@@ -229,8 +235,8 @@ test.describe('Pipeline Page', () => {
       expect(count).toBeGreaterThan(0);
     });
 
-    test('queue entries show issue titles', async ({ page }) => {
-      await seedPipeline(page, { pipeline: true });
+    test('queue entries show issue titles', async ({ page, seedLocal }) => {
+      await seedPipeline(seedLocal, { pipeline: true });
       await page.route('**/api/pipeline/state', route =>
         route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ fetchedAt: new Date().toISOString(), active: [], queue: [], recent: [] }) })
       );
@@ -244,8 +250,8 @@ test.describe('Pipeline Page', () => {
       expect(text.trim().length).toBeGreaterThan(0);
     });
 
-    test('empty states shown when no data', async ({ page }) => {
-      await seedPipeline(page, { pipeline: true });
+    test('empty states shown when no data', async ({ page, seedLocal }) => {
+      await seedPipeline(seedLocal, { pipeline: true });
 
       // Intercept the initial page load to inject empty data
       await page.route('**/api/pipeline/state', route =>
@@ -269,8 +275,8 @@ test.describe('Pipeline Page', () => {
   });
 
   test.describe('Overlay', () => {
-    test.beforeEach(async ({ page }) => {
-      await seedPipeline(page, { pipeline: true });
+    test.beforeEach(async ({ page, seedLocal }) => {
+      await seedPipeline(seedLocal, { pipeline: true });
       await page.route('**/api/pipeline/state', route =>
         route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ fetchedAt: new Date().toISOString(), active: [], queue: [], recent: [] }) })
       );
@@ -411,8 +417,8 @@ test.describe('Pipeline Page', () => {
       return content;
     }
 
-    test.beforeEach(async ({ page }) => {
-      await seedPipeline(page, { pipeline: true });
+    test.beforeEach(async ({ page, seedLocal }) => {
+      await seedPipeline(seedLocal, { pipeline: true });
       await page.route('**/api/pipeline/state', route =>
         route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ fetchedAt: new Date().toISOString(), active: [], queue: [], recent: [] }) })
       );
@@ -485,8 +491,8 @@ test.describe('Pipeline Page', () => {
   });
 
   test.describe('Accessibility', () => {
-    test.beforeEach(async ({ page }) => {
-      await seedPipeline(page, { pipeline: true });
+    test.beforeEach(async ({ page, seedLocal }) => {
+      await seedPipeline(seedLocal, { pipeline: true });
       await page.route('**/api/pipeline/state', route =>
         route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ fetchedAt: new Date().toISOString(), active: [], queue: [], recent: [] }) })
       );

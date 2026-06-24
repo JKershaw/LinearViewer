@@ -11,11 +11,7 @@
  * Rides a seeded local-provider workspace (no `test-token` mock); the detail
  * block itself is fetched lazily from /api/detail on first expand.
  */
-import { test, expect } from '@playwright/test';
-import { seedLocalWorkspace, LOCAL_WORKSPACE_URL_KEY } from '../fixtures/local-harness.js';
-
-const TEST_WORKSPACE_URL_KEY = LOCAL_WORKSPACE_URL_KEY;
-const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;
+import { test, expect } from '../fixtures/test-base.js';
 
 /**
  * Expand the first project issue line, then open its Details block (the nested
@@ -41,9 +37,9 @@ async function openIssueDetails(page) {
 }
 
 test.describe('Tree view: Brief / Recap sections (LIN-522)', () => {
-  test.beforeEach(async ({ page }) => {
-    await seedLocalWorkspace(page);
-    await page.goto(WORKSPACE_URL);
+  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal();
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.evaluate(() => localStorage.clear());
   });
 
@@ -125,9 +121,9 @@ test.describe('Tree view: Brief / Recap sections (LIN-522)', () => {
 // renders the root node and a Children lane.
 // ============================================================================
 test.describe('Tree view: Context section (LIN-572)', () => {
-  test.beforeEach(async ({ page }) => {
-    await seedLocalWorkspace(page);
-    await page.goto(WORKSPACE_URL);
+  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal();
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.evaluate(() => localStorage.clear());
   });
 
@@ -180,40 +176,38 @@ test.describe('Tree view: Context section (LIN-572)', () => {
 // Seeds real sessions by acting as a dispatch consumer (mirrors swipe.spec.js).
 // ============================================================================
 test.describe('Tree view: Dispatched Sessions (LIN-522)', () => {
-  const API = `/workspace/${TEST_WORKSPACE_URL_KEY}`;
-
-  async function clearSessions(page) {
-    await page.goto(`/test/clear-dispatch-queue?urlKey=${TEST_WORKSPACE_URL_KEY}`);
-    await page.goto(`/test/clear-dispatch-history?urlKey=${TEST_WORKSPACE_URL_KEY}`);
-    await page.goto(`/test/clear-dispatch-tokens?urlKey=${TEST_WORKSPACE_URL_KEY}`);
+  async function clearSessions(page, urlKey) {
+    await page.goto(`/test/clear-dispatch-queue?urlKey=${urlKey}`);
+    await page.goto(`/test/clear-dispatch-history?urlKey=${urlKey}`);
+    await page.goto(`/test/clear-dispatch-tokens?urlKey=${urlKey}`);
   }
 
-  async function dispatchForIssue(page, issueIdentifier, promptName = 'implementation') {
-    const resp = await page.request.post(`${API}/api/dispatch`, {
+  async function dispatchForIssue(page, urlKey, issueIdentifier, promptName = 'implementation') {
+    const resp = await page.request.post(`/workspace/${urlKey}/api/dispatch`, {
       data: { prompt: `Work on ${issueIdentifier}`, promptName, issueIdentifier, target: 'cli' }
     });
     expect(resp.status(), `dispatch failed: ${await resp.text()}`).toBe(201);
     return (await resp.json()).item;
   }
 
-  test('sessions toggle is absent when the dispatch flag is off', async ({ page }) => {
-    await seedLocalWorkspace(page, undefined, { features: { dispatch: false } });
-    await page.goto(WORKSPACE_URL);
+  test('sessions toggle is absent when the dispatch flag is off', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(undefined, { features: { dispatch: false } });
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.evaluate(() => localStorage.clear());
 
     const details = await openIssueDetails(page);
     await expect(details.locator('.detail-toggle[data-toggle="sessions"]')).toHaveCount(0);
   });
 
-  test('sessions toggle lazy-loads and lists dispatched sessions', async ({ page }) => {
-    await clearSessions(page);
-    await seedLocalWorkspace(page, undefined, { features: { dispatch: true } });
-    await page.goto(WORKSPACE_URL);
+  test('sessions toggle lazy-loads and lists dispatched sessions', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await clearSessions(page, localWorkerUrlKey);
+    await seedLocal(undefined, { features: { dispatch: true } });
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.evaluate(() => localStorage.clear());
 
     // The first project issue is LOCAL-1 (see defaultLocalSeed); seed two sessions.
-    await dispatchForIssue(page, 'LOCAL-1', 'research');
-    await dispatchForIssue(page, 'LOCAL-1', 'implementation');
+    await dispatchForIssue(page, localWorkerUrlKey, 'LOCAL-1', 'research');
+    await dispatchForIssue(page, localWorkerUrlKey, 'LOCAL-1', 'implementation');
 
     const details = await openIssueDetails(page);
     const toggle = details.locator('.detail-toggle[data-toggle="sessions"]');
@@ -226,10 +220,10 @@ test.describe('Tree view: Dispatched Sessions (LIN-522)', () => {
     await expect(content.locator('.session-entry')).toHaveCount(2);
   });
 
-  test('sessions toggle shows the empty state for an undispatched issue', async ({ page }) => {
-    await clearSessions(page);
-    await seedLocalWorkspace(page, undefined, { features: { dispatch: true } });
-    await page.goto(WORKSPACE_URL);
+  test('sessions toggle shows the empty state for an undispatched issue', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await clearSessions(page, localWorkerUrlKey);
+    await seedLocal(undefined, { features: { dispatch: true } });
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.evaluate(() => localStorage.clear());
 
     const details = await openIssueDetails(page);

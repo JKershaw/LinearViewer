@@ -15,21 +15,17 @@
  * getProviderForWorkspace + getWorkspaceToken read seam.
  */
 import { test, expect } from '../fixtures/test-base.js';
-import { seedLocalWorkspace, LOCAL_WORKSPACE_URL_KEY } from '../fixtures/local-harness.js';
-
-const URL_KEY = LOCAL_WORKSPACE_URL_KEY;
-const API_PREFIX = `/workspace/${URL_KEY}`;
 // defaultLocalSeed: local-issue-1 has two comments; local-issue-2 has none.
 const ISSUE_WITH_COMMENTS = 'local-issue-1';
 const ISSUE_WITHOUT_COMMENTS = 'local-issue-2';
 
 test.describe('Comments API — local provider session (LIN-582)', () => {
-  test.beforeEach(async ({ page }) => {
-    await seedLocalWorkspace(page);
+  test.beforeEach(async ({ seedLocal }) => {
+    await seedLocal();
   });
 
-  test('GET returns the seeded comments oldest-first with author + body', async ({ page }) => {
-    const res = await page.request.get(`${API_PREFIX}/api/comments/${ISSUE_WITH_COMMENTS}`);
+  test('GET returns the seeded comments oldest-first with author + body', async ({ page, localWorkerUrlKey }) => {
+    const res = await page.request.get(`/workspace/${localWorkerUrlKey}/api/comments/${ISSUE_WITH_COMMENTS}`);
     expect(res.status()).toBe(200);
     const { comments } = await res.json();
     expect(Array.isArray(comments)).toBe(true);
@@ -46,21 +42,21 @@ test.describe('Comments API — local provider session (LIN-582)', () => {
     }
   });
 
-  test('GET returns an empty array for an issue with no comments', async ({ page }) => {
-    const res = await page.request.get(`${API_PREFIX}/api/comments/${ISSUE_WITHOUT_COMMENTS}`);
+  test('GET returns an empty array for an issue with no comments', async ({ page, localWorkerUrlKey }) => {
+    const res = await page.request.get(`/workspace/${localWorkerUrlKey}/api/comments/${ISSUE_WITHOUT_COMMENTS}`);
     expect(res.status()).toBe(200);
     const { comments } = await res.json();
     expect(comments).toEqual([]);
   });
 
-  test('GET returns 404 for an issue absent from the local store', async ({ page }) => {
+  test('GET returns 404 for an issue absent from the local store', async ({ page, localWorkerUrlKey }) => {
     // Valid id format, but no such issue → provider throws "Issue not found" → 404.
-    const res = await page.request.get(`${API_PREFIX}/api/comments/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa`);
+    const res = await page.request.get(`/workspace/${localWorkerUrlKey}/api/comments/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa`);
     expect(res.status()).toBe(404);
   });
 
-  test('GET returns 400 for an invalid issue ID format', async ({ page }) => {
-    const res = await page.request.get(`${API_PREFIX}/api/comments/INVALID!!!`);
+  test('GET returns 400 for an invalid issue ID format', async ({ page, localWorkerUrlKey }) => {
+    const res = await page.request.get(`/workspace/${localWorkerUrlKey}/api/comments/INVALID!!!`);
     expect(res.status()).toBe(400);
   });
 });

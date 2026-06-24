@@ -14,14 +14,9 @@
  */
 import { test, expect } from '../fixtures/test-base.js';
 import {
-  seedLocalWorkspace,
   workspaceApiLocalSeed,
-  LOCAL_WORKSPACE_URL_KEY,
 } from '../fixtures/local-harness.js';
 
-const URL_KEY = LOCAL_WORKSPACE_URL_KEY;
-const WORKSPACE_URL = `/workspace/${URL_KEY}`;
-const API_PREFIX = `/workspace/${URL_KEY}`;
 // TEST-11: a leaf task labelled `blocked` → hits the leaf fast-path of the stream.
 const BLOCKED_ISSUE_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 // A parent (container) task: TEST-1 (issue-1) has an incomplete child TEST-2, so the
@@ -59,21 +54,21 @@ function parseSSE(text) {
 // =============================================================================
 
 test.describe('Streaming AI Recommendations - API', () => {
-  test.beforeEach(async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, { openRouterConnected: true });
+  test.beforeEach(async ({ page, seedLocal }) => {
+    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true });
   });
 
-  test('returns SSE content type', async ({ page }) => {
+  test('returns SSE content type', async ({ page, localWorkerUrlKey }) => {
     const response = await page.request.get(
-      `${API_PREFIX}/api/recommend/${BLOCKED_ISSUE_ID}/stream`
+      `/workspace/${localWorkerUrlKey}/api/recommend/${BLOCKED_ISSUE_ID}/stream`
     );
     expect(response.status()).toBe(200);
     expect(response.headers()['content-type']).toContain('text/event-stream');
   });
 
-  test('emits phase events in correct order', async ({ page }) => {
+  test('emits phase events in correct order', async ({ page, localWorkerUrlKey }) => {
     const response = await page.request.get(
-      `${API_PREFIX}/api/recommend/${BLOCKED_ISSUE_ID}/stream`
+      `/workspace/${localWorkerUrlKey}/api/recommend/${BLOCKED_ISSUE_ID}/stream`
     );
     const text = await response.text();
     const events = parseSSE(text);
@@ -85,9 +80,9 @@ test.describe('Streaming AI Recommendations - API', () => {
     expect(phases).toEqual(['fetching_context', 'reasoning', 'prompt']);
   });
 
-  test('emits delta events with reasoning and prompt content', async ({ page }) => {
+  test('emits delta events with reasoning and prompt content', async ({ page, localWorkerUrlKey }) => {
     const response = await page.request.get(
-      `${API_PREFIX}/api/recommend/${BLOCKED_ISSUE_ID}/stream`
+      `/workspace/${localWorkerUrlKey}/api/recommend/${BLOCKED_ISSUE_ID}/stream`
     );
     const text = await response.text();
     const events = parseSSE(text);
@@ -115,9 +110,9 @@ test.describe('Streaming AI Recommendations - API', () => {
     expect(promptText).toContain('TEST-11');
   });
 
-  test('emits multiple delta chunks per section', async ({ page }) => {
+  test('emits multiple delta chunks per section', async ({ page, localWorkerUrlKey }) => {
     const response = await page.request.get(
-      `${API_PREFIX}/api/recommend/${BLOCKED_ISSUE_ID}/stream`
+      `/workspace/${localWorkerUrlKey}/api/recommend/${BLOCKED_ISSUE_ID}/stream`
     );
     const text = await response.text();
     const events = parseSSE(text);
@@ -134,9 +129,9 @@ test.describe('Streaming AI Recommendations - API', () => {
     expect(promptDeltas.length).toBeGreaterThanOrEqual(2);
   });
 
-  test('emits done event with metadata', async ({ page }) => {
+  test('emits done event with metadata', async ({ page, localWorkerUrlKey }) => {
     const response = await page.request.get(
-      `${API_PREFIX}/api/recommend/${BLOCKED_ISSUE_ID}/stream`
+      `/workspace/${localWorkerUrlKey}/api/recommend/${BLOCKED_ISSUE_ID}/stream`
     );
     const text = await response.text();
     const events = parseSSE(text);
@@ -147,9 +142,9 @@ test.describe('Streaming AI Recommendations - API', () => {
     expect(doneEvents[0].data.issueUrl).toBeDefined();
   });
 
-  test('done event is the last event', async ({ page }) => {
+  test('done event is the last event', async ({ page, localWorkerUrlKey }) => {
     const response = await page.request.get(
-      `${API_PREFIX}/api/recommend/${BLOCKED_ISSUE_ID}/stream`
+      `/workspace/${localWorkerUrlKey}/api/recommend/${BLOCKED_ISSUE_ID}/stream`
     );
     const text = await response.text();
     const events = parseSSE(text);
@@ -158,30 +153,30 @@ test.describe('Streaming AI Recommendations - API', () => {
     expect(lastEvent.type).toBe('done');
   });
 
-  test('returns 400 for invalid issue ID', async ({ page }) => {
+  test('returns 400 for invalid issue ID', async ({ page, localWorkerUrlKey }) => {
     const response = await page.request.get(
-      `${API_PREFIX}/api/recommend/INVALID!!!/stream`
+      `/workspace/${localWorkerUrlKey}/api/recommend/INVALID!!!/stream`
     );
     expect(response.status()).toBe(400);
   });
 
-  test('returns 404 for non-existent issue', async ({ page }) => {
+  test('returns 404 for non-existent issue', async ({ page, localWorkerUrlKey }) => {
     const response = await page.request.get(
-      `${API_PREFIX}/api/recommend/00000000-0000-0000-0000-000000000000/stream`
+      `/workspace/${localWorkerUrlKey}/api/recommend/00000000-0000-0000-0000-000000000000/stream`
     );
     expect(response.status()).toBe(404);
   });
 
-  test('assembled content matches non-streaming endpoint', async ({ page }) => {
+  test('assembled content matches non-streaming endpoint', async ({ page, localWorkerUrlKey }) => {
     // Get non-streaming response
     const jsonResponse = await page.request.get(
-      `${API_PREFIX}/api/recommend/${BLOCKED_ISSUE_ID}`
+      `/workspace/${localWorkerUrlKey}/api/recommend/${BLOCKED_ISSUE_ID}`
     );
     const jsonData = await jsonResponse.json();
 
     // Get streaming response
     const sseResponse = await page.request.get(
-      `${API_PREFIX}/api/recommend/${BLOCKED_ISSUE_ID}/stream`
+      `/workspace/${localWorkerUrlKey}/api/recommend/${BLOCKED_ISSUE_ID}/stream`
     );
     const text = await sseResponse.text();
     const events = parseSSE(text);
@@ -205,9 +200,9 @@ test.describe('Streaming AI Recommendations - API', () => {
   // terminal one — not just emit the two `phase` events and buffer the body. Proving
   // it emits `delta` events for both the reasoning and prompt sections, in phase order,
   // is the contract that keeps the socket warm and stops Heroku H15 from firing.
-  test('parent path streams delta events for both reasoning and prompt (not just phases)', async ({ page }) => {
+  test('parent path streams delta events for both reasoning and prompt (not just phases)', async ({ page, localWorkerUrlKey }) => {
     const response = await page.request.get(
-      `${API_PREFIX}/api/recommend/${PARENT_ISSUE_ID}/stream`
+      `/workspace/${localWorkerUrlKey}/api/recommend/${PARENT_ISSUE_ID}/stream`
     );
     expect(response.status()).toBe(200);
     const text = await response.text();
@@ -243,17 +238,17 @@ test.describe('Streaming AI Recommendations - API', () => {
 // =============================================================================
 
 test.describe('Streaming AI Recommendations - Free Tier', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
     // Seed a local session in free-tier mode (no key, session flag) so charging
     // rides the session-flag path — CI sets no OPENROUTER_FREE_TIER_KEY (LIN-405).
     // Clear THIS workspace's counter (the route charges workspace.urlKey).
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, { freeTierEnabled: true });
-    await page.goto(`/test/clear-free-tier?urlKey=${URL_KEY}`);
+    await seedLocal(workspaceApiLocalSeed, { freeTierEnabled: true });
+    await page.goto(`/test/clear-free-tier?urlKey=${localWorkerUrlKey}`);
   });
 
-  test('includes free tier metadata in done event', async ({ page }) => {
+  test('includes free tier metadata in done event', async ({ page, localWorkerUrlKey }) => {
     const response = await page.request.get(
-      `${API_PREFIX}/api/recommend/${BLOCKED_ISSUE_ID}/stream`
+      `/workspace/${localWorkerUrlKey}/api/recommend/${BLOCKED_ISSUE_ID}/stream`
     );
     const text = await response.text();
     const events = parseSSE(text);
@@ -265,11 +260,11 @@ test.describe('Streaming AI Recommendations - Free Tier', () => {
     expect(doneEvent.data.freeTier.limit).toBe(5);
   });
 
-  test('returns 429 when rate limited', async ({ page }) => {
-    await page.goto(`/test/add-free-tier-usage?count=5&urlKey=${URL_KEY}`);
+  test('returns 429 when rate limited', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/test/add-free-tier-usage?count=5&urlKey=${localWorkerUrlKey}`);
 
     const response = await page.request.get(
-      `${API_PREFIX}/api/recommend/${BLOCKED_ISSUE_ID}/stream`
+      `/workspace/${localWorkerUrlKey}/api/recommend/${BLOCKED_ISSUE_ID}/stream`
     );
     expect(response.status()).toBe(429);
   });
@@ -289,10 +284,10 @@ async function expandPromptsSection(page, containerSelector, issueId) {
 }
 
 test.describe('Streaming AI Recommendations - UI', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
     // AI suggest button requires OpenRouter to be configured.
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, { openRouterConnected: true });
-    await page.goto(`${WORKSPACE_URL}/`);
+    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true });
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
   });
 
@@ -393,13 +388,13 @@ test.describe('Streaming AI Recommendations - UI', () => {
     expect(rawPrompt).toContain('Help me with task');
   });
 
-  test('LIN-191: dispatch and copy buttons disabled during streaming, enabled after', async ({ page }) => {
+  test('LIN-191: dispatch and copy buttons disabled during streaming, enabled after', async ({ page, seedLocal, localWorkerUrlKey }) => {
     // Re-setup with dispatch enabled
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, {
+    await seedLocal(workspaceApiLocalSeed, {
       openRouterConnected: true,
       features: { dispatch: true },
     });
-    await page.goto(`${WORKSPACE_URL}/`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
     // Expand the blocked issue

@@ -1,8 +1,6 @@
 import { test, expect } from '../fixtures/test-base.js';
 import {
-  seedLocalWorkspace,
   workspaceApiLocalSeed,
-  LOCAL_WORKSPACE_URL_KEY,
 } from '../fixtures/local-harness.js';
 
 // Migrated onto a GENUINE `provider: 'local'` session (LIN-425, parent S3) seeded
@@ -15,19 +13,17 @@ import {
 // provider's display name. On the local provider that is "in Local", not "in
 // Linear" (applyPromptCapabilities renames `Linear` → `Local`). The `linearMcp`
 // toggle still gates that reference identically — only the tracker name differs.
-const TEST_WORKSPACE_URL_KEY = LOCAL_WORKSPACE_URL_KEY;
-const SETTINGS_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/settings`;
 // UUID-format issue ID from the seed (TEST-6 = "Task needing preparation", Backlog)
 const TEST_ISSUE_ID = '66666666-6666-6666-6666-666666666666';
 
 test.describe('Feature Toggle Settings', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ seedLocal }) => {
     // Seed a local-backed workspace with default feature flags.
-    await seedLocalWorkspace(page, workspaceApiLocalSeed);
+    await seedLocal(workspaceApiLocalSeed);
   });
 
-  test('settings page shows AI and Workflow sections with all toggles', async ({ page }) => {
-    await page.goto(SETTINGS_URL);
+  test('settings page shows AI and Workflow sections with all toggles', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
 
     // AI and Workflow section headers should be visible
@@ -45,8 +41,8 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('.feature-toggle-label:has-text("Narrative roadmap")')).toBeVisible();
   });
 
-  test('shows correct default toggle states', async ({ page }) => {
-    await page.goto(SETTINGS_URL);
+  test('shows correct default toggle states', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
 
     // Defaults: linearMcp ON, featureBranches OFF, codeReview OFF, dispatch OFF, proxy OFF, aiRecommendations ON, promptButtons ON, roadmap OFF
@@ -60,8 +56,8 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('[data-feature="roadmap"] .toggle-state')).toHaveText('○ off');
   });
 
-  test('shows recommendation note on Linear references toggle', async ({ page }) => {
-    await page.goto(SETTINGS_URL);
+  test('shows recommendation note on Linear references toggle', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
 
     const mcpNote = page.locator('[data-feature="linearMcp"] .feature-note');
@@ -69,8 +65,8 @@ test.describe('Feature Toggle Settings', () => {
     await expect(mcpNote).toContainText('Recommended');
   });
 
-  test('can toggle a feature off and state persists on reload', async ({ page }) => {
-    await page.goto(SETTINGS_URL);
+  test('can toggle a feature off and state persists on reload', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
 
     // linearMcp should start ON
@@ -88,8 +84,8 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('[data-feature="linearMcp"] .toggle-state')).toHaveText('○ off');
   });
 
-  test('can toggle a feature on', async ({ page }) => {
-    await page.goto(SETTINGS_URL);
+  test('can toggle a feature on', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
 
     // dispatch should start OFF
@@ -102,8 +98,8 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('[data-feature="dispatch"] .toggle-state')).toHaveText('● on');
   });
 
-  test('toggling one feature does not affect others', async ({ page }) => {
-    await page.goto(SETTINGS_URL);
+  test('toggling one feature does not affect others', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
 
     // Turn off linearMcp (AJAX — no page reload)
@@ -121,23 +117,23 @@ test.describe('Feature Toggle Settings', () => {
   // Linear references toggle affects prompt content
   // =========================================================================
 
-  test('prompts include tracker references by default', async ({ page }) => {
+  test('prompts include tracker references by default', async ({ page, localWorkerUrlKey }) => {
     // Default: linearMcp is ON. The tracker reference renders with the provider's
     // display name — "in Local" on the local provider (was "in Linear" on Linear).
     const response = await page.request.get(
-      `/workspace/${TEST_WORKSPACE_URL_KEY}/api/prompt/${TEST_ISSUE_ID}/look-into`
+      `/workspace/${localWorkerUrlKey}/api/prompt/${TEST_ISSUE_ID}/look-into`
     );
     expect(response.ok()).toBeTruthy();
     const data = await response.json();
     expect(data.prompt).toContain('in Local');
   });
 
-  test('prompts exclude tracker references when linearMcp is off', async ({ page }) => {
+  test('prompts exclude tracker references when linearMcp is off', async ({ page, seedLocal, localWorkerUrlKey }) => {
     // Re-seed with linearMcp OFF — the tracker reference must drop out entirely.
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { linearMcp: false } });
+    await seedLocal(workspaceApiLocalSeed, { features: { linearMcp: false } });
 
     const response = await page.request.get(
-      `/workspace/${TEST_WORKSPACE_URL_KEY}/api/prompt/${TEST_ISSUE_ID}/look-into`
+      `/workspace/${localWorkerUrlKey}/api/prompt/${TEST_ISSUE_ID}/look-into`
     );
     expect(response.ok()).toBeTruthy();
     const data = await response.json();
@@ -148,22 +144,22 @@ test.describe('Feature Toggle Settings', () => {
   // LIN-169: Feature branch toggle affects prompt content
   // =========================================================================
 
-  test('prompts exclude git workflow by default', async ({ page }) => {
+  test('prompts exclude git workflow by default', async ({ page, localWorkerUrlKey }) => {
     // Default: featureBranches is OFF
     const response = await page.request.get(
-      `/workspace/${TEST_WORKSPACE_URL_KEY}/api/prompt/${TEST_ISSUE_ID}/plan`
+      `/workspace/${localWorkerUrlKey}/api/prompt/${TEST_ISSUE_ID}/plan`
     );
     expect(response.ok()).toBeTruthy();
     const data = await response.json();
     expect(data.prompt).not.toContain('Git Workflow');
   });
 
-  test('prompts include git workflow when featureBranches is on', async ({ page }) => {
+  test('prompts include git workflow when featureBranches is on', async ({ page, seedLocal, localWorkerUrlKey }) => {
     // Set session with featureBranches ON
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { featureBranches: true } });
+    await seedLocal(workspaceApiLocalSeed, { features: { featureBranches: true } });
 
     const response = await page.request.get(
-      `/workspace/${TEST_WORKSPACE_URL_KEY}/api/prompt/${TEST_ISSUE_ID}/plan`
+      `/workspace/${localWorkerUrlKey}/api/prompt/${TEST_ISSUE_ID}/plan`
     );
     expect(response.ok()).toBeTruthy();
     const data = await response.json();
@@ -174,9 +170,9 @@ test.describe('Feature Toggle Settings', () => {
   // LIN-170: Dispatch toggle affects UI visibility
   // =========================================================================
 
-  test('dispatch UI is hidden by default (dispatch off)', async ({ page }) => {
+  test('dispatch UI is hidden by default (dispatch off)', async ({ page, localWorkerUrlKey }) => {
     // Default: dispatch is OFF
-    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
     // Queue badge should not be in the DOM
@@ -186,28 +182,28 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('.dispatch-btn')).toHaveCount(0);
   });
 
-  test('dispatch UI is visible when dispatch is on', async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { dispatch: true } });
+  test('dispatch UI is visible when dispatch is on', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, { features: { dispatch: true } });
 
-    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
     // Queue badge should exist (hidden class applied by JS when count is 0, but element exists)
     await expect(page.locator('[data-queue-badge]')).toHaveCount(1);
   });
 
-  test('dispatch section hidden in settings when dispatch off', async ({ page }) => {
-    await page.goto(SETTINGS_URL);
+  test('dispatch section hidden in settings when dispatch off', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
 
     // Dispatch section should not be visible
     await expect(page.locator('.settings-header:text-is("Dispatch")')).toHaveCount(0);
   });
 
-  test('dispatch link visible in footer when dispatch on', async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { dispatch: true } });
+  test('dispatch link visible in footer when dispatch on', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, { features: { dispatch: true } });
 
-    await page.goto(SETTINGS_URL);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
 
     // Dispatch link should appear in footer
@@ -218,10 +214,10 @@ test.describe('Feature Toggle Settings', () => {
   // LIN-172: Prompt buttons toggle affects UI visibility
   // =========================================================================
 
-  test('prompts section is hidden when promptButtons is off', async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { promptButtons: false } });
+  test('prompts section is hidden when promptButtons is off', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, { features: { promptButtons: false } });
 
-    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
     // Expand an issue to see its details
@@ -232,8 +228,8 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('[data-toggle="prompts"]')).toHaveCount(0);
   });
 
-  test('prompts section is visible by default (promptButtons on)', async ({ page }) => {
-    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/`);
+  test('prompts section is visible by default (promptButtons on)', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
     // Expand an issue to see its details
@@ -248,10 +244,10 @@ test.describe('Feature Toggle Settings', () => {
   // LIN-171: AI recommendations toggle affects UI visibility
   // =========================================================================
 
-  test('AI suggest button is hidden when aiRecommendations is off', async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { aiRecommendations: false } });
+  test('AI suggest button is hidden when aiRecommendations is off', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, { features: { aiRecommendations: false } });
 
-    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
     // Expand an issue to see its details
@@ -265,8 +261,8 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('.recommend-container')).toHaveCount(0);
   });
 
-  test('AI suggest button is visible by default (aiRecommendations on)', async ({ page }) => {
-    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/`);
+  test('AI suggest button is visible by default (aiRecommendations on)', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
     // Expand an issue to see its details
@@ -282,8 +278,8 @@ test.describe('Feature Toggle Settings', () => {
   // LIN-173: Code review toggle affects prompt content and sub-toggle visibility
   // =========================================================================
 
-  test('code review sub-toggles hidden by default (codeReview off)', async ({ page }) => {
-    await page.goto(SETTINGS_URL);
+  test('code review sub-toggles hidden by default (codeReview off)', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
 
     // Parent toggle should be off
@@ -293,10 +289,10 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('.code-review-options')).toBeHidden();
   });
 
-  test('code review sub-toggles visible when codeReview is on', async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { codeReview: true } });
+  test('code review sub-toggles visible when codeReview is on', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, { features: { codeReview: true } });
 
-    await page.goto(SETTINGS_URL);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
 
     // Parent toggle should be on
@@ -309,8 +305,8 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('[data-feature="codeReviewPr"] .toggle-state')).toHaveText('○ off');
   });
 
-  test('clicking codeReview toggle dynamically shows sub-toggles via AJAX', async ({ page }) => {
-    await page.goto(SETTINGS_URL);
+  test('clicking codeReview toggle dynamically shows sub-toggles via AJAX', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
 
     // Sub-toggles should start hidden (codeReview defaults to off)
@@ -323,10 +319,10 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('.code-review-options')).toBeVisible();
   });
 
-  test('clicking codeReview toggle dynamically hides sub-toggles via AJAX', async ({ page }) => {
+  test('clicking codeReview toggle dynamically hides sub-toggles via AJAX', async ({ page, seedLocal, localWorkerUrlKey }) => {
     // Start with codeReview ON
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { codeReview: true } });
-    await page.goto(SETTINGS_URL);
+    await seedLocal(workspaceApiLocalSeed, { features: { codeReview: true } });
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
 
     // Sub-toggles should start visible
@@ -339,8 +335,8 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('.code-review-options')).toBeHidden();
   });
 
-  test('codeReview sub-toggles round-trip: on then off in single session', async ({ page }) => {
-    await page.goto(SETTINGS_URL);
+  test('codeReview sub-toggles round-trip: on then off in single session', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
 
     // Start off
@@ -355,10 +351,10 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('.code-review-options')).toBeHidden();
   });
 
-  test('prompts exclude code review sections by default', async ({ page }) => {
+  test('prompts exclude code review sections by default', async ({ page, localWorkerUrlKey }) => {
     // Default: codeReview is OFF
     const response = await page.request.get(
-      `/workspace/${TEST_WORKSPACE_URL_KEY}/api/prompt/${TEST_ISSUE_ID}/plan`
+      `/workspace/${localWorkerUrlKey}/api/prompt/${TEST_ISSUE_ID}/plan`
     );
     expect(response.ok()).toBeTruthy();
     const data = await response.json();
@@ -367,11 +363,11 @@ test.describe('Feature Toggle Settings', () => {
     expect(data.prompt).not.toContain('PR Review');
   });
 
-  test('plan prompt does NOT get code review sections (plan is not implementation)', async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { codeReview: true, codeReviewCicd: true, codeReviewPr: true } });
+  test('plan prompt does NOT get code review sections (plan is not implementation)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, { features: { codeReview: true, codeReviewCicd: true, codeReviewPr: true } });
 
     const response = await page.request.get(
-      `/workspace/${TEST_WORKSPACE_URL_KEY}/api/prompt/${TEST_ISSUE_ID}/plan`
+      `/workspace/${localWorkerUrlKey}/api/prompt/${TEST_ISSUE_ID}/plan`
     );
     expect(response.ok()).toBeTruthy();
     const data = await response.json();
@@ -381,11 +377,11 @@ test.describe('Feature Toggle Settings', () => {
     expect(data.prompt).not.toContain('PR Review');
   });
 
-  test('implementation prompt also gets code review sections', async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { codeReview: true, codeReviewCicd: true } });
+  test('implementation prompt also gets code review sections', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, { features: { codeReview: true, codeReviewCicd: true } });
 
     const response = await page.request.get(
-      `/workspace/${TEST_WORKSPACE_URL_KEY}/api/prompt/${TEST_ISSUE_ID}/implementation`
+      `/workspace/${localWorkerUrlKey}/api/prompt/${TEST_ISSUE_ID}/implementation`
     );
     expect(response.ok()).toBeTruthy();
     const data = await response.json();
@@ -393,11 +389,11 @@ test.describe('Feature Toggle Settings', () => {
     expect(data.prompt).toContain('CI/CD Check');
   });
 
-  test('review prompt does NOT get code review sections', async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { codeReview: true, codeReviewCicd: true } });
+  test('review prompt does NOT get code review sections', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, { features: { codeReview: true, codeReviewCicd: true } });
 
     const response = await page.request.get(
-      `/workspace/${TEST_WORKSPACE_URL_KEY}/api/prompt/${TEST_ISSUE_ID}/review`
+      `/workspace/${localWorkerUrlKey}/api/prompt/${TEST_ISSUE_ID}/review`
     );
     expect(response.ok()).toBeTruthy();
     const data = await response.json();
@@ -411,55 +407,55 @@ test.describe('Feature Toggle Settings', () => {
   // LIN-193: Proxy toggle affects UI visibility
   // =========================================================================
 
-  test('proxy toggle is visible in Workflow section on settings page', async ({ page }) => {
-    await page.goto(SETTINGS_URL);
+  test('proxy toggle is visible in Workflow section on settings page', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
 
     await expect(page.locator('.feature-toggle-label:has-text("Linear API proxy")')).toBeVisible();
   });
 
-  test('proxy toggle defaults to off', async ({ page }) => {
-    await page.goto(SETTINGS_URL);
+  test('proxy toggle defaults to off', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
 
     await expect(page.locator('[data-feature="proxy"] .toggle-state')).toHaveText('○ off');
   });
 
-  test('proxy nav link hidden by default (proxy off)', async ({ page }) => {
-    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/`);
+  test('proxy nav link hidden by default (proxy off)', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
     await expect(page.locator('a[href*="/proxy"]')).toHaveCount(0);
   });
 
-  test('proxy footer link visible when proxy is on', async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { proxy: true } });
+  test('proxy footer link visible when proxy is on', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, { features: { proxy: true } });
 
-    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
     await expect(page.locator('.footer-actions a:has-text("proxy")')).toBeVisible();
   });
 
-  test('proxy page redirects to settings when proxy is off', async ({ page }) => {
-    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/proxy`);
+  test('proxy page redirects to settings when proxy is off', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/proxy`);
 
     // Should redirect to settings
-    await expect(page).toHaveURL(new RegExp(`/workspace/${TEST_WORKSPACE_URL_KEY}/settings`));
+    await expect(page).toHaveURL(new RegExp(`/workspace/${localWorkerUrlKey}/settings`));
   });
 
-  test('proxy page loads when proxy is on', async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { proxy: true } });
+  test('proxy page loads when proxy is on', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, { features: { proxy: true } });
 
-    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/proxy`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/proxy`);
     await page.waitForLoadState('networkidle');
 
     // Should stay on proxy page, not redirect
-    await expect(page).toHaveURL(new RegExp(`/workspace/${TEST_WORKSPACE_URL_KEY}/proxy`));
+    await expect(page).toHaveURL(new RegExp(`/workspace/${localWorkerUrlKey}/proxy`));
   });
 
-  test('can toggle proxy on via settings and state persists', async ({ page }) => {
-    await page.goto(SETTINGS_URL);
+  test('can toggle proxy on via settings and state persists', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
 
     // Should start OFF
@@ -479,18 +475,18 @@ test.describe('Feature Toggle Settings', () => {
   // Proxy toggle button in prompt UI
   // =========================================================================
 
-  test('proxy toggle button hidden when proxy feature is off', async ({ page }) => {
-    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/`);
+  test('proxy toggle button hidden when proxy feature is off', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
     // Proxy toggle buttons should not exist
     await expect(page.locator('.prompt-proxy-toggle')).toHaveCount(0);
   });
 
-  test('proxy toggle button rendered in prompt containers when proxy feature is on', async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { proxy: true } });
+  test('proxy toggle button rendered in prompt containers when proxy feature is on', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, { features: { proxy: true } });
 
-    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
     // LIN-442: prompt containers (and their +proxy toggle) now live in the lazy
@@ -500,10 +496,10 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('.prompt-proxy-toggle').first()).toBeAttached();
   });
 
-  test('proxy toggle button appears on dispatch page when proxy is on', async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { proxy: true, dispatch: true } });
+  test('proxy toggle button appears on dispatch page when proxy is on', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, { features: { proxy: true, dispatch: true } });
 
-    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/dispatch`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/dispatch`);
     await page.waitForLoadState('networkidle');
 
     // The +proxy toggle lives inside the Dispatch options disclosure panel;
@@ -512,10 +508,10 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('.prompt-proxy-toggle')).toBeVisible();
   });
 
-  test('proxy toggle button absent on dispatch page when proxy is off', async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { dispatch: true } });
+  test('proxy toggle button absent on dispatch page when proxy is off', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, { features: { dispatch: true } });
 
-    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/dispatch`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/dispatch`);
     await page.waitForLoadState('networkidle');
 
     await expect(page.locator('.prompt-proxy-toggle')).toHaveCount(0);
@@ -525,9 +521,9 @@ test.describe('Feature Toggle Settings', () => {
   // Validation
   // =========================================================================
 
-  test('feature toggles API rejects invalid feature key', async ({ page }) => {
+  test('feature toggles API rejects invalid feature key', async ({ page, localWorkerUrlKey }) => {
     const response = await page.request.post(
-      `/workspace/${TEST_WORKSPACE_URL_KEY}/settings/features`,
+      `/workspace/${localWorkerUrlKey}/settings/features`,
       {
         form: { feature: 'invalidFeature', enabled: 'true' }
       }

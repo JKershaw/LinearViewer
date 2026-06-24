@@ -1,9 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
-import {
-  seedLocalWorkspace,
-  workspaceApiLocalSeed,
-  LOCAL_WORKSPACE_URL_KEY,
-} from '../fixtures/local-harness.js';
+import { workspaceApiLocalSeed } from '../fixtures/local-harness.js';
 
 // Periodicals feature (LIN-341): a synthetic, workspace-flag-gated group on the
 // main workspace view containing the periodical template rows. The LIN-354 set
@@ -16,37 +12,34 @@ import {
 // Periodicals group is injected in buildDashboardData purely from the
 // workspace-scoped `periodicals` flag, independent of which provider supplies
 // the real issues/projects — so the local provider fully backs this surface.
-const TEST_WORKSPACE_URL_KEY = LOCAL_WORKSPACE_URL_KEY;
-const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;
-
 // The `periodicals` flag is WORKSPACE-scoped (read from workspacePreferencesStore
 // by urlKey), NOT a session feature — so it must be set through the
 // workspace-feature route targeting THIS workspace's partition, not via
-// seedLocalWorkspace's session `features`. The urlKey must be threaded on both
+// seedLocal's session `features`. The urlKey must be threaded on both
 // set and reset, or the flag lands on (or leaks into) the wrong partition.
-async function setPeriodicalsFlag(page, enabled) {
+async function setPeriodicalsFlag(page, urlKey, enabled) {
   const res = await page.goto(
-    `/test/set-workspace-feature?key=periodicals&value=${enabled}&urlKey=${TEST_WORKSPACE_URL_KEY}`
+    `/test/set-workspace-feature?key=periodicals&value=${enabled}&urlKey=${urlKey}`
   );
   expect(res.ok()).toBeTruthy();
 }
 
 test.describe('Periodicals group', () => {
-  test.beforeEach(async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed);
+  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed);
     // Isolate the dispatch queue so the queue-the-periodical test stays
     // deterministic against other specs sharing the local-workspace partition.
-    await page.request.get(`/test/clear-dispatch-queue?urlKey=${TEST_WORKSPACE_URL_KEY}`);
+    await page.request.get(`/test/clear-dispatch-queue?urlKey=${localWorkerUrlKey}`);
   });
 
-  test.afterEach(async ({ page }) => {
+  test.afterEach(async ({ page, localWorkerUrlKey }) => {
     // Reset so the flag never leaks into other specs sharing the store.
-    await setPeriodicalsFlag(page, false);
+    await setPeriodicalsFlag(page, localWorkerUrlKey, false);
   });
 
-  test('flag OFF: no Periodicals group, behaviour unchanged', async ({ page }) => {
-    await setPeriodicalsFlag(page, false);
-    await page.goto(WORKSPACE_URL);
+  test('flag OFF: no Periodicals group, behaviour unchanged', async ({ page, localWorkerUrlKey }) => {
+    await setPeriodicalsFlag(page, localWorkerUrlKey, false);
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
     await expect(page.locator('[data-project-type="periodicals"]')).toHaveCount(0);
@@ -56,9 +49,9 @@ test.describe('Periodicals group', () => {
     await expect(page.locator('.project-header:has-text("Project Alpha")')).toBeVisible();
   });
 
-  test('flag ON: distinct Periodicals group with a dispatchable Documentation Review row', async ({ page }) => {
-    await setPeriodicalsFlag(page, true);
-    await page.goto(WORKSPACE_URL);
+  test('flag ON: distinct Periodicals group with a dispatchable Documentation Review row', async ({ page, localWorkerUrlKey }) => {
+    await setPeriodicalsFlag(page, localWorkerUrlKey, true);
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
     const group = page.locator('[data-project-type="periodicals"]');
@@ -92,9 +85,9 @@ test.describe('Periodicals group', () => {
   // null fields and never passed `issueless: true`. The earlier test only asserts
   // the row *renders* a dispatch container — it never clicks dispatch, which is
   // why this regression slipped through. This test drives the real click path.
-  test('flag ON: clicking dispatch on a Periodical actually queues it', async ({ page }) => {
-    await setPeriodicalsFlag(page, true);
-    await page.goto(WORKSPACE_URL);
+  test('flag ON: clicking dispatch on a Periodical actually queues it', async ({ page, localWorkerUrlKey }) => {
+    await setPeriodicalsFlag(page, localWorkerUrlKey, true);
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
     const group = page.locator('[data-project-type="periodicals"]');
@@ -113,7 +106,7 @@ test.describe('Periodicals group', () => {
     await expect(dispatchBtn).toHaveText('dispatched!');
 
     // The item lands on the workspace queue, issueless, tagged kind=periodical.
-    const listResponse = await page.request.get(`${WORKSPACE_URL}api/dispatch`);
+    const listResponse = await page.request.get(`/workspace/${localWorkerUrlKey}/api/dispatch`);
     const { items } = await listResponse.json();
     const periodicalItem = items.find(i => i.kind === 'periodical');
     expect(periodicalItem).toBeDefined();

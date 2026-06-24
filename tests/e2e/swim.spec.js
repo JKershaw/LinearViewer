@@ -1,12 +1,10 @@
 import { test, expect } from '../fixtures/test-base.js';
-import { seedLocalWorkspace, swimLocalSeed, LOCAL_WORKSPACE_URL_KEY } from '../fixtures/local-harness.js';
+import { swimLocalSeed } from '../fixtures/local-harness.js';
 
 // LIN-378: the swim surface is fully modeled by the local provider, so these
 // specs ride a seeded local workspace (no `test-token` mock). The basic block
 // uses the default seed; the sample-data blocks seed the swim sample fixture
 // converted to local shape (same blocking chains, subtask groups, and labels).
-const TEST_WORKSPACE_URL_KEY = LOCAL_WORKSPACE_URL_KEY;
-const SWIM_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/swim`;
 
 // Flow is the default layout; these specs exercise the lane view, so pin
 // orientation to horizontal (only when nothing is stored, so reload-persistence
@@ -20,10 +18,10 @@ async function pinHorizontal(page) {
 }
 
 test.describe('Swim Page', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
     await pinHorizontal(page);
-    await seedLocalWorkspace(page);
-    await page.goto(SWIM_URL);
+    await seedLocal();
+    await page.goto(`/workspace/${localWorkerUrlKey}/swim`);
     await page.waitForLoadState('networkidle');
   });
 
@@ -157,13 +155,13 @@ test.describe('Swim Page', () => {
     await expect(page.locator('#swim-popover')).toHaveClass(/hidden/);
   });
 
-  test('settings persist across page reload', async ({ page }) => {
+  test('settings persist across page reload', async ({ page, localWorkerUrlKey }) => {
     // Open settings and change grouping
     await page.locator('.swim-settings-toggle').click();
     await page.locator('#swim-grouping').selectOption('project');
 
     // Reload page
-    await page.goto(SWIM_URL);
+    await page.goto(`/workspace/${localWorkerUrlKey}/swim`);
     await page.waitForLoadState('networkidle');
 
     // Open settings - grouping should still be 'project'
@@ -173,10 +171,10 @@ test.describe('Swim Page', () => {
 });
 
 test.describe('Swim Page with Sample Data', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
     await pinHorizontal(page);
-    await seedLocalWorkspace(page, swimLocalSeed);
-    await page.goto(SWIM_URL);
+    await seedLocal(swimLocalSeed);
+    await page.goto(`/workspace/${localWorkerUrlKey}/swim`);
     await page.waitForLoadState('networkidle');
   });
 
@@ -388,11 +386,11 @@ test.describe('Swim Page with Sample Data', () => {
     await expect(page.locator('.swim-box[data-group-role="parent"]').first()).toBeVisible();
   });
 
-  test('group subtasks setting persists across reload', async ({ page }) => {
+  test('group subtasks setting persists across reload', async ({ page, localWorkerUrlKey }) => {
     await page.locator('.swim-settings-toggle').click();
     await page.locator('#swim-group-subtasks').uncheck();
 
-    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/swim`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/swim`);
     await page.waitForLoadState('networkidle');
 
     await page.locator('.swim-settings-toggle').click();
@@ -402,11 +400,11 @@ test.describe('Swim Page with Sample Data', () => {
 });
 
 test.describe('Swim Flow layout', () => {
-  test.beforeEach(async ({ page }) => {
-    await seedLocalWorkspace(page, swimLocalSeed);
-    await page.goto(SWIM_URL);
+  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(swimLocalSeed);
+    await page.goto(`/workspace/${localWorkerUrlKey}/swim`);
     await page.evaluate(() => localStorage.removeItem('swim-settings'));
-    await page.goto(SWIM_URL);
+    await page.goto(`/workspace/${localWorkerUrlKey}/swim`);
     await page.waitForLoadState('networkidle');
     await page.locator('.swim-settings-toggle').click();
     await page.locator('#swim-orientation').selectOption('flow');
@@ -447,8 +445,8 @@ test.describe('Swim Flow layout', () => {
     await expect(page.locator('#swim-popover-title')).not.toBeEmpty();
   });
 
-  test('flow layout persists across reload', async ({ page }) => {
-    await page.goto(SWIM_URL);
+  test('flow layout persists across reload', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/swim`);
     await page.waitForLoadState('networkidle');
     await expect(page.locator('.swim-flow')).toBeVisible();
     await page.locator('.swim-settings-toggle').click();

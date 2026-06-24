@@ -6,25 +6,21 @@
  * the per-user feature path.
  */
 import { test, expect } from '../fixtures/test-base.js';
-import { seedLocalWorkspace, LOCAL_WORKSPACE_URL_KEY } from '../fixtures/local-harness.js';
-
-const URL_KEY = LOCAL_WORKSPACE_URL_KEY;
-const SETTINGS_URL = `/workspace/${URL_KEY}/settings`;
 
 test.describe('Workspace feature toggles', () => {
-  test.beforeEach(async ({ page, request }) => {
+  test.beforeEach(async ({ page, request, seedLocal, localWorkerUrlKey }) => {
     // Clean slate: delete the whole workspace-prefs doc (no modelId = delete),
     // which resets the periodicals override back to its default (off).
-    await request.get(`/test/set-workspace-model?urlKey=${URL_KEY}`);
-    await seedLocalWorkspace(page);
+    await request.get(`/test/set-workspace-model?urlKey=${localWorkerUrlKey}`);
+    await seedLocal();
   });
 
-  test.afterEach(async ({ request }) => {
-    await request.get(`/test/set-workspace-model?urlKey=${URL_KEY}`);
+  test.afterEach(async ({ request, localWorkerUrlKey }) => {
+    await request.get(`/test/set-workspace-model?urlKey=${localWorkerUrlKey}`);
   });
 
-  test('settings page shows the Workspace features section with periodicals (default off)', async ({ page }) => {
-    await page.goto(SETTINGS_URL);
+  test('settings page shows the Workspace features section with periodicals (default off)', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
 
     await expect(page.locator('.settings-header:has-text("Workspace features")')).toBeVisible();
@@ -36,8 +32,8 @@ test.describe('Workspace feature toggles', () => {
     await expect(page.locator('[data-feature="periodicals"]')).toHaveCount(1);
   });
 
-  test('toggling periodicals on persists to the store across reloads', async ({ page }) => {
-    await page.goto(SETTINGS_URL);
+  test('toggling periodicals on persists to the store across reloads', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
 
     await expect(page.locator('[data-feature="periodicals"] .toggle-state')).toHaveText('○ off');
@@ -53,14 +49,14 @@ test.describe('Workspace feature toggles', () => {
     await expect(page.locator('[data-feature="periodicals"] .toggle-state')).toHaveText('● on');
   });
 
-  test('toggling periodicals off persists across reloads', async ({ page }) => {
+  test('toggling periodicals off persists across reloads', async ({ page, localWorkerUrlKey }) => {
     // Seed it on directly via the handler (page.request shares the session
     // cookie), then toggle off through the UI.
-    await page.request.post(`/workspace/${URL_KEY}/settings/workspace-features`, {
+    await page.request.post(`/workspace/${localWorkerUrlKey}/settings/workspace-features`, {
       form: { feature: 'periodicals', enabled: 'true' }
     });
 
-    await page.goto(SETTINGS_URL);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
     await expect(page.locator('[data-feature="periodicals"] .toggle-state')).toHaveText('● on');
 
@@ -72,8 +68,8 @@ test.describe('Workspace feature toggles', () => {
     await expect(page.locator('[data-feature="periodicals"] .toggle-state')).toHaveText('○ off');
   });
 
-  test('workspace toggle is isolated — it does not appear in the per-user features sections', async ({ page }) => {
-    await page.goto(SETTINGS_URL);
+  test('workspace toggle is isolated — it does not appear in the per-user features sections', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
 
     // The periodicals toggle lives only under "Workspace features".
@@ -85,8 +81,8 @@ test.describe('Workspace feature toggles', () => {
     await expect(aiSection.locator('[data-feature="periodicals"]')).toHaveCount(0);
   });
 
-  test('toggling periodicals does not disturb per-user toggles', async ({ page }) => {
-    await page.goto(SETTINGS_URL);
+  test('toggling periodicals does not disturb per-user toggles', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
 
     // Per-user defaults before the workspace toggle.
@@ -100,9 +96,9 @@ test.describe('Workspace feature toggles', () => {
     await expect(page.locator('[data-feature="dispatch"] .toggle-state')).toHaveText('○ off');
   });
 
-  test('handler rejects an invalid workspace feature key', async ({ page }) => {
-    await seedLocalWorkspace(page);
-    const res = await page.request.post(`/workspace/${URL_KEY}/settings/workspace-features`, {
+  test('handler rejects an invalid workspace feature key', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal();
+    const res = await page.request.post(`/workspace/${localWorkerUrlKey}/settings/workspace-features`, {
       form: { feature: 'linearMcp', enabled: 'true' } // a per-user key, not a workspace key
     });
     expect(res.status()).toBe(400);

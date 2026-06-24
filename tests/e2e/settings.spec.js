@@ -1,17 +1,15 @@
 import { test, expect } from '../fixtures/test-base.js'
-import { seedLocalWorkspace, LOCAL_WORKSPACE_URL_KEY } from '../fixtures/local-harness.js'
 import { footer, settings } from '../helpers.js'
 
 // Proof-of-pattern spec for LIN-215: brittle `:has-text()` / class / href
 // selectors here are migrated to the stable `data-testid` selectors and page
 // objects in `tests/helpers.js`. Seeding still rides the provider harness
-// (`seedLocalWorkspace`); navigation drives off the urlKey it returns, not a
+// (`seedLocal`); navigation drives off the urlKey it returns, not a
 // hard-coded literal (parallel-aware caller discipline for LIN-625).
-const TEST_WORKSPACE_URL_KEY = LOCAL_WORKSPACE_URL_KEY
 
 test.describe('Settings Page', () => {
-  test.beforeEach(async ({ page }) => {
-    const { urlKey } = await seedLocalWorkspace(page)
+  test.beforeEach(async ({ page, seedLocal }) => {
+    const { urlKey } = await seedLocal()
     await page.goto(`/workspace/${urlKey}/settings`)
     await page.waitForLoadState('networkidle')
   })
@@ -58,12 +56,10 @@ test.describe('Settings Page', () => {
 })
 
 test.describe('Token Management', () => {
-  const DISPATCH_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/dispatch`
-
-  test.beforeEach(async ({ page }) => {
-    await page.goto(`/test/clear-dispatch-tokens?urlKey=${TEST_WORKSPACE_URL_KEY}`)
-    await seedLocalWorkspace(page, undefined, { features: { dispatch: true } })
-    await page.goto(DISPATCH_URL)
+  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await page.goto(`/test/clear-dispatch-tokens?urlKey=${localWorkerUrlKey}`)
+    await seedLocal(undefined, { features: { dispatch: true } })
+    await page.goto(`/workspace/${localWorkerUrlKey}/dispatch`)
     await page.waitForLoadState('networkidle')
   })
 
@@ -188,15 +184,13 @@ test.describe('Token Management', () => {
 })
 
 test.describe('Token API Integration', () => {
-  const DISPATCH_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/dispatch`
-
-  test.beforeEach(async ({ page }) => {
-    await page.goto(`/test/clear-dispatch-tokens?urlKey=${TEST_WORKSPACE_URL_KEY}`)
-    await seedLocalWorkspace(page, undefined, { features: { dispatch: true } })
+  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await page.goto(`/test/clear-dispatch-tokens?urlKey=${localWorkerUrlKey}`)
+    await seedLocal(undefined, { features: { dispatch: true } })
   })
 
-  test('created token works with consumer API', async ({ page, request }) => {
-    await page.goto(DISPATCH_URL)
+  test('created token works with consumer API', async ({ page, request, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/dispatch`)
     await page.waitForLoadState('networkidle')
 
     // Create token via UI
@@ -214,8 +208,8 @@ test.describe('Token API Integration', () => {
     expect(response.status()).toBe(200)
   })
 
-  test('revoked token stops working', async ({ page, request }) => {
-    await page.goto(DISPATCH_URL)
+  test('revoked token stops working', async ({ page, request, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/dispatch`)
     await page.waitForLoadState('networkidle')
 
     // Create and capture token

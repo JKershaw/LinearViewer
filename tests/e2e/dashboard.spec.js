@@ -1,20 +1,17 @@
 import { test, expect } from '../fixtures/test-base.js';
-import { seedLocalWorkspace, LOCAL_WORKSPACE_URL_KEY } from '../fixtures/local-harness.js';
 
 // LIN-378: the dashboard surface is fully modeled by the local provider, so this
 // spec rides the seeded local workspace (no `test-token` mock). Assertions are
 // derived from defaultLocalSeed (2 projects; an in-progress parent + todo child +
 // completed issue in "Local Project"; a second in-progress task in "Local Beta").
-const TEST_WORKSPACE_URL_KEY = LOCAL_WORKSPACE_URL_KEY;
-const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;
 
 test.describe('Authenticated Dashboard', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
     // Seed a real local-provider workspace and establish its session.
-    await seedLocalWorkspace(page);
+    await seedLocal();
 
     // Navigate to workspace page (authenticated users are redirected here)
-    await page.goto(WORKSPACE_URL);
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
   });
 
   test('renders project tree with issues', async ({ page }) => {
@@ -72,7 +69,7 @@ test.describe('Authenticated Dashboard', () => {
     await expect(page.locator('.nav-bar .nav-action[href="/audit"]')).not.toBeVisible();
   });
 
-  test('shows footer with reset, all navigation links, and deploy info', async ({ page }) => {
+  test('shows footer with reset, all navigation links, and deploy info', async ({ page, localWorkerUrlKey }) => {
     // Footer should be visible
     await expect(page.locator('.page-footer')).toBeVisible();
 
@@ -80,8 +77,8 @@ test.describe('Authenticated Dashboard', () => {
     await expect(page.locator('.footer-action.reset-view')).toBeVisible();
 
     // Should have all navigation links with workspace prefix (dashboard has no "current page" so all are links)
-    await expect(page.locator(`.footer-action[href="/workspace/${TEST_WORKSPACE_URL_KEY}/settings"]`)).toBeVisible();
-    await expect(page.locator(`.footer-action[href="/workspace/${TEST_WORKSPACE_URL_KEY}/swim"]`)).toBeVisible();
+    await expect(page.locator(`.footer-action[href="/workspace/${localWorkerUrlKey}/settings"]`)).toBeVisible();
+    await expect(page.locator(`.footer-action[href="/workspace/${localWorkerUrlKey}/swim"]`)).toBeVisible();
 
     // Should NOT have any bold current page indicator on dashboard
     await expect(page.locator('.footer-current')).not.toBeVisible();

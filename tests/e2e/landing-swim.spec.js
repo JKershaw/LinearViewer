@@ -1,5 +1,4 @@
-import { test, expect } from '@playwright/test';
-import { seedLocalWorkspace } from '../fixtures/local-harness.js';
+import { test, expect } from '../fixtures/test-base.js';
 
 test.describe('Landing Swim Page (/swim)', () => {
   test.beforeEach(async ({ page }) => {
@@ -76,8 +75,8 @@ test.describe('Landing Swim Page (/swim)', () => {
     await expect(page.locator('#swim-popover')).toHaveClass(/hidden/);
   });
 
-  test('authenticated users are redirected to workspace swim', async ({ page }) => {
-    await seedLocalWorkspace(page);
+  test('authenticated users are redirected to workspace swim', async ({ page, seedLocal }) => {
+    await seedLocal();
     await page.goto('/swim');
     await expect(page).toHaveURL(/\/workspace\/.+\/swim/);
   });

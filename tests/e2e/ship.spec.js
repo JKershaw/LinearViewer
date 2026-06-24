@@ -1,16 +1,15 @@
 import { test, expect } from '../fixtures/test-base.js';
-import { seedLocalWorkspace, swimLocalSeed, LOCAL_WORKSPACE_URL_KEY } from '../fixtures/local-harness.js';
+import { swimLocalSeed } from '../fixtures/local-harness.js';
 
 // LIN-378: the ship surface is fully modeled by the local provider, so this spec
 // rides a seeded local workspace (no `test-token` mock). The seed is the swim
 // sample fixture converted to local shape — same projects, blocking chains, and
 // labels the assertions below were written against.
-const SHIP_URL = `/workspace/${LOCAL_WORKSPACE_URL_KEY}/ship`;
 
 test.describe('Ship Page', () => {
-  test.beforeEach(async ({ page }) => {
-    await seedLocalWorkspace(page, swimLocalSeed, { features: { ship: true } });
-    await page.goto(SHIP_URL);
+  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(swimLocalSeed, { features: { ship: true } });
+    await page.goto(`/workspace/${localWorkerUrlKey}/ship`);
     await page.waitForLoadState('networkidle');
   });
 
@@ -187,24 +186,24 @@ test.describe('Ship Page', () => {
     await expect(card).not.toHaveClass(/ship-active/);
   });
 
-  test('popover offers a swipe link alongside the Linear link', async ({ page }) => {
+  test('popover offers a swipe link alongside the Linear link', async ({ page, localWorkerUrlKey }) => {
     await page.locator('#ship-orbit .swim-box').first().click();
     const swipe = page.locator('#ship-popover-swipe');
     await expect(swipe).toBeVisible();
     const href = await swipe.getAttribute('href');
     expect(href).toMatch(
-      new RegExp(`/workspace/${LOCAL_WORKSPACE_URL_KEY}/swipe/[A-Za-z0-9-]+`)
+      new RegExp(`/workspace/${localWorkerUrlKey}/swipe/[A-Za-z0-9-]+`)
     );
     // The Linear link is still present — the swipe link is additive.
     await expect(page.locator('#ship-popover-link')).toBeVisible();
   });
 
-  test('swipe link navigates to the task in the swipe view', async ({ page }) => {
+  test('swipe link navigates to the task in the swipe view', async ({ page, localWorkerUrlKey }) => {
     await page.locator('#ship-orbit .swim-box').first().click();
     const href = await page.locator('#ship-popover-swipe').getAttribute('href');
     await page.goto(href);
     await page.waitForLoadState('networkidle');
-    await expect(page).toHaveURL(new RegExp(`/workspace/${LOCAL_WORKSPACE_URL_KEY}/swipe/`));
+    await expect(page).toHaveURL(new RegExp(`/workspace/${localWorkerUrlKey}/swipe/`));
   });
 
   test('layout is deterministic across reloads', async ({ page }) => {
@@ -231,11 +230,11 @@ test.describe('Ship Page', () => {
 // LIN-496: ship is an experimental, in-development view surfaced via Settings.
 // With its flag off it must redirect to settings (mirrors collective), not render.
 test.describe('Ship Page — gating (LIN-496)', () => {
-  test('redirects to settings when the ship flag is off', async ({ page }) => {
-    await seedLocalWorkspace(page, swimLocalSeed); // no ship flag
-    await page.goto(SHIP_URL);
+  test('redirects to settings when the ship flag is off', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(swimLocalSeed); // no ship flag
+    await page.goto(`/workspace/${localWorkerUrlKey}/ship`);
     await page.waitForLoadState('networkidle');
-    await expect(page).toHaveURL(new RegExp(`/workspace/${LOCAL_WORKSPACE_URL_KEY}/settings$`));
+    await expect(page).toHaveURL(new RegExp(`/workspace/${localWorkerUrlKey}/settings$`));
     await expect(page.locator('#ship-rect')).toHaveCount(0);
   });
 });

@@ -1,20 +1,17 @@
-import { test, expect } from '@playwright/test';
-import { seedLocalWorkspace, LOCAL_WORKSPACE_URL_KEY } from '../fixtures/local-harness.js';
+import { test, expect } from '../fixtures/test-base.js';
 
 // LIN-378: the detail/interaction surface is fully modeled by the local
 // provider, so these specs ride a seeded local workspace (no `test-token`
 // mock). Provider-facing assertions (detail link text, create-task URL) are
 // written against the Local provider's ui surface.
-const TEST_WORKSPACE_URL_KEY = LOCAL_WORKSPACE_URL_KEY;
-const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;
 
 test.describe('Interactive Features', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
     // Seed a local-provider workspace and establish its session.
-    await seedLocalWorkspace(page);
+    await seedLocal();
 
     // Navigate to workspace page, then clear any persisted collapse state.
-    await page.goto(WORKSPACE_URL);
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.evaluate(() => localStorage.clear());
   });
 
@@ -157,9 +154,9 @@ test.describe('Interactive Features', () => {
 });
 
 test.describe('Detail Section Toggles', () => {
-  test.beforeEach(async ({ page }) => {
-    await seedLocalWorkspace(page);
-    await page.goto(WORKSPACE_URL);
+  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal();
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.evaluate(() => localStorage.clear());
   });
 
@@ -293,7 +290,7 @@ test.describe('Detail Section Toggles', () => {
     await expect(viewLink).toContainText('View in Local');
   });
 
-  test('Create task link is visible for authenticated users', async ({ page }) => {
+  test('Create task link is visible for authenticated users', async ({ page, localWorkerUrlKey }) => {
     const project = page.locator('.project').first();
     const projectId = await project.getAttribute('data-id');
 
@@ -304,7 +301,7 @@ test.describe('Detail Section Toggles', () => {
 
     // href comes from the provider's getCreateTaskUrl (ui.write gating).
     const href = await createTaskLink.getAttribute('href');
-    expect(href).toContain(`/workspace/${TEST_WORKSPACE_URL_KEY}/new?project=`);
+    expect(href).toContain(`/workspace/${localWorkerUrlKey}/new?project=`);
     expect(href).toContain(projectId);
     await expect(createTaskLink).toHaveAttribute('target', '_blank');
   });
@@ -399,10 +396,10 @@ test.describe('Landing Page Interactions', () => {
 // =============================================================================
 test.describe('Description Expansion (LIN-156)', () => {
   test.describe('Authenticated', () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
       // Seed a local-provider workspace (issue-1 carries two comments).
-      await seedLocalWorkspace(page);
-      await page.goto(WORKSPACE_URL);
+      await seedLocal();
+      await page.goto(`/workspace/${localWorkerUrlKey}/`);
     });
 
     test('Comments toggle appears for authenticated users', async ({ page }) => {
