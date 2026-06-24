@@ -1,5 +1,5 @@
 /**
- * LIN-309 — capability-gated consumer-API writes.
+ * LIN-309 / LIN-581 — capability-gated consumer-API writes, selected per workspace.
  *
  * The proxy write endpoints route through `provider.*` and consult the active
  * provider's capability descriptor BEFORE the write. A provider that does not
@@ -8,14 +8,19 @@
  * NotImplementedError bubble up to an opaque 500. `provider.supports(...)` is
  * the "never 500" path the provider interface documents.
  *
- * The proxy speaks to Linear in production (every write supported, so the gate
- * is always a pass — byte-identical behaviour). The gate is the forward-looking
- * seam for LIN-306's broader provider unification. To exercise the decline path
- * we inject the real GitHub provider, which implements createIssue/updateIssue/
- * createComment/addLabel/removeLabel but declines createRelation/deleteRelation.
+ * LIN-581 made provider SELECTION per-workspace: the proxy resolves the active
+ * provider from the workspace's own `provider` name (surfaced by
+ * resolveWorkspaceAccess) via the registry's getProviderForWorkspace — NOT a
+ * hardwired Linear default. So the capability gate is now a REAL runtime path,
+ * reached by a workspace whose provider is e.g. GitHub, which implements
+ * createIssue/updateIssue/createComment/addLabel/removeLabel but declines
+ * createRelation/deleteRelation. These tests drive that production path: they
+ * set `resolveWorkspaceAccess` to report the workspace's provider name and let
+ * the registry resolve it (githubProvider self-registers on import).
  *
- * The e2e suite can't cover this: in test mode the proxy always uses the Linear
- * default, which supports the full write surface.
+ * A workspace with no explicit provider falls back to Linear (the registry's
+ * legacy default), which supports the full write surface — so the gate is a
+ * pass and behaviour stays byte-identical (last test).
  */
 
 import { test } from 'node:test';
@@ -23,6 +28,8 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { linearProvider } from '../../lib/providers/linear/index.js';
+// Imported for its self-registration side effect (registers 'github' so the
+// registry can resolve a workspace whose provider name is 'github').
 import { githubProvider } from '../../lib/providers/github/index.js';
 
 const UUID = '11111111-1111-1111-1111-111111111111';
@@ -32,7 +39,11 @@ const UUID = '11111111-1111-1111-1111-111111111111';
 // runs first, so for a declined write the token is never consulted — but a
 // SUPPORTED write must fall through past the gate, and we assert it does by
 // observing it does NOT 422.
-function buildApp(provider, { token = 'ws-token' } = {}) {
+//
+// `providerName` is what resolveWorkspaceAccess reports for the workspace; the
+// proxy resolves the active provider from it through the registry (the real
+// LIN-581 selection path), so no provider instance is injected.
+function buildApp(providerName, { token = 'ws-token' } = {}) {
   const app = express();
   app.use(express.json());
   app.use(createProxyRoutes({
@@ -42,7 +53,7 @@ function buildApp(provider, { token = 'ws-token' } = {}) {
       })
     },
     proxyEventStore: { recordEvent: async () => {} },
-    resolveWorkspaceAccess: async () => ({ token, reason: token ? 'ok' : 'not_connected' }),
+    resolveWorkspaceAccess: async () => ({ token, reason: token ? 'ok' : 'not_connected', provider: providerName }),
     getWorkspaceAccessToken: async () => token,
     agentStatusStore: {},
     recapCacheStore: {},
@@ -52,7 +63,6 @@ function buildApp(provider, { token = 'ws-token' } = {}) {
     getWorkspaceOpenRouterKey: async () => null,
     workspacePreferencesStore: {},
     freeTierStore: { tryUse: async () => ({ allowed: true }) },
-    provider,
   }));
   return app;
 }
@@ -76,8 +86,8 @@ async function request(app, path, { method = 'GET', body } = {}) {
   }
 }
 
-test('unsupported write (createRelation on the GitHub provider) → clean 422, not 500', async () => {
-  const { status, body } = await request(buildApp(githubProvider), `/api/proxy/issues/${UUID}/relations`, {
+test('a GitHub-backed workspace declines createRelation → clean 422, not 500 (real selection path)', async () => {
+  const { status, body } = await request(buildApp('github'), `/api/proxy/issues/${UUID}/relations`, {
     method: 'POST',
     body: { type: 'blocks', relatedIssueId: '22222222-2222-2222-2222-222222222222' },
   });
@@ -87,9 +97,9 @@ test('unsupported write (createRelation on the GitHub provider) → clean 422, n
   assert.equal(body.provider, 'github');
 });
 
-test('unsupported deleteRelation → clean 422', async () => {
+test('a GitHub-backed workspace declines deleteRelation → clean 422', async () => {
   const relId = '33333333-3333-3333-3333-333333333333';
-  const { status, body } = await request(buildApp(githubProvider), `/api/proxy/issues/${UUID}/relations/${relId}`, {
+  const { status, body } = await request(buildApp('github'), `/api/proxy/issues/${UUID}/relations/${relId}`, {
     method: 'DELETE',
   });
   assert.equal(status, 422);
@@ -102,9 +112,23 @@ test('a SUPPORTED write is not blocked by the gate (createIssue falls through)',
   // token the request then short-circuits to the 503 workspace envelope — the
   // point is only that it is NOT the 422 capability decline, proving the gate
   // is selective rather than blanket.
-  const { status, body } = await request(buildApp(githubProvider, { token: null }), '/api/proxy/issues', {
+  const { status, body } = await request(buildApp('github', { token: null }), '/api/proxy/issues', {
     method: 'POST',
     body: { teamId: '00000000-0000-0000-0000-000000000000', title: 'x' },
+  });
+  assert.notEqual(status, 422);
+  assert.notEqual(body.code, 'CAPABILITY_NOT_SUPPORTED');
+  assert.equal(status, 503);
+});
+
+test('a workspace with no explicit provider falls back to Linear — gate is a pass (byte-identical)', async () => {
+  // No provider name reported: getProviderForWorkspace resolves the legacy
+  // default (Linear), which supports createRelation, so the gate does NOT 422.
+  // A null token then short-circuits to 503 — proving selection landed on Linear,
+  // not an accidental decline.
+  const { status, body } = await request(buildApp(undefined, { token: null }), `/api/proxy/issues/${UUID}/relations`, {
+    method: 'POST',
+    body: { type: 'blocks', relatedIssueId: '22222222-2222-2222-2222-222222222222' },
   });
   assert.notEqual(status, 422);
   assert.notEqual(body.code, 'CAPABILITY_NOT_SUPPORTED');

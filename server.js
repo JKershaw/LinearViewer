@@ -1058,20 +1058,26 @@ app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspace
 // Mount proxy routes
 // resolveWorkspaceAccess: looks up a workspace access token from active sessions
 // AND recovers WHY a lookup failed, so callers can surface an actionable signal
-// (LIN-417) instead of an opaque null. Returns { token, reason }:
+// (LIN-417) instead of an opaque null. Returns { token, reason, provider }:
 //   ok               → token present (success path)
 //   store_unreachable → session store find() threw (dyno booting post-deploy) — transient
 //   session_expired   → a session referenced this workspace but its token expired — re-auth
 //   not_connected     → no session references this workspace — never connected
+// `provider` is the matched workspace's provider name (e.g. 'linear'), or null
+// when no session referenced the workspace. It lets the session-less consumer
+// proxy resolve the provider per workspace via getProviderForWorkspace (LIN-581),
+// instead of hardwiring Linear. It is captured from any session that referenced
+// the workspace — even one whose token expired — so the proxy's capability gate
+// (which runs BEFORE the token check on writes) still sees the right provider.
 // In test mode, returns { token: 'test-token', reason: 'ok' } for 'test-workspace'.
 // Uses a short-lived cache (30s) to avoid scanning sessions on every proxy request.
 // The cache only ever holds successes, so it never masks a failure reason.
-const _tokenCache = new Map(); // urlKey -> { token, expiresAt, cachedAt }
+const _tokenCache = new Map(); // urlKey -> { token, expiresAt, cachedAt, provider }
 const TOKEN_CACHE_TTL_MS = 30 * 1000; // 30 seconds
 
 async function resolveWorkspaceAccess(urlKey) {
   if (process.env.NODE_ENV === 'test' && urlKey === 'test-workspace') {
-    return { token: 'test-token', reason: 'ok' };
+    return { token: 'test-token', reason: 'ok', provider: 'linear' };
   }
 
   // Check cache first
@@ -1079,7 +1085,7 @@ async function resolveWorkspaceAccess(urlKey) {
   if (cached && Date.now() - cached.cachedAt < TOKEN_CACHE_TTL_MS) {
     // Only return if the token hasn't expired
     if (cached.expiresAt > Date.now() + TOKEN_REFRESH_BUFFER_MS) {
-      return { token: cached.token, reason: 'ok' };
+      return { token: cached.token, reason: 'ok', provider: cached.provider };
     }
   }
 
@@ -1089,6 +1095,8 @@ async function resolveWorkspaceAccess(urlKey) {
     const sessions = await sessionsCollection.find({}).toArray();
     let bestToken = null;
     let bestExpiry = 0;
+    let bestProvider = null;   // provider of the latest-expiring usable workspace
+    let seenProvider = null;   // provider of any workspace that referenced this urlKey
     let sawUrlKey = false; // did any session reference this workspace at all?
 
     for (const s of sessions) {
@@ -1096,25 +1104,29 @@ async function resolveWorkspaceAccess(urlKey) {
       const ws = data?.workspaces?.find(w => w.urlKey === urlKey);
       if (!ws) continue;
       sawUrlKey = true;
+      if (seenProvider === null && ws.provider) seenProvider = ws.provider;
       if (ws.accessToken && ws.tokenExpiresAt > Date.now() + TOKEN_REFRESH_BUFFER_MS) {
         if (ws.tokenExpiresAt > bestExpiry) {
           bestToken = ws.accessToken;
           bestExpiry = ws.tokenExpiresAt;
+          bestProvider = ws.provider || null;
         }
       }
     }
 
     if (bestToken) {
-      _tokenCache.set(urlKey, { token: bestToken, expiresAt: bestExpiry, cachedAt: Date.now() });
-      return { token: bestToken, reason: 'ok' };
+      _tokenCache.set(urlKey, { token: bestToken, expiresAt: bestExpiry, cachedAt: Date.now(), provider: bestProvider });
+      return { token: bestToken, reason: 'ok', provider: bestProvider };
     }
 
     // No usable token. A row referenced this workspace but its token was expired
     // (auth / needs re-auth) vs no row referenced it at all (never connected).
-    return { token: null, reason: sawUrlKey ? 'session_expired' : 'not_connected' };
+    // Still surface the provider we saw so the proxy's pre-token capability gate
+    // can resolve the right provider on a write.
+    return { token: null, reason: sawUrlKey ? 'session_expired' : 'not_connected', provider: seenProvider };
   } catch (err) {
     console.error('Error looking up workspace access token:', err);
-    return { token: null, reason: 'store_unreachable' };
+    return { token: null, reason: 'store_unreachable', provider: null };
   }
 }
 
