@@ -1,28 +1,35 @@
 import { test, expect } from '../fixtures/test-base.js'
 import { seedLocalWorkspace, LOCAL_WORKSPACE_URL_KEY } from '../fixtures/local-harness.js'
+import { footer, settings } from '../helpers.js'
 
+// Proof-of-pattern spec for LIN-215: brittle `:has-text()` / class / href
+// selectors here are migrated to the stable `data-testid` selectors and page
+// objects in `tests/helpers.js`. Seeding still rides the provider harness
+// (`seedLocalWorkspace`); navigation drives off the urlKey it returns, not a
+// hard-coded literal (parallel-aware caller discipline for LIN-625).
 const TEST_WORKSPACE_URL_KEY = LOCAL_WORKSPACE_URL_KEY
-const SETTINGS_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/settings`
 
 test.describe('Settings Page', () => {
   test.beforeEach(async ({ page }) => {
-    await seedLocalWorkspace(page)
-    await page.goto(SETTINGS_URL)
+    const { urlKey } = await seedLocalWorkspace(page)
+    await page.goto(`/workspace/${urlKey}/settings`)
     await page.waitForLoadState('networkidle')
   })
 
   test('renders settings page with title and sections', async ({ page }) => {
     await expect(page.locator('h1')).toContainText('Settings')
-    await expect(page.locator('.settings-header').first()).toContainText('AI')
+    await expect(settings(page).section('ai')).toContainText('AI')
   })
 
-  test('has navigation links', async ({ page }) => {
-    await expect(page.locator('a:has-text("projects")')).toBeVisible()
+  test('has footer navigation links', async ({ page }) => {
+    await expect(footer(page).getLink('swipe')).toBeVisible()
+    await expect(footer(page).getLink('swim')).toBeVisible()
+    await expect(footer(page).getLink('settings')).toBeVisible()
   })
 
   test('has Account section with logout', async ({ page }) => {
-    await expect(page.locator('.settings-header:has-text("Account")')).toBeVisible()
-    const logoutLink = page.locator('a[href="/logout"]')
+    await expect(settings(page).section('account')).toBeVisible()
+    const logoutLink = settings(page).logout()
     await expect(logoutLink).toBeVisible()
     await expect(logoutLink).toContainText('logout')
   })
@@ -34,9 +41,19 @@ test.describe('Settings Page', () => {
   })
 
   test('shows the AI usage KPI section (LIN-418)', async ({ page }) => {
-    await expect(page.locator('.settings-header:has-text("AI usage")')).toBeVisible()
     // No LLM calls in a fresh local workspace → empty state.
-    await expect(page.locator('.settings-section:has(.settings-header:has-text("AI usage"))')).toContainText('none recorded yet')
+    await expect(settings(page).section('ai-usage')).toContainText('none recorded yet')
+  })
+
+  test('toggling a feature flips its state', async ({ page }) => {
+    // dispatch is off by default. The ● / ○ glyphs make the assertion robust
+    // against feature description text that merely contains "on"/"off".
+    await expect(settings(page).toggle('dispatch')).toContainText('○ off')
+
+    await settings(page).toggleFeature('dispatch')
+    await page.waitForLoadState('networkidle')
+
+    await expect(settings(page).toggle('dispatch')).toContainText('● on')
   })
 })
 
