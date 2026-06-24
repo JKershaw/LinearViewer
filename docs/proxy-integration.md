@@ -472,6 +472,68 @@ With `?noRefresh=1` and no cache, `status` is `"missing"` (or `"stale"`) and the
 > and can exceed 25s; the server streams whitespace keepalive bytes inside a single
 > `200` response, so don't set a client timeout below ~60s for these endpoints.
 
+#### Get Task History Snapshots
+
+```
+GET /api/proxy/issues/{identifier}/snapshots
+GET /api/proxy/issues/{identifier}/snapshots/diff
+```
+
+An append-only **history archive** of the task's observed state over time. The proxy
+captures a snapshot whenever a `recap` or `brief` read sees the issue change — title,
+description, state, labels, priority, comments, and parent/children state. Capture is
+hash-gated, so a snapshot is recorded only when the observed slice actually differs from
+the previous one (no churn on unchanged re-reads). Because edits often happen out-of-band
+in Linear's own UI, history reflects whatever this app has *observed*, not every edit
+ever made; reading the task's `recap`/`brief` is what advances the archive. Read scope is
+sufficient; both endpoints accept a UUID or an identifier.
+
+`/snapshots` lists snapshots newest-first. `?limit=N` caps the rows (max 100); `?diff=1`
+additionally folds in the diff of the two most recent snapshots. Retention is a per-task
+count cap (newest 50 kept), not a time window, so long-lived tasks keep their early
+history.
+
+Response:
+```json
+{
+  "identifier": "ENG-42",
+  "total": 3,
+  "snapshots": [
+    {
+      "id": "…",
+      "taskIdentifier": "ENG-42",
+      "canonicalId": "…uuid…",
+      "inputHash": "…sha256…",
+      "capturedAt": "2026-06-24T12:00:00Z",
+      "snapshot": {
+        "title": "…", "description": "…",
+        "state": { "name": "In Progress", "type": "started" },
+        "labels": ["bug"], "priority": 2,
+        "comments": [{ "id": "…", "body": "…", "createdAt": "…" }],
+        "parent": null, "children": []
+      }
+    }
+  ]
+}
+```
+
+`/snapshots/diff` returns a read-time field-level diff of the two most recent snapshots:
+
+```json
+{
+  "identifier": "ENG-42",
+  "changed": true,
+  "fields": [
+    { "field": "state", "before": { "name": "Todo", "type": "unstarted" }, "after": { "name": "In Progress", "type": "started" } }
+  ],
+  "from": { "…older snapshot record…": "…" },
+  "to": { "…newer snapshot record…": "…" }
+}
+```
+
+With fewer than two snapshots there is nothing to compare: `changed` is `false` and
+`fields` is empty.
+
 ### Task Automation Endpoints
 
 These endpoints back the task-automation workflow: pick the next task, generate a prompt for it, and record agent progress. The **recap** and **brief** endpoints above are part of this group too. All are read-scope except `POST /api/proxy/agent/status` (deprecated alias: `POST /api/proxy/foreman/status`), which requires `readWrite`.

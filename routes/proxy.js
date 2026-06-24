@@ -43,6 +43,7 @@ import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
 import { hashContext } from '../lib/recap-cache.js';
+import { snapshotFromContext } from '../lib/task-snapshot-store.js';
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, isTerminalState, isBlocked, NO_PROJECT_ID } from '../lib/tree.js';
 import { flattenTrees, sortIssuesForSwipe, applyBlockingOrder, clusterByParent, computeGraphFeatures, computeOffPageBlockers, buildWhy } from '../lib/render-swipe.js';
 import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, getPromptDisplayName, PROMPT_TEMPLATES, DISPATCH_KINDS } from '../lib/prompt-templates.js';
@@ -561,8 +562,30 @@ function dispatchWatchChanged(baseline, item) {
  *   clean 4xx rather than a 500. Injectable so tests can exercise the unsupported-capability path.
  * @returns {Router} Express router with proxy routes
  */
-export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, dispatchQueueStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, workspacePreferencesStore, freeTierStore, provider = linearProvider }) {
+export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, workspacePreferencesStore, freeTierStore, provider = linearProvider }) {
   const router = Router();
+
+  /**
+   * Capture a task-history snapshot (LIN-598), fire-and-forget. Called at the
+   * recap/brief read seams right after the existing `hashContext(context)`, so
+   * it reuses the already-computed `context` + `inputHash` — no second fetch or
+   * hash. The store is hash-gated, so a write happens only when the observed
+   * slice actually changed; an unchanged re-read is a no-op. Never awaited on the
+   * response path (mirrors agentStatusStore.onWrite, LIN-623), so a slow or
+   * failing capture cannot affect proxy latency or the response.
+   */
+  function captureTaskSnapshot({ urlKey, identifier, context, canonicalId, inputHash }) {
+    if (!taskSnapshotStore) return;
+    Promise.resolve()
+      .then(() => taskSnapshotStore.captureIfChanged({
+        urlKey,
+        taskIdentifier: context?.issue?.identifier || identifier,
+        canonicalId,
+        inputHash,
+        snapshot: snapshotFromContext(context)
+      }))
+      .catch(err => console.error('task-snapshot capture error:', err?.message || err));
+  }
 
   // =========================================================================
   // Proxy Token Authentication Middleware
@@ -2775,6 +2798,67 @@ One convention across every endpoint, so you can branch on the same fields every
   });
 
   /**
+   * GET /api/proxy/issues/:identifier/snapshots  (LIN-598)
+   * Lists the task-history archive for an issue, newest-first: the append-only
+   * sequence of observed-state snapshots captured at the recap/brief read seams.
+   * `?limit=N` caps the returned rows; `?diff=1` additionally folds in the
+   * read-time diff of the two most recent snapshots (same as /snapshots/diff).
+   * Pure read of local history — no Linear fetch, no LLM call.
+   */
+  router.get('/api/proxy/issues/:identifier/snapshots', proxyLimiter, authenticateProxyToken, async (req, res) => {
+    try {
+      if (!taskSnapshotStore) {
+        logEvent(req, '/api/proxy/snapshots', 503);
+        return jsonError(res, 503, 'Task snapshot store not configured');
+      }
+      const { identifier } = req.params;
+      if (!isValidIssueId(identifier)) {
+        logEvent(req, '/api/proxy/snapshots', 400);
+        return badRequest.json(res, 'Invalid identifier format');
+      }
+
+      const rawLimit = parseInt(req.query.limit, 10);
+      const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : undefined;
+      const { items, total } = await taskSnapshotStore.list(req.proxyUrlKey, identifier, { limit });
+
+      const body = { identifier, total, snapshots: items };
+      if (req.query.diff === '1' || req.query.diff === 'true') {
+        body.diff = await taskSnapshotStore.diffLatest(req.proxyUrlKey, identifier);
+      }
+      logEvent(req, '/api/proxy/snapshots', 200);
+      res.json(body);
+    } catch (err) {
+      logEvent(req, '/api/proxy/snapshots', 500);
+      jsonError(res, 500, 'Failed to list task snapshots');
+    }
+  });
+
+  /**
+   * GET /api/proxy/issues/:identifier/snapshots/diff  (LIN-598)
+   * Read-time field-level diff of the two most recent snapshots for an issue.
+   * `changed: false` with one (or zero) snapshot means nothing to compare yet.
+   */
+  router.get('/api/proxy/issues/:identifier/snapshots/diff', proxyLimiter, authenticateProxyToken, async (req, res) => {
+    try {
+      if (!taskSnapshotStore) {
+        logEvent(req, '/api/proxy/snapshots/diff', 503);
+        return jsonError(res, 503, 'Task snapshot store not configured');
+      }
+      const { identifier } = req.params;
+      if (!isValidIssueId(identifier)) {
+        logEvent(req, '/api/proxy/snapshots/diff', 400);
+        return badRequest.json(res, 'Invalid identifier format');
+      }
+      const diff = await taskSnapshotStore.diffLatest(req.proxyUrlKey, identifier);
+      logEvent(req, '/api/proxy/snapshots/diff', 200);
+      res.json({ identifier, ...diff });
+    } catch (err) {
+      logEvent(req, '/api/proxy/snapshots/diff', 500);
+      jsonError(res, 500, 'Failed to diff task snapshots');
+    }
+  });
+
+  /**
    * GET /api/proxy/issues/:identifier/recap  (canonical — nested issue-scoped)
    * GET /api/proxy/recap/:identifier           (forgiving alias, flat form)
    * Returns the AI-generated recap (done/pending/deviations) for an issue.
@@ -2820,6 +2904,7 @@ One convention across every endpoint, so you can branch on the same fields every
 
         const canonicalId = context.issue?.id || identifier;
         const inputHash = hashContext(context);
+        captureTaskSnapshot({ urlKey: req.proxyUrlKey, identifier, context, canonicalId, inputHash });
         const cached = await recapCacheStore.get(req.proxyUrlKey, canonicalId);
 
         if (cached && cached.inputHash === inputHash) {
@@ -2979,6 +3064,7 @@ One convention across every endpoint, so you can branch on the same fields every
 
         const canonicalId = context.issue?.id || identifier;
         const inputHash = hashContext(context);
+        captureTaskSnapshot({ urlKey: req.proxyUrlKey, identifier, context, canonicalId, inputHash });
 
         const selectedModel = await resolveWorkspaceModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore, forceDefault: isFreeTier });
         let recap;
@@ -3091,6 +3177,7 @@ One convention across every endpoint, so you can branch on the same fields every
 
         const canonicalId = context.issue?.id || identifier;
         const inputHash = hashContext(context);
+        captureTaskSnapshot({ urlKey: req.proxyUrlKey, identifier, context, canonicalId, inputHash });
         const cached = await briefCacheStore.get(req.proxyUrlKey, canonicalId);
 
         if (cached && cached.inputHash === inputHash) {
@@ -3248,6 +3335,7 @@ One convention across every endpoint, so you can branch on the same fields every
 
         const canonicalId = context.issue?.id || identifier;
         const inputHash = hashContext(context);
+        captureTaskSnapshot({ urlKey: req.proxyUrlKey, identifier, context, canonicalId, inputHash });
 
         const selectedModel = await resolveWorkspaceModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore, forceDefault: isFreeTier });
         let brief;
