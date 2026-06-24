@@ -11,7 +11,7 @@
  *     coercion, empty-goal drop, cap
  *   - generateGoalSuggestions always appends the continue-until-stopped option
  */
-import { test, describe } from 'node:test';
+import { test, describe, mock, afterEach } from 'node:test';
 import assert from 'node:assert';
 import {
   formatNextRunContext,
@@ -22,6 +22,7 @@ import {
   CONTINUE_UNTIL_STOPPED_OPTION,
   TSHIRT_SIZES,
 } from '../../lib/next-run.js';
+import { buildRoadmapModel } from '../../lib/roadmap.js';
 
 const MODEL = {
   velocity: { tasksPerWeek: 3.5, pointsPerWeek: 8, trend: 'increasing' },
@@ -66,6 +67,13 @@ describe('buildNextRunMessages', () => {
   });
 });
 
+describe('TSHIRT_SIZES (LIN-633)', () => {
+  test('is the S/M/L/XL scale — XS dropped, XL reserved for the open-ended option', () => {
+    assert.deepEqual(TSHIRT_SIZES, ['S', 'M', 'L', 'XL']);
+    assert.ok(!TSHIRT_SIZES.includes('XS'));
+  });
+});
+
 describe('normalizeSize', () => {
   test('passes valid sizes through (case-insensitive)', () => {
     for (const s of TSHIRT_SIZES) assert.equal(normalizeSize(s.toLowerCase()), s);
@@ -74,6 +82,9 @@ describe('normalizeSize', () => {
     assert.equal(normalizeSize('huge'), 'M');
     assert.equal(normalizeSize(null), 'M');
     assert.equal(normalizeSize(undefined), 'M');
+  });
+  test('the now-dropped XS coerces to the M default', () => {
+    assert.equal(normalizeSize('XS'), 'M');
   });
 });
 
@@ -123,5 +134,48 @@ describe('CONTINUE_UNTIL_STOPPED_OPTION', () => {
     assert.equal(CONTINUE_UNTIL_STOPPED_OPTION.goal, '');
     assert.equal(CONTINUE_UNTIL_STOPPED_OPTION.continueUntilStopped, true);
     assert.equal(typeof generateGoalSuggestions, 'function');
+  });
+
+  test('owns the XL size — the open-ended option is the deterministic XL (LIN-633)', () => {
+    // XL = "run the project with no specific guide", which IS this option. Concrete
+    // LLM goals are constrained to S/M/L, so XL must live here and nowhere else.
+    assert.equal(CONTINUE_UNTIL_STOPPED_OPTION.size, 'XL');
+  });
+});
+
+describe('generateGoalSuggestions return shape (LIN-633)', () => {
+  const realFetch = global.fetch;
+  afterEach(() => { global.fetch = realFetch; });
+
+  function mockStreamResponse(text) {
+    const enc = new TextEncoder();
+    const blocks = [
+      `data: ${JSON.stringify({ choices: [{ delta: { content: text }, finish_reason: null }] })}\n\n`,
+      `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }], usage: { completion_tokens: 10 } })}\n\n`,
+      'data: [DONE]\n\n',
+    ];
+    return { ok: true, body: (async function* () { for (const b of blocks) yield enc.encode(b); })() };
+  }
+
+  test('returns the grounding context verbatim plus the XL open-ended option', async () => {
+    const raw = JSON.stringify({ options: [{ goal: 'Finish the in-flight work.', reasoning: 'WIP first.', size: 'M' }] });
+    global.fetch = mock.fn(async () => mockStreamResponse(raw));
+
+    const result = await generateGoalSuggestions(
+      { projects: [], issues: [], organizationName: 'Acme' },
+      { apiKey: 'test-key' }
+    );
+
+    // context is returned and is the exact deterministic grounding blob (not discarded).
+    assert.equal(typeof result.context, 'string');
+    assert.ok(result.context.length > 0);
+    assert.equal(result.context, formatNextRunContext(buildRoadmapModel([], []), 'Acme'));
+
+    // The concrete option survives; the guaranteed open-ended option is appended last as XL.
+    const last = result.options[result.options.length - 1];
+    assert.equal(last.continueUntilStopped, true);
+    assert.equal(last.goal, '');
+    assert.equal(last.size, 'XL');
+    assert.ok(result.options.some(o => o.goal === 'Finish the in-flight work.' && o.size === 'M'));
   });
 });

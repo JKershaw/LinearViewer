@@ -1,6 +1,7 @@
-/* Suggested Next Run page (experimental, LIN-603).
+/* Suggested Next Run page (experimental, LIN-603; LIN-633 Observation parity).
    Terminal-flavoured, mobile-first. Reuses shared section/tree styling from
-   style.css; only the option cards and generate controls are bespoke. */
+   style.css and the Observation page's obs-* vocabulary (chips, caret/collapse,
+   detail blocks) from /observation.css; only page-specific layout is bespoke. */
 
 .next-run-header h1 {
   margin: 0 0 var(--space-1);
@@ -50,32 +51,51 @@
   gap: var(--space-2);
 }
 
+/* Option card — Observation-styled collapsible (obs-* CSS does the chip + body +
+   detail-block work; these rules own only the card frame and the head layout). */
 .next-run-option {
-  border: 1px solid var(--fg-vdim);
-  border-radius: var(--radius-sm);
-  padding: var(--space-2);
+  border: 1px solid var(--border, var(--fg-vdim));
+  border-radius: 6px;
   background: var(--bg);
+  overflow: hidden;
+}
+
+.next-run-option.is-open {
+  border-color: var(--border-strong, var(--fg-dim));
 }
 
 .next-run-option-open {
   border-style: dashed;
 }
 
+/* Clickable head row: caret · size chip · (open tag) · one-line goal preview. */
 .next-run-option-head {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin-bottom: var(--space-1);
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  color: var(--fg);
 }
 
+.next-run-option-head:hover {
+  background: var(--bg-muted, var(--bg));
+}
+
+/* Caret rotation mirrors the Observation pattern (is-open → rotate 90deg). */
+.next-run-option.is-open .next-run-option-caret {
+  transform: rotate(90deg);
+}
+
+/* Size chip leans on obs-chip; keep only monospace weight to read as a badge. */
 .next-run-size {
-  display: inline-block;
+  font-family: var(--font-mono, monospace);
   font-weight: bold;
-  font-size: var(--font-size-sm);
-  padding: 0 0.4rem;
-  border: 1px solid var(--blue);
-  border-radius: var(--radius-sm);
-  color: var(--blue);
 }
 
 .next-run-open-tag {
@@ -84,8 +104,18 @@
   text-transform: lowercase;
 }
 
+.next-run-goal-preview {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--fg-dim);
+  font-size: var(--font-size-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .next-run-goal {
-  margin: 0 0 var(--space-1);
+  margin: 0 0 var(--space-2);
   white-space: pre-wrap;
   line-height: 1.5;
 }
@@ -106,4 +136,43 @@
 .next-run-empty {
   color: var(--fg-dim);
   font-size: var(--font-size-sm);
+}
+
+/* Page-level grounding context panel (shared across options, expandable). */
+.next-run-context-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: 0.25rem 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  color: var(--fg);
+}
+
+.next-run-context-toggle[aria-expanded="true"] .next-run-context-caret {
+  transform: rotate(90deg);
+}
+
+.next-run-context-label {
+  font-size: var(--font-size-sm);
+  color: var(--fg-dim);
+}
+
+.next-run-context-body {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--font-mono, monospace);
+  font-size: var(--font-size-sm);
+  line-height: 1.45;
+  color: var(--fg-dim);
+  background: var(--bg-muted, var(--bg));
+  border: 1px solid var(--border, var(--fg-vdim));
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
 }

@@ -79,6 +79,14 @@ test.describe('Suggested Next Run Page (experimental)', () => {
       await expect(page.locator('link[href="/next-run.css"]')).toHaveCount(1);
       await expect(page.locator('script[src="/next-run.js"]')).toHaveCount(1);
     });
+
+    test('reuses the Observation stylesheet for visual parity (LIN-633)', async ({ page }) => {
+      await expect(page.locator('link[href="/observation.css"]')).toHaveCount(1);
+    });
+
+    test('the grounding context panel is hidden until a generation returns', async ({ page }) => {
+      await expect(page.locator('#next-run-context-section')).toBeHidden();
+    });
   });
 
   test.describe('Generation', () => {
@@ -104,21 +112,50 @@ test.describe('Suggested Next Run Page (experimental)', () => {
       await expect(page.locator('.next-run-open-tag')).toContainText('continue until stopped');
     });
 
-    test('a concrete option links to dispatch with the goal prefilled', async ({ page }) => {
+    test('expanding a card reveals its reasoning and a goal-prefilled dispatch link', async ({ page }) => {
       await page.locator('#next-run-generate').click();
-      const accept = page.locator('.next-run-option:not(.next-run-option-open) .next-run-accept').first();
-      await expect(accept).toBeVisible({ timeout: 5000 });
+      const card = page.locator('.next-run-option:not(.next-run-option-open)').first();
+      await expect(card).toBeVisible({ timeout: 5000 });
+
+      // Body (reasoning + actions) is collapsed until the head is clicked.
+      const reasoning = card.locator('.next-run-reasoning');
+      const accept = card.locator('.next-run-accept');
+      await expect(accept).toBeHidden();
+
+      await card.locator('.next-run-option-head').click();
+      await expect(card).toHaveClass(/is-open/);
+      await expect(reasoning).toBeVisible();
+      await expect(accept).toBeVisible();
       const href = await accept.getAttribute('href');
       expect(href).toContain('/dispatch?goal=');
     });
 
     test('the continue-until-stopped option links to dispatch with no goal', async ({ page }) => {
       await page.locator('#next-run-generate').click();
-      const accept = page.locator('.next-run-option-open .next-run-accept');
-      await expect(accept).toBeVisible({ timeout: 5000 });
+      const card = page.locator('.next-run-option-open');
+      await expect(card).toBeVisible({ timeout: 5000 });
+      await card.locator('.next-run-option-head').click();
+      const accept = card.locator('.next-run-accept');
+      await expect(accept).toBeVisible();
       const href = await accept.getAttribute('href');
       expect(href).toContain('/dispatch');
       expect(href).not.toContain('goal=');
+    });
+
+    test('the grounding context panel appears and expands after generation (LIN-633)', async ({ page }) => {
+      await page.locator('#next-run-generate').click();
+
+      const section = page.locator('#next-run-context-section');
+      const toggle = page.locator('#next-run-context-toggle');
+      const body = page.locator('#next-run-context-body');
+
+      await expect(section).toBeVisible({ timeout: 5000 });
+      await expect(body).toBeHidden();
+
+      await toggle.click();
+      await expect(body).toBeVisible();
+      // The panel shows the deterministic grounding blob (velocity line is always present).
+      await expect(body).toContainText('Velocity');
     });
   });
 
@@ -139,6 +176,10 @@ test.describe('Suggested Next Run Page (experimental)', () => {
       const open = body.options[body.options.length - 1];
       expect(open.continueUntilStopped).toBe(true);
       expect(open.goal).toBe('');
+      expect(open.size).toBe('XL');
+      // Parity with the live path: the grounding context is returned, not discarded.
+      expect(typeof body.context).toBe('string');
+      expect(body.context.length).toBeGreaterThan(0);
     });
   });
 });
