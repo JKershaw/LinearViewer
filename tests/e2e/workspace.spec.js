@@ -1,5 +1,4 @@
 import { test, expect } from '../fixtures/test-base.js';
-import { seedLocalWorkspace, localDashboardUrl } from '../fixtures/local-harness.js';
 
 // Mixed-harness boundary split (LIN-428, parent S3/LIN-389).
 //   - The two single-workspace selector cases ('single workspace shows in
@@ -15,13 +14,10 @@ const TEST_WORKSPACE_URL_KEY = 'test-workspace';
 const SECOND_WORKSPACE_URL_KEY = 'second-workspace';
 const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;
 
-// Dashboard URL for the migrated local-backed workspace.
-const LOCAL_DASHBOARD = localDashboardUrl();
-
 test.describe('Workspace Selector', () => {
-  test('single workspace shows in selector', async ({ page }) => {
-    await seedLocalWorkspace(page);
-    await page.goto(LOCAL_DASHBOARD);
+  test('single workspace shows in selector', async ({ page, seedLocal }) => {
+    const { dashboard } = await seedLocal();
+    await page.goto(dashboard);
 
     const workspaceToggle = page.locator('#workspace-toggle');
     await expect(workspaceToggle).toBeVisible();
@@ -58,9 +54,9 @@ test.describe('Workspace Selector', () => {
     await expect(workspaceOptions.locator('.nav-option.selected')).toContainText('Test Workspace');
   });
 
-  test('clicking outside closes workspace selector', async ({ page }) => {
-    await seedLocalWorkspace(page);
-    await page.goto(LOCAL_DASHBOARD);
+  test('clicking outside closes workspace selector', async ({ page, seedLocal }) => {
+    const { dashboard } = await seedLocal();
+    await page.goto(dashboard);
 
     const workspaceToggle = page.locator('#workspace-toggle');
     await workspaceToggle.click();

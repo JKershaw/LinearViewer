@@ -16,22 +16,20 @@
  *      buildMockBrief) fires instead of a 503.
  */
 import { test, expect } from '../fixtures/test-base.js';
-import { seedLocalWorkspace, LOCAL_WORKSPACE_URL_KEY } from '../fixtures/local-harness.js';
 
-const URL_KEY = LOCAL_WORKSPACE_URL_KEY;
 // Seeded parent task carrying two comments (Alice, Bob) + a description — exists
 // only in defaultLocalSeed, so a recap/brief for it is provider-sourced.
 const ISSUE_ID = 'local-issue-1';
 
 test.describe('Recap API — local provider session (LIN-388)', () => {
-  test.beforeEach(async ({ page }) => {
-    await seedLocalWorkspace(page);
+  test.beforeEach(async ({ page, seedLocal }) => {
+    await seedLocal();
     // Cache-writing surface: keep the partition clean between tests.
     await page.request.get('/test/clear-recap-cache');
   });
 
-  test('POST generates a recap from provider data (no OpenRouter key, no 503)', async ({ page }) => {
-    const res = await page.request.post(`/workspace/${URL_KEY}/api/recap/${ISSUE_ID}`);
+  test('POST generates a recap from provider data (no OpenRouter key, no 503)', async ({ page, localWorkerUrlKey }) => {
+    const res = await page.request.post(`/workspace/${localWorkerUrlKey}/api/recap/${ISSUE_ID}`);
     expect(res.status()).toBe(200);
     const body = await res.json();
     expect(body.status).toBe('fresh');
@@ -42,28 +40,28 @@ test.describe('Recap API — local provider session (LIN-388)', () => {
     expect(body.recap.done.length).toBeGreaterThan(0);
   });
 
-  test('GET after POST returns status=fresh with the same recap', async ({ page }) => {
-    await page.request.post(`/workspace/${URL_KEY}/api/recap/${ISSUE_ID}`);
-    const res = await page.request.get(`/workspace/${URL_KEY}/api/recap/${ISSUE_ID}`);
+  test('GET after POST returns status=fresh with the same recap', async ({ page, localWorkerUrlKey }) => {
+    await page.request.post(`/workspace/${localWorkerUrlKey}/api/recap/${ISSUE_ID}`);
+    const res = await page.request.get(`/workspace/${localWorkerUrlKey}/api/recap/${ISSUE_ID}`);
     expect(res.status()).toBe(200);
     const body = await res.json();
     expect(body.status).toBe('fresh');
     expect(body.recap).toBeTruthy();
   });
 
-  test('returns 404 for an issue absent from the local store', async ({ page }) => {
-    const res = await page.request.get(`/workspace/${URL_KEY}/api/recap/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa`);
+  test('returns 404 for an issue absent from the local store', async ({ page, localWorkerUrlKey }) => {
+    const res = await page.request.get(`/workspace/${localWorkerUrlKey}/api/recap/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa`);
     expect(res.status()).toBe(404);
   });
 });
 
 test.describe('Brief API — local provider session (LIN-388)', () => {
-  test.beforeEach(async ({ page }) => {
-    await seedLocalWorkspace(page);
+  test.beforeEach(async ({ page, seedLocal }) => {
+    await seedLocal();
   });
 
-  test('POST generates a brief from provider data (no OpenRouter key, no 503)', async ({ page }) => {
-    const res = await page.request.post(`/workspace/${URL_KEY}/api/brief/${ISSUE_ID}`);
+  test('POST generates a brief from provider data (no OpenRouter key, no 503)', async ({ page, localWorkerUrlKey }) => {
+    const res = await page.request.post(`/workspace/${localWorkerUrlKey}/api/brief/${ISSUE_ID}`);
     expect(res.status()).toBe(200);
     const body = await res.json();
     expect(body.status).toBe('fresh');

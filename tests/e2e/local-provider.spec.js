@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
-import { seedLocalWorkspace, LOCAL_WORKSPACE_URL_KEY, localDashboardUrl } from '../fixtures/local-harness.js';
+import { localDashboardUrl } from '../fixtures/local-harness.js';
 
 // LIN-356 (F) / LIN-378: provider-agnostic E2E against a GENUINE second provider.
 //
@@ -11,15 +11,12 @@ import { seedLocalWorkspace, LOCAL_WORKSPACE_URL_KEY, localDashboardUrl } from '
 // abstraction serves a backend that is not Linear, with no mock and no
 // third-party dependency.
 
-const LOCAL_URL_KEY = LOCAL_WORKSPACE_URL_KEY;
-const DASHBOARD = localDashboardUrl(LOCAL_URL_KEY);
-
 test.describe('Local provider (no test-token mock)', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
     // ship is gated behind its experimental flag (LIN-496); the ship test below
     // navigates to /ship, so seed it on for this provider suite.
-    await seedLocalWorkspace(page, undefined, { features: { ship: true } });
-    await page.goto(DASHBOARD);
+    await seedLocal(undefined, { features: { ship: true } });
+    await page.goto(localDashboardUrl(localWorkerUrlKey));
     await page.waitForLoadState('networkidle');
   });
 
@@ -41,27 +38,27 @@ test.describe('Local provider (no test-token mock)', () => {
     await expect(page.locator('.detail-link', { hasText: 'View in Linear' })).toHaveCount(0);
   });
 
-  test('swim popover link is provider-aware (E2E proof of the F1 fix)', async ({ page }) => {
-    await page.goto(`/workspace/${LOCAL_URL_KEY}/swim`);
+  test('swim popover link is provider-aware (E2E proof of the F1 fix)', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/swim`);
     await expect(page.locator('#swim-popover-link')).toContainText('View in Local');
   });
 
-  test('ship popover link is provider-aware (E2E proof of the F1 fix)', async ({ page }) => {
-    await page.goto(`/workspace/${LOCAL_URL_KEY}/ship`);
+  test('ship popover link is provider-aware (E2E proof of the F1 fix)', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/ship`);
     await expect(page.locator('#ship-popover-link')).toContainText('View in Local');
   });
 
-  test('write round-trip: an issue created through provider.createIssue renders back', async ({ page }) => {
+  test('write round-trip: an issue created through provider.createIssue renders back', async ({ page, localWorkerUrlKey }) => {
     // Create via the registered Local provider — NOT the proxy. This is the
     // declared-but-unimplemented-until-now write path the provider exists to prove.
-    const resp = await page.request.get('/test/local-create-issue?title=Created via provider');
+    const resp = await page.request.get(`/test/local-create-issue?title=Created via provider&urlKey=${localWorkerUrlKey}`);
     expect(resp.ok()).toBeTruthy();
     const body = await resp.json();
     expect(body.ok).toBe(true);
     expect(body.issue.title).toBe('Created via provider');
 
     // Reload the dashboard — the read seam surfaces the freshly written issue.
-    await page.goto(DASHBOARD);
+    await page.goto(localDashboardUrl(localWorkerUrlKey));
     await page.waitForLoadState('networkidle');
     await expect(page.locator('.line:has-text("Created via provider")').first()).toBeAttached();
   });

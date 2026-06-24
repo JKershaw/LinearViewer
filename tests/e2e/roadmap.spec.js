@@ -1,9 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
-import {
-  seedLocalWorkspace,
-  workspaceApiLocalSeed,
-  LOCAL_WORKSPACE_URL_KEY,
-} from '../fixtures/local-harness.js';
+import { workspaceApiLocalSeed } from '../fixtures/local-harness.js';
 
 // LIN-409: the happy-path roadmap surface (page render, generate stream, pipeline
 // UI, reload rehydration) runs on a GENUINE `provider: 'local'` session seeded
@@ -17,17 +13,21 @@ import {
 // gates that fire before any provider/AI seam and the local harness seeds one
 // workspace.
 const TEST_WORKSPACE_URL_KEY = 'test-workspace';
-const URL_KEY = LOCAL_WORKSPACE_URL_KEY;
-const ROADMAP_URL = `/workspace/${URL_KEY}/roadmap`;
+// Pure per-worker URL builders for the local (genuine `provider: 'local'`) blocks;
+// the key is supplied per-test from the `localWorkerUrlKey` fixture (LIN-627).
+const roadmapUrl = (key) => `/workspace/${key}/roadmap`;
+const localGenerateUrl = (key) => `/workspace/${key}/api/roadmap/generate`;
 const FEATURES = encodeURIComponent(JSON.stringify({ roadmap: true }));
 // Seed options for a roadmap happy-path local session: the feature flag plus a
 // mock OpenRouter key (the AI mock fires via shouldMockAi, not this key).
 const ROADMAP_SEED_OPTS = { openRouterConnected: true, features: { roadmap: true } };
 
 test.describe('Roadmap Page', () => {
-  test.beforeEach(async ({ page }) => {
+  let ROADMAP_URL;
+  test.beforeEach(async ({ seedLocal, localWorkerUrlKey }) => {
+    ROADMAP_URL = roadmapUrl(localWorkerUrlKey);
     // Local session backs the page render; roadmap feature enabled.
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { roadmap: true } });
+    await seedLocal(workspaceApiLocalSeed, { features: { roadmap: true } });
   });
 
   test('loads roadmap page with deterministic data', async ({ page }) => {
@@ -111,9 +111,9 @@ test.describe('Roadmap Page', () => {
     expect(cardText).not.toMatch(/points:\s*\d/);
   });
 
-  test('redirects to projects when feature flag is off', async ({ page }) => {
+  test('redirects to projects when feature flag is off', async ({ page, seedLocal }) => {
     // Re-seed the local session with roadmap explicitly disabled.
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { roadmap: false } });
+    await seedLocal(workspaceApiLocalSeed, { features: { roadmap: false } });
     await page.goto(ROADMAP_URL);
     await page.waitForLoadState('networkidle');
 
@@ -209,8 +209,8 @@ test.describe('Roadmap Generate Endpoint', () => {
   // Negative paths assert pre-test-mode gates (403 flag-off, 503 no-AI) that fire
   // before any provider/AI seam — they stay on `test-token`.
   const GENERATE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/generate`;
-  // Happy paths drive the AI-mock layer off a local session.
-  const LOCAL_GENERATE_URL = `/workspace/${URL_KEY}/api/roadmap/generate`;
+  // Happy paths drive the AI-mock layer off a local session — `localGenerateUrl`
+  // builds the per-worker URL from the `localWorkerUrlKey` fixture per-test.
 
   test('returns 403 when feature flag is off', async ({ request }) => {
     const noRoadmap = encodeURIComponent(JSON.stringify({ roadmap: false }));
@@ -227,9 +227,9 @@ test.describe('Roadmap Generate Endpoint', () => {
     expect(body.error).toContain('AI not configured');
   });
 
-  test('streams every layer tagged over one SSE connection (with north star)', async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, ROADMAP_SEED_OPTS);
-    const response = await page.request.post(LOCAL_GENERATE_URL, { data: { northStar: 'Be the simplest way to ship.' } });
+  test('streams every layer tagged over one SSE connection (with north star)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, ROADMAP_SEED_OPTS);
+    const response = await page.request.post(localGenerateUrl(localWorkerUrlKey), { data: { northStar: 'Be the simplest way to ship.' } });
     expect(response.status()).toBe(200);
     expect(response.headers()['content-type']).toContain('text/event-stream');
 
@@ -247,9 +247,9 @@ test.describe('Roadmap Generate Endpoint', () => {
     expect(body.trim().endsWith('event: done\ndata: {}')).toBe(true);
   });
 
-  test('without a north star, skips north-star-reading and gap but still runs the digest', async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, ROADMAP_SEED_OPTS);
-    const response = await page.request.post(LOCAL_GENERATE_URL, { data: { northStar: '' } });
+  test('without a north star, skips north-star-reading and gap but still runs the digest', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, ROADMAP_SEED_OPTS);
+    const response = await page.request.post(localGenerateUrl(localWorkerUrlKey), { data: { northStar: '' } });
     expect(response.status()).toBe(200);
 
     const body = await response.text();
@@ -273,9 +273,9 @@ test.describe('Roadmap Generate Endpoint', () => {
     return m ? JSON.parse(m[1]).orientation : undefined;
   }
 
-  test('emits a normalized orientation event when a north star is set', async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, ROADMAP_SEED_OPTS);
-    const response = await page.request.post(LOCAL_GENERATE_URL, { data: { northStar: 'Be the simplest way to ship.' } });
+  test('emits a normalized orientation event when a north star is set', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, ROADMAP_SEED_OPTS);
+    const response = await page.request.post(localGenerateUrl(localWorkerUrlKey), { data: { northStar: 'Be the simplest way to ship.' } });
     const body = await response.text();
 
     expect(body).toContain('event: orientation');
@@ -318,9 +318,9 @@ test.describe('Roadmap Generate Endpoint', () => {
     return Array.from({ length: n }, (_, i) => `BIG-${i} | N | Serves the stated intent.`).join('\n');
   }
 
-  test('realistic-size COMPLETE line payload normalizes to a non-empty array', async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, ROADMAP_SEED_OPTS);
-    const response = await page.request.post(LOCAL_GENERATE_URL, {
+  test('realistic-size COMPLETE line payload normalizes to a non-empty array', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, ROADMAP_SEED_OPTS);
+    const response = await page.request.post(localGenerateUrl(localWorkerUrlKey), {
       data: { northStar: 'Be the simplest way to ship.', __testOrientationRaw: orientationLines(44) }
     });
     const event = parseOrientationEventFull(await response.text());
@@ -331,14 +331,14 @@ test.describe('Roadmap Generate Endpoint', () => {
     });
   });
 
-  test('realistic-size TRUNCATED line payload RECOVERS the complete lines (no silent loss)', async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, ROADMAP_SEED_OPTS);
+  test('realistic-size TRUNCATED line payload RECOVERS the complete lines (no silent loss)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, ROADMAP_SEED_OPTS);
     const full = orientationLines(44);
     // Cut deep into the final line, as a token-cap overrun would. Unlike the old
     // JSON contract — where this discarded every bearing — the line format keeps
     // every complete line above the cut.
     const truncated = full.slice(0, full.length - 25);
-    const response = await page.request.post(LOCAL_GENERATE_URL, {
+    const response = await page.request.post(localGenerateUrl(localWorkerUrlKey), {
       data: { northStar: 'Be the simplest way to ship.', __testOrientationRaw: truncated }
     });
     const event = parseOrientationEventFull(await response.text());
@@ -347,14 +347,14 @@ test.describe('Roadmap Generate Endpoint', () => {
     expect(event.orientation.every(b => b.bearing === 'N')).toBe(true);
   });
 
-  test('format drift (JSON instead of lines) surfaces a failure note (not a silent [])', async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, ROADMAP_SEED_OPTS);
+  test('format drift (JSON instead of lines) surfaces a failure note (not a silent [])', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, ROADMAP_SEED_OPTS);
     // The parser commits to ONE format; a model that ignores it and emits JSON
     // parses to nothing usable. That drift must be SURFACED, not swallowed.
     const drift = JSON.stringify(Array.from({ length: 5 }, (_, i) => ({
       identifier: `BIG-${i}`, bearing: 'N', reason: 'x', archived: false
     })));
-    const response = await page.request.post(LOCAL_GENERATE_URL, {
+    const response = await page.request.post(localGenerateUrl(localWorkerUrlKey), {
       data: { northStar: 'Be the simplest way to ship.', __testOrientationRaw: drift }
     });
     const event = parseOrientationEventFull(await response.text());
@@ -363,9 +363,9 @@ test.describe('Roadmap Generate Endpoint', () => {
     expect(event.notice).toMatch(/could not be generated|could not be parsed/i);
   });
 
-  test('without a north star, emits an orientation notice (no bearings)', async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, ROADMAP_SEED_OPTS);
-    const response = await page.request.post(LOCAL_GENERATE_URL, { data: { northStar: '' } });
+  test('without a north star, emits an orientation notice (no bearings)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, ROADMAP_SEED_OPTS);
+    const response = await page.request.post(localGenerateUrl(localWorkerUrlKey), { data: { northStar: '' } });
     const body = await response.text();
     // D2: rather than emitting nothing (a silently-inert ship toggle), the route
     // now surfaces WHY orientation is unavailable.
@@ -376,24 +376,24 @@ test.describe('Roadmap Generate Endpoint', () => {
     expect(event.notice).toMatch(/north star/i);
   });
 
-  test('orientation round-trips: generate → save → fetch persists the bearings', async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, ROADMAP_SEED_OPTS);
-    await page.request.get(`/test/clear-report-history?urlKey=${URL_KEY}`);
+  test('orientation round-trips: generate → save → fetch persists the bearings', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, ROADMAP_SEED_OPTS);
+    await page.request.get(`/test/clear-report-history?urlKey=${localWorkerUrlKey}`);
 
     // 1. Generate and pull the orientation array off the stream (as the client does).
-    const gen = await page.request.post(LOCAL_GENERATE_URL, { data: { northStar: 'Be the simplest way to ship.' } });
+    const gen = await page.request.post(localGenerateUrl(localWorkerUrlKey), { data: { northStar: 'Be the simplest way to ship.' } });
     const orientation = parseOrientationEvent(await gen.text());
     expect(orientation.length).toBeGreaterThan(0);
 
     // 2. Save the run with the orientation, exactly like saveReport's POST body.
-    const save = await page.request.post(`/workspace/${URL_KEY}/api/roadmap/reports`, {
+    const save = await page.request.post(`/workspace/${localWorkerUrlKey}/api/roadmap/reports`, {
       data: { northStar: 'Be the simplest way to ship.', narrative: { digest: 'Mock summary' }, orientation }
     });
     expect(save.status()).toBe(201);
     const { report } = await save.json();
 
     // 3. Fetch the persisted record and confirm the bearings round-tripped intact.
-    const got = await page.request.get(`/workspace/${URL_KEY}/api/roadmap/reports/${report.id}`);
+    const got = await page.request.get(`/workspace/${localWorkerUrlKey}/api/roadmap/reports/${report.id}`);
     expect(got.status()).toBe(200);
     const persisted = (await got.json()).report;
     expect(persisted.orientation).toEqual(orientation);
@@ -406,11 +406,13 @@ test.describe('Roadmap Generate Endpoint', () => {
 // =============================================================================
 
 test.describe('Roadmap Pipeline UI', () => {
-  test.beforeEach(async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, ROADMAP_SEED_OPTS);
+  let ROADMAP_URL;
+  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
+    ROADMAP_URL = roadmapUrl(localWorkerUrlKey);
+    await seedLocal(workspaceApiLocalSeed, ROADMAP_SEED_OPTS);
     // Start from a clean report store so on-load rehydration (LIN-299) doesn't
     // pre-fill the layer placeholders these tests expect to be idle.
-    await page.context().request.get(`/test/clear-report-history?urlKey=${URL_KEY}`);
+    await page.context().request.get(`/test/clear-report-history?urlKey=${localWorkerUrlKey}`);
   });
 
   test('renders north star textarea, the digest + five section placeholders, and generate button', async ({ page }) => {
@@ -492,9 +494,9 @@ test.describe('Roadmap Pipeline UI', () => {
     await expect(nsReading.locator('.roadmap-layer-heading')).toBeVisible();
   });
 
-  test('north star textarea is hidden when AI is not configured', async ({ page }) => {
+  test('north star textarea is hidden when AI is not configured', async ({ page, seedLocal }) => {
     // Override the beforeEach: local session WITHOUT openRouterConnected.
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { roadmap: true } });
+    await seedLocal(workspaceApiLocalSeed, { features: { roadmap: true } });
     await page.goto(ROADMAP_URL);
     await page.waitForLoadState('networkidle');
 
@@ -504,11 +506,11 @@ test.describe('Roadmap Pipeline UI', () => {
     }
   });
 
-  test('north star textarea loads saved value on page load', async ({ page }) => {
+  test('north star textarea loads saved value on page load', async ({ page, localWorkerUrlKey }) => {
     // Save a value via the API using the page's cookie context
     const saved = 'Be the simplest way to ship.';
     const pageRequest = page.context().request;
-    await pageRequest.put(`/workspace/${URL_KEY}/api/roadmap/north-star`, {
+    await pageRequest.put(`/workspace/${localWorkerUrlKey}/api/roadmap/north-star`, {
       data: { northStar: saved }
     });
 
@@ -519,7 +521,7 @@ test.describe('Roadmap Pipeline UI', () => {
     await expect(textarea).toHaveValue(saved);
   });
 
-  test('north star textarea saves changes on blur', async ({ page }) => {
+  test('north star textarea saves changes on blur', async ({ page, localWorkerUrlKey }) => {
     await page.goto(ROADMAP_URL);
     await page.waitForLoadState('networkidle');
 
@@ -531,7 +533,7 @@ test.describe('Roadmap Pipeline UI', () => {
     await page.waitForTimeout(500);
 
     const pageRequest = page.context().request;
-    const response = await pageRequest.get(`/workspace/${URL_KEY}/api/roadmap/north-star`);
+    const response = await pageRequest.get(`/workspace/${localWorkerUrlKey}/api/roadmap/north-star`);
     const body = await response.json();
     expect(body.northStar).toBe('Updated north star value.');
   });
@@ -550,10 +552,10 @@ test.describe('Roadmap Pipeline UI', () => {
     }
   });
 
-  test('clicking generate-reading runs all layers (including the digest) when north star is set', async ({ page }) => {
+  test('clicking generate-reading runs all layers (including the digest) when north star is set', async ({ page, localWorkerUrlKey }) => {
     // Pre-set a north star so layers 3b and 4 fire
     const pageRequest = page.context().request;
-    await pageRequest.put(`/workspace/${URL_KEY}/api/roadmap/north-star`, {
+    await pageRequest.put(`/workspace/${localWorkerUrlKey}/api/roadmap/north-star`, {
       data: { northStar: 'Be the simplest way to ship.' }
     });
 
@@ -589,10 +591,10 @@ test.describe('Roadmap Pipeline UI', () => {
     await expect(btn).toContainText(/regenerate/i);
   });
 
-  test('without a north star, layers 3b and 4 show CTA and do not run', async ({ page }) => {
+  test('without a north star, layers 3b and 4 show CTA and do not run', async ({ page, localWorkerUrlKey }) => {
     // Ensure north star is empty
     const pageRequest = page.context().request;
-    await pageRequest.put(`/workspace/${URL_KEY}/api/roadmap/north-star`, {
+    await pageRequest.put(`/workspace/${localWorkerUrlKey}/api/roadmap/north-star`, {
       data: { northStar: '' }
     });
 
@@ -834,14 +836,15 @@ test.describe('Roadmap Report History', () => {
 });
 
 test.describe('Roadmap Report History — reload rehydration (UI)', () => {
-  test('a generated reading is restored after reload', async ({ page }) => {
+  test('a generated reading is restored after reload', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    const ROADMAP_URL = roadmapUrl(localWorkerUrlKey);
     // Session setup must happen on the page's own cookie context.
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, ROADMAP_SEED_OPTS);
+    await seedLocal(workspaceApiLocalSeed, ROADMAP_SEED_OPTS);
     const pageRequest = page.context().request;
-    await pageRequest.get(`/test/clear-report-history?urlKey=${URL_KEY}`);
+    await pageRequest.get(`/test/clear-report-history?urlKey=${localWorkerUrlKey}`);
 
     // Pre-set a north star so all five layers run.
-    await pageRequest.put(`/workspace/${URL_KEY}/api/roadmap/north-star`, {
+    await pageRequest.put(`/workspace/${localWorkerUrlKey}/api/roadmap/north-star`, {
       data: { northStar: 'Be the simplest way to ship.' }
     });
 
@@ -868,12 +871,13 @@ test.describe('Roadmap Report History — reload rehydration (UI)', () => {
     await expect(page.locator('.roadmap-generate-reading-btn')).toContainText(/regenerate/i);
   });
 
-  test('orientation bearings render on the page and rehydrate after reload (LIN-324/D)', async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, ROADMAP_SEED_OPTS);
+  test('orientation bearings render on the page and rehydrate after reload (LIN-324/D)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    const ROADMAP_URL = roadmapUrl(localWorkerUrlKey);
+    await seedLocal(workspaceApiLocalSeed, ROADMAP_SEED_OPTS);
     const pageRequest = page.context().request;
-    await pageRequest.get(`/test/clear-report-history?urlKey=${URL_KEY}`);
+    await pageRequest.get(`/test/clear-report-history?urlKey=${localWorkerUrlKey}`);
     // A north star is required for orientation to run.
-    await pageRequest.put(`/workspace/${URL_KEY}/api/roadmap/north-star`, {
+    await pageRequest.put(`/workspace/${localWorkerUrlKey}/api/roadmap/north-star`, {
       data: { northStar: 'Be the simplest way to ship.' }
     });
 
@@ -903,11 +907,12 @@ test.describe('Roadmap Report History — reload rehydration (UI)', () => {
     await expect(page.locator('#roadmap-orientation-result .roadmap-orientation-row')).toHaveCount(3);
   });
 
-  test('history lists past readings; selecting an older one shows a viewing banner', async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, ROADMAP_SEED_OPTS);
+  test('history lists past readings; selecting an older one shows a viewing banner', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    const ROADMAP_URL = roadmapUrl(localWorkerUrlKey);
+    await seedLocal(workspaceApiLocalSeed, ROADMAP_SEED_OPTS);
     const pageRequest = page.context().request;
-    await pageRequest.get(`/test/clear-report-history?urlKey=${URL_KEY}`);
-    await pageRequest.put(`/workspace/${URL_KEY}/api/roadmap/north-star`, {
+    await pageRequest.get(`/test/clear-report-history?urlKey=${localWorkerUrlKey}`);
+    await pageRequest.put(`/workspace/${localWorkerUrlKey}/api/roadmap/north-star`, {
       data: { northStar: 'Be the simplest way to ship.' }
     });
 

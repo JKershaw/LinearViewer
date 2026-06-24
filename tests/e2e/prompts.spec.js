@@ -1,8 +1,6 @@
 import { test, expect } from '../fixtures/test-base.js';
 import {
-  seedLocalWorkspace,
   workspaceApiLocalSeed,
-  LOCAL_WORKSPACE_URL_KEY,
 } from '../fixtures/local-harness.js';
 
 // UUIDs for test issues — workspaceApiLocalSeed shares the linear fixture's
@@ -11,11 +9,6 @@ const BLOCKED_ISSUE_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 const BUG_ISSUE_ID = 'dddddddd-dddd-dddd-dddd-ddddddddddde';
 const PLAN_ISSUE_ID = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeef';
 const CODE_REVIEW_ISSUE_ID = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
-
-// Local-provider workspace seeded via /test/set-local-session (LIN-406).
-const URL_KEY = LOCAL_WORKSPACE_URL_KEY;
-const WORKSPACE_URL = `/workspace/${URL_KEY}/`;
-const API_PREFIX = `/workspace/${URL_KEY}`;
 
 /**
  * Helper to expand Prompts section for an issue
@@ -47,10 +40,10 @@ async function clickMoreToggle(page, containerSelector, issueId) {
 }
 
 test.describe('Promptable Labels', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
     // Prompt GET is template/data-driven; the local provider supplies the data.
-    await seedLocalWorkspace(page, workspaceApiLocalSeed);
-    await page.goto(WORKSPACE_URL);
+    await seedLocal(workspaceApiLocalSeed);
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
   });
 
@@ -302,10 +295,10 @@ test.describe('Promptable Labels', () => {
 });
 
 test.describe('Prompt API', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, seedLocal }) => {
     // Prompt GET short-circuits 400/404 before any data fetch; positive GETs are
     // served by the local provider.
-    await seedLocalWorkspace(page, workspaceApiLocalSeed);
+    await seedLocal(workspaceApiLocalSeed);
   });
 
   // NOTE: the 401-unauthenticated negative path is dropped on migration (LIN-406),
@@ -319,31 +312,31 @@ test.describe('Prompt API', () => {
   // streaming.spec.js ('parent path streams delta events …'); it was duplicate
   // coverage mis-filed under Prompt API and is dropped here on migration (LIN-406).
 
-  test('returns 404 for unknown label', async ({ page }) => {
+  test('returns 404 for unknown label', async ({ page, localWorkerUrlKey }) => {
     // Use valid UUID format so we get to the label check
-    const response = await page.request.get(`${API_PREFIX}/api/prompt/${BLOCKED_ISSUE_ID}/unknown-label`);
+    const response = await page.request.get(`/workspace/${localWorkerUrlKey}/api/prompt/${BLOCKED_ISSUE_ID}/unknown-label`);
     expect(response.status()).toBe(404);
 
     const body = await response.json();
     expect(body.error).toContain('No prompt template');
   });
 
-  test('returns 400 for invalid issue ID format', async ({ page }) => {
-    const response = await page.request.get(`${API_PREFIX}/api/prompt/INVALID!!!/blocked`);
+  test('returns 400 for invalid issue ID format', async ({ page, localWorkerUrlKey }) => {
+    const response = await page.request.get(`/workspace/${localWorkerUrlKey}/api/prompt/INVALID!!!/blocked`);
     expect(response.status()).toBe(400);
 
     const body = await response.json();
     expect(body.error).toContain('Invalid issue ID format');
   });
 
-  test('returns 404 for removed phase labels', async ({ page }) => {
+  test('returns 404 for removed phase labels', async ({ page, localWorkerUrlKey }) => {
     // Old phase labels should no longer have templates
-    const response = await page.request.get(`${API_PREFIX}/api/prompt/${BLOCKED_ISSUE_ID}/in-breakdown`);
+    const response = await page.request.get(`/workspace/${localWorkerUrlKey}/api/prompt/${BLOCKED_ISSUE_ID}/in-breakdown`);
     expect(response.status()).toBe(404);
   });
 
-  test('returns blocked prompt', async ({ page }) => {
-    const response = await page.request.get(`${API_PREFIX}/api/prompt/${BLOCKED_ISSUE_ID}/blocked`);
+  test('returns blocked prompt', async ({ page, localWorkerUrlKey }) => {
+    const response = await page.request.get(`/workspace/${localWorkerUrlKey}/api/prompt/${BLOCKED_ISSUE_ID}/blocked`);
     expect(response.status()).toBe(200);
 
     const body = await response.json();
@@ -353,8 +346,8 @@ test.describe('Prompt API', () => {
     expect(body.prompt).toContain('## Goal');
   });
 
-  test('LIN-316: ?format=md returns prompt as a downloadable markdown file', async ({ page }) => {
-    const response = await page.request.get(`${API_PREFIX}/api/prompt/${BLOCKED_ISSUE_ID}/blocked?format=md`);
+  test('LIN-316: ?format=md returns prompt as a downloadable markdown file', async ({ page, localWorkerUrlKey }) => {
+    const response = await page.request.get(`/workspace/${localWorkerUrlKey}/api/prompt/${BLOCKED_ISSUE_ID}/blocked?format=md`);
     expect(response.status()).toBe(200);
 
     // Markdown content type + attachment headers
@@ -369,8 +362,8 @@ test.describe('Prompt API', () => {
     expect(body.trimStart().startsWith('{')).toBe(false);
   });
 
-  test('LIN-316: prompt route still returns JSON without ?format=md', async ({ page }) => {
-    const response = await page.request.get(`${API_PREFIX}/api/prompt/${BLOCKED_ISSUE_ID}/blocked`);
+  test('LIN-316: prompt route still returns JSON without ?format=md', async ({ page, localWorkerUrlKey }) => {
+    const response = await page.request.get(`/workspace/${localWorkerUrlKey}/api/prompt/${BLOCKED_ISSUE_ID}/blocked`);
     expect(response.status()).toBe(200);
     expect(response.headers()['content-type']).toContain('application/json');
     const body = await response.json();
@@ -378,8 +371,8 @@ test.describe('Prompt API', () => {
     expect(body.prompt).toContain('# Unblock TEST-');
   });
 
-  test('returns bug prompt', async ({ page }) => {
-    const response = await page.request.get(`${API_PREFIX}/api/prompt/${BUG_ISSUE_ID}/bug`);
+  test('returns bug prompt', async ({ page, localWorkerUrlKey }) => {
+    const response = await page.request.get(`/workspace/${localWorkerUrlKey}/api/prompt/${BUG_ISSUE_ID}/bug`);
     expect(response.status()).toBe(200);
 
     const body = await response.json();
@@ -389,8 +382,8 @@ test.describe('Prompt API', () => {
     expect(body.prompt).toContain('## Goal');
   });
 
-  test('returns plan prompt', async ({ page }) => {
-    const response = await page.request.get(`${API_PREFIX}/api/prompt/${PLAN_ISSUE_ID}/plan`);
+  test('returns plan prompt', async ({ page, localWorkerUrlKey }) => {
+    const response = await page.request.get(`/workspace/${localWorkerUrlKey}/api/prompt/${PLAN_ISSUE_ID}/plan`);
     expect(response.status()).toBe(200);
 
     const body = await response.json();
@@ -400,8 +393,8 @@ test.describe('Prompt API', () => {
     expect(body.prompt).toContain('## Goal');
   });
 
-  test('returns review prompt (code-review consolidated into review — LIN-523)', async ({ page }) => {
-    const response = await page.request.get(`${API_PREFIX}/api/prompt/${CODE_REVIEW_ISSUE_ID}/review`);
+  test('returns review prompt (code-review consolidated into review — LIN-523)', async ({ page, localWorkerUrlKey }) => {
+    const response = await page.request.get(`/workspace/${localWorkerUrlKey}/api/prompt/${CODE_REVIEW_ISSUE_ID}/review`);
     expect(response.status()).toBe(200);
 
     const body = await response.json();
@@ -411,8 +404,8 @@ test.describe('Prompt API', () => {
     expect(body.prompt).toContain('## Goal');
   });
 
-  test('returns look-into prompt', async ({ page }) => {
-    const response = await page.request.get(`${API_PREFIX}/api/prompt/${BLOCKED_ISSUE_ID}/look-into`);
+  test('returns look-into prompt', async ({ page, localWorkerUrlKey }) => {
+    const response = await page.request.get(`/workspace/${localWorkerUrlKey}/api/prompt/${BLOCKED_ISSUE_ID}/look-into`);
     expect(response.status()).toBe(200);
 
     const body = await response.json();
@@ -421,8 +414,8 @@ test.describe('Prompt API', () => {
     expect(body.prompt).toContain('## Goal');
   });
 
-  test('returns triage prompt', async ({ page }) => {
-    const response = await page.request.get(`${API_PREFIX}/api/prompt/${BLOCKED_ISSUE_ID}/triage`);
+  test('returns triage prompt', async ({ page, localWorkerUrlKey }) => {
+    const response = await page.request.get(`/workspace/${localWorkerUrlKey}/api/prompt/${BLOCKED_ISSUE_ID}/triage`);
     expect(response.status()).toBe(200);
 
     const body = await response.json();
@@ -434,9 +427,9 @@ test.describe('Prompt API', () => {
 
 // Tests for promptable label rendering across different labels
 test.describe('Multiple Promptable Labels UI', () => {
-  test.beforeEach(async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed);
-    await page.goto(WORKSPACE_URL);
+  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed);
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
   });
 
@@ -536,9 +529,9 @@ test.describe('Multiple Promptable Labels UI', () => {
 
 // Tests for "more" inline expansion feature
 test.describe('More Prompts Inline', () => {
-  test.beforeEach(async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed);
-    await page.goto(WORKSPACE_URL);
+  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed);
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
   });
 
@@ -628,10 +621,10 @@ test.describe('More Prompts Inline', () => {
 // =============================================================================
 
 test.describe('AI Recommendations', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
     // AI suggest button requires OpenRouter to be configured
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, { openRouterConnected: true });
-    await page.goto(WORKSPACE_URL);
+    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true });
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
   });
 
@@ -649,11 +642,11 @@ test.describe('AI Recommendations', () => {
     await expect(suggestBtn).toHaveText('AI suggest');
   });
 
-  test('AI suggest button is hidden when OpenRouter is not configured', async ({ page }) => {
+  test('AI suggest button is hidden when OpenRouter is not configured', async ({ page, seedLocal, localWorkerUrlKey }) => {
     // Re-seed WITHOUT OpenRouter — the absence of the key is the thing under test,
     // so it must not inherit the block's connected seed.
-    await seedLocalWorkspace(page, workspaceApiLocalSeed);
-    await page.goto(WORKSPACE_URL);
+    await seedLocal(workspaceApiLocalSeed);
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
     // Expand an issue
@@ -815,23 +808,23 @@ test.describe('AI Recommendations', () => {
 // =============================================================================
 
 test.describe('Recommendation API', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, seedLocal }) => {
     // openRouterConnected is required: on a local session isTestMode is false, so
     // GET /api/recommend/status reports enabled:true only with the session key.
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, { openRouterConnected: true });
+    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true });
   });
 
   // NOTE: the 401-unauthenticated negative path is dropped on migration (LIN-406) —
   // see the Prompt API block: it tests shared auth middleware, not the recommend
   // surface, and is not expressible on a session-scoped local workspace.
 
-  test('returns 400 for invalid issue ID format', async ({ page }) => {
-    const response = await page.request.get(`${API_PREFIX}/api/recommend/INVALID!!!`);
+  test('returns 400 for invalid issue ID format', async ({ page, localWorkerUrlKey }) => {
+    const response = await page.request.get(`/workspace/${localWorkerUrlKey}/api/recommend/INVALID!!!`);
     expect(response.status()).toBe(400);
   });
 
-  test('returns 200 with generated prompt for valid request', async ({ page }) => {
-    const response = await page.request.get(`${API_PREFIX}/api/recommend/${BLOCKED_ISSUE_ID}`);
+  test('returns 200 with generated prompt for valid request', async ({ page, localWorkerUrlKey }) => {
+    const response = await page.request.get(`/workspace/${localWorkerUrlKey}/api/recommend/${BLOCKED_ISSUE_ID}`);
     expect(response.status()).toBe(200);
 
     const body = await response.json();
@@ -846,10 +839,10 @@ test.describe('Recommendation API', () => {
     expect(body.completionTokens).toBeNull(); // null for mock responses
   });
 
-  test('returns contextual prompt based on labels', async ({ page }) => {
+  test('returns contextual prompt based on labels', async ({ page, localWorkerUrlKey }) => {
     // Bug-labelled issue — the label drives the contextual reasoning. (LIN-357:
     // the `blocked` label was abolished, so `bug` is the remaining label signal.)
-    const response = await page.request.get(`${API_PREFIX}/api/recommend/${BUG_ISSUE_ID}`);
+    const response = await page.request.get(`/workspace/${localWorkerUrlKey}/api/recommend/${BUG_ISSUE_ID}`);
     const body = await response.json();
 
     // Should mention bug in reasoning
@@ -859,8 +852,8 @@ test.describe('Recommendation API', () => {
     expect(body.prompt).toContain('Goal');
   });
 
-  test('returns status endpoint correctly', async ({ page }) => {
-    const response = await page.request.get(`${API_PREFIX}/api/recommend/status`);
+  test('returns status endpoint correctly', async ({ page, localWorkerUrlKey }) => {
+    const response = await page.request.get(`/workspace/${localWorkerUrlKey}/api/recommend/status`);
     expect(response.status()).toBe(200);
 
     const body = await response.json();
@@ -869,8 +862,8 @@ test.describe('Recommendation API', () => {
     expect(body.enabled).toBe(true);
   });
 
-  test('returns issueUrl field', async ({ page }) => {
-    const response = await page.request.get(`${API_PREFIX}/api/recommend/${BLOCKED_ISSUE_ID}`);
+  test('returns issueUrl field', async ({ page, localWorkerUrlKey }) => {
+    const response = await page.request.get(`/workspace/${localWorkerUrlKey}/api/recommend/${BLOCKED_ISSUE_ID}`);
     expect(response.status()).toBe(200);
 
     const body = await response.json();

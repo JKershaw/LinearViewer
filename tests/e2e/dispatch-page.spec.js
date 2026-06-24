@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
-import { seedLocalWorkspace, LOCAL_WORKSPACE_URL_KEY } from '../fixtures/local-harness.js';
+import { seedLocalWorkspace } from '../fixtures/local-harness.js';
 
 // Migrated onto a GENUINE `provider: 'local'` session (LIN-425, parent S3). The
 // dispatch queue/tokens/history stores stay store-backed (urlKey-scoped), NOT
@@ -7,10 +7,11 @@ import { seedLocalWorkspace, LOCAL_WORKSPACE_URL_KEY } from '../fixtures/local-h
 // `?urlKey=local-workspace` (they default to `test-workspace`). The repo selector
 // reads the provider's projects, so we seed exactly ONE project carrying
 // `repo=test-repo` (→ "none" + one repo option, matching the old testMockData set).
-const TEST_WORKSPACE_URL_KEY = LOCAL_WORKSPACE_URL_KEY;
-const DISPATCH_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/dispatch`;
-const SETTINGS_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/settings`;
-const API_PREFIX = `/workspace/${TEST_WORKSPACE_URL_KEY}`;
+// Per-worker key + nav/API URLs are bound before every test by the top-level
+// beforeEach (LIN-627); the request-shim helper and test bodies read these
+// module-scoped lets. Playwright workers are separate processes, so this is
+// per-worker state, never shared across parallel workers.
+let WS, DISPATCH_URL, SETTINGS_URL, API_PREFIX;
 
 // Minimal provider seed for the repo selector: a single project whose content
 // carries `repo=test-repo`, so the selector renders exactly two options
@@ -27,13 +28,22 @@ const REPO_SEED = {
 // so its session-scoped dispatch POSTs resolve the local workspace. seedLocalWorkspace
 // only needs a `.request` API context, so a `{ request }` shim suffices.
 function seedRequestSession(request) {
-  return seedLocalWorkspace({ request }, REPO_SEED, { features: { dispatch: true } });
+  return seedLocalWorkspace({ request }, REPO_SEED, { features: { dispatch: true }, urlKey: WS });
 }
 
 test.describe('Dispatch Page', () => {
+  // Bind the per-worker key + URLs before every test (and the nested beforeEach
+  // hooks that seed / clear via these). LIN-627.
+  test.beforeEach(({ localWorkerUrlKey }) => {
+    WS = localWorkerUrlKey;
+    DISPATCH_URL = `/workspace/${WS}/dispatch`;
+    SETTINGS_URL = `/workspace/${WS}/settings`;
+    API_PREFIX = `/workspace/${WS}`;
+  });
+
   test.describe('Page Access', () => {
     test('dispatch page loads when feature flag is enabled', async ({ page }) => {
-      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true } });
+      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true }, urlKey: WS });
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
 
@@ -42,7 +52,7 @@ test.describe('Dispatch Page', () => {
     });
 
     test('dispatch page redirects to settings when feature flag is disabled', async ({ page }) => {
-      await seedLocalWorkspace(page, REPO_SEED);
+      await seedLocalWorkspace(page, REPO_SEED, { urlKey: WS });
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
 
@@ -51,7 +61,7 @@ test.describe('Dispatch Page', () => {
     });
 
     test('dispatch page shows all four sections', async ({ page }) => {
-      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true } });
+      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true }, urlKey: WS });
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
 
@@ -66,8 +76,8 @@ test.describe('Dispatch Page', () => {
     test.beforeEach(async ({ page }) => {
       // Seed FIRST so the local session (user `test-local-user-id`) exists before
       // clearing recents — `/test/clear-recent-prompts` clears the session's user.
-      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true } });
-      await page.goto(`/test/clear-dispatch-queue?urlKey=${TEST_WORKSPACE_URL_KEY}`);
+      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true }, urlKey: WS });
+      await page.goto(`/test/clear-dispatch-queue?urlKey=${WS}`);
       await page.goto('/test/clear-recent-prompts');
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
@@ -279,7 +289,7 @@ test.describe('Dispatch Page', () => {
 
   test.describe('Dispatch Options Disclosure', () => {
     test.beforeEach(async ({ page }) => {
-      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true } });
+      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true }, urlKey: WS });
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
     });
@@ -346,7 +356,7 @@ test.describe('Dispatch Page', () => {
     });
 
     test('clicking an option inside the panel still dispatches (send handler fires)', async ({ page }) => {
-      await page.goto(`/test/clear-dispatch-queue?urlKey=${TEST_WORKSPACE_URL_KEY}`);
+      await page.goto(`/test/clear-dispatch-queue?urlKey=${WS}`);
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
 
@@ -372,8 +382,8 @@ test.describe('Dispatch Page', () => {
 
   test.describe('Queue List', () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto(`/test/clear-dispatch-queue?urlKey=${TEST_WORKSPACE_URL_KEY}`);
-      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true } });
+      await page.goto(`/test/clear-dispatch-queue?urlKey=${WS}`);
+      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true }, urlKey: WS });
     });
 
     test('queue list shows empty state', async ({ page }) => {
@@ -444,8 +454,8 @@ test.describe('Dispatch Page', () => {
 
   test.describe('Token Management', () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto(`/test/clear-dispatch-tokens?urlKey=${TEST_WORKSPACE_URL_KEY}`);
-      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true } });
+      await page.goto(`/test/clear-dispatch-tokens?urlKey=${WS}`);
+      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true }, urlKey: WS });
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
     });
@@ -523,10 +533,10 @@ test.describe('Dispatch Page', () => {
 
   test.describe('Dispatch History', () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto(`/test/clear-dispatch-queue?urlKey=${TEST_WORKSPACE_URL_KEY}`);
-      await page.goto(`/test/clear-dispatch-tokens?urlKey=${TEST_WORKSPACE_URL_KEY}`);
-      await page.goto(`/test/clear-dispatch-history?urlKey=${TEST_WORKSPACE_URL_KEY}`);
-      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true } });
+      await page.goto(`/test/clear-dispatch-queue?urlKey=${WS}`);
+      await page.goto(`/test/clear-dispatch-tokens?urlKey=${WS}`);
+      await page.goto(`/test/clear-dispatch-history?urlKey=${WS}`);
+      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true }, urlKey: WS });
     });
 
     test('history shows empty state', async ({ page }) => {
@@ -538,7 +548,7 @@ test.describe('Dispatch Page', () => {
     });
 
     test('taken item shows in history with correct status', async ({ page, request }) => {
-      const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${TEST_WORKSPACE_URL_KEY}`);
+      const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${WS}`);
       const { token } = await tokenResponse.json();
 
       await seedRequestSession(request);
@@ -658,15 +668,15 @@ test.describe('Dispatch Page', () => {
 
   test.describe('Feedback in History', () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto(`/test/clear-dispatch-queue?urlKey=${TEST_WORKSPACE_URL_KEY}`);
-      await page.goto(`/test/clear-dispatch-tokens?urlKey=${TEST_WORKSPACE_URL_KEY}`);
-      await page.goto(`/test/clear-dispatch-history?urlKey=${TEST_WORKSPACE_URL_KEY}`);
-      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true } });
+      await page.goto(`/test/clear-dispatch-queue?urlKey=${WS}`);
+      await page.goto(`/test/clear-dispatch-tokens?urlKey=${WS}`);
+      await page.goto(`/test/clear-dispatch-history?urlKey=${WS}`);
+      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true }, urlKey: WS });
     });
 
     test('history item with feedback shows feedback entries', async ({ page, request }) => {
       // Set up: create token, dispatch, take, add feedback
-      const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${TEST_WORKSPACE_URL_KEY}`);
+      const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${WS}`);
       const { token } = await tokenResponse.json();
 
       await seedRequestSession(request);
@@ -734,7 +744,7 @@ test.describe('Dispatch Page', () => {
     });
 
     test('refresh button reloads history', async ({ page, request }) => {
-      const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${TEST_WORKSPACE_URL_KEY}`);
+      const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${WS}`);
       const { token } = await tokenResponse.json();
 
       await seedRequestSession(request);
@@ -776,7 +786,7 @@ test.describe('Dispatch Page', () => {
 
   test.describe('Navigation', () => {
     test('footer shows dispatch link when feature enabled', async ({ page }) => {
-      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true } });
+      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true }, urlKey: WS });
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
 
@@ -786,7 +796,7 @@ test.describe('Dispatch Page', () => {
     });
 
     test('footer dispatch link works from other pages', async ({ page }) => {
-      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true } });
+      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true }, urlKey: WS });
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
 
@@ -802,7 +812,7 @@ test.describe('Dispatch Page', () => {
     });
 
     test('footer does not show dispatch link when feature disabled', async ({ page }) => {
-      await seedLocalWorkspace(page, REPO_SEED);
+      await seedLocalWorkspace(page, REPO_SEED, { urlKey: WS });
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
 
@@ -811,7 +821,7 @@ test.describe('Dispatch Page', () => {
     });
 
     test('navbar shows projects link on dispatch page', async ({ page }) => {
-      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true } });
+      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true }, urlKey: WS });
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
 
@@ -822,7 +832,7 @@ test.describe('Dispatch Page', () => {
 
   test.describe('Settings Page Cleanup', () => {
     test('settings page no longer shows dispatch section when dispatch enabled', async ({ page }) => {
-      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true } });
+      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true }, urlKey: WS });
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
 
@@ -835,7 +845,7 @@ test.describe('Dispatch Page', () => {
     });
 
     test('settings page still shows dispatch feature toggle', async ({ page }) => {
-      await seedLocalWorkspace(page, REPO_SEED);
+      await seedLocalWorkspace(page, REPO_SEED, { urlKey: WS });
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
 
@@ -849,7 +859,7 @@ test.describe('Dispatch Page', () => {
   // after it. The goal control + load button are proxy-gated, so seed proxy on.
   test.describe('Autopilot Goal', () => {
     test.beforeEach(async ({ page }) => {
-      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true, proxy: true } });
+      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true, proxy: true }, urlKey: WS });
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
     });

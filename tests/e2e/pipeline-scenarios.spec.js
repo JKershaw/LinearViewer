@@ -9,16 +9,19 @@
  * accessibility with empty data).
  */
 import { test, expect } from '../fixtures/test-base.js';
-import { seedLocalWorkspace, pipelineLocalSeed, LOCAL_WORKSPACE_URL_KEY } from '../fixtures/local-harness.js';
+import { seedLocalWorkspace, pipelineLocalSeed } from '../fixtures/local-harness.js';
 
 // LIN-387: real dispatch→take→agent flow runs against the local-provider
-// workspace. Tokens/clears are scoped to LOCAL_WORKSPACE_URL_KEY via the
-// shared harness's `?urlKey=` param; the seed reuses testMockData so the
-// asserted identifiers/titles (TEST-14 'Add pagination to user list', TEST-15)
-// are unchanged.
-const WS = LOCAL_WORKSPACE_URL_KEY;
-const PIPELINE_URL = `/workspace/${WS}/pipeline`;
-const API = `/workspace/${WS}`;
+// workspace. Tokens/clears are scoped to the per-worker key via the shared
+// harness's `?urlKey=` param; the seed reuses testMockData so the asserted
+// identifiers/titles (TEST-14 'Add pagination to user list', TEST-15) are
+// unchanged.
+//
+// LIN-627: the workspace key + nav/API URLs are bound per-test from the
+// `localWorkerUrlKey` worker fixture by the top-level beforeEach below; the
+// helpers read these module-scoped lets. Playwright workers are separate
+// processes, so this is per-worker state, never shared across parallel workers.
+let WS, PIPELINE_URL, API;
 const FEATURES = { pipeline: true, dispatch: true, proxy: true };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -32,7 +35,7 @@ async function setupCleanSession(page) {
   await page.goto(`/test/clear-dispatch-tokens?urlKey=${WS}`);
   await page.goto(`/test/clear-proxy-tokens?urlKey=${WS}`);
   await page.goto(`/test/clear-agent-status?urlKey=${WS}`);
-  await seedLocalWorkspace(page, pipelineLocalSeed, { features: FEATURES });
+  await seedLocalWorkspace(page, pipelineLocalSeed, { features: FEATURES, urlKey: WS });
 }
 
 /**
@@ -144,6 +147,13 @@ async function loadPipelinePage(page) {
 // ─── Tests ──────────────────────────────────────────────────────────────────
 
 test.describe('Pipeline Scenarios', () => {
+  // Bind the per-worker key + URLs before every test (and before the nested
+  // beforeEach hooks that call setupCleanSession). LIN-627.
+  test.beforeEach(({ localWorkerUrlKey }) => {
+    WS = localWorkerUrlKey;
+    PIPELINE_URL = `/workspace/${WS}/pipeline`;
+    API = `/workspace/${WS}`;
+  });
 
   // ── Single Active Task ──────────────────────────────────────────────────
 

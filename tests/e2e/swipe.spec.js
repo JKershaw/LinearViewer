@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
-import { seedLocalWorkspace, workspaceApiLocalSeed, LOCAL_WORKSPACE_URL_KEY } from '../fixtures/local-harness.js';
+import { workspaceApiLocalSeed } from '../fixtures/local-harness.js';
 
 // LIN-427: the swipe surface is fully modeled by the local provider (the page
 // reads projects/issues through fetchAndPrepareProjects, and the recap/brief AI
@@ -11,13 +11,11 @@ import { seedLocalWorkspace, workspaceApiLocalSeed, LOCAL_WORKSPACE_URL_KEY } fr
 // Alpha, bug/urgent/feature labels, TEST-15→TEST-14 blocks, TEST-1→TEST-2 parent),
 // so assertions stay byte-identical. The shared workspace URL constant couples all
 // four blocks, so they migrate together.
-const TEST_WORKSPACE_URL_KEY = LOCAL_WORKSPACE_URL_KEY;
-const SWIPE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/swipe`;
 
 test.describe('Swipe Page', () => {
-  test.beforeEach(async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed);
-    await page.goto(SWIPE_URL);
+  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed);
+    await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
     await page.waitForLoadState('networkidle');
   });
 
@@ -145,9 +143,9 @@ test.describe('Swipe Page', () => {
     await expect(page.locator('.footer-current:has-text("swipe")')).toBeVisible();
   });
 
-  test('swipe link appears in dashboard footer', async ({ page }) => {
+  test('swipe link appears in dashboard footer', async ({ page, localWorkerUrlKey }) => {
     // Navigate to main dashboard
-    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
     // Footer should have swipe link
@@ -189,10 +187,10 @@ test.describe('Swipe Page', () => {
     expect(foundBlocked).toBe(true);
   });
 
-  test('shows parent/subtask relationship rows on cards', async ({ page }) => {
+  test('shows parent/subtask relationship rows on cards', async ({ page, localWorkerUrlKey }) => {
     // TEST-2 is a child of TEST-1 (parent/child relationship)
     // Navigate to TEST-2 which should show a "Parent" row
-    await page.goto(`${SWIPE_URL}/TEST-2`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/swipe/TEST-2`);
     await page.waitForLoadState('networkidle');
 
     const parentRow = page.locator('.swipe-meta-parent');
@@ -244,9 +242,9 @@ test.describe('Swipe Page', () => {
     expect(prevStateClass).toContain('in-progress');
   });
 
-  test('clicking subtask link navigates to that card', async ({ page }) => {
+  test('clicking subtask link navigates to that card', async ({ page, localWorkerUrlKey }) => {
     // Load TEST-1 which has TEST-2 as a subtask
-    await page.goto(`${SWIPE_URL}/TEST-1`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/swipe/TEST-1`);
     await page.waitForLoadState('networkidle');
 
     const subtaskLink = page.locator('.swipe-meta-subtasks a.swipe-relation-issue');
@@ -257,9 +255,9 @@ test.describe('Swipe Page', () => {
     expect(page.url()).toContain('/swipe/TEST-2');
   });
 
-  test('URL updates with task identifier when navigating', async ({ page }) => {
+  test('URL updates with task identifier when navigating', async ({ page, localWorkerUrlKey }) => {
     // Start on a card with a known identifier
-    await page.goto(`${SWIPE_URL}/TEST-15`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/swipe/TEST-15`);
     await page.waitForLoadState('networkidle');
 
     // URL should contain the identifier
@@ -277,9 +275,9 @@ test.describe('Swipe Page', () => {
     expect(page.url()).toContain('/swipe/TEST-15');
   });
 
-  test('deep-link URL loads specific card', async ({ page }) => {
+  test('deep-link URL loads specific card', async ({ page, localWorkerUrlKey }) => {
     // Navigate directly to TEST-15 (session already set by beforeEach)
-    await page.goto(`${SWIPE_URL}/TEST-15`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/swipe/TEST-15`);
     await page.waitForLoadState('networkidle');
 
     // Should display the TEST-15 card
@@ -325,9 +323,9 @@ test.describe('Swipe Page', () => {
     expect(stateClass).not.toContain('done');
   });
 
-  test('clicking blocking issue link navigates to that card', async ({ page }) => {
+  test('clicking blocking issue link navigates to that card', async ({ page, localWorkerUrlKey }) => {
     // Load TEST-15 which blocks TEST-14 (session already set by beforeEach)
-    await page.goto(`${SWIPE_URL}/TEST-15`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/swipe/TEST-15`);
     await page.waitForLoadState('networkidle');
 
     // Should see "Blocks" row with a clickable link
@@ -351,26 +349,24 @@ test.describe('Swipe Page', () => {
 // ============================================================================
 
 test.describe('Swipe Dispatched Sessions', () => {
-  const API = `/workspace/${TEST_WORKSPACE_URL_KEY}`;
-
   // Acts as a dispatch consumer to seed real sessions, mirroring
   // pipeline-scenarios.spec.js. Sessions come from the local dispatch/agent-status
   // stores, so the session is a GENUINE local-provider session (the dispatch
-  // feature flag is set via seedLocalWorkspace); clears are scoped to the local
+  // feature flag is set via seedLocal); clears are scoped to the local
   // workspace via `?urlKey=`.
-  async function clearSessions(page) {
-    await page.goto(`/test/clear-dispatch-queue?urlKey=${TEST_WORKSPACE_URL_KEY}`);
-    await page.goto(`/test/clear-dispatch-history?urlKey=${TEST_WORKSPACE_URL_KEY}`);
-    await page.goto(`/test/clear-dispatch-tokens?urlKey=${TEST_WORKSPACE_URL_KEY}`);
+  async function clearSessions(page, urlKey) {
+    await page.goto(`/test/clear-dispatch-queue?urlKey=${urlKey}`);
+    await page.goto(`/test/clear-dispatch-history?urlKey=${urlKey}`);
+    await page.goto(`/test/clear-dispatch-tokens?urlKey=${urlKey}`);
   }
 
-  async function createConsumerToken(page) {
-    const resp = await page.goto(`/test/create-dispatch-token?urlKey=${TEST_WORKSPACE_URL_KEY}`);
+  async function createConsumerToken(page, urlKey) {
+    const resp = await page.goto(`/test/create-dispatch-token?urlKey=${urlKey}`);
     return JSON.parse(await resp.text()).token;
   }
 
-  async function dispatchForIssue(page, issueIdentifier, promptName = 'implementation') {
-    const resp = await page.request.post(`${API}/api/dispatch`, {
+  async function dispatchForIssue(page, urlKey, issueIdentifier, promptName = 'implementation') {
+    const resp = await page.request.post(`/workspace/${urlKey}/api/dispatch`, {
       data: { prompt: `Work on ${issueIdentifier}`, promptName, issueIdentifier, target: 'cli' }
     });
     expect(resp.status(), `dispatch failed: ${await resp.text()}`).toBe(201);
@@ -391,8 +387,8 @@ test.describe('Swipe Dispatched Sessions', () => {
     expect(resp.ok(), `feedback failed: ${await resp.text()}`).toBeTruthy();
   }
 
-  async function openSwipeAt(page, identifier) {
-    await page.goto(`${SWIPE_URL}/${identifier}`);
+  async function openSwipeAt(page, urlKey, identifier) {
+    await page.goto(`/workspace/${urlKey}/swipe/${identifier}`);
     await page.waitForLoadState('networkidle');
     await expect(page.locator('.swipe-card-identifier')).toHaveText(identifier);
   }
@@ -401,35 +397,35 @@ test.describe('Swipe Dispatched Sessions', () => {
     return page.locator('.swipe-accordion-header[data-accordion="sessions"]');
   }
 
-  test.beforeEach(async ({ page }) => {
-    await clearSessions(page);
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { dispatch: true } });
+  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await clearSessions(page, localWorkerUrlKey);
+    await seedLocal(workspaceApiLocalSeed, { features: { dispatch: true } });
   });
 
-  test('accordion header shows the baked-in session count', async ({ page }) => {
-    await dispatchForIssue(page, 'TEST-14');
-    await dispatchForIssue(page, 'TEST-14');
+  test('accordion header shows the baked-in session count', async ({ page, localWorkerUrlKey }) => {
+    await dispatchForIssue(page, localWorkerUrlKey, 'TEST-14');
+    await dispatchForIssue(page, localWorkerUrlKey, 'TEST-14');
 
-    await openSwipeAt(page, 'TEST-14');
+    await openSwipeAt(page, localWorkerUrlKey, 'TEST-14');
 
     const header = sessionsAccordion(page);
     await expect(header).toBeVisible();
     await expect(header.locator('.swipe-sessions-count')).toHaveText('[2]');
   });
 
-  test('opening the accordion lists the sessions', async ({ page }) => {
-    await dispatchForIssue(page, 'TEST-14', 'research');
-    await dispatchForIssue(page, 'TEST-14', 'implementation');
+  test('opening the accordion lists the sessions', async ({ page, localWorkerUrlKey }) => {
+    await dispatchForIssue(page, localWorkerUrlKey, 'TEST-14', 'research');
+    await dispatchForIssue(page, localWorkerUrlKey, 'TEST-14', 'implementation');
 
-    await openSwipeAt(page, 'TEST-14');
+    await openSwipeAt(page, localWorkerUrlKey, 'TEST-14');
     await sessionsAccordion(page).click();
 
     const entries = page.locator('[data-accordion-body="sessions"] .session-entry');
     await expect(entries).toHaveCount(2);
   });
 
-  test('shows the empty state for an issue with no sessions', async ({ page }) => {
-    await openSwipeAt(page, 'TEST-13');
+  test('shows the empty state for an issue with no sessions', async ({ page, localWorkerUrlKey }) => {
+    await openSwipeAt(page, localWorkerUrlKey, 'TEST-13');
 
     const header = sessionsAccordion(page);
     await expect(header.locator('.swipe-sessions-count')).toHaveText('[0]');
@@ -438,22 +434,22 @@ test.describe('Swipe Dispatched Sessions', () => {
     await expect(page.locator('[data-accordion-body="sessions"] .sessions-empty')).toContainText('No sessions yet');
   });
 
-  test('renders feedback on a session', async ({ page }) => {
-    const token = await createConsumerToken(page);
-    const item = await dispatchForIssue(page, 'TEST-15');
+  test('renders feedback on a session', async ({ page, localWorkerUrlKey }) => {
+    const token = await createConsumerToken(page, localWorkerUrlKey);
+    const item = await dispatchForIssue(page, localWorkerUrlKey, 'TEST-15');
     await takeItem(page, item.id, token);
     await postFeedback(page, item.id, token, 'agent finished the work');
 
-    await openSwipeAt(page, 'TEST-15');
+    await openSwipeAt(page, localWorkerUrlKey, 'TEST-15');
     await sessionsAccordion(page).click();
 
     await expect(page.locator('[data-accordion-body="sessions"] .session-feedback-entry'))
       .toContainText('agent finished the work');
   });
 
-  test('accordion is absent when dispatch feature is disabled', async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { dispatch: false } });
-    await openSwipeAt(page, 'TEST-14');
+  test('accordion is absent when dispatch feature is disabled', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, { features: { dispatch: false } });
+    await openSwipeAt(page, localWorkerUrlKey, 'TEST-14');
 
     await expect(sessionsAccordion(page)).toHaveCount(0);
   });
@@ -468,9 +464,9 @@ test.describe('Swipe Dispatched Sessions', () => {
 // ============================================================================
 
 test.describe('Recap UI — Swipe', () => {
-  test.beforeEach(async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed);
-    await page.goto(SWIPE_URL);
+  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed);
+    await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
     await page.waitForLoadState('networkidle');
   });
 
@@ -522,9 +518,9 @@ test.describe('Recap UI — Swipe', () => {
 // ============================================================================
 
 test.describe('Brief UI — Swipe', () => {
-  test.beforeEach(async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed);
-    await page.goto(SWIPE_URL);
+  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed);
+    await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
     await page.waitForLoadState('networkidle');
   });
 
@@ -564,9 +560,9 @@ test.describe('Brief UI — Swipe', () => {
 });
 
 test.describe('Context UI — Swipe (LIN-572)', () => {
-  test.beforeEach(async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed);
-    await page.goto(SWIPE_URL);
+  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed);
+    await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
     await page.waitForLoadState('networkidle');
   });
 

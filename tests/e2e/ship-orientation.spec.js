@@ -1,11 +1,9 @@
 import { test, expect } from '../fixtures/test-base.js';
-import { seedLocalWorkspace, swimLocalSeed, LOCAL_WORKSPACE_URL_KEY } from '../fixtures/local-harness.js';
+import { swimLocalSeed } from '../fixtures/local-harness.js';
 
 // LIN-378: rides a seeded local workspace (no `test-token` mock) — the swim
 // sample fixture converted to local shape, so the orientation identifiers
 // (AUTH-3, API-4, …) still resolve.
-const TEST_WORKSPACE_URL_KEY = LOCAL_WORKSPACE_URL_KEY;
-const SHIP_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/ship`;
 
 // Orientation mode (LIN-301): the Ship view reads saved per-task compass
 // bearings (from the report-history store, LIN-299/300) and offers a
@@ -13,10 +11,10 @@ const SHIP_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/ship`;
 // the consumer end-to-end: no LLM call is made on the ship side.
 
 test.describe('Ship orientation mode (LIN-301)', () => {
-  test('mode control renders; orientation is disabled without a saved report', async ({ page }) => {
-    await page.goto(`/test/clear-report-history?urlKey=${TEST_WORKSPACE_URL_KEY}`);
-    await seedLocalWorkspace(page, swimLocalSeed, { features: { ship: true } });
-    await page.goto(SHIP_URL);
+  test('mode control renders; orientation is disabled without a saved report', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await page.goto(`/test/clear-report-history?urlKey=${localWorkerUrlKey}`);
+    await seedLocal(swimLocalSeed, { features: { ship: true } });
+    await page.goto(`/workspace/${localWorkerUrlKey}/ship`);
     await page.waitForLoadState('networkidle');
 
     await expect(page.locator('#ship-mode-control')).toBeVisible();
@@ -34,8 +32,8 @@ test.describe('Ship orientation mode (LIN-301)', () => {
     for (const s of sectors) expect(allowed.has(s)).toBeTruthy();
   });
 
-  test('with a saved report, toggling to orientation maps tasks to bearings', async ({ page }) => {
-    await seedLocalWorkspace(page, swimLocalSeed, { features: { roadmap: true, ship: true } });
+  test('with a saved report, toggling to orientation maps tasks to bearings', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(swimLocalSeed, { features: { roadmap: true, ship: true } });
 
     // Seed a report whose orientation covers swim-sample non-started tasks.
     const orientation = [
@@ -44,12 +42,12 @@ test.describe('Ship orientation mode (LIN-301)', () => {
       { identifier: 'API-5', bearing: 'E', reason: 'maintenance', archived: false },
       { identifier: 'DASH-2', bearing: 'S', reason: 'shouldn’t be aboard', archived: true }
     ];
-    const resp = await page.request.post(`/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/reports`, {
+    const resp = await page.request.post(`/workspace/${localWorkerUrlKey}/api/roadmap/reports`, {
       data: { northStar: 'Ship the orientation instrument', narrative: { digest: 'x' }, orientation }
     });
     expect(resp.ok()).toBeTruthy();
 
-    await page.goto(SHIP_URL);
+    await page.goto(`/workspace/${localWorkerUrlKey}/ship`);
     await page.waitForLoadState('networkidle');
 
     const orientBtn = page.locator('#ship-mode-orientation');
@@ -74,16 +72,16 @@ test.describe('Ship orientation mode (LIN-301)', () => {
     await expect(page.locator('#ship-orbit [data-bearing]')).toHaveCount(0);
   });
 
-  test('orientation preference persists across reloads', async ({ page }) => {
-    await seedLocalWorkspace(page, swimLocalSeed, { features: { roadmap: true, ship: true } });
-    await page.request.post(`/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/reports`, {
+  test('orientation preference persists across reloads', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(swimLocalSeed, { features: { roadmap: true, ship: true } });
+    await page.request.post(`/workspace/${localWorkerUrlKey}/api/roadmap/reports`, {
       data: {
         northStar: 'star',
         narrative: { digest: 'x' },
         orientation: [{ identifier: 'AUTH-3', bearing: 'N', reason: 'r', archived: false }]
       }
     });
-    await page.goto(SHIP_URL);
+    await page.goto(`/workspace/${localWorkerUrlKey}/ship`);
     await page.waitForLoadState('networkidle');
 
     await page.locator('#ship-mode-orientation').click();

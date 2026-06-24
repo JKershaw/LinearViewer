@@ -11,37 +11,32 @@
  * this spec is fully testMockData-free (unblocks LIN-413).
  */
 import { test, expect } from '../fixtures/test-base.js';
-import {
-  seedLocalWorkspace,
-  workspaceApiLocalSeed,
-  LOCAL_WORKSPACE_URL_KEY,
-} from '../fixtures/local-harness.js';
+import { workspaceApiLocalSeed } from '../fixtures/local-harness.js';
 
-const URL_KEY = LOCAL_WORKSPACE_URL_KEY;
 const ISSUE_ID = '66666666-6666-6666-6666-666666666666';
 const ISSUE_IDENTIFIER = 'TEST-6';
 
 test.describe('Brief API', () => {
-  test.beforeEach(async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed);
+  test.beforeEach(async ({ seedLocal }) => {
+    await seedLocal(workspaceApiLocalSeed);
   });
 
-  test('GET returns status=missing for never-generated issue', async ({ page }) => {
+  test('GET returns status=missing for never-generated issue', async ({ page, localWorkerUrlKey }) => {
     // TEST-14 exists in the seed (so the route reaches the cache, not a 404),
     // but its brief is never generated here. The brief cache is keyed
     // (urlKey, canonicalId) and persists per worker, so clear this id at the
     // local workspace first to guarantee a missing read (the route defaults
     // urlKey=test-workspace and 400s without issueId).
     const MISSING_ID = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeef';
-    await page.request.get(`/test/clear-brief-cache?urlKey=${URL_KEY}&issueId=${MISSING_ID}`);
-    const res = await page.request.get(`/workspace/${URL_KEY}/api/brief/${MISSING_ID}`);
+    await page.request.get(`/test/clear-brief-cache?urlKey=${localWorkerUrlKey}&issueId=${MISSING_ID}`);
+    const res = await page.request.get(`/workspace/${localWorkerUrlKey}/api/brief/${MISSING_ID}`);
     expect(res.status()).toBe(200);
     const body = await res.json();
     expect(body.status).toBe('missing');
   });
 
-  test('POST generates brief and returns status=fresh', async ({ page }) => {
-    const res = await page.request.post(`/workspace/${URL_KEY}/api/brief/${ISSUE_ID}`);
+  test('POST generates brief and returns status=fresh', async ({ page, localWorkerUrlKey }) => {
+    const res = await page.request.post(`/workspace/${localWorkerUrlKey}/api/brief/${ISSUE_ID}`);
     expect(res.status()).toBe(200);
     const body = await res.json();
     expect(body.status).toBe('fresh');
@@ -50,29 +45,29 @@ test.describe('Brief API', () => {
     expect(body.generatedAt).toBeTruthy();
   });
 
-  test('GET after POST returns status=fresh with the same brief', async ({ page }) => {
-    await page.request.post(`/workspace/${URL_KEY}/api/brief/${ISSUE_ID}`);
-    const res = await page.request.get(`/workspace/${URL_KEY}/api/brief/${ISSUE_ID}`);
+  test('GET after POST returns status=fresh with the same brief', async ({ page, localWorkerUrlKey }) => {
+    await page.request.post(`/workspace/${localWorkerUrlKey}/api/brief/${ISSUE_ID}`);
+    const res = await page.request.get(`/workspace/${localWorkerUrlKey}/api/brief/${ISSUE_ID}`);
     expect(res.status()).toBe(200);
     const body = await res.json();
     expect(body.status).toBe('fresh');
     expect(body.brief).toContain('## Current');
   });
 
-  test('accepts LIN-XXX identifier format as well as UUID', async ({ page }) => {
-    const res = await page.request.post(`/workspace/${URL_KEY}/api/brief/${ISSUE_IDENTIFIER}`);
+  test('accepts LIN-XXX identifier format as well as UUID', async ({ page, localWorkerUrlKey }) => {
+    const res = await page.request.post(`/workspace/${localWorkerUrlKey}/api/brief/${ISSUE_IDENTIFIER}`);
     expect(res.status()).toBe(200);
     const body = await res.json();
     expect(body.status).toBe('fresh');
   });
 
-  test('rejects invalid identifier format with 400', async ({ page }) => {
-    const res = await page.request.get(`/workspace/${URL_KEY}/api/brief/not!valid`);
+  test('rejects invalid identifier format with 400', async ({ page, localWorkerUrlKey }) => {
+    const res = await page.request.get(`/workspace/${localWorkerUrlKey}/api/brief/not!valid`);
     expect(res.status()).toBe(400);
   });
 
-  test('returns 404 for unknown issue', async ({ page }) => {
-    const res = await page.request.get(`/workspace/${URL_KEY}/api/brief/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa`);
+  test('returns 404 for unknown issue', async ({ page, localWorkerUrlKey }) => {
+    const res = await page.request.get(`/workspace/${localWorkerUrlKey}/api/brief/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa`);
     expect(res.status()).toBe(404);
   });
 });

@@ -6,19 +6,17 @@
  * variant.
  */
 import { test, expect } from '../fixtures/test-base.js';
-import { seedLocalWorkspace, swimLocalSeed, LOCAL_WORKSPACE_URL_KEY } from '../fixtures/local-harness.js';
+import { swimLocalSeed } from '../fixtures/local-harness.js';
 
 // LIN-378: rides a seeded local workspace (no `test-token` mock) — same swim
 // sample fixture, converted to local shape.
-const TEST_WORKSPACE_URL_KEY = LOCAL_WORKSPACE_URL_KEY;
-const SWIM_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/swim`;
 
 test.describe('Swim Page — Vertical Orientation', () => {
-  test.beforeEach(async ({ page }) => {
-    await seedLocalWorkspace(page, swimLocalSeed);
-    await page.goto(SWIM_URL);
+  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(swimLocalSeed);
+    await page.goto(`/workspace/${localWorkerUrlKey}/swim`);
     await page.evaluate(() => localStorage.removeItem('swim-settings'));
-    await page.goto(SWIM_URL);
+    await page.goto(`/workspace/${localWorkerUrlKey}/swim`);
     await page.waitForLoadState('networkidle');
   });
 
@@ -100,13 +98,13 @@ test.describe('Swim Page — Vertical Orientation', () => {
     }
   });
 
-  test('orientation is persisted in localStorage', async ({ page }) => {
+  test('orientation is persisted in localStorage', async ({ page, localWorkerUrlKey }) => {
     await page.locator('.swim-settings-toggle').click();
     await page.locator('#swim-orientation').selectOption('vertical');
     await page.waitForTimeout(100);
 
     // Reload page
-    await page.goto(SWIM_URL);
+    await page.goto(`/workspace/${localWorkerUrlKey}/swim`);
     await page.waitForLoadState('networkidle');
 
     // Should still be in vertical mode

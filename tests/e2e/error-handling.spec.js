@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
-import { seedLocalWorkspace, localDashboardUrl } from '../fixtures/local-harness.js';
+import { localDashboardUrl } from '../fixtures/local-harness.js';
 
 // Mixed-harness boundary split (LIN-428, parent S3/LIN-389).
 //   - Input Validation + Session State migrate onto a GENUINE `provider: 'local'`
@@ -14,12 +14,9 @@ import { seedLocalWorkspace, localDashboardUrl } from '../fixtures/local-harness
 const TEST_WORKSPACE_URL_KEY = 'test-workspace';
 const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;
 
-// Dashboard URL for the migrated local-backed workspace.
-const LOCAL_DASHBOARD = localDashboardUrl();
-
 test.describe('Input Validation', () => {
-  test.beforeEach(async ({ page }) => {
-    await seedLocalWorkspace(page);
+  test.beforeEach(async ({ seedLocal }) => {
+    await seedLocal();
   });
 
   test('invalid workspace urlKey on remove returns 400', async ({ page }) => {
@@ -29,9 +26,9 @@ test.describe('Input Validation', () => {
     expect(await response.text()).toContain('Invalid workspace ID');
   });
 
-  test('invalid team filter is ignored', async ({ page }) => {
+  test('invalid team filter is ignored', async ({ page, localWorkerUrlKey }) => {
     // Invalid team ID should be ignored (not cause error)
-    await page.goto(`${LOCAL_DASHBOARD}?team=invalid-team-id`);
+    await page.goto(`${localDashboardUrl(localWorkerUrlKey)}?team=invalid-team-id`);
 
     // Page should still load normally
     await expect(page.locator('.nav-bar')).toBeVisible();
@@ -40,10 +37,10 @@ test.describe('Input Validation', () => {
 });
 
 test.describe('Session State', () => {
-  test('cleared session shows landing page', async ({ page }) => {
+  test('cleared session shows landing page', async ({ page, seedLocal }) => {
     // First authenticate (seed a local-backed session)
-    await seedLocalWorkspace(page);
-    await page.goto(LOCAL_DASHBOARD);
+    const { dashboard } = await seedLocal();
+    await page.goto(dashboard);
     await expect(page.locator('.nav-bar')).toBeVisible();
 
     // Clear session
@@ -54,9 +51,9 @@ test.describe('Session State', () => {
     await expect(page.locator('body')).toHaveClass(/is-landing/);
   });
 
-  test('session persists across page reloads', async ({ page }) => {
-    await seedLocalWorkspace(page);
-    await page.goto(LOCAL_DASHBOARD);
+  test('session persists across page reloads', async ({ page, seedLocal }) => {
+    const { dashboard } = await seedLocal();
+    await page.goto(dashboard);
     await expect(page.locator('.nav-bar')).toBeVisible();
 
     // Reload the page

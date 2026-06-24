@@ -1,9 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
-import {
-  seedLocalWorkspace,
-  workspaceApiLocalSeed,
-  LOCAL_WORKSPACE_URL_KEY,
-} from '../fixtures/local-harness.js';
+import { workspaceApiLocalSeed } from '../fixtures/local-harness.js';
 
 // Migrated onto the local-provider harness (LIN-412). Audit is NOT
 // provider-routed (runAudit goes straight to GraphQL), so the surface stays on
@@ -12,10 +8,6 @@ import {
 // local seed only changes session/workspace resolution; the mocked audit report
 // (computeAuditFromData over testMockTeams/testMockData) is unchanged, so every
 // deterministic assertion below holds byte-for-byte.
-const TEST_WORKSPACE_URL_KEY = LOCAL_WORKSPACE_URL_KEY;
-const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;
-const AUDIT_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/audit`;
-const API_PREFIX = `/workspace/${TEST_WORKSPACE_URL_KEY}`;
 
 test.describe('Operator Dashboard', () => {
   test.describe('Unauthenticated', () => {
@@ -32,13 +24,13 @@ test.describe('Operator Dashboard', () => {
   });
 
   test.describe('Authenticated', () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ seedLocal }) => {
       // Seed the local workspace and establish a provider: 'local' session.
-      await seedLocalWorkspace(page, workspaceApiLocalSeed);
+      await seedLocal(workspaceApiLocalSeed);
     });
 
-    test('renders dashboard page', async ({ page }) => {
-      await page.goto(AUDIT_URL);
+    test('renders dashboard page', async ({ page, localWorkerUrlKey }) => {
+      await page.goto(`/workspace/${localWorkerUrlKey}/audit`);
 
       // Should show dashboard header
       await expect(page.locator('h1')).toContainText('Operator Dashboard');
@@ -51,8 +43,8 @@ test.describe('Operator Dashboard', () => {
       await expect(page.locator('#run-audit')).toContainText('Run Audit');
     });
 
-    test('shows workspace dropdown in navigation', async ({ page }) => {
-      await page.goto(AUDIT_URL);
+    test('shows workspace dropdown in navigation', async ({ page, localWorkerUrlKey }) => {
+      await page.goto(`/workspace/${localWorkerUrlKey}/audit`);
 
       // Should show workspace dropdown with workspace name
       const workspaceToggle = page.locator('#workspace-toggle');
@@ -60,24 +52,24 @@ test.describe('Operator Dashboard', () => {
       await expect(workspaceToggle).toContainText('Local Workspace');
     });
 
-    test('has back link to projects', async ({ page }) => {
-      await page.goto(AUDIT_URL);
+    test('has back link to projects', async ({ page, localWorkerUrlKey }) => {
+      await page.goto(`/workspace/${localWorkerUrlKey}/audit`);
 
       // Should have link back to workspace projects page
-      const projectsLink = page.locator(`.nav-action[href="${WORKSPACE_URL}"]`);
+      const projectsLink = page.locator(`.nav-action[href="/workspace/${localWorkerUrlKey}/"]`);
       await expect(projectsLink).toBeVisible();
       await expect(projectsLink).toContainText('projects');
     });
 
-    test('does not have logout link in navbar', async ({ page }) => {
-      await page.goto(AUDIT_URL);
+    test('does not have logout link in navbar', async ({ page, localWorkerUrlKey }) => {
+      await page.goto(`/workspace/${localWorkerUrlKey}/audit`);
 
       // Logout moved to settings page
       await expect(page.locator('.nav-action[href="/logout"]')).not.toBeVisible();
     });
 
-    test('runs audit and displays report', async ({ page }) => {
-      await page.goto(AUDIT_URL);
+    test('runs audit and displays report', async ({ page, localWorkerUrlKey }) => {
+      await page.goto(`/workspace/${localWorkerUrlKey}/audit`);
 
       // Click Run Audit button
       await page.locator('#run-audit').click();
@@ -97,8 +89,8 @@ test.describe('Operator Dashboard', () => {
       await expect(page.locator('.report-timestamp')).toBeVisible();
     });
 
-    test('displays queue readiness section', async ({ page }) => {
-      await page.goto(AUDIT_URL);
+    test('displays queue readiness section', async ({ page, localWorkerUrlKey }) => {
+      await page.goto(`/workspace/${localWorkerUrlKey}/audit`);
 
       // Run audit
       await page.locator('#run-audit').click();
@@ -112,8 +104,8 @@ test.describe('Operator Dashboard', () => {
       await expect(queueSection.locator('.queue-item')).toHaveCount(2);
     });
 
-    test('sections are collapsible', async ({ page }) => {
-      await page.goto(AUDIT_URL);
+    test('sections are collapsible', async ({ page, localWorkerUrlKey }) => {
+      await page.goto(`/workspace/${localWorkerUrlKey}/audit`);
 
       // Run audit
       await page.locator('#run-audit').click();
@@ -136,8 +128,8 @@ test.describe('Operator Dashboard', () => {
       await expect(content).not.toHaveClass(/hidden/);
     });
 
-    test('shows completion status after audit', async ({ page }) => {
-      await page.goto(AUDIT_URL);
+    test('shows completion status after audit', async ({ page, localWorkerUrlKey }) => {
+      await page.goto(`/workspace/${localWorkerUrlKey}/audit`);
 
       // Run audit
       await page.locator('#run-audit').click();
@@ -150,28 +142,28 @@ test.describe('Operator Dashboard', () => {
 });
 
 test.describe('Audit API', () => {
-  test('returns 401 when not authenticated', async ({ request }) => {
+  test('returns 401 when not authenticated', async ({ request, localWorkerUrlKey }) => {
     // No session: workspaceFromUrl validates the urlKey format (local-workspace
     // is valid), then rejects the missing session with 401 before any workspace
     // lookup — so this case stays reachable under the local prefix.
-    const response = await request.get(`${API_PREFIX}/api/audit`);
+    const response = await request.get(`/workspace/${localWorkerUrlKey}/api/audit`);
     expect(response.status()).toBe(401);
 
     const data = await response.json();
     expect(data.error).toBe('Not authenticated');
   });
 
-  test('returns valid audit report when authenticated', async ({ page, request }) => {
+  test('returns valid audit report when authenticated', async ({ page, request, seedLocal, localWorkerUrlKey }) => {
     // Seed the local workspace and establish a provider: 'local' session before
     // harvesting cookies.
-    await seedLocalWorkspace(page, workspaceApiLocalSeed);
+    await seedLocal(workspaceApiLocalSeed);
 
     // Get cookies from page context
     const cookies = await page.context().cookies();
     const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
 
     // Call API with session cookie
-    const response = await request.get(`${API_PREFIX}/api/audit`, {
+    const response = await request.get(`/workspace/${localWorkerUrlKey}/api/audit`, {
       headers: {
         Cookie: cookieHeader
       }

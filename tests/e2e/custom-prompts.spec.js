@@ -1,44 +1,32 @@
 import { test, expect } from '../fixtures/test-base.js';
 import {
-  seedLocalWorkspace,
   workspaceApiLocalSeed,
-  LOCAL_WORKSPACE_URL_KEY,
 } from '../fixtures/local-harness.js';
 
-// Local-provider workspace seeded via /test/set-local-session (LIN-408).
-const TEST_WORKSPACE_URL_KEY = LOCAL_WORKSPACE_URL_KEY;
-const CUSTOM_PROMPTS_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/prompts/custom`;
-const SETTINGS_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/settings`;
-const API_BASE = `/workspace/${TEST_WORKSPACE_URL_KEY}/api/prompts/custom`;
 // TEST-6 "Task needing preparation" — present in workspaceApiLocalSeed (shares
 // the pipeline fixture identity), so prompt-generation assertions resolve
 // unchanged on the local provider.
 const TEST_ISSUE_ID = '66666666-6666-6666-6666-666666666666';
 
-// Clear the active workspace's custom-prompts partition (LIN-408). The store is
-// partitioned by urlKey and /api/prompts/custom writes the local-workspace
-// partition, so the clear must target it explicitly.
-const CLEAR_CUSTOM_PROMPTS = `/test/clear-custom-prompts?urlKey=${TEST_WORKSPACE_URL_KEY}`;
-
 test.describe('Custom Prompts API', () => {
-  test.beforeEach(async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed);
-    await page.request.get(CLEAR_CUSTOM_PROMPTS);
+  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed);
+    await page.request.get(`/test/clear-custom-prompts?urlKey=${localWorkerUrlKey}`);
   });
 
   // =========================================================================
   // CRUD operations
   // =========================================================================
 
-  test('GET returns empty array when no custom prompts exist', async ({ page }) => {
-    const response = await page.request.get(API_BASE);
+  test('GET returns empty array when no custom prompts exist', async ({ page, localWorkerUrlKey }) => {
+    const response = await page.request.get(`/workspace/${localWorkerUrlKey}/api/prompts/custom`);
     expect(response.ok()).toBeTruthy();
     const data = await response.json();
     expect(data.prompts).toEqual([]);
   });
 
-  test('POST creates a new custom prompt', async ({ page }) => {
-    const response = await page.request.post(API_BASE, {
+  test('POST creates a new custom prompt', async ({ page, localWorkerUrlKey }) => {
+    const response = await page.request.post(`/workspace/${localWorkerUrlKey}/api/prompts/custom`, {
       data: { name: 'My Prompt', template: 'Help with {{title}}' }
     });
     expect(response.ok()).toBeTruthy();
@@ -48,31 +36,31 @@ test.describe('Custom Prompts API', () => {
     expect(data.prompt.id).toBeTruthy();
   });
 
-  test('GET returns created prompts', async ({ page }) => {
+  test('GET returns created prompts', async ({ page, localWorkerUrlKey }) => {
     // Create two prompts
-    await page.request.post(API_BASE, {
+    await page.request.post(`/workspace/${localWorkerUrlKey}/api/prompts/custom`, {
       data: { name: 'Prompt A', template: 'Template A' }
     });
-    await page.request.post(API_BASE, {
+    await page.request.post(`/workspace/${localWorkerUrlKey}/api/prompts/custom`, {
       data: { name: 'Prompt B', template: 'Template B' }
     });
 
-    const response = await page.request.get(API_BASE);
+    const response = await page.request.get(`/workspace/${localWorkerUrlKey}/api/prompts/custom`);
     const data = await response.json();
     expect(data.prompts).toHaveLength(2);
     expect(data.prompts[0].name).toBe('Prompt A');
     expect(data.prompts[1].name).toBe('Prompt B');
   });
 
-  test('PUT updates an existing prompt', async ({ page }) => {
+  test('PUT updates an existing prompt', async ({ page, localWorkerUrlKey }) => {
     // Create a prompt
-    const createRes = await page.request.post(API_BASE, {
+    const createRes = await page.request.post(`/workspace/${localWorkerUrlKey}/api/prompts/custom`, {
       data: { name: 'Original', template: 'Original template' }
     });
     const { prompt } = await createRes.json();
 
     // Update it
-    const updateRes = await page.request.put(`${API_BASE}/${prompt.id}`, {
+    const updateRes = await page.request.put(`/workspace/${localWorkerUrlKey}/api/prompts/custom/${prompt.id}`, {
       data: { name: 'Updated', template: 'Updated template' }
     });
     expect(updateRes.ok()).toBeTruthy();
@@ -82,19 +70,19 @@ test.describe('Custom Prompts API', () => {
     expect(updated.prompt.id).toBe(prompt.id);
   });
 
-  test('DELETE removes a custom prompt', async ({ page }) => {
+  test('DELETE removes a custom prompt', async ({ page, localWorkerUrlKey }) => {
     // Create a prompt
-    const createRes = await page.request.post(API_BASE, {
+    const createRes = await page.request.post(`/workspace/${localWorkerUrlKey}/api/prompts/custom`, {
       data: { name: 'To Delete', template: 'Bye' }
     });
     const { prompt } = await createRes.json();
 
     // Delete it
-    const deleteRes = await page.request.delete(`${API_BASE}/${prompt.id}`);
+    const deleteRes = await page.request.delete(`/workspace/${localWorkerUrlKey}/api/prompts/custom/${prompt.id}`);
     expect(deleteRes.ok()).toBeTruthy();
 
     // Verify it's gone
-    const listRes = await page.request.get(API_BASE);
+    const listRes = await page.request.get(`/workspace/${localWorkerUrlKey}/api/prompts/custom`);
     const data = await listRes.json();
     expect(data.prompts).toHaveLength(0);
   });
@@ -103,38 +91,38 @@ test.describe('Custom Prompts API', () => {
   // Validation
   // =========================================================================
 
-  test('POST rejects missing name', async ({ page }) => {
-    const response = await page.request.post(API_BASE, {
+  test('POST rejects missing name', async ({ page, localWorkerUrlKey }) => {
+    const response = await page.request.post(`/workspace/${localWorkerUrlKey}/api/prompts/custom`, {
       data: { template: 'Some template' }
     });
     expect(response.status()).toBe(400);
   });
 
-  test('POST rejects missing template', async ({ page }) => {
-    const response = await page.request.post(API_BASE, {
+  test('POST rejects missing template', async ({ page, localWorkerUrlKey }) => {
+    const response = await page.request.post(`/workspace/${localWorkerUrlKey}/api/prompts/custom`, {
       data: { name: 'Some name' }
     });
     expect(response.status()).toBe(400);
   });
 
-  test('POST rejects name longer than 50 chars', async ({ page }) => {
-    const response = await page.request.post(API_BASE, {
+  test('POST rejects name longer than 50 chars', async ({ page, localWorkerUrlKey }) => {
+    const response = await page.request.post(`/workspace/${localWorkerUrlKey}/api/prompts/custom`, {
       data: { name: 'A'.repeat(51), template: 'Template' }
     });
     expect(response.status()).toBe(400);
   });
 
-  test('POST enforces max 20 custom prompts', async ({ page }) => {
+  test('POST enforces max 20 custom prompts', async ({ page, localWorkerUrlKey }) => {
     // Create 20 prompts
     for (let i = 0; i < 20; i++) {
-      const res = await page.request.post(API_BASE, {
+      const res = await page.request.post(`/workspace/${localWorkerUrlKey}/api/prompts/custom`, {
         data: { name: `Prompt ${i}`, template: `Template ${i}` }
       });
       expect(res.ok()).toBeTruthy();
     }
 
     // 21st should fail
-    const response = await page.request.post(API_BASE, {
+    const response = await page.request.post(`/workspace/${localWorkerUrlKey}/api/prompts/custom`, {
       data: { name: 'One too many', template: 'Template' }
     });
     expect(response.status()).toBe(400);
@@ -142,15 +130,15 @@ test.describe('Custom Prompts API', () => {
     expect(data.error).toContain('maximum');
   });
 
-  test('PUT returns 404 for non-existent prompt', async ({ page }) => {
-    const response = await page.request.put(`${API_BASE}/nonexistent-id`, {
+  test('PUT returns 404 for non-existent prompt', async ({ page, localWorkerUrlKey }) => {
+    const response = await page.request.put(`/workspace/${localWorkerUrlKey}/api/prompts/custom/nonexistent-id`, {
       data: { name: 'Updated', template: 'Updated' }
     });
     expect(response.status()).toBe(404);
   });
 
-  test('DELETE returns 404 for non-existent prompt', async ({ page }) => {
-    const response = await page.request.delete(`${API_BASE}/nonexistent-id`);
+  test('DELETE returns 404 for non-existent prompt', async ({ page, localWorkerUrlKey }) => {
+    const response = await page.request.delete(`/workspace/${localWorkerUrlKey}/api/prompts/custom/nonexistent-id`);
     expect(response.status()).toBe(404);
   });
 
@@ -158,16 +146,16 @@ test.describe('Custom Prompts API', () => {
   // Prompt generation with variable substitution
   // =========================================================================
 
-  test('generates prompt with variable substitution', async ({ page }) => {
+  test('generates prompt with variable substitution', async ({ page, localWorkerUrlKey }) => {
     // Create a custom prompt with variables
-    const createRes = await page.request.post(API_BASE, {
+    const createRes = await page.request.post(`/workspace/${localWorkerUrlKey}/api/prompts/custom`, {
       data: { name: 'My Custom', template: 'Work on {{title}} ({{identifier}})' }
     });
     const { prompt } = await createRes.json();
 
     // Generate the prompt for a specific issue
     const genRes = await page.request.get(
-      `/workspace/${TEST_WORKSPACE_URL_KEY}/api/prompt/${TEST_ISSUE_ID}/custom:${prompt.id}`
+      `/workspace/${localWorkerUrlKey}/api/prompt/${TEST_ISSUE_ID}/custom:${prompt.id}`
     );
     expect(genRes.ok()).toBeTruthy();
     const data = await genRes.json();
@@ -176,9 +164,9 @@ test.describe('Custom Prompts API', () => {
     expect(data.promptName).toBe('My Custom');
   });
 
-  test('custom prompt respects linearMcp feature flag', async ({ page }) => {
+  test('custom prompt respects linearMcp feature flag', async ({ page, seedLocal, localWorkerUrlKey }) => {
     // Create a custom prompt mentioning the provider write surface.
-    const createRes = await page.request.post(API_BASE, {
+    const createRes = await page.request.post(`/workspace/${localWorkerUrlKey}/api/prompts/custom`, {
       data: { name: 'Linear Test', template: 'Update the task in Linear with your findings' }
     });
     const { prompt } = await createRes.json();
@@ -187,7 +175,7 @@ test.describe('Custom Prompts API', () => {
     // stays — capability-awareness (LIN-177) rewrites "Linear" to the active
     // provider's display name, which is "Local" on the local provider.
     const onRes = await page.request.get(
-      `/workspace/${TEST_WORKSPACE_URL_KEY}/api/prompt/${TEST_ISSUE_ID}/custom:${prompt.id}`
+      `/workspace/${localWorkerUrlKey}/api/prompt/${TEST_ISSUE_ID}/custom:${prompt.id}`
     );
     const onData = await onRes.json();
     expect(onData.prompt).toContain('in Local');
@@ -195,9 +183,9 @@ test.describe('Custom Prompts API', () => {
     // With linearMcp OFF — re-establish the local session with the flag cleared.
     // The custom-prompts store is partitioned by urlKey (unchanged), so the
     // prompt created above survives the re-seed.
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { linearMcp: false } });
+    await seedLocal(workspaceApiLocalSeed, { features: { linearMcp: false } });
     const offRes = await page.request.get(
-      `/workspace/${TEST_WORKSPACE_URL_KEY}/api/prompt/${TEST_ISSUE_ID}/custom:${prompt.id}`
+      `/workspace/${localWorkerUrlKey}/api/prompt/${TEST_ISSUE_ID}/custom:${prompt.id}`
     );
     const offData = await offRes.json();
     expect(offData.prompt).not.toContain('in Local');
@@ -210,25 +198,25 @@ test.describe('Custom Prompts API', () => {
 });
 
 test.describe('Custom Prompts Page', () => {
-  test.beforeEach(async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed);
-    await page.request.get(CLEAR_CUSTOM_PROMPTS);
+  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed);
+    await page.request.get(`/test/clear-custom-prompts?urlKey=${localWorkerUrlKey}`);
   });
 
   // =========================================================================
   // Page rendering
   // =========================================================================
 
-  test('page loads with empty state', async ({ page }) => {
-    await page.goto(CUSTOM_PROMPTS_URL);
+  test('page loads with empty state', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/prompts/custom`);
     await page.waitForLoadState('networkidle');
 
     await expect(page.locator('h1')).toContainText('Custom Prompts');
     await expect(page.locator('.custom-prompts-empty')).toBeVisible();
   });
 
-  test('page shows nav bar with workspace', async ({ page }) => {
-    await page.goto(CUSTOM_PROMPTS_URL);
+  test('page shows nav bar with workspace', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/prompts/custom`);
     await page.waitForLoadState('networkidle');
 
     await expect(page.locator('.nav-bar')).toBeVisible();
@@ -238,8 +226,8 @@ test.describe('Custom Prompts Page', () => {
   // Creating prompts via UI
   // =========================================================================
 
-  test('can create a new prompt via the form', async ({ page }) => {
-    await page.goto(CUSTOM_PROMPTS_URL);
+  test('can create a new prompt via the form', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/prompts/custom`);
     await page.waitForLoadState('networkidle');
 
     // Click new prompt button
@@ -257,13 +245,13 @@ test.describe('Custom Prompts Page', () => {
     await expect(page.locator('.custom-prompt-card .custom-prompt-name')).toContainText('Test Prompt');
   });
 
-  test('can edit an existing prompt', async ({ page }) => {
+  test('can edit an existing prompt', async ({ page, localWorkerUrlKey }) => {
     // Create via API
-    await page.request.post(API_BASE, {
+    await page.request.post(`/workspace/${localWorkerUrlKey}/api/prompts/custom`, {
       data: { name: 'Edit Me', template: 'Original' }
     });
 
-    await page.goto(CUSTOM_PROMPTS_URL);
+    await page.goto(`/workspace/${localWorkerUrlKey}/prompts/custom`);
     await page.waitForLoadState('networkidle');
 
     // Click edit button
@@ -279,13 +267,13 @@ test.describe('Custom Prompts Page', () => {
     await expect(page.locator('.custom-prompt-card .custom-prompt-name')).toContainText('Edited Name');
   });
 
-  test('can delete a prompt', async ({ page }) => {
+  test('can delete a prompt', async ({ page, localWorkerUrlKey }) => {
     // Create via API
-    await page.request.post(API_BASE, {
+    await page.request.post(`/workspace/${localWorkerUrlKey}/api/prompts/custom`, {
       data: { name: 'Delete Me', template: 'Bye' }
     });
 
-    await page.goto(CUSTOM_PROMPTS_URL);
+    await page.goto(`/workspace/${localWorkerUrlKey}/prompts/custom`);
     await page.waitForLoadState('networkidle');
 
     await expect(page.locator('.custom-prompt-card')).toHaveCount(1);
@@ -303,8 +291,8 @@ test.describe('Custom Prompts Page', () => {
   // Variable reference
   // =========================================================================
 
-  test('shows variable reference section', async ({ page }) => {
-    await page.goto(CUSTOM_PROMPTS_URL);
+  test('shows variable reference section', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/prompts/custom`);
     await page.waitForLoadState('networkidle');
 
     // Click new prompt to show editor
@@ -320,8 +308,8 @@ test.describe('Custom Prompts Page', () => {
   // Validation in UI
   // =========================================================================
 
-  test('save button disabled when name is empty', async ({ page }) => {
-    await page.goto(CUSTOM_PROMPTS_URL);
+  test('save button disabled when name is empty', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/prompts/custom`);
     await page.waitForLoadState('networkidle');
 
     await page.locator('.custom-prompt-new-btn').click();
@@ -332,8 +320,8 @@ test.describe('Custom Prompts Page', () => {
     await expect(page.locator('.custom-prompt-save-btn')).toBeDisabled();
   });
 
-  test('save button disabled when template is empty', async ({ page }) => {
-    await page.goto(CUSTOM_PROMPTS_URL);
+  test('save button disabled when template is empty', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/prompts/custom`);
     await page.waitForLoadState('networkidle');
 
     await page.locator('.custom-prompt-new-btn').click();
@@ -348,8 +336,8 @@ test.describe('Custom Prompts Page', () => {
   // Settings link
   // =========================================================================
 
-  test('settings page links to custom prompts', async ({ page }) => {
-    await page.goto(SETTINGS_URL);
+  test('settings page links to custom prompts', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
 
     const link = page.locator('a[href*="/prompts/custom"]');
@@ -362,21 +350,19 @@ test.describe('Custom Prompts Page', () => {
 // ==========================================================================
 
 test.describe('Custom Prompts on Dashboard', () => {
-  const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;
-
-  test.beforeEach(async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed);
-    await page.request.get(CLEAR_CUSTOM_PROMPTS);
+  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed);
+    await page.request.get(`/test/clear-custom-prompts?urlKey=${localWorkerUrlKey}`);
   });
 
-  test('custom prompt buttons appear as default buttons on dashboard', async ({ page }) => {
+  test('custom prompt buttons appear as default buttons on dashboard', async ({ page, localWorkerUrlKey }) => {
     // Create a custom prompt via API
-    await page.request.post(API_BASE, {
+    await page.request.post(`/workspace/${localWorkerUrlKey}/api/prompts/custom`, {
       data: { name: 'My Dashboard Prompt', template: 'Analyze {{title}}' }
     });
 
     // Navigate to dashboard
-    await page.goto(WORKSPACE_URL);
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
     // Click an issue to expand it
@@ -396,15 +382,15 @@ test.describe('Custom Prompts on Dashboard', () => {
     await expect(customBtn).toHaveText('My Dashboard Prompt');
   });
 
-  test('clicking custom prompt button generates prompt on dashboard', async ({ page }) => {
+  test('clicking custom prompt button generates prompt on dashboard', async ({ page, localWorkerUrlKey }) => {
     // Create a custom prompt with a variable
-    const createRes = await page.request.post(API_BASE, {
+    const createRes = await page.request.post(`/workspace/${localWorkerUrlKey}/api/prompts/custom`, {
       data: { name: 'Title Prompt', template: 'Work on: {{title}}' }
     });
     const { prompt } = await createRes.json();
 
     // Navigate to dashboard
-    await page.goto(WORKSPACE_URL);
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
     // Click an issue to expand it
@@ -434,8 +420,8 @@ test.describe('Custom Prompts on Dashboard', () => {
     await expect(promptContainer.locator('.prompt-text')).toContainText('Work on:');
   });
 
-  test('no custom prompt buttons when none exist', async ({ page }) => {
-    await page.goto(WORKSPACE_URL);
+  test('no custom prompt buttons when none exist', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
     // Expand an issue
@@ -460,11 +446,9 @@ test.describe('Custom Prompts on Dashboard', () => {
 // ==========================================================================
 
 test.describe('Custom Prompts on Swipe Page', () => {
-  const SWIPE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/swipe`;
-
-  test.beforeEach(async ({ page }) => {
-    await seedLocalWorkspace(page, workspaceApiLocalSeed);
-    await page.request.get(CLEAR_CUSTOM_PROMPTS);
+  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed);
+    await page.request.get(`/test/clear-custom-prompts?urlKey=${localWorkerUrlKey}`);
   });
 
   async function openPromptsAccordion(page) {
@@ -472,14 +456,14 @@ test.describe('Custom Prompts on Swipe Page', () => {
     await header.click();
   }
 
-  test('custom prompt buttons appear in more section on swipe page', async ({ page }) => {
+  test('custom prompt buttons appear in more section on swipe page', async ({ page, localWorkerUrlKey }) => {
     // Create a custom prompt via API
-    await page.request.post(API_BASE, {
+    await page.request.post(`/workspace/${localWorkerUrlKey}/api/prompts/custom`, {
       data: { name: 'My Swipe Prompt', template: 'Review {{title}}' }
     });
 
     // Navigate to swipe page
-    await page.goto(SWIPE_URL);
+    await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
     await page.waitForLoadState('networkidle');
 
     await openPromptsAccordion(page);
@@ -494,15 +478,15 @@ test.describe('Custom Prompts on Swipe Page', () => {
     await expect(customBtn).toHaveText('My Swipe Prompt');
   });
 
-  test('clicking custom prompt button generates prompt on swipe page', async ({ page }) => {
+  test('clicking custom prompt button generates prompt on swipe page', async ({ page, localWorkerUrlKey }) => {
     // Create a custom prompt with a variable
-    const createRes = await page.request.post(API_BASE, {
+    const createRes = await page.request.post(`/workspace/${localWorkerUrlKey}/api/prompts/custom`, {
       data: { name: 'Swipe Title', template: 'Analyze: {{title}}' }
     });
     const { prompt } = await createRes.json();
 
     // Navigate to swipe page
-    await page.goto(SWIPE_URL);
+    await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
     await page.waitForLoadState('networkidle');
 
     await openPromptsAccordion(page);
@@ -524,16 +508,16 @@ test.describe('Custom Prompts on Swipe Page', () => {
     await expect(section.locator('.swipe-prompt-text')).toContainText('Analyze:');
   });
 
-  test('dispatch targets are collapsed behind a Dispatch ▾ trigger on swipe', async ({ page }) => {
+  test('dispatch targets are collapsed behind a Dispatch ▾ trigger on swipe', async ({ page, seedLocal, localWorkerUrlKey }) => {
     // Enable dispatch so the action cluster renders the dispatch disclosure.
-    await seedLocalWorkspace(page, workspaceApiLocalSeed, { features: { dispatch: true } });
+    await seedLocal(workspaceApiLocalSeed, { features: { dispatch: true } });
 
-    const createRes = await page.request.post(API_BASE, {
+    const createRes = await page.request.post(`/workspace/${localWorkerUrlKey}/api/prompts/custom`, {
       data: { name: 'Swipe Dispatch', template: 'Analyze: {{title}}' }
     });
     const { prompt } = await createRes.json();
 
-    await page.goto(SWIPE_URL);
+    await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
     await page.waitForLoadState('networkidle');
 
     await openPromptsAccordion(page);
@@ -559,8 +543,8 @@ test.describe('Custom Prompts on Swipe Page', () => {
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
   });
 
-  test('no custom prompt buttons when none exist on swipe page', async ({ page }) => {
-    await page.goto(SWIPE_URL);
+  test('no custom prompt buttons when none exist on swipe page', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
     await page.waitForLoadState('networkidle');
 
     await openPromptsAccordion(page);
