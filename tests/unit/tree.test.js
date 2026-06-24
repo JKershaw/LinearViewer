@@ -157,6 +157,70 @@ describe('buildForest', () => {
       assert.strictEqual(forest.get(NO_PROJECT_ID).roots.length, 1);
     });
   });
+
+  // ===========================================================================
+  // Cross-provider id collisions (LIN-544)
+  // ===========================================================================
+  // A raw issue.id is only unique within its provider (GitHub emits "42", Local
+  // a doc id, Linear a UUID). A merged multi-provider list can repeat a raw id,
+  // and node Maps keyed on the raw id would silently clobber. Node identity must
+  // be source-qualified so both survive.
+  describe('cross-provider id collisions (LIN-544)', () => {
+    test('two issues sharing a raw id from different sources both survive', () => {
+      const linearIssue = createIssue({ id: '42', title: 'Linear 42', source: 'linear', project: { id: 'proj-1' } });
+      const githubIssue = createIssue({ id: '42', title: 'GitHub 42', source: 'github', project: { id: 'proj-1' } });
+
+      const forest = buildForest([linearIssue, githubIssue]);
+      const { roots } = forest.get('proj-1');
+
+      assert.strictEqual(roots.length, 2, 'both same-id issues survive the merge');
+      const titles = roots.map(r => r.issue.title).sort();
+      assert.deepStrictEqual(titles, ['GitHub 42', 'Linear 42']);
+    });
+
+    test('a child attaches to its same-source parent, not a foreign id twin', () => {
+      // 'p' exists in BOTH providers; the linear child must nest under the
+      // linear parent, leaving the github 'p' a standalone root.
+      const linearParent = createIssue({ id: 'p', title: 'Linear parent', source: 'linear', project: { id: 'proj-1' } });
+      const githubTwin = createIssue({ id: 'p', title: 'GitHub twin', source: 'github', project: { id: 'proj-1' } });
+      const linearChild = createIssue({ id: 'c', title: 'Linear child', source: 'linear', project: { id: 'proj-1' }, parent: { id: 'p' } });
+
+      const forest = buildForest([linearParent, githubTwin, linearChild]);
+      const { roots } = forest.get('proj-1');
+
+      assert.strictEqual(roots.length, 2, 'two roots: linear parent + github twin');
+      const linearRoot = roots.find(r => r.issue.title === 'Linear parent');
+      const githubRoot = roots.find(r => r.issue.title === 'GitHub twin');
+      assert.strictEqual(linearRoot.children.length, 1, 'child nests under same-source parent');
+      assert.strictEqual(linearRoot.children[0].issue.title, 'Linear child');
+      assert.strictEqual(githubRoot.children.length, 0, 'foreign id twin gets no child');
+    });
+
+    test('single-provider (un-stamped) issues keep raw-id behaviour', () => {
+      // No `source` field → issueSource defaults to linear; tree shape unchanged.
+      const parent = createIssue({ id: 'parent', project: { id: 'proj-1' } });
+      const child = createIssue({ id: 'child', parent: { id: 'parent' }, project: null });
+
+      const forest = buildForest([parent, child]);
+      const { roots } = forest.get('proj-1');
+      assert.strictEqual(roots.length, 1);
+      assert.strictEqual(roots[0].children[0].issue.id, 'child');
+    });
+  });
+
+  describe('buildInProgressForest cross-provider collisions (LIN-544)', () => {
+    test('same-id in-progress issues from different sources both appear', () => {
+      const started = { name: 'In Progress', type: 'started' };
+      const linearIssue = createIssue({ id: '7', title: 'Linear 7', source: 'linear', project: { id: 'proj-1' }, state: started });
+      const githubIssue = createIssue({ id: '7', title: 'GitHub 7', source: 'github', project: { id: 'proj-1' }, state: started });
+
+      const trees = buildInProgressForest([linearIssue, githubIssue], [{ id: 'proj-1', name: 'Proj 1', sortOrder: 0 }]);
+      const roots = trees.flatMap(t => t.roots);
+      assert.strictEqual(roots.length, 2, 'both in-progress same-id issues render');
+      const titles = roots.map(r => r.issue.title).sort();
+      assert.deepStrictEqual(titles, ['GitHub 7', 'Linear 7']);
+    });
+  });
 });
 
 // =============================================================================
