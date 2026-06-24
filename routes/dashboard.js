@@ -65,6 +65,11 @@ const MARKER_TO_AGENT_STATE = { done: 'complete', failed: 'error', aborted: 'err
 // is never mutated, so a later heartbeat (which advances lastActivity) un-stales it.
 const STALE_AFTER_MS = 24 * 60 * 60 * 1000; // 24h ("after a day")
 
+// Default archive page size for the observation /sessions feed (LIN-631). The
+// client requests this many archived sessions per "load more"; the server caps
+// any explicit ?limit at recentLimit.
+const ARCHIVE_PAGE_SIZE = 30;
+
 // Max workspace histories reconstructed concurrently in the cross-workspace
 // fan-out. The old unbounded `Promise.allSettled` over every connected workspace
 // made peak memory = the SUM of every workspace's full 30-day Loop graph
@@ -288,6 +293,20 @@ export function createDashboardRoutes({
     return Number.isFinite(max) ? max : 0;
   }
 
+  // Top-level "what is this session doing" signal (LIN-631): the run kind to
+  // surface on the card. Prefer the most-recently-active among the still-running
+  // runs (what the session is doing right now); fall back to the most-recent
+  // terminal run's kind (what it last did) when nothing is live.
+  function recentRunKind(children) {
+    const live = children.filter(l => !isTerminalLoop(l));
+    const pool = live.length ? live : children.filter(isTerminalLoop);
+    let best = null;
+    for (const l of pool) {
+      if (!best || loopActivityMs(l) >= loopActivityMs(best)) best = l;
+    }
+    return best ? (best.kind || null) : null;
+  }
+
   // Shape one reconstructed session for the observation feed. Loops are enriched
   // (marker-aware agentState/completedAt) so a marker-done run doesn't look live
   // forever; terminality follows the ANCHOR loop (LIN-592), not completedAt.
@@ -354,6 +373,7 @@ export function createDashboardRoutes({
       stale,
       runCount: runs.length,
       runs,
+      recentKind: recentRunKind(children),
       dispatchedAt: session.dispatchedAt || null,
       completedAt: session.completedAt || null,
       lastActivity: lastActivityMs ? new Date(lastActivityMs).toISOString() : null,
@@ -463,17 +483,34 @@ export function createDashboardRoutes({
         sessionsFeedCache.keyFor(workspaces),
         () => mergeSessions(workspaces)
       );
-      // Stale (>24h idle, non-terminal) sessions are bucketed with the archive, not
-      // Active — derived, never mutated (Bug 3, LIN-608).
-      const active = merged.filter(s => !s.terminal && !s.stale);
-      const recent = merged.filter(s => s.terminal || s.stale).slice(0, recentLimit);
+      // Active vs Archive is recency-only (LIN-631): a session is Active iff it
+      // has been touched within the last 24h, regardless of terminal state — so a
+      // run that completed <24h ago still shows as Active, and an old non-terminal
+      // session correctly drops into Archive. The same predicate is mirrored in
+      // public/observation.js (renderFeeds) so server and client buckets agree.
+      const now = Date.now();
+      const recentlyActive = (s) => {
+        const t = Date.parse(s.lastActivity);
+        return Number.isFinite(t) && (now - t) <= STALE_AFTER_MS;
+      };
+      const active = merged.filter(recentlyActive);
+      const archive = merged.filter(s => !recentlyActive(s));
+
+      // Archive is paginated (LIN-631): offset/limit page the bounded archive
+      // instead of a hard slice(0, recentLimit) that silently hid older entries.
+      const offset = Math.max(0, parseInt(req.query.offset, 10) || 0);
+      const limit = Math.min(Math.max(1, parseInt(req.query.limit, 10) || ARCHIVE_PAGE_SIZE), recentLimit);
+      const recent = archive.slice(offset, offset + limit);
 
       keepalive.stop();
       keepalive.send(200, {
         workspaces,
         active,
         recent,
-        counts: { active: active.length, recent: recent.length, total: merged.length },
+        recentTotal: archive.length,
+        recentOffset: offset,
+        recentLimit: limit,
+        counts: { active: active.length, recent: archive.length, total: merged.length },
         generatedAt: new Date().toISOString()
       });
     } catch (error) {
