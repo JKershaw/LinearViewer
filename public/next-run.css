@@ -1,0 +1,109 @@
+/* Suggested Next Run page (experimental, LIN-603).
+   Terminal-flavoured, mobile-first. Reuses shared section/tree styling from
+   style.css; only the option cards and generate controls are bespoke. */
+
+.next-run-header h1 {
+  margin: 0 0 var(--space-1);
+}
+
+.next-run-subtitle {
+  margin: 0;
+  color: var(--fg-dim);
+  font-size: var(--font-size-sm);
+}
+
+.next-run-experimental {
+  color: var(--fg-dim);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  margin: 0 0 var(--space-2);
+}
+
+.next-run-warning {
+  color: var(--orange, #b06a00);
+  font-size: var(--font-size-sm);
+  margin: 0 0 var(--space-2);
+}
+
+.next-run-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.next-run-feedback {
+  font-size: var(--font-size-sm);
+  color: var(--fg-dim);
+}
+
+.next-run-feedback.error {
+  color: var(--red, #c0392b);
+}
+
+.next-run-options {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.next-run-option {
+  border: 1px solid var(--fg-vdim);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+  background: var(--bg);
+}
+
+.next-run-option-open {
+  border-style: dashed;
+}
+
+.next-run-option-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+.next-run-size {
+  display: inline-block;
+  font-weight: bold;
+  font-size: var(--font-size-sm);
+  padding: 0 0.4rem;
+  border: 1px solid var(--blue);
+  border-radius: var(--radius-sm);
+  color: var(--blue);
+}
+
+.next-run-open-tag {
+  font-size: var(--font-size-sm);
+  color: var(--fg-dim);
+  text-transform: lowercase;
+}
+
+.next-run-goal {
+  margin: 0 0 var(--space-1);
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+.next-run-reasoning {
+  margin: 0 0 var(--space-2);
+  color: var(--fg-dim);
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+}
+
+.next-run-option-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.next-run-empty {
+  color: var(--fg-dim);
+  font-size: var(--font-size-sm);
+}

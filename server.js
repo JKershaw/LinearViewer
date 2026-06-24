@@ -79,6 +79,7 @@ import { createCollectiveRoutes } from './routes/collective.js'
 import { createDashboardRoutes, sessionIsTerminal } from './routes/dashboard.js'
 import { fetchIssueContext } from './lib/linear.js'
 import { createTaskChatRoutes } from './routes/task-chat.js'
+import { createNextRunRoutes } from './routes/next-run.js'
 import { yapClientFromEnv } from './lib/yap-client.js'
 import { getLoopsForWorkspace } from './lib/pipeline-loops.js'
 import { buildSessionCounts } from './lib/sessions-view.js'
@@ -1200,6 +1201,9 @@ app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatu
 
 // Mount task-chat routes (experimental "talk to a task" conversation).
 app.use(createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo }))
+
+// Mount next-run routes (experimental "suggest the next autopilot run" — LIN-603).
+app.use(createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo }))
 
 /**
  * Workspace project view - renders the interactive tree view.
