@@ -2015,13 +2015,14 @@ ${goal}`
   })
 
   // ===========================================================================
-  // Feedback intake (LIN-636) — sole consumer of the provider uploadFile seam
+  // Feedback intake (LIN-636 route / LIN-635 widget)
   // ===========================================================================
   //
-  // POST /workspace/:urlKey/api/feedback creates a ticket from a feedback
-  // message, optionally embedding a screenshot. It is the ONLY consumer of the
-  // provider `uploadFile` seam (LIN-636); the feedback widget (LIN-635) POSTs
-  // here.
+  // POST /workspace/:urlKey/api/feedback creates a fresh ticket from a feedback
+  // message — priority, captured page URL + browser, and an optional embedded
+  // screenshot — then enqueues a triage-style follow-up. It is the ONLY consumer
+  // of the provider `uploadFile` seam (LIN-636); the feedback widget (LIN-635)
+  // POSTs here.
   //
   // Body-size exception, scoped to THIS route only: the global
   // `express.json({ limit: '250kb' })` (server.js) is left untouched. That
@@ -2034,26 +2035,85 @@ ${goal}`
   const FEEDBACK_BODY_LIMIT = '12mb';
   const MAX_FEEDBACK_IMAGE_BYTES = 10 * 1024 * 1024; // matches the image-proxy ceiling
   const MAX_FEEDBACK_MESSAGE_LENGTH = 10_000;
+  const MAX_FEEDBACK_CONTEXT_LENGTH = 2_000; // url / userAgent clamp
   const feedbackBodyParser = json({ type: () => true, limit: FEEDBACK_BODY_LIMIT });
 
+  // Clamp an incoming priority to Linear's 0-4 scale (0 = none … 4 = low);
+  // anything else falls back to 0 ("No priority").
+  function normalizeFeedbackPriority(value) {
+    const n = typeof value === 'number' ? value : parseInt(value, 10);
+    return Number.isInteger(n) && n >= 0 && n <= 4 ? n : 0;
+  }
+
   /**
-   * Submit feedback as a new ticket, optionally with an embedded screenshot.
+   * Resolve the team a feedback ticket should be filed under. Precedence:
+   * explicit body `teamId` → `FEEDBACK_TEAM_ID` env → the provider's first team.
+   * Returns null when none can be resolved (the caller turns that into a 422).
+   */
+  async function resolveFeedbackTeamId(provider, token, bodyTeamId) {
+    if (typeof bodyTeamId === 'string' && bodyTeamId.trim()) return bodyTeamId.trim();
+    if (process.env.FEEDBACK_TEAM_ID) return process.env.FEEDBACK_TEAM_ID;
+    if (typeof provider.supports === 'function' && !provider.supports('fetchTeams')) return null;
+    try {
+      const teams = await provider.fetchTeams(token);
+      return (Array.isArray(teams) && teams[0] && teams[0].id) || null;
+    } catch (err) {
+      console.error('Feedback team resolution failed:', err.message);
+      return null;
+    }
+  }
+
+  // Best-effort triage follow-up after a feedback ticket is filed (LIN-635 S6).
+  // Non-fatal: a failure here must not fail the submission — the ticket already
+  // exists. Reuses the existing dispatch substrate (no separate queue).
+  async function enqueueFeedbackTriage(workspace, issue, priority, session) {
+    if (!dispatchQueueStore || !issue?.identifier) return;
+    try {
+      const triageIssue = {
+        id: issue.id,
+        identifier: issue.identifier,
+        title: issue.title,
+        url: issue.url,
+        state: issue.state,
+        priority,
+        labels: []
+      };
+      const generated = generatePrompt('triage', triageIssue, { project: null, parent: null, siblings: [] });
+      const prompt = generated?.prompt;
+      if (!prompt) return;
+      await dispatchQueueStore.addItem(workspace.urlKey, {
+        prompt,
+        promptName: 'Triage',
+        kind: 'triage',
+        issueId: issue.id || null,
+        issueIdentifier: issue.identifier,
+        issueTitle: issue.title || null,
+        issueUrl: issue.url || null,
+        dispatchedBy: session?.linearUserId || null,
+        target: 'cli'
+      });
+    } catch (err) {
+      console.error('Feedback triage enqueue failed:', err.message);
+    }
+  }
+
+  /**
+   * Submit feedback as a new ticket, optionally with an embedded screenshot,
+   * then enqueue a triage follow-up.
    * @route POST /workspace/:urlKey/api/feedback
    */
   router.post('/workspace/:urlKey/api/feedback', workspaceFromUrl, feedbackBodyParser, async (req, res) => {
     const workspace = req.workspace;
     const provider = getProviderForWorkspace(workspace);
     const token = getWorkspaceToken(workspace);
-    const { message, title, teamId, image } = req.body || {};
+    const { message, title, teamId, projectId, image, url, userAgent } = req.body || {};
+    const priority = normalizeFeedbackPriority(req.body?.priority);
 
     if (!message || typeof message !== 'string' || !message.trim()) {
       return badRequest.json(res, 'message is required');
     }
     if (message.length > MAX_FEEDBACK_MESSAGE_LENGTH) {
       return badRequest.json(res, 'message exceeds maximum length');
-    }
-    if (!teamId || typeof teamId !== 'string') {
-      return badRequest.json(res, 'teamId is required');
     }
 
     // Capability gates — clean 422 (never 500) when the workspace's provider
@@ -2069,8 +2129,32 @@ ${goal}`
       });
     }
 
+    const resolvedTeamId = await resolveFeedbackTeamId(provider, token, teamId);
+    if (!resolvedTeamId) {
+      return jsonError(res, 422, 'Could not resolve a team to file feedback against', {
+        code: 'TEAM_UNRESOLVED', provider: provider.name,
+      });
+    }
+    const resolvedProjectId = (typeof projectId === 'string' && projectId.trim())
+      ? projectId.trim()
+      : (process.env.FEEDBACK_PROJECT_ID || null);
+
     try {
       let description = message.trim();
+
+      // Capture block — page URL + browser, recorded at submit time (LIN-635
+      // S4). Both come from the client; clamp length and let markdown escape
+      // them as inline code so they can't break the ticket body.
+      const captured = [];
+      if (typeof url === 'string' && url.trim()) {
+        captured.push(`- **Page:** \`${url.trim().slice(0, MAX_FEEDBACK_CONTEXT_LENGTH)}\``);
+      }
+      if (typeof userAgent === 'string' && userAgent.trim()) {
+        captured.push(`- **Browser:** \`${userAgent.trim().slice(0, MAX_FEEDBACK_CONTEXT_LENGTH)}\``);
+      }
+      if (captured.length) {
+        description += `\n\n---\n${captured.join('\n')}`;
+      }
 
       if (image) {
         const parsed = parseFeedbackImage(image);
@@ -2091,10 +2175,17 @@ ${goal}`
         ? title.trim().slice(0, 250)
         : `Feedback: ${message.trim().split('\n')[0].slice(0, 60)}`;
 
-      const result = await provider.createIssue(token, { teamId, title: ticketTitle, description });
+      const createInput = { teamId: resolvedTeamId, title: ticketTitle, description, priority };
+      if (resolvedProjectId) createInput.projectId = resolvedProjectId;
+
+      const result = await provider.createIssue(token, createInput);
       if (!result?.success || !result.issue) {
         return jsonError(res, 502, 'Failed to create feedback ticket');
       }
+
+      // Triage follow-up — best-effort, never fails the submission.
+      await enqueueFeedbackTriage(workspace, result.issue, priority, req.session);
+
       return res.status(201).json({ success: true, issue: result.issue });
     } catch (error) {
       console.error('Feedback submit error:', error);
