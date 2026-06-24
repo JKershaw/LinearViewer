@@ -375,15 +375,34 @@ test.describe('Proxy API - Consumer Endpoints', () => {
     expect(data.error).toContain('title');
   });
 
-  test('write endpoint validates teamId format', async ({ request }) => {
-    const resp = await request.post('/api/proxy/issues', {
+  test('write endpoint requires teamId but accepts symbolic refs (LIN-556)', async ({ request }) => {
+    // Presence is still enforced: a missing teamId fails fast with 400.
+    const missing = await request.post('/api/proxy/issues', {
       headers: {
         Authorization: `Bearer ${writeToken}`,
         'Content-Type': 'application/json'
       },
-      data: { teamId: 'not-a-uuid', title: 'Test' }
+      data: { title: 'Test' }
     });
-    expect(resp.status()).toBe(400);
+    expect(missing.status()).toBe(400);
+    expect((await missing.json()).error).toContain('teamId');
+
+    // A non-UUID teamId is no longer a format rejection (LIN-556): it is treated
+    // as a symbolic team ref (key/name) and resolved against the provider. The
+    // test token can't reach Linear, so the resolution read fails upstream — we
+    // only assert it is NOT the old 400 format rejection and not our own token
+    // error (mirrors the read-write scope test above).
+    const symbolic = await request.post('/api/proxy/issues', {
+      headers: {
+        Authorization: `Bearer ${writeToken}`,
+        'Content-Type': 'application/json'
+      },
+      data: { teamId: 'LIN', title: 'Test' }
+    });
+    expect(symbolic.status()).not.toBe(400);
+    if (symbolic.status() === 401) {
+      expect((await symbolic.json()).error).not.toContain('Invalid or missing proxy token');
+    }
   });
 
   test('search endpoint validates query parameter', async ({ request }) => {
@@ -499,17 +518,29 @@ test.describe('Proxy API - Consumer Endpoints', () => {
     expect(data.error).toContain('read-write');
   });
 
-  test('label add endpoint validates labelId', async ({ request }) => {
-    const resp = await request.post('/api/proxy/issues/11111111-1111-1111-1111-111111111111/labels', {
+  test('label add requires labelId but accepts a label name (LIN-556)', async ({ request }) => {
+    // Presence is still enforced: a missing labelId fails fast with 400.
+    const missing = await request.post('/api/proxy/issues/11111111-1111-1111-1111-111111111111/labels', {
       headers: {
         Authorization: `Bearer ${writeToken}`,
         'Content-Type': 'application/json'
       },
-      data: { labelId: 'not-a-uuid' }
+      data: {}
     });
-    expect(resp.status()).toBe(400);
-    const data = await resp.json();
-    expect(data.error).toContain('labelId');
+    expect(missing.status()).toBe(400);
+    expect((await missing.json()).error).toContain('labelId');
+
+    // A non-UUID labelId is no longer a format rejection (LIN-556): it is treated
+    // as a label name and resolved against the provider. The test token can't
+    // reach Linear, so we only assert it is NOT the old 400 format rejection.
+    const named = await request.post('/api/proxy/issues/11111111-1111-1111-1111-111111111111/labels', {
+      headers: {
+        Authorization: `Bearer ${writeToken}`,
+        'Content-Type': 'application/json'
+      },
+      data: { labelId: 'bug' }
+    });
+    expect(named.status()).not.toBe(400);
   });
 
   test('update endpoint requires valid fields', async ({ request }) => {

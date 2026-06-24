@@ -737,6 +737,19 @@ All write endpoints require a `readWrite` scoped token. Read-only tokens receive
 
 Success responses wrap the affected entity (e.g. `{ "success": true, "issue": {...} }`) — read the documented shape rather than assuming the entity comes back top-level. **The response is authoritative:** a `2xx` with `"success": true` means the write landed; a non-`2xx` (the write is rejected with `502`, never returned as a `2xx` with a falsy `success`) means it did not. Creates are non-idempotent, so do **not** blind-retry a create on a lost/empty response — re-read (search or GET the issue) to confirm before retrying. As an extra guard, identical **comment** creates are deduped server-side within a short window: a repeat of the same `(issue + body)` returns the original comment with `"deduped": true` and HTTP `200` (not `201`) instead of minting a duplicate, so a confirming retry of the same body is safe.
 
+#### Symbolic & namespaced references (write inputs)
+
+Write inputs accept LLM-friendly references in addition to raw UUIDs — you no longer have to look up an id first. This is **input-only**: stored data and every read/response shape are unchanged, and existing UUID payloads behave exactly as before.
+
+- **States** (`stateId`): a UUID, a canonical state keyword — `done`/`completed`, `in-progress`/`started`, `todo`/`unstarted`, `backlog`, `canceled`/`cancelled`, `duplicate` — or the literal state name (case-insensitive). On update the state is scoped to the issue's own team; on create, to the `teamId` you pass.
+- **Labels** (`labelId`, in the add/remove endpoints): a UUID or the label name (case-insensitive).
+- **Projects** (`projectId`): a UUID or the exact project name (case-insensitive).
+- **Teams** (`teamId`): a UUID, the team key (e.g. `LIN`), or the team name (case-insensitive).
+
+Resolution order is **UUID → native identifier → symbolic name/type**, so a UUID is always an unambiguous escape hatch. If a symbolic reference matches more than one entity (e.g. two workflow states of the same type, or two labels differing only by case) the request fails with **`422`** and lists the candidate `{id, name}` pairs — pass the UUID to disambiguate. An unmatched name also fails with `422` rather than being silently dropped.
+
+References may optionally carry a provider namespace prefix of the form `<source>:<ref>` (e.g. `linear:LIN`, `linear:done`). The proxy is Linear-only today, so only `linear:` (or a bare, un-prefixed reference) is accepted; any other namespace is rejected with `422`. The prefix exists so multi-provider workspaces stay collision-safe in future without reopening the addressing scheme.
+
 #### Create Issue
 
 ```
@@ -758,11 +771,11 @@ Content-Type: application/json
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `teamId` | UUID | Yes | Team to create issue in |
+| `teamId` | UUID / key / name | Yes | Team to create issue in (UUID, team key e.g. `LIN`, or name) |
 | `title` | string | Yes | Issue title (max 1000 chars) |
 | `description` | string | No | Markdown description (max 100K chars) |
-| `projectId` | UUID | No | Assign to project |
-| `stateId` | UUID | No | Set workflow state |
+| `projectId` | UUID / name | No | Assign to project (UUID or exact project name) |
+| `stateId` | UUID / keyword / name | No | Set workflow state (UUID, e.g. `done`/`in-progress`/`backlog`, or state name) |
 | `assigneeId` | UUID | No | Assign to user |
 | `parentId` | UUID | No | Set parent issue |
 | `cycleId` | UUID | No | Assign to cycle |
@@ -800,8 +813,8 @@ At least one field must be provided.
 |-------|------|-------------|
 | `title` | string | Issue title (max 1000 chars) |
 | `description` | string | Markdown description (max 100K chars) |
-| `projectId` | UUID | Assign to project |
-| `stateId` | UUID | Set workflow state |
+| `projectId` | UUID / name | Assign to project (UUID or exact project name) |
+| `stateId` | UUID / keyword / name | Set workflow state (UUID, e.g. `done`/`in-progress`/`backlog`, or state name; scoped to the issue's team) |
 | `assigneeId` | UUID | Assign to user |
 | `parentId` | UUID \| `null` | Set parent issue (UUID), or `null` to remove the parent and promote the issue to top-level |
 | `cycleId` | UUID | Assign to cycle |
@@ -956,7 +969,7 @@ Content-Type: application/json
 { "labelId": "uuid" }
 ```
 
-Uses the label UUID (get from `GET /api/proxy/labels`). Idempotent — returns success if label is already present.
+`labelId` accepts the label UUID **or** the label name (case-insensitive) — e.g. `{ "labelId": "bug" }`. Get the catalog from `GET /api/proxy/labels`. Idempotent — returns success if label is already present.
 
 Note: Uses Read-Modify-Write internally. Concurrent label modifications may overwrite each other (backend label-API limitation — there is no atomic add/remove).
 
@@ -980,7 +993,7 @@ When the label is already present: `{ "success": true, "message": "Label already
 DELETE /api/proxy/issues/{issueId}/labels/{labelId}
 ```
 
-Idempotent — returns success if label was not present.
+`{labelId}` accepts the label UUID or the label name (case-insensitive), e.g. `.../labels/bug`. Idempotent — returns success if label was not present.
 
 Response: same shape as Add Label (the issue with its remaining `labels` array). When the label was not present: `{ "success": true, "message": "Label not present" }`.
 
