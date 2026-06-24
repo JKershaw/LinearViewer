@@ -19,6 +19,16 @@ import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
 import { InMemorySessionSummaryCacheStore } from '../../lib/session-summary-cache.js';
 
 const NOW_ISO = new Date().toISOString();
+// >24h ago: a session whose last activity is this old falls into Archive under
+// the recency-only Active/Archive split (LIN-631).
+const OLD_ISO = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+
+// Active/Archive is recency-only now (LIN-631), so a terminal session can be
+// Active. Tests that only care about a session's payload (not its bucket) look
+// it up across both lists.
+function findSession(body, id) {
+  return [...(body.active || []), ...(body.recent || [])].find(s => s.sessionId === id);
+}
 
 // ─── Mock dispatch/agentStatus stores ──────────────────────────────────────────────
 // Shaped to drive lib/pipeline-loops.getLoopsForWorkspace deterministically:
@@ -43,8 +53,8 @@ function activeItem(id, identifier) {
 function historyItem(id, identifier) {
   return { id, issueIdentifier: identifier, issueTitle: `Title ${identifier}`, promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken', feedback: [{ message: 'pr opened' }] };
 }
-function agentStatusDone(dispatchId, identifier) {
-  return { dispatchId, taskIdentifier: identifier, action: 'implementation', status: 'completed', summary: 'all done', timestamp: NOW_ISO };
+function agentStatusDone(dispatchId, identifier, ts = NOW_ISO) {
+  return { dispatchId, taskIdentifier: identifier, action: 'implementation', status: 'completed', summary: 'all done', timestamp: ts };
 }
 // A taken run that the runner finished via a [done] feedback marker but with NO
 // agentStatus 'completed' entry — pipeline-loops alone derives 'running' for this.
@@ -97,14 +107,14 @@ function makeRouter(perWorkspace, { runSummaryCacheStore, sessionSummaryCacheSto
 // An autopilot orchestrator dispatch (kind:'autopilot') anchors a session; its
 // session id is the orchestrator's own dispatch id. Workers carry that id as
 // `sessionId`. Terminality is folded in via agentStatus 'completed' / [done].
-function autopilotHistoryItem(id, identifier) {
-  return { id, kind: 'autopilot', issueIdentifier: identifier, issueTitle: `Title ${identifier}`, promptName: 'autopilot', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken' };
+function autopilotHistoryItem(id, identifier, ts = NOW_ISO) {
+  return { id, kind: 'autopilot', issueIdentifier: identifier, issueTitle: `Title ${identifier}`, promptName: 'autopilot', prompt: 'p', dispatchedAt: ts, resolvedAt: ts, status: 'taken' };
 }
 function autopilotLiveItem(id, identifier) {
   return { id, kind: 'autopilot', issueIdentifier: identifier, issueTitle: `Title ${identifier}`, promptName: 'autopilot', prompt: 'p', dispatchedAt: NOW_ISO };
 }
-function workerHistoryItem(id, identifier, sessionId) {
-  return { id, sessionId, issueIdentifier: identifier, issueTitle: `Title ${identifier}`, promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken', feedback: [{ message: 'pr opened' }] };
+function workerHistoryItem(id, identifier, sessionId, ts = NOW_ISO) {
+  return { id, sessionId, issueIdentifier: identifier, issueTitle: `Title ${identifier}`, promptName: 'implementation', prompt: 'p', dispatchedAt: ts, resolvedAt: ts, status: 'taken', feedback: [{ message: 'pr opened' }] };
 }
 
 // The page is first-class (LIN-595): no feature flag is required. ENABLED is kept
@@ -260,13 +270,13 @@ describe('feed memory (LIN-622)', () => {
 // ─── /sessions (Observation feed; LIN-595) ───────────────────────────────────
 
 describe('GET /api/dashboard/sessions', () => {
-  test('groups loops into sessions, splits active/recent, and tags each', async () => {
+  test('groups loops into sessions, splits active/recent by recency, and tags each', async () => {
     const perWorkspace = {
-      // Terminal session: completed autopilot anchor + one completed worker.
+      // Terminal session that finished >24h ago → Archive under the recency split.
       'ws-a': {
         live: [],
-        history: [autopilotHistoryItem('sess-1', 'LIN-100'), workerHistoryItem('w-1', 'LIN-101', 'sess-1')],
-        agentStatus: [agentStatusDone('sess-1', 'LIN-100'), agentStatusDone('w-1', 'LIN-101')]
+        history: [autopilotHistoryItem('sess-1', 'LIN-100', OLD_ISO), workerHistoryItem('w-1', 'LIN-101', 'sess-1', OLD_ISO)],
+        agentStatus: [agentStatusDone('sess-1', 'LIN-100', OLD_ISO), agentStatusDone('w-1', 'LIN-101', OLD_ISO)]
       },
       // Live session: queued autopilot anchor (not terminal).
       'ws-b': {
@@ -284,7 +294,7 @@ describe('GET /api/dashboard/sessions', () => {
     assert.equal(res.statusCode, 200);
     const body = res.jsonBody;
     assert.equal(body.active.length, 1, 'the live session is active');
-    assert.equal(body.recent.length, 1, 'the terminal session is recent');
+    assert.equal(body.recent.length, 1, 'the old terminal session is in the archive');
 
     const live = body.active[0];
     assert.equal(live.sessionId, 'sess-2');
@@ -333,8 +343,8 @@ describe('GET /api/dashboard/sessions', () => {
     await handler(req, res);
 
     assert.equal(res.statusCode, 200);
-    const sess = res.jsonBody.recent.find(s => s.sessionId === 'sess-r');
-    assert.ok(sess, 'session is recent');
+    const sess = findSession(res.jsonBody, 'sess-r');
+    assert.ok(sess, 'session is present');
     const run = sess.runs.find(r => r.loopId === 'w-rich');
     assert.ok(run, 'worker run is present');
     // Recap fallback + evidence/metrics for the Level-3 node.
@@ -386,8 +396,8 @@ describe('GET /api/dashboard/sessions', () => {
     await handler(req, res);
 
     assert.equal(res.statusCode, 200);
-    const s = res.jsonBody.recent.find(x => x.sessionId === 'sess-t');
-    assert.ok(s, 'terminal session is recent');
+    const s = findSession(res.jsonBody, 'sess-t');
+    assert.ok(s, 'terminal session is present');
     assert.equal(s.terminal, true);
     assert.equal(s.statusLine, null, 'terminal sessions carry no feed status line');
   });
@@ -415,7 +425,7 @@ describe('GET /api/dashboard/sessions', () => {
     await handler(req, res);
 
     assert.equal(res.statusCode, 200);
-    const sess = res.jsonBody.recent.find(s => s.sessionId === 'sess-long');
+    const sess = findSession(res.jsonBody, 'sess-long');
     const run = sess.runs.find(r => r.loopId === 'w-long');
     assert.ok(run, 'worker run present');
     assert.equal(run.metrics.length, 6, 'metrics trimmed to the recent tail');
@@ -437,8 +447,8 @@ describe('GET /api/dashboard/sessions', () => {
     const { req, res } = makeReqRes({ session });
     await handler(req, res);
     assert.equal(res.statusCode, 200);
-    const s = res.jsonBody.recent.find(x => x.sessionId === 'sess-9');
-    assert.ok(s, 'terminal session is recent');
+    const s = findSession(res.jsonBody, 'sess-9');
+    assert.ok(s, 'terminal session is present');
     assert.equal(s.status, 'error');
   });
 
@@ -477,6 +487,71 @@ describe('GET /api/dashboard/sessions', () => {
     assert.ok(s, 'a later heartbeat keeps the session in Active');
     assert.equal(s.stale, false);
     assert.equal(s.status, 'in-progress');
+  });
+
+  test('a terminal session that finished <24h ago is Active, not Archive (LIN-631)', async () => {
+    // Recency-only split: a just-completed session stays in Active for 24h instead
+    // of dropping straight into the archive on completion.
+    const perWorkspace = {
+      'ws-a': {
+        live: [],
+        history: [autopilotHistoryItem('sess-rt', 'LIN-650'), workerHistoryItem('w-rt', 'LIN-651', 'sess-rt')],
+        agentStatus: [agentStatusDone('sess-rt', 'LIN-650'), agentStatusDone('w-rt', 'LIN-651')]
+      }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const session = { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] };
+    const { req, res } = makeReqRes({ session });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const inActive = res.jsonBody.active.find(x => x.sessionId === 'sess-rt');
+    assert.ok(inActive, 'a terminal session within 24h shows in Active');
+    assert.equal(inActive.terminal, true, 'it is still terminal — only its bucket changed');
+    assert.ok(!res.jsonBody.recent.some(x => x.sessionId === 'sess-rt'), 'it is not in the archive');
+  });
+
+  test('recentKind surfaces the most-recently-active run kind (LIN-631)', async () => {
+    // Two live workers with different kinds; the one with later activity wins.
+    const wEarly = { id: 'w-e', sessionId: 'sess-k', kind: 'research', issueIdentifier: 'LIN-601', issueTitle: 'E', promptName: 'research', prompt: 'p', dispatchedAt: OLD_ISO };
+    const wLate = { id: 'w-l', sessionId: 'sess-k', kind: 'plan', issueIdentifier: 'LIN-602', issueTitle: 'L', promptName: 'plan', prompt: 'p', dispatchedAt: NOW_ISO };
+    const router = makeRouter({ 'ws-a': { live: [autopilotLiveItem('sess-k', 'LIN-600'), wEarly, wLate], history: [], agentStatus: [] } });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const session = { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] };
+    const { req, res } = makeReqRes({ session });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const s = findSession(res.jsonBody, 'sess-k');
+    assert.ok(s, 'session present');
+    assert.equal(s.recentKind, 'plan', 'recentKind = kind of the most-recently-active non-terminal run');
+  });
+
+  test('archive paginates via offset/limit and reports recentTotal (LIN-631)', async () => {
+    const history = [];
+    const agentStatus = [];
+    for (let i = 0; i < 5; i++) {
+      history.push(autopilotHistoryItem(`sess-p${i}`, `LIN-9${i}0`, OLD_ISO));
+      agentStatus.push(agentStatusDone(`sess-p${i}`, `LIN-9${i}0`, OLD_ISO));
+    }
+    const router = makeRouter({ 'ws-a': { live: [], history, agentStatus } });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const session = { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] };
+
+    const r1 = makeReqRes({ session, query: { offset: '0', limit: '2' } });
+    await handler(r1.req, r1.res);
+    assert.equal(r1.res.statusCode, 200);
+    assert.equal(r1.res.jsonBody.recent.length, 2, 'first page honours limit');
+    assert.equal(r1.res.jsonBody.recentTotal, 5, 'recentTotal is the full archive size');
+    assert.equal(r1.res.jsonBody.recentOffset, 0);
+    assert.equal(r1.res.jsonBody.recentLimit, 2);
+
+    const r2 = makeReqRes({ session, query: { offset: '2', limit: '2' } });
+    await handler(r2.req, r2.res);
+    assert.equal(r2.res.jsonBody.recent.length, 2, 'second page honours offset+limit');
+    const ids1 = new Set(r1.res.jsonBody.recent.map(s => s.sessionId));
+    assert.ok(r2.res.jsonBody.recent.every(s => !ids1.has(s.sessionId)), 'pages do not overlap');
   });
 
   test('one failing workspace store does not blank the whole feed', async () => {

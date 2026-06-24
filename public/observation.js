@@ -37,9 +37,23 @@ let visibilityHandler = null;
 const POLL_MS = 5000;
 const REDUCED_MOTION = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+// Active vs Archive split (LIN-631): recency-only, mirrored EXACTLY from the
+// server (routes/dashboard.js — STALE_AFTER_MS + the recentlyActive predicate),
+// so both sides bucket a session the same way.
+const STALE_AFTER_MS = 24 * 60 * 60 * 1000; // 24h
+const ARCHIVE_PAGE_SIZE = 30;               // archive "load more" page size
+
 // Filter state.
 const hiddenWorkspaces = new Set();        // urlKeys toggled off
 let archiveOpen = false;
+
+// Archive pagination state (LIN-631). The live poll always refreshes the first
+// page (offset 0); "load more" requests subsequent offsets and those extra
+// sessions persist across polls instead of being clobbered by the next refresh.
+let archiveTotal = 0;                       // server-reported full archive size
+let archiveOffset = ARCHIVE_PAGE_SIZE;      // next offset to request via load-more
+let archiveLoading = false;
+const loadedArchiveIds = new Set();         // sessionIds pulled in via load-more
 
 // Live data + view state preserved across polls.
 const sessionIndex = new Map();            // sessionId → session payload
@@ -79,6 +93,14 @@ function isVisibleWs(urlKey) {
 
 function passesFilter(session) {
   return isVisibleWs(session.workspaceUrlKey);
+}
+
+// Recency-only Active/Archive predicate (LIN-631) — mirrors the server
+// (routes/dashboard.js recentlyActive) exactly: Active iff touched within 24h,
+// regardless of terminal state.
+function isRecentlyActive(session) {
+  const t = Date.parse(session.lastActivity);
+  return Number.isFinite(t) && (Date.now() - t) <= STALE_AFTER_MS;
 }
 
 function shortSessionId(id) {
@@ -136,7 +158,10 @@ function renderSummaryLine(s) {
   if (st && st.statusLine) return `<span class="obs-summary-line obs-summary-status">${escapeHtml(st.statusLine)}</span>`;
   // Live status line served on the feed itself (no per-poll backend fetch).
   if (s.statusLine) return `<span class="obs-summary-line obs-summary-status">${escapeHtml(s.statusLine)}</span>`;
-  if (!s.terminal) return `<span class="obs-summary-line obs-summary-dim">◐ working…</span>`;
+  if (!s.terminal) {
+    const kind = s.recentKind ? ` <span class="obs-summary-kind">${escapeHtml(String(s.recentKind))}</span>` : '';
+    return `<span class="obs-summary-line obs-summary-dim">◐ working…${kind}</span>`;
+  }
   // Terminal but no cached summary → offer to generate (explicit spend only).
   return `<button type="button" class="obs-summary-gen" data-session="${escapeHtml(s.sessionId)}">summarise this session</button>`;
 }
@@ -242,15 +267,28 @@ function diffSessionList(listId, emptyId, cardMap, sessions) {
 
 function renderFeeds() {
   const sessions = [...sessionIndex.values()].filter(passesFilter);
-  // Stale sessions (derived server-side, >24h idle) drop out of Active into the
-  // completed archive (Bug 3, LIN-608) — they are no longer "live".
-  const active = sessions.filter(s => !s.terminal && !s.stale);
-  const recent = sessions.filter(s => s.terminal || s.stale);
+  // Recency-only split (LIN-631), mirroring the server: Active iff touched within
+  // 24h, else Archive — regardless of terminal state. Old non-terminal sessions
+  // therefore land in Archive, where the stale render branch still labels them.
+  const active = sessions.filter(isRecentlyActive);
+  const recent = sessions.filter(s => !isRecentlyActive(s));
   diffSessionList('obs-active', 'obs-active-empty', activeCards, active);
   diffSessionList('obs-recent', 'obs-recent-empty', recentCards, recent);
 
+  // Count reflects the full server-side archive (LIN-631), not just the pages
+  // loaded so far, so the badge stays honest before "load more" is used.
   const count = document.getElementById('obs-archive-count');
-  if (count) count.textContent = String(recent.length);
+  if (count) count.textContent = String(Math.max(archiveTotal, recent.length));
+  updateLoadMore();
+}
+
+function updateLoadMore() {
+  const btn = document.getElementById('obs-archive-more');
+  if (!btn) return;
+  const hasMore = archiveOffset < archiveTotal;
+  btn.hidden = !hasMore;
+  btn.disabled = archiveLoading;
+  btn.textContent = archiveLoading ? 'loading…' : 'load more';
 }
 
 // ─── Session body (expanded — Level 3 drill-down) ───────────────────────────────
@@ -697,8 +735,16 @@ async function pollSessions() {
     const data = await res.json();
     const active = Array.isArray(data.active) ? data.active : [];
     const recent = Array.isArray(data.recent) ? data.recent : [];
+    archiveTotal = Number.isFinite(data.recentTotal) ? data.recentTotal : recent.length;
 
-    sessionIndex.clear();
+    // The poll is authoritative for Active + the first archive page. Extra
+    // archive pages pulled in via "load more" (loadedArchiveIds) persist across
+    // polls; everything else not in this poll is dropped (LIN-631).
+    const fresh = new Set([...active, ...recent].map(s => String(s.sessionId)));
+    for (const id of [...sessionIndex.keys()]) {
+      if (fresh.has(id) || loadedArchiveIds.has(id)) continue;
+      sessionIndex.delete(id);
+    }
     for (const s of [...active, ...recent]) sessionIndex.set(String(s.sessionId), s);
 
     renderFeeds();
@@ -706,6 +752,35 @@ async function pollSessions() {
   } catch (e) {
     setPollStatus('● disconnected');
     console.warn('Observation poll failed:', e);
+  }
+}
+
+// Pull the next archive page (LIN-631). Offset-based: the live poll owns the
+// first page, so we request from archiveOffset onward and merge — these extra
+// sessions are tagged in loadedArchiveIds so the next poll won't evict them.
+async function loadMoreArchive() {
+  const urlKey = observationData?.urlKey;
+  if (!urlKey || archiveLoading || archiveOffset >= archiveTotal) return;
+  archiveLoading = true;
+  updateLoadMore();
+  try {
+    const res = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dashboard/sessions?offset=${archiveOffset}&limit=${ARCHIVE_PAGE_SIZE}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const page = Array.isArray(data.recent) ? data.recent : [];
+    archiveTotal = Number.isFinite(data.recentTotal) ? data.recentTotal : archiveTotal;
+    for (const s of page) {
+      const id = String(s.sessionId);
+      sessionIndex.set(id, s);
+      loadedArchiveIds.add(id);
+    }
+    archiveOffset += page.length;
+    renderFeeds();
+  } catch (e) {
+    console.warn('Observation load-more failed:', e);
+  } finally {
+    archiveLoading = false;
+    updateLoadMore();
   }
 }
 
@@ -750,6 +825,9 @@ function initControls() {
       archiveBody.hidden = !archiveOpen;
     });
   }
+
+  const more = document.getElementById('obs-archive-more');
+  if (more) more.addEventListener('click', loadMoreArchive);
 }
 
 // ─── Initialization ───────────────────────────────────────────────────────────

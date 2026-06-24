@@ -173,6 +173,17 @@
 .obs-summary-line { display: inline; }
 .obs-summary-status { font-style: italic; }
 .obs-summary-dim { color: var(--fg-dim); }
+/* Most-recent run kind beside "working…" (LIN-631). */
+.obs-summary-kind {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--fg-dim);
+  background: var(--bg-muted);
+  border-radius: 3px;
+  padding: 0.02rem 0.32rem;
+  margin-left: 0.3rem;
+}
 .obs-summary-pending { color: var(--fg-dim); }
 
 .obs-summary-gen {
@@ -487,6 +498,23 @@ a.obs-task-ident:hover { text-decoration: underline; }
 }
 
 .obs-archive-body[hidden] { display: none; }
+
+/* Archive pagination control (LIN-631). */
+.obs-archive-more {
+  display: block;
+  margin: 0.5rem auto 0;
+  padding: 0.3rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: none;
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--fg-dim);
+  cursor: pointer;
+}
+.obs-archive-more:hover:not([disabled]) { color: var(--fg); border-color: var(--fg-dim); }
+.obs-archive-more[disabled] { cursor: default; opacity: 0.6; }
+.obs-archive-more[hidden] { display: none; }
 
 /* New-row arrival pulse (shared idiom with pipeline/dashboard). */
 .obs-session.cell-new { animation: obs-cell-new 1.2s ease-out; }
