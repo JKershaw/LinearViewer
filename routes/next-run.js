@@ -21,7 +21,8 @@ import { Router } from 'express';
 import { renderNextRunPage } from '../lib/render-next-run.js';
 import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
-import { generateGoalSuggestions, CONTINUE_UNTIL_STOPPED_OPTION } from '../lib/next-run.js';
+import { generateGoalSuggestions, CONTINUE_UNTIL_STOPPED_OPTION, formatNextRunContext } from '../lib/next-run.js';
+import { buildRoadmapModel } from '../lib/roadmap.js';
 import { isRecommendationEnabled } from '../lib/openrouter.js';
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
@@ -39,13 +40,15 @@ function shouldMockAi(workspace) {
 }
 
 /**
- * Deterministic, grounded mock options for test mode — one direction per the
+ * Deterministic, grounded mock response for test mode — one direction per the
  * first in-progress / queued mock issue, then the always-present
- * continue-until-stopped option. Mirrors the spirit of the real generator without
- * calling an LLM.
+ * continue-until-stopped option, plus the representative grounding `context`.
+ * Mirrors the SHAPE of the real generator ({ options, context }) without calling
+ * an LLM, so live and test paths don't diverge (LIN-633).
  */
-function buildMockOptions() {
+function buildMockResponse() {
   const issues = testMockData.issues || [];
+  const projects = testMockData.projects || [];
   const inProgress = issues.find(i => i.state?.type === 'started');
   const queued = issues.find(i => i.state?.type === 'unstarted' || i.state?.type === 'backlog');
 
@@ -65,7 +68,11 @@ function buildMockOptions() {
     });
   }
   options.push({ ...CONTINUE_UNTIL_STOPPED_OPTION });
-  return options;
+
+  // Build the context from the same machinery the real generator uses, so the
+  // mock context panel shows a representative grounding blob (parity).
+  const context = formatNextRunContext(buildRoadmapModel(projects, issues), 'Test Workspace');
+  return { options, context };
 }
 
 /**
@@ -146,7 +153,7 @@ export function createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspace
     }
 
     if (mockAi) {
-      return res.json({ options: buildMockOptions(), model: 'mock' });
+      return res.json({ ...buildMockResponse(), model: 'mock' });
     }
 
     try {

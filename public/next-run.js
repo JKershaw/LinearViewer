@@ -1,12 +1,18 @@
 /**
- * Suggested Next Run client (experimental, LIN-603).
+ * Suggested Next Run client (experimental, LIN-603; LIN-633 UI parity).
  *
  * Drives the "suggest the next autopilot run" page: click Generate → POST to the
- * suggest endpoint → render the returned goal options as cards. Each card shows
- * the goal paragraph, its reasoning, and a t-shirt size; the always-present
- * "continue until stopped" option is flagged. Accepting an option hands its goal
- * to the existing dispatch launch path by navigating to the dispatch page with
- * the goal prefilled (?goal=) — no new run mechanism here.
+ * suggest endpoint → render the returned goal options as Observation-styled cards.
+ * Each card shows a t-shirt size chip and a caret-collapsible body holding the goal
+ * paragraph, its reasoning, and the accept/copy actions; the always-present
+ * "continue until stopped" option is flagged. A single page-level expandable panel
+ * shows the exact grounding context the model saw (shared across options, not
+ * per-option). Accepting an option hands its goal to the existing dispatch launch
+ * path by navigating to the dispatch page with the goal prefilled (?goal=).
+ *
+ * Visual parity with the Observation page is via reused obs-* CSS + a replicated
+ * caret/collapse toggle — observation.js is NOT imported (it binds to
+ * server-rendered markup; these cards are built dynamically).
  */
 (function () {
   'use strict';
@@ -18,6 +24,9 @@
   var feedbackEl = document.getElementById('next-run-feedback');
   var optionsEl = document.getElementById('next-run-options');
   var emptyState = document.getElementById('next-run-empty');
+  var contextSection = document.getElementById('next-run-context-section');
+  var contextToggle = document.getElementById('next-run-context-toggle');
+  var contextBody = document.getElementById('next-run-context-body');
 
   if (!generateBtn || !optionsEl) return;
 
@@ -30,6 +39,17 @@
   function dispatchUrl(goal) {
     var base = '/workspace/' + encodeURIComponent(urlKey) + '/dispatch';
     return goal ? base + '?goal=' + encodeURIComponent(goal) : base;
+  }
+
+  // Caret/collapse toggle — replicated from the Observation page's pattern (no
+  // observation.js import). Flips `is-open` on the card and unhides its body.
+  function toggleCard(li) {
+    var open = !li.classList.contains('is-open');
+    li.classList.toggle('is-open', open);
+    var head = li.querySelector('.next-run-option-head');
+    var body = li.querySelector('.next-run-option-body');
+    if (head) head.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (body) body.hidden = !open;
   }
 
   function renderOptions(options) {
@@ -50,24 +70,38 @@
       var size = String(opt.size || 'M');
       var isOpen = !!opt.continueUntilStopped;
       var goalText = isOpen ? '(no goal — continue until stopped)' : (opt.goal || '');
+      var preview = isOpen
+        ? 'Continue until stopped'
+        : (opt.goal || '').split('\n')[0].slice(0, 120);
 
-      var head = document.createElement('div');
+      // Head: caret · size chip (obs-chip) · open tag · one-line goal preview.
+      var head = document.createElement('button');
+      head.type = 'button';
       head.className = 'next-run-option-head';
+      head.setAttribute('aria-expanded', 'false');
       head.innerHTML =
-        '<span class="next-run-size" title="t-shirt size estimate">' + escapeHtml(size) + '</span>' +
-        (isOpen ? '<span class="next-run-open-tag">continue until stopped</span>' : '');
+        '<span class="obs-session-caret next-run-option-caret" aria-hidden="true">▸</span>' +
+        '<span class="obs-chip is-on next-run-size" title="t-shirt size estimate">' + escapeHtml(size) + '</span>' +
+        (isOpen ? '<span class="next-run-open-tag">continue until stopped</span>' : '') +
+        '<span class="next-run-goal-preview">' + escapeHtml(preview) + '</span>';
+      head.addEventListener('click', function () { toggleCard(li); });
       li.appendChild(head);
+
+      // Body (collapsed by default): full goal · reasoning · actions.
+      var body = document.createElement('div');
+      body.className = 'obs-session-body next-run-option-body';
+      body.hidden = true;
 
       var goalEl = document.createElement('p');
       goalEl.className = 'next-run-goal';
       goalEl.textContent = goalText;
-      li.appendChild(goalEl);
+      body.appendChild(goalEl);
 
       if (opt.reasoning) {
         var reasonEl = document.createElement('p');
-        reasonEl.className = 'next-run-reasoning';
-        reasonEl.textContent = opt.reasoning;
-        li.appendChild(reasonEl);
+        reasonEl.className = 'next-run-reasoning obs-detail-block';
+        reasonEl.innerHTML = '<span class="obs-body-lbl">why</span> ' + escapeHtml(opt.reasoning);
+        body.appendChild(reasonEl);
       }
 
       var actions = document.createElement('div');
@@ -98,8 +132,32 @@
         actions.appendChild(copyBtn);
       }
 
-      li.appendChild(actions);
+      body.appendChild(actions);
+      li.appendChild(body);
       optionsEl.appendChild(li);
+    });
+  }
+
+  // Single page-level grounding panel: shows the exact context the model saw. It
+  // grounds the WHOLE generation, so it is shared (one panel), not per-option.
+  function renderContext(context) {
+    if (!contextSection || !contextBody || !contextToggle) return;
+    if (!context) {
+      contextSection.hidden = true;
+      return;
+    }
+    contextBody.textContent = context;
+    contextSection.hidden = false;
+    // Reset to collapsed on each fresh generation.
+    contextToggle.setAttribute('aria-expanded', 'false');
+    contextBody.hidden = true;
+  }
+
+  if (contextToggle && contextBody) {
+    contextToggle.addEventListener('click', function () {
+      var open = contextToggle.getAttribute('aria-expanded') !== 'true';
+      contextToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      contextBody.hidden = !open;
     });
   }
 
@@ -117,6 +175,7 @@
       on401: false
     }).then(function (res) {
       renderOptions(res && res.options);
+      renderContext(res && res.context);
       if (res && res.model && res.model !== 'mock') {
         setFeedback('generated with ' + res.model);
       } else {
