@@ -55,7 +55,10 @@ export function featuresParam(features) {
  * @param {import('@playwright/test').Page} page
  * @param {Object} [overrides] - flags forwarded to /test/set-session. Booleans
  *   become presence flags (`?multiWorkspace=true`); a `features` object is
- *   JSON-encoded; everything else is stringified.
+ *   JSON-encoded; everything else is stringified. A `urlKey` override seeds a
+ *   per-worker workspace partition (LIN-625 S1, supplied by the `workerUrlKey`
+ *   worker fixture once specs are swept); it is forwarded verbatim and echoed
+ *   back so callers navigate off the returned key.
  * @returns {Promise<{ urlKey: string }>}
  */
 export async function createSession(page, overrides = {}) {
@@ -67,7 +70,7 @@ export async function createSession(page, overrides = {}) {
   if (overrides.features) params.set('features', JSON.stringify(overrides.features))
   const qs = params.toString()
   await page.goto(`/test/set-session${qs ? `?${qs}` : ''}`)
-  return { urlKey: TEST_WORKSPACE_URL_KEY }
+  return { urlKey: overrides.urlKey || TEST_WORKSPACE_URL_KEY }
 }
 
 /**

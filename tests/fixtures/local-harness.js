@@ -98,22 +98,29 @@ export function localDashboardUrl(urlKey = LOCAL_WORKSPACE_URL_KEY) {
  *
  * Project names are kept substring-distinct ("Local Project" vs "Local Beta") so
  * `:has-text("Local Project")` matches a single header (no strict-mode clash).
+ *
+ * urlKey-aware (LIN-625 S1): a function mirroring `localSeedFromLinearFixture`,
+ * so the embedded `url:` fields point at the seeding worker's per-worker
+ * workspace. Defaults to `LOCAL_WORKSPACE_URL_KEY` for un-swept callers, leaving
+ * their seed byte-identical to the previous constant.
  */
-export const defaultLocalSeed = {
-  projects: [
-    { id: 'local-proj-1', name: 'Local Project', content: 'A local backend project', sortOrder: 1 },
-    { id: 'local-proj-2', name: 'Local Beta', content: 'A second local project', sortOrder: 2 },
-  ],
-  issues: [
-    { id: 'local-issue-1', identifier: 'LOCAL-1', title: 'Local parent task', description: 'Seeded parent', projectId: 'local-proj-1', sortOrder: 1, state: { name: 'In Progress', type: 'started' }, labels: ['local-label'], url: `/workspace/${LOCAL_WORKSPACE_URL_KEY}/issue/local-issue-1`, comments: [
-      { id: 'local-comment-1', body: 'This is a test comment with **markdown**.', createdAt: '2024-01-15T10:00:00Z', user: 'Alice' },
-      { id: 'local-comment-2', body: 'Second comment with `code`.', createdAt: '2024-01-16T14:30:00Z', user: 'Bob' },
-    ] },
-    { id: 'local-issue-2', identifier: 'LOCAL-2', title: 'Local child task', description: 'Seeded child', projectId: 'local-proj-1', parentId: 'local-issue-1', sortOrder: 2, state: { name: 'Todo', type: 'unstarted' }, url: `/workspace/${LOCAL_WORKSPACE_URL_KEY}/issue/local-issue-2` },
-    { id: 'local-issue-3', identifier: 'LOCAL-3', title: 'Local done task', description: 'Seeded done', projectId: 'local-proj-1', sortOrder: 3, state: { name: 'Done', type: 'completed' }, completedAt: '2024-01-10T00:00:00Z', url: `/workspace/${LOCAL_WORKSPACE_URL_KEY}/issue/local-issue-3` },
-    { id: 'local-issue-4', identifier: 'LOCAL-4', title: 'Second project task', description: 'Seeded second-project task', projectId: 'local-proj-2', sortOrder: 1, state: { name: 'In Progress', type: 'started' }, url: `/workspace/${LOCAL_WORKSPACE_URL_KEY}/issue/local-issue-4` },
-  ],
-};
+export function defaultLocalSeed(urlKey = LOCAL_WORKSPACE_URL_KEY) {
+  return {
+    projects: [
+      { id: 'local-proj-1', name: 'Local Project', content: 'A local backend project', sortOrder: 1 },
+      { id: 'local-proj-2', name: 'Local Beta', content: 'A second local project', sortOrder: 2 },
+    ],
+    issues: [
+      { id: 'local-issue-1', identifier: 'LOCAL-1', title: 'Local parent task', description: 'Seeded parent', projectId: 'local-proj-1', sortOrder: 1, state: { name: 'In Progress', type: 'started' }, labels: ['local-label'], url: `/workspace/${urlKey}/issue/local-issue-1`, comments: [
+        { id: 'local-comment-1', body: 'This is a test comment with **markdown**.', createdAt: '2024-01-15T10:00:00Z', user: 'Alice' },
+        { id: 'local-comment-2', body: 'Second comment with `code`.', createdAt: '2024-01-16T14:30:00Z', user: 'Bob' },
+      ] },
+      { id: 'local-issue-2', identifier: 'LOCAL-2', title: 'Local child task', description: 'Seeded child', projectId: 'local-proj-1', parentId: 'local-issue-1', sortOrder: 2, state: { name: 'Todo', type: 'unstarted' }, url: `/workspace/${urlKey}/issue/local-issue-2` },
+      { id: 'local-issue-3', identifier: 'LOCAL-3', title: 'Local done task', description: 'Seeded done', projectId: 'local-proj-1', sortOrder: 3, state: { name: 'Done', type: 'completed' }, completedAt: '2024-01-10T00:00:00Z', url: `/workspace/${urlKey}/issue/local-issue-3` },
+      { id: 'local-issue-4', identifier: 'LOCAL-4', title: 'Second project task', description: 'Seeded second-project task', projectId: 'local-proj-2', sortOrder: 1, state: { name: 'In Progress', type: 'started' }, url: `/workspace/${urlKey}/issue/local-issue-4` },
+    ],
+  };
+}
 
 /**
  * Convert a Linear-shaped fixture (`{ projects, issues }` as mock-data.js /
@@ -243,17 +250,20 @@ export function createLocalProvider() {
  * returns the workspace urlKey plus its dashboard URL.
  *
  * @param {import('@playwright/test').Page} page
- * @param {{projects?: Array, issues?: Array}} [seed] - defaults to defaultLocalSeed
- * @param {{features?: Object, openRouterConnected?: boolean, freeTierEnabled?: boolean}} [options] -
+ * @param {{projects?: Array, issues?: Array}} [seed] - defaults to the urlKey-aware
+ *   defaultLocalSeed for the resolved `urlKey`
+ * @param {{features?: Object, openRouterConnected?: boolean, freeTierEnabled?: boolean, urlKey?: string}} [options] -
  *   session feature flags (whitelist-validated server-side); `openRouterConnected`
  *   to provision a mock OpenRouter key on the local session (so e.g. roadmap specs
- *   reach the AI mock instead of resolveRoadmapLLM's 503); and `freeTierEnabled` to
+ *   reach the AI mock instead of resolveRoadmapLLM's 503); `freeTierEnabled` to
  *   simulate free-tier mode (no key, session flag) for the recommend free-tier
- *   block (LIN-405).
+ *   block (LIN-405); and `urlKey` to seed a per-worker workspace partition
+ *   (LIN-625 S1 — defaults to `LOCAL_WORKSPACE_URL_KEY`, supplied by the
+ *   `localWorkerUrlKey` worker fixture once specs are swept).
  * @returns {Promise<{urlKey: string, dashboard: string}>}
  */
-export async function seedLocalWorkspace(page, seed = defaultLocalSeed, { features, openRouterConnected, freeTierEnabled } = {}) {
-  const data = { ...seed };
+export async function seedLocalWorkspace(page, seed = null, { features, openRouterConnected, freeTierEnabled, urlKey = LOCAL_WORKSPACE_URL_KEY } = {}) {
+  const data = { ...(seed ?? defaultLocalSeed(urlKey)), urlKey };
   if (features) data.features = features;
   if (openRouterConnected) data.openRouterConnected = openRouterConnected;
   if (freeTierEnabled) data.freeTierEnabled = freeTierEnabled;
