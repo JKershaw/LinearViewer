@@ -72,6 +72,11 @@ describe('POST /workspace/new (local bootstrap)', () => {
     assert.ok(ws.id && ws.id !== ws.urlKey, 'id is a distinct uuid, not the urlKey');
     assert.ok(typeof ws.addedAt === 'number');
     assert.strictEqual(req.session.activeWorkspaceId, ws.id, 'new workspace is active');
+    // LIN-562: local creation converges on linkProvider, so it carries a single
+    // local binding scoped to its urlKey (the store partition).
+    assert.deepStrictEqual(ws.bindings, [
+      { provider: 'local', scope: ws.urlKey, credentials: { token: ws.urlKey, tokenExpiresAt: Number.MAX_SAFE_INTEGER } }
+    ], 'one local binding, scope === urlKey, token === partition');
   });
 
   test('derives a valid, slugged, collision-safe urlKey and redirects into it', async () => {

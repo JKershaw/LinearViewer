@@ -11,6 +11,8 @@ import {
   removeWorkspace,
   updateWorkspaceTokens,
   getWorkspaceToken,
+  linkProvider,
+  getBindingsForWorkspace,
   saveSession,
   MAX_WORKSPACES
 } from '../../lib/workspace.js';
@@ -153,6 +155,163 @@ describe('updateWorkspaceTokens', () => {
     assert.strictEqual(workspace.credentials.token, 'rotated-token');
     assert.strictEqual(workspace.credentials.scope, 'read,write');
     assert.strictEqual(getWorkspaceToken(workspace), 'rotated-token');
+  });
+
+  // LIN-562: the refresh middleware shares this writer, so a refreshed token must
+  // land inside the active binding too — otherwise bindings[] goes stale.
+  test('rotates the active binding in lockstep with the scalar mirror (LIN-562)', () => {
+    const workspace = linkProvider({ id: 'ws-1' }, 'linear', 'org-1', {
+      token: 'old-token', refreshToken: 'old-ref', tokenExpiresAt: 1
+    });
+
+    updateWorkspaceTokens(workspace, {
+      access_token: 'fresh-token', refresh_token: 'fresh-ref', expires_in: 3600
+    });
+
+    const binding = workspace.bindings.find(b => b.provider === 'linear');
+    assert.strictEqual(binding.credentials.token, 'fresh-token');
+    assert.strictEqual(binding.credentials.refreshToken, 'fresh-ref');
+    assert.strictEqual(binding.credentials.tokenExpiresAt, workspace.tokenExpiresAt);
+    // Scalar mirror + per-binding token agree (no drift).
+    assert.strictEqual(getWorkspaceToken(workspace), 'fresh-token');
+    assert.strictEqual(getWorkspaceToken(workspace, 'linear', 'org-1'), 'fresh-token');
+  });
+
+  test('does not synthesize a binding for legacy workspaces on refresh (byte-identical)', () => {
+    const workspace = { id: 'ws-1', accessToken: 'old' };
+    updateWorkspaceTokens(workspace, { access_token: 'new', refresh_token: 'r', expires_in: 3600 });
+    // No bindings[] grown — legacy workspaces stay scalar-only and rely on
+    // getBindingsForWorkspace synthesizing on read.
+    assert.strictEqual(workspace.bindings, undefined);
+  });
+});
+
+// =============================================================================
+// linkProvider Tests (LIN-562)
+// =============================================================================
+
+describe('linkProvider', () => {
+  test('attaches a (provider, scope) binding with nested credentials', () => {
+    const ws = linkProvider({ id: 'ws-1' }, 'linear', 'org-1', {
+      token: 'tok', refreshToken: 'ref', tokenExpiresAt: 999
+    });
+    assert.deepStrictEqual(ws.bindings, [
+      { provider: 'linear', scope: 'org-1', credentials: { token: 'tok', refreshToken: 'ref', tokenExpiresAt: 999 } }
+    ]);
+  });
+
+  test('writes the legacy scalar mirror for the active binding (readers stay green)', () => {
+    const ws = linkProvider({ id: 'ws-1' }, 'linear', 'org-1', {
+      token: 'tok', refreshToken: 'ref', tokenExpiresAt: 999
+    });
+    assert.strictEqual(ws.provider, 'linear');
+    assert.deepStrictEqual(ws.credentials, { token: 'tok' });
+    assert.strictEqual(ws.accessToken, 'tok');
+    assert.strictEqual(ws.refreshToken, 'ref');
+    assert.strictEqual(ws.tokenExpiresAt, 999);
+    // No-arg getWorkspaceToken stays byte-identical (reads the scalar mirror).
+    assert.strictEqual(getWorkspaceToken(ws), 'tok');
+  });
+
+  test('defaults active provider when unset; never clobbers an existing one', () => {
+    const ws = linkProvider({ id: 'ws-1', provider: 'linear' }, 'local', 'scratch', { token: 'scratch' });
+    // provider already set → preserved; local is a second, non-active binding.
+    assert.strictEqual(ws.provider, 'linear');
+    assert.strictEqual(ws.bindings.length, 1);
+    assert.strictEqual(ws.bindings[0].provider, 'local');
+  });
+
+  test('a non-active second binding does not clobber the primary scalar mirror', () => {
+    const ws = linkProvider({ id: 'ws-1' }, 'linear', 'org-1', { token: 'linear-tok', refreshToken: 'lr' });
+    linkProvider(ws, 'local', 'scratch', { token: 'local-tok' });
+    // Scalar mirror still reflects the active (linear) binding.
+    assert.strictEqual(getWorkspaceToken(ws), 'linear-tok');
+    assert.strictEqual(ws.accessToken, 'linear-tok');
+    assert.strictEqual(ws.refreshToken, 'lr');
+    // But the local token is reachable by (provider, scope).
+    assert.strictEqual(getWorkspaceToken(ws, 'local', 'scratch'), 'local-tok');
+    assert.strictEqual(ws.bindings.length, 2);
+  });
+
+  test('re-linking the same (provider, scope) upserts (merges) credentials, not duplicates', () => {
+    const ws = linkProvider({ id: 'ws-1' }, 'linear', 'org-1', { token: 't1', scope: 'read,write' });
+    linkProvider(ws, 'linear', 'org-1', { token: 't2' });
+    assert.strictEqual(ws.bindings.length, 1);
+    assert.strictEqual(ws.bindings[0].credentials.token, 't2');
+    // Pre-existing non-token credential fields survive the merge.
+    assert.strictEqual(ws.bindings[0].credentials.scope, 'read,write');
+  });
+
+  test('same provider, different scope yields two distinct bindings', () => {
+    const ws = linkProvider({ id: 'ws-1' }, 'github', 'owner/repo', { token: 'gh' });
+    linkProvider(ws, 'github', 'org/5', { token: 'gh' });
+    assert.strictEqual(ws.bindings.length, 2);
+    assert.deepStrictEqual(ws.bindings.map(b => b.scope), ['owner/repo', 'org/5']);
+  });
+});
+
+// =============================================================================
+// getBindingsForWorkspace Tests (LIN-562)
+// =============================================================================
+
+describe('getBindingsForWorkspace', () => {
+  test('returns explicit bindings when present', () => {
+    const ws = linkProvider({ id: 'ws-1' }, 'linear', 'org-1', { token: 'tok' });
+    assert.strictEqual(getBindingsForWorkspace(ws), ws.bindings);
+  });
+
+  test('synthesizes one legacy linear binding for an un-migrated workspace (no migration)', () => {
+    const ws = { id: 'org-9', provider: 'linear', accessToken: 'legacy', refreshToken: 'lr', tokenExpiresAt: 42 };
+    assert.deepStrictEqual(getBindingsForWorkspace(ws), [
+      { provider: 'linear', scope: 'org-9', credentials: { token: 'legacy', refreshToken: 'lr', tokenExpiresAt: 42 } }
+    ]);
+  });
+
+  test('synthesized binding defaults provider to linear when absent', () => {
+    const ws = { id: 'org-9', accessToken: 'legacy' };
+    assert.strictEqual(getBindingsForWorkspace(ws)[0].provider, 'linear');
+  });
+
+  test('synthesizes a local binding scoped to urlKey (the store partition)', () => {
+    const ws = { id: 'uuid-1', provider: 'local', urlKey: 'notes-abcd', accessToken: 'notes-abcd', tokenExpiresAt: Number.MAX_SAFE_INTEGER };
+    assert.deepStrictEqual(getBindingsForWorkspace(ws), [
+      { provider: 'local', scope: 'notes-abcd', credentials: { token: 'notes-abcd', tokenExpiresAt: Number.MAX_SAFE_INTEGER } }
+    ]);
+  });
+
+  test('returns [] for null/undefined workspace', () => {
+    assert.deepStrictEqual(getBindingsForWorkspace(null), []);
+    assert.deepStrictEqual(getBindingsForWorkspace(undefined), []);
+  });
+});
+
+// =============================================================================
+// getWorkspaceToken — widened (provider, scope) form (LIN-562)
+// =============================================================================
+
+describe('getWorkspaceToken (provider/scope selection)', () => {
+  test('selects a binding token by provider', () => {
+    const ws = linkProvider({ id: 'ws-1' }, 'linear', 'org-1', { token: 'lin-tok' });
+    assert.strictEqual(getWorkspaceToken(ws, 'linear'), 'lin-tok');
+  });
+
+  test('selects a binding token by (provider, scope)', () => {
+    const ws = linkProvider({ id: 'ws-1' }, 'github', 'owner/repo', { token: 'a' });
+    linkProvider(ws, 'github', 'org/5', { token: 'b' });
+    assert.strictEqual(getWorkspaceToken(ws, 'github', 'owner/repo'), 'a');
+    assert.strictEqual(getWorkspaceToken(ws, 'github', 'org/5'), 'b');
+  });
+
+  test('reads through the synthesized legacy binding for un-migrated workspaces', () => {
+    const ws = { id: 'org-9', provider: 'linear', accessToken: 'legacy' };
+    assert.strictEqual(getWorkspaceToken(ws, 'linear'), 'legacy');
+    assert.strictEqual(getWorkspaceToken(ws, 'linear', 'org-9'), 'legacy');
+  });
+
+  test('returns undefined when no binding matches', () => {
+    const ws = linkProvider({ id: 'ws-1' }, 'linear', 'org-1', { token: 'lin-tok' });
+    assert.strictEqual(getWorkspaceToken(ws, 'github'), undefined);
+    assert.strictEqual(getWorkspaceToken(ws, 'linear', 'wrong-scope'), undefined);
   });
 });
 

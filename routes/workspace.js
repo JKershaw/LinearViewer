@@ -4,7 +4,7 @@
  */
 import { Router } from 'express'
 import { randomUUID } from 'node:crypto'
-import { removeWorkspace, upsertWorkspace, saveSession, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, URL_KEY_REGEX } from '../lib/workspace.js'
+import { removeWorkspace, upsertWorkspace, saveSession, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, URL_KEY_REGEX, linkProvider } from '../lib/workspace.js'
 import { badRequest, notFound } from '../lib/errors.js'
 
 /**
@@ -74,16 +74,23 @@ export function createWorkspaceRoutes({ localStore } = {}) {
       urlKey = `${slugifyName(name)}-${randomUUID().slice(0, 8)}`
     } while (existing.has(urlKey) || !URL_KEY_REGEX.test(urlKey))
 
+    // Local is the non-OAuth credential-acquisition strategy: its credential is
+    // the urlKey used as a store-partition key, acquired synchronously (no
+    // redirect), so it converges on the SAME linkProvider seam as OAuth login
+    // and PAT (LIN-562) rather than hand-assembling the credential shape. The
+    // scope IS the urlKey (the partition); token === partition, never-expiring.
+    // linkProvider writes the legacy scalar mirror (provider/credentials/
+    // accessToken/tokenExpiresAt) so the existing local readers stay green.
     const workspace = {
       id: randomUUID(),
       name,
       urlKey,
-      provider: 'local',
-      credentials: { token: urlKey },
-      accessToken: urlKey, // un-migrated readers use this as the store-partition selector
-      tokenExpiresAt: Number.MAX_SAFE_INTEGER, // keeps token-refresh from firing for local
       addedAt: Date.now(),
     }
+    linkProvider(workspace, 'local', urlKey, {
+      token: urlKey,
+      tokenExpiresAt: Number.MAX_SAFE_INTEGER, // keeps token-refresh from firing for local
+    })
 
     try {
       upsertWorkspace(req.session, workspace)
