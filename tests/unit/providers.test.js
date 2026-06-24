@@ -235,6 +235,15 @@ describe('Linear provider through lib/linear.js shim', () => {
     }
   });
 
+  test('uploadFile (LIN-636) is a declared upload capability: Linear supports it, base declines', () => {
+    assert.ok(PROVIDER_SURFACE.uploads.includes('uploadFile'), 'uploadFile must be a declared upload');
+    assert.strictEqual(linearProvider.supports('uploadFile'), true, 'Linear must implement uploadFile');
+    // Non-upload providers inherit the base decline → clean 422 path, never 500.
+    const base = new ProviderInterface();
+    assert.strictEqual(base.supports('uploadFile'), false);
+    assert.throws(() => base.uploadFile(), NotImplementedError);
+  });
+
   test('LIN-307 additions (deleteRelation, comment edit/delete) are declared writes', () => {
     // The three methods LIN-307 adds beyond LIN-176's declared surface.
     for (const m of ['deleteRelation', 'updateComment', 'deleteComment']) {
