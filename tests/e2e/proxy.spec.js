@@ -1166,7 +1166,7 @@ test.describe('Proxy API - Dispatch', () => {
     });
     const { item } = await take.json();
     expect(item.prompt).toContain('fix the bug');
-    expect(item.prompt).toContain('Linear access');
+    expect(item.prompt).toContain('Workspace API access');
     expect(item.prompt).toContain('/api/proxy/instructions');
     // Starting context is the distilled brief, not the raw issue dump (LIN-260).
     expect(item.prompt).toContain('/api/proxy/brief/LIN-288');
@@ -1189,7 +1189,7 @@ test.describe('Proxy API - Dispatch', () => {
       headers: { Authorization: `Bearer ${consumerToken}` }
     });
     const { item } = await take.json();
-    expect(item.prompt).toContain('Linear access');
+    expect(item.prompt).toContain('Workspace API access');
     // No malformed "/issues/your task" with a literal space.
     expect(item.prompt).not.toContain('your task');
     expect(item.prompt).not.toMatch(/issues\/\S+ \S+\)/);
@@ -1209,7 +1209,7 @@ test.describe('Proxy API - Dispatch', () => {
     });
     const { item } = await take.json();
     expect(item.prompt).toBe('self-contained prompt');
-    expect(item.prompt).not.toContain('Linear access');
+    expect(item.prompt).not.toContain('Workspace API access');
   });
 
   test('watch returns 404 for unknown id', async ({ request }) => {
@@ -1750,8 +1750,8 @@ test.describe('Proxy API - Autopilot kickoff (fused launch verb, LIN-569)', () =
     // addItem appended the session-id self-ref block naming this run's own id.
     expect(queued.prompt).toContain('Your autopilot session id');
     expect(queued.prompt).toContain(created.id);
-    // appendProxyContext defaults on → the worker inherits Linear access.
-    expect(queued.prompt).toContain('Linear access (auto-appended)');
+    // appendProxyContext defaults on → the worker inherits Workspace API access.
+    expect(queued.prompt).toContain('Workspace API access (auto-appended)');
   });
 
   test('scoped run: names the issue and inherits the project repo (LIN-537)', async ({ request }) => {
