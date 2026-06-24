@@ -119,6 +119,10 @@ Both In Progress and Projects sections use the same nested structure:
 - `.footer-ai-status.free` - free tier status (yellow, shows "ai: ● free (N/20)")
 - `[data-ai-source]` - AI source attribute on footer status (`oauth`, `env`, `free`)
 - `.footer-ai-model` / `[data-ai-model]` - workspace LLM model name, filled client-side from `/api/recommend/status`
+- `[data-testid="footer-feedback-toggle"]` - footer toggle for the feedback widget (`data-enabled="true|false"`); persists the per-user `feedbackWidget` flag via `POST /workspace/{urlKey}/settings/features`
+- `[data-testid="feedback-widget-root"]` - feedback widget mount (`data-enabled` reflects the flag); the floating button renders only when enabled
+- `[data-testid="feedback-fab"]` - floating feedback button (opens the popup)
+- `[data-testid="feedback-popup"]` - feedback popup; `feedback-message` (textarea), `feedback-priority` (0-4 select), `feedback-file` (screenshot), `feedback-minimize` (keeps draft), `feedback-submit` → `POST /workspace/{urlKey}/api/feedback`
 
 ### Interactive Elements
 - `.toggle` - expand/collapse arrow for child tasks (▶/▼)

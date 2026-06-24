@@ -1,0 +1,182 @@
+/**
+ * Feedback Widget styles (LIN-635)
+ *
+ * CLI/terminal aesthetic, light theme, mobile-responsive — reuses the shared
+ * design tokens from style.css (:root). Floating button + popup, fixed to the
+ * bottom-right and kept above page chrome via --z-overlay.
+ */
+
+.feedback-fab {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: var(--z-overlay, 1000);
+  font-family: var(--font-structural, monospace);
+  font-size: var(--font-size-sm, 0.85em);
+  color: var(--bg, #fff);
+  background: var(--blue, #2563eb);
+  border: 1px solid var(--blue, #2563eb);
+  border-radius: var(--radius-md, 6px);
+  box-shadow: var(--shadow-md, 0 2px 8px rgba(0, 0, 0, 0.1));
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.feedback-fab:hover {
+  filter: brightness(0.95);
+}
+
+/* A pending draft (text not yet sent) gets a subtle marker dot. */
+.feedback-fab-draft::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--yellow, #d4a600);
+  border: 1px solid var(--bg, #fff);
+}
+
+.feedback-popup {
+  position: fixed;
+  right: 16px;
+  bottom: 60px;
+  z-index: var(--z-overlay, 1000);
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  background: var(--bg, #fff);
+  color: var(--fg, #1a1a1a);
+  border: 1px solid var(--border-strong, #ccc);
+  border-radius: var(--radius-md, 6px);
+  box-shadow: var(--shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.12));
+  font-family: var(--font-content, sans-serif);
+}
+
+.feedback-popup[hidden] {
+  display: none;
+}
+
+.feedback-popup-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border, #ddd);
+}
+
+.feedback-popup-title {
+  font-family: var(--font-structural, monospace);
+  font-size: var(--font-size-sm, 0.85em);
+  font-weight: 600;
+}
+
+.feedback-popup-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.feedback-min,
+.feedback-close {
+  background: none;
+  border: none;
+  color: var(--fg-dim, #666);
+  font-size: 1.1em;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm, 3px);
+}
+
+.feedback-min:hover,
+.feedback-close:hover {
+  background: var(--bg-muted, #f8f9fa);
+  color: var(--fg, #1a1a1a);
+}
+
+.feedback-popup-body {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.feedback-label {
+  font-size: var(--font-size-sm, 0.85em);
+  color: var(--fg-dim, #666);
+}
+
+.feedback-message,
+.feedback-priority,
+.feedback-file {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: var(--font-content, sans-serif);
+  font-size: var(--font-size-base, 1em);
+  color: var(--fg, #1a1a1a);
+  background: var(--bg, #fff);
+  border: 1px solid var(--border, #ddd);
+  border-radius: var(--radius-sm, 3px);
+  padding: 6px 8px;
+}
+
+.feedback-message {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.feedback-message:focus,
+.feedback-priority:focus {
+  outline: none;
+  border-color: var(--border-strong, #ccc);
+}
+
+.feedback-status {
+  font-size: var(--font-size-sm, 0.85em);
+  min-height: 1.2em;
+  color: var(--fg-dim, #666);
+}
+
+.feedback-status-error {
+  color: var(--red, #cc0000);
+}
+
+.feedback-status-success {
+  color: var(--green, #16a085);
+}
+
+.feedback-popup-foot {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 2px;
+}
+
+.feedback-submit {
+  font-family: var(--font-structural, monospace);
+  font-size: var(--font-size-sm, 0.85em);
+  color: var(--bg, #fff);
+  background: var(--blue, #2563eb);
+  border: 1px solid var(--blue, #2563eb);
+  border-radius: var(--radius-sm, 3px);
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.feedback-submit:hover {
+  filter: brightness(0.95);
+}
+
+.feedback-submit:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+@media (max-width: 480px) {
+  .feedback-popup {
+    right: 8px;
+    left: 8px;
+    width: auto;
+    bottom: 56px;
+  }
+}
