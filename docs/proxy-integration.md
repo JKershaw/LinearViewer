@@ -687,6 +687,42 @@ Returns the **Autopilot kickoff** as **plain text** (`text/plain`) — the brief
 
 The body embeds `YOUR_TOKEN` as a placeholder; substitute the consumer's `readWrite` token (Autopilot reuses it for the prompts it dispatches). A read-scope token can fetch the kickoff, but running it needs `readWrite` (Autopilot dispatches). The general (stack-walk) kickoff is what this endpoint serves; the in-app per-task variant ("run on autopilot until this task is done") is generated at `/workspace/:urlKey/api/autopilot-prompt/:issueId`.
 
+This GET is a **preview/inspect** form only — it returns the text and **does not enqueue or launch anything**. To actually *start* a run from a goal in one call, use the fused launch verb below.
+
+#### Launch Autopilot (fused)
+
+```
+POST /api/proxy/autopilot/kickoff
+```
+
+Requires a `readWrite` scoped token. Builds the kickoff **and dispatches it** in one server-side call, returning the dispatch id — which **is the run's session id**. This is the single verb that turns a goal into a running Autopilot session; it removes the old two-step round-trip (GET the kickoff text, then POST the whole body back via `/api/proxy/dispatch`). It mirrors the `POST /api/proxy/recommend-and-dispatch` fusion: the prompt body is generated server-side and **never returned to the caller**.
+
+| Body field | Default | Description |
+|------------|---------|-------------|
+| `goal` | _(none)_ | Free-text focus for a **general** run. Ignored when `issueIdentifier` is set. |
+| `mode` | `write` | `write` (implementation/review + evidence-gated merge) or `readonly` (investigation only). |
+| `issueIdentifier` | _(none)_ | Present ⇒ **scoped** run ("autopilot until THIS task is done"); the issue title is named in the goal line and the project `repo=` is inherited. Absent ⇒ general stack-walk run. |
+| `target` | `cli` | Dispatch target (`cli`/`web`/`dash`; `local`/Harbour is not available to proxy consumers). |
+| `repo` | _(resolved)_ | Target repo. For a scoped run, defaults to the project's `repo=`; an explicit value wins. |
+| `appendProxyContext` | `true` | Append the Linear-access + token + reporting block so the run inherits proxy access. |
+
+Dispatched as `kind:"autopilot"`, so the server appends the session-id self-reference block to the prompt and the returned `id` is this run's session id. Pass that id as `sessionId` on every worker dispatch the run fans out (`POST /dispatch`, `POST /recommend-and-dispatch`) so all the work reconstructs as one session.
+
+```json
+{
+  "success": true,
+  "id": "9a3f...",
+  "sessionId": "9a3f...",
+  "status": "queued",
+  "kind": "autopilot",
+  "promptName": "Autopilot (stack walk)",
+  "mode": "write",
+  "issueIdentifier": null,
+  "target": "cli",
+  "dispatchedAt": "..."
+}
+```
+
 #### Autopilot Manual
 
 ```
