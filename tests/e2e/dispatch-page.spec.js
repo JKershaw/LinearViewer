@@ -869,6 +869,43 @@ test.describe('Dispatch Page', () => {
       await expect(page.locator('.dispatch-load-autopilot')).toBeVisible();
     });
 
+    // LIN-603: the goal control is a <textarea> (not a single-line <input>) so
+    // multi-line paragraph goals can be entered — the kickoff/transport already
+    // carry newlines end-to-end.
+    test('goal control is a textarea that accepts multi-line paragraph goals', async ({ page }) => {
+      const goal = page.locator('.dispatch-autopilot-goal');
+      await expect(goal).toHaveJSProperty('tagName', 'TEXTAREA');
+
+      const multiline = 'First, finish the migration.\n\nThen tackle the cleanup tasks.';
+      await goal.fill(multiline);
+      await expect(goal).toHaveValue(multiline);
+    });
+
+    // LIN-603: the explicit "continue until stopped" affordance clears any typed
+    // goal and loads the open-ended stack-walk kickoff (empty goal).
+    test('"continue until stopped" clears the goal and loads the stack-walk kickoff', async ({ page }) => {
+      await page.locator('.dispatch-autopilot-goal').fill('some goal I will abandon');
+      await page.locator('.dispatch-continue-until-stopped').click();
+
+      const continueBtn = page.locator('.dispatch-continue-until-stopped');
+      await expect(continueBtn).toHaveText('loaded ✓');
+
+      // The goal field is cleared and the kickoff is the open-ended stack walk.
+      await expect(page.locator('.dispatch-autopilot-goal')).toHaveValue('');
+      const textarea = page.locator('.dispatch-prompt-input');
+      await expect(textarea).toHaveValue(/Goal from the human:\*\* none this run/);
+      await expect(textarea).toHaveAttribute('data-prompt-name', 'Autopilot (stack walk)');
+    });
+
+    // LIN-603: the next-run suggester hands off a chosen goal via ?goal=; the
+    // dispatch page prefills the goal textarea from it.
+    test('prefills the goal textarea from ?goal=', async ({ page }) => {
+      const goal = 'Push the roadmap milestone to done';
+      await page.goto(`${DISPATCH_URL}?goal=${encodeURIComponent(goal)}`);
+      await page.waitForLoadState('networkidle');
+      await expect(page.locator('.dispatch-autopilot-goal')).toHaveValue(goal);
+    });
+
     test('typed goal reaches the loaded kickoff text and prompt name', async ({ page }) => {
       const goal = 'Ship the billing migration';
       await page.locator('.dispatch-autopilot-goal').fill(goal);

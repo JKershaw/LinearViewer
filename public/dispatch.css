@@ -88,10 +88,13 @@
 }
 
 /* LIN-564: free-text Autopilot goal, sits beside the "load Autopilot" button.
-   Matches the repo selector's compact, terminal-flavoured input look. */
+   Matches the repo selector's compact, terminal-flavoured input look.
+   LIN-603: a <textarea> (not <input>) so multi-line paragraph goals can be
+   entered — the kickoff/transport already carry newlines end-to-end. */
 .dispatch-autopilot-goal {
   font-family: var(--font-content);
   font-size: var(--font-size-sm);
+  line-height: 1.4;
   padding: var(--space-1) 0.4rem;
   border: 1px solid var(--fg-vdim);
   border-radius: var(--radius-sm);
@@ -100,6 +103,7 @@
   min-width: 12rem;
   flex: 1 1 12rem;
   max-width: 22rem;
+  resize: vertical;
 }
 
 .dispatch-autopilot-goal:focus {

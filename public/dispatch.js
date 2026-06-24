@@ -157,9 +157,58 @@ function initDispatchPagePrompt() {
   const recentsContainer = section.querySelector('.dispatch-recents-container')
   const feedbackEl = section.querySelector('.dispatch-prompt-feedback')
   const repoSelect = section.querySelector('.dispatch-repo-select')
+  const goalInput = section.querySelector('.dispatch-autopilot-goal')
 
   // Load recent prompts
   renderDispatchRecentPrompts(recentsContainer, urlKey)
+
+  // Prefill the goal from ?goal= so the experimental "next run" page can hand off
+  // a chosen goal paragraph to the existing launch path (LIN-603). Empty/absent
+  // means "continue until stopped" — no prefill needed.
+  if (goalInput) {
+    try {
+      const goalParam = new URLSearchParams(window.location.search).get('goal')
+      if (goalParam) goalInput.value = goalParam.slice(0, 1000)
+    } catch (e) {
+      // Non-fatal: just don't prefill
+    }
+  }
+
+  // Fetch the general (stack-walk) Autopilot kickoff and drop it into the
+  // textarea, tagged so the next dispatch carries kind=autopilot. A free-text
+  // goal (optional, paragraphs fine) focuses the run; an empty goal is the
+  // "continue until stopped" open-ended walk. Shared by both the "load Autopilot"
+  // and "continue until stopped" buttons (LIN-603).
+  async function loadAutopilotKickoff(btn, { forceNoGoal = false } = {}) {
+    const original = btn.textContent
+    btn.disabled = true
+    btn.textContent = 'loading...'
+    try {
+      if (forceNoGoal && goalInput) goalInput.value = ''
+      // The goal must be baked into the fetched prompt — the textarea's input
+      // listener strips dataset.kind/promptName on any keystroke, so it can't be
+      // hand-typed in after loading. Append it as ?goal= for buildAutopilotKickoff.
+      const goal = goalInput ? goalInput.value.trim() : ''
+      const query = goal ? `?goal=${encodeURIComponent(goal)}` : ''
+      // on401:false — failures surface on the bespoke inline feedback el below.
+      const data = await api(`/workspace/${encodeURIComponent(urlKey)}/api/autopilot-prompt${query}`, { on401: false })
+      textarea.value = data.prompt
+      textarea.dataset.kind = data.kind || 'autopilot'
+      textarea.dataset.promptName = data.promptName || 'Autopilot (stack walk)'
+      textarea.focus()
+      btn.textContent = 'loaded ✓'
+    } catch (err) {
+      btn.textContent = 'failed'
+      if (feedbackEl) {
+        feedbackEl.textContent = `autopilot load failed: ${err.message}`
+        feedbackEl.className = 'dispatch-prompt-feedback error'
+      }
+    } finally {
+      setTimeout(() => {
+        if (btn.isConnected) { btn.textContent = original; btn.disabled = false }
+      }, 1500)
+    }
+  }
 
   // A loaded Autopilot kickoff tags the next dispatch as kind='autopilot'. Any
   // hand-typing afterwards reverts it to a plain custom prompt — the kind is a
@@ -175,41 +224,22 @@ function initDispatchPagePrompt() {
     // via document delegation; bail here so this section's other handlers don't fire)
     if (e.target.closest('.prompt-proxy-toggle')) return
 
-    // Handle "load Autopilot" clicks: fetch the general (stack-walk) kickoff and
-    // drop it into the textarea, tagged so the next dispatch carries kind=autopilot.
+    // Handle "load Autopilot" clicks: fetch the general (stack-walk) kickoff,
+    // focused by the (optional, paragraph-friendly) goal field, and drop it into
+    // the textarea tagged so the next dispatch carries kind=autopilot.
     const loadBtn = e.target.closest('.dispatch-load-autopilot')
     if (loadBtn) {
       e.preventDefault()
-      const original = loadBtn.textContent
-      loadBtn.disabled = true
-      loadBtn.textContent = 'loading...'
-      try {
-        // A free-text goal (optional) focuses the general kickoff. It must be
-        // baked into the fetched prompt — the textarea's input listener strips
-        // dataset.kind/promptName on any keystroke, so it can't be hand-typed in
-        // after loading. Append it as ?goal= for buildAutopilotKickoff to embed.
-        const goalInput = section.querySelector('.dispatch-autopilot-goal')
-        const goal = goalInput ? goalInput.value.trim() : ''
-        const query = goal ? `?goal=${encodeURIComponent(goal)}` : ''
-        // on401:false — failures surface on the bespoke inline feedback el below
-        // (the catch), so a 401 must not redirect out from under it.
-        const data = await api(`/workspace/${encodeURIComponent(urlKey)}/api/autopilot-prompt${query}`, { on401: false })
-        textarea.value = data.prompt
-        textarea.dataset.kind = data.kind || 'autopilot'
-        textarea.dataset.promptName = data.promptName || 'Autopilot (stack walk)'
-        textarea.focus()
-        loadBtn.textContent = 'loaded ✓'
-      } catch (err) {
-        loadBtn.textContent = 'failed'
-        if (feedbackEl) {
-          feedbackEl.textContent = `autopilot load failed: ${err.message}`
-          feedbackEl.className = 'dispatch-prompt-feedback error'
-        }
-      } finally {
-        setTimeout(() => {
-          if (loadBtn.isConnected) { loadBtn.textContent = original; loadBtn.disabled = false }
-        }, 1500)
-      }
+      await loadAutopilotKickoff(loadBtn)
+      return
+    }
+
+    // Handle "continue until stopped" clicks: the explicit empty-goal affordance.
+    // Clears any typed goal and loads the open-ended stack-walk kickoff (LIN-603).
+    const continueBtn = e.target.closest('.dispatch-continue-until-stopped')
+    if (continueBtn) {
+      e.preventDefault()
+      await loadAutopilotKickoff(continueBtn, { forceNoGoal: true })
       return
     }
 
