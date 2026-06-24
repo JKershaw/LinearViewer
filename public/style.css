@@ -583,6 +583,19 @@ button.nav-action {
   font-family: var(--font-content);
 }
 
+/* Per-task source flag, shown only when a workspace merges >1 provider (LIN-544) */
+.source-badge {
+  color: var(--fg-dim);
+  margin-left: 1ch;
+  padding: 0 0.5ch;
+  font-size: 0.8em;
+  font-family: var(--font-content);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 /* =============================================================================
    "Recently Completed" Section
    =============================================================================

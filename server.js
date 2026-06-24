@@ -50,7 +50,7 @@ import { parseRepoFromDescription } from './lib/prompt-formatters.js'
 import { renderPage, renderErrorPage, renderUpstreamAwareErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken } from './lib/token-refresh.js'
-import { UUID_REGEX, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, updateWorkspaceTokens, getWorkspaceToken, linkProvider } from './lib/workspace.js'
+import { UUID_REGEX, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, updateWorkspaceTokens, getWorkspaceToken, getBindingsForWorkspace, linkProvider } from './lib/workspace.js'
 import { createWorkspaceRoutes } from './routes/workspace.js'
 import { createOpenRouterAuthRoutes } from './routes/openrouter-auth.js'
 import { createDispatchRoutes } from './routes/dispatch.js'
@@ -599,35 +599,67 @@ app.use(createOpenRouterAuthRoutes({ userPreferencesStore }))
  * @returns {Promise<{trees, inProgressTrees, organizationName, teams, selectedTeamId}>} Prepared data for rendering
  */
 async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = null, urlKey = null, { slim = false } = {}) {
-  const provider = getProviderForWorkspace(workspace);
-  const accessToken = getWorkspaceToken(workspace);
-  // Use mock data in test mode to avoid hitting the provider API
-  const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
+  // Fan out across ALL of the workspace's provider bindings and merge the
+  // results, rather than resolving a single provider (LIN-544). A legacy/Linear
+  // workspace has exactly one synthesized binding here, so the merge is a no-op
+  // and the output stays byte-identical (pinned by render.test.js parity test).
+  // The merge keys collision-safely on `<source>:<id>` inside buildForest, and
+  // the source badge is rendered downstream when >1 source is present.
+  const bindings = getBindingsForWorkspace(workspace);
 
-  // Fetch teams
-  const teams = isTestMode
-    ? testMockTeams
-    : await provider.fetchTeams(accessToken);
+  // Org-level metadata (org name, team selector) comes from the primary
+  // (active) binding only — the merged dashboard still presents ONE workspace
+  // identity; only the issue/project lists fan out across sources.
+  let teams = [];
+  let organizationName = 'Projects';
+  const mergedProjects = [];
+  const mergedIssues = [];
 
-  // Fetch projects and issues (filtered by team if specified).
-  // `slim` (LIN-442) is the homepage's description-trim: it only reaches the
-  // dashboard + its token-refresh retry, never swim/ship/swipe, which keep the
-  // full query.
-  let { organizationName, projects, issues } = isTestMode
-    ? (mockOverride || testMockData)
-    : await provider.fetchProjects(accessToken, teamId, { slim });
+  for (let i = 0; i < bindings.length; i++) {
+    const binding = bindings[i];
+    const isPrimary = i === 0;
+    const provider = getProvider(binding.provider);
+    const bindingToken = binding.credentials?.token;
+    // Use mock data in test mode to avoid hitting the provider API
+    const isTestMode = process.env.NODE_ENV === 'test' && bindingToken === 'test-token';
 
-  // In test mode, manually filter issues by team
-  if (isTestMode && teamId) {
-    issues = issues.filter(i => i.team?.id === teamId);
+    // Fetch teams (primary binding only)
+    const bindingTeams = isTestMode
+      ? testMockTeams
+      : await provider.fetchTeams(bindingToken);
+
+    // Fetch projects and issues (filtered by team if specified).
+    // `slim` (LIN-442) is the homepage's description-trim: it only reaches the
+    // dashboard + its token-refresh retry, never swim/ship/swipe, which keep the
+    // full query.
+    let { organizationName: orgName, projects, issues } = isTestMode
+      ? (mockOverride || testMockData)
+      : await provider.fetchProjects(bindingToken, teamId, { slim });
+
+    // In test mode, manually filter issues by team
+    if (isTestMode && teamId) {
+      issues = issues.filter(i => i.team?.id === teamId);
+    }
+
+    if (isPrimary) {
+      teams = bindingTeams;
+      organizationName = orgName;
+    }
+    mergedProjects.push(...projects);
+    mergedIssues.push(...issues);
   }
+
+  // Multi-source workspace → render a per-task source badge (suppressed for a
+  // single-provider workspace so the Linear-only render stays byte-identical).
+  const showSource = bindings.length > 1;
 
   // Defensive copy before the synthetic-group injections below (No Project,
   // Periodicals) push onto `projects`. In production `fetchProjects` returns a
   // fresh array each call, but in test mode `projects` is the shared
   // `testMockData.projects` const — mutating it in place leaks a duplicate
   // Periodicals/No-Project entry into every later request (LIN-345).
-  projects = [...projects];
+  let projects = [...mergedProjects];
+  const issues = mergedIssues;
 
   // Build issue tree structure (parent-child relationships)
   const forest = buildForest(issues);
@@ -687,7 +719,7 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
       return { project, incomplete, completed, completedCount };
     });
 
-  return { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId: teamId, periodicalsEnabled };
+  return { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId: teamId, periodicalsEnabled, showSource };
 }
 
 /**
@@ -732,7 +764,7 @@ async function handleTokenRefreshAndRetry(workspace, session, teamId, openRouter
   const deployInfo = getDeployInfo()
   // Pass urlKey so the periodicals group renders consistently after a token
   // refresh, matching the primary dashboard route (LIN-341).
-  const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true });
+  const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true });
   const html = renderPage(trees, inProgressTrees, recentActivityTrees, organizationName, {
     teams,
     selectedTeamId,
@@ -741,7 +773,8 @@ async function handleTokenRefreshAndRetry(workspace, session, teamId, openRouter
     deployInfo,
     urlKey: workspace.urlKey,
     featureFlags: getFeatureFlags(session),
-    customPrompts
+    customPrompts,
+    showSource
   });
   return res.send(html);
 }
@@ -1182,7 +1215,7 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
       customPrompts = (await customPromptsStore.list(workspace.urlKey)).map(p => ({ id: p.id, name: p.name }));
     } catch (e) { /* non-fatal */ }
 
-    const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true });
+    const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true });
     const isLocalhost = ['localhost', '127.0.0.1'].some(h => req.get('host')?.startsWith(h));
     const html = renderPage(trees, inProgressTrees, recentActivityTrees, organizationName, {
       teams,
@@ -1193,7 +1226,8 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
       urlKey: workspace.urlKey,
       featureFlags: getFeatureFlags(req.session),
       customPrompts,
-      isLocalhost
+      isLocalhost,
+      showSource
     });
     res.send(html);
   } catch (error) {

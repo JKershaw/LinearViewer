@@ -70,6 +70,7 @@ Both In Progress and Projects sections use the same nested structure:
 - `.node > .children` - container for nested child nodes
 - `[data-id="{linear-issue-id}"]` - task by Linear issue ID (on both .node and .line)
 - `[data-testid="issue-line"]` - stable task-row hook (on .line; pair with `[data-id]` for a specific issue)
+- `[data-testid="issue-source"]` - per-task source flag, e.g. `data-source="github"` (present only in a multi-provider workspace; absent for single-source/Linear-only)
 - `[data-testid="project"][data-project-name="{name}"]` - project card by name (`[data-testid="project-header"]` on its header)
 - `[data-identifier="{LIN-123}"]` - task by Linear identifier (on .line element)
 - `[data-status="todo|in-progress|done"]` - filter by status

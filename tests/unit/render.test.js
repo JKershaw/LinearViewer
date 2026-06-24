@@ -612,6 +612,27 @@ describe('capability-aware rendering (LIN-177 S3)', () => {
     assert.ok(!detailContentWithProviderUi({ estimates: false }).includes('3 pts'), 'estimate hidden');
   });
 
+  test('source badge appears per-task only when showSource is on (LIN-544)', () => {
+    const githubTree = {
+      project: { id: 'p1', name: 'Proj', content: null, url: null },
+      incomplete: [{
+        issue: { id: '42', identifier: '#42', title: 'A GitHub task', source: 'github', state: { type: 'started' }, labels: { nodes: [] } },
+        children: [],
+        depth: 0
+      }],
+      completed: [],
+      completedCount: 0
+    };
+    const opts = { isLanding: false, urlKey: 'ws', workspaces: [{ id: 'w1', name: 'WS', urlKey: 'ws' }] };
+
+    const withBadge = renderPage([githubTree], [], [], 'Test', { ...opts, showSource: true });
+    assert.ok(withBadge.includes('data-testid="issue-source"'), 'source badge present when showSource on');
+    assert.ok(withBadge.includes('data-source="github"'), 'badge reflects the issue source');
+
+    const withoutBadge = renderPage([githubTree], [], [], 'Test', { ...opts, showSource: false });
+    assert.ok(!withoutBadge.includes('data-testid="issue-source"'), 'badge suppressed when showSource off (single-provider parity)');
+  });
+
   test('legacy/Linear workspace renders byte-identically (back-compat)', () => {
     // No `provider` field on the workspace → resolves the Linear provider, whose
     // ui keeps all affordances on and displayName 'Linear'. Page-level affordances
