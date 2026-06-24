@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures/test-base.js';
 
 // Regression coverage for the "+proxy silent-drop" bug: when the +proxy toggle
-// is active, copying/dispatching a prompt must append the Linear API Proxy
+// is active, copying/dispatching a prompt must append the Workspace API access
 // block — and if the proxy token can't be minted (e.g. the token rate limiter
 // trips after repeated reloads), the action must SURFACE the failure rather
 // than silently copying a bare prompt while the toggle still shows active.
@@ -15,7 +15,7 @@ import { test, expect } from '../fixtures/test-base.js';
 let URL_KEY;
 const BLOCKED_ISSUE_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 const PROXY_FEAT = encodeURIComponent(JSON.stringify({ proxy: true }));
-const PROXY_MARKER = 'Linear API Proxy';
+const PROXY_MARKER = 'Workspace API access';
 
 test.beforeEach(({ workerUrlKey }) => {
   URL_KEY = workerUrlKey;

@@ -69,7 +69,7 @@ describe('buildCollectiveParticipantPrompt', () => {
 
   test('omits the Linear-access block when no proxy token is supplied', () => {
     const text = buildCollectiveParticipantPrompt(BASE);
-    assert.ok(!text.includes('Linear access (auto-appended)'));
+    assert.ok(!text.includes('Workspace API access (auto-appended)'));
   });
 
   test('appends a read-first Linear-access block when a proxy token is supplied', () => {
@@ -78,7 +78,7 @@ describe('buildCollectiveParticipantPrompt', () => {
       proxyBaseUrl: 'https://app.test',
       proxyToken: 'tok_123',
     });
-    assert.ok(text.includes('Linear access (auto-appended)'));
+    assert.ok(text.includes('Workspace API access (auto-appended)'));
     assert.ok(text.includes('Authorization: Bearer tok_123'));
     assert.ok(text.includes('https://app.test/api/proxy'));
     // Writes must be gated behind John's go-ahead.

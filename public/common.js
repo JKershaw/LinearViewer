@@ -294,7 +294,7 @@ window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
 };
 
 // =============================================================================
-// Proxy Toggle (append Linear API proxy instructions + token to prompts)
+// Proxy Toggle (append workspace API proxy instructions + token to prompts)
 // =============================================================================
 
 /**
@@ -391,7 +391,7 @@ window.ProxyToggle = (function () {
 
   function buildBlock(token) {
     const baseUrl = window.location.origin;
-    return `\n\n## Linear API Proxy\n\nYou have access to a Linear API proxy. Use it to read and modify Linear issues, projects, and more.\n\nTo get started, fetch the full API documentation:\n\n  curl -H "Authorization: Bearer ${token}" ${baseUrl}/api/proxy/instructions\n\nThis will return all available endpoints with examples. Your token scope is: readWrite.`;
+    return `\n\n## Workspace API access\n\nYou have access to a workspace API proxy (source-neutral; currently backed by Linear). Use it to read and modify workspace issues, projects, and more.\n\nTo get started, fetch the full API documentation:\n\n  curl -H "Authorization: Bearer ${token}" ${baseUrl}/api/proxy/instructions\n\nThis will return all available endpoints with examples. Your token scope is: readWrite.`;
   }
 
   /**

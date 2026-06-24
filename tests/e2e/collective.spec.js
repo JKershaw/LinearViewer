@@ -100,7 +100,7 @@ test.describe('Collective Page (experimental)', () => {
       expect(text).toContain('#review-room-2026-06-13');
       expect(text).toContain('what should we build next?');
       // The auto-appended Linear-access block is shown with a placeholder token.
-      expect(text).toContain('Linear access (auto-appended)');
+      expect(text).toContain('Workspace API access (auto-appended)');
       await expect(page.locator('#collective-prompt-copy')).toBeVisible();
     });
 

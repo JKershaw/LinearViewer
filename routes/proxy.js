@@ -412,8 +412,10 @@ function toStackHeadline(description) {
 
 /**
  * Builds the proxy-context block appended to a dispatched prompt so the worker
- * inherits Linear access for this workspace — the richer replacement for the
- * old local MCP. It does NOT teach phone-home: the dispatch runner's own Stop
+ * inherits this workspace's API access — the richer replacement for the
+ * old local MCP. The wording is source-neutral (the proxy is one contract
+ * across providers; this workspace happens to be Linear-backed today). It does
+ * NOT teach phone-home: the dispatch runner's own Stop
  * hook reports back automatically when the session ends, so reporting is a
  * harness concern, not a prompt concern. We only ask the worker to END with an
  * evidence-rich summary, so whatever the hook forwards carries proof rather
@@ -441,20 +443,20 @@ function buildProxyContextPreamble({ baseUrl, token, issueIdentifier }) {
         `Start from the distilled brief: GET ${baseUrl}/api/proxy/brief/${issueIdentifier}`,
         `(present-state — folds in comments, supersedes stale wording; read it before the raw`,
         `description). Use GET ${baseUrl}/api/proxy/issues/${issueIdentifier} for full raw detail`,
-        `and /relations/${issueIdentifier}, and update Linear as you work (status, comments, labels).`
+        `and /relations/${issueIdentifier}, and update the workspace as you work (status, comments, labels).`
       ]
     : [
         `Once you pick a task, start from its distilled brief (GET ${baseUrl}/api/proxy/brief/{id}).`,
         `Use the proxy to pull context (e.g. GET ${baseUrl}/api/proxy/stack, /search?q=…,`,
-        `/issues/LIN-123) and to update Linear as you work (status, comments, labels).`
+        `/issues/LIN-123) and to update the workspace as you work (status, comments, labels).`
       ];
   return [
     '',
     '',
     '---',
-    '## Linear access (auto-appended)',
+    '## Workspace API access (auto-appended)',
     '',
-    `You have a Linear API proxy for this workspace. Base: ${baseUrl}/api/proxy`,
+    `You have a workspace API proxy for this workspace (source-neutral; currently backed by Linear). Base: ${baseUrl}/api/proxy`,
     `Auth header on every call: \`Authorization: Bearer ${token}\` (read+write).`,
     `Full endpoint catalog: GET ${baseUrl}/api/proxy/instructions`,
     '',
@@ -1241,7 +1243,7 @@ POST ${baseUrl}/api/proxy/dispatch
   → "kind" is a stable task classification (research/plan/implementation/review/etc. — the prompt-template keys, plus "custom"). Optional: when omitted it is derived from "promptName", falling back to "custom". Read it instead of inferring the task type from promptName or the prompt body.
   → "followUpTo" (optional) resumes an existing session: pass the "id" of an earlier dispatch and "prompt" becomes a follow-up instruction to that same session. cli/web only, same workspace. The runner owns session liveness — if the session is gone it posts terminal "[failed] no live session to resume". Use sparingly: only when the prior session ran cleanly and naturally suggests the next step (e.g. confirm CI is green, update Linear/git); any wobble → dispatch a fresh session instead.
   → "sessionId" (optional) is the autopilot dispatch id that spawned this worker. Pass it on every worker dispatch the autopilot fans out so the run reconstructs as one session across all touched tasks (incl. epic descent / breakdown spin-offs). UUID, stored + forwarded blindly, ANY target (unlike followUpTo). See LIN-591.
-  → By default a proxy-context block is appended to the prompt so the worker inherits Linear access for this workspace. Reporting is handled by the runner's Stop hook, not the prompt. Set "appendProxyContext": false to opt out.
+  → By default a proxy-context block is appended to the prompt so the worker inherits this workspace's API access. Reporting is handled by the runner's Stop hook, not the prompt. Set "appendProxyContext": false to opt out.
   → { "id": "...", "status": "queued", "promptName": "...", "kind": "implementation", "issueIdentifier": "...", "target": "cli", "sessionId": null, "dispatchedAt": "..." }
 
 POST ${baseUrl}/api/proxy/recommend-and-dispatch
@@ -3632,7 +3634,7 @@ One convention across every endpoint, so you can branch on the same fields every
         mode: resolvedMode
       });
 
-      // Append the proxy context (Linear access + bearer token + reporting
+      // Append the proxy context (workspace API access + bearer token + reporting
       // channel) by default — the kickoff guide refers the autopilot to "the
       // +proxy block" for its concrete token. Opt out with appendProxyContext:false.
       let finalPrompt = kickoff;
@@ -3797,7 +3799,7 @@ One convention across every endpoint, so you can branch on the same fields every
         }
       }
 
-      // Auto-append the proxy context (Linear access + reporting channel) by
+      // Auto-append the proxy context (workspace API access + reporting channel) by
       // default, so the worker can both read context and report its result.
       // Opt out with appendProxyContext:false (e.g. a self-contained prompt).
       const { appendProxyContext } = req.body || {};
