@@ -8,7 +8,7 @@
  * - Comments: Fetch issue comments
  * - Images: Proxy Linear-hosted images with auth
  */
-import { Router } from 'express';
+import { Router, json } from 'express';
 import { badRequest, jsonError, notFound, unauthorized } from '../lib/errors.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import '../lib/providers/linear/index.js'; // side effect: self-registers the Linear provider into the registry
@@ -192,6 +192,54 @@ export function buildMockRecommendationHop(ctx) {
     recommendedAction: 'recommend',
     deferTo: null,
   };
+}
+
+/**
+ * Decode a feedback screenshot into raw bytes for the upload seam (LIN-636).
+ *
+ * Accepts either a base64 data URL string (`data:image/png;base64,…`, what a
+ * browser produces via canvas.toDataURL / FileReader.readAsDataURL) or an
+ * object `{ data, contentType?, filename? }` carrying raw base64. Returns
+ * `{ bytes, contentType, filename }`, or `null` if the input is not a usable
+ * base64 image. A filename is synthesised from the content type when absent.
+ *
+ * @param {string|{data?: string, contentType?: string, filename?: string}} image
+ * @returns {{bytes: Buffer, contentType: string, filename: string}|null}
+ */
+export function parseFeedbackImage(image) {
+  let base64;
+  let contentType;
+  let filename;
+
+  if (typeof image === 'string') {
+    const match = /^data:([^;,]*)(;base64)?,(.*)$/s.exec(image.trim());
+    // Require a base64 data URL — raw (URL-encoded) data URLs are not images.
+    if (!match || !match[2]) return null;
+    contentType = match[1] || 'application/octet-stream';
+    base64 = match[3];
+  } else if (image && typeof image === 'object' && typeof image.data === 'string') {
+    base64 = image.data;
+    contentType = typeof image.contentType === 'string' && image.contentType
+      ? image.contentType
+      : 'application/octet-stream';
+    filename = typeof image.filename === 'string' && image.filename ? image.filename : undefined;
+  } else {
+    return null;
+  }
+
+  let bytes;
+  try {
+    bytes = Buffer.from(base64, 'base64');
+  } catch {
+    return null;
+  }
+  if (!bytes || bytes.length === 0) return null;
+
+  if (!filename) {
+    const ext = (contentType.split('/')[1] || 'png').replace(/[^a-z0-9]/gi, '') || 'png';
+    filename = `feedback.${ext}`;
+  }
+  return { bytes, contentType, filename };
 }
 
 /**
@@ -1965,6 +2013,94 @@ ${goal}`
       jsonError(res, 500, 'Failed to fetch image')
     }
   })
+
+  // ===========================================================================
+  // Feedback intake (LIN-636) — sole consumer of the provider uploadFile seam
+  // ===========================================================================
+  //
+  // POST /workspace/:urlKey/api/feedback creates a ticket from a feedback
+  // message, optionally embedding a screenshot. It is the ONLY consumer of the
+  // provider `uploadFile` seam (LIN-636); the feedback widget (LIN-635) POSTs
+  // here.
+  //
+  // Body-size exception, scoped to THIS route only: the global
+  // `express.json({ limit: '250kb' })` (server.js) is left untouched. That
+  // global parser only matches `application/json`, so a larger body sent with a
+  // non-JSON content type (e.g. text/plain) passes through it unparsed; the
+  // per-route parser below (permissive `type`, raised limit) then parses it.
+  // Small `application/json` bodies are already parsed by the global parser and
+  // are skipped here, so they keep the 250kb ceiling — the exception cannot leak
+  // to other routes.
+  const FEEDBACK_BODY_LIMIT = '12mb';
+  const MAX_FEEDBACK_IMAGE_BYTES = 10 * 1024 * 1024; // matches the image-proxy ceiling
+  const MAX_FEEDBACK_MESSAGE_LENGTH = 10_000;
+  const feedbackBodyParser = json({ type: () => true, limit: FEEDBACK_BODY_LIMIT });
+
+  /**
+   * Submit feedback as a new ticket, optionally with an embedded screenshot.
+   * @route POST /workspace/:urlKey/api/feedback
+   */
+  router.post('/workspace/:urlKey/api/feedback', workspaceFromUrl, feedbackBodyParser, async (req, res) => {
+    const workspace = req.workspace;
+    const provider = getProviderForWorkspace(workspace);
+    const token = getWorkspaceToken(workspace);
+    const { message, title, teamId, image } = req.body || {};
+
+    if (!message || typeof message !== 'string' || !message.trim()) {
+      return badRequest.json(res, 'message is required');
+    }
+    if (message.length > MAX_FEEDBACK_MESSAGE_LENGTH) {
+      return badRequest.json(res, 'message exceeds maximum length');
+    }
+    if (!teamId || typeof teamId !== 'string') {
+      return badRequest.json(res, 'teamId is required');
+    }
+
+    // Capability gates — clean 422 (never 500) when the workspace's provider
+    // can't perform the op, mirroring the proxy write surface.
+    if (!provider.supports('createIssue')) {
+      return jsonError(res, 422, "This workspace's provider does not support creating tickets", {
+        code: 'CAPABILITY_NOT_SUPPORTED', capability: 'createIssue', provider: provider.name,
+      });
+    }
+    if (image && !provider.supports('uploadFile')) {
+      return jsonError(res, 422, "This workspace's provider does not support file uploads", {
+        code: 'CAPABILITY_NOT_SUPPORTED', capability: 'uploadFile', provider: provider.name,
+      });
+    }
+
+    try {
+      let description = message.trim();
+
+      if (image) {
+        const parsed = parseFeedbackImage(image);
+        if (!parsed) {
+          return badRequest.json(res, 'image must be a base64 data URL');
+        }
+        if (parsed.bytes.length > MAX_FEEDBACK_IMAGE_BYTES) {
+          return jsonError(res, 413, 'image too large');
+        }
+        const assetUrl = await provider.uploadFile(token, parsed.bytes, {
+          contentType: parsed.contentType,
+          filename: parsed.filename,
+        });
+        description += `\n\n![](${assetUrl})`;
+      }
+
+      const ticketTitle = (typeof title === 'string' && title.trim())
+        ? title.trim().slice(0, 250)
+        : `Feedback: ${message.trim().split('\n')[0].slice(0, 60)}`;
+
+      const result = await provider.createIssue(token, { teamId, title: ticketTitle, description });
+      if (!result?.success || !result.issue) {
+        return jsonError(res, 502, 'Failed to create feedback ticket');
+      }
+      return res.status(201).json({ success: true, issue: result.issue });
+    } catch (error) {
+      console.error('Feedback submit error:', error);
+      return jsonError(res, 500, 'Failed to submit feedback');
+    }
+  });
 
   // ===========================================================================
   // Custom Prompts API

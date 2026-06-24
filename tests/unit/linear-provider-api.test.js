@@ -41,6 +41,7 @@ import {
   issueDescription,
   issueLabels,
   updateIssueLabels,
+  uploadFile,
   linearProvider,
 } from '../../lib/providers/linear/index.js';
 
@@ -435,5 +436,68 @@ describe('LinearProvider class delegates the API surface (LIN-307)', () => {
     for (const m of surface) {
       assert.strictEqual(linearProvider.supports(m), true, `${m} must be supported`);
     }
+  });
+});
+
+// =============================================================================
+// File upload seam (LIN-636)
+// =============================================================================
+
+describe('Linear provider uploadFile (LIN-636)', () => {
+  let realFetch;
+  beforeEach(() => { realFetch = globalThis.fetch; });
+  afterEach(() => { globalThis.fetch = realFetch; });
+
+  test('two-step handshake: fileUpload mutation → PUT bytes → returns assetUrl', async () => {
+    const m = stub(async () => ({
+      fileUpload: {
+        success: true,
+        uploadFile: {
+          uploadUrl: 'https://upload.example/signed',
+          assetUrl: 'https://uploads.linear.app/abc/screenshot.png',
+          headers: [{ key: 'x-goog-meta', value: 'v' }],
+        },
+      },
+    }));
+    let putArgs;
+    globalThis.fetch = async (url, opts) => { putArgs = { url, opts }; return { ok: true, status: 200 }; };
+
+    const bytes = Buffer.from('PNGDATA');
+    const assetUrl = await uploadFile(API_KEY, bytes, { contentType: 'image/png', filename: 'screenshot.png' });
+
+    assert.strictEqual(assetUrl, 'https://uploads.linear.app/abc/screenshot.png');
+    // Mutation variables carry the declared size/contentType/filename.
+    assert.deepStrictEqual(m.mock.calls[0].arguments[1], {
+      contentType: 'image/png', filename: 'screenshot.png', size: bytes.length,
+    });
+    // Bytes are PUT to the signed URL with Content-Type + the returned headers.
+    assert.strictEqual(putArgs.url, 'https://upload.example/signed');
+    assert.strictEqual(putArgs.opts.method, 'PUT');
+    assert.strictEqual(putArgs.opts.headers['Content-Type'], 'image/png');
+    assert.strictEqual(putArgs.opts.headers['x-goog-meta'], 'v');
+    assert.strictEqual(putArgs.opts.body, bytes);
+  });
+
+  test('throws when the mutation returns no signed URL', async () => {
+    stub(async () => ({ fileUpload: { success: false, uploadFile: null } }));
+    globalThis.fetch = async () => ({ ok: true });
+    await assert.rejects(() => uploadFile(API_KEY, Buffer.from('x'), {}), /did not return a signed upload URL/);
+  });
+
+  test('throws when the binary PUT fails', async () => {
+    stub(async () => ({
+      fileUpload: { success: true, uploadFile: { uploadUrl: 'https://u', assetUrl: 'https://a', headers: [] } },
+    }));
+    globalThis.fetch = async () => ({ ok: false, status: 403 });
+    await assert.rejects(() => uploadFile(API_KEY, Buffer.from('x'), {}), /status 403/);
+  });
+
+  test('class delegates uploadFile and it is a declared capability', async () => {
+    stub(async () => ({
+      fileUpload: { success: true, uploadFile: { uploadUrl: 'https://u', assetUrl: 'https://a', headers: [] } },
+    }));
+    globalThis.fetch = async () => ({ ok: true });
+    assert.strictEqual(linearProvider.supports('uploadFile'), true);
+    assert.strictEqual(await linearProvider.uploadFile(API_KEY, Buffer.from('x'), {}), 'https://a');
   });
 });
