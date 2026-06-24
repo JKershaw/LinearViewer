@@ -78,8 +78,15 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   //   ?maxWorkspaces=true       - Set up 10 workspaces (at limit)
   //   ?openRouterConnected=true - Set up OpenRouter API key in session
   //   ?freeTierEnabled=true     - Simulate free tier mode (no OAuth, no env key)
+  //   ?urlKey=<workspace>       - Per-worker urlKey for the single default workspace
+  //                               (LIN-625 S1). Defaults to 'test-workspace' for
+  //                               back-compat; the multiWorkspace / maxWorkspaces
+  //                               branches keep their fixed second-/workspace-N keys.
   router.get('/test/set-session', (req, res) => {
     const { tokenExpired, noRefreshToken, multiWorkspace, maxWorkspaces, openRouterConnected, freeTierEnabled, features, swimSample, shipSample, patMode } = req.query
+    // Per-worker key for the single default workspace; same `?urlKey=` interface
+    // the teardown endpoints already use, with the identical 'test-workspace' default.
+    const singleUrlKey = req.query.urlKey || 'test-workspace'
 
     // Base workspace configuration - IDs must be valid UUIDs to pass validation
     const createWorkspace = (id, name, urlKey) => ({
@@ -115,9 +122,9 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
         createWorkspace(TEST_UUID_2, 'Second Workspace', 'second-workspace')
       ]
     } else {
-      // Default: single workspace
+      // Default: single workspace (urlKey is per-worker-aware; LIN-625 S1)
       workspaces = [
-        createWorkspace(TEST_UUID_1, 'Test Workspace', 'test-workspace')
+        createWorkspace(TEST_UUID_1, 'Test Workspace', singleUrlKey)
       ]
     }
 
@@ -515,9 +522,12 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       if (!localStore) throw new Error('localStore not wired into test routes');
 
       const body = req.body || {};
+      // Per-worker key (LIN-625 S1): accept via query or body, seed/clear against
+      // the *passed* key, and default to the fixed local key for un-swept callers.
+      const urlKey = req.query.urlKey || body.urlKey || LOCAL_WS_URL_KEY;
       const seed = (Array.isArray(body.projects) || Array.isArray(body.issues))
         ? { projects: body.projects || [], issues: body.issues || [] }
-        : defaultLocalSeed;
+        : defaultLocalSeed(urlKey);
 
       if (body.features && typeof body.features === 'object') {
         const validated = {}
@@ -527,18 +537,18 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
         req.session.features = validated
       }
 
-      await localStore.clear(LOCAL_WS_URL_KEY);
-      await localStore.seed(LOCAL_WS_URL_KEY, seed);
+      await localStore.clear(urlKey);
+      await localStore.seed(urlKey, seed);
 
       // Token === urlKey: carries no auth, only selects the store partition.
       // No `accessToken: 'test-token'`, so the mock short-circuit never fires.
       req.session.workspaces = [{
         id: LOCAL_WS_UUID,
         name: 'Local Workspace',
-        urlKey: LOCAL_WS_URL_KEY,
+        urlKey,
         provider: 'local',
-        credentials: { token: LOCAL_WS_URL_KEY },
-        accessToken: LOCAL_WS_URL_KEY,
+        credentials: { token: urlKey },
+        accessToken: urlKey,
         tokenExpiresAt: Number.MAX_SAFE_INTEGER,
         addedAt: Date.now(),
       }];
@@ -568,7 +578,7 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
         delete req.session.freeTierEnabled;
       }
 
-      req.session.save(() => res.json({ ok: true, urlKey: LOCAL_WS_URL_KEY }));
+      req.session.save(() => res.json({ ok: true, urlKey }));
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -583,7 +593,7 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     try {
       const provider = getProvider('local');
       if (!provider) throw new Error('local provider not registered');
-      const created = await provider.createIssue(LOCAL_WS_URL_KEY, {
+      const created = await provider.createIssue(req.query.urlKey || LOCAL_WS_URL_KEY, {
         title: req.query.title || 'Created via provider',
         projectId: 'local-proj-1',
         state: { name: 'Todo', type: 'unstarted' },
@@ -597,7 +607,7 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   // Clear the local store partition (test teardown / isolation).
   router.get('/test/clear-local-store', async (req, res) => {
     try {
-      const removed = localStore ? await localStore.clear(LOCAL_WS_URL_KEY) : 0;
+      const removed = localStore ? await localStore.clear(req.query.urlKey || LOCAL_WS_URL_KEY) : 0;
       res.json({ ok: true, removed });
     } catch (err) {
       res.status(500).json({ error: err.message });
