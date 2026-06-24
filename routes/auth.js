@@ -8,8 +8,10 @@
 import crypto from 'crypto'
 import { Router } from 'express'
 import { getProvider } from '../lib/providers/registry.js'
+import { AuthExchangeError } from '../lib/providers/interface.js'
 import { renderErrorPage } from '../lib/render.js'
-import { upsertWorkspace, saveSession, updateWorkspaceTokens } from '../lib/workspace.js'
+import { upsertWorkspace, saveSession, linkProvider } from '../lib/workspace.js'
+import { calculateExpiresAt } from '../lib/token-refresh.js'
 import { applyUserPreferencesToSession } from '../lib/user-preferences.js'
 
 /**
@@ -54,21 +56,17 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider 
     // Clean up expired sessions before proceeding
     await sessionStore.cleanup()
 
-    // Generate random state token to prevent CSRF attacks
+    // Generate random state token to prevent CSRF attacks. `state` stays an
+    // opaque CSRF nonce — intent (new container vs. add-source) lives server-side
+    // in the session, never encoded into `state` (LIN-562). Linear login is
+    // always the new-container case today; add-source is LIN-541/544.
     const state = crypto.randomUUID()
+    const authProvider = provider || getProvider('linear')
     req.session.oauthState = state
-
-    const params = new URLSearchParams({
-      client_id: process.env.LINEAR_CLIENT_ID,
-      redirect_uri: process.env.LINEAR_REDIRECT_URI,
-      response_type: 'code',
-      scope: 'read,write',
-      state,
-      prompt: 'consent'
-    })
+    req.session.oauthIntent = { mode: 'new', provider: authProvider.name }
 
     req.session.save(() => {
-      res.redirect(`https://linear.app/oauth/authorize?${params}`)
+      res.redirect(authProvider.beginAuth({ state }))
     })
   })
 
@@ -114,37 +112,37 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider 
       return res.status(400).send(html)
     }
 
+    // LIN-561: use the provider this router was mounted for, not a hardcoded
+    // getProvider('linear'); fall back to Linear as the documented legacy default.
+    const authProvider = provider || getProvider('linear')
+    // Intent (new container vs. add-source) is carried server-side in
+    // req.session.oauthIntent (LIN-562). Linear login realizes only `mode:'new'`
+    // today, so the callback consumes none of it yet; add-source (`mode:'existing'`,
+    // a different find-or-create branch) reads it here for LIN-541/544.
+
     try {
-      // Exchange authorization code for access token
-      const response = await fetch('https://api.linear.app/oauth/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          grant_type: 'authorization_code',
-          client_id: process.env.LINEAR_CLIENT_ID,
-          client_secret: process.env.LINEAR_CLIENT_SECRET,
-          redirect_uri: process.env.LINEAR_REDIRECT_URI,
-          code
-        })
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        console.error('Token exchange error:', data.error)
-        const html = renderErrorPage('Authentication Failed', 'Could not complete authentication with Linear. Please try again.', {
-          action: 'Try again',
-          actionUrl: '/auth/linear'
-        })
-        return res.status(400).send(html)
+      // Exchange authorization code for credentials via the provider's
+      // acquisition seam (LIN-562). A clean exchange failure surfaces as
+      // AuthExchangeError → the same 400 page the inline `!response.ok` branch
+      // rendered before; anything else falls through to the generic 500 catch.
+      let data
+      try {
+        data = await authProvider.completeAuth(code)
+      } catch (exchangeError) {
+        if (exchangeError instanceof AuthExchangeError) {
+          console.error('Token exchange error:', exchangeError.detail)
+          const html = renderErrorPage('Authentication Failed', 'Could not complete authentication with Linear. Please try again.', {
+            action: 'Try again',
+            actionUrl: '/auth/linear'
+          })
+          return res.status(400).send(html)
+        }
+        throw exchangeError
       }
 
       // Fetch organization info and current user in parallel.
-      // LIN-561: use the provider this router was mounted for, not a hardcoded
-      // getProvider('linear'); fall back to Linear as the documented legacy default.
       let org, viewer
       try {
-        const authProvider = provider || getProvider('linear');
         [org, viewer] = await Promise.all([
           authProvider.fetchOrganization(data.access_token),
           authProvider.fetchViewer(data.access_token)
@@ -158,15 +156,22 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider 
         return res.status(500).send(html)
       }
 
-      // Build workspace object
+      // Find-or-create the provider-independent container (LIN-562). For Linear,
+      // identity stays org-derived for back-compat (existing urlKeys preserved);
+      // upsertWorkspace below is the find-or-create by id. The credential is
+      // attached through the single linkProvider seam — same path local/PAT use —
+      // which also writes the legacy scalar mirror byte-identically.
       const workspace = {
         id: org.id,
         name: org.name,
         urlKey: org.urlKey || org.name,
         addedAt: Date.now()
       }
-      // Add token fields using helper (with default expires_in for safety)
-      updateWorkspaceTokens(workspace, { ...data, expires_in: data.expires_in || 86400 })
+      linkProvider(workspace, authProvider.name, org.id, {
+        token: data.access_token,
+        refreshToken: data.refresh_token,
+        tokenExpiresAt: calculateExpiresAt(data.expires_in || 86400)
+      })
 
       // Preserve existing workspaces before regenerating session
       const existingWorkspaces = req.session.workspaces || []

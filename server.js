@@ -49,7 +49,7 @@ import { parseRepoFromDescription } from './lib/prompt-formatters.js'
 import { renderPage, renderErrorPage, renderUpstreamAwareErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken } from './lib/token-refresh.js'
-import { UUID_REGEX, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, updateWorkspaceTokens, getWorkspaceToken } from './lib/workspace.js'
+import { UUID_REGEX, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, updateWorkspaceTokens, getWorkspaceToken, linkProvider } from './lib/workspace.js'
 import { createWorkspaceRoutes } from './routes/workspace.js'
 import { createOpenRouterAuthRoutes } from './routes/openrouter-auth.js'
 import { createDispatchRoutes } from './routes/dispatch.js'
@@ -432,15 +432,25 @@ async function ensurePATSession(req, res, next) {
       provider.fetchViewer(pat)
     ]);
 
+    // PAT is the third identity-creation site (alongside OAuth login and local
+    // create). It converges on the same linkProvider seam (LIN-562) so PAT
+    // workspaces carry bindings[] for the downstream fan-out (LIN-544) instead
+    // of being a divergent branch. Identity stays org-derived for back-compat
+    // (session-ephemeral, nothing persisted to migrate); only the credential
+    // attachment routes through linkProvider, which writes the legacy scalar
+    // mirror (accessToken/credentials) so all existing PAT readers stay green.
     const workspace = {
       id: org.id,
       name: org.name,
       urlKey: org.urlKey || org.name,
       addedAt: Date.now(),
-      accessToken: pat,
       isPAT: true,
       tokenExpiresAt: Number.MAX_SAFE_INTEGER
     };
+    linkProvider(workspace, 'linear', org.id, {
+      token: pat,
+      tokenExpiresAt: Number.MAX_SAFE_INTEGER, // PAT never expires; refresh middleware skips on isPAT
+    });
 
     req.session.workspaces = [workspace];
     req.session.activeWorkspaceId = workspace.id;

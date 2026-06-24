@@ -21,6 +21,7 @@ import { dirname, join } from 'node:path';
 import {
   ProviderInterface,
   NotImplementedError,
+  AuthExchangeError,
   PROVIDER_SURFACE,
 } from '../../lib/providers/interface.js';
 import {
@@ -79,6 +80,12 @@ describe('ProviderInterface', () => {
   test('getCreateTaskUrl is declared and throws NotImplementedError on the base', () => {
     const base = new ProviderInterface();
     assert.throws(() => base.getCreateTaskUrl(), NotImplementedError);
+  });
+
+  test('beginAuth/completeAuth are declared headroom — throw NotImplementedError on the base (LIN-562)', () => {
+    const base = new ProviderInterface();
+    assert.throws(() => base.beginAuth({ state: 'x' }), NotImplementedError);
+    assert.throws(() => base.completeAuth('code'), NotImplementedError);
   });
 
   test('capability descriptor reports nothing implemented on the bare base', () => {
@@ -265,6 +272,68 @@ describe('Linear provider through lib/linear.js shim', () => {
       linearProvider.mapState('started'),
       { ...getStateDisplay('started'), order: getStateOrder('started') }
     );
+  });
+
+  test('beginAuth builds the byte-identical Linear authorize URL (LIN-562)', () => {
+    const prev = {
+      id: process.env.LINEAR_CLIENT_ID,
+      uri: process.env.LINEAR_REDIRECT_URI,
+    };
+    process.env.LINEAR_CLIENT_ID = 'client-123';
+    process.env.LINEAR_REDIRECT_URI = 'https://app.example/auth/callback';
+    try {
+      const url = linearProvider.beginAuth({ state: 'nonce-xyz' });
+      // Exactly the params the /auth/linear route inlined before LIN-562.
+      const expected = 'https://linear.app/oauth/authorize?' + new URLSearchParams({
+        client_id: 'client-123',
+        redirect_uri: 'https://app.example/auth/callback',
+        response_type: 'code',
+        scope: 'read,write',
+        state: 'nonce-xyz',
+        prompt: 'consent',
+      }).toString();
+      assert.strictEqual(url, expected);
+    } finally {
+      process.env.LINEAR_CLIENT_ID = prev.id;
+      process.env.LINEAR_REDIRECT_URI = prev.uri;
+    }
+  });
+
+  test('completeAuth exchanges the code and returns the token bag (LIN-562)', async () => {
+    const realFetch = globalThis.fetch;
+    let sentBody;
+    globalThis.fetch = async (url, opts) => {
+      assert.strictEqual(url, 'https://api.linear.app/oauth/token');
+      sentBody = opts.body.toString();
+      return { ok: true, json: async () => ({ access_token: 'tok', refresh_token: 'ref', expires_in: 3600 }) };
+    };
+    try {
+      const data = await linearProvider.completeAuth('the-code');
+      assert.deepStrictEqual(data, { access_token: 'tok', refresh_token: 'ref', expires_in: 3600 });
+      assert.match(sentBody, /grant_type=authorization_code/);
+      assert.match(sentBody, /code=the-code/);
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+
+  test('completeAuth throws AuthExchangeError on a non-2xx exchange (byte-identical 400 path) (LIN-562)', async () => {
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async () => ({ ok: false, json: async () => ({ error: 'invalid_grant' }) });
+    try {
+      await assert.rejects(
+        () => linearProvider.completeAuth('bad-code'),
+        (err) => {
+          assert.ok(err instanceof AuthExchangeError);
+          assert.strictEqual(err.code, 'AUTH_EXCHANGE_FAILED');
+          assert.strictEqual(err.detail, 'invalid_grant');
+          assert.strictEqual(err.provider, 'linear');
+          return true;
+        }
+      );
+    } finally {
+      globalThis.fetch = realFetch;
+    }
   });
 });
 
