@@ -173,6 +173,52 @@ test('a target session that no longer reconstructs has its derived doc removed',
   assert.equal(sessions.find(s => s.sessionId === 'GHOST'), undefined, 'vanished session evicted');
 });
 
+test('offers each upserted target session to the background precompute hook (LIN-632)', async () => {
+  const ctx = setup();
+  seedSpanningFixture(ctx);
+  const { materializer, observationSessionsStore } = ctx;
+
+  const offered = [];
+  materializer.precomputeSessionSummary = (urlKey, session) => { offered.push([urlKey, session.sessionId]); };
+
+  await materializer.rebuildForWrite(URL_KEY, { issueIdentifier: 'LIN-300' });
+
+  // Both sessions touching the issue were upserted → both offered to the hook,
+  // with the SAME lean session object the read-model stored.
+  const offeredIds = offered.map(([, id]) => id).sort();
+  assert.deepEqual(offeredIds, ['S1', 'S2']);
+  assert.ok(offered.every(([k]) => k === URL_KEY), 'hook receives the workspace urlKey');
+  const { sessions } = await observationSessionsStore.findByWorkspace(URL_KEY);
+  assert.equal(sessions.length, 2, 'hook is offered alongside a real upsert, not instead of it');
+});
+
+test('a hook throwing or rejecting never breaks the read-model write (LIN-632)', async () => {
+  const ctx = setup();
+  seedSpanningFixture(ctx);
+  const { materializer, observationSessionsStore } = ctx;
+
+  materializer.precomputeSessionSummary = () => { throw new Error('boom'); };
+  await materializer.rebuildForWrite(URL_KEY, { sessionId: 'S1' }); // must not reject
+
+  const { sessions } = await observationSessionsStore.findByWorkspace(URL_KEY);
+  assert.ok(sessions.find(s => s.sessionId === 'S1'), 'session still materialized despite hook throwing');
+});
+
+test('precompute hook is opt-in — disabled by default and clearable with a non-function (LIN-632)', async () => {
+  const ctx = setup();
+  seedSpanningFixture(ctx);
+  const { materializer, observationSessionsStore } = ctx;
+
+  assert.equal(materializer.precomputeSessionSummary, null, 'no hook wired by default');
+  materializer.precomputeSessionSummary = () => { throw new Error('should not run'); };
+  materializer.precomputeSessionSummary = null; // disable again
+  assert.equal(materializer.precomputeSessionSummary, null);
+
+  await materializer.rebuildForWrite(URL_KEY, { sessionId: 'S1' }); // disabled hook never runs
+  const { sessions } = await observationSessionsStore.findByWorkspace(URL_KEY);
+  assert.ok(sessions.find(s => s.sessionId === 'S1'));
+});
+
 test('rebuildForWrite for an issue in no session is a no-op (does not throw, writes nothing)', async () => {
   const ctx = setup();
   seedSpanningFixture(ctx);
