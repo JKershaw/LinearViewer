@@ -1617,6 +1617,161 @@ test.describe('Proxy API - Recommend-and-Dispatch (fused verb, LIN-321)', () => 
   });
 });
 
+test.describe('Proxy API - Autopilot kickoff (fused launch verb, LIN-569)', () => {
+  let readToken;
+  let writeToken;
+
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/test/clear-proxy-tokens');
+    await page.goto('/test/clear-dispatch-queue');
+    await page.goto('/test/clear-dispatch-history');
+
+    const readResp = await page.goto('/test/create-proxy-token?scope=read&label=autopilot-read');
+    readToken = (await readResp.json()).token;
+
+    const writeResp = await page.goto('/test/create-proxy-token?scope=readWrite&label=autopilot-write');
+    writeToken = (await writeResp.json()).token;
+  });
+
+  test('read-only token cannot launch (403)', async ({ request }) => {
+    const resp = await request.post('/api/proxy/autopilot/kickoff', {
+      headers: { Authorization: `Bearer ${readToken}`, 'Content-Type': 'application/json' },
+      data: { goal: 'ship the thing' }
+    });
+    expect(resp.status()).toBe(403);
+  });
+
+  test('invalid mode gets 400', async ({ request }) => {
+    const resp = await request.post('/api/proxy/autopilot/kickoff', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { mode: 'sideways' }
+    });
+    expect(resp.status()).toBe(400);
+    const body = await resp.json();
+    expect(body.error).toContain('mode');
+  });
+
+  test('invalid target gets 400', async ({ request }) => {
+    const resp = await request.post('/api/proxy/autopilot/kickoff', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { target: 'local' }
+    });
+    expect(resp.status()).toBe(400);
+  });
+
+  test('general run: launches, returns id===sessionId, kind autopilot, NO prompt body, and is watchable', async ({ request }) => {
+    const resp = await request.post('/api/proxy/autopilot/kickoff', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { goal: 'clear the bug backlog', target: 'cli' }
+    });
+    expect(resp.status()).toBe(201);
+    const created = await resp.json();
+
+    expect(created.id).toBeTruthy();
+    expect(created.sessionId).toBe(created.id);   // the dispatch id IS the session id
+    expect(created.status).toBe('queued');
+    expect(created.kind).toBe('autopilot');
+    expect(created.mode).toBe('write');
+    expect(created.target).toBe('cli');
+    expect(created.issueIdentifier).toBeNull();
+    // The fused verb never hands the prompt body back to the caller.
+    expect(created.prompt).toBeUndefined();
+
+    // The launched run is watchable like any other dispatch.
+    const watch = await request.get(`/api/proxy/dispatch/${created.id}`, {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(watch.status()).toBe(200);
+    const watched = await watch.json();
+    expect(watched.id).toBe(created.id);
+    expect(watched.status).toBe('queued');
+  });
+
+  test('the dispatched prompt embeds the goal AND the session-id self-ref block (LIN-599)', async ({ request }) => {
+    const resp = await request.post('/api/proxy/autopilot/kickoff', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { goal: 'UNIQUE-GOAL-MARKER-569' }
+    });
+    expect(resp.status()).toBe(201);
+    const created = await resp.json();
+
+    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const { token: dispatchToken } = await tokenResponse.json();
+    const pollResp = await request.get('/api/dispatch/poll', {
+      headers: { Authorization: `Bearer ${dispatchToken}` }
+    });
+    const { items } = await pollResp.json();
+    const queued = items.find(i => i.id === created.id);
+    expect(queued).toBeTruthy();
+    expect(queued.kind).toBe('autopilot');
+    // Goal made it into the kickoff body.
+    expect(queued.prompt).toContain('UNIQUE-GOAL-MARKER-569');
+    // addItem appended the session-id self-ref block naming this run's own id.
+    expect(queued.prompt).toContain('Your autopilot session id');
+    expect(queued.prompt).toContain(created.id);
+    // appendProxyContext defaults on → the worker inherits Linear access.
+    expect(queued.prompt).toContain('Linear access (auto-appended)');
+  });
+
+  test('scoped run: names the issue and inherits the project repo (LIN-537)', async ({ request }) => {
+    // TEST-14 lives in proj-alpha, whose description carries `repo=test-repo`.
+    const resp = await request.post('/api/proxy/autopilot/kickoff', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { issueIdentifier: 'TEST-14' }
+    });
+    expect(resp.status()).toBe(201);
+    const created = await resp.json();
+    expect(created.issueIdentifier).toBe('TEST-14');
+    expect(created.promptName).toContain('TEST-14');
+
+    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const { token: dispatchToken } = await tokenResponse.json();
+    const pollResp = await request.get('/api/dispatch/poll', {
+      headers: { Authorization: `Bearer ${dispatchToken}` }
+    });
+    const { items } = await pollResp.json();
+    const queued = items.find(i => i.id === created.id);
+    expect(queued).toBeTruthy();
+    expect(queued.repo).toBe('test-repo');
+  });
+
+  test('an explicit caller repo overrides the resolved project repo (LIN-537)', async ({ request }) => {
+    const resp = await request.post('/api/proxy/autopilot/kickoff', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { issueIdentifier: 'TEST-14', repo: 'caller-override' }
+    });
+    expect(resp.status()).toBe(201);
+    const created = await resp.json();
+
+    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const { token: dispatchToken } = await tokenResponse.json();
+    const pollResp = await request.get('/api/dispatch/poll', {
+      headers: { Authorization: `Bearer ${dispatchToken}` }
+    });
+    const { items } = await pollResp.json();
+    const queued = items.find(i => i.id === created.id);
+    expect(queued).toBeTruthy();
+    expect(queued.repo).toBe('caller-override');
+  });
+
+  test('scoped run with a nonexistent issue gets 404', async ({ request }) => {
+    const resp = await request.post('/api/proxy/autopilot/kickoff', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { issueIdentifier: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' }
+    });
+    expect(resp.status()).toBe(404);
+  });
+
+  test('read-write instructions advertise the fused launch verb', async ({ request }) => {
+    const resp = await request.get('/api/proxy/instructions', {
+      headers: { Authorization: `Bearer ${writeToken}` }
+    });
+    const text = await resp.text();
+    expect(text).toContain('POST');
+    expect(text).toContain('/api/proxy/autopilot/kickoff');
+  });
+});
+
 // LIN-525 #2 (mint route is feature-gated) and #5 (prompt-proxy tokens get a
 // short TTL so they self-prune instead of accumulating as standing readWrite
 // credentials). Exercises the real session-auth mint route via page.request,

@@ -1161,6 +1161,14 @@ POST ${baseUrl}/api/proxy/recommend-and-dispatch
   → VERB OVERRIDE — pass "kind" (a prompt template key: plan, implementation, review, research, design, breakdown, look-into, triage, scoping, spike, context, retro, blocked) to PIN the step when the engine's chosen verb is demonstrably wrong. The server still WRITES the body — you pick the verb, never the words. Override pins the NAMED issue with NO descent and skips the LLM entirely; response carries "override": true. Use sparingly and only on a clear engine miss (see the autopilot manual); it is not the everyday path. Invalid keys (incl. defer/custom/autopilot/periodical) get a 400.
   → { "id": "...", "status": "queued", "kind": "plan", "promptName": "plan", "issueIdentifier": "...", "target": "cli", "sessionId": null, "dispatchedAt": "..." }
 
+POST ${baseUrl}/api/proxy/autopilot/kickoff
+  Body: { "goal": "...", "mode": "write|readonly", "issueIdentifier": "LIN-42", "target": "cli|web|dash", "repo": "...", "appendProxyContext": true }
+  → Fused launch verb: builds the Autopilot kickoff AND dispatches it in one call — the single verb that actually STARTS a run from a goal (no need to GET the kickoff text and POST it back). The receiving session becomes the Autopilot orchestrator. All fields optional.
+  → Omit "issueIdentifier" for a GENERAL run ("goal" focuses the stack walk); pass it for a SCOPED run ("autopilot until THIS task is done") — the project "repo=" is then inherited unless you pass "repo". "mode" defaults to "write" ("readonly" = investigation only).
+  → Dispatched as kind:"autopilot", so the returned "id" IS this run's session id. Pass that id as "sessionId" on every worker dispatch the run fans out (the kickoff body also tells the run its own id).
+  → The prompt body NEVER returns to you — only the header. The GET twin (GET /api/proxy/autopilot/kickoff?goal=&mode=) stays a text-only preview/inspect form that does NOT enqueue anything.
+  → { "id": "...", "sessionId": "...", "status": "queued", "kind": "autopilot", "promptName": "Autopilot (stack walk)", "mode": "write", "issueIdentifier": null, "target": "cli", "dispatchedAt": "..." }
+
 GET ${baseUrl}/api/proxy/dispatch?issueIdentifier={LIN-42}&status={queued|taken|done|failed|aborted}&limit={n}
   → List your dispatch items (live queue + recent history), newest first. All query params optional. Use this to find an item's id when you only know the issue.
   → { "items": [{ "id": "...", "status": "queued|taken|done|failed|aborted", "kind": "implementation", "issueIdentifier": "...", "feedbackCount": 1, ... }], "total": N }
@@ -3336,6 +3344,142 @@ One convention across every endpoint, so you can branch on the same fields every
 
     const kickoff = buildAutopilotKickoff({ baseUrl, goal, mode });
     res.type('text/plain').send(kickoff);
+  });
+
+  /**
+   * POST /api/proxy/autopilot/kickoff
+   * Fused launch verb (LIN-569): build the Autopilot kickoff AND enqueue it in
+   * one call, returning the dispatch id — which IS the run's session id. This is
+   * the single verb that actually *starts* a run from a goal. It collapses the
+   * UI's old two-step round-trip (GET the kickoff → ship the whole body back via
+   * POST /dispatch) into one server-side composition, the same fusion shape as
+   * POST /recommend-and-dispatch: the prompt body is generated server-side and
+   * never returned to the caller. The GET twin above stays the text-only
+   * preview/inspect form.
+   *
+   * Body (all optional): { goal?, mode?, issueIdentifier?, target?, repo?, appendProxyContext? }
+   *   - issueIdentifier present → SCOPED run ("autopilot until THIS task is
+   *     done"): the issue's title is resolved for the goal line and its project
+   *     `repo=` is inherited (an explicit caller `repo` wins, mirroring /prompt).
+   *   - issueIdentifier absent  → GENERAL run; `goal` focuses the stack walk.
+   *   - mode: 'write' (default) | 'readonly'.
+   * Dispatches with kind:'autopilot', so addItem appends the session-id self-ref
+   * block and the returned id is the session id (LIN-591/LIN-599).
+   */
+  router.post('/api/proxy/autopilot/kickoff', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
+    if (!dispatchQueueStore) {
+      logEvent(req, '/api/proxy/autopilot/kickoff', 503);
+      return jsonError(res, 503, 'Dispatch is not available');
+    }
+
+    try {
+      const { goal, mode, issueIdentifier, target, repo, appendProxyContext } = req.body || {};
+
+      // Validate caller-supplied inputs. (The composed body is server-generated
+      // and trusted, so only these raw inputs are checked — same split as the
+      // recommend-and-dispatch override path.)
+      const resolvedMode = mode === undefined ? AUTOPILOT_MODE_DEFAULT : mode;
+      if (!AUTOPILOT_MODES.includes(resolvedMode)) {
+        logEvent(req, '/api/proxy/autopilot/kickoff', 400);
+        return badRequest.json(res, `mode must be one of: ${AUTOPILOT_MODES.join(', ')}`);
+      }
+      if (goal !== undefined && (typeof goal !== 'string' || goal.length > MAX_NAME_LENGTH || DANGEROUS_CHARS_REGEX.test(goal))) {
+        logEvent(req, '/api/proxy/autopilot/kickoff', 400);
+        return badRequest.json(res, 'goal is invalid');
+      }
+      if (target !== undefined && !VALID_PROXY_DISPATCH_TARGETS.includes(target)) {
+        logEvent(req, '/api/proxy/autopilot/kickoff', 400);
+        return badRequest.json(res, `target must be one of: ${VALID_PROXY_DISPATCH_TARGETS.join(', ')}`);
+      }
+      if (repo !== undefined && (typeof repo !== 'string' || repo.length > MAX_NAME_LENGTH || DANGEROUS_CHARS_REGEX.test(repo))) {
+        logEvent(req, '/api/proxy/autopilot/kickoff', 400);
+        return badRequest.json(res, 'repo is invalid');
+      }
+      if (issueIdentifier !== undefined && !isValidIssueId(issueIdentifier)) {
+        logEvent(req, '/api/proxy/autopilot/kickoff', 400);
+        return badRequest.json(res, 'Invalid identifier format');
+      }
+
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+
+      // SCOPED run: resolve the named issue so the goal line can name it and we
+      // can inherit the project repo (mirrors /prompt + recommend-and-dispatch).
+      let issue = null;
+      let resolvedRepo = repo || null;
+      if (issueIdentifier) {
+        const { token: accessToken, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+        if (!accessToken) {
+          return workspaceUnavailable(req, res, '/api/proxy/autopilot/kickoff', reason);
+        }
+        const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
+        let ctx;
+        try {
+          ctx = await resolvePromptIssueContext(accessToken, issueIdentifier, isTestMode);
+        } catch (err) {
+          if (err.message?.includes('not found')) {
+            logEvent(req, '/api/proxy/autopilot/kickoff', 404);
+            return notFound.json(res, 'Issue not found');
+          }
+          throw err;
+        }
+        if (!ctx) {
+          logEvent(req, '/api/proxy/autopilot/kickoff', 404);
+          return notFound.json(res, 'Issue not found');
+        }
+        issue = { identifier: ctx.issue.identifier, title: ctx.issue.title };
+        resolvedRepo = repo || parseRepoFromDescription(ctx.project?.description) || null;
+      }
+
+      const kickoff = buildAutopilotKickoff({
+        baseUrl,
+        issue,
+        goal: typeof goal === 'string' ? goal : '',
+        mode: resolvedMode
+      });
+
+      // Append the proxy context (Linear access + bearer token + reporting
+      // channel) by default — the kickoff guide refers the autopilot to "the
+      // +proxy block" for its concrete token. Opt out with appendProxyContext:false.
+      let finalPrompt = kickoff;
+      if (appendProxyContext !== false) {
+        const bearerToken = (req.headers.authorization || '').slice(7);
+        finalPrompt = kickoff + buildProxyContextPreamble({
+          baseUrl,
+          token: bearerToken,
+          issueIdentifier: issueIdentifier || null
+        });
+      }
+
+      const item = await dispatchQueueStore.addItem(req.proxyUrlKey, {
+        prompt: finalPrompt,
+        promptName: issue ? `Autopilot (${issue.identifier})` : 'Autopilot (stack walk)',
+        kind: 'autopilot',
+        issueIdentifier: issueIdentifier || null,
+        dispatchedBy: req.proxyCreatedBy || null,
+        target: target || 'cli',
+        repo: resolvedRepo
+      });
+
+      logEvent(req, '/api/proxy/autopilot/kickoff', 201);
+      res.status(201).json({
+        success: true,
+        // The dispatch id IS the autopilot session id (LIN-591/LIN-599); surface
+        // it under both names so callers can use whichever reads clearer.
+        id: item._id,
+        sessionId: item._id,
+        status: 'queued',
+        kind: item.kind,
+        promptName: item.promptName,
+        mode: resolvedMode,
+        issueIdentifier: item.issueIdentifier,
+        target: item.target,
+        dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt
+      });
+    } catch (err) {
+      logEvent(req, '/api/proxy/autopilot/kickoff', 500);
+      console.error('Proxy autopilot kickoff error:', err.message);
+      jsonError(res, 500, 'Failed to dispatch autopilot kickoff');
+    }
   });
 
   /**
