@@ -18,23 +18,25 @@ import { createDedupeCache, dedupeKey } from '../lib/proxy-dedupe.js';
 import { deriveTerminalStatus, deriveCompletedAt } from '../lib/dispatch-terminal.js';
 // The entire consumer-API surface — reads (LIN-308), writes + write-guard reads
 // (LIN-309), and the compute-endpoint fetchers — sources through a provider; the
-// route owns no GraphQL. `linearProvider` is the default provider for the
-// consumer read + write data API (capability-gated; the injectable `provider`
-// param). The read/write data endpoints route through that injectable provider
-// (LIN-583), so the route holds NO Linear-bound read imports on its data path —
-// `localProvider` can back `/api/proxy/*` for a local workspace (see
-// resolveProviderAccess). The lib/linear.js shim stays the frozen back-compat
+// route owns no GraphQL. Provider SELECTION for the consumer read + write data
+// API is per-workspace (LIN-581): resolveProviderAccess resolves the active
+// provider from the workspace's own `provider` field via getProviderForWorkspace
+// (the same resolution the dashboard render surfaces use), so the route holds NO
+// Linear-bound read imports on its data path — `localProvider` (or any other
+// registered provider) can back `/api/proxy/*` for its workspace, and the
+// capability gate (provider.supports -> 422) is now a real runtime path, not
+// only a test-injected one. The lib/linear.js shim stays the frozen back-compat
 // surface for the dashboard fetchers only.
 //
 // The compute/task-automation fetchers (fetchProjects/fetchIssueContext/
 // fetchRecommendationContext) remain statically Linear-bound: they feed the
 // LLM-driven stack/recommend/recap/brief/prompt endpoints, not the read data
-// path, and are out of scope for the local-targeting work (LIN-583).
+// path, and are out of scope for the per-workspace selection work (LIN-581).
 import {
   fetchProjects, fetchIssueContext, fetchRecommendationContext,
-  linearProvider,
 } from '../lib/providers/linear/index.js';
 import { localProvider } from '../lib/providers/local/index.js';
+import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { applyTrashedSignal, isTrashed } from '../lib/trashed-signal.js';
 import { flattenIssue, neutralizeProject, flattenCycle, flattenRelations } from '../lib/proxy-wire.js';
 import { isRecommendationEnabled, getRecommendation } from '../lib/openrouter.js';
@@ -559,12 +561,15 @@ function dispatchWatchChanged(baseline, item) {
  * @param {Function} options.getWorkspaceAccessToken - Function to get workspace access token by urlKey (token-only)
  * @param {Function} options.resolveWorkspaceAccess - Function returning { token, reason } for actionable error envelopes (LIN-417)
  * @param {Function} options.getWorkspaceOpenRouterKey - Function to get OpenRouter API key from workspace sessions
- * @param {Object} [options.provider] - Issue-tracker provider backing the consumer-API writes
- *   (LIN-309). Defaults to the Linear provider; capability-gated so an unsupported write returns a
- *   clean 4xx rather than a 500. Injectable so tests can exercise the unsupported-capability path.
+ * @param {Object} [options.provider] - TEST-ONLY provider override (LIN-581). In production this is
+ *   unset and the active provider is resolved per-workspace via getProviderForWorkspace inside
+ *   resolveProviderAccess. Tests that need a non-registered fake provider (e.g. to observe ref
+ *   resolution) inject one here; it wins over registry resolution. The capability gate
+ *   (provider.supports -> 422) is reachable both ways: via a real registered provider whose
+ *   workspace selects it, and via this injection.
  * @returns {Router} Express router with proxy routes
  */
-export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, workspacePreferencesStore, freeTierStore, provider = linearProvider }) {
+export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, workspacePreferencesStore, freeTierStore, provider: injectedProvider = null }) {
   const router = Router();
 
   /**
@@ -635,17 +640,23 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
 
   /**
    * Per-request provider + token resolution for the consumer data API (reads +
-   * writes). Default: the injectable `provider` (Linear) reached with the
-   * session-derived OAuth access token from `resolveWorkspaceAccess`. Test-only
-   * seam (LIN-583): a proxy token minted for the known local workspace resolves
-   * to the LocalProvider, reached with the urlKey itself as the store partition
-   * key ("the token IS the urlKey" for local) — this is what lets `/api/proxy/*`
-   * target a local workspace for the B2 e2e (LIN-584). Never fires in
-   * production, so the Linear path is byte-identical.
+   * writes). Provider SELECTION is per-workspace (LIN-581): `resolveWorkspaceAccess`
+   * surfaces the workspace's own `provider` name alongside the session-derived OAuth
+   * access token, and `getProviderForWorkspace` resolves it from the registry — the
+   * same resolution the dashboard render surfaces use. A workspace with no explicit
+   * provider falls back to Linear (the registry's legacy default), so the historical
+   * Linear path stays byte-identical, while a workspace bound to another provider now
+   * actually hits that provider (and its capability gate) in production rather than
+   * only under test injection.
    *
-   * The session-less, per-workspace consumer-path provider resolution (reading
-   * `workspace.provider` without a session) is the broader deferred goal
-   * (LIN-306); this seam intentionally does only what B1 needs.
+   * Two narrower seams remain:
+   *   - `injectedProvider` (TEST-ONLY): a fake/non-registered provider passed to
+   *     createProxyRoutes wins over registry resolution, so a test can observe a
+   *     bespoke provider without registering it.
+   *   - the known local workspace under NODE_ENV=test resolves to the LocalProvider,
+   *     reached with the urlKey itself as the store partition key ("the token IS the
+   *     urlKey" for local) — what lets `/api/proxy/*` target a local workspace for the
+   *     B2 e2e (LIN-584). Never fires in production.
    *
    * @returns {Promise<{provider: Object, token: (string|null), reason: string}>}
    */
@@ -653,8 +664,9 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     if (process.env.NODE_ENV === 'test' && urlKey === TEST_LOCAL_URL_KEY) {
       return { provider: localProvider, token: urlKey, reason: 'ok' };
     }
-    const { token, reason } = await resolveWorkspaceAccess(urlKey);
-    return { provider, token, reason };
+    const { token, reason, provider: providerName } = await resolveWorkspaceAccess(urlKey);
+    const activeProvider = injectedProvider || getProviderForWorkspace({ provider: providerName });
+    return { provider: activeProvider, token, reason };
   }
 
   /**
