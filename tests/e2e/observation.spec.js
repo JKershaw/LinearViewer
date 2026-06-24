@@ -8,11 +8,23 @@ import { test, expect } from '../fixtures/test-base.js';
 // the live feed reads dispatch/agent-status stores (Mongo-only), so we seed runs
 // through the user dispatch API.
 
-const URL_KEY = 'test-workspace';
-const OBSERVATION_URL = `/workspace/${URL_KEY}/observation`;
-const DASHBOARD_URL = `/workspace/${URL_KEY}/dashboard`;
-const SETTINGS_URL = `/workspace/${URL_KEY}/settings`;
-const SESSIONS_URL = `/workspace/${URL_KEY}/api/dashboard/sessions`;
+// Bound per-test from the per-worker key (LIN-628) so session, nav, the seed/
+// teardown query params, and the workspace-tag assertions all address this
+// worker's partition. Playwright workers are separate processes, so these
+// module-scoped lets are per-worker state.
+let URL_KEY;
+let OBSERVATION_URL;
+let DASHBOARD_URL;
+let SETTINGS_URL;
+let SESSIONS_URL;
+
+test.beforeEach(({ workerUrlKey }) => {
+  URL_KEY = workerUrlKey;
+  OBSERVATION_URL = `/workspace/${URL_KEY}/observation`;
+  DASHBOARD_URL = `/workspace/${URL_KEY}/dashboard`;
+  SETTINGS_URL = `/workspace/${URL_KEY}/settings`;
+  SESSIONS_URL = `/workspace/${URL_KEY}/api/dashboard/sessions`;
+});
 
 async function clearRuns(page) {
   await page.goto(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
@@ -35,28 +47,28 @@ async function seedQueuedRun(page, { issueIdentifier, issueTitle, kind = 'autopi
 test.describe('Autopilot Observation page (first-class)', () => {
   test.describe('Tier: first-class, no flag', () => {
     test('loads without any feature flag', async ({ page }) => {
-      await page.goto('/test/set-session');
+      await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       await page.goto(OBSERVATION_URL);
       await page.waitForLoadState('networkidle');
       await expect(page.locator('.obs-header h1')).toHaveText('Observation');
     });
 
     test('/dashboard 302-redirects to /observation', async ({ page }) => {
-      await page.goto('/test/set-session');
+      await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       await page.goto(DASHBOARD_URL);
       await page.waitForLoadState('networkidle');
       expect(page.url()).toContain('/observation');
     });
 
     test('the footer carries a first-class observation link', async ({ page }) => {
-      await page.goto('/test/set-session');
+      await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
       await expect(page.locator(`.footer-action[href="${OBSERVATION_URL}"]`)).toBeVisible();
     });
 
     test('the experimental dashboard toggle is gone from Settings', async ({ page }) => {
-      await page.goto('/test/set-session');
+      await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
       await expect(page.locator('[data-feature="dashboard"]')).toHaveCount(0);
@@ -66,7 +78,7 @@ test.describe('Autopilot Observation page (first-class)', () => {
 
   test.describe('Page structure', () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto('/test/set-session?multiWorkspace=true');
+      await page.goto(`/test/set-session?multiWorkspace=true&urlKey=${URL_KEY}`);
       await page.goto(OBSERVATION_URL);
       await page.waitForLoadState('networkidle');
     });
@@ -96,7 +108,7 @@ test.describe('Autopilot Observation page (first-class)', () => {
 
   test.describe('Sessions feed', () => {
     test('returns the active/recent contract (no flag gate)', async ({ page }) => {
-      await page.goto('/test/set-session');
+      await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       await clearRuns(page);
       const res = await page.request.get(SESSIONS_URL);
       expect(res.status()).toBe(200);
@@ -107,7 +119,7 @@ test.describe('Autopilot Observation page (first-class)', () => {
     });
 
     test('a queued autopilot run appears as an active session, workspace-tagged', async ({ page }) => {
-      await page.goto('/test/set-session');
+      await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       await clearRuns(page);
       await seedQueuedRun(page, { issueIdentifier: 'LIN-901', issueTitle: 'Seeded session' });
 
@@ -122,7 +134,7 @@ test.describe('Autopilot Observation page (first-class)', () => {
     });
 
     test('the page renders a seeded autopilot session in the active feed', async ({ page }) => {
-      await page.goto('/test/set-session');
+      await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       await clearRuns(page);
       await seedQueuedRun(page, { issueIdentifier: 'LIN-902', issueTitle: 'Visible session' });
 
@@ -132,7 +144,7 @@ test.describe('Autopilot Observation page (first-class)', () => {
     });
 
     test('expanding a session reveals its body', async ({ page }) => {
-      await page.goto('/test/set-session');
+      await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       await clearRuns(page);
       await seedQueuedRun(page, { issueIdentifier: 'LIN-905', issueTitle: 'Expandable session' });
 
@@ -145,7 +157,7 @@ test.describe('Autopilot Observation page (first-class)', () => {
     });
 
     test('the expanded body drills into the tasks the session touched (Level 3)', async ({ page }) => {
-      await page.goto('/test/set-session');
+      await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       await clearRuns(page);
       await seedQueuedRun(page, { issueIdentifier: 'LIN-906', issueTitle: 'Drill-down session' });
 
@@ -179,7 +191,7 @@ test.describe('Autopilot Observation page (first-class)', () => {
     }
 
     test('a worker node renders under its task and expands to a detail block', async ({ page }) => {
-      await page.goto('/test/set-session');
+      await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       await clearRuns(page);
       await seedSessionWithWorker(page);
 

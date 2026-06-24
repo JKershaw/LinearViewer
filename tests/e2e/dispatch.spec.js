@@ -1,9 +1,18 @@
 import { test, expect } from '../fixtures/test-base.js';
 
-// Test workspace URL key (from test session setup)
-const TEST_WORKSPACE_URL_KEY = 'test-workspace';
-const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;
-const API_PREFIX = `/workspace/${TEST_WORKSPACE_URL_KEY}`;
+// Per-worker workspace URL key (LIN-628): bound from the worker-scoped fixture
+// so session, nav, the dispatch token, and the teardown query params all address
+// this worker's partition. Playwright workers are separate processes, so these
+// module-scoped lets are per-worker state.
+let URL_KEY;
+let WORKSPACE_URL;
+let API_PREFIX;
+
+test.beforeEach(({ workerUrlKey }) => {
+  URL_KEY = workerUrlKey;
+  WORKSPACE_URL = `/workspace/${URL_KEY}/`;
+  API_PREFIX = `/workspace/${URL_KEY}`;
+});
 
 // Test issue ID (from mock-data.js - blocked issue has prompts)
 const BLOCKED_ISSUE_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
@@ -45,11 +54,11 @@ test.describe('Dispatch Queue', () => {
     await page.unroute('**/api/dispatch/count');
 
     // Clear dispatch queue and tokens before each test
-    await page.goto('/test/clear-dispatch-queue');
-    await page.goto('/test/clear-dispatch-tokens');
+    await page.goto(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
+    await page.goto(`/test/clear-dispatch-tokens?urlKey=${URL_KEY}`);
 
     // Set up test session with dispatch feature enabled
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}&urlKey=${URL_KEY}`);
     await page.goto(WORKSPACE_URL);
     await page.waitForLoadState('networkidle');
   });
@@ -135,7 +144,7 @@ test.describe('Dispatch Queue', () => {
 
   test('dispatching a prompt includes repo from project description', async ({ page, request }) => {
     // Create a consumer token
-    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${URL_KEY}`);
     const { token } = await tokenResponse.json();
 
     // Find and expand a task with prompts (blocked issue is in proj-alpha which has repo=test-repo)
@@ -334,7 +343,7 @@ test.describe('Dispatch Queue', () => {
 
   test('badge updates via polling when consumer claims item', async ({ page, request }) => {
     // Create a consumer token
-    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${URL_KEY}`);
     const { token } = await tokenResponse.json();
 
     // Find and expand a task with prompts
@@ -453,13 +462,13 @@ test.describe('Dispatch Queue', () => {
 test.describe('Dispatch API', () => {
   test.beforeEach(async ({ page }) => {
     // Clear dispatch queue before each test
-    await page.goto('/test/clear-dispatch-queue');
-    await page.goto('/test/set-session');
+    await page.goto(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
   });
 
   test('POST /api/dispatch creates queue item', async ({ request }) => {
     // Set session first
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     const response = await request.post(`${API_PREFIX}/api/dispatch`, {
       data: {
@@ -480,7 +489,7 @@ test.describe('Dispatch API', () => {
   });
 
   test('GET /api/dispatch lists queue items', async ({ request }) => {
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     // Create an item first
     await request.post(`${API_PREFIX}/api/dispatch`, {
@@ -501,7 +510,7 @@ test.describe('Dispatch API', () => {
   });
 
   test('DELETE /api/dispatch/:itemId removes item', async ({ request }) => {
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     // Create an item
     const createResponse = await request.post(`${API_PREFIX}/api/dispatch`, {
@@ -520,7 +529,7 @@ test.describe('Dispatch API', () => {
   });
 
   test('POST /api/dispatch with target=web stores target correctly', async ({ request }) => {
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     const response = await request.post(`${API_PREFIX}/api/dispatch`, {
       data: {
@@ -543,7 +552,7 @@ test.describe('Dispatch API', () => {
   });
 
   test('POST /api/dispatch with target=dash stores target correctly', async ({ request }) => {
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     const response = await request.post(`${API_PREFIX}/api/dispatch`, {
       data: {
@@ -566,7 +575,7 @@ test.describe('Dispatch API', () => {
   });
 
   test('POST /api/dispatch without target defaults to cli', async ({ request }) => {
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     const response = await request.post(`${API_PREFIX}/api/dispatch`, {
       data: {
@@ -587,7 +596,7 @@ test.describe('Dispatch API', () => {
   });
 
   test('POST /api/dispatch with invalid target returns 400', async ({ request }) => {
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     const response = await request.post(`${API_PREFIX}/api/dispatch`, {
       data: {
@@ -604,7 +613,7 @@ test.describe('Dispatch API', () => {
   });
 
   test('POST /api/dispatch rejects repo exceeding max length', async ({ request }) => {
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     const longRepo = 'a'.repeat(1001);
     const response = await request.post(`${API_PREFIX}/api/dispatch`, {
@@ -621,7 +630,7 @@ test.describe('Dispatch API', () => {
   });
 
   test('POST /api/dispatch rejects repo with null bytes', async ({ request }) => {
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     const response = await request.post(`${API_PREFIX}/api/dispatch`, {
       data: {
@@ -637,7 +646,7 @@ test.describe('Dispatch API', () => {
   });
 
   test('POST /api/dispatch without repo stores null repo', async ({ request }) => {
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     const response = await request.post(`${API_PREFIX}/api/dispatch`, {
       data: {
@@ -655,7 +664,7 @@ test.describe('Dispatch API', () => {
   });
 
   test('POST /api/dispatch accepts an explicit kind and surfaces it', async ({ request }) => {
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     const response = await request.post(`${API_PREFIX}/api/dispatch`, {
       data: { prompt: 'Plan it', promptName: 'Custom', kind: 'research' }
@@ -672,7 +681,7 @@ test.describe('Dispatch API', () => {
   });
 
   test('POST /api/dispatch accepts the autopilot meta-kind', async ({ request }) => {
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     const response = await request.post(`${API_PREFIX}/api/dispatch`, {
       data: { prompt: "You're Autopilot…", promptName: 'Autopilot (stack walk)', kind: 'autopilot' }
@@ -685,7 +694,7 @@ test.describe('Dispatch API', () => {
   });
 
   test('POST /api/dispatch derives kind from promptName when omitted', async ({ request }) => {
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     // 'implement' is the display name of the 'implementation' template key.
     const response = await request.post(`${API_PREFIX}/api/dispatch`, {
@@ -697,7 +706,7 @@ test.describe('Dispatch API', () => {
   });
 
   test('POST /api/dispatch defaults kind to custom for freeform prompts', async ({ request }) => {
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     const response = await request.post(`${API_PREFIX}/api/dispatch`, {
       data: { prompt: 'Freeform text', promptName: 'Custom' }
@@ -710,7 +719,7 @@ test.describe('Dispatch API', () => {
   // Follow-up dispatch plumbing (LIN-415): a follow-up is an ordinary item
   // carrying followUpTo = the original dispatchId whose session to resume.
   test('POST /api/dispatch follow-up: a second item references the first by id and surfaces followUpTo', async ({ request }) => {
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     // 1. Dispatch a custom item.
     const original = await request.post(`${API_PREFIX}/api/dispatch`, {
@@ -739,7 +748,7 @@ test.describe('Dispatch API', () => {
   });
 
   test('POST /api/dispatch rejects a non-UUID followUpTo', async ({ request }) => {
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     const response = await request.post(`${API_PREFIX}/api/dispatch`, {
       data: { prompt: 'Resume please', followUpTo: 'not-a-uuid' }
@@ -751,7 +760,7 @@ test.describe('Dispatch API', () => {
   });
 
   test('POST /api/dispatch rejects followUpTo for non-cli/web targets', async ({ request }) => {
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     const response = await request.post(`${API_PREFIX}/api/dispatch`, {
       data: {
@@ -767,7 +776,7 @@ test.describe('Dispatch API', () => {
   });
 
   test('POST /api/dispatch without followUpTo stores null', async ({ request }) => {
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     const response = await request.post(`${API_PREFIX}/api/dispatch`, {
       data: { prompt: 'Fresh task', promptName: 'Custom' }
@@ -779,7 +788,7 @@ test.describe('Dispatch API', () => {
   });
 
   test('POST /api/dispatch with invalid kind returns 400', async ({ request }) => {
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     const response = await request.post(`${API_PREFIX}/api/dispatch`, {
       data: { prompt: 'Test prompt', promptName: 'Test', kind: 'not-a-real-kind' }
@@ -790,7 +799,7 @@ test.describe('Dispatch API', () => {
   });
 
   test('GET /api/dispatch/count returns count', async ({ request }) => {
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     // Initially empty
     let response = await request.get(`${API_PREFIX}/api/dispatch/count`);
@@ -811,8 +820,8 @@ test.describe('Dispatch API', () => {
 
 test.describe('Consumer API', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/test/clear-dispatch-queue');
-    await page.goto('/test/clear-dispatch-tokens');
+    await page.goto(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
+    await page.goto(`/test/clear-dispatch-tokens?urlKey=${URL_KEY}`);
   });
 
   test('poll returns 401 without token', async ({ request }) => {
@@ -822,11 +831,11 @@ test.describe('Consumer API', () => {
 
   test('poll returns items with valid token', async ({ request }) => {
     // Create a token
-    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${URL_KEY}`);
     const { token } = await tokenResponse.json();
 
     // Add item to queue via session
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
     await request.post(`${API_PREFIX}/api/dispatch`, {
       data: { prompt: 'Test prompt', promptName: 'Test' }
     });
@@ -844,11 +853,11 @@ test.describe('Consumer API', () => {
 
   test('take atomically removes item', async ({ request }) => {
     // Create a token
-    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${URL_KEY}`);
     const { token } = await tokenResponse.json();
 
     // Add item to queue
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
     const createResponse = await request.post(`${API_PREFIX}/api/dispatch`, {
       data: { prompt: 'Test prompt', promptName: 'Test' }
     });
@@ -874,11 +883,11 @@ test.describe('Consumer API', () => {
 
   test('poll returns target field for items', async ({ request }) => {
     // Create a token
-    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${URL_KEY}`);
     const { token } = await tokenResponse.json();
 
     // Add items with different targets
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
     await request.post(`${API_PREFIX}/api/dispatch`, {
       data: { prompt: 'CLI prompt', promptName: 'CLI', target: 'cli' }
     });
@@ -901,11 +910,11 @@ test.describe('Consumer API', () => {
 
   test('poll returns repo field when included in dispatch', async ({ request }) => {
     // Create a token
-    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${URL_KEY}`);
     const { token } = await tokenResponse.json();
 
     // Add item with repo field
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
     await request.post(`${API_PREFIX}/api/dispatch`, {
       data: { prompt: 'Repo prompt', promptName: 'Test', repo: 'my-repo' }
     });
@@ -932,11 +941,11 @@ test.describe('Consumer API', () => {
 
   test('take returns repo field in claimed item', async ({ request }) => {
     // Create a token
-    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${URL_KEY}`);
     const { token } = await tokenResponse.json();
 
     // Add item with repo
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
     const createResponse = await request.post(`${API_PREFIX}/api/dispatch`, {
       data: { prompt: 'Test prompt', promptName: 'Test', repo: 'dash-build' }
     });
@@ -953,7 +962,7 @@ test.describe('Consumer API', () => {
   });
 
   test('take returns 404 for non-existent item', async ({ request }) => {
-    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${URL_KEY}`);
     const { token } = await tokenResponse.json();
 
     const response = await request.post('/api/dispatch/take/00000000-0000-0000-0000-000000000000', {
@@ -965,12 +974,12 @@ test.describe('Consumer API', () => {
 
 test.describe('Token Management API', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/test/clear-dispatch-tokens');
-    await page.goto('/test/set-session');
+    await page.goto(`/test/clear-dispatch-tokens?urlKey=${URL_KEY}`);
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
   });
 
   test('can create dispatch token', async ({ request }) => {
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     const response = await request.post(`${API_PREFIX}/api/dispatch/tokens`, {
       data: { label: 'My Token' }
@@ -985,7 +994,7 @@ test.describe('Token Management API', () => {
   });
 
   test('can list tokens (without secrets)', async ({ request }) => {
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     // Create a token
     await request.post(`${API_PREFIX}/api/dispatch/tokens`, {
@@ -1004,7 +1013,7 @@ test.describe('Token Management API', () => {
   });
 
   test('can revoke token', async ({ request }) => {
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     // Create a token
     const createResponse = await request.post(`${API_PREFIX}/api/dispatch/tokens`, {
@@ -1025,16 +1034,18 @@ test.describe('Token Management API', () => {
 });
 
 test.describe('Custom Prompt Dispatch', () => {
-  const DISPATCH_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/dispatch`;
+  // Per-worker (LIN-628): bound in beforeEach, after the file-level hook sets URL_KEY.
+  let DISPATCH_URL;
 
   test.beforeEach(async ({ page }) => {
+    DISPATCH_URL = `/workspace/${URL_KEY}/dispatch`;
     // Clear state before each test
-    await page.goto('/test/clear-dispatch-queue');
-    await page.goto('/test/clear-dispatch-tokens');
-    await page.goto('/test/clear-recent-prompts');
+    await page.goto(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
+    await page.goto(`/test/clear-dispatch-tokens?urlKey=${URL_KEY}`);
+    await page.goto(`/test/clear-recent-prompts?urlKey=${URL_KEY}`);
 
     // Set up test session with dispatch feature enabled
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}&urlKey=${URL_KEY}`);
   });
 
   /**
@@ -1229,12 +1240,12 @@ test.describe('Custom Prompt Dispatch', () => {
 
 test.describe('Recent Prompts API', () => {
   test.beforeEach(async ({ request }) => {
-    await request.get('/test/clear-recent-prompts');
-    await request.get('/test/set-session');
+    await request.get(`/test/clear-recent-prompts?urlKey=${URL_KEY}`);
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
   });
 
   test('GET recent-prompts returns empty array initially', async ({ request }) => {
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
     const response = await request.get(`${API_PREFIX}/api/dispatch/recent-prompts`);
     expect(response.status()).toBe(200);
     const data = await response.json();
@@ -1242,7 +1253,7 @@ test.describe('Recent Prompts API', () => {
   });
 
   test('POST recent-prompts saves and GET retrieves', async ({ request }) => {
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     const postResponse = await request.post(`${API_PREFIX}/api/dispatch/recent-prompts`, {
       data: { prompt: 'Test recent prompt' }
@@ -1257,7 +1268,7 @@ test.describe('Recent Prompts API', () => {
   });
 
   test('recent prompts are deduplicated and most-recent-first', async ({ request }) => {
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     await request.post(`${API_PREFIX}/api/dispatch/recent-prompts`, {
       data: { prompt: 'First' }
@@ -1275,7 +1286,7 @@ test.describe('Recent Prompts API', () => {
   });
 
   test('recent prompts limited to 10', async ({ request }) => {
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     // Add 12 prompts
     for (let i = 1; i <= 12; i++) {
@@ -1293,7 +1304,7 @@ test.describe('Recent Prompts API', () => {
   });
 
   test('POST recent-prompts validates input', async ({ request }) => {
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     // Empty prompt
     const emptyResponse = await request.post(`${API_PREFIX}/api/dispatch/recent-prompts`, {
@@ -1311,17 +1322,17 @@ test.describe('Recent Prompts API', () => {
 
 test.describe('Dispatch History API', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/test/clear-dispatch-queue');
-    await page.goto('/test/clear-dispatch-tokens');
-    await page.goto('/test/clear-dispatch-history');
-    await page.goto('/test/set-session');
+    await page.goto(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
+    await page.goto(`/test/clear-dispatch-tokens?urlKey=${URL_KEY}`);
+    await page.goto(`/test/clear-dispatch-history?urlKey=${URL_KEY}`);
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
   });
 
   test('taken items appear in history', async ({ request }) => {
     // Create token and session
-    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${URL_KEY}`);
     const { token } = await tokenResponse.json();
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     // Dispatch an item
     const createResponse = await request.post(`${API_PREFIX}/api/dispatch`, {
@@ -1353,7 +1364,7 @@ test.describe('Dispatch History API', () => {
   });
 
   test('cancelled items appear in history', async ({ request }) => {
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     // Dispatch and then cancel
     const createResponse = await request.post(`${API_PREFIX}/api/dispatch`, {
@@ -1372,7 +1383,7 @@ test.describe('Dispatch History API', () => {
   });
 
   test('history returns newest-first', async ({ request }) => {
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     // Dispatch and cancel two items sequentially
     const resp1 = await request.post(`${API_PREFIX}/api/dispatch`, {
@@ -1396,7 +1407,7 @@ test.describe('Dispatch History API', () => {
   });
 
   test('history pagination works', async ({ request }) => {
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     // Create 3 items and cancel them
     for (let i = 1; i <= 3; i++) {
@@ -1421,7 +1432,7 @@ test.describe('Dispatch History API', () => {
   });
 
   test('history endpoint returns empty when no history', async ({ request }) => {
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     const response = await request.get(`${API_PREFIX}/api/dispatch/history`);
     const data = await response.json();
@@ -1432,19 +1443,19 @@ test.describe('Dispatch History API', () => {
 
 test.describe('Consumer Feedback API', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/test/clear-dispatch-queue');
-    await page.goto('/test/clear-dispatch-tokens');
-    await page.goto('/test/clear-dispatch-history');
+    await page.goto(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
+    await page.goto(`/test/clear-dispatch-tokens?urlKey=${URL_KEY}`);
+    await page.goto(`/test/clear-dispatch-history?urlKey=${URL_KEY}`);
   });
 
   /**
    * Helper: create a token, dispatch an item, take it, and return all references
    */
   async function setupTakenItem(request) {
-    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${URL_KEY}`);
     const { token } = await tokenResponse.json();
 
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     const createResponse = await request.post(`${API_PREFIX}/api/dispatch`, {
       data: { prompt: 'Test prompt', promptName: 'Feedback Test', issueIdentifier: 'LIN-42' }
@@ -1486,7 +1497,7 @@ test.describe('Consumer Feedback API', () => {
       data: { message: 'Analyzing issue...', url: 'https://example.com/pr/1', urlLabel: 'PR #1' }
     });
 
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
     const historyResponse = await request.get(`${API_PREFIX}/api/dispatch/history`);
     const { items } = await historyResponse.json();
 
@@ -1512,7 +1523,7 @@ test.describe('Consumer Feedback API', () => {
       data: { message: 'Done!', url: 'https://example.com/result' }
     });
 
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
     const historyResponse = await request.get(`${API_PREFIX}/api/dispatch/history`);
     const { items } = await historyResponse.json();
 
@@ -1561,7 +1572,7 @@ test.describe('Consumer Feedback API', () => {
   });
 
   test('feedback returns 400 for invalid item ID', async ({ request }) => {
-    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${URL_KEY}`);
     const { token } = await tokenResponse.json();
 
     const response = await request.post('/api/dispatch/feedback/not-a-uuid', {
@@ -1572,7 +1583,7 @@ test.describe('Consumer Feedback API', () => {
   });
 
   test('feedback returns 404 for non-existent item', async ({ request }) => {
-    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${URL_KEY}`);
     const { token } = await tokenResponse.json();
 
     const response = await request.post('/api/dispatch/feedback/00000000-0000-0000-0000-000000000000', {
@@ -1583,10 +1594,10 @@ test.describe('Consumer Feedback API', () => {
   });
 
   test('feedback returns 404 for cancelled item', async ({ request }) => {
-    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${URL_KEY}`);
     const { token } = await tokenResponse.json();
 
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     const createResponse = await request.post(`${API_PREFIX}/api/dispatch`, {
       data: { prompt: 'Test', promptName: 'Test' }
@@ -1607,7 +1618,7 @@ test.describe('Consumer Feedback API', () => {
     const { itemId } = await setupTakenItem(request);
 
     // Create a second token with a different label
-    const token2Response = await request.get('/test/create-dispatch-token?label=other-agent');
+    const token2Response = await request.get(`/test/create-dispatch-token?label=other-agent&urlKey=${URL_KEY}`);
     const { token: token2 } = await token2Response.json();
 
     const response = await request.post(`/api/dispatch/feedback/${itemId}`, {
@@ -1625,7 +1636,7 @@ test.describe('Consumer Feedback API', () => {
       data: { message: 'No link here' }
     });
 
-    await request.get('/test/set-session');
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
     const historyResponse = await request.get(`${API_PREFIX}/api/dispatch/history`);
     const { items } = await historyResponse.json();
 
@@ -1636,14 +1647,14 @@ test.describe('Consumer Feedback API', () => {
 
 test.describe('Dispatch History UI', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/test/clear-dispatch-queue');
-    await page.goto('/test/clear-dispatch-tokens');
-    await page.goto('/test/clear-dispatch-history');
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+    await page.goto(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
+    await page.goto(`/test/clear-dispatch-tokens?urlKey=${URL_KEY}`);
+    await page.goto(`/test/clear-dispatch-history?urlKey=${URL_KEY}`);
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}&urlKey=${URL_KEY}`);
   });
 
   test('history section shows on dispatch page with dispatch enabled', async ({ page }) => {
-    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/dispatch`);
+    await page.goto(`/workspace/${URL_KEY}/dispatch`);
     await page.waitForLoadState('networkidle');
 
     const historyList = page.locator('.history-list');
@@ -1655,8 +1666,8 @@ test.describe('Dispatch History UI', () => {
   });
 
   test('dispatch page redirects to settings when dispatch disabled', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: false }))}`);
-    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/dispatch`);
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: false }))}&urlKey=${URL_KEY}`);
+    await page.goto(`/workspace/${URL_KEY}/dispatch`);
     await page.waitForLoadState('networkidle');
 
     // Should redirect to settings page
@@ -1665,10 +1676,10 @@ test.describe('Dispatch History UI', () => {
 
   test('taken item shows with correct status indicator', async ({ page, request }) => {
     // Create token and dispatch+take an item
-    const tokenResponse = await request.get('/test/create-dispatch-token');
+    const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${URL_KEY}`);
     const { token } = await tokenResponse.json();
 
-    await request.get(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+    await request.get(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}&urlKey=${URL_KEY}`);
 
     const createResponse = await request.post(`${API_PREFIX}/api/dispatch`, {
       data: { prompt: 'Taken prompt', promptName: 'Taken Test', issueIdentifier: 'LIN-99' }
@@ -1680,7 +1691,7 @@ test.describe('Dispatch History UI', () => {
     });
 
     // Navigate to dispatch page
-    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/dispatch`);
+    await page.goto(`/workspace/${URL_KEY}/dispatch`);
     await page.waitForLoadState('networkidle');
 
     // History item should be visible
@@ -1691,7 +1702,7 @@ test.describe('Dispatch History UI', () => {
   });
 
   test('cancelled item shows with correct status indicator', async ({ page, request }) => {
-    await request.get(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+    await request.get(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}&urlKey=${URL_KEY}`);
 
     const createResponse = await request.post(`${API_PREFIX}/api/dispatch`, {
       data: { prompt: 'Cancelled prompt', promptName: 'Cancel Test' }
@@ -1700,7 +1711,7 @@ test.describe('Dispatch History UI', () => {
 
     await request.delete(`${API_PREFIX}/api/dispatch/${item.id}`);
 
-    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/dispatch`);
+    await page.goto(`/workspace/${URL_KEY}/dispatch`);
     await page.waitForLoadState('networkidle');
 
     const historyItem = page.locator('.history-item[data-status="cancelled"]');
@@ -1710,7 +1721,7 @@ test.describe('Dispatch History UI', () => {
   });
 
   test('all history items load without pagination', async ({ page, request }) => {
-    await request.get(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}`);
+    await request.get(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}&urlKey=${URL_KEY}`);
 
     // Create 25 history items
     for (let i = 1; i <= 25; i++) {
@@ -1721,7 +1732,7 @@ test.describe('Dispatch History UI', () => {
       await request.delete(`${API_PREFIX}/api/dispatch/${item.id}`);
     }
 
-    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/dispatch`);
+    await page.goto(`/workspace/${URL_KEY}/dispatch`);
     await page.waitForLoadState('networkidle');
 
     // Should show all 25 items at once (no pagination limit)

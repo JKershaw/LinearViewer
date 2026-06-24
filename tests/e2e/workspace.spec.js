@@ -9,10 +9,15 @@ import { test, expect } from '../fixtures/test-base.js';
 //     cannot represent the `multiWorkspace`/`maxWorkspaces` session state those
 //     cases exercise.
 
-// Workspace URL keys used in the PINNED (test-token) sessions below.
-const TEST_WORKSPACE_URL_KEY = 'test-workspace';
-const SECOND_WORKSPACE_URL_KEY = 'second-workspace';
-const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;
+// Workspace URL for the PINNED (test-token) sessions below, bound per-test from
+// the per-worker key (LIN-628). The multiWorkspace siblings come from the
+// `secondWorkerUrlKey` / `workerSuffix` fixtures so every workspace in the
+// session is partition-distinct per worker.
+let WORKSPACE_URL;
+
+test.beforeEach(({ workerUrlKey }) => {
+  WORKSPACE_URL = `/workspace/${workerUrlKey}/`;
+});
 
 test.describe('Workspace Selector', () => {
   test('single workspace shows in selector', async ({ page, seedLocal }) => {
@@ -36,8 +41,8 @@ test.describe('Workspace Selector', () => {
     await expect(workspaceOptions.locator('.nav-option-add-local')).toContainText('+local workspace');
   });
 
-  test('multiple workspaces show in selector', async ({ page }) => {
-    await page.goto('/test/set-session?multiWorkspace=true');
+  test('multiple workspaces show in selector', async ({ page, workerUrlKey }) => {
+    await page.goto(`/test/set-session?multiWorkspace=true&urlKey=${workerUrlKey}`);
     await page.goto(WORKSPACE_URL);
 
     const workspaceToggle = page.locator('#workspace-toggle');
@@ -71,9 +76,9 @@ test.describe('Workspace Selector', () => {
 });
 
 test.describe('Workspace Switching', () => {
-  test('can switch to second workspace', async ({ page }) => {
+  test('can switch to second workspace', async ({ page, workerUrlKey, secondWorkerUrlKey }) => {
     // Set up multiWorkspace session
-    await page.goto('/test/set-session?multiWorkspace=true');
+    await page.goto(`/test/set-session?multiWorkspace=true&urlKey=${workerUrlKey}`);
     await page.goto(WORKSPACE_URL);
 
     // Initially showing first workspace
@@ -85,7 +90,7 @@ test.describe('Workspace Switching', () => {
 
     // Click the second workspace and wait for navigation to the new workspace URL
     await Promise.all([
-      page.waitForURL(`/workspace/${SECOND_WORKSPACE_URL_KEY}/`),
+      page.waitForURL(`/workspace/${secondWorkerUrlKey}/`),
       page.getByRole('option', { name: /Second Workspace/ }).click()
     ]);
 
@@ -96,10 +101,10 @@ test.describe('Workspace Switching', () => {
     await expect(page.locator('#workspace-toggle')).toHaveText('Second Workspace');
   });
 
-  test('switching workspace from settings stays on settings', async ({ page }) => {
+  test('switching workspace from settings stays on settings', async ({ page, workerUrlKey, secondWorkerUrlKey }) => {
     // Set up multiWorkspace session
-    await page.goto('/test/set-session?multiWorkspace=true');
-    await page.goto(`/workspace/${TEST_WORKSPACE_URL_KEY}/settings`);
+    await page.goto(`/test/set-session?multiWorkspace=true&urlKey=${workerUrlKey}`);
+    await page.goto(`/workspace/${workerUrlKey}/settings`);
 
     // Verify we're on settings page
     await expect(page.locator('h1')).toHaveText('Settings');
@@ -110,7 +115,7 @@ test.describe('Workspace Switching', () => {
 
     // Click the second workspace and wait for navigation to settings in new workspace
     await Promise.all([
-      page.waitForURL(`/workspace/${SECOND_WORKSPACE_URL_KEY}/settings`),
+      page.waitForURL(`/workspace/${secondWorkerUrlKey}/settings`),
       page.getByRole('option', { name: /Second Workspace/ }).click()
     ]);
 
@@ -121,8 +126,8 @@ test.describe('Workspace Switching', () => {
 });
 
 test.describe('Workspace Removal', () => {
-  test('remove button appears on active workspace', async ({ page }) => {
-    await page.goto('/test/set-session?multiWorkspace=true');
+  test('remove button appears on active workspace', async ({ page, workerUrlKey }) => {
+    await page.goto(`/test/set-session?multiWorkspace=true&urlKey=${workerUrlKey}`);
     await page.goto(WORKSPACE_URL);
 
     await page.locator('#workspace-toggle').click();
@@ -133,9 +138,9 @@ test.describe('Workspace Removal', () => {
     await expect(removeButton).toHaveText('remove');
   });
 
-  test('removing last workspace logs out', async ({ page }) => {
+  test('removing last workspace logs out', async ({ page, workerUrlKey }) => {
     // Single workspace
-    await page.goto('/test/set-session');
+    await page.goto(`/test/set-session?urlKey=${workerUrlKey}`);
     await page.goto(WORKSPACE_URL);
 
     await page.locator('#workspace-toggle').click();
@@ -156,8 +161,8 @@ test.describe('Workspace Removal', () => {
   // Note: Testing the full removal flow with multiple workspaces is flaky due to
   // form submission timing. We test single workspace removal (logs out) and
   // verify remove button exists for multi-workspace setups.
-  test('remove button exists for multi-workspace setup', async ({ page }) => {
-    await page.goto('/test/set-session?multiWorkspace=true');
+  test('remove button exists for multi-workspace setup', async ({ page, workerUrlKey }) => {
+    await page.goto(`/test/set-session?multiWorkspace=true&urlKey=${workerUrlKey}`);
     await page.goto(WORKSPACE_URL);
 
     await page.locator('#workspace-toggle').click();
@@ -171,10 +176,10 @@ test.describe('Workspace Removal', () => {
 });
 
 test.describe('Workspace Limit', () => {
-  test('at max workspaces, all are displayed', async ({ page }) => {
-    await page.goto('/test/set-session?maxWorkspaces=true');
-    // Use workspace-0's URL key for max workspaces test
-    await page.goto('/workspace/workspace-0/');
+  test('at max workspaces, all are displayed', async ({ page, workerUrlKey, workerSuffix }) => {
+    await page.goto(`/test/set-session?maxWorkspaces=true&urlKey=${workerUrlKey}`);
+    // Use workspace-0's URL key for max workspaces test (per-worker suffixed)
+    await page.goto(`/workspace/workspace-0${workerSuffix}/`);
 
     await page.locator('#workspace-toggle').click();
 

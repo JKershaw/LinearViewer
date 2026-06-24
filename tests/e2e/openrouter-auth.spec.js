@@ -1,9 +1,16 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/test-base.js';
 
-// Workspace URL key used in test session
-const TEST_WORKSPACE_URL_KEY = 'test-workspace';
-const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`;
-const SETTINGS_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/settings`;
+// Workspace URL key used in test session. Bound per-test from the per-worker key
+// (LIN-628) so session + nav + API calls all address this worker's partition.
+let WORKSPACE_KEY;
+let WORKSPACE_URL;
+let SETTINGS_URL;
+
+test.beforeEach(({ workerUrlKey }) => {
+  WORKSPACE_KEY = workerUrlKey;
+  WORKSPACE_URL = `/workspace/${workerUrlKey}/`;
+  SETTINGS_URL = `/workspace/${workerUrlKey}/settings`;
+});
 
 /**
  * Helper to set up a test session with proper waiting.
@@ -18,8 +25,8 @@ async function setupSession(page, options = {}) {
   for (const [key, value] of Object.entries(options)) {
     if (value) params.set(key, 'true');
   }
-  const url = params.toString() ? `/test/set-session?${params}` : '/test/set-session';
-  const response = await page.goto(url);
+  params.set('urlKey', WORKSPACE_KEY);
+  const response = await page.goto(`/test/set-session?${params}`);
   expect(response.status()).toBe(200);
 }
 
@@ -90,7 +97,7 @@ test.describe('OpenRouter OAuth Flow', () => {
     await setupSession(page, { openRouterConnected: true });
 
     // Verify connected state via API (more reliable than UI)
-    const beforeResponse = await page.request.get(`/workspace/${TEST_WORKSPACE_URL_KEY}/api/recommend/status`);
+    const beforeResponse = await page.request.get(`/workspace/${WORKSPACE_KEY}/api/recommend/status`);
     expect(beforeResponse.ok()).toBeTruthy();
     const beforeData = await beforeResponse.json();
     expect(beforeData.source).toBe('oauth');
@@ -100,7 +107,7 @@ test.describe('OpenRouter OAuth Flow', () => {
     expect(disconnectResponse.ok()).toBeTruthy();
 
     // Verify disconnected state via API
-    const afterResponse = await page.request.get(`/workspace/${TEST_WORKSPACE_URL_KEY}/api/recommend/status`);
+    const afterResponse = await page.request.get(`/workspace/${WORKSPACE_KEY}/api/recommend/status`);
     expect(afterResponse.ok()).toBeTruthy();
     const afterData = await afterResponse.json();
     // After disconnect, source should not be 'oauth' (could be 'env' or null depending on test env)
@@ -112,7 +119,7 @@ test.describe('OpenRouter OAuth Flow', () => {
     await setupSession(page);
 
     // Check recommendation status - should be enabled (test mode always enabled)
-    const response = await page.request.get(`/workspace/${TEST_WORKSPACE_URL_KEY}/api/recommend/status`);
+    const response = await page.request.get(`/workspace/${WORKSPACE_KEY}/api/recommend/status`);
     expect(response.ok()).toBeTruthy();
     const data = await response.json();
 
@@ -125,7 +132,7 @@ test.describe('OpenRouter OAuth Flow', () => {
     await setupSession(page, { openRouterConnected: true });
 
     // Check recommendation status
-    const response = await page.request.get(`/workspace/${TEST_WORKSPACE_URL_KEY}/api/recommend/status`);
+    const response = await page.request.get(`/workspace/${WORKSPACE_KEY}/api/recommend/status`);
     expect(response.ok()).toBeTruthy();
     const data = await response.json();
 

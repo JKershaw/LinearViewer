@@ -34,6 +34,21 @@ export const test = base.extend({
     await use(`${TEST_WORKSPACE_URL_KEY}-w${workerInfo.parallelIndex}`);
   }, { scope: 'worker' }],
 
+  // The per-worker discriminator (`-w<parallelIndex>`) shared by every key in a
+  // worker's session. `/test/set-session` derives the multiWorkspace /
+  // maxWorkspaces sibling keys from this same suffix (LIN-628), so set-session
+  // specs that drive secondary workspaces build them as `second-workspace` +
+  // suffix / `workspace-N` + suffix off this value rather than fixed literals.
+  workerSuffix: [async ({}, use, workerInfo) => {
+    await use(`-w${workerInfo.parallelIndex}`);
+  }, { scope: 'worker' }],
+
+  // The second workspace's per-worker key for the `multiWorkspace` set-session
+  // session — the companion to `workerUrlKey` for two-workspace specs.
+  secondWorkerUrlKey: [async ({}, use, workerInfo) => {
+    await use(`second-workspace-w${workerInfo.parallelIndex}`);
+  }, { scope: 'worker' }],
+
   localWorkerUrlKey: [async ({}, use, workerInfo) => {
     await use(`${LOCAL_WORKSPACE_URL_KEY}-w${workerInfo.parallelIndex}`);
   }, { scope: 'worker' }],

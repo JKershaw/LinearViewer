@@ -25,7 +25,7 @@ test.describe('Recap API', () => {
     // Use a different UUID to keep this test independent of state from others.
     // The recap cache is keyed (urlKey, canonicalId) and persists per worker, so
     // clear this id at the local workspace first to guarantee a missing read
-    // (the route defaults urlKey=test-workspace and 400s without issueId).
+    // (the route defaults its urlKey to the test-token workspace and 400s without issueId).
     const MISSING_ID = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeef';
     await page.request.get(`/test/clear-recap-cache?urlKey=${localWorkerUrlKey}&issueId=${MISSING_ID}`);
     const res = await page.request.get(`/workspace/${localWorkerUrlKey}/api/recap/${MISSING_ID}`);

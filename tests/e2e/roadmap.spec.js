@@ -12,7 +12,14 @@ import { workspaceApiLocalSeed } from '../fixtures/local-harness.js';
 // and the multiWorkspace store-isolation cases STAY on `test-token` — they assert
 // gates that fire before any provider/AI seam and the local harness seeds one
 // workspace.
-const TEST_WORKSPACE_URL_KEY = 'test-workspace';
+// LIN-628: the Linear test-token (`/test/set-session`) flows consume a per-worker
+// first-workspace key from the `workerUrlKey` fixture (instead of a fixed key), so
+// Playwright can later run with workers>1. URL_KEY is bound by the file-level
+// beforeEach below before any test reads it.
+let URL_KEY;
+test.beforeEach(({ workerUrlKey }) => {
+  URL_KEY = workerUrlKey;
+});
 // Pure per-worker URL builders for the local (genuine `provider: 'local'`) blocks;
 // the key is supplied per-test from the `localWorkerUrlKey` fixture (LIN-627).
 const roadmapUrl = (key) => `/workspace/${key}/roadmap`;
@@ -179,19 +186,19 @@ test.describe('Roadmap Page', () => {
 test.describe('Roadmap API Endpoints', () => {
   test('chat endpoint returns 403 when feature flag is off', async ({ request }) => {
     const noRoadmap = encodeURIComponent(JSON.stringify({ roadmap: false }));
-    await request.get(`/test/set-session?features=${noRoadmap}`);
+    await request.get(`/test/set-session?features=${noRoadmap}&urlKey=${URL_KEY}`);
 
-    const response = await request.post(`/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/chat`, {
+    const response = await request.post(`/workspace/${URL_KEY}/api/roadmap/chat`, {
       data: { question: 'test', roadmapModel: {} }
     });
     expect(response.status()).toBe(403);
   });
 
   test('chat endpoint returns 503 when no AI configured', async ({ request }) => {
-    await request.get(`/test/set-session?features=${FEATURES}`);
+    await request.get(`/test/set-session?features=${FEATURES}&urlKey=${URL_KEY}`);
 
     // Without OPENROUTER_API_KEY, should get 503 before body validation
-    const response = await request.post(`/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/chat`, {
+    const response = await request.post(`/workspace/${URL_KEY}/api/roadmap/chat`, {
       data: { question: 'test', roadmapModel: {} }
     });
     expect(response.status()).toBe(503);
@@ -207,20 +214,24 @@ test.describe('Roadmap API Endpoints', () => {
 
 test.describe('Roadmap Generate Endpoint', () => {
   // Negative paths assert pre-test-mode gates (403 flag-off, 503 no-AI) that fire
-  // before any provider/AI seam — they stay on `test-token`.
-  const GENERATE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/generate`;
+  // before any provider/AI seam — they stay on `test-token`. GENERATE_URL is bound
+  // per-test (LIN-628) so it resolves the per-worker key at run time, not eval time.
+  let GENERATE_URL;
+  test.beforeEach(() => {
+    GENERATE_URL = `/workspace/${URL_KEY}/api/roadmap/generate`;
+  });
   // Happy paths drive the AI-mock layer off a local session — `localGenerateUrl`
   // builds the per-worker URL from the `localWorkerUrlKey` fixture per-test.
 
   test('returns 403 when feature flag is off', async ({ request }) => {
     const noRoadmap = encodeURIComponent(JSON.stringify({ roadmap: false }));
-    await request.get(`/test/set-session?features=${noRoadmap}`);
+    await request.get(`/test/set-session?features=${noRoadmap}&urlKey=${URL_KEY}`);
     const response = await request.post(GENERATE_URL, { data: { northStar: 'be useful' } });
     expect(response.status()).toBe(403);
   });
 
   test('returns 503 when no AI configured', async ({ request }) => {
-    await request.get(`/test/set-session?features=${FEATURES}`);
+    await request.get(`/test/set-session?features=${FEATURES}&urlKey=${URL_KEY}`);
     const response = await request.post(GENERATE_URL, { data: { northStar: 'be useful' } });
     expect(response.status()).toBe(503);
     const body = await response.json();
@@ -622,11 +633,15 @@ test.describe('Roadmap Pipeline UI', () => {
 });
 
 test.describe('Roadmap North Star Storage', () => {
-  const NORTH_STAR_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/north-star`;
+  // Bound per-test (LIN-628) so it resolves the per-worker key at run time.
+  let NORTH_STAR_URL;
+  test.beforeEach(() => {
+    NORTH_STAR_URL = `/workspace/${URL_KEY}/api/roadmap/north-star`;
+  });
 
   test('GET returns 403 when feature flag is off', async ({ request }) => {
     const noRoadmap = encodeURIComponent(JSON.stringify({ roadmap: false }));
-    await request.get(`/test/set-session?features=${noRoadmap}`);
+    await request.get(`/test/set-session?features=${noRoadmap}&urlKey=${URL_KEY}`);
 
     const response = await request.get(NORTH_STAR_URL);
     expect(response.status()).toBe(403);
@@ -634,7 +649,7 @@ test.describe('Roadmap North Star Storage', () => {
 
   test('PUT returns 403 when feature flag is off', async ({ request }) => {
     const noRoadmap = encodeURIComponent(JSON.stringify({ roadmap: false }));
-    await request.get(`/test/set-session?features=${noRoadmap}`);
+    await request.get(`/test/set-session?features=${noRoadmap}&urlKey=${URL_KEY}`);
 
     const response = await request.put(NORTH_STAR_URL, {
       data: { northStar: 'test' }
@@ -643,7 +658,7 @@ test.describe('Roadmap North Star Storage', () => {
   });
 
   test('GET returns empty string by default', async ({ request }) => {
-    await request.get(`/test/set-session?features=${FEATURES}`);
+    await request.get(`/test/set-session?features=${FEATURES}&urlKey=${URL_KEY}`);
 
     const response = await request.get(NORTH_STAR_URL);
     expect(response.status()).toBe(200);
@@ -653,7 +668,7 @@ test.describe('Roadmap North Star Storage', () => {
   });
 
   test('PUT then GET round-trips the value', async ({ request }) => {
-    await request.get(`/test/set-session?features=${FEATURES}`);
+    await request.get(`/test/set-session?features=${FEATURES}&urlKey=${URL_KEY}`);
 
     const text = 'Become the simplest way for non-technical founders to ship a product.';
     const putRes = await request.put(NORTH_STAR_URL, {
@@ -670,7 +685,7 @@ test.describe('Roadmap North Star Storage', () => {
   });
 
   test('PUT rejects non-string body', async ({ request }) => {
-    await request.get(`/test/set-session?features=${FEATURES}`);
+    await request.get(`/test/set-session?features=${FEATURES}&urlKey=${URL_KEY}`);
 
     const response = await request.put(NORTH_STAR_URL, {
       data: { northStar: 123 }
@@ -679,7 +694,7 @@ test.describe('Roadmap North Star Storage', () => {
   });
 
   test('PUT rejects oversized input', async ({ request }) => {
-    await request.get(`/test/set-session?features=${FEATURES}`);
+    await request.get(`/test/set-session?features=${FEATURES}&urlKey=${URL_KEY}`);
 
     const huge = 'x'.repeat(9000);
     const response = await request.put(NORTH_STAR_URL, {
@@ -689,7 +704,7 @@ test.describe('Roadmap North Star Storage', () => {
   });
 
   test('PUT accepts empty string (clearing the value)', async ({ request }) => {
-    await request.get(`/test/set-session?features=${FEATURES}`);
+    await request.get(`/test/set-session?features=${FEATURES}&urlKey=${URL_KEY}`);
 
     // Set a value first
     await request.put(NORTH_STAR_URL, { data: { northStar: 'initial' } });
@@ -705,12 +720,12 @@ test.describe('Roadmap North Star Storage', () => {
     expect(body.northStar).toBe('');
   });
 
-  test('values are scoped per workspace', async ({ request }) => {
+  test('values are scoped per workspace', async ({ request, secondWorkerUrlKey }) => {
     // Set up two workspaces via the multiWorkspace test flag
-    await request.get(`/test/set-session?features=${FEATURES}&multiWorkspace=true`);
+    await request.get(`/test/set-session?features=${FEATURES}&multiWorkspace=true&urlKey=${URL_KEY}`);
 
-    const url1 = `/workspace/test-workspace/api/roadmap/north-star`;
-    const url2 = `/workspace/second-workspace/api/roadmap/north-star`;
+    const url1 = `/workspace/${URL_KEY}/api/roadmap/north-star`;
+    const url2 = `/workspace/${secondWorkerUrlKey}/api/roadmap/north-star`;
 
     await request.put(url1, { data: { northStar: 'star one' } });
     await request.put(url2, { data: { northStar: 'star two' } });
@@ -727,7 +742,8 @@ test.describe('Roadmap North Star Storage', () => {
 // =============================================================================
 
 test.describe('Roadmap Report History', () => {
-  const REPORTS_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/api/roadmap/reports`;
+  // Bound per-test (LIN-628) so it resolves the per-worker key at run time.
+  let REPORTS_URL;
 
   const sampleNarrative = (tag = '') => ({
     technical: 'tech ' + tag,
@@ -738,20 +754,21 @@ test.describe('Roadmap Report History', () => {
   });
 
   test.beforeEach(async ({ request }) => {
-    await request.get(`/test/set-session?features=${FEATURES}`);
-    await request.get('/test/clear-report-history');
+    REPORTS_URL = `/workspace/${URL_KEY}/api/roadmap/reports`;
+    await request.get(`/test/set-session?features=${FEATURES}&urlKey=${URL_KEY}`);
+    await request.get(`/test/clear-report-history?urlKey=${URL_KEY}`);
   });
 
   test('POST returns 403 when feature flag is off', async ({ request }) => {
     const noRoadmap = encodeURIComponent(JSON.stringify({ roadmap: false }));
-    await request.get(`/test/set-session?features=${noRoadmap}`);
+    await request.get(`/test/set-session?features=${noRoadmap}&urlKey=${URL_KEY}`);
     const response = await request.post(REPORTS_URL, { data: { narrative: sampleNarrative() } });
     expect(response.status()).toBe(403);
   });
 
   test('GET returns 403 when feature flag is off', async ({ request }) => {
     const noRoadmap = encodeURIComponent(JSON.stringify({ roadmap: false }));
-    await request.get(`/test/set-session?features=${noRoadmap}`);
+    await request.get(`/test/set-session?features=${noRoadmap}&urlKey=${URL_KEY}`);
     const response = await request.get(REPORTS_URL);
     expect(response.status()).toBe(403);
   });
@@ -797,7 +814,7 @@ test.describe('Roadmap Report History', () => {
   test('GET :id returns 403 when feature flag is off', async ({ request }) => {
     const { report } = await (await request.post(REPORTS_URL, { data: { narrative: sampleNarrative() } })).json();
     const noRoadmap = encodeURIComponent(JSON.stringify({ roadmap: false }));
-    await request.get(`/test/set-session?features=${noRoadmap}`);
+    await request.get(`/test/set-session?features=${noRoadmap}&urlKey=${URL_KEY}`);
     const response = await request.get(`${REPORTS_URL}/${report.id}`);
     expect(response.status()).toBe(403);
   });
@@ -821,13 +838,13 @@ test.describe('Roadmap Report History', () => {
     expect(listBody.reports.length).toBe(1);
   });
 
-  test('reports are scoped per workspace', async ({ request }) => {
-    await request.get(`/test/set-session?features=${FEATURES}&multiWorkspace=true`);
-    await request.get('/test/clear-report-history?urlKey=test-workspace');
-    await request.get('/test/clear-report-history?urlKey=second-workspace');
+  test('reports are scoped per workspace', async ({ request, secondWorkerUrlKey }) => {
+    await request.get(`/test/set-session?features=${FEATURES}&multiWorkspace=true&urlKey=${URL_KEY}`);
+    await request.get(`/test/clear-report-history?urlKey=${URL_KEY}`);
+    await request.get(`/test/clear-report-history?urlKey=${secondWorkerUrlKey}`);
 
-    const url1 = `/workspace/test-workspace/api/roadmap/reports`;
-    const url2 = `/workspace/second-workspace/api/roadmap/reports`;
+    const url1 = `/workspace/${URL_KEY}/api/roadmap/reports`;
+    const url2 = `/workspace/${secondWorkerUrlKey}/api/roadmap/reports`;
     await request.post(url1, { data: { narrative: sampleNarrative('ws1') } });
 
     expect((await (await request.get(url1)).json()).total).toBe(1);

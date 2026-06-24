@@ -1,12 +1,14 @@
 import { test, expect } from '../fixtures/test-base.js'
 
-const TEST_WORKSPACE_URL_KEY = 'test-workspace'
-const WORKSPACE_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/`
-const SETTINGS_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/settings`
-
 test.describe('PAT Authentication Mode', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/test/set-session?patMode=true')
+  // Bound per-test from the per-worker key so session + nav stay partition-aligned.
+  let WORKSPACE_URL
+  let SETTINGS_URL
+
+  test.beforeEach(async ({ page, workerUrlKey }) => {
+    WORKSPACE_URL = `/workspace/${workerUrlKey}/`
+    SETTINGS_URL = `/workspace/${workerUrlKey}/settings`
+    await page.goto(`/test/set-session?patMode=true&urlKey=${workerUrlKey}`)
   })
 
   test('PAT workspace hides Linear +add but shows local-create in workspace dropdown', async ({ page }) => {

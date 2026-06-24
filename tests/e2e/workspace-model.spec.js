@@ -7,32 +7,32 @@
  * The two UI-path POST recap tests ride a GENUINE `provider: 'local'` session
  * (LIN-411) seeded from `workspaceApiLocalSeed`, exercising the real
  * workspace-model lookup at `LOCAL_WORKSPACE_URL_KEY`. The proxy-path test is
- * intentionally left on the `test-token` + `test-workspace` proxy contract —
- * that surface migrates separately. beforeEach/afterEach therefore reset model
- * prefs and recap cache for BOTH urlKeys so the two workspaces stay isolated.
+ * intentionally left on the `test-token` proxy contract (per-worker key,
+ * LIN-628) — that surface migrates separately. beforeEach/afterEach therefore
+ * reset model prefs and recap cache for BOTH urlKeys so the two workspaces stay
+ * isolated.
  */
 import { test, expect } from '../fixtures/test-base.js';
 import { workspaceApiLocalSeed } from '../fixtures/local-harness.js';
 
-const URL_KEY = 'test-workspace';             // proxy-path test (proxy-token contract)
 const NON_DEFAULT_MODEL = 'anthropic/claude-sonnet-4';
 const DEFAULT_MODEL = 'openai/gpt-5.4-mini';
 const ISSUE_ID = '66666666-6666-6666-6666-666666666666'; // TEST-6 in workspaceApiLocalSeed
 
 test.describe('Workspace AI model selection', () => {
-  test.beforeEach(async ({ request, localWorkerUrlKey }) => {
+  test.beforeEach(async ({ request, workerUrlKey, localWorkerUrlKey }) => {
     // Each test starts with a clean slate: no workspace prefs and no
     // cached recap (the cache stores the model used at generation time).
     // Both urlKeys are reset because this file mixes a local UI-path workspace
-    // with the proxy-path test-workspace; neither must leak into the other.
-    for (const key of [URL_KEY, localWorkerUrlKey]) {
+    // with the proxy-path workspace; neither must leak into the other.
+    for (const key of [workerUrlKey, localWorkerUrlKey]) {
       await request.get(`/test/set-workspace-model?urlKey=${key}`);
       await request.get(`/test/clear-recap-cache?urlKey=${key}&issueId=${ISSUE_ID}`);
     }
   });
 
-  test.afterEach(async ({ request, localWorkerUrlKey }) => {
-    for (const key of [URL_KEY, localWorkerUrlKey]) {
+  test.afterEach(async ({ request, workerUrlKey, localWorkerUrlKey }) => {
+    for (const key of [workerUrlKey, localWorkerUrlKey]) {
       await request.get(`/test/set-workspace-model?urlKey=${key}`);
       await request.get(`/test/clear-recap-cache?urlKey=${key}&issueId=${ISSUE_ID}`);
     }
@@ -52,12 +52,12 @@ test.describe('Workspace AI model selection', () => {
     expect(body.model).toBe(NON_DEFAULT_MODEL);
   });
 
-  test('Proxy path: GET /api/proxy/recap reflects the seeded workspace model', async ({ page, request }) => {
-    const seed = await request.get(`/test/set-workspace-model?urlKey=${URL_KEY}&modelId=${encodeURIComponent(NON_DEFAULT_MODEL)}`);
+  test('Proxy path: GET /api/proxy/recap reflects the seeded workspace model', async ({ page, request, workerUrlKey }) => {
+    const seed = await request.get(`/test/set-workspace-model?urlKey=${workerUrlKey}&modelId=${encodeURIComponent(NON_DEFAULT_MODEL)}`);
     expect(seed.ok()).toBe(true);
 
-    await page.goto('/test/set-session');
-    const tokenRes = await page.request.get('/test/create-proxy-token?label=workspace-model-test&scope=readWrite');
+    await page.goto(`/test/set-session?urlKey=${workerUrlKey}`);
+    const tokenRes = await page.request.get(`/test/create-proxy-token?label=workspace-model-test&scope=readWrite&urlKey=${workerUrlKey}`);
     expect(tokenRes.ok()).toBe(true);
     const { token } = await tokenRes.json();
 

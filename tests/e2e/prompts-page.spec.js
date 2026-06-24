@@ -8,8 +8,8 @@
  * provider fetch, or `testMockData`. So this surface needs a plain
  * `provider: 'local'` session and nothing more: `seedLocalWorkspace(page)`
  * establishes it (workspace config only — no issue fixture, no AI mock, no
- * feature flags), replacing the old `/test/set-session` + `test-workspace`
- * mock harness.
+ * feature flags), replacing the old `/test/set-session` test-token mock
+ * harness.
  */
 import { test, expect } from '../fixtures/test-base.js';
 
