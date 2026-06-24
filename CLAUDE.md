@@ -112,6 +112,7 @@ lib/
   dispatch-tokens.js   Consumer API token management
   agent-status-store.js  Agent status append-only log storage (Tier C substrate; loop reconstruction; canonical proxy path /agent/status, /foreman/status deprecated alias)
   report-history-store.js  Durable per-workspace roadmap report runs
+  task-snapshot-store.js   Append-only task-history archive: full issue-slice snapshots captured (hash-gated) at the proxy recap/brief read seams; durable, per-task count-capped, read-time diffs (LIN-598)
   llm-call-log.js      Append-only per-LLM-call metadata log (model, provider, tokens, cost, time; LIN-418)
   prompt-trace-store.js  Prompt trace storage (LIN-578)
   free-tier-store.js   Free tier usage tracking and rate limiting

@@ -37,6 +37,7 @@ import { RunSummaryCacheStore } from './lib/run-summary-cache.js'
 import { SessionSummaryCacheStore, hashSession } from './lib/session-summary-cache.js'
 import { generateSessionSummary, childLoops, DEFAULT_SESSION_SUMMARY_MODEL } from './lib/session-summary.js'
 import { ReportHistoryStore } from './lib/report-history-store.js'
+import { TaskSnapshotStore } from './lib/task-snapshot-store.js'
 import { LlmCallLogStore } from './lib/llm-call-log.js'
 import { PromptTraceStore } from './lib/prompt-trace-store.js'
 import { getProvider, getProviderForWorkspace, getAllProviders } from './lib/providers/registry.js'
@@ -338,6 +339,15 @@ const reportHistoryStore = new ReportHistoryStore({
   collection: reportHistoryCollection
 })
 
+// Task snapshot archive (LIN-598): append-only per-task history of the observed
+// issue slice. Captured fire-and-forget at the proxy recap/brief read seams
+// (which already compute hashContext), hash-gated so a write happens only on a
+// real change. Durable + per-task count-capped (no TTL), like report-history.
+const taskSnapshotCollection = db.collection('task-snapshots')
+const taskSnapshotStore = new TaskSnapshotStore({
+  collection: taskSnapshotCollection
+})
+
 // LLM call log (LIN-418): per-call metadata (model, provider, tokens, cost, time).
 // Registered as the openrouter client's recorder hook so every LLM call is logged
 // without the client importing the store.
@@ -421,7 +431,7 @@ app.use(session({
 // Test Mode Setup
 // =============================================================================
 if (process.env.NODE_ENV === 'test') {
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, localStore, getWorkspaceAccessToken }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, taskSnapshotStore, localStore, getWorkspaceAccessToken }))
 }
 
 // =============================================================================
@@ -1170,7 +1180,7 @@ async function getWorkspaceOpenRouterKey(urlKey, linearUserId) {
   }
 }
 
-app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, dispatchQueueStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, workspacePreferencesStore, freeTierStore }))
+app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, workspacePreferencesStore, freeTierStore }))
 
 // Mount workspace API routes (audit, prompts, recommendations, comments, images)
 app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore }))
