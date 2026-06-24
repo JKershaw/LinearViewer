@@ -104,7 +104,7 @@
 
   function buildAgentPrompt(token, scope) {
     const instructionsUrl = `${baseUrl}/api/proxy/instructions`;
-    return `You have access to a Linear API proxy. Use it to read${scope === 'readWrite' ? ' and modify' : ''} Linear issues, projects, and more.
+    return `You have access to a workspace API proxy (source-neutral; currently backed by Linear). Use it to read${scope === 'readWrite' ? ' and modify' : ''} workspace issues, projects, and more.
 
 To get started, fetch the full API documentation:
 
