@@ -1,0 +1,226 @@
+/**
+ * LIN-556 — route-level proof that the proxy write paths resolve LLM-friendly and
+ * provider-namespaced references to native ids before mutating, while existing
+ * UUID payloads stay byte-identical.
+ *
+ * Uses a fake provider so resolution is observed through the recorded mutation
+ * input rather than the network. The capability gate (`supports`) is a pass for
+ * every method, matching the production Linear surface.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import express from 'express';
+import { createProxyRoutes } from '../../routes/proxy.js';
+
+const TEAM_UUID = '11111111-1111-1111-1111-111111111111';
+const DONE_UUID = '22222222-2222-2222-2222-222222222222';
+const STARTED_UUID = '33333333-3333-3333-3333-333333333333';
+const PROJECT_UUID = '44444444-4444-4444-4444-444444444444';
+const BUG_UUID = '55555555-5555-5555-5555-555555555555';
+const ISSUE_UUID = '66666666-6666-6666-6666-666666666666';
+
+function makeProvider(overrides = {}) {
+  const calls = {};
+  const provider = {
+    name: 'linear',
+    supports: () => true,
+    fetchTeams: async () => [{ id: TEAM_UUID, name: 'Linear Team', key: 'LIN' }],
+    states: async (_t, teamId) => {
+      calls.statesTeamId = teamId;
+      return [
+        { id: STARTED_UUID, name: 'In Progress', type: 'started' },
+        { id: DONE_UUID, name: 'Done', type: 'completed' },
+      ];
+    },
+    labels: async () => [{ id: BUG_UUID, name: 'bug' }],
+    fetchProjectsList: async () => [{ id: PROJECT_UUID, name: 'Providers & API Unification' }],
+    issueWriteGuard: async () => ({ id: ISSUE_UUID, trashed: false, team: { id: TEAM_UUID } }),
+    issueLabels: async () => ({ id: ISSUE_UUID, trashed: false, labels: { nodes: [] } }),
+    updateIssueLabels: async (_t, _id, labelIds) => {
+      calls.labelIds = labelIds;
+      return { success: true, issue: { id: ISSUE_UUID, identifier: 'LIN-1', labels: { nodes: [] } } };
+    },
+    createIssue: async (_t, input) => {
+      calls.createInput = input;
+      return { success: true, issue: { id: ISSUE_UUID, identifier: 'LIN-1' } };
+    },
+    updateIssue: async (_t, _id, input) => {
+      calls.updateInput = input;
+      return { success: true, issue: { id: ISSUE_UUID, identifier: 'LIN-1' } };
+    },
+    ...overrides,
+  };
+  return { provider, calls };
+}
+
+function buildApp(provider) {
+  const app = express();
+  app.use(express.json());
+  app.use(createProxyRoutes({
+    proxyTokenStore: {
+      validateToken: async () => ({ tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'readWrite', createdBy: 'u1' }),
+    },
+    proxyEventStore: { recordEvent: async () => {} },
+    resolveWorkspaceAccess: async () => ({ token: 'ws-token', reason: 'ok' }),
+    getWorkspaceAccessToken: async () => 'ws-token',
+    agentStatusStore: {}, recapCacheStore: {}, briefCacheStore: {}, dispatchQueueStore: {},
+    workspaceFromUrl: (req, res, next) => next(),
+    getWorkspaceOpenRouterKey: async () => null,
+    workspacePreferencesStore: {},
+    freeTierStore: { tryUse: async () => ({ allowed: true }) },
+    provider,
+  }));
+  return app;
+}
+
+async function request(app, path, { method = 'GET', body } = {}) {
+  const server = app.listen(0);
+  await new Promise(resolve => server.once('listening', resolve));
+  const { port } = server.address();
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}${path}`, {
+      method,
+      headers: { Authorization: 'Bearer anything', ...(body ? { 'Content-Type': 'application/json' } : {}) },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+    let parsed = null;
+    try { parsed = await res.json(); } catch { /* no body */ }
+    return { status: res.status, body: parsed };
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Create
+// ---------------------------------------------------------------------------
+
+test('POST /issues: symbolic teamId/stateId/projectId resolve to native ids', async () => {
+  const { provider, calls } = makeProvider();
+  const { status } = await request(buildApp(provider), '/api/proxy/issues', {
+    method: 'POST',
+    body: { teamId: 'LIN', title: 'hi', stateId: 'done', projectId: 'Providers & API Unification' },
+  });
+  assert.equal(status, 201);
+  assert.equal(calls.createInput.teamId, TEAM_UUID);
+  assert.equal(calls.createInput.stateId, DONE_UUID);
+  assert.equal(calls.createInput.projectId, PROJECT_UUID);
+  // state resolution must be scoped to the resolved team
+  assert.equal(calls.statesTeamId, TEAM_UUID);
+});
+
+test('POST /issues: existing UUID payload is byte-identical (no resolution drift)', async () => {
+  const { provider, calls } = makeProvider();
+  const { status } = await request(buildApp(provider), '/api/proxy/issues', {
+    method: 'POST',
+    body: { teamId: TEAM_UUID, title: 'hi', stateId: DONE_UUID, projectId: PROJECT_UUID },
+  });
+  assert.equal(status, 201);
+  assert.equal(calls.createInput.teamId, TEAM_UUID);
+  assert.equal(calls.createInput.stateId, DONE_UUID);
+  assert.equal(calls.createInput.projectId, PROJECT_UUID);
+});
+
+test('POST /issues: linear: namespace prefix is accepted and stripped', async () => {
+  const { provider, calls } = makeProvider();
+  const { status } = await request(buildApp(provider), '/api/proxy/issues', {
+    method: 'POST',
+    body: { teamId: 'linear:LIN', title: 'hi', stateId: 'linear:done' },
+  });
+  assert.equal(status, 201);
+  assert.equal(calls.createInput.teamId, TEAM_UUID);
+  assert.equal(calls.createInput.stateId, DONE_UUID);
+});
+
+test('POST /issues: a non-active provider namespace is rejected with 422', async () => {
+  const { provider } = makeProvider();
+  const { status, body } = await request(buildApp(provider), '/api/proxy/issues', {
+    method: 'POST',
+    body: { teamId: 'github:42', title: 'hi' },
+  });
+  assert.equal(status, 422);
+  assert.match(body.error, /not active/);
+});
+
+test('POST /issues: an unresolvable state name fails loud (422), not a silent drop', async () => {
+  const { provider, calls } = makeProvider();
+  const { status } = await request(buildApp(provider), '/api/proxy/issues', {
+    method: 'POST',
+    body: { teamId: 'LIN', title: 'hi', stateId: 'nonsense-state' },
+  });
+  assert.equal(status, 422);
+  assert.equal(calls.createInput, undefined); // never reached the mutation
+});
+
+// ---------------------------------------------------------------------------
+// Update
+// ---------------------------------------------------------------------------
+
+test('PATCH /issues/:id: symbolic stateId resolves, scoped to the issue team', async () => {
+  const { provider, calls } = makeProvider();
+  const { status } = await request(buildApp(provider), `/api/proxy/issues/${ISSUE_UUID}`, {
+    method: 'PATCH',
+    body: { stateId: 'in-progress' },
+  });
+  assert.equal(status, 200);
+  assert.equal(calls.updateInput.stateId, STARTED_UUID);
+  assert.equal(calls.statesTeamId, TEAM_UUID);
+});
+
+test('PATCH /issues/:id: literal state name resolves case-insensitively', async () => {
+  const { provider, calls } = makeProvider();
+  const { status } = await request(buildApp(provider), `/api/proxy/issues/${ISSUE_UUID}`, {
+    method: 'PATCH',
+    body: { stateId: 'done' },
+  });
+  assert.equal(status, 200);
+  assert.equal(calls.updateInput.stateId, DONE_UUID);
+});
+
+test('PATCH /issues/:id: empty body still 400 with no provider read', async () => {
+  let guardCalled = false;
+  const { provider } = makeProvider({ issueWriteGuard: async () => { guardCalled = true; return null; } });
+  const { status } = await request(buildApp(provider), `/api/proxy/issues/${ISSUE_UUID}`, {
+    method: 'PATCH',
+    body: {},
+  });
+  assert.equal(status, 400);
+  assert.equal(guardCalled, false);
+});
+
+test('PATCH /issues/:id: a trashed issue is refused (409) before resolution', async () => {
+  const { provider } = makeProvider({
+    issueWriteGuard: async () => ({ id: ISSUE_UUID, trashed: true, team: { id: TEAM_UUID } }),
+  });
+  const { status } = await request(buildApp(provider), `/api/proxy/issues/${ISSUE_UUID}`, {
+    method: 'PATCH',
+    body: { stateId: 'done' },
+  });
+  assert.equal(status, 409);
+});
+
+// ---------------------------------------------------------------------------
+// Labels
+// ---------------------------------------------------------------------------
+
+test('POST /issues/:id/labels: a label name resolves to its id', async () => {
+  const { provider, calls } = makeProvider();
+  const { status } = await request(buildApp(provider), `/api/proxy/issues/${ISSUE_UUID}/labels`, {
+    method: 'POST',
+    body: { labelId: 'bug' },
+  });
+  assert.equal(status, 200);
+  assert.deepEqual(calls.labelIds, [BUG_UUID]);
+});
+
+test('DELETE /issues/:id/labels/:labelId: a label name path param resolves to its id', async () => {
+  const { provider, calls } = makeProvider({
+    issueLabels: async () => ({ id: ISSUE_UUID, trashed: false, labels: { nodes: [{ id: BUG_UUID, name: 'bug' }] } }),
+  });
+  const { status } = await request(buildApp(provider), `/api/proxy/issues/${ISSUE_UUID}/labels/bug`, {
+    method: 'DELETE',
+  });
+  assert.equal(status, 200);
+  assert.deepEqual(calls.labelIds, []);
+});

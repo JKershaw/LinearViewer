@@ -51,6 +51,14 @@ import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT } from '
 import { buildAutopilotManual } from '../lib/prompts/autopilot-manual.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
 import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
+import {
+  parseSourceNamespace,
+  resolveStateRef,
+  resolveLabelRef,
+  resolveProjectRef,
+  resolveTeamRef,
+  RefResolutionError,
+} from '../lib/proxy-ref-resolver.js';
 import { appendBlock, replace as replaceInDescription, DescriptionEditError } from '../lib/description-edit.js';
 import { badRequest, jsonError, notFound, unauthorized, workspaceUnavailableEnvelope } from '../lib/errors.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
@@ -772,6 +780,66 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   }
 
   // =========================================================================
+  // LIN-556: input-side reference resolution for the write paths.
+  //
+  // Each helper applies the two resolver layers from lib/proxy-ref-resolver.js:
+  // (1) strip/validate an optional `<source>:` namespace, then (2) resolve the
+  // local-part to a native id. A bare UUID short-circuits BEFORE any provider
+  // read, so existing UUID payloads are byte-identical and pay no extra network
+  // cost; only a genuinely symbolic ref triggers the scoped list fetch. A
+  // RefResolutionError bubbles to the route's catch, which maps it to a clean
+  // 422 (see refResolutionFailed).
+  // =========================================================================
+
+  async function resolveTeamInput(activeProvider, token, rawRef) {
+    const { localRef } = parseSourceNamespace(rawRef);
+    if (UUID_REGEX.test(localRef)) return localRef;
+    const teams = await activeProvider.fetchTeams(token);
+    return resolveTeamRef(teams, localRef);
+  }
+
+  async function resolveStateInput(activeProvider, token, teamId, rawRef) {
+    const { localRef } = parseSourceNamespace(rawRef);
+    if (UUID_REGEX.test(localRef)) return localRef;
+    // States are team-scoped in Linear; without a team we cannot scope the
+    // symbolic match, so fail loud rather than guess across teams.
+    if (!teamId) {
+      throw new RefResolutionError(
+        `Cannot resolve state '${localRef}' — the issue's team could not be determined`,
+        { status: 422 },
+      );
+    }
+    const states = await activeProvider.states(token, teamId);
+    return resolveStateRef(states, localRef);
+  }
+
+  async function resolveProjectInput(activeProvider, token, rawRef) {
+    const { localRef } = parseSourceNamespace(rawRef);
+    if (UUID_REGEX.test(localRef)) return localRef;
+    const projects = await activeProvider.fetchProjectsList(token);
+    return resolveProjectRef(projects, localRef);
+  }
+
+  async function resolveLabelInput(activeProvider, token, rawRef) {
+    const { localRef } = parseSourceNamespace(rawRef);
+    if (UUID_REGEX.test(localRef)) return localRef;
+    const labels = await activeProvider.labels(token, null);
+    return resolveLabelRef(labels, localRef);
+  }
+
+  /**
+   * Map a RefResolutionError to a clean 422 (with candidate ids for an ambiguous
+   * match). Returns true when it handled the error so callers can
+   * `if (refResolutionFailed(...)) return;` from inside a catch.
+   */
+  function refResolutionFailed(req, res, endpoint, err) {
+    if (!(err instanceof RefResolutionError)) return false;
+    logEvent(req, endpoint, err.status);
+    jsonError(res, err.status, err.message, err.candidates ? { candidates: err.candidates } : undefined);
+    return true;
+  }
+
+  // =========================================================================
   // User-Facing API (Session Auth) - Token Management
   // =========================================================================
 
@@ -1089,10 +1157,12 @@ POST ${baseUrl}/api/proxy/issues
   Body: { "teamId": "...", "title": "...", "description": "...", "projectId": "...", "stateId": "...", "assigneeId": "...", "priority": 0-4, "cycleId": "...", "parentId": "..." }
   → Create a new issue; set parentId (UUID) to create as a sub-issue. Returns 201:
   → { "success": true, "issue": { "id": "...", "identifier": "LIN-123", "title": "...", "state": { "name": "Backlog", "type": "backlog" } } }
+  → teamId/stateId/projectId accept symbolic refs, not just UUIDs: teamId as a team key (e.g. LIN) or name; stateId as a keyword (done/in-progress/todo/backlog/canceled/duplicate) or state name; projectId as a project name. Ambiguous or unknown names fail with 422 (UUID is the unambiguous escape hatch).
 
 PATCH ${baseUrl}/api/proxy/issues/{issueId}
   Body: { "title": "...", "description": "...", "stateId": "...", "assigneeId": "...", "priority": 0-4, "cycleId": "...", "parentId": "...|null" }
   → Update an existing issue; set cycleId to assign/move to a cycle; set parentId to a UUID to re-parent, or null to promote to top-level
+  → stateId/projectId accept symbolic refs too: stateId as a keyword (done/in-progress/todo/backlog/canceled/duplicate) or state name (scoped to the issue's team), projectId as a project name. Ambiguous/unknown names → 422.
   → { "success": true, "issue": { "id": "...", "identifier": "LIN-123", "title": "...", "state": { "name": "In Progress", "type": "started" } } }
   → Passing "description" here REPLACES the whole body. For anything other than a deliberate full rewrite, prefer the two splice endpoints below — they let you supply only the new content, so you never re-emit (and risk corrupting) the existing body.
 
@@ -1125,12 +1195,12 @@ DELETE ${baseUrl}/api/proxy/issues/{issueId}/relations/{relationId}
 
 POST ${baseUrl}/api/proxy/issues/{issueId}/labels
   Body: { "labelId": "..." }
-  → Add a label to an issue (idempotent)
+  → Add a label to an issue (idempotent). labelId accepts a UUID or the label name (case-insensitive), e.g. "bug".
   → { "success": true, "issue": { "id": "...", "identifier": "LIN-123", "labels": ["bug"] } }
   → When the label is already present: { "success": true, "message": "Label already present" }
 
 DELETE ${baseUrl}/api/proxy/issues/{issueId}/labels/{labelId}
-  → Remove a label from an issue (idempotent)
+  → Remove a label from an issue (idempotent). {labelId} accepts a UUID or the label name (case-insensitive).
   → { "success": true, "issue": { "id": "...", "identifier": "LIN-123", "labels": [...] } }
   → When the label is not present: { "success": true, "message": "Label not present" }
 
@@ -1631,7 +1701,10 @@ One convention across every endpoint, so you can branch on the same fields every
 
       const { teamId, title, description, projectId, stateId, assigneeId, priority, parentId, cycleId } = req.body;
 
-      if (!teamId || !UUID_REGEX.test(teamId)) {
+      // teamId is required and may be a UUID, a team key (e.g. `LIN`), or a team
+      // name (LIN-556); the symbolic→id resolution happens once below so the
+      // resolved id can also scope the symbolic stateId.
+      if (!teamId || typeof teamId !== 'string') {
         logEvent(req, '/api/proxy/issues', 400);
         return badRequest.json(res, 'Valid teamId is required');
       }
@@ -1657,10 +1730,16 @@ One convention across every endpoint, so you can branch on the same fields every
         return badRequest.json(res, 'description contains invalid characters');
       }
 
-      const input = { teamId, title };
+      const resolvedTeamId = await resolveTeamInput(provider, token, teamId);
+
+      const input = { teamId: resolvedTeamId, title };
       if (description) input.description = description;
-      if (projectId && UUID_REGEX.test(projectId)) input.projectId = projectId;
-      if (stateId && UUID_REGEX.test(stateId)) input.stateId = stateId;
+      // LIN-556: projectId / stateId accept symbolic names alongside UUIDs.
+      // State is scoped to the just-resolved team so symbolic matches cannot
+      // bleed across teams. assigneeId / parentId / cycleId stay UUID-only this
+      // ticket (named out of scope in the LIN-556 design record).
+      if (projectId) input.projectId = await resolveProjectInput(provider, token, projectId);
+      if (stateId) input.stateId = await resolveStateInput(provider, token, resolvedTeamId, stateId);
       if (assigneeId && UUID_REGEX.test(assigneeId)) input.assigneeId = assigneeId;
       if (parentId && UUID_REGEX.test(parentId)) input.parentId = parentId;
       if (cycleId && UUID_REGEX.test(cycleId)) input.cycleId = cycleId;
@@ -1674,6 +1753,7 @@ One convention across every endpoint, so you can branch on the same fields every
       logEvent(req, '/api/proxy/issues', 201);
       res.status(201).json(issueCreate);
     } catch (err) {
+      if (refResolutionFailed(req, res, '/api/proxy/issues', err)) return;
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/issues', status);
       console.error('Proxy create issue error:', err.message);
@@ -1734,12 +1814,35 @@ One convention across every endpoint, so you can branch on the same fields every
         return badRequest.json(res, 'description contains invalid characters');
       }
 
+      // Reject a wholly empty body before any read (preserves the no-network 400
+      // for `{}`); the post-resolution check below still catches a body whose
+      // only fields are unsupported/dropped.
+      const hasUpdatableField = [title, description, stateId, assigneeId, projectId, parentId, cycleId, priority]
+        .some(v => v !== undefined);
+      if (!hasUpdatableField) {
+        logEvent(req, '/api/proxy/issues/:id', 400);
+        return badRequest.json(res, 'No valid fields to update');
+      }
+
+      // LIN-556: one guard read serves both the trashed refusal AND the team
+      // scope a symbolic stateId needs (e.g. `done` → the team's completed
+      // state). Replaces the former post-build refuseIfTrashed call.
+      const guard = await provider.issueWriteGuard(token, issueId);
+      if (isTrashed(guard)) {
+        logEvent(req, '/api/proxy/issues/:id', 409);
+        return jsonError(res, 409, 'Issue is trashed; refusing to modify a deleted issue');
+      }
+      const teamId = guard?.team?.id || null;
+
       const input = {};
       if (title) input.title = title;
       if (description !== undefined) input.description = description;
-      if (stateId && UUID_REGEX.test(stateId)) input.stateId = stateId;
+      // LIN-556: stateId / projectId accept symbolic names alongside UUIDs;
+      // state is scoped to the issue's team. assigneeId / parentId / cycleId
+      // stay UUID-only this ticket (named out of scope in the design record).
+      if (stateId) input.stateId = await resolveStateInput(provider, token, teamId, stateId);
+      if (projectId) input.projectId = await resolveProjectInput(provider, token, projectId);
       if (assigneeId && UUID_REGEX.test(assigneeId)) input.assigneeId = assigneeId;
-      if (projectId && UUID_REGEX.test(projectId)) input.projectId = projectId;
       if (parentId === null) input.parentId = null;
       else if (parentId && UUID_REGEX.test(parentId)) input.parentId = parentId;
       if (cycleId && UUID_REGEX.test(cycleId)) input.cycleId = cycleId;
@@ -1752,14 +1855,13 @@ One convention across every endpoint, so you can branch on the same fields every
         return badRequest.json(res, 'No valid fields to update');
       }
 
-      if (await refuseIfTrashed(provider, token, issueId, req, res, '/api/proxy/issues/:id')) return;
-
       const issueUpdate = normalizeWritePayload(await provider.updateIssue(token, issueId, input), 'issue');
       if (writeRejected(req, res, '/api/proxy/issues/:id', issueUpdate, 'Issue was not updated')) return;
       flattenIssue(issueUpdate.issue);
       logEvent(req, '/api/proxy/issues/:id', 200);
       res.json(issueUpdate);
     } catch (err) {
+      if (refResolutionFailed(req, res, '/api/proxy/issues/:id', err)) return;
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/issues/:id', status);
       console.error('Proxy update issue error:', err.message);
@@ -2048,10 +2150,13 @@ One convention across every endpoint, so you can branch on the same fields every
       }
 
       const { labelId } = req.body;
-      if (!labelId || !UUID_REGEX.test(labelId)) {
+      if (!labelId || typeof labelId !== 'string') {
         logEvent(req, '/api/proxy/issues/labels', 400);
         return badRequest.json(res, 'Valid labelId is required');
       }
+
+      // LIN-556: labelId may be a UUID or a label name (case-insensitive).
+      const resolvedLabelId = await resolveLabelInput(provider, token, labelId);
 
       // Fetch current labels (the read half of the label read-modify-write).
       const issue = await provider.issueLabels(token, issueId);
@@ -2065,17 +2170,18 @@ One convention across every endpoint, so you can branch on the same fields every
       }
 
       const currentLabelIds = (issue.labels?.nodes || []).map(l => l.id);
-      if (currentLabelIds.includes(labelId)) {
+      if (currentLabelIds.includes(resolvedLabelId)) {
         logEvent(req, '/api/proxy/issues/labels', 200);
         return res.json({ success: true, message: 'Label already present' });
       }
 
-      const issueUpdate = await provider.updateIssueLabels(token, issueId, [...currentLabelIds, labelId]);
+      const issueUpdate = await provider.updateIssueLabels(token, issueId, [...currentLabelIds, resolvedLabelId]);
       if (writeRejected(req, res, '/api/proxy/issues/labels', issueUpdate, 'Label was not added')) return;
       flattenIssue(issueUpdate.issue);
       logEvent(req, '/api/proxy/issues/labels', 200);
       res.json(issueUpdate);
     } catch (err) {
+      if (refResolutionFailed(req, res, '/api/proxy/issues/labels', err)) return;
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/issues/labels', status);
       console.error('Proxy add label error:', err.message);
@@ -2102,9 +2208,9 @@ One convention across every endpoint, so you can branch on the same fields every
       if (!isValidIssueId(issueId)) {
         return badRequest.json(res, 'Invalid issue ID format');
       }
-      if (!UUID_REGEX.test(labelId)) {
-        return badRequest.json(res, 'Invalid label ID format');
-      }
+
+      // LIN-556: labelId may be a UUID or a label name (case-insensitive).
+      const resolvedLabelId = await resolveLabelInput(provider, token, labelId);
 
       // Fetch current labels (the read half of the label read-modify-write).
       const issue = await provider.issueLabels(token, issueId);
@@ -2118,7 +2224,7 @@ One convention across every endpoint, so you can branch on the same fields every
       }
 
       const currentLabelIds = (issue.labels?.nodes || []).map(l => l.id);
-      const filtered = currentLabelIds.filter(id => id !== labelId);
+      const filtered = currentLabelIds.filter(id => id !== resolvedLabelId);
 
       if (filtered.length === currentLabelIds.length) {
         logEvent(req, '/api/proxy/issues/labels', 200);
@@ -2131,6 +2237,7 @@ One convention across every endpoint, so you can branch on the same fields every
       logEvent(req, '/api/proxy/issues/labels', 200);
       res.json(issueUpdate);
     } catch (err) {
+      if (refResolutionFailed(req, res, '/api/proxy/issues/labels', err)) return;
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/issues/labels', status);
       console.error('Proxy remove label error:', err.message);
