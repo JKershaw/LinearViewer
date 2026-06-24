@@ -115,6 +115,37 @@ test('historyExpiresAt tracks the session\'s last activity, and cleanup evicts e
   assert.equal((await store.findByWorkspace(URL_KEY)).sessions.length, 0);
 });
 
+test('getSession point-reads one session by id, byte-identical to what was stored (LIN-632)', async () => {
+  const store = new ObservationSessionsStore({ collection: createMockCollection() });
+  const session = makeSession('S1');
+  await store.upsertSession(URL_KEY, session);
+  await store.upsertSession(URL_KEY, makeSession('S2'));
+
+  const got = await store.getSession(URL_KEY, 'S1');
+  assert.deepEqual(got, session, 'returns the stored lean session unchanged');
+});
+
+test('getSession returns null on a genuine miss, workspace mismatch, or missing args (LIN-632)', async () => {
+  const store = new ObservationSessionsStore({ collection: createMockCollection() });
+  await store.upsertSession('ws-a', makeSession('S1'));
+
+  assert.equal(await store.getSession('ws-a', 'nope'), null, 'unknown session id → null');
+  assert.equal(await store.getSession('ws-b', 'S1'), null, 'right id, wrong workspace → null');
+  assert.equal(await store.getSession('', 'S1'), null, 'missing urlKey → null');
+  assert.equal(await store.getSession('ws-a', ''), null, 'missing sessionId → null');
+});
+
+test('getSession treats a stale-builderVersion doc as a miss (rebuild-able) (LIN-632)', async () => {
+  const collection = createMockCollection();
+  const store = new ObservationSessionsStore({ collection });
+  await store.upsertSession(URL_KEY, makeSession('S1'));
+
+  const doc = collection._docs.find(d => d.type === 'session');
+  doc.builderVersion = BUILDER_VERSION - 1;
+
+  assert.equal(await store.getSession(URL_KEY, 'S1'), null, 'stale-shape doc → null so the route falls back to reconstruction');
+});
+
 test('clear removes every doc for a workspace', async () => {
   const store = new ObservationSessionsStore({ collection: createMockCollection() });
   await store.upsertSession(URL_KEY, makeSession('S1'));

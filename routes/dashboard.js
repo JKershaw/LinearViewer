@@ -137,6 +137,29 @@ function isTerminalLoop(loop) {
   return !!loop && TERMINAL_AGENT_STATES.has(loop.agentState);
 }
 
+// Marker-aware terminal check for a raw session loop (loops from
+// getSessionsForWorkspace / the read-model are not pre-enriched).
+function loopIsTerminal(loop) {
+  return isTerminalLoop(enrichLoop(loop));
+}
+
+/**
+ * Is the whole session terminal (cacheable / summarisable)? Anchor-loop
+ * terminality, with an all-loops-terminal fallback for anchorless/orphan
+ * sessions. Module-scoped + exported (LIN-632) so the background summary
+ * precompute (server.js → materializer) shares this exact gate instead of
+ * forking a second definition that could drift.
+ *
+ * @param {Object} session - A lean session record (getSessionsForWorkspace shape).
+ * @returns {boolean}
+ */
+export function sessionIsTerminal(session) {
+  const anchor = findAnchorLoop(session);
+  if (anchor) return loopIsTerminal(anchor);
+  const loops = Array.isArray(session?.loops) ? session.loops : [];
+  return loops.length > 0 && loops.every(loopIsTerminal);
+}
+
 /**
  * Most-relevant activity timestamp for a run, used to sort the merged feed.
  * Prefers the truthful completion time (terminal feedback marker) so a run that
@@ -657,20 +680,8 @@ export function createDashboardRoutes({
   //       in-flight child — a named, accepted proxy, surfaced as live:true +
   //       statusLineSource:'latest-completed-child', not misrepresented as live.
 
-  // Marker-aware terminal check for a raw session loop (loops from
-  // getSessionsForWorkspace are not pre-enriched).
-  function loopIsTerminal(loop) {
-    return isTerminalLoop(enrichLoop(loop));
-  }
-
-  // Is the whole session terminal (cacheable)? Anchor-loop terminality, with an
-  // all-loops-terminal fallback for anchorless/orphan sessions.
-  function sessionIsTerminal(session) {
-    const anchor = findAnchorLoop(session);
-    if (anchor) return loopIsTerminal(anchor);
-    const loops = Array.isArray(session.loops) ? session.loops : [];
-    return loops.length > 0 && loops.every(loopIsTerminal);
-  }
+  // Terminal checks are module-scoped + exported (sessionIsTerminal, loopIsTerminal)
+  // so the background precompute shares the exact same gate (LIN-632).
 
   // The cheap live proxy for an in-progress session's status line. Deterministic:
   // never an LLM call (the cost contract). Bug 2 (LIN-608): a freshly-started
@@ -724,10 +735,19 @@ export function createDashboardRoutes({
     const { sessionId } = req.params;
     if (!sessionId) return res.status(400).json({ error: 'sessionId is required' });
 
-    let session;
+    // Find one session by id. Prefer the materialized read-model point-read
+    // (LIN-632) and degrade to the full 30-day workspace reconstruction on a
+    // miss — the same fix as the session-context path, removing a second
+    // reconstruct-by-id antipattern.
+    let session = null;
     try {
-      const sessions = await getSessionsForWorkspace(workspace.urlKey, loopDeps);
-      session = sessions.find(s => String(s.sessionId) === String(sessionId)) || null;
+      if (observationSessionsStore) {
+        session = await observationSessionsStore.getSession(workspace.urlKey, sessionId);
+      }
+      if (!session) {
+        const sessions = await getSessionsForWorkspace(workspace.urlKey, loopDeps);
+        session = sessions.find(s => String(s.sessionId) === String(sessionId)) || null;
+      }
     } catch (error) {
       console.error('Dashboard session-summary lookup error:', error);
       return res.status(500).json({ error: 'Could not load the session' });
@@ -819,17 +839,29 @@ export function createDashboardRoutes({
     const { sessionId } = req.params;
     if (!sessionId) return res.status(400).json({ error: 'sessionId is required' });
 
-    // Workspace-wide getSessionsForWorkspace read (by-id lookup); bound the
-    // request with a keepalive heartbeat (LIN-615).
+    // Bound the request with a keepalive heartbeat (LIN-615).
     const keepalive = armKeepalive(res);
     try {
-      // One issue read feeds both the issueGraph (for accurate session inference)
-      // and the session-context graph.
+      // The graph build always needs the workspace's full issue set (it resolves
+      // each touched task's neighbourhood against it). Memoized at the source
+      // (server.js, LIN-632) so warm drill-ins do NOT refetch all of Linear.
       const issues = fetchWorkspaceIssues ? (await fetchWorkspaceIssues(workspace)) || [] : [];
-      const issueGraph = deriveIssueGraph(issues);
 
-      const sessions = await getSessionsForWorkspace(workspace.urlKey, { ...loopDeps, issueGraph });
-      const session = sessions.find(s => String(s.sessionId) === String(sessionId)) || null;
+      // Find the one session by id. Prefer the materialized read-model point-read
+      // (LIN-632): on a hit we skip the full 30-day workspace reconstruction
+      // entirely. On a miss, degrade to the live reconstruction — which also
+      // needs the issueGraph for accurate session inference, so derive it only
+      // on that path (the read-model session already carries everything
+      // buildSessionContextGraph reads).
+      let session = null;
+      if (observationSessionsStore) {
+        session = await observationSessionsStore.getSession(workspace.urlKey, sessionId);
+      }
+      if (!session) {
+        const issueGraph = deriveIssueGraph(issues);
+        const sessions = await getSessionsForWorkspace(workspace.urlKey, { ...loopDeps, issueGraph });
+        session = sessions.find(s => String(s.sessionId) === String(sessionId)) || null;
+      }
       if (!session) {
         keepalive.stop();
         return keepalive.send(404, { error: 'Session not found' });

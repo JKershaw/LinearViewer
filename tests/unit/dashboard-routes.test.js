@@ -86,12 +86,13 @@ function makeReqRes({ session = {}, workspace = null, params = {}, query = {} } 
   return { req, res };
 }
 
-function makeRouter(perWorkspace, { runSummaryCacheStore, sessionSummaryCacheStore, issues } = {}) {
+function makeRouter(perWorkspace, { runSummaryCacheStore, sessionSummaryCacheStore, issues, observationSessionsStore } = {}) {
   const { dispatchQueueStore, agentStatusStore } = makeStores(perWorkspace);
   return createDashboardRoutes({
     workspaceFromUrl: (req, res, next) => next(),
     dispatchQueueStore,
     agentStatusStore,
+    observationSessionsStore: observationSessionsStore || null,
     runSummaryCacheStore: runSummaryCacheStore || new InMemoryRunSummaryCacheStore(),
     sessionSummaryCacheStore: sessionSummaryCacheStore || new InMemorySessionSummaryCacheStore(),
     freeTierStore: { async tryUse() { return { allowed: true }; } },
@@ -824,6 +825,35 @@ describe('session-summary endpoint', () => {
     assert.equal(res.statusCode, 404);
   });
 
+  // LIN-632: the summary lookup reuses the same read-model point-read as
+  // session-context. Empty stores → reconstruction would 404; the read-model hit
+  // serves it, proving the by-id lookup skipped the full workspace rebuild.
+  test('finds the session via the read-model point-read, skipping reconstruction (LIN-632)', async () => {
+    const prev = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'test';
+    try {
+      const session = {
+        sessionId: 'sess-1', seedIssue: 'LIN-100', tasksTouched: ['LIN-100', 'LIN-101'],
+        dispatchedAt: NOW_ISO, completedAt: NOW_ISO,
+        loops: [{ loopId: 'sess-1', kind: 'autopilot', issueIdentifier: 'LIN-100', agentState: 'complete', terminalStatus: 'done', terminalCompletedAt: NOW_ISO }]
+      };
+      let getCalls = 0;
+      const observationSessionsStore = { async getSession() { getCalls++; return session; } };
+      const cache = new InMemorySessionSummaryCacheStore();
+      const router = makeRouter({ 'ws-a': { history: [], live: [], agentStatus: [] } }, { sessionSummaryCacheStore: cache, observationSessionsStore });
+      const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/session-summary/:sessionId');
+      const { req, res } = makeReqRes({ session: ENABLED, workspace: { urlKey: 'ws-a' }, params: { sessionId: 'sess-1' } });
+      await handler(req, res);
+
+      assert.equal(getCalls, 1, 'read-model point-read used for the summary lookup');
+      assert.equal(res.statusCode, 200, 'served despite empty stores → no reconstruction');
+      assert.equal(res.jsonBody.live, false, 'terminal session was summarised');
+      assert.match(res.jsonBody.summary.outcome, /sess-1/);
+    } finally {
+      process.env.NODE_ENV = prev;
+    }
+  });
+
   test('test-mode returns and caches a deterministic rollup for a terminal session', async () => {
     const prev = process.env.NODE_ENV;
     process.env.NODE_ENV = 'test';
@@ -995,6 +1025,44 @@ describe('session-context endpoint', () => {
     const { req, res } = makeReqRes({ session: ENABLED, workspace: { urlKey: 'ws-a' }, params: {} });
     await handler(req, res);
     assert.equal(res.statusCode, 400);
+  });
+
+  // LIN-632: when the read-model has the session, the route serves it WITHOUT the
+  // full 30-day workspace reconstruction. Proven by leaving the dispatch/status
+  // stores EMPTY — reconstruction would 404, the read-model hit must 200.
+  test('serves from the read-model point-read, skipping workspace reconstruction (LIN-632)', async () => {
+    const session = {
+      sessionId: 'sess-1', seedIssue: 'LIN-100', tasksTouched: ['LIN-100', 'LIN-101'],
+      dispatchedAt: NOW_ISO, completedAt: NOW_ISO, loops: []
+    };
+    let getCalls = 0;
+    const observationSessionsStore = {
+      async getSession(urlKey, sessionId) { getCalls++; return (urlKey === 'ws-a' && sessionId === 'sess-1') ? session : null; }
+    };
+    // EMPTY stores → any reconstruction attempt finds no session and 404s.
+    const router = makeRouter({ 'ws-a': { history: [], live: [], agentStatus: [] } }, { issues: issueSet(), observationSessionsStore });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/session-context/:sessionId');
+    const { req, res } = makeReqRes({ session: ENABLED, workspace: { urlKey: 'ws-a' }, params: { sessionId: 'sess-1' } });
+    await handler(req, res);
+
+    assert.equal(getCalls, 1, 'read-model point-read was used');
+    assert.equal(res.statusCode, 200, 'served despite empty stores → no reconstruction needed');
+    assert.deepEqual(res.jsonBody.tasksTouched, ['LIN-100', 'LIN-101']);
+    const tags = Object.fromEntries(res.jsonBody.graph.tasks.map(t => [t.root.identifier, t.provenance]));
+    assert.equal(tags['LIN-100'], 'seed');
+    assert.equal(tags['LIN-101'], 'spun-off');
+  });
+
+  // LIN-632: a read-model MISS must still fall back to live reconstruction.
+  test('falls back to workspace reconstruction when the read-model misses (LIN-632)', async () => {
+    const observationSessionsStore = { async getSession() { return null; } };
+    const router = makeRouter(terminalSessionWorkspace(), { issues: issueSet(), observationSessionsStore });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/session-context/:sessionId');
+    const { req, res } = makeReqRes({ session: ENABLED, workspace: { urlKey: 'ws-a' }, params: { sessionId: 'sess-1' } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200, 'reconstruction backstop served the session');
+    assert.deepEqual(res.jsonBody.tasksTouched, ['LIN-100', 'LIN-101']);
   });
 });
 

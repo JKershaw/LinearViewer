@@ -34,7 +34,8 @@ import { FreeTierStore } from './lib/free-tier-store.js'
 import { RecapCacheStore } from './lib/recap-cache.js'
 import { BriefCacheStore } from './lib/brief-cache.js'
 import { RunSummaryCacheStore } from './lib/run-summary-cache.js'
-import { SessionSummaryCacheStore } from './lib/session-summary-cache.js'
+import { SessionSummaryCacheStore, hashSession } from './lib/session-summary-cache.js'
+import { generateSessionSummary, childLoops, DEFAULT_SESSION_SUMMARY_MODEL } from './lib/session-summary.js'
 import { ReportHistoryStore } from './lib/report-history-store.js'
 import { LlmCallLogStore } from './lib/llm-call-log.js'
 import { PromptTraceStore } from './lib/prompt-trace-store.js'
@@ -74,7 +75,7 @@ import { renderSwimPage } from './lib/render-swim.js'
 import { renderShipPage } from './lib/render-ship.js'
 import { createPipelineRoutes } from './routes/pipeline.js'
 import { createCollectiveRoutes } from './routes/collective.js'
-import { createDashboardRoutes } from './routes/dashboard.js'
+import { createDashboardRoutes, sessionIsTerminal } from './routes/dashboard.js'
 import { fetchIssueContext } from './lib/linear.js'
 import { createTaskChatRoutes } from './routes/task-chat.js'
 import { yapClientFromEnv } from './lib/yap-client.js'
@@ -291,6 +292,39 @@ const sessionSummaryCacheCollection = db.collection('session-summary-cache')
 const sessionSummaryCacheStore = new SessionSummaryCacheStore({
   collection: sessionSummaryCacheCollection
 })
+
+// Background session-summary precompute (LIN-632). Late-wired into the observation
+// materializer now that both the summary cache and the run-summary cache exist:
+// whenever a session is (re)materialized AND is terminal, generate its one-sentence
+// rollup ahead of time so the first user click is a cache hit. This runs at WRITE
+// time with NO user session, so it resolves an OpenRouter key server-side
+// (OPENROUTER_API_KEY → free-tier) and SKIPS cleanly when neither is configured —
+// never blocking, never throwing into the read-model write it rode in on.
+observationMaterializer.precomputeSessionSummary = async (urlKey, session) => {
+  if (!sessionSummaryCacheStore || !session?.sessionId) return;
+  if (process.env.NODE_ENV === 'test') return;       // tests stay offline (no LLM)
+  if (!sessionIsTerminal(session)) return;            // only terminal sessions are cacheable
+  const apiKey = process.env.OPENROUTER_API_KEY || process.env.OPENROUTER_FREE_TIER_KEY;
+  if (!apiKey) return;                                // no server-side key → skip gracefully
+
+  // Skip if a fresh summary for this exact input is already cached.
+  const inputHash = hashSession(session)
+  const cached = await sessionSummaryCacheStore.get(urlKey, session.sessionId)
+  if (cached && cached.inputHash === inputHash) return
+
+  // Gather already-cached child run-summary outcomes for richer context — never
+  // generate per child (the one-LLM-call cost contract).
+  const childOutcomes = {}
+  if (runSummaryCacheStore) {
+    for (const loop of childLoops(session)) {
+      const c = await runSummaryCacheStore.get(urlKey, loop.loopId)
+      if (c?.summary?.outcome) childOutcomes[loop.loopId] = c.summary.outcome
+    }
+  }
+
+  const { summary, model } = await generateSessionSummary(session, { apiKey, model: DEFAULT_SESSION_SUMMARY_MODEL, childOutcomes })
+  await sessionSummaryCacheStore.put(urlKey, session.sessionId, { inputHash, summary, model })
+}
 
 // Brief cache: AI-generated current-state task briefs, keyed on context hash
 const briefCacheCollection = db.collection('brief-cache')
@@ -1046,6 +1080,15 @@ async function getWorkspaceAccessToken(urlKey) {
   return (await resolveWorkspaceAccess(urlKey)).token;
 }
 
+// Short-lived in-process memo for the workspace issue set (LIN-632). The
+// session-context drill-in fetches ALL of a workspace's projects+issues live
+// from Linear; without this, every repeat drill-in (and the 5s observation poll
+// behind it) refetched the whole workspace. A ~30s TTL is longer than the poll
+// cadence so warm drill-ins reuse, but short enough to stay fresh. Keyed by
+// workspace id (urlKey fallback). Bypassed in test mode (deterministic mock).
+const WORKSPACE_ISSUES_MEMO_TTL_MS = 30 * 1000;
+const _workspaceIssuesMemo = new Map(); // key → { issues, cachedAt }
+
 // Load a workspace's canonical issue set (the dashboard session-context endpoint,
 // LIN-593). Mirrors the Context API's data path: test-token workspaces read the
 // Linear-shaped mock, real ones read through the provider. Returns [] defensively.
@@ -1053,8 +1096,18 @@ async function fetchWorkspaceIssues(workspace) {
   if (!workspace) return [];
   const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
   if (isTestMode) return testMockData.issues;
+
+  const memoKey = workspace.id || workspace.urlKey;
+  if (memoKey) {
+    const hit = _workspaceIssuesMemo.get(memoKey);
+    if (hit && Date.now() - hit.cachedAt < WORKSPACE_ISSUES_MEMO_TTL_MS) {
+      return hit.issues;
+    }
+  }
   const { issues } = await getProviderForWorkspace(workspace).fetchProjects(getWorkspaceToken(workspace));
-  return issues || [];
+  const result = issues || [];
+  if (memoKey) _workspaceIssuesMemo.set(memoKey, { issues: result, cachedAt: Date.now() });
+  return result;
 }
 
 // getWorkspaceOpenRouterKey: resolves the token creator's OpenRouter API key for
