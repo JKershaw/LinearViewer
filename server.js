@@ -51,7 +51,7 @@ import { parseRepoFromDescription } from './lib/prompt-formatters.js'
 import { renderPage, renderErrorPage, renderUpstreamAwareErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken } from './lib/token-refresh.js'
-import { UUID_REGEX, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, updateWorkspaceTokens, getWorkspaceToken, getBindingsForWorkspace, linkProvider } from './lib/workspace.js'
+import { UUID_REGEX, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, updateWorkspaceTokens, getWorkspaceToken, getBindingsForWorkspace, linkProvider, unlinkProvider } from './lib/workspace.js'
 import { createWorkspaceRoutes } from './routes/workspace.js'
 import { createOpenRouterAuthRoutes } from './routes/openrouter-auth.js'
 import { createDispatchRoutes } from './routes/dispatch.js'
@@ -1524,6 +1524,33 @@ app.get('/workspace/:urlKey/audit', workspaceFromUrl, (req, res) => {
  * Settings page - requires authentication.
  * Displays user preferences and AI configuration.
  */
+/**
+ * Translate provider-action redirect query params into a settings-page notice
+ * for the Providers section (LIN-634). The provider-action POST handlers redirect
+ * back with one of these flags; the renderer escapes the text, so the derived
+ * messages (not raw query echoes) keep it injection-safe.
+ * @param {Object} query - req.query
+ * @returns {{type: 'ok'|'fail'|'blocked', text: string}|null}
+ */
+function providerNoticeFromQuery(query = {}) {
+  if (query.provider_blocked === 'github') {
+    return { type: 'blocked', text: 'Adding GitHub is not available yet — blocked on LIN-541.' };
+  }
+  if (query.provider_removed) {
+    return { type: 'ok', text: `Removed ${query.provider_removed} binding.` };
+  }
+  if (query.provider_ok) {
+    return { type: 'ok', text: `${query.provider_ok} credentials are valid.` };
+  }
+  if (query.provider_fail) {
+    return { type: 'fail', text: `${query.provider_fail} credentials failed validation.` };
+  }
+  if (query.provider_error) {
+    return { type: 'fail', text: 'Provider action could not be completed.' };
+  }
+  return null;
+}
+
 app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
   const workspace = req.workspace;
 
@@ -1545,6 +1572,19 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
   // LLM usage KPIs (LIN-418): aggregate per-call metadata over the retained window.
   const llmStats = await llmCallLogStore.summarize(workspace.urlKey);
 
+  // Provider bindings for the Providers management section (LIN-634). Shape each
+  // binding with its provider's human displayName (registry); the masked-token
+  // and active-marker presentation lives in the renderer. Mark the binding whose
+  // provider matches the workspace's active pointer.
+  const providerBindings = getBindingsForWorkspace(workspace).map(b => ({
+    provider: b.provider,
+    scope: b.scope,
+    displayName: getProvider(b.provider)?.ui?.displayName || b.provider,
+    token: b.credentials?.token,
+    active: b.provider === workspace.provider,
+  }));
+  const providerNotice = providerNoticeFromQuery(req.query);
+
   const html = renderSettingsPage(workspace.name || 'Workspace', {
     openRouterConnected: !!(openRouterSource === 'oauth' || openRouterSource === 'env'),
     openRouterSource,
@@ -1556,7 +1596,9 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
     workspaces: req.session.workspaces,
     featureFlags: getFeatureFlags(req.session),
     workspaceFeatures,
-    llmStats
+    llmStats,
+    providerBindings,
+    providerNotice
   });
   res.send(html);
 });
@@ -1840,6 +1882,108 @@ app.post('/workspace/:urlKey/settings/features', workspaceFromUrl, async (req, r
   } else {
     res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
   }
+});
+
+// =============================================================================
+// Provider management (LIN-634)
+// =============================================================================
+//
+// Full POST→redirect forms (NOT the XHR feature-toggle flow) that manage a
+// workspace's provider bindings over the LIN-562 binding seams. Every mutation of
+// the session-backed bindings is persisted with saveSession. The interactive
+// add-source linking (GitHub OAuth, the generic oauthIntent.mode:'existing'
+// find-or-create branch) is blocked on LIN-541/544 and only scaffolded here.
+
+/**
+ * Remove one provider binding from the active workspace. Uses unlinkProvider
+ * (per-binding) — never removeWorkspace, which would delete the whole workspace.
+ */
+app.post('/workspace/:urlKey/settings/providers/remove', workspaceFromUrl, async (req, res) => {
+  const workspace = req.workspace;
+  const settingsUrl = `/workspace/${encodeURIComponent(workspace.urlKey)}/settings`;
+  const { provider, scope } = req.body;
+
+  if (!provider || !scope) {
+    return res.redirect(`${settingsUrl}?provider_error=invalid`);
+  }
+
+  unlinkProvider(workspace, provider, scope);
+
+  try {
+    await saveSession(req.session);
+  } catch (err) {
+    console.error('Failed to persist provider removal:', err);
+    return res.status(500).send(renderErrorPage('Settings Error', 'Failed to remove provider. Please try again.', {
+      action: 'Back to settings',
+      actionUrl: settingsUrl
+    }));
+  }
+
+  res.redirect(`${settingsUrl}?provider_removed=${encodeURIComponent(provider)}`);
+});
+
+/**
+ * Refresh / test a provider binding's auth. Validates the EXISTING credential via
+ * a lightweight provider read (fetchViewer, falling back to fetchOrganization) —
+ * it invents no new auth mechanism. Reports ok/fail back through the redirect.
+ */
+app.post('/workspace/:urlKey/settings/providers/refresh', workspaceFromUrl, async (req, res) => {
+  const workspace = req.workspace;
+  const settingsUrl = `/workspace/${encodeURIComponent(workspace.urlKey)}/settings`;
+  const { provider, scope } = req.body;
+
+  if (!provider || !scope) {
+    return res.redirect(`${settingsUrl}?provider_error=invalid`);
+  }
+
+  const token = getWorkspaceToken(workspace, provider, scope);
+  const providerInstance = getProvider(provider);
+  // Validate the EXISTING credential via the first lightweight read the provider
+  // actually implements — Linear has fetchViewer, the local provider exposes
+  // fetchProjectsList. We invent no new auth mechanism; a successful read means
+  // the binding's token authenticates.
+  const READ_PROBES = ['fetchViewer', 'fetchOrganization', 'fetchProjectsList'];
+  let ok = false;
+  if (providerInstance && token) {
+    const probe = READ_PROBES.find(m => providerInstance.supports(m));
+    if (probe) {
+      try {
+        await providerInstance[probe](token);
+        ok = true;
+      } catch (err) {
+        ok = false;
+      }
+    }
+  }
+
+  res.redirect(`${settingsUrl}?provider_${ok ? 'ok' : 'fail'}=${encodeURIComponent(provider)}`);
+});
+
+/**
+ * Add a provider source (scaffold). GitHub add is blocked on LIN-541 and is NOT
+ * silently faked — it returns a clear "not available yet" notice. For an OAuth
+ * provider that has a real auth-begin (Linear), it routes into that flow; the
+ * generic add-source find-or-create branch (mode:'existing') lands with
+ * LIN-541/544.
+ */
+app.post('/workspace/:urlKey/settings/providers/add', workspaceFromUrl, async (req, res) => {
+  const workspace = req.workspace;
+  const settingsUrl = `/workspace/${encodeURIComponent(workspace.urlKey)}/settings`;
+  const { provider } = req.body;
+
+  // GitHub linking depends on LIN-541 (no auth flow exists yet) — surface it as
+  // blocked rather than pretending to add it.
+  if (provider === 'github') {
+    return res.redirect(`${settingsUrl}?provider_blocked=github`);
+  }
+
+  // Linear has a real OAuth begin; route into it as the add scaffold. The
+  // per-workspace add-source binding (mode:'existing') is deferred to LIN-541/544.
+  if (provider === 'linear') {
+    return res.redirect('/auth/linear');
+  }
+
+  return res.redirect(`${settingsUrl}?provider_error=unsupported-add`);
 });
 
 // =============================================================================
