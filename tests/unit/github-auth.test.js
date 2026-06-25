@@ -286,8 +286,8 @@ describe('GitHub auth routes', () => {
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'github' } });
     await handler({ query: { installation_id: '99', setup_action: 'install', state: 'real' }, session }, res);
     // Installation token + installation-account identity held in pending; installationId
-    // carried for the binding-shape surface (LIN-711).
-    assert.deepEqual(session.githubPending, { token: 'ghs_inst', mode: 'new', login: 'octocat', userId: '42', installationId: '99' });
+    // (re-mint key) and the raw expires_at both carried for the binding-shape surface (LIN-711).
+    assert.deepEqual(session.githubPending, { token: 'ghs_inst', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' });
     assert.match(res.body, /octocat\/hello-world/);
     assert.match(res.body, /github-repo-form/);
   });
@@ -298,7 +298,7 @@ describe('GitHub auth routes', () => {
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'add-source', provider: 'github', workspaceUrlKey: 'acme' } });
     await handler({ query: { installation_id: '99', state: 'real' }, session }, res);
-    assert.deepEqual(session.githubPending, { token: 'ghs_inst', mode: 'add-source', login: 'octocat', userId: '42', installationId: '99', workspaceUrlKey: 'acme' });
+    assert.deepEqual(session.githubPending, { token: 'ghs_inst', mode: 'add-source', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z', workspaceUrlKey: 'acme' });
   });
 
   test('GET callback surfaces a clean 400 when the installation-token mint fails', async () => {
@@ -315,7 +315,7 @@ describe('GitHub auth routes', () => {
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const session = makeSession({
-      githubPending: { token: 'gho_token', mode: 'new', login: 'octocat', userId: '42' },
+      githubPending: { token: 'gho_token', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
       workspaces: [],
     });
     await handler({ body: { repo: 'octocat/hello-world' }, session }, res);
@@ -325,7 +325,12 @@ describe('GitHub auth routes', () => {
     assert.equal(ws.id, 'github:42');
     assert.equal(ws.urlKey, 'octocat');
     assert.equal(ws.provider, 'github');
-    assert.deepEqual(ws.bindings, [{ provider: 'github', scope: 'octocat/hello-world', credentials: { token: 'gho_token', tokenExpiresAt: Number.MAX_SAFE_INTEGER } }]);
+    // GitHub App binding shape (LIN-711): installationId persisted (re-mint key) and
+    // a REAL ms expiry from expires_at, not the old never-expires MAX.
+    const expectedExpiry = Date.parse('2026-06-25T20:00:00Z');
+    assert.deepEqual(ws.bindings, [{ provider: 'github', scope: 'octocat/hello-world', credentials: { installationId: '99', token: 'gho_token', tokenExpiresAt: expectedExpiry } }]);
+    assert.equal(ws.tokenExpiresAt, expectedExpiry, 'workspace stamp is the real expiry, not MAX');
+    assert.notEqual(ws.tokenExpiresAt, Number.MAX_SAFE_INTEGER);
     assert.equal(session.activeWorkspaceId, 'github:42');
     assert.equal(session.githubPending, undefined, 'pending cleared');
     assert.equal(res.redirectedTo, '/workspace/octocat/');
@@ -340,7 +345,7 @@ describe('GitHub auth routes', () => {
       bindings: [{ provider: 'github', scope: 'octocat/hello-world', credentials: { token: 'gho_token' } }],
     };
     const session = makeSession({
-      githubPending: { token: 'gho_token', mode: 'new', login: 'octocat', userId: '42' },
+      githubPending: { token: 'gho_token', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
       workspaces: [existing],
     });
     await handler({ body: { repo: 'octocat/another-repo' }, session }, res);
@@ -355,7 +360,7 @@ describe('GitHub auth routes', () => {
     const res = makeRes();
     const linearWs = { id: 'org-1', name: 'Acme', urlKey: 'acme', provider: 'linear', accessToken: 'lin_tok' };
     const session = makeSession({
-      githubPending: { token: 'gho_token', mode: 'add-source', login: 'octocat', userId: '42' },
+      githubPending: { token: 'gho_token', mode: 'add-source', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
       workspaces: [linearWs],
       activeWorkspaceId: 'org-1',
     });
@@ -375,7 +380,7 @@ describe('GitHub auth routes', () => {
     const viewedWs = { id: 'org-a', name: 'Acme', urlKey: 'acme', provider: 'linear', accessToken: 'lin_a' };
     const activeWs = { id: 'org-b', name: 'Globex', urlKey: 'globex', provider: 'linear', accessToken: 'lin_b' };
     const session = makeSession({
-      githubPending: { token: 'gho_token', mode: 'add-source', login: 'octocat', userId: '42', workspaceUrlKey: 'acme' },
+      githubPending: { token: 'gho_token', mode: 'add-source', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z', workspaceUrlKey: 'acme' },
       workspaces: [viewedWs, activeWs],
       activeWorkspaceId: 'org-b',
     });
@@ -393,7 +398,7 @@ describe('GitHub auth routes', () => {
     const res = makeRes();
     const activeWs = { id: 'org-b', name: 'Globex', urlKey: 'globex', provider: 'linear', accessToken: 'lin_b' };
     const session = makeSession({
-      githubPending: { token: 'gho_token', mode: 'add-source', login: 'octocat', userId: '42' },
+      githubPending: { token: 'gho_token', mode: 'add-source', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
       workspaces: [activeWs],
       activeWorkspaceId: 'org-b',
     });
@@ -409,7 +414,7 @@ describe('GitHub auth routes', () => {
     const res = makeRes();
     const activeWs = { id: 'org-b', name: 'Globex', urlKey: 'globex', provider: 'linear', accessToken: 'lin_b' };
     const session = makeSession({
-      githubPending: { token: 'gho_token', mode: 'add-source', login: 'octocat', userId: '42', workspaceUrlKey: 'gone' },
+      githubPending: { token: 'gho_token', mode: 'add-source', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z', workspaceUrlKey: 'gone' },
       workspaces: [activeWs],
       activeWorkspaceId: 'org-b',
     });
@@ -426,6 +431,45 @@ describe('GitHub auth routes', () => {
     await handler({ body: { repo: 'octocat/hello-world' }, session: makeSession() }, res);
     assert.equal(res.statusCode, 400);
     assert.match(res.body, /Session Expired/);
+  });
+
+  test('POST link (add-source) writes the LIN-711 binding shape: installationId + real ms expiry', async () => {
+    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const handler = getHandler(router, 'post', '/auth/github/link');
+    const res = makeRes();
+    const linearWs = { id: 'org-1', name: 'Acme', urlKey: 'acme', provider: 'linear', accessToken: 'lin_tok' };
+    const session = makeSession({
+      githubPending: { token: 'ghs_inst', mode: 'add-source', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [linearWs],
+      activeWorkspaceId: 'org-1',
+    });
+    await handler({ body: { repo: 'octocat/hello-world' }, session }, res);
+
+    const binding = linearWs.bindings.find(b => b.provider === 'github');
+    assert.deepEqual(binding.credentials, {
+      installationId: '99',
+      token: 'ghs_inst',
+      tokenExpiresAt: Date.parse('2026-06-25T20:00:00Z'),
+    });
+    // A non-active binding must NOT clobber the Linear primary's scalar mirror.
+    assert.equal(linearWs.provider, 'linear');
+    assert.equal(linearWs.accessToken, 'lin_tok');
+  });
+
+  test('POST link surfaces a clean error when the installation expiry is missing/unparseable (LIN-711)', async () => {
+    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const handler = getHandler(router, 'post', '/auth/github/link');
+    const res = makeRes();
+    // No tokenExpiresAt carried — must NOT silently fall back to a never-expires stamp.
+    const session = makeSession({
+      githubPending: { token: 'gho_token', mode: 'new', login: 'octocat', userId: '42', installationId: '99' },
+      workspaces: [],
+    });
+    await handler({ body: { repo: 'octocat/hello-world' }, session }, res);
+    assert.equal(res.statusCode, 500);
+    assert.match(res.body, /Something Went Wrong/);
+    // No workspace/binding was written from a bad expiry.
+    assert.equal(session.workspaces.length, 0);
   });
 
   test('POST link rejects a malformed repo slug', async () => {
