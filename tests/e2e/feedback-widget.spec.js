@@ -63,6 +63,64 @@ test.describe('Feedback widget', () => {
     await expect(page.getByTestId('feedback-message')).toHaveValue('Half-written feedback')
     await expect(page.getByTestId('feedback-priority')).toHaveValue('2')
   })
+
+  // LIN-704: a selected screenshot must be removable (a native file input
+  // cannot be cleared by the user), and a failed client-side read must not
+  // dead-end the user on the same unreadable file.
+  test('shows a remove control once a screenshot is selected and clears it', async ({ page, seedLocal }) => {
+    const { urlKey } = await seedLocal()
+    await enableWidget(page, urlKey)
+
+    await page.getByTestId('feedback-fab').click()
+    const remove = page.getByTestId('feedback-file-remove')
+    await expect(remove).toBeHidden()
+
+    await page.getByTestId('feedback-file').setInputFiles({
+      name: 'shot.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from('iVBORw0KGgo=', 'base64')
+    })
+    await expect(remove).toBeVisible()
+
+    await remove.click()
+    await expect(remove).toBeHidden()
+    await expect(page.getByTestId('feedback-file')).toHaveValue('')
+    await expect(page.getByTestId('feedback-status')).toHaveText('Screenshot removed.')
+  })
+
+  test('recovers from an unreadable screenshot: clears it and offers a retry path', async ({ page, seedLocal }) => {
+    const { urlKey } = await seedLocal()
+    await enableWidget(page, urlKey)
+
+    await page.getByTestId('feedback-fab').click()
+
+    // Force the client-side FileReader read to fail, mimicking the device-side
+    // NotReadableError an Android-Chrome content-provider read can throw — the
+    // exact failure this ticket reproduces.
+    await page.evaluate(() => {
+      window.FileReader.prototype.readAsDataURL = function () {
+        setTimeout(() => { if (this.onerror) this.onerror(new Event('error')) }, 0)
+      }
+    })
+
+    await page.getByTestId('feedback-message').fill('Feedback with a bad screenshot')
+    await page.getByTestId('feedback-file').setInputFiles({
+      name: 'bad.jpg',
+      mimeType: 'image/jpeg',
+      buffer: Buffer.from('not-a-real-image')
+    })
+    await expect(page.getByTestId('feedback-file-remove')).toBeVisible()
+
+    await page.getByTestId('feedback-submit').click()
+
+    // The error explains the problem and the recovery path; the unreadable file
+    // is dropped (remove control hidden, input cleared) and Send is re-enabled
+    // so the user is no longer stuck.
+    await expect(page.getByTestId('feedback-status')).toContainText("Couldn't read that image")
+    await expect(page.getByTestId('feedback-file-remove')).toBeHidden()
+    await expect(page.getByTestId('feedback-file')).toHaveValue('')
+    await expect(page.getByTestId('feedback-submit')).toBeEnabled()
+  })
 })
 
 // Enable the flag via the footer toggle and land on a reloaded page with the

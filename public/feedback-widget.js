@@ -143,6 +143,8 @@
           <label class="feedback-label" for="feedback-file">Screenshot (optional)</label>
           <input id="feedback-file" class="feedback-file" data-testid="feedback-file"
                  type="file" accept="image/*">
+          <button type="button" class="feedback-file-remove" data-testid="feedback-file-remove"
+                  hidden>Remove screenshot</button>
           <div class="feedback-status" data-testid="feedback-status" role="status" aria-live="polite"></div>
           <div class="feedback-popup-foot">
             <button type="button" class="feedback-submit" data-testid="feedback-submit">Send feedback</button>
@@ -155,6 +157,7 @@
     const messageEl = root.querySelector('.feedback-message');
     const priorityEl = root.querySelector('.feedback-priority');
     const fileEl = root.querySelector('.feedback-file');
+    const removeFileBtn = root.querySelector('.feedback-file-remove');
     const statusEl = root.querySelector('.feedback-status');
     const submitBtn = root.querySelector('.feedback-submit');
     const minBtn = root.querySelector('.feedback-min');
@@ -172,6 +175,22 @@
     function reflectDraftIndicator() {
       const hasDraft = !!messageEl.value.trim();
       fab.classList.toggle('feedback-fab-draft', hasDraft);
+    }
+
+    // The remove control only exists while a screenshot is selected; it gives
+    // the user the escape hatch a native file input lacks.
+    function reflectFileSelection() {
+      removeFileBtn.hidden = !selectedFile;
+    }
+
+    // Drop the current screenshot and reset the native input. Resetting
+    // fileEl.value is essential: a native <input type=file> cannot be cleared
+    // by the user, and an unreadable file would otherwise re-fail on every
+    // retry.
+    function clearSelectedFile() {
+      selectedFile = null;
+      fileEl.value = '';
+      reflectFileSelection();
     }
 
     function open() {
@@ -202,15 +221,20 @@
 
     fileEl.addEventListener('change', () => {
       const file = fileEl.files && fileEl.files[0];
-      if (!file) { selectedFile = null; setStatus(''); return; }
+      if (!file) { clearSelectedFile(); setStatus(''); return; }
       if (file.size > MAX_IMAGE_BYTES) {
-        selectedFile = null;
-        fileEl.value = '';
+        clearSelectedFile();
         setStatus('That image is too large (max 7MB). Pick a smaller one or submit without it.', 'error');
         return;
       }
       selectedFile = file;
+      reflectFileSelection();
       setStatus('');
+    });
+
+    removeFileBtn.addEventListener('click', () => {
+      clearSelectedFile();
+      setStatus('Screenshot removed.');
     });
 
     submitBtn.addEventListener('click', async () => {
@@ -231,7 +255,11 @@
             image = await readFileAsDataUrl(selectedFile);
           } catch (readErr) {
             console.error('Failed to read screenshot:', readErr);
-            setStatus('Could not read that screenshot. You can submit without it.', 'error');
+            // Drop the unreadable file so the user isn't stuck retrying it
+            // forever — pressing Send again now submits without it, or they
+            // can pick a different image.
+            clearSelectedFile();
+            setStatus("Couldn't read that image on this device — it's been removed. Pick a different one, or press Send to submit without it.", 'error');
             submitBtn.disabled = false;
             return;
           }
@@ -261,8 +289,7 @@
           clearDraft();
           messageEl.value = '';
           priorityEl.value = '0';
-          fileEl.value = '';
-          selectedFile = null;
+          clearSelectedFile();
           reflectDraftIndicator();
           const ident = data.issue && (data.issue.identifier || data.issue.id);
           setStatus(ident ? `Thanks! Filed ${ident}.` : 'Thanks! Your feedback was filed.', 'success');
@@ -287,6 +314,7 @@
     });
 
     reflectDraftIndicator();
+    reflectFileSelection();
   }
 
   if (document.readyState === 'loading') {
