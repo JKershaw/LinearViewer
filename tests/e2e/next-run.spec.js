@@ -91,6 +91,10 @@ test.describe('Suggested Next Run Page (experimental)', () => {
     test('the summary intro is hidden until a generation returns (LIN-638)', async ({ page }) => {
       await expect(page.locator('#next-run-summary')).toBeHidden();
     });
+
+    test('the analysis preamble is hidden until a generation returns (LIN-642)', async ({ page }) => {
+      await expect(page.locator('#next-run-analysis')).toBeHidden();
+    });
   });
 
   test.describe('Generation', () => {
@@ -144,6 +148,52 @@ test.describe('Suggested Next Run Page (experimental)', () => {
       const href = await accept.getAttribute('href');
       expect(href).toContain('/dispatch');
       expect(href).not.toContain('goal=');
+    });
+
+    test('guarantees at least one option for each size S/M/L (LIN-642)', async ({ page }) => {
+      await page.locator('#next-run-generate').click();
+      await expect(page.locator('.next-run-option').first()).toBeVisible({ timeout: 5000 });
+
+      // Every concrete size must be represented at least once (the open option is XL).
+      for (const size of ['S', 'M', 'L']) {
+        await expect(
+          page.locator('.next-run-size', { hasText: new RegExp(`^${size}$`) })
+        ).not.toHaveCount(0);
+      }
+    });
+
+    test('cards show a standalone headline title, not the goal first line (LIN-642)', async ({ page }) => {
+      await page.locator('#next-run-generate').click();
+      const card = page.locator('.next-run-option:not(.next-run-option-open)').first();
+      await expect(card).toBeVisible({ timeout: 5000 });
+      // The mock titles are "Finish TEST-1: …" / "Start TEST-2: …" — a headline,
+      // distinct from the goal prose ("Drive …" / "Start …: research …").
+      const preview = card.locator('.next-run-goal-preview');
+      await expect(preview).toBeVisible();
+      await expect(preview).toContainText('TEST-');
+    });
+
+    test('expanding a card lists its referenced tasks at the end (LIN-642)', async ({ page }) => {
+      await page.locator('#next-run-generate').click();
+      const card = page.locator('.next-run-option:not(.next-run-option-open)').first();
+      await expect(card).toBeVisible({ timeout: 5000 });
+      await card.locator('.next-run-option-head').click();
+
+      const refs = card.locator('.next-run-refs');
+      await expect(refs).toBeVisible();
+      // Referenced ids render as machine-readable identifier tags.
+      await expect(refs.locator('.next-run-ref').first()).toContainText('TEST-');
+    });
+
+    test('a visible global analysis section appears above the cards (LIN-642)', async ({ page }) => {
+      await page.locator('#next-run-generate').click();
+
+      const analysis = page.locator('#next-run-analysis');
+      await expect(analysis).toBeVisible({ timeout: 5000 });
+      await expect(page.locator('#next-run-analysis-body')).not.toBeEmpty();
+
+      // It renders above the options list in DOM order.
+      await expect(page.locator('#next-run-analysis ~ #next-run-options')).toHaveCount(1);
     });
 
     test('a deterministic summary intro appears above the options (LIN-638)', async ({ page }) => {
@@ -285,6 +335,20 @@ test.describe('Suggested Next Run Page (experimental)', () => {
       // Parity with the live path: the grounding context is returned, not discarded.
       expect(typeof body.context).toBe('string');
       expect(body.context.length).toBeGreaterThan(0);
+
+      // LIN-642 contract: a global analysis preamble, per-size S/M/L coverage, and
+      // every concrete option carries a title + machine-readable referencedTaskIds.
+      expect(typeof body.analysis).toBe('string');
+      expect(body.analysis.length).toBeGreaterThan(0);
+      const concrete = body.options.filter(o => !o.continueUntilStopped);
+      for (const size of ['S', 'M', 'L']) {
+        expect(concrete.some(o => o.size === size)).toBe(true);
+      }
+      for (const o of concrete) {
+        expect(typeof o.title).toBe('string');
+        expect(o.title.length).toBeGreaterThan(0);
+        expect(Array.isArray(o.referencedTaskIds)).toBe(true);
+      }
     });
   });
 });

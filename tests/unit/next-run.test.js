@@ -18,9 +18,12 @@ import {
   buildNextRunMessages,
   buildNextRunSummary,
   parseGoalSuggestions,
+  parseNextRunResponse,
+  ensureSizeCoverage,
   normalizeSize,
   generateGoalSuggestions,
   CONTINUE_UNTIL_STOPPED_OPTION,
+  REQUIRED_SIZES,
   TSHIRT_SIZES,
 } from '../../lib/next-run.js';
 import { buildRoadmapModel } from '../../lib/roadmap.js';
@@ -176,13 +179,96 @@ describe('parseGoalSuggestions', () => {
   test('caps at the generated maximum', () => {
     const many = Array.from({ length: 12 }, (_, i) => ({ goal: `g${i}`, size: 'M' }));
     const out = parseGoalSuggestions(JSON.stringify({ options: many }));
-    assert.ok(out.length <= 5);
+    assert.ok(out.length <= 6);
   });
 
   test('returns [] for garbage', () => {
     assert.deepEqual(parseGoalSuggestions('not json at all'), []);
     assert.deepEqual(parseGoalSuggestions(''), []);
     assert.deepEqual(parseGoalSuggestions(null), []);
+  });
+
+  test('parses a headline title and falls back to the goal first line (LIN-642)', () => {
+    const raw = JSON.stringify({ options: [
+      { goal: 'Line one.\nLine two.', reasoning: 'r', size: 'M', title: 'Ship the proxy migration' },
+      { goal: 'Untitled first line.\nmore', reasoning: 'r', size: 'S' },
+    ] });
+    const out = parseGoalSuggestions(raw);
+    assert.equal(out[0].title, 'Ship the proxy migration');
+    assert.equal(out[1].title, 'Untitled first line.');
+  });
+
+  test('normalizes machine-readable referencedTaskIds (LIN-642)', () => {
+    const raw = JSON.stringify({ options: [
+      { goal: 'g', size: 'M', referencedTaskIds: ['LIN-10', 'LIN-10', ' LIN-11 ', 42, ''] },
+      { goal: 'g2', size: 'S', referencedTaskIds: 'LIN-12' },
+      { goal: 'g3', size: 'L' },
+    ] });
+    const out = parseGoalSuggestions(raw);
+    // Deduped, trimmed, non-strings dropped.
+    assert.deepEqual(out[0].referencedTaskIds, ['LIN-10', 'LIN-11']);
+    // A bare string is tolerated as a single-id list.
+    assert.deepEqual(out[1].referencedTaskIds, ['LIN-12']);
+    // Absent → [].
+    assert.deepEqual(out[2].referencedTaskIds, []);
+  });
+});
+
+describe('parseNextRunResponse (LIN-642)', () => {
+  test('extracts the global analysis preamble alongside the options', () => {
+    const raw = JSON.stringify({
+      analysis: 'The project has stalled WIP; clearing it is the priority.',
+      options: [{ goal: 'g', reasoning: 'r', size: 'M', title: 'T' }],
+    });
+    const { analysis, options } = parseNextRunResponse(raw);
+    assert.match(analysis, /stalled WIP/);
+    assert.equal(options.length, 1);
+    assert.equal(options[0].title, 'T');
+  });
+
+  test('analysis defaults to empty string when absent or on garbage', () => {
+    assert.equal(parseNextRunResponse(JSON.stringify({ options: [] })).analysis, '');
+    assert.deepEqual(parseNextRunResponse('garbage'), { analysis: '', options: [] });
+  });
+});
+
+describe('ensureSizeCoverage (LIN-642)', () => {
+  test('fills missing sizes from the execution queue and leaves present ones', () => {
+    const opts = [{ title: 'a', goal: 'g', reasoning: 'r', size: 'M', referencedTaskIds: ['LIN-1'] }];
+    const out = ensureSizeCoverage(opts, RICH_MODEL);
+    const sizes = out.map(o => o.size);
+    for (const s of REQUIRED_SIZES) assert.ok(sizes.includes(s), `missing ${s}`);
+    // The original option is preserved as-is and leads.
+    assert.equal(out[0].size, 'M');
+    assert.equal(out[0].referencedTaskIds[0], 'LIN-1');
+    // Fills are grounded in real queue identifiers and flagged synthesized.
+    const fills = out.filter(o => o.synthesized);
+    assert.equal(fills.length, 2); // S and L
+    for (const f of fills) {
+      assert.ok(REQUIRED_SIZES.includes(f.size));
+      if (f.referencedTaskIds.length) {
+        assert.ok(RICH_MODEL.executionQueue.some(c => c.identifier === f.referencedTaskIds[0]));
+      }
+    }
+  });
+
+  test('is a no-op when all three sizes are already present', () => {
+    const opts = [
+      { title: 's', goal: 'g', size: 'S', referencedTaskIds: [] },
+      { title: 'm', goal: 'g', size: 'M', referencedTaskIds: [] },
+      { title: 'l', goal: 'g', size: 'L', referencedTaskIds: [] },
+    ];
+    const out = ensureSizeCoverage(opts, RICH_MODEL);
+    assert.equal(out.length, 3);
+    assert.ok(!out.some(o => o.synthesized));
+  });
+
+  test('still guarantees coverage with an empty queue (generic fills)', () => {
+    const out = ensureSizeCoverage([], { executionQueue: [] });
+    const sizes = out.map(o => o.size);
+    for (const s of REQUIRED_SIZES) assert.ok(sizes.includes(s));
+    // No queue → generic fills with no referenced ids.
+    assert.ok(out.every(o => o.referencedTaskIds.length === 0));
   });
 });
 
@@ -202,6 +288,14 @@ describe('CONTINUE_UNTIL_STOPPED_OPTION', () => {
     // LLM goals are constrained to S/M/L, so XL must live here and nowhere else.
     assert.equal(CONTINUE_UNTIL_STOPPED_OPTION.size, 'XL');
   });
+
+  test('satisfies the new schema — has a headline title and empty referenced ids (LIN-642)', () => {
+    // The frozen option must satisfy the same contract concrete options do, so the
+    // page renders it without special-casing missing fields.
+    assert.equal(typeof CONTINUE_UNTIL_STOPPED_OPTION.title, 'string');
+    assert.ok(CONTINUE_UNTIL_STOPPED_OPTION.title.length > 0);
+    assert.deepEqual([...CONTINUE_UNTIL_STOPPED_OPTION.referencedTaskIds], []);
+  });
 });
 
 describe('generateGoalSuggestions return shape (LIN-633)', () => {
@@ -219,7 +313,7 @@ describe('generateGoalSuggestions return shape (LIN-633)', () => {
   }
 
   test('returns the grounding context verbatim plus the XL open-ended option', async () => {
-    const raw = JSON.stringify({ options: [{ goal: 'Finish the in-flight work.', reasoning: 'WIP first.', size: 'M' }] });
+    const raw = JSON.stringify({ analysis: 'WIP first.', options: [{ goal: 'Finish the in-flight work.', reasoning: 'WIP first.', size: 'M', title: 'Finish the in-flight work' }] });
     global.fetch = mock.fn(async () => mockStreamResponse(raw));
 
     const result = await generateGoalSuggestions(
@@ -236,11 +330,46 @@ describe('generateGoalSuggestions return shape (LIN-633)', () => {
     assert.equal(typeof result.summary, 'string');
     assert.equal(result.summary, buildNextRunSummary(buildRoadmapModel([], []), 'Acme'));
 
+    // analysis (the global think-first preamble) is surfaced (LIN-642).
+    assert.equal(result.analysis, 'WIP first.');
+
     // The concrete option survives; the guaranteed open-ended option is appended last as XL.
     const last = result.options[result.options.length - 1];
     assert.equal(last.continueUntilStopped, true);
     assert.equal(last.goal, '');
     assert.equal(last.size, 'XL');
     assert.ok(result.options.some(o => o.goal === 'Finish the in-flight work.' && o.size === 'M'));
+  });
+
+  test('guarantees ≥1 option per size S/M/L even when the LLM returns only one (LIN-642)', async () => {
+    // The model returns a single M option; the deterministic backstop must fill S and L.
+    const raw = JSON.stringify({ analysis: '', options: [{ goal: 'Just one direction.', reasoning: 'r', size: 'M', title: 'One' }] });
+    global.fetch = mock.fn(async () => mockStreamResponse(raw));
+
+    const result = await generateGoalSuggestions(
+      { projects: [], issues: [], organizationName: 'Acme' },
+      { apiKey: 'test-key' }
+    );
+
+    const concrete = result.options.filter(o => !o.continueUntilStopped);
+    const sizes = new Set(concrete.map(o => o.size));
+    for (const s of REQUIRED_SIZES) assert.ok(sizes.has(s), `missing size ${s}`);
+  });
+
+  test('drops referencedTaskIds the model hallucinated, keeps real ones (LIN-642)', async () => {
+    const issues = [
+      { id: 'i1', identifier: 'LIN-1', title: 'Real task', state: { type: 'started' }, estimate: 2 },
+    ];
+    const raw = JSON.stringify({ options: [
+      { goal: 'Act on real + fake.', reasoning: 'r', size: 'M', title: 'T', referencedTaskIds: ['LIN-1', 'LIN-999'] },
+    ] });
+    global.fetch = mock.fn(async () => mockStreamResponse(raw));
+
+    const result = await generateGoalSuggestions(
+      { projects: [], issues, organizationName: 'Acme' },
+      { apiKey: 'test-key' }
+    );
+    const opt = result.options.find(o => o.title === 'T');
+    assert.deepEqual(opt.referencedTaskIds, ['LIN-1']);
   });
 });
