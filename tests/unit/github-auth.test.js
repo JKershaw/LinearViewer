@@ -44,7 +44,11 @@ describe('GitHubProvider auth primitives', () => {
     assert.equal(params.get('client_id'), 'cid');
     assert.equal(params.get('redirect_uri'), 'http://localhost:3000/auth/github/callback');
     assert.equal(params.get('state'), 'nonce-123');
-    assert.match(params.get('scope'), /repo/);
+    // Scope is narrowed to exactly `repo read:user` — `read:org` was dropped
+    // (LIN-702 S2); org-owned repos still enumerate via the `affiliation` filter,
+    // gated by the org's third-party-app policy rather than this scope.
+    assert.equal(params.get('scope'), 'repo read:user');
+    assert.doesNotMatch(params.get('scope'), /read:org/);
   });
 
   test('completeAuth returns a normalized token bag on success', async () => {
