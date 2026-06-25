@@ -11,7 +11,7 @@ test.describe('Landing Page', () => {
     await page.goto('/');
 
     // Should show the organization name from landing.md
-    await expect(page.locator('h1')).toContainText('Linear Projects Viewer');
+    await expect(page.locator('h1')).toContainText('Harbour');
   });
 
   test('does not show login or reset in header', async ({ page }) => {
@@ -43,14 +43,13 @@ test.describe('Landing Page', () => {
   test('displays static project preview from landing.md', async ({ page }) => {
     await page.goto('/');
 
-    // landing.md defines 7 projects: Login, Views, What This Is, AI Integration, Self-Host, Use Cases, Source
-    await expect(page.locator('.project-header')).toHaveCount(7);
+    // landing.md defines 6 projects: Login, What Harbour Is, Views, Orchestration, Self-Host, Source
+    await expect(page.locator('.project-header')).toHaveCount(6);
     await expect(page.locator('.project-header:has-text("Login")')).toBeVisible();
+    await expect(page.locator('.project-header:has-text("What Harbour Is")')).toBeVisible();
     await expect(page.locator('.project-header:has-text("Views")')).toBeVisible();
-    await expect(page.locator('.project-header:has-text("What This Is")')).toBeVisible();
-    await expect(page.locator('.project-header:has-text("AI Prompts")')).toBeVisible();
+    await expect(page.locator('.project-header:has-text("Orchestration")')).toBeVisible();
     await expect(page.locator('.project-header:has-text("Self-Host")')).toBeVisible();
-    await expect(page.locator('.project-header:has-text("Use Cases")')).toBeVisible();
     await expect(page.locator('.project-header:has-text("Source")')).toBeVisible();
   });
 
@@ -58,15 +57,15 @@ test.describe('Landing Page', () => {
     await page.goto('/');
 
     // State counts from landing.md content:
-    // - 4 done (✓): Collapsible tree view, Always fresh, Auto-logout, Works everywhere
-    // - 2 in-progress (◐): Connect with Linear, Projects tree
-    // - 16 todo (○): You're looking at it, Swipe, Swim lanes, Task-specific prompts, Connect OpenRouter,
-    //                How it works, Run it yourself, AI-assisted setup, Customize it,
-    //                Daily standups, Project reviews, Status overviews,
-    //                What is Linear, View on GitHub, Bugs & feature requests, Built by John Kershaw
-    await expect(page.locator('.state.done')).toHaveCount(4);
-    await expect(page.locator('.state.in-progress')).toHaveCount(2);
-    await expect(page.locator('.state.todo')).toHaveCount(16);
+    // - 2 done (✓): Any backend one cockpit, Grounded prompts two ways
+    // - 1 in-progress (◐): Connect with Linear
+    // - 13 todo (○): The control plane, Tree/swipe/swim, Roadmap & ship, Observation,
+    //                Dispatch, Autopilot, Workspace API proxy, Run it yourself,
+    //                AI-assisted setup, Customize it, View on GitHub,
+    //                Bugs & feature requests, Built by John Kershaw
+    await expect(page.locator('.state.done')).toHaveCount(2);
+    await expect(page.locator('.state.in-progress')).toHaveCount(1);
+    await expect(page.locator('.state.todo')).toHaveCount(13);
   });
 
   test('does not show logout link on landing page', async ({ page }) => {
@@ -79,21 +78,19 @@ test.describe('Landing Page', () => {
   test('projects with @collapsed start collapsed by default', async ({ page }) => {
     await page.goto('/');
 
-    // Self-Host, Use Cases, and Source should be collapsed (have ▶ arrow)
+    // Self-Host and Source should be collapsed (have ▶ arrow)
     const selfHostHeader = page.locator('.project-header:has-text("Self-Host")');
-    const useCasesHeader = page.locator('.project-header:has-text("Use Cases")');
     const sourceHeader = page.locator('.project-header:has-text("Source")');
 
     await expect(selfHostHeader).toContainText('▶');
-    await expect(useCasesHeader).toContainText('▶');
     await expect(sourceHeader).toContainText('▶');
 
-    // Login and What This Is should be expanded (have ▼ arrow)
+    // Login and What Harbour Is should be expanded (have ▼ arrow)
     const loginHeader = page.locator('.project-header:has-text("Login")');
-    const whatThisIsHeader = page.locator('.project-header:has-text("What This Is")');
+    const whatHarbourIsHeader = page.locator('.project-header:has-text("What Harbour Is")');
 
     await expect(loginHeader).toContainText('▼');
-    await expect(whatThisIsHeader).toContainText('▼');
+    await expect(whatHarbourIsHeader).toContainText('▼');
   });
 
   test('collapsed projects have hidden content', async ({ page }) => {
@@ -130,9 +127,9 @@ test.describe('Landing Page', () => {
   test('data-default-collapsed attribute is present on collapsed projects', async ({ page }) => {
     await page.goto('/');
 
-    // Should have 3 projects with data-default-collapsed
+    // Should have 2 projects with data-default-collapsed
     const collapsedProjects = page.locator('.project[data-default-collapsed="true"]');
-    await expect(collapsedProjects).toHaveCount(3);
+    await expect(collapsedProjects).toHaveCount(2);
   });
 
   // LIN-566: the sign-in CTA must be reachable for keyboard/screen-reader users.

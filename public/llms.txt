@@ -1,4 +1,4 @@
-# Linear Projects Viewer
+# Harbour
 
 > A minimal web app that displays Linear projects and issues as a collapsible tree with a CLI aesthetic.
 

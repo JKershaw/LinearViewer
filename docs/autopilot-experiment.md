@@ -52,7 +52,7 @@ look like, and is it enough for a judge to decide "done" without re-reading ever
   provided in-session (not committed here).
 - The existing user-facing enqueue is `POST /workspace/:urlKey/api/dispatch`, body
   `{ prompt, promptName?, issueId?, issueIdentifier?, issueTitle?, issueUrl?, target?, repo? }`,
-  `target ∈ {cli, web, dash, local}` (default `cli`). `local` = Harbour, localhost-only.
+  `target ∈ {cli, web, dash, local}` (default `cli`). `local` = Harbour OS, localhost-only.
 - The runner already exists: a **separate system** consumes the dispatch queue and runs
   Claude Code as a local CLI or via web remote-control. It posts feedback via
   `POST /api/dispatch/feedback/:itemId` (`{ message, url?, urlLabel? }`) — feedback is a
@@ -99,7 +99,7 @@ GET  /api/proxy/dispatch/:id    (read scope)   ← the watch half (do not skip)
 ```
 
 Reuses `dispatchQueueStore.addItem` and the history read; the only new logic is the
-proxy-token auth boundary and the read projection. `target: local`/Harbour is out of scope.
+proxy-token auth boundary and the read projection. `target: local`/Harbour OS is out of scope.
 
 **Draft autopilot prompt** (pasted into a Claude session) that references the above:
 orient → `/recommend` → dispatch via `POST /api/proxy/dispatch` → poll
@@ -275,7 +275,7 @@ re-roots #1 in the **launcher**, not the session hook. The orchestrator must tre
   ```
   #3 10:15:27  [working] Summary complete. Executing task...   ← no "command not accepted"; handoff clean
   #4           [launcher project-overview preamble]
-  #5 10:16:10  (recap 1/2)  ## Retrospective — LinearViewer recent activity …
+  #5 10:16:10  (recap 1/2)  ## Retrospective — Harbour recent activity …
   #6 10:16:10  (recap 2/2)  …### Evidence • Latest CI on main: success — run 27042794260 …
   #7 10:16:10  [done] Task completed in 1m 1s
   ```

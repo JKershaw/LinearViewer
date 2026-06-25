@@ -90,10 +90,10 @@ test.describe('Authenticated Dashboard', () => {
 
   test('shows organization name from the local provider', async ({ page }) => {
     // The h1 should contain the provider's organization name (the local provider
-    // reports "Local"), not the landing page title "Linear Projects Viewer".
+    // reports "Local"), not the landing page title "Harbour".
     const h1 = page.locator('h1');
     await expect(h1).toBeVisible();
-    await expect(h1).not.toContainText('Linear Projects Viewer');
+    await expect(h1).not.toContainText('Harbour');
   });
 
   test('renders CSS-based tree structure', async ({ page }) => {

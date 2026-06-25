@@ -307,7 +307,7 @@ const MAX_COMMENT_LENGTH = 50000;
 const MAX_PROMPT_LENGTH = 10000000;    // 10MB max for prompt content
 const MAX_URL_LENGTH = 8000;           // URLs (covers long query strings)
 const MAX_IDENTIFIER_LENGTH = 100;     // Issue identifiers
-// Proxy consumers are remote, so 'local' (Harbour, spawns on the server's
+// Proxy consumers are remote, so 'local' (Harbour OS, spawns on the server's
 // own /dev/tty) is intentionally excluded from the targets they may set.
 const VALID_PROXY_DISPATCH_TARGETS = ['cli', 'web', 'dash'];
 
@@ -428,7 +428,7 @@ function toStackHeadline(description) {
  * caller's STANDING readWrite proxy token in plaintext inside the queued prompt
  * (and anywhere that prompt is later rendered). A leaked prompt leaks full
  * workspace write. Planned hardening: mint a per-dispatch, short-TTL token bound
- * to this item with a narrow scope, mirroring the Harbour per-item feedback
+ * to this item with a narrow scope, mirroring the Harbour OS per-item feedback
  * token. For now (by explicit choice): standing readWrite.
  *
  * @param {Object} params
@@ -1271,7 +1271,7 @@ POST ${baseUrl}/api/proxy/agent/status   (alias: /api/proxy/foreman/status — d
 
 POST ${baseUrl}/api/proxy/dispatch
   Body: { "prompt": "...", "promptName": "...", "kind": "implementation", "issueId": "...", "issueIdentifier": "LIN-42", "issueTitle": "...", "issueUrl": "...", "target": "cli|web|dash", "repo": "...", "followUpTo": "...", "sessionId": "...", "appendProxyContext": true }
-  → Queue a prompt for the workspace's dispatch consumer (the runner). Only "prompt" is required; target defaults to "cli". ("local"/Harbour is not available to proxy consumers.)
+  → Queue a prompt for the workspace's dispatch consumer (the runner). Only "prompt" is required; target defaults to "cli". ("local"/Harbour OS is not available to proxy consumers.)
   → "kind" is a stable task classification (research/plan/implementation/review/etc. — the prompt-template keys, plus "custom"). Optional: when omitted it is derived from "promptName", falling back to "custom". Read it instead of inferring the task type from promptName or the prompt body.
   → "followUpTo" (optional) resumes an existing session: pass the "id" of an earlier dispatch and "prompt" becomes a follow-up instruction to that same session. cli/web only, same workspace. The runner owns session liveness — if the session is gone it posts terminal "[failed] no live session to resume". Use sparingly: only when the prior session ran cleanly and naturally suggests the next step (e.g. confirm CI is green, update Linear/git); any wobble → dispatch a fresh session instead.
   → "sessionId" (optional) is the autopilot dispatch id that spawned this worker. Pass it on every worker dispatch the autopilot fans out so the run reconstructs as one session across all touched tasks (incl. epic descent / breakdown spin-offs). UUID, stored + forwarded blindly, ANY target (unlike followUpTo). See LIN-591.
@@ -3856,7 +3856,7 @@ One convention across every endpoint, so you can branch on the same fields every
    * Queue a prompt for the workspace's dispatch consumer (the runner).
    * Proxy-token equivalent of POST /workspace/:urlKey/api/dispatch — same
    * body shape and validation, but scoped by the token's workspace and
-   * requiring readWrite scope. Excludes target 'local' (Harbour spawns on
+   * requiring readWrite scope. Excludes target 'local' (Harbour OS spawns on
    * the server's own tty, which a remote consumer can't drive). This is the
    * write half the autopilot orchestrator uses to dispatch a chosen task.
    */

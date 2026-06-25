@@ -818,7 +818,7 @@ Requires a `readWrite` scoped token. Builds the kickoff **and dispatches it** in
 | `goal` | _(none)_ | Free-text focus for a **general** run. Ignored when `issueIdentifier` is set. |
 | `mode` | `write` | `write` (implementation/review + evidence-gated merge) or `readonly` (investigation only). |
 | `issueIdentifier` | _(none)_ | Present ⇒ **scoped** run ("autopilot until THIS task is done"); the issue title is named in the goal line and the project `repo=` is inherited. Absent ⇒ general stack-walk run. |
-| `target` | `cli` | Dispatch target (`cli`/`web`/`dash`; `local`/Harbour is not available to proxy consumers). |
+| `target` | `cli` | Dispatch target (`cli`/`web`/`dash`; `local`/Harbour OS is not available to proxy consumers). |
 | `repo` | _(resolved)_ | Target repo. For a scoped run, defaults to the project's `repo=`; an explicit value wins. |
 | `appendProxyContext` | `true` | Append the Linear-access + token + reporting block so the run inherits proxy access. |
 
@@ -1156,7 +1156,7 @@ Content-Type: application/json
 | `promptName` | string | No | Short label for the dispatch (max 100 chars) |
 | `kind` | string | No | Stable task classification — one of the `DISPATCH_KINDS` (the prompt-template keys, plus `custom`; see `lib/prompt-templates.js`). When omitted it is derived from `promptName`, falling back to `custom`. Read it instead of inferring the task type from `promptName` or the prompt body |
 | `issueId` / `issueIdentifier` / `issueTitle` / `issueUrl` | string | No | Optional linkage to an issue |
-| `target` | string | No | `cli` \| `web` \| `dash` (default `cli`). `local`/Harbour is **not** available to proxy consumers |
+| `target` | string | No | `cli` \| `web` \| `dash` (default `cli`). `local`/Harbour OS is **not** available to proxy consumers |
 | `repo` | string | No | Optional repository hint |
 | `followUpTo` | string (UUID) | No | Resume an existing session: pass the `id` of an earlier dispatch and `prompt` becomes a follow-up instruction to that same session. `cli`/`web` only, same workspace. The runner owns session liveness — if the session is gone it posts a terminal `[failed] no live session to resume`. Use sparingly (see the dispatch guide's [Follow-ups](dispatch-integration.md#follow-ups) section); any wobble → dispatch a fresh session instead |
 | `sessionId` | string (UUID) | No | The autopilot dispatch id that spawned this worker. Stamp it on every worker an autopilot run fans out so the whole run (incl. epic descent / `breakdown` spin-offs) reconstructs as one session. Stored and forwarded verbatim; unlike `followUpTo` it carries **no target restriction**. See LIN-591 |
@@ -1181,7 +1181,7 @@ Runs `/recommend` and forwards the recommended prompt straight into a dispatch �
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `issueIdentifier` | string | Yes | The issue to recommend a next step for (UUID or `LIN-123`) |
-| `target` | string | No | `cli` \| `web` \| `dash` (default `cli`). `local`/Harbour is **not** available to proxy consumers |
+| `target` | string | No | `cli` \| `web` \| `dash` (default `cli`). `local`/Harbour OS is **not** available to proxy consumers |
 | `repo` | string | No | Optional repository hint |
 | `appendProxyContext` | bool | No | Default `true`: append a proxy-context block so the worker inherits workspace access via this proxy |
 | `noDescend` | bool | No | Default `false`. When `true`, recommend and dispatch the **named issue's own** next step and never descend into an open child (see below) |

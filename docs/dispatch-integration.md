@@ -359,7 +359,7 @@ Each dispatch item has a `target` field indicating which type of consumer should
 | `cli` | Default. Intended for CLI-based consumers (e.g., Claude Code) |
 | `web` | Intended for web-based consumers (e.g., Claude on the Web) |
 | `dash` | Intended for dashboard-based consumers (e.g., Dash agent) |
-| `local` | Spawns a local Harbour Claude session on the server host. Localhost-only: a `local` dispatch from a non-localhost request is rejected with `400` |
+| `local` | Spawns a local Harbour OS Claude session on the server host. Localhost-only: a `local` dispatch from a non-localhost request is rejected with `400` |
 
 > **Proxy consumers cannot use `local`.** The four targets above are the dispatch consumer API's full set, but the [Workspace API Proxy](proxy-integration.md) twin (`POST /api/proxy/dispatch`) explicitly bars `local` — proxy-issued dispatches may only target `cli`/`web`/`dash`. Keep this asymmetry in mind when porting a flow between the two surfaces.
 

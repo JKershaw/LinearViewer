@@ -1,4 +1,4 @@
-# Linear Projects Viewer
+# Harbour
 
 A minimal, CLI-aesthetic web app that displays your Linear projects and issues as a collapsible tree — plus a growing set of focused views and an API surface for AI agents.
 

@@ -1,6 +1,6 @@
 # UI Improvement Strategy
 
-A research-backed plan for making the UI/UX of Linear Projects Viewer **easy to
+A research-backed plan for making the UI/UX of Harbour **easy to
 change and improve** — and to keep it that way as the app grows.
 
 > **Goal.** Reach a state where UI/UX work is cheap and safe, whether that's

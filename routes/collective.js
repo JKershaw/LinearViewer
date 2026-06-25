@@ -29,7 +29,7 @@ import {
 } from '../lib/prompts/collective-participant.js';
 
 // Substrate is DECIDED (John, 2026-06-13): full Claude Code sessions only.
-// `dash` is pure-code-change execution and `local`/Harbour isn't a fan-out
+// `dash` is pure-code-change execution and `local`/Harbour OS isn't a fan-out
 // target here, so the Collective accepts only cli/web.
 const COLLECTIVE_TARGETS = ['cli', 'web'];
 

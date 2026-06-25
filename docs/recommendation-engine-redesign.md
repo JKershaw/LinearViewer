@@ -324,5 +324,5 @@ Each step is independently shippable; you are never holding a half-rewritten sys
   `recommendedAction`, `deferStopReason`, `deferTruncated`, `truncated`, full `reasoning` and
   `prompt` (length + hash).
 - Model: server default `openai/gpt-5.4-mini`, `temperature: 0`.
-- Fixtures: LinearViewer epic `LIN-385` (E2E test migration) and Harbour epic `HAR-149` (custom
+- Fixtures: Harbour epic `LIN-385` (E2E test migration) and Harbour epic `HAR-149` (custom
   node runtime), both in-progress with partly-finished subtasks.
