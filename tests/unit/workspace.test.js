@@ -14,6 +14,8 @@ import {
   linkProvider,
   unlinkProvider,
   getBindingsForWorkspace,
+  getBindingCallScope,
+  getWorkspaceCallScope,
   remintActiveCredential,
   saveSession,
   MAX_WORKSPACES
@@ -434,6 +436,75 @@ describe('getBindingsForWorkspace', () => {
   test('returns [] for null/undefined workspace', () => {
     assert.deepStrictEqual(getBindingsForWorkspace(null), []);
     assert.deepStrictEqual(getBindingsForWorkspace(undefined), []);
+  });
+});
+
+// =============================================================================
+// Provider call-scope helpers (LIN-713) — the read/write seam argument that lets
+// a GitHub App binding authenticate per-request while staying byte-identical for
+// every other provider.
+// =============================================================================
+
+describe('getBindingCallScope', () => {
+  test('returns the bare token for a Linear binding (byte-identical seam)', () => {
+    const binding = { provider: 'linear', scope: 'org-1', credentials: { token: 'lin-tok' } };
+    assert.strictEqual(getBindingCallScope(binding), 'lin-tok');
+  });
+
+  test('returns the bare token for a local binding', () => {
+    const binding = { provider: 'local', scope: 'notes-abcd', credentials: { token: 'notes-abcd' } };
+    assert.strictEqual(getBindingCallScope(binding), 'notes-abcd');
+  });
+
+  test('pairs the installation token with the repo scope for a GitHub binding', () => {
+    const binding = { provider: 'github', scope: 'octocat/hello', credentials: { token: 'ghs_install', installationId: '42' } };
+    assert.deepStrictEqual(getBindingCallScope(binding), { token: 'ghs_install', repo: 'octocat/hello' });
+  });
+
+  test('tolerates a missing credential bag (undefined token)', () => {
+    assert.strictEqual(getBindingCallScope({ provider: 'linear', scope: 'org' }), undefined);
+    assert.deepStrictEqual(getBindingCallScope({ provider: 'github', scope: 'o/r' }), { token: undefined, repo: 'o/r' });
+  });
+
+  test('returns undefined for a null/undefined binding', () => {
+    assert.strictEqual(getBindingCallScope(null), undefined);
+    assert.strictEqual(getBindingCallScope(undefined), undefined);
+  });
+});
+
+describe('getWorkspaceCallScope', () => {
+  test('returns the active token for a Linear workspace (byte-identical to getWorkspaceToken)', () => {
+    const ws = { id: 'org-1', provider: 'linear', accessToken: 'lin-tok' };
+    assert.strictEqual(getWorkspaceCallScope(ws), 'lin-tok');
+  });
+
+  test('returns the active token for a local workspace', () => {
+    const ws = { id: 'uuid', provider: 'local', urlKey: 'notes-abcd', accessToken: 'notes-abcd' };
+    assert.strictEqual(getWorkspaceCallScope(ws), 'notes-abcd');
+  });
+
+  test('returns { token, repo } for a GitHub workspace, pairing the active token with its binding repo', () => {
+    // Two GitHub repo bindings on one account; the active one is the scalar mirror.
+    let ws = linkProvider({ id: 'github:7' }, 'github', 'octocat/one', { token: 'tok-one', installationId: '1' });
+    ws = linkProvider(ws, 'github', 'octocat/two', { token: 'tok-two', installationId: '2' });
+    // The scalar mirror tracks the most-recently-linked binding (the active one).
+    assert.strictEqual(getWorkspaceToken(ws), 'tok-two');
+    assert.deepStrictEqual(getWorkspaceCallScope(ws), { token: 'tok-two', repo: 'octocat/two' });
+  });
+
+  test('GitHub repo resolves from the binding whose token matches the active scalar mirror', () => {
+    const ws = {
+      id: 'github:7', provider: 'github', accessToken: 'tok-one',
+      bindings: [
+        { provider: 'github', scope: 'octocat/one', credentials: { token: 'tok-one' } },
+        { provider: 'github', scope: 'octocat/two', credentials: { token: 'tok-two' } },
+      ],
+    };
+    assert.deepStrictEqual(getWorkspaceCallScope(ws), { token: 'tok-one', repo: 'octocat/one' });
+  });
+
+  test('undefined for a null workspace', () => {
+    assert.strictEqual(getWorkspaceCallScope(null), undefined);
   });
 });
 

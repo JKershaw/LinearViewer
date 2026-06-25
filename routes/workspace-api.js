@@ -47,7 +47,7 @@ import { hashContext } from '../lib/recap-cache.js';
 import { getLoopsForIssue } from '../lib/pipeline-loops.js';
 import { toSessionView } from '../lib/sessions-view.js';
 import { runAudit, computeAuditFromData } from '../lib/audit.js';
-import { UUID_REGEX, isValidIssueId, getWorkspaceToken } from '../lib/workspace.js';
+import { UUID_REGEX, isValidIssueId, getWorkspaceCallScope } from '../lib/workspace.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
 import { isTerminalState, isBlocked } from '../lib/tree.js';
@@ -460,7 +460,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       }
 
       // Fetch issue context from Linear
-      const { issue, parent, siblings, project, children, comments } = await getProviderForWorkspace(workspace).fetchIssueContext(getWorkspaceToken(workspace), issueId)
+      const { issue, parent, siblings, project, children, comments } = await getProviderForWorkspace(workspace).fetchIssueContext(getWorkspaceCallScope(workspace), issueId)
 
       // Generate the prompt
       let result;
@@ -568,7 +568,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         })
       }
 
-      const { issue, project } = await getProviderForWorkspace(workspace).fetchIssueContext(getWorkspaceToken(workspace), issueId)
+      const { issue, project } = await getProviderForWorkspace(workspace).fetchIssueContext(getWorkspaceCallScope(workspace), issueId)
       const prompt = buildAutopilotKickoff({
         baseUrl,
         issue: { identifier: issue.identifier, title: issue.title },
@@ -817,7 +817,7 @@ ${goal}`
         deadline: Date.now() + RECOMMEND_DESCENT_BUDGET_MS,
         computeOne: async (id) => {
           // Two-tier context for parent tasks; the focused child seeds the defer choice.
-          const ctx = await getProviderForWorkspace(workspace).fetchRecommendationContext(getWorkspaceToken(workspace), id)
+          const ctx = await getProviderForWorkspace(workspace).fetchRecommendationContext(getWorkspaceCallScope(workspace), id)
           // AI mock (local session): synthesise the hop deterministically so the
           // SAME resolver drives the descent without an OpenRouter call (LIN-405).
           if (mockAi) return buildMockRecommendationHop(ctx)
@@ -944,7 +944,7 @@ ${goal}`
     // keeps its own 404 in the isTestMode block below.
     if (mockAi && !isTestMode) {
       try {
-        await getProviderForWorkspace(workspace).fetchRecommendationContext(getWorkspaceToken(workspace), issueId);
+        await getProviderForWorkspace(workspace).fetchRecommendationContext(getWorkspaceCallScope(workspace), issueId);
       } catch (err) {
         if (/not found/i.test(err?.message)) {
           return notFound.json(res, 'Issue not found');
@@ -1095,7 +1095,7 @@ ${goal}`
       // Gap #1 (LIN-346): bound this fetch by the client-disconnect signal ∪ a
       // per-fetch timeout so a stalled Linear call can't silently idle the socket.
       const context = await getProviderForWorkspace(workspace).fetchRecommendationContext(
-        getWorkspaceToken(workspace),
+        getWorkspaceCallScope(workspace),
         issueId,
         { signal: AbortSignal.any([abortController.signal, AbortSignal.timeout(CONTEXT_FETCH_TIMEOUT_MS)]) }
       );
@@ -1143,7 +1143,7 @@ ${goal}`
             try {
               // Gap #1: bound the per-hop Linear fetch by the hop signal ∪ a per-fetch timeout.
               const ctx = await getProviderForWorkspace(workspace).fetchRecommendationContext(
-                getWorkspaceToken(workspace),
+                getWorkspaceCallScope(workspace),
                 id,
                 { signal: AbortSignal.any([hop.signal, AbortSignal.timeout(CONTEXT_FETCH_TIMEOUT_MS)]) }
               );
@@ -1298,7 +1298,7 @@ ${goal}`
       // (interactions.spec) reads comments through the local provider and no
       // test-token spec reaches this endpoint, so the old `testMockData` data-mock
       // branch was orphaned and removed (LIN-413). Linear + local both serve here.
-      const comments = await getProviderForWorkspace(workspace).fetchIssueComments(getWorkspaceToken(workspace), issueId)
+      const comments = await getProviderForWorkspace(workspace).fetchIssueComments(getWorkspaceCallScope(workspace), issueId)
       res.json({ comments })
     } catch (error) {
       console.error('Comments fetch error:', error)
@@ -1354,7 +1354,7 @@ ${goal}`
           return notFound.json(res, 'Issue not found')
         }
       } else {
-        issue = await provider.fetchIssueFields(getWorkspaceToken(workspace), issueId)
+        issue = await provider.fetchIssueFields(getWorkspaceCallScope(workspace), issueId)
       }
 
       // Custom prompts (non-blocking, fallback to empty) — matches the homepage.
@@ -1457,7 +1457,7 @@ ${goal}`
         context = await buildMockRecapContext(issueId);
         if (!context) return notFound.json(res, 'Issue not found');
       } else {
-        context = await getProviderForWorkspace(workspace).fetchRecommendationContext(getWorkspaceToken(workspace), issueId);
+        context = await getProviderForWorkspace(workspace).fetchRecommendationContext(getWorkspaceCallScope(workspace), issueId);
       }
 
       const canonicalId = context.issue?.id || issueId;
@@ -1542,7 +1542,7 @@ ${goal}`
           return keepalive.send(404, { error: 'Issue not found' });
         }
       } else {
-        context = await getProviderForWorkspace(workspace).fetchRecommendationContext(getWorkspaceToken(workspace), issueId);
+        context = await getProviderForWorkspace(workspace).fetchRecommendationContext(getWorkspaceCallScope(workspace), issueId);
       }
 
       const canonicalId = context.issue?.id || issueId;
@@ -1627,7 +1627,7 @@ ${goal}`
       const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
       const issues = isTestMode
         ? testMockData.issues
-        : (await getProviderForWorkspace(workspace).fetchProjects(getWorkspaceToken(workspace))).issues;
+        : (await getProviderForWorkspace(workspace).fetchProjects(getWorkspaceCallScope(workspace))).issues;
 
       // Resolve the root by canonical id or human identifier (LIN-123), since the
       // section mounts with whichever the surface has to hand.
@@ -1683,7 +1683,7 @@ ${goal}`
         context = await buildMockRecapContext(issueId);
         if (!context) return notFound.json(res, 'Issue not found');
       } else {
-        context = await getProviderForWorkspace(workspace).fetchRecommendationContext(getWorkspaceToken(workspace), issueId);
+        context = await getProviderForWorkspace(workspace).fetchRecommendationContext(getWorkspaceCallScope(workspace), issueId);
       }
 
       const canonicalId = context.issue?.id || issueId;
@@ -1766,7 +1766,7 @@ ${goal}`
           return keepalive.send(404, { error: 'Issue not found' });
         }
       } else {
-        context = await getProviderForWorkspace(workspace).fetchRecommendationContext(getWorkspaceToken(workspace), issueId);
+        context = await getProviderForWorkspace(workspace).fetchRecommendationContext(getWorkspaceCallScope(workspace), issueId);
       }
 
       const canonicalId = context.issue?.id || issueId;
@@ -2106,7 +2106,11 @@ ${goal}`
   router.post('/workspace/:urlKey/api/feedback', workspaceFromUrl, feedbackBodyParser, async (req, res) => {
     const workspace = req.workspace;
     const provider = getProviderForWorkspace(workspace);
-    const token = getWorkspaceToken(workspace);
+    // Provider call scope: bare token for Linear/local (byte-identical), or a
+    // { token, repo } GitHub App credential so createIssue builds a request-time
+    // client from the installation token (LIN-713). uploadFile is capability-gated
+    // off for GitHub; fetchTeams (via resolveFeedbackTeamId) ignores its arg.
+    const token = getWorkspaceCallScope(workspace);
     const { message, title, teamId, projectId, image, url, userAgent } = req.body || {};
     const priority = normalizeFeedbackPriority(req.body?.priority);
 
@@ -2786,7 +2790,7 @@ ${goal}`
     try {
       const { projects, issues } = testMode
         ? testMockData
-        : await getProviderForWorkspace(req.workspace).fetchProjects(getWorkspaceToken(req.workspace), teamId);
+        : await getProviderForWorkspace(req.workspace).fetchProjects(getWorkspaceCallScope(req.workspace), teamId);
       roadmapModel = buildRoadmapModel(projects, issues);
     } catch (error) {
       console.error('Roadmap generate fetch error:', error);
