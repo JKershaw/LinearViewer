@@ -139,6 +139,31 @@ async function loadComments(toggle, content) {
 }
 
 /**
+ * Wire error fallbacks for a task-detail attachments gallery on first expand.
+ * LIN-652: the gallery HTML (and its `/api/image`-relayed `<img loading="lazy">`
+ * tags) is server-rendered, so there is no metadata fetch here — only an error
+ * handler per image, attached once, mirroring the description-image fallback. A
+ * relay miss (revoked token, deleted upload) swaps the broken image for a small
+ * "[Image failed to load]" note instead of a browser-default broken icon.
+ * @param {HTMLElement} content - The attachments `.detail-content` container
+ */
+function initAttachmentImages(content) {
+  // Idempotent: a later collapse/expand must not re-bind handlers.
+  content.dataset.loaded = 'true'
+  content.querySelectorAll('img.attachment-image').forEach(img => {
+    img.addEventListener('error', function() {
+      this.style.display = 'none'
+      const errorSpan = document.createElement('span')
+      errorSpan.className = 'img-error'
+      errorSpan.textContent = '[Image failed to load]'
+      if (this.parentNode) {
+        this.parentNode.insertBefore(errorSpan, this.nextSibling)
+      }
+    })
+  })
+}
+
+/**
  * Lazy-mount a shared on-card section (Brief / Recap / Dispatched Sessions) on
  * first expand of its nested toggle. LIN-522: mirrors public/swipe.js, reusing
  * the view-agnostic BriefSection / RecapSection / SessionsSection modules. The
@@ -710,6 +735,14 @@ function init() {
         // LIN-156: Load comments on first expand
         if (toggleType === 'comments' && !isHidden && !content.dataset.loaded) {
           loadComments(detailToggle, content)
+        }
+
+        // LIN-652: Attachments gallery is server-rendered (images already point
+        // at the /api/image relay with loading="lazy", so the bytes load when the
+        // section becomes visible). On first expand we only wire per-image error
+        // fallbacks — no fetch path of our own.
+        if (toggleType === 'attachments' && !isHidden && !content.dataset.loaded) {
+          initAttachmentImages(content)
         }
 
         // LIN-522: Lazy-mount the shared Brief / Recap / Sessions sections on

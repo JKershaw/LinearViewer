@@ -39,6 +39,7 @@ Issues are wrapped in nested `.node` containers:
     .detail-toggle[data-toggle="details"] - "Details ▶" toggle
     .detail-content[data-content="details"] - description + metadata (hidden)
       .detail-toggle[data-toggle="comments"] - "Comments ▶" toggle (auth only, nested)
+      .detail-toggle[data-toggle="attachments"] - "Attachments (N) ▶" toggle (auth only, nested; image gallery via /api/image relay, attachment-capable providers only)
       .detail-toggle[data-toggle="brief"]    - "Brief ▶" toggle (auth only, nested; lazy AI brief)
       .detail-toggle[data-toggle="recap"]    - "Recap ▶" toggle (auth only, nested; lazy AI recap)
       .detail-toggle[data-toggle="context"] - "Context ▶" toggle (auth only, nested; lazy relationship diagram)

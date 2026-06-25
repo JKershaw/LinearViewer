@@ -612,6 +612,65 @@ describe('capability-aware rendering (LIN-177 S3)', () => {
     assert.ok(!detailContentWithProviderUi({ estimates: false }).includes('3 pts'), 'estimate hidden');
   });
 
+  // ---------------------------------------------------------------------------
+  // Attachments gallery (LIN-652) — capability-gated, /api/image-relayed.
+  // ---------------------------------------------------------------------------
+  // An issue carrying a formal image attachment + a markdown image in the
+  // description + a markdown image in a comment, so the gallery aggregates all
+  // three sources.
+  function issueWithImages() {
+    return {
+      id: 'i1',
+      identifier: 'STB-1',
+      title: 'A task',
+      state: { type: 'started' },
+      url: 'https://stub.example/issue/STB-1',
+      description: 'See ![desc shot](https://uploads.linear.app/desc.png)',
+      attachments: { nodes: [{ id: 'a1', title: 'Formal', url: 'https://cdn.linear.app/formal.jpg' }] },
+      comments: { nodes: [{ id: 'c1', body: '![from comment](https://uploads.linear.app/c.gif)' }] },
+      labels: { nodes: [] },
+    };
+  }
+  function detailWithImages(ui) {
+    const provider = makeStubProvider(ui);
+    return renderDetailsContent(issueWithImages(), { isLanding: false, urlKey: 'ws', provider });
+  }
+
+  test('attachments=true shows the gallery; attachments=false hides it', () => {
+    const on = detailWithImages({ attachments: true });
+    assert.ok(on.includes('data-toggle="attachments"'), 'attachments toggle shown when capable');
+    assert.ok(on.includes('Attachments (3)'), 'toggle counts every image (formal + desc + comment)');
+
+    const off = detailWithImages({ attachments: false });
+    assert.ok(!off.includes('data-toggle="attachments"'), 'attachments toggle hidden when capability is off');
+  });
+
+  test('gallery routes Linear-hosted images through the /api/image relay', () => {
+    const html = detailWithImages({ attachments: true });
+    assert.ok(
+      html.includes('/workspace/ws/api/image?url=' + encodeURIComponent('https://uploads.linear.app/desc.png')),
+      'description image rewritten to the session-auth relay'
+    );
+    assert.ok(
+      html.includes('/workspace/ws/api/image?url=' + encodeURIComponent('https://cdn.linear.app/formal.jpg')),
+      'formal attachment rewritten to the relay'
+    );
+    assert.ok(html.includes('loading="lazy"'), 'images lazy-load so bytes stay off the wire until expand');
+    assert.ok(html.includes('data-original-src='), 'original URL retained for the client error fallback');
+  });
+
+  test('no attachments section when the issue has no images (byte-parity preserved)', () => {
+    const provider = makeStubProvider({ attachments: true });
+    const bare = renderDetailsContent(stubTree().incomplete[0].issue, { isLanding: false, urlKey: 'ws', provider });
+    assert.ok(!bare.includes('data-toggle="attachments"'), 'no gallery toggle for an image-free issue');
+  });
+
+  test('landing page never renders the gallery', () => {
+    const provider = makeStubProvider({ attachments: true });
+    const landing = renderDetailsContent(issueWithImages(), { isLanding: true, urlKey: 'ws', provider });
+    assert.ok(!landing.includes('data-toggle="attachments"'), 'gallery suppressed on the landing page');
+  });
+
   test('source badge appears per-task only when showSource is on (LIN-544)', () => {
     const githubTree = {
       project: { id: 'p1', name: 'Proj', content: null, url: null },
