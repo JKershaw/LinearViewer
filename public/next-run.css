@@ -54,6 +54,36 @@
   border-radius: var(--radius-sm);
 }
 
+/* Global think-first reasoning preamble above the cards (LIN-642). Visually
+   distinct from the deterministic summary above it (accented box) so the reader
+   reads it as the model's reasoning, not a restated intro. */
+.next-run-analysis {
+  margin: 0 0 var(--space-2);
+  padding: var(--space-2);
+  background: var(--bg);
+  border: 1px solid var(--border, var(--fg-vdim));
+  border-radius: var(--radius-sm);
+}
+
+.next-run-analysis-label {
+  display: block;
+  margin-bottom: var(--space-1);
+  font-family: var(--font-mono, monospace);
+  font-size: var(--font-size-sm);
+  font-weight: bold;
+  color: var(--fg-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.next-run-analysis-body {
+  margin: 0;
+  line-height: 1.5;
+  color: var(--fg);
+  font-size: var(--font-size-sm);
+  white-space: pre-wrap;
+}
+
 .next-run-options {
   list-style: none;
   margin: 0;
@@ -139,6 +169,25 @@
   color: var(--fg-dim);
   font-size: var(--font-size-sm);
   line-height: 1.4;
+}
+
+/* Referenced tasks rendered at the end of a recommendation (LIN-642). */
+.next-run-refs {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
+}
+
+.next-run-ref {
+  display: inline-block;
+  padding: 0.05rem 0.4rem;
+  margin-right: 0.25rem;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8em;
+  color: var(--fg-dim);
+  background: var(--bg-muted, var(--bg));
+  border: 1px solid var(--border, var(--fg-vdim));
+  border-radius: var(--radius-sm);
 }
 
 .next-run-option-actions {

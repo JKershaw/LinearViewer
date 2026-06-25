@@ -3,11 +3,14 @@
  *
  * Drives the "suggest the next autopilot run" page: click Generate → POST to the
  * suggest endpoint → render the returned goal options as Observation-styled cards.
- * Each card shows a t-shirt size chip and a caret-collapsible body holding the goal
- * paragraph, its reasoning, and the accept/copy actions; the always-present
- * "continue until stopped" option is flagged. A single page-level expandable panel
- * shows the exact grounding context the model saw (shared across options, not
- * per-option).
+ * Each card's head shows a t-shirt size chip and a standalone headline `title`
+ * (LIN-642); its caret-collapsible body holds the goal paragraph, per-option
+ * reasoning, the referenced-task ids rendered at the end, and the accept/copy
+ * actions. The always-present "continue until stopped" option is flagged. Above
+ * the cards sit the deterministic `summary` intro (LIN-638) and the model's global
+ * `analysis` preamble (LIN-642 — "how I chose", vs each card's "why this one"). A
+ * single page-level expandable panel shows the exact grounding context the model
+ * saw (shared across options, not per-option).
  *
  * Accepting an option (LIN-640): when the proxy feature is on, each card offers an
  * inline `Dispatch ▾` disclosure (parity with the projects/swipe views) that builds
@@ -32,6 +35,8 @@
   var feedbackEl = document.getElementById('next-run-feedback');
   var optionsEl = document.getElementById('next-run-options');
   var summaryEl = document.getElementById('next-run-summary');
+  var analysisEl = document.getElementById('next-run-analysis');
+  var analysisBodyEl = document.getElementById('next-run-analysis-body');
   var emptyState = document.getElementById('next-run-empty');
   var contextSection = document.getElementById('next-run-context-section');
   var contextToggle = document.getElementById('next-run-context-toggle');
@@ -155,11 +160,13 @@
       var size = String(opt.size || 'M');
       var isOpen = !!opt.continueUntilStopped;
       var goalText = isOpen ? '(no goal — continue until stopped)' : (opt.goal || '');
-      // Full first line of the goal — no char truncation, so the headline is
-      // fully visible (LIN-638); it wraps via CSS instead of being ellipsised.
+      // Headline title (LIN-642): a standalone headline read straight from the
+      // option's `title`, falling back to the goal's first line for older
+      // responses. No char truncation — it wraps via CSS instead of being
+      // ellipsised, so the whole headline is visible while collapsed (LIN-638).
       var preview = isOpen
         ? 'Continue until stopped'
-        : (opt.goal || '').split('\n')[0];
+        : (opt.title || (opt.goal || '').split('\n')[0]);
 
       // Head: caret · size chip (obs-chip) · open tag · one-line goal preview.
       var head = document.createElement('button');
@@ -189,6 +196,20 @@
         reasonEl.className = 'next-run-reasoning obs-detail-block';
         reasonEl.innerHTML = '<span class="obs-body-lbl">why</span> ' + escapeHtml(opt.reasoning);
         body.appendChild(reasonEl);
+      }
+
+      // Referenced tasks rendered at the end of the recommendation (LIN-642).
+      // Machine-readable identifiers from the option, shown as a labelled list so
+      // the reader can see exactly which tasks the goal acts on.
+      var refIds = Array.isArray(opt.referencedTaskIds) ? opt.referencedTaskIds : [];
+      if (refIds.length) {
+        var refsEl = document.createElement('p');
+        refsEl.className = 'next-run-refs obs-detail-block';
+        var tags = refIds.map(function (id) {
+          return '<span class="next-run-ref">' + escapeHtml(String(id)) + '</span>';
+        }).join(' ');
+        refsEl.innerHTML = '<span class="obs-body-lbl">tasks</span> ' + tags;
+        body.appendChild(refsEl);
       }
 
       var actions = document.createElement('div');
@@ -246,6 +267,20 @@
     summaryEl.hidden = false;
   }
 
+  // Global think-first reasoning preamble above the cards (LIN-642). This is the
+  // model's "how I chose" — distinct from each card's per-option "why this one".
+  // Hidden when the generation returned no analysis (e.g. older responses).
+  function renderAnalysis(analysis) {
+    if (!analysisEl || !analysisBodyEl) return;
+    if (!analysis) {
+      analysisEl.hidden = true;
+      analysisBodyEl.textContent = '';
+      return;
+    }
+    analysisBodyEl.textContent = analysis;
+    analysisEl.hidden = false;
+  }
+
   // Single page-level grounding panel: shows the exact context the model saw. It
   // grounds the WHOLE generation, so it is shared (one panel), not per-option.
   function renderContext(context) {
@@ -292,6 +327,7 @@
       on401: false
     }).then(function (res) {
       renderSummary(res && res.summary);
+      renderAnalysis(res && res.analysis);
       renderOptions(res && res.options);
       renderContext(res && res.context);
       if (res && res.model && res.model !== 'mock') {

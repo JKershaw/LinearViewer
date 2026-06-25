@@ -21,7 +21,7 @@ import { Router } from 'express';
 import { renderNextRunPage } from '../lib/render-next-run.js';
 import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
-import { generateGoalSuggestions, CONTINUE_UNTIL_STOPPED_OPTION, formatNextRunContext, buildNextRunSummary } from '../lib/next-run.js';
+import { generateGoalSuggestions, CONTINUE_UNTIL_STOPPED_OPTION, formatNextRunContext, buildNextRunSummary, ensureSizeCoverage } from '../lib/next-run.js';
 import { buildRoadmapModel } from '../lib/roadmap.js';
 import { isRecommendationEnabled } from '../lib/openrouter.js';
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
@@ -40,11 +40,14 @@ function shouldMockAi(workspace) {
 }
 
 /**
- * Deterministic, grounded mock response for test mode — one direction per the
- * first in-progress / queued mock issue, then the always-present
- * continue-until-stopped option, plus the representative grounding `context`.
- * Mirrors the SHAPE of the real generator ({ options, summary, context }) without
- * calling an LLM, so live and test paths don't diverge (LIN-633, LIN-638).
+ * Deterministic, grounded mock response for test mode — a headline-titled
+ * direction per the first in-progress / queued mock issue (each carrying
+ * machine-readable referencedTaskIds), the per-size S/M/L guarantee filled the
+ * same way the live path fills it, a global `analysis` preamble, then the
+ * always-present continue-until-stopped option, plus the representative grounding
+ * `context`/`summary`. Mirrors the SHAPE of the real generator
+ * ({ analysis, options, summary, context }) without calling an LLM, so live and
+ * test paths don't diverge (LIN-633, LIN-638, LIN-642).
  */
 function buildMockResponse() {
   const issues = testMockData.issues || [];
@@ -52,29 +55,38 @@ function buildMockResponse() {
   const inProgress = issues.find(i => i.state?.type === 'started');
   const queued = issues.find(i => i.state?.type === 'unstarted' || i.state?.type === 'backlog');
 
-  const options = [];
+  const roadmapModel = buildRoadmapModel(projects, issues);
+
+  const concrete = [];
   if (inProgress) {
-    options.push({
+    concrete.push({
+      title: `Finish ${inProgress.identifier}: ${inProgress.title}`,
       goal: `Drive ${inProgress.identifier} (${inProgress.title}) to completion: finish the work in progress, verify it, and close it out before pulling anything new off the stack.`,
       reasoning: `${inProgress.identifier} is already in progress — finishing started work first keeps WIP low.`,
-      size: 'M'
+      size: 'M',
+      referencedTaskIds: [inProgress.identifier]
     });
   }
   if (queued) {
-    options.push({
+    concrete.push({
+      title: `Start ${queued.identifier}: ${queued.title}`,
       goal: `Start ${queued.identifier} (${queued.title}): research the codebase, plan the change, and make progress toward a reviewable state.`,
       reasoning: `${queued.identifier} is the next ranked item on the execution queue.`,
-      size: 'S'
+      size: 'S',
+      referencedTaskIds: [queued.identifier]
     });
   }
-  options.push({ ...CONTINUE_UNTIL_STOPPED_OPTION });
+  // Guarantee S/M/L exactly as the live generator does, so the mock honours the
+  // same contract (the fixtures cover S+M, so this fills the missing L).
+  const covered = ensureSizeCoverage(concrete, roadmapModel);
+  const options = [...covered, { ...CONTINUE_UNTIL_STOPPED_OPTION }];
 
-  // Build the context + summary from the same machinery the real generator uses,
-  // so the mock panels show representative output (parity).
-  const roadmapModel = buildRoadmapModel(projects, issues);
+  // Build the analysis + context + summary from the same machinery the real
+  // generator uses, so the mock panels show representative output (parity).
+  const analysis = 'Started work is the priority to keep WIP low; the queue then offers the next ranked item, and a larger direction is available if there is appetite for it.';
   const context = formatNextRunContext(roadmapModel, 'Test Workspace');
   const summary = buildNextRunSummary(roadmapModel, 'Test Workspace');
-  return { options, context, summary };
+  return { analysis, options, context, summary };
 }
 
 /**
