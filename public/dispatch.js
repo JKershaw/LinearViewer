@@ -179,22 +179,32 @@ function initDispatchPagePrompt() {
   // goal (optional, paragraphs fine) focuses the run; an empty goal is the
   // "continue until stopped" open-ended walk. Shared by both the "load Autopilot"
   // and "continue until stopped" buttons (LIN-603).
+  // Fetch the general (stack-walk) kickoff for the current goal and drop it
+  // into the textarea, tagged so the next dispatch carries kind=autopilot.
+  // Button-free so it can be reused both by the buttons (via
+  // loadAutopilotKickoff) and the goal-handoff dispatch path (LIN-639), where
+  // the send button owns its own state. Throws on fetch failure for the caller
+  // to surface.
+  async function fillAutopilotKickoff({ forceNoGoal = false } = {}) {
+    if (forceNoGoal && goalInput) goalInput.value = ''
+    // The goal must be baked into the fetched prompt — the textarea's input
+    // listener strips dataset.kind/promptName on any keystroke, so it can't be
+    // hand-typed in after loading. Append it as ?goal= for buildAutopilotKickoff.
+    const goal = goalInput ? goalInput.value.trim() : ''
+    const query = goal ? `?goal=${encodeURIComponent(goal)}` : ''
+    // on401:false — failures surface on the bespoke inline feedback el.
+    const data = await api(`/workspace/${encodeURIComponent(urlKey)}/api/autopilot-prompt${query}`, { on401: false })
+    textarea.value = data.prompt
+    textarea.dataset.kind = data.kind || 'autopilot'
+    textarea.dataset.promptName = data.promptName || 'Autopilot (stack walk)'
+  }
+
   async function loadAutopilotKickoff(btn, { forceNoGoal = false } = {}) {
     const original = btn.textContent
     btn.disabled = true
     btn.textContent = 'loading...'
     try {
-      if (forceNoGoal && goalInput) goalInput.value = ''
-      // The goal must be baked into the fetched prompt — the textarea's input
-      // listener strips dataset.kind/promptName on any keystroke, so it can't be
-      // hand-typed in after loading. Append it as ?goal= for buildAutopilotKickoff.
-      const goal = goalInput ? goalInput.value.trim() : ''
-      const query = goal ? `?goal=${encodeURIComponent(goal)}` : ''
-      // on401:false — failures surface on the bespoke inline feedback el below.
-      const data = await api(`/workspace/${encodeURIComponent(urlKey)}/api/autopilot-prompt${query}`, { on401: false })
-      textarea.value = data.prompt
-      textarea.dataset.kind = data.kind || 'autopilot'
-      textarea.dataset.promptName = data.promptName || 'Autopilot (stack walk)'
+      await fillAutopilotKickoff({ forceNoGoal })
       textarea.focus()
       btn.textContent = 'loaded ✓'
     } catch (err) {
@@ -247,11 +257,33 @@ function initDispatchPagePrompt() {
     const btn = e.target.closest('.dispatch-prompt-send')
     if (btn) {
       e.preventDefault()
-      const prompt = textarea.value.trim()
+      let prompt = textarea.value.trim()
+
+      // Goal-handoff launch (LIN-639): when the prompt is empty but a goal is
+      // set — e.g. arriving via the next-run ?goal= handoff (LIN-603) — the
+      // user expects dispatching to launch with that goal, not to be rejected
+      // with the misleading "prompt is empty". Bake the goal into an Autopilot
+      // kickoff transparently (the same prompt "load Autopilot" would produce),
+      // then dispatch it.
+      const goal = goalInput ? goalInput.value.trim() : ''
+      if (!prompt && goal) {
+        try {
+          await fillAutopilotKickoff()
+          prompt = textarea.value.trim()
+        } catch (err) {
+          if (feedbackEl) {
+            feedbackEl.textContent = `autopilot load failed: ${err.message}`
+            feedbackEl.className = 'dispatch-prompt-feedback error'
+          }
+          return
+        }
+      }
 
       if (!prompt) {
         if (feedbackEl) {
-          feedbackEl.textContent = 'prompt is empty'
+          // A goal field (proxy-gated) means either a prompt or a goal is a
+          // valid input, so say so rather than naming only the prompt.
+          feedbackEl.textContent = goalInput ? 'enter a prompt or a goal' : 'prompt is empty'
           feedbackEl.className = 'dispatch-prompt-feedback error'
           setTimeout(() => { feedbackEl.textContent = '' }, 1500)
         }

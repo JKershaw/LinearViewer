@@ -934,5 +934,44 @@ test.describe('Dispatch Page', () => {
       await expect(textarea).toHaveValue(/Goal from the human:\*\* none this run/);
       await expect(textarea).toHaveAttribute('data-prompt-name', 'Autopilot (stack walk)');
     });
+
+    // LIN-639: arriving via the ?goal= handoff with an empty prompt and clicking
+    // dispatch must NOT report the misleading "prompt is empty" — the goal is a
+    // valid input, so it is baked into an Autopilot kickoff and dispatched.
+    test('dispatching with a goal but empty prompt bakes the kickoff and launches', async ({ page }) => {
+      const goal = 'Finish the providers unification work';
+      await page.locator('.dispatch-autopilot-goal').fill(goal);
+
+      // The empty prompt textarea must NOT block the launch.
+      await expect(page.locator('.dispatch-prompt-input')).toHaveValue('');
+
+      await page.locator('.dispatch-toggle').click();
+      const dispatchBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
+      await dispatchBtn.click();
+
+      await expect(dispatchBtn).toContainText('dispatched!');
+      // No misleading empty-prompt error appeared.
+      await expect(page.locator('.dispatch-prompt-feedback')).not.toHaveText('prompt is empty');
+
+      // The dispatched item is the goal-scoped Autopilot kickoff, not a blank prompt.
+      const listResponse = await page.request.get(`${API_PREFIX}/api/dispatch`);
+      const { items } = await listResponse.json();
+      const item = items.find(i => i.kind === 'autopilot');
+      expect(item).toBeDefined();
+      expect(item.promptName).toBe(`Autopilot — ${goal}`);
+      expect(item.prompt).toContain(`Goal from the human:** ${goal}`);
+    });
+
+    // LIN-639: with the goal field present (proxy on) but BOTH prompt and goal
+    // empty, the validation message names both valid inputs rather than only the
+    // prompt.
+    test('empty prompt and empty goal shows the goal-aware validation message', async ({ page }) => {
+      await page.locator('.dispatch-toggle').click();
+      await page.locator('.dispatch-prompt-send[data-target="cli"]').click();
+
+      const feedback = page.locator('.dispatch-prompt-feedback');
+      await expect(feedback).toHaveText('enter a prompt or a goal');
+      await expect(feedback).toHaveText('', { timeout: 3000 });
+    });
   });
 });
