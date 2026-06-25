@@ -645,6 +645,10 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   // proving the canonical model survives GitHub's hostile schema end-to-end.
   // ---------------------------------------------------------------------------
   const GITHUB_WS_UUID = '44444444-4444-4444-4444-444444444444';
+  // Stand-in installation access token (LIN-711/LIN-713): the binding credential
+  // is the installation token, NOT the repo slug. The clientFactory seam ignores
+  // it (returns the fake), but it travels through the real read/write call scope.
+  const GITHUB_INSTALL_TOKEN = 'ghs_fake_installation_token';
 
   // POST → seeds a custom GitHub-REST-shaped `{ issues, milestones, labels }`
   //        body (falls back to defaultGitHubSeed). GET → seeds the default.
@@ -663,21 +667,34 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
         req.session.features = validated
       }
 
-      // Inject a fresh fake backend for this repo + the default repo for the
-      // "+ Add task" deep link (getCreateTaskUrl).
+      // Inject a fresh fake backend for this repo. Under the GitHub App model
+      // (LIN-711/LIN-713) production authenticates per-request from the binding's
+      // installation token, so we wire the `clientFactory` test seam: the
+      // request-time client (`_clientForToken`) resolves to the SAME fake,
+      // proving the per-request read/write path offline. `client` still backs any
+      // bare-string boot call, and `repo` is the "+ Add task" deep-link default.
       const provider = getProvider('github');
       if (!provider) throw new Error('github provider not registered');
-      provider.configure({ client: createFakeGitHubClient({ [GITHUB_REPO]: seed }), repo: GITHUB_REPO });
+      const fake = createFakeGitHubClient({ [GITHUB_REPO]: seed });
+      provider.configure({ client: fake, clientFactory: () => fake, repo: GITHUB_REPO });
 
-      // Token === repo slug: carries no auth, only selects the repo. Not
-      // 'test-token', so the mock short-circuit never fires.
+      // GitHub App binding shape (LIN-711): the credential is an INSTALLATION
+      // TOKEN, and the repo is the binding SCOPE (not the token). The read/write
+      // seam threads { token, repo } so the provider builds a request-time client
+      // from the installation token. Not 'test-token', so the mock short-circuit
+      // never fires.
       req.session.workspaces = [{
         id: GITHUB_WS_UUID,
         name: 'GitHub Workspace',
         urlKey: GITHUB_WORKSPACE_URL_KEY,
         provider: 'github',
-        credentials: { token: GITHUB_REPO },
-        accessToken: GITHUB_REPO,
+        bindings: [{
+          provider: 'github',
+          scope: GITHUB_REPO,
+          credentials: { token: GITHUB_INSTALL_TOKEN, installationId: '4242', tokenExpiresAt: Number.MAX_SAFE_INTEGER },
+        }],
+        credentials: { token: GITHUB_INSTALL_TOKEN, installationId: '4242' },
+        accessToken: GITHUB_INSTALL_TOKEN,
         tokenExpiresAt: Number.MAX_SAFE_INTEGER,
         addedAt: Date.now(),
       }];
@@ -698,7 +715,9 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     try {
       const provider = getProvider('github');
       if (!provider) throw new Error('github provider not registered');
-      const created = await provider.createIssue(GITHUB_REPO, {
+      // Exercise the per-request write path: a { repo, token } binding credential
+      // (LIN-713), not a bare repo slug — the same scope the proxy/seam threads.
+      const created = await provider.createIssue({ repo: GITHUB_REPO, token: GITHUB_INSTALL_TOKEN }, {
         title: req.query.title || 'Created via GitHub provider',
         description: 'created in test',
         labels: [],
