@@ -23,6 +23,7 @@
   var generateBtn = document.getElementById('next-run-generate');
   var feedbackEl = document.getElementById('next-run-feedback');
   var optionsEl = document.getElementById('next-run-options');
+  var summaryEl = document.getElementById('next-run-summary');
   var emptyState = document.getElementById('next-run-empty');
   var contextSection = document.getElementById('next-run-context-section');
   var contextToggle = document.getElementById('next-run-context-toggle');
@@ -70,9 +71,11 @@
       var size = String(opt.size || 'M');
       var isOpen = !!opt.continueUntilStopped;
       var goalText = isOpen ? '(no goal — continue until stopped)' : (opt.goal || '');
+      // Full first line of the goal — no char truncation, so the headline is
+      // fully visible (LIN-638); it wraps via CSS instead of being ellipsised.
       var preview = isOpen
         ? 'Continue until stopped'
-        : (opt.goal || '').split('\n')[0].slice(0, 120);
+        : (opt.goal || '').split('\n')[0];
 
       // Head: caret · size chip (obs-chip) · open tag · one-line goal preview.
       var head = document.createElement('button');
@@ -138,6 +141,19 @@
     });
   }
 
+  // Deterministic intro paragraph above the options (LIN-638). Hidden when the
+  // generation returned no summary (e.g. older responses / nothing to say).
+  function renderSummary(summary) {
+    if (!summaryEl) return;
+    if (!summary) {
+      summaryEl.hidden = true;
+      summaryEl.textContent = '';
+      return;
+    }
+    summaryEl.textContent = summary;
+    summaryEl.hidden = false;
+  }
+
   // Single page-level grounding panel: shows the exact context the model saw. It
   // grounds the WHOLE generation, so it is shared (one panel), not per-option.
   function renderContext(context) {
@@ -174,6 +190,7 @@
       body: JSON.stringify({}),
       on401: false
     }).then(function (res) {
+      renderSummary(res && res.summary);
       renderOptions(res && res.options);
       renderContext(res && res.context);
       if (res && res.model && res.model !== 'mock') {

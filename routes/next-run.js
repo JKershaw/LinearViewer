@@ -21,7 +21,7 @@ import { Router } from 'express';
 import { renderNextRunPage } from '../lib/render-next-run.js';
 import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
-import { generateGoalSuggestions, CONTINUE_UNTIL_STOPPED_OPTION, formatNextRunContext } from '../lib/next-run.js';
+import { generateGoalSuggestions, CONTINUE_UNTIL_STOPPED_OPTION, formatNextRunContext, buildNextRunSummary } from '../lib/next-run.js';
 import { buildRoadmapModel } from '../lib/roadmap.js';
 import { isRecommendationEnabled } from '../lib/openrouter.js';
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
@@ -43,8 +43,8 @@ function shouldMockAi(workspace) {
  * Deterministic, grounded mock response for test mode — one direction per the
  * first in-progress / queued mock issue, then the always-present
  * continue-until-stopped option, plus the representative grounding `context`.
- * Mirrors the SHAPE of the real generator ({ options, context }) without calling
- * an LLM, so live and test paths don't diverge (LIN-633).
+ * Mirrors the SHAPE of the real generator ({ options, summary, context }) without
+ * calling an LLM, so live and test paths don't diverge (LIN-633, LIN-638).
  */
 function buildMockResponse() {
   const issues = testMockData.issues || [];
@@ -69,10 +69,12 @@ function buildMockResponse() {
   }
   options.push({ ...CONTINUE_UNTIL_STOPPED_OPTION });
 
-  // Build the context from the same machinery the real generator uses, so the
-  // mock context panel shows a representative grounding blob (parity).
-  const context = formatNextRunContext(buildRoadmapModel(projects, issues), 'Test Workspace');
-  return { options, context };
+  // Build the context + summary from the same machinery the real generator uses,
+  // so the mock panels show representative output (parity).
+  const roadmapModel = buildRoadmapModel(projects, issues);
+  const context = formatNextRunContext(roadmapModel, 'Test Workspace');
+  const summary = buildNextRunSummary(roadmapModel, 'Test Workspace');
+  return { options, context, summary };
 }
 
 /**
