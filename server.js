@@ -44,6 +44,7 @@ import { getProvider, getProviderForWorkspace, getAllProviders } from './lib/pro
 import { NotImplementedError } from './lib/providers/interface.js'
 import './lib/providers/linear/index.js' // side effect: self-registers the Linear provider into the registry
 import { localProvider } from './lib/providers/local/index.js' // side effect: self-registers the Local provider; store injected below
+import './lib/providers/github/index.js' // side effect: self-registers the GitHub provider so its OAuth router mounts (LIN-541)
 import { LocalStore } from './lib/local-store.js'
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID, PERIODICALS_PROJECT_ID } from './lib/tree.js'
 import { buildPeriodicalNodes } from './lib/periodicals.js'
@@ -1533,8 +1534,8 @@ app.get('/workspace/:urlKey/audit', workspaceFromUrl, (req, res) => {
  * @returns {{type: 'ok'|'fail'|'blocked', text: string}|null}
  */
 function providerNoticeFromQuery(query = {}) {
-  if (query.provider_blocked === 'github') {
-    return { type: 'blocked', text: 'Adding GitHub is not available yet — blocked on LIN-541.' };
+  if (query.provider_blocked) {
+    return { type: 'blocked', text: `Adding ${query.provider_blocked} is not available yet.` };
   }
   if (query.provider_removed) {
     return { type: 'ok', text: `Removed ${query.provider_removed} binding.` };
@@ -1960,25 +1961,25 @@ app.post('/workspace/:urlKey/settings/providers/refresh', workspaceFromUrl, asyn
 });
 
 /**
- * Add a provider source (scaffold). GitHub add is blocked on LIN-541 and is NOT
- * silently faked — it returns a clear "not available yet" notice. For an OAuth
- * provider that has a real auth-begin (Linear), it routes into that flow; the
- * generic add-source find-or-create branch (mode:'existing') lands with
- * LIN-541/544.
+ * Add a provider source. Routes an OAuth provider into its auth-begin flow. The
+ * GitHub add-source path (LIN-541) carries `mode=add-source` so its callback
+ * links the new binding onto THIS workspace rather than creating a new one.
  */
 app.post('/workspace/:urlKey/settings/providers/add', workspaceFromUrl, async (req, res) => {
   const workspace = req.workspace;
   const settingsUrl = `/workspace/${encodeURIComponent(workspace.urlKey)}/settings`;
   const { provider } = req.body;
 
-  // GitHub linking depends on LIN-541 (no auth flow exists yet) — surface it as
-  // blocked rather than pretending to add it.
+  // GitHub OAuth begin in add-source mode. Carry the VIEWED workspace's urlKey
+  // (this :urlKey route context) so the callback binds onto THIS workspace, not
+  // the session's active one — a multi-workspace user viewing A while B is active
+  // must bind onto A (LIN-541).
   if (provider === 'github') {
-    return res.redirect(`${settingsUrl}?provider_blocked=github`);
+    return res.redirect(`/auth/github?mode=add-source&workspace=${encodeURIComponent(workspace.urlKey)}`);
   }
 
   // Linear has a real OAuth begin; route into it as the add scaffold. The
-  // per-workspace add-source binding (mode:'existing') is deferred to LIN-541/544.
+  // per-workspace add-source binding (mode:'existing') is deferred to LIN-544.
   if (provider === 'linear') {
     return res.redirect('/auth/linear');
   }
