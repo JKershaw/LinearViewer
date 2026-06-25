@@ -224,8 +224,11 @@ Response includes pagination:
       "assignee": { "name": "Alice" },
       "labels": ["bug"],
       "priority": 1,
+      "priorityLabel": "Urgent",
       "dueDate": "2024-03-01",
       "parent": { "id": "uuid", "identifier": "ENG-40" },
+      "team": { "id": "uuid", "name": "Engineering" },
+      "teamId": "uuid",
       "project": { "id": "uuid", "name": "Project Alpha" },
       "cycle": { "id": "uuid", "name": "Sprint 5", "number": 5 }
     }
@@ -258,7 +261,10 @@ Response includes full context: description, comments, children, parent, relatio
   "assignee": { "name": "Alice" },
   "labels": ["bug"],
   "priority": 1,
+  "priorityLabel": "Urgent",
   "dueDate": "2024-03-01",
+  "team": { "id": "uuid", "name": "Engineering" },
+  "teamId": "uuid",
   "project": { "id": "uuid", "name": "Project Alpha" },
   "cycle": { "id": "uuid", "name": "Sprint 5", "number": 5 },
   "parent": { "id": "uuid", "identifier": "ENG-40", "title": "Auth overhaul" },
@@ -268,6 +274,8 @@ Response includes full context: description, comments, children, parent, relatio
 ```
 
 `parent` is `null` when the issue has no parent. `children` is empty (`[]`) when there are no sub-issues. `labels`, `children`, `comments`, and `relations` are always plain arrays (never a `{ nodes: [...] }` wrapper), and `labels` is a plain array of name strings.
+
+`team` is the issue's owning team as `{ id, name }`, with a flat `teamId` mirror — pass `teamId` straight to `GET /states/{teamId}` or `GET /labels?teamId=` without a separate `GET /teams` lookup. `priorityLabel` is the human-readable priority name (`Urgent` / `High` / `Medium` / `Low` / `No priority`) corresponding to the numeric `priority` (1–4, 0). Both `team`/`teamId` and `priorityLabel` are also present on list and search results.
 
 ##### Trashed (soft-deleted) issues
 
@@ -296,7 +304,7 @@ GET /api/proxy/search?q={query}
 |-----------|------|----------|-------------|
 | `q` | string | Yes | Search text (max 500 chars) |
 
-Returns up to 50 matching issues. Response shape matches the list issues endpoint (including the `parent` field). Children are not included in search results — call `GET /api/proxy/issues/{id}` for the full sub-issue hierarchy.
+Returns up to 50 matching issues. Response shape matches the list issues endpoint (including the `parent`, `team`/`teamId`, and `priority`/`priorityLabel` fields). Children, comments, and relations are not included in search results — call `GET /api/proxy/issues/{id}` for the full sub-issue hierarchy.
 
 #### List Workflow States
 
@@ -843,7 +851,7 @@ Content-Type: application/json
 | `cycleId` | UUID | No | Assign to cycle |
 | `priority` | int | No | Priority 0 (none) to 4 (urgent) |
 
-Returns `201`:
+Returns `201`. The echoed `issue` is the **same flat shape as `GET /issues/{id}`** (minus the `children` / `comments` / `relations` collections, which a create cannot set) — self-verifying, so you do **not** need a follow-up `GET` to confirm the fields the request set:
 ```json
 {
   "success": true,
@@ -851,7 +859,18 @@ Returns `201`:
     "id": "uuid",
     "identifier": "LIN-123",
     "title": "Fix authentication bug",
-    "state": { "name": "Backlog", "type": "backlog" }
+    "description": "...",
+    "state": { "name": "Backlog", "type": "backlog" },
+    "labels": [],
+    "priority": 1,
+    "priorityLabel": "Urgent",
+    "team": { "id": "uuid", "name": "Engineering" },
+    "teamId": "uuid",
+    "project": { "id": "uuid", "name": "Project Alpha" },
+    "parent": null,
+    "cycle": null,
+    "estimate": null,
+    "dueDate": null
   }
 }
 ```
@@ -882,7 +901,7 @@ At least one field must be provided.
 | `cycleId` | UUID | Assign to cycle |
 | `priority` | int | Priority 0 (none) to 4 (urgent) |
 
-Response:
+Response. As with create, the echoed `issue` is the **same flat shape as `GET /issues/{id}`** (minus `children` / `comments` / `relations`) and is **self-verifying** — every mutable field (`priority`/`priorityLabel`, `labels`, `parent`, `project`, `assignee`, `state`, `cycle`, `estimate`, `team`/`teamId`) reflects the post-write state, so a round-trip write→read shows no field absent from the write response that the request set:
 ```json
 {
   "success": true,
@@ -890,7 +909,16 @@ Response:
     "id": "uuid",
     "identifier": "LIN-123",
     "title": "Updated title",
-    "state": { "name": "In Progress", "type": "started" }
+    "description": "...",
+    "state": { "name": "In Progress", "type": "started" },
+    "labels": ["bug"],
+    "priority": 2,
+    "priorityLabel": "High",
+    "team": { "id": "uuid", "name": "Engineering" },
+    "teamId": "uuid",
+    "project": { "id": "uuid", "name": "Project Alpha" },
+    "parent": { "id": "uuid", "identifier": "ENG-40", "title": "Auth overhaul" },
+    "cycle": { "id": "uuid", "name": "Sprint 5", "number": 5 }
   }
 }
 ```

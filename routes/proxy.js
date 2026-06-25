@@ -1025,7 +1025,8 @@ GET ${baseUrl}/api/proxy/issues?teamId={teamId}&limit={n}
   → List issues (optionally filter by team, default limit 50, max 250)
   → { "issues": [{ "id": "...", "identifier": "LIN-1", "title": "...",
                    "state": { "name": "In Progress", "type": "started" },
-                   "labels": ["bug"],
+                   "labels": ["bug"], "priority": 2, "priorityLabel": "High",
+                   "team": { "id": "...", "name": "Engineering" }, "teamId": "...",
                    "cycle": { "id": "...", "number": 12 } }] }
 
 GET ${baseUrl}/api/proxy/issues/{issueId}
@@ -1035,12 +1036,19 @@ GET ${baseUrl}/api/proxy/issues/{issueId}
       "state": { "name": "In Progress", "type": "started" },
       "trashed": false,
       "labels":   ["bug"],
+      "priority": 2, "priorityLabel": "High",
+      "team":     { "id": "...", "name": "Engineering" }, "teamId": "...",
       "children": [{ "id": "...", "identifier": "LIN-124", "title": "..." }],
       "parent":   { "id": "...", "identifier": "LIN-100", "title": "..." },
       "comments": [{ "id": "...", "body": "...", "createdAt": "..." }]
     }
   → labels / children / comments / relations are plain arrays (never wrapped);
     labels are plain name strings. The same flat convention holds everywhere.
+  → team is the issue's owning team as { id, name }, with a flat "teamId" mirror —
+    feed teamId straight to /states/{teamId} and /labels?teamId= without a /teams
+    lookup. priorityLabel is the human-readable priority name (Urgent/High/Medium/
+    Low/No priority) matching the 0–4 "priority". Both are present on list/search
+    results and issue detail.
   → TRASHED ISSUES: deleted issues are soft-deleted (recoverable for ~30 days).
     A deleted issue vanishes from every list/search/child collection but STILL resolves by ID,
     carrying its stale pre-deletion state. When that happens this endpoint sets
@@ -1053,7 +1061,7 @@ GET ${baseUrl}/api/proxy/issues/{issueId}
 
 GET ${baseUrl}/api/proxy/search?q={query}
   → Search issues by text (max 50 results)
-  → { "issues": [ /* same shape as /issues, including parent field; children not included — call /issue/{id} for full hierarchy */ ] }
+  → { "issues": [ /* same flat shape as /issues — including parent, team/teamId, and priority/priorityLabel; children/comments/relations not included — call /issue/{id} for full hierarchy */ ] }
 
 GET ${baseUrl}/api/proxy/states/{teamId}
   → Workflow states for a team
@@ -1193,14 +1201,15 @@ short window: a repeat of the same (issue + body) returns the original comment w
 POST ${baseUrl}/api/proxy/issues
   Body: { "teamId": "...", "title": "...", "description": "...", "projectId": "...", "stateId": "...", "assigneeId": "...", "priority": 0-4, "cycleId": "...", "parentId": "..." }
   → Create a new issue; set parentId (UUID) to create as a sub-issue. Returns 201:
-  → { "success": true, "issue": { "id": "...", "identifier": "LIN-123", "title": "...", "state": { "name": "Backlog", "type": "backlog" } } }
+  → { "success": true, "issue": { /* the SAME flat shape as GET /issues/{id} (minus children/comments/relations): id, identifier, title, description, state, labels, priority, priorityLabel, team, teamId, project, parent, cycle, estimate, dueDate, … */ } }
+  → The echo is self-verifying: it reflects the post-write state of every field the request set, so you do NOT need a follow-up GET to confirm the mutation landed.
   → teamId/stateId/projectId accept symbolic refs, not just UUIDs: teamId as a team key (e.g. LIN) or name; stateId as a keyword (done/in-progress/todo/backlog/canceled/duplicate) or state name; projectId as a project name. Ambiguous or unknown names fail with 422 (UUID is the unambiguous escape hatch).
 
 PATCH ${baseUrl}/api/proxy/issues/{issueId}
   Body: { "title": "...", "description": "...", "stateId": "...", "assigneeId": "...", "priority": 0-4, "cycleId": "...", "parentId": "...|null" }
   → Update an existing issue; set cycleId to assign/move to a cycle; set parentId to a UUID to re-parent, or null to promote to top-level
   → stateId/projectId accept symbolic refs too: stateId as a keyword (done/in-progress/todo/backlog/canceled/duplicate) or state name (scoped to the issue's team), projectId as a project name. Ambiguous/unknown names → 422.
-  → { "success": true, "issue": { "id": "...", "identifier": "LIN-123", "title": "...", "state": { "name": "In Progress", "type": "started" } } }
+  → { "success": true, "issue": { /* the SAME flat shape as GET /issues/{id} (minus children/comments/relations) — self-verifying: every mutable field (priority/priorityLabel, labels, parent, project, assignee, state, cycle, estimate, team/teamId) reflects the post-write state, so no follow-up GET is needed */ } }
   → Passing "description" here REPLACES the whole body. For anything other than a deliberate full rewrite, prefer the two splice endpoints below — they let you supply only the new content, so you never re-emit (and risk corrupting) the existing body.
 
 POST ${baseUrl}/api/proxy/issues/{issueId}/description/append

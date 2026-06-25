@@ -289,6 +289,21 @@ describe('LocalProvider writes', () => {
     assert.equal((await store.listIssues(SCOPE)).length, 1);
   });
 
+  test('canonical issue carries priorityLabel derived from priority (LIN-589)', async () => {
+    // Default priority 0 → "No priority"; a set priority maps to Linear's label.
+    const def = await provider.createIssue(SCOPE, { title: 'No prio' });
+    assert.equal(def.priority, 0);
+    assert.equal(def.priorityLabel, 'No priority');
+
+    const high = await provider.createIssue(SCOPE, { title: 'High prio', priority: 2 });
+    assert.equal(high.priority, 2);
+    assert.equal(high.priorityLabel, 'High');
+
+    // Write echoes use the same _toCanonicalIssue pass, so an update echo carries it too.
+    const updated = await provider.updateIssue(SCOPE, high.id, { priority: 1 });
+    assert.equal(updated.priorityLabel, 'Urgent');
+  });
+
   test('updateIssue round-trips through fetchIssueContext', async () => {
     const created = await provider.createIssue(SCOPE, { title: 'Old' });
     const updated = await provider.updateIssue(SCOPE, created.id, {

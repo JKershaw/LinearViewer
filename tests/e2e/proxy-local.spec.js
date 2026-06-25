@@ -200,6 +200,47 @@ test.describe('Proxy API — local workspace e2e (LIN-584)', () => {
     expect((await back.json()).title).toBe('Renamed child');
   });
 
+  // LIN-589: a write response must be self-verifying — it echoes the fields the
+  // request set (here: priority + its derived priorityLabel + the project it
+  // already had), so a consumer needs no follow-up GET to confirm the mutation.
+  test('PATCH echo is self-verifying: carries the set priority + derived priorityLabel (LIN-589)', async ({ request }) => {
+    const resp = await write(request, 'patch', '/api/proxy/issues/LOCAL-2', { priority: 2 });
+    expect(resp.status()).toBe(200);
+    const echoed = (await resp.json()).issue;
+    // No follow-up read needed — the echo itself reflects the post-write state.
+    expect(echoed.priority).toBe(2);
+    expect(echoed.priorityLabel).toBe('High');
+    expect(echoed.labels).toEqual([]);        // mutable field present (flat array), not omitted
+    expect(echoed.project).toMatchObject({ id: 'p1' }); // existing field round-trips on the echo
+
+    // And it agrees with a subsequent read (priorityLabel also populated on reads).
+    const back = await read(request, '/api/proxy/issues/LOCAL-2');
+    const fresh = await back.json();
+    expect(fresh.priority).toBe(2);
+    expect(fresh.priorityLabel).toBe('High');
+  });
+
+  test('GET issue/list carry priorityLabel; default priority reads as "No priority" (LIN-589)', async ({ request }) => {
+    const detail = await read(request, '/api/proxy/issues/LOCAL-1');
+    expect((await detail.json()).priorityLabel).toBe('No priority'); // seeded with no priority → 0
+
+    const list = await read(request, '/api/proxy/issues');
+    const parent = (await list.json()).issues.find(i => i.identifier === 'LOCAL-1');
+    expect(parent.priorityLabel).toBe('No priority');
+  });
+
+  // POST echo completeness: a freshly created issue's response reflects the
+  // priority the request set, with no follow-up GET (LIN-589).
+  test('POST echo is self-verifying: reflects the set priority + priorityLabel (LIN-589)', async ({ request }) => {
+    const resp = await write(request, 'post', '/api/proxy/issues', {
+      teamId: ANY_UUID, title: 'Urgent thing', priority: 1,
+    });
+    expect(resp.status()).toBe(201);
+    const issue = (await resp.json()).issue;
+    expect(issue.priority).toBe(1);
+    expect(issue.priorityLabel).toBe('Urgent');
+  });
+
   test('POST /issues/:id/comments creates a comment that shows on the issue', async ({ request }) => {
     const resp = await write(request, 'post', '/api/proxy/issues/LOCAL-1/comments', { body: 'A proxy comment' });
     expect(resp.status()).toBe(201);

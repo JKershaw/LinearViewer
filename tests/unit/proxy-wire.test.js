@@ -43,6 +43,29 @@ describe('flattenIssue', () => {
     assert.strictEqual(issue.inverseRelations[0].issue.identifier, 'LIN-7');
   });
 
+  test('derives a flat teamId from the nested team object, keeping team (LIN-589)', () => {
+    const issue = { id: 'i1', team: { id: 'team-uuid', name: 'Engineering' } };
+    flattenIssue(issue);
+    assert.strictEqual(issue.teamId, 'team-uuid');
+    assert.deepStrictEqual(issue.team, { id: 'team-uuid', name: 'Engineering' });
+  });
+
+  test('teamId is null when team came back null, and absent when team unselected (LIN-589)', () => {
+    const withNull = { id: 'i1', team: null };
+    flattenIssue(withNull);
+    assert.strictEqual(withNull.teamId, null);
+
+    const withoutTeam = { id: 'i2' };
+    flattenIssue(withoutTeam);
+    assert.strictEqual('teamId' in withoutTeam, false);
+  });
+
+  test('derives teamId on nested children too (one shared pass) (LIN-589)', () => {
+    const issue = { id: 'i1', children: { nodes: [{ id: 'c1', team: { id: 't9', name: 'Ops' } }] } };
+    flattenIssue(issue);
+    assert.strictEqual(issue.children[0].teamId, 't9');
+  });
+
   test('drops the backend url but preserves opaque id and identifier', () => {
     const issue = { id: 'uuid-1', identifier: 'LIN-123', url: 'https://linear.app/org/issue/LIN-123' };
     flattenIssue(issue);
