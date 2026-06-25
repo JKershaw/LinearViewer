@@ -5,6 +5,14 @@
  * dashboard / Swipe (single column, touch targets, horizontal-scroll chips)
  * rather than the Pipeline desktop floor. Reuses the shared light-theme
  * variables (--fg, --fg-dim, --fg-vdim, --bg, --bg-muted, green/yellow/red).
+ *
+ * Typography note (LIN-705): this stylesheet is mobile-first and its `rem`
+ * sizes are rooted at the 16px browser default (the global mobile `body`
+ * font-size reductions in style.css are em/px-based and do NOT reach these
+ * `.obs-*` rem sizes). So the base values here ARE the mobile values. They
+ * are tiered for a legible small-type floor — micro uppercase labels ~0.72rem,
+ * small chips/states ~0.74rem, secondary meta ~0.78rem, body text ~0.82rem,
+ * and the session name lifted to 1.05rem for clear card hierarchy.
  */
 
 .obs-page {
@@ -33,7 +41,7 @@
 
 .obs-poll-status {
   margin-left: auto;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   color: var(--fg-dim);
 }
 
@@ -53,13 +61,13 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  padding: 0.2rem 0.55rem;
+  padding: 0.3rem 0.6rem;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--bg);
   color: var(--fg-dim);
   font: inherit;
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   cursor: pointer;
 }
 
@@ -86,7 +94,7 @@
   /* Coloured left accent bar per status (mockup, LIN-608); status hue set below. */
   border-left: 4px solid var(--border);
   border-radius: 6px;
-  margin-bottom: 0.45rem;
+  margin-bottom: 0.5rem;
   background: var(--bg);
   overflow: hidden;
 }
@@ -101,9 +109,9 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 0.3rem;
+  gap: 0.35rem;
   width: 100%;
-  padding: 0.55rem 0.7rem;
+  padding: 0.65rem 0.8rem;
   border: 0;
   background: none;
   font: inherit;
@@ -133,11 +141,11 @@
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  padding: 0.08rem 0.45rem;
+  padding: 0.12rem 0.5rem;
   border: 1px solid var(--border);
   border-radius: 6px;
   font-family: var(--font-mono, monospace);
-  font-size: 0.74rem;
+  font-size: 0.78rem;
   line-height: 1.4;
   color: var(--fg-dim);
   white-space: nowrap;
@@ -149,8 +157,8 @@
 
 .obs-session-name {
   font-weight: 600;
-  font-size: 0.95rem;
-  line-height: 1.25;
+  font-size: 1.05rem;
+  line-height: 1.3;
 }
 
 /* Labelled runtime / model meta line (mockup). */
@@ -158,7 +166,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.25rem 0.9rem;
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   font-family: var(--font-mono, monospace);
 }
 .obs-meta-k { color: var(--fg-dim); }
@@ -166,9 +174,9 @@
 .obs-meta-ws { color: var(--fg-dim); }
 
 .obs-session-summary {
-  font-size: 0.82rem;
+  font-size: 0.84rem;
   color: var(--fg-dim);
-  line-height: 1.3;
+  line-height: 1.35;
 }
 .obs-summary-line { display: inline; }
 .obs-summary-status { font-style: italic; }
@@ -181,7 +189,7 @@
   color: var(--fg-dim);
   background: var(--bg-muted);
   border-radius: 3px;
-  padding: 0.02rem 0.32rem;
+  padding: 0.08rem 0.36rem;
   margin-left: 0.3rem;
 }
 .obs-summary-pending { color: var(--fg-dim); }
@@ -191,7 +199,7 @@
   background: none;
   padding: 0;
   font: inherit;
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   color: var(--yellow);
   text-decoration: underline;
   cursor: pointer;
@@ -202,7 +210,7 @@
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  margin: 0.15rem 0;
+  margin: 0.2rem 0;
 }
 
 .obs-progress {
@@ -215,7 +223,7 @@
 .obs-progress-count {
   flex: 0 0 auto;
   font-family: var(--font-mono, monospace);
-  font-size: 0.74rem;
+  font-size: 0.78rem;
   color: var(--fg-dim);
 }
 
@@ -251,7 +259,7 @@
 .obs-session-time {
   flex: 0 0 auto;
   margin-left: auto;
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   color: var(--fg-dim);
   white-space: nowrap;
 }
@@ -266,15 +274,15 @@
 /* ─── Session body (expanded) ─────────────────────────────────────────────── */
 
 .obs-session-body {
-  padding: 0.4rem 0.7rem 0.6rem;
+  padding: 0.5rem 0.8rem 0.65rem;
   border-top: 1px solid var(--border-subtle);
-  font-size: 0.82rem;
+  font-size: 0.84rem;
 }
 
 .obs-body-lbl {
   color: var(--fg-dim);
   text-transform: uppercase;
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   letter-spacing: 0.04em;
   margin-right: 0.35rem;
 }
@@ -286,11 +294,11 @@
 /* ─── Level 3: tasks touched + relationships ──────────────────────────────── */
 
 .obs-tasks { margin-top: 0.4rem; }
-.obs-context-note { margin: 0.2rem 0; font-size: 0.76rem; }
+.obs-context-note { margin: 0.2rem 0; font-size: 0.8rem; }
 
 .obs-task {
-  margin: 0.45rem 0;
-  padding-left: 0.5rem;
+  margin: 0.5rem 0;
+  padding-left: 0.55rem;
   border-left: 2px solid var(--border-subtle);
 }
 
@@ -302,20 +310,20 @@
 }
 
 .obs-prov {
-  font-size: 0.64rem;
+  font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--fg-dim);
   border: 1px solid var(--border);
   border-radius: 999px;
-  padding: 0.02rem 0.35rem;
+  padding: 0.08rem 0.4rem;
 }
 .obs-prov[data-prov="seed"] { color: var(--fg); border-color: var(--border-strong); }
 .obs-prov[data-prov="spun-off"] { color: var(--yellow); }
 
 .obs-task-ident {
   font-family: var(--font-mono, monospace);
-  font-size: 0.76rem;
+  font-size: 0.8rem;
   color: var(--fg);
   text-decoration: none;
 }
@@ -330,22 +338,22 @@ a.obs-task-ident:hover { text-decoration: underline; }
 }
 
 .obs-task-state {
-  font-size: 0.68rem;
+  font-size: 0.74rem;
   color: var(--fg-dim);
   background: var(--bg-muted);
   border-radius: 3px;
-  padding: 0.02rem 0.35rem;
+  padding: 0.08rem 0.4rem;
 }
 .obs-task-state[data-type="started"] { color: var(--yellow); }
 .obs-task-state[data-type="completed"] { color: var(--green); }
 .obs-task-state[data-type="canceled"] { color: var(--red); }
 
 .obs-task-label {
-  font-size: 0.66rem;
+  font-size: 0.72rem;
   color: var(--fg-dim);
   border: 1px solid var(--border-subtle);
   border-radius: 3px;
-  padding: 0.02rem 0.3rem;
+  padding: 0.08rem 0.35rem;
 }
 
 .obs-rels {
@@ -353,12 +361,12 @@ a.obs-task-ident:hover { text-decoration: underline; }
   flex-wrap: wrap;
   gap: 0.3rem 0.7rem;
   margin: 0.2rem 0 0.3rem;
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   color: var(--fg-dim);
 }
 .obs-rel-k {
   text-transform: uppercase;
-  font-size: 0.6rem;
+  font-size: 0.68rem;
   letter-spacing: 0.04em;
   color: var(--fg-dim);
   margin-right: 0.2rem;
@@ -368,7 +376,7 @@ a.obs-task-ident:hover { text-decoration: underline; }
 /* ─── Level 3: worker-session tree ────────────────────────────────────────── */
 
 .obs-worker-tree { list-style: none; margin: 0.25rem 0 0; padding: 0; }
-.obs-worker-empty { font-size: 0.76rem; margin: 0.2rem 0; }
+.obs-worker-empty { font-size: 0.8rem; margin: 0.2rem 0; }
 
 .obs-worker {
   border-top: 1px solid var(--border-subtle);
@@ -380,7 +388,7 @@ a.obs-task-ident:hover { text-decoration: underline; }
   align-items: flex-start;
   gap: 0.45rem;
   width: 100%;
-  padding: 0.3rem 0;
+  padding: 0.4rem 0;
   border: 0;
   background: none;
   font: inherit;
@@ -406,42 +414,42 @@ a.obs-task-ident:hover { text-decoration: underline; }
 }
 .obs-worker-iter {
   font-family: var(--font-mono, monospace);
-  font-size: 0.7rem;
+  font-size: 0.76rem;
   color: var(--fg-dim);
 }
 
 /* Bordered box phase tag (RESEARCH / PLAN …) — mockup treatment (LIN-608). */
 .obs-worker-phase {
   font-family: var(--font-mono, monospace);
-  font-size: 0.64rem;
+  font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--fg-dim);
   border: 1px solid var(--border);
   border-radius: 4px;
-  padding: 0.04rem 0.4rem;
+  padding: 0.1rem 0.45rem;
 }
 
 /* Bordered rounded metric chips (14 call sites …) — mockup treatment (LIN-608). */
 .obs-chips-metric { display: inline-flex; gap: 0.3rem; flex-wrap: wrap; }
 .obs-chip-metric {
-  font-size: 0.66rem;
+  font-size: 0.74rem;
   color: var(--fg-dim);
   background: transparent;
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 0.04rem 0.4rem;
+  padding: 0.1rem 0.45rem;
   font-family: var(--font-mono, monospace);
 }
 
-.obs-worker-recap { font-size: 0.78rem; color: var(--fg-dim); line-height: 1.3; }
+.obs-worker-recap { font-size: 0.82rem; color: var(--fg-dim); line-height: 1.35; }
 
 .obs-worker-caret { flex: 0 0 auto; color: var(--fg-dim); transition: transform 0.12s ease; }
 .obs-worker[data-open="1"] .obs-worker-caret { transform: rotate(90deg); }
 
 .obs-worker-body {
   padding: 0.15rem 0 0.4rem 1.3rem;
-  font-size: 0.78rem;
+  font-size: 0.82rem;
 }
 
 .obs-detail-block { margin: 0.25rem 0; }
@@ -450,12 +458,12 @@ a.obs-task-ident:hover { text-decoration: underline; }
 .obs-acts, .obs-artifacts { list-style: none; margin: 0.15rem 0 0; padding: 0; }
 .obs-act {
   font-family: var(--font-mono, monospace);
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   color: var(--fg-dim);
   padding: 0.05rem 0;
 }
 
-.obs-artifact { color: var(--link, #2563eb); font-size: 0.76rem; word-break: break-all; }
+.obs-artifact { color: var(--link, #2563eb); font-size: 0.8rem; word-break: break-all; }
 .obs-artifacts li { padding: 0.05rem 0; }
 
 .obs-run-gen {
@@ -463,7 +471,7 @@ a.obs-task-ident:hover { text-decoration: underline; }
   background: none;
   padding: 0;
   font: inherit;
-  font-size: 0.76rem;
+  font-size: 0.8rem;
   color: var(--yellow);
   text-decoration: underline;
   cursor: pointer;
@@ -490,7 +498,7 @@ a.obs-task-ident:hover { text-decoration: underline; }
 .obs-archive-label { font-weight: 600; }
 
 .obs-archive-count {
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   color: var(--fg-dim);
   background: var(--bg-muted);
   border-radius: 999px;
