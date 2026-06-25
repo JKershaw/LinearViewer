@@ -16,6 +16,7 @@ import assert from 'node:assert';
 import {
   formatNextRunContext,
   buildNextRunMessages,
+  buildNextRunSummary,
   parseGoalSuggestions,
   normalizeSize,
   generateGoalSuggestions,
@@ -31,6 +32,25 @@ const MODEL = {
     { identifier: 'LIN-11', title: 'Next up', stateType: 'unstarted', priority: 2, projectName: 'Core', labels: ['bug'] },
   ],
   milestones: [{ projectName: 'Core', subtaskDone: 4, subtaskTotal: 10 }],
+};
+
+// A richer model exercising the enriched context sections (LIN-638): ids +
+// blocking edges + parent, plus criticalPaths / risks / analysis as the real
+// buildRoadmapModel emits them.
+const RICH_MODEL = {
+  velocity: { tasksPerWeek: 2, pointsPerWeek: 5, trend: 'decreasing' },
+  executionQueue: [
+    { id: 'a', identifier: 'LIN-1', title: 'Blocker', stateType: 'started', priority: 1, projectName: 'Core', labels: [], blocksIds: ['b'] },
+    { id: 'b', identifier: 'LIN-2', title: 'Blocked work', stateType: 'unstarted', priority: 2, projectName: 'Core', labels: [], blocksIds: [], parentId: 'a' },
+  ],
+  criticalPaths: new Map([['Core', { path: ['a', 'b'], length: 2, blockers: ['a'] }]]),
+  risks: [{ type: 'overdue', severity: 'high', description: 'Projected completion exceeds due date.', milestone: 'Core' }],
+  analysis: {
+    cycleTime: { medianDays: 3, avgDays: 4.2, sampleSize: 7 },
+    velocityShift: { recentAvg: 1.5, priorAvg: 3, pctChange: -50 },
+    staleTasks: [{ title: 'old one', ageDays: 30, milestone: 'Core' }],
+  },
+  milestones: [{ projectName: 'Core', subtaskDone: 1, subtaskTotal: 2 }],
 };
 
 describe('formatNextRunContext', () => {
@@ -54,6 +74,47 @@ describe('formatNextRunContext', () => {
   test('tolerates a null/garbage model', () => {
     assert.equal(typeof formatNextRunContext(null), 'string');
     assert.equal(typeof formatNextRunContext(undefined), 'string');
+  });
+
+  test('enriches with relationships, critical paths, risks, and health (LIN-638)', () => {
+    const out = formatNextRunContext(RICH_MODEL, 'Acme');
+    // Per-card relationship clauses resolved to identifiers.
+    assert.match(out, /LIN-1 — Blocker.*blocks LIN-2/);
+    assert.match(out, /LIN-2 — Blocked work.*blocked by LIN-1; subtask of LIN-1/);
+    // Dependency chain section.
+    assert.match(out, /Dependency chains/);
+    assert.match(out, /Core: LIN-1 → LIN-2/);
+    // Risks.
+    assert.match(out, /Risks flagged \(1\)/);
+    assert.match(out, /\[high\] Projected completion/);
+    // Delivery health from the analysis.
+    assert.match(out, /Median cycle time: 3 days/);
+    assert.match(out, /Velocity shift: 1\.5\/wk recent vs 3\/wk prior \(-50%\)/);
+    assert.match(out, /Stale in progress: 1 task/);
+  });
+
+  test('omits enrichment sections cleanly when the model lacks them', () => {
+    // The simple MODEL has no criticalPaths/risks/analysis — no headers leak.
+    const out = formatNextRunContext(MODEL, 'Acme');
+    assert.doesNotMatch(out, /Dependency chains/);
+    assert.doesNotMatch(out, /Risks flagged/);
+    assert.doesNotMatch(out, /Delivery health/);
+  });
+});
+
+describe('buildNextRunSummary (LIN-638)', () => {
+  test('summarises in-progress/queued counts, velocity, next item, and risks', () => {
+    const out = buildNextRunSummary(RICH_MODEL, 'Acme');
+    assert.match(out, /Acme has 1 task in progress and 1 queued\./);
+    assert.match(out, /Recent velocity is 2 tasks\/week \(decreasing trend\)\./);
+    assert.match(out, /Next up the queue: LIN-2 — Blocked work\./);
+    assert.match(out, /1 risk flagged \(1 high\)\./);
+  });
+
+  test('falls back to a generic subject and tolerates a garbage model', () => {
+    assert.match(buildNextRunSummary(MODEL), /^This workspace has/);
+    assert.equal(buildNextRunSummary(null), '');
+    assert.equal(buildNextRunSummary(undefined), '');
   });
 });
 
@@ -170,6 +231,10 @@ describe('generateGoalSuggestions return shape (LIN-633)', () => {
     assert.equal(typeof result.context, 'string');
     assert.ok(result.context.length > 0);
     assert.equal(result.context, formatNextRunContext(buildRoadmapModel([], []), 'Acme'));
+
+    // summary is returned and is the deterministic intro paragraph (LIN-638).
+    assert.equal(typeof result.summary, 'string');
+    assert.equal(result.summary, buildNextRunSummary(buildRoadmapModel([], []), 'Acme'));
 
     // The concrete option survives; the guaranteed open-ended option is appended last as XL.
     const last = result.options[result.options.length - 1];

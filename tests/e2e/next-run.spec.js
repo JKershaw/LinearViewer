@@ -87,6 +87,10 @@ test.describe('Suggested Next Run Page (experimental)', () => {
     test('the grounding context panel is hidden until a generation returns', async ({ page }) => {
       await expect(page.locator('#next-run-context-section')).toBeHidden();
     });
+
+    test('the summary intro is hidden until a generation returns (LIN-638)', async ({ page }) => {
+      await expect(page.locator('#next-run-summary')).toBeHidden();
+    });
   });
 
   test.describe('Generation', () => {
@@ -140,6 +144,19 @@ test.describe('Suggested Next Run Page (experimental)', () => {
       const href = await accept.getAttribute('href');
       expect(href).toContain('/dispatch');
       expect(href).not.toContain('goal=');
+    });
+
+    test('a deterministic summary intro appears above the options (LIN-638)', async ({ page }) => {
+      await page.locator('#next-run-generate').click();
+
+      const summary = page.locator('#next-run-summary');
+      await expect(summary).toBeVisible({ timeout: 5000 });
+      // The summary is grounded — it states in-progress/queued counts.
+      await expect(summary).toContainText('in progress');
+
+      // It renders above the options list in DOM order.
+      const summaryThenOptions = page.locator('#next-run-summary ~ #next-run-options');
+      await expect(summaryThenOptions).toHaveCount(1);
     });
 
     test('the grounding context panel appears and expands after generation (LIN-633)', async ({ page }) => {

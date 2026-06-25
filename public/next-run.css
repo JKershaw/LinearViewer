@@ -42,6 +42,18 @@
   color: var(--red, #c0392b);
 }
 
+/* Deterministic intro paragraph above the options (LIN-638). */
+.next-run-summary {
+  margin: 0 0 var(--space-2);
+  padding: var(--space-2);
+  line-height: 1.5;
+  color: var(--fg);
+  font-size: var(--font-size-sm);
+  background: var(--bg-muted, var(--bg));
+  border-left: 3px solid var(--border-strong, var(--fg-dim));
+  border-radius: var(--radius-sm);
+}
+
 .next-run-options {
   list-style: none;
   margin: 0;
@@ -104,14 +116,16 @@
   text-transform: lowercase;
 }
 
+/* Headline goal preview — full text, no truncation (LIN-638): it wraps rather
+   than being clipped with an ellipsis, so the whole title is readable at a
+   glance even while the card is collapsed. */
 .next-run-goal-preview {
   flex: 1 1 auto;
   min-width: 0;
   color: var(--fg-dim);
   font-size: var(--font-size-sm);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .next-run-goal {
