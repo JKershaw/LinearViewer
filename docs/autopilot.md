@@ -58,7 +58,7 @@ the overlap honestly so the reconciliation step can do its job.
 
 ## 1. What it is
 
-Autopilot is the loop that runs the workbench itself. Today a human loads LinearViewer,
+Autopilot is the loop that runs the workbench itself. Today a human loads Harbour,
 reads a couple of briefs, decides which task is next, and dispatches the AI-recommended
 prompt to an agent. Autopilot is a **thin orchestrator** that does that walk
 continuously — read state, pick the next task, dispatch the recommended prompt to a worker,
@@ -74,7 +74,7 @@ It has two halves that have been discussed separately but are one machine:
 
 ## 2. Why now
 
-LinearViewer's north star: *keep human intent in command of AI-accelerated execution.* The
+Harbour's north star: *keep human intent in command of AI-accelerated execution.* The
 direction-layer thesis is that AI made *producing* work cheap, so the bottleneck moved
 upstream — from execution to direction. "The bottleneck moves but doesn't disappear; it
 goes upstream." The lower layers (prompts, dispatch, recommender, single-session foreman)
@@ -264,7 +264,7 @@ Honest inventory, because the main risk is parallel-building:
 | Dispatch queue + feedback | `routes/dispatch.js` | shipped (feedback free-form — intentional) |
 | **Proxy dispatch verbs** (`POST /api/proxy/dispatch` enqueue, `POST …/recommend-and-dispatch` fused trigger, `GET …/:id` watch, `GET …` list) | proxy API | **shipped (this branch)** — derived terminal `status`, structured `[evidence]` URLs, fused recommend+dispatch (LIN-321); see experiment doc |
 | Runner: dispatch consumer running Claude Code (local CLI or web remote-control) | separate system | **shipped + telemetry-complete** — phase tags, 30s heartbeats, recap, `[evidence]`, `[done]`/`[failed]` (Runs 1–10) |
-| Harbour (local) runner | `lib/harbour-spawn.js`, LIN-259 | shipped — one such consumer |
+| Harbour OS (local) runner | `lib/harbour-spawn.js`, LIN-259 | shipped — one such consumer |
 | API contract unification | LIN-306 / 309 / 310 / 311 | in-flight — **will move the contract Autopilot drives** |
 
 What is genuinely net-new (lives in no ticket yet, only in the design conversation):

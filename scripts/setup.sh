@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Auto-setup script for LinearViewer
+# Auto-setup script for Harbour
 # Installs missing dependencies and Playwright browsers, then runs env check
 
 set -e

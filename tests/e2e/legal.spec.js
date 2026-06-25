@@ -88,7 +88,7 @@ test.describe('Legal Pages', () => {
     test('header links back to home', async ({ page }) => {
       await page.goto('/privacy');
       await page.locator('h1 a').click();
-      await expect(page.locator('h1')).toContainText('Linear Projects Viewer');
+      await expect(page.locator('h1')).toContainText('Harbour');
     });
   });
 

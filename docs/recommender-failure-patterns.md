@@ -11,7 +11,7 @@ live. No code changes proposed as committed work yet.
 
 ## Why this exists
 
-LinearViewer's recommendation loop is a greedy per-issue optimizer driving (optionally
+Harbour's recommendation loop is a greedy per-issue optimizer driving (optionally
 autonomous) AI agents. Greedy autonomous loops have characteristic emergent failure modes. The
 goal here is to catalogue them *once*, decide which are real, and — critically — avoid
 "fixing" structural problems with cheap local patches, which is itself the failure mode this

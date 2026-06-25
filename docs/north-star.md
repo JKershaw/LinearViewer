@@ -1,6 +1,6 @@
-# LinearViewer — North Star
+# Harbour — North Star
 
-*The workspace north star: prose, singular, normative. Native to LinearViewer (not a Linear
+*The workspace north star: prose, singular, normative. Native to Harbour (not a Linear
 primitive). This file is the version-controlled canonical copy; paste it into the Roadmap page's
 north-star input (`PUT /workspace/:urlKey/api/roadmap/north-star`) to make it live. The layer-3b
 reader (`lib/prompts/roadmap-north-star-template.js`) scores work against it; the same
@@ -8,7 +8,7 @@ classification eventually orients the Ship view's FORWARD sector.*
 
 ---
 
-LinearViewer exists to keep human intent in command of AI-accelerated execution.
+Harbour exists to keep human intent in command of AI-accelerated execution.
 
 As agents make producing work cheap, the scarce act is no longer doing the work — it is deciding
 what is worth doing, and noticing when the body of work has drifted from it. The product's job is

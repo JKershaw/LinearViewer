@@ -20,7 +20,7 @@ function rootTokenNames() {
 test('renders a complete, public, static HTML document', () => {
   const html = renderStyleguide();
   assert.match(html, /^<!DOCTYPE html>/);
-  assert.match(html, /<title>Style Guide - Linear Projects Viewer<\/title>/);
+  assert.match(html, /<title>Style Guide - Harbour<\/title>/);
   assert.match(html, /<link rel="stylesheet" href="\/style.css">/);
   assert.match(html, /<link rel="stylesheet" href="\/styleguide.css">/);
   // Public page chrome (mirrors legal pages): landing body class, header home link.

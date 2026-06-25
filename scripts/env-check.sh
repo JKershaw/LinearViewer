@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Environment check script for LinearViewer
+# Environment check script for Harbour
 # Verifies all dependencies, environment variables, and tools are properly configured
 # Output is structured for AI agents: blocking issues first, then passing checks
 

@@ -1,6 +1,17 @@
-# Linear Projects Viewer
+# Harbour
 
-A minimal, CLI-aesthetic web app that displays Linear projects and issues as a collapsible tree.
+A minimal, CLI-aesthetic web app — a provider-agnostic control plane for AI-augmented
+software development. It started as a read-only Linear projects/issues tree viewer and grew
+into a cockpit that reads any issue backend, generates grounded prompts, dispatches them to
+AI agents, and verifies the work on real evidence.
+
+> **Naming: Harbour vs Harbour OS.** **Harbour** is this product (the cockpit/control plane).
+> **Harbour OS** is John's separate in-browser workstation that Harbour can *dispatch* agent
+> sessions into (the `local` dispatch target; see `lib/harbour-spawn.js`). They are
+> parent/child like Apple/macOS — always write the workstation as **Harbour OS** in full.
+> The `local` target name and the `HAR-` eval fixtures (a separate Harbour OS Linear
+> workspace used as test data) refer to the workstation, not the product brand — leave them
+> as-is.
 
 ## Commands
 
@@ -357,7 +368,7 @@ Items expire after 24 hours. Tokens are workspace-scoped and never expire (but c
 Feedback is append-only, inherits 30-day history TTL, and requires strict token ownership.
 
 A dispatch item may carry an optional `followUpTo` field (the `id` of an earlier dispatch) to resume that
-session as a follow-up instead of starting fresh (cli/web only, same workspace; LIN-415). LinearViewer
+session as a follow-up instead of starting fresh (cli/web only, same workspace; LIN-415). Harbour
 stores and forwards the id blindly — the consumer owns session identity and liveness, and reports
 `[failed] no live session to resume` when the target session is gone. See the Follow-ups section of the
 integration guide; the autopilot's conservative "fresh by default, follow up only after a flawless,

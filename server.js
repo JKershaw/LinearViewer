@@ -1,5 +1,5 @@
 /**
- * Linear Projects Viewer - Express Server
+ * Harbour - Express Server
  *
  * Main entry point for the application. Handles:
  * - OAuth 2.0 authentication with Linear
@@ -2041,7 +2041,7 @@ app.use((err, req, res, next) => {
 // =============================================================================
 const PORT = process.env.PORT || 3000
 app.listen(PORT, () => {
-  console.log(`Linear Projects Viewer running at http://localhost:${PORT}`)
+  console.log(`Harbour running at http://localhost:${PORT}`)
 
   // Start periodic cleanup of expired items (every hour)
   const CLEANUP_INTERVAL_MS = 60 * 60 * 1000 // 1 hour

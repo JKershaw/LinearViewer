@@ -1,4 +1,4 @@
-# Adding a Direction Layer to LinearViewer
+# Adding a Direction Layer to Harbour
 
 *A thinking document. Last updated May 2026.*
 
@@ -12,11 +12,11 @@
 
 ## Summary
 
-LinearViewer is an experimental workbench for orchestrating AI coding agents against a Linear backlog. Through daily use, a structural gap has emerged: the project has many views that show *what* work exists, but none that show *whether the work is pointed anywhere worth going*. This document argues that gap reflects a broader shift — AI-augmented development has moved the bottleneck of software work from execution to direction-setting — and proposes a small experiment as the first step toward closing it: a "north star" document plus an LLM analyzer with read-only Linear access, producing both alignment scoring of current work and feedback on the quality of the north star itself. It's framed as the MVP for what would later become a fuller direction layer, eventually visualized by the unbuilt Ship view.
+Harbour is an experimental workbench for orchestrating AI coding agents against a Linear backlog. Through daily use, a structural gap has emerged: the project has many views that show *what* work exists, but none that show *whether the work is pointed anywhere worth going*. This document argues that gap reflects a broader shift — AI-augmented development has moved the bottleneck of software work from execution to direction-setting — and proposes a small experiment as the first step toward closing it: a "north star" document plus an LLM analyzer with read-only Linear access, producing both alignment scoring of current work and feedback on the quality of the north star itself. It's framed as the MVP for what would later become a fuller direction layer, eventually visualized by the unbuilt Ship view.
 
-## Context: LinearViewer today
+## Context: Harbour today
 
-Despite the name, LinearViewer isn't really a viewer. It's an opinionated workbench for orchestrating AI coding agents against a Linear backlog. The project serves two audiences in one app — humans who navigate and decide what to work on, and AI agents who execute and report back — and treats the prompt as the unit of value that flows between them, carrying enough Linear context to make agent work actually useful.
+Despite the name, Harbour isn't really a viewer. It's an opinionated workbench for orchestrating AI coding agents against a Linear backlog. The project serves two audiences in one app — humans who navigate and decide what to work on, and AI agents who execute and report back — and treats the prompt as the unit of value that flows between them, carrying enough Linear context to make agent work actually useful.
 
 The shape of the project is a set of deliberately overlapping experiments. There are multiple views (tree, swipe, swim, pipeline), each a different theory of what makes a backlog feel navigable. There are two paths for generating prompts (handwritten templates and AI-generated via meta-prompt over the same template set), kept in sync as a controlled comparison. There are four transport layers for getting prompts to agents (dispatch queue, proxy API, Linear CLI, llms.txt + data attributes), at four different coupling levels. The no-frameworks, server-rendered, vanilla-JS constraint isn't aesthetics — it keeps the iteration cost of trying yet another shape low enough that experimentation stays cheap. The overlap among views and transports isn't sprawl; it's the methodology.
 
@@ -30,7 +30,7 @@ But beneath that observation is a sharper one. The standard taxonomy of work —
 
 This is the founding observation of Domain-Driven Design: teams pour effort into the periphery while the core domain drifts. It's why big rewrites happen — not because the features got bad, but because the core got buried under so much accreted accidental work that nobody can find or change it anymore. The backlog hides it rather than protecting it.
 
-The visualization views in LinearViewer don't escape this. Tree view shows hierarchy. Swim shows lanes. Pipeline shows flow. Each answers *"how is the work organized and navigable?"* None of them answer *"is the work pointed somewhere worth going?"* They make state legible. They don't make direction legible.
+The visualization views in Harbour don't escape this. Tree view shows hierarchy. Swim shows lanes. Pipeline shows flow. Each answers *"how is the work organized and navigable?"* None of them answer *"is the work pointed somewhere worth going?"* They make state legible. They don't make direction legible.
 
 That's the gap.
 
@@ -52,7 +52,7 @@ The thesis:
 
 Direct evidence: my own arc through AI-augmented development passed through stages — copy-paste via chat UI; in-SDK hints; Claude Code completing functions; expanding documentation to let it flourish; moving repetitive prompts into templates; building a task tracker that wraps those templates; letting the AI choose the next prompt; and now experimenting with a foreman that dispatches work autonomously. At each stage, the AI absorbed the previous bottleneck, and my attention concentrated on the layer above. The constant: **the bottleneck moves but doesn't disappear — it goes upstream**. And what's at the top? Direction. "Are we going somewhere worth going?" — the question no foreman, template, or meta-prompt can answer for you.
 
-LinearViewer was built for the lower layers. The direction layer is where it now needs to go.
+Harbour was built for the lower layers. The direction layer is where it now needs to go.
 
 ## The constructive answer: a direction layer
 
@@ -73,14 +73,14 @@ The north star should be:
 
 - **Prose** — markdown, because that's the format humans and LLMs both treat as native
 - **Singular per project** — one north star per project being worked on, not a list (running parallel competing north stars against a single project would be incoherent)
-- **Native to LinearViewer** — not stored in Linear, because Linear doesn't accommodate its shape
+- **Native to Harbour** — not stored in Linear, because Linear doesn't accommodate its shape
 - **Read-only from Linear's perspective** — the AI/alignment layer reads Linear to score against the north star; Linear doesn't need to know about the north star
 
 This is the first piece of content in the project that has no analogue in Linear. That's a feature, not a problem: **Linear is for execution; the north star is for intent; the workbench is the place where intent governs execution.**
 
 ### A note on track record
 
-LinearViewer has rich track record data — completed tasks, durations, recent activity. It's tempting to use that as the basis for direction. But track record is one layer too low. It's *empirical* (what happened); a north star is *normative* (what should happen). Extrapolating from empirical to normative is using past behavior as the definition of the goal — exactly the drift the direction layer is supposed to detect.
+Harbour has rich track record data — completed tasks, durations, recent activity. It's tempting to use that as the basis for direction. But track record is one layer too low. It's *empirical* (what happened); a north star is *normative* (what should happen). Extrapolating from empirical to normative is using past behavior as the definition of the goal — exactly the drift the direction layer is supposed to detect.
 
 Track record still has a role, just a different one: it becomes a **sensor**, not a navigator. Once a north star exists, the track record can be measured against it — alignment of completed work, rate of forward progress, drift detection. Track record + north star = "are we going where we said we were going?" Track record alone = "are we going somewhere?" The second question is much less useful, which is why the earlier Roadmap experiment — which derived summaries from Linear data alone — never felt quite right. It was producing empirical output when the moment called for normative.
 

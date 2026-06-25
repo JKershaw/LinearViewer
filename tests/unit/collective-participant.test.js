@@ -13,7 +13,7 @@ import {
 
 const BASE = {
   channel: '#Collective',
-  nick: 'LinearViewer',
+  nick: 'Harbour',
   yapBaseUrl: 'https://yap.test',
 };
 
@@ -21,7 +21,7 @@ describe('buildCollectiveParticipantPrompt', () => {
   test('threads the channel and nick into the body', () => {
     const text = buildCollectiveParticipantPrompt(BASE);
     assert.ok(text.includes('#Collective'));
-    assert.ok(text.includes('LinearViewer'));
+    assert.ok(text.includes('Harbour'));
   });
 
   test('points the participant at the Yap server and its llms.txt', () => {

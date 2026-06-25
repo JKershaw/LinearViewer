@@ -23,7 +23,7 @@ retro finding ──▶ does this live in our own tooling? ──▶ change BOTH
 ### 1. Promote the finding from "this task" to "the system"
 
 A retro normally produces a lesson about one task. Before filing it away, ask:
-**does this failure mode live in our own tooling?** LinearViewer *generates* the
+**does this failure mode live in our own tooling?** Harbour *generates* the
 plan prompts that shape how work is planned — so "the plan missed sibling surfaces"
 wasn't just a LIN-295 mistake, it was a gap in the plan template. The highest-value
 retro outcomes are the ones you can push upstream into the prompts so the whole

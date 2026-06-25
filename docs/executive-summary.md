@@ -1,8 +1,8 @@
-# Linear Projects Viewer — Executive Summary & Technical Analysis
+# Harbour — Executive Summary & Technical Analysis
 
 ## What It Is
 
-Linear Projects Viewer is a server-rendered web application that presents Linear project management data as a collapsible, CLI-aesthetic tree. It serves two audiences:
+Harbour is a server-rendered web application that presents Linear project management data as a collapsible, CLI-aesthetic tree. It serves two audiences:
 
 1. **Human users** — browse projects and issues in a terminal-styled UI, generate context-rich prompts for AI coding agents, and dispatch those prompts to a queue.
 2. **AI agents** — consume dispatched prompts via a polling API, provide feedback, and query Linear through the token-scoped workspace API proxy.
@@ -212,6 +212,6 @@ Any addition should respect:
 
 ## Summary
 
-Linear Projects Viewer transforms Linear project data into an opinionated, AI-agent-friendly workflow tool. Its prompt system (handwritten templates + AI recommendations) generates context-rich coding prompts. Its dispatch system queues those prompts for external consumers. Its feedback loop closes the circle.
+Harbour transforms Linear project data into an opinionated, AI-agent-friendly workflow tool. Its prompt system (handwritten templates + AI recommendations) generates context-rich coding prompts. Its dispatch system queues those prompts for external consumers. Its feedback loop closes the circle.
 
 The architecture is deliberately simple — server-rendered HTML, vanilla client JS, no build tooling — which makes it straightforward to extend. The existing `completionSignals`, dispatch metadata, and feedback model provide natural hooks for a follow-on prompt system that chains prompts based on completed work.

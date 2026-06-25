@@ -23,14 +23,14 @@ import os from 'os';
 import { spawnClaudeSession } from '../lib/harbour-spawn.js';
 import { isValidDispatchKind, deriveDispatchKind, DISPATCH_KINDS } from '../lib/prompt-templates.js';
 
-// Directory for Harbour dispatch prompt staging files. The OS tmp dir is
-// shared between the Node server and the Harbour terminal that reads the
+// Directory for Harbour OS dispatch prompt staging files. The OS tmp dir is
+// shared between the Node server and the Harbour OS terminal that reads the
 // staged prompt back out via `cat` inside the spawned `sh -c` command.
 const HARBOUR_STAGING_DIR = path.join(os.tmpdir(), 'harbour-dispatch');
 
 /**
  * Writes the prompt to a staging file under HARBOUR_STAGING_DIR (mode 0600
- * inside a 0700 dir). The file is read back by the Harbour-spawned `sh -c`
+ * inside a 0700 dir). The file is read back by the Harbour OS-spawned `sh -c`
  * command via `cat`, sidestepping argv length limits and shell-escaping
  * pain for multi-line prompts. Cleanup is the responsibility of the
  * cloned repo's Claude `SessionStart` hook.
@@ -100,7 +100,7 @@ const DANGEROUS_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
  * @param {Object} options.dispatchTokenStore - Token storage instance
  * @param {Function} options.workspaceFromUrl - Middleware to validate workspace
  * @param {Object} options.userPreferencesStore - User preferences store for recent prompts
- * @param {Object} [options.harbourFeedbackTokenStore] - Short-TTL feedback token store for Harbour dispatches
+ * @param {Object} [options.harbourFeedbackTokenStore] - Short-TTL feedback token store for Harbour OS dispatches
  * @returns {Router} Express router with dispatch routes
  */
 export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore }) {
@@ -146,11 +146,11 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
 
   /**
    * Middleware for the dispatch feedback endpoint. Accepts either:
-   *  - A short-lived single-use Harbour feedback token (bound to the
+   *  - A short-lived single-use Harbour OS feedback token (bound to the
    *    itemId in the URL); or
    *  - A workspace-scoped consumer dispatch token (existing path).
    *
-   * Harbour tokens are tried first because they're the more constrained
+   * Harbour OS tokens are tried first because they're the more constrained
    * credential — a leaked harbour token can post one feedback against one
    * item, where a leaked dispatch token would have full workspace scope.
    * On success sets req.dispatchUrlKey and req.dispatchTokenLabel.
@@ -264,7 +264,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       // existing session, so it carries the original dispatchId (a UUID).
       // We store + forward it blindly — the downstream dispatcher owns session
       // liveness — but the value must be well-formed. Follow-ups are cli/web
-      // only; resuming a Harbour/dash session is out of scope. See LIN-415.
+      // only; resuming a Harbour OS/dash session is out of scope. See LIN-415.
       if (followUpTo !== undefined && followUpTo !== null) {
         if (!UUID_REGEX.test(followUpTo)) {
           return badRequest.json(res, 'Invalid followUpTo format');
@@ -301,9 +301,9 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         sessionId: sessionId || null
       });
 
-      // Spawn a Harbour Claude session when target is 'local' (the API value
+      // Spawn a Harbour OS Claude session when target is 'local' (the API value
       // 'local' is preserved for backward compatibility; user-facing surfaces
-      // refer to this as "Harbour"). We ALWAYS stage the prompt to a file
+      // refer to this as "Harbour OS"). We ALWAYS stage the prompt to a file
       // for target='local' — regardless of whether a repo was picked — so
       // the prompt never lands inline on jsh's stdin line (where embedded
       // newlines break single-quote parsing and appear as "pasted over many
