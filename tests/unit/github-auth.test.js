@@ -22,13 +22,18 @@ import { createFakeGitHubClient } from '../../lib/providers/github/fake-client.j
 // ---------------------------------------------------------------------------
 
 describe('GitHubProvider auth primitives', () => {
-  const ENV = ['GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET', 'GITHUB_REDIRECT_URI'];
+  const ENV = ['GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET', 'GITHUB_REDIRECT_URI', 'GITHUB_APP_ID', 'GITHUB_APP_PRIVATE_KEY', 'GITHUB_APP_SLUG'];
   let saved;
   beforeEach(() => {
     saved = Object.fromEntries(ENV.map(k => [k, process.env[k]]));
     process.env.GITHUB_CLIENT_ID = 'cid';
     process.env.GITHUB_CLIENT_SECRET = 'secret';
     process.env.GITHUB_REDIRECT_URI = 'http://localhost:3000/auth/github/callback';
+    // GitHub App config (LIN-708) — beginAuth now builds the App installation URL
+    // and reads `slug` via getAppConfig(), which also requires appId/privateKey.
+    process.env.GITHUB_APP_ID = '12345';
+    process.env.GITHUB_APP_PRIVATE_KEY = 'test-key';
+    process.env.GITHUB_APP_SLUG = 'my-app';
   });
   afterEach(() => {
     for (const k of ENV) {
@@ -37,18 +42,28 @@ describe('GitHubProvider auth primitives', () => {
     }
   });
 
-  test('beginAuth builds the GitHub authorize URL with opaque state', () => {
+  test('beginAuth builds the GitHub App installation URL with opaque state (LIN-708)', () => {
     const url = new GitHubProvider().beginAuth({ state: 'nonce-123' });
-    assert.ok(url.startsWith('https://github.com/login/oauth/authorize?'));
+    // App installation picker, NOT the OAuth authorize URL.
+    assert.ok(url.startsWith('https://github.com/apps/my-app/installations/new?'),
+      `expected App install URL, got ${url}`);
     const params = new URL(url).searchParams;
-    assert.equal(params.get('client_id'), 'cid');
-    assert.equal(params.get('redirect_uri'), 'http://localhost:3000/auth/github/callback');
+    // state passes through unchanged as an opaque nonce.
     assert.equal(params.get('state'), 'nonce-123');
-    // Scope is narrowed to exactly `repo read:user` — `read:org` was dropped
-    // (LIN-702 S2); org-owned repos still enumerate via the `affiliation` filter,
-    // gated by the org's third-party-app policy rather than this scope.
-    assert.equal(params.get('scope'), 'repo read:user');
-    assert.doesNotMatch(params.get('scope'), /read:org/);
+    // `scope` is dropped entirely — App permissions (Issues: read & write) declare
+    // access, so keeping `repo` would preserve the over-grant this migration fixes
+    // (security M1, LIN-683).
+    assert.equal(params.get('scope'), null);
+    assert.doesNotMatch(url, /scope=/);
+    // OAuth-only params are gone too — the App identifies itself by slug.
+    assert.equal(params.get('client_id'), null);
+    assert.equal(params.get('redirect_uri'), null);
+    assert.equal(params.get('allow_signup'), null);
+  });
+
+  test('beginAuth throws when GITHUB_APP_SLUG is unset rather than emitting apps/undefined (LIN-708)', () => {
+    delete process.env.GITHUB_APP_SLUG;
+    assert.throws(() => new GitHubProvider().beginAuth({ state: 'nonce-123' }), /GITHUB_APP_SLUG/);
   });
 
   test('completeAuth returns a normalized token bag on success', async () => {
