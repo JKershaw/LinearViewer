@@ -24,12 +24,12 @@ test.describe('Settings — Providers section (LIN-634)', () => {
     await expect(binding.locator('.provider-active')).toBeVisible()
   })
 
-  test('lists GitHub as a disabled add row blocked on LIN-541', async ({ page }) => {
+  test('offers GitHub as a live add source (unblocked, LIN-541)', async ({ page }) => {
     const githubAdd = page.locator('[data-testid="settings-provider-add-github"]')
     await expect(githubAdd).toBeVisible()
-    await expect(githubAdd).toContainText('blocked on LIN-541')
-    // No add button is rendered for the blocked provider.
-    await expect(githubAdd.locator('button')).toHaveCount(0)
+    // No longer blocked — a real add button is rendered that POSTs to the add flow.
+    await expect(githubAdd).not.toContainText('blocked')
+    await expect(githubAdd.locator('button')).toHaveCount(1)
   })
 
   test('refresh / test validates the binding and reports success', async ({ page }) => {

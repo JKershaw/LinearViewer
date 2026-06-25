@@ -107,10 +107,10 @@ describe('renderSettingsPage — Providers section (LIN-634)', () => {
     assert.doesNotMatch(html, /••••abcd/);
   });
 
-  test('shows GitHub in the add list as disabled and blocked on LIN-541', () => {
+  test('offers a working add affordance for GitHub (unblocked, LIN-541)', () => {
     const html = renderSettingsPage('Acme', BASE);
     assert.match(html, /data-testid="settings-provider-add-github"/);
-    assert.match(html, /blocked on LIN-541/);
+    assert.doesNotMatch(html, /blocked on LIN-541/);
   });
 
   test('offers a working add affordance for Linear', () => {
