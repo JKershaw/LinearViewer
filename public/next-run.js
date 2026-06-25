@@ -105,6 +105,13 @@
   // Inline-dispatch a goal: build the autopilot kickoff (proxy-gated endpoint),
   // then dispatch it issue-less and tagged kind=autopilot, with in-place
   // sending…/dispatched!/failed feedback (mirrors app.js's .prompt-dispatch flow).
+  //
+  // The kickoff body promises a `readWrite` proxy token (the +proxy block), so we
+  // MUST attach it before dispatch (LIN-645). This surface exposes no +proxy
+  // toggle and emits no data-proxy-feature, so the normal toggle-gated append
+  // would be a no-op here — force the append unconditionally. Appending inside
+  // the try means a failed token-mint surfaces as the button's `failed` state
+  // rather than dispatching a bare, proxy-less autopilot prompt.
   function dispatchGoal(btn) {
     var target = btn.getAttribute('data-target') || 'cli';
     var goal = btn.getAttribute('data-goal') || '';
@@ -114,14 +121,17 @@
     var query = goal ? '?goal=' + encodeURIComponent(goal) : '';
     api('/workspace/' + encodeURIComponent(urlKey) + '/api/autopilot-prompt' + query, { on401: false })
       .then(function (kickoff) {
-        return dispatchPrompt({
-          urlKey: urlKey,
-          prompt: kickoff.prompt,
-          promptName: kickoff.promptName || 'Autopilot',
-          kind: kickoff.kind || 'autopilot',
-          issueless: true,
-          target: target
-        });
+        return window.ProxyToggle.maybeAppend(kickoff.prompt, urlKey, { force: true })
+          .then(function (prompt) {
+            return dispatchPrompt({
+              urlKey: urlKey,
+              prompt: prompt,
+              promptName: kickoff.promptName || 'Autopilot',
+              kind: kickoff.kind || 'autopilot',
+              issueless: true,
+              target: target
+            });
+          });
       })
       .then(function () {
         btn.textContent = 'dispatched!';
