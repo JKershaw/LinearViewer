@@ -131,6 +131,44 @@
   display: flex;
   gap: var(--space-2);
   flex-wrap: wrap;
+  align-items: center;
+}
+
+/* Inline dispatch options (LIN-640). The disclosure trigger (.dispatch-disclosure)
+   and panel (.prompt-options) styles are reused from style.css; these rules style
+   only the next-run-specific per-target buttons so we stay decoupled from app.js's
+   .prompt-dispatch (whose click handler is not loaded on this page). */
+.next-run-dispatch-wrap {
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.next-run-dispatch {
+  background: none;
+  border: 1px solid var(--blue);
+  padding: var(--space-1) var(--space-2);
+  font-family: var(--font-content);
+  font-size: 0.8em;
+  color: var(--blue);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.next-run-dispatch:hover {
+  background: var(--blue);
+  color: white;
+}
+
+.next-run-dispatch:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.next-run-dispatch.dispatched {
+  border-color: var(--green);
+  color: var(--green);
 }
 
 .next-run-empty {

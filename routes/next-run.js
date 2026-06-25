@@ -100,6 +100,11 @@ export function createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspace
 
     try {
       const aiConfigured = isRecommendationEnabled(req.session.openRouterApiKey) || !!process.env.OPENROUTER_FREE_TIER_KEY;
+      // Localhost is the only place the `local`/harbour dispatch target makes
+      // sense (a Harbour OS session on the operator's own machine), mirroring the
+      // tree/swipe disclosure's `isLocalhost` gate.
+      const host = req.get('host') || '';
+      const isLocalhost = ['localhost', '127.0.0.1'].some(h => host.startsWith(h));
       const html = renderNextRunPage(
         { aiConfigured },
         {
@@ -108,6 +113,7 @@ export function createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspace
           openRouterSource: getOpenRouterSource(req),
           workspaces: req.session.workspaces,
           featureFlags,
+          isLocalhost,
         }
       );
       res.send(html);
