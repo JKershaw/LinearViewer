@@ -91,8 +91,13 @@ describe('by-ID queries select the trashed field', () => {
   // LIN-308 (API_ISSUE_DETAIL_QUERY / RELATIONS_QUERY); the write-guard reads
   // followed in LIN-309 (ISSUE_LABELS_QUERY / ISSUE_DESCRIPTION_QUERY /
   // TRASHED_GUARD_QUERY). The trashed-field guard follows them to the provider.
-  test('provider API_ISSUE_DETAIL_QUERY selects trashed', () => {
-    assert.match(extractQuery(providerSource, 'API_ISSUE_DETAIL_QUERY'), /\btrashed\b/);
+  test('provider API_ISSUE_DETAIL_QUERY selects trashed (via the shared ApiIssueFields fragment)', () => {
+    // LIN-589 moved the issue's own fields (including `trashed`) into the shared
+    // API_ISSUE_FIELDS fragment so the detail read and the write echoes can't
+    // drift. The detail query composes that fragment, so the trashed selection is
+    // pinned on the fragment and the composition is pinned on the query.
+    assert.match(extractQuery(providerSource, 'API_ISSUE_FIELDS'), /\btrashed\b/);
+    assert.match(extractQuery(providerSource, 'API_ISSUE_DETAIL_QUERY'), /\.\.\.ApiIssueFields\b/);
   });
   test('provider RELATIONS_QUERY selects trashed on the root', () => {
     assert.match(extractQuery(providerSource, 'RELATIONS_QUERY'), /\btrashed\b/);

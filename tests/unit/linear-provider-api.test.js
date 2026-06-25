@@ -44,6 +44,7 @@ import {
   uploadFile,
   linearProvider,
 } from '../../lib/providers/linear/index.js';
+import { flattenIssue } from '../../lib/proxy-wire.js';
 
 const API_KEY = 'lin_api_test';
 
@@ -436,6 +437,83 @@ describe('LinearProvider class delegates the API surface (LIN-307)', () => {
     for (const m of surface) {
       assert.strictEqual(linearProvider.supports(m), true, `${m} must be supported`);
     }
+  });
+});
+
+// =============================================================================
+// Wire-completeness: team / teamId / priorityLabel + self-verifying write echoes
+// (LIN-589)
+// =============================================================================
+//
+// The local e2e harness (proxy-local.spec.js) is teamless and proxy.spec.js is
+// mock-mode, so neither can prove team/teamId end-to-end. These tests pin the two
+// halves the e2e suite structurally cannot: (1) the Linear queries/mutations
+// SELECT the fields, and (2) flattenIssue derives the flat teamId scalar from the
+// selected team object — the same post-fetch pass the route runs.
+
+describe('Linear API wire-completeness (LIN-589)', () => {
+  test('issue reads select team + priorityLabel (detail, list, search)', async () => {
+    const m = stub(async () => ({
+      issue: { id: 'i1' }, issues: { nodes: [], pageInfo: {} }, searchIssues: { nodes: [] },
+    }));
+    await issueDetail(API_KEY, 'LIN-1');
+    await issues(API_KEY, {});
+    await search(API_KEY, 'q');
+    const queries = m.mock.calls.map(c => c.arguments[0]);
+    for (const q of queries) {
+      assert.match(q, /team\s*{\s*id\s+name\s*}/, 'every issue read must select team { id name }');
+      assert.match(q, /priorityLabel/, 'every issue read must select priorityLabel');
+    }
+  });
+
+  test('write mutations echo the same field set as the detail read (shared fragment, no drift)', async () => {
+    // The create echo, update echo, and detail read all compose the ONE shared
+    // ApiIssueFields fragment — so a write is self-verifying and can never drift
+    // from what a read returns (the exact gap LIN-589 closes).
+    const cm = stub(async () => ({ issueCreate: { success: true, issue: { id: 'i1' } } }));
+    await createIssue(API_KEY, { teamId: 't1', title: 'New' });
+    const createQuery = cm.mock.calls[0].arguments[0];
+    restore(); restore = undefined;
+
+    const um = stub(async () => ({ issueUpdate: { success: true, issue: { id: 'i1' } } }));
+    await updateIssue(API_KEY, 'LIN-1', { priority: 2 });
+    const updateQuery = um.mock.calls[0].arguments[0];
+    restore(); restore = undefined;
+
+    const dm = stub(async () => ({ issue: { id: 'i1' } }));
+    await issueDetail(API_KEY, 'LIN-1');
+    const detailQuery = dm.mock.calls[0].arguments[0];
+
+    for (const [name, q] of [['create', createQuery], ['update', updateQuery], ['detail', detailQuery]]) {
+      assert.match(q, /\.\.\.ApiIssueFields/, `${name} must spread the shared ApiIssueFields fragment`);
+      assert.match(q, /fragment ApiIssueFields on Issue/, `${name} must embed the fragment definition`);
+    }
+    // And the mutable fields the ticket calls out are all in that one fragment.
+    for (const field of ['priority', 'priorityLabel', 'team', 'project', 'parent', 'labels', 'assignee', 'state', 'cycle', 'estimate']) {
+      assert.match(createQuery, new RegExp(field), `write echo must carry ${field}`);
+    }
+  });
+
+  test('flattenIssue derives a flat teamId from the selected team object', async () => {
+    // What a Linear node looks like once the (now team-selecting) query returns,
+    // before the route's shared flatten pass.
+    const node = { id: 'i1', identifier: 'LIN-1', team: { id: 'team-uuid', name: 'Engineering' }, priority: 2, priorityLabel: 'High' };
+    flattenIssue(node);
+    assert.strictEqual(node.teamId, 'team-uuid', 'flat teamId lifted from team.id');
+    assert.deepStrictEqual(node.team, { id: 'team-uuid', name: 'Engineering' }, 'nested team preserved');
+    assert.strictEqual(node.priorityLabel, 'High', 'priorityLabel passes through untouched');
+  });
+
+  test('flattenIssue yields a null teamId when the team came back null (teamless / unset)', async () => {
+    const node = { id: 'i1', team: null };
+    flattenIssue(node);
+    assert.strictEqual(node.teamId, null);
+  });
+
+  test('flattenIssue adds no teamId when team was never selected (other read paths byte-identical)', async () => {
+    const node = { id: 'i1', identifier: 'LIN-1' };
+    flattenIssue(node);
+    assert.strictEqual('teamId' in node, false);
   });
 });
 
