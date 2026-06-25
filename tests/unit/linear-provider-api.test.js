@@ -134,6 +134,13 @@ describe('Linear provider API reads (LIN-307)', () => {
     assert.strictEqual(m.mock.calls[0].arguments[1].first, 10);
   });
 
+  test('issueDetail: the query selects issue-level attachments (LIN-649)', async () => {
+    const m = stub(async () => ({ issue: { id: 'i1', identifier: 'LIN-1' } }));
+    await issueDetail(API_KEY, 'LIN-1');
+    const [query] = m.mock.calls[0].arguments;
+    assert.match(query, /attachments\(first: 50\) \{ nodes \{ id title url \} \}/);
+  });
+
   test('states: filters by teamId and sorts by board position', async () => {
     const m = stub(async () => ({
       workflowStates: {

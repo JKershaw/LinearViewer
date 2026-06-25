@@ -269,11 +269,33 @@ Response includes full context: description, comments, children, parent, relatio
   "cycle": { "id": "uuid", "name": "Sprint 5", "number": 5 },
   "parent": { "id": "uuid", "identifier": "ENG-40", "title": "Auth overhaul" },
   "children": [{ "id": "uuid", "identifier": "ENG-43", "title": "Sub-task", "state": { "name": "Todo", "type": "unstarted" } }],
-  "comments": [{ "id": "uuid", "body": "Fixed in PR #12.", "createdAt": "2024-02-28T10:00:00.000Z", "user": { "name": "Bob" } }]
+  "comments": [{
+    "id": "uuid", "body": "Fixed in PR #12. ![screenshot](…)", "createdAt": "2024-02-28T10:00:00.000Z", "user": { "name": "Bob" },
+    "attachments": [{ "id": "md:aHR0cHM6…", "title": "screenshot", "contentType": "image/png", "kind": "image" }]
+  }],
+  "attachments": [
+    { "id": "att:uuid", "title": "design.png", "contentType": "image/png", "kind": "image" },
+    { "id": "att:uuid", "title": "spec.pdf", "contentType": null, "kind": "file" }
+  ]
 }
 ```
 
 `parent` is `null` when the issue has no parent. `children` is empty (`[]`) when there are no sub-issues. `labels`, `children`, `comments`, and `relations` are always plain arrays (never a `{ nodes: [...] }` wrapper), and `labels` is a plain array of name strings.
+
+##### Attachments
+
+The task and each comment may carry an `attachments` array. It is **omitted entirely** when there is nothing attached (never an empty `[]`), so an issue with no attachments is byte-identical to the legacy shape. Each entry is source-neutral:
+
+| Field | Meaning |
+|-------|---------|
+| `id` | Opaque, server-resolvable handle (see below). **Not** a URL. |
+| `title` | Human label (`null` when none). |
+| `contentType` | MIME type when known (e.g. `image/png`), else `null`. |
+| `kind` | `"image"` or `"file"`. |
+
+Attachments come from two sources, both normalized into the same shape: **formal attachment entities** on the issue (handle prefix `att:`) and **markdown-embedded images** (`![](…)`) in the issue description and in comment bodies, filtered to image extensions (handle prefix `md:`). Comments carry only the markdown-image kind (the backend has no per-comment attachment entity).
+
+Following the no-deep-link policy, **no attachment exposes a backend URL** — the `id` is an opaque handle, not a link you can dereference. Fetching the bytes will be done through a separate Bearer-authed, server-side image relay endpoint that resolves the `id` (forthcoming). Treat `id` as an identifier to hand back to that relay, not as something to GET directly.
 
 `team` is the issue's owning team as `{ id, name }`, with a flat `teamId` mirror — pass `teamId` straight to `GET /states/{teamId}` or `GET /labels?teamId=` without a separate `GET /teams` lookup. `priorityLabel` is the human-readable priority name (`Urgent` / `High` / `Medium` / `Low` / `No priority`) corresponding to the numeric `priority` (1–4, 0). Both `team`/`teamId` and `priorityLabel` are also present on list and search results.
 
