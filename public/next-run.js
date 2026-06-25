@@ -7,8 +7,16 @@
  * paragraph, its reasoning, and the accept/copy actions; the always-present
  * "continue until stopped" option is flagged. A single page-level expandable panel
  * shows the exact grounding context the model saw (shared across options, not
- * per-option). Accepting an option hands its goal to the existing dispatch launch
- * path by navigating to the dispatch page with the goal prefilled (?goal=).
+ * per-option).
+ *
+ * Accepting an option (LIN-640): when the proxy feature is on, each card offers an
+ * inline `Dispatch ▾` disclosure (parity with the projects/swipe views) that builds
+ * the autopilot kickoff via /api/autopilot-prompt and dispatches it in place via
+ * window.dispatchPrompt — no navigation. When proxy is off (the kickoff endpoint is
+ * proxy-gated), it falls back to the original navigate-to-/dispatch?goal= link. The
+ * inline buttons use a next-run-specific `.next-run-dispatch` class, NOT app.js's
+ * `.prompt-dispatch` handler — app.js isn't loaded here and that handler reads a
+ * `.prompt-text` node these cards don't have.
  *
  * Visual parity with the Observation page is via reused obs-* CSS + a replicated
  * caret/collapse toggle — observation.js is NOT imported (it binds to
@@ -50,6 +58,82 @@
     var body = li.querySelector('.next-run-option-body');
     if (head) head.setAttribute('aria-expanded', open ? 'true' : 'false');
     if (body) body.hidden = !open;
+  }
+
+  // Unique id seed for each card's dispatch panel (aria-controls target).
+  var disclosureSeq = 0;
+
+  // Build a `Dispatch ▾` disclosure mirroring the projects-view markup
+  // (lib/render.js renderDispatchDisclosure): a `.disclosure-toggle` trigger +
+  // a `.prompt-options.hidden` panel of per-target buttons. The shared
+  // initDisclosure() (common.js, document-delegated, auto-run on this page)
+  // handles open/close; our delegated handler below does the dispatch. The
+  // chosen `goal` is stamped on each button as data-goal (empty for the open
+  // option) so the delegated handler can read it without per-card closures.
+  function buildDispatchDisclosure(goal) {
+    var panelId = 'next-run-dispatch-' + (++disclosureSeq);
+    var wrap = document.createElement('span');
+    wrap.className = 'next-run-dispatch-wrap';
+
+    var targets = [
+      { target: 'cli', label: 'cli' },
+      { target: 'web', label: 'web' },
+      { target: 'dash', label: 'dash' }
+    ];
+    // harbour (the `local` target) only makes sense on the operator's own box.
+    if (data.isLocalhost) targets.push({ target: 'local', label: 'harbour' });
+
+    var safeGoal = escapeHtml(goal || '');
+    var btns = targets.map(function (t) {
+      return '<button type="button" class="next-run-dispatch dispatch-btn" data-target="' +
+        t.target + '" data-goal="' + safeGoal + '">' + escapeHtml(t.label) + '</button>';
+    }).join('');
+
+    wrap.innerHTML =
+      '<button type="button" class="dispatch-disclosure disclosure-toggle next-run-dispatch-toggle" ' +
+      'aria-expanded="false" aria-haspopup="true" aria-controls="' + panelId + '">Dispatch ▾</button>' +
+      '<span class="prompt-options hidden" id="' + panelId + '">' + btns + '</span>';
+    return wrap;
+  }
+
+  // Inline-dispatch a goal: build the autopilot kickoff (proxy-gated endpoint),
+  // then dispatch it issue-less and tagged kind=autopilot, with in-place
+  // sending…/dispatched!/failed feedback (mirrors app.js's .prompt-dispatch flow).
+  function dispatchGoal(btn) {
+    var target = btn.getAttribute('data-target') || 'cli';
+    var goal = btn.getAttribute('data-goal') || '';
+    var original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'sending…';
+    var query = goal ? '?goal=' + encodeURIComponent(goal) : '';
+    api('/workspace/' + encodeURIComponent(urlKey) + '/api/autopilot-prompt' + query, { on401: false })
+      .then(function (kickoff) {
+        return dispatchPrompt({
+          urlKey: urlKey,
+          prompt: kickoff.prompt,
+          promptName: kickoff.promptName || 'Autopilot',
+          kind: kickoff.kind || 'autopilot',
+          issueless: true,
+          target: target
+        });
+      })
+      .then(function () {
+        btn.textContent = 'dispatched!';
+        btn.classList.add('dispatched');
+        setTimeout(function () {
+          btn.textContent = original;
+          btn.classList.remove('dispatched');
+          btn.disabled = false;
+        }, 1500);
+      })
+      .catch(function (err) {
+        btn.textContent = 'failed';
+        setFeedback((err && err.message) ? err.message : 'failed to dispatch', true);
+        setTimeout(function () {
+          btn.textContent = original;
+          btn.disabled = false;
+        }, 1500);
+      });
   }
 
   function renderOptions(options) {
@@ -107,11 +191,19 @@
       var actions = document.createElement('div');
       actions.className = 'next-run-option-actions';
 
-      var acceptLink = document.createElement('a');
-      acceptLink.className = 'action-btn save next-run-accept';
-      acceptLink.href = dispatchUrl(isOpen ? '' : opt.goal);
-      acceptLink.textContent = isOpen ? 'start (no goal) →' : 'send to dispatch →';
-      actions.appendChild(acceptLink);
+      if (data.proxyEnabled) {
+        // Proxy on: offer inline dispatch options (parity with projects/swipe).
+        // The open option dispatches with no goal (an open-ended stack walk).
+        actions.appendChild(buildDispatchDisclosure(isOpen ? '' : opt.goal));
+      } else {
+        // Proxy off: the kickoff endpoint is unavailable, so keep handing the goal
+        // to the dispatch page via ?goal= (its proxy-off receiver, unchanged).
+        var acceptLink = document.createElement('a');
+        acceptLink.className = 'action-btn save next-run-accept';
+        acceptLink.href = dispatchUrl(isOpen ? '' : opt.goal);
+        acceptLink.textContent = isOpen ? 'start (no goal) →' : 'send to dispatch →';
+        actions.appendChild(acceptLink);
+      }
 
       if (!isOpen && opt.goal) {
         var copyBtn = document.createElement('button');
@@ -152,6 +244,15 @@
     contextToggle.setAttribute('aria-expanded', 'false');
     contextBody.hidden = true;
   }
+
+  // One delegated listener for all inline dispatch buttons across all cards —
+  // optionsEl persists across re-generations (renderOptions only clears its
+  // innerHTML), so this binds once and survives every fresh option set.
+  optionsEl.addEventListener('click', function (e) {
+    var btn = e.target.closest('.next-run-dispatch');
+    if (!btn || btn.disabled) return;
+    dispatchGoal(btn);
+  });
 
   if (contextToggle && contextBody) {
     contextToggle.addEventListener('click', function () {

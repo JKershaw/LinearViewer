@@ -159,6 +159,94 @@ test.describe('Suggested Next Run Page (experimental)', () => {
     });
   });
 
+  // LIN-640: when the proxy feature is on, cards offer inline `Dispatch ▾` options
+  // (parity with projects/swipe) that build the autopilot kickoff and dispatch in
+  // place; when proxy is off, the navigate-to-/dispatch?goal= fallback is kept.
+  test.describe('Inline dispatch options (proxy on)', () => {
+    test.beforeEach(async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ nextRun: true, proxy: true })}&urlKey=${URL_KEY}`);
+      await page.goto(PAGE_URL);
+      await page.waitForLoadState('networkidle');
+      await page.locator('#next-run-generate').click();
+    });
+
+    test('a card offers a Dispatch disclosure with per-target buttons instead of the navigate link', async ({ page }) => {
+      const card = page.locator('.next-run-option:not(.next-run-option-open)').first();
+      await expect(card).toBeVisible({ timeout: 5000 });
+      await card.locator('.next-run-option-head').click();
+
+      // The proxy-off navigate link is replaced by the inline disclosure.
+      await expect(card.locator('.next-run-accept')).toHaveCount(0);
+      const toggle = card.locator('.next-run-dispatch-toggle');
+      await expect(toggle).toBeVisible();
+      await expect(toggle).toHaveText(/Dispatch/);
+
+      // Targets are hidden until the disclosure is opened, then revealed.
+      const cli = card.locator('.next-run-dispatch[data-target="cli"]');
+      await expect(cli).toBeHidden();
+      await toggle.click();
+      await expect(cli).toBeVisible();
+      await expect(card.locator('.next-run-dispatch[data-target="web"]')).toBeVisible();
+      await expect(card.locator('.next-run-dispatch[data-target="dash"]')).toBeVisible();
+      // copy goal is preserved alongside the dispatch options.
+      await expect(card.locator('.next-run-copy')).toBeVisible();
+    });
+
+    test('clicking a target dispatches the goal inline (issue-less, kind=autopilot)', async ({ page }) => {
+      const card = page.locator('.next-run-option:not(.next-run-option-open)').first();
+      await expect(card).toBeVisible({ timeout: 5000 });
+      await card.locator('.next-run-option-head').click();
+      await card.locator('.next-run-dispatch-toggle').click();
+
+      const dispatchReq = page.waitForRequest(req =>
+        req.url().includes('/api/dispatch') && req.method() === 'POST');
+      const cli = card.locator('.next-run-dispatch[data-target="cli"]');
+      await cli.click();
+
+      const req = await dispatchReq;
+      const body = JSON.parse(req.postData() || '{}');
+      expect(body.kind).toBe('autopilot');
+      expect(body.target).toBe('cli');
+      // Issue-less: no Linear issue is anchored on a goal dispatch.
+      expect(body.issueId == null).toBe(true);
+
+      await expect(cli).toHaveText('dispatched!', { timeout: 5000 });
+    });
+
+    test('the continue-until-stopped option dispatches with no goal', async ({ page }) => {
+      const card = page.locator('.next-run-option-open');
+      await expect(card).toBeVisible({ timeout: 5000 });
+      await card.locator('.next-run-option-head').click();
+      await card.locator('.next-run-dispatch-toggle').click();
+
+      const autopilotReq = page.waitForRequest(req =>
+        req.url().includes('/api/autopilot-prompt') && req.method() === 'GET');
+      await card.locator('.next-run-dispatch[data-target="cli"]').click();
+
+      const req = await autopilotReq;
+      // The open option omits ?goal= entirely (an open-ended stack walk).
+      expect(req.url()).not.toContain('goal=');
+    });
+  });
+
+  test.describe('Dispatch fallback (proxy off)', () => {
+    test('keeps the navigate-to-dispatch link and renders no inline disclosure', async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ nextRun: true })}&urlKey=${URL_KEY}`);
+      await page.goto(PAGE_URL);
+      await page.waitForLoadState('networkidle');
+      await page.locator('#next-run-generate').click();
+
+      const card = page.locator('.next-run-option:not(.next-run-option-open)').first();
+      await expect(card).toBeVisible({ timeout: 5000 });
+      await card.locator('.next-run-option-head').click();
+
+      await expect(card.locator('.next-run-dispatch-toggle')).toHaveCount(0);
+      const accept = card.locator('.next-run-accept');
+      await expect(accept).toBeVisible();
+      expect(await accept.getAttribute('href')).toContain('/dispatch?goal=');
+    });
+  });
+
   test.describe('Suggest endpoint', () => {
     test('returns 403 when the feature flag is off', async ({ page }) => {
       await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
