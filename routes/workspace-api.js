@@ -41,6 +41,7 @@ const CONTEXT_FETCH_TIMEOUT_MS = 45_000;
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
+import { generateFeedbackTitle } from '../lib/feedback-title.js';
 import { buildContextGraph } from '../lib/context-graph.js';
 import { hashContext } from '../lib/recap-cache.js';
 import { getLoopsForIssue } from '../lib/pipeline-loops.js';
@@ -2171,9 +2172,38 @@ ${goal}`
         description += `\n\n![](${assetUrl})`;
       }
 
-      const ticketTitle = (typeof title === 'string' && title.trim())
-        ? title.trim().slice(0, 250)
-        : `Feedback: ${message.trim().split('\n')[0].slice(0, 60)}`;
+      // Title resolution (LIN-643). An explicit title always wins (trimmed to
+      // 250). Otherwise: when AI is enabled for this user/workspace, generate a
+      // concise whole-thought title from the feedback body via the LLM; when AI
+      // is off — or generation fails — keep the deterministic first-line slice.
+      // Title generation must happen BEFORE provider.createIssue, and never
+      // applies the 60-char truncation on the AI path. The post-create triage
+      // enqueue below is untouched.
+      const fallbackTitle = `Feedback: ${message.trim().split('\n')[0].slice(0, 60)}`;
+      let ticketTitle;
+      if (typeof title === 'string' && title.trim()) {
+        ticketTitle = title.trim().slice(0, 250);
+      } else {
+        ticketTitle = fallbackTitle;
+        // Key resolution mirrors the recommendation path: user OAuth > env >
+        // free-tier. When only the shared free-tier key is available the model
+        // is clamped to DEFAULT (forceDefault: isFreeTier), matching every other
+        // billed call site (the LIN-513 wiring invariant).
+        const sessionApiKey = req.session?.openRouterApiKey;
+        const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
+        const isFreeTier = !sessionApiKey && !process.env.OPENROUTER_API_KEY && !!freeTierKey;
+        const aiApiKey = sessionApiKey || process.env.OPENROUTER_API_KEY || freeTierKey || null;
+        if (aiApiKey) {
+          try {
+            const model = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
+            const generated = await generateFeedbackTitle(message.trim(), { apiKey: aiApiKey, model });
+            if (generated) ticketTitle = generated;
+          } catch (error) {
+            // Best-effort: never block ticket creation on title generation.
+            console.error('Feedback AI title generation failed, using fallback:', error.message);
+          }
+        }
+      }
 
       const createInput = { teamId: resolvedTeamId, title: ticketTitle, description, priority };
       if (resolvedProjectId) createInput.projectId = resolvedProjectId;

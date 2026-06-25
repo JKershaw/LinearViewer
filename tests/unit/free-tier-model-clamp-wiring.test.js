@@ -47,7 +47,7 @@ test('every billed resolveWorkspaceModel call threads forceDefault: isFreeTier',
       );
     });
   }
-  // Sanity floor: all 12 billed sites (workspace-api recommend/stream/recap/brief/
-  // roadmap/chat = 6, task-chat = 1, proxy recommend/recap×2/brief×2 = 5).
-  assert.equal(billedClampCount, 12, `expected 12 clamped billed sites, found ${billedClampCount}`);
+  // Sanity floor: all 13 billed sites (workspace-api recommend/stream/recap/brief/
+  // roadmap/chat = 6, feedback-title = 1, task-chat = 1, proxy recommend/recap×2/brief×2 = 5).
+  assert.equal(billedClampCount, 13, `expected 13 clamped billed sites, found ${billedClampCount}`);
 });
