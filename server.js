@@ -52,7 +52,7 @@ import { parseRepoFromDescription } from './lib/prompt-formatters.js'
 import { renderPage, renderErrorPage, renderUpstreamAwareErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken } from './lib/token-refresh.js'
-import { UUID_REGEX, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, updateWorkspaceTokens, getWorkspaceToken, getBindingsForWorkspace, linkProvider, unlinkProvider, remintActiveCredential } from './lib/workspace.js'
+import { UUID_REGEX, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, updateWorkspaceTokens, getWorkspaceToken, getBindingsForWorkspace, getBindingCallScope, getWorkspaceCallScope, linkProvider, unlinkProvider, remintActiveCredential } from './lib/workspace.js'
 import { createWorkspaceRoutes } from './routes/workspace.js'
 import { createOpenRouterAuthRoutes } from './routes/openrouter-auth.js'
 import { createDispatchRoutes } from './routes/dispatch.js'
@@ -645,13 +645,18 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
     const isPrimary = i === 0;
     const provider = getProvider(binding.provider);
     const bindingToken = binding.credentials?.token;
+    // The per-call read scope: the bare token for Linear/local (byte-identical),
+    // or a { token, repo } credential for a GitHub App binding so the provider
+    // builds a request-time client from the installation token (LIN-713) — the
+    // boot client is never configured in production.
+    const bindingScope = getBindingCallScope(binding);
     // Use mock data in test mode to avoid hitting the provider API
     const isTestMode = process.env.NODE_ENV === 'test' && bindingToken === 'test-token';
 
     // Fetch teams (primary binding only)
     const bindingTeams = isTestMode
       ? testMockTeams
-      : await provider.fetchTeams(bindingToken);
+      : await provider.fetchTeams(bindingScope);
 
     // Fetch projects and issues (filtered by team if specified).
     // `slim` (LIN-442) is the homepage's description-trim: it only reaches the
@@ -659,7 +664,7 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
     // full query.
     let { organizationName: orgName, projects, issues } = isTestMode
       ? (mockOverride || testMockData)
-      : await provider.fetchProjects(bindingToken, teamId, { slim });
+      : await provider.fetchProjects(bindingScope, teamId, { slim });
 
     // In test mode, manually filter issues by team
     if (isTestMode && teamId) {
@@ -1174,7 +1179,7 @@ async function fetchWorkspaceIssues(workspace) {
       return hit.issues;
     }
   }
-  const { issues } = await getProviderForWorkspace(workspace).fetchProjects(getWorkspaceToken(workspace));
+  const { issues } = await getProviderForWorkspace(workspace).fetchProjects(getWorkspaceCallScope(workspace));
   const result = issues || [];
   if (memoKey) _workspaceIssuesMemo.set(memoKey, { issues: result, cachedAt: Date.now() });
   return result;
@@ -1483,7 +1488,7 @@ app.get('/workspace/:urlKey/roadmap', workspaceFromUrl, async (req, res) => {
   try {
     // Fetch raw data — roadmap needs raw issues for velocity/queue calculations
     const { organizationName, projects, issues } =
-      await getProviderForWorkspace(workspace).fetchProjects(getWorkspaceToken(workspace), teamId);
+      await getProviderForWorkspace(workspace).fetchProjects(getWorkspaceCallScope(workspace), teamId);
 
     // Build roadmap model from deterministic layer
     const roadmapModel = buildRoadmapModel(projects, issues);
@@ -1683,7 +1688,7 @@ app.get('/workspace/:urlKey/dispatch', workspaceFromUrl, async (req, res) => {
   let projectRepos = [];
   try {
     const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
-    const projects = isTestMode ? testMockData.projects : await getProviderForWorkspace(workspace).fetchProjectsList(getWorkspaceToken(workspace));
+    const projects = isTestMode ? testMockData.projects : await getProviderForWorkspace(workspace).fetchProjectsList(getWorkspaceCallScope(workspace));
     projectRepos = projects
       .map(p => ({ name: p.name, repo: parseRepoFromDescription(p.content) }))
       .filter(p => p.repo);

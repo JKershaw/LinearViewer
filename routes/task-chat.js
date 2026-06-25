@@ -23,7 +23,7 @@ import { buildTaskChatMessages } from '../lib/prompts/task-chat-template.js';
 import { streamChat, isRecommendationEnabled } from '../lib/openrouter.js';
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
-import { getWorkspaceToken, isValidIssueId } from '../lib/workspace.js';
+import { getWorkspaceCallScope, isValidIssueId } from '../lib/workspace.js';
 import { testMockData } from '../tests/fixtures/mock-data.js';
 
 const MAX_QUESTION_LENGTH = 2000;
@@ -223,7 +223,7 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
         context = buildMockTaskContext(issueId);
         if (!context) return res.status(404).json({ error: 'Issue not found' });
       } else {
-        context = await getProviderForWorkspace(workspace).fetchRecommendationContext(getWorkspaceToken(workspace), issueId);
+        context = await getProviderForWorkspace(workspace).fetchRecommendationContext(getWorkspaceCallScope(workspace), issueId);
         if (!context || !context.issue) return res.status(404).json({ error: 'Issue not found' });
       }
     } catch (error) {

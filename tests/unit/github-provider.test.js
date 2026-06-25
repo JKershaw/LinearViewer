@@ -264,6 +264,97 @@ describe('GitHubProvider writes', () => {
 });
 
 // =============================================================================
+// Per-request client from a binding credential (LIN-713)
+// =============================================================================
+//
+// Production NEVER configures the boot `client` (server.js wires only the local
+// provider). A GitHub App workspace authenticates per-request: the read/write
+// seam passes a `{ repo, token }` binding credential, and the provider builds a
+// request-time client from the installation token via `_clientForToken`
+// (createGitHubClient) while keeping the repo slug as the per-call argument.
+//
+// `_clientForToken` would build the REAL HTTP client (network), so we override it
+// to capture the token and return the in-memory fake keyed by repo — the same
+// fake the boot-client tests use. This proves the credential path (a) needs no
+// boot client, (b) authenticates with the credential's token, and (c) routes the
+// repo from the credential, not from boot config.
+describe('GitHubProvider per-request client from binding credential (LIN-713)', () => {
+  // A provider with NO boot client; _clientForToken is stubbed to record the
+  // token it was handed and hand back the seeded fake.
+  function makeAppProvider() {
+    const provider = new GitHubProvider(); // no boot client — like production
+    const fake = seededClient();
+    const tokensSeen = [];
+    provider._clientForToken = (token) => {
+      tokensSeen.push(token);
+      return fake;
+    };
+    return { provider, tokensSeen };
+  }
+
+  test('fetchProjects works WITHOUT a boot client, building the client from the credential token', async () => {
+    const { provider, tokensSeen } = makeAppProvider();
+    const { organizationName, projects, issues } =
+      await provider.fetchProjects({ repo: REPO, token: 'ghs_install_token' });
+    assert.equal(organizationName, 'octocat');
+    assert.equal(projects.length, 1);
+    assert.equal(issues.length, 3);
+    // Built the per-request client from the installation token (never the boot client).
+    assert.deepEqual(tokensSeen, ['ghs_install_token']);
+  });
+
+  test('fetchIssueFields routes the repo from the credential, not boot config', async () => {
+    const { provider, tokensSeen } = makeAppProvider();
+    const issue = await provider.fetchIssueFields({ repo: REPO, token: 'tok' }, '1');
+    assert.equal(issue.identifier, '#1');
+    assert.equal(issue.title, 'Open bug');
+    assert.deepEqual(tokensSeen, ['tok']);
+  });
+
+  test('fetchIssueContext nests fetchIssueComments through the SAME credential', async () => {
+    const { provider, tokensSeen } = makeAppProvider();
+    const ctx = await provider.fetchIssueContext({ repo: REPO, token: 'tok' }, '1');
+    // Two comments returned oldest-first → proves the nested comments read also
+    // authenticated through the credential (not a boot client).
+    assert.equal(ctx.comments.length, 2);
+    assert.deepEqual(ctx.comments.map(c => c.body), ['second', 'first']);
+    // One token use per client build (context read + nested comments read).
+    assert.deepEqual(tokensSeen, ['tok', 'tok']);
+  });
+
+  test('a write (createIssue) round-trips through the per-request client', async () => {
+    const { provider, tokensSeen } = makeAppProvider();
+    const created = await provider.createIssue({ repo: REPO, token: 'tok' }, { title: 'From App', description: 'body' });
+    assert.equal(created.title, 'From App');
+    // Read it back through the same credential path.
+    const back = await provider.fetchIssueFields({ repo: REPO, token: 'tok' }, created.id);
+    assert.equal(back.title, 'From App');
+    assert.deepEqual(tokensSeen, ['tok', 'tok']);
+  });
+
+  test('search/labels also build from the credential token', async () => {
+    const { provider, tokensSeen } = makeAppProvider();
+    const labels = await provider.labels({ repo: REPO, token: 'tok' });
+    assert.ok(labels.some(l => l.name === 'bug'));
+    await provider.search({ repo: REPO, token: 'tok' }, 'bug');
+    assert.deepEqual(tokensSeen, ['tok', 'tok']);
+  });
+
+  test('a credential missing its token is a hard error (no silent boot-client fallback)', async () => {
+    const { provider } = makeAppProvider();
+    await assert.rejects(
+      () => provider.fetchProjects({ repo: REPO }),
+      /missing an installation token/
+    );
+  });
+
+  test('the bare-string (boot client) path is unchanged — still requires configure({ client })', async () => {
+    const bare = new GitHubProvider();
+    await assert.rejects(() => bare.fetchProjects(REPO), /client not configured/);
+  });
+});
+
+// =============================================================================
 // Client URL construction — repo-slug encoding (security review M4, LIN-702)
 // =============================================================================
 //

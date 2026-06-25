@@ -4,18 +4,21 @@
  * Mirrors the Local-provider harness (local-harness.js): it seeds an in-memory
  * fake GitHub backend and establishes a `provider: 'github'` session, so the
  * dashboard renders a GENUINE foreign backend through the real
- * getProviderForWorkspace + getWorkspaceToken read seam — no `test-token` mock
- * short-circuit, no network, no GitHub auth (the OAuth/login wiring is LIN-541).
+ * getProviderForWorkspace read seam — no `test-token` mock short-circuit, no
+ * network, no GitHub auth (the OAuth/login wiring is LIN-541).
  *
- * The workspace credential (token) is the REPO SLUG (`owner/name`) — the value
- * the GitHub provider uses to select which repo to read/write. Auth lives on the
- * fake client, exactly as the Local provider's auth lives in its store.
+ * Under the GitHub App model (LIN-711/LIN-713) the binding credential is an
+ * INSTALLATION TOKEN and the repo is the binding SCOPE. The provider authenticates
+ * per-request: the seam threads `{ token, repo }` and the provider builds a
+ * request-time client from the installation token. The test route wires a
+ * `clientFactory` so that request-time client resolves to the same fake backend
+ * (offline), exactly as the Local provider's auth lives in its store.
  */
 
 /** urlKey of the seeded GitHub workspace. */
 export const GITHUB_WORKSPACE_URL_KEY = 'github-workspace';
 
-/** The repo slug the seeded workspace is bound to (doubles as the read token). */
+/** The repo slug the seeded workspace's binding is scoped to (LIN-711). */
 export const GITHUB_REPO = 'octocat/hello-world';
 
 /** Dashboard URL for the GitHub workspace. */

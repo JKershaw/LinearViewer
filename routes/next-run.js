@@ -26,7 +26,7 @@ import { buildRoadmapModel } from '../lib/roadmap.js';
 import { isRecommendationEnabled } from '../lib/openrouter.js';
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
-import { getWorkspaceToken } from '../lib/workspace.js';
+import { getWorkspaceCallScope } from '../lib/workspace.js';
 import { testMockData } from '../tests/fixtures/mock-data.js';
 
 /**
@@ -178,7 +178,7 @@ export function createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspace
 
     try {
       const { organizationName, projects, issues } =
-        await getProviderForWorkspace(workspace).fetchProjects(getWorkspaceToken(workspace));
+        await getProviderForWorkspace(workspace).fetchProjects(getWorkspaceCallScope(workspace));
       const model = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
       const result = await generateGoalSuggestions(
         { projects, issues, organizationName },
