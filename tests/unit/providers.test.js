@@ -400,6 +400,7 @@ describe('provider.ui surface (LIN-332)', () => {
       comments: false,
       estimates: false,
       subtasks: false,
+      attachments: false, // read-attachments opt-in, off by default (LIN-649)
       displayName: base.name, // 'base' — the machine name, never undefined
     });
     assert.strictEqual(base.ui.displayName, 'base');
@@ -411,6 +412,7 @@ describe('provider.ui surface (LIN-332)', () => {
       comments: true,   // fetchIssueComments is implemented
       estimates: true,  // estimate is in ISSUE_FIELDS_FRAGMENT
       subtasks: true,   // children/parent are fetched
+      attachments: true, // API read selects attachments + extracts md images (LIN-649)
       displayName: 'Linear',
     });
   });
@@ -472,7 +474,7 @@ describe('provider.ui surface (LIN-332)', () => {
     makeStubProvider({ write: true, displayName: 'Other' });
     // linearProvider.ui is unaffected by stub construction.
     assert.deepStrictEqual(linearProvider.ui, {
-      write: true, comments: true, estimates: true, subtasks: true, displayName: 'Linear',
+      write: true, comments: true, estimates: true, subtasks: true, attachments: true, displayName: 'Linear',
     });
   });
 });

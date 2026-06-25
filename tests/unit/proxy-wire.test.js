@@ -9,7 +9,14 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { flattenIssue, neutralizeProject, flattenCycle, flattenRelations } from '../../lib/proxy-wire.js';
+import {
+  flattenIssue,
+  neutralizeProject,
+  flattenCycle,
+  flattenRelations,
+  encodeAttachmentHandle,
+  decodeAttachmentHandle,
+} from '../../lib/proxy-wire.js';
 
 describe('flattenIssue', () => {
   test('flattens labels {nodes} to a plain array of names', () => {
@@ -93,6 +100,103 @@ describe('flattenIssue', () => {
   test('returns non-objects unchanged', () => {
     assert.strictEqual(flattenIssue(null), null);
     assert.strictEqual(flattenIssue(undefined), undefined);
+  });
+});
+
+describe('flattenIssue attachments (LIN-649)', () => {
+  test('maps formal Linear attachment nodes to the canonical shape, dropping url', () => {
+    const issue = {
+      id: 'i1',
+      description: '',
+      attachments: { nodes: [
+        { id: 'att-1', title: 'screenshot', url: 'https://uploads.linear.app/a/b.png' },
+        { id: 'att-2', title: 'spec', url: 'https://example.com/spec.pdf' },
+      ] },
+    };
+    flattenIssue(issue);
+    assert.deepStrictEqual(issue.attachments, [
+      { id: 'att:att-1', title: 'screenshot', contentType: 'image/png', kind: 'image' },
+      { id: 'att:att-2', title: 'spec', contentType: null, kind: 'file' },
+    ]);
+    // No backend url leaks onto any attachment.
+    assert.ok(issue.attachments.every(a => !('url' in a)), 'no url on attachments');
+  });
+
+  test('extracts markdown-embedded images from the description (image-ext filter)', () => {
+    const issue = {
+      id: 'i1',
+      attachments: { nodes: [] },
+      description: 'before ![pasted](https://uploads.linear.app/x/shot.jpg) and a [link](https://example.com/page) after',
+    };
+    flattenIssue(issue);
+    assert.strictEqual(issue.attachments.length, 1, 'only the image, not the plain link');
+    const [att] = issue.attachments;
+    assert.strictEqual(att.kind, 'image');
+    assert.strictEqual(att.contentType, 'image/jpeg');
+    assert.strictEqual(att.title, 'pasted');
+    // The id is an opaque handle that round-trips back to the source url.
+    assert.deepStrictEqual(decodeAttachmentHandle(att.id), {
+      type: 'md', value: 'https://uploads.linear.app/x/shot.jpg',
+    });
+  });
+
+  test('attaches per-comment markdown images under each comment', () => {
+    const issue = {
+      id: 'i1',
+      comments: { nodes: [
+        { id: 'm1', body: 'see ![](https://uploads.linear.app/c/one.png)' },
+        { id: 'm2', body: 'no images here' },
+      ] },
+    };
+    flattenIssue(issue);
+    assert.strictEqual(issue.comments[0].attachments.length, 1);
+    assert.strictEqual(issue.comments[0].attachments[0].kind, 'image');
+    assert.strictEqual('attachments' in issue.comments[1], false, 'no attachments key when comment has no images');
+  });
+
+  test('omits the attachments field entirely when nothing is attached (parity)', () => {
+    const issue = { id: 'i1', description: 'plain text, no images', attachments: { nodes: [] } };
+    flattenIssue(issue);
+    assert.strictEqual('attachments' in issue, false, 'empty ⇒ field absent, not []');
+  });
+
+  test('issue-list parity: an issue with no attachments connection is untouched', () => {
+    // The list read does not select `attachments`; flattenIssue must not invent it
+    // even if the description contains a markdown image.
+    const issue = { id: 'i1', description: '![x](https://uploads.linear.app/x.png)' };
+    flattenIssue(issue);
+    assert.strictEqual('attachments' in issue, false);
+  });
+
+  test('attachment normalization is idempotent', () => {
+    const issue = {
+      id: 'i1',
+      description: '![a](https://uploads.linear.app/a.png)',
+      attachments: { nodes: [{ id: 'att-1', title: 't', url: 'https://uploads.linear.app/b.gif' }] },
+    };
+    flattenIssue(issue);
+    const once = JSON.parse(JSON.stringify(issue));
+    flattenIssue(issue);
+    assert.deepStrictEqual(issue, once);
+  });
+});
+
+describe('attachment handle encode/decode (LIN-649)', () => {
+  test('att handles carry the raw opaque id', () => {
+    assert.strictEqual(encodeAttachmentHandle('att', 'abc-123'), 'att:abc-123');
+    assert.deepStrictEqual(decodeAttachmentHandle('att:abc-123'), { type: 'att', value: 'abc-123' });
+  });
+
+  test('md handles base64url-encode the url so no deep link is exposed', () => {
+    const url = 'https://uploads.linear.app/x/y.png?sig=abc';
+    const handle = encodeAttachmentHandle('md', url);
+    assert.ok(!handle.includes('https://'), 'no readable url in the handle');
+    assert.deepStrictEqual(decodeAttachmentHandle(handle), { type: 'md', value: url });
+  });
+
+  test('decode returns null for non-handles', () => {
+    assert.strictEqual(decodeAttachmentHandle('not-a-handle'), null);
+    assert.strictEqual(decodeAttachmentHandle(null), null);
   });
 });
 
