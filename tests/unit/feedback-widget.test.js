@@ -46,17 +46,29 @@ describe('footer feedback surface (LIN-635)', () => {
 
   test('reflects the off state when the flag is disabled', () => {
     const html = renderPageFooter({ urlKey: 'acme', featureFlags: { feedbackWidget: false } });
-    // mount + toggle both report disabled
+    // mount + link both report disabled
     assert.match(html, /id="feedback-widget-root"[^>]*data-enabled="false"/);
     assert.match(html, /footer-feedback-toggle[^>]*data-enabled="false"/);
-    assert.match(html, /feedback: ○/);
   });
 
   test('reflects the on state when the flag is enabled', () => {
     const html = renderPageFooter({ urlKey: 'acme', featureFlags: { feedbackWidget: true } });
     assert.match(html, /id="feedback-widget-root"[^>]*data-enabled="true"/);
     assert.match(html, /footer-feedback-toggle[^>]*data-enabled="true"/);
-    assert.match(html, /feedback: ●/);
+  });
+
+  test('renders feedback as a simple link alongside the privacy/terms legal links (LIN-641)', () => {
+    const html = renderPageFooter({ urlKey: 'acme', featureFlags: {} });
+    // Presented as a plain "feedback" link styled like the legal links, no ●/○ toggle text.
+    assert.match(html, /class="footer-legal footer-feedback-toggle"[^>]*>feedback</);
+    assert.doesNotMatch(html, /feedback: [●○]/);
+    // It lives inside the .footer-deploy legal row, not in a standalone wrap after </footer>.
+    assert.doesNotMatch(html, /footer-feedback-toggle-wrap/);
+    const deployRow = html.match(/<div class="footer-deploy">([\s\S]*?)<\/div>/);
+    assert.ok(deployRow, 'footer-deploy row present');
+    assert.match(deployRow[1], /privacy/);
+    assert.match(deployRow[1], /terms/);
+    assert.match(deployRow[1], /footer-feedback-toggle/);
   });
 
   test('is omitted on the unauthenticated landing footer', () => {
