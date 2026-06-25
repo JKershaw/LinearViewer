@@ -52,7 +52,7 @@ import { parseRepoFromDescription } from './lib/prompt-formatters.js'
 import { renderPage, renderErrorPage, renderUpstreamAwareErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken } from './lib/token-refresh.js'
-import { UUID_REGEX, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, updateWorkspaceTokens, getWorkspaceToken, getBindingsForWorkspace, linkProvider, unlinkProvider } from './lib/workspace.js'
+import { UUID_REGEX, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, updateWorkspaceTokens, getWorkspaceToken, getBindingsForWorkspace, linkProvider, unlinkProvider, remintActiveCredential } from './lib/workspace.js'
 import { createWorkspaceRoutes } from './routes/workspace.js'
 import { createOpenRouterAuthRoutes } from './routes/openrouter-auth.js'
 import { createDispatchRoutes } from './routes/dispatch.js'
@@ -536,10 +536,23 @@ async function ensureValidToken(req, res, next) {
   if (!needsTokenRefresh) return next()
 
   try {
-    const newTokens = await refreshAccessToken(workspace.refreshToken)
+    // Provider-aware refresh / re-mint seam (LIN-712). GitHub App installation
+    // tokens carry NO refresh_token — they are RE-MINTED from the App JWT +
+    // installationId — so a GitHub workspace must NOT be routed through Linear's
+    // refresh endpoint. Branch on provider: GitHub re-mints via the provider seam;
+    // everything else (Linear, and the legacy undefined-provider default) keeps the
+    // refresh_token exchange below, byte-for-byte unchanged. (PAT/local never reach
+    // here — PAT is skipped above and local carries a MAX expiry, so needsTokenRefresh
+    // stays false.) Switching GitHub to a real ~1h expiry means GitHub bindings flow
+    // through this middleware for the first time — that is intended, not a regression.
+    if (workspace.provider === 'github') {
+      await remintActiveCredential(workspace, getProviderForWorkspace(workspace))
+    } else {
+      const newTokens = await refreshAccessToken(workspace.refreshToken)
 
-    // Update workspace tokens
-    updateWorkspaceTokens(workspace, newTokens)
+      // Update workspace tokens
+      updateWorkspaceTokens(workspace, newTokens)
+    }
 
     await saveSession(req.session)
     console.log(`Token refreshed for workspace ${workspace.id}`)

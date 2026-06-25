@@ -14,6 +14,7 @@ import {
   linkProvider,
   unlinkProvider,
   getBindingsForWorkspace,
+  remintActiveCredential,
   saveSession,
   MAX_WORKSPACES
 } from '../../lib/workspace.js';
@@ -323,6 +324,81 @@ describe('unlinkProvider', () => {
     const ws = { id: 'ws-1' };
     assert.doesNotThrow(() => unlinkProvider(ws, 'linear', 'org-1'));
     assert.strictEqual(ws.id, 'ws-1');
+  });
+});
+
+// =============================================================================
+// remintActiveCredential Tests (LIN-712)
+// =============================================================================
+// The provider-aware re-mint glue the refresh middleware routes GitHub through.
+// Provider is INJECTED (a fake) so this is pure of the registry and the network.
+
+describe('remintActiveCredential', () => {
+  // A fake "minting" provider — returns a credentials patch the way the GitHub
+  // provider's refreshCredential does: rotated token + real ms expiry + the
+  // installationId re-mint key, and NO refreshToken.
+  function fakeMintProvider(patch, seen) {
+    return {
+      async refreshCredential(binding) {
+        seen.push(binding);
+        return patch;
+      },
+    };
+  }
+
+  test('re-mints the active binding and rotates token + expiry through the scalar mirror', async () => {
+    const ws = linkProvider({ id: 'gh-1' }, 'github', 'octocat/hello-world', {
+      installationId: '987', token: 'ghs_old', tokenExpiresAt: 1000,
+    });
+    const seen = [];
+    const provider = fakeMintProvider({ token: 'ghs_new', tokenExpiresAt: 5000, installationId: '987' }, seen);
+
+    await remintActiveCredential(ws, provider);
+
+    // The provider was handed the active GitHub binding (with its installationId).
+    assert.strictEqual(seen.length, 1);
+    assert.strictEqual(seen[0].credentials.installationId, '987');
+
+    // Binding credentials rotated; installationId preserved via linkProvider merge.
+    const binding = ws.bindings.find(b => b.provider === 'github');
+    assert.strictEqual(binding.credentials.token, 'ghs_new');
+    assert.strictEqual(binding.credentials.tokenExpiresAt, 5000);
+    assert.strictEqual(binding.credentials.installationId, '987');
+
+    // Scalar mirror (what ensureValidToken's expiry check reads) rotated in lockstep.
+    assert.strictEqual(ws.accessToken, 'ghs_new');
+    assert.strictEqual(ws.tokenExpiresAt, 5000);
+    // GitHub bindings never gain a refreshToken — that would route them back to Linear.
+    assert.strictEqual(ws.refreshToken, undefined);
+  });
+
+  test('selects the binding mirrored into the scalar fields when several share the provider', async () => {
+    // Two GitHub repos. linkProvider mirrors the LAST same-provider link into the
+    // scalar fields, so the active binding (the one the middleware's expiry check
+    // reads via workspace.tokenExpiresAt) is octocat/b — the helper must refresh
+    // exactly that one, leaving the other binding untouched.
+    const ws = linkProvider({ id: 'gh-1' }, 'github', 'octocat/a', { installationId: '111', token: 'tok-a', tokenExpiresAt: 1 });
+    linkProvider(ws, 'github', 'octocat/b', { installationId: '222', token: 'tok-b', tokenExpiresAt: 1 });
+    assert.strictEqual(ws.accessToken, 'tok-b', 'precondition: scalar mirror points at the last-linked binding');
+    const seen = [];
+    const provider = fakeMintProvider({ token: 'tok-b2', tokenExpiresAt: 9, installationId: '222' }, seen);
+
+    await remintActiveCredential(ws, provider);
+
+    // It refreshed the active (tok-b / installation 222) binding, not the other.
+    assert.strictEqual(seen[0].credentials.installationId, '222');
+    assert.strictEqual(ws.bindings.find(b => b.scope === 'octocat/b').credentials.token, 'tok-b2');
+    assert.strictEqual(ws.bindings.find(b => b.scope === 'octocat/a').credentials.token, 'tok-a');
+  });
+
+  test('throws (defensive guard) when there is no binding to refresh at all', async () => {
+    // getBindingsForWorkspace synthesizes a binding for any real workspace, so the
+    // only input that reaches the guard is a null workspace — the middleware never
+    // passes one, but the guard fails loudly rather than minting against nothing.
+    await assert.rejects(
+      () => remintActiveCredential(null, fakeMintProvider({}, [])),
+      /no provider binding/
+    );
   });
 });
 

@@ -16,6 +16,7 @@
  */
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert';
+import crypto from 'node:crypto';
 import {
   GitHubProvider,
   githubProvider,
@@ -27,6 +28,13 @@ import { getProvider } from '../../lib/providers/registry.js';
 import { NotImplementedError } from '../../lib/providers/interface.js';
 
 const REPO = 'octocat/hello-world';
+
+// One ephemeral RSA keypair so refreshCredential's App JWT can be signed offline
+// (mirrors github-app-auth.test.js). Generated, never written to disk.
+function cryptoGenerateRsa() {
+  const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+  return { privateKey: privateKey.export({ type: 'pkcs1', format: 'pem' }) };
+}
 
 function seededClient() {
   return createFakeGitHubClient({
@@ -357,5 +365,93 @@ describe('createGitHubClient listRepos → installation repositories (LIN-710)',
     });
     const client = createGitHubClient({ token: 't', baseUrl: 'https://api.github.com', fetchImpl });
     assert.deepEqual(await client.listRepos(), []);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// refreshCredential — provider-aware re-mint seam (LIN-712, surface 6)
+// ---------------------------------------------------------------------------
+// GitHub App installation tokens carry NO refresh_token; they are RE-MINTED from
+// the App JWT + installationId. These pin the credentials PATCH shape the refresh
+// middleware folds back through linkProvider. Env is set so mintAppJwt can sign;
+// the network is stubbed via the injected fetchImpl (no fake-client change).
+describe('GitHubProvider refreshCredential re-mint (LIN-712)', () => {
+  const APP_ENV = ['GITHUB_APP_ID', 'GITHUB_APP_PRIVATE_KEY', 'GITHUB_APP_SLUG'];
+  const { privateKey } = cryptoGenerateRsa();
+  let saved;
+
+  beforeEach(() => {
+    saved = Object.fromEntries(APP_ENV.map(k => [k, process.env[k]]));
+    process.env.GITHUB_APP_ID = '123456';
+    process.env.GITHUB_APP_PRIVATE_KEY = privateKey;
+    process.env.GITHUB_APP_SLUG = 'my-app';
+  });
+
+  const restore = () => {
+    for (const k of APP_ENV) {
+      if (saved[k] === undefined) delete process.env[k];
+      else process.env[k] = saved[k];
+    }
+  };
+
+  test('re-mints from installationId and returns a {token, ms-expiry, installationId} patch', async () => {
+    try {
+      const calls = [];
+      const fetchImpl = async (url, opts) => {
+        calls.push({ url, headers: opts?.headers || {}, method: opts?.method });
+        return {
+          ok: true, status: 201, statusText: 'Created',
+          text: async () => JSON.stringify({ token: 'ghs_fresh_token', expires_at: '2026-06-25T13:00:00Z' }),
+        };
+      };
+
+      const patch = await githubProvider.refreshCredential(
+        { provider: 'github', scope: 'octocat/hello-world', credentials: { installationId: '987', token: 'ghs_old', tokenExpiresAt: 1 } },
+        { fetchImpl }
+      );
+
+      // The mint hits the installation access-tokens endpoint with the App JWT.
+      assert.equal(calls.length, 1);
+      assert.equal(calls[0].url, 'https://api.github.com/app/installations/987/access_tokens');
+      assert.equal(calls[0].method, 'POST');
+      assert.match(calls[0].headers.Authorization, /^Bearer /);
+
+      // Patch shape: rotated token, REAL ms-epoch expiry (not the raw ISO string,
+      // not MAX), installationId preserved as the re-mint key. No refreshToken —
+      // emitting one would route the binding back through the Linear refresh path.
+      assert.equal(patch.token, 'ghs_fresh_token');
+      assert.equal(patch.tokenExpiresAt, Date.parse('2026-06-25T13:00:00Z'));
+      assert.equal(typeof patch.tokenExpiresAt, 'number');
+      assert.equal(patch.installationId, '987');
+      assert.ok(!('refreshToken' in patch), 'GitHub re-mint must not emit a refreshToken');
+    } finally {
+      restore();
+    }
+  });
+
+  test('throws when the binding is missing installationId (cannot re-mint)', async () => {
+    try {
+      await assert.rejects(
+        () => githubProvider.refreshCredential({ provider: 'github', scope: 'octocat/x', credentials: { token: 'ghs_old' } }),
+        /installationId/
+      );
+    } finally {
+      restore();
+    }
+  });
+
+  test('throws on an unparseable installation-token expiry (no silent never-expires)', async () => {
+    try {
+      const fetchImpl = async () => ({
+        ok: true, status: 201, statusText: 'Created',
+        text: async () => JSON.stringify({ token: 'ghs_fresh', expires_at: 'not-a-date' }),
+      });
+      await assert.rejects(
+        () => githubProvider.refreshCredential({ credentials: { installationId: '987' } }, { fetchImpl }),
+        /invalid installation token expiry/
+      );
+    } finally {
+      restore();
+    }
   });
 });
