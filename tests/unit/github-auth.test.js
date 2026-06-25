@@ -193,6 +193,26 @@ describe('GitHub auth routes', () => {
     assert.match(res.body, /Session Expired/);
   });
 
+  test('GET /auth/github (add-source) carries a validated viewed-workspace urlKey in the intent', async () => {
+    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const handler = getHandler(router, 'get', '/auth/github');
+    const res = makeRes();
+    const session = makeSession();
+    await handler({ query: { mode: 'add-source', workspace: 'acme' }, session }, res);
+    assert.deepEqual(session.oauthIntent, { mode: 'add-source', provider: 'github', workspaceUrlKey: 'acme' });
+    // urlKey rides in the session intent, never in the opaque OAuth state.
+    assert.ok(!res.redirectedTo.includes('acme'));
+  });
+
+  test('GET /auth/github (add-source) ignores a malformed workspace query param', async () => {
+    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const handler = getHandler(router, 'get', '/auth/github');
+    const res = makeRes();
+    const session = makeSession();
+    await handler({ query: { mode: 'add-source', workspace: 'not a valid key!' }, session }, res);
+    assert.deepEqual(session.oauthIntent, { mode: 'add-source', provider: 'github' });
+  });
+
   test('GET callback exchanges code and renders the repo picker, holding the token in session', async () => {
     const router = createGitHubAuthRoutes({ provider: fakeProvider() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
@@ -202,6 +222,15 @@ describe('GitHub auth routes', () => {
     assert.deepEqual(session.githubPending, { token: 'gho_token', mode: 'new', login: 'octocat', userId: '42' });
     assert.match(res.body, /octocat\/hello-world/);
     assert.match(res.body, /github-repo-form/);
+  });
+
+  test('GET callback (add-source) carries the viewed-workspace urlKey from intent into pending', async () => {
+    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const handler = getHandler(router, 'get', '/auth/github/callback');
+    const res = makeRes();
+    const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'add-source', provider: 'github', workspaceUrlKey: 'acme' } });
+    await handler({ query: { code: 'good', state: 'real' }, session }, res);
+    assert.deepEqual(session.githubPending, { token: 'gho_token', mode: 'add-source', login: 'octocat', userId: '42', workspaceUrlKey: 'acme' });
   });
 
   test('GET callback surfaces a clean 400 on a bad code (AuthExchangeError)', async () => {
@@ -268,6 +297,58 @@ describe('GitHub auth routes', () => {
     assert.equal(linearWs.provider, 'linear', 'active provider unchanged by a non-active binding');
     assert.ok(linearWs.bindings.some(b => b.provider === 'github' && b.scope === 'octocat/hello-world'));
     assert.equal(res.redirectedTo, '/workspace/acme/settings?provider_ok=github');
+  });
+
+  test('POST link (add-source) binds onto the VIEWED workspace, not the active one (LIN-541)', async () => {
+    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const handler = getHandler(router, 'post', '/auth/github/link');
+    const res = makeRes();
+    // User is viewing workspace A (acme) but B (globex) is the active one.
+    const viewedWs = { id: 'org-a', name: 'Acme', urlKey: 'acme', provider: 'linear', accessToken: 'lin_a' };
+    const activeWs = { id: 'org-b', name: 'Globex', urlKey: 'globex', provider: 'linear', accessToken: 'lin_b' };
+    const session = makeSession({
+      githubPending: { token: 'gho_token', mode: 'add-source', login: 'octocat', userId: '42', workspaceUrlKey: 'acme' },
+      workspaces: [viewedWs, activeWs],
+      activeWorkspaceId: 'org-b',
+    });
+    await handler({ body: { repo: 'octocat/hello-world' }, session }, res);
+
+    // The binding lands on the VIEWED workspace (acme), NOT the active one (globex).
+    assert.ok(viewedWs.bindings?.some(b => b.provider === 'github' && b.scope === 'octocat/hello-world'), 'viewed workspace gets the binding');
+    assert.ok(!activeWs.bindings, 'active workspace is untouched');
+    assert.equal(res.redirectedTo, '/workspace/acme/settings?provider_ok=github');
+  });
+
+  test('POST link (add-source) falls back to the active workspace when no target urlKey was carried', async () => {
+    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const handler = getHandler(router, 'post', '/auth/github/link');
+    const res = makeRes();
+    const activeWs = { id: 'org-b', name: 'Globex', urlKey: 'globex', provider: 'linear', accessToken: 'lin_b' };
+    const session = makeSession({
+      githubPending: { token: 'gho_token', mode: 'add-source', login: 'octocat', userId: '42' },
+      workspaces: [activeWs],
+      activeWorkspaceId: 'org-b',
+    });
+    await handler({ body: { repo: 'octocat/hello-world' }, session }, res);
+
+    assert.ok(activeWs.bindings?.some(b => b.provider === 'github' && b.scope === 'octocat/hello-world'));
+    assert.equal(res.redirectedTo, '/workspace/globex/settings?provider_ok=github');
+  });
+
+  test('POST link (add-source) falls back to active when the carried urlKey no longer resolves', async () => {
+    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const handler = getHandler(router, 'post', '/auth/github/link');
+    const res = makeRes();
+    const activeWs = { id: 'org-b', name: 'Globex', urlKey: 'globex', provider: 'linear', accessToken: 'lin_b' };
+    const session = makeSession({
+      githubPending: { token: 'gho_token', mode: 'add-source', login: 'octocat', userId: '42', workspaceUrlKey: 'gone' },
+      workspaces: [activeWs],
+      activeWorkspaceId: 'org-b',
+    });
+    await handler({ body: { repo: 'octocat/hello-world' }, session }, res);
+
+    assert.ok(activeWs.bindings?.some(b => b.provider === 'github' && b.scope === 'octocat/hello-world'));
+    assert.equal(res.redirectedTo, '/workspace/globex/settings?provider_ok=github');
   });
 
   test('POST link rejects when there is no pending GitHub session', async () => {

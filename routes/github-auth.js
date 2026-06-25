@@ -26,6 +26,7 @@ import {
   saveSession,
   linkProvider,
   getActiveWorkspace,
+  getWorkspaceByUrlKey,
   validateWorkspaceUrlKey,
 } from '../lib/workspace.js'
 
@@ -70,7 +71,15 @@ export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
     const mode = req.query.mode === 'add-source' ? 'add-source' : 'new'
     const state = crypto.randomUUID()
     req.session.oauthState = state
-    req.session.oauthIntent = { mode, provider: provider.name }
+    // Intent lives server-side in the session, never in `state` (LIN-562). For
+    // add-source, also carry the VIEWED workspace's urlKey so the link step binds
+    // onto the workspace the user initiated from rather than the active one
+    // (LIN-541). Only attach a validated urlKey; absence falls back to active.
+    const intent = { mode, provider: provider.name }
+    if (mode === 'add-source' && validateWorkspaceUrlKey(req.query.workspace)) {
+      intent.workspaceUrlKey = req.query.workspace
+    }
+    req.session.oauthIntent = intent
 
     req.session.save(() => {
       res.redirect(provider.beginAuth({ state }))
@@ -102,7 +111,8 @@ export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
       }))
     }
 
-    const mode = req.session.oauthIntent?.mode === 'add-source' ? 'add-source' : 'new'
+    const intent = req.session.oauthIntent || {}
+    const mode = intent.mode === 'add-source' ? 'add-source' : 'new'
 
     try {
       let tokenBag
@@ -133,8 +143,12 @@ export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
       }
 
       // Hold the acquired token + identity until the user picks a repo. The repo
-      // selection completes the binding (POST /auth/github/link).
-      req.session.githubPending = { token, mode, login: viewer.login, userId: viewer.id }
+      // selection completes the binding (POST /auth/github/link). The add-source
+      // target workspace (if any) rides along so the link step binds onto the
+      // viewed workspace, not the active one (LIN-541).
+      const pending = { token, mode, login: viewer.login, userId: viewer.id }
+      if (intent.workspaceUrlKey) pending.workspaceUrlKey = intent.workspaceUrlKey
+      req.session.githubPending = pending
       req.session.save(() => {
         res.send(renderGitHubRepoSelectPage(repos, { mode, login: viewer.login }))
       })
@@ -173,8 +187,15 @@ export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
 
     try {
       if (pending.mode === 'add-source') {
-        // Link onto the EXISTING active workspace (which may be Linear/local).
-        const workspace = getActiveWorkspace(req.session)
+        // Link onto the VIEWED workspace the user initiated from — its urlKey was
+        // carried through the OAuth round-trip in the session intent (LIN-541) —
+        // not the session's ACTIVE workspace. For a multi-workspace user viewing A
+        // while B is active, adding a source from A's settings must bind onto A.
+        // Falls back to the active workspace when no target was carried (single-
+        // workspace and legacy callers), preserving prior behavior.
+        const workspace =
+          (pending.workspaceUrlKey && getWorkspaceByUrlKey(req.session, pending.workspaceUrlKey)) ||
+          getActiveWorkspace(req.session)
         if (!workspace) {
           return res.status(400).send(renderErrorPage('No Active Workspace', 'Could not find a workspace to add this source to.', {
             action: 'Go to homepage', actionUrl: '/'

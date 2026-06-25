@@ -1970,9 +1970,12 @@ app.post('/workspace/:urlKey/settings/providers/add', workspaceFromUrl, async (r
   const settingsUrl = `/workspace/${encodeURIComponent(workspace.urlKey)}/settings`;
   const { provider } = req.body;
 
-  // GitHub OAuth begin in add-source mode (link onto the active workspace).
+  // GitHub OAuth begin in add-source mode. Carry the VIEWED workspace's urlKey
+  // (this :urlKey route context) so the callback binds onto THIS workspace, not
+  // the session's active one — a multi-workspace user viewing A while B is active
+  // must bind onto A (LIN-541).
   if (provider === 'github') {
-    return res.redirect('/auth/github?mode=add-source');
+    return res.redirect(`/auth/github?mode=add-source&workspace=${encodeURIComponent(workspace.urlKey)}`);
   }
 
   // Linear has a real OAuth begin; route into it as the add scaffold. The
