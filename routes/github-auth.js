@@ -1,25 +1,26 @@
 /**
- * GitHub OAuth routes (LIN-541) — the GitHub consumer of the LIN-562
- * provider-binding seam.
+ * GitHub auth routes (LIN-541) — the GitHub consumer of the LIN-562
+ * provider-binding seam, migrated to the GitHub App installation flow (LIN-703).
  *
  * GitHub login is a TWO-step flow, which is why it is its own router rather than
  * a reuse of the Linear-only routes/auth.js:
- *   1. /auth/github           → redirect to GitHub's OAuth authorize page
- *   2. /auth/github/callback  → exchange code for a token, then show a repo
+ *   1. /auth/github           → redirect to the GitHub App installation page
+ *                               (the user picks which repos the App may access)
+ *   2. /auth/github/callback  → mint an installation access token from the
+ *                               returned `installation_id`, then show a repo
  *                               picker (a GitHub issues binding is scoped to one
- *                               `owner/name` repo, which OAuth alone can't pick)
+ *                               `owner/name` repo)
  *   3. POST /auth/github/link → write the binding via linkProvider and land in
  *                               the workspace
  *
  * Both entry points (login-page "Continue with GitHub" and settings "Add a
  * source") drive the SAME routes, differing only by the server-side intent
- * (`mode`) carried in the session — never encoded into the OAuth `state`, which
- * stays an opaque CSRF nonce (the LIN-562 pattern).
+ * (`mode`) carried in the session — never encoded into the `state`, which stays
+ * an opaque CSRF nonce (the LIN-562 pattern).
  */
 import crypto from 'crypto'
 import { Router } from 'express'
 import { getProvider } from '../lib/providers/registry.js'
-import { AuthExchangeError } from '../lib/providers/interface.js'
 import { renderErrorPage, renderGitHubRepoSelectPage } from '../lib/render-pages.js'
 import {
   upsertWorkspace,
@@ -30,7 +31,12 @@ import {
   validateWorkspaceUrlKey,
 } from '../lib/workspace.js'
 
-const OAUTH_ENV_VARS = ['GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET', 'GITHUB_REDIRECT_URI']
+// GitHub App config the install flow needs (LIN-703 migration): the App's id +
+// private key (to mint the App JWT / installation token) and its slug (to build
+// the installation URL in beginAuth). This replaces the OAuth
+// client_id/secret/redirect_uri the code→token exchange used — the App flow no
+// longer reads them, so the "not configured" guard now gates on the App vars.
+const APP_ENV_VARS = ['GITHUB_APP_ID', 'GITHUB_APP_PRIVATE_KEY', 'GITHUB_APP_SLUG']
 
 // A GitHub issues binding's scope is an `owner/name` repo slug. Validate the
 // shape of the picked repo before writing it as a binding scope.
@@ -46,14 +52,14 @@ const REPO_SLUG_REGEX = /^[\w.-]+\/[\w.-]+$/
 export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
   const router = Router()
 
-  function getMissingOAuthVars() {
-    return OAUTH_ENV_VARS.filter(v => !process.env[v])
+  function getMissingAppVars() {
+    return APP_ENV_VARS.filter(v => !process.env[v])
   }
 
   function notConfigured(res) {
-    const missing = getMissingOAuthVars()
+    const missing = getMissingAppVars()
     return res.status(503).send(renderErrorPage(
-      'GitHub OAuth Not Configured',
+      'GitHub App Not Configured',
       `GitHub login is not available. Missing environment variables: ${missing.join(', ')}. See .env.example for setup instructions.`
     ))
   }
@@ -65,7 +71,7 @@ export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
    * session, never in `state`.
    */
   router.get('/auth/github', async (req, res) => {
-    if (getMissingOAuthVars().length > 0) return notConfigured(res)
+    if (getMissingAppVars().length > 0) return notConfigured(res)
     if (sessionStore?.cleanup) await sessionStore.cleanup()
 
     const mode = req.query.mode === 'add-source' ? 'add-source' : 'new'
@@ -87,26 +93,52 @@ export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
   })
 
   /**
-   * Step 2: Handle the OAuth callback — validate state, exchange the code, fetch
-   * the user + their repos, and render the repo picker. The acquired token and
-   * intent are held in session (`githubPending`) until the user picks a repo.
+   * Step 2: Handle the GitHub App installation callback (LIN-709 — surface 3 of
+   * the LIN-703 App migration). The inbound is `installation_id` + `setup_action`,
+   * NOT an OAuth `code`: the user has just installed/updated the App and picked
+   * which repos it may access. We mint an installation access token from
+   * `installation_id` (the surface-1 helper) and look up the installation's
+   * `account` for identity — replacing the old code→user-token exchange and the
+   * `/user` viewer (an installation token cannot read `/user`).
+   *
+   * The LIN-541 intent carry is preserved unchanged: `mode`/`workspaceUrlKey`
+   * round-trip via the session, and `state` stays an opaque CSRF nonce (never
+   * repurposed to carry intent). The acquired token + identity are held in
+   * session (`githubPending`) until the user picks a repo (POST .../link).
    */
   router.get('/auth/github/callback', async (req, res) => {
-    if (getMissingOAuthVars().length > 0) return notConfigured(res)
+    if (getMissingAppVars().length > 0) return notConfigured(res)
 
-    const { code, state, error } = req.query
+    // App-flow inbound: `installation_id` + `setup_action`, not an OAuth `code`.
+    const { installation_id: installationId, setup_action: setupAction, state, error } = req.query
 
     if (error) {
       const message = error === 'access_denied'
-        ? 'You cancelled the GitHub authorization request.'
-        : `GitHub authorization failed: ${error}`
-      return res.status(400).send(renderErrorPage('Authorization Cancelled', message, {
+        ? 'You cancelled the GitHub App installation request.'
+        : `GitHub App installation failed: ${error}`
+      return res.status(400).send(renderErrorPage('Installation Cancelled', message, {
         action: 'Try again', actionUrl: '/auth/github'
       }))
     }
 
+    // `state` stays the opaque CSRF nonce minted by /auth/github — the SAME guard
+    // as the OAuth flow. Intent is read from the session, never decoded from
+    // `state` (LIN-562).
     if (!state || state !== req.session.oauthState) {
       return res.status(400).send(renderErrorPage('Session Expired', 'Your GitHub sign-in session expired or was invalid. Please try again.', {
+        action: 'Try again', actionUrl: '/auth/github'
+      }))
+    }
+
+    // No installation id means the install did not complete on GitHub's side —
+    // most commonly `setup_action=request` (an org member asked an admin to
+    // approve the App, which is therefore not yet installed). There is nothing to
+    // mint a token from, so steer the user rather than 500 on a missing id.
+    if (!installationId) {
+      const message = setupAction === 'request'
+        ? 'Your GitHub App installation needs an organization admin to approve it. Once approved, sign in again.'
+        : 'The GitHub App installation did not complete. Please try again.'
+      return res.status(400).send(renderErrorPage('Installation Incomplete', message, {
         action: 'Try again', actionUrl: '/auth/github'
       }))
     }
@@ -115,45 +147,49 @@ export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
     const mode = intent.mode === 'add-source' ? 'add-source' : 'new'
 
     try {
-      let tokenBag
+      // Acquire the installation credential + identity. provider.completeInstallation
+      // mints an installation access token from installation_id (the surface-1
+      // helper) and resolves the installation's `account` for identity — replacing
+      // the old completeAuth(code) user-token exchange and the `/user` viewer (an
+      // installation token cannot read `/user`). Driving it through the provider
+      // keeps the route's acquisition seam consistent with beginAuth/listRepos.
+      let creds
       try {
-        tokenBag = await provider.completeAuth(code)
-      } catch (exchangeError) {
-        if (exchangeError instanceof AuthExchangeError) {
-          console.error('GitHub token exchange error:', exchangeError.detail)
-          return res.status(400).send(renderErrorPage('Authentication Failed', 'Could not complete authentication with GitHub. Please try again.', {
-            action: 'Try again', actionUrl: '/auth/github'
-          }))
-        }
-        throw exchangeError
-      }
-
-      const token = tokenBag.access_token
-      let viewer, repos
-      try {
-        [viewer, repos] = await Promise.all([
-          provider.fetchViewer(token),
-          provider.listRepos(token),
-        ])
-      } catch (fetchError) {
-        console.error('Failed to fetch from GitHub:', fetchError)
-        return res.status(500).send(renderErrorPage('Connection Error', 'Could not fetch your account information from GitHub. Please try again.', {
+        creds = await provider.completeInstallation(installationId)
+      } catch (mintError) {
+        console.error('GitHub App installation-token mint error:', mintError)
+        return res.status(400).send(renderErrorPage('Authentication Failed', 'Could not complete authentication with GitHub. Please try again.', {
           action: 'Try again', actionUrl: '/auth/github'
         }))
       }
 
-      // Hold the acquired token + identity until the user picks a repo. The repo
-      // selection completes the binding (POST /auth/github/link). The add-source
-      // target workspace (if any) rides along so the link step binds onto the
-      // viewed workspace, not the active one (LIN-541).
-      const pending = { token, mode, login: viewer.login, userId: viewer.id }
+      // Repos come from the installation now (LIN-710): listRepos reads
+      // /installation/repositories with the installation token, so the picker is
+      // constrained to exactly the repos selected at install time.
+      let repos
+      try {
+        repos = await provider.listRepos(creds.token)
+      } catch (fetchError) {
+        console.error('Failed to fetch installation repositories from GitHub:', fetchError)
+        return res.status(500).send(renderErrorPage('Connection Error', 'Could not fetch your repositories from GitHub. Please try again.', {
+          action: 'Try again', actionUrl: '/auth/github'
+        }))
+      }
+
+      // Hold the installation token + identity until the user picks a repo. The
+      // repo selection completes the binding (POST /auth/github/link). `installationId`
+      // rides along as the re-mint key the binding-shape surface (LIN-711) will
+      // persist on the binding — the link step does not consume it yet. The
+      // add-source target workspace (if any) rides along too so the link binds onto
+      // the viewed workspace, not the active one (LIN-541).
+      const pending = { token: creds.token, mode, login: creds.login, userId: creds.userId, installationId: String(installationId) }
       if (intent.workspaceUrlKey) pending.workspaceUrlKey = intent.workspaceUrlKey
       req.session.githubPending = pending
       req.session.save(() => {
-        res.send(renderGitHubRepoSelectPage(repos, { mode, login: viewer.login }))
+        res.send(renderGitHubRepoSelectPage(repos, { mode, login: creds.login }))
       })
     } catch (err) {
-      console.error('GitHub OAuth callback error:', err)
+      console.error('GitHub App callback error:', err)
       res.status(500).send(renderErrorPage('Something Went Wrong', 'An unexpected error occurred during GitHub authentication. Please try again.', {
         action: 'Try again', actionUrl: '/auth/github'
       }))
