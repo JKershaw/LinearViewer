@@ -15,7 +15,7 @@
 import { test, describe, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert'
 import crypto from 'node:crypto'
-import { mintAppJwt, mintInstallationToken, getAppConfig } from '../../lib/providers/github/app-auth.js'
+import { mintAppJwt, mintInstallationToken, fetchInstallation, getAppConfig } from '../../lib/providers/github/app-auth.js'
 
 // One ephemeral RSA keypair for the whole suite — generated, never on disk.
 const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 })
@@ -177,5 +177,62 @@ describe('GitHub App auth primitives (LIN-707)', () => {
   test('mintInstallationToken requires an installationId', async () => {
     await assert.rejects(() => mintInstallationToken('', { fetchImpl: async () => ({}) }), /installationId is required/)
     await assert.rejects(() => mintInstallationToken(null, { fetchImpl: async () => ({}) }), /installationId is required/)
+  })
+
+  // -------------------------------------------------------------------------
+  // fetchInstallation() — App-JWT installation lookup for callback identity (LIN-709)
+  // -------------------------------------------------------------------------
+
+  test('fetchInstallation GETs the installation endpoint with the App JWT and returns account', async () => {
+    let captured
+    const fetchImpl = async (url, init) => {
+      captured = { url, init }
+      return {
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({ id: 42, account: { id: 7, login: 'octocat' } }),
+      }
+    }
+    const data = await fetchInstallation('42', { fetchImpl })
+
+    assert.equal(captured.url, 'https://api.github.com/app/installations/42')
+    assert.equal(captured.init.method, 'GET')
+    assert.match(captured.init.headers.Authorization, /^Bearer [\w-]+\.[\w-]+\.[\w-]+$/)
+    assert.equal(captured.init.headers.Accept, 'application/vnd.github+json')
+    assert.equal(captured.init.headers['X-GitHub-Api-Version'], '2022-11-28')
+
+    assert.deepEqual(data.account, { id: 7, login: 'octocat' })
+  })
+
+  test('fetchInstallation path-encodes the installation id', async () => {
+    let capturedUrl
+    const fetchImpl = async (url) => {
+      capturedUrl = url
+      return { ok: true, status: 200, text: async () => '{"account":{"id":1,"login":"x"}}' }
+    }
+    await fetchInstallation('a/b', { fetchImpl })
+    assert.equal(capturedUrl, 'https://api.github.com/app/installations/a%2Fb')
+  })
+
+  test('fetchInstallation throws with status on a non-2xx response', async () => {
+    const fetchImpl = async () => ({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+      text: async () => JSON.stringify({ message: 'Not Found' }),
+    })
+    await assert.rejects(
+      () => fetchInstallation('99', { fetchImpl }),
+      (err) => {
+        assert.equal(err.status, 404)
+        assert.match(err.message, /Not Found/)
+        return true
+      },
+    )
+  })
+
+  test('fetchInstallation requires an installationId', async () => {
+    await assert.rejects(() => fetchInstallation('', { fetchImpl: async () => ({}) }), /installationId is required/)
+    await assert.rejects(() => fetchInstallation(null, { fetchImpl: async () => ({}) }), /installationId is required/)
   })
 })

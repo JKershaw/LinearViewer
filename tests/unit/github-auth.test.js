@@ -12,10 +12,16 @@
  */
 import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
+import crypto from 'node:crypto';
 import { GitHubProvider } from '../../lib/providers/github/index.js';
 import { AuthExchangeError } from '../../lib/providers/interface.js';
 import { createGitHubAuthRoutes } from '../../routes/github-auth.js';
 import { createFakeGitHubClient } from '../../lib/providers/github/fake-client.js';
+
+// Ephemeral RSA keypair so completeInstallation's App-JWT signing (mintAppJwt)
+// runs for real against a valid PEM — generated, never on disk.
+const { privateKey: RSA_PRIVATE_KEY } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+const RSA_PEM = RSA_PRIVATE_KEY.export({ type: 'pkcs1', format: 'pem' });
 
 // ---------------------------------------------------------------------------
 // Provider acquisition primitives
@@ -110,6 +116,33 @@ describe('GitHubProvider auth primitives', () => {
       { slug: 'octocat/secret', name: 'octocat/secret', private: true },
     ]);
   });
+
+  test('completeInstallation mints an installation token and resolves account identity (LIN-709)', async () => {
+    process.env.GITHUB_APP_PRIVATE_KEY = RSA_PEM; // real key so mintAppJwt signs
+    const realFetch = global.fetch;
+    // Route by URL: the access_tokens POST vs the installation GET.
+    global.fetch = async (url, init) => {
+      if (String(url).endsWith('/access_tokens')) {
+        assert.equal(init.method, 'POST');
+        return { ok: true, status: 201, text: async () => JSON.stringify({ token: 'ghs_inst', expires_at: '2026-06-25T20:00:00Z' }) };
+      }
+      // GET /app/installations/42 → identity comes from the installation account.
+      assert.match(String(url), /\/app\/installations\/42$/);
+      return { ok: true, status: 200, text: async () => JSON.stringify({ id: 42, account: { id: 7, login: 'octocat' } }) };
+    };
+    try {
+      const creds = await new GitHubProvider().completeInstallation('42');
+      assert.deepEqual(creds, {
+        token: 'ghs_inst',
+        login: 'octocat',
+        userId: '7',
+        installationId: '42',
+        tokenExpiresAt: '2026-06-25T20:00:00Z',
+      });
+    } finally {
+      global.fetch = realFetch;
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -121,12 +154,14 @@ describe('GitHubProvider auth primitives', () => {
 function fakeProvider() {
   return {
     name: 'github',
-    beginAuth: ({ state }) => `https://github.com/login/oauth/authorize?state=${state}`,
-    completeAuth: async (code) => {
-      if (code === 'bad') throw new AuthExchangeError('bad_verification_code', 'github');
-      return { access_token: 'gho_token' };
+    beginAuth: ({ state }) => `https://github.com/apps/my-app/installations/new?state=${state}`,
+    // The App-flow acquisition seam (LIN-709): mint installation token + resolve
+    // the installation account identity. The route drives this; the network lives
+    // behind it (covered by the provider-primitive tests above).
+    completeInstallation: async (installationId) => {
+      if (installationId === 'bad') throw new Error('GitHub App auth: installation-token request failed');
+      return { token: 'ghs_inst', login: 'octocat', userId: '42', installationId: String(installationId), tokenExpiresAt: '2026-06-25T20:00:00Z' };
     },
-    fetchViewer: async () => ({ id: '42', login: 'octocat', name: 'The Octocat' }),
     listRepos: async () => ([{ slug: 'octocat/hello-world', name: 'octocat/hello-world', private: false }]),
   };
 }
@@ -163,15 +198,17 @@ function makeSession(initial = {}) {
   return session;
 }
 
-const ENV = ['GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET', 'GITHUB_REDIRECT_URI'];
+// The install flow now gates on the GitHub App config (LIN-703 migration), not
+// the retired OAuth client_id/secret/redirect_uri.
+const ENV = ['GITHUB_APP_ID', 'GITHUB_APP_PRIVATE_KEY', 'GITHUB_APP_SLUG'];
 
 describe('GitHub auth routes', () => {
   let saved;
   beforeEach(() => {
     saved = Object.fromEntries(ENV.map(k => [k, process.env[k]]));
-    process.env.GITHUB_CLIENT_ID = 'cid';
-    process.env.GITHUB_CLIENT_SECRET = 'secret';
-    process.env.GITHUB_REDIRECT_URI = 'http://localhost:3000/auth/github/callback';
+    process.env.GITHUB_APP_ID = '12345';
+    process.env.GITHUB_APP_PRIVATE_KEY = 'test-key';
+    process.env.GITHUB_APP_SLUG = 'my-app';
   });
   afterEach(() => {
     for (const k of ENV) {
@@ -180,14 +217,14 @@ describe('GitHub auth routes', () => {
     }
   });
 
-  test('GET /auth/github 503s when OAuth env is not configured', async () => {
-    delete process.env.GITHUB_CLIENT_ID;
+  test('GET /auth/github 503s when GitHub App env is not configured', async () => {
+    delete process.env.GITHUB_APP_ID;
     const router = createGitHubAuthRoutes({ provider: fakeProvider() });
     const handler = getHandler(router, 'get', '/auth/github');
     const res = makeRes();
     await handler({ query: {}, session: makeSession() }, res);
     assert.equal(res.statusCode, 503);
-    assert.match(res.body, /GitHub OAuth Not Configured/);
+    assert.match(res.body, /GitHub App Not Configured/);
   });
 
   test('GET /auth/github mints state, stores intent server-side, and redirects', async () => {
@@ -207,9 +244,19 @@ describe('GitHub auth routes', () => {
     const router = createGitHubAuthRoutes({ provider: fakeProvider() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
-    await handler({ query: { code: 'x', state: 'attacker' }, session: makeSession({ oauthState: 'real' }) }, res);
+    await handler({ query: { installation_id: '42', state: 'attacker' }, session: makeSession({ oauthState: 'real' }) }, res);
     assert.equal(res.statusCode, 400);
     assert.match(res.body, /Session Expired/);
+  });
+
+  test('GET callback 400s when installation_id is missing (setup_action=request)', async () => {
+    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const handler = getHandler(router, 'get', '/auth/github/callback');
+    const res = makeRes();
+    await handler({ query: { setup_action: 'request', state: 'real' }, session: makeSession({ oauthState: 'real' }) }, res);
+    assert.equal(res.statusCode, 400);
+    assert.match(res.body, /Installation Incomplete/);
+    assert.match(res.body, /admin to approve/);
   });
 
   test('GET /auth/github (add-source) carries a validated viewed-workspace urlKey in the intent', async () => {
@@ -232,13 +279,15 @@ describe('GitHub auth routes', () => {
     assert.deepEqual(session.oauthIntent, { mode: 'add-source', provider: 'github' });
   });
 
-  test('GET callback exchanges code and renders the repo picker, holding the token in session', async () => {
+  test('GET callback mints from installation_id and renders the repo picker, holding the token in session', async () => {
     const router = createGitHubAuthRoutes({ provider: fakeProvider() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'github' } });
-    await handler({ query: { code: 'good', state: 'real' }, session }, res);
-    assert.deepEqual(session.githubPending, { token: 'gho_token', mode: 'new', login: 'octocat', userId: '42' });
+    await handler({ query: { installation_id: '99', setup_action: 'install', state: 'real' }, session }, res);
+    // Installation token + installation-account identity held in pending; installationId
+    // carried for the binding-shape surface (LIN-711).
+    assert.deepEqual(session.githubPending, { token: 'ghs_inst', mode: 'new', login: 'octocat', userId: '42', installationId: '99' });
     assert.match(res.body, /octocat\/hello-world/);
     assert.match(res.body, /github-repo-form/);
   });
@@ -248,15 +297,15 @@ describe('GitHub auth routes', () => {
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'add-source', provider: 'github', workspaceUrlKey: 'acme' } });
-    await handler({ query: { code: 'good', state: 'real' }, session }, res);
-    assert.deepEqual(session.githubPending, { token: 'gho_token', mode: 'add-source', login: 'octocat', userId: '42', workspaceUrlKey: 'acme' });
+    await handler({ query: { installation_id: '99', state: 'real' }, session }, res);
+    assert.deepEqual(session.githubPending, { token: 'ghs_inst', mode: 'add-source', login: 'octocat', userId: '42', installationId: '99', workspaceUrlKey: 'acme' });
   });
 
-  test('GET callback surfaces a clean 400 on a bad code (AuthExchangeError)', async () => {
+  test('GET callback surfaces a clean 400 when the installation-token mint fails', async () => {
     const router = createGitHubAuthRoutes({ provider: fakeProvider() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
-    await handler({ query: { code: 'bad', state: 'real' }, session: makeSession({ oauthState: 'real' }) }, res);
+    await handler({ query: { installation_id: 'bad', state: 'real' }, session: makeSession({ oauthState: 'real' }) }, res);
     assert.equal(res.statusCode, 400);
     assert.match(res.body, /Authentication Failed/);
   });
