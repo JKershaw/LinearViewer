@@ -1074,6 +1074,42 @@ button.nav-action {
 }
 
 /* =============================================================================
+   Attachments Section (LIN-652)
+   =============================================================================
+   Hidden-by-default gallery of an issue's images (issue + comment), each fetched
+   through the /api/image relay. Thumbnails wrap responsively; click opens the
+   relayed image in a new tab.
+*/
+.attachments-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.attachment-item {
+  display: inline-block;
+  line-height: 0;
+}
+
+.attachment-image {
+  max-width: 160px;
+  max-height: 160px;
+  width: auto;
+  height: auto;
+  border: 1px solid var(--fg-vdim);
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+.attachment-item .img-error {
+  color: var(--fg-dim);
+  font-style: italic;
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+}
+
+/* =============================================================================
    Comments Section (LIN-156)
    =============================================================================
    Collapsible comments list fetched on-demand.
