@@ -241,6 +241,17 @@
   color: var(--fg-dim);
 }
 
+/* Distinct from the OpenRouter connect/disconnect buttons (which several specs
+   locate strictly as `.action-btn.connect` / `.action-btn.disconnect`) — provider
+   actions use their own classes so they never collide. */
+.provider-add-btn {
+  color: var(--green);
+}
+
+.provider-remove-btn {
+  color: var(--red, #c0392b);
+}
+
 /* Inline save feedback */
 .save-feedback {
   font-size: var(--font-size-sm);
