@@ -1756,8 +1756,7 @@ One convention across every endpoint, so you can branch on the same fields every
   // `decodeAttachmentHandle`, SSRF-guarded against the Linear-host allowlist
   // (mirrors the LIN-156 `/api/image` guard model: https-only, exact-host
   // allowlist, no path traversal, no redirects, image-only content-type, 10 MB
-  // cap), then fetched through the proxy-aware egress path (matching
-  // `lib/linear-cli.js fetchImage()`).
+  // cap), then fetched through the proxy-aware egress path.
   //
   // `att:` formal-attachment handles are NOT byte-resolvable in this slice — the
   // wire dropped their URL and there is no provider fetch seam yet — so they get
@@ -1818,7 +1817,7 @@ One convention across every endpoint, so you can branch on the same fields every
 
     try {
       // Proxy-aware egress: route through the egress proxy when one is
-      // configured, exactly like every other Linear call (linear-cli fetchImage).
+      // configured, exactly like every other Linear call.
       const customFetch = (await createProxyFetch()) || fetch;
       const response = await customFetch(imageUrl, {
         method: 'GET',

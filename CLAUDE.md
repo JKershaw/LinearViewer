@@ -36,7 +36,6 @@ routes/
 lib/
   linear.js            GraphQL client for Linear API
   linear-fetch.js      Resilient fetch for the Linear GraphQL boundary (retry/timeout)
-  linear-cli.js        CLI tool for AI agents to query/modify Linear
   bash-tool.js         Safe bash executor with data/code separation (stdin + argv modes)
   tree.js              Transforms flat issues → nested tree structure (frontier ranking in selectFocusSubtask)
   graph-features.js    Network-free blocking-graph / critical-path primitives (shared by swipe + frontier ranking)
@@ -368,7 +367,7 @@ self-suggesting session" disposition lives in `docs/autopilot-operating-manual.m
 
 ## Workspace API Proxy (provider-backed)
 
-The proxy allows authenticated users to generate secure tokens for external AI agents and automation tools to interact with their workspace's issues and projects via a REST-like API. The wire contract is **source-neutral** (flat shapes, no provider-specific URLs) and the data path runs through the provider layer (LIN-306/308/309/310): reads source through `lib/providers/linear/index.js`, writes go through an injected `provider.*` that is capability-gated (`provider.supports()` → clean 422 `CAPABILITY_NOT_SUPPORTED` for unsupported ops). The route owns no inline Linear GraphQL — only residual `graphqlErrorStatus()`/`graphqlErrorDetail()` error-shape parsers remain on the error path. Provider **selection** is now per-workspace (LIN-581): `resolveWorkspaceAccess` surfaces the workspace's own `provider` name and `resolveProviderAccess` resolves it via `getProviderForWorkspace` (registry; Linear is the legacy default for workspaces with no explicit provider, so the historical path is byte-identical), which makes the capability gate (`provider.supports()` → 422) a real runtime path rather than only a test-injected one. (Input `<source>:` namespace acceptance in `lib/proxy-ref-resolver.js` is still Linear-only — that relaxation is sequenced separately as LIN-544. `lib/linear-cli.js` is still raw GraphQL and is intentionally out of scope here — a separate ticket if it should ride the provider layer.)
+The proxy allows authenticated users to generate secure tokens for external AI agents and automation tools to interact with their workspace's issues and projects via a REST-like API. The wire contract is **source-neutral** (flat shapes, no provider-specific URLs) and the data path runs through the provider layer (LIN-306/308/309/310): reads source through `lib/providers/linear/index.js`, writes go through an injected `provider.*` that is capability-gated (`provider.supports()` → clean 422 `CAPABILITY_NOT_SUPPORTED` for unsupported ops). The route owns no inline Linear GraphQL — only residual `graphqlErrorStatus()`/`graphqlErrorDetail()` error-shape parsers remain on the error path. Provider **selection** is now per-workspace (LIN-581): `resolveWorkspaceAccess` surfaces the workspace's own `provider` name and `resolveProviderAccess` resolves it via `getProviderForWorkspace` (registry; Linear is the legacy default for workspaces with no explicit provider, so the historical path is byte-identical), which makes the capability gate (`provider.supports()` → 422) a real runtime path rather than only a test-injected one. (Input `<source>:` namespace acceptance in `lib/proxy-ref-resolver.js` is still Linear-only — that relaxation is sequenced separately as LIN-544.)
 
 **Key features:**
 - Token-based authentication (Bearer tokens with SHA-256 hashing)
@@ -405,162 +404,6 @@ Endpoints (session auth, workspace-anchored but operating over `session.workspac
 - `POST /workspace/:urlKey/collective/preview` — build the participant prompt (view & copy, no dispatch)
 - `GET  /workspace/:urlKey/api/collective/state` — JSON poll fronting `yap.poll`
 - `POST /workspace/:urlKey/api/collective/say` — inject human input via `yap.say`
-
-## Linear CLI (for AI Agents)
-
-When `LINEAR_API_KEY` environment variable is set, AI agents can query Linear directly:
-
-```bash
-node lib/linear-cli.js <command> [args]
-```
-
-### Commands
-
-| Command | Description |
-|---------|-------------|
-| `viewer` / `me` | Get current user info |
-| `org` | Get organization info |
-| `teams` | List all teams |
-| `projects` | List active projects |
-| `issues [teamId]` | List all issues (optionally filter by team) |
-| `issue <id>` | Get issue details with full context (use `--with-images` for base64) |
-| `search "query"` | Search issues |
-| `states <teamId>` | List workflow states for a team |
-| `relations <issueId>` | Get issue relations (blocks, blocked-by, etc.) |
-| `labels [teamId]` | List all labels (optionally filter by team) |
-| `fetch-image <url>` | Fetch image with auth (`--base64` or `--file <path>`) |
-| `create-issue <teamId> <title> [json]` | Create a new issue |
-| `update-issue <issueId> <json>` | Update an existing issue |
-| `comment <issueId> "body"` | Add a comment to an issue |
-| `relation <issueId> <type> <relatedId>` | Create a relation between issues |
-| `add-label <issueId> <label>` | Add a label to an issue (by name or ID) |
-| `remove-label <issueId> <label>` | Remove a label from an issue (by name or ID) |
-
-### Setup
-
-1. Get your API key from: https://linear.app/settings/api
-2. Set the environment variable: `export LINEAR_API_KEY="lin_api_..."`
-
-### Examples
-
-```bash
-# Check authentication
-node lib/linear-cli.js viewer
-
-# List all active projects
-node lib/linear-cli.js projects
-
-# Get full context for an issue
-node lib/linear-cli.js issue abc123def
-
-# Search for issues
-node lib/linear-cli.js search "authentication bug"
-
-# Create a new issue
-node lib/linear-cli.js create-issue team_id "Fix login bug"
-node lib/linear-cli.js create-issue team_id "Add feature" '{"description":"Details","projectId":"proj_123"}'
-
-# Update an issue (change status, assignee, etc.)
-node lib/linear-cli.js update-issue issue_id '{"stateId":"state_done"}'
-
-# Add a comment
-node lib/linear-cli.js comment issue_id "Fixed in PR #42"
-
-# Query issue relations
-node lib/linear-cli.js relations LIN-37
-
-# Create relations between issues
-node lib/linear-cli.js relation LIN-40 blocked-by LIN-39
-node lib/linear-cli.js relation LIN-31 blocks LIN-32
-node lib/linear-cli.js relation LIN-31 duplicate LIN-28
-node lib/linear-cli.js relation LIN-31 related LIN-29
-
-# List and manage labels
-node lib/linear-cli.js labels
-node lib/linear-cli.js labels team_id
-node lib/linear-cli.js add-label LIN-99 "bug"
-node lib/linear-cli.js add-label LIN-99 label_uuid_here
-node lib/linear-cli.js remove-label LIN-99 "bug"
-```
-
-### Relation Types
-
-| Type | Description |
-|------|-------------|
-| `blocks` | This issue blocks another issue |
-| `blocked-by` | This issue is blocked by another issue |
-| `duplicate` | This issue is a duplicate of another |
-| `related` | General relation between issues |
-
-**Note**: `blocked-by` is a convenience type - internally it creates a `blocks` relation with swapped issue IDs.
-
-### Stdin Support
-
-For complex content with special characters (newlines, quotes, backticks), use `--stdin` to avoid shell escaping issues:
-
-```bash
-# Using pipe
-echo '{"description":"Text with \"quotes\" and\nnewlines"}' | node lib/linear-cli.js create-issue team_id "Title" --stdin
-
-# Using heredoc (recommended for complex content)
-node lib/linear-cli.js update-issue issue_id --stdin << 'EOF'
-{
-  "description": "Complex content with `backticks` and special chars",
-  "stateId": "state_123"
-}
-EOF
-
-# From file
-cat payload.json | node lib/linear-cli.js create-issue team_id "Title" --stdin
-
-# Comments with special characters
-node lib/linear-cli.js comment issue_id --stdin << 'EOF'
-Analysis complete:
-- Found 3 issues with `authentication` module
-- Fixed in commit abc123
-EOF
-```
-
-**Note**: The CLI outputs JSON for easy parsing by AI agents.
-
-### Image Support
-
-The CLI can fetch images from Linear issues for AI agent visual analysis.
-
-**Issue images are automatically included:**
-```bash
-# Get issue with image URLs extracted from description, comments, and attachments
-node lib/linear-cli.js issue LIN-99
-
-# Output includes:
-# {
-#   "images": {
-#     "fromDescription": [{"alt": "screenshot", "url": "..."}],
-#     "fromComments": [{"alt": "", "url": "...", "commentId": "..."}],
-#     "fromAttachments": [{"id": "...", "url": "...", "title": "..."}]
-#   }
-# }
-```
-
-**Embed images as base64 for multimodal AI:**
-```bash
-node lib/linear-cli.js issue LIN-99 --with-images
-# Adds "embeddedImages" array with base64 data URIs
-```
-
-**Fetch individual images:**
-```bash
-# Get image metadata only
-node lib/linear-cli.js fetch-image "https://linear.app/uploads/..."
-
-# Get as base64 data URI (for AI vision models)
-node lib/linear-cli.js fetch-image "https://linear.app/uploads/..." --base64
-
-# Save to file
-node lib/linear-cli.js fetch-image "https://linear.app/uploads/..." --file ./image.png
-```
-
-**Note**: Linear-hosted images require authentication. The CLI uses your `LINEAR_API_KEY` automatically.
 
 ## GitHub Actions CI (for AI Agents)
 

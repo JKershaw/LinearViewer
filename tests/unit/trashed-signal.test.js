@@ -8,8 +8,8 @@
  *
  *   - behaviour of the shared SIGNAL helper (lib/trashed-signal.js), and
  *   - the source-level wiring across every by-ID surface that feeds an external
- *     consumer (proxy reads, proxy writes, the provider context fetcher, and the
- *     CLI). The proxy consumer endpoints make real GraphQL calls with no
+ *     consumer (proxy reads, proxy writes, and the provider context fetcher).
+ *     The proxy consumer endpoints make real GraphQL calls with no
  *     test-mode mock client, so — as with the LIN-300/LIN-399 guardrails — the
  *     wiring is pinned by reading the source rather than booting the server.
  *
@@ -25,7 +25,6 @@ import { applyTrashedSignal, isTrashed, TRASHED_STATE } from '../../lib/trashed-
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const proxySource = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8');
 const providerSource = readFileSync(join(__dirname, '../../lib/providers/linear/index.js'), 'utf8');
-const cliSource = readFileSync(join(__dirname, '../../lib/linear-cli.js'), 'utf8');
 const instructionsAndDocs = proxySource + readFileSync(join(__dirname, '../../docs/proxy-integration.md'), 'utf8');
 
 // Pull a named gql`...` template literal out of a source file by its const name.
@@ -114,13 +113,6 @@ describe('by-ID queries select the trashed field', () => {
   test('provider ISSUE_DETAIL_QUERY selects trashed', () => {
     assert.match(extractQuery(providerSource, 'ISSUE_DETAIL_QUERY'), /\btrashed\b/);
   });
-  test('CLI by-ID issue query selects trashed', () => {
-    // The CLI query is an inline gql template, not a named const — assert it
-    // appears in the fetchIssueContext function body.
-    const start = cliSource.indexOf('async function fetchIssueContext');
-    const body = cliSource.slice(start, start + 2000);
-    assert.match(body, /\btrashed\b/, 'CLI issue query must select trashed');
-  });
 });
 
 describe('SIGNAL: raw by-ID reads override state / flag the ghost', () => {
@@ -129,9 +121,6 @@ describe('SIGNAL: raw by-ID reads override state / flag the ghost', () => {
   });
   test('/relations/:id handler returns a top-level trashed flag', () => {
     assert.match(proxySource, /trashed:\s*isTrashed\(issueRelations\)/);
-  });
-  test('CLI issue output runs through applyTrashedSignal', () => {
-    assert.match(cliSource, /applyTrashedSignal\(/);
   });
 });
 
