@@ -33,11 +33,11 @@ test.describe('GitHub provider (no test-token mock)', () => {
     await expect(page.locator('.line:has-text("GitHub shipped task")').first()).toBeAttached();
   });
 
-  test('detail link is provider-aware: "View in GitHub" (not Linear)', async ({ page }) => {
-    // render.js interpolates provider.ui.displayName ('GitHub') into the link.
-    // The detail block is lazy — expand an issue to load it first.
+  test('detail link is provider-aware: "View in GitHub Issues" (not Linear)', async ({ page }) => {
+    // render.js interpolates provider.ui.displayName ('GitHub Issues', LIN-702)
+    // into the link. The detail block is lazy — expand an issue to load it first.
     await page.locator('.line.expandable').first().click();
-    await expect(page.locator('.detail-link', { hasText: 'View in GitHub' }).first()).toBeAttached();
+    await expect(page.locator('.detail-link', { hasText: 'View in GitHub Issues' }).first()).toBeAttached();
     await expect(page.locator('.detail-link', { hasText: 'View in Linear' })).toHaveCount(0);
   });
 

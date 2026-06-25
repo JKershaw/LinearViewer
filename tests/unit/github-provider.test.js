@@ -22,6 +22,7 @@ import {
   githubStateToCanonical,
 } from '../../lib/providers/github/index.js';
 import { createFakeGitHubClient } from '../../lib/providers/github/fake-client.js';
+import { createGitHubClient } from '../../lib/providers/github/client.js';
 import { getProvider } from '../../lib/providers/registry.js';
 import { NotImplementedError } from '../../lib/providers/interface.js';
 
@@ -96,7 +97,7 @@ describe('GitHubProvider capability profile (LIN-178)', () => {
       estimates: false,   // no estimate field
       subtasks: false,    // no hierarchy
       attachments: false, // inherits the base decline — no override (LIN-649)
-      displayName: 'GitHub',
+      displayName: 'GitHub Issues', // relabeled from 'GitHub' (LIN-702)
     });
   });
 
@@ -251,5 +252,58 @@ describe('GitHubProvider writes', () => {
     await provider.removeLabel(REPO, '2', 'enhancement');
     issue = await provider.fetchIssueFields(REPO, '2');
     assert.deepEqual(issue.labels.nodes, []);
+  });
+});
+
+// =============================================================================
+// Client URL construction — repo-slug encoding (security review M4, LIN-702)
+// =============================================================================
+//
+// The fake client never builds URLs, so these tests drive the REAL
+// createGitHubClient with an injected fetch that captures the request URL, to
+// pin that `owner/name` is encoded per-segment (the `/` separator survives,
+// URL-significant characters in each segment do not break out of the path).
+
+describe('createGitHubClient repo-slug encoding (LIN-702 S3)', () => {
+  function captureClient() {
+    const calls = [];
+    const fetchImpl = async (url) => {
+      calls.push(url);
+      return { ok: true, status: 200, statusText: 'OK', text: async () => '[]' };
+    };
+    const client = createGitHubClient({ token: 't', baseUrl: 'https://api.github.com', fetchImpl });
+    return { client, calls };
+  }
+
+  test('encodes owner and name segments separately, keeping the "/" separator', async () => {
+    const { client, calls } = captureClient();
+    await client.listIssues('weird owner/repo#name');
+    assert.equal(calls.length, 1);
+    assert.equal(
+      calls[0],
+      'https://api.github.com/repos/weird%20owner/repo%23name/issues?state=all&per_page=100'
+    );
+    // The separator is a literal slash, never %2F (which would 404).
+    assert.ok(!calls[0].includes('%2F'));
+  });
+
+  test('a normal slug is unchanged (no double-encoding of safe characters)', async () => {
+    const { client, calls } = captureClient();
+    await client.getIssue('octocat/hello-world', 7);
+    assert.equal(calls[0], 'https://api.github.com/repos/octocat/hello-world/issues/7');
+  });
+
+  test('encoding covers every repo-scoped path (create/update/comment/labels)', async () => {
+    const { client, calls } = captureClient();
+    const slug = 'a b/c d';
+    await client.createIssue(slug, { title: 'x' });
+    await client.updateIssue(slug, 3, { state: 'closed' });
+    await client.createComment(slug, 3, 'hi');
+    await client.addLabel(slug, 3, 'bug');
+    await client.removeLabel(slug, 3, 'bug');
+    for (const url of calls) {
+      assert.ok(url.includes('/repos/a%20b/c%20d/'), `expected encoded slug in ${url}`);
+      assert.ok(!url.includes('/repos/a b/'), `raw slug leaked into ${url}`);
+    }
   });
 });
