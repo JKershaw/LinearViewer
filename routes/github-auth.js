@@ -43,6 +43,28 @@ const APP_ENV_VARS = ['GITHUB_APP_ID', 'GITHUB_APP_PRIVATE_KEY', 'GITHUB_APP_SLU
 const REPO_SLUG_REGEX = /^[\w.-]+\/[\w.-]+$/
 
 /**
+ * Convert GitHub's installation-token expiry (`expires_at`, an ISO-8601 string,
+ * ~1h out) to the ms-epoch the token-refresh middleware compares against
+ * `Date.now()` (server.js `ensureValidToken`). This replaces the OAuth-App
+ * `Number.MAX_SAFE_INTEGER` never-expires stamp (LIN-711): GitHub App
+ * installation tokens DO expire, so the binding must carry a real expiry.
+ *
+ * A missing/unparseable expiry is a hard error, never a silent MAX fallback —
+ * resurrecting never-expires is exactly what this surface removes. The throw is
+ * caught by the link handler's try/catch and surfaced as an auth failure.
+ *
+ * @param {string} expiresAt - GitHub's raw `expires_at` ISO string.
+ * @returns {number} expiry as ms since epoch.
+ */
+function installationExpiryMs(expiresAt) {
+  const ms = Date.parse(expiresAt)
+  if (!Number.isFinite(ms)) {
+    throw new Error(`GitHub App: invalid installation token expiry: ${expiresAt}`)
+  }
+  return ms
+}
+
+/**
  * Create the GitHub OAuth routes.
  * @param {Object} options
  * @param {Object} [options.sessionStore] - Session store with cleanup() (optional; mirrors Linear router shape).
@@ -178,11 +200,12 @@ export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
 
       // Hold the installation token + identity until the user picks a repo. The
       // repo selection completes the binding (POST /auth/github/link). `installationId`
-      // rides along as the re-mint key the binding-shape surface (LIN-711) will
-      // persist on the binding — the link step does not consume it yet. The
-      // add-source target workspace (if any) rides along too so the link binds onto
-      // the viewed workspace, not the active one (LIN-541).
-      const pending = { token: creds.token, mode, login: creds.login, userId: creds.userId, installationId: String(installationId) }
+      // is the re-mint key the link step now persists on the binding (LIN-711), and
+      // `tokenExpiresAt` (GitHub's raw `expires_at` ISO string) rides along so the
+      // link step can stamp the binding with the real ms expiry rather than the old
+      // OAuth-App never-expires MAX. The add-source target workspace (if any) rides
+      // along too so the link binds onto the viewed workspace, not the active one (LIN-541).
+      const pending = { token: creds.token, mode, login: creds.login, userId: creds.userId, installationId: String(installationId), tokenExpiresAt: creds.tokenExpiresAt }
       if (intent.workspaceUrlKey) pending.workspaceUrlKey = intent.workspaceUrlKey
       req.session.githubPending = pending
       req.session.save(() => {
@@ -217,11 +240,22 @@ export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
       }))
     }
 
-    // GitHub OAuth App tokens do not expire and carry no refresh token; a MAX
-    // expiry makes the token-refresh middleware skip this workspace.
-    const credentials = { token: pending.token, tokenExpiresAt: Number.MAX_SAFE_INTEGER }
-
     try {
+      // GitHub App binding shape (LIN-711): persist `installationId` (the re-mint
+      // key) and stamp the binding with the real installation-token expiry in ms,
+      // dropping the old OAuth-App `Number.MAX_SAFE_INTEGER` never-expires stamp.
+      // installationExpiryMs throws on a missing/unparseable expiry (never a silent
+      // MAX fallback); kept inside this try so it renders the clean error page below
+      // rather than escaping the handler.
+      // SHARED BOUNDARY: a real (~1h) expiry means the refresh middleware
+      // (server.js `ensureValidToken`) will now consider this binding stale, but a
+      // GitHub binding carries no `refreshToken`, so provider-aware re-minting from
+      // `installationId` is deliberately NOT wired here — that is LIN-712 (surface 6),
+      // which this surface feeds. Until it lands, this binding is reachable only when
+      // GITHUB_APP_* is configured (not in production), so no live flow regresses.
+      const tokenExpiresAt = installationExpiryMs(pending.tokenExpiresAt)
+      const credentials = { installationId: pending.installationId, token: pending.token, tokenExpiresAt }
+
       if (pending.mode === 'add-source') {
         // Link onto the VIEWED workspace the user initiated from — its urlKey was
         // carried through the OAuth round-trip in the session intent (LIN-541) —
@@ -263,7 +297,11 @@ export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
         name: pending.login,
         urlKey,
         addedAt: Date.now(),
-        tokenExpiresAt: Number.MAX_SAFE_INTEGER,
+        // Real installation-token expiry, mirroring the binding (LIN-711); the
+        // active-binding scalar mirror in linkProvider overwrites this with the
+        // same value, but stamp it explicitly so the workspace is never momentarily
+        // marked never-expires.
+        tokenExpiresAt,
       }
       linkProvider(workspace, provider.name, repo, credentials)
 
