@@ -131,6 +131,29 @@ describe('explicit sessionId grouping (multi-task / spin-off)', () => {
     // Orchestrator's [done] at 13:00 is the latest; resolvedAt values are far earlier.
     assert.strictEqual(s.completedAt, AP_DONE);
   });
+
+  test('completedAt stays null while any subtask loop is still unfinished (LIN-637)', () => {
+    const loops = loopsFrom([
+      orchestrator(),
+      // w1 finished, but w2 has NO terminal feedback marker — still running.
+      worker('w1', CHILD, '2026-06-22T10:30:00.000Z', { sessionId: SESSION_ID }),
+      worker('w2', SPAWNED, '2026-06-22T11:30:00.000Z', { sessionId: SESSION_ID, feedback: [] })
+    ]);
+    const [s] = _buildSessions(loops, { now: NOW });
+    // One subtask terminal + others still in progress must NOT report done.
+    assert.strictEqual(s.completedAt, null);
+  });
+
+  test('completedAt is the latest terminal time once every loop is terminal (LIN-637)', () => {
+    const loops = loopsFrom([
+      orchestrator(),
+      worker('w1', CHILD, '2026-06-22T10:30:00.000Z', { sessionId: SESSION_ID }),
+      worker('w2', SPAWNED, '2026-06-22T11:30:00.000Z', { sessionId: SESSION_ID })
+    ]);
+    const [s] = _buildSessions(loops, { now: NOW });
+    // All loops terminal → latest marker is the orchestrator's [done] at 13:00.
+    assert.strictEqual(s.completedAt, AP_DONE);
+  });
 });
 
 // ─── Inference fallback (historical data, no sessionId) ───────────────────────
