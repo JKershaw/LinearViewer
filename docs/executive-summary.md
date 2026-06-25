@@ -5,7 +5,7 @@
 Linear Projects Viewer is a server-rendered web application that presents Linear project management data as a collapsible, CLI-aesthetic tree. It serves two audiences:
 
 1. **Human users** — browse projects and issues in a terminal-styled UI, generate context-rich prompts for AI coding agents, and dispatch those prompts to a queue.
-2. **AI agents** — consume dispatched prompts via a polling API, provide feedback, and query Linear directly via a bundled CLI tool.
+2. **AI agents** — consume dispatched prompts via a polling API, provide feedback, and query Linear through the token-scoped workspace API proxy.
 
 The app runs on Express with no frontend framework or build step. All HTML is generated server-side; the client handles only collapse/expand state (persisted in localStorage) and async actions like prompt fetching and dispatch.
 
@@ -86,11 +86,7 @@ Each dispatched item carries: prompt text, prompt name, issue metadata (id, iden
 
 **Token security**: consumer tokens are 32-byte random values; only SHA-256 hashes are stored. Plain text shown once at creation.
 
-### 4. Linear CLI (`lib/linear-cli.js`)
-
-A standalone CLI for AI agents to query and modify Linear directly when `LINEAR_API_KEY` is set. Supports: issue CRUD, comments, relations, labels, search, and image fetching (with `--with-images` for base64 embedding). Outputs JSON for machine parsing. Supports `--stdin` for complex payloads.
-
-### 5. Feature Toggle System
+### 4. Feature Toggle System
 
 10 toggles stored per-user in session, synced to MongoDB for cross-device persistence:
 
@@ -137,9 +133,6 @@ A standalone CLI for AI agents to query and modify Linear directly when `LINEAR_
 │  Client (vanilla JS, no framework):                             │
 │    app.js ────── Collapse/expand, localStorage state            │
 │    dispatch.js ── Prompt dispatch, queue polling, tokens        │
-│                                                                 │
-│  CLI:                                                           │
-│    linear-cli.js ── Standalone agent tool (JSON output)         │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -148,7 +141,7 @@ A standalone CLI for AI agents to query and modify Linear directly when `LINEAR_
 **Authentication layers**:
 - Session-based (Linear OAuth) for all user routes
 - Bearer token for consumer dispatch API
-- API key for Linear CLI
+- Bearer token for the workspace API proxy
 
 ---
 

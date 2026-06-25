@@ -144,14 +144,16 @@ Update `docs/prompt-audit-report.md` with:
 For each improvement, create a Linear subtask:
 
 ```bash
-# Example: Create improvement subtask
-node lib/linear-cli.js create-issue <team-id> "U1: Add role definitions" --stdin << 'EOF'
-{
-  "description": "**Priority:** HIGH\n\n**Issue:** [description]\n\n**Solution:** [solution]\n\n**Acceptance Criteria:**\n- [ ] Criteria 1\n- [ ] Criteria 2",
-  "parentId": "<parent-issue-id>",
-  "projectId": "<project-id>"
-}
-EOF
+# Example: Create improvement subtask via the workspace API proxy
+curl -s -X POST "$PROXY_BASE/api/proxy/issues" \
+  -H "Authorization: Bearer $PROXY_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "U1: Add role definitions",
+    "description": "**Priority:** HIGH\n\n**Issue:** [description]\n\n**Solution:** [solution]\n\n**Acceptance Criteria:**\n- [ ] Criteria 1\n- [ ] Criteria 2",
+    "parentId": "<parent-issue-id>",
+    "projectId": "<project-id>"
+  }'
 ```
 
 ## Step 7: Implement and Verify

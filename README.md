@@ -49,7 +49,6 @@ Platform Projects
 - **Dispatch Queue** - Queue prompts for external consumers (AI agents, automation) with bearer-token auth
 - **Linear API Proxy** - Token-scoped REST-like access to the Linear workspace (read / readWrite), with audit logging and rate limiting
 - **Task Automation** - Endpoints for agent-driven workflows (stack, prompt, recommend, recap, brief, status)
-- **Linear CLI** - `node lib/linear-cli.js <command>` for agents to query and modify Linear directly
 
 ## Authentication
 

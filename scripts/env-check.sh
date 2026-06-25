@@ -109,17 +109,6 @@ else
   blocker_commands+=("npx playwright install chromium --with-deps")
 fi
 
-# Check Linear CLI (only if dependencies are installed and API key is set)
-if [ -n "$LINEAR_API_KEY" ] && [ "$deps_installed" -eq 1 ]; then
-  if [ -f "lib/linear-cli.js" ]; then
-    cli_output=$(node lib/linear-cli.js viewer 2>&1) || true
-    if echo "$cli_output" | grep -q '"name"'; then
-      user_name=$(echo "$cli_output" | grep -o '"name": *"[^"]*"' | head -1 | sed 's/"name": *"//' | sed 's/"$//')
-      ready+=("Linear CLI (authenticated as $user_name)")
-    fi
-  fi
-fi
-
 # --- Output results ---
 
 echo "Environment Check"
