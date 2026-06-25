@@ -38,7 +38,8 @@ import {
 import { localProvider } from '../lib/providers/local/index.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { applyTrashedSignal, isTrashed } from '../lib/trashed-signal.js';
-import { flattenIssue, neutralizeProject, flattenCycle, flattenRelations } from '../lib/proxy-wire.js';
+import { flattenIssue, neutralizeProject, flattenCycle, flattenRelations, decodeAttachmentHandle } from '../lib/proxy-wire.js';
+import { createProxyFetch } from '../lib/proxy-fetch.js';
 import { isRecommendationEnabled, getRecommendation } from '../lib/openrouter.js';
 import { resolveRecommendation, describeDescent, armHopSignal } from '../lib/recommend-recurse.js';
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
@@ -1093,6 +1094,16 @@ GET ${baseUrl}/api/proxy/issues/{issueId}/relations
   → This pairs with POST/DELETE /issues/{issueId}/relations below, so the whole
     relations surface (read + write) lives under one issue-scoped path.
 
+GET ${baseUrl}/api/proxy/attachments/{id}
+  → Relay the bytes for an image attachment. {id} is the opaque attachment
+    handle from an issue/comment "attachments" entry (NOT a URL — the proxy
+    never exposes backend URLs). The bytes are fetched server-side, authed, and
+    SSRF-guarded; the response is the raw image with its image/* content-type.
+  → SCOPE: handles beginning "md:" (markdown-embedded images) resolve. Handles
+    beginning "att:" (formal attachment entities) are NOT fetchable yet and
+    return 422 { "code": "ATTACHMENT_FETCH_NOT_SUPPORTED" } — a later slice adds
+    them. A non-image or oversized (>10MB) response is rejected.
+
 Issue-scoped paths are canonical as /issues/{id}/... — relations (above),
 recommend / recap / brief (below), and comments (write section) all nest under
 the issue. Legacy flat forms (e.g. /relations/{id}, /recap/{id}, /comments/{id})
@@ -1726,6 +1737,131 @@ One convention across every endpoint, so you can branch on the same fields every
       logEvent(req, '/api/proxy/relations', status);
       console.error('Proxy /relations error:', err.message);
       jsonError(res, status, 'Failed to fetch relations', { detail: graphqlErrorDetail(err) });
+    }
+  });
+
+  // =========================================================================
+  // GET /api/proxy/attachments/:id — Bearer-authed image byte-relay (LIN-650)
+  // =========================================================================
+  //
+  // External consumers hold an OPAQUE attachment handle (LIN-649), never a
+  // backend URL — the proxy is deliberately source-neutral and strips asset
+  // URLs — and their *proxy* token 401s against Linear's asset host, so they
+  // cannot fetch image bytes directly. This relay decodes the handle, fetches
+  // the bytes server-side with the workspace's Linear token, and streams them
+  // back. The consumer is the external automation agent reading task/comment
+  // image attachments (direct beneficiary; no other endpoint changes).
+  //
+  // Slice 2/4 scope: the `md:` markdown-image path only. The URL is recovered by
+  // `decodeAttachmentHandle`, SSRF-guarded against the Linear-host allowlist
+  // (mirrors the LIN-156 `/api/image` guard model: https-only, exact-host
+  // allowlist, no path traversal, no redirects, image-only content-type, 10 MB
+  // cap), then fetched through the proxy-aware egress path (matching
+  // `lib/linear-cli.js fetchImage()`).
+  //
+  // `att:` formal-attachment handles are NOT byte-resolvable in this slice — the
+  // wire dropped their URL and there is no provider fetch seam yet — so they get
+  // a clean 422 + machine-readable code, intentionally deferred to a follow-up.
+  // Any other shape is a 400. We never silently 500 on the missing capability.
+  const ATTACHMENT_ALLOWED_HOSTS = new Set(['uploads.linear.app', 'cdn.linear.app', 'linear.app']);
+  const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024; // 10 MB — matches /api/image
+
+  router.get('/api/proxy/attachments/:id', proxyLimiter, authenticateProxyToken, async (req, res) => {
+    const endpoint = '/api/proxy/attachments/:id';
+
+    const decoded = decodeAttachmentHandle(req.params.id);
+    if (!decoded) {
+      logEvent(req, endpoint, 400);
+      return badRequest.json(res, 'Invalid attachment handle');
+    }
+
+    // `att:` formal-attachment byte-resolution is deferred (needs a new
+    // capability-gated provider.fetchAttachment seam). Name the gap; don't 500.
+    if (decoded.type === 'att') {
+      logEvent(req, endpoint, 422);
+      return jsonError(res, 422, 'Formal attachment byte-resolution is not supported yet', {
+        code: 'ATTACHMENT_FETCH_NOT_SUPPORTED',
+        handleType: 'att',
+      });
+    }
+
+    // `md:` handle — decoded.value is the source image URL. SSRF-guard it exactly
+    // as /api/image does before any egress.
+    const imageUrl = decoded.value;
+    if (typeof imageUrl !== 'string' || !imageUrl.startsWith('https://')) {
+      logEvent(req, endpoint, 400);
+      return badRequest.json(res, 'Invalid attachment URL: must be HTTPS');
+    }
+    let urlObj;
+    try {
+      urlObj = new URL(imageUrl);
+    } catch {
+      logEvent(req, endpoint, 400);
+      return badRequest.json(res, 'Invalid attachment URL format');
+    }
+    if (!ATTACHMENT_ALLOWED_HOSTS.has(urlObj.hostname)) {
+      logEvent(req, endpoint, 400);
+      return badRequest.json(res, 'Invalid attachment URL: must be from Linear');
+    }
+    if (urlObj.pathname.includes('..')) {
+      logEvent(req, endpoint, 400);
+      return badRequest.json(res, 'Invalid attachment URL: path traversal not allowed');
+    }
+
+    // Resolve the workspace's Linear access token (the same token /api/image
+    // authenticates with). Reads through the shared raw-token seam so an
+    // unavailable workspace yields the structured 503 envelope.
+    const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
+    if (!token) {
+      return workspaceUnavailable(req, res, endpoint, reason);
+    }
+
+    try {
+      // Proxy-aware egress: route through the egress proxy when one is
+      // configured, exactly like every other Linear call (linear-cli fetchImage).
+      const customFetch = (await createProxyFetch()) || fetch;
+      const response = await customFetch(imageUrl, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}` },
+        redirect: 'error', // a redirect could bypass the SSRF allowlist
+      });
+
+      if (!response.ok) {
+        logEvent(req, endpoint, response.status);
+        return jsonError(res, response.status, 'Failed to fetch attachment');
+      }
+
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.startsWith('image/')) {
+        logEvent(req, endpoint, 400);
+        return badRequest.json(res, 'Invalid response: not an image');
+      }
+
+      const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
+      if (contentLength > MAX_ATTACHMENT_BYTES) {
+        logEvent(req, endpoint, 413);
+        return jsonError(res, 413, 'Attachment too large');
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      if (arrayBuffer.byteLength > MAX_ATTACHMENT_BYTES) {
+        logEvent(req, endpoint, 413);
+        return jsonError(res, 413, 'Attachment too large');
+      }
+
+      res.set('Content-Type', contentType);
+      res.set('Cache-Control', 'private, max-age=3600');
+      logEvent(req, endpoint, 200);
+      res.send(Buffer.from(arrayBuffer));
+    } catch (error) {
+      // redirect: 'error' surfaces as a thrown fetch error on the native path.
+      if (error.cause?.code === 'ERR_FR_TOO_MANY_REDIRECTS' || error.message?.includes('redirect')) {
+        logEvent(req, endpoint, 400);
+        return badRequest.json(res, 'Redirects not allowed');
+      }
+      console.error('Proxy attachment relay error:', error.message);
+      logEvent(req, endpoint, 502);
+      jsonError(res, 502, 'Failed to fetch attachment');
     }
   });
 
