@@ -295,7 +295,31 @@ The task and each comment may carry an `attachments` array. It is **omitted enti
 
 Attachments come from two sources, both normalized into the same shape: **formal attachment entities** on the issue (handle prefix `att:`) and **markdown-embedded images** (`![](…)`) in the issue description and in comment bodies, filtered to image extensions (handle prefix `md:`). Comments carry only the markdown-image kind (the backend has no per-comment attachment entity).
 
-Following the no-deep-link policy, **no attachment exposes a backend URL** — the `id` is an opaque handle, not a link you can dereference. Fetching the bytes will be done through a separate Bearer-authed, server-side image relay endpoint that resolves the `id` (forthcoming). Treat `id` as an identifier to hand back to that relay, not as something to GET directly.
+Following the no-deep-link policy, **no attachment exposes a backend URL** — the `id` is an opaque handle, not a link you can dereference. Fetch the bytes through the Bearer-authed, server-side image relay below, which resolves the handle and streams the image; treat `id` as something to hand back to that relay, not as something to GET directly.
+
+##### Fetch Attachment Bytes (image relay)
+
+```
+GET /api/proxy/attachments/{id}
+```
+
+Relays the bytes for an image attachment. `{id}` is the opaque handle from an `attachments[].id` field — pass it verbatim as the path segment. The relay decodes the handle, fetches the image server-side with the workspace's own credentials, SSRF-guards the upstream request (HTTPS only, exact Linear-host allowlist, no redirects), and streams the result back with its `image/*` `Content-Type`. There is no JSON envelope — a `200` response **is** the raw image. Inline base64 is intentionally not offered; fetch on demand instead.
+
+| Aspect | Behaviour |
+|--------|-----------|
+| Auth | Same proxy Bearer token as every other endpoint (a `read` scope is sufficient). |
+| Success | `200` with the raw image bytes and the upstream `image/*` content-type. |
+| Size cap | Responses over 10 MB are rejected with `413`. |
+| Non-image | An upstream response that isn't `image/*` is rejected with `400`. |
+| Upstream miss | A failed upstream fetch (e.g. asset gone) passes the upstream status through (e.g. `404`). |
+
+**Handle support (this slice):** only `md:`-prefixed handles — markdown-embedded images (`![](…)`) in descriptions and comment bodies — are resolvable. These cover all comment image attachments and description-embedded images. A `att:`-prefixed handle (a formal Linear attachment entity) is **not byte-resolvable yet** and returns:
+
+```
+422 { "error": "...", "code": "ATTACHMENT_FETCH_NOT_SUPPORTED", "handleType": "att" }
+```
+
+Resolving `att:` bytes needs a provider-side capability that is intentionally deferred to a follow-up slice (formal attachments are often arbitrary external links that fall outside the image SSRF allowlist). Key off the `code` to detect this and skip those attachments for now. An unrecognised handle is a `400`.
 
 `team` is the issue's owning team as `{ id, name }`, with a flat `teamId` mirror — pass `teamId` straight to `GET /states/{teamId}` or `GET /labels?teamId=` without a separate `GET /teams` lookup. `priorityLabel` is the human-readable priority name (`Urgent` / `High` / `Medium` / `Low` / `No priority`) corresponding to the numeric `priority` (1–4, 0). Both `team`/`teamId` and `priorityLabel` are also present on list and search results.
 
