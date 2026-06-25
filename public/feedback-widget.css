@@ -132,6 +132,22 @@
   border-color: var(--border-strong, #ccc);
 }
 
+.feedback-file-remove {
+  align-self: flex-start;
+  font-family: var(--font-structural, monospace);
+  font-size: var(--font-size-sm, 0.85em);
+  color: var(--red, #cc0000);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.feedback-file-remove[hidden] {
+  display: none;
+}
+
 .feedback-status {
   font-size: var(--font-size-sm, 0.85em);
   min-height: 1.2em;
