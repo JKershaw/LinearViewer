@@ -307,3 +307,55 @@ describe('createGitHubClient repo-slug encoding (LIN-702 S3)', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// listRepos → installation repositories (LIN-710, GH App migration surface 4)
+//
+// listRepos must read the App installation's granted repos
+// (GET /installation/repositories with the installation token), NOT the OAuth
+// `/user/repos` listing, and unwrap GitHub's `{ total_count, repositories }`
+// envelope back to a bare array so the provider mapping is unchanged.
+// ---------------------------------------------------------------------------
+
+describe('createGitHubClient listRepos → installation repositories (LIN-710)', () => {
+  test('hits /installation/repositories with the installation token and unwraps the envelope', async () => {
+    const calls = [];
+    const fetchImpl = async (url, opts) => {
+      calls.push({ url, headers: opts?.headers || {} });
+      return {
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        text: async () => JSON.stringify({
+          total_count: 2,
+          repositories: [
+            { full_name: 'octocat/hello-world', private: false },
+            { full_name: 'octocat/secret', private: true },
+          ],
+        }),
+      };
+    };
+    const client = createGitHubClient({ token: 'ghs_install_token', baseUrl: 'https://api.github.com', fetchImpl });
+
+    const repos = await client.listRepos();
+
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].url, 'https://api.github.com/installation/repositories?per_page=100');
+    assert.ok(!calls[0].url.includes('/user/repos'), 'must not use the legacy OAuth /user/repos endpoint');
+    // The installation token the client was built with rides every request.
+    assert.equal(calls[0].headers.Authorization, 'Bearer ghs_install_token');
+    // Envelope is unwrapped to a bare array (same shape the provider/fake expect).
+    assert.deepEqual(repos, [
+      { full_name: 'octocat/hello-world', private: false },
+      { full_name: 'octocat/secret', private: true },
+    ]);
+  });
+
+  test('tolerates a missing repositories field (returns an empty array)', async () => {
+    const fetchImpl = async () => ({
+      ok: true, status: 200, statusText: 'OK', text: async () => JSON.stringify({ total_count: 0 }),
+    });
+    const client = createGitHubClient({ token: 't', baseUrl: 'https://api.github.com', fetchImpl });
+    assert.deepEqual(await client.listRepos(), []);
+  });
+});
