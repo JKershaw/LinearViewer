@@ -401,14 +401,25 @@ window.ProxyToggle = (function () {
    * be produced (no workspace context, or the token mint fails/rate-limits) this
    * THROWS, so callers surface the failure instead of silently copying or
    * dispatching a bare prompt while the toggle still shows active.
+   *
+   * `opts.force` (LIN-645) bypasses BOTH the toggle and the feature-flag gate to
+   * append unconditionally. It is for surfaces whose prompt REQUIRES the proxy
+   * regardless of user toggle — e.g. the next-run autopilot kickoff, which
+   * promises a `readWrite` token in its body but exposes no +proxy toggle. The
+   * urlKey + token requirements (and their throw-on-failure) still hold, so a
+   * forced append never silently dispatches a tokenless prompt.
    * @param {string} text
    * @param {string} urlKey
+   * @param {{ force?: boolean }} [opts]
    * @returns {Promise<string>}
-   * @throws {Error} when active+enabled but no block can be produced
+   * @throws {Error} when (active+enabled OR forced) but no block can be produced
    */
-  async function maybeAppend(text, urlKey) {
-    if (!isActive()) return text;
-    if (!isFeatureEnabled()) return text;
+  async function maybeAppend(text, urlKey, opts) {
+    const force = !!(opts && opts.force);
+    if (!force) {
+      if (!isActive()) return text;
+      if (!isFeatureEnabled()) return text;
+    }
     if (!urlKey) throw new Error('Proxy is enabled but no workspace context was found for this prompt.');
     const token = await getOrCreateToken(urlKey);
     if (!token) throw new Error('Proxy is enabled but a proxy token could not be created — you may have hit the token rate limit; wait a minute and try again.');

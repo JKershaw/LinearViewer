@@ -276,8 +276,40 @@ test.describe('Suggested Next Run Page (experimental)', () => {
       expect(body.target).toBe('cli');
       // Issue-less: no Linear issue is anchored on a goal dispatch.
       expect(body.issueId == null).toBe(true);
+      // LIN-645: the autopilot kickoff promises a readWrite proxy token, so the
+      // dispatched prompt MUST carry the +proxy block — even though this surface
+      // exposes no +proxy toggle (the append is forced).
+      expect(body.prompt).toContain('Workspace API access');
+      expect(body.prompt).toContain('/api/proxy/instructions');
 
       await expect(cli).toHaveText('dispatched!', { timeout: 5000 });
+    });
+
+    test('a failed proxy-token mint surfaces as failure, not a bare dispatch (LIN-645)', async ({ page }) => {
+      // Trip the token mint as a rate limiter would. The kickoff must NOT be
+      // dispatched without its promised proxy block.
+      await page.route('**/api/proxy/tokens', route => {
+        if (route.request().method() === 'POST') {
+          return route.fulfill({ status: 429, contentType: 'application/json', body: '{"error":"rate limited"}' });
+        }
+        return route.continue();
+      });
+
+      let dispatched = false;
+      page.on('request', req => {
+        if (req.url().includes('/api/dispatch') && req.method() === 'POST') dispatched = true;
+      });
+
+      const card = page.locator('.next-run-option:not(.next-run-option-open)').first();
+      await expect(card).toBeVisible({ timeout: 5000 });
+      await card.locator('.next-run-option-head').click();
+      await card.locator('.next-run-dispatch-toggle').click();
+
+      const cli = card.locator('.next-run-dispatch[data-target="cli"]');
+      await cli.click();
+
+      await expect(cli).toHaveText('failed', { timeout: 5000 });
+      expect(dispatched).toBe(false);
     });
 
     test('the continue-until-stopped option dispatches with no goal', async ({ page }) => {
