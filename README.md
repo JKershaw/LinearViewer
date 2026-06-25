@@ -142,6 +142,25 @@ SESSION_SECRET=generate-a-secure-random-string
 
 And add `https://yourdomain.com/auth/callback` to your Linear OAuth app's redirect URIs. HTTPS and secure cookies are enforced in production.
 
+### GitHub OAuth (optional)
+
+GitHub login ("Continue with GitHub") and adding a GitHub repository as a workspace source are optional. They stay **disabled until the GitHub environment variables are set** — the settings page shows GitHub as unavailable, and `/auth/github` returns a clear "not available" message.
+
+To enable them:
+
+1. Create an OAuth App at [github.com/settings/developers](https://github.com/settings/developers) → **New OAuth App**.
+   - **Authorization callback URL**: `https://yourdomain.com/auth/github/callback` (must match `GITHUB_REDIRECT_URI` exactly).
+2. The app requests these scopes: `repo read:user read:org` (repo access is needed to read GitHub Issues for a linked repository).
+3. Add to your production `.env`:
+
+```
+GITHUB_CLIENT_ID=your-github-client-id
+GITHUB_CLIENT_SECRET=your-github-client-secret
+GITHUB_REDIRECT_URI=https://yourdomain.com/auth/github/callback
+```
+
+For local development, use `http://localhost:3000/auth/github/callback` instead (see `.env.example`). After setting the variables and restarting, do a one-time manual smoke test of the GitHub login + "Add a source" flow, since CI exercises only mocked OAuth.
+
 ## Tech Stack
 
 - **Server**: Express.js (Node.js, ES modules)
