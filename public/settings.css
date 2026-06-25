@@ -201,6 +201,57 @@
   font-family: var(--font-content);
 }
 
+/* =============================================================================
+   Providers section (LIN-634)
+   ============================================================================= */
+.provider-binding,
+.provider-add,
+.provider-add-blocked {
+  gap: var(--space-sm);
+}
+
+.provider-scope {
+  font-family: var(--font-content);
+  color: var(--fg);
+}
+
+.provider-token {
+  font-family: var(--font-mono);
+  color: var(--fg-dim);
+}
+
+.provider-active {
+  color: var(--green);
+}
+
+.provider-blocked {
+  color: var(--fg-dim);
+  font-style: italic;
+}
+
+.provider-notice-ok .field-value {
+  color: var(--green);
+}
+
+.provider-notice-fail .field-value {
+  color: var(--red, #c0392b);
+}
+
+.provider-notice-blocked .field-value {
+  color: var(--fg-dim);
+}
+
+/* Distinct from the OpenRouter connect/disconnect buttons (which several specs
+   locate strictly as `.action-btn.connect` / `.action-btn.disconnect`) — provider
+   actions use their own classes so they never collide. */
+.provider-add-btn {
+  color: var(--green);
+}
+
+.provider-remove-btn {
+  color: var(--red, #c0392b);
+}
+
 /* Inline save feedback */
 .save-feedback {
   font-size: var(--font-size-sm);

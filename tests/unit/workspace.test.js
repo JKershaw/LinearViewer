@@ -12,6 +12,7 @@ import {
   updateWorkspaceTokens,
   getWorkspaceToken,
   linkProvider,
+  unlinkProvider,
   getBindingsForWorkspace,
   saveSession,
   MAX_WORKSPACES
@@ -247,6 +248,81 @@ describe('linkProvider', () => {
     linkProvider(ws, 'github', 'org/5', { token: 'gh' });
     assert.strictEqual(ws.bindings.length, 2);
     assert.deepStrictEqual(ws.bindings.map(b => b.scope), ['owner/repo', 'org/5']);
+  });
+});
+
+// =============================================================================
+// unlinkProvider Tests (LIN-634)
+// =============================================================================
+
+describe('unlinkProvider', () => {
+  test('removes the matching (provider, scope) binding', () => {
+    const ws = linkProvider({ id: 'ws-1' }, 'linear', 'org-1', { token: 'lin' });
+    linkProvider(ws, 'github', 'owner/repo', { token: 'gh' });
+    unlinkProvider(ws, 'github', 'owner/repo');
+    assert.strictEqual(ws.bindings.length, 1);
+    assert.strictEqual(ws.bindings[0].provider, 'linear');
+  });
+
+  test('removes only the matching scope when a provider has two bindings', () => {
+    const ws = linkProvider({ id: 'ws-1' }, 'github', 'owner/repo', { token: 'a' });
+    linkProvider(ws, 'github', 'org/5', { token: 'b' });
+    unlinkProvider(ws, 'github', 'owner/repo');
+    assert.deepStrictEqual(ws.bindings.map(b => b.scope), ['org/5']);
+  });
+
+  test('is a no-op for an unknown (provider, scope)', () => {
+    const ws = linkProvider({ id: 'ws-1' }, 'linear', 'org-1', { token: 'lin' });
+    unlinkProvider(ws, 'github', 'nope');
+    assert.strictEqual(ws.bindings.length, 1);
+    assert.strictEqual(ws.accessToken, 'lin');
+  });
+
+  test('repoints active provider + scalar mirror when the active binding is removed', () => {
+    // linear is the active binding (first link wins); add a second provider.
+    const ws = linkProvider({ id: 'ws-1' }, 'linear', 'org-1', { token: 'lin', refreshToken: 'lr', tokenExpiresAt: 100 });
+    linkProvider(ws, 'local', 'scratch', { token: 'loc', tokenExpiresAt: 999 });
+    assert.strictEqual(ws.provider, 'linear');
+
+    unlinkProvider(ws, 'linear', 'org-1');
+
+    // Active pointer + scalar mirror now reflect the remaining (local) binding.
+    assert.strictEqual(ws.provider, 'local');
+    assert.strictEqual(ws.accessToken, 'loc');
+    assert.strictEqual(ws.credentials.token, 'loc');
+    assert.strictEqual(ws.tokenExpiresAt, 999);
+    assert.strictEqual(getBindingsForWorkspace(ws).length, 1);
+  });
+
+  test('leaves the active scalar mirror untouched when a non-active binding is removed', () => {
+    const ws = linkProvider({ id: 'ws-1' }, 'linear', 'org-1', { token: 'lin' });
+    linkProvider(ws, 'local', 'scratch', { token: 'loc' });
+    unlinkProvider(ws, 'local', 'scratch');
+    assert.strictEqual(ws.provider, 'linear');
+    assert.strictEqual(ws.accessToken, 'lin');
+  });
+
+  test('clears the active pointer and scalar mirror when the last binding is removed', () => {
+    const ws = linkProvider({ id: 'ws-1' }, 'linear', 'org-1', { token: 'lin', refreshToken: 'lr' });
+    unlinkProvider(ws, 'linear', 'org-1');
+    assert.strictEqual(ws.bindings.length, 0);
+    assert.strictEqual(ws.provider, undefined);
+    assert.strictEqual(ws.accessToken, undefined);
+    assert.strictEqual(ws.credentials, undefined);
+    assert.strictEqual(ws.refreshToken, undefined);
+  });
+
+  test('never deletes the workspace object itself', () => {
+    const ws = linkProvider({ id: 'ws-1', name: 'Keep me' }, 'linear', 'org-1', { token: 'lin' });
+    unlinkProvider(ws, 'linear', 'org-1');
+    assert.strictEqual(ws.id, 'ws-1');
+    assert.strictEqual(ws.name, 'Keep me');
+  });
+
+  test('is a no-op on a workspace with no bindings', () => {
+    const ws = { id: 'ws-1' };
+    assert.doesNotThrow(() => unlinkProvider(ws, 'linear', 'org-1'));
+    assert.strictEqual(ws.id, 'ws-1');
   });
 });
 
