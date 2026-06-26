@@ -2040,6 +2040,13 @@ app.post('/workspace/:urlKey/settings/providers/add', workspaceFromUrl, async (r
     return res.redirect(`/auth/github?mode=add-source&workspace=${encodeURIComponent(workspace.urlKey)}`);
   }
 
+  // GitHub Projects add-source (LIN-560 Session 2) — the board-picker sibling of
+  // the Issues flow, on the same shared GitHub App. Carries the same add-source
+  // mode + viewed-workspace urlKey so the callback binds onto THIS workspace.
+  if (provider === 'github-projects') {
+    return res.redirect(`/auth/github-projects?mode=add-source&workspace=${encodeURIComponent(workspace.urlKey)}`);
+  }
+
   // Linear has a real OAuth begin; route into it as the add scaffold. The
   // per-workspace add-source binding (mode:'existing') is deferred to LIN-544.
   if (provider === 'linear') {

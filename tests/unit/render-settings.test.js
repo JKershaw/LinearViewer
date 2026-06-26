@@ -140,6 +140,13 @@ describe('renderSettingsPage — Providers section (LIN-634)', () => {
     assert.doesNotMatch(html, /blocked on LIN-541/);
   });
 
+  test('offers a working add affordance for GitHub Projects (unblocked, LIN-560)', () => {
+    const html = renderSettingsPage('Acme', BASE);
+    assert.match(html, /data-testid="settings-provider-add-github-projects"/);
+    assert.match(html, /GitHub Projects/);
+    assert.doesNotMatch(html, /blocked on LIN-560/);
+  });
+
   test('offers a working add affordance for Linear', () => {
     const html = renderSettingsPage('Acme', BASE);
     assert.match(html, /data-testid="settings-provider-add-linear"/);
