@@ -50,6 +50,7 @@ import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActi
 import { buildPeriodicalNodes } from './lib/periodicals.js'
 import { parseRepoFromDescription } from './lib/prompt-formatters.js'
 import { renderPage, renderErrorPage, renderUpstreamAwareErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
+import { renderLandingHero } from './lib/components/landing-hero.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken } from './lib/token-refresh.js'
 import { UUID_REGEX, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, updateWorkspaceTokens, getWorkspaceToken, getBindingsForWorkspace, getBindingCallScope, getWorkspaceCallScope, linkProvider, unlinkProvider, setActiveProvider, remintActiveCredential } from './lib/workspace.js'
@@ -152,6 +153,12 @@ const landingTrees = landingData.projects
     const { incomplete, completed, completedCount } = partitionCompleted(roots)
     return { project, incomplete, completed, completedCount }
   })
+
+// The brand hero (LIN-726) that fronts every static-landing render. The GitHub
+// CTA is gated on the GitHub App being configured — read from env at startup,
+// the same lifecycle as the rest of the pre-rendered landing — so the landing
+// never offers a sign-in path that would 503.
+const landingHeroHtml = renderLandingHero({ githubEnabled: !!process.env.GITHUB_CLIENT_ID })
 
 // =============================================================================
 // Database & Session Setup
@@ -769,7 +776,7 @@ async function handleWorkspaceRemoval(session, workspaceId, res) {
   return new Promise((resolve) => {
     session.destroy((err) => {
       if (err) console.error('Session destroy error:', err);
-      const html = renderPage(landingTrees, [], [], landingData.organizationName, { isLanding: true, deployInfo });
+      const html = renderPage(landingTrees, [], [], landingData.organizationName, { isLanding: true, deployInfo, heroHtml: landingHeroHtml });
       res.send(html);
       resolve();
     });
@@ -857,7 +864,7 @@ app.get('/', (req, res) => {
   const setupNotice = (isLocalhost && hasNoAuth) ? 'setup' : null
 
   // Unauthenticated users see the static landing page
-  const html = renderPage(landingTrees, [], [], landingData.organizationName, { isLanding: true, deployInfo, setupNotice })
+  const html = renderPage(landingTrees, [], [], landingData.organizationName, { isLanding: true, deployInfo, setupNotice, heroHtml: landingHeroHtml })
   res.send(html)
 })
 

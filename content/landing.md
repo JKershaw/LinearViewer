@@ -2,17 +2,6 @@
 title: Harbour
 ---
 
-# Login
-> Keep human intent in command of AI execution
-
-- ◐ Connect with Linear
-  OAuth with read & write scope
-  @identifier: LV-1
-  @priority: 1
-  @url: /auth/linear
-  @linkText: Login with Linear →
-  @sameTab: true
-
 # What Harbour Is
 > Mission control for AI-built software
 
@@ -101,3 +90,13 @@ title: Harbour
   @priority: 4
   @url: https://jkershaw.com
   @linkText: jkershaw.com
+
+# Harbour OS
+> A separate in-browser workstation Harbour can dispatch into
+
+- ○ Harbour OS
+  Harbour's sibling product — an in-browser developer workstation you can dispatch agent sessions into. Parent/child like Apple and macOS; Harbour is the cockpit, Harbour OS is the workshop floor.
+  @identifier: LV-17
+  @priority: 4
+  @url: https://os.harbour.cat
+  @linkText: os.harbour.cat →
