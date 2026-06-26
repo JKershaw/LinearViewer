@@ -1022,6 +1022,21 @@ describe('triage template', () => {
     assert.ok(result.prompt.includes('bug'));
     assert.ok(!result.prompt.includes('preparing'));
   });
+
+  // LIN-734: triage must account for project selection, not only labels/priority/state.
+  test('instructs the agent to confirm and fix the project', () => {
+    const result = generatePrompt('triage', mockIssue, mockContext);
+    assert.ok(/\*\*Project\*\*/.test(result.prompt), 'should list Project under metadata');
+    assert.ok(/correct project/i.test(result.prompt), 'should ask whether the task is in the correct project');
+    assert.ok(/move or assign/i.test(result.prompt), 'should instruct moving/assigning mis-filed tasks');
+  });
+
+  test('triage completion signals include project correctness', () => {
+    assert.ok(
+      COMPLETION_SIGNALS['triage'].signals.some(s => /correct project/i.test(s)),
+      'triage readiness should account for project, not just labels/priority/state'
+    );
+  });
 });
 
 // =============================================================================
