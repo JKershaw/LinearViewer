@@ -674,27 +674,36 @@ window.toast = function toast(message, opts = {}) {
 // authenticated page — every page loads common.js, but only some load app.js.
 const TEAM_STORAGE_KEY = 'linear-projects-selected-team'
 
+// Team selection is remembered per workspace (LIN-727): a single global key let
+// one workspace's team overwrite another's, so returning to a workspace lost the
+// filter. Namespacing by urlKey keeps each workspace's selection independent. The
+// server (user-preferences) is the cross-device source of truth; this localStorage
+// cache only drives the no-param instant redirect below.
+function teamStorageKey(urlKey) {
+  return urlKey ? `${TEAM_STORAGE_KEY}:${urlKey}` : TEAM_STORAGE_KEY
+}
+
 // Safe localStorage helpers for team selection
-function getTeamSelection() {
+function getTeamSelection(urlKey) {
   try {
-    return localStorage.getItem(TEAM_STORAGE_KEY)
+    return localStorage.getItem(teamStorageKey(urlKey))
   } catch (e) {
     console.warn('Failed to read team selection:', e)
     return null
   }
 }
 
-function setTeamSelection(teamId) {
+function setTeamSelection(teamId, urlKey) {
   try {
-    localStorage.setItem(TEAM_STORAGE_KEY, teamId)
+    localStorage.setItem(teamStorageKey(urlKey), teamId)
   } catch (e) {
     console.warn('Failed to save team selection:', e)
   }
 }
 
-function clearTeamSelection() {
+function clearTeamSelection(urlKey) {
   try {
-    localStorage.removeItem(TEAM_STORAGE_KEY)
+    localStorage.removeItem(teamStorageKey(urlKey))
   } catch (e) {
     console.warn('Failed to clear team selection:', e)
   }
@@ -770,11 +779,14 @@ function initNavBar() {
 
       e.stopPropagation()
       const teamId = option.dataset.team
-      setTeamSelection(teamId)
       // Get workspace URL key from data attribute (workspace-prefixed URLs)
       const urlKey = teamOptions.dataset.urlKey
+      setTeamSelection(teamId, urlKey)
       const workspacePrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : ''
-      const url = teamId === 'all' ? `${workspacePrefix}/` : `${workspacePrefix}/?team=${teamId}`
+      // Always carry the param — including ?team=all — so the server records the
+      // explicit choice (and clears any remembered team) rather than treating a
+      // bare URL as "restore the prior selection" (LIN-727).
+      const url = `${workspacePrefix}/?team=${teamId}`
       window.location.href = url
     })
   }
@@ -852,7 +864,9 @@ function initNavBar() {
   if (teamToggle) {
     const urlParams = new URLSearchParams(window.location.search)
     const urlTeam = urlParams.get('team')
-    const savedTeam = getTeamSelection()
+    // Per-workspace key (LIN-727) so one workspace's selection can't shadow another's.
+    const urlKey = teamOptions?.dataset.urlKey
+    const savedTeam = getTeamSelection(urlKey)
 
     // Check if saved team still exists in options
     const teamOptionsAll = document.querySelectorAll('#team-options .nav-option[data-team]')
@@ -861,8 +875,6 @@ function initNavBar() {
 
     // If URL has no team but localStorage does (and team still exists), redirect
     if (!urlTeam && savedTeam && savedTeam !== 'all' && savedTeamExists) {
-      // Get workspace URL key from data attribute (workspace-prefixed URLs)
-      const urlKey = teamOptions?.dataset.urlKey
       const workspacePrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : ''
       window.location.href = `${workspacePrefix}/?team=${savedTeam}`
       return
@@ -870,11 +882,11 @@ function initNavBar() {
 
     // Clear invalid saved team
     if (savedTeam && !savedTeamExists) {
-      clearTeamSelection()
+      clearTeamSelection(urlKey)
     }
 
     // Save current selection
-    setTeamSelection(urlTeam || 'all')
+    setTeamSelection(urlTeam || 'all', urlKey)
   }
 }
 

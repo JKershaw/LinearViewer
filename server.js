@@ -1257,7 +1257,26 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
 
   // Parse and validate team filter from query string (must be valid UUID)
   const rawTeam = req.query.team;
-  const teamId = rawTeam && rawTeam !== 'all' && UUID_REGEX.test(rawTeam) ? rawTeam : null;
+  let teamId = rawTeam && rawTeam !== 'all' && UUID_REGEX.test(rawTeam) ? rawTeam : null;
+
+  // Remember team selection per {user, workspace} (LIN-727). An explicit ?team=
+  // param (including 'all') is the source of truth and is persisted; when the
+  // param is absent we restore the prior selection so leaving a workspace and
+  // returning preserves the filter. Best-effort: persistence never blocks the page.
+  const linearUserId = req.session.linearUserId;
+  if (linearUserId) {
+    if (rawTeam !== undefined) {
+      userPreferencesStore.setSelectedTeam(linearUserId, workspace.urlKey, teamId)
+        .catch(err => console.error('Failed to persist team selection:', err));
+    } else {
+      try {
+        const remembered = await userPreferencesStore.getSelectedTeam(linearUserId, workspace.urlKey);
+        if (remembered && UUID_REGEX.test(remembered)) teamId = remembered;
+      } catch (err) {
+        console.error('Failed to read remembered team selection:', err);
+      }
+    }
+  }
 
   // Determine OpenRouter connection status for nav bar
   const openRouterSource = getOpenRouterSource(req);
