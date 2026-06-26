@@ -96,8 +96,10 @@ test.describe('Team Filtering', () => {
     await page.locator('#team-toggle').click();
     await page.locator('#team-options .nav-option[data-team="all"]').click();
 
-    // URL should not have team parameter
-    await expect(page).not.toHaveURL(/team=/);
+    // The filter is cleared (toggle shows "all"). Selecting "all" now carries an
+    // explicit ?team=all so the server records the choice rather than treating a
+    // bare URL as "restore the prior selection" (LIN-727).
+    await expect(page).toHaveURL(/team=all/);
     await expect(page.locator('#team-toggle')).toHaveText('all');
   });
 
