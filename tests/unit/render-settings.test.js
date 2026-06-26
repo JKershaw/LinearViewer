@@ -147,10 +147,13 @@ describe('renderSettingsPage — Providers section (LIN-634)', () => {
     assert.doesNotMatch(html, /blocked on LIN-560/);
   });
 
-  test('offers a working add affordance for Linear', () => {
+  test('disables the Linear add affordance as a stopgap until per-workspace binding lands (LIN-735/LIN-544)', () => {
     const html = renderSettingsPage('Acme', BASE);
+    // The row still renders, but as a blocked affordance naming LIN-544 — not a
+    // live "add" button that would silently create/switch to a separate workspace.
     assert.match(html, /data-testid="settings-provider-add-linear"/);
-    assert.match(html, /settings-provider-add-btn/);
+    assert.match(html, /blocked on LIN-544/);
+    assert.match(html, /provider-add-blocked/);
   });
 
   test('shows an empty state when there are no bindings', () => {

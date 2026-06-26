@@ -29,13 +29,19 @@ const RSA_PEM = RSA_PRIVATE_KEY.export({ type: 'pkcs1', format: 'pem' });
 // ---------------------------------------------------------------------------
 
 describe('GitHubProjectsProvider auth primitives', () => {
-  const ENV = ['GITHUB_APP_ID', 'GITHUB_APP_PRIVATE_KEY', 'GITHUB_APP_SLUG'];
+  const ENV = ['GITHUB_APP_ID', 'GITHUB_APP_PRIVATE_KEY', 'GITHUB_APP_SLUG', 'GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET', 'GITHUB_REDIRECT_URI', 'GITHUB_PROJECTS_REDIRECT_URI'];
   let saved;
   beforeEach(() => {
     saved = Object.fromEntries(ENV.map(k => [k, process.env[k]]));
     process.env.GITHUB_APP_ID = '12345';
     process.env.GITHUB_APP_PRIVATE_KEY = 'test-key';
     process.env.GITHUB_APP_SLUG = 'my-app';
+    // The App's OWN user-to-server OAuth credentials drive beginAuth (authorize) +
+    // the re-bind code exchange (LIN-735); Projects rounds through its own callback.
+    process.env.GITHUB_CLIENT_ID = 'cid';
+    process.env.GITHUB_CLIENT_SECRET = 'secret';
+    process.env.GITHUB_REDIRECT_URI = 'http://localhost:3000/auth/github/callback';
+    process.env.GITHUB_PROJECTS_REDIRECT_URI = 'http://localhost:3000/auth/github-projects/callback';
   });
   afterEach(() => {
     for (const k of ENV) {
@@ -44,20 +50,59 @@ describe('GitHubProjectsProvider auth primitives', () => {
     }
   });
 
-  test('beginAuth builds the shared GitHub App installation URL with opaque state', () => {
+  test('beginAuth builds the user-to-server OAuth authorize URL with opaque state (LIN-735)', () => {
     const url = new GitHubProjectsProvider().beginAuth({ state: 'nonce-123' });
-    assert.ok(url.startsWith('https://github.com/apps/my-app/installations/new?'),
-      `expected App install URL, got ${url}`);
+    // Authorize URL now, NOT installations/new — fixes the already-installed dead-end.
+    assert.ok(url.startsWith('https://github.com/login/oauth/authorize?'),
+      `expected OAuth authorize URL, got ${url}`);
     const params = new URL(url).searchParams;
     assert.equal(params.get('state'), 'nonce-123');
-    // No OAuth scope/client_id leakage — App permissions declare access.
+    assert.equal(params.get('client_id'), 'cid');
+    // Projects rounds through its OWN callback path.
+    assert.equal(params.get('redirect_uri'), 'http://localhost:3000/auth/github-projects/callback');
+    // No OAuth scope leakage — App permissions declare access.
     assert.equal(params.get('scope'), null);
-    assert.equal(params.get('client_id'), null);
   });
 
-  test('beginAuth throws when GITHUB_APP_SLUG is unset rather than emitting apps/undefined', () => {
+  test('beginAuth redirect_uri falls back to GITHUB_REDIRECT_URI when no Projects-specific URI is set (LIN-735)', () => {
+    delete process.env.GITHUB_PROJECTS_REDIRECT_URI;
+    const url = new GitHubProjectsProvider().beginAuth({ state: 'n' });
+    assert.equal(new URL(url).searchParams.get('redirect_uri'), 'http://localhost:3000/auth/github/callback');
+  });
+
+  test('beginAuth throws when GITHUB_CLIENT_ID is unset (LIN-735)', () => {
+    delete process.env.GITHUB_CLIENT_ID;
+    assert.throws(() => new GitHubProjectsProvider().beginAuth({ state: 'n' }), /GITHUB_CLIENT_ID/);
+  });
+
+  test('beginInstall builds the App installation URL; throws without GITHUB_APP_SLUG (LIN-735)', () => {
+    const url = new GitHubProjectsProvider().beginInstall({ state: 'nonce-123' });
+    assert.ok(url.startsWith('https://github.com/apps/my-app/installations/new?'), `got ${url}`);
+    assert.equal(new URL(url).searchParams.get('state'), 'nonce-123');
     delete process.env.GITHUB_APP_SLUG;
-    assert.throws(() => new GitHubProjectsProvider().beginAuth({ state: 'n' }), /GITHUB_APP_SLUG/);
+    assert.throws(() => new GitHubProjectsProvider().beginInstall({ state: 'n' }), /GITHUB_APP_SLUG/);
+  });
+
+  test('listReboundableBoards flattens installations + their OPEN boards with installationId (LIN-735)', async () => {
+    const provider = new GitHubProjectsProvider();
+    // Inject the installations (the shared REST enumeration seam) and the board client.
+    provider._listUserInstallations = async () => ([
+      { id: 77, account: { login: 'octocat' } },
+      { id: 88, account: { login: 'acme' } },
+    ]);
+    const fake = createFakeGitHubProjectsClient({
+      'octocat/5': { project: { number: 5, title: 'Roadmap', url: 'u5', shortDescription: 'd5' } },
+      'octocat/6': { project: { number: 6, title: 'Archived', url: 'u6', closed: true } },
+      'acme/9': { project: { number: 9, title: 'Widgets' } },
+    });
+    provider._clientForToken = () => fake;
+
+    const boards = await provider.listReboundableBoards('gho_user');
+    // Flattened across BOTH installations, closed board dropped, each tagged with its installationId.
+    assert.deepEqual(boards, [
+      { login: 'octocat', number: 5, title: 'Roadmap', url: 'u5', shortDescription: 'd5', closed: false, installationId: '77' },
+      { login: 'acme', number: 9, title: 'Widgets', url: null, shortDescription: null, closed: false, installationId: '88' },
+    ]);
   });
 
   test('completeInstallation mints an installation token and resolves the board-owner identity', async () => {
@@ -129,13 +174,24 @@ describe('GitHubProjectsProvider auth primitives', () => {
 function fakeProvider() {
   return {
     name: 'github-projects',
-    beginAuth: ({ state }) => `https://github.com/apps/my-app/installations/new?state=${state}`,
+    // beginAuth is the authorize URL (LIN-735); beginInstall is the no-installation fallback.
+    beginAuth: ({ state }) => `https://github.com/login/oauth/authorize?client_id=cid&state=${state}`,
+    beginInstall: ({ state }) => `https://github.com/apps/my-app/installations/new?state=${state}`,
     completeInstallation: async (installationId) => {
       if (installationId === 'bad') throw new Error('GitHub App auth: installation-token request failed');
       return { token: 'ghs_inst', login: 'octocat', userId: '42', installationId: String(installationId), tokenExpiresAt: '2026-06-25T20:00:00Z' };
     },
     listBoards: async (_token, login) => ([
       { login, number: 5, title: 'Roadmap', url: 'u', shortDescription: null, closed: false },
+    ]),
+    // Already-installed re-bind seam (LIN-735): the callback exchanges the OAuth
+    // `code` for a DISCOVERY-only user token, then enumerates the user's boards.
+    completeAuth: async (code) => {
+      if (code === 'bad') throw new Error('bad_verification_code');
+      return { access_token: 'gho_user' };
+    },
+    listReboundableBoards: async () => ([
+      { login: 'octocat', number: 5, title: 'Roadmap', url: 'u', shortDescription: null, closed: false, installationId: '77' },
     ]),
   };
 }
@@ -251,15 +307,50 @@ describe('GitHub Projects auth routes', () => {
     assert.equal(session.githubProjectsPending.workspaceUrlKey, 'acme');
   });
 
-  test('GET callback steers the already-installed (code, no installation_id) case rather than 500', async () => {
+  test('GET callback (re-bind) exchanges the code, enumerates boards, and stashes a rebind pending WITHOUT the user token (LIN-735)', async () => {
     const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider() });
+    const handler = getHandler(router, 'get', '/auth/github-projects/callback');
+    const res = makeRes();
+    const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'github-projects' } });
+    // Already-installed App round-trips a `code`, no installation_id.
+    await handler({ query: { code: 'oauth-code', state: 'real' }, session }, res);
+    // Same board picker, rendered from the enumerated boards.
+    assert.match(res.body, /Roadmap/);
+    assert.match(res.body, /github-projects-board-form/);
+    assert.match(res.body, /value="octocat\/5"/);
+    // Pending carries ONLY a board->installationId map (server-side resolution at link).
+    assert.deepEqual(session.githubProjectsPending, { rebind: true, mode: 'new', boardInstallations: { 'octocat/5': '77' } });
+    // The discovery user token is never stored on the session.
+    assert.ok(!JSON.stringify(session.githubProjectsPending).includes('gho_user'));
+  });
+
+  test('GET callback (re-bind) carries the viewed-workspace urlKey from intent into the rebind pending (LIN-541 + LIN-735)', async () => {
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider() });
+    const handler = getHandler(router, 'get', '/auth/github-projects/callback');
+    const res = makeRes();
+    const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'add-source', provider: 'github-projects', workspaceUrlKey: 'acme' } });
+    await handler({ query: { code: 'oauth-code', state: 'real' }, session }, res);
+    assert.deepEqual(session.githubProjectsPending, { rebind: true, mode: 'add-source', boardInstallations: { 'octocat/5': '77' }, workspaceUrlKey: 'acme' });
+  });
+
+  test('GET callback (re-bind) with NO installations falls through to the install URL (LIN-735)', async () => {
+    const provider = { ...fakeProvider(), listReboundableBoards: async () => [] };
+    const router = createGitHubProjectsAuthRoutes({ provider });
     const handler = getHandler(router, 'get', '/auth/github-projects/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new' } });
     await handler({ query: { code: 'oauth-code', state: 'real' }, session }, res);
+    assert.equal(res.redirectedTo, 'https://github.com/apps/my-app/installations/new?state=real');
+    assert.equal(session.githubProjectsPending, undefined, 'no rebind pending stashed when there is nothing to pick');
+  });
+
+  test('GET callback (re-bind) surfaces a clean 400 when the code exchange fails (LIN-735)', async () => {
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider() });
+    const handler = getHandler(router, 'get', '/auth/github-projects/callback');
+    const res = makeRes();
+    await handler({ query: { code: 'bad', state: 'real' }, session: makeSession({ oauthState: 'real', oauthIntent: { mode: 'new' } }) }, res);
     assert.equal(res.statusCode, 400);
-    assert.match(res.body, /Already Installed/);
-    assert.equal(session.githubProjectsPending, undefined, 'no pending stashed on the steered path');
+    assert.match(res.body, /Authentication Failed/);
   });
 
   test('GET callback 400s when installation_id is missing (setup_action=request)', async () => {
@@ -341,6 +432,61 @@ describe('GitHub Projects auth routes', () => {
     assert.ok(!activeWs.bindings, 'active workspace untouched');
     assert.equal(viewedWs.provider, 'linear', 'viewed primary scalar unchanged by the non-active binding');
     assert.equal(res.redirectedTo, '/workspace/acme/settings?provider_ok=github-projects');
+  });
+
+  test('POST link (re-bind, new) mints the installation token for the chosen board and writes the LIN-711 binding (LIN-735)', async () => {
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider() });
+    const handler = getHandler(router, 'post', '/auth/github-projects/link');
+    const res = makeRes();
+    const session = makeSession({
+      githubProjectsPending: { rebind: true, mode: 'new', boardInstallations: { 'octocat/5': '77' } },
+      workspaces: [],
+    });
+    await handler({ body: { board: 'octocat/5' }, session }, res);
+
+    assert.equal(session.workspaces.length, 1);
+    const ws = session.workspaces[0];
+    // Identity comes from completeInstallation (installation account), like the install path.
+    assert.equal(ws.id, 'github:42');
+    const expectedExpiry = Date.parse('2026-06-25T20:00:00Z');
+    // Persisted credential is an INSTALLATION token for the board's resolved installation (77).
+    assert.deepEqual(ws.bindings, [{ provider: 'github-projects', scope: 'octocat/5', credentials: { installationId: '77', token: 'ghs_inst', tokenExpiresAt: expectedExpiry } }]);
+    assert.ok(!JSON.stringify(session.workspaces).includes('gho_user'), 'discovery user token is never persisted');
+    assert.equal(session.githubProjectsPending, undefined, 'pending cleared');
+    assert.equal(res.redirectedTo, '/workspace/octocat/');
+  });
+
+  test('POST link (re-bind, add-source) mints + binds onto the viewed workspace without clobbering its primary (LIN-735)', async () => {
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider() });
+    const handler = getHandler(router, 'post', '/auth/github-projects/link');
+    const res = makeRes();
+    const linearWs = { id: 'org-1', name: 'Acme', urlKey: 'acme', provider: 'linear', accessToken: 'lin_tok' };
+    const session = makeSession({
+      githubProjectsPending: { rebind: true, mode: 'add-source', boardInstallations: { 'octocat/5': '77' } },
+      workspaces: [linearWs],
+      activeWorkspaceId: 'org-1',
+    });
+    await handler({ body: { board: 'octocat/5' }, session }, res);
+
+    const binding = linearWs.bindings.find(b => b.provider === 'github-projects');
+    assert.deepEqual(binding.credentials, { installationId: '77', token: 'ghs_inst', tokenExpiresAt: Date.parse('2026-06-25T20:00:00Z') });
+    assert.equal(linearWs.provider, 'linear', 'non-active re-add must not clobber the active scalar mirror');
+    assert.equal(res.redirectedTo, '/workspace/acme/settings?provider_ok=github-projects');
+  });
+
+  test('POST link (re-bind) rejects a board that is not in the enumerated installation map (LIN-735)', async () => {
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider() });
+    const handler = getHandler(router, 'post', '/auth/github-projects/link');
+    const res = makeRes();
+    const session = makeSession({
+      githubProjectsPending: { rebind: true, mode: 'new', boardInstallations: { 'octocat/5': '77' } },
+      workspaces: [],
+    });
+    // A well-formed board slug the user never had enumerated — must not mint anything.
+    await handler({ body: { board: 'octocat/9' }, session }, res);
+    assert.equal(res.statusCode, 400);
+    assert.match(res.body, /Invalid Project Board/);
+    assert.equal(session.workspaces.length, 0);
   });
 
   test('POST link rejects a non-numeric board slug (must be org/projectNumber, not owner/repo)', async () => {

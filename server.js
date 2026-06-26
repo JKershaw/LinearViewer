@@ -1576,6 +1576,9 @@ function providerNoticeFromQuery(query = {}) {
   if (query.provider_fail) {
     return { type: 'fail', text: `${query.provider_fail} credentials failed validation.` };
   }
+  if (query.provider_error === 'linear-add-deferred') {
+    return { type: 'fail', text: 'Adding Linear as a source to this workspace is not available yet (LIN-544). To connect a separate Linear workspace, use "connect a new workspace" from the home page.' };
+  }
   if (query.provider_error) {
     return { type: 'fail', text: 'Provider action could not be completed.' };
   }
@@ -2048,10 +2051,16 @@ app.post('/workspace/:urlKey/settings/providers/add', workspaceFromUrl, async (r
     return res.redirect(`/auth/github-projects?mode=add-source&workspace=${encodeURIComponent(workspace.urlKey)}`);
   }
 
-  // Linear has a real OAuth begin; route into it as the add scaffold. The
-  // per-workspace add-source binding (mode:'existing') is deferred to LIN-544.
+  // Linear add-source is DISABLED as a stopgap (LIN-735 Symptom 1): routing into
+  // /auth/linear here did NOT add a source to THIS workspace — its callback is
+  // always mode:'new', so it created a separate workspace and switched active to
+  // it, misrepresenting the affordance. The real per-workspace Linear binding is
+  // deferred to LIN-544; until then refuse rather than silently swap workspaces.
+  // (This guards a direct POST; the UI affordance is also blocked in
+  // render-settings.js. The login-page "connect a new workspace" flow is
+  // untouched — that one is honest about creating a new workspace.)
   if (provider === 'linear') {
-    return res.redirect('/auth/linear');
+    return res.redirect(`${settingsUrl}?provider_error=linear-add-deferred`);
   }
 
   return res.redirect(`${settingsUrl}?provider_error=unsupported-add`);

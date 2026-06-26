@@ -48,28 +48,38 @@ describe('GitHubProvider auth primitives', () => {
     }
   });
 
-  test('beginAuth builds the GitHub App installation URL with opaque state (LIN-708)', () => {
+  test('beginAuth builds the user-to-server OAuth authorize URL with opaque state (LIN-735)', () => {
     const url = new GitHubProvider().beginAuth({ state: 'nonce-123' });
-    // App installation picker, NOT the OAuth authorize URL.
-    assert.ok(url.startsWith('https://github.com/apps/my-app/installations/new?'),
-      `expected App install URL, got ${url}`);
+    // Authorize URL now, NOT installations/new — the authorize round-trip always
+    // returns a `code` even for an already-installed App (the LIN-728 dead-end fix).
+    assert.ok(url.startsWith('https://github.com/login/oauth/authorize?'),
+      `expected OAuth authorize URL, got ${url}`);
     const params = new URL(url).searchParams;
     // state passes through unchanged as an opaque nonce.
     assert.equal(params.get('state'), 'nonce-123');
-    // `scope` is dropped entirely — App permissions (Issues: read & write) declare
-    // access, so keeping `repo` would preserve the over-grant this migration fixes
-    // (security M1, LIN-683).
+    // The App identifies itself by its OAuth client_id, and the redirect_uri is the
+    // Issues callback.
+    assert.equal(params.get('client_id'), 'cid');
+    assert.equal(params.get('redirect_uri'), 'http://localhost:3000/auth/github/callback');
+    // `scope` is still dropped entirely — App permissions declare access, so keeping
+    // `repo` would resurrect the over-grant the App migration fixes (security M1, LIN-683).
     assert.equal(params.get('scope'), null);
     assert.doesNotMatch(url, /scope=/);
-    // OAuth-only params are gone too — the App identifies itself by slug.
-    assert.equal(params.get('client_id'), null);
-    assert.equal(params.get('redirect_uri'), null);
-    assert.equal(params.get('allow_signup'), null);
   });
 
-  test('beginAuth throws when GITHUB_APP_SLUG is unset rather than emitting apps/undefined (LIN-708)', () => {
+  test('beginAuth throws when GITHUB_CLIENT_ID is unset (LIN-735)', () => {
+    delete process.env.GITHUB_CLIENT_ID;
+    assert.throws(() => new GitHubProvider().beginAuth({ state: 'nonce-123' }), /GITHUB_CLIENT_ID/);
+  });
+
+  test('beginInstall builds the App installation URL; throws without GITHUB_APP_SLUG (LIN-735)', () => {
+    const url = new GitHubProvider().beginInstall({ state: 'nonce-123' });
+    // The fresh-install / no-installation fallback still targets installations/new.
+    assert.ok(url.startsWith('https://github.com/apps/my-app/installations/new?'),
+      `expected App install URL, got ${url}`);
+    assert.equal(new URL(url).searchParams.get('state'), 'nonce-123');
     delete process.env.GITHUB_APP_SLUG;
-    assert.throws(() => new GitHubProvider().beginAuth({ state: 'nonce-123' }), /GITHUB_APP_SLUG/);
+    assert.throws(() => new GitHubProvider().beginInstall({ state: 'n' }), /GITHUB_APP_SLUG/);
   });
 
   test('completeAuth returns a normalized token bag on success', async () => {
@@ -179,7 +189,10 @@ describe('GitHubProvider auth primitives', () => {
 function fakeProvider() {
   return {
     name: 'github',
-    beginAuth: ({ state }) => `https://github.com/apps/my-app/installations/new?state=${state}`,
+    // beginAuth is the authorize URL (LIN-735); beginInstall is the no-installation
+    // fallback the callback redirects to.
+    beginAuth: ({ state }) => `https://github.com/login/oauth/authorize?client_id=cid&state=${state}`,
+    beginInstall: ({ state }) => `https://github.com/apps/my-app/installations/new?state=${state}`,
     // The App-flow acquisition seam (LIN-709): mint installation token + resolve
     // the installation account identity. The route drives this; the network lives
     // behind it (covered by the provider-primitive tests above).
@@ -393,6 +406,20 @@ describe('GitHub auth routes', () => {
     await handler({ query: { code: 'bad', state: 'real' }, session: makeSession({ oauthState: 'real', oauthIntent: { mode: 'new' } }) }, res);
     assert.equal(res.statusCode, 400);
     assert.match(res.body, /Authentication Failed/);
+  });
+
+  test('GET callback (re-bind) with NO installations falls through to the install URL (LIN-735)', async () => {
+    // A first-time connect: the user authorized via OAuth but has never installed
+    // the App, so enumeration is empty. Rather than the old dead-end empty picker,
+    // send them to installations/new (reusing the CSRF nonce) to install + pick.
+    const provider = { ...fakeProvider(), listReboundableRepos: async () => [] };
+    const router = createGitHubAuthRoutes({ provider });
+    const handler = getHandler(router, 'get', '/auth/github/callback');
+    const res = makeRes();
+    const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'github' } });
+    await handler({ query: { code: 'oauth-code', state: 'real' }, session }, res);
+    assert.equal(res.redirectedTo, 'https://github.com/apps/my-app/installations/new?state=real');
+    assert.equal(session.githubPending, undefined, 'no rebind pending stashed when there is nothing to pick');
   });
 
   test('POST link (re-bind, new) mints the installation token for the chosen repo and writes the LIN-711 binding (LIN-728)', async () => {
