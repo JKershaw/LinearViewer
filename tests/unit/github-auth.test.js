@@ -117,6 +117,31 @@ describe('GitHubProvider auth primitives', () => {
     ]);
   });
 
+  test('listReboundableRepos flattens the user installations + their repos with installationId (LIN-728)', async () => {
+    const provider = new GitHubProvider();
+    const fake = createFakeGitHubClient({
+      _installations: [
+        { id: 77, account: { login: 'octocat' }, repositories: [
+          { full_name: 'octocat/hello-world', private: false },
+          { full_name: 'octocat/secret', private: true },
+        ] },
+        { id: 88, account: { login: 'acme' }, repositories: [
+          { full_name: 'acme/widgets', private: false },
+        ] },
+      ],
+    });
+    provider._clientForToken = () => fake; // inject the fake instead of a real HTTP client
+
+    const repos = await provider.listReboundableRepos('gho_user');
+    // Flattened across BOTH installations, each repo tagged with its installationId
+    // so the link step can mint the right installation token server-side.
+    assert.deepEqual(repos, [
+      { slug: 'octocat/hello-world', name: 'octocat/hello-world', private: false, installationId: '77' },
+      { slug: 'octocat/secret', name: 'octocat/secret', private: true, installationId: '77' },
+      { slug: 'acme/widgets', name: 'acme/widgets', private: false, installationId: '88' },
+    ]);
+  });
+
   test('completeInstallation mints an installation token and resolves account identity (LIN-709)', async () => {
     process.env.GITHUB_APP_PRIVATE_KEY = RSA_PEM; // real key so mintAppJwt signs
     const realFetch = global.fetch;
@@ -163,6 +188,15 @@ function fakeProvider() {
       return { token: 'ghs_inst', login: 'octocat', userId: '42', installationId: String(installationId), tokenExpiresAt: '2026-06-25T20:00:00Z' };
     },
     listRepos: async () => ([{ slug: 'octocat/hello-world', name: 'octocat/hello-world', private: false }]),
+    // Already-installed re-bind seam (LIN-728): the callback exchanges the OAuth
+    // `code` for a DISCOVERY-only user token, then enumerates the user's repos.
+    completeAuth: async (code) => {
+      if (code === 'bad') throw new AuthExchangeError('bad_verification_code', 'github');
+      return { access_token: 'gho_user' };
+    },
+    listReboundableRepos: async () => ([
+      { slug: 'octocat/hello-world', name: 'octocat/hello-world', private: false, installationId: '77' },
+    ]),
   };
 }
 
@@ -308,6 +342,115 @@ describe('GitHub auth routes', () => {
     await handler({ query: { installation_id: 'bad', state: 'real' }, session: makeSession({ oauthState: 'real' }) }, res);
     assert.equal(res.statusCode, 400);
     assert.match(res.body, /Authentication Failed/);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Already-installed re-bind path (LIN-728): no fresh installation_id, an OAuth
+  // `code` instead. The callback enumerates the user's installations/repos and
+  // reuses the SAME picker + linkProvider seam; the link step mints an
+  // installation token (never persisting the discovery user token).
+  // ---------------------------------------------------------------------------
+
+  test('GET callback (re-bind) exchanges the code, enumerates repos, and stashes a rebind pending WITHOUT the user token (LIN-728)', async () => {
+    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const handler = getHandler(router, 'get', '/auth/github/callback');
+    const res = makeRes();
+    const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'github' } });
+    // Already-installed App round-trips a `code`, no installation_id.
+    await handler({ query: { code: 'oauth-code', state: 'real' }, session }, res);
+    // Same repo picker, rendered from the enumerated repos.
+    assert.match(res.body, /octocat\/hello-world/);
+    assert.match(res.body, /github-repo-form/);
+    // Pending carries ONLY a repo->installationId map (server-side resolution at link).
+    assert.deepEqual(session.githubPending, { rebind: true, mode: 'new', repoInstallations: { 'octocat/hello-world': '77' } });
+    // The discovery user token is never stored on the session.
+    assert.equal(session.githubPending.token, undefined);
+    assert.ok(!JSON.stringify(session.githubPending).includes('gho_user'));
+  });
+
+  test('GET callback (re-bind) carries the viewed-workspace urlKey from intent into the rebind pending (LIN-541 + LIN-728)', async () => {
+    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const handler = getHandler(router, 'get', '/auth/github/callback');
+    const res = makeRes();
+    const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'add-source', provider: 'github', workspaceUrlKey: 'acme' } });
+    await handler({ query: { code: 'oauth-code', state: 'real' }, session }, res);
+    assert.deepEqual(session.githubPending, { rebind: true, mode: 'add-source', repoInstallations: { 'octocat/hello-world': '77' }, workspaceUrlKey: 'acme' });
+  });
+
+  test('GET callback (re-bind) keeps the CSRF state guard (mismatched state rejected before code exchange)', async () => {
+    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const handler = getHandler(router, 'get', '/auth/github/callback');
+    const res = makeRes();
+    await handler({ query: { code: 'oauth-code', state: 'attacker' }, session: makeSession({ oauthState: 'real' }) }, res);
+    assert.equal(res.statusCode, 400);
+    assert.match(res.body, /Session Expired/);
+  });
+
+  test('GET callback (re-bind) surfaces a clean 400 when the code exchange fails', async () => {
+    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const handler = getHandler(router, 'get', '/auth/github/callback');
+    const res = makeRes();
+    await handler({ query: { code: 'bad', state: 'real' }, session: makeSession({ oauthState: 'real', oauthIntent: { mode: 'new' } }) }, res);
+    assert.equal(res.statusCode, 400);
+    assert.match(res.body, /Authentication Failed/);
+  });
+
+  test('POST link (re-bind, new) mints the installation token for the chosen repo and writes the LIN-711 binding (LIN-728)', async () => {
+    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const handler = getHandler(router, 'post', '/auth/github/link');
+    const res = makeRes();
+    const session = makeSession({
+      githubPending: { rebind: true, mode: 'new', repoInstallations: { 'octocat/hello-world': '77' } },
+      workspaces: [],
+    });
+    await handler({ body: { repo: 'octocat/hello-world' }, session }, res);
+
+    assert.equal(session.workspaces.length, 1);
+    const ws = session.workspaces[0];
+    // Identity comes from completeInstallation (installation account), like the install path.
+    assert.equal(ws.id, 'github:42');
+    const expectedExpiry = Date.parse('2026-06-25T20:00:00Z');
+    // The persisted credential is an INSTALLATION token in the LIN-711 shape — for the
+    // repo's resolved installation (77), never the discovery user token.
+    assert.deepEqual(ws.bindings, [{ provider: 'github', scope: 'octocat/hello-world', credentials: { installationId: '77', token: 'ghs_inst', tokenExpiresAt: expectedExpiry } }]);
+    assert.ok(!JSON.stringify(session.workspaces).includes('gho_user'), 'discovery user token is never persisted');
+    assert.equal(session.githubPending, undefined, 'pending cleared');
+    assert.equal(res.redirectedTo, '/workspace/octocat/');
+  });
+
+  test('POST link (re-bind, add-source) mints + binds onto the active workspace without clobbering its primary (LIN-717 + LIN-728)', async () => {
+    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const handler = getHandler(router, 'post', '/auth/github/link');
+    const res = makeRes();
+    const linearWs = { id: 'org-1', name: 'Acme', urlKey: 'acme', provider: 'linear', accessToken: 'lin_tok' };
+    const session = makeSession({
+      githubPending: { rebind: true, mode: 'add-source', repoInstallations: { 'octocat/hello-world': '77' } },
+      workspaces: [linearWs],
+      activeWorkspaceId: 'org-1',
+    });
+    await handler({ body: { repo: 'octocat/hello-world' }, session }, res);
+
+    const binding = linearWs.bindings.find(b => b.provider === 'github');
+    assert.deepEqual(binding.credentials, { installationId: '77', token: 'ghs_inst', tokenExpiresAt: Date.parse('2026-06-25T20:00:00Z') });
+    // A non-active re-add must NOT clobber the active scalar mirror (LIN-717).
+    assert.equal(linearWs.provider, 'linear');
+    assert.equal(linearWs.accessToken, 'lin_tok');
+    assert.equal(res.redirectedTo, '/workspace/acme/settings?provider_ok=github');
+  });
+
+  test('POST link (re-bind) rejects a repo that is not in the enumerated installation map (LIN-728)', async () => {
+    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const handler = getHandler(router, 'post', '/auth/github/link');
+    const res = makeRes();
+    const session = makeSession({
+      githubPending: { rebind: true, mode: 'new', repoInstallations: { 'octocat/hello-world': '77' } },
+      workspaces: [],
+    });
+    // A well-formed slug that the user never had enumerated — must not mint anything.
+    await handler({ body: { repo: 'octocat/not-enumerated' }, session }, res);
+    assert.equal(res.statusCode, 400);
+    assert.match(res.body, /Invalid Repository/);
+    assert.equal(session.workspaces.length, 0);
   });
 
   test('POST link (new) find-or-creates the GitHub account container and writes the binding', async () => {

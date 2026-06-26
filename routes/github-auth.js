@@ -131,8 +131,11 @@ export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
   router.get('/auth/github/callback', async (req, res) => {
     if (getMissingAppVars().length > 0) return notConfigured(res)
 
-    // App-flow inbound: `installation_id` + `setup_action`, not an OAuth `code`.
-    const { installation_id: installationId, setup_action: setupAction, state, error } = req.query
+    // App-flow inbound: `installation_id` + `setup_action`. An ALREADY-INSTALLED
+    // App instead round-trips an OAuth `code` (LIN-728): GitHub re-issues no
+    // `installation_id` because there is nothing to install, so the re-bind path
+    // keys off `code`.
+    const { installation_id: installationId, setup_action: setupAction, code, state, error } = req.query
 
     if (error) {
       const message = error === 'access_denied'
@@ -152,6 +155,52 @@ export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
       }))
     }
 
+    const intent = req.session.oauthIntent || {}
+    const mode = intent.mode === 'add-source' ? 'add-source' : 'new'
+
+    // ALREADY-INSTALLED re-bind path (LIN-728). No fresh `installation_id`, but an
+    // OAuth `code` is present: the App is already installed, so GitHub round-trips
+    // a user-to-server `code` instead of an install event. Exchange it for a user
+    // token, enumerate the user's installations + repos, and render the SAME repo
+    // picker. The user token is DISCOVERY-ONLY — it is never stored; the link step
+    // mints an installation token for the chosen repo (the LIN-711 binding shape).
+    if (!installationId && code) {
+      let userToken
+      try {
+        const tokenBag = await provider.completeAuth(code)
+        userToken = tokenBag.access_token
+      } catch (authError) {
+        console.error('GitHub re-bind code exchange error:', authError)
+        return res.status(400).send(renderErrorPage('Authentication Failed', 'Could not complete authentication with GitHub. Please try again.', {
+          action: 'Try again', actionUrl: '/auth/github'
+        }))
+      }
+
+      let reboundable
+      try {
+        reboundable = await provider.listReboundableRepos(userToken)
+      } catch (fetchError) {
+        console.error('Failed to enumerate GitHub installations for re-bind:', fetchError)
+        return res.status(500).send(renderErrorPage('Connection Error', 'Could not fetch your repositories from GitHub. Please try again.', {
+          action: 'Try again', actionUrl: '/auth/github'
+        }))
+      }
+
+      // Stash a repo->installationId map (NOT the user token, NOT a per-repo
+      // credential): the link step resolves the chosen repo's installation
+      // server-side from this map and mints the installation token then, so a
+      // client can never assert which installation a repo belongs to. The LIN-541
+      // `mode`/`workspaceUrlKey` carry rides along exactly as the install branch.
+      const repoInstallations = {}
+      for (const r of reboundable) repoInstallations[r.slug] = String(r.installationId)
+      const pending = { rebind: true, mode, repoInstallations }
+      if (intent.workspaceUrlKey) pending.workspaceUrlKey = intent.workspaceUrlKey
+      req.session.githubPending = pending
+      return req.session.save(() => {
+        res.send(renderGitHubRepoSelectPage(reboundable, { mode }))
+      })
+    }
+
     // No installation id means the install did not complete on GitHub's side —
     // most commonly `setup_action=request` (an org member asked an admin to
     // approve the App, which is therefore not yet installed). There is nothing to
@@ -164,9 +213,6 @@ export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
         action: 'Try again', actionUrl: '/auth/github'
       }))
     }
-
-    const intent = req.session.oauthIntent || {}
-    const mode = intent.mode === 'add-source' ? 'add-source' : 'new'
 
     try {
       // Acquire the installation credential + identity. provider.completeInstallation
@@ -227,7 +273,10 @@ export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
    */
   router.post('/auth/github/link', async (req, res) => {
     const pending = req.session.githubPending
-    if (!pending?.token) {
+    // Two pending shapes converge here: the install branch already minted an
+    // installation `token`; the re-bind branch (LIN-728) carries only a
+    // repo->installationId map (`rebind`) and mints the token at link time.
+    if (!pending || (!pending.token && !pending.rebind)) {
       return res.status(400).send(renderErrorPage('Session Expired', 'Your GitHub sign-in session expired. Please start again.', {
         action: 'Sign in with GitHub', actionUrl: '/auth/github'
       }))
@@ -241,6 +290,26 @@ export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
     }
 
     try {
+      // Resolve the binding credential. The install branch already holds the
+      // minted installation token + identity in `pending`. The re-bind branch
+      // (LIN-728) holds only a repo->installationId map: resolve the chosen repo's
+      // installation server-side (a client-supplied installation is never trusted)
+      // and mint the installation token NOW via the same completeInstallation seam.
+      // EITHER WAY the persisted credential is an installation token, so re-mint
+      // (LIN-712) keeps working — the user token is never stored.
+      let creds
+      if (pending.rebind) {
+        const installationId = pending.repoInstallations?.[repo]
+        if (!installationId) {
+          return res.status(400).send(renderErrorPage('Invalid Repository', 'That repository is not one of your installed GitHub repositories. Please pick one from the list.', {
+            action: 'Try again', actionUrl: '/auth/github'
+          }))
+        }
+        creds = await provider.completeInstallation(installationId)
+      } else {
+        creds = pending
+      }
+
       // GitHub App binding shape (LIN-711): persist `installationId` (the re-mint
       // key) and stamp the binding with the real installation-token expiry in ms,
       // dropping the old OAuth-App `Number.MAX_SAFE_INTEGER` never-expires stamp.
@@ -253,8 +322,8 @@ export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
       // `installationId` is deliberately NOT wired here — that is LIN-712 (surface 6),
       // which this surface feeds. Until it lands, this binding is reachable only when
       // GITHUB_APP_* is configured (not in production), so no live flow regresses.
-      const tokenExpiresAt = installationExpiryMs(pending.tokenExpiresAt)
-      const credentials = { installationId: pending.installationId, token: pending.token, tokenExpiresAt }
+      const tokenExpiresAt = installationExpiryMs(creds.tokenExpiresAt)
+      const credentials = { installationId: creds.installationId, token: creds.token, tokenExpiresAt }
 
       if (pending.mode === 'add-source') {
         // Link onto the VIEWED workspace the user initiated from — its urlKey was
@@ -281,7 +350,7 @@ export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
       // second repo for the same account adds a binding rather than clobbering
       // the first (bindings are keyed by (provider, scope)). Identity is the
       // GitHub user; per-repo issues are bindings on it (LIN-544).
-      const workspaceId = `github:${pending.userId}`
+      const workspaceId = `github:${creds.userId}`
       const existing = (req.session.workspaces || []).find(w => w.id === workspaceId)
       if (existing) {
         linkProvider(existing, provider.name, repo, credentials)
@@ -291,10 +360,10 @@ export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
         return res.redirect(`/workspace/${encodeURIComponent(existing.urlKey)}/`)
       }
 
-      const urlKey = validateWorkspaceUrlKey(pending.login) ? pending.login : `gh-${pending.userId}`
+      const urlKey = validateWorkspaceUrlKey(creds.login) ? creds.login : `gh-${creds.userId}`
       const workspace = {
         id: workspaceId,
-        name: pending.login,
+        name: creds.login,
         urlKey,
         addedAt: Date.now(),
         // Real installation-token expiry, mirroring the binding (LIN-711); the

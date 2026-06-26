@@ -59,4 +59,28 @@ describe('renderGitHubRepoSelectPage (LIN-541)', () => {
     assert.doesNotMatch(html, /<b>/);
     assert.match(html, /&lt;b&gt;/);
   });
+
+  // Already-installed re-bind path (LIN-728): repos may carry an installationId.
+  test('keeps a flat option list (no optgroups) for a single installation', () => {
+    const single = [
+      { slug: 'octocat/hello-world', name: 'octocat/hello-world', private: false, installationId: '77' },
+      { slug: 'octocat/secret', name: 'octocat/secret', private: true, installationId: '77' },
+    ];
+    const html = renderGitHubRepoSelectPage(single, { mode: 'new' });
+    assert.doesNotMatch(html, /<optgroup/);
+    assert.match(html, /<option value="octocat\/hello-world">/);
+  });
+
+  test('groups options by account when repos span more than one installation (LIN-728)', () => {
+    const multi = [
+      { slug: 'octocat/hello-world', name: 'octocat/hello-world', private: false, installationId: '77' },
+      { slug: 'acme/widgets', name: 'acme/widgets', private: false, installationId: '88' },
+    ];
+    const html = renderGitHubRepoSelectPage(multi, { mode: 'new' });
+    assert.match(html, /<optgroup label="octocat">/);
+    assert.match(html, /<optgroup label="acme">/);
+    // Still submits only the repo slug — server maps repo -> installation.
+    assert.match(html, /<option value="octocat\/hello-world">/);
+    assert.match(html, /<option value="acme\/widgets">/);
+  });
 });
