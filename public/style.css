@@ -279,6 +279,44 @@ button.nav-action {
   cursor: pointer;
 }
 
+/* Harbour brand wordmark (LIN-725, brand S3).
+   Shared by the nav bar and the footer via lib/components/wordmark.js. Stays on
+   the CLI mono stack (--font-structural) — NOT a serif — with a trailing accent
+   dot painted in the brand --teal token (LIN-724). */
+.wordmark {
+  font-family: var(--font-structural);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--fg);
+  text-decoration: none;
+}
+
+.wordmark-accent {
+  color: var(--teal);
+}
+
+a.wordmark:hover {
+  color: var(--teal);
+}
+
+/* Nav bar: leads the filters; nudge it slightly larger than the label/value
+   text and add breathing room before "workspace:". */
+.wordmark-nav {
+  font-size: 1em;
+  margin-right: 1ch;
+}
+
+/* Footer: a quieter brand label sitting under the deploy line. */
+.footer-brand {
+  margin-top: var(--space-2);
+}
+
+.wordmark-footer {
+  color: var(--fg-dim);
+  font-weight: 600;
+  font-size: 0.95em;
+}
+
 /* Queue badge in nav bar */
 .queue-badge {
   display: inline-flex;
