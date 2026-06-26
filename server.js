@@ -45,6 +45,7 @@ import { NotImplementedError } from './lib/providers/interface.js'
 import './lib/providers/linear/index.js' // side effect: self-registers the Linear provider into the registry
 import { localProvider } from './lib/providers/local/index.js' // side effect: self-registers the Local provider; store injected below
 import './lib/providers/github/index.js' // side effect: self-registers the GitHub provider so its OAuth router mounts (LIN-541)
+import './lib/providers/github-projects/index.js' // side effect: self-registers the GitHub Projects v2 provider (LIN-560)
 import { LocalStore } from './lib/local-store.js'
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID, PERIODICALS_PROJECT_ID } from './lib/tree.js'
 import { buildPeriodicalNodes } from './lib/periodicals.js'
@@ -2037,6 +2038,13 @@ app.post('/workspace/:urlKey/settings/providers/add', workspaceFromUrl, async (r
   // must bind onto A (LIN-541).
   if (provider === 'github') {
     return res.redirect(`/auth/github?mode=add-source&workspace=${encodeURIComponent(workspace.urlKey)}`);
+  }
+
+  // GitHub Projects add-source (LIN-560 Session 2) — the board-picker sibling of
+  // the Issues flow, on the same shared GitHub App. Carries the same add-source
+  // mode + viewed-workspace urlKey so the callback binds onto THIS workspace.
+  if (provider === 'github-projects') {
+    return res.redirect(`/auth/github-projects?mode=add-source&workspace=${encodeURIComponent(workspace.urlKey)}`);
   }
 
   // Linear has a real OAuth begin; route into it as the add scaffold. The

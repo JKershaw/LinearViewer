@@ -32,6 +32,14 @@ test.describe('Settings — Providers section (LIN-634)', () => {
     await expect(githubAdd.locator('button')).toHaveCount(1)
   })
 
+  test('offers GitHub Projects as a live add source (unblocked, LIN-560)', async ({ page }) => {
+    const projectsAdd = page.locator('[data-testid="settings-provider-add-github-projects"]')
+    await expect(projectsAdd).toBeVisible()
+    await expect(projectsAdd).not.toContainText('blocked')
+    await expect(projectsAdd).toContainText('GitHub Projects')
+    await expect(projectsAdd.locator('button')).toHaveCount(1)
+  })
+
   test('refresh / test validates the binding and reports success', async ({ page }) => {
     await page.locator('[data-testid="settings-provider-binding"][data-provider="local"] [data-testid="settings-provider-refresh"]').click()
     await page.waitForLoadState('networkidle')

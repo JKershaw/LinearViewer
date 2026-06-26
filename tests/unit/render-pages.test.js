@@ -8,7 +8,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { renderLoginPage, renderGitHubRepoSelectPage } from '../../lib/render-pages.js';
+import { renderLoginPage, renderGitHubRepoSelectPage, renderGitHubProjectSelectPage } from '../../lib/render-pages.js';
 
 describe('renderLoginPage — GitHub CTA gating (LIN-541)', () => {
   test('shows the GitHub button when GitHub OAuth is enabled', () => {
@@ -23,6 +23,39 @@ describe('renderLoginPage — GitHub CTA gating (LIN-541)', () => {
     assert.doesNotMatch(html, /data-testid="login-github"/);
     // Linear login is always offered.
     assert.match(html, /href="\/auth\/linear"/);
+  });
+});
+
+describe('renderGitHubProjectSelectPage (LIN-560 Session 2)', () => {
+  const boards = [
+    { login: 'octocat', number: 5, title: 'Roadmap', url: 'u5', shortDescription: 'd5' },
+    { login: 'octocat', number: 7, title: 'Bugs' },
+  ];
+
+  test('renders a board picker form posting to the Projects link route', () => {
+    const html = renderGitHubProjectSelectPage(boards, { mode: 'new', login: 'octocat' });
+    assert.match(html, /action="\/auth\/github-projects\/link"/);
+    assert.match(html, /data-testid="github-projects-board-select"/);
+    // Option value is the org/projectNumber slug; label folds in the board title.
+    assert.match(html, /<option value="octocat\/5">Roadmap \(octocat\/5\)<\/option>/);
+    assert.match(html, /Installed for octocat/);
+  });
+
+  test('uses add-source heading when linking onto an existing workspace', () => {
+    const html = renderGitHubProjectSelectPage(boards, { mode: 'add-source', login: 'octocat' });
+    assert.match(html, /Add a GitHub project board/);
+  });
+
+  test('empty state names the Projects (read) permission prerequisite (no form)', () => {
+    const html = renderGitHubProjectSelectPage([], { mode: 'new', login: 'octocat' });
+    assert.match(html, /Projects \(read\)/);
+    assert.doesNotMatch(html, /github-projects-board-form/);
+  });
+
+  test('escapes board slugs/titles to prevent injection', () => {
+    const html = renderGitHubProjectSelectPage([{ login: 'a', number: 1, title: '<b>x</b>' }], {});
+    assert.doesNotMatch(html, /<b>x<\/b>/);
+    assert.match(html, /&lt;b&gt;x&lt;\/b&gt;/);
   });
 });
 

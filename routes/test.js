@@ -15,6 +15,12 @@ import { defaultLocalSeed, LOCAL_WORKSPACE_URL_KEY } from '../tests/fixtures/loc
 import '../lib/providers/github/index.js';
 import { createFakeGitHubClient } from '../lib/providers/github/fake-client.js';
 import { defaultGitHubSeed, GITHUB_WORKSPACE_URL_KEY, GITHUB_REPO } from '../tests/fixtures/github-harness.js';
+// Same self-registration for the GitHub Projects v2 provider (LIN-560): importing
+// it registers 'github-projects' so the read seam can resolve a board-backed
+// workspace, and its fake GraphQL client backs the E2E with no network/auth.
+import '../lib/providers/github-projects/index.js';
+import { createFakeGitHubProjectsClient } from '../lib/providers/github-projects/fake-client.js';
+import { defaultGitHubProjectsSeed, GITHUB_PROJECTS_WORKSPACE_URL_KEY, GITHUB_PROJECTS_BOARD } from '../tests/fixtures/github-projects-harness.js';
 
 /**
  * Create test routes with required dependencies.
@@ -738,6 +744,74 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       res.status(500).json({ error: err.message });
     }
   })
+
+  // ---------------------------------------------------------------------------
+  // GitHub Projects v2 provider harness (LIN-560) — a board-shaped backend.
+  // Configures the registered `github-projects` singleton with an in-memory fake
+  // GraphQL client (no network, no auth) and establishes a
+  // `provider: 'github-projects'` session whose binding is scoped to a board
+  // (`org/projectNumber`). The dashboard then renders the board through the real
+  // getProviderForWorkspace + getWorkspaceCallScope read seam — proving the
+  // canonical model maps a Projects v2 board's Status columns offline.
+  // ---------------------------------------------------------------------------
+  const GITHUB_PROJECTS_WS_UUID = '55555555-5555-5555-5555-555555555555';
+  // Stand-in installation access token (mirrors the Issues harness): the binding
+  // credential is the installation token, NOT the board slug. The clientFactory
+  // seam ignores it (returns the fake) but it travels through the real read scope.
+  const GITHUB_PROJECTS_INSTALL_TOKEN = 'ghs_fake_projects_installation_token';
+
+  // POST → seeds a custom `{ seed }` body (the clean board shape, falls back to
+  //        defaultGitHubProjectsSeed). GET → seeds the default.
+  const setGitHubProjectsSession = async (req, res) => {
+    try {
+      const body = req.body || {};
+      const seed = (body.seed && typeof body.seed === 'object') ? body.seed : defaultGitHubProjectsSeed;
+
+      if (body.features && typeof body.features === 'object') {
+        const validated = {}
+        for (const [key, value] of Object.entries(body.features)) {
+          if (isValidFeatureKey(key)) validated[key] = value
+        }
+        req.session.features = validated
+      }
+
+      // Wire the request-time path: the `clientFactory` test seam resolves the
+      // per-request GraphQL client (`_clientForToken`) to the SAME fake, proving
+      // the per-request read path offline. `client` backs any bare-string boot call.
+      const provider = getProvider('github-projects');
+      if (!provider) throw new Error('github-projects provider not registered');
+      const fake = createFakeGitHubProjectsClient({ [GITHUB_PROJECTS_BOARD]: seed });
+      provider.configure({ client: fake, clientFactory: () => fake });
+
+      // GitHub App binding shape: the credential is an INSTALLATION TOKEN and the
+      // board is the binding SCOPE (not the token). The read seam threads
+      // { token, scope } so the provider builds a request-time client from the
+      // installation token. Not 'test-token', so the mock short-circuit never fires.
+      req.session.workspaces = [{
+        id: GITHUB_PROJECTS_WS_UUID,
+        name: 'GitHub Projects Workspace',
+        urlKey: GITHUB_PROJECTS_WORKSPACE_URL_KEY,
+        provider: 'github-projects',
+        bindings: [{
+          provider: 'github-projects',
+          scope: GITHUB_PROJECTS_BOARD,
+          credentials: { token: GITHUB_PROJECTS_INSTALL_TOKEN, installationId: '4243', tokenExpiresAt: Number.MAX_SAFE_INTEGER },
+        }],
+        credentials: { token: GITHUB_PROJECTS_INSTALL_TOKEN, installationId: '4243' },
+        accessToken: GITHUB_PROJECTS_INSTALL_TOKEN,
+        tokenExpiresAt: Number.MAX_SAFE_INTEGER,
+        addedAt: Date.now(),
+      }];
+      req.session.activeWorkspaceId = GITHUB_PROJECTS_WS_UUID;
+      req.session.linearUserId = 'test-github-projects-user-id';
+
+      req.session.save(() => res.json({ ok: true, urlKey: GITHUB_PROJECTS_WORKSPACE_URL_KEY, board: GITHUB_PROJECTS_BOARD }));
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  };
+  router.get('/test/set-github-projects-session', setGitHubProjectsSession);
+  router.post('/test/set-github-projects-session', setGitHubProjectsSession);
 
   return router;
 }
