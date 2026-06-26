@@ -24,6 +24,7 @@ import { generatePrompt, generateCustomPrompt, hasPrompt, getAvailablePrompts } 
 import { renderDetailsContent } from '../lib/render.js';
 import { WORK_ISSUE_LABELS } from '../lib/workflow-config.js';
 import { parseRepoFromDescription, buildPromptFilename } from '../lib/prompt-formatters.js';
+import { buildProxyContextPreamble } from '../lib/proxy-preamble.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { isRecommendationEnabled, getRecommendation, getRecommendationStream, streamChat, getModelDisplayName } from '../lib/openrouter.js';
 import { resolveRecommendation, armHopSignal } from '../lib/recommend-recurse.js';
@@ -251,7 +252,7 @@ export function parseFeedbackImage(image) {
  * @param {Function} options.getOpenRouterSource - Helper to determine OpenRouter source
  * @returns {Router} Express router
  */
-export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore }) {
+export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore }) {
   const router = Router();
 
   // ===========================================================================
@@ -2067,7 +2068,14 @@ ${goal}`
   // Best-effort triage follow-up after a feedback ticket is filed (LIN-635 S6).
   // Non-fatal: a failure here must not fail the submission — the ticket already
   // exists. Reuses the existing dispatch substrate (no separate queue).
-  async function enqueueFeedbackTriage(workspace, issue, priority, session) {
+  //
+  // Gated behind the per-user `feedbackTriage` flag (default off, LIN-733): the
+  // caller only invokes this when the flag is on. When it runs, the triage
+  // prompt always carries this workspace's API proxy details (a short-lived,
+  // best-effort readWrite token + the standard "Workspace API access" block)
+  // so the triage agent can ground itself and update the ticket — the same
+  // preamble the proxy dispatch endpoints append.
+  async function enqueueFeedbackTriage(workspace, issue, priority, session, baseUrl) {
     if (!dispatchQueueStore || !issue?.identifier) return;
     try {
       const triageIssue = {
@@ -2080,8 +2088,24 @@ ${goal}`
         labels: []
       };
       const generated = generatePrompt('triage', triageIssue, { project: null, parent: null, siblings: [] });
-      const prompt = generated?.prompt;
+      let prompt = generated?.prompt;
       if (!prompt) return;
+
+      // Always append the workspace API proxy details to the triage prompt
+      // (LIN-733). Mint a fresh readWrite token for this dispatch; if minting is
+      // unavailable or fails, fall back to dispatching without the block rather
+      // than dropping the triage entirely (best-effort, like the enqueue itself).
+      if (proxyTokenStore && baseUrl) {
+        try {
+          const minted = await proxyTokenStore.createToken(workspace.urlKey, { scope: 'readWrite', label: 'feedback-triage' });
+          if (minted?.token) {
+            prompt += buildProxyContextPreamble({ baseUrl, token: minted.token, issueIdentifier: issue.identifier });
+          }
+        } catch (err) {
+          console.error('Feedback triage proxy token mint failed:', err.message);
+        }
+      }
+
       await dispatchQueueStore.addItem(workspace.urlKey, {
         prompt,
         promptName: 'Triage',
@@ -2217,8 +2241,13 @@ ${goal}`
         return jsonError(res, 502, 'Failed to create feedback ticket');
       }
 
-      // Triage follow-up — best-effort, never fails the submission.
-      await enqueueFeedbackTriage(workspace, result.issue, priority, req.session);
+      // Triage follow-up — opt-in (default off, LIN-733) and best-effort, never
+      // fails the submission. Only dispatch when the per-user `feedbackTriage`
+      // flag is on; when it is, the prompt carries the proxy details below.
+      if (getFeatureFlags(req.session).feedbackTriage) {
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        await enqueueFeedbackTriage(workspace, result.issue, priority, req.session, baseUrl);
+      }
 
       return res.status(201).json({ success: true, issue: result.issue });
     } catch (error) {
