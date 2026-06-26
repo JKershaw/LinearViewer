@@ -184,7 +184,9 @@ describe('feedback submit (LIN-635)', () => {
   test('uploads an embedded screenshot and embeds its URL', async () => {
     const { provider, calls } = makeFakeProvider();
     const app = buildApp({ provider, dispatchQueueStore: capturingDispatchStore() });
-    const png = Buffer.from('imgbytes').toString('base64');
+    // Valid PNG magic bytes — parseFeedbackImage sniffs the bytes (LIN-682), so
+    // the fixture must be a real raster header, not arbitrary text.
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d]).toString('base64');
     const { status } = await submit(app, 'acme', { message: 'see shot', image: `data:image/png;base64,${png}` });
     assert.strictEqual(status, 201);
     assert.strictEqual(calls.uploadFile.length, 1);
