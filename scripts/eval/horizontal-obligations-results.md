@@ -22,7 +22,7 @@ implementation that landed "locally right but globally wrong" because the resear
 of something already modelled and missed cross-surface sync / lifecycle. GOLD-1/GOLD-2 re-encode that
 failure shape at author-visible-evidence fidelity (the literal KUL-567 code lives in another project).
 
-## Results
+## Results — Run 1 (soft guard only, the as-reviewed 403b5ef diff)
 
 | case | axis tested | gen | arm A (pre-LIN-697) | arm B (live) | Δ |
 |---|---|---|---|---|---|
@@ -35,45 +35,55 @@ failure shape at author-visible-evidence fidelity (the literal KUL-567 code live
 
 (For CTRL-1, a YES = ritual axis-listing on a trivial task = **bad**. We want B low and Δ≈0.)
 
+**Run-1 reading.** The directive worked on the decisive second-representation case (GOLD-1, the exact
+KUL-567 failure shape) — 40%→90% on the prod model — but the **overfitting control fired**: the live
+prompt produced a full Horizontal Obligations section + "Attack your own research" pass on a
+one-character typo fix 50% of runs (stripped prompt: 0%). Inspected samples confirmed genuine ritual
+axis-listing, not a judge artifact. Diagnosis: the scale-to-task guard lived in `formatScaleToTask()`
+several paragraphs *upstream*, while the `### Horizontal Obligations` header opened with an
+unconditional imperative — so the model obeyed the local instruction. Run-1 decision was **do not merge**.
+
+## Fix — local applicability gate (positive framing)
+
+A one-line gate at the section head, carrying the guard with the imperative it governs, framed as *what
+to do on a small task* rather than a prohibition:
+
+> *This applies when the change touches shared structure, more than one surface, or data the system
+> already models. For a genuinely small, single-surface change — a typo, a constant or config edit, a
+> one-file change — record the file and the fix and go straight to the Surface Assessment below.*
+
+Mirrored into the meta-prompt Research-prompts bullet (both-paths rule); Linear byte-identical parity
+test stays green; 161/161 unit tests pass (one added to pin the gate). No new checklist sections — the
+direction the plan warned against.
+
+## Results — Run 2 (with the local gate) — the shipping config
+
+| case | gen | arm A (pre-LIN-697) | arm B (live) | Δ |
+|---|---|---|---|---|
+| **GOLD-1** archived-vs-status (2nd representation) | **gpt-5.4-mini** | 4/10 (40%) | **10/10 (100%)** | **+60** ✅ |
+| GOLD-1 | haiku | 7/10 (70%) | 8/10 (80%) | +10 |
+| **GOLD-2** retryCount sync + lifecycle | **gpt-5.4-mini** | 6/10 (60%) | **9/10 (90%)** | **+30** ✅ |
+| GOLD-2 | haiku | 6/10 (60%) | 10/10 (100%) | +40 |
+| **CTRL-1** footer typo (control) | **gpt-5.4-mini** | 0/10 (0%) | **0/10 (0%)** | **0** ✅ |
+| CTRL-1 | haiku | 0/10 (0%) | 0/10 (0%) | 0 ✅ |
+
 ## Reading
 
-- **The directive works where it matters.** On the prod model, the decisive second-representation
-  case (GOLD-1 — the exact KUL-567 failure shape) jumps **40% → 90%, Δ+50**. The live prompt reliably
-  gets the research to flag that the new `archived` flag duplicates the existing `status` lifecycle and
-  must stay in sync across the server + client sidebar filters, where the stripped prompt misses it 60%
-  of the time. This is a real, prod-model lift on the case the change exists for.
-- **GOLD-2 is flat (Δ0), not a regression.** The sync/lifecycle obligations on the dispatch-retry case
-  were already surfaced ~60–70% by both arms; the directive neither helped nor hurt there.
-- **The overfitting control FIRES on the prod model.** On gpt-5.4-mini the live prompt produces a full
-  Horizontal Obligations section (all four axes) **plus** an "Attack your own research" pass on a
-  **one-character typo fix** — 50% of runs, vs **0%** for the stripped prompt (Δ+50). Inspected samples
-  confirm it's genuine ritual axis-listing (each axis named, mostly concluding "n/a / lands cleanly"),
-  not a judge artifact; the judge was if anything conservative. haiku mostly resists (10%), so the
-  overfit is prod-model-specific — and the prod model is the one that ships.
+- **Overfitting eliminated.** The control drops to **0% on both models** (was 50% / 10%) — the local
+  gate gives small/single-surface tasks a clean off-ramp; no more ritual axis-listing on a typo.
+- **Gold lifts improved, not traded away.** GOLD-1 goes to a perfect **100%** on the prod model (Δ+60);
+  GOLD-2 moves from flat to **+30** (prod) / **+40** (haiku). Sharpening *when the section applies* both
+  killed the ritual on trivial work and primed the model to recognise the real obligation cases — a
+  positive-sum change, not a precision/recall trade.
+- No regression on any cell across either model.
 
-## Decision: **DO NOT MERGE (yet)**
+## Decision: **MERGE-ELIGIBLE**
 
-Per the pre-registered decision rule (LIN-697 plan watch-item + the dispatch directive): a positive
-lift is necessary but **not sufficient** — the small-task control must also show no overfitting. It
-does not. The scale-to-task guard (`formatScaleToTask()` in `lib/prompt-formatters.js`, which names
-the new `/obligations` sub-steps) is **too weak to suppress the obligation tax on small/single-surface
-tasks on the prod model**. Merging as-is would ship exactly the "ritual compliance / attention thins on
-trivial work" failure the LIN-697 plan named as the thing to watch for.
-
-This is a **good** result for the directive's core idea and a **fail** for its current guard wording.
-
-## Routed next action
-
-Tighten the scale-to-task wording so a genuinely small / single-surface research task **skips the
-Horizontal Obligations + Attack passes entirely** on gpt-5.4-mini (not just lists them as "n/a"), then
-re-run `ONLY=CTRL-1 GEN_MODELS=openai/gpt-5.4-mini node scripts/eval-horizontal-obligations.mjs` and
-confirm CTRL-1 Arm B drops back toward 0% **without** regressing GOLD-1 Arm B (must stay ≥ ~80%).
-Candidate levers (do NOT add more checklist sections — that's the wrong direction the plan warned about):
-- Make the guard a hard *gate* at the top of the obligations block ("If the task is a typo, a constant/
-  config change, or a one-file edit, STOP here — do not produce a Horizontal Obligations section"),
-  rather than a soft "skip the heavier sub-steps" hint several paragraphs upstream.
-- The both-paths rule applies: the same tightening must land in the meta-prompt Research-prompts bullet,
-  and the Linear byte-identical parity test must stay green.
+Both pre-registered conditions are now met on the prod model: a positive lift on the gold cases
+(GOLD-1 +60, GOLD-2 +30) **and** a clean small-task control (0%, Δ0). The tightening is the routed fix
+the Run-1 finding called for. Note: this adds a small prompt change beyond the human-reviewed `403b5ef`
+diff — the gate line + its meta-prompt mirror — so the final merge call should acknowledge the diff
+moved since review.
 
 ## Caveats
 

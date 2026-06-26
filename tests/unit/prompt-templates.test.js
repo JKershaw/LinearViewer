@@ -1477,6 +1477,22 @@ describe('Horizontal Obligations (handwritten path)', () => {
     );
   });
 
+  // LIN-697 eval (2026-06-26): the upstream scale-to-task hint alone left gpt-5.4-mini
+  // ritually filling the obligations section on a one-file typo (control fired 50%). The
+  // fix is a LOCAL applicability gate at the section head — positive framing (what to do
+  // on a small task + a clean off-ramp), so the gate travels with the imperative it governs.
+  test('the Horizontal Obligations block leads with a local small-task off-ramp', () => {
+    const result = generatePrompt('research', mockIssue, mockContext);
+    const headerAt = result.prompt.indexOf('### Horizontal Obligations');
+    const imperativeAt = result.prompt.indexOf('characterise not just');
+    const gateAt = result.prompt.indexOf('go straight to the Surface Assessment');
+    assert.ok(gateAt > headerAt && gateAt < imperativeAt,
+      'the small-task off-ramp must sit at the section head, before the obligations imperative');
+    assert.ok(
+      result.prompt.includes('This applies when the change touches shared structure, more than one surface, or data the system already models'),
+      'the gate must positively state when the section applies');
+  });
+
   test('meta-prompt mirrors the obligations directives in the Research-prompts rule', () => {
     const p = buildMetaPromptTemplate({
       issueContext: 'CTX', identifier: 'LIN-901',
