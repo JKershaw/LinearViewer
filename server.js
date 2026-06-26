@@ -51,6 +51,7 @@ import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActi
 import { buildPeriodicalNodes } from './lib/periodicals.js'
 import { parseRepoFromDescription } from './lib/prompt-formatters.js'
 import { renderPage, renderErrorPage, renderUpstreamAwareErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
+import { isAuthError } from './lib/errors.js'
 import { renderLandingHero } from './lib/components/landing-hero.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken } from './lib/token-refresh.js'
@@ -1287,7 +1288,7 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
     console.error('Error fetching projects:', error);
 
     // Handle 401 Unauthorized - attempt refresh or remove workspace
-    if (error.response?.status === 401) {
+    if (isAuthError(error)) {
       return handleUnauthorizedError(workspace, req.session, teamId, openRouterSource, res);
     }
 
@@ -1356,7 +1357,7 @@ app.get('/workspace/:urlKey/swipe/:identifier?', workspaceFromUrl, async (req, r
   } catch (error) {
     console.error('Swipe page error:', error);
 
-    if (error.response?.status === 401) {
+    if (isAuthError(error)) {
       return handleUnauthorizedError(workspace, req.session, teamId, openRouterSource, res);
     }
 
@@ -1399,7 +1400,7 @@ app.get('/workspace/:urlKey/swim', workspaceFromUrl, async (req, res) => {
   } catch (error) {
     console.error('Swim page error:', error);
 
-    if (error.response?.status === 401) {
+    if (isAuthError(error)) {
       return handleUnauthorizedError(workspace, req.session, teamId, openRouterSource, res);
     }
 
@@ -1463,7 +1464,7 @@ app.get('/workspace/:urlKey/ship', workspaceFromUrl, async (req, res) => {
   } catch (error) {
     console.error('Ship page error:', error);
 
-    if (error.response?.status === 401) {
+    if (isAuthError(error)) {
       return handleUnauthorizedError(workspace, req.session, teamId, openRouterSource, res);
     }
 
@@ -1515,7 +1516,7 @@ app.get('/workspace/:urlKey/roadmap', workspaceFromUrl, async (req, res) => {
   } catch (error) {
     console.error('Roadmap page error:', error);
 
-    if (error.response?.status === 401) {
+    if (isAuthError(error)) {
       return handleUnauthorizedError(workspace, req.session, teamId, openRouterSource, res);
     }
 
