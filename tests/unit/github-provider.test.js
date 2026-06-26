@@ -150,8 +150,14 @@ describe('GitHubProvider reads', () => {
   test('fetchProjects returns canonical {organizationName, projects, issues}', async () => {
     const { organizationName, projects, issues } = await provider.fetchProjects(REPO);
     assert.equal(organizationName, 'octocat'); // owner is the org analog
-    assert.equal(projects.length, 1);
+    // The repo binding itself is always emitted as a container (LIN-718),
+    // sorted first (sortOrder 0), with milestones following.
+    assert.equal(projects.length, 2);
     assert.deepEqual(projects[0], {
+      id: REPO, name: REPO, content: null,
+      url: `https://github.com/${REPO}`, sortOrder: 0,
+    });
+    assert.deepEqual(projects[1], {
       id: '1', name: 'v1.0', content: 'first release',
       url: `https://github.com/${REPO}/milestone/1`, sortOrder: 1,
     });
@@ -169,6 +175,30 @@ describe('GitHubProvider reads', () => {
 
     assert.equal(issues.find(i => i.id === '2').state.type, 'completed');
     assert.equal(issues.find(i => i.id === '3').state.type, 'canceled');
+  });
+
+  test('fetchProjects emits the repo container even for a zero-issue, zero-milestone repo (LIN-718)', async () => {
+    const EMPTY = 'octocat/empty-repo';
+    const emptyProvider = new GitHubProvider({ client: createFakeGitHubClient({ [EMPTY]: { milestones: [], issues: [], labels: [] } }) });
+    const { projects, issues } = await emptyProvider.fetchProjects(EMPTY);
+    assert.equal(issues.length, 0);
+    // Exactly one container — the repo binding itself — so the tree renders an
+    // empty GitHub Issues container instead of nothing at all.
+    assert.equal(projects.length, 1);
+    assert.deepEqual(projects[0], {
+      id: EMPTY, name: EMPTY, content: null,
+      url: `https://github.com/${EMPTY}`, sortOrder: 0,
+    });
+  });
+
+  test('fetchProjects: milestone-less issues keep project:null (No-Project grouping unchanged by LIN-718)', async () => {
+    const { issues } = await provider.fetchProjects(REPO);
+    // The repo container is empty: no issue is re-parented onto it. Milestone-less
+    // issues (#2, #3) still carry project:null, so they stay in the synthetic
+    // 'No Project' group — the re-parenting decision is deferred (open question).
+    assert.equal(issues.find(i => i.id === '2').project, null);
+    assert.equal(issues.find(i => i.id === '3').project, null);
+    assert.deepEqual(issues.find(i => i.id === '1').project, { id: '1', name: 'v1.0' });
   });
 
   test('fetchTeams returns [] (repos are the team analog — A⇄D interaction, not a throw)', async () => {
@@ -297,7 +327,7 @@ describe('GitHubProvider per-request client from binding credential (LIN-713)', 
     const { organizationName, projects, issues } =
       await provider.fetchProjects({ repo: REPO, token: 'ghs_install_token' });
     assert.equal(organizationName, 'octocat');
-    assert.equal(projects.length, 1);
+    assert.equal(projects.length, 2); // repo container (LIN-718) + 1 milestone
     assert.equal(issues.length, 3);
     // Built the per-request client from the installation token (never the boot client).
     assert.deepEqual(tokensSeen, ['ghs_install_token']);
