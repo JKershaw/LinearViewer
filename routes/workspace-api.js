@@ -1418,6 +1418,14 @@ ${goal}`
 
       const isLocalhost = ['localhost', '127.0.0.1'].some(h => req.get('host')?.startsWith(h))
 
+      // The same issue can be lazily expanded in two sections at once (e.g. In
+      // Progress + its project tree). `section` disambiguates the dispatch
+      // disclosure panel ids so the second appearance's "Dispatch ▾" resolves to
+      // its OWN panel, not the first one's (LIN-732). Whitelisted to the known
+      // render sections; anything else falls back to '' (pre-LIN-732 id scheme).
+      const KNOWN_SECTIONS = ['project', 'in-progress', 'recent-activity']
+      const section = KNOWN_SECTIONS.includes(req.query.section) ? req.query.section : ''
+
       const html = renderDetailsContent(issue, {
         isLanding: false,
         openRouterSource: getOpenRouterSource(req),
@@ -1425,7 +1433,8 @@ ${goal}`
         featureFlags: getFeatureFlags(req.session),
         customPrompts,
         isLocalhost,
-        provider
+        provider,
+        section
       })
 
       res.json({ html })

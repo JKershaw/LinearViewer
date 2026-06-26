@@ -757,3 +757,56 @@ describe('Recent activity section', () => {
     assert.ok(html.includes('class="completed-time"'), 'activity time badge present for created row');
   });
 });
+
+// =============================================================================
+// Per-render-instance dispatch panel ids (LIN-732)
+// =============================================================================
+//
+// The same issue can be rendered in two sections at once (In Progress + its
+// project tree). The dispatch disclosure resolves its panel via aria-controls →
+// getElementById, which only matches the FIRST element with that id — so a panel
+// id keyed on issue id alone makes the second appearance's "Dispatch ▾" target
+// the first's panel and look broken. The fix folds `section` into the panel ids.
+describe('Per-render-instance dispatch panel ids (LIN-732)', () => {
+  const issue = {
+    id: 'i1', identifier: 'STB-1', title: 'A task',
+    state: { type: 'started' }, labels: { nodes: [] }
+  };
+  const flags = { dispatch: true, proxy: true };
+  const opts = (section) => ({ isLanding: false, urlKey: 'ws', featureFlags: flags, section });
+
+  test('no section ⇒ ids keyed on issue id (byte-identical to pre-LIN-732)', () => {
+    const html = renderDetailsContent(issue, opts(''));
+    assert.ok(html.includes('id="prompt-options-i1"'), 'prompt panel keyed on issue id');
+    assert.ok(html.includes('id="recommend-options-i1"'), 'recommend panel keyed on issue id');
+    assert.ok(html.includes('id="autopilot-options-i1"'), 'autopilot panel keyed on issue id');
+  });
+
+  test('section is folded into every dispatch panel id', () => {
+    const html = renderDetailsContent(issue, opts('in-progress'));
+    assert.ok(html.includes('id="prompt-options-in-progress-i1"'), 'prompt panel namespaced by section');
+    assert.ok(html.includes('id="recommend-options-in-progress-i1"'), 'recommend panel namespaced by section');
+    assert.ok(html.includes('id="autopilot-options-in-progress-i1"'), 'autopilot panel namespaced by section');
+    assert.ok(!html.includes('id="prompt-options-i1"'), 'no bare issue-id panel id remains');
+  });
+
+  test('two sections yield disjoint panel ids for the same issue (no DOM collision)', () => {
+    const ids = (section) => {
+      const html = renderDetailsContent(issue, opts(section));
+      return [...html.matchAll(/id="((?:prompt|recommend|autopilot)-options-[^"]+)"/g)].map(m => m[1]);
+    };
+    const inProgress = ids('in-progress');
+    const project = ids('project');
+    assert.equal(inProgress.length, 3, 'three dispatch panels per render instance');
+    const overlap = inProgress.filter(id => project.includes(id));
+    assert.deepEqual(overlap, [], 'In Progress and project appearances share no panel id');
+  });
+
+  test('the disclosure trigger aria-controls matches its own panel id', () => {
+    const html = renderDetailsContent(issue, opts('in-progress'));
+    // Every aria-controls value must have a matching id="" in the same render.
+    for (const m of html.matchAll(/aria-controls="((?:prompt|recommend|autopilot)-options-[^"]+)"/g)) {
+      assert.ok(html.includes(`id="${m[1]}"`), `panel ${m[1]} exists for its trigger`);
+    }
+  });
+});

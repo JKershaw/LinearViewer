@@ -224,9 +224,16 @@ async function loadDetails(details) {
   // 'loading' or 'true' — already fetched or in flight; don't refetch.
   if (details.dataset.loaded) return
 
+  // Forward the wrapper's section so the rendered dispatch disclosure panel ids
+  // are unique per render instance. The same issue can be expanded in two
+  // sections at once (In Progress + project tree); without this the second
+  // appearance's "Dispatch ▾" resolves to the first's panel (LIN-732).
+  const section = details.dataset.section || ''
+  const sectionQuery = section ? `?section=${encodeURIComponent(section)}` : ''
+
   details.dataset.loaded = 'loading'
   try {
-    const data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/detail/${encodeURIComponent(issueId)}`)
+    const data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/detail/${encodeURIComponent(issueId)}${sectionQuery}`)
     details.innerHTML = (data && data.html) || ''
     details.dataset.loaded = 'true'
   } catch (error) {
