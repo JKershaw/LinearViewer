@@ -1564,7 +1564,7 @@ describe('Scale to the task (handwritten path)', () => {
 // LIN-177 S4/S5: Capability-aware prompts (provider.ui threaded into both paths)
 // =============================================================================
 import { generateCustomPrompt } from '../../lib/prompt-templates.js';
-import { resolvePromptUi, applyPromptCapabilities, DEFAULT_PROMPT_UI, formatSubtaskSummary, appendGroundingSections } from '../../lib/prompt-formatters.js';
+import { resolvePromptUi, applyPromptCapabilities, DEFAULT_PROMPT_UI, formatSubtaskSummary, appendGroundingSections, formatPlanFidelityCheck } from '../../lib/prompt-formatters.js';
 import { applyGroundingToRecommendation } from '../../lib/openrouter.js';
 import { buildMetaPromptTemplate } from '../../lib/prompts/meta-prompt-template.js';
 
@@ -1936,5 +1936,79 @@ describe('cross-path grounding parity (LIN-435)', () => {
 
     const meta = applyGroundingToRecommendation({ prompt: 'BODY' }, terminalBug, ctx);
     assert.strictEqual(meta.prompt, 'BODY' + grounding, 'meta path matches for the terminal+bug case too');
+  });
+});
+
+// =============================================================================
+// Plan-fidelity reconciliation + refactor-equivalence (LIN-698). The
+// implementation template already re-grounds the TICKET's claims about the code
+// against HEAD; it lacked the symmetric re-grounding of the PLAN's claims about
+// the research. Add that check (plus the refactor/behavior-preservation
+// equivalence guidance) on BOTH prompt paths, kept implementation-specific and
+// deliberately NOT routed through the universal appendGroundingSections seam.
+// =============================================================================
+describe('plan-fidelity reconciliation + refactor-equivalence (LIN-698)', () => {
+  const mockIssue = {
+    id: 'issue-pf', identifier: 'TEST-PF1', title: 'Implement a thing',
+    description: 'Implement the planned change', url: 'https://linear.app/test/issue/TEST-PF1',
+    state: { name: 'Todo', type: 'unstarted' }, labels: ['implementation']
+  };
+  const mockContext = { parent: null, siblings: [], project: null, children: [], comments: [] };
+
+  test('implementation template adds a Re-ground the Plan fidelity check', () => {
+    const result = generatePrompt('implementation', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('Re-ground the Plan'), 'implementation must include the plan-fidelity check');
+    assert.ok(result.prompt.includes('distillation'), 'must frame the plan as a distillation of the research');
+    assert.ok(
+      result.prompt.includes('research/exploration notes') && result.prompt.includes('comment thread'),
+      'must direct reading the research notes and comment thread, not just the description'
+    );
+    assert.ok(
+      result.prompt.includes('"preserve this behavior" constraint'),
+      'must require extracting the research constraints, not just a staleness skim'
+    );
+  });
+
+  test('implementation template tightens Guideline 1 to research-wins-on-conflict', () => {
+    const result = generatePrompt('implementation', mockIssue, mockContext);
+    assert.ok(
+      result.prompt.includes("research's reasoning wins"),
+      'Guideline 1 must defer to the research when plan and research conflict'
+    );
+    assert.ok(
+      !result.prompt.includes('Follow the plan, including any history-sourced constraints it documented'),
+      'the old plan-only Guideline 1 wording must be replaced'
+    );
+  });
+
+  test('implementation template adds a refactor / behavior-preservation equivalence check', () => {
+    const result = generatePrompt('implementation', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('behavior-preserving'), 'must address behavior-preserving / refactor labels');
+    assert.ok(result.prompt.includes('characterization test'), 'must call for a characterization test of old behavior');
+  });
+
+  test('the plan-fidelity prose is provider-agnostic (no hardcoded Linear)', () => {
+    assert.ok(!formatPlanFidelityCheck().includes('Linear'), 'shared template prose must not hardcode a tracker name');
+  });
+
+  test('plan-fidelity is NOT routed through the universal grounding seam (LIN-698 anti-pattern)', () => {
+    const issue = { identifier: 'LIN-700', createdAt: '2026-03-01T00:00:00.000Z', labels: ['implementation'] };
+    const grounding = appendGroundingSections('', issue, { children: [], comments: [] });
+    assert.ok(
+      !grounding.includes('Re-ground the Plan'),
+      'plan-fidelity must stay implementation-specific and not leak into the universal grounding sections'
+    );
+  });
+
+  test('meta-prompt mirrors the plan-fidelity + refactor-equivalence directives (both-paths rule)', () => {
+    const p = buildMetaPromptTemplate({
+      issueContext: 'CTX', identifier: 'LIN-902',
+      hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
+      hasComments: false, commentCount: 0, aiHints: 'H', actionVocabulary: 'plan, review, implement',
+      completionSignals: 'S', focusedSubtaskId: null, isTerminal: false, hasOpenChildren: false
+    });
+    assert.ok(/reconcile the plan against the research/.test(p), 'meta-prompt must require plan-vs-research reconciliation');
+    assert.ok(/research's reasoning wins/.test(p), 'meta-prompt must give the research priority on conflict');
+    assert.ok(/characterization test/.test(p), 'meta-prompt must require characterizing old behavior for refactor labels');
   });
 });
