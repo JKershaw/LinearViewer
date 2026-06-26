@@ -40,6 +40,41 @@ test.describe('Settings — Providers section (LIN-634)', () => {
     await expect(notice).toContainText('local credentials are valid')
   })
 
+  test('switch re-points the active provider and persists across reload (LIN-717)', async ({ page, seedLocal }) => {
+    // Seed a coexisting second binding (GitHub) alongside the active local one.
+    ({ urlKey } = await seedLocal(null, {
+      extraBindings: [
+        { provider: 'github', scope: 'octo/repo', credentials: { token: 'gh-install-tok', installationId: '99', tokenExpiresAt: Number.MAX_SAFE_INTEGER } },
+      ],
+    }))
+    await page.goto(`/workspace/${urlKey}/settings`)
+    await page.waitForLoadState('networkidle')
+
+    const localBinding = page.locator('[data-testid="settings-provider-binding"][data-provider="local"]')
+    const githubBinding = page.locator('[data-testid="settings-provider-binding"][data-provider="github"]')
+
+    // Both bindings coexist; local is active (●), GitHub offers "make active".
+    await expect(localBinding.locator('.provider-active')).toBeVisible()
+    await expect(githubBinding.locator('.provider-active')).toHaveCount(0)
+    await expect(githubBinding.locator('[data-testid="settings-provider-activate"]')).toBeVisible()
+
+    // Switch the active provider to GitHub.
+    await githubBinding.locator('[data-testid="settings-provider-activate"]').click()
+    await page.waitForLoadState('networkidle')
+
+    await expect(page.locator('[data-testid="settings-provider-notice"]')).toContainText('Switched active provider to github')
+    // Active marker now tracks GitHub; local exposes the switch instead.
+    await expect(githubBinding.locator('.provider-active')).toBeVisible()
+    await expect(localBinding.locator('.provider-active')).toHaveCount(0)
+    await expect(localBinding.locator('[data-testid="settings-provider-activate"]')).toBeVisible()
+
+    // Persisted: a fresh load keeps GitHub active.
+    await page.goto(`/workspace/${urlKey}/settings`)
+    await page.waitForLoadState('networkidle')
+    await expect(githubBinding.locator('.provider-active')).toBeVisible()
+    await expect(localBinding.locator('.provider-active')).toHaveCount(0)
+  })
+
   test('remove unlinks the binding and persists across reload', async ({ page }) => {
     await page.locator('[data-testid="settings-provider-binding"][data-provider="local"] [data-testid="settings-provider-remove"]').click()
     await page.waitForLoadState('networkidle')

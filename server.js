@@ -52,7 +52,7 @@ import { parseRepoFromDescription } from './lib/prompt-formatters.js'
 import { renderPage, renderErrorPage, renderUpstreamAwareErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken } from './lib/token-refresh.js'
-import { UUID_REGEX, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, updateWorkspaceTokens, getWorkspaceToken, getBindingsForWorkspace, getBindingCallScope, getWorkspaceCallScope, linkProvider, unlinkProvider, remintActiveCredential } from './lib/workspace.js'
+import { UUID_REGEX, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, updateWorkspaceTokens, getWorkspaceToken, getBindingsForWorkspace, getBindingCallScope, getWorkspaceCallScope, linkProvider, unlinkProvider, setActiveProvider, remintActiveCredential } from './lib/workspace.js'
 import { createWorkspaceRoutes } from './routes/workspace.js'
 import { createOpenRouterAuthRoutes } from './routes/openrouter-auth.js'
 import { createDispatchRoutes } from './routes/dispatch.js'
@@ -1558,6 +1558,9 @@ function providerNoticeFromQuery(query = {}) {
   if (query.provider_removed) {
     return { type: 'ok', text: `Removed ${query.provider_removed} binding.` };
   }
+  if (query.provider_switched) {
+    return { type: 'ok', text: `Switched active provider to ${query.provider_switched}.` };
+  }
   if (query.provider_ok) {
     return { type: 'ok', text: `${query.provider_ok} credentials are valid.` };
   }
@@ -1594,13 +1597,15 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
   // Provider bindings for the Providers management section (LIN-634). Shape each
   // binding with its provider's human displayName (registry); the masked-token
   // and active-marker presentation lives in the renderer. Mark the binding whose
-  // provider matches the workspace's active pointer.
+  // provider matches the workspace's active pointer AND whose credential is the one
+  // mirrored into the scalar fields — provider-name alone would mark two same-provider
+  // bindings active at once (mirrors remintActiveCredential's active-binding match).
   const providerBindings = getBindingsForWorkspace(workspace).map(b => ({
     provider: b.provider,
     scope: b.scope,
     displayName: getProvider(b.provider)?.ui?.displayName || b.provider,
     token: b.credentials?.token,
-    active: b.provider === workspace.provider,
+    active: b.provider === workspace.provider && b.credentials?.token === workspace.accessToken,
   }));
   const providerNotice = providerNoticeFromQuery(req.query);
 
@@ -1939,6 +1944,37 @@ app.post('/workspace/:urlKey/settings/providers/remove', workspaceFromUrl, async
   }
 
   res.redirect(`${settingsUrl}?provider_removed=${encodeURIComponent(provider)}`);
+});
+
+/**
+ * Switch the active provider of the viewed workspace to an existing binding
+ * (LIN-717). The coexistence fix: bindings already survive an add-source, but
+ * nothing could re-point the single active provider the views render. Mirrors the
+ * /providers/remove POST→redirect pattern; setActiveProvider moves the active
+ * pointer + scalar credential mirror atomically, no-op on an unknown binding.
+ */
+app.post('/workspace/:urlKey/settings/providers/switch', workspaceFromUrl, async (req, res) => {
+  const workspace = req.workspace;
+  const settingsUrl = `/workspace/${encodeURIComponent(workspace.urlKey)}/settings`;
+  const { provider, scope } = req.body;
+
+  if (!provider || !scope) {
+    return res.redirect(`${settingsUrl}?provider_error=invalid`);
+  }
+
+  setActiveProvider(workspace, provider, scope);
+
+  try {
+    await saveSession(req.session);
+  } catch (err) {
+    console.error('Failed to persist provider switch:', err);
+    return res.status(500).send(renderErrorPage('Settings Error', 'Failed to switch provider. Please try again.', {
+      action: 'Back to settings',
+      actionUrl: settingsUrl
+    }));
+  }
+
+  res.redirect(`${settingsUrl}?provider_switched=${encodeURIComponent(provider)}`);
 });
 
 /**

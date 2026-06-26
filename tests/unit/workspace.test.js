@@ -13,6 +13,7 @@ import {
   getWorkspaceToken,
   linkProvider,
   unlinkProvider,
+  setActiveProvider,
   getBindingsForWorkspace,
   getBindingCallScope,
   getWorkspaceCallScope,
@@ -326,6 +327,71 @@ describe('unlinkProvider', () => {
     const ws = { id: 'ws-1' };
     assert.doesNotThrow(() => unlinkProvider(ws, 'linear', 'org-1'));
     assert.strictEqual(ws.id, 'ws-1');
+  });
+});
+
+// =============================================================================
+// setActiveProvider Tests (LIN-717)
+// =============================================================================
+
+describe('setActiveProvider', () => {
+  test('re-points the active pointer + scalar mirror to the chosen binding', () => {
+    // linear is active (first link wins); GitHub is appended (coexists).
+    const ws = linkProvider({ id: 'ws-1' }, 'linear', 'org-1', { token: 'lin', refreshToken: 'lr', tokenExpiresAt: 100 });
+    linkProvider(ws, 'github', 'owner/repo', { token: 'gh', tokenExpiresAt: 999 });
+    assert.strictEqual(ws.provider, 'linear');
+    assert.strictEqual(ws.accessToken, 'lin');
+
+    setActiveProvider(ws, 'github', 'owner/repo');
+
+    assert.strictEqual(ws.provider, 'github');
+    assert.strictEqual(ws.accessToken, 'gh');
+    assert.strictEqual(ws.credentials.token, 'gh');
+    assert.strictEqual(ws.tokenExpiresAt, 999);
+    // Both bindings still present — a pointer move, not a removal.
+    assert.strictEqual(getBindingsForWorkspace(ws).length, 2);
+  });
+
+  test('clears refreshToken in the mirror when the target binding has none', () => {
+    // Linear carries a refreshToken; GitHub App tokens do not. Switching must not
+    // leave the stale Linear refreshToken in the scalar mirror.
+    const ws = linkProvider({ id: 'ws-1' }, 'linear', 'org-1', { token: 'lin', refreshToken: 'lr' });
+    linkProvider(ws, 'github', 'owner/repo', { token: 'gh' });
+    setActiveProvider(ws, 'github', 'owner/repo');
+    assert.strictEqual(ws.refreshToken, undefined);
+  });
+
+  test('is a no-op for an unknown (provider, scope)', () => {
+    const ws = linkProvider({ id: 'ws-1' }, 'linear', 'org-1', { token: 'lin' });
+    setActiveProvider(ws, 'github', 'nope');
+    assert.strictEqual(ws.provider, 'linear');
+    assert.strictEqual(ws.accessToken, 'lin');
+  });
+
+  test('is idempotent when the binding is already active', () => {
+    const ws = linkProvider({ id: 'ws-1' }, 'linear', 'org-1', { token: 'lin', tokenExpiresAt: 100 });
+    linkProvider(ws, 'github', 'owner/repo', { token: 'gh' });
+    setActiveProvider(ws, 'linear', 'org-1');
+    assert.strictEqual(ws.provider, 'linear');
+    assert.strictEqual(ws.accessToken, 'lin');
+    assert.strictEqual(ws.tokenExpiresAt, 100);
+  });
+
+  test('distinguishes two same-provider bindings by scope', () => {
+    // Two GitHub repos; linkProvider mirrors the last same-provider link, so repo-b
+    // is active. Switching back to repo-a must re-point the mirror to repo-a's token.
+    const ws = linkProvider({ id: 'ws-1' }, 'github', 'owner/a', { token: 'tok-a' });
+    linkProvider(ws, 'github', 'owner/b', { token: 'tok-b' });
+    assert.strictEqual(ws.accessToken, 'tok-b');
+
+    setActiveProvider(ws, 'github', 'owner/a');
+
+    assert.strictEqual(ws.provider, 'github');
+    assert.strictEqual(ws.accessToken, 'tok-a');
+  });
+
+  test('is a no-op on a null workspace', () => {
+    assert.doesNotThrow(() => setActiveProvider(null, 'linear', 'org-1'));
   });
 });
 

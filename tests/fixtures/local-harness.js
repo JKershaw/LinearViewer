@@ -252,7 +252,7 @@ export function createLocalProvider() {
  * @param {import('@playwright/test').Page} page
  * @param {{projects?: Array, issues?: Array}} [seed] - defaults to the urlKey-aware
  *   defaultLocalSeed for the resolved `urlKey`
- * @param {{features?: Object, openRouterConnected?: boolean, freeTierEnabled?: boolean, urlKey?: string}} [options] -
+ * @param {{features?: Object, openRouterConnected?: boolean, freeTierEnabled?: boolean, extraBindings?: Array, urlKey?: string}} [options] -
  *   session feature flags (whitelist-validated server-side); `openRouterConnected`
  *   to provision a mock OpenRouter key on the local session (so e.g. roadmap specs
  *   reach the AI mock instead of resolveRoadmapLLM's 503); `freeTierEnabled` to
@@ -262,11 +262,15 @@ export function createLocalProvider() {
  *   `localWorkerUrlKey` worker fixture once specs are swept).
  * @returns {Promise<{urlKey: string, dashboard: string}>}
  */
-export async function seedLocalWorkspace(page, seed = null, { features, openRouterConnected, freeTierEnabled, urlKey = LOCAL_WORKSPACE_URL_KEY } = {}) {
+export async function seedLocalWorkspace(page, seed = null, { features, openRouterConnected, freeTierEnabled, extraBindings, urlKey = LOCAL_WORKSPACE_URL_KEY } = {}) {
   const data = { ...(seed ?? defaultLocalSeed(urlKey)), urlKey };
   if (features) data.features = features;
   if (openRouterConnected) data.openRouterConnected = openRouterConnected;
   if (freeTierEnabled) data.freeTierEnabled = freeTierEnabled;
+  // Make the seeded workspace explicitly multi-binding (LIN-717): the local
+  // binding stays active, with each extra appended so the providers settings
+  // surface can exercise the active-provider switch end-to-end.
+  if (extraBindings) data.extraBindings = extraBindings;
   const resp = await page.request.post('/test/set-local-session', { data });
   if (!resp.ok()) {
     throw new Error(`seedLocalWorkspace failed: ${resp.status()} ${await resp.text()}`);
