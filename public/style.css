@@ -1503,6 +1503,149 @@ a.wordmark:hover {
 }
 
 /* =============================================================================
+   Landing (LIN-726, Harbour brand S4)
+   =============================================================================
+   The unauthenticated landing adopts the Harbour visual system: the anchor mark
+   + lowercase wordmark in teal, a faint teal grid background, and a genuine
+   light/dark response. Everything is brand-tokened (--teal / --teal-soft from
+   S2), and typography stays the product's mono (--font-structural) + sans
+   (--font-content) stacks — no serif (DM Serif is explicitly rejected).
+
+   Scope is `body.is-landing` only, so the authenticated app's default-light
+   chrome is untouched. */
+
+body.is-landing {
+  /* Faint teal grid. Two layered gradients draw a 1px line on a 32px cell;
+     --teal-soft keeps them barely-there so the CLI tree stays legible on top.
+     `fixed` so the grid sits still while the page scrolls. */
+  background-image:
+    linear-gradient(to right, var(--teal-soft) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--teal-soft) 1px, transparent 1px);
+  background-size: 32px 32px;
+  background-position: -1px -1px;
+  background-attachment: fixed;
+}
+
+/* Genuine light/dark for the landing only. Remaps the same token values the
+   .theme-dark sample uses (style.css top), so the grid, hero, CTAs, and the
+   preview tree all flip together — no switcher, and nothing outside the landing
+   is affected. */
+@media (prefers-color-scheme: dark) {
+  body.is-landing {
+    --bg: #16181d;
+    --bg-muted: #1f222a;
+    --bg-alt: rgba(255, 255, 255, 0.05);
+    --fg: #e6e6e6;
+    --fg-dim: #9aa0a6;
+    --fg-vdim: #2c313a;
+    --fg-mid: #5c6370;
+    --green: #2ee65f;
+    --yellow: #e6c14a;
+    --blue: #6ea8fe;
+    --purple: #b794f6;
+    --red: #ff6b6b;
+    --teal: #2dd4bf;
+    --teal-soft: #2dd4bf20;
+    --border: #2c313a;
+    --border-strong: #3d4450;
+    --border-subtle: rgba(255, 255, 255, 0.12);
+    background-color: var(--bg);
+    color: var(--fg);
+  }
+}
+
+.landing-hero {
+  text-align: center;
+  margin: 3rem 0 4rem;
+}
+
+/* Anchor mark (S1) painted in the brand teal token; sizing the inline SVG. */
+.landing-mark {
+  color: var(--teal);
+  line-height: 0;
+  margin-bottom: var(--space-3);
+}
+
+.landing-mark svg {
+  width: 56px;
+  height: 56px;
+}
+
+/* Lowercase wordmark on the CLI mono stack — the page's single <h1>. */
+.landing-wordmark {
+  font-family: var(--font-structural);
+  font-size: 2.75rem;
+  font-weight: normal;
+  letter-spacing: -0.02em;
+  color: var(--fg);
+  margin: 0;
+}
+
+.landing-wordmark-accent {
+  color: var(--teal);
+}
+
+.landing-tagline {
+  font-family: var(--font-content);
+  color: var(--fg-dim);
+  margin: var(--space-2) 0 var(--space-4);
+}
+
+.landing-ctas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.landing-cta {
+  display: inline-block;
+  padding: 0.75rem 1.5rem;
+  border-radius: 4px;
+  text-decoration: none;
+  font-family: var(--font-content);
+  font-size: 1.05rem;
+  border: 1px solid transparent;
+}
+
+/* Linear: the filled, primary action. Dark teal-tinted text reads on the teal
+   fill in every theme (light/dark/amber all keep --teal saturated). */
+.landing-cta-linear {
+  background: var(--teal);
+  color: #04231f;
+  font-weight: 500;
+}
+
+.landing-cta-linear:hover {
+  background: color-mix(in srgb, var(--teal) 85%, black);
+}
+
+/* GitHub: a co-equal CTA, visually quieter as a teal outline. */
+.landing-cta-github {
+  background: transparent;
+  color: var(--teal);
+  border-color: var(--teal);
+}
+
+.landing-cta-github:hover {
+  background: var(--teal-soft);
+}
+
+@media (max-width: 480px) {
+  .landing-ctas {
+    flex-direction: column;
+  }
+  .landing-cta {
+    width: 100%;
+    max-width: 18rem;
+  }
+  .landing-wordmark {
+    font-size: 2.25rem;
+  }
+}
+
+/* =============================================================================
    Error Page
    =============================================================================
    Friendly error display for OAuth and other errors.

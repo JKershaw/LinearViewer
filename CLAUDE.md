@@ -150,6 +150,7 @@ lib/
   components/
     navbar.js          Nav bar with workspace/team selectors, queue badge
     footer.js          Footer with deploy info, AI status
+    landing-hero.js    Landing brand hero (anchor mark + wordmark + Linear/GitHub CTAs; GitHub gated on GITHUB_CLIENT_ID; LIN-726)
 content/
   landing.md           Static projects preview for unauthenticated users
 public/

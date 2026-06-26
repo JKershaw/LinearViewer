@@ -12,11 +12,10 @@ test.describe('Authentication Flow', () => {
     // Should see landing page (has is-landing class on body)
     await expect(page.locator('body')).toHaveClass(/is-landing/);
 
-    // Should have the "Login" project section
-    await expect(page.locator('.project-header:has-text("Login")')).toBeVisible();
-
-    // The "Connect with Linear" issue should be visible (parent issue in Login section)
-    await expect(page.locator('.title:has-text("Connect with Linear")')).toBeVisible();
+    // The Harbour brand hero fronts the page with the Linear sign-in CTA
+    // (LIN-726 moved sign-in out of the content tree into the hero).
+    await expect(page.locator('[data-testid="landing-hero"]')).toBeVisible();
+    await expect(page.locator('[data-testid="landing-cta-linear"]')).toBeVisible();
   });
 
   test('unauthenticated users do not see navigation actions', async ({ page }) => {
@@ -29,17 +28,16 @@ test.describe('Authentication Flow', () => {
   test('login link exists and points to auth endpoint', async ({ page }) => {
     await page.goto('/');
 
-    // The login link is in the details of the "Connect with Linear" issue
-    // First expand that issue to reveal the link
-    const connectIssue = page.locator('.line:has(.title:has-text("Connect with Linear"))');
-    await connectIssue.click();
-
-    // Now the login link should be visible
-    const loginLink = page.locator('a[href="/auth/linear"]');
+    // The Linear CTA in the hero is a plain, directly-visible link (LIN-726) —
+    // no expand step, always reachable for keyboard/screen-reader users.
+    const loginLink = page.locator('[data-testid="landing-cta-linear"]');
     await expect(loginLink).toBeVisible();
+    await expect(loginLink).toHaveAttribute('href', '/auth/linear');
+    await expect(loginLink).toContainText('Log in with Linear');
 
-    // Verify the link text
-    await expect(loginLink).toContainText('Login with Linear');
+    // Reachable by keyboard (it's a real <a>, in the tab order).
+    await loginLink.focus();
+    await expect(loginLink).toBeFocused();
   });
 
   test('authenticated users see dashboard with navigation', async ({ page, workerUrlKey }) => {

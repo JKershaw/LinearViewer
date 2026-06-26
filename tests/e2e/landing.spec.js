@@ -10,8 +10,11 @@ test.describe('Landing Page', () => {
   test('renders landing page for unauthenticated users', async ({ page }) => {
     await page.goto('/');
 
-    // Should show the organization name from landing.md
-    await expect(page.locator('h1')).toContainText('Harbour');
+    // The brand hero is the page heading (LIN-726): lowercase `harbour` wordmark
+    // as the single <h1>, with the anchor mark above it.
+    await expect(page.locator('[data-testid="landing-hero"]')).toBeVisible();
+    await expect(page.locator('h1.landing-wordmark')).toContainText('harbour');
+    await expect(page.locator('.landing-mark svg')).toBeVisible();
   });
 
   test('does not show login or reset in header', async ({ page }) => {
@@ -43,29 +46,43 @@ test.describe('Landing Page', () => {
   test('displays static project preview from landing.md', async ({ page }) => {
     await page.goto('/');
 
-    // landing.md defines 6 projects: Login, What Harbour Is, Views, Orchestration, Self-Host, Source
+    // landing.md defines 6 sections: What Harbour Is, Views, Orchestration,
+    // Self-Host, Source, Harbour OS (LIN-726: Login moved into the hero; a small
+    // Harbour OS section anchors the bottom).
     await expect(page.locator('.project-header')).toHaveCount(6);
-    await expect(page.locator('.project-header:has-text("Login")')).toBeVisible();
     await expect(page.locator('.project-header:has-text("What Harbour Is")')).toBeVisible();
     await expect(page.locator('.project-header:has-text("Views")')).toBeVisible();
     await expect(page.locator('.project-header:has-text("Orchestration")')).toBeVisible();
     await expect(page.locator('.project-header:has-text("Self-Host")')).toBeVisible();
     await expect(page.locator('.project-header:has-text("Source")')).toBeVisible();
+    await expect(page.locator('.project-header:has-text("Harbour OS")')).toBeVisible();
+  });
+
+  test('Harbour OS section links to os.harbour.cat', async ({ page }) => {
+    await page.goto('/');
+
+    // The Harbour OS row reveals its os.harbour.cat link on expand (same CLI
+    // tree pattern as the Source links).
+    const osRow = page.locator('.line:has(.title:has-text("Harbour OS"))');
+    await osRow.click();
+    const osLink = page.locator('a[href="https://os.harbour.cat"]');
+    await expect(osLink).toBeVisible();
   });
 
   test('displays state indicators correctly', async ({ page }) => {
     await page.goto('/');
 
-    // State counts from landing.md content:
+    // State counts from landing.md content (LIN-726: the in-progress "Connect
+    // with Linear" row moved into the hero; a todo Harbour OS row was added):
     // - 2 done (✓): Any backend one cockpit, Grounded prompts two ways
-    // - 1 in-progress (◐): Connect with Linear
-    // - 13 todo (○): The control plane, Tree/swipe/swim, Roadmap & ship, Observation,
+    // - 0 in-progress (◐)
+    // - 14 todo (○): The control plane, Tree/swipe/swim, Roadmap & ship, Observation,
     //                Dispatch, Autopilot, Workspace API proxy, Run it yourself,
     //                AI-assisted setup, Customize it, View on GitHub,
-    //                Bugs & feature requests, Built by John Kershaw
+    //                Bugs & feature requests, Built by John Kershaw, Harbour OS
     await expect(page.locator('.state.done')).toHaveCount(2);
-    await expect(page.locator('.state.in-progress')).toHaveCount(1);
-    await expect(page.locator('.state.todo')).toHaveCount(13);
+    await expect(page.locator('.state.in-progress')).toHaveCount(0);
+    await expect(page.locator('.state.todo')).toHaveCount(14);
   });
 
   test('does not show logout link on landing page', async ({ page }) => {
@@ -85,12 +102,12 @@ test.describe('Landing Page', () => {
     await expect(selfHostHeader).toContainText('▶');
     await expect(sourceHeader).toContainText('▶');
 
-    // Login and What Harbour Is should be expanded (have ▼ arrow)
-    const loginHeader = page.locator('.project-header:has-text("Login")');
+    // What Harbour Is and Views should be expanded (have ▼ arrow)
     const whatHarbourIsHeader = page.locator('.project-header:has-text("What Harbour Is")');
+    const viewsHeader = page.locator('.project-header:has-text("Views")');
 
-    await expect(loginHeader).toContainText('▼');
     await expect(whatHarbourIsHeader).toContainText('▼');
+    await expect(viewsHeader).toContainText('▼');
   });
 
   test('collapsed projects have hidden content', async ({ page }) => {
@@ -132,60 +149,20 @@ test.describe('Landing Page', () => {
     await expect(collapsedProjects).toHaveCount(2);
   });
 
-  // LIN-566: the sign-in CTA must be reachable for keyboard/screen-reader users.
-  // The "Connect with Linear" row is the shared .line.expandable primitive; it
-  // must be a focusable role=button that expands on Enter/Space and reveals the
-  // /auth/linear link back into the tab order.
-  test('sign-in row is a keyboard-operable control (LIN-566)', async ({ page }) => {
+  // LIN-726: sign-in moved into the brand hero. The CTAs are plain <a> links —
+  // always visible and in the tab order — a strictly simpler a11y story than the
+  // old expandable "Connect with Linear" row (LIN-566).
+  test('hero sign-in CTA is a directly reachable link (LIN-726)', async ({ page }) => {
     await page.goto('/');
 
-    const signInRow = page.locator('.line.expandable:has-text("Connect with Linear")');
-    await expect(signInRow).toBeVisible();
+    const linearCta = page.locator('[data-testid="landing-cta-linear"]');
+    // Visible without any expand step.
+    await expect(linearCta).toBeVisible();
+    await expect(linearCta).toHaveAttribute('href', '/auth/linear');
 
-    // It is announced as a control and starts collapsed.
-    await expect(signInRow).toHaveAttribute('role', 'button');
-    await expect(signInRow).toHaveAttribute('tabindex', '0');
-    await expect(signInRow).toHaveAttribute('aria-expanded', 'false');
-
-    // The login link is out of the tab order until the row is expanded.
-    const loginLink = page.locator('a[href="/auth/linear"]');
-    await expect(loginLink).not.toBeVisible();
-
-    // Keyboard activation: focus the row and press Enter.
-    await signInRow.focus();
-    await expect(signInRow).toBeFocused();
-    await page.keyboard.press('Enter');
-
-    // State is announced as expanded and the login link is now reachable.
-    await expect(signInRow).toHaveAttribute('aria-expanded', 'true');
-    await expect(loginLink).toBeVisible();
-
-    // The revealed anchor is a real, keyboard-focusable link (back in tab order).
-    await loginLink.focus();
-    await expect(loginLink).toBeFocused();
-  });
-
-  test('sign-in row toggles with Space and Space does not scroll (LIN-566)', async ({ page }) => {
-    await page.goto('/');
-
-    const signInRow = page.locator('.line.expandable:has-text("Connect with Linear")');
-    const loginLink = page.locator('a[href="/auth/linear"]');
-
-    await signInRow.focus();
-    const scrollBefore = await page.evaluate(() => window.scrollY);
-    await page.keyboard.press(' ');
-
-    // Space expands the row (single source of truth: aria-expanded flips)...
-    await expect(signInRow).toHaveAttribute('aria-expanded', 'true');
-    await expect(loginLink).toBeVisible();
-    // ...and is prevented from scrolling the page.
-    const scrollAfter = await page.evaluate(() => window.scrollY);
-    expect(scrollAfter).toBe(scrollBefore);
-
-    // Space again collapses it (round-trips through the same toggle path).
-    await page.keyboard.press(' ');
-    await expect(signInRow).toHaveAttribute('aria-expanded', 'false');
-    await expect(loginLink).not.toBeVisible();
+    // It's a real, keyboard-focusable link in the tab order.
+    await linearCta.focus();
+    await expect(linearCta).toBeFocused();
   });
 
   test('page reload resets to default state', async ({ page }) => {
