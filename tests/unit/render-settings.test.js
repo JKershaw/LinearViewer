@@ -96,6 +96,33 @@ describe('renderSettingsPage — Providers section (LIN-634)', () => {
     assert.strictEqual(activeCount, 1);
   });
 
+  test('offers a "make active" switch on inactive bindings only (LIN-717)', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      providerBindings: [
+        { provider: 'linear', scope: 'org-1', displayName: 'Linear', token: 'aaaabbbb', active: true },
+        { provider: 'github', scope: 'owner/repo', displayName: 'GitHub', token: 'ccccdddd', active: false },
+      ],
+    });
+    // Exactly one activate button — on the inactive (GitHub) row, not the active one.
+    const activateCount = (html.match(/settings-provider-activate/g) || []).length;
+    assert.strictEqual(activateCount, 1);
+    assert.match(html, /\/settings\/providers\/switch/);
+    // The active binding carries the ● marker, the inactive one the switch.
+    const ghRow = html.slice(html.indexOf('data-provider="github"'));
+    assert.match(ghRow.slice(0, 600), /settings-provider-activate/);
+  });
+
+  test('no "make active" switch when the only binding is already active (LIN-717)', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      providerBindings: [
+        { provider: 'linear', scope: 'org-1', displayName: 'Linear', token: 'aaaabbbb', active: true },
+      ],
+    });
+    assert.doesNotMatch(html, /settings-provider-activate/);
+  });
+
   test('renders local token as a partition-key label, not a masked secret', () => {
     const html = renderSettingsPage('Acme', {
       ...BASE,

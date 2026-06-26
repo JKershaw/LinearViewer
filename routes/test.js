@@ -564,7 +564,7 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
 
       // Token === urlKey: carries no auth, only selects the store partition.
       // No `accessToken: 'test-token'`, so the mock short-circuit never fires.
-      req.session.workspaces = [{
+      const localWorkspace = {
         id: LOCAL_WS_UUID,
         name: 'Local Workspace',
         urlKey,
@@ -573,7 +573,18 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
         accessToken: urlKey,
         tokenExpiresAt: Number.MAX_SAFE_INTEGER,
         addedAt: Date.now(),
-      }];
+      };
+      // Optional multi-binding shape (LIN-717): when extra bindings are supplied,
+      // materialize an explicit bindings[] with the local binding ACTIVE first,
+      // so the providers settings switch can be exercised end-to-end. The local
+      // binding stays the scalar-mirrored active one; extras are non-active.
+      if (Array.isArray(body.extraBindings) && body.extraBindings.length) {
+        localWorkspace.bindings = [
+          { provider: 'local', scope: urlKey, credentials: { token: urlKey, tokenExpiresAt: Number.MAX_SAFE_INTEGER } },
+          ...body.extraBindings,
+        ];
+      }
+      req.session.workspaces = [localWorkspace];
       req.session.activeWorkspaceId = LOCAL_WS_UUID;
       req.session.linearUserId = 'test-local-user-id';
 
