@@ -715,3 +715,45 @@ describe('capability-aware rendering (LIN-177 S3)', () => {
     assert.ok(detail.includes('3 pts'), 'estimate present for Linear');
   });
 });
+
+// =============================================================================
+// Recent activity section (LIN-490)
+// =============================================================================
+
+describe('Recent activity section', () => {
+  function activityNode(id, kind, at, overrides = {}) {
+    return {
+      issue: {
+        id, identifier: id, title: `Issue ${id}`,
+        state: { name: 'Done', type: 'completed' },
+        ...overrides
+      },
+      children: [],
+      depth: 0,
+      projectName: 'Product',
+      activityKind: kind,
+      activityAt: at
+    };
+  }
+
+  const forest = (roots) => [{ projectId: null, projectName: null, roots }];
+
+  test('uses the "Recent activity" label, not "Recently Completed"', () => {
+    const trees = forest([activityNode('a', 'completed', new Date(Date.now() - 3600 * 1000).toISOString())]);
+    const html = renderPage([], [], trees, 'Test', { isLanding: true });
+    assert.ok(html.includes('▶ Recent activity'), 'header renamed');
+    assert.ok(html.includes('aria-label="Recent activity"'), 'aria-label renamed');
+    assert.ok(!html.includes('Recently Completed'), 'old label gone');
+  });
+
+  test('time badge carries the activity kind word and keys on activityAt', () => {
+    const createdAt = new Date(Date.now() - 2 * 3600 * 1000).toISOString();
+    const trees = forest([
+      activityNode('c', 'created', createdAt, { state: { name: 'Backlog', type: 'backlog' }, completedAt: null })
+    ]);
+    const html = renderPage([], [], trees, 'Test', { isLanding: true });
+    assert.ok(html.includes('created'), 'shows the "created" activity word');
+    // A created (non-completed) row still gets a time badge even with no completedAt.
+    assert.ok(html.includes('class="completed-time"'), 'activity time badge present for created row');
+  });
+});

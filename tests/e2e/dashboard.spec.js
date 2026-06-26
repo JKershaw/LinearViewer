@@ -46,15 +46,23 @@ test.describe('Authenticated Dashboard', () => {
   });
 
   test('displays correct state indicators', async ({ page }) => {
-    // Started issues (local-issue-1, local-issue-4) each appear 2x: once in the
-    // In Progress section and once in their project section → 2 x 2 = 4.
-    await expect(page.locator('.state.in-progress')).toHaveCount(4);
+    // The Recent activity feed now surfaces created/edited tasks, not just
+    // completed ones (LIN-490). The local store stamps `createdAt` at seed time,
+    // so every seeded issue also appears once as a "created" row in Recent
+    // activity, on top of its In Progress / project-tree appearances.
 
-    // Todo issue (local-issue-2) appears 2x: In Progress subtree + project tree.
-    await expect(page.locator('.state.todo')).toHaveCount(2);
+    // Started issues (local-issue-1, local-issue-4): In Progress section + project
+    // section + Recent activity ("created") → 2 x 3 = 6.
+    await expect(page.locator('.state.in-progress')).toHaveCount(6);
 
-    // Completed issue (local-issue-3) renders once in the completed section.
-    await expect(page.locator('.state.done')).toHaveCount(1);
+    // Todo issue (local-issue-2): In Progress subtree + project tree + Recent
+    // activity ("created") = 3.
+    await expect(page.locator('.state.todo')).toHaveCount(3);
+
+    // Completed issue (local-issue-3): project tree + Recent activity. Its
+    // completedAt is old (out of window) but its seed-stamped createdAt is recent,
+    // so it shows as a "created" row → 2.
+    await expect(page.locator('.state.done')).toHaveCount(2);
   });
 
   test('shows text-based navigation bar', async ({ page }) => {

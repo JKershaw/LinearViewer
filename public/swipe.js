@@ -228,10 +228,17 @@ function renderCard(direction) {
     </div>`;
   }
 
-  if (issue.completedAt) {
+  // Activity row (LIN-490): the Recent activity feed attaches activityKind/At so
+  // created/edited rows show their own time and label; everything else keeps the
+  // legacy "Done" + completedAt behaviour.
+  const activityAt = issue.activityAt || issue.completedAt;
+  if (activityAt) {
+    const activityLabel = issue.activityKind
+      ? issue.activityKind.charAt(0).toUpperCase() + issue.activityKind.slice(1)
+      : 'Done';
     metaHtml += `<div class="swipe-card-meta-row">
-      <span class="swipe-card-meta-label">Done</span>
-      <span class="swipe-card-meta-value">${relativeTime(issue.completedAt)}</span>
+      <span class="swipe-card-meta-label">${activityLabel}</span>
+      <span class="swipe-card-meta-value">${relativeTime(activityAt)}</span>
     </div>`;
   }
 
