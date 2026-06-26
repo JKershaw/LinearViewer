@@ -21,12 +21,20 @@
   --fg-dim: #666666;
   --fg-vdim: #eeeeee;  /* Very dim - box-drawing characters, structural elements */
   --fg-mid: #bbbbbb;   /* Mid neutral accent — e.g. unstarted-state marker, distinct from --border (LIN-510) */
-  --green: #16a085;    /* Completed status */
+  --green: #16a34a;    /* Completed status (de-tealed from #16a085 so it stays distinct from --teal; LIN-724) */
   --yellow: #d4a600;   /* In-progress status */
   --blue: #2563eb;     /* Links and project headers */
   --purple: #7c3aed;   /* Periodicals (synthetic maintenance group) */
   --red: #cc0000;      /* Danger actions (remove) */
   --red-hover: #990000;
+
+  /* Harbour brand accent (LIN-724). Teal is the product's accent hue, inherited
+     from harbour.cat. The status hues above are kept visibly distinct from it
+     (notably --green, nudged off its old teal-green #16a085). Consumed by the
+     wordmark (LIN-725) and landing (LIN-726). Per-theme teal values are defined
+     in .theme-dark / .theme-amber below. */
+  --teal: #0d9488;          /* Brand accent (light) */
+  --teal-soft: #0d948820;   /* Low-alpha teal tint for accent fills/hovers */
 
   /* Font families: Separate structural (monospace) from content (readable) */
   --font-structural: 'SF Mono', 'Fira Code', 'Consolas', monospace;
@@ -96,12 +104,14 @@
   --fg-dim: #9aa0a6;
   --fg-vdim: #2c313a;        /* box-drawing / hairline structure on dark */
   --fg-mid: #5c6370;         /* mid neutral accent on dark — between --border and --fg-dim */
-  --green: #2ee6a6;
+  --green: #2ee65f;          /* de-tealed from #2ee6a6 so it stays distinct from --teal/--ok on dark (LIN-724) */
   --yellow: #e6c14a;
   --blue: #6ea8fe;
   --purple: #b794f6;
   --red: #ff6b6b;
   --red-hover: #ff8787;
+  --teal: #2dd4bf;           /* Brand accent (dark) — brighter teal for contrast on dark bg */
+  --teal-soft: #2dd4bf20;
   --accent: #ff6b6b;
   --ok: #4ade80;
   --border: #2c313a;
@@ -125,12 +135,14 @@
   --fg-dim: #b3820f;
   --fg-vdim: #3a2b08;
   --fg-mid: #7a5a0b;          /* mid amber accent — between --border and --fg-dim */
-  --green: #8fdb5f;
+  --green: #8fdb5f;          /* lime green — already distinct from the amber-mapped --teal below */
   --yellow: #ffcf4d;
   --blue: #ffb000;           /* links read as amber, not blue, in this theme */
   --purple: #d7a3ff;
   --red: #ff5f56;
   --red-hover: #ff8079;
+  --teal: #ff9d2e;           /* brand accent collapses to a warm amber-orange here (a cyan teal would clash with the monochrome theme); deeper than --blue/--yellow so the accent still reads as distinct (LIN-724) */
+  --teal-soft: #ff9d2e20;
   --accent: #ff5f56;
   --ok: #8fdb5f;
   --border: #3a2b08;

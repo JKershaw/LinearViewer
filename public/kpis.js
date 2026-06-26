@@ -14,7 +14,7 @@
   // Match the app's light theme + terminal aesthetic
   const css = getComputedStyle(document.documentElement);
   const COLORS = {
-    green: css.getPropertyValue('--green').trim() || '#16a085',
+    green: css.getPropertyValue('--green').trim() || '#16a34a',
     yellow: css.getPropertyValue('--yellow').trim() || '#d4a600',
     blue: css.getPropertyValue('--blue').trim() || '#2563eb',
     purple: css.getPropertyValue('--purple').trim() || '#7c3aed',
