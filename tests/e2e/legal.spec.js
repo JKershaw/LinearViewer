@@ -88,7 +88,10 @@ test.describe('Legal Pages', () => {
     test('header links back to home', async ({ page }) => {
       await page.goto('/privacy');
       await page.locator('h1 a').click();
-      await expect(page.locator('h1')).toContainText('Harbour');
+      // Home is the unauthenticated landing — fronted by the Harbour brand hero
+      // whose lowercase `harbour` wordmark is the page <h1> (LIN-726).
+      await expect(page.locator('[data-testid="landing-hero"]')).toBeVisible();
+      await expect(page.locator('h1.landing-wordmark')).toContainText('harbour');
     });
   });
 
