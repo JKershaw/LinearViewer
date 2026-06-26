@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
-import { seedGitHubWorkspace, GITHUB_WORKSPACE_URL_KEY, githubDashboardUrl } from '../fixtures/github-harness.js';
+import { seedGitHubWorkspace, GITHUB_WORKSPACE_URL_KEY, GITHUB_REPO, githubDashboardUrl } from '../fixtures/github-harness.js';
 
 // LIN-178: end-to-end proof of the GitHub Issues provider — the abstraction's
 // first FOREIGN backend.
@@ -54,5 +54,22 @@ test.describe('GitHub provider (no test-token mock)', () => {
     await page.goto(DASHBOARD);
     await page.waitForLoadState('networkidle');
     await expect(page.locator('.line:has-text("Created via GitHub provider")').first()).toBeAttached();
+  });
+});
+
+// LIN-718: an installed repo with zero issues/milestones must still render its
+// container (empty state), consistent with how Linear/Local render an empty
+// project. The provider emits a per-repo container so a milestones-only model no
+// longer yields nothing for an empty repo.
+test.describe('GitHub provider — empty repo (LIN-718)', () => {
+  test('a repo with zero issues/milestones still renders its container', async ({ page }) => {
+    await seedGitHubWorkspace(page, { milestones: [], issues: [], labels: [] });
+    await page.goto(githubDashboardUrl(GITHUB_WORKSPACE_URL_KEY));
+    await page.waitForLoadState('networkidle');
+
+    // The repo binding itself renders as a container header (named by slug)...
+    await expect(page.locator(`.project-header:has-text("${GITHUB_REPO}")`)).toBeVisible();
+    // ...with no issue rows inside it (empty state).
+    await expect(page.locator('.line')).toHaveCount(0);
   });
 });
