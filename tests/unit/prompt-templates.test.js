@@ -1412,6 +1412,105 @@ describe('Surface Assessment (handwritten path)', () => {
   });
 });
 
+// Horizontal Obligations (LIN-697) — research must ask not only what the change
+// builds (the vertical slice) but what it must hold true against in the existing
+// system, plus a cheap adversarial self-review, plus a symmetric Surface-Assessment
+// trigger for duplicate representations. One class, expressed as generative reasoning
+// guidance (seed examples, not a fixed checklist), kept in sync across both prompt
+// paths and under the existing scale-to-task lower-bound guard.
+describe('Horizontal Obligations (handwritten path)', () => {
+  const mockIssue = {
+    id: 'issue-ho', identifier: 'TEST-HO1', title: 'Add a thing',
+    description: 'Add a thing to the codebase', url: 'https://linear.app/test/issue/TEST-HO1',
+    state: { name: 'Todo', type: 'unstarted' }, labels: []
+  };
+  const mockContext = { parent: null, siblings: [], project: null, children: [], comments: [] };
+
+  test('research template asks for the change\'s horizontal obligations to the existing system', () => {
+    const result = generatePrompt('research', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('Horizontal Obligations'), 'research must include the Horizontal Obligations block');
+    assert.ok(
+      result.prompt.includes('what it must hold true against'),
+      'it must frame obligations as what the change must hold true against, not only what it builds'
+    );
+    assert.ok(
+      result.prompt.includes('reuse rather than duplicate'),
+      'it must name the existing-structure / reuse-don\'t-duplicate axis'
+    );
+    assert.ok(
+      result.prompt.includes('seed examples, not the whole set'),
+      'the axes must be seed examples, not a fixed exhaustive checklist'
+    );
+  });
+
+  test('research template includes a cheap adversarial self-review pass', () => {
+    const result = generatePrompt('research', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('Attack Your Own Research'), 'research must include the adversarial self-review block');
+    assert.ok(
+      result.prompt.includes('did you NOT check') && result.prompt.includes('assert without verifying'),
+      'the adversarial pass must hunt unchecked obligations and unverified assertions'
+    );
+  });
+
+  test('Surface Assessment treats a second representation of existing data as refactor required', () => {
+    const result = generatePrompt('research', mockIssue, mockContext);
+    assert.ok(
+      result.prompt.includes('SECOND REPRESENTATION'),
+      'Surface Assessment must catch introducing a duplicate representation of already-modelled data'
+    );
+    assert.ok(
+      /SECOND REPRESENTATION[\s\S]*refactor required/.test(result.prompt),
+      'a duplicate representation must resolve to refactor required, not lands cleanly'
+    );
+  });
+
+  test('the obligations blocks sit under the existing scale-to-task guard', () => {
+    const result = generatePrompt('research', mockIssue, mockContext);
+    // Guard names the new sub-step, and the guard precedes the blocks it governs.
+    assert.ok(
+      result.prompt.includes('framing/completeness/history/obligations sub-steps'),
+      'the scale-to-task guard must name the new obligations sub-steps so small tasks skip them'
+    );
+    assert.ok(
+      result.prompt.indexOf('Scale this to the task') < result.prompt.indexOf('Horizontal Obligations'),
+      'the lower-bound guard must precede the obligations block it governs'
+    );
+  });
+
+  // LIN-697 eval (2026-06-26): the upstream scale-to-task hint alone left gpt-5.4-mini
+  // ritually filling the obligations section on a one-file typo (control fired 50%). The
+  // fix is a LOCAL applicability gate at the section head — positive framing (what to do
+  // on a small task + a clean off-ramp), so the gate travels with the imperative it governs.
+  test('the Horizontal Obligations block leads with a local small-task off-ramp', () => {
+    const result = generatePrompt('research', mockIssue, mockContext);
+    const headerAt = result.prompt.indexOf('### Horizontal Obligations');
+    const imperativeAt = result.prompt.indexOf('characterise not just');
+    const gateAt = result.prompt.indexOf('go straight to the Surface Assessment');
+    assert.ok(gateAt > headerAt && gateAt < imperativeAt,
+      'the small-task off-ramp must sit at the section head, before the obligations imperative');
+    assert.ok(
+      result.prompt.includes('This applies when the change touches shared structure, more than one surface, or data the system already models'),
+      'the gate must positively state when the section applies');
+  });
+
+  test('meta-prompt mirrors the obligations directives in the Research-prompts rule', () => {
+    const p = buildMetaPromptTemplate({
+      issueContext: 'CTX', identifier: 'LIN-901',
+      hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
+      hasComments: false, commentCount: 0, aiHints: 'H', actionVocabulary: 'plan, review, research',
+      completionSignals: 'S', focusedSubtaskId: null, isTerminal: false, hasOpenChildren: false
+    });
+    assert.ok(/Horizontal Obligations pass/.test(p), 'meta-prompt must require a Horizontal Obligations pass');
+    assert.ok(/seed examples, not a fixed checklist/.test(p), 'meta-prompt must frame the axes as seed examples, not a checklist');
+    assert.ok(/adversarial self-review pass/.test(p), 'meta-prompt must require the adversarial self-review pass');
+    assert.ok(
+      /second representation of something already modelled/.test(p),
+      'meta-prompt Surface Assessment must treat a duplicate representation as refactor required'
+    );
+    assert.ok(/does not pay the obligation tax/.test(p), 'meta-prompt must keep the scale-to-task guard over the new content');
+  });
+});
+
 // Scale-to-task (lower bound, LIN-260). The heavy generative phases must tell the
 // agent to size output to the task — proven on the meta-prompt path via
 // scripts/eval-prompt-scaling.mjs and mirrored here per CLAUDE.md's both-paths rule.
