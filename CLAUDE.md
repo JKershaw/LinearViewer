@@ -60,6 +60,7 @@ lib/
     linear/index.js    Linear provider adapter
     local/index.js     Local provider adapter (writable, Mongo/Mango-backed; LIN-356)
     github/index.js    GitHub provider adapter — the abstraction's first foreign backend (+ client.js, fake-client.js; LIN-178)
+    github-projects/index.js  GitHub Projects v2 provider — additive sibling to GitHub Issues (own GraphQL client.js + fake-client.js; read-only V1; board Status→canonical heuristic; LIN-560)
   render.js            Dashboard page renderer (tree view, sections)
   render-pages.js      Standalone page renderers (login, error, workspace-not-found)
   render-audit.js      Operator dashboard page renderer
