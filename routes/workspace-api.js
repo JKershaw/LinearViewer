@@ -197,6 +197,45 @@ export function buildMockRecommendationHop(ctx) {
 }
 
 /**
+ * Sniff the raster image type from a buffer's magic bytes (LIN-682).
+ *
+ * Security helper shared by the feedback upload parser (entry gate) and the
+ * `/api/image` proxy (delivery gate). Returns the canonical content type for a
+ * recognised raster image, or `null` for anything else — crucially including
+ * `image/svg+xml`, HTML, and JS, which must never be trusted from a declared
+ * content type and must never be served inline same-origin.
+ *
+ * Allowed raster types: PNG, JPEG, GIF, WEBP. No new dependency — pure byte
+ * inspection.
+ *
+ * @param {Buffer} bytes
+ * @returns {('image/png'|'image/jpeg'|'image/gif'|'image/webp')|null}
+ */
+export function sniffRasterType(bytes) {
+  if (!Buffer.isBuffer(bytes) || bytes.length < 12) return null;
+  // PNG: 89 50 4E 47 (\x89PNG)
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
+    return 'image/png';
+  }
+  // JPEG: FF D8 FF
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return 'image/jpeg';
+  }
+  // GIF: 47 49 46 38 (GIF8 — covers GIF87a/GIF89a)
+  if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x38) {
+    return 'image/gif';
+  }
+  // WEBP: 'RIFF' at 0, 'WEBP' at offset 8
+  if (
+    bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+    bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50
+  ) {
+    return 'image/webp';
+  }
+  return null;
+}
+
+/**
  * Decode a feedback screenshot into raw bytes for the upload seam (LIN-636).
  *
  * Accepts either a base64 data URL string (`data:image/png;base64,…`, what a
@@ -204,6 +243,11 @@ export function buildMockRecommendationHop(ctx) {
  * object `{ data, contentType?, filename? }` carrying raw base64. Returns
  * `{ bytes, contentType, filename }`, or `null` if the input is not a usable
  * base64 image. A filename is synthesised from the content type when absent.
+ *
+ * Security (LIN-682): the client-declared content type is NOT trusted. The bytes
+ * are sniffed (`sniffRasterType`) and only raster images (PNG/JPEG/GIF/WEBP) are
+ * accepted; the stored content type is derived from the bytes, not the input.
+ * SVG and any non-raster payload fall through to the existing `null` (400) path.
  *
  * @param {string|{data?: string, contentType?: string, filename?: string}} image
  * @returns {{bytes: Buffer, contentType: string, filename: string}|null}
@@ -236,6 +280,14 @@ export function parseFeedbackImage(image) {
     return null;
   }
   if (!bytes || bytes.length === 0) return null;
+
+  // Security (LIN-682): ignore the client-declared content type — sniff the
+  // actual bytes and accept only raster images. SVG/HTML/JS and anything else
+  // fall through to the existing null (400) path. The stored content type is the
+  // sniffed one, so a mislabeled upload can never reach the provider as SVG.
+  const sniffed = sniffRasterType(bytes);
+  if (!sniffed) return null;
+  contentType = sniffed;
 
   if (!filename) {
     const ext = (contentType.split('/')[1] || 'png').replace(/[^a-z0-9]/gi, '') || 'png';
@@ -1985,12 +2037,6 @@ ${goal}`
         return jsonError(res, response.status, 'Failed to fetch image')
       }
 
-      // Validate content-type is an image (prevent serving HTML/JS through proxy)
-      const contentType = response.headers.get('content-type') || ''
-      if (!contentType.startsWith('image/')) {
-        return badRequest.json(res, 'Invalid response: not an image')
-      }
-
       // Check content-length if available
       const contentLength = parseInt(response.headers.get('content-length') || '0', 10)
       if (contentLength > MAX_IMAGE_SIZE) {
@@ -2003,9 +2049,28 @@ ${goal}`
         return jsonError(res, 413, 'Image too large')
       }
 
-      res.set('Content-Type', contentType)
+      // Security (LIN-682): do NOT relay the upstream content type verbatim — the
+      // old `startsWith('image/')` guard let `image/svg+xml` through, and an SVG
+      // served inline same-origin executes its embedded script in the operator's
+      // session. Sniff the actual bytes and serve only raster images; reject any
+      // non-raster body (SVG/HTML/JS) via the existing 400 path. This closes the
+      // class for ANY SVG asset reaching the proxy — feedback uploads, legacy
+      // tickets, or the LIN-652 attachments gallery — not just new uploads.
+      //
+      // No `Content-Disposition: attachment`: this is an `<img src>` relay for
+      // both the feedback render and the LIN-652 gallery, so attachment would
+      // force a download and break legitimate inline raster rendering. The
+      // raster allowlist + `nosniff` close the hole while preserving inline use.
+      const buffer = Buffer.from(arrayBuffer)
+      const rasterType = sniffRasterType(buffer)
+      if (!rasterType) {
+        return badRequest.json(res, 'Invalid response: not a supported raster image')
+      }
+
+      res.set('Content-Type', rasterType)
+      res.set('X-Content-Type-Options', 'nosniff')
       res.set('Cache-Control', 'private, max-age=3600')
-      res.send(Buffer.from(arrayBuffer))
+      res.send(buffer)
     } catch (error) {
       // Handle redirect errors specifically
       if (error.cause?.code === 'ERR_FR_TOO_MANY_REDIRECTS' || error.message?.includes('redirect')) {

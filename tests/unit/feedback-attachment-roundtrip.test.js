@@ -106,8 +106,9 @@ describe('workspace-feedback attachment round-trip (LIN-651)', () => {
     const { provider, calls } = makeFakeProvider({ assetUrl });
     const app = buildApp(provider);
 
-    // INTAKE: drive the real route with an embedded screenshot.
-    const png = Buffer.from('imgbytes').toString('base64');
+    // INTAKE: drive the real route with an embedded screenshot. Valid PNG magic
+    // bytes — parseFeedbackImage sniffs the bytes (LIN-682).
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d]).toString('base64');
     const description = await submitAndCaptureBody(app, calls, {
       message: 'see attached shot',
       image: `data:image/png;base64,${png}`,
@@ -143,7 +144,7 @@ describe('workspace-feedback attachment round-trip (LIN-651)', () => {
     const { provider, calls } = makeFakeProvider({ assetUrl });
     const app = buildApp(provider);
 
-    const png = Buffer.from('x').toString('base64');
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d]).toString('base64');
     const description = await submitAndCaptureBody(app, calls, {
       message: 'signed url shot',
       image: `data:image/png;base64,${png}`,
