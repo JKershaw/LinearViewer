@@ -625,7 +625,7 @@ a.wordmark:hover {
   font-family: var(--font-content);
 }
 
-/* Completion time shown in Recently Completed section */
+/* Activity time/kind shown in the Recent activity section */
 .completed-time {
   color: var(--fg-dim);
   margin-left: 1ch;
@@ -647,10 +647,10 @@ a.wordmark:hover {
 }
 
 /* =============================================================================
-   "Recently Completed" Section
+   "Recent activity" Section
    =============================================================================
-   Displays recently completed issues across projects in a single collapsible list.
-   Green accent color matches Linear's "completed" state.
+   Displays recent task activity (completed/created/edited) across projects in a
+   single collapsible list. Green accent color matches Linear's "completed" state.
 */
 .recent-activity-section {
   margin-bottom: 2.5rem;
@@ -1309,7 +1309,7 @@ a.wordmark:hover {
      title rather than competing for horizontal space (LIN-423). flex-basis:100%
      forces the wrap; order:1 moves it past the toggle so the toggle stays on the
      title's row. The left indent aligns it under the title text (past the state
-     icon). Applies to both In Progress and Recently Completed rows. */
+     icon). Applies to both In Progress and Recent activity rows. */
   .in-progress-project {
     flex-basis: 100%;
     order: 1;

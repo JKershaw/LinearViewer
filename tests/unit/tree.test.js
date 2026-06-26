@@ -5,7 +5,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { buildForest, buildInProgressForest, NO_PROJECT_ID, PERIODICALS_PROJECT_ID, isTerminalState, isCompleted, TERMINAL_STATE_TYPES, selectFocusSubtask, computeFrontierFacts, isBlocked } from '../../lib/tree.js';
+import { buildForest, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID, PERIODICALS_PROJECT_ID, isTerminalState, isCompleted, TERMINAL_STATE_TYPES, selectFocusSubtask, computeFrontierFacts, isBlocked } from '../../lib/tree.js';
 import { childrenToGraphNodes, computeGraphFeatures, hasOpenFrontier } from '../../lib/graph-features.js';
 
 // =============================================================================
@@ -664,5 +664,105 @@ describe('computeFrontierFacts (LIN-433)', () => {
   test('returns null for empty input', () => {
     assert.strictEqual(computeFrontierFacts([]), null);
     assert.strictEqual(computeFrontierFacts(null), null);
+  });
+});
+
+// =============================================================================
+// buildRecentActivityForest Tests (LIN-490)
+// =============================================================================
+
+describe('buildRecentActivityForest', () => {
+  // Helpers for window-relative timestamps (default look-back is 7 days).
+  const ago = ms => new Date(Date.now() - ms).toISOString();
+  const HOUR = 60 * 60 * 1000;
+  const DAY = 24 * HOUR;
+  const projects = [{ id: 'proj-1', name: 'Product' }];
+
+  function rootsOf(forest) {
+    assert.strictEqual(forest.length <= 1, true, 'forest is a single flat tree or empty');
+    return forest.length ? forest[0].roots : [];
+  }
+
+  test('returns empty array when nothing is in the window', () => {
+    const issues = [createIssue({ createdAt: ago(30 * DAY), updatedAt: ago(30 * DAY) })];
+    assert.deepStrictEqual(buildRecentActivityForest(issues, projects), []);
+  });
+
+  test('surfaces a recently completed issue as a "completed" row', () => {
+    const issues = [createIssue({
+      id: 'done', state: { name: 'Done', type: 'completed' }, project: { id: 'proj-1' },
+      createdAt: ago(10 * DAY), completedAt: ago(2 * HOUR), updatedAt: ago(2 * HOUR)
+    })];
+    const roots = rootsOf(buildRecentActivityForest(issues, projects));
+    assert.strictEqual(roots.length, 1);
+    assert.strictEqual(roots[0].activityKind, 'completed');
+    assert.strictEqual(roots[0].activityAt, issues[0].completedAt);
+    assert.strictEqual(roots[0].projectName, 'Product');
+  });
+
+  test('surfaces a recently created issue as a "created" row (no new data needed)', () => {
+    const issues = [createIssue({
+      id: 'new', state: { name: 'Backlog', type: 'backlog' },
+      createdAt: ago(3 * HOUR), updatedAt: ago(3 * HOUR)
+    })];
+    const roots = rootsOf(buildRecentActivityForest(issues, projects));
+    assert.strictEqual(roots.length, 1);
+    assert.strictEqual(roots[0].activityKind, 'created');
+    assert.strictEqual(roots[0].activityAt, issues[0].createdAt);
+  });
+
+  test('surfaces an edited issue (updatedAt well after createdAt) as an "edited" row', () => {
+    const issues = [createIssue({
+      id: 'edited', state: { name: 'In Progress', type: 'started' },
+      createdAt: ago(20 * DAY), updatedAt: ago(5 * HOUR)
+    })];
+    const roots = rootsOf(buildRecentActivityForest(issues, projects));
+    assert.strictEqual(roots.length, 1);
+    assert.strictEqual(roots[0].activityKind, 'edited');
+    assert.strictEqual(roots[0].activityAt, issues[0].updatedAt);
+  });
+
+  test('a freshly created issue is "created", not "edited" (creation bump within epsilon)', () => {
+    const createdAt = ago(2 * HOUR);
+    const issues = [createIssue({
+      id: 'fresh', state: { name: 'Backlog', type: 'backlog' },
+      createdAt,
+      // updatedAt only a few seconds after createdAt → below the edit epsilon
+      updatedAt: new Date(new Date(createdAt).getTime() + 5 * 1000).toISOString()
+    })];
+    const roots = rootsOf(buildRecentActivityForest(issues, projects));
+    assert.strictEqual(roots.length, 1);
+    assert.strictEqual(roots[0].activityKind, 'created');
+  });
+
+  test('emits at most one row per issue: created-then-completed reads as "completed"', () => {
+    const issues = [createIssue({
+      id: 'both', state: { name: 'Done', type: 'completed' },
+      createdAt: ago(6 * HOUR), updatedAt: ago(1 * HOUR), completedAt: ago(1 * HOUR)
+    })];
+    const roots = rootsOf(buildRecentActivityForest(issues, projects));
+    assert.strictEqual(roots.length, 1, 'one issue → one row (dedupe)');
+    assert.strictEqual(roots[0].activityKind, 'completed');
+  });
+
+  test('sorts all activity kinds together, newest activity first', () => {
+    const issues = [
+      createIssue({ id: 'a-old-created', state: { name: 'Backlog', type: 'backlog' }, createdAt: ago(5 * DAY), updatedAt: ago(5 * DAY) }),
+      createIssue({ id: 'b-recent-completed', state: { name: 'Done', type: 'completed' }, createdAt: ago(10 * DAY), completedAt: ago(1 * HOUR), updatedAt: ago(1 * HOUR) }),
+      createIssue({ id: 'c-recent-edited', state: { name: 'In Progress', type: 'started' }, createdAt: ago(10 * DAY), updatedAt: ago(2 * HOUR) })
+    ];
+    const roots = rootsOf(buildRecentActivityForest(issues, projects));
+    assert.deepStrictEqual(roots.map(r => r.issue.id), ['b-recent-completed', 'c-recent-edited', 'a-old-created']);
+  });
+
+  test('kinds option restricts the feed (pipeline keeps completion-only)', () => {
+    const issues = [
+      createIssue({ id: 'done', state: { name: 'Done', type: 'completed' }, createdAt: ago(10 * DAY), completedAt: ago(1 * HOUR), updatedAt: ago(1 * HOUR) }),
+      createIssue({ id: 'new', state: { name: 'Backlog', type: 'backlog' }, createdAt: ago(2 * HOUR), updatedAt: ago(2 * HOUR) }),
+      createIssue({ id: 'edited', state: { name: 'In Progress', type: 'started' }, createdAt: ago(10 * DAY), updatedAt: ago(3 * HOUR) })
+    ];
+    const roots = rootsOf(buildRecentActivityForest(issues, projects, 7, { kinds: ['completed'] }));
+    assert.deepStrictEqual(roots.map(r => r.issue.id), ['done']);
+    assert.strictEqual(roots[0].activityKind, 'completed');
   });
 });
