@@ -18,7 +18,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { classifyUpstreamError } from '../../lib/errors.js';
+import { classifyUpstreamError, isAuthError } from '../../lib/errors.js';
 import { renderErrorPage, renderUpstreamAwareErrorPage } from '../../lib/render-pages.js';
 
 describe('classifyUpstreamError', () => {
@@ -56,6 +56,14 @@ describe('classifyUpstreamError', () => {
     assert.strictEqual(classifyUpstreamError(rate).category, 'upstream');
     const boom = new Error('boom'); boom.status = 503;
     assert.strictEqual(classifyUpstreamError(boom).category, 'upstream');
+  });
+
+  test('403 → non-retryable auth (not just 401)', () => {
+    const err = new Error('Forbidden');
+    err.response = { status: 403 };
+    const c = classifyUpstreamError(err);
+    assert.strictEqual(c.category, 'auth');
+    assert.strictEqual(c.code, 'LINEAR_AUTH');
   });
 
   test('unknown error → non-retryable internal', () => {
@@ -107,6 +115,34 @@ describe('renderUpstreamAwareErrorPage', () => {
     assert.ok(html.includes('INTERNAL_ERROR'));
   });
 
+  test('auth failure → escapable page that logs out instead of looping the same URL', () => {
+    const err = new Error('Authentication required');
+    err.response = { status: 401 };
+    // The caller passes the failing workspace URL — a "Try again" there would
+    // just re-hit the rejected token. The page must override it with a logout.
+    const html = renderUpstreamAwareErrorPage(err, {
+      defaultMessage: 'Could not load your projects. Please try again or re-authenticate.',
+      action: 'Try again',
+      actionUrl: '/workspace/acme/',
+      time: '2026-06-26T00:00:00.000Z'
+    });
+    assert.ok(html.includes('Re-authentication Needed'));
+    assert.ok(html.includes('href="/logout"'));
+    assert.ok(/log out and sign in again/i.test(html));
+    // The dead-end retry into the same workspace must NOT be the primary action.
+    assert.ok(!html.includes('href="/workspace/acme/"'));
+    // Still carries the safe diagnostic so it can be quoted in a bug report.
+    assert.ok(html.includes('LINEAR_AUTH'));
+  });
+
+  test('403 auth failure also gets the logout escape', () => {
+    const err = new Error('Forbidden');
+    err.response = { status: 403 };
+    const html = renderUpstreamAwareErrorPage(err, { actionUrl: '/workspace/acme/', time: 't' });
+    assert.ok(html.includes('href="/logout"'));
+    assert.ok(html.includes('LINEAR_AUTH'));
+  });
+
   test('diagnostic is HTML-escaped — no raw markup leaks through', () => {
     const err = new Error('boom');
     err.response = { status: 503 };
@@ -114,6 +150,30 @@ describe('renderUpstreamAwareErrorPage', () => {
     const html = renderUpstreamAwareErrorPage(err, { time: '<script>x</script>' });
     assert.ok(!html.includes('<script>x</script>'));
     assert.ok(html.includes('&lt;script&gt;'));
+  });
+});
+
+describe('isAuthError', () => {
+  test('401 on error.response.status → true', () => {
+    const err = new Error('nope'); err.response = { status: 401 };
+    assert.strictEqual(isAuthError(err), true);
+  });
+
+  test('403 on error.response.status → true (the dead-end the route guard missed)', () => {
+    const err = new Error('forbidden'); err.response = { status: 403 };
+    assert.strictEqual(isAuthError(err), true);
+  });
+
+  test('401 on a bare error.status → true (the other shape the narrow guard missed)', () => {
+    const err = new Error('nope'); err.status = 401;
+    assert.strictEqual(isAuthError(err), true);
+  });
+
+  test('upstream / network failures → false (must not destroy the session)', () => {
+    const net = new Error('fetch failed'); net.cause = { code: 'ECONNRESET' };
+    assert.strictEqual(isAuthError(net), false);
+    const five = new Error('boom'); five.response = { status: 503 };
+    assert.strictEqual(isAuthError(five), false);
   });
 });
 
