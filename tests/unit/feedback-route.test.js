@@ -7,7 +7,9 @@
 //   - priority is forwarded (clamped to Linear's 0-4)
 //   - page URL + browser are captured into the ticket body
 //   - the team is resolved server-side when the body omits teamId
-//   - a triage follow-up is enqueued on the existing dispatch substrate
+//   - a triage follow-up is OPT-IN (default off, LIN-733): not enqueued unless
+//     the per-user `feedbackTriage` flag is on
+//   - when triage is on, the prompt carries the workspace API proxy details
 //   - capability gates still return a clean 422 (never 500)
 //   - a failed triage enqueue does not fail the submission
 
@@ -45,7 +47,17 @@ function makeFakeProvider(overrides = {}) {
   return { provider, calls };
 }
 
-function buildApp({ provider, dispatchQueueStore, token = 'ws-token' }) {
+// A fake proxy token store that mints a fixed readWrite token, so the enabled
+// triage path can assert the proxy block is appended (LIN-733).
+function fakeProxyTokenStore(token = 'minted-rw-token') {
+  const calls = [];
+  return {
+    calls,
+    async createToken(urlKey, options) { calls.push({ urlKey, options }); return { token, scope: options?.scope }; }
+  };
+}
+
+function buildApp({ provider, dispatchQueueStore, token = 'ws-token', features = {}, proxyTokenStore } = {}) {
   registerProvider(provider);
   const app = express();
   // Mirror the production global JSON parser (250kb, application/json only) so
@@ -54,10 +66,11 @@ function buildApp({ provider, dispatchQueueStore, token = 'ws-token' }) {
   const router = createWorkspaceApiRoutes({
     workspaceFromUrl: (req, res, next) => {
       req.workspace = { urlKey: req.params.urlKey, provider: PROVIDER_NAME, accessToken: token };
-      req.session = { linearUserId: 'user-1' };
+      req.session = { linearUserId: 'user-1', features };
       next();
     },
     dispatchQueueStore,
+    proxyTokenStore,
     // Unused by the feedback route but part of the factory signature.
     freeTierStore: {}, getOpenRouterSource: () => null, userPreferencesStore: {},
     workspacePreferencesStore: {}, customPromptsStore: {}, recapCacheStore: {},
@@ -95,10 +108,11 @@ describe('feedback submit (LIN-635)', () => {
   beforeEach(() => { savedTeamEnv = process.env.FEEDBACK_TEAM_ID; delete process.env.FEEDBACK_TEAM_ID; });
   afterEach(() => { if (savedTeamEnv === undefined) delete process.env.FEEDBACK_TEAM_ID; else process.env.FEEDBACK_TEAM_ID = savedTeamEnv; });
 
-  test('files a ticket with priority + captured URL/UA and enqueues triage', async () => {
+  test('files a ticket with priority + captured URL/UA, no triage by default (LIN-733)', async () => {
     const { provider, calls } = makeFakeProvider();
     const dispatch = capturingDispatchStore();
-    const app = buildApp({ provider, dispatchQueueStore: dispatch });
+    // No features → feedbackTriage defaults off.
+    const app = buildApp({ provider, dispatchQueueStore: dispatch, proxyTokenStore: fakeProxyTokenStore() });
 
     const { status, body } = await submit(app, 'acme', {
       message: 'The swipe view jumps on mobile',
@@ -121,12 +135,42 @@ describe('feedback submit (LIN-635)', () => {
     assert.match(input.description, /iPhone/);
     assert.strictEqual(calls.fetchTeams, 1);
 
+    // Triage is OPT-IN — with the flag off, nothing is enqueued.
+    assert.strictEqual(dispatch.items.length, 0);
+  });
+
+  test('enqueues triage with proxy details when feedbackTriage is on (LIN-733)', async () => {
+    const { provider } = makeFakeProvider();
+    const dispatch = capturingDispatchStore();
+    const proxyTokenStore = fakeProxyTokenStore('rw-tok-123');
+    const app = buildApp({
+      provider, dispatchQueueStore: dispatch, proxyTokenStore,
+      features: { feedbackTriage: true }
+    });
+
+    const { status, body } = await submit(app, 'acme', { message: 'Something is broken', priority: 2 });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(body.success, true);
+
     // Triage follow-up enqueued on the dispatch substrate.
     assert.strictEqual(dispatch.items.length, 1);
     assert.strictEqual(dispatch.items[0].urlKey, 'acme');
     assert.strictEqual(dispatch.items[0].item.kind, 'triage');
     assert.strictEqual(dispatch.items[0].item.issueIdentifier, 'LIN-900');
-    assert.match(dispatch.items[0].item.prompt, /Triage/);
+    const prompt = dispatch.items[0].item.prompt;
+    assert.match(prompt, /Triage/);
+
+    // A readWrite token was minted for this dispatch...
+    assert.strictEqual(proxyTokenStore.calls.length, 1);
+    assert.strictEqual(proxyTokenStore.calls[0].urlKey, 'acme');
+    assert.strictEqual(proxyTokenStore.calls[0].options.scope, 'readWrite');
+
+    // ...and the proxy details (Workspace API access block) are appended to the
+    // triage prompt, carrying the minted token and the per-issue brief endpoint.
+    assert.match(prompt, /Workspace API access/);
+    assert.match(prompt, /Authorization: Bearer rw-tok-123/);
+    assert.match(prompt, /\/api\/proxy\/brief\/LIN-900/);
   });
 
   test('clamps an out-of-range priority to 0', async () => {
@@ -182,7 +226,11 @@ describe('feedback submit (LIN-635)', () => {
   test('still succeeds when the triage enqueue throws (best-effort)', async () => {
     const { provider } = makeFakeProvider();
     const failingDispatch = { addItem: async () => { throw new Error('queue down'); } };
-    const app = buildApp({ provider, dispatchQueueStore: failingDispatch });
+    // Flag on so the triage path actually runs and hits the failing enqueue.
+    const app = buildApp({
+      provider, dispatchQueueStore: failingDispatch,
+      proxyTokenStore: fakeProxyTokenStore(), features: { feedbackTriage: true }
+    });
     const { status, body } = await submit(app, 'acme', { message: 'hi' });
     assert.strictEqual(status, 201);
     assert.strictEqual(body.success, true);

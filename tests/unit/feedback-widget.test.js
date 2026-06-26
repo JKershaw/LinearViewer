@@ -33,6 +33,21 @@ describe('feedbackWidget feature flag (LIN-635)', () => {
   });
 });
 
+describe('feedbackTriage feature flag (LIN-733)', () => {
+  test('is registered as a valid per-user flag', () => {
+    assert.strictEqual(FEATURES.FEEDBACK_TRIAGE, 'feedbackTriage');
+    assert.strictEqual(isValidFeatureKey('feedbackTriage'), true);
+  });
+
+  test('defaults to off — triage dispatch is opt-in', () => {
+    assert.strictEqual(FEATURE_DEFAULTS.feedbackTriage, false);
+  });
+
+  test('has a human-readable label for the settings UI', () => {
+    assert.ok(FEATURE_LABELS.feedbackTriage);
+  });
+});
+
 describe('footer feedback surface (LIN-635)', () => {
   test('renders the toggle and widget mount on an authenticated workspace page', () => {
     const html = renderPageFooter({ urlKey: 'acme', featureFlags: {} });

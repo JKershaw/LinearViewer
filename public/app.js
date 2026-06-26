@@ -1459,9 +1459,14 @@ function initFeatureToggles() {
       // Show/hide sub-toggles when a parent feature with children is toggled
       const nodeDiv = featureLine.closest('.node')
       if (nodeDiv) {
-        const childrenDiv = nodeDiv.querySelector('.children.code-review-options')
-        if (childrenDiv && featureLine.dataset.feature === 'codeReview') {
-          childrenDiv.hidden = !data.enabled
+        // Map each parent feature to the children container it controls.
+        const childSelector = {
+          codeReview: '.children.code-review-options',
+          feedbackWidget: '.children.feedback-widget-options'
+        }[featureLine.dataset.feature]
+        if (childSelector) {
+          const childrenDiv = nodeDiv.querySelector(childSelector)
+          if (childrenDiv) childrenDiv.hidden = !data.enabled
         }
       }
     } catch (err) {
