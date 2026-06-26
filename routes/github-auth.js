@@ -131,10 +131,11 @@ export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
   router.get('/auth/github/callback', async (req, res) => {
     if (getMissingAppVars().length > 0) return notConfigured(res)
 
-    // App-flow inbound: `installation_id` + `setup_action`. An ALREADY-INSTALLED
-    // App instead round-trips an OAuth `code` (LIN-728): GitHub re-issues no
-    // `installation_id` because there is nothing to install, so the re-bind path
-    // keys off `code`.
+    // Two inbound shapes (LIN-735): the user-to-server OAuth round-trip returns a
+    // `code` (no `installation_id`) — the default entry now that beginAuth is the
+    // authorize URL, covering both already-installed re-bind and first-time connect;
+    // the post-install return from `installations/new` returns a fresh
+    // `installation_id` + `setup_action`. The `code` branch is handled first.
     const { installation_id: installationId, setup_action: setupAction, code, state, error } = req.query
 
     if (error) {
@@ -158,12 +159,13 @@ export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
     const intent = req.session.oauthIntent || {}
     const mode = intent.mode === 'add-source' ? 'add-source' : 'new'
 
-    // ALREADY-INSTALLED re-bind path (LIN-728). No fresh `installation_id`, but an
-    // OAuth `code` is present: the App is already installed, so GitHub round-trips
-    // a user-to-server `code` instead of an install event. Exchange it for a user
-    // token, enumerate the user's installations + repos, and render the SAME repo
-    // picker. The user token is DISCOVERY-ONLY — it is never stored; the link step
-    // mints an installation token for the chosen repo (the LIN-711 binding shape).
+    // OAuth-`code` path (LIN-728 + LIN-735). beginAuth is now the user-to-server
+    // OAuth authorize URL, so the typical inbound is a `code` with no fresh
+    // `installation_id` — for an already-installed App AND for a first-time connect.
+    // Exchange it for a discovery user token, enumerate the user's installations +
+    // repos, and render the SAME repo picker. The user token is DISCOVERY-ONLY — it
+    // is never stored; the link step mints an installation token for the chosen repo
+    // (the LIN-711 binding shape).
     if (!installationId && code) {
       let userToken
       try {
@@ -184,6 +186,15 @@ export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
         return res.status(500).send(renderErrorPage('Connection Error', 'Could not fetch your repositories from GitHub. Please try again.', {
           action: 'Try again', actionUrl: '/auth/github'
         }))
+      }
+
+      // No installations yet — the user authorized but has never installed the App
+      // (a first-time connect, NOT a re-bind). Send them to the installation picker
+      // to install + pick repos; they return with a fresh `installation_id` and flow
+      // through the install branch below. Reuse the existing CSRF nonce so that
+      // post-install callback still passes the state guard (LIN-735).
+      if (!reboundable.length) {
+        return res.redirect(provider.beginInstall({ state: req.session.oauthState }))
       }
 
       // Stash a repo->installationId map (NOT the user token, NOT a per-repo

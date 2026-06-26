@@ -142,17 +142,56 @@ export function createGitHubProjectsAuthRoutes({ sessionStore, provider } = {}) 
     const intent = req.session.oauthIntent || {}
     const mode = intent.mode === 'add-source' ? 'add-source' : 'new'
 
-    // ALREADY-INSTALLED case: no fresh `installation_id`, an OAuth `code` instead.
-    // The shared App is already installed (commonly for Issues), so GitHub round-
-    // trips a `code` with nothing to install. Re-binding a board across existing
-    // installations is the Projects analogue of LIN-728 (a named follow-up); for
-    // now steer the user clearly rather than 500 on a missing id.
+    // OAuth-`code` re-bind path (LIN-735 — the Projects analogue of LIN-728). With
+    // beginAuth now the user-to-server OAuth authorize URL, the typical inbound is a
+    // `code` with no fresh `installation_id` — for an already-installed shared App
+    // AND for a first-time connect. Exchange it for a discovery user token, list the
+    // user's installations' boards, and render the SAME board picker. The user token
+    // is DISCOVERY-ONLY — never stored; the link step mints an installation token for
+    // the chosen board (the LIN-711 binding shape).
     if (!installationId && code) {
-      return res.status(400).send(renderErrorPage(
-        'App Already Installed',
-        'The Harbour GitHub App is already installed on your account. Re-selecting a Projects board on an existing installation is coming soon — for now, open the App installation settings on GitHub, add or reconfigure an installation, and you will be returned to the board picker.',
-        { action: 'Try again', actionUrl: '/auth/github-projects' }
-      ))
+      let userToken
+      try {
+        const tokenBag = await provider.completeAuth(code)
+        userToken = tokenBag.access_token
+      } catch (authError) {
+        console.error('GitHub Projects re-bind code exchange error:', authError)
+        return res.status(400).send(renderErrorPage('Authentication Failed', 'Could not complete authentication with GitHub. Please try again.', {
+          action: 'Try again', actionUrl: '/auth/github-projects'
+        }))
+      }
+
+      let reboundable
+      try {
+        reboundable = await provider.listReboundableBoards(userToken)
+      } catch (fetchError) {
+        console.error('Failed to enumerate GitHub Projects boards for re-bind:', fetchError)
+        return res.status(500).send(renderErrorPage('Connection Error', 'Could not fetch your project boards from GitHub. Please try again.', {
+          action: 'Try again', actionUrl: '/auth/github-projects'
+        }))
+      }
+
+      // No installations yet — the user authorized but has never installed the App
+      // (a first-time connect, NOT a re-bind). Send them to install + grant the
+      // Projects (read) permission; they return with a fresh `installation_id` and
+      // flow through the install branch below. Reuse the CSRF nonce so the
+      // post-install callback still passes the state guard (LIN-735).
+      if (!reboundable.length) {
+        return res.redirect(provider.beginInstall({ state: req.session.oauthState }))
+      }
+
+      // Stash a board->installationId map (NOT the user token): the link step
+      // resolves the chosen board's installation server-side and mints the
+      // installation token then, so a client can never assert which installation a
+      // board belongs to. The LIN-541 `mode`/`workspaceUrlKey` carry rides along.
+      const boardInstallations = {}
+      for (const b of reboundable) boardInstallations[`${b.login}/${b.number}`] = String(b.installationId)
+      const pending = { rebind: true, mode, boardInstallations }
+      if (intent.workspaceUrlKey) pending.workspaceUrlKey = intent.workspaceUrlKey
+      req.session.githubProjectsPending = pending
+      return req.session.save(() => {
+        res.send(renderGitHubProjectSelectPage(reboundable, { mode }))
+      })
     }
 
     // No installation id (e.g. setup_action=request — an org member asked an admin
@@ -220,7 +259,10 @@ export function createGitHubProjectsAuthRoutes({ sessionStore, provider } = {}) 
    */
   router.post('/auth/github-projects/link', async (req, res) => {
     const pending = req.session.githubProjectsPending
-    if (!pending || !pending.token) {
+    // Two pending shapes converge here: the install branch already minted an
+    // installation `token`; the re-bind branch (LIN-735) carries only a
+    // board->installationId map (`rebind`) and mints the token at link time.
+    if (!pending || (!pending.token && !pending.rebind)) {
       return res.status(400).send(renderErrorPage('Session Expired', 'Your GitHub sign-in session expired. Please start again.', {
         action: 'Connect GitHub Projects', actionUrl: '/auth/github-projects'
       }))
@@ -234,12 +276,32 @@ export function createGitHubProjectsAuthRoutes({ sessionStore, provider } = {}) 
     }
 
     try {
+      // Resolve the binding credential. The install branch already holds the minted
+      // installation token + identity in `pending`. The re-bind branch (LIN-735)
+      // holds only a board->installationId map: resolve the chosen board's
+      // installation server-side (a client-supplied installation is never trusted)
+      // and mint the installation token NOW via completeInstallation. EITHER WAY the
+      // persisted credential is an installation token, so re-mint keeps working and
+      // the discovery user token is never stored.
+      let creds
+      if (pending.rebind) {
+        const installationId = pending.boardInstallations?.[board]
+        if (!installationId) {
+          return res.status(400).send(renderErrorPage('Invalid Project Board', 'That board is not one of your installed GitHub project boards. Please pick one from the list.', {
+            action: 'Try again', actionUrl: '/auth/github-projects'
+          }))
+        }
+        creds = await provider.completeInstallation(installationId)
+      } else {
+        creds = pending
+      }
+
       // GitHub App binding shape (LIN-711): persist `installationId` (the re-mint
       // key) and stamp the binding with the real installation-token expiry in ms.
       // installationExpiryMs throws on a missing/unparseable expiry (kept inside the
       // try so it renders the clean error page below).
-      const tokenExpiresAt = installationExpiryMs(pending.tokenExpiresAt)
-      const credentials = { installationId: pending.installationId, token: pending.token, tokenExpiresAt }
+      const tokenExpiresAt = installationExpiryMs(creds.tokenExpiresAt)
+      const credentials = { installationId: creds.installationId, token: creds.token, tokenExpiresAt }
 
       if (pending.mode === 'add-source') {
         // Link onto the VIEWED workspace (its urlKey rode through the session
@@ -261,7 +323,7 @@ export function createGitHubProjectsAuthRoutes({ sessionStore, provider } = {}) 
       // New-container login: find-or-create the GitHub *account* container keyed by
       // identity, so a Projects board (or a second board, or an Issues repo) for the
       // same account adds a binding rather than clobbering the first.
-      const workspaceId = `github:${pending.userId}`
+      const workspaceId = `github:${creds.userId}`
       const existing = (req.session.workspaces || []).find(w => w.id === workspaceId)
       if (existing) {
         linkProvider(existing, provider.name, board, credentials)
@@ -271,10 +333,10 @@ export function createGitHubProjectsAuthRoutes({ sessionStore, provider } = {}) 
         return res.redirect(`/workspace/${encodeURIComponent(existing.urlKey)}/`)
       }
 
-      const urlKey = validateWorkspaceUrlKey(pending.login) ? pending.login : `gh-${pending.userId}`
+      const urlKey = validateWorkspaceUrlKey(creds.login) ? creds.login : `gh-${creds.userId}`
       const workspace = {
         id: workspaceId,
-        name: pending.login,
+        name: creds.login,
         urlKey,
         addedAt: Date.now(),
         tokenExpiresAt,
