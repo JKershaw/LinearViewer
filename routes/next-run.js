@@ -96,9 +96,10 @@ function buildMockResponse() {
  * @param {Object}   deps.workspacePreferencesStore - workspace prefs store (model selection)
  * @param {Function} deps.getOpenRouterSource - (req) → 'oauth'|'env'|'free'|null
  * @param {Function} deps.getDeployInfo       - () → deploy metadata
+ * @param {Object}   [deps.reportHistoryStore] - durable roadmap-report store (getLatest); LIN-742
  * @returns {Router}
  */
-export function createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo }) {
+export function createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, reportHistoryStore }) {
   const router = Router();
 
   // ─── HTML page ──────────────────────────────────────────────────────────────
@@ -180,8 +181,12 @@ export function createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspace
       const { organizationName, projects, issues } =
         await getProviderForWorkspace(workspace).fetchProjects(getWorkspaceCallScope(workspace));
       const model = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
+      // Fold the latest durable roadmap narrative into context when one exists and
+      // is fresh; getLatest already returns null on absence/error, and the lib gates
+      // staleness, so suggestions degrade cleanly when there is nothing to add (LIN-742).
+      const roadmapReport = reportHistoryStore ? await reportHistoryStore.getLatest(workspace.urlKey) : null;
       const result = await generateGoalSuggestions(
-        { projects, issues, organizationName },
+        { projects, issues, organizationName, roadmapReport },
         { apiKey: apiKeyToUse, model, urlKey: workspace.urlKey }
       );
       res.json(result);

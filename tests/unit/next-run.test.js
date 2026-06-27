@@ -22,6 +22,8 @@ import {
   ensureSizeCoverage,
   normalizeSize,
   generateGoalSuggestions,
+  resolveRoadmapNarrative,
+  ROADMAP_REPORT_MAX_AGE_DAYS,
   CONTINUE_UNTIL_STOPPED_OPTION,
   REQUIRED_SIZES,
   TSHIRT_SIZES,
@@ -102,6 +104,85 @@ describe('formatNextRunContext', () => {
     assert.doesNotMatch(out, /Dependency chains/);
     assert.doesNotMatch(out, /Risks flagged/);
     assert.doesNotMatch(out, /Delivery health/);
+  });
+});
+
+describe('resolveRoadmapNarrative (LIN-742)', () => {
+  const NOW = Date.UTC(2026, 5, 27); // fixed clock for deterministic ages
+  const iso = daysAgo => new Date(NOW - daysAgo * 86400000).toISOString();
+  const report = (overrides = {}) => ({
+    generatedAt: iso(2),
+    narrative: { digest: 'Digest synthesis.', trajectory: 'Trajectory reading.' },
+    ...overrides,
+  });
+
+  test('returns the digest + age for a fresh report (digest preferred)', () => {
+    const out = resolveRoadmapNarrative(report(), { now: NOW });
+    assert.equal(out.text, 'Digest synthesis.');
+    assert.equal(out.ageDays, 2);
+  });
+
+  test('falls back to trajectory when there is no digest', () => {
+    const out = resolveRoadmapNarrative(report({ narrative: { trajectory: 'Only trajectory.' } }), { now: NOW });
+    assert.equal(out.text, 'Only trajectory.');
+  });
+
+  test('omits (null) a report older than the freshness window', () => {
+    const out = resolveRoadmapNarrative(report({ generatedAt: iso(ROADMAP_REPORT_MAX_AGE_DAYS + 1) }), { now: NOW });
+    assert.equal(out, null);
+  });
+
+  test('keeps a report exactly at the window boundary', () => {
+    const out = resolveRoadmapNarrative(report({ generatedAt: iso(ROADMAP_REPORT_MAX_AGE_DAYS) }), { now: NOW });
+    assert.ok(out);
+    assert.equal(out.ageDays, ROADMAP_REPORT_MAX_AGE_DAYS);
+  });
+
+  test('respects a custom maxAgeDays override', () => {
+    assert.equal(resolveRoadmapNarrative(report({ generatedAt: iso(5) }), { now: NOW, maxAgeDays: 3 }), null);
+    assert.ok(resolveRoadmapNarrative(report({ generatedAt: iso(5) }), { now: NOW, maxAgeDays: 7 }));
+  });
+
+  test('returns null for absent report, missing/invalid date, no prose, or future date', () => {
+    assert.equal(resolveRoadmapNarrative(null, { now: NOW }), null);
+    assert.equal(resolveRoadmapNarrative({}, { now: NOW }), null);
+    assert.equal(resolveRoadmapNarrative(report({ generatedAt: 'not-a-date' }), { now: NOW }), null);
+    assert.equal(resolveRoadmapNarrative(report({ narrative: {} }), { now: NOW }), null);
+    assert.equal(resolveRoadmapNarrative(report({ narrative: { digest: '   ' } }), { now: NOW }), null);
+    assert.equal(resolveRoadmapNarrative(report({ generatedAt: iso(-1) }), { now: NOW }), null);
+  });
+
+  test('truncates an oversized narrative to keep the prompt lean', () => {
+    const out = resolveRoadmapNarrative(report({ narrative: { digest: 'x'.repeat(10000) } }), { now: NOW });
+    assert.ok(out.text.length <= 4000);
+  });
+});
+
+describe('formatNextRunContext roadmap section (LIN-742)', () => {
+  test('appends a dated Roadmap analysis section when a narrative is supplied', () => {
+    const out = formatNextRunContext(MODEL, 'Acme', { text: 'The north star is X.', ageDays: 3 });
+    assert.match(out, /Roadmap analysis \(generated 3 days ago\):/);
+    assert.match(out, /The north star is X\./);
+  });
+
+  test('says "today" at age 0 and singularises "1 day ago"', () => {
+    assert.match(formatNextRunContext(MODEL, 'Acme', { text: 'n', ageDays: 0 }), /generated today/);
+    assert.match(formatNextRunContext(MODEL, 'Acme', { text: 'n', ageDays: 1 }), /generated 1 day ago/);
+  });
+
+  test('omits the section entirely when no narrative is supplied', () => {
+    assert.doesNotMatch(formatNextRunContext(MODEL, 'Acme'), /Roadmap analysis/);
+    assert.doesNotMatch(formatNextRunContext(MODEL, 'Acme', null), /Roadmap analysis/);
+  });
+});
+
+describe('NEXT_RUN_SYSTEM_PROMPT size guidance (LIN-742)', () => {
+  test('reframes "large" to include bundling many small straightforward tasks', () => {
+    const system = buildNextRunMessages(MODEL)[0].content;
+    assert.match(system, /Breadth counts the same as depth/);
+    assert.match(system, /many small, straightforward, independent tasks/);
+    // XL stays reserved for the auto-added open-ended option.
+    assert.match(system, /XL[^]*added automatically/);
   });
 });
 
@@ -371,5 +452,42 @@ describe('generateGoalSuggestions return shape (LIN-633)', () => {
     );
     const opt = result.options.find(o => o.title === 'T');
     assert.deepEqual(opt.referencedTaskIds, ['LIN-1']);
+  });
+
+  test('folds a fresh roadmap report digest into the returned context (LIN-742)', async () => {
+    const raw = JSON.stringify({ options: [{ goal: 'g', reasoning: 'r', size: 'M', title: 'T' }] });
+    global.fetch = mock.fn(async () => mockStreamResponse(raw));
+
+    const report = { generatedAt: new Date().toISOString(), narrative: { digest: 'The roadmap digest line.' } };
+    const result = await generateGoalSuggestions(
+      { projects: [], issues: [], organizationName: 'Acme', roadmapReport: report },
+      { apiKey: 'test-key' }
+    );
+    assert.match(result.context, /Roadmap analysis \(generated today\):/);
+    assert.match(result.context, /The roadmap digest line\./);
+  });
+
+  test('omits a stale roadmap report from the context (LIN-742)', async () => {
+    const raw = JSON.stringify({ options: [{ goal: 'g', reasoning: 'r', size: 'M', title: 'T' }] });
+    global.fetch = mock.fn(async () => mockStreamResponse(raw));
+
+    const stale = new Date(Date.now() - 60 * 86400000).toISOString();
+    const report = { generatedAt: stale, narrative: { digest: 'Stale digest line.' } };
+    const result = await generateGoalSuggestions(
+      { projects: [], issues: [], organizationName: 'Acme', roadmapReport: report },
+      { apiKey: 'test-key' }
+    );
+    assert.doesNotMatch(result.context, /Roadmap analysis/);
+  });
+
+  test('omits silently when no roadmap report is provided (LIN-742)', async () => {
+    const raw = JSON.stringify({ options: [{ goal: 'g', reasoning: 'r', size: 'M', title: 'T' }] });
+    global.fetch = mock.fn(async () => mockStreamResponse(raw));
+
+    const result = await generateGoalSuggestions(
+      { projects: [], issues: [], organizationName: 'Acme' },
+      { apiKey: 'test-key' }
+    );
+    assert.doesNotMatch(result.context, /Roadmap analysis/);
   });
 });
