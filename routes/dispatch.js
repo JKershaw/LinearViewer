@@ -195,7 +195,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const { workspace } = req;
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo, abort, abortTo, sessionId } = req.body;
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo, force, abort, abortTo, sessionId } = req.body;
 
       // Abort verb (LIN-743): an abort item asks the consumer to cancel/close an
       // existing session (named by abortTo) instead of running a prompt, so it
@@ -302,6 +302,19 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         }
       }
 
+      // Validate the force-resume flag if provided (LIN-559). force overrides the
+      // runner's active-session liveness guard so a follow-up can resume a wedged/
+      // sleeping session. It is only meaningful alongside followUpTo (the human
+      // asserts the prior process is dead — see LIN-546), so reject force:true
+      // without it rather than persisting an inert flag — mirroring the
+      // abortTo-requires-abort guard above. force:false / omitted is always fine.
+      if (force !== undefined && typeof force !== 'boolean') {
+        return badRequest.json(res, 'force must be a boolean');
+      }
+      if (force === true && (followUpTo === undefined || followUpTo === null)) {
+        return badRequest.json(res, 'force requires followUpTo');
+      }
+
       // Validate autopilot session reference if provided. Unlike followUpTo,
       // sessionId carries NO target restriction — it groups worker dispatches
       // into one autopilot session regardless of target. Store + forward it
@@ -325,6 +338,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         target: target || 'cli',
         repo: repo || null,
         followUpTo: followUpTo || null,
+        force: force === true,
         abort: isAbort,
         abortTo: isAbort ? abortTo : null,
         sessionId: sessionId || null

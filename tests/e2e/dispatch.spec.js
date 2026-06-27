@@ -787,6 +787,49 @@ test.describe('Dispatch API', () => {
     expect(listData.items[0].followUpTo).toBeNull();
   });
 
+  // Force-resume flag plumbing (LIN-559): a follow-up may carry force:true to
+  // override the runner's active-session guard. Only meaningful with followUpTo.
+  test('POST /api/dispatch follow-up with force:true surfaces force on the item', async ({ request }) => {
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
+
+    const original = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: { prompt: 'Implement the thing', promptName: 'Custom', target: 'cli' }
+    });
+    expect(original.status()).toBe(201);
+    const originalId = (await original.json()).item.id;
+
+    const followUp = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: { prompt: 'Pick this back up', promptName: 'Custom', target: 'cli', followUpTo: originalId, force: true }
+    });
+    expect(followUp.status()).toBe(201);
+
+    const listData = await (await request.get(`${API_PREFIX}/api/dispatch`)).json();
+    const byPrompt = Object.fromEntries(listData.items.map(i => [i.prompt, i]));
+    expect(byPrompt['Pick this back up'].force).toBe(true);
+    // A plain dispatch reads force:false (never undefined).
+    expect(byPrompt['Implement the thing'].force).toBe(false);
+  });
+
+  test('POST /api/dispatch rejects force:true without followUpTo', async ({ request }) => {
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
+
+    const response = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: { prompt: 'Resume please', force: true }
+    });
+    expect(response.status()).toBe(400);
+    expect((await response.json()).error).toContain('force requires followUpTo');
+  });
+
+  test('POST /api/dispatch rejects a non-boolean force', async ({ request }) => {
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
+
+    const response = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: { prompt: 'Resume please', followUpTo: '11111111-1111-4111-8111-111111111111', force: 'yes' }
+    });
+    expect(response.status()).toBe(400);
+    expect((await response.json()).error).toContain('force must be a boolean');
+  });
+
   // Abort dispatch plumbing (LIN-743): an abort is an ordinary item carrying
   // abort:true + abortTo (the dispatchId of the session to cancel) and NO prompt.
   test('POST /api/dispatch abort: cancels an existing session by id and surfaces abort/abortTo', async ({ request }) => {

@@ -821,6 +821,56 @@ test.describe('Proxy API - Dispatch', () => {
     expect((await watch.json()).followUpTo).toBe(originalId);
   });
 
+  // Force-resume flag (LIN-559): a follow-up may carry force:true to override the
+  // runner's active-session guard. Only meaningful with followUpTo.
+  test('force: a follow-up with force:true surfaces force on the watched item', async ({ request }) => {
+    // 1. Dispatch the original item.
+    const original = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'implement the thing', target: 'cli' }
+    });
+    expect(original.status()).toBe(201);
+    const originalId = (await original.json()).id;
+
+    // 2. Dispatch a force follow-up pointing at the original's id.
+    const followUp = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'pick this back up', target: 'cli', followUpTo: originalId, force: true }
+    });
+    expect(followUp.status()).toBe(201);
+    const followUpId = (await followUp.json()).id;
+
+    // The watch endpoint surfaces force for observability; the original reads false.
+    const watch = await request.get(`/api/proxy/dispatch/${followUpId}`, {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(watch.status()).toBe(200);
+    expect((await watch.json()).force).toBe(true);
+
+    const watchOriginal = await request.get(`/api/proxy/dispatch/${originalId}`, {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect((await watchOriginal.json()).force).toBe(false);
+  });
+
+  test('force requires followUpTo (400)', async ({ request }) => {
+    const resp = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'resume please', force: true }
+    });
+    expect(resp.status()).toBe(400);
+    expect((await resp.json()).error).toContain('force requires followUpTo');
+  });
+
+  test('force rejects a non-boolean value (400)', async ({ request }) => {
+    const resp = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'resume please', followUpTo: '11111111-1111-4111-8111-111111111111', force: 'yes' }
+    });
+    expect(resp.status()).toBe(400);
+    expect((await resp.json()).error).toContain('force must be a boolean');
+  });
+
   // Abort verb (LIN-743): an abort item carries abort:true + abortTo and no prompt.
   test('abort: enqueue without a prompt, then watch surfaces abort/abortTo', async ({ request }) => {
     // 1. Dispatch an original item on dash.
