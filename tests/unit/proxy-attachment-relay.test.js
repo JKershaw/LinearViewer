@@ -68,6 +68,27 @@ async function getAttachment(app, handle) {
   }
 }
 
+// Like getAttachment but stubs the upstream in-line and returns the full set of
+// response headers (lower-cased) so header-level assertions are possible.
+async function fetchRaw(app, handle, upstreamHandler) {
+  stubUpstream(upstreamHandler);
+  const server = app.listen(0);
+  await new Promise(resolve => server.once('listening', resolve));
+  const { port } = server.address();
+  try {
+    const res = await fetch(
+      `http://127.0.0.1:${port}/api/proxy/attachments/${encodeURIComponent(handle)}`,
+      { headers: { Authorization: 'Bearer anything' } }
+    );
+    const buf = Buffer.from(await res.arrayBuffer());
+    const headers = {};
+    for (const [k, v] of res.headers.entries()) headers[k] = v;
+    return { status: res.status, headers, bodyText: buf.toString('utf8') };
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+  }
+}
+
 // A minimal fetch Response stand-in for the upstream image fetch.
 function fakeResponse({ ok = true, status = 200, contentType = 'image/png', contentLength, bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47]) } = {}) {
   const headers = new Map();
@@ -112,11 +133,11 @@ describe('GET /api/proxy/attachments/:id — relay (md: path)', () => {
     assert.equal(sawAuth, 'Bearer ws-linear-token', 'fetches with the workspace access token');
   });
 
-  test('rejects an upstream non-image content-type', async () => {
+  test('rejects an upstream non-image content-type on an image (no name hint) handle', async () => {
     stubUpstream(() => fakeResponse({ contentType: 'text/html', bytes: Buffer.from('<html>') }));
     const res = await getAttachment(buildApp(), md(`${LINEAR_HOST}/x.png`));
     assert.equal(res.status, 400);
-    assert.match(res.bodyText, /not an image/i);
+    assert.match(res.bodyText, /unsupported content-type/i);
   });
 
   test('rejects an oversized attachment by content-length header', async () => {
@@ -136,6 +157,57 @@ describe('GET /api/proxy/attachments/:id — relay (md: path)', () => {
     const res = await getAttachment(buildApp(), md(`${LINEAR_HOST}/redir.png`));
     assert.equal(res.status, 400);
     assert.match(res.bodyText, /redirect/i);
+  });
+});
+
+// A non-image file handle: the md: value carries a `#name=<filename>` hint the
+// discovery layer encodes so the relay can type extension-less upload bytes.
+const mdFile = (url, name) => md(`${url}#name=${encodeURIComponent(name)}`);
+
+describe('GET /api/proxy/attachments/:id — non-image file relay (LIN-750)', () => {
+  test('serves a text/markdown file typed from the name hint, even when upstream is octet-stream', async () => {
+    const body = Buffer.from('# Theme design\n\nbody');
+    let fetchedUrl = null;
+    stubUpstream((url) => {
+      fetchedUrl = url;
+      return fakeResponse({ contentType: 'application/octet-stream', bytes: body });
+    });
+    const res = await getAttachment(
+      buildApp(),
+      mdFile(`${LINEAR_HOST}/a/b/c`, 'theme-design.md')
+    );
+    assert.equal(res.status, 200);
+    assert.match(res.contentType, /^text\/markdown/, 'typed from filename hint, not upstream octet-stream');
+    assert.deepEqual(res.bodyBuf, body, 'streams the bytes verbatim');
+    assert.equal(fetchedUrl, `${LINEAR_HOST}/a/b/c`, 'the #name= fragment is stripped before egress');
+  });
+
+  test('sets Content-Disposition: attachment + nosniff on a file relay', async () => {
+    const res = await fetchRaw(buildApp(), mdFile(`${LINEAR_HOST}/x/y`, 'AgentRuns.jsx'),
+      () => fakeResponse({ contentType: 'application/octet-stream', bytes: Buffer.from('export default 1') }));
+    assert.equal(res.status, 200);
+    assert.match(res.headers['content-type'] || '', /^text\/plain/, 'source served as text/plain');
+    assert.match(res.headers['content-disposition'] || '', /attachment; filename="AgentRuns\.jsx"/);
+    assert.equal(res.headers['x-content-type-options'], 'nosniff');
+  });
+
+  test('rejects a file whose extension is not on the allowlist, cleanly (no 500)', async () => {
+    stubUpstream(() => fakeResponse({ contentType: 'application/octet-stream', bytes: Buffer.from('PK') }));
+    const res = await getAttachment(buildApp(), mdFile(`${LINEAR_HOST}/a/b`, 'archive.zip'));
+    assert.equal(res.status, 400);
+    assert.match(res.bodyText, /unsupported content-type/i);
+  });
+
+  test('enforces the 10 MB cap on file relays too', async () => {
+    stubUpstream(() => fakeResponse({ contentType: 'application/octet-stream', contentLength: 11 * 1024 * 1024 }));
+    const res = await getAttachment(buildApp(), mdFile(`${LINEAR_HOST}/a/b`, 'huge.md'));
+    assert.equal(res.status, 413);
+  });
+
+  test('SSRF guard still applies to file handles (non-Linear host rejected)', async () => {
+    const res = await getAttachment(buildApp(), mdFile('https://evil.example.com/x', 'spec.md'));
+    assert.equal(res.status, 400);
+    assert.match(res.bodyText, /from Linear/i);
   });
 });
 
