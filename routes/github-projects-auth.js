@@ -29,6 +29,7 @@
 import crypto from 'crypto'
 import { Router } from 'express'
 import { renderErrorPage, renderGitHubProjectSelectPage } from '../lib/render-pages.js'
+import { githubErrorDiagnostic } from '../lib/errors.js'
 import {
   upsertWorkspace,
   saveSession,
@@ -157,7 +158,7 @@ export function createGitHubProjectsAuthRoutes({ sessionStore, provider } = {}) 
       } catch (authError) {
         console.error('GitHub Projects re-bind code exchange error:', authError)
         return res.status(400).send(renderErrorPage('Authentication Failed', 'Could not complete authentication with GitHub. Please try again.', {
-          action: 'Try again', actionUrl: '/auth/github-projects'
+          action: 'Try again', actionUrl: '/auth/github-projects', diagnostic: githubErrorDiagnostic(authError)
         }))
       }
 
@@ -167,7 +168,7 @@ export function createGitHubProjectsAuthRoutes({ sessionStore, provider } = {}) 
       } catch (fetchError) {
         console.error('Failed to enumerate GitHub Projects boards for re-bind:', fetchError)
         return res.status(500).send(renderErrorPage('Connection Error', 'Could not fetch your project boards from GitHub. Please try again.', {
-          action: 'Try again', actionUrl: '/auth/github-projects'
+          action: 'Try again', actionUrl: '/auth/github-projects', diagnostic: githubErrorDiagnostic(fetchError)
         }))
       }
 
@@ -214,7 +215,7 @@ export function createGitHubProjectsAuthRoutes({ sessionStore, provider } = {}) 
       } catch (mintError) {
         console.error('GitHub Projects installation-token mint error:', mintError)
         return res.status(400).send(renderErrorPage('Authentication Failed', 'Could not complete authentication with GitHub. Please try again.', {
-          action: 'Try again', actionUrl: '/auth/github-projects'
+          action: 'Try again', actionUrl: '/auth/github-projects', diagnostic: githubErrorDiagnostic(mintError)
         }))
       }
 
@@ -227,7 +228,7 @@ export function createGitHubProjectsAuthRoutes({ sessionStore, provider } = {}) 
       } catch (fetchError) {
         console.error('Failed to list GitHub Projects boards:', fetchError)
         return res.status(500).send(renderErrorPage('Connection Error', 'Could not fetch your project boards from GitHub. Please try again.', {
-          action: 'Try again', actionUrl: '/auth/github-projects'
+          action: 'Try again', actionUrl: '/auth/github-projects', diagnostic: githubErrorDiagnostic(fetchError)
         }))
       }
 
@@ -244,7 +245,7 @@ export function createGitHubProjectsAuthRoutes({ sessionStore, provider } = {}) 
     } catch (err) {
       console.error('GitHub Projects callback error:', err)
       res.status(500).send(renderErrorPage('Something Went Wrong', 'An unexpected error occurred during GitHub authentication. Please try again.', {
-        action: 'Try again', actionUrl: '/auth/github-projects'
+        action: 'Try again', actionUrl: '/auth/github-projects', diagnostic: githubErrorDiagnostic(err)
       }))
     }
   })
@@ -366,7 +367,7 @@ export function createGitHubProjectsAuthRoutes({ sessionStore, provider } = {}) 
     } catch (err) {
       console.error('GitHub Projects link error:', err)
       res.status(500).send(renderErrorPage('Something Went Wrong', 'Could not link your GitHub project board. Please try again.', {
-        action: 'Try again', actionUrl: '/auth/github-projects'
+        action: 'Try again', actionUrl: '/auth/github-projects', diagnostic: githubErrorDiagnostic(err)
       }))
     }
   })
