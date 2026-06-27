@@ -19,7 +19,7 @@ import { MongoClient } from 'mongodb'
 import { MangoClient } from '@jkershaw/mangodb'
 import { ensureIndexes } from './lib/db-indexes.js'
 import { MongoSessionStore } from './lib/session-store.js'
-import { UserPreferencesStore } from './lib/user-preferences.js'
+import { UserPreferencesStore, VALID_THEMES } from './lib/user-preferences.js'
 import { WorkspacePreferencesStore } from './lib/workspace-preferences.js'
 import { DispatchQueueStore } from './lib/dispatch-store.js'
 import { CustomPromptsStore } from './lib/custom-prompts-store.js'
@@ -1640,6 +1640,11 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
   }));
   const providerNotice = providerNoticeFromQuery(req.query);
 
+  // Current durable theme (LIN-756) for the Appearance control's active state.
+  // The bootstrap in page.js applies the theme client-side; this only drives the
+  // settings UI's "which option is selected" marker.
+  const theme = (await userPreferencesStore.getTheme(req.session.linearUserId)) || 'light';
+
   const html = renderSettingsPage(workspace.name || 'Workspace', {
     openRouterConnected: !!(openRouterSource === 'oauth' || openRouterSource === 'env'),
     openRouterSource,
@@ -1653,7 +1658,8 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
     workspaceFeatures,
     llmStats,
     providerBindings,
-    providerNotice
+    providerNotice,
+    theme
   });
   res.send(html);
 });
@@ -1934,6 +1940,59 @@ app.post('/workspace/:urlKey/settings/features', workspaceFromUrl, async (req, r
   // AJAX requests get JSON; regular form submissions get redirect
   if (req.headers['x-requested-with'] === 'XMLHttpRequest') {
     res.json({ ok: true, feature, enabled: isEnabled });
+  } else {
+    res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
+  }
+});
+
+/**
+ * Persist the global theme preference (LIN-756).
+ *
+ * Writes durable `preferences.theme` (cross-device) and seeds a readable `theme`
+ * cookie so an authenticated load on a fresh device is themed before first paint
+ * (the page.js bootstrap reads localStorage first, then this cookie). The client
+ * also writes `localStorage.theme` for instant, flash-free same-device navigation,
+ * so this route is the durable/cross-device half — not the only path.
+ *
+ * Full POST→redirect form (works without JS); AJAX callers get JSON.
+ */
+app.post('/workspace/:urlKey/settings/theme', workspaceFromUrl, async (req, res) => {
+  const workspace = req.workspace;
+  const { theme } = req.body;
+
+  if (!VALID_THEMES.includes(theme)) {
+    return res.status(400).json({ error: 'Invalid theme' });
+  }
+
+  // Mirror into the session (the rehydrated-fields seam) and seed the cookie so the
+  // pre-paint bootstrap can pick it up on the next authenticated load. The cookie is
+  // intentionally NOT httpOnly — the inline bootstrap reads it via document.cookie.
+  req.session.theme = theme;
+  res.cookie('theme', theme, {
+    maxAge: 1000 * 60 * 60 * 24 * 365, // 1 year
+    httpOnly: false,
+    sameSite: 'lax'
+  });
+
+  try {
+    await saveSession(req.session);
+  } catch (err) {
+    console.error('Failed to save theme to session:', err);
+    return res.status(500).json({ error: 'Failed to save theme' });
+  }
+
+  // Best-effort durable persist for cross-device sync (non-fatal; cookie + the
+  // client's localStorage already carry the choice for this device).
+  if (req.session.linearUserId) {
+    try {
+      await userPreferencesStore.setTheme(req.session.linearUserId, theme);
+    } catch (err) {
+      console.error('Failed to persist theme to preferences store:', err);
+    }
+  }
+
+  if (req.headers['x-requested-with'] === 'XMLHttpRequest') {
+    res.json({ ok: true, theme });
   } else {
     res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
   }

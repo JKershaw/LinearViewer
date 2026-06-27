@@ -285,3 +285,17 @@
     width: 100%;
   }
 }
+
+/* Theme / Appearance control (LIN-756): lay the option buttons inline with the
+   label, reusing the feature-toggle button styling. */
+.theme-control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.theme-control .theme-form {
+  display: inline-flex;
+  margin: 0;
+}

@@ -1491,6 +1491,97 @@ function initFeatureToggles() {
   })
 }
 
+/**
+ * Initialize the global theme toggle on the settings page (LIN-756).
+ *
+ * Intercepts clicks on the Appearance control's options to apply the theme
+ * INSTANTLY (no round-trip, no flash) and write `localStorage.theme` — the input
+ * the pre-paint bootstrap in page.js reads on every subsequent navigation. The POST
+ * still fires (via fetch) to persist `preferences.theme` durably + seed the cookie;
+ * on any failure it falls back to a full form POST so the server-side path runs.
+ *
+ * The stored value is a theme KEY ('light' | 'dark' | 'amber'); the matching
+ * `.theme-*` class (or none for light) is applied to documentElement — exactly
+ * what the bootstrap does — so the live page and the next page agree.
+ */
+function initThemeToggle() {
+  const control = document.querySelector('[data-testid="settings-theme-control"]')
+  if (!control) return // Not on settings page
+
+  const THEME_CLASS = { dark: 'theme-dark', amber: 'theme-amber' } // light → '' (default)
+  const CLASS_THEME = { 'theme-dark': 'dark', 'theme-amber': 'amber' } // inverse; '' → light
+
+  /** Apply a theme key to the live document and remember it. */
+  function applyTheme(theme) {
+    document.documentElement.className = THEME_CLASS[theme] || ''
+    try { localStorage.setItem('theme', theme) } catch (e) { /* private mode — cookie still persists */ }
+  }
+
+  /** Reflect the active theme across the option set (markers + a11y state). */
+  function setActiveMarker(theme) {
+    control.querySelectorAll('.theme-option').forEach((opt) => {
+      const isActive = opt.dataset.themeOption === theme
+      opt.classList.toggle('toggle-on', isActive)
+      opt.classList.toggle('toggle-off', !isActive)
+      if (isActive) opt.setAttribute('aria-pressed', 'true')
+      else opt.removeAttribute('aria-pressed')
+      const state = opt.querySelector('.toggle-state')
+      if (state) state.textContent = (isActive ? '● ' : '○ ') + (opt.dataset.themeOption || '')
+    })
+  }
+
+  // Sync the marker to the EFFECTIVE theme the bootstrap already applied — the
+  // authoritative source the user is actually seeing. This corrects the
+  // server-rendered marker for sessions whose durable preference is unavailable
+  // (e.g. local/PAT, no linearUserId) where only the cookie/localStorage carry it.
+  let effective = CLASS_THEME[document.documentElement.className] || 'light'
+  try {
+    const ls = localStorage.getItem('theme')
+    if (ls && (ls === 'light' || THEME_CLASS[ls])) effective = ls
+  } catch (e) { /* private mode — fall back to the applied class */ }
+  setActiveMarker(effective)
+
+  control.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.theme-option')
+    if (!btn) return
+    e.preventDefault()
+
+    const form = btn.closest('form')
+    if (!form) return
+    const theme = form.querySelector('input[name="theme"]')?.value
+    if (!theme) return
+
+    if (btn.disabled) return
+    btn.disabled = true
+
+    // Apply immediately so the toggle feels instant regardless of the network.
+    applyTheme(theme)
+    setActiveMarker(theme)
+
+    try {
+      const data = await window.api(form.action, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: new URLSearchParams(new FormData(form)),
+        on401: false
+      })
+      if (!data || !data.ok) form.submit()
+    } catch (err) {
+      if (err.status === 401 || err.status === 403) {
+        window.location.href = '/logout'
+        return
+      }
+      console.warn('Theme save AJAX failed, falling back to form POST:', err)
+      form.submit()
+    } finally {
+      btn.disabled = false
+    }
+  })
+}
+
 
 
 // ==========================================================================
@@ -2172,6 +2263,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initAutopilot()
   initQueuePanel()
   initFeatureToggles()
+  initThemeToggle()
   initFreeTierStatus()
   // +proxy toggle is wired by window.ProxyToggle.init() in common.js (LIN-525)
 })
