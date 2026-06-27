@@ -1243,7 +1243,7 @@ app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatu
 app.use(createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo }))
 
 // Mount next-run routes (experimental "suggest the next autopilot run" — LIN-603).
-app.use(createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo }))
+app.use(createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, reportHistoryStore }))
 
 /**
  * Workspace project view - renders the interactive tree view.
