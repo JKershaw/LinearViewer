@@ -821,6 +821,69 @@ test.describe('Proxy API - Dispatch', () => {
     expect((await watch.json()).followUpTo).toBe(originalId);
   });
 
+  // Abort verb (LIN-743): an abort item carries abort:true + abortTo and no prompt.
+  test('abort: enqueue without a prompt, then watch surfaces abort/abortTo', async ({ request }) => {
+    // 1. Dispatch an original item on dash.
+    const original = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'implement the thing', target: 'dash' }
+    });
+    expect(original.status()).toBe(201);
+    const originalId = (await original.json()).id;
+
+    // 2. Abort it with a cli abort item (no prompt) — eligibility is the abort
+    //    item's own target, independent of the aborted session's substrate.
+    const abortResp = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { abort: true, abortTo: originalId, target: 'cli' }
+    });
+    expect(abortResp.status()).toBe(201);
+    const abortBody = await abortResp.json();
+    expect(abortBody.abort).toBe(true);
+    expect(abortBody.abortTo).toBe(originalId);
+    const abortId = abortBody.id;
+
+    // The watch endpoint surfaces the verb for observability.
+    const watch = await request.get(`/api/proxy/dispatch/${abortId}`, {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(watch.status()).toBe(200);
+    const watched = await watch.json();
+    expect(watched.abort).toBe(true);
+    expect(watched.abortTo).toBe(originalId);
+  });
+
+  test('abort requires abortTo (400)', async ({ request }) => {
+    const resp = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { abort: true }
+    });
+    expect(resp.status()).toBe(400);
+    expect((await resp.json()).error).toContain('abortTo');
+  });
+
+  test('abort rejects a non-UUID abortTo (400)', async ({ request }) => {
+    const resp = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { abort: true, abortTo: 'nope' }
+    });
+    expect(resp.status()).toBe(400);
+    expect((await resp.json()).error).toContain('abortTo');
+  });
+
+  test('abort rejects being combined with followUpTo (400)', async ({ request }) => {
+    const resp = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: {
+        abort: true,
+        abortTo: '11111111-1111-4111-8111-111111111111',
+        followUpTo: '22222222-2222-4222-8222-222222222222'
+      }
+    });
+    expect(resp.status()).toBe(400);
+    expect((await resp.json()).error).toContain('mutually exclusive');
+  });
+
   test('enqueue then watch reports queued with no feedback', async ({ request }) => {
     const enqueue = await request.post('/api/proxy/dispatch', {
       headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },

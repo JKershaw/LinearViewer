@@ -456,6 +456,8 @@ function formatDispatchWatch(item, meta = null) {
     issueUrl: item.issueUrl,
     target: item.target,
     followUpTo: item.followUpTo || null,
+    abort: item.abort === true,
+    abortTo: item.abortTo || null,
     sessionId: item.sessionId || null,
     dispatchedAt: item.dispatchedAt,
     // resolvedAt is take/archive time (when the runner claimed the item), NOT
@@ -1216,13 +1218,15 @@ POST ${baseUrl}/api/proxy/agent/status   (alias: /api/proxy/foreman/status — d
 ## Dispatch Endpoints
 
 POST ${baseUrl}/api/proxy/dispatch
-  Body: { "prompt": "...", "promptName": "...", "kind": "implementation", "issueId": "...", "issueIdentifier": "LIN-42", "issueTitle": "...", "issueUrl": "...", "target": "cli|web|dash", "repo": "...", "followUpTo": "...", "sessionId": "...", "appendProxyContext": true }
+  Body: { "prompt": "...", "promptName": "...", "kind": "implementation", "issueId": "...", "issueIdentifier": "LIN-42", "issueTitle": "...", "issueUrl": "...", "target": "cli|web|dash", "repo": "...", "followUpTo": "...", "abort": false, "abortTo": "...", "sessionId": "...", "appendProxyContext": true }
   → Queue a prompt for the workspace's dispatch consumer (the runner). Only "prompt" is required; target defaults to "cli". ("local"/Harbour OS is not available to proxy consumers.)
   → "kind" is a stable task classification (research/plan/implementation/review/etc. — the prompt-template keys, plus "custom"). Optional: when omitted it is derived from "promptName", falling back to "custom". Read it instead of inferring the task type from promptName or the prompt body.
   → "followUpTo" (optional) resumes an existing session: pass the "id" of an earlier dispatch and "prompt" becomes a follow-up instruction to that same session. cli/web only, same workspace. The runner owns session liveness — if the session is gone it posts terminal "[failed] no live session to resume". Use sparingly: only when the prior session ran cleanly and naturally suggests the next step (e.g. confirm CI is green, update Linear/git); any wobble → dispatch a fresh session instead.
+  → "abort" (optional, default false) requests an abort/cancel/close of an existing session instead of running a prompt: set "abort": true and "abortTo" to the "id" of the dispatch whose session should be cancelled. "prompt" is NOT required for an abort, and the consumer flips the running session to a terminal cancelled state. The abort item's OWN "target" must be poll-eligible (cli/web/dash) — eligibility is the abort item's target, NOT the substrate of the session being aborted (so you can abort a "dash" session with a "cli" abort item). Mutually exclusive with "followUpTo". See LIN-743.
+  → "abortTo" (required when "abort" is true) is the dispatch id (UUID) of the session to abort. Stored + forwarded blindly; the consumer owns session liveness.
   → "sessionId" (optional) is the autopilot dispatch id that spawned this worker. Pass it on every worker dispatch the autopilot fans out so the run reconstructs as one session across all touched tasks (incl. epic descent / breakdown spin-offs). UUID, stored + forwarded blindly, ANY target (unlike followUpTo). See LIN-591.
   → By default a proxy-context block is appended to the prompt so the worker inherits this workspace's API access. Reporting is handled by the runner's Stop hook, not the prompt. Set "appendProxyContext": false to opt out.
-  → { "id": "...", "status": "queued", "promptName": "...", "kind": "implementation", "issueIdentifier": "...", "target": "cli", "sessionId": null, "dispatchedAt": "..." }
+  → { "id": "...", "status": "queued", "promptName": "...", "kind": "implementation", "issueIdentifier": "...", "target": "cli", "abort": false, "abortTo": null, "sessionId": null, "dispatchedAt": "..." }
 
 POST ${baseUrl}/api/proxy/recommend-and-dispatch
   Body: { "issueIdentifier": "LIN-42", "target": "cli|web|dash", "repo": "...", "appendProxyContext": true, "noDescend": false, "kind": "review", "sessionId": "..." }
@@ -3813,9 +3817,18 @@ One convention across every endpoint, so you can branch on the same fields every
     }
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo, sessionId } = req.body || {};
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo, abort, abortTo, sessionId } = req.body || {};
 
-      if (!prompt || typeof prompt !== 'string') {
+      // Abort verb (LIN-743): an abort item cancels/closes an existing session
+      // (named by abortTo) instead of running a prompt — it carries no prompt and
+      // skips the prompt-required check. abort and followUpTo are mutually exclusive.
+      const isAbort = abort === true;
+      if (isAbort && followUpTo !== undefined && followUpTo !== null) {
+        logEvent(req, '/api/proxy/dispatch', 400);
+        return badRequest.json(res, 'abort and followUpTo are mutually exclusive');
+      }
+
+      if (!isAbort && (!prompt || typeof prompt !== 'string')) {
         logEvent(req, '/api/proxy/dispatch', 400);
         return badRequest.json(res, 'prompt is required and must be a string');
       }
@@ -3823,13 +3836,27 @@ One convention across every endpoint, so you can branch on the same fields every
         logEvent(req, '/api/proxy/dispatch', 400);
         return badRequest.json(res, `target must be one of: ${VALID_PROXY_DISPATCH_TARGETS.join(', ')}`);
       }
+
+      // Abort eligibility (LIN-743): the abort item's OWN target must be
+      // poll-eligible — NOT derived from the aborted session's substrate. The
+      // proxy target set (cli/web/dash) is already exactly the poll-eligible set,
+      // so the check above suffices; here we only enforce abortTo's presence/shape.
+      if (isAbort) {
+        if (!abortTo || !UUID_REGEX.test(abortTo)) {
+          logEvent(req, '/api/proxy/dispatch', 400);
+          return badRequest.json(res, 'abortTo is required and must be a UUID when abort is true');
+        }
+      } else if (abortTo !== undefined && abortTo !== null) {
+        logEvent(req, '/api/proxy/dispatch', 400);
+        return badRequest.json(res, 'abortTo requires abort to be true');
+      }
       // Validate kind if provided; when omitted it is derived from promptName below.
       if (kind !== undefined && !isValidDispatchKind(kind)) {
         logEvent(req, '/api/proxy/dispatch', 400);
         return badRequest.json(res, `kind must be one of: ${DISPATCH_KINDS.join(', ')}`);
       }
 
-      if (prompt.length > MAX_PROMPT_LENGTH) {
+      if (prompt && prompt.length > MAX_PROMPT_LENGTH) {
         logEvent(req, '/api/proxy/dispatch', 400);
         return badRequest.json(res, `prompt exceeds maximum length of ${MAX_PROMPT_LENGTH}`);
       }
@@ -3854,7 +3881,7 @@ One convention across every endpoint, so you can branch on the same fields every
         return badRequest.json(res, `repo exceeds maximum length of ${MAX_NAME_LENGTH}`);
       }
 
-      if (DANGEROUS_CHARS_REGEX.test(prompt)) {
+      if (prompt && DANGEROUS_CHARS_REGEX.test(prompt)) {
         logEvent(req, '/api/proxy/dispatch', 400);
         return badRequest.json(res, 'prompt contains invalid characters');
       }
@@ -3906,7 +3933,9 @@ One convention across every endpoint, so you can branch on the same fields every
       // Opt out with appendProxyContext:false (e.g. a self-contained prompt).
       const { appendProxyContext } = req.body || {};
       let finalPrompt = prompt;
-      if (appendProxyContext !== false) {
+      // An abort item carries no prompt, so there is nothing to append the proxy
+      // context to — guard on prompt presence (LIN-743).
+      if (prompt && appendProxyContext !== false) {
         const baseUrl = `${req.protocol}://${req.get('host')}`;
         const bearerToken = (req.headers.authorization || '').slice(7);
         finalPrompt = prompt + buildProxyContextPreamble({
@@ -3928,6 +3957,8 @@ One convention across every endpoint, so you can branch on the same fields every
         target: target || 'cli',
         repo: repo || null,
         followUpTo: followUpTo || null,
+        abort: isAbort,
+        abortTo: isAbort ? abortTo : null,
         sessionId: sessionId || null
       });
 
@@ -3940,6 +3971,8 @@ One convention across every endpoint, so you can branch on the same fields every
         kind: item.kind,
         issueIdentifier: item.issueIdentifier,
         target: item.target,
+        abort: item.abort === true,
+        abortTo: item.abortTo || null,
         sessionId: item.sessionId || null,
         dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt
       });

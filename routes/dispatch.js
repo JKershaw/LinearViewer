@@ -195,10 +195,20 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const { workspace } = req;
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo, sessionId } = req.body;
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo, abort, abortTo, sessionId } = req.body;
 
-      // Validate required fields
-      if (!prompt || typeof prompt !== 'string') {
+      // Abort verb (LIN-743): an abort item asks the consumer to cancel/close an
+      // existing session (named by abortTo) instead of running a prompt, so it
+      // carries no prompt and skips the prompt-required check below. abort and
+      // followUpTo are mutually-exclusive verbs.
+      const isAbort = abort === true;
+      if (isAbort && followUpTo !== undefined && followUpTo !== null) {
+        return badRequest.json(res, 'abort and followUpTo are mutually exclusive');
+      }
+
+      // Validate required fields. prompt is required for a normal dispatch; an
+      // abort carries none.
+      if (!isAbort && (!prompt || typeof prompt !== 'string')) {
         return badRequest.json(res, 'prompt is required and must be a string');
       }
 
@@ -206,6 +216,22 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       const VALID_TARGETS = ['cli', 'web', 'dash', 'local'];
       if (target !== undefined && !VALID_TARGETS.includes(target)) {
         return badRequest.json(res, `target must be one of: ${VALID_TARGETS.join(', ')}`);
+      }
+
+      // Abort eligibility (LIN-743): the abort item's OWN target must be
+      // poll-eligible (cli/web/dash) — eligibility is NOT derived from the aborted
+      // session's substrate. 'local' (Harbour OS) spawns server-side and is never
+      // polled, so it cannot carry an abort. Default 'cli'.
+      if (isAbort) {
+        if (!abortTo || !UUID_REGEX.test(abortTo)) {
+          return badRequest.json(res, 'abortTo is required and must be a UUID when abort is true');
+        }
+        const abortTarget = target || 'cli';
+        if (!['cli', 'web', 'dash'].includes(abortTarget)) {
+          return badRequest.json(res, 'abort target must be poll-eligible (cli, web, or dash)');
+        }
+      } else if (abortTo !== undefined && abortTo !== null) {
+        return badRequest.json(res, 'abortTo requires abort to be true');
       }
 
       // Validate kind if provided; when omitted it is derived from promptName below.
@@ -221,8 +247,9 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         }
       }
 
-      // Validate input lengths to prevent database bloat
-      if (prompt.length > MAX_PROMPT_LENGTH) {
+      // Validate input lengths to prevent database bloat. `prompt` is optional for
+      // abort items, so guard the prompt-specific checks on its presence.
+      if (prompt && prompt.length > MAX_PROMPT_LENGTH) {
         return badRequest.json(res, `prompt exceeds maximum length of ${MAX_PROMPT_LENGTH}`);
       }
       if (promptName && promptName.length > MAX_NAME_LENGTH) {
@@ -242,7 +269,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       }
 
       // Reject null bytes and dangerous control characters
-      if (DANGEROUS_CHARS_REGEX.test(prompt)) {
+      if (prompt && DANGEROUS_CHARS_REGEX.test(prompt)) {
         return badRequest.json(res, 'prompt contains invalid characters');
       }
       if (promptName && DANGEROUS_CHARS_REGEX.test(promptName)) {
@@ -298,6 +325,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         target: target || 'cli',
         repo: repo || null,
         followUpTo: followUpTo || null,
+        abort: isAbort,
+        abortTo: isAbort ? abortTo : null,
         sessionId: sessionId || null
       });
 
