@@ -73,6 +73,41 @@ test('renders each theme side-by-side via the .theme-* hook', () => {
   assert.match(html, /class="sg-theme-panel theme-amber"/);
 });
 
+test('demos every new LIN-754 primitive inside ALL THREE theme panels', () => {
+  const html = renderStyleguide();
+  // The three theme panels are the seam the primitives must appear in.
+  const panels = html.split(/class="sg-theme-panel/).slice(1);
+  assert.equal(panels.length, 3, 'expected exactly three theme panels');
+
+  // Every new primitive from LIN-754 (StatusPill from C + the 7 surface-D
+  // primitives) must render once in each panel, so a theme rebind is provably
+  // exercised against the full primitive set rather than a subset.
+  const PRIMITIVE_MARKERS = [
+    'class="tag"',                 // Tag
+    'class="chip"',                // Chip
+    'class="chip__remove"',        // Chip remove affordance
+    'class="btn"',                 // Button (base)
+    'class="btn btn--primary"',    // Button (primary)
+    'class="btn btn--danger"',     // Button (danger)
+    'class="accent-bar"',          // AccentBar
+    'class="segment-bar"',         // SegmentBar
+    'class="segment" data-state="complete"',  // SegmentBar state
+    'class="surface surface--raised"',         // Surface (raised)
+    'class="surface surface--inset"',          // Surface (inset)
+    'class="disclosure"',          // Disclosure
+    'status-pill--done-with-warning',          // StatusPill: retained LIN-749 state
+    'status-pill--stale',          // StatusPill: retained stale state
+  ];
+  for (const panel of panels) {
+    for (const marker of PRIMITIVE_MARKERS) {
+      assert.ok(
+        panel.includes(marker),
+        `a theme panel is missing the primitive marker ${marker}`
+      );
+    }
+  }
+});
+
 test('alternate theme hooks exist in the stylesheet and only override tokens', () => {
   const css = readFileSync(STYLE_CSS, 'utf8');
   // The theme classes the page demonstrates must be real, reusable hooks.

@@ -184,3 +184,12 @@
   align-items: center;
   gap: var(--space-2);
 }
+
+/* Caption above each new primitive demo (LIN-758) so the per-theme panels read
+   as a labelled primitive reference, not an unlabelled component pile. */
+.sg-prim-label {
+  font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
+  color: var(--fg-dim);
+  margin: var(--space-2) 0 calc(-1 * var(--space-1));
+}
