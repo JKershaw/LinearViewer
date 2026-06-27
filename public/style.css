@@ -83,6 +83,14 @@
   --font-size-base: 1em;
   --font-size-lg: 1.25em;
 
+  /* Transition scale (LIN-757). Theme-neutral timing tokens (like spacing /
+     radius / z), so :root only — themes override colour, not motion. They name
+     the two durations already hand-rolled across the app so primitives share
+     one standardized transition and prefers-reduced-motion can neutralise them
+     in one place. */
+  --transition-fast: 0.12s ease;
+  --transition-base: 0.15s ease;
+
   /* Doc-vocabulary aliases (LIN-756). theme-design.md uses --amber/--slate/--muted
      for hues this palette already carries under other names. Mapped here as var()
      aliases so doc-named consumers resolve onto the existing tokens — and because
@@ -1768,7 +1776,7 @@ body.is-landing {
   margin-right: 0.3rem;
   margin-bottom: 0.4rem;
   white-space: nowrap;
-  transition: all 0.15s ease;
+  transition: all var(--transition-base);
 }
 
 .label-prompt:hover {
@@ -2471,16 +2479,20 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   border-radius: var(--radius-sm);
 }
 
-/* State accent — a thicker colored left border over the base hairline. */
+/* State accent — a thicker colored left border over the base hairline.
+   The state→color rules are shared with the standalone AccentBar primitive
+   (.accent-bar, defined in the LIN-757 primitives block) so the two speak one
+   visual language. .card-accent rides on .card's existing border; .accent-bar
+   carries its own. */
 .card-accent {
   border-left-width: 3px;
 }
 
-.card-accent--in-progress { border-left-color: var(--yellow); }
-.card-accent--done { border-left-color: var(--green); }
-.card-accent--todo { border-left-color: var(--fg-dim); }
-.card-accent--backlog { border-left-color: var(--fg-vdim); }
-.card-accent--failed { border-left-color: var(--red); }
+.card-accent--in-progress, .accent-bar--in-progress { border-left-color: var(--yellow); }
+.card-accent--done, .accent-bar--done { border-left-color: var(--green); }
+.card-accent--todo, .accent-bar--todo { border-left-color: var(--fg-dim); }
+.card-accent--backlog, .accent-bar--backlog { border-left-color: var(--fg-vdim); }
+.card-accent--failed, .accent-bar--failed { border-left-color: var(--red); }
 
 .card-header {
   display: flex;
@@ -2536,15 +2548,196 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   text-align: center;
 }
 
-/* State color modifiers — same state→token mapping as .card-accent--*. */
-.status-pill--in-progress { color: var(--yellow); }
-.status-pill--done { color: var(--green); }
+/* =========================================================================
+   Canonical status contract (LIN-757, Theme S2)
+   ONE state→colour declaration block shared by the server-rendered
+   .status-pill (renderStatusPill) and observation's client-emitted .obs-pill
+   (public/observation.js). Before S2 these two pills defined parallel visual
+   languages; now they collapse onto this single contract — state-coloured
+   text + border — so they stop drifting. The obs-pill MARKUP (class +
+   data-status) is unchanged here; repointing it to .status-pill is the
+   client-JS convergence tracked in LIN-759. The matching state→colour rules
+   that used to live in observation.css (.obs-pill[data-status=…]) were removed
+   there and folded in below.
+   ========================================================================= */
+.status-pill--in-progress,
+.obs-pill[data-status="in-progress"] { color: var(--yellow); border-color: var(--yellow); }
+.status-pill--done,
+.obs-pill[data-status="done"] { color: var(--green); border-color: var(--green); }
+/* done-with-warning (LIN-749): green text (it IS done) over a yellow warning
+   border, so the pill reads as success-with-a-caveat at a glance. */
+.status-pill--done-with-warning,
+.obs-pill[data-status="done-with-warning"] { color: var(--green); border-color: var(--yellow); }
+/* failed ≡ error: one concept, two input names. renderStatusPill normalises
+   `error`→`failed` (so it emits .status-pill--failed), while observation still
+   emits data-status="error"; both selectors resolve to the same look. */
+.status-pill--failed,
+.obs-pill[data-status="failed"],
+.obs-pill[data-status="error"] { color: var(--red); border-color: var(--red); }
+.status-pill--stale,
+.obs-pill[data-status="stale"] { color: var(--fg-dim); border-color: var(--border-strong); }
+/* Provider-canonical states carried by the pill only (no obs-pill emitter). */
 .status-pill--todo { color: var(--fg-dim); }
 .status-pill--backlog { color: var(--fg-vdim); }
-.status-pill--failed { color: var(--red); }
 
 /* Neutral, stateless label/tag chip (no state color). */
 .status-pill--tag { color: var(--fg-dim); }
+
+/* =========================================================================
+   Shared design-system primitives (LIN-757, Theme S2 — surface D)
+   CSS-first primitives built on S1's reconciled tokens. They are additive:
+   consumed by existing markup and demoed per-theme in the styleguide (LIN-758).
+   Each applies the mono=fact / sans=label rule (--font-structural for
+   facts/IDs/metrics, --font-content for labels/prose) and picks up the global
+   a11y + motion baseline below. A server helper is added ONLY where a real
+   render site exists (renderStatusPill, renderCard); the rest ship as classes.
+   ========================================================================= */
+
+/* Surface — the elevation ramp made concrete (inset < bg < card < raised). */
+.surface {
+  background: var(--card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+}
+.surface--raised { background: var(--raised); box-shadow: var(--shadow-sm); }
+.surface--inset { background: var(--inset); }
+.surface--flush { padding: 0; }
+
+/* Tag — a small neutral label chip (sans/label). */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.45rem;
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  color: var(--fg-dim);
+  background: var(--bg-alt);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+
+/* Chip — a tag with a removable/interactive affordance (sans/label). */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 1.6rem;
+  padding: 0.15rem 0.5rem;
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  color: var(--fg);
+  background: var(--inset);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+}
+.chip__remove {
+  font-family: var(--font-structural);
+  color: var(--fg-dim);
+  cursor: pointer;
+  background: none;
+  border: 0;
+  padding: 0 0.1rem;
+  line-height: 1;
+}
+.chip__remove:hover { color: var(--red); }
+
+/* Button — the shared button baseline (sans/label) with a 40px touch target,
+   standardized transition, and the global focus ring. The existing
+   .action-btn family (common-actions.css) stays its own skin for now; this is
+   the canonical primitive new buttons compose on. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-height: 40px;
+  padding: var(--space-1) var(--space-3);
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  color: var(--fg);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+}
+.btn:hover { border-color: var(--fg-dim); background: var(--raised); }
+.btn--primary { color: var(--blue); border-color: var(--blue); }
+.btn--primary:hover { background: var(--blue); color: var(--raised); }
+.btn--danger { color: var(--red); border-color: var(--red); }
+
+/* AccentBar — a standalone state-coloured left rule. State→colour is shared
+   with .card-accent (grouped above); this is the version that carries its own
+   border for non-card surfaces. */
+.accent-bar { border-left: 3px solid var(--border); padding-left: var(--space-2); }
+
+/* SegmentBar — generalises observation's per-phase progress (.obs-seg). The
+   state→colour rules are shared with .obs-seg (grouped below); .obs-seg's base
+   geometry + live pulse stay in observation.css until LIN-759 repoints it. */
+.segment-bar { display: flex; gap: 2px; height: 6px; }
+.segment {
+  flex: 1 1 auto;
+  min-width: 4px;
+  border-radius: 2px;
+  background: var(--fg-vdim);
+}
+.segment[data-state="complete"],
+.obs-seg[data-state="complete"] { background: var(--green); }
+.segment[data-state="error"],
+.obs-seg[data-state="error"] { background: var(--red); }
+.segment[data-state="running"], .segment[data-state="waiting"],
+.obs-seg[data-state="running"], .obs-seg[data-state="waiting"] { background: var(--yellow); }
+.segment[data-state="queued"],
+.obs-seg[data-state="queued"] { background: var(--fg-mid); }
+
+/* Disclosure — a show/hide trigger (sans/label), generalising the precursor
+   .dispatch-disclosure. 40px touch target + the global focus ring. */
+.disclosure {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 40px;
+  padding: var(--space-1) var(--space-2);
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  color: var(--fg);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  user-select: none;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+.disclosure:hover { border-color: var(--fg-dim); }
+.disclosure__caret { transition: transform var(--transition-fast); }
+.disclosure[aria-expanded="true"] .disclosure__caret { transform: rotate(90deg); }
+
+/* =========================================================================
+   Global a11y + motion baseline (LIN-757, Theme S2 — surface E)
+   Applies app-wide, under the new primitives and every existing surface.
+   ========================================================================= */
+
+/* Keyboard focus ring on interactive elements. :where() keeps specificity at
+   zero so any element's own :focus-visible rule (e.g. .line.expandable) still
+   wins; this is only the floor. Pointer focus is unaffected (focus-VISIBLE). */
+:where(a, button, summary, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Honour a reduced-motion preference globally: neutralise animations and
+   transitions (generalises the one scoped block that lived in observation.css
+   for .obs-seg's pulse). */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 
 /*
    Badge convergence anchor (LIN-477, Phase B.2)
@@ -2876,7 +3069,7 @@ a.context-node { text-decoration: none; }
   padding: 0.3rem 0.55rem;
   background: var(--bg-alt);
   color: var(--fg);
-  transition: border-color 0.12s ease, background 0.12s ease;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
 }
 
 a.context-node:hover { border-color: var(--fg); background: var(--bg); }
