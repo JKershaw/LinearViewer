@@ -16,7 +16,15 @@ import {
   flattenRelations,
   encodeAttachmentHandle,
   decodeAttachmentHandle,
+  relayContentTypeFromName,
 } from '../../lib/proxy-wire.js';
+
+// Helper: pull the `#name=` filename hint a non-image file handle carries.
+function nameHintOf(handle) {
+  const { value } = decodeAttachmentHandle(handle);
+  const hash = value.includes('#') ? value.slice(value.indexOf('#') + 1) : '';
+  return new URLSearchParams(hash).get('name');
+}
 
 describe('flattenIssue', () => {
   test('flattens labels {nodes} to a plain array of names', () => {
@@ -178,6 +186,87 @@ describe('flattenIssue attachments (LIN-649)', () => {
     const once = JSON.parse(JSON.stringify(issue));
     flattenIssue(issue);
     assert.deepStrictEqual(issue, once);
+  });
+});
+
+describe('flattenIssue non-image file attachments (LIN-750)', () => {
+  test('captures a non-image upload link in the description as kind:file', () => {
+    const issue = {
+      id: 'i1',
+      attachments: { nodes: [] },
+      description: 'spec: [theme-design.md](https://uploads.linear.app/a/b/c) here',
+    };
+    flattenIssue(issue);
+    assert.strictEqual(issue.attachments.length, 1);
+    const [att] = issue.attachments;
+    assert.strictEqual(att.kind, 'file');
+    assert.strictEqual(att.contentType, null, 'extension-less upload → type unknown at discovery');
+    assert.strictEqual(att.title, 'theme-design.md');
+    // md: handle round-trips to the url and carries the filename hint.
+    const decoded = decodeAttachmentHandle(att.id);
+    assert.strictEqual(decoded.type, 'md');
+    assert.ok(decoded.value.startsWith('https://uploads.linear.app/a/b/c'));
+    assert.strictEqual(nameHintOf(att.id), 'theme-design.md');
+  });
+
+  test('captures non-image file links in comment bodies too', () => {
+    const issue = {
+      id: 'i1',
+      comments: { nodes: [
+        { id: 'm1', body: 'code: [AgentRuns.jsx](https://uploads.linear.app/x/y/z)' },
+        { id: 'm2', body: 'nothing attached' },
+      ] },
+    };
+    flattenIssue(issue);
+    assert.strictEqual(issue.comments[0].attachments.length, 1);
+    assert.strictEqual(issue.comments[0].attachments[0].kind, 'file');
+    assert.strictEqual(issue.comments[0].attachments[0].title, 'AgentRuns.jsx');
+    assert.strictEqual('attachments' in issue.comments[1], false);
+  });
+
+  test('does NOT double-capture image embeds or off-host links', () => {
+    const issue = {
+      id: 'i1',
+      attachments: { nodes: [] },
+      description: [
+        '![shot](https://uploads.linear.app/x/shot.jpg)',     // image embed → image path only
+        '[external](https://example.com/page)',               // not an upload host → skipped
+        '[doc](https://uploads.linear.app/u/spec.md)',        // upload file link → captured
+      ].join('\n'),
+    };
+    flattenIssue(issue);
+    const kinds = issue.attachments.map(a => `${a.kind}:${a.title}`).sort();
+    assert.deepStrictEqual(kinds, ['file:doc', 'image:shot'], 'image once, file once, external never');
+  });
+
+  test('omits the attachments field when only off-host links are present (parity)', () => {
+    const issue = { id: 'i1', attachments: { nodes: [] }, description: '[x](https://example.com/a)' };
+    flattenIssue(issue);
+    assert.strictEqual('attachments' in issue, false, 'empty ⇒ field absent, not []');
+  });
+
+  test('non-image file discovery is idempotent', () => {
+    const issue = {
+      id: 'i1',
+      description: '[spec.md](https://uploads.linear.app/u/spec)',
+      attachments: { nodes: [] },
+    };
+    flattenIssue(issue);
+    const once = JSON.parse(JSON.stringify(issue));
+    flattenIssue(issue);
+    assert.deepStrictEqual(issue, once);
+  });
+});
+
+describe('relayContentTypeFromName (LIN-750)', () => {
+  test('types images and the text/source allowlist; rejects the rest', () => {
+    assert.strictEqual(relayContentTypeFromName('theme-design.md'), 'text/markdown');
+    assert.strictEqual(relayContentTypeFromName('AgentRuns.jsx'), 'text/plain');
+    assert.strictEqual(relayContentTypeFromName('data.json'), 'application/json');
+    assert.strictEqual(relayContentTypeFromName('shot.png'), 'image/png');
+    assert.strictEqual(relayContentTypeFromName('archive.zip'), null, 'not on the allowlist');
+    assert.strictEqual(relayContentTypeFromName('noextension'), null);
+    assert.strictEqual(relayContentTypeFromName(null), null);
   });
 });
 

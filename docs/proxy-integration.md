@@ -293,27 +293,30 @@ The task and each comment may carry an `attachments` array. It is **omitted enti
 | `contentType` | MIME type when known (e.g. `image/png`), else `null`. |
 | `kind` | `"image"` or `"file"`. |
 
-Attachments come from two sources, both normalized into the same shape: **formal attachment entities** on the issue (handle prefix `att:`) and **markdown-embedded images** (`![](…)`) in the issue description and in comment bodies, filtered to image extensions (handle prefix `md:`). Comments carry only the markdown-image kind (the backend has no per-comment attachment entity).
+Attachments come from three sources, all normalized into the same shape: **formal attachment entities** on the issue (handle prefix `att:`); **markdown-embedded images** (`![](…)`, filtered to image extensions); and **markdown-linked non-image files** (`[text](…)`, e.g. `[spec.md](…)`/`[App.jsx](…)`) pointing at a Linear upload host (handle prefix `md:`, `kind: "file"`, `contentType: null`). Both markdown sources are discovered in the issue description and in comment bodies (the backend has no per-comment attachment entity, so comments carry only the markdown kinds).
 
-Following the no-deep-link policy, **no attachment exposes a backend URL** — the `id` is an opaque handle, not a link you can dereference. Fetch the bytes through the Bearer-authed, server-side image relay below, which resolves the handle and streams the image; treat `id` as something to hand back to that relay, not as something to GET directly.
+Because upload URLs are **extension-less**, a file link's type can't be known at discovery time — `contentType` is `null` and `kind` is `"file"`; the relay (below) is the sole type-gate, so an attachment can be discovered yet rejected at relay if its type isn't on the allowlist.
 
-##### Fetch Attachment Bytes (image relay)
+Following the no-deep-link policy, **no attachment exposes a backend URL** — the `id` is an opaque handle, not a link you can dereference. Fetch the bytes through the Bearer-authed, server-side relay below, which resolves the handle and streams the bytes; treat `id` as something to hand back to that relay, not as something to GET directly.
+
+##### Fetch Attachment Bytes (relay)
 
 ```
 GET /api/proxy/attachments/{id}
 ```
 
-Relays the bytes for an image attachment. `{id}` is the opaque handle from an `attachments[].id` field — pass it verbatim as the path segment. The relay decodes the handle, fetches the image server-side with the workspace's own credentials, SSRF-guards the upstream request (HTTPS only, exact Linear-host allowlist, no redirects), and streams the result back with its `image/*` `Content-Type`. There is no JSON envelope — a `200` response **is** the raw image. Inline base64 is intentionally not offered; fetch on demand instead.
+Relays the bytes for an attachment. `{id}` is the opaque handle from an `attachments[].id` field — pass it verbatim as the path segment. The relay decodes the handle, fetches the bytes server-side with the workspace's own credentials, SSRF-guards the upstream request (HTTPS only, exact Linear-host allowlist, no redirects, 10 MB cap), and streams the result back. There is no JSON envelope — a `200` response **is** the raw bytes. Inline base64 is intentionally not offered; fetch on demand instead.
 
 | Aspect | Behaviour |
 |--------|-----------|
 | Auth | Same proxy Bearer token as every other endpoint (a `read` scope is sufficient). |
-| Success | `200` with the raw image bytes and the upstream `image/*` content-type. |
+| Image success | `200` with the raw image bytes and the upstream `image/*` content-type. |
+| File success | `200` with the raw bytes, a text content-type (`text/markdown`, `text/plain`, `application/json`, …; uploaded source is served as `text/plain`), `Content-Disposition: attachment`, and `X-Content-Type-Options: nosniff`. |
 | Size cap | Responses over 10 MB are rejected with `413`. |
-| Non-image | An upstream response that isn't `image/*` is rejected with `400`. |
+| Unsupported type | A response that is neither an `image/*` nor an allowlisted text/source file is rejected with `400`. |
 | Upstream miss | A failed upstream fetch (e.g. asset gone) passes the upstream status through (e.g. `404`). |
 
-**Handle support (this slice):** only `md:`-prefixed handles — markdown-embedded images (`![](…)`) in descriptions and comment bodies — are resolvable. These cover all comment image attachments and description-embedded images. A `att:`-prefixed handle (a formal Linear attachment entity) is **not byte-resolvable yet** and returns:
+**Handle support:** `md:`-prefixed handles — markdown-embedded images **and** markdown-linked non-image files (`[text](…)`) in descriptions and comment bodies — are resolvable. A `att:`-prefixed handle (a formal Linear attachment entity) is **not byte-resolvable yet** and returns:
 
 ```
 422 { "error": "...", "code": "ATTACHMENT_FETCH_NOT_SUPPORTED", "handleType": "att" }

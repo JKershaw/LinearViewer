@@ -38,7 +38,7 @@ import {
 import { localProvider } from '../lib/providers/local/index.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { applyTrashedSignal, isTrashed } from '../lib/trashed-signal.js';
-import { flattenIssue, neutralizeProject, flattenCycle, flattenRelations, decodeAttachmentHandle } from '../lib/proxy-wire.js';
+import { flattenIssue, neutralizeProject, flattenCycle, flattenRelations, decodeAttachmentHandle, relayContentTypeFromName } from '../lib/proxy-wire.js';
 import { createProxyFetch } from '../lib/proxy-fetch.js';
 import { isRecommendationEnabled, getRecommendation } from '../lib/openrouter.js';
 import { resolveRecommendation, describeDescent, armHopSignal } from '../lib/recommend-recurse.js';
@@ -1043,14 +1043,18 @@ GET ${baseUrl}/api/proxy/issues/{issueId}/relations
     relations surface (read + write) lives under one issue-scoped path.
 
 GET ${baseUrl}/api/proxy/attachments/{id}
-  → Relay the bytes for an image attachment. {id} is the opaque attachment
-    handle from an issue/comment "attachments" entry (NOT a URL — the proxy
-    never exposes backend URLs). The bytes are fetched server-side, authed, and
-    SSRF-guarded; the response is the raw image with its image/* content-type.
-  → SCOPE: handles beginning "md:" (markdown-embedded images) resolve. Handles
-    beginning "att:" (formal attachment entities) are NOT fetchable yet and
-    return 422 { "code": "ATTACHMENT_FETCH_NOT_SUPPORTED" } — a later slice adds
-    them. A non-image or oversized (>10MB) response is rejected.
+  → Relay the bytes for an attachment. {id} is the opaque attachment handle from
+    an issue/comment "attachments" entry (NOT a URL — the proxy never exposes
+    backend URLs). The bytes are fetched server-side, authed, and SSRF-guarded.
+    Images stream back with their image/* content-type; non-image text/source
+    files (markdown, text, and common source files) stream back with a text
+    content-type plus Content-Disposition: attachment.
+  → SCOPE: handles beginning "md:" (markdown-embedded images AND markdown-linked
+    non-image files) resolve. Handles beginning "att:" (formal attachment
+    entities) are NOT fetchable yet and return
+    422 { "code": "ATTACHMENT_FETCH_NOT_SUPPORTED" } — a later slice adds them.
+    A response whose type is neither an image nor an allowlisted text/source file
+    is rejected (400), as is an oversized (>10MB) one.
 
 Issue-scoped paths are canonical as /issues/{id}/... — relations (above),
 recommend / recap / brief (below), and comments (write section) all nest under
@@ -1702,11 +1706,19 @@ One convention across every endpoint, so you can branch on the same fields every
   // back. The consumer is the external automation agent reading task/comment
   // image attachments (direct beneficiary; no other endpoint changes).
   //
-  // Slice 2/4 scope: the `md:` markdown-image path only. The URL is recovered by
+  // `md:` markdown handles resolve here. The URL is recovered by
   // `decodeAttachmentHandle`, SSRF-guarded against the Linear-host allowlist
   // (mirrors the LIN-156 `/api/image` guard model: https-only, exact-host
-  // allowlist, no path traversal, no redirects, image-only content-type, 10 MB
-  // cap), then fetched through the proxy-aware egress path.
+  // allowlist, no path traversal, no redirects, 10 MB cap), then fetched through
+  // the proxy-aware egress path. Two media classes are served (LIN-750):
+  //   - images: typed from the upstream `image/*` content-type (original path);
+  //   - non-image text/source files: typed from the `#name=<filename>` hint the
+  //     discovery layer encoded in the handle (upload URLs are extension-less and
+  //     upstream often serves octet-stream, so the hint is authoritative), gated
+  //     to a small allowlist (`relayContentTypeFromName`) and served with
+  //     `Content-Disposition: attachment` + `nosniff`.
+  // A content-type that is neither an allowlisted file nor an image is rejected
+  // cleanly (never a 500).
   //
   // `att:` formal-attachment handles are NOT byte-resolvable in this slice — the
   // wire dropped their URL and there is no provider fetch seam yet — so they get
@@ -1765,11 +1777,21 @@ One convention across every endpoint, so you can branch on the same fields every
       return workspaceUnavailable(req, res, endpoint, reason);
     }
 
+    // Non-image file relay (LIN-750): discovery encodes the filename in a
+    // `#name=<filename>` fragment so we can type extension-less upload bytes.
+    // The fragment is stripped before egress (it must never reach the asset
+    // host); `relayContentTypeFromName` is the sole type-gate and returns null
+    // for anything not on the allowlist.
+    const nameHint = new URLSearchParams(urlObj.hash.replace(/^#/, '')).get('name');
+    const typedFromHint = nameHint ? relayContentTypeFromName(nameHint) : null;
+    const isFileRelay = !!typedFromHint && !typedFromHint.startsWith('image/');
+    const fetchUrl = imageUrl.split('#')[0];
+
     try {
       // Proxy-aware egress: route through the egress proxy when one is
       // configured, exactly like every other Linear call.
       const customFetch = (await createProxyFetch()) || fetch;
-      const response = await customFetch(imageUrl, {
+      const response = await customFetch(fetchUrl, {
         method: 'GET',
         headers: { Authorization: `Bearer ${token}` },
         redirect: 'error', // a redirect could bypass the SSRF allowlist
@@ -1780,10 +1802,13 @@ One convention across every endpoint, so you can branch on the same fields every
         return jsonError(res, response.status, 'Failed to fetch attachment');
       }
 
-      const contentType = response.headers.get('content-type') || '';
-      if (!contentType.startsWith('image/')) {
+      // Type-gate. Images keep the original upstream-`image/*` contract; file
+      // relays are typed from the (allowlisted) filename hint. Anything else is
+      // rejected cleanly — never a 500.
+      const upstreamType = response.headers.get('content-type') || '';
+      if (!isFileRelay && !upstreamType.startsWith('image/')) {
         logEvent(req, endpoint, 400);
-        return badRequest.json(res, 'Invalid response: not an image');
+        return badRequest.json(res, 'Invalid response: unsupported content-type');
       }
 
       const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
@@ -1798,7 +1823,17 @@ One convention across every endpoint, so you can branch on the same fields every
         return jsonError(res, 413, 'Attachment too large');
       }
 
-      res.set('Content-Type', contentType);
+      if (isFileRelay) {
+        res.set('Content-Type', typedFromHint);
+        // Force download + block content-sniffing: we serve uploaded source as
+        // text/plain, so the consumer (or a browser) must not sniff it back into
+        // an executable/renderable type.
+        const safeName = nameHint.replace(/[^\w.\- ]/g, '_');
+        res.set('Content-Disposition', `attachment; filename="${safeName}"`);
+        res.set('X-Content-Type-Options', 'nosniff');
+      } else {
+        res.set('Content-Type', upstreamType);
+      }
       res.set('Cache-Control', 'private, max-age=3600');
       logEvent(req, endpoint, 200);
       res.send(Buffer.from(arrayBuffer));
