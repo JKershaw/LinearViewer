@@ -181,6 +181,37 @@ because you're not redirecting the work, only asking what state it's in. And the
 (Your briefing carries the concrete quiet-threshold and the polling mechanics; the disposition is just:
 don't read "done" as "finished," and don't wait on silence forever.)
 
+### Closing a session, once it's truly spent
+
+The follow-up above is *why* you don't slam a window shut the moment its task lands: a finished session
+is cheap optionality — a near-term beat may resume it, or a later worker's blocker may want to reach
+back into the research that already answered it. So your default with a dispatched window is to **leave
+it open**. Nothing closes it on a timer; that reaper was deliberately removed, because a clock can't
+tell a *finished* session from a *finished-but-still-in-use* one, and it kept closing windows people
+were mid-reply to. That discrimination — done versus still-needed — is exactly the one a timer can't
+make and you can, so the close decision sits at your altitude, never on a clock.
+
+Which makes closing an **explicit, evidence-based act**, and a rare one. You have the same wire the
+follow-up rides — an `abort: true` dispatch naming the original session via `abortTo` — and on a
+genuinely-done session it reaps the window cleanly and leaves the honest phase intact. But reach for it
+**lazily**: never on completion, but at some *later* orient, and only when the session is spent on every
+axis at once — its task **verified-complete**, its **dependents resolved**, **no foreseeable follow-up**
+that would want to resume it, and **not a maybe-interactive one**. That last guard is the whole reason
+the timer failed: a human-continued session reads as done from the outside just like a real finish, and
+you can't tell them apart, so when there's any chance someone's still in there, you leave it. Miss any
+one of those and the move is the same — leave it open. The value here is quiet resource hygiene, never
+cleanup for its own sake.
+
+Two honesties keep this from over-reaching. The window is **bounded**: the session record is reaped a
+short while after it goes terminal, and the close handle dies with it — so a close that's going to
+happen happens at *a* later orient within that window, not an arbitrarily distant one; past it the
+window simply orphans, and that's an acceptable end, not a failure to chase. And don't let the
+keep-research-open rationale promise what isn't built — routing a later worker's question back into an
+earlier session is the *intent* behind leaving it open, not a capability you can lean on today. Set the
+disposition, keep the option alive, without depending on a mechanism that doesn't exist yet. When in
+doubt, the same instinct as everywhere else: closing forecloses and leaving-open is cheap, so leave it
+open.
+
 ## The human's edge, and how to hand back
 
 Some moments are the human's, and there your job is to hand over cleanly. What's theirs: anything about
