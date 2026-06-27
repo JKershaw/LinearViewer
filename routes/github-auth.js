@@ -22,6 +22,7 @@ import crypto from 'crypto'
 import { Router } from 'express'
 import { getProvider } from '../lib/providers/registry.js'
 import { renderErrorPage, renderGitHubRepoSelectPage } from '../lib/render-pages.js'
+import { githubErrorDiagnostic } from '../lib/errors.js'
 import {
   upsertWorkspace,
   saveSession,
@@ -174,7 +175,7 @@ export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
       } catch (authError) {
         console.error('GitHub re-bind code exchange error:', authError)
         return res.status(400).send(renderErrorPage('Authentication Failed', 'Could not complete authentication with GitHub. Please try again.', {
-          action: 'Try again', actionUrl: '/auth/github'
+          action: 'Try again', actionUrl: '/auth/github', diagnostic: githubErrorDiagnostic(authError)
         }))
       }
 
@@ -184,7 +185,7 @@ export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
       } catch (fetchError) {
         console.error('Failed to enumerate GitHub installations for re-bind:', fetchError)
         return res.status(500).send(renderErrorPage('Connection Error', 'Could not fetch your repositories from GitHub. Please try again.', {
-          action: 'Try again', actionUrl: '/auth/github'
+          action: 'Try again', actionUrl: '/auth/github', diagnostic: githubErrorDiagnostic(fetchError)
         }))
       }
 
@@ -238,7 +239,7 @@ export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
       } catch (mintError) {
         console.error('GitHub App installation-token mint error:', mintError)
         return res.status(400).send(renderErrorPage('Authentication Failed', 'Could not complete authentication with GitHub. Please try again.', {
-          action: 'Try again', actionUrl: '/auth/github'
+          action: 'Try again', actionUrl: '/auth/github', diagnostic: githubErrorDiagnostic(mintError)
         }))
       }
 
@@ -251,7 +252,7 @@ export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
       } catch (fetchError) {
         console.error('Failed to fetch installation repositories from GitHub:', fetchError)
         return res.status(500).send(renderErrorPage('Connection Error', 'Could not fetch your repositories from GitHub. Please try again.', {
-          action: 'Try again', actionUrl: '/auth/github'
+          action: 'Try again', actionUrl: '/auth/github', diagnostic: githubErrorDiagnostic(fetchError)
         }))
       }
 
@@ -271,7 +272,7 @@ export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
     } catch (err) {
       console.error('GitHub App callback error:', err)
       res.status(500).send(renderErrorPage('Something Went Wrong', 'An unexpected error occurred during GitHub authentication. Please try again.', {
-        action: 'Try again', actionUrl: '/auth/github'
+        action: 'Try again', actionUrl: '/auth/github', diagnostic: githubErrorDiagnostic(err)
       }))
     }
   })
@@ -410,7 +411,7 @@ export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
     } catch (err) {
       console.error('GitHub link error:', err)
       res.status(500).send(renderErrorPage('Something Went Wrong', 'Could not link your GitHub repository. Please try again.', {
-        action: 'Try again', actionUrl: '/auth/github'
+        action: 'Try again', actionUrl: '/auth/github', diagnostic: githubErrorDiagnostic(err)
       }))
     }
   })

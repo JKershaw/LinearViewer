@@ -17,6 +17,7 @@ import { GitHubProvider } from '../../lib/providers/github/index.js';
 import { AuthExchangeError } from '../../lib/providers/interface.js';
 import { createGitHubAuthRoutes } from '../../routes/github-auth.js';
 import { createFakeGitHubClient } from '../../lib/providers/github/fake-client.js';
+import { githubErrorDiagnostic } from '../../lib/errors.js';
 
 // Ephemeral RSA keypair so completeInstallation's App-JWT signing (mintAppJwt)
 // runs for real against a valid PEM — generated, never on disk.
@@ -650,5 +651,89 @@ describe('GitHub auth routes', () => {
     await handler({ body: { repo: 'not-a-repo' }, session }, res);
     assert.equal(res.statusCode, 400);
     assert.match(res.body, /Invalid Repository/);
+  });
+
+  // ---------------------------------------------------------------------------
+  // LIN-746: the caught GitHub error detail (already built at the client/app-auth
+  // boundary) is THREADED into the error page's diagnostic block, instead of being
+  // console.error'd server-side and flattened to a generic "Please try again.".
+  // The generic friendly headline is preserved; the diagnostic ADDS the cause.
+  // ---------------------------------------------------------------------------
+
+  test('GET callback surfaces GitHub’s real error detail + HTTP status in the page diagnostic (LIN-746)', async () => {
+    const err = new Error('GitHub API POST /app/installations/99/access_tokens failed: Resource not accessible by integration');
+    err.status = 403;
+    const provider = { ...fakeProvider(), completeInstallation: async () => { throw err; } };
+    const router = createGitHubAuthRoutes({ provider });
+    const handler = getHandler(router, 'get', '/auth/github/callback');
+    const res = makeRes();
+    await handler({ query: { installation_id: '99', state: 'real' }, session: makeSession({ oauthState: 'real' }) }, res);
+    assert.equal(res.statusCode, 400);
+    assert.match(res.body, /Authentication Failed/, 'generic friendly headline preserved');
+    assert.match(res.body, /error-details/, 'diagnostic block rendered');
+    assert.match(res.body, /Resource not accessible by integration/, 'GitHub’s real cause is surfaced');
+    assert.match(res.body, /GITHUB_403/, 'the HTTP status is surfaced');
+  });
+
+  test('GET callback (re-bind) surfaces the OAuth error detail in the diagnostic (LIN-746)', async () => {
+    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const handler = getHandler(router, 'get', '/auth/github/callback');
+    const res = makeRes();
+    // fakeProvider.completeAuth('bad') throws AuthExchangeError('bad_verification_code').
+    await handler({ query: { code: 'bad', state: 'real' }, session: makeSession({ oauthState: 'real', oauthIntent: { mode: 'new' } }) }, res);
+    assert.equal(res.statusCode, 400);
+    assert.match(res.body, /Authentication Failed/);
+    assert.match(res.body, /bad_verification_code/, 'AuthExchangeError.detail surfaced to the user');
+  });
+});
+
+describe('githubErrorDiagnostic (LIN-746)', () => {
+  test('maps an HTTP 403 to an auth, non-retryable diagnostic carrying GitHub’s message', () => {
+    const err = new Error('GitHub API GET /installation/repositories failed: Resource not accessible by integration');
+    err.status = 403;
+    const d = githubErrorDiagnostic(err, '2026-06-27T00:00:00.000Z');
+    assert.equal(d.category, 'auth');
+    assert.equal(d.retryable, false);
+    assert.equal(d.code, 'GITHUB_403');
+    assert.match(d.detail, /Resource not accessible by integration/);
+    assert.equal(d.time, '2026-06-27T00:00:00.000Z');
+  });
+
+  test('maps 429 and 5xx to a retryable upstream diagnostic', () => {
+    const rate = new Error('rate limited'); rate.status = 429;
+    const rd = githubErrorDiagnostic(rate);
+    assert.equal(rd.category, 'upstream');
+    assert.equal(rd.retryable, true);
+    assert.equal(rd.code, 'GITHUB_429');
+
+    const boom = new Error('bad gateway'); boom.status = 502;
+    const bd = githubErrorDiagnostic(boom);
+    assert.equal(bd.category, 'upstream');
+    assert.equal(bd.retryable, true);
+    assert.equal(bd.code, 'GITHUB_502');
+  });
+
+  test('prefers AuthExchangeError.detail + .code when no HTTP status is present', () => {
+    const err = new AuthExchangeError('bad_verification_code', 'github');
+    const d = githubErrorDiagnostic(err);
+    assert.equal(d.detail, 'bad_verification_code');
+    assert.equal(d.code, 'AUTH_EXCHANGE_FAILED');
+  });
+
+  test('classifies a dropped socket (no status) as a retryable upstream failure', () => {
+    const err = new Error('fetch failed'); err.code = 'ECONNRESET';
+    const d = githubErrorDiagnostic(err);
+    assert.equal(d.category, 'upstream');
+    assert.equal(d.retryable, true);
+    // No HTTP status, so the Code row falls back to the transport errno — itself
+    // a useful anchor (ECONNRESET) rather than a generic marker.
+    assert.equal(d.code, 'ECONNRESET');
+  });
+
+  test('falls back to a safe placeholder detail when the error carries nothing', () => {
+    const d = githubErrorDiagnostic({});
+    assert.match(d.detail, /without a detail message/);
+    assert.equal(d.category, 'internal');
+    assert.equal(d.code, 'GITHUB_ERROR');
   });
 });
