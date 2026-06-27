@@ -82,6 +82,24 @@
   --font-size-sm: 0.85em;
   --font-size-base: 1em;
   --font-size-lg: 1.25em;
+
+  /* Doc-vocabulary aliases (LIN-756). theme-design.md uses --amber/--slate/--muted
+     for hues this palette already carries under other names. Mapped here as var()
+     aliases so doc-named consumers resolve onto the existing tokens — and because
+     they reference theme tokens, they track the active theme automatically. Kept in
+     all three theme blocks symmetrically (not :root-only) so the alias map is
+     explicit per theme and survives a future de-aliasing. */
+  --amber: var(--yellow);   /* warning/in-progress accent */
+  --slate: var(--fg-mid);   /* mid neutral structural grey */
+  --muted: var(--bg-muted); /* muted container background */
+
+  /* Net-new surface/elevation tokens (LIN-756). A genuine elevation ramp the flat
+     --bg/--bg-muted pair did not express: --inset (recessed) < --bg < --card <
+     --raised (lifted). Concrete per-theme values (NOT aliases) — defined in all
+     three blocks. */
+  --raised: #ffffff;  /* lifted surface (panels/popovers; elevation via shadow on light) */
+  --card: #f4f5f7;    /* card surface, a step above the page background */
+  --inset: #eceef1;   /* recessed surface (wells/inputs) */
 }
 
 /* =============================================================================
@@ -120,6 +138,14 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
+  /* Doc-vocabulary aliases (LIN-756) — mirrored per theme; see :root note. */
+  --amber: var(--yellow);
+  --slate: var(--fg-mid);
+  --muted: var(--bg-muted);
+  /* Net-new surface/elevation ramp (LIN-756): inset < bg < card < raised. */
+  --raised: #20242c;
+  --card: #1f222a;
+  --inset: #121419;
   background: var(--bg);
   color: var(--fg);
 }
@@ -151,6 +177,14 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
   --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.6);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.7);
+  /* Doc-vocabulary aliases (LIN-756) — mirrored per theme; see :root note. */
+  --amber: var(--yellow);
+  --slate: var(--fg-mid);
+  --muted: var(--bg-muted);
+  /* Net-new surface/elevation ramp (LIN-756): inset < bg < card < raised. */
+  --raised: #261d0c;
+  --card: #20180a;
+  --inset: #0f0a01;
   background: var(--bg);
   color: var(--fg);
 }

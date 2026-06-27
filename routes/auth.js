@@ -202,6 +202,16 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider 
         if (userPreferencesStore) {
           const savedPrefs = await userPreferencesStore.getUserPreferences(viewer.id)
           applyUserPreferencesToSession(req.session, savedPrefs)
+          // Seed the theme cookie so the pre-paint bootstrap themes a fresh-device
+          // login before first paint, even with empty localStorage (LIN-756). Not
+          // httpOnly — the inline bootstrap reads it via document.cookie.
+          if (req.session.theme) {
+            res.cookie('theme', req.session.theme, {
+              maxAge: 1000 * 60 * 60 * 24 * 365,
+              httpOnly: false,
+              sameSite: 'lax'
+            })
+          }
         }
 
         // Add/update workspace in session
