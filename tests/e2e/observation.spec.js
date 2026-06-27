@@ -208,4 +208,59 @@ test.describe('Autopilot Observation page (first-class)', () => {
       await expect(worker.locator('.obs-worker-body')).toBeVisible();
     });
   });
+
+  // LIN-749: a terminal session that errored but whose touched task is now Done
+  // renders done-with-warning. The "task is Done" signal comes ONLY from the
+  // drill-down hydration seam (never the per-poll feed, which has a no-Linear
+  // cost contract), so the card stays 'error' until expanded, then upgrades.
+  test.describe('done-with-warning upgrade (LIN-749)', () => {
+    // Drive one dispatch run to a terminal [failed] outcome through the real
+    // consumer take+feedback flow, so the session reconstructs as terminal+error.
+    async function seedFailedRun(page, { issueIdentifier, issueTitle }) {
+      const item = await seedQueuedRun(page, { issueIdentifier, issueTitle });
+      const tokenResp = await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${URL_KEY}`);
+      const { token } = await tokenResp.json();
+      const take = await page.request.post(`/api/dispatch/take/${item.id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      expect(take.status(), `take failed: ${await take.text()}`).toBe(200);
+      const fb = await page.request.post(`/api/dispatch/feedback/${item.id}`, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        data: { message: '[failed] iterm window never launched' }
+      });
+      expect(fb.status(), `feedback failed: ${await fb.text()}`).toBe(200);
+    }
+
+    test('an errored terminal session whose task hydrates to Done upgrades to done-with-warning', async ({ page }) => {
+      await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+      await clearRuns(page);
+      await seedFailedRun(page, { issueIdentifier: 'LIN-744', issueTitle: 'iTerm-struggling session' });
+
+      // The touched task reports Done from the hydration seam (mocked so the test
+      // does not depend on a live Linear backend).
+      await page.route('**/api/dashboard/hydrate/**', (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ hydrated: true, identifier: 'LIN-744', state: { name: 'Done', type: 'completed' }, labels: [], url: null })
+        })
+      );
+
+      await page.goto(OBSERVATION_URL);
+      await page.waitForLoadState('networkidle');
+
+      // A terminal session that finished <24h ago is Active, not Archive (LIN-631).
+      const card = page.locator('#obs-active .obs-session').filter({ hasText: 'iTerm-struggling session' }).first();
+      await expect(card).toBeVisible();
+
+      // Pre-drill-down: the feed-derived status is plain 'error' (no task lookup).
+      await expect(card).toHaveAttribute('data-status', 'error');
+
+      // Drilling in fires the hydration; the Done state upgrades the card.
+      await card.locator('.obs-session-head').first().click();
+      await expect(card).toHaveAttribute('data-status', 'done-with-warning');
+      await expect(card.locator('.obs-pill')).toHaveAttribute('data-status', 'done-with-warning');
+      await expect(card.locator('.obs-pill')).toContainText('done ⚠');
+    });
+  });
 });

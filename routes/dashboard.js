@@ -161,6 +161,37 @@ export function sessionIsTerminal(session) {
 }
 
 /**
+ * The observation session status string — the single contract consumed by the
+ * client's icon/label maps and CSS (`public/observation.js` / `observation.css`).
+ *
+ * Five values: `stale`, `in-progress`, `error`, `done`, and `done-with-warning`
+ * (LIN-749). `done-with-warning` is the done/error split's 5th outcome: a
+ * terminal session that had at least one errored run but whose touched task is
+ * now Done — the autopilot finished the task despite the errors (the LIN-744
+ * case: two runs failed to launch iTerm, the third completed the work).
+ *
+ * `taskDone` is the ONLY task-state input. It is NOT proof the task flipped
+ * *during* this run (no start-state baseline is recorded; that precise per-run
+ * attribution is a tracked cross-repo follow-up) — it approximates "done now ∧
+ * ≥1 run errored". It is sourced solely from the existing Linear hydration seam
+ * at the terminal boundary, never from the per-poll feed, which honours an
+ * explicit no-Linear cost contract and always passes `taskDone=false`. `stale`
+ * only ever holds for non-terminal sessions, so its branch is checked first to
+ * keep the four pre-existing outcomes byte-identical.
+ *
+ * Pure; exported for unit tests.
+ *
+ * @param {{terminal: boolean, stale: boolean, hasError: boolean, taskDone?: boolean}} input
+ * @returns {'stale'|'in-progress'|'error'|'done'|'done-with-warning'}
+ */
+export function deriveSessionStatus({ terminal, stale, hasError, taskDone = false }) {
+  if (stale) return 'stale';
+  if (!terminal) return 'in-progress';
+  if (hasError) return taskDone ? 'done-with-warning' : 'error';
+  return 'done';
+}
+
+/**
  * Most-relevant activity timestamp for a run, used to sort the merged feed.
  * Prefers the truthful completion time (terminal feedback marker) so a run that
  * just finished sorts above an older still-running one.
@@ -345,11 +376,16 @@ export function createDashboardRoutes({
     // mutation — so a later heartbeat advances lastActivity and un-stales it.
     const stale = !terminal && lastActivityMs > 0 && (Date.now() - lastActivityMs) > STALE_AFTER_MS;
 
-    const status = stale
-      ? 'stale'
-      : (!terminal
-        ? 'in-progress'
-        : (enriched.some(l => l.agentState === 'error') ? 'error' : 'done'));
+    // The per-poll feed honours an explicit no-Linear cost contract, so it never
+    // looks up the touched task's current state — `taskDone` stays false here.
+    // The `done-with-warning` upgrade (LIN-749) is applied client-side from the
+    // existing drill-down hydration seam; `deriveSessionStatus` owns the status
+    // contract (and its 5th value) in one unit-tested place for both paths.
+    const status = deriveSessionStatus({
+      terminal,
+      stale,
+      hasError: enriched.some(l => l.agentState === 'error')
+    });
 
     // One segment per worker run for the progress bar (state-colored; the live
     // one pulses client-side). Each run also carries the Level-3 drill-down

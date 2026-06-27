@@ -102,6 +102,9 @@
 .obs-session.is-open { border-color: var(--border-strong); }
 .obs-session[data-status="in-progress"] { border-left-color: var(--yellow); }
 .obs-session[data-status="done"] { border-left-color: var(--green); }
+/* done-with-warning (LIN-749): green success base, warning-tinted to read as
+   "done, but a run errored". */
+.obs-session[data-status="done-with-warning"] { border-left-color: var(--green); }
 .obs-session[data-status="error"] { border-left-color: var(--red); }
 .obs-session[data-status="stale"] { border-left-color: var(--fg-mid); }
 
@@ -152,6 +155,9 @@
 }
 .obs-pill[data-status="in-progress"] { color: var(--yellow); border-color: var(--yellow); }
 .obs-pill[data-status="done"] { color: var(--green); border-color: var(--green); }
+/* done-with-warning (LIN-749): green text (it IS done) over a yellow warning
+   border, so the pill reads as success-with-a-caveat at a glance. */
+.obs-pill[data-status="done-with-warning"] { color: var(--green); border-color: var(--yellow); }
 .obs-pill[data-status="error"] { color: var(--red); border-color: var(--red); }
 .obs-pill[data-status="stale"] { color: var(--fg-dim); border-color: var(--border-strong); }
 
