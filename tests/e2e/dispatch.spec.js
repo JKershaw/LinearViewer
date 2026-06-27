@@ -787,6 +787,80 @@ test.describe('Dispatch API', () => {
     expect(listData.items[0].followUpTo).toBeNull();
   });
 
+  // Abort dispatch plumbing (LIN-743): an abort is an ordinary item carrying
+  // abort:true + abortTo (the dispatchId of the session to cancel) and NO prompt.
+  test('POST /api/dispatch abort: cancels an existing session by id and surfaces abort/abortTo', async ({ request }) => {
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
+
+    // 1. Dispatch a normal item (on dash, to prove eligibility is keyed off the
+    //    abort item's own target, not the aborted session's substrate).
+    const original = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: { prompt: 'Implement the thing', promptName: 'Custom', target: 'dash' }
+    });
+    expect(original.status()).toBe(201);
+    const originalId = (await original.json()).item.id;
+
+    // 2. Dispatch an abort (no prompt) pointing at the original item's id, on cli.
+    const abortResp = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: { abort: true, abortTo: originalId, target: 'cli' }
+    });
+    expect(abortResp.status()).toBe(201);
+
+    // The consumer-facing list projection carries abort/abortTo for the abort item.
+    const listData = await (await request.get(`${API_PREFIX}/api/dispatch`)).json();
+    const abortItem = listData.items.find(i => i.abort === true);
+    expect(abortItem).toBeDefined();
+    expect(abortItem.abortTo).toBe(originalId);
+    expect(abortItem.target).toBe('cli');
+    const normalItem = listData.items.find(i => i.prompt === 'Implement the thing');
+    expect(normalItem.abort).toBe(false);
+    expect(normalItem.abortTo).toBeNull();
+  });
+
+  test('POST /api/dispatch abort requires abortTo', async ({ request }) => {
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
+
+    const response = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: { abort: true }
+    });
+    expect(response.status()).toBe(400);
+    expect((await response.json()).error).toContain('abortTo');
+  });
+
+  test('POST /api/dispatch abort rejects a non-UUID abortTo', async ({ request }) => {
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
+
+    const response = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: { abort: true, abortTo: 'not-a-uuid' }
+    });
+    expect(response.status()).toBe(400);
+    expect((await response.json()).error).toContain('abortTo');
+  });
+
+  test('POST /api/dispatch abort rejects a non-poll-eligible (local) target', async ({ request }) => {
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
+
+    const response = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: { abort: true, abortTo: '11111111-1111-4111-8111-111111111111', target: 'local' }
+    });
+    expect(response.status()).toBe(400);
+    expect((await response.json()).error).toContain('poll-eligible');
+  });
+
+  test('POST /api/dispatch rejects combining abort and followUpTo', async ({ request }) => {
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
+
+    const response = await request.post(`${API_PREFIX}/api/dispatch`, {
+      data: {
+        abort: true,
+        abortTo: '11111111-1111-4111-8111-111111111111',
+        followUpTo: '22222222-2222-4222-8222-222222222222'
+      }
+    });
+    expect(response.status()).toBe(400);
+    expect((await response.json()).error).toContain('mutually exclusive');
+  });
+
   test('POST /api/dispatch with invalid kind returns 400', async ({ request }) => {
     await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 

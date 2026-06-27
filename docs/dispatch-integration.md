@@ -276,6 +276,8 @@ and is the recommended pattern for any consumer that posts foreman status.
 | `target` | string | Dispatch target: `"cli"` (default), `"web"`, `"dash"`, or `"local"`. See [Target Routing](#target-routing) |
 | `repo` | string | Repository hint (e.g. `"owner/name"`) for the consumer to operate in, or `null` (nullable) |
 | `followUpTo` | string | The `id` of an earlier dispatch whose session this item should resume, or `null`. See [Follow-ups](#follow-ups) (nullable) |
+| `abort` | boolean | When `true`, this item asks the consumer to cancel/close an existing session (named by `abortTo`) instead of running a prompt. Defaults to `false`. See [Aborting a session](#aborting-a-session) |
+| `abortTo` | string | The `id` of the dispatch whose session should be aborted, or `null`. Required when `abort` is `true`. See [Aborting a session](#aborting-a-session) (nullable) |
 | `sessionId` | string | The `id` of the autopilot dispatch that spawned this worker, or `null`. Groups worker dispatches into one autopilot session (any target). See [Autopilot sessions](#autopilot-sessions) (nullable) |
 | `workspace.urlKey` | string | Workspace identifier |
 | `dispatchedAt` | string | ISO 8601 timestamp when item was queued |
@@ -323,6 +325,50 @@ ORIG=$(curl -s -X POST "$BASE/api/proxy/dispatch" \
 curl -s -X POST "$BASE/api/proxy/dispatch" \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d "{\"prompt\": \"Now confirm CI is green and report the run URL\", \"followUpTo\": \"$ORIG\"}"
+```
+
+## Aborting a session
+
+An **abort** asks the consumer to cancel/close an existing session instead of running a
+prompt. It is an ordinary queue item that carries two extra fields and **no** `prompt`:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `abort` | boolean | No (default `false`) | When `true`, this item is an abort request, not a prompt. |
+| `abortTo` | string (UUID) | Yes, when `abort` is `true` | The `id` of the dispatch whose session should be cancelled. |
+
+When set, the consumer maps `abortTo` back to its live session and flips it to a terminal
+cancelled state (closing the host window where applicable). The dispatch store records
+and forwards `abort`/`abortTo` verbatim — it owns no session identity or liveness; the
+**consumer** resolves the target.
+
+**Rules and constraints (note the contrast with `followUpTo`):**
+
+- **No prompt required.** An abort carries no prompt; `prompt` is optional and ignored.
+  `abortTo` is required and must be a well-formed UUID.
+- **The abort item's OWN target governs eligibility.** The abort item is itself polled
+  like any other dispatch, so its **own** `target` must be poll-eligible (`cli`, `web`,
+  or `dash`; defaults to `cli`). This is **independent of the substrate of the session
+  being aborted** — you can abort a `dash` session with a `cli` abort item. Unlike
+  `followUpTo`, there is **no** `cli`/`web`-only restriction; `local` is rejected because
+  Harbour OS spawns server-side and is never polled.
+- **Mutually exclusive with `followUpTo`.** An item carrying both `abort` and `followUpTo`
+  is rejected (`400`) — resume and cancel are opposite verbs.
+- **The session can be gone.** As with follow-ups, the target may no longer be live; the
+  store does **not** verify the referenced dispatch exists. The consumer owns liveness.
+
+**Sending an abort** (dispatch a task, then abort its session by `id`):
+
+```bash
+# 1. Dispatch the original
+ORIG=$(curl -s -X POST "$BASE/api/proxy/dispatch" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"prompt": "Implement the thing", "target": "cli"}' | jq -r .id)
+
+# 2. Abort that session (no prompt needed)
+curl -s -X POST "$BASE/api/proxy/dispatch" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d "{\"abort\": true, \"abortTo\": \"$ORIG\"}"
 ```
 
 ## Autopilot sessions
