@@ -14,7 +14,7 @@
  */
 import { test, describe, before } from 'node:test';
 import assert from 'node:assert';
-import { createDashboardRoutes, buildTestSummary, buildTestSessionSummary } from '../../routes/dashboard.js';
+import { createDashboardRoutes, buildTestSummary, buildTestSessionSummary, deriveSessionStatus } from '../../routes/dashboard.js';
 import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
 import { InMemorySessionSummaryCacheStore } from '../../lib/session-summary-cache.js';
 
@@ -800,6 +800,39 @@ describe('buildTestSummary', () => {
     const s = buildTestSummary({ issueIdentifier: 'LIN-6', iteration: 1, agentState: 'error', feedback: [] });
     assert.match(s.outcome, /error/);
     assert.equal(s.blockers.length, 1);
+  });
+});
+
+// ─── deriveSessionStatus (LIN-749) ───────────────────────────────────────────
+
+describe('deriveSessionStatus', () => {
+  test('stale wins first (a stale session is never terminal)', () => {
+    assert.equal(deriveSessionStatus({ terminal: false, stale: true, hasError: true }), 'stale');
+  });
+
+  test('a non-terminal, non-stale session is in-progress', () => {
+    assert.equal(deriveSessionStatus({ terminal: false, stale: false, hasError: false }), 'in-progress');
+  });
+
+  test('a clean terminal session is done', () => {
+    assert.equal(deriveSessionStatus({ terminal: true, stale: false, hasError: false }), 'done');
+  });
+
+  test('a terminal session with an errored run is error when the task is not done', () => {
+    assert.equal(deriveSessionStatus({ terminal: true, stale: false, hasError: true }), 'error');
+  });
+
+  test('a terminal+errored session whose task is now done is done-with-warning', () => {
+    assert.equal(deriveSessionStatus({ terminal: true, stale: false, hasError: true, taskDone: true }), 'done-with-warning');
+  });
+
+  test('taskDone is inert without an error (a clean done stays done)', () => {
+    assert.equal(deriveSessionStatus({ terminal: true, stale: false, hasError: false, taskDone: true }), 'done');
+  });
+
+  test('taskDone defaults to false (the per-poll feed never supplies it)', () => {
+    // The cost-contract call site omits taskDone entirely; it must degrade to error.
+    assert.equal(deriveSessionStatus({ terminal: true, stale: false, hasError: true }), 'error');
   });
 });
 

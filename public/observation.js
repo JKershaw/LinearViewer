@@ -70,17 +70,40 @@ const contextState = new Map();            // sessionId → { pending, graph, er
 const contextFetched = new Set();          // sessionId (context fetched once per drill-in)
 const hydrationState = new Map();          // `${wsUrlKey}::${identifier}` → { state, labels, url, hydrated }
 const hydrationFetched = new Set();        // `${wsUrlKey}::${identifier}` (one Linear hit per task per drill-in)
+// Terminal+error sessions upgraded to done-with-warning (LIN-749): the touched
+// task hydrated to a Done state on drill-down. Persisted so the upgrade survives
+// the next poll, which re-emits the marker-derived 'error' from the feed.
+const warnedSessions = new Set();          // sessionId
 const runSummaryState = new Map();         // loopId → { pending, outcome, next, error }
 const runSummaryFetched = new Set();       // loopId (peeked once per run signature)
 const expandedRuns = new Set();            // loopId (worker-node drill-down)
 
 const PROVENANCE_LABEL = { seed: 'seed', descended: 'descended', 'spun-off': 'spun-off' };
 
-const STATUS_ICON = { 'in-progress': '◐', done: '✓', error: '✕', stale: '○' };
-const STATUS_LABEL = { 'in-progress': 'in progress', done: 'done', error: 'error', stale: 'stale' };
+// Status strings mirror the server contract (routes/dashboard.js deriveSessionStatus).
+// `done-with-warning` (LIN-749): a terminal session that errored at least once but
+// whose touched task is now Done — green ✓ plus a ⚠ warning glyph.
+const STATUS_ICON = { 'in-progress': '◐', done: '✓', 'done-with-warning': '✓', error: '✕', stale: '○' };
+const STATUS_LABEL = { 'in-progress': 'in progress', done: 'done', 'done-with-warning': 'done ⚠', error: 'error', stale: 'stale' };
 const STATE_ICON = { complete: '✓', error: '✕', running: '◐', waiting: '◌', queued: '○' };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+// A Linear workflow state of type `completed` is the "Done" signal (LIN-749).
+function isDoneState(state) {
+  return !!state && state.type === 'completed';
+}
+
+// The status string actually rendered on a card. The server feed never carries
+// `done-with-warning` (its no-Linear cost contract leaves it emitting 'error'),
+// so the terminal-boundary upgrade is applied here from drill-down hydration
+// recorded in `warnedSessions`. Every other status passes through unchanged.
+function displayStatus(s) {
+  if (s.terminal && s.status === 'error' && warnedSessions.has(s.sessionId)) {
+    return 'done-with-warning';
+  }
+  return s.status;
+}
 
 function setPollStatus(text) {
   const el = document.getElementById('obs-poll-status');
@@ -124,7 +147,7 @@ function formatRuntime(runtime) {
 // A signature that changes when anything the card displays changes — drives
 // minimal re-render and gates the one-time summary fetch.
 function sessionSignature(s) {
-  return [s.status, s.runCount, s.lastActivity,
+  return [displayStatus(s), s.runCount, s.lastActivity,
     s.runs.map(r => `${r.loopId}:${r.agentState}`).join(',')].join('|');
 }
 
@@ -167,8 +190,9 @@ function renderSummaryLine(s) {
 }
 
 function fillSessionHead(li, s) {
-  const icon = STATUS_ICON[s.status] || '○';
-  const label = STATUS_LABEL[s.status] || s.status || '';
+  const status = displayStatus(s);
+  const icon = STATUS_ICON[status] || '○';
+  const label = STATUS_LABEL[status] || status || '';
   const title = s.seedTitle || s.seedIssue || 'autopilot session';
   const ident = s.seedIssue || `run ${shortSessionId(s.sessionId)}`;
   const runtime = formatRuntime(s.runtime);
@@ -185,7 +209,7 @@ function fillSessionHead(li, s) {
     <span class="obs-session-topline">
       <span class="obs-session-caret" aria-hidden="true">▸</span>
       <span class="obs-session-ident">${escapeHtml(String(ident))}</span>
-      <span class="obs-pill" data-status="${escapeHtml(s.status)}">${escapeHtml(icon)} ${escapeHtml(label)}</span>
+      <span class="obs-pill" data-status="${escapeHtml(status)}">${escapeHtml(icon)} ${escapeHtml(label)}</span>
       <span class="obs-session-time">updated ${escapeHtml(relativeTime(s.lastActivity))}</span>
     </span>
     <span class="obs-session-name">${escapeHtml(String(title))}</span>
@@ -224,7 +248,7 @@ function makeSessionCard(s) {
 }
 
 function applySessionState(li, s) {
-  li.dataset.status = s.status;
+  li.dataset.status = displayStatus(s);
   const expanded = expandedSessions.has(s.sessionId);
   const head = li.querySelector('.obs-session-head');
   head.setAttribute('aria-expanded', expanded ? 'true' : 'false');
@@ -553,6 +577,18 @@ function toggleRun(sessionId, loopId) {
   repaintSessionBody(sessionId);
 }
 
+// Re-render a card's head + accent from current state (LIN-749) — used when a
+// drill-down hydration upgrades the session to done-with-warning, which changes
+// the pill/accent in the collapsed head, not just the open body.
+function refreshSessionCard(sessionId) {
+  const s = sessionIndex.get(sessionId);
+  const el = activeCards.get(sessionId) || recentCards.get(sessionId);
+  if (!s || !el) return;
+  fillSessionHead(el, s);
+  wireSummaryGen(el, s);
+  applySessionState(el, s);
+}
+
 // Re-render only an open session's body from current state (after a lazy fetch).
 function repaintSessionBody(sessionId) {
   const s = sessionIndex.get(sessionId);
@@ -602,6 +638,14 @@ async function ensureHydration(s) {
       const data = await res.json();
       if (data && data.hydrated) {
         hydrationState.set(key, { hydrated: true, state: data.state || null, labels: data.labels || [], url: data.url || null });
+        // Terminal-boundary upgrade (LIN-749): an errored terminal session whose
+        // touched task is now Done renders as done-with-warning. Sourced here from
+        // the drill-down hydration seam, never the per-poll feed. Refresh the card
+        // head/accent (not just the body) so the pill reflects the new status.
+        if (!warnedSessions.has(s.sessionId) && s.terminal && s.status === 'error' && isDoneState(data.state)) {
+          warnedSessions.add(s.sessionId);
+          refreshSessionCard(s.sessionId);
+        }
         repaintSessionBody(s.sessionId);
       }
     } catch { /* best-effort: a hydration miss still leaves the Mongo-sourced detail */ }
