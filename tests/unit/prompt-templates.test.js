@@ -1427,13 +1427,14 @@ describe('Surface Assessment (handwritten path)', () => {
   });
 });
 
-// Horizontal Obligations (LIN-697) — research must ask not only what the change
-// builds (the vertical slice) but what it must hold true against in the existing
-// system, plus a cheap adversarial self-review, plus a symmetric Surface-Assessment
-// trigger for duplicate representations. One class, expressed as generative reasoning
-// guidance (seed examples, not a fixed checklist), kept in sync across both prompt
-// paths and under the existing scale-to-task lower-bound guard.
-describe('Horizontal Obligations (handwritten path)', () => {
+// Audit the Layers (LIN-740, reframes Horizontal Obligations LIN-697) — research must
+// enumerate EVERY layer the change touches, brief how each is done here (citing sources),
+// then CLOSE the set (prove it complete). Generative, not a fixed category list (a list
+// anchors and the agent skips the unnamed layer — the LIN-735/295/579 gap). Keeps the
+// obligation axes as per-layer seed reasoning, the duplicate-representation Surface-
+// Assessment trigger, the small-task off-ramp, and the both-paths mirror; adds the
+// per-layer brief artifact, the cite-your-sources rule, and the coverage-not-speed license.
+describe('Audit the Layers (handwritten path)', () => {
   const mockIssue = {
     id: 'issue-ho', identifier: 'TEST-HO1', title: 'Add a thing',
     description: 'Add a thing to the codebase', url: 'https://linear.app/test/issue/TEST-HO1',
@@ -1443,7 +1444,7 @@ describe('Horizontal Obligations (handwritten path)', () => {
 
   test('research template asks for the change\'s horizontal obligations to the existing system', () => {
     const result = generatePrompt('research', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Horizontal Obligations'), 'research must include the Horizontal Obligations block');
+    assert.ok(result.prompt.includes('Audit the Layers'), 'research must include the Audit the Layers block');
     assert.ok(
       result.prompt.includes('what it must hold true against'),
       'it must frame obligations as what the change must hold true against, not only what it builds'
@@ -1458,12 +1459,37 @@ describe('Horizontal Obligations (handwritten path)', () => {
     );
   });
 
-  test('research template includes a cheap adversarial self-review pass', () => {
+  test('the audit enumerates layers, requires a per-layer brief, and cites sources', () => {
     const result = generatePrompt('research', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Attack Your Own Research'), 'research must include the adversarial self-review block');
+    assert.ok(result.prompt.includes('Enumerate the layers'), 'the audit must enumerate every layer the change touches');
+    assert.ok(
+      result.prompt.includes('Cite a source for each claim'),
+      'the audit must require a cited source per claim so the brief is verified, not assumed'
+    );
+    assert.ok(
+      result.prompt.includes('per-layer audit') && result.prompt.includes('one brief per layer'),
+      'the comment output must require a per-layer brief with sources cited'
+    );
+  });
+
+  test('the audit licenses coverage over speed (the exhaustiveness trade)', () => {
+    const result = generatePrompt('research', mockIssue, mockContext);
+    assert.ok(
+      /measured by \*coverage\*, not speed/.test(result.prompt),
+      'the audit must say completion is measured by coverage, not speed'
+    );
+  });
+
+  test('the audit closes the layer set rather than hunting loosely', () => {
+    const result = generatePrompt('research', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('Close the set'), 'the audit must end with a closure step');
     assert.ok(
       result.prompt.includes('did you NOT check') && result.prompt.includes('assert without verifying'),
-      'the adversarial pass must hunt unchecked obligations and unverified assertions'
+      'closure must hunt unchecked layers and unverified assertions'
+    );
+    assert.ok(
+      result.prompt.includes('show the search that would have surfaced'),
+      'closure must require evidence the set is complete, not a bare claim'
     );
   });
 
@@ -1479,16 +1505,16 @@ describe('Horizontal Obligations (handwritten path)', () => {
     );
   });
 
-  test('the obligations blocks sit under the existing scale-to-task guard', () => {
+  test('the audit blocks sit under the existing scale-to-task guard', () => {
     const result = generatePrompt('research', mockIssue, mockContext);
-    // Guard names the new sub-step, and the guard precedes the blocks it governs.
+    // Guard names the sub-steps, and the guard precedes the blocks it governs.
     assert.ok(
       result.prompt.includes('framing/completeness/history/obligations sub-steps'),
-      'the scale-to-task guard must name the new obligations sub-steps so small tasks skip them'
+      'the scale-to-task guard must name the obligations sub-steps so small tasks skip them'
     );
     assert.ok(
-      result.prompt.indexOf('Scale this to the task') < result.prompt.indexOf('Horizontal Obligations'),
-      'the lower-bound guard must precede the obligations block it governs'
+      result.prompt.indexOf('Scale this to the task') < result.prompt.indexOf('Audit the Layers'),
+      'the lower-bound guard must precede the audit block it governs'
     );
   });
 
@@ -1496,26 +1522,28 @@ describe('Horizontal Obligations (handwritten path)', () => {
   // ritually filling the obligations section on a one-file typo (control fired 50%). The
   // fix is a LOCAL applicability gate at the section head — positive framing (what to do
   // on a small task + a clean off-ramp), so the gate travels with the imperative it governs.
-  test('the Horizontal Obligations block leads with a local small-task off-ramp', () => {
+  test('the Audit the Layers block leads with a local small-task off-ramp', () => {
     const result = generatePrompt('research', mockIssue, mockContext);
-    const headerAt = result.prompt.indexOf('### Horizontal Obligations');
+    const headerAt = result.prompt.indexOf('### Audit the Layers');
     const imperativeAt = result.prompt.indexOf('characterise not just');
     const gateAt = result.prompt.indexOf('go straight to the Surface Assessment');
     assert.ok(gateAt > headerAt && gateAt < imperativeAt,
-      'the small-task off-ramp must sit at the section head, before the obligations imperative');
+      'the small-task off-ramp must sit at the section head, before the audit imperative');
     assert.ok(
       result.prompt.includes('This applies when the change touches shared structure, more than one surface, or data the system already models'),
       'the gate must positively state when the section applies');
   });
 
-  test('meta-prompt mirrors the obligations directives in the Research-prompts rule', () => {
+  test('meta-prompt mirrors the audit directives in the Research-prompts rule', () => {
     const p = buildMetaPromptTemplate({
       issueContext: 'CTX', identifier: 'LIN-901',
       hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
       hasComments: false, commentCount: 0, aiHints: 'H', actionVocabulary: 'plan, review, research',
       completionSignals: 'S', focusedSubtaskId: null, isTerminal: false, hasOpenChildren: false
     });
-    assert.ok(/Horizontal Obligations pass/.test(p), 'meta-prompt must require a Horizontal Obligations pass');
+    assert.ok(/Audit the Layers pass/.test(p), 'meta-prompt must require an Audit the Layers pass');
+    assert.ok(/cite a source for each claim/.test(p), 'meta-prompt must require a cited source per claim');
+    assert.ok(/state the layer set as complete/.test(p), 'meta-prompt must require closing the layer set');
     assert.ok(/seed examples, not a fixed checklist/.test(p), 'meta-prompt must frame the axes as seed examples, not a checklist');
     assert.ok(/adversarial self-review pass/.test(p), 'meta-prompt must require the adversarial self-review pass');
     assert.ok(

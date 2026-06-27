@@ -176,12 +176,15 @@ lib/components/footer.js:12:  return \`<footer>Copyrght \${year} Harbour</footer
 // Arm construction. Strip BOTH LIN-697 additions to make Arm A the true pre-LIN-697
 // research prompt; throw if either target is absent (no silent no-op).
 // ---------------------------------------------------------------------------
-const HO_BLOCK_RE = /\n### Horizontal Obligations[\s\S]*?(?=\n### Surface Assessment)/;
+// Heading renamed to "### Audit the Layers" in LIN-740 (the LIN-697 Horizontal
+// Obligations + Attack-Your-Own-Research pair was reframed into one audit pass); the
+// strip target tracks the live heading so this A/B harness keeps cutting the same block.
+const HO_BLOCK_RE = /\n### Audit the Layers[\s\S]*?(?=\n### Surface Assessment)/;
 const DUP_REP_RE = /\nOne shape always counts as demanding a structural change:[^\n]*\n/;
 
 function buildArms(c) {
   const full = generatePrompt('research', c.issue, mockContext).prompt;
-  if (!HO_BLOCK_RE.test(full)) throw new Error('Horizontal Obligations/Attack block not found to strip for ' + c.id);
+  if (!HO_BLOCK_RE.test(full)) throw new Error('Audit the Layers block not found to strip for ' + c.id);
   if (!DUP_REP_RE.test(full)) throw new Error('Surface-Assessment duplicate-representation sentence not found to strip for ' + c.id);
   const armA = full.replace(HO_BLOCK_RE, '\n').replace(DUP_REP_RE, '\n');
   if (armA === full) throw new Error('strip was a no-op for ' + c.id);
