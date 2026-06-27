@@ -276,6 +276,7 @@ and is the recommended pattern for any consumer that posts foreman status.
 | `target` | string | Dispatch target: `"cli"` (default), `"web"`, `"dash"`, or `"local"`. See [Target Routing](#target-routing) |
 | `repo` | string | Repository hint (e.g. `"owner/name"`) for the consumer to operate in, or `null` (nullable) |
 | `followUpTo` | string | The `id` of an earlier dispatch whose session this item should resume, or `null`. See [Follow-ups](#follow-ups) (nullable) |
+| `force` | boolean | When `true` on a follow-up, the consumer should **override its active-session guard** and resume even a wedged/sleeping session. Defaults to `false`; only meaningful alongside `followUpTo`. See [Follow-ups](#follow-ups) |
 | `abort` | boolean | When `true`, this item asks the consumer to cancel/close an existing session (named by `abortTo`) instead of running a prompt. Defaults to `false`. See [Aborting a session](#aborting-a-session) |
 | `abortTo` | string | The `id` of the dispatch whose session should be aborted, or `null`. Required when `abort` is `true`. See [Aborting a session](#aborting-a-session) (nullable) |
 | `sessionId` | string | The `id` of the autopilot dispatch that spawned this worker, or `null`. Groups worker dispatches into one autopilot session (any target). See [Autopilot sessions](#autopilot-sessions) (nullable) |
@@ -292,6 +293,7 @@ ordinary queue item that carries one extra field:
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `followUpTo` | string (UUID) | No | The `id` of the original dispatch whose session should be resumed. |
+| `force` | boolean | No (default `false`) | Override the consumer's active-session guard so a wedged/sleeping session is resumed instead of being rejected by the busy-session check. Only meaningful with `followUpTo`. |
 
 When set, `prompt` is delivered as a follow-up instruction to the session that handled
 the original dispatch. The dispatch store records and forwards `followUpTo` verbatim —
@@ -312,6 +314,13 @@ live session (the dispatch runner keys this off the `id` it received from
   longer be live. When it cannot resume, the consumer posts terminal
   `[failed] no live session to resume` feedback and the item leaves the queue — surface
   this like any other failed dispatch rather than assuming success.
+- **`force` overrides the active-session guard.** A normal follow-up is refused when the
+  target session is still busy in an active phase (the consumer's liveness gate guards
+  against colliding with a running process). Set `force: true` to bypass that guard and
+  resume anyway — it asserts the prior process is effectively dead (wedged on Claude infra
+  wobble, or parked in a long `sleep`). It is **only** meaningful alongside `followUpTo`:
+  `force: true` without a `followUpTo` is rejected (`400`). The consumer reads it as
+  `item.force` off the polled/claimed item. (Liveness contract: LIN-546; API plumbing: LIN-559.)
 
 **Sending a follow-up** (dispatch a custom item, then a second referencing its `id`):
 
@@ -325,6 +334,11 @@ ORIG=$(curl -s -X POST "$BASE/api/proxy/dispatch" \
 curl -s -X POST "$BASE/api/proxy/dispatch" \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d "{\"prompt\": \"Now confirm CI is green and report the run URL\", \"followUpTo\": \"$ORIG\"}"
+
+# 2b. Or force-resume a session that is wedged/sleeping (bypasses the busy-session guard)
+curl -s -X POST "$BASE/api/proxy/dispatch" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d "{\"prompt\": \"Pick this back up\", \"followUpTo\": \"$ORIG\", \"force\": true}"
 ```
 
 ## Aborting a session

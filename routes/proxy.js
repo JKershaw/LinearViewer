@@ -456,6 +456,7 @@ function formatDispatchWatch(item, meta = null) {
     issueUrl: item.issueUrl,
     target: item.target,
     followUpTo: item.followUpTo || null,
+    force: item.force === true,
     abort: item.abort === true,
     abortTo: item.abortTo || null,
     sessionId: item.sessionId || null,
@@ -1222,10 +1223,11 @@ POST ${baseUrl}/api/proxy/agent/status   (alias: /api/proxy/foreman/status — d
 ## Dispatch Endpoints
 
 POST ${baseUrl}/api/proxy/dispatch
-  Body: { "prompt": "...", "promptName": "...", "kind": "implementation", "issueId": "...", "issueIdentifier": "LIN-42", "issueTitle": "...", "issueUrl": "...", "target": "cli|web|dash", "repo": "...", "followUpTo": "...", "abort": false, "abortTo": "...", "sessionId": "...", "appendProxyContext": true }
+  Body: { "prompt": "...", "promptName": "...", "kind": "implementation", "issueId": "...", "issueIdentifier": "LIN-42", "issueTitle": "...", "issueUrl": "...", "target": "cli|web|dash", "repo": "...", "followUpTo": "...", "force": false, "abort": false, "abortTo": "...", "sessionId": "...", "appendProxyContext": true }
   → Queue a prompt for the workspace's dispatch consumer (the runner). Only "prompt" is required; target defaults to "cli". ("local"/Harbour OS is not available to proxy consumers.)
   → "kind" is a stable task classification (research/plan/implementation/review/etc. — the prompt-template keys, plus "custom"). Optional: when omitted it is derived from "promptName", falling back to "custom". Read it instead of inferring the task type from promptName or the prompt body.
   → "followUpTo" (optional) resumes an existing session: pass the "id" of an earlier dispatch and "prompt" becomes a follow-up instruction to that same session. cli/web only, same workspace. The runner owns session liveness — if the session is gone it posts terminal "[failed] no live session to resume". Use sparingly: only when the prior session ran cleanly and naturally suggests the next step (e.g. confirm CI is green, update Linear/git); any wobble → dispatch a fresh session instead.
+  → "force" (optional, default false) is a cli/web follow-up modifier: it overrides the runner's active-session guard so a "followUpTo" can resume a session that is wedged or sleeping in an active phase (Claude infra wobble, long-running sleep) instead of being rejected by the busy-session liveness gate. Setting it asserts the prior process is effectively dead — see LIN-546 for the collision contract it bypasses. Only meaningful with "followUpTo": "force": true without one is rejected (400). The runner reads it as "item.force" off the polled/claimed item. See LIN-559.
   → "abort" (optional, default false) requests an abort/cancel/close of an existing session instead of running a prompt: set "abort": true and "abortTo" to the "id" of the dispatch whose session should be cancelled. "prompt" is NOT required for an abort, and the consumer flips the running session to a terminal cancelled state. The abort item's OWN "target" must be poll-eligible (cli/web/dash) — eligibility is the abort item's target, NOT the substrate of the session being aborted (so you can abort a "dash" session with a "cli" abort item). Mutually exclusive with "followUpTo". See LIN-743.
   → "abortTo" (required when "abort" is true) is the dispatch id (UUID) of the session to abort. Stored + forwarded blindly; the consumer owns session liveness.
   → "sessionId" (optional) is the autopilot dispatch id that spawned this worker. Pass it on every worker dispatch the autopilot fans out so the run reconstructs as one session across all touched tasks (incl. epic descent / breakdown spin-offs). UUID, stored + forwarded blindly, ANY target (unlike followUpTo). See LIN-591.
@@ -3852,7 +3854,7 @@ One convention across every endpoint, so you can branch on the same fields every
     }
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo, abort, abortTo, sessionId } = req.body || {};
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo, force, abort, abortTo, sessionId } = req.body || {};
 
       // Abort verb (LIN-743): an abort item cancels/closes an existing session
       // (named by abortTo) instead of running a prompt — it carries no prompt and
@@ -3952,6 +3954,21 @@ One convention across every endpoint, so you can branch on the same fields every
         }
       }
 
+      // Force-resume flag (LIN-559): overrides the runner's active-session
+      // liveness guard so a follow-up can resume a wedged/sleeping session. Only
+      // meaningful alongside followUpTo (the human asserts the prior process is
+      // dead — see LIN-546), so reject force:true without it rather than storing
+      // an inert flag. force:false / omitted is always fine. The runner reads
+      // item.force off the polled/claimed item.
+      if (force !== undefined && typeof force !== 'boolean') {
+        logEvent(req, '/api/proxy/dispatch', 400);
+        return badRequest.json(res, 'force must be a boolean');
+      }
+      if (force === true && (followUpTo === undefined || followUpTo === null)) {
+        logEvent(req, '/api/proxy/dispatch', 400);
+        return badRequest.json(res, 'force requires followUpTo');
+      }
+
       // Autopilot session reference (LIN-591): the autopilot dispatchId that
       // spawned this worker, used to group workers into one session. Optional
       // UUID; stored + forwarded blindly. Unlike followUpTo there is NO target
@@ -3992,6 +4009,7 @@ One convention across every endpoint, so you can branch on the same fields every
         target: target || 'cli',
         repo: repo || null,
         followUpTo: followUpTo || null,
+        force: force === true,
         abort: isAbort,
         abortTo: isAbort ? abortTo : null,
         sessionId: sessionId || null
