@@ -2806,7 +2806,7 @@ One convention across every endpoint, so you can branch on the same fields every
     // then the AI recommendation. Uses a longer timeout since this makes a
     // Linear API call + an OpenRouter LLM call.
     const context = await fetchWithTimeout((signal) => fetchRecommendationContext(accessToken, identifier, { signal, noDescend }), CONTEXT_FETCH_TIMEOUT_MS);
-    const { issue, parent, siblings, project, children, comments, focusedChild } = context;
+    const { issue, parent, siblings, project, children, comments, focusedChild, attachments } = context;
 
     // Resolve the effective key (free-tier when no session/env key) so both
     // recommend surfaces send a valid key. Metering is NOT done here — this runs
@@ -2826,7 +2826,13 @@ One convention across every endpoint, so you can branch on the same fields every
       recommendation = await fetchWithTimeout(
         (signal) => getRecommendation(
           issue,
-          { parent, siblings, project, children, comments, focusedChild },
+          // Forward `attachments` (LIN-777) so getRecommendation's meta-prompt
+          // (formatIssueContext → formatAttachmentsSection) surfaces the worker-facing
+          // ## Attachments section. fetchRecommendationContext carries it at top level
+          // (LIN-772/773); dropping it here silently hid the section on the LLM
+          // recommendation path autopilot drives by default — the sibling of the
+          // deterministic LIN-776 fix. `focusedChild` stays (the meta path reads it).
+          { parent, siblings, project, children, comments, focusedChild, attachments },
           {
             apiKey: resolvedApiKey,
             model: selectedModel,
