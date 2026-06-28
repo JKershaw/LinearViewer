@@ -79,6 +79,32 @@ describe('focused-child fetch is lean (no redundant subtree)', () => {
   });
 });
 
+// =============================================================================
+// LIN-772: attachments threaded through the context fetch. ISSUE_DETAIL_QUERY
+// must select the formal attachments connection, and fetchIssueContext must feed
+// the description + those nodes through the shared collector (collectIssueAttachments)
+// and return the result as a top-level context.attachments. Source-pinned (this
+// path runs real GraphQL, which the e2e suite mocks away), mirroring the LIN-300
+// guardrails above.
+// =============================================================================
+describe('attachments threaded through context fetch (LIN-772)', () => {
+  test('ISSUE_DETAIL_QUERY selects the formal attachments connection', () => {
+    const q = extractQuery(linearSource, 'ISSUE_DETAIL_QUERY');
+    assert.match(q, /attachments\(first:\s*50\)\s*\{\s*nodes\s*\{\s*id\s+title\s+url/,
+      'must select attachments { nodes { id title url } } so the collector can build handles');
+  });
+
+  test('fetchIssueContext builds context.attachments via the shared collector', () => {
+    assert.match(linearSource, /import\s*\{\s*collectIssueAttachments\s*\}\s*from\s*'\.\.\/\.\.\/proxy-wire\.js'/,
+      'must reuse the shared collector, not a per-surface attachment gather');
+    assert.match(linearSource,
+      /collectIssueAttachments\(\{\s*description:\s*issue\.description,\s*formalAttachmentNodes:\s*issue\.attachments\s*\}\)/,
+      'must feed description + formal nodes through the collector (issue-level set, matching the wire contract)');
+    assert.match(linearSource, /\n\s*attachments\n\s*\}\n\s*\}/,
+      'fetchIssueContext must return attachments as a top-level context field');
+  });
+});
+
 describe('recommendation context fetch stops fighting the keepalive', () => {
   test('CONTEXT_FETCH_TIMEOUT_MS backstop exists and exceeds the keepalive flush (25s)', () => {
     const m = proxySource.match(/const CONTEXT_FETCH_TIMEOUT_MS\s*=\s*([\d_]+)/);
