@@ -881,7 +881,9 @@ ${goal}`
           if (mockAi) return buildMockRecommendationHop(ctx)
           const r = await getRecommendation(
             ctx.issue,
-            { parent: ctx.parent, siblings: ctx.siblings, project: ctx.project, children: ctx.children, comments: ctx.comments, focusedChild: ctx.focusedChild },
+            // Forward `attachments` (LIN-777) so the meta-prompt surfaces the
+            // worker-facing ## Attachments section on this LLM recommendation hop.
+            { parent: ctx.parent, siblings: ctx.siblings, project: ctx.project, children: ctx.children, comments: ctx.comments, focusedChild: ctx.focusedChild, attachments: ctx.attachments },
             { apiKey: apiKeyToUse, model: selectedModel, featureFlags: getFeatureFlags(req.session), providerUi: getProviderForWorkspace(workspace)?.ui || null,
               callMeta: { urlKey: workspace.urlKey, feature: 'recommend', issueIdentifier: ctx.issue.identifier } }
           )
@@ -1157,7 +1159,7 @@ ${goal}`
         issueId,
         { signal: AbortSignal.any([abortController.signal, AbortSignal.timeout(CONTEXT_FETCH_TIMEOUT_MS)]) }
       );
-      const { issue, parent, siblings, project, children, comments, focusedChild } = context;
+      const { issue, parent, siblings, project, children, comments, focusedChild, attachments } = context;
 
       if (closed) return;
 
@@ -1220,7 +1222,9 @@ ${goal}`
               }
               const r = await getRecommendationStream(
                 ctx.issue,
-                { parent: ctx.parent, siblings: ctx.siblings, project: ctx.project, children: ctx.children, comments: ctx.comments, focusedChild: ctx.focusedChild },
+                // Forward `attachments` (LIN-777) so the streamed meta-prompt surfaces
+                // the worker-facing ## Attachments section on each descent hop.
+                { parent: ctx.parent, siblings: ctx.siblings, project: ctx.project, children: ctx.children, comments: ctx.comments, focusedChild: ctx.focusedChild, attachments: ctx.attachments },
                 { apiKey: apiKeyToUse, model: selectedModel, featureFlags: getFeatureFlags(req.session), providerUi: getProviderForWorkspace(workspace)?.ui || null, signal: hop.signal,
                   callMeta: { urlKey: workspace.urlKey, feature: 'recommend', issueIdentifier: ctx.issue.identifier } },
                 (type, data) => {
@@ -1302,7 +1306,10 @@ ${goal}`
       } else {
         await getRecommendationStream(
           issue,
-          { parent, siblings, project, children, comments, focusedChild },
+          // Forward `attachments` (LIN-777) so the streamed terminal-hop meta-prompt
+          // surfaces the worker-facing ## Attachments section, matching the proxy
+          // recommendation path. fetchRecommendationContext carries it (LIN-772/773).
+          { parent, siblings, project, children, comments, focusedChild, attachments },
           {
             apiKey: apiKeyToUse,
             model: selectedModel,
