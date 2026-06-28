@@ -43,12 +43,12 @@ describe('COMPLETION_SIGNALS', () => {
     ...expectedLabelTypes,
     'plan',
     'look-into', 'triage', 'breakdown', 'research', 'scoping',
-    'design', 'spike', 'context', 'implementation', 'review', 'retro'
+    'design', 'spike', 'context', 'implementation', 'review', 'close-out', 'retro'
   ];
 
-  test('has all 14 expected prompt types', () => {
+  test('has all 15 expected prompt types', () => {
     const keys = Object.keys(COMPLETION_SIGNALS);
-    assert.strictEqual(keys.length, 14, 'Should have exactly 14 prompt types');
+    assert.strictEqual(keys.length, 15, 'Should have exactly 15 prompt types');
     for (const type of expectedPromptTypes) {
       assert.ok(type in COMPLETION_SIGNALS, `Should have ${type} signal`);
     }
@@ -126,10 +126,10 @@ describe('Signal Content', () => {
 // =============================================================================
 
 describe('getDefinedSignalTypes', () => {
-  test('returns all 14 signal types', () => {
+  test('returns all 15 signal types', () => {
     const defined = getDefinedSignalTypes();
     assert.ok(Array.isArray(defined));
-    assert.strictEqual(defined.length, 14);
+    assert.strictEqual(defined.length, 15);
   });
 
   test('returns all expected types', () => {
