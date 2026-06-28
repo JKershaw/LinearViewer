@@ -26,6 +26,7 @@ import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { mergeAncestorAttachments } from '../../lib/providers/linear/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // LIN-330: the Linear fetchers + FOCUSED_CHILD_QUERY moved out of lib/linear.js
@@ -102,6 +103,90 @@ describe('attachments threaded through context fetch (LIN-772)', () => {
       'must feed description + formal nodes through the collector (issue-level set, matching the wire contract)');
     assert.match(linearSource, /\n\s*attachments\n\s*\}\n\s*\}/,
       'fetchIssueContext must return attachments as a top-level context field');
+  });
+});
+
+// =============================================================================
+// LIN-773 S4: ancestor attachment provenance. A descendant read must surface a
+// parent's attachments tagged inherited + owner (the LIN-748 rollback cause), via
+// a bounded walk up the parent chain — NOT hardcoded depth-1, and NOT by widening
+// the existing depth-1 `parent { … }` relationship selection. The walk + query are
+// source-pinned (real GraphQL the e2e suite mocks away); the merge/dedupe/provenance
+// is exercised functionally through the exported pure mergeAncestorAttachments.
+// =============================================================================
+describe('ancestor attachment provenance (LIN-773 S4)', () => {
+  test('a dedicated ANCESTOR_QUERY exists, separate from the parent relationship selection', () => {
+    assert.ok(linearSource.includes('const ANCESTOR_QUERY = gql`'),
+      'a dedicated ANCESTOR_QUERY must own the ancestor-attachment walk');
+    const q = extractQuery(linearSource, 'ANCESTOR_QUERY');
+    assert.match(q, /attachments\(first:\s*50\)\s*\{\s*nodes\s*\{\s*id\s+title\s+url/,
+      'ANCESTOR_QUERY must select each ancestor\'s attachments so the collector can build handles');
+    assert.match(q, /parent\s*\{\s*id\s*\}/, 'ANCESTOR_QUERY must select parent { id } so the walk can climb');
+  });
+
+  test('the walk depth is a configurable bound, not hardcoded depth-1', () => {
+    const m = linearSource.match(/const ANCESTOR_ATTACHMENT_MAX_DEPTH\s*=\s*(\d+)/);
+    assert.ok(m, 'a named ANCESTOR_ATTACHMENT_MAX_DEPTH const must bound the walk');
+    assert.ok(Number(m[1]) >= 1, 'the bound must allow at least the LIN-748 depth-1 case');
+    assert.match(linearSource, /depth\s*<\s*ANCESTOR_ATTACHMENT_MAX_DEPTH/,
+      'the walk must stop on the configurable depth bound');
+  });
+
+  test('fetchIssueContext climbs the parent chain via the dedicated walk and merges provenance', () => {
+    assert.match(linearSource, /fetchAncestorChain\(\s*client,\s*parent\.id/,
+      'fetchIssueContext must climb from the parent via the dedicated ancestor walk');
+    assert.match(linearSource, /mergeAncestorAttachments\(\s*ownAttachments,\s*ancestors\s*\)/,
+      'own + ancestor attachments must merge through the provenance-preserving helper');
+    // The S3-pinned own-attachments collector call must survive unchanged.
+    assert.match(linearSource,
+      /collectIssueAttachments\(\{\s*description:\s*issue\.description,\s*formalAttachmentNodes:\s*issue\.attachments\s*\}\)/,
+      'the issue\'s own attachment set is still built by the shared collector');
+  });
+
+  test('merge tags inherited items with owner and leaves own items untagged (LIN-748 depth-1)', () => {
+    const own = [{ id: 'att:own', title: 'own.png', kind: 'image' }];
+    const ancestors = [{
+      identifier: 'LIN-748',
+      title: 'Parent epic',
+      description: 'see ![spec](https://uploads.linear.app/aaaa/spec.md)',
+      attachments: { nodes: [{ id: 'formal-1', title: 'design.md', url: 'https://uploads.linear.app/bbbb/design.md' }] }
+    }];
+    const merged = mergeAncestorAttachments(own, ancestors);
+    const ownItem = merged.find(a => a.id === 'att:own');
+    assert.ok(!ownItem.inherited && ownItem.owner === undefined, 'own attachment stays untagged');
+    const inherited = merged.filter(a => a.inherited);
+    assert.ok(inherited.length >= 1, 'a descendant surfaces the parent\'s inherited attachments');
+    assert.ok(inherited.every(a => a.owner === 'LIN-748 Parent epic'),
+      'each inherited attachment names its owning ancestor (identifier + title)');
+  });
+
+  test('dedupe by handle id with the nearest owner winning', () => {
+    // Own items are already collector-shaped (att: handles); ancestor formal nodes
+    // carry RAW ids that the collector re-encodes to att:<id>, so `shared`→`att:shared`.
+    const own = [{ id: 'att:shared', title: 'mine', kind: 'file' }];
+    const ancestors = [
+      { identifier: 'LIN-700', title: 'Near', description: null,
+        attachments: { nodes: [{ id: 'shared', title: 't', url: 'x' }, { id: 'near', title: 'n', url: 'y' }] } },
+      { identifier: 'LIN-600', title: 'Far', description: null,
+        attachments: { nodes: [{ id: 'near', title: 't', url: 'z' }] } }
+    ];
+    const merged = mergeAncestorAttachments(own, ancestors);
+    // att:shared resolves to the OWN copy (nearest of all), still untagged.
+    assert.strictEqual(merged.filter(a => a.id === 'att:shared').length, 1, 'shared handle surfaces once');
+    assert.ok(!merged.find(a => a.id === 'att:shared').inherited, 'own copy of a shared handle wins over an ancestor');
+    // att:near appears in both ancestors; the nearer (LIN-700) wins.
+    const near = merged.filter(a => a.id === 'att:near');
+    assert.strictEqual(near.length, 1, 'a handle shared across ancestors surfaces once');
+    assert.strictEqual(near[0].owner, 'LIN-700 Near', 'the nearest ancestor owns a shared handle');
+  });
+
+  test('no-ancestor-uploads / empty cases pass the own array through unchanged', () => {
+    const own = [{ id: 'att:a', title: 'a', kind: 'file' }];
+    assert.deepStrictEqual(mergeAncestorAttachments(own, []), own, 'no ancestors → own array unchanged');
+    assert.deepStrictEqual(mergeAncestorAttachments(own), own, 'omitted ancestors → own array unchanged');
+    assert.deepStrictEqual(
+      mergeAncestorAttachments(own, [{ identifier: 'LIN-1', title: 'x', description: null, attachments: { nodes: [] } }]),
+      own, 'an ancestor with no uploads adds nothing');
   });
 });
 
