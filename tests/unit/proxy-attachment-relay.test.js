@@ -257,3 +257,40 @@ describe('GET /api/proxy/attachments/:id — handle routing', () => {
     assert.equal(res.status, 503);
   });
 });
+
+// LIN-771 — auth is resolved BY PROVIDER/HOST. GitHub user-content is a public
+// CDN, so the relay must NOT send the workspace token to it (cross-provider token
+// leak), while Linear asset hosts keep their authenticated fetch (covered above).
+const GH_HOST = 'https://user-images.githubusercontent.com';
+function stubUpstreamHost(hostPrefix, handler) {
+  globalThis.fetch = async (url, opts) => {
+    if (typeof url === 'string' && url.startsWith(hostPrefix)) return handler(url, opts);
+    return realFetch(url, opts);
+  };
+}
+
+describe('GET /api/proxy/attachments/:id — provider/host-aware auth (LIN-771)', () => {
+  test('relays a GitHub user-content image WITHOUT an Authorization header', async () => {
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+    let sawAuthHeader = 'UNSET';
+    stubUpstreamHost(GH_HOST, (url, opts) => {
+      sawAuthHeader = 'Authorization' in (opts.headers || {});
+      return fakeResponse({ contentType: 'image/png', bytes: png });
+    });
+    const res = await getAttachment(buildApp(), md(`${GH_HOST}/1/abc.png`));
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.bodyBuf, png);
+    assert.equal(sawAuthHeader, false, 'workspace token must not be sent to GitHub');
+  });
+
+  test('serves a public GitHub asset even when the workspace has no token (no 503)', async () => {
+    stubUpstreamHost(GH_HOST, () => fakeResponse({ contentType: 'image/png' }));
+    const res = await getAttachment(buildApp({ token: null, reason: 'reauth' }), md(`${GH_HOST}/1/abc.png`));
+    assert.equal(res.status, 200, 'public CDN needs no workspace token');
+  });
+
+  test('SSRF guard still rejects a GitHub look-alike host', async () => {
+    const res = await getAttachment(buildApp(), md('https://user-images.githubusercontent.com.evil.com/x.png'));
+    assert.equal(res.status, 400);
+  });
+});

@@ -14,9 +14,11 @@ import {
   neutralizeProject,
   flattenCycle,
   flattenRelations,
+  collectIssueAttachments,
   encodeAttachmentHandle,
   decodeAttachmentHandle,
   relayContentTypeFromName,
+  GITHUB_UPLOAD_HOSTS,
 } from '../../lib/proxy-wire.js';
 
 // Helper: pull the `#name=` filename hint a non-image file handle carries.
@@ -338,6 +340,92 @@ describe('host-anchored inline-upload discovery (LIN-770)', () => {
       'file:AgentRuns.jsx',
     ], 'document order preserved; image embed not double-captured as a file');
     assert.ok(issue.attachments.every(a => a.contentType === null), 'discovery never types');
+  });
+});
+
+describe('collectIssueAttachments — pure provider-agnostic collector (LIN-771)', () => {
+  test('combines formal nodes + description uploads into the canonical array', () => {
+    const atts = collectIssueAttachments({
+      description: 'see ![pasted](https://uploads.linear.app/x/shot.jpg)',
+      formalAttachmentNodes: { nodes: [
+        { id: 'att-1', title: 'spec', url: 'https://uploads.linear.app/a/b.png' },
+      ] },
+    });
+    assert.strictEqual(atts.length, 2);
+    assert.strictEqual(atts[0].id, 'att:att-1', 'formal node first, in document order');
+    assert.strictEqual(atts[1].kind, 'image');
+    assert.strictEqual(atts[1].title, 'pasted');
+  });
+
+  test('accepts a flat array of formal nodes as well as a {nodes} connection', () => {
+    const flat = collectIssueAttachments({ formalAttachmentNodes: [
+      { id: 'att-9', title: 't', url: 'https://uploads.linear.app/b.gif' },
+    ] });
+    assert.deepStrictEqual(flat, [
+      { id: 'att:att-9', title: 't', contentType: 'image/gif', kind: 'image' },
+    ]);
+  });
+
+  test('folds comment-body uploads in when comments are passed (the S3 aggregate path)', () => {
+    const atts = collectIssueAttachments({
+      description: '![d](https://uploads.linear.app/d.png)',
+      comments: [
+        { id: 'm1', body: 'in a comment: [doc](https://uploads.linear.app/u/spec.md)' },
+        { id: 'm2', body: 'no uploads here' },
+        null, // tolerated
+      ],
+    });
+    const summary = atts.map(a => `${a.kind}:${a.title}`);
+    assert.deepStrictEqual(summary, ['image:d', 'file:doc']);
+  });
+
+  test('is pure: no inputs ⇒ empty array, and it never throws on partial input', () => {
+    assert.deepStrictEqual(collectIssueAttachments(), []);
+    assert.deepStrictEqual(collectIssueAttachments({}), []);
+    assert.deepStrictEqual(collectIssueAttachments({ description: 'plain' }), []);
+  });
+
+  test('is provider-agnostic: discovers GitHub user-content uploads through the same path', () => {
+    const atts = collectIssueAttachments({
+      description: 'pasted ![grab](https://user-images.githubusercontent.com/1/abc.png) here',
+    });
+    assert.strictEqual(atts.length, 1, 'GitHub asset host is discovered like a Linear one');
+    assert.strictEqual(atts[0].kind, 'image');
+    const decoded = decodeAttachmentHandle(atts[0].id);
+    assert.ok(decoded.value.startsWith('https://user-images.githubusercontent.com/1/abc.png'));
+  });
+});
+
+describe('host-anchored discovery is provider-aware via the host union (LIN-771)', () => {
+  test('surfaces uploads on every GitHub asset host in UPLOAD_HOSTS', () => {
+    for (const host of GITHUB_UPLOAD_HOSTS) {
+      const issue = {
+        id: 'i1',
+        attachments: { nodes: [] },
+        description: `![g](https://${host}/owner/repo/file.png)`,
+      };
+      flattenIssue(issue);
+      assert.strictEqual(issue.attachments?.length, 1, `discovered on ${host}`);
+      assert.strictEqual(issue.attachments[0].kind, 'image');
+    }
+  });
+
+  test('does NOT treat bare github.com links as uploads (cross-ref, not attachment)', () => {
+    const issue = {
+      id: 'i1',
+      attachments: { nodes: [] },
+      description: 'fixes [#5](https://github.com/owner/repo/issues/5)',
+    };
+    flattenIssue(issue);
+    assert.strictEqual('attachments' in issue, false, 'github.com cross-ref is never an upload');
+  });
+
+  test('GITHUB_UPLOAD_HOSTS holds only dedicated *.githubusercontent.com asset hosts', () => {
+    assert.ok(GITHUB_UPLOAD_HOSTS.length >= 1);
+    assert.ok(
+      GITHUB_UPLOAD_HOSTS.every(h => h.endsWith('.githubusercontent.com')),
+      'only dedicated asset hosts — never bare github.com',
+    );
   });
 });
 
