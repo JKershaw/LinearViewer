@@ -127,7 +127,8 @@ describe('workspace-feedback attachment round-trip (LIN-651)', () => {
     // Canonical shape (LIN-649): { id, title, contentType, kind }, no url.
     assert.deepStrictEqual(Object.keys(att).sort(), ['contentType', 'id', 'kind', 'title']);
     assert.strictEqual(att.kind, 'image');
-    assert.strictEqual(att.contentType, 'image/png');
+    // Host-anchored discovery never types (LIN-770); the relay is the type-gate.
+    assert.strictEqual(att.contentType, null);
     assert.strictEqual('url' in att, false, 'no backend deep-link leaks');
 
     // The opaque md: handle round-trips back to the asset URL the intake embedded
@@ -138,8 +139,9 @@ describe('workspace-feedback attachment round-trip (LIN-651)', () => {
 
   test('survives a signed asset URL with a query string (real Linear uploads)', async () => {
     // Real provider.uploadFile returns a signed URL (`…shot.png?signature=…`);
-    // the expose path must still recognise it by extension and round-trip the
-    // FULL signed URL through the handle (the relay needs the signature to fetch).
+    // the host-anchored expose path must still recognise it by upload host and
+    // round-trip the FULL signed URL through the handle (the relay needs the
+    // signature to fetch).
     const assetUrl = 'https://uploads.linear.app/ws/abc/shot.png?signature=deadbeef&expires=1';
     const { provider, calls } = makeFakeProvider({ assetUrl });
     const app = buildApp(provider);
@@ -156,7 +158,7 @@ describe('workspace-feedback attachment round-trip (LIN-651)', () => {
     assert.strictEqual(issue.attachments.length, 1);
     const [att] = issue.attachments;
     assert.strictEqual(att.kind, 'image');
-    assert.strictEqual(att.contentType, 'image/png');
+    assert.strictEqual(att.contentType, null);
     assert.deepStrictEqual(decodeAttachmentHandle(att.id), { type: 'md', value: assetUrl });
   });
 

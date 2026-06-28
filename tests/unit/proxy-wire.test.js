@@ -130,22 +130,23 @@ describe('flattenIssue attachments (LIN-649)', () => {
     assert.ok(issue.attachments.every(a => !('url' in a)), 'no url on attachments');
   });
 
-  test('extracts markdown-embedded images from the description (image-ext filter)', () => {
+  test('extracts a markdown-embedded image from the description (host-anchored, LIN-770)', () => {
     const issue = {
       id: 'i1',
       attachments: { nodes: [] },
       description: 'before ![pasted](https://uploads.linear.app/x/shot.jpg) and a [link](https://example.com/page) after',
     };
     flattenIssue(issue);
-    assert.strictEqual(issue.attachments.length, 1, 'only the image, not the plain link');
+    assert.strictEqual(issue.attachments.length, 1, 'only the upload-host image, not the off-host link');
     const [att] = issue.attachments;
     assert.strictEqual(att.kind, 'image');
-    assert.strictEqual(att.contentType, 'image/jpeg');
+    assert.strictEqual(att.contentType, null, 'discovery never types; the relay is the type-gate');
     assert.strictEqual(att.title, 'pasted');
-    // The id is an opaque handle that round-trips back to the source url.
-    assert.deepStrictEqual(decodeAttachmentHandle(att.id), {
-      type: 'md', value: 'https://uploads.linear.app/x/shot.jpg',
-    });
+    // The id is an opaque handle whose url round-trips, now carrying the #name hint.
+    const decoded = decodeAttachmentHandle(att.id);
+    assert.strictEqual(decoded.type, 'md');
+    assert.ok(decoded.value.startsWith('https://uploads.linear.app/x/shot.jpg'));
+    assert.strictEqual(nameHintOf(att.id), 'pasted', 'images carry the #name= hint too');
   });
 
   test('attaches per-comment markdown images under each comment', () => {
@@ -255,6 +256,88 @@ describe('flattenIssue non-image file attachments (LIN-750)', () => {
     const once = JSON.parse(JSON.stringify(issue));
     flattenIssue(issue);
     assert.deepStrictEqual(issue, once);
+  });
+});
+
+describe('host-anchored inline-upload discovery (LIN-770)', () => {
+  // Discovery is keyed on the URL HOST, not the file extension or markdown form.
+  test('surfaces an extension-less image embed (no .jpg in the URL)', () => {
+    const issue = {
+      id: 'i1',
+      attachments: { nodes: [] },
+      // The image upload URL is extension-less — the old image-ext filter dropped it.
+      description: '![Screenshot 2026.jpg](https://uploads.linear.app/a/b/4f3c-uuid)',
+    };
+    flattenIssue(issue);
+    assert.strictEqual(issue.attachments.length, 1, 'extension-less image embed is surfaced');
+    const [att] = issue.attachments;
+    assert.strictEqual(att.kind, 'image', 'kind comes from the leading `!`, not the URL');
+    assert.strictEqual(att.contentType, null);
+    assert.strictEqual(att.title, 'Screenshot 2026.jpg');
+    assert.strictEqual(nameHintOf(att.id), 'Screenshot 2026.jpg', 'filename hint carried for typing');
+    assert.strictEqual(decodeAttachmentHandle(att.id).value.split('#')[0], 'https://uploads.linear.app/a/b/4f3c-uuid');
+  });
+
+  test('surfaces an angle-bracket-wrapped URL `[label](<url>)` (the .jsx case)', () => {
+    const issue = {
+      id: 'i1',
+      attachments: { nodes: [] },
+      // `(<url>)` made the old `new URL()` throw and the link was dropped.
+      description: '[AgentRuns.jsx](<https://uploads.linear.app/x/y/9a2b-uuid>)',
+    };
+    flattenIssue(issue);
+    assert.strictEqual(issue.attachments.length, 1, 'angle-bracket-wrapped URL is surfaced');
+    const [att] = issue.attachments;
+    assert.strictEqual(att.kind, 'file');
+    assert.strictEqual(att.contentType, null);
+    assert.strictEqual(att.title, 'AgentRuns.jsx');
+    // The `<>` are stripped before encoding, so the handle round-trips to a clean URL.
+    assert.strictEqual(
+      decodeAttachmentHandle(att.id).value.split('#')[0],
+      'https://uploads.linear.app/x/y/9a2b-uuid',
+      'surrounding angle brackets stripped from the captured URL',
+    );
+    assert.strictEqual(nameHintOf(att.id), 'AgentRuns.jsx');
+  });
+
+  test('image syntax on a non-image upload keeps kind:image (form, not extension)', () => {
+    const issue = {
+      id: 'i1',
+      attachments: { nodes: [] },
+      // `![]()` used on a PDF: discovery preserves the leading-mark kind and never
+      // rejects on extension — the relay is the sole type-gate downstream.
+      description: '![report.pdf](https://uploads.linear.app/p/d/c1d2-uuid)',
+    };
+    flattenIssue(issue);
+    assert.strictEqual(issue.attachments.length, 1);
+    const [att] = issue.attachments;
+    assert.strictEqual(att.kind, 'image', 'kind follows the `!` mark, not the .pdf');
+    assert.strictEqual(att.contentType, null);
+    assert.strictEqual(att.title, 'report.pdf');
+  });
+
+  test('LIN-748 regression: all 4 inline uploads are surfaced (was 2)', () => {
+    const issue = {
+      id: 'i1',
+      attachments: { nodes: [] },
+      description: [
+        '[theme-design.md](https://uploads.linear.app/a/1)',            // clean .md link
+        '[notes.md](https://uploads.linear.app/a/2)',                   // clean .md link
+        '![Screenshot 2026.jpg](https://uploads.linear.app/a/3-uuid)',  // extension-less image embed (was MISSED)
+        '[AgentRuns.jsx](<https://uploads.linear.app/a/4-uuid>)',       // angle-bracket-wrapped URL (was MISSED)
+        '[external](https://example.com/page)',                         // off-host → never an attachment
+      ].join('\n'),
+    };
+    flattenIssue(issue);
+    assert.strictEqual(issue.attachments.length, 4, 'all 4 uploads surfaced, off-host link excluded');
+    const summary = issue.attachments.map(a => `${a.kind}:${a.title}`);
+    assert.deepStrictEqual(summary, [
+      'file:theme-design.md',
+      'file:notes.md',
+      'image:Screenshot 2026.jpg',
+      'file:AgentRuns.jsx',
+    ], 'document order preserved; image embed not double-captured as a file');
+    assert.ok(issue.attachments.every(a => a.contentType === null), 'discovery never types');
   });
 });
 
