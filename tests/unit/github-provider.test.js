@@ -104,7 +104,7 @@ describe('GitHubProvider capability profile (LIN-178)', () => {
       comments: true,     // fetchIssueComments implemented
       estimates: false,   // no estimate field
       subtasks: false,    // no hierarchy
-      attachments: false, // inherits the base decline — no override (LIN-649)
+      attachments: true,  // issue/comment bodies carry user-content uploads (LIN-771)
       displayName: 'GitHub Issues', // relabeled from 'GitHub' (LIN-702)
     });
   });

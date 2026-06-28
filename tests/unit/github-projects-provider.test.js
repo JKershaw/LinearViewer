@@ -107,7 +107,7 @@ describe('GitHubProjectsProvider capability profile (LIN-560)', () => {
       comments: false,    // fetchIssueComments NOT implemented
       estimates: false,   // no estimate mapping in V1
       subtasks: false,    // no item hierarchy
-      attachments: false, // inherits the base decline
+      attachments: true,  // item body (issue/PR) carries user-content uploads (LIN-771)
       displayName: 'GitHub Projects',
     });
   });

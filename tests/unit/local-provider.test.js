@@ -32,7 +32,7 @@ describe('LocalProvider capability profile (LIN-356 step D)', () => {
       comments: true,     // fetchIssueComments implemented
       estimates: false,
       subtasks: true,
-      attachments: false, // inherits the base decline — no override (LIN-649)
+      attachments: true,  // markdown bodies can embed upload links (LIN-771)
       displayName: 'Local',
     });
   });

@@ -38,7 +38,7 @@ import {
 import { localProvider } from '../lib/providers/local/index.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { applyTrashedSignal, isTrashed } from '../lib/trashed-signal.js';
-import { flattenIssue, neutralizeProject, flattenCycle, flattenRelations, decodeAttachmentHandle, relayContentTypeFromName } from '../lib/proxy-wire.js';
+import { flattenIssue, neutralizeProject, flattenCycle, flattenRelations, decodeAttachmentHandle, relayContentTypeFromName, GITHUB_UPLOAD_HOSTS } from '../lib/proxy-wire.js';
 import { createProxyFetch } from '../lib/proxy-fetch.js';
 import { isRecommendationEnabled, getRecommendation } from '../lib/openrouter.js';
 import { resolveRecommendation, describeDescent, armHopSignal } from '../lib/recommend-recurse.js';
@@ -1702,14 +1702,16 @@ One convention across every endpoint, so you can branch on the same fields every
   //
   // External consumers hold an OPAQUE attachment handle (LIN-649), never a
   // backend URL — the proxy is deliberately source-neutral and strips asset
-  // URLs — and their *proxy* token 401s against Linear's asset host, so they
-  // cannot fetch image bytes directly. This relay decodes the handle, fetches
-  // the bytes server-side with the workspace's Linear token, and streams them
-  // back. The consumer is the external automation agent reading task/comment
-  // image attachments (direct beneficiary; no other endpoint changes).
+  // URLs — and their *proxy* token 401s against the asset host, so they cannot
+  // fetch image bytes directly. This relay decodes the handle and fetches the
+  // bytes server-side, authenticating BY PROVIDER/HOST (LIN-771): Linear asset
+  // hosts get the workspace bearer token; GitHub user-content hosts are public and
+  // fetched with no auth so the workspace token is never sent cross-provider. The
+  // consumer is the external automation agent reading task/comment image
+  // attachments (direct beneficiary; no other endpoint changes).
   //
   // `md:` markdown handles resolve here. The URL is recovered by
-  // `decodeAttachmentHandle`, SSRF-guarded against the Linear-host allowlist
+  // `decodeAttachmentHandle`, SSRF-guarded against the host allowlist
   // (mirrors the LIN-156 `/api/image` guard model: https-only, exact-host
   // allowlist, no path traversal, no redirects, 10 MB cap), then fetched through
   // the proxy-aware egress path. Two media classes are served (LIN-750):
@@ -1726,7 +1728,15 @@ One convention across every endpoint, so you can branch on the same fields every
   // wire dropped their URL and there is no provider fetch seam yet — so they get
   // a clean 422 + machine-readable code, intentionally deferred to a follow-up.
   // Any other shape is a 400. We never silently 500 on the missing capability.
-  const ATTACHMENT_ALLOWED_HOSTS = new Set(['uploads.linear.app', 'cdn.linear.app', 'linear.app']);
+  // Kept in lockstep with discovery's UPLOAD_HOSTS (lib/proxy-wire.js): every host
+  // discovery can mint a handle for must be relayable here, or discovery would emit
+  // a handle this guard refuses. The GitHub asset hosts are sourced from the SAME
+  // exported set so the two allowlists cannot drift (LIN-771). `linear.app` stays
+  // relay-only (it is an SSRF allow, not a discovery upload host).
+  const ATTACHMENT_ALLOWED_HOSTS = new Set([
+    'uploads.linear.app', 'cdn.linear.app', 'linear.app',
+    ...GITHUB_UPLOAD_HOSTS,
+  ]);
   const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024; // 10 MB — matches /api/image
 
   router.get('/api/proxy/attachments/:id', proxyLimiter, authenticateProxyToken, async (req, res) => {
@@ -1771,11 +1781,25 @@ One convention across every endpoint, so you can branch on the same fields every
       return badRequest.json(res, 'Invalid attachment URL: path traversal not allowed');
     }
 
-    // Resolve the workspace's Linear access token (the same token /api/image
-    // authenticates with). Reads through the shared raw-token seam so an
-    // unavailable workspace yields the structured 503 envelope.
-    const { token, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
-    if (!token) {
+    // Resolve the fetch auth BY PROVIDER/HOST (LIN-771). Historically the relay
+    // sent the workspace's Linear bearer token to every asset host — correct for
+    // Linear, but a token-leak hazard for GitHub user-content. We instead key off
+    // the asset host (which uniquely identifies its provider):
+    //   - Linear hosts  → authenticated with the workspace token (unchanged: the
+    //     asset host requires it). Resolved through the shared provider/token seam
+    //     so an unavailable workspace still yields the structured 503 envelope.
+    //   - GitHub asset hosts → public user-content CDNs; fetched WITHOUT any auth
+    //     header so the workspace token is never sent cross-provider. A workspace
+    //     token is therefore not required to relay them.
+    // Known gap, sequenced with S4/S5 (LIN-773/774, relay safety): the signed
+    // `private-user-images.githubusercontent.com` form and the `github.com/
+    // user-attachments/assets/<id>` form 302-redirect to the real bytes, which the
+    // `redirect: 'error'` SSRF guard below rejects (a clean 400, never a 500).
+    // Redirect-safe relaying of those is owned by S5; `user-images.
+    // githubusercontent.com` serves bytes directly and works today.
+    const isGithubAssetHost = GITHUB_UPLOAD_HOSTS.includes(urlObj.hostname);
+    const { token, reason } = await resolveProviderAccess(req.proxyUrlKey);
+    if (!isGithubAssetHost && !token) {
       return workspaceUnavailable(req, res, endpoint, reason);
     }
 
@@ -1793,9 +1817,13 @@ One convention across every endpoint, so you can branch on the same fields every
       // Proxy-aware egress: route through the egress proxy when one is
       // configured, exactly like every other Linear call.
       const customFetch = (await createProxyFetch()) || fetch;
+      // Auth header by host: Linear asset hosts require the workspace bearer token
+      // (unchanged); GitHub user-content is public, so send no Authorization and
+      // never leak the workspace token cross-provider (LIN-771).
+      const fetchHeaders = isGithubAssetHost ? {} : { Authorization: `Bearer ${token}` };
       const response = await customFetch(fetchUrl, {
         method: 'GET',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: fetchHeaders,
         redirect: 'error', // a redirect could bypass the SSRF allowlist
       });
 
