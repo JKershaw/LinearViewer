@@ -1592,8 +1592,8 @@ describe('Scale to the task (handwritten path)', () => {
 // LIN-177 S4/S5: Capability-aware prompts (provider.ui threaded into both paths)
 // =============================================================================
 import { generateCustomPrompt } from '../../lib/prompt-templates.js';
-import { resolvePromptUi, applyPromptCapabilities, DEFAULT_PROMPT_UI, formatSubtaskSummary, appendGroundingSections, formatPlanFidelityCheck } from '../../lib/prompt-formatters.js';
-import { applyGroundingToRecommendation } from '../../lib/openrouter.js';
+import { resolvePromptUi, applyPromptCapabilities, DEFAULT_PROMPT_UI, formatSubtaskSummary, appendGroundingSections, formatPlanFidelityCheck, formatAttachmentsSection } from '../../lib/prompt-formatters.js';
+import { applyGroundingToRecommendation, formatIssueContext } from '../../lib/openrouter.js';
 import { buildMetaPromptTemplate } from '../../lib/prompts/meta-prompt-template.js';
 
 describe('resolvePromptUi (LIN-177 S4)', () => {
@@ -1964,6 +1964,94 @@ describe('cross-path grounding parity (LIN-435)', () => {
 
     const meta = applyGroundingToRecommendation({ prompt: 'BODY' }, terminalBug, ctx);
     assert.strictEqual(meta.prompt, 'BODY' + grounding, 'meta path matches for the terminal+bug case too');
+  });
+});
+
+// =============================================================================
+// Cross-path Attachments section parity (LIN-772). The handwritten path
+// (generatePrompt post-pass) and the AI meta-prompt path (formatIssueContext
+// context block) must emit the SAME formatAttachmentsSection output, so a worker
+// sees an identical attachment set regardless of surface. Attachment-less issues
+// must stay byte-identical on both paths (the section self-gates to '').
+// =============================================================================
+describe('cross-path Attachments section parity (LIN-772)', () => {
+  const issue = {
+    identifier: 'LIN-720', title: 'T', description: 'd',
+    state: { name: 'Todo', type: 'unstarted' },
+    createdAt: '2026-06-01T00:00:00.000Z', labels: ['implementation']
+  };
+  const attachments = [
+    { id: 'att:abc', title: 'design.png', contentType: 'image/png', kind: 'image' },
+    { id: 'md:def', title: 'spec.md', contentType: null, kind: 'file' }
+  ];
+  const ctxWith = { children: [], comments: [], attachments };
+  const ctxWithout = { children: [], comments: [], attachments: [] };
+
+  test('attachment-less context is byte-identical to no-attachments-field (both paths)', () => {
+    // Handwritten path: empty attachments must not change the rendered prompt.
+    const hwNone = generatePrompt('implementation', issue, { children: [], comments: [] }).prompt;
+    const hwEmpty = generatePrompt('implementation', issue, ctxWithout).prompt;
+    assert.strictEqual(hwEmpty, hwNone, 'handwritten prompt unchanged by an empty attachments array');
+    assert.ok(!hwEmpty.includes('## Attachments'), 'no Attachments section when there is nothing attached');
+
+    // Meta path: the context block is likewise unchanged.
+    const metaNone = formatIssueContext(issue, { children: [], comments: [] });
+    const metaEmpty = formatIssueContext(issue, ctxWithout);
+    assert.strictEqual(metaEmpty, metaNone, 'meta context block unchanged by an empty attachments array');
+    assert.ok(!metaEmpty.includes('## Attachments'), 'no Attachments section in meta context when empty');
+  });
+
+  test('both paths embed the byte-identical shared Attachments section when attachments exist', () => {
+    const section = formatAttachmentsSection(ctxWith);
+    assert.ok(section.length > 0, 'fixture with attachments produces a non-empty section');
+    assert.ok(section.includes('## Attachments'), 'section carries the heading');
+
+    // Handwritten path appends it verbatim (capability post-pass is a no-op for Linear).
+    const hw = generatePrompt('implementation', issue, ctxWith).prompt;
+    assert.ok(hw.includes(section), 'handwritten prompt embeds the shared Attachments section verbatim');
+
+    // Meta path folds the identical section into the context block.
+    const meta = formatIssueContext(issue, ctxWith);
+    assert.ok(meta.includes(section), 'meta context block embeds the identical Attachments section');
+  });
+
+  test('the section lists every attachment by title, kind, and opaque relay handle', () => {
+    const section = formatAttachmentsSection(ctxWith);
+    assert.ok(section.includes('design.png') && section.includes('`att:abc`'), 'formal image listed with its handle');
+    assert.ok(section.includes('spec.md') && section.includes('`md:def`'), 'markdown file listed with its handle');
+    assert.ok(section.includes('image/png'), 'contentType surfaced when present');
+    assert.ok(section.includes('(file)'), 'null-contentType file omits the type suffix');
+    assert.ok(
+      /GET \/api\/proxy\/attachments\/<id>/.test(section),
+      'directs the worker to fetch bytes through the relay, not by dereferencing the handle'
+    );
+  });
+
+  test('section self-gates to empty for absent / non-array / handle-less input', () => {
+    assert.strictEqual(formatAttachmentsSection(), '', 'no context → empty');
+    assert.strictEqual(formatAttachmentsSection({}), '', 'no attachments field → empty');
+    assert.strictEqual(formatAttachmentsSection({ attachments: null }), '', 'null attachments → empty');
+    assert.strictEqual(formatAttachmentsSection({ attachments: 'x' }), '', 'non-array attachments → empty');
+    assert.strictEqual(formatAttachmentsSection({ attachments: [{}, null] }), '', 'entries without an id → empty');
+  });
+
+  test('renders the optional owner/inherited provenance hook (S4, LIN-773) only when set', () => {
+    const base = formatAttachmentsSection({ attachments: [{ id: 'att:x', title: 'a.png', kind: 'image' }] });
+    assert.ok(!/inherited|_\(from /.test(base), 'no provenance suffix when owner/inherited are unset (S3 default is stable)');
+
+    const inherited = formatAttachmentsSection({
+      attachments: [{ id: 'att:x', title: 'a.png', kind: 'image', inherited: true, owner: 'LIN-700' }]
+    });
+    assert.ok(inherited.includes('inherited from LIN-700'), 'inherited attachment names its owning ancestor');
+
+    const owned = formatAttachmentsSection({
+      attachments: [{ id: 'att:x', title: 'a.png', kind: 'image', owner: 'LIN-720' }]
+    });
+    assert.ok(owned.includes('_(from LIN-720)_'), 'own attachment can still carry an owner label');
+  });
+
+  test('the Attachments section is provider-agnostic (no hardcoded Linear)', () => {
+    assert.ok(!formatAttachmentsSection(ctxWith).includes('Linear'), 'shared section prose must not hardcode a tracker name');
   });
 });
 
