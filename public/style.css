@@ -1862,21 +1862,25 @@ body.is-landing {
 }
 
 /* Proxy toggle button - toggles proxy API instructions in prompts */
+/* LIN-738: resting state uses --fg-dim (readable interactive control), not the
+   structural box-drawing token --fg-vdim, which rendered the button effectively
+   invisible at rest (1.16:1). Same token-misuse class LIN-570 fixed. Hover lifts
+   to full --fg so the affordance is still distinguishable from rest. */
 .prompt-proxy-toggle {
   background: none;
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--fg-dim);
   padding: var(--space-1) var(--space-2);
   font-family: var(--font-content);
   font-size: 0.8em;
-  color: var(--fg-vdim);
+  color: var(--fg-dim);
   cursor: pointer;
   border-radius: var(--radius-sm);
   margin-left: var(--space-1);
 }
 
 .prompt-proxy-toggle:hover {
-  border-color: var(--fg-dim);
-  color: var(--fg-dim);
+  border-color: var(--fg);
+  color: var(--fg);
 }
 
 /* LIN-525 #1: active look is driven by a single body attribute, not a per-button
