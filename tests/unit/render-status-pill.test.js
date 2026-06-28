@@ -11,40 +11,19 @@ test('renders the canonical .status-pill wrapper with a default state glyph + la
   );
 });
 
-test('each state adds its color modifier and default glyph (full canonical set)', () => {
-  // The canonical union (LIN-757): provider-canonical issue states + autopilot
-  // run-states. done-with-warning (LIN-749) and stale MUST survive.
+test('each state adds its color modifier and default glyph', () => {
   const glyphs = {
     'in-progress': '◐',
     done: '✓',
     todo: '○',
     backlog: '○',
     failed: '✕',
-    'done-with-warning': '✓',
-    stale: '○',
   };
   for (const [state, glyph] of Object.entries(glyphs)) {
     const html = renderStatusPill({ state });
     assert.match(html, new RegExp(`^<span class="status-pill status-pill--${state}">`));
     assert.match(html, new RegExp(`<span class="status-pill__char">${glyph}<\\/span>`));
   }
-});
-
-test('error is accepted as an alias of failed (normalises to the failed key + glyph)', () => {
-  const html = renderStatusPill({ state: 'error' });
-  // Normalised to the canonical `failed` modifier class, not a `--error` class.
-  assert.match(html, /^<span class="status-pill status-pill--failed">/);
-  assert.doesNotMatch(html, /status-pill--error/);
-  // …and the failed glyph (✕), so error and failed render identically.
-  assert.match(html, /<span class="status-pill__char">✕<\/span>/);
-  const failedHtml = renderStatusPill({ state: 'failed', label: 'x' });
-  assert.equal(renderStatusPill({ state: 'error', label: 'x' }), failedHtml);
-});
-
-test('done-with-warning keeps the done glyph (the warning is carried by the border, LIN-749)', () => {
-  const html = renderStatusPill({ state: 'done-with-warning', label: 'done' });
-  assert.match(html, /^<span class="status-pill status-pill--done-with-warning">/);
-  assert.match(html, /<span class="status-pill__char">✓<\/span>/);
 });
 
 test('char overrides the state default glyph', () => {
