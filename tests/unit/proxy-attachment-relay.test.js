@@ -119,7 +119,7 @@ afterEach(() => { globalThis.fetch = realFetch; });
 const md = (url) => encodeAttachmentHandle('md', url);
 
 describe('GET /api/proxy/attachments/:id — relay (md: path)', () => {
-  test('streams image bytes with upstream content-type on a valid md: handle', async () => {
+  test('streams image bytes as a neutral-typed forced download, never inline (LIN-774)', async () => {
     const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a]);
     let sawAuth = null;
     stubUpstream((url, opts) => {
@@ -128,9 +128,36 @@ describe('GET /api/proxy/attachments/:id — relay (md: path)', () => {
     });
     const res = await getAttachment(buildApp(), md(`${LINEAR_HOST}/abc/screenshot.png`));
     assert.equal(res.status, 200);
-    assert.match(res.contentType, /^image\/png/);
+    assert.match(res.contentType, /^application\/octet-stream/, 'neutral type, not the upstream image/*');
     assert.deepEqual(res.bodyBuf, png, 'streams the upstream bytes verbatim');
     assert.equal(sawAuth, 'Bearer ws-linear-token', 'fetches with the workspace access token');
+  });
+
+  // LIN-774 — the image branch must obey the same safe-download contract as the
+  // file branch: forced download + nosniff + neutral type, with no path serving
+  // the bytes inline. This is the header-level proof on the image path.
+  test('sets attachment + nosniff + neutral content-type on the image branch', async () => {
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+    const res = await fetchRaw(buildApp(), md(`${LINEAR_HOST}/abc/screenshot.png`),
+      () => fakeResponse({ contentType: 'image/png', bytes: png }));
+    assert.equal(res.status, 200);
+    assert.equal(res.headers['content-type'], 'application/octet-stream', 'neutral type, never inline image/*');
+    assert.match(res.headers['content-disposition'] || '', /^attachment;/, 'forced download');
+    assert.match(res.headers['content-disposition'] || '', /filename="screenshot\.png"/);
+    assert.equal(res.headers['x-content-type-options'], 'nosniff');
+  });
+
+  // The latent stored-XSS this slice closes: SVG passes the `image/*` admit-gate,
+  // so before LIN-774 it was relayed inline as image/svg+xml (active markup). It
+  // must now be forced to download as neutral bytes — never served inline.
+  test('never serves an SVG inline — forces download as neutral bytes (LIN-774)', async () => {
+    const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
+    const res = await fetchRaw(buildApp(), md(`${LINEAR_HOST}/abc/evil.svg`),
+      () => fakeResponse({ contentType: 'image/svg+xml', bytes: svg }));
+    assert.equal(res.status, 200);
+    assert.equal(res.headers['content-type'], 'application/octet-stream', 'must NOT be image/svg+xml');
+    assert.match(res.headers['content-disposition'] || '', /^attachment;/, 'must be forced to download, never inline');
+    assert.equal(res.headers['x-content-type-options'], 'nosniff');
   });
 
   test('rejects an upstream non-image content-type on an image (no name hint) handle', async () => {
@@ -165,7 +192,7 @@ describe('GET /api/proxy/attachments/:id — relay (md: path)', () => {
 const mdFile = (url, name) => md(`${url}#name=${encodeURIComponent(name)}`);
 
 describe('GET /api/proxy/attachments/:id — non-image file relay (LIN-750)', () => {
-  test('serves a text/markdown file typed from the name hint, even when upstream is octet-stream', async () => {
+  test('admits an allowlisted file (.md) and streams its bytes verbatim, fragment stripped', async () => {
     const body = Buffer.from('# Theme design\n\nbody');
     let fetchedUrl = null;
     stubUpstream((url) => {
@@ -177,16 +204,16 @@ describe('GET /api/proxy/attachments/:id — non-image file relay (LIN-750)', ()
       mdFile(`${LINEAR_HOST}/a/b/c`, 'theme-design.md')
     );
     assert.equal(res.status, 200);
-    assert.match(res.contentType, /^text\/markdown/, 'typed from filename hint, not upstream octet-stream');
+    assert.match(res.contentType, /^application\/octet-stream/, 'neutral type for all relayed bytes (LIN-774), never a typed text/*');
     assert.deepEqual(res.bodyBuf, body, 'streams the bytes verbatim');
     assert.equal(fetchedUrl, `${LINEAR_HOST}/a/b/c`, 'the #name= fragment is stripped before egress');
   });
 
-  test('sets Content-Disposition: attachment + nosniff on a file relay', async () => {
+  test('sets neutral content-type + Content-Disposition: attachment + nosniff on a file relay', async () => {
     const res = await fetchRaw(buildApp(), mdFile(`${LINEAR_HOST}/x/y`, 'AgentRuns.jsx'),
       () => fakeResponse({ contentType: 'application/octet-stream', bytes: Buffer.from('export default 1') }));
     assert.equal(res.status, 200);
-    assert.match(res.headers['content-type'] || '', /^text\/plain/, 'source served as text/plain');
+    assert.equal(res.headers['content-type'], 'application/octet-stream', 'neutral type, never a sniffable text/*');
     assert.match(res.headers['content-disposition'] || '', /attachment; filename="AgentRuns\.jsx"/);
     assert.equal(res.headers['x-content-type-options'], 'nosniff');
   });

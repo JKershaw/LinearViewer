@@ -1714,15 +1714,24 @@ One convention across every endpoint, so you can branch on the same fields every
   // `decodeAttachmentHandle`, SSRF-guarded against the host allowlist
   // (mirrors the LIN-156 `/api/image` guard model: https-only, exact-host
   // allowlist, no path traversal, no redirects, 10 MB cap), then fetched through
-  // the proxy-aware egress path. Two media classes are served (LIN-750):
-  //   - images: typed from the upstream `image/*` content-type (original path);
-  //   - non-image text/source files: typed from the `#name=<filename>` hint the
+  // the proxy-aware egress path. Two media classes are accepted (LIN-750):
+  //   - images: recognised by the upstream `image/*` content-type;
+  //   - non-image text/source files: recognised by the `#name=<filename>` hint the
   //     discovery layer encoded in the handle (upload URLs are extension-less and
   //     upstream often serves octet-stream, so the hint is authoritative), gated
-  //     to a small allowlist (`relayContentTypeFromName`) and served with
-  //     `Content-Disposition: attachment` + `nosniff`.
+  //     to a small allowlist (`relayContentTypeFromName`).
   // A content-type that is neither an allowlisted file nor an image is rejected
   // cleanly (never a 500).
+  //
+  // SAFE-DOWNLOAD CONTRACT (LIN-774): regardless of class, EVERY relayed byte is
+  // served as a forced download — `Content-Disposition: attachment` +
+  // `X-Content-Type-Options: nosniff` with a neutral `application/octet-stream`
+  // content-type. The relay never preserves the upstream content-type and never
+  // serves anything inline, so `image/svg+xml` (which would otherwise sniff/render
+  // as active markup) cannot become a stored-XSS vector. The security boundary is
+  // the host-allowlist + size cap + this download-coercion — NOT a per-extension
+  // type-allowlist (the file-extension gate above is an access filter, not the
+  // thing standing between bytes and inline execution).
   //
   // `att:` formal-attachment handles are NOT byte-resolvable in this slice — the
   // wire dropped their URL and there is no provider fetch seam yet — so they get
@@ -1853,17 +1862,17 @@ One convention across every endpoint, so you can branch on the same fields every
         return jsonError(res, 413, 'Attachment too large');
       }
 
-      if (isFileRelay) {
-        res.set('Content-Type', typedFromHint);
-        // Force download + block content-sniffing: we serve uploaded source as
-        // text/plain, so the consumer (or a browser) must not sniff it back into
-        // an executable/renderable type.
-        const safeName = nameHint.replace(/[^\w.\- ]/g, '_');
-        res.set('Content-Disposition', `attachment; filename="${safeName}"`);
-        res.set('X-Content-Type-Options', 'nosniff');
-      } else {
-        res.set('Content-Type', upstreamType);
-      }
+      // Safe-download contract for ALL relayed bytes (LIN-774). Force download
+      // with a neutral content-type + nosniff so nothing — most dangerously
+      // `image/svg+xml` — can be sniffed back into a renderable/executable type or
+      // served inline. We deliberately do NOT preserve the upstream content-type
+      // (image or file): the upstream `image/*`/file class is used only to admit
+      // the bytes (the gate above), never to type the response.
+      const rawName = nameHint || urlObj.pathname.split('/').pop() || 'attachment';
+      const safeName = rawName.replace(/[^\w.\- ]/g, '_') || 'attachment';
+      res.set('Content-Type', 'application/octet-stream');
+      res.set('Content-Disposition', `attachment; filename="${safeName}"`);
+      res.set('X-Content-Type-Options', 'nosniff');
       res.set('Cache-Control', 'private, max-age=3600');
       logEvent(req, endpoint, 200);
       res.send(Buffer.from(arrayBuffer));
