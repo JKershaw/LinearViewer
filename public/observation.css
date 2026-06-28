@@ -153,11 +153,13 @@
   color: var(--fg-dim);
   white-space: nowrap;
 }
-/* The per-status colour/border rules (in-progress / done / done-with-warning /
-   error / stale) moved to the canonical status contract in style.css (LIN-757),
-   where .obs-pill[data-status=…] is grouped with .status-pill--… so the two
-   pills share one declaration block. This base rule keeps obs-pill's geometry;
-   repointing the markup to .status-pill is LIN-759. */
+.obs-pill[data-status="in-progress"] { color: var(--yellow); border-color: var(--yellow); }
+.obs-pill[data-status="done"] { color: var(--green); border-color: var(--green); }
+/* done-with-warning (LIN-749): green text (it IS done) over a yellow warning
+   border, so the pill reads as success-with-a-caveat at a glance. */
+.obs-pill[data-status="done-with-warning"] { color: var(--green); border-color: var(--yellow); }
+.obs-pill[data-status="error"] { color: var(--red); border-color: var(--red); }
+.obs-pill[data-status="stale"] { color: var(--fg-dim); border-color: var(--border-strong); }
 
 .obs-session-name {
   font-weight: 600;
@@ -243,11 +245,11 @@
   border-radius: 2px;
   background: var(--fg-vdim);
 }
-/* The per-state segment colours (complete / error / running / waiting / queued)
-   moved to the canonical SegmentBar contract in style.css (LIN-757), grouped
-   with .segment[data-state=…]. This base rule keeps obs-seg's geometry; the
-   live pulse stays here as obs-specific. Repointing markup to .segment is
-   LIN-759. */
+.obs-seg[data-state="complete"] { background: var(--green); }
+.obs-seg[data-state="error"] { background: var(--red); }
+.obs-seg[data-state="running"],
+.obs-seg[data-state="waiting"] { background: var(--yellow); }
+.obs-seg[data-state="queued"] { background: var(--fg-mid); }
 
 .obs-seg[data-live="1"] { animation: obs-pulse 1.3s ease-in-out infinite; }
 
@@ -255,8 +257,7 @@
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }
 }
-/* obs-seg's pulse is also covered by the global prefers-reduced-motion block in
-   style.css (LIN-757); this scoped reset is kept as a belt-and-braces no-op. */
+
 @media (prefers-reduced-motion: reduce) {
   .obs-seg[data-live="1"] { animation: none; }
 }

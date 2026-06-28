@@ -164,13 +164,6 @@
   font-family: var(--font-structural);
   font-size: 0.85rem;
   min-width: 5ch;
-  /* 40px minimum touch target (LIN-757 a11y baseline); the global
-     :focus-visible ring (style.css) covers keyboard focus, fixing the inherited
-     debt on the theme toggle's aria-pressed submit buttons. */
-  min-height: 40px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   padding: 0.2rem 0.6rem;
   border: 1px solid var(--fg-vdim);
   border-radius: var(--radius-sm);
