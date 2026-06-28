@@ -513,7 +513,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       }
 
       // Fetch issue context from Linear
-      const { issue, parent, siblings, project, children, comments } = await getProviderForWorkspace(workspace).fetchIssueContext(getWorkspaceCallScope(workspace), issueId)
+      const { issue, parent, siblings, project, children, comments, attachments } = await getProviderForWorkspace(workspace).fetchIssueContext(getWorkspaceCallScope(workspace), issueId)
 
       // Generate the prompt
       let result;
@@ -523,9 +523,14 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         if (!customPromptDef) {
           return notFound.json(res, 'Custom prompt not found');
         }
+        // NOTE: generateCustomPrompt renders no Attachments section (variable
+        // substitution only) — passing `attachments` would be a no-op, so it's left
+        // out here; that's a separate pre-existing gap, not part of LIN-776.
         result = generateCustomPrompt(customPromptDef, issue, { parent, siblings, project, children, comments }, getFeatureFlags(req.session), providerUi);
       } else {
-        result = generatePrompt(labelName, issue, { parent, siblings, project, children, comments }, getFeatureFlags(req.session), providerUi);
+        // Forward `attachments` (LIN-776) so the in-app /prompt endpoint surfaces the
+        // worker-facing Attachments section, matching the proxy /prompt route.
+        result = generatePrompt(labelName, issue, { parent, siblings, project, children, comments, attachments }, getFeatureFlags(req.session), providerUi);
       }
 
       if (!result) {

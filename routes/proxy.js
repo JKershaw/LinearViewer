@@ -38,7 +38,7 @@ import {
 import { localProvider } from '../lib/providers/local/index.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { applyTrashedSignal, isTrashed } from '../lib/trashed-signal.js';
-import { flattenIssue, neutralizeProject, flattenCycle, flattenRelations, decodeAttachmentHandle, relayContentTypeFromName, GITHUB_UPLOAD_HOSTS } from '../lib/proxy-wire.js';
+import { flattenIssue, neutralizeProject, flattenCycle, flattenRelations, decodeAttachmentHandle, relayContentTypeFromName, GITHUB_UPLOAD_HOSTS, collectIssueAttachments } from '../lib/proxy-wire.js';
 import { createProxyFetch } from '../lib/proxy-fetch.js';
 import { isRecommendationEnabled, getRecommendation } from '../lib/openrouter.js';
 import { resolveRecommendation, describeDescent, armHopSignal } from '../lib/recommend-recurse.js';
@@ -133,7 +133,16 @@ async function resolvePromptIssueContext(accessToken, identifier, isTestMode) {
       children: mockData.issues.filter(i => i.parent?.id === mockIssue.id).map(i => ({
         id: i.id, identifier: i.identifier, title: i.title, state: i.state
       })),
-      comments: []
+      comments: [],
+      // Mirror production: fetchIssueContext carries top-level `attachments`
+      // (LIN-772) via the shared collector, so the test-mode mock must too — else
+      // a route-level test of the /prompt + verb-override paths can't observe the
+      // Attachments section the LIN-776 fix restores. Fixture TEST-1 carries a
+      // formal attachment node, so no new fixture is needed.
+      attachments: collectIssueAttachments({
+        description: mockIssue.description || '',
+        formalAttachmentNodes: mockIssue.attachments
+      })
     };
   }
   return await withTimeout(fetchIssueContext(accessToken, identifier), GRAPHQL_TIMEOUT_MS);
@@ -2660,10 +2669,13 @@ One convention across every endpoint, so you can branch on the same fields every
         logEvent(req, '/api/proxy/prompt', 404);
         return notFound.json(res, 'Issue not found');
       }
-      const { issue, parent, siblings, project, children, comments } = ctx;
+      const { issue, parent, siblings, project, children, comments, attachments } = ctx;
 
-      // Generate the prompt
-      const result = generatePrompt(templateKey, issue, { parent, siblings, project, children, comments }, {});
+      // Generate the prompt. Forward `attachments` so generatePrompt's
+      // formatAttachmentsSection post-pass surfaces the worker-facing Attachments
+      // section (LIN-776) — fetchIssueContext now carries it at top-level (LIN-772),
+      // and dropping it here is what silently hid the section on this route.
+      const result = generatePrompt(templateKey, issue, { parent, siblings, project, children, comments, attachments }, {});
 
       if (!result) {
         logEvent(req, '/api/proxy/prompt', 500);
@@ -4172,8 +4184,13 @@ One convention across every endpoint, so you can branch on the same fields every
           return notFound.json(res, 'Issue not found');
         }
 
-        const { issue, parent, siblings, project, children, comments } = ctx;
-        const generated = generatePrompt(kind, issue, { parent, siblings, project, children, comments }, {});
+        const { issue, parent, siblings, project, children, comments, attachments } = ctx;
+        // Forward `attachments` (LIN-776): the verb-override dispatch path must
+        // surface the same Attachments section as the LLM recommend-and-dispatch
+        // path, which already passes the full context. Keep `{}` for provider.ui —
+        // the Attachments section emits no "Linear" literal, so Linear output stays
+        // byte-identical.
+        const generated = generatePrompt(kind, issue, { parent, siblings, project, children, comments, attachments }, {});
         if (!generated) {
           logEvent(req, '/api/proxy/recommend-and-dispatch', 500);
           return jsonError(res, 500, 'Failed to generate prompt');
