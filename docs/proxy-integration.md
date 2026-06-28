@@ -801,7 +801,7 @@ Returns the **Autopilot kickoff** as **plain text** (`text/plain`) — the brief
 
 | Query param | Default | Description |
 |-------------|---------|-------------|
-| `mode` | `write` | `write` allows implementation/review kinds and an evidence-gated merge; `readonly` restricts dispatched work to investigation/research/planning/retro (no code, PRs, or issue writes). |
+| `mode` | `write` | `write` allows implementation/review/close-out kinds and an evidence-gated merge (review writes the ledger and authorizes; `close-out` discharges it and merges); `readonly` restricts dispatched work to investigation/research/planning/retro (no code, PRs, or issue writes). |
 | `goal` | _(none)_ | Optional free-text focus for the run. Omitted ⇒ walk the stack under the precedence policy. |
 
 The body embeds `YOUR_TOKEN` as a placeholder; substitute the consumer's `readWrite` token (Autopilot reuses it for the prompts it dispatches). A read-scope token can fetch the kickoff, but running it needs `readWrite` (Autopilot dispatches). The general (stack-walk) kickoff is what this endpoint serves; the in-app per-task variant ("run on autopilot until this task is done") is generated at `/workspace/:urlKey/api/autopilot-prompt/:issueId`.
@@ -819,7 +819,7 @@ Requires a `readWrite` scoped token. Builds the kickoff **and dispatches it** in
 | Body field | Default | Description |
 |------------|---------|-------------|
 | `goal` | _(none)_ | Free-text focus for a **general** run. Ignored when `issueIdentifier` is set. |
-| `mode` | `write` | `write` (implementation/review + evidence-gated merge) or `readonly` (investigation only). |
+| `mode` | `write` | `write` (implementation/review/close-out + evidence-gated merge) or `readonly` (investigation only). |
 | `issueIdentifier` | _(none)_ | Present ⇒ **scoped** run ("autopilot until THIS task is done"); the issue title is named in the goal line and the project `repo=` is inherited. Absent ⇒ general stack-walk run. |
 | `target` | `cli` | Dispatch target (`cli`/`web`/`dash`; `local`/Harbour OS is not available to proxy consumers). |
 | `repo` | _(resolved)_ | Target repo. For a scoped run, defaults to the project's `repo=`; an explicit value wins. |
@@ -1199,7 +1199,7 @@ Runs `/recommend` and forwards the recommended prompt straight into a dispatch �
 When `kind` is present the verb:
 - **bypasses the LLM** recommendation and descent entirely (no OpenRouter call, no free-tier charge);
 - generates the body for the **named issue with no descent** (the wobble is the verb, not the target);
-- accepts only real prompt-template keys — `plan`, `implementation`, `review`, `research`, `design`, `breakdown`, `look-into`, `triage`, `scoping`, `spike`, `context`, `retro`, `blocked`. Meta-kinds (`defer`, `custom`, `autopilot`, `periodical`) and any unknown key are rejected with `400`, because they have no template body and would dispatch an empty prompt;
+- accepts only real prompt-template keys — `plan`, `implementation`, `review`, `close-out`, `research`, `design`, `breakdown`, `look-into`, `triage`, `scoping`, `spike`, `context`, `retro`, `blocked`. Meta-kinds (`defer`, `custom`, `autopilot`, `periodical`) and any unknown key are rejected with `400`, because they have no template body and would dispatch an empty prompt;
 - returns the same headers-only response plus `"override": true`.
 
 Use it **sparingly and only on a demonstrable engine miss** — each override is recorded so the recommendation heuristic can be improved. It is not the everyday path; the LLM-driven verb (no `kind`) remains the default. The caller still never supplies prompt text — only the verb key.
