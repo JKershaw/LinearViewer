@@ -11,13 +11,17 @@ LinearViewer LIN-385/389/428) are curated real text, re-frozen at key in-progres
 (LIN-596) — each node keeps its first `keep` comments so `state` and the trimmed trail
 agree. Graded leaf-only targets re-use one real leaf at several decision moments to cover a
 spread of next-actions. Synthetic FIX-448-leaf is deliberately constructed (see its note).
+The synthetic `closeout-review.json` fixtures (LIN-812) cover the close-out/review routing
+gate — the positive/negative pair of one Step-0/Step-3 decision (LIN-550 split, LIN-810,
+LIN-811): an Approve verdict on record + unmerged → `close-out`; work that looks done with
+no review-verdict comment → `review`. Previously `close-out` was un-eval'ed (LIN-804).
 Regenerate from the committed `_source/` captures with `scripts/eval/build-recommend-fixtures.mjs`.
 
 **Scored (LIN-596):** each target carries `expect` (acceptable terminal action[s]) +
 `descentExpect` (terminal id the descent should reach). The harness grades deterministically
 (no LLM judge) and emits **terminal-action accuracy** + **descent-correct rate**.
 
-**Latest baseline:** `scripts/eval/recommend-baseline/2026-06-22/`
+**Latest baseline:** `scripts/eval/recommend-baseline/2026-06-29/`
 - `table.md` — scored summary + per-run capture (descent path / terminal / action / grade)
 - `run.json` — full capture incl. every prompt + reasoning + the scored summary
 
