@@ -82,6 +82,7 @@ import { renderShipPage } from './lib/render-ship.js'
 import { createPipelineRoutes } from './routes/pipeline.js'
 import { createCollectiveRoutes } from './routes/collective.js'
 import { createDashboardRoutes, sessionIsTerminal } from './routes/dashboard.js'
+import { createSessionsFeedCache } from './lib/sessions-feed-cache.js'
 import { fetchIssueContext } from './lib/linear.js'
 import { createTaskChatRoutes } from './routes/task-chat.js'
 import { createNextRunRoutes } from './routes/next-run.js'
@@ -273,6 +274,11 @@ const observationMaterializer = createObservationMaterializer({
   agentStatusStore,
   observationSessionsStore
 })
+// Shared Observation sessions-feed cache (LIN-617). One process-wide instance,
+// passed to BOTH the dashboard router (which reads it on the /sessions path) and
+// the test router (which exposes a /test/clear-* invalidation seam), so the E2E
+// reset can drop the cached feed and not race a stale pre-seed payload (LIN-799).
+const sessionsFeedCache = createSessionsFeedCache()
 // Fire-and-forget recompute on every feed-relevant dispatch/status write.
 dispatchQueueStore.onWrite = ({ urlKey, sessionId, issueIdentifier }) =>
   observationMaterializer.rebuildForWrite(urlKey, { sessionId, issueIdentifier })
@@ -445,7 +451,7 @@ app.use(session({
 // Test Mode Setup
 // =============================================================================
 if (process.env.NODE_ENV === 'test') {
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, taskSnapshotStore, localStore, getWorkspaceAccessToken }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, taskSnapshotStore, localStore, getWorkspaceAccessToken }))
 }
 
 // =============================================================================
@@ -1246,7 +1252,7 @@ app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyToke
 // Mount dashboard routes (experimental combined realtime autopilot dashboard — LIN-509).
 // Merges Mongo-only Loop reads across session.workspaces; Linear is hydrated lazily
 // (drill-down only), never fanned out per poll.
-app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, runSummaryCacheStore, sessionSummaryCacheStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo }))
+app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, runSummaryCacheStore, sessionSummaryCacheStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo }))
 
 // Mount task-chat routes (experimental "talk to a task" conversation).
 app.use(createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo }))
