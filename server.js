@@ -48,6 +48,7 @@ import './lib/providers/github/index.js' // side effect: self-registers the GitH
 import './lib/providers/github-projects/index.js' // side effect: self-registers the GitHub Projects v2 provider (LIN-560)
 import { LocalStore } from './lib/local-store.js'
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID, PERIODICALS_PROJECT_ID } from './lib/tree.js'
+import { isHiddenState } from './lib/providers/state-map.js'
 import { buildPeriodicalNodes } from './lib/periodicals.js'
 import { parseRepoFromDescription } from './lib/prompt-formatters.js'
 import { renderPage, renderErrorPage, renderUpstreamAwareErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
@@ -147,7 +148,9 @@ function getDeployInfo() {
 // Pre-render static content for unauthenticated users from content/landing.md.
 // This is parsed once at startup to avoid re-parsing on every request.
 const landingData = parseLandingPage('./content/landing.md')
-const landingForest = buildForest(landingData.issues)
+// LIN-769: same cancelled-hiding as the live dashboard, applied to the static
+// preview so the two surfaces stay consistent.
+const landingForest = buildForest(landingData.issues.filter(issue => !isHiddenState(issue)))
 const landingTrees = landingData.projects
   .sort((a, b) => a.sortOrder - b.sortOrder)
   .map(project => {
@@ -698,7 +701,13 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
   // `testMockData.projects` const — mutating it in place leaks a duplicate
   // Periodicals/No-Project entry into every later request (LIN-345).
   let projects = [...mergedProjects];
-  const issues = mergedIssues;
+  // LIN-769: hide cancelled issues from the dashboard entirely, mirroring how
+  // trashed issues never enter the rendered list (they are excluded from Linear
+  // collections; cancelled ones are not, so we drop them here). Filtering at this
+  // single pre-forest seam hides them from the project tree, the in-progress
+  // ancestor context, and the recent-activity feed at once — without touching the
+  // shared terminal/glyph helpers, so completed (✓) and duplicate stay visible.
+  const issues = mergedIssues.filter(issue => !isHiddenState(issue));
 
   // Build issue tree structure (parent-child relationships)
   const forest = buildForest(issues);
