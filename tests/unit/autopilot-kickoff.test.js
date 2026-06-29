@@ -5,7 +5,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT } from '../../lib/prompts/autopilot-kickoff.js';
+import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../../lib/prompts/autopilot-kickoff.js';
 
 const BASE_URL = 'https://example.com';
 
@@ -160,5 +160,81 @@ describe('buildAutopilotKickoff (read-only mode)', () => {
 
   test('AUTOPILOT_MODES enumerates the supported modes', () => {
     assert.deepStrictEqual(AUTOPILOT_MODES, ['write', 'readonly']);
+  });
+});
+
+describe('buildAutopilotKickoff (variant axis, LIN-791)', () => {
+  // The kickoff body is composed as sections joined by this exact separator;
+  // the stepper variant inserts ONE extra section, so splitting on it lets us
+  // prove the insertion is purely additive (the standard sections are untouched).
+  const SEP = '\n\n---\n\n';
+  const STEPPER_MARKER = "You're running as the STEPPER";
+
+  test('AUTOPILOT_VARIANTS enumerates the variants; default is standard', () => {
+    assert.deepStrictEqual(AUTOPILOT_VARIANTS, ['standard', 'stepper']);
+    assert.strictEqual(AUTOPILOT_VARIANT_DEFAULT, 'standard');
+  });
+
+  test("omitting variant === variant:'standard' (byte-identical default path)", () => {
+    // Pin the default so the standard path can never silently drift onto the
+    // stepper branch. Covers the general, scoped, and readonly permutations.
+    const cases = [
+      { baseUrl: BASE_URL },
+      { baseUrl: BASE_URL, goal: 'ship the thing' },
+      { baseUrl: BASE_URL, mode: 'readonly' },
+      { baseUrl: BASE_URL, issue: { identifier: 'LIN-42', title: 'Do work' } },
+    ];
+    for (const c of cases) {
+      assert.strictEqual(
+        buildAutopilotKickoff(c),
+        buildAutopilotKickoff({ ...c, variant: 'standard' }),
+        `default must equal explicit standard for ${JSON.stringify(c)}`
+      );
+    }
+  });
+
+  test('standard output carries NO stepper disposition markers', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, variant: 'standard' });
+    assert.ok(!text.includes(STEPPER_MARKER));
+    assert.ok(!text.includes('beat N/M'));
+    assert.ok(!text.includes('followUpTo: ROOT'));
+  });
+
+  test('stepper inserts exactly one additive section — the standard sections stay byte-identical', () => {
+    const standard = buildAutopilotKickoff({ baseUrl: BASE_URL, variant: 'standard' });
+    const stepper = buildAutopilotKickoff({ baseUrl: BASE_URL, variant: 'stepper' });
+
+    const stdSections = standard.split(SEP);
+    const stepSections = stepper.split(SEP);
+    // stepper adds exactly one section.
+    assert.strictEqual(stepSections.length, stdSections.length + 1);
+    // and the added one is the stepper disposition.
+    const added = stepSections.filter(s => s.includes(STEPPER_MARKER));
+    assert.strictEqual(added.length, 1);
+    // Removing the stepper section reconstitutes the standard kickoff EXACTLY —
+    // proves the intro/manual/guide/snapshot are untouched by the variant.
+    const withoutStepper = stepSections.filter(s => !s.includes(STEPPER_MARKER)).join(SEP);
+    assert.strictEqual(withoutStepper, standard);
+  });
+
+  test('stepper output carries the full disposition (warm beats, ROOT, force, labels, keep-alive, challenge, wrap-up)', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, variant: 'stepper' });
+    assert.ok(text.includes(STEPPER_MARKER));
+    assert.ok(text.includes('3–6'));                 // decompose into 3–6 beats
+    assert.ok(text.includes('ROOT'));                // beat 1 fresh, captured as ROOT
+    assert.ok(text.includes('followUpTo: ROOT'));    // later beats anchor on ROOT
+    assert.ok(text.includes('force: true'));         // force on every resume
+    assert.ok(text.includes('beat N/M'));            // label every send
+    assert.ok(text.includes('run_in_background'));   // long-poll keep-alive
+    assert.ok(text.includes('PENDING'));             // mid-chain PENDING = clean advance
+    assert.ok(text.toLowerCase().includes('challenge'));
+    assert.ok(text.toLowerCase().includes('wrap-up'));
+    assert.ok(/warm/i.test(text));                   // warm single-session default
+  });
+
+  test('variant is orthogonal to mode — stepper composes with readonly', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, mode: 'readonly', variant: 'stepper' });
+    assert.ok(text.includes('READ-ONLY'));
+    assert.ok(text.includes(STEPPER_MARKER));
   });
 });
