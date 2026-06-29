@@ -104,20 +104,39 @@ export function localDashboardUrl(urlKey = LOCAL_WORKSPACE_URL_KEY) {
  * workspace. Defaults to `LOCAL_WORKSPACE_URL_KEY` for un-swept callers, leaving
  * their seed byte-identical to the previous constant.
  */
+/**
+ * Namespace a seed document id by its workspace scope (LIN-800).
+ *
+ * The LocalStore is one collection partitioned by `scope` (urlKey), but a
+ * collection enforces a single globally-unique `_id` (createIssue/createProject
+ * upsert by `{_id}` alone — fine in production where ids are UUIDs). The shared
+ * `defaultLocalSeed` reused the SAME hardcoded ids (`local-issue-1`, …) for every
+ * scope, so two parallel workers seeding concurrently clobbered each other's doc
+ * `scope` via the `{_id}` upsert — the victim's `getIssue(scope, id)` then missed
+ * with `Issue not found`. Prefixing the seed's `_id`s by the per-worker urlKey
+ * makes them globally unique, so parallel seeds can't collide. The human-facing
+ * `identifier` (LOCAL-1) is NOT namespaced — it isn't the colliding field and is
+ * what specs/the proxy resolve against (getIssue falls back to identifier).
+ */
+export function localSeedId(urlKey, rawId) {
+  return `${urlKey}--${rawId}`;
+}
+
 export function defaultLocalSeed(urlKey = LOCAL_WORKSPACE_URL_KEY) {
+  const id = (rawId) => localSeedId(urlKey, rawId);
   return {
     projects: [
-      { id: 'local-proj-1', name: 'Local Project', content: 'A local backend project', sortOrder: 1 },
-      { id: 'local-proj-2', name: 'Local Beta', content: 'A second local project', sortOrder: 2 },
+      { id: id('local-proj-1'), name: 'Local Project', content: 'A local backend project', sortOrder: 1 },
+      { id: id('local-proj-2'), name: 'Local Beta', content: 'A second local project', sortOrder: 2 },
     ],
     issues: [
-      { id: 'local-issue-1', identifier: 'LOCAL-1', title: 'Local parent task', description: 'Seeded parent', projectId: 'local-proj-1', sortOrder: 1, state: { name: 'In Progress', type: 'started' }, labels: ['local-label'], url: `/workspace/${urlKey}/issue/local-issue-1`, comments: [
+      { id: id('local-issue-1'), identifier: 'LOCAL-1', title: 'Local parent task', description: 'Seeded parent', projectId: id('local-proj-1'), sortOrder: 1, state: { name: 'In Progress', type: 'started' }, labels: ['local-label'], url: `/workspace/${urlKey}/issue/${id('local-issue-1')}`, comments: [
         { id: 'local-comment-1', body: 'This is a test comment with **markdown**.', createdAt: '2024-01-15T10:00:00Z', user: 'Alice' },
         { id: 'local-comment-2', body: 'Second comment with `code`.', createdAt: '2024-01-16T14:30:00Z', user: 'Bob' },
       ] },
-      { id: 'local-issue-2', identifier: 'LOCAL-2', title: 'Local child task', description: 'Seeded child', projectId: 'local-proj-1', parentId: 'local-issue-1', sortOrder: 2, state: { name: 'Todo', type: 'unstarted' }, url: `/workspace/${urlKey}/issue/local-issue-2` },
-      { id: 'local-issue-3', identifier: 'LOCAL-3', title: 'Local done task', description: 'Seeded done', projectId: 'local-proj-1', sortOrder: 3, state: { name: 'Done', type: 'completed' }, completedAt: '2024-01-10T00:00:00Z', url: `/workspace/${urlKey}/issue/local-issue-3` },
-      { id: 'local-issue-4', identifier: 'LOCAL-4', title: 'Second project task', description: 'Seeded second-project task', projectId: 'local-proj-2', sortOrder: 1, state: { name: 'In Progress', type: 'started' }, url: `/workspace/${urlKey}/issue/local-issue-4` },
+      { id: id('local-issue-2'), identifier: 'LOCAL-2', title: 'Local child task', description: 'Seeded child', projectId: id('local-proj-1'), parentId: id('local-issue-1'), sortOrder: 2, state: { name: 'Todo', type: 'unstarted' }, url: `/workspace/${urlKey}/issue/${id('local-issue-2')}` },
+      { id: id('local-issue-3'), identifier: 'LOCAL-3', title: 'Local done task', description: 'Seeded done', projectId: id('local-proj-1'), sortOrder: 3, state: { name: 'Done', type: 'completed' }, completedAt: '2024-01-10T00:00:00Z', url: `/workspace/${urlKey}/issue/${id('local-issue-3')}` },
+      { id: id('local-issue-4'), identifier: 'LOCAL-4', title: 'Second project task', description: 'Seeded second-project task', projectId: id('local-proj-2'), sortOrder: 1, state: { name: 'In Progress', type: 'started' }, url: `/workspace/${urlKey}/issue/${id('local-issue-4')}` },
     ],
   };
 }

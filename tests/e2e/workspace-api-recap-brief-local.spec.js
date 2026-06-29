@@ -18,8 +18,10 @@
 import { test, expect } from '../fixtures/test-base.js';
 
 // Seeded parent task carrying two comments (Alice, Bob) + a description — exists
-// only in defaultLocalSeed, so a recap/brief for it is provider-sourced.
-const ISSUE_ID = 'local-issue-1';
+// only in defaultLocalSeed, so a recap/brief for it is provider-sourced. Addressed
+// by the human-facing identifier (resolved via getIssue's identifier fallback)
+// rather than the raw _id, which is now namespaced per scope (LIN-800).
+const ISSUE_ID = 'LOCAL-1';
 
 test.describe('Recap API — local provider session (LIN-388)', () => {
   test.beforeEach(async ({ page, seedLocal }) => {
