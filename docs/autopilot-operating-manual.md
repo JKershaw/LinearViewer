@@ -212,6 +212,33 @@ disposition, keep the option alive, without depending on a mechanism that doesn'
 doubt, the same instinct as everywhere else: closing forecloses and leaving-open is cheap, so leave it
 open.
 
+### Holding a worker vs. freeing a producer
+
+One dial sits *upstream* of all of that — set before a session even starts. Whether a dispatched session
+*holds open* at completion is a choice you make at dispatch time, by the role you're launching — because
+you know which it is and the session doesn't. It's a dispatch flag, `waitForFollowUps` (default `false`),
+not something you say to the worker, so it doesn't touch the can't-coach rule. (Holding here means
+*blocking at completion to be fed* — a different axis from leaving a finished window open above; a held
+session hasn't finalized yet, an open one has.)
+
+- **A worker** — a session you intend to keep feeding beats — dispatch **with** `waitForFollowUps:true`.
+  At completion it holds the session open and takes the next beat in-session, so a continuing task keeps
+  its context instead of paying to rebuild it cold each beat.
+- **An orchestrator or sub-orchestrator** — a *producer* that drives its own loop — dispatch **without**
+  the flag (the default). A producer must finalize normally — reach a terminal *completion*, the honest
+  end-state the section above then leaves open — and stay free to run its watch. Holding one open is the
+  trap: a held producer sits *non-terminal*, and if it's waiting on a follow-up to itself while its
+  worker waits to be fed, neither is terminal, no watch fires, and the run quietly deadlocks. Left
+  unflagged, a producer that stalls instead **completes** — goes terminal — and its driver can resume it.
+  A visible, recoverable stop beats an invisible freeze.
+
+This leans on the dispatch watch you already poll. A held worker only stays healthy if its next beat
+arrives **inside its hold budget** — the long-poll on the watch is what delivers beats fast enough to
+keep a flagged worker fed before the hold lapses. An unflagged producer makes no such bet: it relies on
+the ordinary async-wait/watch path, which is exactly why it must keep a poll in flight rather than
+blocking. So the rule pairs with the loop: **flag the fed, free the feeder, and keep the watch live for
+both.**
+
 ## The human's edge, and how to hand back
 
 Some moments are the human's, and there your job is to hand over cleanly. What's theirs: anything about
