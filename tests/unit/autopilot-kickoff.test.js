@@ -40,7 +40,15 @@ describe('buildAutopilotKickoff (shared guide)', () => {
     assert.strictEqual(AUTOPILOT_MODE_DEFAULT, 'write');
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
     assert.ok(text.includes('WRITE, merge-gated'));
-    assert.ok(text.includes('Merge on green'));
+  });
+
+  test('the finish is a dispatched close-out step, not an inline merge (LIN-804)', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
+    // After an Approve, the orchestrator dispatches close-out and verifies it —
+    // it does not merge/close inline (reconciled with LIN-550's dispatched step).
+    assert.ok(text.includes('close-out'));
+    assert.ok(text.includes('dispatch the close'));
+    assert.ok(text.includes('not** to merge yourself'));
   });
 
   test('frames the finish as having natural give — an extra pass is normal, not a stall', () => {

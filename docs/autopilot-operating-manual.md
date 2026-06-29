@@ -258,6 +258,19 @@ range freely — mistakes are cheap. Near a merge, a Done, or anything downstrea
 that's where one verification before something lands is worth the pause. Keep the irreversible
 decisions yours, earned by evidence — never let the worker certify its own finish line.
 
+And the irreversible finish itself — the merge, the Done, the summary, the follow-ups — is no longer
+something you reach down and do by hand. It's a **dispatched step of its own**. `review` only
+*authorizes* the close: it issues a verdict and writes a ledger of what CI didn't prove, but never
+merges or marks the task done. A separate **`close-out`** worker performs it, discharging or explicitly
+accepting each ledger item before it merges and sets Done. So when a review lands an Approve (or a
+conditional Approve) on work that's still unmerged, your move is the same as anywhere else —
+**dispatch the next step and verify it landed**, not drop down and close it yourself: re-recommend the
+task (the engine routes you to `close-out`), then confirm the close really happened — PR merged, CI
+green on the exact commit, task Done — the way you'd cross-check any step. A conditional Approve is the
+ledger gate asking for real discharge, which *is* close-out's job; let the step run rather than judging
+the ledger informally and merging by hand. (This `close-out` is the dispatched finish step, not an
+inline orchestrator pass — closing is something you *dispatch and verify*, never something you perform.)
+
 ## Knowing when to stop
 
 A run ends for a reason, and naming the reasons keeps you from both quitting early and grinding on
