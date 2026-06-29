@@ -795,6 +795,7 @@ Lists recent status entries, newest first. `limit` is 1-100 (default 20). Option
 ```
 GET /api/proxy/autopilot/kickoff
 GET /api/proxy/autopilot/kickoff?mode=readonly&goal=<text>
+GET /api/proxy/autopilot/kickoff?variant=stepper&goal=<text>
 ```
 
 Returns the **Autopilot kickoff** as **plain text** (`text/plain`) — the briefing that turns the receiving session into the *Autopilot orchestrator*. Autopilot is a light orchestrator: it picks the next task, **dispatches the work to a separate worker** via `POST /api/proxy/dispatch`, watches the feedback, judges completion from external evidence, and decides continue / complete / pause-for-human.
@@ -802,6 +803,7 @@ Returns the **Autopilot kickoff** as **plain text** (`text/plain`) — the brief
 | Query param | Default | Description |
 |-------------|---------|-------------|
 | `mode` | `write` | `write` allows implementation/review/close-out kinds and an evidence-gated merge (review writes the Not-Proven-by-CI ledger; `close-out` discharges or accepts each item, then merges and sets Done); `readonly` restricts dispatched work to investigation/research/planning/retro (no code, PRs, or issue writes). |
+| `variant` | `standard` | `standard` is the normal orchestrator. `stepper` swaps in the **beat-stepping** disposition (see [Stepper variant](./autopilot-kickoff.md#stepper-variant)): decompose a task's worker prompt into 3–6 ordered beats and drip-feed them into one warm session, challenging each before advancing. Orthogonal to `mode` — they compose. |
 | `goal` | _(none)_ | Optional free-text focus for the run. Omitted ⇒ walk the stack under the precedence policy. |
 
 The body embeds `YOUR_TOKEN` as a placeholder; substitute the consumer's `readWrite` token (Autopilot reuses it for the prompts it dispatches). A read-scope token can fetch the kickoff, but running it needs `readWrite` (Autopilot dispatches). The general (stack-walk) kickoff is what this endpoint serves; the in-app per-task variant ("run on autopilot until this task is done") is generated at `/workspace/:urlKey/api/autopilot-prompt/:issueId`.
@@ -820,6 +822,7 @@ Requires a `readWrite` scoped token. Builds the kickoff **and dispatches it** in
 |------------|---------|-------------|
 | `goal` | _(none)_ | Free-text focus for a **general** run. Ignored when `issueIdentifier` is set. |
 | `mode` | `write` | `write` (implementation/review + evidence-gated merge) or `readonly` (investigation only). |
+| `variant` | `standard` | `standard` (normal orchestrator) or `stepper` (warm beat-stepping disposition — see [Stepper variant](./autopilot-kickoff.md#stepper-variant)). Orthogonal to `mode`. An unknown value is a 400. |
 | `issueIdentifier` | _(none)_ | Present ⇒ **scoped** run ("autopilot until THIS task is done"); the issue title is named in the goal line and the project `repo=` is inherited. Absent ⇒ general stack-walk run. |
 | `target` | `cli` | Dispatch target (`cli`/`web`/`dash`; `local`/Harbour OS is not available to proxy consumers). |
 | `repo` | _(resolved)_ | Target repo. For a scoped run, defaults to the project's `repo=`; an explicit value wins. |
@@ -836,6 +839,7 @@ Dispatched as `kind:"autopilot"`, so the server appends the session-id self-refe
   "kind": "autopilot",
   "promptName": "Autopilot (stack walk)",
   "mode": "write",
+  "variant": "standard",
   "issueIdentifier": null,
   "target": "cli",
   "dispatchedAt": "..."

@@ -52,7 +52,7 @@ import { flattenTrees, sortIssuesForSwipe, applyBlockingOrder, clusterByParent, 
 import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, getPromptDisplayName, PROMPT_TEMPLATES, DISPATCH_KINDS } from '../lib/prompt-templates.js';
 import { parseRepoFromDescription, buildPromptFilename } from '../lib/prompt-formatters.js';
 import { buildProxyContextPreamble } from '../lib/proxy-preamble.js';
-import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
+import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { buildAutopilotManual } from '../lib/prompts/autopilot-manual.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
 import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
@@ -1256,12 +1256,13 @@ POST ${baseUrl}/api/proxy/recommend-and-dispatch
   → { "id": "...", "status": "queued", "kind": "plan", "promptName": "plan", "issueIdentifier": "...", "target": "cli", "sessionId": null, "dispatchedAt": "..." }
 
 POST ${baseUrl}/api/proxy/autopilot/kickoff
-  Body: { "goal": "...", "mode": "write|readonly", "issueIdentifier": "LIN-42", "target": "cli|web|dash", "repo": "...", "appendProxyContext": true }
+  Body: { "goal": "...", "mode": "write|readonly", "variant": "standard|stepper", "issueIdentifier": "LIN-42", "target": "cli|web|dash", "repo": "...", "appendProxyContext": true }
   → Fused launch verb: builds the Autopilot kickoff AND dispatches it in one call — the single verb that actually STARTS a run from a goal (no need to GET the kickoff text and POST it back). The receiving session becomes the Autopilot orchestrator. All fields optional.
   → Omit "issueIdentifier" for a GENERAL run ("goal" focuses the stack walk); pass it for a SCOPED run ("autopilot until THIS task is done") — the project "repo=" is then inherited unless you pass "repo". "mode" defaults to "write" ("readonly" = investigation only).
+  → "variant" defaults to "standard" (the normal orchestrator). "stepper" swaps in the warm single-session, beat-stepping disposition: it decomposes the task's worker prompt into 3–6 ordered beats and drip-feeds them into ONE session over followUpTo+force, judging and challenging each beat before advancing. Orthogonal to "mode" — they compose.
   → Dispatched as kind:"autopilot", so the returned "id" IS this run's session id. Pass that id as "sessionId" on every worker dispatch the run fans out (the kickoff body also tells the run its own id). The orchestrator itself is launched WITHOUT "waitForFollowUps" (default false) so it finalizes normally and stays free to run its watch loop.
-  → The prompt body NEVER returns to you — only the header. The GET twin (GET /api/proxy/autopilot/kickoff?goal=&mode=) stays a text-only preview/inspect form that does NOT enqueue anything.
-  → { "id": "...", "sessionId": "...", "status": "queued", "kind": "autopilot", "promptName": "Autopilot (stack walk)", "mode": "write", "issueIdentifier": null, "target": "cli", "dispatchedAt": "..." }
+  → The prompt body NEVER returns to you — only the header. The GET twin (GET /api/proxy/autopilot/kickoff?goal=&mode=&variant=) stays a text-only preview/inspect form that does NOT enqueue anything.
+  → { "id": "...", "sessionId": "...", "status": "queued", "kind": "autopilot", "promptName": "Autopilot (stack walk)", "mode": "write", "variant": "standard", "issueIdentifier": null, "target": "cli", "dispatchedAt": "..." }
 
 GET ${baseUrl}/api/proxy/dispatch?issueIdentifier={LIN-42}&status={queued|taken|done|failed|aborted}&limit={n}
   → List your dispatch items (live queue + recent history), newest first. All query params optional. Use this to find an item's id when you only know the issue.
@@ -3730,16 +3731,18 @@ One convention across every endpoint, so you can branch on the same fields every
    * turns the receiving session into the Autopilot orchestrator (it dispatches
    * work to a separate worker and judges completion from external evidence).
    * General (stack-walk) by default; `?goal=` supplies a focus, `?mode=readonly`
-   * restricts to investigation/research prompts.
+   * restricts to investigation/research prompts, `?variant=stepper` swaps in the
+   * beat-stepping disposition.
    */
   router.get('/api/proxy/autopilot/kickoff', proxyLimiter, authenticateProxyToken, async (req, res) => {
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     const mode = AUTOPILOT_MODES.includes(req.query.mode) ? req.query.mode : AUTOPILOT_MODE_DEFAULT;
+    const variant = AUTOPILOT_VARIANTS.includes(req.query.variant) ? req.query.variant : AUTOPILOT_VARIANT_DEFAULT;
     const goal = typeof req.query.goal === 'string' ? req.query.goal.slice(0, 1000) : '';
 
     logEvent(req, '/api/proxy/autopilot/kickoff', 200);
 
-    const kickoff = buildAutopilotKickoff({ baseUrl, goal, mode });
+    const kickoff = buildAutopilotKickoff({ baseUrl, goal, mode, variant });
     res.type('text/plain').send(kickoff);
   });
 
@@ -3754,12 +3757,14 @@ One convention across every endpoint, so you can branch on the same fields every
    * never returned to the caller. The GET twin above stays the text-only
    * preview/inspect form.
    *
-   * Body (all optional): { goal?, mode?, issueIdentifier?, target?, repo?, appendProxyContext? }
+   * Body (all optional): { goal?, mode?, variant?, issueIdentifier?, target?, repo?, appendProxyContext? }
    *   - issueIdentifier present → SCOPED run ("autopilot until THIS task is
    *     done"): the issue's title is resolved for the goal line and its project
    *     `repo=` is inherited (an explicit caller `repo` wins, mirroring /prompt).
    *   - issueIdentifier absent  → GENERAL run; `goal` focuses the stack walk.
    *   - mode: 'write' (default) | 'readonly'.
+   *   - variant: 'standard' (default) | 'stepper' (warm beat-stepping disposition,
+   *     LIN-791); orthogonal to mode.
    * Dispatches with kind:'autopilot', so addItem appends the session-id self-ref
    * block and the returned id is the session id (LIN-591/LIN-599).
    */
@@ -3770,7 +3775,7 @@ One convention across every endpoint, so you can branch on the same fields every
     }
 
     try {
-      const { goal, mode, issueIdentifier, target, repo, appendProxyContext } = req.body || {};
+      const { goal, mode, variant, issueIdentifier, target, repo, appendProxyContext } = req.body || {};
 
       // Validate caller-supplied inputs. (The composed body is server-generated
       // and trusted, so only these raw inputs are checked — same split as the
@@ -3779,6 +3784,11 @@ One convention across every endpoint, so you can branch on the same fields every
       if (!AUTOPILOT_MODES.includes(resolvedMode)) {
         logEvent(req, '/api/proxy/autopilot/kickoff', 400);
         return badRequest.json(res, `mode must be one of: ${AUTOPILOT_MODES.join(', ')}`);
+      }
+      const resolvedVariant = variant === undefined ? AUTOPILOT_VARIANT_DEFAULT : variant;
+      if (!AUTOPILOT_VARIANTS.includes(resolvedVariant)) {
+        logEvent(req, '/api/proxy/autopilot/kickoff', 400);
+        return badRequest.json(res, `variant must be one of: ${AUTOPILOT_VARIANTS.join(', ')}`);
       }
       if (goal !== undefined && (typeof goal !== 'string' || goal.length > MAX_NAME_LENGTH || DANGEROUS_CHARS_REGEX.test(goal))) {
         logEvent(req, '/api/proxy/autopilot/kickoff', 400);
@@ -3831,7 +3841,8 @@ One convention across every endpoint, so you can branch on the same fields every
         baseUrl,
         issue,
         goal: typeof goal === 'string' ? goal : '',
-        mode: resolvedMode
+        mode: resolvedMode,
+        variant: resolvedVariant
       });
 
       // Append the proxy context (workspace API access + bearer token + reporting
@@ -3868,6 +3879,7 @@ One convention across every endpoint, so you can branch on the same fields every
         kind: item.kind,
         promptName: item.promptName,
         mode: resolvedMode,
+        variant: resolvedVariant,
         issueIdentifier: item.issueIdentifier,
         target: item.target,
         dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt

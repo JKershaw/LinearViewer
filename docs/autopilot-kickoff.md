@@ -25,6 +25,10 @@
 >   the guide inline at build time (`buildAutopilotManual()`), between the identity intro and
 >   the four lines. It is the disposition layer — the *why* behind the mechanics — and the same
 >   text backs `GET /api/proxy/autopilot/manual`.
+> - **The variant** (`standard` | `stepper`, default `standard`) is an axis orthogonal to the
+>   run mode: `stepper` inserts the beat-stepping disposition section (see
+>   [Stepper variant](#stepper-variant)) between the guide and the snapshot. `standard` is the
+>   guide as written here.
 > - **The snapshot** (after the `---`) is *per-dispatch* — assembled at kickoff: the run
 >   mode, the goal (a pinned task for a scoped run, free text, or "walk the stack"), and
 >   the proxy token (injected at dispatch via the +proxy block, never committed). The block
@@ -204,6 +208,51 @@ list above; recognising one of those costs a second.
   > `taken · [working] 6 tools/32s · alive`
   > `done in 3m40s — recap claims a plan + Linear comment; verifying…`
   > `verified: LIN-320 In Progress, 5.6k plan in description → continue (implementation next)`
+
+## Stepper variant
+
+`buildAutopilotKickoff()` has a `variant` axis (`standard` | `stepper`, default `standard`) that
+sits **orthogonal to `mode`** — they compose, so a stepper run can still be `write` or `readonly`.
+A `standard` kickoff is exactly the guide above. A `stepper` kickoff (`variant: 'stepper'`) inserts
+one extra disposition section between the guide and the snapshot; the four lines, instruments, and
+halt rules above still hold, but the loop Autopilot actually runs is the stepped one below. This is
+an **orchestrator** disposition (how Autopilot drives), not a worker prompt template, so it is *not*
+subject to the both-paths parity rule — the worker prompts the stepper dispatches still come from the
+normal engine and keep their own parity. (The disposition text lives in `buildStepperDisposition()`
+in [`autopilot-kickoff.js`](../lib/prompts/autopilot-kickoff.js), gated on `variant`, so it never
+enters a `standard` kickoff — which stays byte-identical. It is deliberately **not** in the shared
+`autopilot-operating-manual.md`, which is composed inline into *every* run.)
+
+The stepper drives **one warm session** through ordered **beats** instead of one-shotting a task's
+worker prompt — the disposition proved by [LIN-788](https://linear.app/linearviewer/issue/LIN-788)
+and made survivable by [LIN-793](https://linear.app/linearviewer/issue/LIN-793) (don't-reap) +
+long-poll delivery ([LIN-794](https://linear.app/linearviewer/issue/LIN-794)):
+
+1. **Read** the task's worker prompt (`GET /recommend/{id}` — the un-fused GET returns the body).
+2. **Decompose** it into **3–6 ordered, self-contained beats** that follow the prompt's own
+   structure, staying within **one kind** (don't chain into review — keep the fresh-eyes boundary).
+3. **Beat 1 is fresh; capture its dispatch id as `ROOT`.** Every later beat resumes that same warm
+   session with `followUpTo: ROOT` (always beat-1's id — a stable anchor) **+ `force: true`**,
+   `target: web`, `sessionId` = the orchestrator's own id.
+4. **Deliver each beat via long-poll inside a `run_in_background` task** (`GET /dispatch/{id}?wait=Ns`,
+   sub-20-min cycles) — never a long foreground loop, never idle-on-`PENDING`. The hold returns within
+   seconds of the beat going terminal, so the next beat lands inside the session's warm hold
+   (in-session, no `--resume`), **and** the returning task re-invokes the orchestrator — the async-wait
+   defer that resets the verify-backstop clock. **The long-poll background wait is the keep-warm
+   mechanism** (it's what kept earlier orchestrators from being reaped as "silent" at 32–47 min).
+5. **Judge *and* challenge** each beat before advancing — interrogate it (real tests? followed the
+   plan? grounded against HEAD?) and send a corrective `followUpTo: ROOT` if it's thin; don't
+   rubber-stamp. **Mid-chain `PENDING`** ("my beat's done, later beats remain") is a **clean advance**,
+   not a wobble — only challenge when *this* beat's own work is unproven.
+6. **Label every send** `beat N/M: <label>`, including challenge/corrective follow-ups.
+7. **Required wrap-up** — post a run-summary comment before concluding.
+
+Warm single-session is the default; fresh-per-beat (a new session per beat) is an emergency fallback
+only — it loses intra-session memory and pays re-orientation cost each beat.
+
+Launch it via the proxy: `POST /api/proxy/autopilot/kickoff` with `{"variant":"stepper", …}` (or
+preview with `GET …/autopilot/kickoff?variant=stepper`). See the
+[proxy integration guide](./proxy-integration.md#launch-autopilot-fused) for the param tables.
 
 ---
 
