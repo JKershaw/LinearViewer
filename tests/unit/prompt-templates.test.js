@@ -1739,6 +1739,24 @@ describe('meta-prompt review close-out gate + cannot-close routing (LIN-474)', (
     assert.ok(/names the exact precondition they exercised/i.test(p), 'human acceptance must name the exact precondition');
   });
 
+  test('close-out requires positive evidence of a review; absent it, default to review (LIN-811)', () => {
+    // Step 0 (already-complete) path renders when terminal with no open children.
+    const step0 = buildMetaPromptTemplate({ ...baseArgs, isTerminal: true, hasOpenChildren: false });
+    assert.ok(/requires positive evidence that a review actually ran/i.test(step0),
+      'Step 0 close-out branch carries the review-evidence gate');
+    assert.ok(/complete-looking description is not that evidence/i.test(step0),
+      'a rich description is explicitly not evidence of a review');
+    assert.ok(/When the evidence is ambiguous, default to `review`/i.test(step0),
+      'ambiguous evidence defaults to review');
+    // Step 3 (landed implementation) path renders independently (no Step 0 here).
+    const step3 = buildMetaPromptTemplate({
+      ...baseArgs, hasSubtasks: false, subtaskCount: 0, completedCount: 0,
+      isTerminal: false, hasOpenChildren: false
+    });
+    assert.ok(/requires positive evidence that a review actually ran/i.test(step3),
+      'Step 3 close-out branch carries the review-evidence gate');
+  });
+
   test('Step 0 completion branch carries the cannot-close branch routing to a blocker', () => {
     const p = buildMetaPromptTemplate({ ...baseArgs, isTerminal: true, hasOpenChildren: false });
     assert.ok(/\*\*Cannot-close branch:\*\*/i.test(p), 'Step 0 names the cannot-close branch');
