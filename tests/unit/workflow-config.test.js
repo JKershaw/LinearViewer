@@ -40,6 +40,10 @@ describe('VIRTUAL_PROMPTS', () => {
     assert.strictEqual(VIRTUAL_PROMPTS.PLAN, 'plan');
     assert.strictEqual(VIRTUAL_PROMPTS.LOOK_INTO, 'look-into');
     assert.strictEqual(VIRTUAL_PROMPTS.TRIAGE, 'triage');
+    assert.strictEqual(VIRTUAL_PROMPTS.REVIEW, 'review');
+    // LIN-550: close-out is a first-class universal step alongside review/retro.
+    assert.strictEqual(VIRTUAL_PROMPTS.CLOSE_OUT, 'close-out');
+    assert.strictEqual(VIRTUAL_PROMPTS.RETRO, 'retro');
   });
 });
 

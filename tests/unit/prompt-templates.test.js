@@ -98,12 +98,13 @@ describe('getPromptLabels', () => {
     assert.ok(labels.includes('context'));
     assert.ok(labels.includes('implementation'));
     assert.ok(labels.includes('review'));
+    assert.ok(labels.includes('close-out'));
     assert.ok(labels.includes('retro'));
   });
 
-  test('has exactly 14 templates', () => {
+  test('has exactly 15 templates', () => {
     const labels = getPromptLabels();
-    assert.strictEqual(labels.length, 14);
+    assert.strictEqual(labels.length, 15);
   });
 });
 
@@ -116,7 +117,7 @@ describe('defer recommend-meta action', () => {
     // The no-body cost contract is structural: defer has no PROMPT_TEMPLATES entry,
     // so it cannot produce a prompt and cannot inflate the template count.
     assert.ok(!('defer' in PROMPT_TEMPLATES), 'defer must not be a prompt template');
-    assert.strictEqual(getPromptLabels().length, 14, 'defer must not change the template count');
+    assert.strictEqual(getPromptLabels().length, 15, 'defer must not change the template count');
   });
 
   test('defer is registered in RECOMMEND_META_ACTIONS and the dispatch vocabulary', () => {
@@ -1165,31 +1166,40 @@ describe('review template', () => {
     );
   });
 
-  // LIN-474: review is review-and-close. The body carries a Close-Out Gate that
-  // verifies merged/CI state, reconciles related tasks, and (when it cannot close)
-  // files a `blocks` ticket and routes to it instead of looping back to review.
-  test('review body carries the Close-Out Gate after Manual Verification, before Completion', () => {
+  // LIN-550: review is the ledger WRITER. Its body carries the `### What CI Did Not Prove`
+  // ledger (after Manual Verification, before Verdict) and a `### Hand Off to Close-Out`
+  // section (after Verdict, before Completion). Review no longer owns the merge.
+  test('review body carries the ledger then hands off to close-out (LIN-550 ordering)', () => {
     const result = generatePrompt('review', mockIssue, mockContext);
     const manualIdx = result.prompt.indexOf('### Manual Verification');
-    const gateIdx = result.prompt.indexOf('### Close-Out Gate');
+    const ledgerIdx = result.prompt.indexOf('### What CI Did Not Prove');
+    const verdictIdx = result.prompt.indexOf('### Verdict');
+    const handoffIdx = result.prompt.indexOf('### Hand Off to Close-Out');
     const completionIdx = result.prompt.indexOf('### Completion');
-    assert.ok(gateIdx !== -1, 'Close-Out Gate section exists');
-    assert.ok(manualIdx !== -1 && manualIdx < gateIdx, 'Close-Out Gate comes after Manual Verification');
-    assert.ok(completionIdx !== -1 && gateIdx < completionIdx, 'Close-Out Gate comes before Completion');
+    assert.ok(ledgerIdx !== -1, 'ledger section exists');
+    assert.ok(handoffIdx !== -1, 'hand-off section exists');
+    assert.ok(manualIdx !== -1 && manualIdx < ledgerIdx, 'ledger comes after Manual Verification');
+    assert.ok(ledgerIdx < verdictIdx, 'ledger comes before the Verdict');
+    assert.ok(verdictIdx < handoffIdx, 'hand-off comes after the Verdict');
+    assert.ok(completionIdx !== -1 && handoffIdx < completionIdx, 'hand-off comes before Completion');
+    // The old fused gate section is gone.
+    assert.ok(!result.prompt.includes('### Close-Out Gate'), 'the old fused Close-Out Gate section is removed');
   });
 
-  // LIN-523: review is the PRE-merge gate. It authorizes the close (verdict) but
-  // does not merge, mark Done, or verify/reconcile after a merge — those are the
-  // merger's (Autopilot/human). It confirms CI green on the PR and issues a verdict.
-  test('Close-Out Gate authorizes the merge but does not perform/verify it', () => {
+  // LIN-550: review is WRITE-ONLY. It writes the ledger + a conditional verdict and hands
+  // the merge / Done / follow-up filing to the close-out step — it never performs them.
+  test('review is write-only: ledger + conditional verdict, hands off (does not merge/Done)', () => {
     const result = generatePrompt('review', mockIssue, mockContext);
-    assert.ok(/AUTHORIZES the close, not the step that performs it/i.test(result.prompt), 'review authorizes, does not perform');
+    assert.ok(/Review is write-only/i.test(result.prompt), 'states review is write-only');
     assert.ok(/CI is green on the PR/i.test(result.prompt), 'confirms CI green on the PR');
-    assert.ok(/do NOT mark this task Done/i.test(result.prompt), 'does not mark Done');
-    assert.ok(/belong to whoever merges/i.test(result.prompt) || /belong to the merger/i.test(result.prompt),
-      'merge/Done/reconcile belong to the merger');
-    // The retired merge-verification language must be gone
-    assert.ok(!/merged state is the hard close gate/i.test(result.prompt), 'no longer verifies a merge that has not happened');
+    assert.ok(/does NOT merge, does NOT mark the task Done, and does NOT file the close-out follow-ups/i.test(result.prompt),
+      'review does not merge, mark Done, or file close-out follow-ups');
+    assert.ok(/Approve — conditional on close-out discharging the ledger/i.test(result.prompt),
+      'a non-empty ledger forces a conditional approval');
+    assert.ok(/hand off to `close-out`/i.test(result.prompt), 'hands off to the close-out step');
+    // The retired "merger owns it" framing must be gone.
+    assert.ok(!/belong to whoever merges/i.test(result.prompt) && !/belong to the merger/i.test(result.prompt),
+      'no longer hands to an undefined merger');
   });
 
   test('review concludes with an explicit verdict (folded in from code-review)', () => {
@@ -1706,20 +1716,27 @@ describe('meta-prompt review close-out gate + cannot-close routing (LIN-474)', (
     completionSignals: 'S', focusedSubtaskId: null
   };
 
-  test('the existing Review-prompts rule is EXTENDED with the verdict + pre-merge close-out gate (no second rule)', () => {
+  test('Review rule is trimmed to WRITE-ONLY + ledger + conditional verdict; a SEPARATE Close-out rule owns the gate (LIN-550)', () => {
     const p = buildMetaPromptTemplate({ ...baseArgs, isTerminal: false, hasOpenChildren: true });
-    const matches = p.match(/\*\*Review prompts\*\* must:/g) || [];
-    assert.strictEqual(matches.length, 1, 'there is exactly one Review-prompts rule (extended, not duplicated)');
+    const reviewMatches = p.match(/\*\*Review prompts\*\* must:/g) || [];
+    assert.strictEqual(reviewMatches.length, 1, 'there is exactly one Review-prompts rule');
     assert.ok(/explicit verdict \(Approve \/ Request Changes \/ Needs Discussion\)/i.test(p), 'the verdict is encoded');
-    assert.ok(/PRE-MERGE close-out gate/i.test(p), 'the pre-merge close-out gate is encoded');
-    assert.ok(/must NOT instruct it to merge, to mark the task Done/i.test(p), 'review does not merge or mark Done');
-    assert.ok(/belong to the merger/i.test(p), 'merge/Done/reconcile belong to the merger');
+    assert.ok(/write a `### What CI Did Not Prove` ledger/i.test(p), 'review writes the ledger');
+    assert.ok(/Approve — conditional on close-out discharging the ledger/i.test(p), 'conditional approval encoded');
+    assert.ok(/Review is WRITE-ONLY/i.test(p), 'review is write-only — no merge/Done/follow-ups');
     assert.ok(/must NOT loop back into another review/i.test(p), 'forbids looping back to review');
     assert.ok(/as `blocks` the current task/i.test(p), 'files/links the blocker as `blocks`');
     assert.ok(/a `blocks` relation alone does not make the engine descend/i.test(p),
       'next action named because `blocks` does not drive descent');
-    // The retired merge-verification language must be gone
-    assert.ok(!/the hard close gate/i.test(p), 'no longer claims to verify a merge that has not happened');
+    // The retired fused-gate + undefined-merger framing must be gone from the review rule.
+    assert.ok(!/PRE-MERGE close-out gate/i.test(p), 'no fused pre-merge close-out gate language');
+    assert.ok(!/belong to the merger/i.test(p), 'no undefined-merger handoff');
+    // A SEPARATE Close-out rule now owns the ledger gate (the three blocking invariants).
+    const closeoutMatches = p.match(/\*\*Close-out prompts\*\* must/g) || [];
+    assert.strictEqual(closeoutMatches.length, 1, 'exactly one Close-out-prompts rule exists');
+    assert.ok(/treat a MISSING or unparseable ledger as a BLOCK, never as "empty"/i.test(p), 'close-out blocks on a missing ledger');
+    assert.ok(/it never discharges a ledger item/i.test(p), 'green CI never discharges a ledger item');
+    assert.ok(/names the exact precondition they exercised/i.test(p), 'human acceptance must name the exact precondition');
   });
 
   test('Step 0 completion branch carries the cannot-close branch routing to a blocker', () => {
@@ -1737,6 +1754,104 @@ describe('meta-prompt review close-out gate + cannot-close routing (LIN-474)', (
     assert.ok(/neither to `?implementation`? nor to a repeated `?review`?/i.test(p),
       'Step 3 carries the cannot-close exception');
     assert.ok(/route the next action to that blocker/i.test(p), 'it routes the next action to the blocker');
+  });
+});
+
+// =============================================================================
+// close-out template + review→close-out ledger handoff (LIN-550)
+// =============================================================================
+
+describe('close-out template + review→close-out ledger handoff (LIN-550)', () => {
+  const issue = {
+    id: 'co-1', identifier: 'LIN-901', title: 'Land the thing',
+    description: 'work', url: 'https://linear.app/test/issue/LIN-901',
+    labels: [], createdAt: '2026-01-01T00:00:00.000Z'
+  };
+  const context = { parent: null, siblings: [], project: { name: 'P' }, children: [], comments: [] };
+
+  test('close-out is a registered first-class template (key, name, UNIVERSAL, AI-recommendable, completion signal)', () => {
+    assert.ok('close-out' in PROMPT_TEMPLATES, 'close-out is a PROMPT_TEMPLATES key');
+    const t = PROMPT_TEMPLATES['close-out'];
+    assert.strictEqual(t.name, 'close-out');
+    assert.strictEqual(t.category, PROMPT_CATEGORIES.UNIVERSAL);
+    assert.ok(t.aiHint, 'has an aiHint so it is AI-recommendable');
+    assert.ok(COMPLETION_SIGNALS['close-out'], 'has a registered completion signal');
+    assert.strictEqual(t.completionSignals, COMPLETION_SIGNALS['close-out'], 'template wires its completion signal');
+  });
+
+  test('(a) close-out reads the review ledger and gates merge/Done until each item is discharged or accepted', () => {
+    const { prompt } = generatePrompt('close-out', issue, context);
+    assert.ok(/most recent review summary comment/i.test(prompt), 'reads the latest review comment');
+    assert.ok(/Not-Proven-by-CI Ledger Gate/i.test(prompt), 'has the ledger gate');
+    assert.ok(/Do NOT merge or set the task Done while any ledger item is undischarged/i.test(prompt),
+      'blocks merge/Done while any item is undischarged');
+    assert.ok(/\*\*\(a\) discharged\*\*/i.test(prompt) && /\*\*\(b\) explicitly accepted\*\*/i.test(prompt),
+      'each item is discharged-with-evidence or explicitly accepted');
+    // Only after all-clear does it perform the irreversible set.
+    assert.ok(/Perform the Irreversible Set/i.test(prompt) && /Merge the approved PR/i.test(prompt) && /Set the task to Done/i.test(prompt),
+      'merge/Done/summary/follow-ups happen only on all-clear');
+  });
+
+  test('(b) the review→close-out ledger section round-trips (review writes it, close-out reads it by name)', () => {
+    const review = generatePrompt('review', issue, context).prompt;
+    const closeout = generatePrompt('close-out', issue, context).prompt;
+    assert.ok(review.includes('### What CI Did Not Prove'), 'review writes the ### What CI Did Not Prove ledger');
+    assert.ok(/add a summary comment containing the `### What CI Did Not Prove` ledger/i.test(review),
+      'review records the ledger into its summary comment (the carrier)');
+    assert.ok(closeout.includes('### What CI Did Not Prove'), 'close-out reads the same ### What CI Did Not Prove ledger');
+  });
+
+  test('(c) empty ledger => close-out is a cheap no-op pass-through; review allows an unconditional Approve only then', () => {
+    const closeout = generatePrompt('close-out', issue, context).prompt;
+    assert.ok(/### Cheap When Empty/i.test(closeout), 'close-out has the cheap-when-empty path');
+    assert.ok(/no-op pass-through/i.test(closeout), 'an explicitly empty ledger makes close-out a no-op pass-through');
+    const review = generatePrompt('review', issue, context).prompt;
+    assert.ok(/only an explicitly empty ledger may carry a plain \*\*Approve\*\*/i.test(review),
+      'review permits a plain Approve only when the ledger is explicitly empty');
+    assert.ok(/An explicitly empty ledger makes close-out a no-op pass-through/i.test(review),
+      'review states the empty-ledger ⇒ no-op contract');
+  });
+
+  test('(d) the three blocking invariants are present in the rendered close-out body', () => {
+    const { prompt } = generatePrompt('close-out', issue, context);
+    // 1. missing/unparseable ledger BLOCKS — never treated as empty
+    assert.ok(/Missing or unparseable ledger BLOCKS — absent is not empty/i.test(prompt),
+      'missing/unparseable ledger blocks and is not treated as empty');
+    // 2. green CI alone never discharges a ledger item
+    assert.ok(/Green CI is never evidence for a ledger item/i.test(prompt),
+      'green CI never discharges a ledger item');
+    // 3. human validation counts only if it names the exact precondition
+    assert.ok(/does not name the precondition it exercised does NOT discharge an item/i.test(prompt),
+      'a human validation that does not name the precondition does not discharge');
+    assert.ok(/by a human who names the exact precondition they exercised/i.test(prompt),
+      'explicit human acceptance must name the exact precondition');
+  });
+
+  test('(e1) close-out body emits no literal "Linear" and renames cleanly for a non-Linear provider', () => {
+    const linear = generatePrompt('close-out', issue, context).prompt;
+    assert.ok(!linear.includes('Linear'), 'close-out body contains no literal Linear (it enters the byte-parity loop)');
+    const local = generatePrompt('close-out', { ...issue, labels: ['close-out'] }, context, {},
+      { write: true, comments: true, subtasks: true, displayName: 'Local' }).prompt;
+    assert.ok(!local.includes('Linear'), 'no Linear leaks for a non-Linear provider');
+  });
+
+  test('(e2) close-out is byte-identical for Linear with vs without an explicit provider', () => {
+    const i = { ...issue, labels: ['close-out'] };
+    const base = generatePrompt('close-out', i, context, {}).prompt;
+    const withUi = generatePrompt('close-out', i, context, {}, { ...DEFAULT_PROMPT_UI }).prompt;
+    assert.strictEqual(withUi, base, 'close-out must be byte-identical for Linear');
+  });
+
+  test('(meta) both paths render close-out: routing offers it after review approval (Step 0 + Step 3 + priority line)', () => {
+    const baseArgs = {
+      issueContext: 'CTX', identifier: 'LIN-901', hasComments: true, commentCount: 2,
+      aiHints: 'H', actionVocabulary: 'review, close-out, implementation', completionSignals: 'S'
+    };
+    const step0 = buildMetaPromptTemplate({ ...baseArgs, hasSubtasks: true, subtaskCount: 2, completedCount: 2, inProgressCount: 0, remainingCount: 0, isTerminal: true, hasOpenChildren: false });
+    assert.ok(/recommend `close-out`, NOT another `review`/i.test(step0), 'Step 0 offers close-out after approval');
+    assert.ok(/then `close-out` once review has approved/i.test(step0), 'priority line sequences review→close-out');
+    const step3 = buildMetaPromptTemplate({ ...baseArgs, hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0, isTerminal: false, hasOpenChildren: false });
+    assert.ok(/Recommend `close-out` — the ledger-gated finish/i.test(step3), 'Step 3 landed-guard offers close-out after approval');
   });
 });
 
