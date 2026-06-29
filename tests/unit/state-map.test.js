@@ -16,6 +16,7 @@ import {
   isTerminalState,
   isCompleted,
   isInProgress,
+  isHiddenState,
 } from '../../lib/providers/state-map.js';
 import {
   STARTED, UNSTARTED, BACKLOG, COMPLETED, CANCELED, DUPLICATE,
@@ -108,5 +109,35 @@ describe('semantic predicates', () => {
     assert.equal(isInProgress({ state: { type: 'unstarted' } }), false);
     assert.equal(isInProgress({ state: { type: 'completed' } }), false);
     assert.equal(isInProgress({}), false);
+  });
+});
+
+describe('isHiddenState (LIN-769)', () => {
+  test('hides canceled only', () => {
+    assert.equal(isHiddenState({ state: { type: 'canceled' } }), true);
+  });
+
+  // Pin the deliberate canceled-ONLY decision: duplicate is a live pointer to
+  // its canonical issue and must stay visible, and completed genuinely is done.
+  // Guards against a future change silently widening to all TERMINAL_TYPES.
+  test('does NOT hide duplicate (stays visible, unlike canceled)', () => {
+    assert.equal(isHiddenState({ state: { type: 'duplicate' } }), false);
+  });
+
+  test('does NOT hide completed (it is genuinely done)', () => {
+    assert.equal(isHiddenState({ state: { type: 'completed' } }), false);
+  });
+
+  test('does NOT hide active states (started/unstarted/backlog)', () => {
+    assert.equal(isHiddenState({ state: { type: 'started' } }), false);
+    assert.equal(isHiddenState({ state: { type: 'unstarted' } }), false);
+    assert.equal(isHiddenState({ state: { type: 'backlog' } }), false);
+  });
+
+  test('does NOT hide an issue with missing/unknown state', () => {
+    assert.equal(isHiddenState({}), false);
+    assert.equal(isHiddenState({ state: {} }), false);
+    assert.equal(isHiddenState(undefined), false);
+    assert.equal(isHiddenState({ state: { type: 'mystery' } }), false);
   });
 });

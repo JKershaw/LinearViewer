@@ -5,7 +5,8 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { buildForest, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID, PERIODICALS_PROJECT_ID, isTerminalState, isCompleted, TERMINAL_STATE_TYPES, selectFocusSubtask, computeFrontierFacts, isBlocked } from '../../lib/tree.js';
+import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID, PERIODICALS_PROJECT_ID, isTerminalState, isCompleted, TERMINAL_STATE_TYPES, selectFocusSubtask, computeFrontierFacts, isBlocked } from '../../lib/tree.js';
+import { isHiddenState, getStateDisplay } from '../../lib/providers/state-map.js';
 import { childrenToGraphNodes, computeGraphFeatures, hasOpenFrontier } from '../../lib/graph-features.js';
 
 // =============================================================================
@@ -31,6 +32,76 @@ function createIssue(overrides = {}) {
     ...overrides
   };
 }
+
+// =============================================================================
+// Dashboard hide-cancelled seam (LIN-769)
+// =============================================================================
+// server.js filters cancelled issues out of the merged issue list BEFORE any
+// forest is built (`issues.filter(i => !isHiddenState(i))`). These tests
+// reproduce that exact pipeline — filter → buildForest → partitionCompleted —
+// to prove cancelled never reaches the rendered tree while completed (and other
+// states) still do, and a completed issue still partitions as done.
+describe('hide-cancelled dashboard seam (LIN-769)', () => {
+  // Mirrors the server.js seam verbatim.
+  const applyDashboardFilter = (issues) => issues.filter(i => !isHiddenState(i));
+
+  const collectIds = (forest) => {
+    const ids = [];
+    const walk = (node) => {
+      ids.push(node.issue.id);
+      node.children.forEach(walk);
+    };
+    for (const { roots } of forest.values()) roots.forEach(walk);
+    return ids;
+  };
+
+  test('cancelled issue is removed from the forest; completed + active survive', () => {
+    const active = createIssue({ id: 'active', project: { id: 'p1' }, state: { name: 'In Progress', type: 'started' } });
+    const done = createIssue({ id: 'done', project: { id: 'p1' }, state: { name: 'Done', type: 'completed' } });
+    const dup = createIssue({ id: 'dup', project: { id: 'p1' }, state: { name: 'Duplicate', type: 'duplicate' } });
+    const cancelled = createIssue({ id: 'cancelled', project: { id: 'p1' }, state: { name: 'Canceled', type: 'canceled' } });
+
+    const forest = buildForest(applyDashboardFilter([active, done, dup, cancelled]));
+    const ids = collectIds(forest);
+
+    assert.ok(!ids.includes('cancelled'), 'cancelled must NOT appear in the rendered forest');
+    assert.ok(ids.includes('active'), 'active issue must remain');
+    assert.ok(ids.includes('done'), 'completed issue must remain');
+    assert.ok(ids.includes('dup'), 'duplicate must remain (deliberately not hidden)');
+  });
+
+  test('a completed issue still partitions as done; cancelled is gone entirely', () => {
+    const done = createIssue({ id: 'done', project: { id: 'p1' }, state: { name: 'Done', type: 'completed' } });
+    const cancelled = createIssue({ id: 'cancelled', project: { id: 'p1' }, state: { name: 'Canceled', type: 'canceled' } });
+
+    const forest = buildForest(applyDashboardFilter([done, cancelled]));
+    const { roots } = forest.get('p1');
+    const { incomplete, completed, completedCount } = partitionCompleted(roots);
+
+    // Completed issue is present and grouped as done, rendered with the ✓ glyph.
+    assert.strictEqual(incomplete.length, 0);
+    assert.strictEqual(completed.length, 1);
+    assert.strictEqual(completed[0].issue.id, 'done');
+    assert.strictEqual(completedCount, 1);
+    assert.strictEqual(getStateDisplay(completed[0].issue.state.type).class, 'done');
+    assert.strictEqual(getStateDisplay(completed[0].issue.state.type).char, '✓');
+
+    // Cancelled appears in NEITHER bucket — it was filtered out before the forest.
+    const allIds = [...incomplete, ...completed].map(n => n.issue.id);
+    assert.ok(!allIds.includes('cancelled'), 'cancelled is hidden, not shown as done');
+  });
+
+  test('a cancelled child is dropped while its live parent survives', () => {
+    const parent = createIssue({ id: 'parent', project: { id: 'p1' }, state: { name: 'In Progress', type: 'started' } });
+    const cancelledChild = createIssue({ id: 'kid', project: null, parent: { id: 'parent' }, state: { name: 'Canceled', type: 'canceled' } });
+
+    const forest = buildForest(applyDashboardFilter([parent, cancelledChild]));
+    const ids = collectIds(forest);
+
+    assert.ok(ids.includes('parent'), 'live parent must remain');
+    assert.ok(!ids.includes('kid'), 'cancelled child must be hidden, mirroring trashed');
+  });
+});
 
 // =============================================================================
 // buildForest Tests - Subtask Project Inheritance (LIN-53)
