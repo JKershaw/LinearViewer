@@ -15,9 +15,12 @@
  * getProviderForWorkspace + getWorkspaceToken read seam.
  */
 import { test, expect } from '../fixtures/test-base.js';
-// defaultLocalSeed: local-issue-1 has two comments; local-issue-2 has none.
-const ISSUE_WITH_COMMENTS = 'local-issue-1';
-const ISSUE_WITHOUT_COMMENTS = 'local-issue-2';
+// defaultLocalSeed: LOCAL-1 has two comments; LOCAL-2 has none. Addressed by the
+// human-facing identifier (resolved via getIssue's identifier fallback) rather
+// than the raw _id, which is now namespaced per scope to avoid parallel-seed
+// collisions (LIN-800).
+const ISSUE_WITH_COMMENTS = 'LOCAL-1';
+const ISSUE_WITHOUT_COMMENTS = 'LOCAL-2';
 
 test.describe('Comments API — local provider session (LIN-582)', () => {
   test.beforeEach(async ({ seedLocal }) => {

@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { localSeedId } from '../fixtures/local-harness.js';
 
 // LIN-378: the dashboard surface is fully modeled by the local provider, so this
 // spec rides the seeded local workspace (no `test-token` mock). Assertions are
@@ -23,7 +24,7 @@ test.describe('Authenticated Dashboard', () => {
     await expect(page.locator('.project-header:has-text("Local Beta")')).toBeVisible();
   });
 
-  test('shows In Progress section with active issues', async ({ page }) => {
+  test('shows In Progress section with active issues', async ({ page, localWorkerUrlKey }) => {
     // Should have In Progress section header
     const inProgressHeader = page.locator('.in-progress-header');
     await expect(inProgressHeader).toBeVisible();
@@ -41,7 +42,7 @@ test.describe('Authenticated Dashboard', () => {
     // Note: hidden class is on the .node wrapper, not the .line.
     const childTask = page.locator('.in-progress-items .line:has-text("Local child task")');
     await expect(childTask).toHaveCount(1);
-    const childNode = page.locator('.in-progress-items .node[data-id="local-issue-2"]');
+    const childNode = page.locator(`.in-progress-items .node[data-id="${localSeedId(localWorkerUrlKey, 'local-issue-2')}"]`);
     await expect(childNode).toHaveClass(/hidden/);
   });
 
