@@ -34,11 +34,18 @@ function capturing(collection) {
 
 function makeStore() {
   const history = capturing(createMockCollection());
+  const queue = capturing(createMockCollection());
   const store = new DispatchQueueStore({
-    collection: createMockCollection(),
+    collection: queue.collection,
     historyCollection: history.collection
   });
-  return { store, historyCalls: history.calls, historyDocs: history.collection._docs };
+  return {
+    store,
+    historyCalls: history.calls,
+    historyDocs: history.collection._docs,
+    queueCalls: queue.calls,
+    queueDocs: queue.collection._docs
+  };
 }
 
 test('listHistory threads projection into find() and drops the excluded field', async () => {
@@ -78,4 +85,40 @@ test('listHistory without a projection passes no find options (full-document rea
   assert.equal(historyCalls[0].options, undefined,
     'a non-lean read must not pass a projection — full document, byte-identical');
   assert.equal(result.items[0].prompt, 'full prompt body', 'the full prompt is retained');
+});
+
+test('listItems threads projection into find() and drops the excluded field', async () => {
+  const { store, queueCalls, queueDocs } = makeStore();
+  queueDocs.push({
+    _id: 'q', urlKey: 'acme', issueIdentifier: 'LIN-1',
+    dispatchedAt: new Date('2026-06-20T00:00:00.000Z'),
+    expiresAt: new Date('2999-01-01T00:00:00.000Z'),
+    prompt: 'a very large queued prompt body'
+  });
+
+  const items = await store.listItems('acme', { projection: { prompt: 0 } });
+
+  assert.equal(queueCalls.length, 1);
+  assert.deepEqual(queueCalls[0].options, { projection: { prompt: 0 } },
+    'the projection must reach find() so a real DB never transfers the queued prompt');
+  assert.equal(items.length, 1);
+  assert.equal(items[0].prompt, undefined, 'projected-out prompt is absent from the queued result');
+  assert.equal(items[0].issueIdentifier, 'LIN-1', 'metadata the list view needs survives the projection');
+});
+
+test('listItems without a projection passes no find options (full-document read)', async () => {
+  const { store, queueCalls, queueDocs } = makeStore();
+  queueDocs.push({
+    _id: 'q', urlKey: 'acme', issueIdentifier: 'LIN-1',
+    dispatchedAt: new Date('2026-06-20T00:00:00.000Z'),
+    expiresAt: new Date('2999-01-01T00:00:00.000Z'),
+    prompt: 'full queued prompt body'
+  });
+
+  const items = await store.listItems('acme');
+
+  assert.equal(queueCalls.length, 1);
+  assert.equal(queueCalls[0].options, undefined,
+    'a read without a projection must not pass find options — pollAvailable still gets the prompt');
+  assert.equal(items[0].prompt, 'full queued prompt body', 'the full prompt is retained for consumers');
 });

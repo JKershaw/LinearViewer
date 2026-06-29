@@ -4440,10 +4440,18 @@ One convention across every endpoint, so you can branch on the same fields every
       // When scoped to one issue, push `issueIdentifier` into both store reads
       // (LIN-613/LIN-615 index-backed predicate) instead of fetching the whole
       // workspace and filtering in JS. The 200-history bound is preserved.
-      const scopeOpts = issueIdentifier ? { issueIdentifier } : undefined;
+      //
+      // This list response is metadata-only — it never returns `prompt`, only
+      // status/feedback-derived fields. So exclude `prompt` at the query (the
+      // LIN-623 lean-feed pattern): for an unscoped read the whole-workspace
+      // 30-day history carries a multi-KB-to-10-MB prompt per row, and
+      // transferring + BSON-deserialising all of them is what pushes a busy
+      // workspace's read past the 30s router timeout into a 503. Column
+      // exclusion only — same rows, correctness-identical.
+      const scopeOpts = issueIdentifier ? { issueIdentifier } : {};
       const [queued, history] = await Promise.all([
-        dispatchQueueStore.listItems(req.proxyUrlKey, scopeOpts),
-        dispatchQueueStore.listHistory(req.proxyUrlKey, { limit: 200, ...scopeOpts })
+        dispatchQueueStore.listItems(req.proxyUrlKey, { ...scopeOpts, projection: { prompt: 0 } }),
+        dispatchQueueStore.listHistory(req.proxyUrlKey, { limit: 200, ...scopeOpts, projection: { prompt: 0 } })
       ]);
 
       const merged = [
