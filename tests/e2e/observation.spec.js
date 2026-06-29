@@ -34,6 +34,12 @@ async function clearRuns(page) {
   // above — clear it too, or a stale derived doc + backfill marker would mask the
   // freshly-seeded run and the live fallback would never engage.
   await page.goto(`/test/clear-observation-sessions?urlKey=${URL_KEY}`);
+  // The LIN-617 sessions-feed cache (in-process, 5s TTL, keyed by workspace set) is
+  // a projection too — but of the merged feed OUTPUT, not the stores. Left warm it
+  // serves the stale pre-seed feed within its TTL, so the first assertion races a
+  // feed that predates this test's seed. Drop it so the reset is fully consistent
+  // (LIN-799). Production TTL semantics are unaffected — this is a test-reset seam.
+  await page.goto(`/test/clear-sessions-feed-cache?urlKey=${URL_KEY}`);
 }
 
 async function seedQueuedRun(page, { issueIdentifier, issueTitle, kind = 'autopilot' }) {

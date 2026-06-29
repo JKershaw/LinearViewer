@@ -136,3 +136,54 @@ describe('sessions-feed-cache: get', () => {
     assert.equal(await cache.get('k', produce), 'good');
   });
 });
+
+describe('sessions-feed-cache: clear (LIN-799 test-reset seam)', () => {
+  test('clearing a workspace forces a fresh production on the next get', async () => {
+    const cache = createSessionsFeedCache();
+    let calls = 0;
+    const produce = async () => { calls++; return `gen-${calls}`; };
+    const key = cache.keyFor([{ urlKey: 'ws-a' }]);
+
+    assert.equal(await cache.get(key, produce), 'gen-1');
+    assert.equal(await cache.get(key, produce), 'gen-1', 'served from cache within TTL');
+
+    cache.clear('ws-a');
+    assert.equal(await cache.get(key, produce), 'gen-2', 'cleared entry re-produces');
+    assert.equal(calls, 2);
+  });
+
+  test('clear is scoped to entries whose workspace set includes the key', async () => {
+    const cache = createSessionsFeedCache();
+    const produce = async () => 'v';
+    const keyA = cache.keyFor([{ urlKey: 'ws-a' }]);
+    const keyAB = cache.keyFor([{ urlKey: 'ws-a' }, { urlKey: 'ws-b' }]);
+    const keyC = cache.keyFor([{ urlKey: 'ws-c' }]);
+    let aCalls = 0, abCalls = 0, cCalls = 0;
+    await cache.get(keyA, async () => { aCalls++; return 'a'; });
+    await cache.get(keyAB, async () => { abCalls++; return 'ab'; });
+    await cache.get(keyC, async () => { cCalls++; return 'c'; });
+
+    cache.clear('ws-a'); // drops keyA and keyAB (both include ws-a), leaves keyC
+
+    await cache.get(keyA, async () => { aCalls++; return 'a'; });
+    await cache.get(keyAB, async () => { abCalls++; return 'ab'; });
+    await cache.get(keyC, async () => { cCalls++; return 'c'; });
+    assert.equal(aCalls, 2, 'ws-a entry re-produced');
+    assert.equal(abCalls, 2, 'ws-a∪ws-b entry re-produced');
+    assert.equal(cCalls, 1, 'unrelated ws-c entry untouched');
+  });
+
+  test('clear() with no argument drops every entry', async () => {
+    const cache = createSessionsFeedCache();
+    let calls = 0;
+    const produce = async () => { calls++; return 'v'; };
+    await cache.get('k1', produce);
+    await cache.get('k2', produce);
+    assert.equal(calls, 2);
+
+    cache.clear();
+    await cache.get('k1', produce);
+    await cache.get('k2', produce);
+    assert.equal(calls, 4, 'both entries re-produced after a full clear');
+  });
+});

@@ -36,7 +36,7 @@ import { defaultGitHubProjectsSeed, GITHUB_PROJECTS_WORKSPACE_URL_KEY, GITHUB_PR
  * @param {Function} options.getWorkspaceAccessToken - Function to look up workspace access token
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, taskSnapshotStore, localStore, getWorkspaceAccessToken }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, taskSnapshotStore, localStore, getWorkspaceAccessToken }) {
   const router = Router();
 
   // ── Mock Yap server (LIN-450) ─────────────────────────────────────────────
@@ -323,6 +323,20 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   router.get('/test/clear-observation-sessions', async (req, res) => {
     try {
       if (observationSessionsStore) await observationSessionsStore.clear(req.query.urlKey || 'test-workspace')
+      res.send('ok')
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
+
+  // Endpoint to drop the in-process Observation sessions-feed cache for testing
+  // (LIN-799). The LIN-617 feed cache is a process singleton keyed by the
+  // connected-workspace set; clearRuns() wipes the source logs + read-model but the
+  // cached OUTPUT survived its 5s TTL and served a stale pre-seed feed, racing the
+  // first assertion. Resetting state must drop this too. No-op if not wired.
+  router.get('/test/clear-sessions-feed-cache', (req, res) => {
+    try {
+      if (sessionsFeedCache) sessionsFeedCache.clear(req.query.urlKey || 'test-workspace')
       res.send('ok')
     } catch (err) {
       res.status(500).json({ error: err.message })
