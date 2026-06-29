@@ -1734,8 +1734,8 @@ describe('meta-prompt review close-out gate + cannot-close routing (LIN-474)', (
     // A SEPARATE Close-out rule now owns the ledger gate (the three blocking invariants).
     const closeoutMatches = p.match(/\*\*Close-out prompts\*\* must/g) || [];
     assert.strictEqual(closeoutMatches.length, 1, 'exactly one Close-out-prompts rule exists');
-    assert.ok(/treat a MISSING or unparseable ledger as a BLOCK, never as "empty"/i.test(p), 'close-out blocks on a missing ledger');
-    assert.ok(/it never discharges a ledger item/i.test(p), 'green CI never discharges a ledger item');
+    assert.ok(/gate on the review verdict rather than any specific format/i.test(p), 'close-out gates on the verdict, not the exact heading (LIN-810)');
+    assert.ok(/it never discharges a flagged gap/i.test(p), 'green CI never discharges a flagged gap');
     assert.ok(/names the exact precondition they exercised/i.test(p), 'human acceptance must name the exact precondition');
   });
 
@@ -1792,13 +1792,18 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
       'merge/Done/summary/follow-ups happen only on all-clear');
   });
 
-  test('(b) the review→close-out ledger section round-trips (review writes it, close-out reads it by name)', () => {
+  test('(b) review writes a structured ledger; close-out reads the verdict/gaps without keying on the heading (LIN-810 decoupling)', () => {
     const review = generatePrompt('review', issue, context).prompt;
     const closeout = generatePrompt('close-out', issue, context).prompt;
+    // Review still emits the structured heading — helpful structure when present.
     assert.ok(review.includes('### What CI Did Not Prove'), 'review writes the ### What CI Did Not Prove ledger');
     assert.ok(/add a summary comment containing the `### What CI Did Not Prove` ledger/i.test(review),
       'review records the ledger into its summary comment (the carrier)');
-    assert.ok(closeout.includes('### What CI Did Not Prove'), 'close-out reads the same ### What CI Did Not Prove ledger');
+    // Close-out no longer requires that exact string — it reads the verdict and flagged gaps fuzzily.
+    assert.ok(!closeout.includes('### What CI Did Not Prove'),
+      'close-out does not key on the literal heading (decoupled)');
+    assert.ok(/gaps it flagged as (not covered by|unproven by) CI/i.test(closeout),
+      'close-out reads the review\'s flagged gaps generically');
   });
 
   test('(c) empty ledger => close-out is a cheap no-op pass-through; review allows an unconditional Approve only then', () => {
@@ -1812,11 +1817,13 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
       'review states the empty-ledger ⇒ no-op contract');
   });
 
-  test('(d) the three blocking invariants are present in the rendered close-out body', () => {
+  test('(d) the gate invariants are present in the rendered close-out body', () => {
     const { prompt } = generatePrompt('close-out', issue, context);
-    // 1. missing/unparseable ledger BLOCKS — never treated as empty
-    assert.ok(/Missing or unparseable ledger BLOCKS — absent is not empty/i.test(prompt),
-      'missing/unparseable ledger blocks and is not treated as empty');
+    // 1. gate on the review verdict — an absent ledger under an Approve is treated as empty (LIN-810)
+    assert.ok(/Gate on the review verdict/i.test(prompt),
+      'close-out gates on the verdict, treating an absent ledger under an Approve as empty');
+    assert.ok(/treat the absence of such gaps as an empty ledger/i.test(prompt),
+      'an absent ledger under an Approve is read as empty, not a block');
     // 2. green CI alone never discharges a ledger item
     assert.ok(/Green CI is never evidence for a ledger item/i.test(prompt),
       'green CI never discharges a ledger item');
@@ -1825,6 +1832,23 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
       'a human validation that does not name the precondition does not discharge');
     assert.ok(/by a human who names the exact precondition they exercised/i.test(prompt),
       'explicit human acceptance must name the exact precondition');
+  });
+
+  test('(f) close-out relaxes the missing-ledger block: verdict-gated, absent-is-empty, only no-verdict routes to review (LIN-810)', () => {
+    const { prompt } = generatePrompt('close-out', issue, context);
+    // The old hard block on a missing/unparseable heading is gone.
+    assert.ok(!/Missing or unparseable ledger BLOCKS/i.test(prompt),
+      'the old missing-ledger hard-block language is removed');
+    assert.ok(!/route back to `review` to \(re\)write/i.test(prompt),
+      'no longer routes back to review over a missing heading');
+    // Gate on the verdict; absence of flagged gaps under an Approve is an empty ledger.
+    assert.ok(/When the latest review records an \*\*Approve\*\*/i.test(prompt),
+      'proceeds when the review recorded an Approve');
+    assert.ok(/note that in your summary/i.test(prompt),
+      'records the absence of an explicit ledger in the summary');
+    // Only a complete lack of a review verdict is unauthorized to close.
+    assert.ok(/no review verdict at all is unauthorized to close/i.test(prompt),
+      'only a task with no review verdict at all routes back to review');
   });
 
   test('(e1) close-out body emits no literal "Linear" and renames cleanly for a non-Linear provider', () => {
