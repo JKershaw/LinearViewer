@@ -701,6 +701,66 @@ describe('buildMetaPromptTemplate review routing for a plan-less landed leaf (LI
 });
 
 // =============================================================================
+// Close-out routing gate (LIN-812) — close-out and review are the positive/negative
+// pair of ONE decision (the review→close-out split, LIN-550; the verdict-not-heading
+// relax, LIN-810; the positive-review-evidence requirement, LIN-811). The recommender
+// baseline did not cover `close-out` at all (LIN-804: it fired ~1/3 of the time it
+// should), so these structural guards pin the routing prose that the LLM shape-coverage
+// fixtures (scripts/eval/fixtures/recommend/closeout-review.json) measure under load.
+// The decision is driven by COMMENT-TRAIL state: an Approve verdict on record +
+// unmerged → close-out; work that merely looks done with NO review-verdict comment →
+// review. Step 0 carries it for the already-complete node; Step 3 for the landed leaf.
+// =============================================================================
+describe('buildMetaPromptTemplate close-out routing gate (LIN-812)', () => {
+  function build(overrides = {}) {
+    return buildMetaPromptTemplate({
+      issueContext: 'Test context', identifier: 'LIN-1', hasSubtasks: false,
+      subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
+      hasComments: true, commentCount: 2, aiHints: 'hints',
+      actionVocabulary: getAIRecommendationActionNames().join(', '), ...overrides
+    });
+  }
+
+  test('Step 0 routes an approved-but-unmerged finished task to close-out, not another review', () => {
+    // All subtasks complete (hasSubtasks, no open children) arms the Step-0 branch.
+    const text = build({ isTerminal: false, hasSubtasks: true, subtaskCount: 2, completedCount: 2, hasOpenChildren: false });
+    assert.ok(/### Step 0: The substantive work here is already complete/.test(text),
+      'Step 0 must fire for a finished node with no open children');
+    assert.ok(/Approve \(or Approve — conditional\) verdict and a ledger, but the work is still unmerged \/ not Done → recommend \`close-out\`, NOT another \`review\`/i.test(text),
+      'Step 0 must route approved-but-unmerged work to close-out, not a repeated review');
+  });
+
+  test('Step 0 requires positive review evidence before close-out — looking done is not enough', () => {
+    const text = build({ isTerminal: false, hasSubtasks: true, subtaskCount: 1, completedCount: 1, hasOpenChildren: false });
+    assert.ok(/\`close-out\` requires positive evidence that a review actually ran/i.test(text),
+      'close-out must demand positive evidence (a review-verdict comment) on the trail');
+    assert.ok(/if no such review comment is on the trail, the review has not happened — recommend \`review\`/i.test(text),
+      'absent a review-verdict comment, the gate must route to review');
+    assert.ok(/When the evidence is ambiguous, default to \`review\`/i.test(text),
+      'ambiguous evidence must default to review, never close-out');
+  });
+
+  test('Step 3 carries the landed-leaf close-out path (approve-on-record + unmerged)', () => {
+    // Childless open leaf: Step 0 cannot fire, so Step 3 owns the close-out routing.
+    const text = build({ isTerminal: false, hasSubtasks: false, hasOpenChildren: false });
+    assert.ok(!/### Step 0: The substantive work here is already complete/.test(text),
+      'Step 0 must NOT fire for a childless open leaf — Step 3 is the path');
+    assert.ok(/Implementation landed AND \`review\` has already recorded an Approve \(or Approve — conditional\) verdict.*Recommend \`close-out\`/is.test(text),
+      'Step 3 must route landed + approved-on-record + unmerged work to close-out');
+    assert.ok(/A rich, detailed, or complete-looking description is not that evidence.*recommend \`review\`/is.test(text),
+      'Step 3 must keep the LIN-811 positive-evidence requirement on the leaf path too');
+  });
+
+  test('the cannot-close branch routes landed-but-red / blocked work away from close-out', () => {
+    const text = build({ isTerminal: false, hasSubtasks: true, subtaskCount: 1, completedCount: 1, hasOpenChildren: false });
+    assert.ok(/Cannot-close branch/i.test(text),
+      'Step 0 must carry the cannot-close branch');
+    assert.ok(/if the comments already show the work landed but CI is red.*do NOT keep routing to \`review\` or \`close-out\`/is.test(text),
+      'landed-but-red work must route to the blocker, not to review/close-out');
+  });
+});
+
+// =============================================================================
 // Over-advance guard (LIN-597) — the engine's dominant front-half miss is reaching
 // too far down-lifecycle (e.g. `implement`) on a task with too little COMMITTED
 // SCOPE to act. Step 3 now makes the rule explicit and one-directional: absent

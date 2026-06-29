@@ -2,6 +2,14 @@
 /**
  * A/B eval for the review prompt's "Not-Proven-by-CI ledger" directive (LIN-550).
  *
+ * NOT recommender close-out coverage (LIN-812). Despite the filename, this exercises
+ * the HANDWRITTEN `review` prompt's ledger via `generatePrompt('review', …)` — it never
+ * touches the meta-prompt recommender and never measures `close-out` ROUTING. The
+ * recommender's close-out/review routing gate is covered by
+ * scripts/eval-recommend-baseline.mjs over scripts/eval/fixtures/recommend/closeout-review.json
+ * (shape coverage) and tests/unit/openrouter.test.js ('close-out routing gate (LIN-812)')
+ * (the deterministic guard). Don't confuse the two.
+ *
  * The directive's risk is NOISE: on the ~majority of tasks where green CI genuinely
  * covers the whole deliverable (a self-contained, unit-tested, pure-internal change),
  * does the new `### What CI Did Not Prove` ledger make review MANUFACTURE doubt —
