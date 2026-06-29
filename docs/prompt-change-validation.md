@@ -65,8 +65,12 @@ catch regressions and accidental divergence but prove nothing about behavior —
 ### 5. Measure behavioral impact (an offline A/B eval)
 
 Structural tests prove the words are there; an A/B eval estimates whether the words
-change model behavior. The harness is `scripts/eval-completeness-check.mjs`; adapt
-its cases for other directives. The design rules that made it trustworthy:
+change model behavior. The harness is `scripts/eval-completeness-check.mjs` (plan
+breadth-awareness); `scripts/eval-research-routing.mjs` (research routing) and
+`scripts/eval-review-closeout.mjs` (LIN-550 — whether the review ledger adds *noise*
+on self-contained, CI-covered tasks) are sibling harnesses cut from the same pattern
+when a directive lives in a different prompt with a different metric. Adapt the cases
+for other directives. The design rules that made it trustworthy:
 
 - **The prompt is the only variable.** Arm B = the live prompt; arm A = the same
   prompt with the one directive stripped. Nothing else differs.

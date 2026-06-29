@@ -801,7 +801,7 @@ Returns the **Autopilot kickoff** as **plain text** (`text/plain`) — the brief
 
 | Query param | Default | Description |
 |-------------|---------|-------------|
-| `mode` | `write` | `write` allows implementation/review kinds and an evidence-gated merge; `readonly` restricts dispatched work to investigation/research/planning/retro (no code, PRs, or issue writes). |
+| `mode` | `write` | `write` allows implementation/review/close-out kinds and an evidence-gated merge (review writes the Not-Proven-by-CI ledger; `close-out` discharges or accepts each item, then merges and sets Done); `readonly` restricts dispatched work to investigation/research/planning/retro (no code, PRs, or issue writes). |
 | `goal` | _(none)_ | Optional free-text focus for the run. Omitted ⇒ walk the stack under the precedence policy. |
 
 The body embeds `YOUR_TOKEN` as a placeholder; substitute the consumer's `readWrite` token (Autopilot reuses it for the prompts it dispatches). A read-scope token can fetch the kickoff, but running it needs `readWrite` (Autopilot dispatches). The general (stack-walk) kickoff is what this endpoint serves; the in-app per-task variant ("run on autopilot until this task is done") is generated at `/workspace/:urlKey/api/autopilot-prompt/:issueId`.
