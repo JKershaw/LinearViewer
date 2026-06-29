@@ -280,6 +280,7 @@ and is the recommended pattern for any consumer that posts foreman status.
 | `abort` | boolean | When `true`, this item asks the consumer to cancel/close an existing session (named by `abortTo`) instead of running a prompt. Defaults to `false`. See [Aborting a session](#aborting-a-session) |
 | `abortTo` | string | The `id` of the dispatch whose session should be aborted, or `null`. Required when `abort` is `true`. See [Aborting a session](#aborting-a-session) (nullable) |
 | `sessionId` | string | The `id` of the autopilot dispatch that spawned this worker, or `null`. Groups worker dispatches into one autopilot session (any target). See [Autopilot sessions](#autopilot-sessions) (nullable) |
+| `waitForFollowUps` | boolean | Opt-in completion hold (default `false`). When `true`, the consumer should hold the session open at completion to receive in-session follow-ups instead of finalizing. See [Completion hold](#completion-hold-waitforfollowups). |
 | `workspace.urlKey` | string | Workspace identifier |
 | `dispatchedAt` | string | ISO 8601 timestamp when item was queued |
 | `dispatchedBy` | string | Linear user ID who dispatched (nullable) |
@@ -409,6 +410,38 @@ verbatim — it owns no grouping logic.
   store does **not** verify the referenced autopilot dispatch exists.
 - **Independent of `followUpTo`.** The two are orthogonal: a worker may both resume a
   session (`followUpTo`) and belong to an autopilot run (`sessionId`).
+
+## Completion hold (`waitForFollowUps`)
+
+`waitForFollowUps` is an **opt-in completion hold**, distinct from `followUpTo`: it is set
+on the *original* dispatch (not a later one) to tell the consumer how that session should
+behave when its work completes.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `waitForFollowUps` | boolean | No | When `true`, hold the session open at completion to receive in-session follow-ups (beats) instead of finalizing. Default `false`. |
+
+The dispatch store records and forwards `waitForFollowUps` verbatim — it owns no behaviour;
+the **consumer/runner** owns the hold. The flag exists so the *launcher*, which knows the
+session's role, can choose at dispatch time:
+
+- **Set `true` for a worker** you intend to keep feeding follow-ups in-session — it holds at
+  completion and takes the next beat without a cold restart, keeping its context.
+- **Leave it `false` (omit) for an orchestrator / sub-orchestrator** — a producer that runs
+  its own loop must finalize normally and stay free to watch. Holding a producer open leaves
+  it non-terminal and can deadlock (a producer waiting on a follow-up to itself while its
+  worker waits to be fed, neither terminal so no watch fires). Unflagged, a stalled producer
+  goes terminal and its driver can resume it.
+
+**Rules and constraints:**
+
+- **cli/web only.** Resumable in-session holds apply to CLI and web consumers; `dash`/`local`
+  consumers ignore the flag.
+- **Boolean and validated.** `waitForFollowUps` must be a boolean when present (`400`
+  otherwise); any non-`true` value stores as the default `false`.
+- **Pairs with the watch.** A held worker stays healthy only if its next beat arrives inside
+  its hold budget — keep the long-poll on the dispatch watch live so beats are delivered
+  promptly; an unflagged producer instead relies on the ordinary async-wait/watch path.
 
 ## Target Routing
 

@@ -1232,7 +1232,7 @@ POST ${baseUrl}/api/proxy/agent/status   (alias: /api/proxy/foreman/status — d
 ## Dispatch Endpoints
 
 POST ${baseUrl}/api/proxy/dispatch
-  Body: { "prompt": "...", "promptName": "...", "kind": "implementation", "issueId": "...", "issueIdentifier": "LIN-42", "issueTitle": "...", "issueUrl": "...", "target": "cli|web|dash", "repo": "...", "followUpTo": "...", "force": false, "abort": false, "abortTo": "...", "sessionId": "...", "appendProxyContext": true }
+  Body: { "prompt": "...", "promptName": "...", "kind": "implementation", "issueId": "...", "issueIdentifier": "LIN-42", "issueTitle": "...", "issueUrl": "...", "target": "cli|web|dash", "repo": "...", "followUpTo": "...", "force": false, "abort": false, "abortTo": "...", "sessionId": "...", "waitForFollowUps": false, "appendProxyContext": true }
   → Queue a prompt for the workspace's dispatch consumer (the runner). Only "prompt" is required; target defaults to "cli". ("local"/Harbour OS is not available to proxy consumers.)
   → "kind" is a stable task classification (research/plan/implementation/review/etc. — the prompt-template keys, plus "custom"). Optional: when omitted it is derived from "promptName", falling back to "custom". Read it instead of inferring the task type from promptName or the prompt body.
   → "followUpTo" (optional) resumes an existing session: pass the "id" of an earlier dispatch and "prompt" becomes a follow-up instruction to that same session. cli/web only, same workspace. The runner owns session liveness — if the session is gone it posts terminal "[failed] no live session to resume". Use sparingly: only when the prior session ran cleanly and naturally suggests the next step (e.g. confirm CI is green, update Linear/git); any wobble → dispatch a fresh session instead.
@@ -1240,16 +1240,18 @@ POST ${baseUrl}/api/proxy/dispatch
   → "abort" (optional, default false) requests an abort/cancel/close of an existing session instead of running a prompt: set "abort": true and "abortTo" to the "id" of the dispatch whose session should be cancelled. "prompt" is NOT required for an abort, and the consumer flips the running session to a terminal cancelled state. The abort item's OWN "target" must be poll-eligible (cli/web/dash) — eligibility is the abort item's target, NOT the substrate of the session being aborted (so you can abort a "dash" session with a "cli" abort item). Mutually exclusive with "followUpTo". See LIN-743.
   → "abortTo" (required when "abort" is true) is the dispatch id (UUID) of the session to abort. Stored + forwarded blindly; the consumer owns session liveness.
   → "sessionId" (optional) is the autopilot dispatch id that spawned this worker. Pass it on every worker dispatch the autopilot fans out so the run reconstructs as one session across all touched tasks (incl. epic descent / breakdown spin-offs). UUID, stored + forwarded blindly, ANY target (unlike followUpTo). See LIN-591.
+  → "waitForFollowUps" (optional boolean, default false; cli/web only) is the opt-in completion hold: when true the runner holds the session open at completion to receive in-session follow-ups (beats) instead of finalizing. The runner owns the behaviour — this flag is stored + forwarded blindly. Set it for a worker you intend to keep feeding in-session; leave it false (omit) for an orchestrator/sub-orchestrator that must finalize normally and stay free to run its own watch loop. See LIN-795/LIN-797.
   → By default a proxy-context block is appended to the prompt so the worker inherits this workspace's API access. Reporting is handled by the runner's Stop hook, not the prompt. Set "appendProxyContext": false to opt out.
   → { "id": "...", "status": "queued", "promptName": "...", "kind": "implementation", "issueIdentifier": "...", "target": "cli", "abort": false, "abortTo": null, "sessionId": null, "dispatchedAt": "..." }
 
 POST ${baseUrl}/api/proxy/recommend-and-dispatch
-  Body: { "issueIdentifier": "LIN-42", "target": "cli|web|dash", "repo": "...", "appendProxyContext": true, "noDescend": false, "kind": "review", "sessionId": "..." }
+  Body: { "issueIdentifier": "LIN-42", "target": "cli|web|dash", "repo": "...", "appendProxyContext": true, "noDescend": false, "kind": "review", "sessionId": "...", "waitForFollowUps": false }
   → Fused verb: runs /recommend and forwards the recommended prompt straight into a dispatch, server-side. "issueIdentifier" is required; target defaults to "cli".
   → "sessionId" (optional) is the autopilot dispatch id driving this run; stamp it on every fan-out so the whole multi-task run reconstructs as one session. UUID, any target. See LIN-591.
   → The prompt body NEVER returns to you — you only get the task header. This keeps the prompt out of your context (the point of the verb); learn what was chosen from "kind"/"promptName", then watch the item via GET /dispatch/{id}.
   → "kind" is derived from the recommendation's own action signal (falling back to "custom") — no need to read the prompt to classify the task.
   → Set "noDescend": true to dispatch the named issue's OWN next step and NOT descend into an open child (deterministic). Use it to drive a parent whose deliverables live in its own description while a child is out of scope / separately tracked; the dispatched item then references the parent, and "deferredVia" is just [parent].
+  → "waitForFollowUps" (optional boolean, default false; cli/web only) is threaded onto the dispatched item, same meaning as on POST /dispatch — the opt-in completion hold. Set it when this dispatch is a worker you intend to keep feeding in-session; leave it false for an orchestrator/sub-orchestrator. See LIN-795/LIN-797.
   → VERB OVERRIDE — pass "kind" (a prompt template key: plan, implementation, review, research, design, breakdown, look-into, triage, scoping, spike, context, retro, blocked) to PIN the step when the engine's chosen verb is demonstrably wrong. The server still WRITES the body — you pick the verb, never the words. Override pins the NAMED issue with NO descent and skips the LLM entirely; response carries "override": true. Use sparingly and only on a clear engine miss (see the autopilot manual); it is not the everyday path. Invalid keys (incl. defer/custom/autopilot/periodical) get a 400.
   → { "id": "...", "status": "queued", "kind": "plan", "promptName": "plan", "issueIdentifier": "...", "target": "cli", "sessionId": null, "dispatchedAt": "..." }
 
@@ -1257,7 +1259,7 @@ POST ${baseUrl}/api/proxy/autopilot/kickoff
   Body: { "goal": "...", "mode": "write|readonly", "issueIdentifier": "LIN-42", "target": "cli|web|dash", "repo": "...", "appendProxyContext": true }
   → Fused launch verb: builds the Autopilot kickoff AND dispatches it in one call — the single verb that actually STARTS a run from a goal (no need to GET the kickoff text and POST it back). The receiving session becomes the Autopilot orchestrator. All fields optional.
   → Omit "issueIdentifier" for a GENERAL run ("goal" focuses the stack walk); pass it for a SCOPED run ("autopilot until THIS task is done") — the project "repo=" is then inherited unless you pass "repo". "mode" defaults to "write" ("readonly" = investigation only).
-  → Dispatched as kind:"autopilot", so the returned "id" IS this run's session id. Pass that id as "sessionId" on every worker dispatch the run fans out (the kickoff body also tells the run its own id).
+  → Dispatched as kind:"autopilot", so the returned "id" IS this run's session id. Pass that id as "sessionId" on every worker dispatch the run fans out (the kickoff body also tells the run its own id). The orchestrator itself is launched WITHOUT "waitForFollowUps" (default false) so it finalizes normally and stays free to run its watch loop.
   → The prompt body NEVER returns to you — only the header. The GET twin (GET /api/proxy/autopilot/kickoff?goal=&mode=) stays a text-only preview/inspect form that does NOT enqueue anything.
   → { "id": "...", "sessionId": "...", "status": "queued", "kind": "autopilot", "promptName": "Autopilot (stack walk)", "mode": "write", "issueIdentifier": null, "target": "cli", "dispatchedAt": "..." }
 
@@ -3909,7 +3911,7 @@ One convention across every endpoint, so you can branch on the same fields every
     }
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo, force, abort, abortTo, sessionId } = req.body || {};
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo, force, abort, abortTo, sessionId, waitForFollowUps } = req.body || {};
 
       // Abort verb (LIN-743): an abort item cancels/closes an existing session
       // (named by abortTo) instead of running a prompt — it carries no prompt and
@@ -3946,6 +3948,12 @@ One convention across every endpoint, so you can branch on the same fields every
       if (kind !== undefined && !isValidDispatchKind(kind)) {
         logEvent(req, '/api/proxy/dispatch', 400);
         return badRequest.json(res, `kind must be one of: ${DISPATCH_KINDS.join(', ')}`);
+      }
+      // Opt-in completion hold (LIN-797): boolean, default false. Stored +
+      // forwarded blindly — the runner owns the behaviour (see LIN-795).
+      if (waitForFollowUps !== undefined && typeof waitForFollowUps !== 'boolean') {
+        logEvent(req, '/api/proxy/dispatch', 400);
+        return badRequest.json(res, 'waitForFollowUps must be a boolean');
       }
 
       if (prompt && prompt.length > MAX_PROMPT_LENGTH) {
@@ -4067,7 +4075,8 @@ One convention across every endpoint, so you can branch on the same fields every
         force: force === true,
         abort: isAbort,
         abortTo: isAbort ? abortTo : null,
-        sessionId: sessionId || null
+        sessionId: sessionId || null,
+        waitForFollowUps: waitForFollowUps === true
       });
 
       logEvent(req, '/api/proxy/dispatch', 201);
@@ -4114,7 +4123,7 @@ One convention across every endpoint, so you can branch on the same fields every
     }
 
     try {
-      const { issueIdentifier, target, repo, appendProxyContext, noDescend, kind, sessionId } = req.body || {};
+      const { issueIdentifier, target, repo, appendProxyContext, noDescend, kind, sessionId, waitForFollowUps } = req.body || {};
 
       // Validate caller-supplied inputs. (Only the server-generated prompt skips
       // the dangerous-char/length checks — see the dispatch step below.)
@@ -4133,6 +4142,12 @@ One convention across every endpoint, so you can branch on the same fields every
       if (noDescend !== undefined && typeof noDescend !== 'boolean') {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
         return badRequest.json(res, 'noDescend must be a boolean');
+      }
+      // Opt-in completion hold (LIN-797): boolean, default false. Threaded through
+      // to the dispatched item and forwarded blindly — the runner owns the behaviour.
+      if (waitForFollowUps !== undefined && typeof waitForFollowUps !== 'boolean') {
+        logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
+        return badRequest.json(res, 'waitForFollowUps must be a boolean');
       }
       if (repo !== undefined && (typeof repo !== 'string' || repo.length > MAX_NAME_LENGTH || DANGEROUS_CHARS_REGEX.test(repo))) {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
@@ -4363,7 +4378,9 @@ One convention across every endpoint, so you can branch on the same fields every
           // is functional execution context (working directory), so this fused
           // verb must propagate it, not just the display header fields (LIN-537).
           repo: repo || rec.repo || null,
-          sessionId: sessionId || null
+          sessionId: sessionId || null,
+          // Opt-in completion hold (LIN-797), forwarded blindly to the runner.
+          waitForFollowUps: waitForFollowUps === true
         });
 
         keepalive.stop();

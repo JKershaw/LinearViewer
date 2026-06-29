@@ -195,7 +195,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const { workspace } = req;
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo, force, abort, abortTo, sessionId } = req.body;
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo, force, abort, abortTo, sessionId, waitForFollowUps } = req.body;
 
       // Abort verb (LIN-743): an abort item asks the consumer to cancel/close an
       // existing session (named by abortTo) instead of running a prompt, so it
@@ -237,6 +237,12 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       // Validate kind if provided; when omitted it is derived from promptName below.
       if (kind !== undefined && !isValidDispatchKind(kind)) {
         return badRequest.json(res, `kind must be one of: ${DISPATCH_KINDS.join(', ')}`);
+      }
+
+      // Opt-in completion hold (LIN-797): boolean, default false. Stored +
+      // forwarded blindly — the runner owns the behaviour (see LIN-795).
+      if (waitForFollowUps !== undefined && typeof waitForFollowUps !== 'boolean') {
+        return badRequest.json(res, 'waitForFollowUps must be a boolean');
       }
 
       // Reject local target from non-localhost requests
@@ -341,7 +347,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         force: force === true,
         abort: isAbort,
         abortTo: isAbort ? abortTo : null,
-        sessionId: sessionId || null
+        sessionId: sessionId || null,
+        waitForFollowUps: waitForFollowUps === true
       });
 
       // Spawn a Harbour OS Claude session when target is 'local' (the API value
