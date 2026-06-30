@@ -250,19 +250,31 @@ describe('buildAutopilotKickoff (variant axis, LIN-791)', () => {
     assert.strictEqual(withoutStepper, standard);
   });
 
-  test('stepper output carries the full disposition (warm beats, ROOT, force, labels, keep-alive, challenge, wrap-up)', () => {
+  test('stepper output carries the full disposition (warm beats, ROOT, force, subscribe, push rails, labels, challenge, wrap-up)', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL, variant: 'stepper' });
     assert.ok(text.includes(STEPPER_MARKER));
     assert.ok(text.includes('3–6'));                 // decompose into 3–6 beats
     assert.ok(text.includes('ROOT'));                // beat 1 fresh, captured as ROOT
     assert.ok(text.includes('followUpTo: ROOT'));    // later beats anchor on ROOT
     assert.ok(text.includes('force: true'));         // force on every resume
+    assert.ok(text.includes('subscribe: true'));     // LIN-843: every beat is subscribed (push rails)
     assert.ok(text.includes('beat N/M'));            // label every send
-    assert.ok(text.includes('run_in_background'));   // long-poll keep-alive
-    assert.ok(text.includes('PENDING'));             // mid-chain PENDING = clean advance
+    assert.ok(text.includes('PENDING'));             // PENDING wake = clean advance, the push signal
     assert.ok(text.toLowerCase().includes('challenge'));
     assert.ok(text.toLowerCase().includes('wrap-up'));
     assert.ok(/warm/i.test(text));                   // warm single-session default
+  });
+
+  test('the stepper is on PUSH RAILS — it stands by, no hand-rolled long-poll keep-alive (LIN-843)', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, variant: 'stepper' });
+    // The orchestrator stands by for the up-chain wake instead of long-polling.
+    assert.ok(/stand by/i.test(text), 'stepper instructs the orchestrator to stand by');
+    assert.ok(/push rails/i.test(text), 'names the push-rails contract');
+    // The old long-poll keep-alive loop must be gone as the delivery mechanism —
+    // run_in_background may still appear, but only as something to NOT do.
+    assert.ok(!/long-poll background wait IS your/i.test(text), 'the old keep-warm-via-long-poll claim is gone');
+    assert.ok(/do not run a `run_in_background` long-poll/i.test(text) || /do not .*long-poll/i.test(text),
+      'long-poll is now prohibited, not the mechanism');
   });
 
   test('variant is orthogonal to mode — stepper composes with readonly', () => {

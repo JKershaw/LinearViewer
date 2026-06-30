@@ -225,25 +225,37 @@ enters a `standard` kickoff — which stays byte-identical. It is deliberately *
 
 The stepper drives **one warm session** through ordered **beats** instead of one-shotting a task's
 worker prompt — the disposition proved by [LIN-788](https://linear.app/linearviewer/issue/LIN-788)
-and made survivable by [LIN-793](https://linear.app/linearviewer/issue/LIN-793) (don't-reap) +
-long-poll delivery ([LIN-794](https://linear.app/linearviewer/issue/LIN-794)):
+and made survivable by [LIN-793](https://linear.app/linearviewer/issue/LIN-793) (don't-reap), now on
+**push rails** ([LIN-843](https://linear.app/linearviewer/issue/LIN-843) /
+[LIN-841](https://linear.app/linearviewer/issue/LIN-841)) — every beat is `subscribe: true` and the
+orchestrator stands by for the up-chain wake instead of hand-rolling a long-poll:
 
 1. **Read** the task's worker prompt (`GET /recommend/{id}` — the un-fused GET returns the body).
 2. **Decompose** it into **3–6 ordered, self-contained beats** that follow the prompt's own
    structure, staying within **one kind** (don't chain into review — keep the fresh-eyes boundary).
 3. **Beat 1 is fresh; capture its dispatch id as `ROOT`.** Every later beat resumes that same warm
-   session with `followUpTo: ROOT` (always beat-1's id — a stable anchor) **+ `force: true`**,
-   `target: web`, `sessionId` = the orchestrator's own id.
-4. **Deliver each beat via long-poll inside a `run_in_background` task** (`GET /dispatch/{id}?wait=Ns`,
-   sub-20-min cycles) — never a long foreground loop, never idle-on-`PENDING`. The hold returns within
-   seconds of the beat going terminal, so the next beat lands inside the session's warm hold
-   (in-session, no `--resume`), **and** the returning task re-invokes the orchestrator — the async-wait
-   defer that resets the verify-backstop clock. **The long-poll background wait is the keep-warm
-   mechanism** (it's what kept earlier orchestrators from being reaped as "silent" at 32–47 min).
+   session with `followUpTo: ROOT` (always beat-1's id — a stable anchor) **+ `force: true`** **+
+   `subscribe: true`**, `target: web`, `sessionId` = the orchestrator's own id. `subscribe: true` on
+   every beat is what declares the up-chain edge that puts the run on push rails.
+4. **Stand by for the push — do not long-poll.** Because every beat is `subscribe: true`, the
+   orchestrator is woken automatically the moment a beat reaches a stop boundary — `done`/`failed`/
+   `blocked`, **and** `PENDING` (the holdable beat boundary), which now fires an up-chain wake labelled
+   *paused (pending), not done* ([LIN-843](https://linear.app/linearviewer/issue/LIN-843)). So the
+   orchestrator just **stops and stands by** after dispatching a beat — no `GET /dispatch/{id}?wait=Ns`
+   watch, no foreground loop, no `run_in_background` long-poll. The hold is automatic once it stops
+   without an outstanding background wait, and the wake arrives within seconds, so beat boundaries
+   advance in seconds rather than at the old ~14-min long-poll cap. This retires the hand-rolled
+   long-poll active-wait that was the common root of the beat-boundary deadlock and the LIN-831 wedge.
+   The worker stays warm on its own side (the runner holds it `AWAITING_FOLLOWUP` at `PENDING`), so the
+   next beat's `followUpTo: ROOT` + `force: true` lands inside that warm hold (in-session, no
+   `--resume`). The one ceiling the push can't cover is a **wedged beat** that goes silent without ever
+   reaching a boundary: after ~30 min of zero activity, nudge with a `followUpTo: ROOT` liveness ping,
+   then re-dispatch fresh — but don't rebuild that exception into a standing poll.
 5. **Judge *and* challenge** each beat before advancing — interrogate it (real tests? followed the
-   plan? grounded against HEAD?) and send a corrective `followUpTo: ROOT` if it's thin; don't
-   rubber-stamp. **Mid-chain `PENDING`** ("my beat's done, later beats remain") is a **clean advance**,
-   not a wobble — only challenge when *this* beat's own work is unproven.
+   plan? grounded against HEAD?) and send a corrective `followUpTo: ROOT` (also `subscribe: true`) if
+   it's thin; don't rubber-stamp. **Mid-chain `PENDING`** ("my beat's done, later beats remain") is a
+   **clean advance**, not a wobble — its wake is the cue to judge and advance; only challenge when
+   *this* beat's own work is unproven.
 6. **Label every send** `beat N/M: <label>`, including challenge/corrective follow-ups.
 7. **Required wrap-up** — post a run-summary comment before concluding.
 

@@ -73,12 +73,13 @@ describe('findTerminalFeedback', () => {
  * leaks into completion/telemetry/KPI semantics.
  */
 describe('isWakeEvent', () => {
-  test('[done]/[complete]/[failed]/[aborted]/[blocked] are all wake events', () => {
+  test('[done]/[complete]/[failed]/[aborted]/[blocked]/[pending] are all wake events', () => {
     assert.equal(isWakeEvent('[done] finished in 40s'), true);
     assert.equal(isWakeEvent('[complete] all green'), true);
     assert.equal(isWakeEvent('[failed] tests red'), true);
     assert.equal(isWakeEvent('[aborted] gave up'), true);
     assert.equal(isWakeEvent('[blocked] waiting on a human'), true);
+    assert.equal(isWakeEvent('[pending] beat 1 done, beats 2-4 remain'), true);
   });
 
   test('non-terminal markers and empty input are not wake events', () => {
@@ -104,6 +105,17 @@ describe('isWakeEvent', () => {
     assert.equal(isWakeEvent(feedback[0].message), true);
     assert.equal(findTerminalFeedback(feedback), null);
     assert.equal(deriveTerminalStatus(feedback), null);
+  });
+
+  // SPLIT-PROOF (LIN-843): [pending] is a PAUSE — it wakes a parent but must
+  // never count as completion. The whole point of the split is that telemetry/
+  // KPI/close-out never see a pause as a finish.
+  test('[pending] is a wake event WHILE findTerminalFeedback / deriveCompletedAt stay blind to it', () => {
+    const feedback = [{ message: '[pending] my part is done, the task is not', timestamp: 't' }];
+    assert.equal(isWakeEvent(feedback[0].message), true);
+    assert.equal(findTerminalFeedback(feedback), null);
+    assert.equal(deriveTerminalStatus(feedback), null);
+    assert.equal(deriveCompletedAt(feedback), null, 'a pause must not stamp a completion time');
   });
 });
 
