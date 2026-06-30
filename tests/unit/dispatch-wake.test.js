@@ -173,6 +173,35 @@ describe('addFeedback wake enqueue (effect + once-only)', () => {
     assert.equal(wakeItems(collection, historyCollection).length, 0);
   });
 
+  test('the orchestrator/kickoff (kind:autopilot) never self-enqueues a wake, even if sessioned+subscribed', async () => {
+    const { store, collection, historyCollection } = makeStore();
+    // Pathological belt-and-suspenders shape: an autopilot dispatch that somehow
+    // carries subscribe + a sessionId. The kind==='autopilot' guard must still
+    // refuse to wake — the orchestrator is the subscriber, not a subscribed child.
+    const kickoff = await store.addItem(URL_KEY, {
+      prompt: 'orchestrate', kind: 'autopilot', issueIdentifier: 'LIN-1',
+      sessionId: 'some-other-session', subscribe: true
+    });
+    await store.takeItem(kickoff._id, URL_KEY, 'token-a');
+
+    await store.addFeedback(kickoff._id, URL_KEY, { message: '[done] run complete' }, 'token-a');
+    await drain();
+
+    assert.equal(wakeItems(collection, historyCollection).length, 0, 'autopilot kind produces no wake');
+  });
+
+  test('a plain non-sessioned manual dispatch produces no wake (no subscriber edge)', async () => {
+    const { store, collection, historyCollection } = makeStore();
+    // No sessionId, no subscribe — an ordinary manual dispatch.
+    const manual = await store.addItem(URL_KEY, { prompt: 'manual job', kind: 'implementation', issueIdentifier: 'LIN-9' });
+    await store.takeItem(manual._id, URL_KEY, 'token-a');
+
+    await store.addFeedback(manual._id, URL_KEY, { message: '[done] finished' }, 'token-a');
+    await drain();
+
+    assert.equal(wakeItems(collection, historyCollection).length, 0);
+  });
+
   test('a non-terminal heartbeat does not enqueue and does not burn the guard', async () => {
     const { store, collection, historyCollection } = makeStore();
     const child = await takenChild(store);

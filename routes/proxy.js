@@ -3865,7 +3865,14 @@ One convention across every endpoint, so you can branch on the same fields every
         issueIdentifier: issueIdentifier || null,
         dispatchedBy: req.proxyCreatedBy || null,
         target: target || 'cli',
-        repo: resolvedRepo
+        repo: resolvedRepo,
+        // Park the orchestrator holdable (LIN-826). Under push-based comms the
+        // subscribed children run independently to terminal and then WAKE the
+        // parent with a follow-up (the LIN-826 auto-enqueue), so the orchestrator
+        // must stop at a holdable AWAITING_FOLLOWUP point to receive those wakes
+        // instead of polling. This inverts the old "free the producer" rule only
+        // for the subscribed case; Phase 2 retires that rule in the prose.
+        waitForFollowUps: true
       });
 
       logEvent(req, '/api/proxy/autopilot/kickoff', 201);
