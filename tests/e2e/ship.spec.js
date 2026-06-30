@@ -8,7 +8,7 @@ import { swimLocalSeed } from '../fixtures/local-harness.js';
 
 test.describe('Ship Page', () => {
   test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(swimLocalSeed, { features: { ship: true } });
+    await seedLocal(swimLocalSeed(localWorkerUrlKey), { features: { ship: true } });
     await page.goto(`/workspace/${localWorkerUrlKey}/ship`);
     await page.waitForLoadState('networkidle');
   });
@@ -231,7 +231,7 @@ test.describe('Ship Page', () => {
 // With its flag off it must redirect to settings (mirrors collective), not render.
 test.describe('Ship Page — gating (LIN-496)', () => {
   test('redirects to settings when the ship flag is off', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(swimLocalSeed); // no ship flag
+    await seedLocal(swimLocalSeed(localWorkerUrlKey)); // no ship flag
     await page.goto(`/workspace/${localWorkerUrlKey}/ship`);
     await page.waitForLoadState('networkidle');
     await expect(page).toHaveURL(new RegExp(`/workspace/${localWorkerUrlKey}/settings$`));

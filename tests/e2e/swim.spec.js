@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
-import { swimLocalSeed } from '../fixtures/local-harness.js';
+import { swimLocalSeed, localSeedId } from '../fixtures/local-harness.js';
 
 // LIN-378: the swim surface is fully modeled by the local provider, so these
 // specs ride a seeded local workspace (no `test-token` mock). The basic block
@@ -173,7 +173,7 @@ test.describe('Swim Page', () => {
 test.describe('Swim Page with Sample Data', () => {
   test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
     await pinHorizontal(page);
-    await seedLocal(swimLocalSeed);
+    await seedLocal(swimLocalSeed(localWorkerUrlKey));
     await page.goto(`/workspace/${localWorkerUrlKey}/swim`);
     await page.waitForLoadState('networkidle');
   });
@@ -401,7 +401,7 @@ test.describe('Swim Page with Sample Data', () => {
 
 test.describe('Swim Flow layout', () => {
   test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(swimLocalSeed);
+    await seedLocal(swimLocalSeed(localWorkerUrlKey));
     await page.goto(`/workspace/${localWorkerUrlKey}/swim`);
     await page.evaluate(() => localStorage.removeItem('swim-settings'));
     await page.goto(`/workspace/${localWorkerUrlKey}/swim`);
@@ -424,7 +424,7 @@ test.describe('Swim Flow layout', () => {
     await expect(page.locator('.swim-blk-spine').first()).toBeAttached();
   });
 
-  test('long-haul edge is hidden at rest and revealed on hover', async ({ page }) => {
+  test('long-haul edge is hidden at rest and revealed on hover', async ({ page, localWorkerUrlKey }) => {
     // DASH-3 blocks INFRA-2 across the API column — its line crosses an
     // intervening card, so it is suppressed (swim-blk-long, opacity 0) at rest
     // and marked with endpoint nubs (swim-blk-stub).
@@ -434,7 +434,7 @@ test.describe('Swim Flow layout', () => {
     expect(await longLine.evaluate(el => getComputedStyle(el).opacity)).toBe('0');
 
     // Hovering the target traces the full line.
-    await page.locator('.swim-fcard[data-issue-id="infra-2"]').hover();
+    await page.locator(`.swim-fcard[data-issue-id="${localSeedId(localWorkerUrlKey, 'infra-2')}"]`).hover();
     await expect(longLine).toHaveClass(/swim-edge-hl/);
     await expect.poll(() => longLine.evaluate(el => getComputedStyle(el).opacity)).toBe('1');
   });

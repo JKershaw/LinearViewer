@@ -183,15 +183,53 @@ export function localSeedFromLinearFixture({ projects, issues }, urlKey = LOCAL_
 }
 
 /**
+ * Re-key every `_id` (and the internal references that point at one) in a local
+ * seed by its workspace scope (LIN-801, extending LIN-800 to the fixture seeds).
+ *
+ * `localSeedFromLinearFixture` copies the fixture's RAW ids verbatim (`dash-1b`,
+ * `auth-3`, …). Because the LocalStore upserts by a single globally-unique `_id`
+ * (createIssue/createProject key on `{_id}` alone, ignoring `scope`), two
+ * parallel workers seeding the SAME fixture ids clobber each other's doc `scope`
+ * — the victim's `listIssues(scope)` then reads back partial/empty data and the
+ * ship/swim page renders with missing cards (the LIN-801 reload-determinism
+ * flake at `workers: 2`). Prefixing each `_id` by the per-worker urlKey makes
+ * them globally unique, so parallel seeds can't collide. Internal references
+ * (`projectId`, `parentId`, `relations[].relatedIssueId`) are rewritten with the
+ * same prefix so the graph stays connected; the human-facing `identifier` is NOT
+ * namespaced (it isn't the colliding field and is what specs resolve against).
+ */
+function namespaceLocalSeed(seed, urlKey) {
+  const ns = (raw) => (raw == null ? raw : localSeedId(urlKey, raw));
+  return {
+    projects: seed.projects.map(p => ({ ...p, id: ns(p.id) })),
+    issues: seed.issues.map(i => ({
+      ...i,
+      id: ns(i.id),
+      projectId: ns(i.projectId),
+      parentId: ns(i.parentId),
+      relations: (i.relations || []).map(r => ({ ...r, relatedIssueId: ns(r.relatedIssueId) })),
+      url: `/workspace/${urlKey}/issue/${ns(i.id)}`,
+    })),
+  };
+}
+
+/**
  * The swim/ship sample fixture as a local seed: 4 projects, ~20 issues with
  * deep blocking chains, nested subtask groups, and labels — everything the
  * dependency-driven views (swim lanes/flow, ship sectors) need. Backed by the
  * relations surfaced through LocalProvider._toCanonicalIssue (LIN-378).
+ *
+ * urlKey-aware (LIN-801): like `defaultLocalSeed`, this is a function so its
+ * `_id`s are namespaced per worker scope and parallel seeds can't collide. Pass
+ * the seeding `urlKey` (the `localWorkerUrlKey` worker fixture) so the seed ids
+ * match the scope they're seeded into.
  */
-export const swimLocalSeed = localSeedFromLinearFixture({
-  projects: swimSampleProjects,
-  issues: swimSampleIssues,
-});
+export function swimLocalSeed(urlKey = LOCAL_WORKSPACE_URL_KEY) {
+  return namespaceLocalSeed(
+    localSeedFromLinearFixture({ projects: swimSampleProjects, issues: swimSampleIssues }, urlKey),
+    urlKey
+  );
+}
 
 /**
  * The pipeline mock fixture as a local seed (LIN-387). Reuses the SAME
