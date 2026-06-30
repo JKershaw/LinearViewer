@@ -128,6 +128,20 @@ test('POST kickoff: stepper dispatches a prompt carrying the stepper disposition
   assert.doesNotMatch(std.added[0].doc.prompt, /You're running as the STEPPER/);
 });
 
+test('POST kickoff: parks the orchestrator holdable (waitForFollowUps:true) — LIN-826', async () => {
+  // Under push-based comms the kickoff must stop at a holdable AWAITING_FOLLOWUP
+  // point so subscribed children can wake it, instead of polling. Every variant
+  // dispatches with waitForFollowUps:true.
+  for (const body of [{}, { variant: 'stepper' }, { goal: 'walk the stack' }]) {
+    const { app, added } = buildApp();
+    const { status } = await request(app, '/api/proxy/autopilot/kickoff', { method: 'POST', body });
+    assert.equal(status, 201);
+    assert.equal(added.length, 1);
+    assert.equal(added[0].doc.kind, 'autopilot', 'this is the orchestrator kickoff dispatch');
+    assert.equal(added[0].doc.waitForFollowUps, true, 'kickoff parks holdable');
+  }
+});
+
 test('GET kickoff preview: ?variant=stepper swaps in the disposition; default omits it', async () => {
   const { app } = buildApp();
   const stepper = await request(app, '/api/proxy/autopilot/kickoff?variant=stepper');
