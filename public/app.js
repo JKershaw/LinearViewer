@@ -2109,6 +2109,9 @@ function initAutopilot() {
     e.stopPropagation()
 
     const issueId = btn.dataset.issueId
+    // LIN-836: the stepper sibling button carries data-variant="stepper"; the
+    // classic button has none (→ standard). Both share one container per issue.
+    const variant = btn.dataset.variant
     const detailsContainer = btn.closest('.details')
     const container = detailsContainer?.querySelector(`[data-autopilot-for="${issueId}"]`)
     if (!container) return
@@ -2134,14 +2137,20 @@ function initAutopilot() {
     try {
       const urlKey = container.dataset.urlKey
       const apiPrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : ''
+      const variantQuery = variant ? `?variant=${encodeURIComponent(variant)}` : ''
       const data = await window.api(
-        `${apiPrefix}/api/autopilot-prompt/${issueId}`,
+        `${apiPrefix}/api/autopilot-prompt/${issueId}${variantQuery}`,
         { signal: abortController.signal }
       )
 
       if (activeAutopilotFetch === abortController) {
         promptText.dataset.rawPrompt = data.prompt
         promptText.innerHTML = renderMarkdown(data.prompt)
+        // Tag the dispatch queue entry with the variant-specific name. The
+        // shared dispatch handler reads .prompt-name; reset it for standard so a
+        // prior stepper click on the same container can't leak its label.
+        const nameEl = container.querySelector('.prompt-name')
+        if (nameEl) nameEl.textContent = variant === 'stepper' ? (data.promptName || 'Autopilot · stepped') : 'Autopilot'
         if (data.repo) {
           container.dataset.repo = data.repo
         } else {

@@ -185,13 +185,18 @@ function initDispatchPagePrompt() {
   // loadAutopilotKickoff) and the goal-handoff dispatch path (LIN-639), where
   // the send button owns its own state. Throws on fetch failure for the caller
   // to surface.
-  async function fillAutopilotKickoff({ forceNoGoal = false } = {}) {
+  async function fillAutopilotKickoff({ forceNoGoal = false, variant = null } = {}) {
     if (forceNoGoal && goalInput) goalInput.value = ''
     // The goal must be baked into the fetched prompt — the textarea's input
     // listener strips dataset.kind/promptName on any keystroke, so it can't be
     // hand-typed in after loading. Append it as ?goal= for buildAutopilotKickoff.
     const goal = goalInput ? goalInput.value.trim() : ''
-    const query = goal ? `?goal=${encodeURIComponent(goal)}` : ''
+    // LIN-836: optional stepper variant — append ?variant=stepper alongside the
+    // goal. Server validates and falls back to standard when absent.
+    const params = new URLSearchParams()
+    if (goal) params.set('goal', goal)
+    if (variant) params.set('variant', variant)
+    const query = params.toString() ? `?${params.toString()}` : ''
     // on401:false — failures surface on the bespoke inline feedback el.
     const data = await api(`/workspace/${encodeURIComponent(urlKey)}/api/autopilot-prompt${query}`, { on401: false })
     textarea.value = data.prompt
@@ -199,12 +204,12 @@ function initDispatchPagePrompt() {
     textarea.dataset.promptName = data.promptName || 'Autopilot (stack walk)'
   }
 
-  async function loadAutopilotKickoff(btn, { forceNoGoal = false } = {}) {
+  async function loadAutopilotKickoff(btn, { forceNoGoal = false, variant = null } = {}) {
     const original = btn.textContent
     btn.disabled = true
     btn.textContent = 'loading...'
     try {
-      await fillAutopilotKickoff({ forceNoGoal })
+      await fillAutopilotKickoff({ forceNoGoal, variant })
       textarea.focus()
       btn.textContent = 'loaded ✓'
     } catch (err) {
@@ -240,7 +245,8 @@ function initDispatchPagePrompt() {
     const loadBtn = e.target.closest('.dispatch-load-autopilot')
     if (loadBtn) {
       e.preventDefault()
-      await loadAutopilotKickoff(loadBtn)
+      // LIN-836: the stepper sibling carries data-variant="stepper"; classic has none.
+      await loadAutopilotKickoff(loadBtn, { variant: loadBtn.dataset.variant || null })
       return
     }
 

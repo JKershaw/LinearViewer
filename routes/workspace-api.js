@@ -25,7 +25,7 @@ import { renderDetailsContent } from '../lib/render.js';
 import { WORK_ISSUE_LABELS } from '../lib/workflow-config.js';
 import { parseRepoFromDescription, buildPromptFilename } from '../lib/prompt-formatters.js';
 import { buildProxyContextPreamble } from '../lib/proxy-preamble.js';
-import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
+import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { isRecommendationEnabled, getRecommendation, getRecommendationStream, streamChat, getModelDisplayName } from '../lib/openrouter.js';
 import { resolveRecommendation, armHopSignal } from '../lib/recommend-recurse.js';
 
@@ -596,6 +596,12 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     }
 
     const mode = AUTOPILOT_MODES.includes(req.query.mode) ? req.query.mode : AUTOPILOT_MODE_DEFAULT
+    // LIN-836: surface the stepper variant in the UI. Validate against the shared
+    // list (unknown/absent → standard), thread it into the kickoff body, and let
+    // ONLY the stepper branch change label/promptName/downloadName — the standard
+    // strings stay byte-identical to preserve the LIN-791 additive invariant.
+    const variant = AUTOPILOT_VARIANTS.includes(req.query.variant) ? req.query.variant : AUTOPILOT_VARIANT_DEFAULT
+    const stepper = variant === 'stepper'
     const baseUrl = `${req.protocol}://${req.get('host')}`
 
     try {
@@ -610,15 +616,16 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         const prompt = buildAutopilotKickoff({
           baseUrl,
           issue: { identifier, title: mockIssue.title },
-          mode
+          mode,
+          variant
         })
         return sendPromptResult(req, res, {
           identifier,
-          downloadName: 'autopilot',
+          downloadName: stepper ? 'autopilot-stepper' : 'autopilot',
           prompt,
           json: {
-            label: 'autopilot',
-            promptName: `Autopilot — ${identifier}`,
+            label: stepper ? 'autopilot-stepper' : 'autopilot',
+            promptName: stepper ? `Autopilot (stepped) — ${identifier}` : `Autopilot — ${identifier}`,
             kind: 'autopilot',
             prompt,
             repo: parseRepoFromDescription(mockProject?.content || null)
@@ -630,15 +637,16 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       const prompt = buildAutopilotKickoff({
         baseUrl,
         issue: { identifier: issue.identifier, title: issue.title },
-        mode
+        mode,
+        variant
       })
       sendPromptResult(req, res, {
         identifier: issue.identifier,
-        downloadName: 'autopilot',
+        downloadName: stepper ? 'autopilot-stepper' : 'autopilot',
         prompt,
         json: {
-          label: 'autopilot',
-          promptName: `Autopilot — ${issue.identifier}`,
+          label: stepper ? 'autopilot-stepper' : 'autopilot',
+          promptName: stepper ? `Autopilot (stepped) — ${issue.identifier}` : `Autopilot — ${issue.identifier}`,
           kind: 'autopilot',
           prompt,
           repo: parseRepoFromDescription(project?.description)
@@ -672,18 +680,24 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     }
 
     const mode = AUTOPILOT_MODES.includes(req.query.mode) ? req.query.mode : AUTOPILOT_MODE_DEFAULT
+    // LIN-836: same variant wiring as the issue-scoped twin above (stepper only
+    // changes the response strings; standard stays byte-identical).
+    const variant = AUTOPILOT_VARIANTS.includes(req.query.variant) ? req.query.variant : AUTOPILOT_VARIANT_DEFAULT
+    const stepper = variant === 'stepper'
     const goal = typeof req.query.goal === 'string' ? req.query.goal.slice(0, 1000) : ''
     const baseUrl = `${req.protocol}://${req.get('host')}`
 
     try {
-      const prompt = buildAutopilotKickoff({ baseUrl, goal, mode })
+      const prompt = buildAutopilotKickoff({ baseUrl, goal, mode, variant })
       sendPromptResult(req, res, {
         identifier: '',
-        downloadName: 'autopilot',
+        downloadName: stepper ? 'autopilot-stepper' : 'autopilot',
         prompt,
         json: {
-          label: 'autopilot',
-          promptName: goal.trim() ? `Autopilot — ${goal.trim().slice(0, 60)}` : 'Autopilot (stack walk)',
+          label: stepper ? 'autopilot-stepper' : 'autopilot',
+          promptName: stepper
+            ? (goal.trim() ? `Autopilot (stepped) — ${goal.trim().slice(0, 60)}` : 'Autopilot (stepped, stack walk)')
+            : (goal.trim() ? `Autopilot — ${goal.trim().slice(0, 60)}` : 'Autopilot (stack walk)'),
           kind: 'autopilot',
           prompt
         }
