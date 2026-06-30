@@ -48,11 +48,30 @@ describe('buildWakeFollowUp — descriptor shape', () => {
     assert.ok(wake.prompt.includes('[done] shipped in 40s'), 'carries the terminal outcome');
   });
 
-  test('every terminal marker (incl. [blocked]) wakes the parent', () => {
-    for (const marker of ['done', 'complete', 'failed', 'aborted', 'blocked']) {
+  test('every wake marker (incl. [blocked] and [pending]) wakes the parent', () => {
+    for (const marker of ['done', 'complete', 'failed', 'aborted', 'blocked', 'pending']) {
       const wake = buildWakeFollowUp(subscribedChild(), [{ message: `[${marker}] x` }]);
       assert.ok(wake, `[${marker}] should produce a wake`);
     }
+  });
+
+  test('a [pending] wake is labelled "paused (pending), not done" so the parent never reads it as complete (LIN-843)', () => {
+    const wake = buildWakeFollowUp(subscribedChild(), [{ message: '[pending] beat 1 done, beats 2-4 remain' }]);
+    assert.ok(wake, 'a [pending] child wakes its parent');
+    assert.match(wake.prompt, /paused \(pending\), not done/i, 'the pause is labelled, not presented as a completion');
+    assert.ok(!/terminal outcome/i.test(wake.prompt), 'a pause is not described as a terminal outcome');
+    assert.ok(wake.prompt.includes('[pending] beat 1 done, beats 2-4 remain'), 'carries the pause detail');
+  });
+
+  test('a SUBSCRIBED follow-up (the stepper warm-resume beat) wakes — no followUpTo guard (LIN-843)', () => {
+    // The push-rails stepper resumes its warm worker with followUpTo: ROOT and
+    // declares the up-chain edge with subscribe: true. That beat MUST wake the
+    // orchestrator on every boundary, not just the first fresh beat.
+    const beat = subscribedChild({ id: 'beat-2', followUpTo: 'ROOT', sessionId: 'orchestrator-S1' });
+    const wake = buildWakeFollowUp(beat, [{ message: '[pending] beat 2 done' }]);
+    assert.ok(wake, 'a subscribed follow-up beat wakes its orchestrator');
+    assert.equal(wake.followUpTo, 'orchestrator-S1', 'addressed to the orchestrator via sessionId, not ROOT');
+    assert.equal(wake.subscribe, false, 'the wake itself is not subscribed — the sole loop guard');
   });
 });
 
@@ -71,14 +90,18 @@ describe('buildWakeFollowUp — loop-guard / null cases', () => {
     assert.equal(buildWakeFollowUp(subscribedChild({ sessionId: null }), doneFeedback), null);
   });
 
-  test('a wake follow-up (subscribe:false / followUpTo set) → null — a wake cannot beget a wake', () => {
+  test('a wake follow-up (subscribe:false) → null — a wake cannot beget a wake', () => {
     // Shape a descriptor like the one buildWakeFollowUp emits, then prove that
-    // feeding ITS terminal event back through never produces another wake.
+    // feeding ITS terminal event back through never produces another wake. The
+    // loop guard rests on the subscribe:false arm alone (LIN-843 removed the
+    // followUpTo arm so subscribed stepper beats can wake), and a wake follow-up
+    // is always subscribe:false — so it is still excluded.
     const wakeItem = { id: 'wake-1', sessionId: 'parent-S1', subscribe: false, followUpTo: 'parent-S1', kind: 'wake' };
     assert.equal(buildWakeFollowUp(wakeItem, doneFeedback), null);
-    // Even a (malformed) still-subscribed follow-up is excluded by the followUpTo arm.
-    const stray = { id: 'x', sessionId: 'parent-S1', subscribe: true, followUpTo: 'parent-S1', kind: 'implementation' };
-    assert.equal(buildWakeFollowUp(stray, doneFeedback), null);
+    // A non-subscribed follow-up (a plain liveness nudge) is likewise excluded by
+    // the same subscribe arm — only an explicitly subscribed follow-up wakes.
+    const nudge = { id: 'x', sessionId: 'parent-S1', subscribe: false, followUpTo: 'parent-S1', kind: 'implementation' };
+    assert.equal(buildWakeFollowUp(nudge, doneFeedback), null);
   });
 
   test('self (id === sessionId) → null — the run owner must not wake itself', () => {
@@ -146,6 +169,21 @@ describe('addFeedback wake enqueue (effect + once-only)', () => {
     assert.equal(wakes[0].sessionId, 'parent-S1');
     assert.equal(wakes[0].queueIfBusy, true);
     assert.equal(wakes[0].subscribe, false);
+  });
+
+  test('a [pending] pause on a subscribed child enqueues exactly one parent wake, labelled paused-not-done (LIN-843)', async () => {
+    const { store, collection, historyCollection } = makeStore();
+    const child = await takenChild(store);
+
+    const res = await store.addFeedback(child._id, URL_KEY, { message: '[pending] beat 1 done, task not done' }, 'token-a');
+    await drain();
+
+    assert.ok(res && res.success);
+    const wakes = wakeItems(collection, historyCollection);
+    assert.equal(wakes.length, 1, 'a pause wakes the parent exactly once');
+    assert.equal(wakes[0].followUpTo, 'parent-S1');
+    assert.equal(wakes[0].subscribe, false);
+    assert.match(wakes[0].prompt, /paused \(pending\), not done/i, 'the wake says paused, not done');
   });
 
   test('once-only: a SECOND wake event after wakeEnqueued:true does NOT enqueue a second wake', async () => {
