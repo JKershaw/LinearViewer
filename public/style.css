@@ -1,8 +1,11 @@
 /**
  * Harbour - Stylesheet
  *
- * Design: CLI/terminal aesthetic with monospace fonts and box-drawing characters.
- * Theme: Light mode with clean, minimal colors.
+ * Design: CLI/terminal character — box-drawing scaffolding and a typographic
+ *   split (mono for machine facts, sans for human structure/labels). Not a pure
+ *   monospace aesthetic any more (LIN-785 / LIN-782).
+ * Theme: Light is the default (:root); dark is an opt-in `.theme-dark` hook on
+ *   `<html>`, applied pre-paint by the shared shell from a persisted preference.
  * Layout: Single-column, max 120ch wide for readability.
  */
 
@@ -31,13 +34,17 @@
   /* Harbour brand accent (LIN-724). Teal is the product's accent hue, inherited
      from harbour.cat. The status hues above are kept visibly distinct from it
      (notably --green, nudged off its old teal-green #16a085). Consumed by the
-     wordmark (LIN-725) and landing (LIN-726). Per-theme teal values are defined
-     in .theme-dark / .theme-amber below. */
+     wordmark (LIN-725) and landing (LIN-726). The per-theme teal value is
+     defined in .theme-dark below. */
   --teal: #0d9488;          /* Brand accent (light) */
   --teal-soft: #0d948820;   /* Low-alpha teal tint for accent fills/hovers */
 
-  /* Font families: Separate structural (monospace) from content (readable) */
-  --font-structural: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  /* Font families: Separate structural (mono, for machine facts) from content
+     (sans, for human structure/labels). LIN-785 loads both faces self-hosted
+     (see @font-face below): JetBrains Mono heads the structural stack, Inter the
+     content stack — both with robust system fallbacks so a failed/blocked font
+     load degrades to the prior look rather than a layout shift. */
+  --font-structural: 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Consolas', monospace;
   --font-content: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
   /* LIN-456: tokens previously referenced via var() fallback only — now defined
@@ -82,20 +89,90 @@
   --font-size-sm: 0.85em;
   --font-size-base: 1em;
   --font-size-lg: 1.25em;
+
+  /* ===========================================================================
+     Semantic theme vocabulary (LIN-785 S1, per the LIN-782 locked direction)
+     ===========================================================================
+     The named layer S2 primitives consume. In light (:root) these are ALIASES
+     over the existing token system, so adding them changes nothing visually for
+     un-migrated pages (the stability guardrail). `.theme-dark` re-binds the same
+     names below. Defining the aliases as `var(--existing)` keeps the two layers
+     from drifting — change the raw token and the semantic name follows. */
+  --text: var(--fg);            /* primary body text */
+  --muted: var(--fg-dim);       /* secondary text */
+  --faint: var(--fg-vdim);      /* structural hairlines / box-drawing */
+  --line: var(--border);        /* default hairline */
+  --line-soft: var(--border-subtle);  /* lower-contrast hairline */
+  --card: var(--bg-muted);      /* card / container surface */
+  --card-h: var(--bg-alt);      /* card hover surface */
+  --raised: var(--bg);          /* raised surface (sits on the page bg) */
+  --inset: var(--bg-alt);       /* inset / well surface */
+  --brand: var(--teal);         /* product accent (teal, per LIN-782) */
+  --shadow: var(--shadow-md);   /* default elevation */
+
+  /* Status palette — keep --green/--red; add running (--amber) + neutral
+     (--slate). Each ships an AA-safe `-dim` companion for use as TEXT on the
+     theme's surface (the raw hue is for fills / dots / accents only). --amber
+     #FFB224 in particular fails AA as text on white, hence --amber-dim. --yellow
+     stays the existing in-progress hue; --amber is the new running-status token. */
+  --green-dim: #15803d;   /* AA-safe green text on light */
+  --amber: #FFB224;       /* running status (fill/dot) */
+  --amber-dim: #8a5a00;   /* AA-safe amber text on light */
+  --red-dim: #b91c1c;     /* AA-safe red text on light */
+  --slate: #64748b;       /* neutral / idle status (fill/dot) */
+  --slate-dim: #475569;   /* AA-safe slate text on light */
+
+  /* a11y: focus-visible ring colour (AA-safe against light surfaces). */
+  --focus: #0d6efd;
+
+  /* Motion baseline (LIN-785 §7). Tokenized durations so the reduced-motion
+     media query can neutralize them in one place; keyframes defined below. */
+  --motion-fast: 120ms;
+  --motion-base: 240ms;
+  --motion-slow: 480ms;
 }
 
 /* =============================================================================
-   Theme hooks (LIN-484)
+   Self-hosted fonts (LIN-785)
    =============================================================================
-   The `<body>` (or any container) theme hook the UI-improvement strategy planned
-   as the "now-unlocked extra": alternate themes are pure overrides of the color
-   tokens above — the structural tokens (spacing/radius/font/z) are theme-neutral
-   and stay shared. The default light theme is `:root`, so applying NO class is
-   the light theme and every existing page renders byte-identically; only the
-   token *values* change under a theme class, so no new token names are
-   introduced. Each theme class is self-painting (sets bg/fg) so it can wrap any
-   subtree — a panel on /styleguide today, the whole `<body>` if a switcher lands
-   later. /styleguide renders these side-by-side so theme impact is at-a-glance. */
+   Vendored latin-subset woff2 under /public/fonts (no build step). `swap` shows
+   the fallback immediately and swaps when the face arrives, so a slow/blocked
+   load never blanks text. The families head their respective --font-* stacks. */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/inter-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/inter-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/jetbrains-mono-400.woff2') format('woff2');
+}
+
+/* =============================================================================
+   Theme hooks (LIN-484, extended for the global toggle in LIN-785)
+   =============================================================================
+   Alternate themes are pure overrides of the color tokens above — the structural
+   tokens (spacing/radius/font/z/motion) are theme-neutral and stay shared. The
+   default light theme is `:root`, so applying NO class is the light theme and
+   every existing page renders byte-identically; only the token *values* change
+   under a theme class, so no new token names are introduced by a theme. The
+   class is applied to `<html>` pre-paint by the shared shell (lib/components/
+   page.js) from the persisted preference, but each theme class is also
+   self-painting (sets bg/fg) so it can still wrap any subtree — e.g. the
+   side-by-side panel on /styleguide. (The legacy amber variant was removed in
+   LIN-785.) */
 .theme-dark {
   --bg: #16181d;
   --bg-muted: #1f222a;
@@ -120,37 +197,33 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
-  background: var(--bg);
-  color: var(--fg);
-}
 
-/* Amber-on-black: a monochrome terminal variant. Status hues stay legible but
-   the surface leans hard into the CLI/terminal aesthetic — the most dramatic
-   "impact of different themes" sample on /styleguide. */
-.theme-amber {
-  --bg: #160f02;
-  --bg-muted: #20180a;
-  --bg-alt: rgba(255, 176, 0, 0.07);
-  --fg: #ffb000;
-  --fg-dim: #b3820f;
-  --fg-vdim: #3a2b08;
-  --fg-mid: #7a5a0b;          /* mid amber accent — between --border and --fg-dim */
-  --green: #8fdb5f;          /* lime green — already distinct from the amber-mapped --teal below */
-  --yellow: #ffcf4d;
-  --blue: #ffb000;           /* links read as amber, not blue, in this theme */
-  --purple: #d7a3ff;
-  --red: #ff5f56;
-  --red-hover: #ff8079;
-  --teal: #ff9d2e;           /* brand accent collapses to a warm amber-orange here (a cyan teal would clash with the monochrome theme); deeper than --blue/--yellow so the accent still reads as distinct (LIN-724) */
-  --teal-soft: #ff9d2e20;
-  --accent: #ff5f56;
-  --ok: #8fdb5f;
-  --border: #3a2b08;
-  --border-strong: #5c4310;  /* stronger hover/focus border in amber (brighter than --border) */
-  --border-subtle: rgba(255, 176, 0, 0.18);
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
-  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.6);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.7);
+  /* LIN-785 semantic vocabulary re-bound for dark. Re-declaring the aliases here
+     (rather than relying on the :root `var(--fg)` cascade) keeps them correct
+     even when `.theme-dark` wraps a SUBTREE rather than `<html>` (the styleguide
+     panel). Values resolve against this block's raw tokens. */
+  --text: var(--fg);
+  --muted: var(--fg-dim);
+  --faint: var(--fg-vdim);
+  --line: var(--border);
+  --line-soft: var(--border-subtle);
+  --card: var(--bg-muted);
+  --card-h: var(--bg-alt);
+  --raised: var(--bg-muted);
+  --inset: var(--bg-alt);
+  --brand: var(--teal);
+  --shadow: var(--shadow-md);
+
+  /* Status palette on dark — raw hues for fills/dots, `-dim` companions are the
+     AA-safe text colours on the dark surface. */
+  --green-dim: #4ade80;
+  --amber: #ffc04d;          /* running status (fill/dot) on dark */
+  --amber-dim: #ffd27a;      /* AA-safe amber text on dark */
+  --red-dim: #ff9b9b;        /* AA-safe red text on dark */
+  --slate: #94a3b8;          /* neutral / idle status on dark */
+  --slate-dim: #cbd5e1;      /* AA-safe slate text on dark */
+  --focus: #6ea8fe;          /* focus ring on dark (AA-safe) */
+
   background: var(--bg);
   color: var(--fg);
 }
@@ -177,6 +250,37 @@ body {
   margin-left: auto;
   margin-right: auto;
   overflow-x: hidden;
+}
+
+/* =============================================================================
+   Motion + a11y baseline (LIN-785 §7 / §11)
+   =============================================================================
+   Reusable keyframes for status affordances S2 will attach to (a pulsing dot for
+   "running", an indeterminate shimmer for "loading"), a focus-visible ring driven
+   by the --focus token, and a prefers-reduced-motion baseline that neutralizes
+   animation/transition/smooth-scroll for users who ask for less motion. */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* =============================================================================

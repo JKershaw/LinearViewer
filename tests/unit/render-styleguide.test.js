@@ -64,32 +64,35 @@ test('renders the leaf button/input components with the shared stylesheet', () =
   assert.match(html, /class="token-label-input"/);
 });
 
-test('renders each theme side-by-side via the .theme-* hook', () => {
+test('renders the dark theme side-by-side via the .theme-* hook', () => {
   const html = renderStyleguide();
   assert.match(html, /class="sg-theme-grid"/);
-  // The default (light) panel plus every alternate theme hook appear, so the
-  // page shows the impact of different themes at-a-glance.
+  // The default (light) panel plus the dark theme hook appear, so the page shows
+  // the impact of the theme at-a-glance. (LIN-785 removed the amber variant.)
   assert.match(html, /class="sg-theme-panel theme-dark"/);
-  assert.match(html, /class="sg-theme-panel theme-amber"/);
 });
 
-test('alternate theme hooks exist in the stylesheet and only override tokens', () => {
+test('the .theme-amber variant is fully removed (LIN-785)', () => {
+  const html = renderStyleguide();
   const css = readFileSync(STYLE_CSS, 'utf8');
-  // The theme classes the page demonstrates must be real, reusable hooks.
+  assert.doesNotMatch(html, /theme-amber/, 'styleguide must not reference theme-amber');
+  assert.doesNotMatch(css, /\.theme-amber/, 'stylesheet must not define .theme-amber');
+});
+
+test('the .theme-dark hook exists in the stylesheet and only overrides tokens', () => {
+  const css = readFileSync(STYLE_CSS, 'utf8');
+  // The theme class the page demonstrates must be a real, reusable hook.
   assert.match(css, /\.theme-dark\s*\{/);
-  assert.match(css, /\.theme-amber\s*\{/);
   // A theme may only restate EXISTING :root token names (no new tokens), so the
   // "exercises EVERY :root token" guarantee and page byte-stability both hold.
   const rootTokens = new Set(rootTokenNames());
-  for (const cls of ['.theme-dark', '.theme-amber']) {
-    const block = css.slice(css.indexOf(cls));
-    const body = block.slice(block.indexOf('{') + 1, block.indexOf('}'));
-    for (const m of body.matchAll(/(--[a-z0-9-]+)\s*:/gi)) {
-      assert.ok(
-        rootTokens.has(m[1]),
-        `${cls} declares ${m[1]} which is not a :root token — themes must only override existing tokens`
-      );
-    }
+  const block = css.slice(css.indexOf('.theme-dark'));
+  const body = block.slice(block.indexOf('{') + 1, block.indexOf('}'));
+  for (const m of body.matchAll(/(--[a-z0-9-]+)\s*:/gi)) {
+    assert.ok(
+      rootTokens.has(m[1]),
+      `.theme-dark declares ${m[1]} which is not a :root token — themes must only override existing tokens`
+    );
   }
 });
 
