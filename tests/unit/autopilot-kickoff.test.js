@@ -258,6 +258,7 @@ describe('buildAutopilotKickoff (variant axis, LIN-791)', () => {
     assert.ok(text.includes('followUpTo: ROOT'));    // later beats anchor on ROOT
     assert.ok(text.includes('force: true'));         // force on every resume
     assert.ok(text.includes('subscribe: true'));     // LIN-843: every beat is subscribed (push rails)
+    assert.ok(text.includes('waitForFollowUps: true')); // LIN-845: every beat asks for the worker-side hold
     assert.ok(text.includes('beat N/M'));            // label every send
     assert.ok(text.includes('PENDING'));             // PENDING wake = clean advance, the push signal
     assert.ok(text.toLowerCase().includes('challenge'));
@@ -275,6 +276,19 @@ describe('buildAutopilotKickoff (variant axis, LIN-791)', () => {
     assert.ok(!/long-poll background wait IS your/i.test(text), 'the old keep-warm-via-long-poll claim is gone');
     assert.ok(/do not run a `run_in_background` long-poll/i.test(text) || /do not .*long-poll/i.test(text),
       'long-poll is now prohibited, not the mechanism');
+  });
+
+  test('beats carry BOTH halves of the warm drip — subscribe (wake) AND waitForFollowUps (hold) (LIN-845)', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, variant: 'stepper' });
+    // subscribe alone wires only the up-chain wake; without waitForFollowUps the
+    // worker finalizes after beat 1 and beat 2 falls back to a cold `claude --resume`.
+    assert.ok(text.includes('subscribe: true'));
+    assert.ok(text.includes('waitForFollowUps: true'));
+    // The hold parks the worker at AWAITING_FOLLOWUP so the next beat lands in-session.
+    assert.ok(text.includes('AWAITING_FOLLOWUP'));
+    // Standard runs must never carry the stepper-only hold instruction.
+    const standard = buildAutopilotKickoff({ baseUrl: BASE_URL, variant: 'standard' });
+    assert.ok(!standard.includes('waitForFollowUps: true'));
   });
 
   test('variant is orthogonal to mode — stepper composes with readonly', () => {
