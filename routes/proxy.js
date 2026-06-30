@@ -2902,15 +2902,26 @@ One convention across every endpoint, so you can branch on the same fields every
       // Resolve OpenRouter API key: token creator's OAuth key or server env var
       const sessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
 
-      // Check if AI recommendations are available (skip in test mode). A free-tier-only
-      // deployment (only OPENROUTER_FREE_TIER_KEY set) is accepted via isFreeTier.
+      const { identifier } = req.params;
+
+      // Verb-override (LIN-839): an optional ?kind= pins the returned prompt to a
+      // specific template kind, returning that kind's grounded prompt
+      // deterministically (no LLM/OpenRouter call). Because it makes no LLM call
+      // it must bypass the recommendation-enabled 503 gate and free-tier metering
+      // below — mirroring the LIN-573 recommend-and-dispatch override. Read it
+      // early so those gates can be skipped; generation happens in the keepalive
+      // block, falling through to the shared md/JSON response so ?format=md
+      // mirrors automatically. No ?kind= → byte-identical to pre-LIN-839 behavior.
+      const kind = req.query.kind;
+
+      // Check if AI recommendations are available (skip in test mode and on the
+      // deterministic kind-override path). A free-tier-only deployment (only
+      // OPENROUTER_FREE_TIER_KEY set) is accepted via isFreeTier.
       const { isFreeTier } = resolveProxyLLM(sessionApiKey);
-      if (!isTestMode && !isRecommendationEnabled(sessionApiKey) && !isFreeTier) {
+      if (kind === undefined && !isTestMode && !isRecommendationEnabled(sessionApiKey) && !isFreeTier) {
         logEvent(req, '/api/proxy/recommend', 503);
         return jsonError(res, 503, 'AI recommendations not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.');
       }
-
-      const { identifier } = req.params;
 
       // Validate identifier format (UUID or LIN-123 pattern)
       if (!isValidIssueId(identifier)) {
@@ -2918,10 +2929,20 @@ One convention across every endpoint, so you can branch on the same fields every
         return badRequest.json(res, 'Invalid identifier format');
       }
 
+      // Validate the override kind against the generatable template set
+      // (hasPrompt = `kind in PROMPT_TEMPLATES`) — NOT isValidDispatchKind, whose
+      // DISPATCH_KINDS superset admits non-generatable meta-kinds (defer/autopilot/
+      // periodical/custom) that make generatePrompt return null (LIN-839).
+      if (kind !== undefined && !hasPrompt(kind)) {
+        logEvent(req, '/api/proxy/recommend', 400);
+        return badRequest.json(res, `Invalid kind: ${kind}`);
+      }
+
       // Charge one free-tier unit ONCE per request (not per descent hop — that
       // would overbill a multi-hop container). resolveRecommendation does the
       // generation below; charge before it so an exhausted user gets a clean 429.
-      if (isFreeTier && !isTestMode) {
+      // Skipped on the kind-override path (LIN-839): it makes no LLM call.
+      if (kind === undefined && isFreeTier && !isTestMode) {
         const rejection = await chargeFreeTierOrReject(req.proxyUrlKey);
         if (rejection) {
           logEvent(req, '/api/proxy/recommend', 429);
@@ -2939,24 +2960,69 @@ One convention across every endpoint, so you can branch on the same fields every
       // while the LLM call completes.
       const keepalive = armKeepalive(res);
       try {
-        // Follow any `defer` decisions to a terminal actionable node (LIN-329).
-        // A leaf resolves in one hop; a container descends to its real work.
-        const recommendDeadline = Date.now() + RECOMMEND_DESCENT_BUDGET_MS;
-        const { recommendation: rec, deferredVia, deferTruncated, deferStopReason } = await resolveRecommendation({
-          startIdentifier: identifier,
-          deadline: recommendDeadline,
-          noDescend,
-          computeOne: (id) => computeRecommendation({
-            urlKey: req.proxyUrlKey,
-            createdBy: req.proxyCreatedBy,
-            identifier: id,
-            accessToken,
-            isTestMode,
-            sessionApiKey,
+        let rec, deferredVia, deferTruncated, deferStopReason;
+        if (kind !== undefined) {
+          // Kind-override (LIN-839): skip the LLM recommendation + descent. Fetch
+          // the named issue's context and generate the requested kind's prompt
+          // deterministically. generatePrompt() internally runs the grounding
+          // post-passes (appendGroundingSections: staleness / terminal-state /
+          // all-subtasks-complete / bug-investigated, plus capability + attachments),
+          // so every grounding section the LLM path emits is preserved here.
+          // `{}` for provider.ui keeps Linear output byte-identical to /prompt.
+          let ctx;
+          try {
+            ctx = await resolvePromptIssueContext(accessToken, identifier, isTestMode);
+          } catch (err) {
+            if (err.message?.includes('not found')) {
+              keepalive.stop();
+              logEvent(req, '/api/proxy/recommend', 404);
+              return notFound.json(res, 'Issue not found');
+            }
+            throw err;
+          }
+          if (!ctx) {
+            keepalive.stop();
+            logEvent(req, '/api/proxy/recommend', 404);
+            return notFound.json(res, 'Issue not found');
+          }
+          const { issue, parent, siblings, project, children, comments, attachments } = ctx;
+          const generated = generatePrompt(kind, issue, { parent, siblings, project, children, comments, attachments }, {});
+          if (!generated) {
+            keepalive.stop();
+            logEvent(req, '/api/proxy/recommend', 500);
+            return jsonError(res, 500, 'Failed to generate prompt');
+          }
+          // Shape a recommendation-equivalent object so the override falls through
+          // to the shared md/JSON response below (no forked response path).
+          rec = {
+            identifier: issue.identifier,
+            reasoning: null,
+            prompt: generated.prompt,
+            truncated: false,
+            repo: parseRepoFromDescription(project?.description) || null,
+            recommendedAction: kind,
+            override: true
+          };
+        } else {
+          // Follow any `defer` decisions to a terminal actionable node (LIN-329).
+          // A leaf resolves in one hop; a container descends to its real work.
+          const recommendDeadline = Date.now() + RECOMMEND_DESCENT_BUDGET_MS;
+          ({ recommendation: rec, deferredVia, deferTruncated, deferStopReason } = await resolveRecommendation({
+            startIdentifier: identifier,
             deadline: recommendDeadline,
-            noDescend
-          })
-        });
+            noDescend,
+            computeOne: (id) => computeRecommendation({
+              urlKey: req.proxyUrlKey,
+              createdBy: req.proxyCreatedBy,
+              identifier: id,
+              accessToken,
+              isTestMode,
+              sessionApiKey,
+              deadline: recommendDeadline,
+              noDescend
+            })
+          }));
+        }
 
         keepalive.stop();
         logEvent(req, '/api/proxy/recommend', 200);
@@ -2974,7 +3040,9 @@ One convention across every endpoint, so you can branch on the same fields every
         }
         // recommendedAction + kind are additive (LIN-321); deferredVia + the terminal
         // identifier are additive (LIN-327): existing clients that read
-        // identifier/reasoning/prompt/truncated/repo are unaffected.
+        // identifier/reasoning/prompt/truncated/repo are unaffected. `override` is
+        // additive too and present only on the kind-override path (LIN-839), so the
+        // default no-kind response stays byte-identical.
         keepalive.send(200, {
           identifier: rec.identifier,
           reasoning: rec.reasoning,
@@ -2985,7 +3053,8 @@ One convention across every endpoint, so you can branch on the same fields every
           kind: deriveDispatchKind(rec.recommendedAction),
           deferredVia,
           deferTruncated,
-          deferStopReason
+          deferStopReason,
+          ...(rec.override ? { override: true } : {})
         });
       } catch (err) {
         keepalive.stop();
