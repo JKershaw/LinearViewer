@@ -195,7 +195,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const { workspace } = req;
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo, force, abort, abortTo, sessionId, waitForFollowUps } = req.body;
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo, force, abort, abortTo, sessionId, waitForFollowUps, queueIfBusy, subscribe } = req.body;
 
       // Abort verb (LIN-743): an abort item asks the consumer to cancel/close an
       // existing session (named by abortTo) instead of running a prompt, so it
@@ -243,6 +243,19 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       // forwarded blindly — the runner owns the behaviour (see LIN-795).
       if (waitForFollowUps !== undefined && typeof waitForFollowUps !== 'boolean') {
         return badRequest.json(res, 'waitForFollowUps must be a boolean');
+      }
+
+      // Push-based inter-session comms (LIN-826). Both are stored + forwarded
+      // blindly, exactly like waitForFollowUps/force — Harbour owns no semantics:
+      //   queueIfBusy  — the runner leaves a busy-target follow-up unclaimed
+      //                  rather than failing it (LIN-827 runner path).
+      //   subscribe    — edge declaration: route this child's terminal events
+      //                  back to the dispatching parent as a wake follow-up.
+      if (queueIfBusy !== undefined && typeof queueIfBusy !== 'boolean') {
+        return badRequest.json(res, 'queueIfBusy must be a boolean');
+      }
+      if (subscribe !== undefined && typeof subscribe !== 'boolean') {
+        return badRequest.json(res, 'subscribe must be a boolean');
       }
 
       // Reject local target from non-localhost requests
@@ -348,7 +361,9 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         abort: isAbort,
         abortTo: isAbort ? abortTo : null,
         sessionId: sessionId || null,
-        waitForFollowUps: waitForFollowUps === true
+        waitForFollowUps: waitForFollowUps === true,
+        queueIfBusy: queueIfBusy === true,
+        subscribe: subscribe === true
       });
 
       // Spawn a Harbour OS Claude session when target is 'local' (the API value

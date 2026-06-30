@@ -3923,7 +3923,7 @@ One convention across every endpoint, so you can branch on the same fields every
     }
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo, force, abort, abortTo, sessionId, waitForFollowUps } = req.body || {};
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo, force, abort, abortTo, sessionId, waitForFollowUps, queueIfBusy, subscribe } = req.body || {};
 
       // Abort verb (LIN-743): an abort item cancels/closes an existing session
       // (named by abortTo) instead of running a prompt — it carries no prompt and
@@ -3966,6 +3966,16 @@ One convention across every endpoint, so you can branch on the same fields every
       if (waitForFollowUps !== undefined && typeof waitForFollowUps !== 'boolean') {
         logEvent(req, '/api/proxy/dispatch', 400);
         return badRequest.json(res, 'waitForFollowUps must be a boolean');
+      }
+      // Push-based inter-session comms (LIN-826): stored + forwarded blindly,
+      // exactly like waitForFollowUps/force — no Harbour-side semantics.
+      if (queueIfBusy !== undefined && typeof queueIfBusy !== 'boolean') {
+        logEvent(req, '/api/proxy/dispatch', 400);
+        return badRequest.json(res, 'queueIfBusy must be a boolean');
+      }
+      if (subscribe !== undefined && typeof subscribe !== 'boolean') {
+        logEvent(req, '/api/proxy/dispatch', 400);
+        return badRequest.json(res, 'subscribe must be a boolean');
       }
 
       if (prompt && prompt.length > MAX_PROMPT_LENGTH) {
@@ -4088,7 +4098,9 @@ One convention across every endpoint, so you can branch on the same fields every
         abort: isAbort,
         abortTo: isAbort ? abortTo : null,
         sessionId: sessionId || null,
-        waitForFollowUps: waitForFollowUps === true
+        waitForFollowUps: waitForFollowUps === true,
+        queueIfBusy: queueIfBusy === true,
+        subscribe: subscribe === true
       });
 
       logEvent(req, '/api/proxy/dispatch', 201);
@@ -4135,7 +4147,7 @@ One convention across every endpoint, so you can branch on the same fields every
     }
 
     try {
-      const { issueIdentifier, target, repo, appendProxyContext, noDescend, kind, sessionId, waitForFollowUps } = req.body || {};
+      const { issueIdentifier, target, repo, appendProxyContext, noDescend, kind, sessionId, waitForFollowUps, queueIfBusy, subscribe } = req.body || {};
 
       // Validate caller-supplied inputs. (Only the server-generated prompt skips
       // the dangerous-char/length checks — see the dispatch step below.)
@@ -4161,6 +4173,19 @@ One convention across every endpoint, so you can branch on the same fields every
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
         return badRequest.json(res, 'waitForFollowUps must be a boolean');
       }
+      // Push-based inter-session comms (LIN-826): stored + forwarded blindly,
+      // exactly like waitForFollowUps. queueIfBusy is never defaulted here (it is
+      // Harbour-set only on the auto-enqueued wake follow-up); subscribe defaults
+      // ON for a fresh sessioned worker below so the orchestrator needs no new
+      // prompt instruction — an explicit caller value (incl. false) always wins.
+      if (queueIfBusy !== undefined && typeof queueIfBusy !== 'boolean') {
+        logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
+        return badRequest.json(res, 'queueIfBusy must be a boolean');
+      }
+      if (subscribe !== undefined && typeof subscribe !== 'boolean') {
+        logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
+        return badRequest.json(res, 'subscribe must be a boolean');
+      }
       if (repo !== undefined && (typeof repo !== 'string' || repo.length > MAX_NAME_LENGTH || DANGEROUS_CHARS_REGEX.test(repo))) {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
         return badRequest.json(res, 'repo is invalid');
@@ -4184,6 +4209,14 @@ One convention across every endpoint, so you can branch on the same fields every
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
         return badRequest.json(res, 'Invalid sessionId format');
       }
+
+      // Resolve the subscribe edge once for both dispatch paths below (LIN-826).
+      // V1 "fresh sessioned worker" = a sessionId is present: recommend-and-dispatch
+      // has no followUpTo/abort verb, so those exclusion arms (sessionId && !followUpTo
+      // && !abort) are always satisfied here. Default ON so the autopilot fan-out
+      // subscribes to each worker with no new prompt instruction; an explicit caller
+      // `subscribe` (true OR false) overrides the default.
+      const subscribeResolved = typeof subscribe === 'boolean' ? subscribe : !!sessionId;
 
       // Recommendation preconditions — identical to GET /recommend.
       const { token: accessToken, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
@@ -4257,7 +4290,12 @@ One convention across every endpoint, so you can branch on the same fields every
             // Mirror /prompt's repo resolution: project `repo=` from the
             // description, with an explicit caller repo winning (LIN-537).
             repo: repo || parseRepoFromDescription(project?.description) || null,
-            sessionId: sessionId || null
+            sessionId: sessionId || null,
+            // Push-comms (LIN-826): subscribe defaults ON for a sessioned worker
+            // so its terminal events wake the orchestrator; queueIfBusy forwarded
+            // blindly. Both stored + forwarded, no Harbour-side semantics.
+            queueIfBusy: queueIfBusy === true,
+            subscribe: subscribeResolved
           });
 
           // Record the override so it can feed heuristic improvement — the
@@ -4392,7 +4430,12 @@ One convention across every endpoint, so you can branch on the same fields every
           repo: repo || rec.repo || null,
           sessionId: sessionId || null,
           // Opt-in completion hold (LIN-797), forwarded blindly to the runner.
-          waitForFollowUps: waitForFollowUps === true
+          waitForFollowUps: waitForFollowUps === true,
+          // Push-comms (LIN-826): subscribe defaults ON for a sessioned worker so
+          // its terminal events wake the orchestrator; queueIfBusy forwarded
+          // blindly. Both stored + forwarded, no Harbour-side semantics.
+          queueIfBusy: queueIfBusy === true,
+          subscribe: subscribeResolved
         });
 
         keepalive.stop();
