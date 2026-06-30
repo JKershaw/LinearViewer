@@ -758,6 +758,28 @@ describe('buildMetaPromptTemplate close-out routing gate (LIN-812)', () => {
     assert.ok(/if the comments already show the work landed but CI is red.*do NOT keep routing to \`review\` or \`close-out\`/is.test(text),
       'landed-but-red work must route to the blocker, not to review/close-out');
   });
+
+  // LIN-823 — the LIN-811 review-evidence gate covered the generic "landed leaf, no
+  // review" shape but missed the BUG path: a `bug`-labelled fix posts its own rich
+  // investigation comments (`Root cause CONFIRMED`, findings, class-check, stepper
+  // run-summary) that read review-ish and fooled the recommender into close-out before
+  // review. The gate must now explicitly exclude that author-diagnosis commentary from
+  // counting as a review verdict. The prose is shared by Step 0 and Step 3, so both
+  // close-out decision points carry the exclusion.
+  test('the close-out gate excludes a bug\'s own investigation commentary from review evidence (LIN-823)', () => {
+    // Step 0 path (all subtasks complete) and Step 3 path (childless open leaf) must
+    // both carry the bug-investigation exclusion.
+    const step0 = build({ isTerminal: false, hasSubtasks: true, subtaskCount: 1, completedCount: 1, hasOpenChildren: false });
+    const step3 = build({ isTerminal: false, hasSubtasks: false, hasOpenChildren: false });
+    for (const [label, text] of [['Step 0', step0], ['Step 3', step3]]) {
+      assert.ok(/a \`bug\`'s own investigation commentary is NOT a review verdict/i.test(text),
+        `${label} must state that a bug's investigation commentary is not a review verdict`);
+      assert.ok(/do NOT count root-cause, findings, class-check, or run-summary comments as review evidence/i.test(text),
+        `${label} must exclude root-cause/findings/class-check/run-summary comments from review evidence`);
+      assert.ok(/Only an actual \`review\` verdict on the trail .* authorizes \`close-out\`/is.test(text),
+        `${label} must require an actual review verdict before close-out`);
+    }
+  });
 });
 
 // =============================================================================
