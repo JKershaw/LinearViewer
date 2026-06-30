@@ -178,8 +178,10 @@ isn't a course-correction — it's a *probe*: confirm the in-flight thing, or as
 (*"still working? report where things stand"*). A liveness probe doesn't breach the no-coaching line,
 because you're not redirecting the work, only asking what state it's in. And the redundancy still holds
 — if the probe can't land or the silence outlasts it, that's a dead session, so re-dispatch fresh.
-(Your briefing carries the concrete quiet-threshold and the polling mechanics; the disposition is just:
-don't read "done" as "finished," and don't wait on silence forever.)
+(Your briefing carries the concrete quiet-threshold and how the probe works — you're *woken* by a
+child's terminal outcome rather than polling for it, and the probe is the explicit exception for a
+worker gone silent; the disposition is just: don't read "done" as "finished," and don't wait on
+silence forever.)
 
 ### Closing a session, once it's truly spent
 
@@ -212,7 +214,7 @@ disposition, keep the option alive, without depending on a mechanism that doesn'
 doubt, the same instinct as everywhere else: closing forecloses and leaving-open is cheap, so leave it
 open.
 
-### Holding a worker vs. freeing a producer
+### Holding a worker, and holding a subscribed orchestrator
 
 One dial sits *upstream* of all of that — set before a session even starts. Whether a dispatched session
 *holds open* at completion is a choice you make at dispatch time, by the role you're launching — because
@@ -223,21 +225,27 @@ session hasn't finalized yet, an open one has.)
 
 - **A worker** — a session you intend to keep feeding beats — dispatch **with** `waitForFollowUps:true`.
   At completion it holds the session open and takes the next beat in-session, so a continuing task keeps
-  its context instead of paying to rebuild it cold each beat.
-- **An orchestrator or sub-orchestrator** — a *producer* that drives its own loop — dispatch **without**
-  the flag (the default). A producer must finalize normally — reach a terminal *completion*, the honest
-  end-state the section above then leaves open — and stay free to run its watch. Holding one open is the
-  trap: a held producer sits *non-terminal*, and if it's waiting on a follow-up to itself while its
-  worker waits to be fed, neither is terminal, no watch fires, and the run quietly deadlocks. Left
-  unflagged, a producer that stalls instead **completes** — goes terminal — and its driver can resume it.
-  A visible, recoverable stop beats an invisible freeze.
+  its context instead of paying to rebuild it cold each beat. This is the *down-chain* push: you signal
+  the next beat in and the held worker picks it up in seconds, no cold `--resume`.
+- **An orchestrator that subscribes to its children** — dispatch **with** `waitForFollowUps:true` too,
+  and **stand by** after each dispatch instead of watching. Each child runs independently to a terminal
+  outcome, and the subscribe edge then **pushes** that outcome back *up* to the parent as an injected
+  follow-up — so a held orchestrator is woken in seconds without ever polling its children. The old
+  deadlock trap doesn't apply under push: it assumed a held producer sitting non-terminal while it waited
+  to *feed* a worker that was itself waiting — a mutual wait with no terminal, so no watch fired. A
+  subscribed child has no such mutual wait: it doesn't block to be fed, it runs to terminal on its own and
+  *then* wakes the parent. With nothing waiting on the parent to act first, the hold is safe — and the
+  `--resume` fallback catches anything that outruns the hold budget.
 
-This leans on the dispatch watch you already poll. A held worker only stays healthy if its next beat
-arrives **inside its hold budget** — the long-poll on the watch is what delivers beats fast enough to
-keep a flagged worker fed before the hold lapses. An unflagged producer makes no such bet: it relies on
-the ordinary async-wait/watch path, which is exactly why it must keep a poll in flight rather than
-blocking. So the rule pairs with the loop: **flag the fed, free the feeder, and keep the watch live for
-both.**
+The up-chain poll is retired for the subscribed case: you no longer keep a watch in flight to learn a
+*child* finished, because that outcome is pushed to you. Two narrow uses of the watch remain, and only
+these. First, the *intra-session* keep-warm when you're stepping a single warm session yourself — a beat
+you feed back into your own session must land **inside its hold budget**, and a long-poll is what delivers
+it fast enough; that bet is unchanged for a session you drive beat-by-beat. Second, the **explicit
+liveness probe**: the runtime pushes terminal *outcomes*, but a worker that goes silent without ever
+terminating emits none, so a one-off watch (or a `followUpTo` nudge) on a suspected-wedged worker is still
+yours to send. So the rule is now: **flag the fed, hold the subscribed, and keep a poll only for your own
+warm beats and the occasional liveness probe.**
 
 ## The human's edge, and how to hand back
 
