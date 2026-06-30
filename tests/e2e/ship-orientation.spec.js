@@ -13,7 +13,7 @@ import { swimLocalSeed } from '../fixtures/local-harness.js';
 test.describe('Ship orientation mode (LIN-301)', () => {
   test('mode control renders; orientation is disabled without a saved report', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await page.goto(`/test/clear-report-history?urlKey=${localWorkerUrlKey}`);
-    await seedLocal(swimLocalSeed, { features: { ship: true } });
+    await seedLocal(swimLocalSeed(localWorkerUrlKey), { features: { ship: true } });
     await page.goto(`/workspace/${localWorkerUrlKey}/ship`);
     await page.waitForLoadState('networkidle');
 
@@ -33,7 +33,7 @@ test.describe('Ship orientation mode (LIN-301)', () => {
   });
 
   test('with a saved report, toggling to orientation maps tasks to bearings', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(swimLocalSeed, { features: { roadmap: true, ship: true } });
+    await seedLocal(swimLocalSeed(localWorkerUrlKey), { features: { roadmap: true, ship: true } });
 
     // Seed a report whose orientation covers swim-sample non-started tasks.
     const orientation = [
@@ -73,7 +73,7 @@ test.describe('Ship orientation mode (LIN-301)', () => {
   });
 
   test('orientation preference persists across reloads', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(swimLocalSeed, { features: { roadmap: true, ship: true } });
+    await seedLocal(swimLocalSeed(localWorkerUrlKey), { features: { roadmap: true, ship: true } });
     await page.request.post(`/workspace/${localWorkerUrlKey}/api/roadmap/reports`, {
       data: {
         northStar: 'star',

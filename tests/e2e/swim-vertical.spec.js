@@ -13,7 +13,7 @@ import { swimLocalSeed } from '../fixtures/local-harness.js';
 
 test.describe('Swim Page — Vertical Orientation', () => {
   test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(swimLocalSeed);
+    await seedLocal(swimLocalSeed(localWorkerUrlKey));
     await page.goto(`/workspace/${localWorkerUrlKey}/swim`);
     await page.evaluate(() => localStorage.removeItem('swim-settings'));
     await page.goto(`/workspace/${localWorkerUrlKey}/swim`);
