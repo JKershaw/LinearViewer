@@ -810,3 +810,39 @@ describe('Per-render-instance dispatch panel ids (LIN-732)', () => {
     }
   });
 });
+
+// =============================================================================
+// Stepper Autopilot sibling button (LIN-836)
+// =============================================================================
+//
+// The proxy-gated Autopilot affordance grew a SECOND button for the stepper
+// variant (LIN-791). The classic anchor stays untouched (implicit `standard`);
+// the sibling carries data-variant="stepper", which app.js reads and forwards
+// as `?variant=stepper` on the kickoff fetch.
+describe('Stepper Autopilot sibling button (LIN-836)', () => {
+  const issue = {
+    id: 'i1', identifier: 'STB-1', title: 'A task',
+    state: { type: 'started' }, labels: { nodes: [] }
+  };
+  const render = (proxy) => renderDetailsContent(issue, {
+    isLanding: false, urlKey: 'ws', featureFlags: { proxy }
+  });
+
+  test('proxy on ⇒ both the classic and the stepper anchor render', () => {
+    const html = render(true);
+    // Classic button unchanged (no data-variant marker).
+    assert.ok(html.includes('class="label-prompt autopilot-btn" data-issue-id="i1" title='),
+      'classic autopilot anchor still present, carries no variant');
+    // Stepper sibling: same class + gate, data-variant="stepper", visible label.
+    assert.ok(html.includes('data-variant="stepper"'), 'stepper sibling carries the variant marker');
+    assert.ok(html.includes('>Autopilot · stepped</a>'), 'stepper sibling shows the stepped label');
+    // Exactly two autopilot launch anchors, not more.
+    assert.equal((html.match(/class="label-prompt autopilot-btn"/g) || []).length, 2);
+  });
+
+  test('proxy off ⇒ neither autopilot anchor renders (same gate as the classic button)', () => {
+    const html = render(false);
+    assert.ok(!html.includes('autopilot-btn'), 'no autopilot launch anchors without the proxy flag');
+    assert.ok(!html.includes('data-variant="stepper"'), 'no stepper sibling without the proxy flag');
+  });
+});

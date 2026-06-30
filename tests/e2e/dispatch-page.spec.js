@@ -866,7 +866,9 @@ test.describe('Dispatch Page', () => {
 
     test('goal input and load button are present when proxy is enabled', async ({ page }) => {
       await expect(page.locator('.dispatch-autopilot-goal')).toBeVisible();
-      await expect(page.locator('.dispatch-load-autopilot')).toBeVisible();
+      // LIN-836: the classic load button (variant-less) and its stepper sibling.
+      await expect(page.locator('.dispatch-load-autopilot:not([data-variant])')).toBeVisible();
+      await expect(page.locator('.dispatch-load-autopilot[data-variant="stepper"]')).toBeVisible();
     });
 
     // LIN-603: the goal control is a <textarea> (not a single-line <input>) so
@@ -909,9 +911,9 @@ test.describe('Dispatch Page', () => {
     test('typed goal reaches the loaded kickoff text and prompt name', async ({ page }) => {
       const goal = 'Ship the billing migration';
       await page.locator('.dispatch-autopilot-goal').fill(goal);
-      await page.locator('.dispatch-load-autopilot').click();
+      await page.locator('.dispatch-load-autopilot:not([data-variant])').click();
 
-      const loadBtn = page.locator('.dispatch-load-autopilot');
+      const loadBtn = page.locator('.dispatch-load-autopilot:not([data-variant])');
       await expect(loadBtn).toHaveText('loaded ✓');
 
       const textarea = page.locator('.dispatch-prompt-input');
@@ -923,9 +925,9 @@ test.describe('Dispatch Page', () => {
     });
 
     test('loading with no goal yields the stack-walk kickoff (no goal line)', async ({ page }) => {
-      await page.locator('.dispatch-load-autopilot').click();
+      await page.locator('.dispatch-load-autopilot:not([data-variant])').click();
 
-      const loadBtn = page.locator('.dispatch-load-autopilot');
+      const loadBtn = page.locator('.dispatch-load-autopilot:not([data-variant])');
       await expect(loadBtn).toHaveText('loaded ✓');
 
       const textarea = page.locator('.dispatch-prompt-input');
@@ -933,6 +935,21 @@ test.describe('Dispatch Page', () => {
       // user-supplied goal) and is named accordingly.
       await expect(textarea).toHaveValue(/Goal from the human:\*\* none this run/);
       await expect(textarea).toHaveAttribute('data-prompt-name', 'Autopilot (stack walk)');
+    });
+
+    // LIN-836: the stepper sibling loads the same general kickoff with
+    // ?variant=stepper, so the body carries the beat-stepping disposition and
+    // the dispatch is named for the stepped variant (kind stays autopilot).
+    test('the stepper load button loads the stepped stack-walk kickoff', async ({ page }) => {
+      await page.locator('.dispatch-load-autopilot[data-variant="stepper"]').click();
+
+      const stepBtn = page.locator('.dispatch-load-autopilot[data-variant="stepper"]');
+      await expect(stepBtn).toHaveText('loaded ✓');
+
+      const textarea = page.locator('.dispatch-prompt-input');
+      await expect(textarea).toHaveValue(/STEPPER/);
+      await expect(textarea).toHaveAttribute('data-kind', 'autopilot');
+      await expect(textarea).toHaveAttribute('data-prompt-name', 'Autopilot (stepped, stack walk)');
     });
 
     // LIN-639: arriving via the ?goal= handoff with an empty prompt and clicking

@@ -83,6 +83,9 @@
     }
     if (hasAutopilot) {
       html += `<button class="swipe-prompt-btn autopilot-btn" data-prompt="__autopilot__" title="Run on autopilot until this task is done — dispatches work to a separate worker and watches the loop">Autopilot</button>`;
+      // LIN-836: sibling stepper button (LIN-791 variant). Same kickoff endpoint,
+      // fetched with ?variant=stepper; dispatch contract stays kind:autopilot.
+      html += `<button class="swipe-prompt-btn autopilot-btn" data-prompt="__autopilot_stepper__" title="Run on autopilot in stepped mode — drips ordered beats into one warm session, judging each before advancing">Autopilot · stepped</button>`;
     }
     for (const key of defaultPromptKeys) {
       const name = promptMeta[key] || key;
@@ -249,6 +252,8 @@
         state.activeLabelName = 'AI Recommend';
       } else if (label === '__autopilot__') {
         state.activeLabelName = 'Autopilot';
+      } else if (label === '__autopilot_stepper__') {
+        state.activeLabelName = 'Autopilot · stepped';
       } else {
         state.activeLabelName = opts.promptMeta[label] || label;
       }
@@ -267,8 +272,11 @@
             throw new Error(error.error || 'Failed to load prompt');
           }
           await handleStreamingResponse(response, label, ac);
-        } else if (label === '__autopilot__') {
-          const result = await window.api(`${apiPrefix}/api/autopilot-prompt/${issueId}`, { signal: ac.signal, on401: false });
+        } else if (label === '__autopilot__' || label === '__autopilot_stepper__') {
+          // LIN-836: the stepper label fetches the same kickoff endpoint with
+          // ?variant=stepper; standard (`__autopilot__`) is byte-identical to before.
+          const variantQuery = label === '__autopilot_stepper__' ? '?variant=stepper' : '';
+          const result = await window.api(`${apiPrefix}/api/autopilot-prompt/${issueId}${variantQuery}`, { signal: ac.signal, on401: false });
           if (abortController !== ac || destroyed) return;
           const html = renderMarkdown(result.prompt);
           // Carry kind through so the dispatch tags the item as the autopilot meta-loop.
