@@ -1,10 +1,11 @@
 {
   "name": "Closeout-Review",
-  "note": "Deliberately-synthetic fixtures (LIN-812) for the close-out/review routing gate — currently UN-eval'ed by the recommender baseline (its real fixtures' `expect` only covered implement/plan/research/breakdown/review; LIN-804 reports close-out firing ~1/3 of the time it should). close-out and review are the positive/negative pair of ONE Step-0/Step-3 decision in lib/prompts/meta-prompt-template.js, driven entirely by COMMENT-TRAIL state: is there a comment where a review recorded an Approve (or Approve — conditional) verdict, and is the work still unmerged / not Done? With such a verdict on record + unmerged → close-out (LIN-550 split; LIN-810 — gate on the verdict, not on a ledger heading); with the work looking done but NO review-verdict comment on the trail → review, never close-out (LIN-811 — close-out requires positive evidence a review actually ran; ambiguous → review). Each is a childless In-Progress leaf (no children/focusedChild) so the descent terminates on it. Honest scope: this is live SHAPE-COVERAGE under continuous measurement, NOT a self-reproducing red test — the authoritative red->green guard is the deterministic structural test in tests/unit/openrouter.test.js ('close-out routing gate (LIN-812)'). LIN-804's 'around a third of the time' is the motivating baseline to validate here, not a target to optimize.",
+  "note": "Deliberately-synthetic fixtures (LIN-812) for the close-out/review routing gate — currently UN-eval'ed by the recommender baseline (its real fixtures' `expect` only covered implement/plan/research/breakdown/review; LIN-804 reports close-out firing ~1/3 of the time it should). close-out and review are the positive/negative pair of ONE Step-0/Step-3 decision in lib/prompts/meta-prompt-template.js, driven entirely by COMMENT-TRAIL state: is there a comment where a review recorded an Approve (or Approve — conditional) verdict, and is the work still unmerged / not Done? With such a verdict on record + unmerged → close-out (LIN-550 split; LIN-810 — gate on the verdict, not on a ledger heading); with the work looking done but NO review-verdict comment on the trail → review, never close-out (LIN-811 — close-out requires positive evidence a review actually ran; ambiguous → review). The LIN-823 case (FIX-823-bug-noreview) is the bug-path leak of that same gate: a `bug`-labelled fix posts its OWN rich investigation trail (Root-cause-CONFIRMED + findings + class-check + stepper run-summary) that reads review-ish and fooled the recommender into close-out before review — modeled on the real LIN-799 misroute. The gate must NOT count a bug's author-diagnosis commentary as a fresh-eyes review verdict; only an actual review verdict authorizes close-out → expect review, NOT close-out. Each is a childless In-Progress leaf (no children/focusedChild) so the descent terminates on it. Honest scope: this is live SHAPE-COVERAGE under continuous measurement, NOT a self-reproducing red test — the authoritative red->green guard is the deterministic structural test in tests/unit/openrouter.test.js ('close-out routing gate (LIN-812)', incl. the LIN-823 bug-investigation-exclusion case). LIN-804's 'around a third of the time' is the motivating baseline to validate here, not a target to optimize.",
   "targets": [
     { "id": "FIX-812-approve-ledger", "role": "landed leaf, review recorded Approve — conditional + non-empty ledger, still unmerged/In Progress (expect -> close-out; the LIN-804 under-fire headline shape)", "expect": ["close-out"], "descentExpect": "FIX-812-approve-ledger" },
     { "id": "FIX-812-approve-empty", "role": "landed leaf, review recorded a plain Approve + empty ledger, still unmerged/In Progress (LIN-810 — gate on verdict, not heading; expect -> close-out as a cheap pass-through)", "expect": ["close-out"], "descentExpect": "FIX-812-approve-empty" },
-    { "id": "FIX-812-noreview", "role": "landed leaf that LOOKS done (PR merged comment) but has NO review-verdict comment on the trail (LIN-811 — positive review evidence required before close-out; expect -> review, NOT close-out)", "expect": ["review"], "descentExpect": "FIX-812-noreview" }
+    { "id": "FIX-812-noreview", "role": "landed leaf that LOOKS done (PR merged comment) but has NO review-verdict comment on the trail (LIN-811 — positive review evidence required before close-out; expect -> review, NOT close-out)", "expect": ["review"], "descentExpect": "FIX-812-noreview" },
+    { "id": "FIX-823-bug-noreview", "role": "landed `bug`-labelled leaf, fix landed (PR open, CI green) with a rich investigation trail (Root-cause-CONFIRMED + decisive experiment + class-check + stepper run-summary) but NO review verdict — modeled on the real LIN-799 misroute (LIN-823 — a bug's own analysis is not a review verdict; expect -> review, NOT close-out)", "expect": ["review"], "descentExpect": "FIX-823-bug-noreview" }
   ],
   "bundles": {
     "FIX-812-approve-ledger": {
@@ -87,6 +88,36 @@
         {
           "body": "Added the 60s cache and invalidation in `lib/audit.js`; unit tests cover hit/miss and the TTL boundary. PR #814 opened and merged to a feature branch; CI green.",
           "createdAt": "2026-06-22T01:00:00.000Z",
+          "user": "engineer"
+        }
+      ],
+      "focusedChild": null
+    },
+    "FIX-823-bug-noreview": {
+      "issue": {
+        "id": "fix-823-bug-noreview-uuid",
+        "identifier": "FIX-823-bug-noreview",
+        "title": "Flaky: sessions-feed tests flake on the first attempt every CI run",
+        "description": "## Symptom\n\nSix tests in `tests/e2e/observation.spec.js` (the sessions feed) ✘ on the first attempt on 30 of 30 recent CI runs, then recover on retry, so CI stays green but the first attempt is non-deterministic.\n\n## Hypothesis\n\nA shared per-test setup race — likely the feed cache not being invalidated between tests, so the first read returns a stale pre-seed payload.\n\n## Done when\n\nAll six pass green on the FIRST attempt (no retry markers) across repeated CI runs.",
+        "url": "https://linear.app/linearviewer/issue/FIX-823-bug-noreview",
+        "state": { "name": "In Progress", "type": "started" },
+        "createdAt": "2026-06-29T00:00:00.000Z",
+        "labels": ["Bug"]
+      },
+      "parent": null,
+      "siblings": [],
+      "siblingsTotal": 0,
+      "project": { "name": "Autopilot, Recommendation & Prompt Engine", "description": null },
+      "children": [],
+      "comments": [
+        {
+          "body": "## Root cause — CONFIRMED\n\nThe merged sessions-feed cache in `lib/sessions-feed-cache.js` is an in-process singleton with a 5s TTL + stale-while-revalidate. The E2E `clearRuns()` wiped the dispatch/agent-status logs but never invalidated this OUTPUT cache, so a test that cleared state, seeded a fresh run, then read the feed within 5s got the stale pre-seed payload. The seeded session was absent on the first attempt; by Playwright retry (>5s later) the entry had expired/refreshed, so it passed. That's why it was 30/30 first-attempt failures, all green on retry.\n\n## Decisive experiment\n\nChanged ONLY the cache and the flake flipped: bypassing `sessionsFeedCache` (route reads `mergeSessions()` directly) turned 30/30 first-attempt failures → 84/84 green, then 112/112 at `--repeat-each=8`. Single-variable — three rival hypotheses ruled out.",
+          "createdAt": "2026-06-29T20:42:00.000Z",
+          "user": "engineer"
+        },
+        {
+          "body": "## Autopilot stepper run-summary (session 69690e92)\n\nDriven through a warm single-session stepper, 4 ordered beats within the `bug` kind (review/close-out kept separate for fresh eyes):\n\n- **Beat 1 — ground + reproduce:** set In Progress, re-grounded spec/helpers against HEAD, reproduced the first-attempt flake 30/30 at `--retries=0 --repeat-each=6`.\n- **Beat 2 — confirm cause:** single-variable experiment — bypassing only `sessionsFeedCache` flipped 30/30 → 84/84 green; three rival hypotheses ruled out.\n- **Beat 3 — fix + verify:** cache-invalidation seam wired into `clearRuns` (prod 5s TTL untouched). Retries-OFF green: observation 112/0, full e2e 915/0, unit 2781/0 (+3 new tests). PR #691 @`30785e5`, CI run success.\n- **Beat 4 — findings + class check:** root-cause comment posted; class check found no sibling shares this exact root cause (siblings are separate flake classes).\n\n**Holds:** fix verified locally (first-attempt determinism) and on CI. **Remaining (orchestrator-owned):** review → close-out (merge PR #691, set Done). PR intentionally left unmerged.",
+          "createdAt": "2026-06-29T20:44:00.000Z",
           "user": "engineer"
         }
       ],
