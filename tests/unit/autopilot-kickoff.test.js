@@ -57,12 +57,37 @@ describe('buildAutopilotKickoff (shared guide)', () => {
     assert.ok(text.includes('not churn or a stall'));
   });
 
-  test('caps the watch on silence — a ~30-min zero-activity ceiling, then a liveness follow-up', () => {
+  test('the watch step is a stand-by-for-push contract, not a poll loop (LIN-826)', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
-    // The watch loop must have a terminal escape: silence is not trusted forever.
-    assert.ok(text.includes('Quiet has a ceiling'));
+    // Phase 2 swaps the up-chain poll for the push contract: after dispatching a
+    // step the orchestrator stands by and is woken automatically with the outcome.
+    assert.ok(text.includes('Stand by for the wake'));
+    assert.ok(text.includes('subscribed'));
+    assert.ok(text.includes('woken automatically'));
+    assert.ok(text.includes('do not poll'));
+    // The deleted long-poll loop must be gone — no residual watch-loop machinery.
+    assert.ok(!text.includes('do { r = GET .../dispatch/{id}?wait=50 }'));
+    assert.ok(!text.includes('Quiet has a ceiling'));
+  });
+
+  test('keeps the ~30-min wedged-session liveness nudge (the push can\'t see silence) (LIN-826)', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
+    // The runtime wakes on a terminal *outcome*; a worker that goes silent without
+    // terminating still needs the agent's nudge — this judgment must survive the swap.
+    assert.ok(text.includes('wedged session'));
+    assert.ok(text.includes('silent without ever terminating'));
     assert.ok(text.includes('30 min'));
     assert.ok(text.includes('followUpTo'));
+    assert.ok(text.includes('no live session to resume'));
+  });
+
+  test('keeps the step-4 "done means go look" cross-check after the swap (LIN-826)', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
+    // The cross-check that earns its keep — fetch [evidence], confirm the deliverable
+    // exists, treat done-while-waiting as not-yet — is untouched by the step-3 swap.
+    assert.ok(text.includes('the step that earns its keep'));
+    assert.ok(text.includes('[evidence]'));
+    assert.ok(text.includes('claimed, not verified'));
   });
 
   test('reads a done-while-waiting (e2e/CI/deploy in flight) as a not-yet, not a finish', () => {
