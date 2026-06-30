@@ -19,7 +19,7 @@ import { MongoClient } from 'mongodb'
 import { MangoClient } from '@jkershaw/mangodb'
 import { ensureIndexes } from './lib/db-indexes.js'
 import { MongoSessionStore } from './lib/session-store.js'
-import { UserPreferencesStore } from './lib/user-preferences.js'
+import { UserPreferencesStore, VALID_THEMES, setThemeCookie } from './lib/user-preferences.js'
 import { WorkspacePreferencesStore } from './lib/workspace-preferences.js'
 import { DispatchQueueStore } from './lib/dispatch-store.js'
 import { CustomPromptsStore } from './lib/custom-prompts-store.js'
@@ -1949,6 +1949,54 @@ app.post('/workspace/:urlKey/settings/features', workspaceFromUrl, async (req, r
   // AJAX requests get JSON; regular form submissions get redirect
   if (req.headers['x-requested-with'] === 'XMLHttpRequest') {
     res.json({ ok: true, feature, enabled: isEnabled });
+  } else {
+    res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
+  }
+});
+
+/**
+ * Set the global light/dark theme preference (LIN-785).
+ *
+ * Mirrors the feature-toggle handler above: validate, write the session, set the
+ * pre-paint `theme` cookie (the transport the shared shell reads before paint),
+ * best-effort persist to UserPreferencesStore for cross-device durability, then
+ * JSON for XHR / redirect for a plain form submit. Accepts { theme } in the body.
+ */
+app.post('/workspace/:urlKey/settings/theme', workspaceFromUrl, async (req, res) => {
+  const workspace = req.workspace;
+  const { theme } = req.body;
+
+  if (!VALID_THEMES.includes(theme)) {
+    return res.status(400).json({ error: 'Invalid theme' });
+  }
+
+  // Session + the pre-paint cookie are the authoritative, immediate path.
+  req.session.theme = theme;
+  try {
+    await saveSession(req.session);
+  } catch (err) {
+    console.error('Failed to save theme preference:', err);
+    return res.status(500).json({ error: 'Failed to save theme preference' });
+  }
+  setThemeCookie(res, theme);
+
+  // Best-effort durable persist for cross-device sync (non-fatal: the cookie +
+  // session already carry the choice for this device/session).
+  if (req.session.linearUserId) {
+    try {
+      const existingPrefs = await userPreferencesStore.getUserPreferences(req.session.linearUserId);
+      await userPreferencesStore.saveUserPreferences(req.session.linearUserId, {
+        ...existingPrefs,
+        theme
+      });
+    } catch (err) {
+      console.error('Failed to persist theme preference to preferences store:', err);
+    }
+  }
+
+  // AJAX requests get JSON; regular form submissions get redirect
+  if (req.headers['x-requested-with'] === 'XMLHttpRequest') {
+    res.json({ ok: true, theme });
   } else {
     res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
   }

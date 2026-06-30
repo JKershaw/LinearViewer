@@ -12,7 +12,7 @@ import { AuthExchangeError } from '../lib/providers/interface.js'
 import { renderErrorPage } from '../lib/render.js'
 import { upsertWorkspace, saveSession, linkProvider } from '../lib/workspace.js'
 import { calculateExpiresAt } from '../lib/token-refresh.js'
-import { applyUserPreferencesToSession } from '../lib/user-preferences.js'
+import { applyUserPreferencesToSession, setThemeCookie } from '../lib/user-preferences.js'
 
 /**
  * Create auth routes with required dependencies.
@@ -217,6 +217,10 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider 
 
         req.session.activeWorkspaceId = workspace.id
         await saveSession(req.session)
+        // LIN-785: seed the pre-paint theme cookie from the rehydrated durable
+        // preference so a returning/cross-device user's dark choice applies on the
+        // very first page after login (the cookie is this device's transport).
+        if (req.session.theme) setThemeCookie(res, req.session.theme)
         res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/`)
       })
     } catch (err) {

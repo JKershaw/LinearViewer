@@ -154,10 +154,11 @@ describe('renderPipelinePage', () => {
     assert.ok(html.includes('\\u003c/script>'), 'embed contains escaped </script>');
     assert.ok(!html.includes('</script><img src=x'), 'literal </script> attack sequence absent');
 
-    // And there must be exactly one literal </script> — the genuine closing tag
-    // for <script src="/pipeline.js"> at the bottom of the document.
+    // And the only literal </script> tags are the genuine ones: the pre-paint
+    // theme script in <head> (LIN-785), the data embed, and the three page
+    // scripts (common.js, recap.js, pipeline.js).
     const literalCloses = html.match(/<\/script>/g) || [];
-    assert.strictEqual(literalCloses.length, 4, 'exactly four literal </script> tags (data embed, common.js, recap.js, pipeline.js)');
+    assert.strictEqual(literalCloses.length, 5, 'exactly five literal </script> tags (theme pre-paint, data embed, common.js, recap.js, pipeline.js)');
 
     // Side-effect test: confirm the escaped payload is valid JSON and does
     // not contain the attacker payload as live script content.
