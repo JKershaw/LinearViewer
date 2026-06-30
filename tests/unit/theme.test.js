@@ -93,6 +93,113 @@ test('ships motion keyframes, a focus-visible ring, and a reduced-motion baselin
   assert.match(STYLE_CSS, /@media\s*\(prefers-reduced-motion:\s*reduce\)/);
 });
 
+// --- Theme S2 primitives (LIN-786) ------------------------------------------
+
+// Every interactive primitive must rely on the global :focus-visible ring, so
+// none may set `outline:none` — that would suppress the keyboard focus ring with
+// no replacement. (The token-input's scoped :not(:focus-visible) suppression is
+// the one allowed pattern and lives in common-actions.css, not here.)
+test('no S2 primitive suppresses focus with outline:none', () => {
+  const start = STYLE_CSS.indexOf('Theme S2 Primitives (LIN-786)');
+  assert.notEqual(start, -1, 'expected the S2 primitives block in the stylesheet');
+  // Bound the slice to the S2 section (it ends at the next major block).
+  const end = STYLE_CSS.indexOf('Badge convergence anchor', start);
+  assert.notEqual(end, -1, 'expected a following section to bound the S2 block');
+  const block = STYLE_CSS.slice(start, end);
+  assert.doesNotMatch(block, /outline:\s*none/, 'S2 primitives must not kill the focus ring');
+});
+
+test('primary Button and IconButton meet the 40px touch-target floor', () => {
+  const primary = ruleBody(STYLE_CSS, '.btn--primary');
+  assert.match(primary, /min-height:\s*40px/, '.btn--primary needs a ≥40px touch target');
+  const iconBtn = ruleBody(STYLE_CSS, '.icon-btn {');
+  assert.match(iconBtn, /min-height:\s*40px/, '.icon-btn needs a ≥40px touch target');
+  assert.match(iconBtn, /min-width:\s*40px/, '.icon-btn needs a ≥40px touch target');
+});
+
+test('the run-status pill ships a dot + the running/error/queued modifiers on -dim text', () => {
+  assert.match(STYLE_CSS, /\.status-pill__dot\s*\{/);
+  assert.match(STYLE_CSS, /\.status-pill--running\s*\{\s*color:\s*var\(--amber-dim\)/);
+  assert.match(STYLE_CSS, /\.status-pill--error\s*\{\s*color:\s*var\(--red-dim\)/);
+  assert.match(STYLE_CSS, /\.status-pill--queued\s*\{\s*color:\s*var\(--slate-dim\)/);
+  // The dot uses the bright fill token, and the running dot reuses the global
+  // pulse keyframe (no new animation machinery).
+  assert.match(STYLE_CSS, /\.status-pill--running\s+\.status-pill__dot\s*\{\s*background:\s*var\(--amber\)/);
+  assert.match(STYLE_CSS, /\.status-pill--running\s+\.status-pill__dot\s*\{[\s\S]*animation:\s*pulse/);
+});
+
+test('--brand-dim is defined in both themes (the §11 AA text companion)', () => {
+  assert.match(ruleBody(STYLE_CSS, ':root'), /--brand-dim\s*:/);
+  assert.match(ruleBody(STYLE_CSS, '.theme-dark'), /--brand-dim\s*:/);
+});
+
+// --- AA verification of the §11 at-risk token pairs -------------------------
+//
+// WCAG 2.x relative-luminance + contrast ratio, computed over the resolved
+// token hex values straight from the stylesheet, so changing a token without
+// re-checking contrast fails this test.
+
+function srgbToLinear(c) {
+  const cs = c / 255;
+  return cs <= 0.03928 ? cs / 12.92 : Math.pow((cs + 0.055) / 1.055, 2.4);
+}
+function luminance(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  assert.ok(m, `expected a #rrggbb hex, got "${hex}"`);
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return 0.2126 * srgbToLinear(r) + 0.7152 * srgbToLinear(g) + 0.0722 * srgbToLinear(b);
+}
+function contrast(fg, bg) {
+  const l1 = luminance(fg), l2 = luminance(bg);
+  const [hi, lo] = l1 >= l2 ? [l1, l2] : [l2, l1];
+  return (hi + 0.05) / (lo + 0.05);
+}
+/** Resolve a token to a hex, following up to a few `var(--x)` indirections. */
+function resolveToken(themeSelector, name) {
+  const block = ruleBody(STYLE_CSS, themeSelector);
+  const root = ruleBody(STYLE_CSS, ':root');
+  let cur = name;
+  for (let i = 0; i < 6; i++) {
+    const re = new RegExp(`${cur}\\s*:\\s*([^;]+);`);
+    // Prefer the theme block's binding; fall back to :root for shared tokens.
+    const val = (re.exec(block) || re.exec(root) || [])[1];
+    assert.ok(val, `could not resolve ${cur} in ${themeSelector}/:root`);
+    const v = val.trim();
+    const varMatch = /^var\((--[a-z0-9-]+)\)$/i.exec(v);
+    if (varMatch) { cur = varMatch[1]; continue; }
+    return v;
+  }
+  throw new Error(`token ${name} did not resolve to a value`);
+}
+
+const AA_NORMAL = 4.5;
+
+test('§11 AA: --brand-dim as text on --card clears AA-normal in both themes', () => {
+  for (const theme of [':root', '.theme-dark']) {
+    const ratio = contrast(resolveToken(theme, '--brand-dim'), resolveToken(theme, '--card'));
+    assert.ok(ratio >= AA_NORMAL, `${theme}: --brand-dim on --card is ${ratio.toFixed(2)}:1 (< ${AA_NORMAL})`);
+  }
+});
+
+test('§11 AA: each status -dim text colour clears AA-normal on the page surface', () => {
+  for (const theme of [':root', '.theme-dark']) {
+    const bg = resolveToken(theme, '--bg');
+    for (const tok of ['--green-dim', '--amber-dim', '--red-dim', '--slate-dim']) {
+      const ratio = contrast(resolveToken(theme, tok), bg);
+      assert.ok(ratio >= AA_NORMAL, `${theme}: ${tok} on --bg is ${ratio.toFixed(2)}:1 (< ${AA_NORMAL})`);
+    }
+  }
+});
+
+test('§11 note: --faint is structural (non-text), used only for hairlines', () => {
+  // --faint on --bg is intentionally below the 4.5:1 TEXT bar — it is the
+  // box-drawing / hairline colour (non-text, 3:1 bar), so it is NOT asserted as
+  // a text pair. This test documents the exemption and guards the intent.
+  const root = ruleBody(STYLE_CSS, ':root');
+  assert.match(root, /--faint:\s*var\(--fg-vdim\)/, '--faint maps to the structural hairline token');
+});
+
 // --- Pre-paint shell --------------------------------------------------------
 
 test('the shared shell emits a pre-paint theme script before the title', () => {

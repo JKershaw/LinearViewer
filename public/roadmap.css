@@ -378,11 +378,11 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
 }
 
 .roadmap-risk--medium {
-  border-left: 3px solid #e67e22;
+  border-left: 3px solid var(--amber);
 }
 
 .roadmap-risk--medium .roadmap-risk-sev {
-  color: #e67e22;
+  color: var(--amber-dim);  /* AA-safe amber text; the stripe keeps the bright --amber */
 }
 
 .roadmap-risk--low {

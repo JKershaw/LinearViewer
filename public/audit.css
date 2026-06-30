@@ -20,7 +20,7 @@
 .settings-section {
   margin-bottom: var(--space-5);
   padding: var(--space-3);
-  background: rgba(0, 0, 0, 0.02);
+  background: var(--bg-alt);
   border-radius: 4px;
 }
 
@@ -168,7 +168,7 @@
 }
 
 .audit-button:hover {
-  background: #1d4ed8;
+  background: color-mix(in srgb, var(--blue) 85%, black);
 }
 
 .audit-button:disabled {
@@ -223,7 +223,7 @@
   flex-wrap: wrap;
   margin-bottom: var(--space-5);
   padding: var(--space-3);
-  background: rgba(0, 0, 0, 0.02);
+  background: var(--bg-alt);
   border-radius: 4px;
 }
 
@@ -394,7 +394,7 @@
   align-items: center;
   gap: 0.5ch;
   padding: 0.2rem var(--space-2);
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--card-h);
   border-radius: var(--radius-sm);
   font-family: var(--font-content);
   font-size: var(--font-size-sm);
@@ -412,19 +412,19 @@
 
 .label-tag.mapped,
 .label-tag.workflow.present {
-  background: rgba(22, 160, 133, 0.1);
-  border: 1px solid rgba(22, 160, 133, 0.3);
+  background: color-mix(in srgb, var(--teal) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--teal) 30%, transparent);
 }
 
 .label-tag.unmapped,
 .label-tag.other {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--card-h);
 }
 
 .label-tag.missing,
 .label-tag.workflow.missing {
-  background: rgba(231, 76, 60, 0.1);
-  border: 1px solid rgba(231, 76, 60, 0.3);
+  background: color-mix(in srgb, var(--red) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--red) 30%, transparent);
 }
 
 .label-tag .tag-status {
