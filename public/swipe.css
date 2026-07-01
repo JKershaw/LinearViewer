@@ -113,15 +113,9 @@
   font-style: italic;
 }
 
-/* Status accent bar at top of card */
-.swipe-card-accent {
-  height: 2px;
-  width: 100%;
-}
-.swipe-card-accent.in-progress { background: linear-gradient(90deg, var(--yellow), #e8c547); }
-.swipe-card-accent.done { background: linear-gradient(90deg, var(--green), #2ecc71); }
-.swipe-card-accent.todo { background: var(--border); }
-.swipe-card-accent.backlog { background: var(--fg-vdim); }
+/* Status accent bar at top of card — the shared AccentBar primitive
+   (.accent-bar / .accent-bar--<state>, public/style.css §Theme S2). State →
+   token colour is owned there; no bespoke gradients here. */
 
 /* Card inner content */
 .swipe-card-inner {
@@ -144,14 +138,8 @@
   gap: 0.35rem;
 }
 
-.swipe-card-status .state {
-  font-size: 13px;
-}
-
-.swipe-card-status .state.done { color: var(--green); }
-.swipe-card-status .state.in-progress { color: var(--yellow); }
-.swipe-card-status .state.todo { color: var(--fg-dim); }
-.swipe-card-status .state.backlog { color: var(--fg-vdim); }
+/* The state pill converges on the canonical .status-pill component
+   (public/style.css); its glyph + state colours are owned there. */
 
 .swipe-card-identifier {
   color: var(--fg-dim);
@@ -243,13 +231,13 @@
 
 /* Blocking Relationship Rows */
 .swipe-meta-blocks {
-  border: 1px solid #e74c3c;
+  border: 1px solid var(--red);
   border-radius: var(--radius-md);
   padding: 0.3rem var(--space-2);
   margin-top: 0.15rem;
 }
-.swipe-meta-blocks .swipe-card-meta-label { color: #c0392b; }
-.swipe-meta-blocks .swipe-card-meta-value { color: #c0392b; }
+.swipe-meta-blocks .swipe-card-meta-label { color: var(--red-dim); }
+.swipe-meta-blocks .swipe-card-meta-value { color: var(--red-dim); }
 
 .swipe-meta-blocked {
   background: var(--bg-muted);

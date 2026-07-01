@@ -415,11 +415,11 @@ function renderCard(direction) {
     : '';
 
   const html = `
-    <div class="swipe-card-accent ${state.cls}"></div>
+    <span class="accent-bar accent-bar--${state.cls}" aria-hidden="true"></span>
     <div class="swipe-card-inner">
       <div class="swipe-card-header">
         <div class="swipe-card-status">
-          <span class="state ${state.cls} status-pill__char status-pill--${state.cls}">${state.char}</span>
+          <span class="status-pill status-pill--${state.cls}"><span class="status-pill__char">${state.char}</span></span>
           <span class="swipe-card-identifier">${_esc(issue.identifier)}</span>
         </div>
         <span class="swipe-card-position">${currentIndex + 1} / ${total}</span>

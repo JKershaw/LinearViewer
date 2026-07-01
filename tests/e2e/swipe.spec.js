@@ -32,7 +32,7 @@ test.describe('Swipe Page', () => {
 
   test('displays task card with correct elements', async ({ page }) => {
     // Card should have status indicator
-    await expect(page.locator('.swipe-card-status .state')).toBeVisible();
+    await expect(page.locator('.swipe-card-status .status-pill')).toBeVisible();
 
     // Card should have a title
     await expect(page.locator('.swipe-card-title')).toBeVisible();
@@ -230,7 +230,7 @@ test.describe('Swipe Page', () => {
     await select.selectOption({ label: alphaOption });
 
     // Should NOT start on an in-progress card
-    const stateClass = await page.locator('.swipe-card-status .state').getAttribute('class');
+    const stateClass = await page.locator('.swipe-card-status .status-pill').getAttribute('class');
     expect(stateClass).not.toContain('in-progress');
 
     // Left arrow should be enabled (in-progress cards are before this one)
@@ -238,7 +238,7 @@ test.describe('Swipe Page', () => {
 
     // Navigate backward to reach an in-progress card
     await page.locator('.swipe-arrow-left').click();
-    const prevStateClass = await page.locator('.swipe-card-status .state').getAttribute('class');
+    const prevStateClass = await page.locator('.swipe-card-status .status-pill').getAttribute('class');
     expect(prevStateClass).toContain('in-progress');
   });
 
@@ -319,7 +319,7 @@ test.describe('Swipe Page', () => {
     await select.selectOption('label:bug');
 
     // Sort puts completed/canceled last, so first card under "bug" must not be done
-    const stateClass = await page.locator('.swipe-card-status .state').getAttribute('class');
+    const stateClass = await page.locator('.swipe-card-status .status-pill').getAttribute('class');
     expect(stateClass).not.toContain('done');
   });
 
