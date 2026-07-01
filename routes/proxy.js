@@ -12,7 +12,7 @@
  *    - Agent instructions endpoint (llms.txt)
  */
 
-import { Router } from 'express';
+import { Router, json } from 'express';
 import rateLimit from 'express-rate-limit';
 import { createDedupeCache, dedupeKey } from '../lib/proxy-dedupe.js';
 import { deriveTerminalStatus, deriveCompletedAt } from '../lib/dispatch-terminal.js';
@@ -67,6 +67,7 @@ import {
 import { appendBlock, replace as replaceInDescription, DescriptionEditError } from '../lib/description-edit.js';
 import { badRequest, jsonError, notFound, unauthorized, workspaceUnavailableEnvelope } from '../lib/errors.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
+import { parseFeedbackImage } from '../lib/attachment-upload.js';
 
 /**
  * Resolve the OpenRouter credentials for a proxy LLM call, mirroring
@@ -1228,6 +1229,14 @@ DELETE ${baseUrl}/api/proxy/issues/{issueId}/labels/{labelId}
   → { "success": true, "issue": { "id": "...", "identifier": "LIN-123", "labels": [...] } }
   → When the label is not present: { "success": true, "message": "Label not present" }
 
+POST ${baseUrl}/api/proxy/issues/{issueId}/attachments
+  Body: { "image": "data:image/png;base64,..." | { "data": "...", "contentType": "...", "filename": "..." }, "target": "comment"|"description", "body": "..." }
+  → Upload a raster image (PNG/JPEG/GIF/WEBP — sniffed from bytes, not the declared content type) and attach it to the issue. "target" defaults to "comment": a new comment is created whose body is the optional "body" text followed by a markdown image embed. "target": "description" instead appends the same embed to the END of the description (same append semantics as .../description/append). Either way the asset is immediately readable through GET /attachments/{id} — no separate registration step.
+  → "comment" target returns 201: { "success": true, "comment": { "id": "...", "body": "...", "createdAt": "...", "user": { "name": "..." } } }
+  → "description" target returns 200: { "success": true, "issue": { /* same shape as PATCH .../issues/{id} */ } }
+  → Capability-gated: 422 CAPABILITY_NOT_SUPPORTED "uploadFile" if the provider can't upload files; 422 CAPABILITY_NOT_SUPPORTED "createComment"/"updateIssue" if it can't write the chosen target. A non-raster payload (e.g. SVG) is rejected with 400 before any upload — this is the same magic-byte guard the human feedback widget uses, not a declared-content-type check.
+  → LARGE BODY NOTE: like the image itself is base64 (~4/3 its raw size), so a real screenshot can exceed the default 250kb JSON body cap. Send the request with "Content-Type: text/plain" (NOT "application/json") and JSON-encode the body yourself — this route parses ANY content type up to 14mb, exactly like /api/feedback's widget-upload path.
+
 POST ${baseUrl}/api/proxy/agent/status   (alias: /api/proxy/foreman/status — deprecated)
   Body: { "taskIdentifier": "LIN-42", "action": "research", "status": "completed", "summary": "...", "dispatchId": "..." }
   → Record an agent status update (dispatchId optional: pass the dispatch-history item ID from /api/dispatch/take to enable exact loop-reconstruction join). Returns 201:
@@ -2334,6 +2343,140 @@ One convention across every endpoint, so you can branch on the same fields every
       logEvent(req, '/api/proxy/issues/comments', status);
       console.error('Proxy create comment error:', err.message);
       jsonError(res, status, 'Failed to create comment', { detail: graphqlErrorDetail(err) });
+    }
+  });
+
+  // Body-size exception, scoped to THIS route only (mirrors the feedback
+  // route's own parser, routes/workspace-api.js): the global
+  // `express.json({ limit: '250kb' })` (server.js) only matches
+  // `application/json`, so a caller sending the base64 image payload with a
+  // non-JSON content type (e.g. `text/plain`) passes through it unparsed; this
+  // permissive parser (raised limit) then parses it. A small `application/json`
+  // body is already parsed by the global parser by the time it gets here —
+  // body-parser no-ops on an already-parsed body — so it keeps the 250kb
+  // ceiling and this exception cannot leak to other routes.
+  const ATTACHMENT_UPLOAD_BODY_LIMIT = '14mb'; // ~4/3 base64 expansion of MAX_ATTACHMENT_BYTES + JSON overhead
+  const attachmentUploadBodyParser = json({ type: () => true, limit: ATTACHMENT_UPLOAD_BODY_LIMIT });
+  // Stand-in for the `![](assetUrl)` markdown before the real assetUrl exists
+  // (it's only returned by uploadFile itself): comfortably covers "![]()" (4
+  // chars) plus a real Linear asset URL, so the pre-upload estimate below never
+  // passes a body that the real embed would then push over the limit.
+  const ATTACHMENT_EMBED_RESERVE = 200;
+
+  /**
+   * POST /api/proxy/issues/:issueId/attachments (LIN-891)
+   * Agent-facing upload: attach a base64 raster image to an issue, either as a
+   * new comment (default "comment" target) or appended to the description
+   * ("description" target). The uploaded asset is embedded as markdown
+   * `![](assetUrl)`, so it is immediately readable through the EXISTING `md:`
+   * read path (lib/proxy-wire.js) — no new read-side plumbing.
+   *
+   * Deliberately NOT the human feedback widget's `/api/image` route (session-
+   * authed, human-only) — this is a separate Bearer-token route that reuses
+   * its underlying primitives end-to-end: `provider.uploadFile()` (LIN-636)
+   * and the raster magic-byte sniffing guard (LIN-682, `parseFeedbackImage` /
+   * `sniffRasterType`, now shared via lib/attachment-upload.js). No formal
+   * `attachmentCreate` mutation exists in this codebase (per LIN-871's
+   * research) — this route does not assume one.
+   */
+  router.post('/api/proxy/issues/:issueId/attachments', proxyLimiter, authenticateProxyToken, requireWriteScope, attachmentUploadBodyParser, async (req, res) => {
+    const endpoint = '/api/proxy/issues/:id/attachments';
+    try {
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey);
+      if (denyIfUnsupported(provider, 'uploadFile', req, res, endpoint)) return;
+
+      const { image, target, body } = req.body || {};
+      if (target !== undefined && target !== 'comment' && target !== 'description') {
+        logEvent(req, endpoint, 400);
+        return badRequest.json(res, 'target must be "comment" or "description"');
+      }
+      const resolvedTarget = target || 'comment';
+      const writeCapability = resolvedTarget === 'description' ? 'updateIssue' : 'createComment';
+      if (denyIfUnsupported(provider, writeCapability, req, res, endpoint)) return;
+
+      if (!token) {
+        return workspaceUnavailable(req, res, endpoint, reason);
+      }
+
+      const { issueId } = req.params;
+      if (!isValidIssueId(issueId)) {
+        logEvent(req, endpoint, 400);
+        return badRequest.json(res, 'Invalid issue ID format');
+      }
+
+      if (body !== undefined && typeof body !== 'string') {
+        logEvent(req, endpoint, 400);
+        return badRequest.json(res, 'body must be a string');
+      }
+      if (typeof body === 'string' && DANGEROUS_CHARS_REGEX.test(body)) {
+        logEvent(req, endpoint, 400);
+        return badRequest.json(res, 'body contains invalid characters');
+      }
+
+      if (!image) {
+        logEvent(req, endpoint, 400);
+        return badRequest.json(res, 'image is required');
+      }
+      const parsed = parseFeedbackImage(image);
+      if (!parsed) {
+        logEvent(req, endpoint, 400);
+        return badRequest.json(res, 'image must be a base64 data URL or { data, contentType?, filename? } decoding to a PNG/JPEG/GIF/WEBP');
+      }
+      if (parsed.bytes.length > MAX_ATTACHMENT_BYTES) {
+        logEvent(req, endpoint, 413);
+        return jsonError(res, 413, 'image too large');
+      }
+
+      if (await refuseIfTrashed(provider, token, issueId, req, res, endpoint)) return;
+
+      // Pre-validate the projected final length BEFORE uploadFile() runs, using
+      // ATTACHMENT_EMBED_RESERVE in place of the not-yet-known assetUrl. This
+      // turns an oversized `body` into a 400 with no side effect, instead of
+      // the upload running unconditionally and only then discovering (via the
+      // post-write check below / inside applyDescriptionEdit) that nothing
+      // could reference it — an orphaned, wasted Linear asset per call.
+      const bodyBudget = body ? body.length + 2 : 0; // "\n\n" separator before the embed
+      if (resolvedTarget === 'description') {
+        const issue = await provider.issueDescription(token, issueId);
+        if (!issue) {
+          logEvent(req, endpoint, 404);
+          return notFound.json(res, 'Issue not found');
+        }
+        const currentLength = (issue.description || '').length;
+        const separator = currentLength > 0 ? 2 : 0;
+        if (currentLength + separator + bodyBudget + ATTACHMENT_EMBED_RESERVE > MAX_DESCRIPTION_LENGTH) {
+          logEvent(req, endpoint, 400);
+          return badRequest.json(res, 'resulting description exceeds maximum length');
+        }
+      } else if (bodyBudget + ATTACHMENT_EMBED_RESERVE > MAX_COMMENT_LENGTH) {
+        logEvent(req, endpoint, 400);
+        return badRequest.json(res, `body exceeds maximum length of ${MAX_COMMENT_LENGTH}`);
+      }
+
+      const assetUrl = await provider.uploadFile(token, parsed.bytes, {
+        contentType: parsed.contentType,
+        filename: parsed.filename,
+      });
+      const markdown = `![](${assetUrl})`;
+      const embedded = body ? `${body}\n\n${markdown}` : markdown;
+
+      if (resolvedTarget === 'description') {
+        return applyDescriptionEdit(req, res, endpoint, (current) => appendBlock(current, embedded));
+      }
+
+      if (embedded.length > MAX_COMMENT_LENGTH) {
+        logEvent(req, endpoint, 400);
+        return badRequest.json(res, `body exceeds maximum length of ${MAX_COMMENT_LENGTH}`);
+      }
+      const commentCreate = normalizeWritePayload(await provider.createComment(token, issueId, embedded), 'comment');
+      if (writeRejected(req, res, endpoint, commentCreate, 'Comment was not created')) return;
+      logEvent(req, endpoint, 201);
+      res.status(201).json(commentCreate);
+    } catch (err) {
+      const status = graphqlErrorStatus(err);
+      logEvent(req, endpoint, status);
+      console.error('Proxy attachment upload error:', err.message);
+      jsonError(res, status, 'Failed to upload attachment', { detail: graphqlErrorDetail(err) });
     }
   });
 
