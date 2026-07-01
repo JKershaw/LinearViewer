@@ -3,8 +3,9 @@
  *
  * GET /api/proxy/attachments/:id is a Bearer-authed, provider-backed,
  * SSRF-guarded relay that turns the opaque attachment handle (LIN-649) back into
- * image bytes server-side. This slice covers the `md:` markdown-image path only;
- * `att:` formal attachments are explicitly deferred with a 422.
+ * image bytes server-side. This slice covers the `md:` markdown-image path.
+ * `att:` formal attachments resolve through a provider seam (LIN-890, see the
+ * dedicated describe block below) and then reuse this SAME relay tail.
  *
  * These tests drive the real handler over HTTP (mirroring proxy-route-aliases)
  * and stub the *upstream* Linear fetch by URL-discriminating globalThis.fetch:
@@ -20,8 +21,22 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { encodeAttachmentHandle } from '../../lib/proxy-wire.js';
+import { ProviderInterface } from '../../lib/providers/interface.js';
 
-function buildApp({ token = 'ws-linear-token', reason = 'ok' } = {}) {
+// A minimal injectable provider for the `att:` tests (LIN-890): `fetchAttachment`
+// is set as an instance property only when a resolver is supplied, so
+// `provider.supports('fetchAttachment')` correctly reports false when omitted
+// (it then resolves to the base's throwing stub, exactly like a real provider
+// that hasn't implemented the capability).
+class FakeAttachmentProvider extends ProviderInterface {
+  constructor(fetchAttachmentImpl) {
+    super();
+    this.name = 'fake';
+    if (fetchAttachmentImpl) this.fetchAttachment = fetchAttachmentImpl;
+  }
+}
+
+function buildApp({ token = 'ws-linear-token', reason = 'ok', provider } = {}) {
   const app = express();
   app.use(express.json());
   app.use(createProxyRoutes({
@@ -41,7 +56,8 @@ function buildApp({ token = 'ws-linear-token', reason = 'ok' } = {}) {
     dispatchQueueStore: {},
     workspaceFromUrl: (req, res, next) => next(),
     workspacePreferencesStore: {},
-    freeTierStore: { tryUse: async () => ({ allowed: true }) }
+    freeTierStore: { tryUse: async () => ({ allowed: true }) },
+    ...(provider ? { provider } : {}),
   }));
   return app;
 }
@@ -265,14 +281,6 @@ describe('GET /api/proxy/attachments/:id — SSRF guard (md: path)', () => {
 });
 
 describe('GET /api/proxy/attachments/:id — handle routing', () => {
-  test('defers att: handles with a 422 + machine code', async () => {
-    const res = await getAttachment(buildApp(), encodeAttachmentHandle('att', 'attachment-uuid'));
-    assert.equal(res.status, 422);
-    const body = JSON.parse(res.bodyText);
-    assert.equal(body.code, 'ATTACHMENT_FETCH_NOT_SUPPORTED');
-    assert.equal(body.handleType, 'att');
-  });
-
   test('rejects an unrecognised handle shape with 400', async () => {
     const res = await getAttachment(buildApp(), 'not-a-handle');
     assert.equal(res.status, 400);
@@ -319,5 +327,88 @@ describe('GET /api/proxy/attachments/:id — provider/host-aware auth (LIN-771)'
   test('SSRF guard still rejects a GitHub look-alike host', async () => {
     const res = await getAttachment(buildApp(), md('https://user-images.githubusercontent.com.evil.com/x.png'));
     assert.equal(res.status, 400);
+  });
+});
+
+// LIN-890 — `att:` formal-attachment handles resolve id → { url, title } via a
+// provider seam (`provider.fetchAttachment`), then reuse this SAME SSRF-guarded
+// relay tail `md:` already uses end-to-end. Covers: happy-path resolution +
+// filename-hint-from-title, the distinct allowlist-rejection code, not-found,
+// the capability decline for a provider without the seam, and the no-deep-link
+// guarantee (the resolved backend URL never reaches the caller).
+describe('GET /api/proxy/attachments/:id — att: resolution via provider seam (LIN-890)', () => {
+  const att = (id) => encodeAttachmentHandle('att', id);
+
+  test('resolves an att: handle through provider.fetchAttachment and streams bytes via the shared relay', async () => {
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+    let sawAuth = null;
+    let sawAttachmentId = null;
+    const provider = new FakeAttachmentProvider(async (token, id) => {
+      sawAttachmentId = id;
+      return { id, url: `${LINEAR_HOST}/abc/screenshot.png`, title: 'screenshot.png' };
+    });
+    stubUpstream((url, opts) => {
+      sawAuth = opts.headers.Authorization;
+      return fakeResponse({ contentType: 'image/png', bytes: png });
+    });
+    const res = await getAttachment(buildApp({ provider }), att('attachment-uuid'));
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.bodyBuf, png, 'streams the upstream bytes verbatim');
+    assert.equal(sawAttachmentId, 'attachment-uuid', 'the decoded id reaches the provider seam');
+    assert.equal(sawAuth, 'Bearer ws-linear-token', 'fetches with the workspace access token');
+  });
+
+  test('supplies the attachment title as the filename hint so a non-image file is not rejected as unsupported', async () => {
+    const provider = new FakeAttachmentProvider(async () => (
+      { url: `${LINEAR_HOST}/a/b`, title: 'notes.md' }
+    ));
+    const body = Buffer.from('# notes');
+    const res = await fetchRaw(buildApp({ provider }), att('attachment-uuid'),
+      () => fakeResponse({ contentType: 'application/octet-stream', bytes: body }));
+    assert.equal(res.status, 200);
+    assert.deepEqual(Buffer.from(res.bodyText), body);
+    assert.match(res.headers['content-disposition'] || '', /filename="notes\.md"/);
+  });
+
+  test('maps an off-allowlist resolved URL to a distinct ATTACHMENT_HOST_NOT_ALLOWED 422, not a bare 400', async () => {
+    const provider = new FakeAttachmentProvider(async () => (
+      { url: 'https://evil.example.com/x.png', title: null }
+    ));
+    const res = await getAttachment(buildApp({ provider }), att('attachment-uuid'));
+    assert.equal(res.status, 422);
+    const body = JSON.parse(res.bodyText);
+    assert.equal(body.code, 'ATTACHMENT_HOST_NOT_ALLOWED');
+  });
+
+  test('does not leak the resolved backend URL back to the caller on the allowlist-rejection path', async () => {
+    const provider = new FakeAttachmentProvider(async () => (
+      { url: 'https://evil.example.com/secret-path', title: null }
+    ));
+    const res = await getAttachment(buildApp({ provider }), att('attachment-uuid'));
+    assert.doesNotMatch(res.bodyText, /evil\.example\.com/, 'no-deep-link: raw backend URL must never reach the caller');
+  });
+
+  test('404s when the provider cannot resolve the attachment id', async () => {
+    const provider = new FakeAttachmentProvider(async () => null);
+    const res = await getAttachment(buildApp({ provider }), att('missing-id'));
+    assert.equal(res.status, 404);
+  });
+
+  test('a provider without fetchAttachment declines with 422 CAPABILITY_NOT_SUPPORTED (the retired ATTACHMENT_FETCH_NOT_SUPPORTED path is gone)', async () => {
+    const provider = new FakeAttachmentProvider(); // no fetchAttachment override
+    const res = await getAttachment(buildApp({ provider }), att('attachment-uuid'));
+    assert.equal(res.status, 422);
+    const body = JSON.parse(res.bodyText);
+    assert.equal(body.code, 'CAPABILITY_NOT_SUPPORTED');
+    assert.equal(body.capability, 'fetchAttachment');
+    assert.notEqual(body.code, 'ATTACHMENT_FETCH_NOT_SUPPORTED');
+  });
+
+  test('503s the structured envelope when the workspace token is unavailable, before any provider call', async () => {
+    const provider = new FakeAttachmentProvider(async () => {
+      throw new Error('must not be called without a token');
+    });
+    const res = await getAttachment(buildApp({ provider, token: null, reason: 'reauth' }), att('attachment-uuid'));
+    assert.equal(res.status, 503);
   });
 });
