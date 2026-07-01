@@ -183,9 +183,17 @@
       head.type = 'button';
       head.className = 'next-run-option-head';
       head.setAttribute('aria-expanded', 'false');
+      // Size chip → neutral StatusPill tag (LIN-861); `next-run-size` hook rides
+      // along for the E2E selector + the bold-mono badge weight.
+      var sizePill = window.renderStatusPill({
+        label: size,
+        variant: 'tag',
+        className: 'next-run-size',
+        attrs: 'title="t-shirt size estimate"',
+      });
       head.innerHTML =
         '<span class="obs-session-caret next-run-option-caret" aria-hidden="true">▸</span>' +
-        '<span class="obs-chip is-on next-run-size" title="t-shirt size estimate">' + escapeHtml(size) + '</span>' +
+        sizePill +
         (isOpen ? '<span class="next-run-open-tag">continue until stopped</span>' : '') +
         '<span class="next-run-goal-preview">' + escapeHtml(preview) + '</span>';
       head.addEventListener('click', function () { toggleCard(li); });
@@ -196,30 +204,38 @@
       body.className = 'obs-session-body next-run-option-body';
       body.hidden = true;
 
-      var goalEl = document.createElement('p');
-      goalEl.className = 'next-run-goal';
-      goalEl.textContent = goalText;
-      body.appendChild(goalEl);
+      // Goal / reasoning / refs blocks → inset Surface panels (LIN-861). Each
+      // keeps its per-page hook class (inside the surface) for the existing layout
+      // rules + E2E selectors; the Surface supplies the shared inset chrome.
+      body.insertAdjacentHTML('beforeend', window.renderSurface({
+        body: '<p class="next-run-goal">' + escapeHtml(goalText) + '</p>',
+        variant: 'inset',
+        className: 'next-run-goal-surface',
+      }));
 
       if (opt.reasoning) {
-        var reasonEl = document.createElement('p');
-        reasonEl.className = 'next-run-reasoning obs-detail-block';
-        reasonEl.innerHTML = '<span class="obs-body-lbl">why</span> ' + escapeHtml(opt.reasoning);
-        body.appendChild(reasonEl);
+        body.insertAdjacentHTML('beforeend', window.renderSurface({
+          body: '<p class="next-run-reasoning obs-detail-block">' +
+            '<span class="obs-body-lbl">why</span> ' + escapeHtml(opt.reasoning) + '</p>',
+          variant: 'inset',
+          className: 'next-run-reasoning-surface',
+        }));
       }
 
       // Referenced tasks rendered at the end of the recommendation (LIN-642).
-      // Machine-readable identifiers from the option, shown as a labelled list so
-      // the reader can see exactly which tasks the goal acts on.
+      // Machine-readable identifiers → mono data Chips (LIN-861), shown as a
+      // labelled list so the reader sees exactly which tasks the goal acts on.
       var refIds = Array.isArray(opt.referencedTaskIds) ? opt.referencedTaskIds : [];
       if (refIds.length) {
-        var refsEl = document.createElement('p');
-        refsEl.className = 'next-run-refs obs-detail-block';
         var tags = refIds.map(function (id) {
-          return '<span class="next-run-ref">' + escapeHtml(String(id)) + '</span>';
+          return window.renderChip({ label: String(id), className: 'next-run-ref' });
         }).join(' ');
-        refsEl.innerHTML = '<span class="obs-body-lbl">tasks</span> ' + tags;
-        body.appendChild(refsEl);
+        body.insertAdjacentHTML('beforeend', window.renderSurface({
+          body: '<p class="next-run-refs obs-detail-block">' +
+            '<span class="obs-body-lbl">tasks</span> ' + tags + '</p>',
+          variant: 'inset',
+          className: 'next-run-refs-surface',
+        }));
       }
 
       var actions = document.createElement('div');

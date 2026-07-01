@@ -66,18 +66,29 @@
   function appendBubble(role, text) {
     var li = document.createElement('li');
     li.className = 'task-chat-msg task-chat-msg-' + role;
-    var who = document.createElement('span');
-    who.className = 'task-chat-msg-who';
-    who.textContent = role === 'user' ? 'you' : (activeTask || 'task');
-    var body = document.createElement('span');
-    body.className = 'task-chat-msg-body';
-    body.textContent = text;
-    li.appendChild(who);
-    li.appendChild(body);
+
+    // Speaker → StatusPill (LIN-861): the user's "you" is a neutral tag chip; the
+    // task's turn reads as in-progress (◐). The `task-chat-msg-who` hook rides
+    // along so the per-role colour rules + E2E selectors still resolve.
+    var whoLabel = role === 'user' ? 'you' : (activeTask || 'task');
+    var whoPill = role === 'user'
+      ? window.renderStatusPill({ label: whoLabel, variant: 'tag', className: 'task-chat-msg-who' })
+      : window.renderStatusPill({ label: whoLabel, state: 'in-progress', className: 'task-chat-msg-who' });
+
+    // Body → Surface (LIN-861). The streaming cursor MUST stay on the SSE text
+    // node (`.task-chat-msg-body`, the element send() writes textContent into and
+    // toggles `.task-chat-streaming` on), so the Surface WRAPS that node — the
+    // streaming class never moves onto the wrapper.
+    var bodySurface = window.renderSurface({
+      body: '<span class="task-chat-msg-body">' + window.escapeHtml(text) + '</span>',
+      className: 'task-chat-msg-surface',
+    });
+
+    li.innerHTML = whoPill + bodySurface;
     transcript.appendChild(li);
     setEmptyVisible(false);
     transcript.scrollTop = transcript.scrollHeight;
-    return body;
+    return li.querySelector('.task-chat-msg-body');
   }
 
   function resetConversation() {
