@@ -23,20 +23,20 @@
   font-size: 1.1em;
   font-weight: 600;
   margin: 0 0 0.75rem 0;
-  color: var(--fg);
+  color: var(--text);
 }
 
 .roadmap-section-total {
   font-weight: 400;
   font-size: var(--font-size-sm);
-  color: var(--fg-dim);
+  color: var(--muted);
   margin-left: 0.5em;
 }
 
 .roadmap-empty {
   font-family: var(--font-structural);
   font-size: var(--font-size-sm);
-  color: var(--fg-dim);
+  color: var(--muted);
   margin: 0.5em 0;
   padding-left: 0.75em;
 }
@@ -63,7 +63,7 @@ details.roadmap-layer > summary::-webkit-details-marker {
 .roadmap-section > summary::after,
 details.roadmap-layer > summary::after {
   content: ' ▸';
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: var(--font-size-sm);
 }
 
@@ -74,14 +74,14 @@ details.roadmap-layer[open] > summary::after {
 
 .roadmap-section > summary:hover,
 details.roadmap-layer > summary:hover {
-  color: var(--fg);
+  color: var(--text);
 }
 
 /* Per-layer state glyph on the summary, visible while the layer is collapsed. */
-details.roadmap-layer[data-state="streaming"] > summary::before { content: '◐ '; color: var(--fg-dim); }
+details.roadmap-layer[data-state="streaming"] > summary::before { content: '◐ '; color: var(--muted); }
 details.roadmap-layer[data-state="done"] > summary::before { content: '✓ '; color: var(--ok); }
 details.roadmap-layer[data-state="failed"] > summary::before { content: '✕ '; color: var(--accent); }
-details.roadmap-layer[data-state="not-available"] > summary::before { content: '○ '; color: var(--fg-dim); }
+details.roadmap-layer[data-state="not-available"] > summary::before { content: '○ '; color: var(--muted); }
 
 /* =============================================================================
    Page Header
@@ -92,32 +92,32 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
   text-align: left;
   margin: 0 0 var(--space-4) 0;
   padding-bottom: var(--space-3);
-  border-bottom: 1px solid var(--fg-vdim);
+  border-bottom: 1px solid var(--line);
 }
 
 .roadmap-page-title {
-  font-family: var(--font-structural);
+  font-family: var(--font-content);
   font-size: 1.4em;
   font-weight: 700;
   margin: 0 0 var(--space-1) 0;
-  color: var(--fg);
+  color: var(--text);
 }
 
 .roadmap-header-meta {
   font-family: var(--font-structural);
   font-size: var(--font-size-sm);
-  color: var(--fg-dim);
+  color: var(--muted);
   margin: 0;
   line-height: 1.5;
 }
 
 .roadmap-header-workspace {
-  color: var(--fg);
+  color: var(--text);
   font-weight: 500;
 }
 
 .roadmap-header-cadence {
-  color: var(--fg);
+  color: var(--text);
 }
 
 /* =============================================================================
@@ -135,13 +135,13 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
   font-family: var(--font-structural);
   font-size: 0.9em;
   font-weight: 600;
-  color: var(--fg);
+  color: var(--text);
   margin: 0 0 0.4em 0;
 }
 
 .ship-count {
   font-weight: 400;
-  color: var(--fg-dim);
+  color: var(--muted);
   margin-left: 0.25em;
 }
 
@@ -158,7 +158,7 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
   gap: 0.5em;
   padding: 0.2em 0;
   font-size: var(--font-size-sm);
-  color: var(--fg);
+  color: var(--text);
 }
 
 .ship-icon {
@@ -173,19 +173,19 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
 }
 
 .ship-state {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: 0.95em;
   margin-right: 0.25em;
 }
 
 .ship-meta {
   font-size: var(--font-size-sm);
-  color: var(--fg-dim);
+  color: var(--muted);
   white-space: nowrap;
 }
 
 .ship-project {
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .ship-date {
@@ -198,14 +198,14 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
 
 .ship-more summary {
   font-size: 0.8em;
-  color: var(--fg-dim);
+  color: var(--muted);
   cursor: pointer;
   padding: 0.2em 0;
   user-select: none;
 }
 
 .ship-more summary:hover {
-  color: var(--fg);
+  color: var(--text);
 }
 
 .ship-list--hidden {
@@ -220,57 +220,39 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
   flex-direction: column;
 }
 
-.roadmap-milestone-card {
-  border: 1px solid var(--fg-vdim);
-  margin-bottom: 1em;
-  padding: 1em;
-  border-radius: 2px;
-}
-
+/* Chrome (border, padding, radius, fill) is owned by the shared `.card`; the
+   `.roadmap-milestone-card` class rides alongside purely as a no-style
+   semantic/E2E hook. */
 .roadmap-milestone-card:last-child {
   margin-bottom: 0;
 }
 
-.roadmap-milestone-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 1em;
-  margin-bottom: 0.5em;
-  font-family: var(--font-structural);
-}
-
+/* Human-facing project name → sans (structure/label), not a machine fact. */
 .roadmap-milestone-name {
+  font-family: var(--font-content);
   font-size: var(--font-size-base);
   font-weight: 600;
-  color: var(--fg);
-  margin: 0;
+  color: var(--text);
 }
 
-.roadmap-milestone-progress-text {
-  font-family: var(--font-structural);
-  font-size: 0.8em;
-  color: var(--fg-dim);
+/* Progress %·done/total is a machine fact → keep mono + tabular figures in the
+   shared card-meta slot. */
+.roadmap-milestone-card .card-meta {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
-.roadmap-progress-bar {
-  font-family: var(--font-structural);
-  font-size: 0.9em;
-  color: var(--fg);
-  margin: 0.4em 0;
-  letter-spacing: 0.05em;
-  display: block;
+.roadmap-milestone-progress {
+  margin: 0.5em 0;
 }
 
 .roadmap-milestone-desc {
   font-family: var(--font-structural);
   font-size: 0.8em;
-  color: var(--fg-dim);
+  color: var(--muted);
   margin: 0.25em 0;
   padding-left: 0.5em;
-  border-left: 2px solid var(--fg-vdim);
+  border-left: 2px solid var(--line);
 }
 
 /* =============================================================================
@@ -280,16 +262,16 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
   font-family: var(--font-structural);
   font-size: 0.8em;
   margin-top: 0.6em;
-  color: var(--fg);
+  color: var(--text);
 }
 
 .roadmap-task-tree--upcoming {
   margin-top: 0.4em;
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .roadmap-tree-heading {
-  color: var(--fg-dim);
+  color: var(--muted);
   margin-bottom: 0.25em;
 }
 
@@ -305,17 +287,17 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
 
 .roadmap-task-child {
   white-space: nowrap;
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .task-id {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: 0.9em;
   margin-right: 0.2em;
 }
 
 .task-rollup {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: 0.9em;
   margin-left: 0.25em;
 }
@@ -327,21 +309,21 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
 .roadmap-upcoming summary {
   font-family: var(--font-structural);
   font-size: 0.8em;
-  color: var(--fg-dim);
+  color: var(--muted);
   cursor: pointer;
   padding: 0.2em 0;
   user-select: none;
 }
 
 .roadmap-upcoming summary:hover {
-  color: var(--fg);
+  color: var(--text);
 }
 
 .roadmap-critical-path {
   font-family: var(--font-structural);
   font-size: 0.8em;
   margin-top: 0.6em;
-  color: var(--fg);
+  color: var(--text);
 }
 
 /* =============================================================================
@@ -351,13 +333,24 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
   margin-top: 0.6em;
   font-family: var(--font-structural);
   font-size: 0.8em;
-  color: var(--fg);
+  color: var(--text);
 }
 
+/* Risk row: the severity stripe is now the shared vertical accent-bar primitive
+   at the row's left edge (severity → error/running/queued colour), with the
+   severity word + description as text alongside. The `.roadmap-risk--<severity>`
+   class is retained as a no-style semantic/E2E hook. */
 .roadmap-risk {
-  padding: 0.3em 0.5em;
+  display: flex;
+  align-items: stretch;
+  gap: 0.5em;
+  padding: 0.3em 0;
   margin-top: 0.25em;
-  color: var(--fg);
+  color: var(--text);
+}
+
+.roadmap-risk-body {
+  min-width: 0;
 }
 
 .roadmap-risk-sev {
@@ -367,30 +360,7 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
   text-transform: uppercase;
   letter-spacing: 0.03em;
   margin-right: 0.5em;
-}
-
-.roadmap-risk--high {
-  border-left: 3px solid var(--red);
-}
-
-.roadmap-risk--high .roadmap-risk-sev {
-  color: var(--red);
-}
-
-.roadmap-risk--medium {
-  border-left: 3px solid var(--amber);
-}
-
-.roadmap-risk--medium .roadmap-risk-sev {
-  color: var(--amber-dim);  /* AA-safe amber text; the stripe keeps the bright --amber */
-}
-
-.roadmap-risk--low {
-  border-left: 3px solid var(--fg-vdim);
-}
-
-.roadmap-risk--low .roadmap-risk-sev {
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 /* =============================================================================
@@ -398,7 +368,7 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
    ============================================================================= */
 .roadmap-pipeline {
   padding-top: 1.5em;
-  border-top: 1px solid var(--fg-vdim);
+  border-top: 1px solid var(--line);
 }
 
 .roadmap-north-star {
@@ -409,7 +379,7 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
   display: block;
   font-family: var(--font-structural);
   font-size: var(--font-size-sm);
-  color: var(--fg-dim);
+  color: var(--muted);
   margin-bottom: 0.3em;
 }
 
@@ -420,8 +390,8 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
   line-height: 1.5;
   padding: 0.5em;
   background: var(--bg);
-  color: var(--fg);
-  border: 1px solid var(--fg-vdim);
+  color: var(--text);
+  border: 1px solid var(--line);
   border-radius: 2px;
   resize: vertical;
   min-height: 4em;
@@ -429,13 +399,13 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
 
 .roadmap-north-star-input:focus {
   outline: none;
-  border-color: var(--fg-dim);
+  border-color: var(--muted);
 }
 
 .roadmap-north-star-help {
   font-family: var(--font-structural);
   font-size: 0.75em;
-  color: var(--fg-dim);
+  color: var(--muted);
   margin: 0.3em 0 0;
 }
 
@@ -448,14 +418,14 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
   font-size: var(--font-size-sm);
   padding: 0.4em 0.9em;
   background: var(--bg);
-  color: var(--fg);
-  border: 1px solid var(--fg-dim);
+  color: var(--text);
+  border: 1px solid var(--muted);
   border-radius: 2px;
   cursor: pointer;
 }
 
 .roadmap-generate-reading-btn:hover:not(:disabled) {
-  background: var(--fg-vdim);
+  background: var(--card-h);
 }
 
 .roadmap-generate-reading-btn:disabled {
@@ -470,9 +440,9 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
 .roadmap-orientation-note {
   font-family: var(--font-structural);
   font-size: 0.75em;
-  color: var(--fg-dim);
+  color: var(--muted);
   margin: 0.5em 0 0;
-  border-left: 2px solid var(--fg-dim);
+  border-left: 2px solid var(--muted);
   padding-left: 0.6em;
 }
 
@@ -482,7 +452,7 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
    Collapsible so it never crowds the narrative reading below it. */
 .roadmap-orientation-result {
   margin: 0.75em 0 1.25em;
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--line);
   border-radius: 2px;
 }
 
@@ -491,11 +461,11 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
   font-size: var(--font-size-sm);
   padding: 0.4em 0.6em;
   cursor: pointer;
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .roadmap-orientation-result-heading:hover {
-  background: var(--fg-vdim);
+  background: var(--card-h);
 }
 
 .roadmap-orientation-result-body {
@@ -509,7 +479,7 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
   align-items: baseline;
   font-size: 0.8em;
   padding: 0.2em 0;
-  border-top: 1px solid var(--fg-vdim);
+  border-top: 1px solid var(--line);
 }
 
 .roadmap-orientation-row:first-child {
@@ -518,16 +488,16 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
 
 .roadmap-orientation-id {
   font-family: var(--font-structural);
-  color: var(--fg);
+  color: var(--text);
 }
 
 .roadmap-orientation-bearing {
   font-family: var(--font-structural);
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .roadmap-orientation-reason {
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 /* Off-compass (archived) task: flagged overboard, dimmed. */
@@ -547,12 +517,12 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
    it reads as the lede the reader scans first, not another equal-weight section
    (the whole point of the synthesis layer). */
 .roadmap-layer--digest {
-  border: 1px solid var(--fg-dim);
-  border-left: 3px solid var(--fg);
+  border: 1px solid var(--muted);
+  border-left: 3px solid var(--text);
   border-radius: var(--radius-sm);
   padding: 0.8em 1em;
   margin-bottom: 1.8em;
-  background: var(--fg-vdim);
+  background: var(--card-h);
 }
 
 .roadmap-layer--digest .roadmap-layer-heading {
@@ -568,13 +538,13 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
    starts (pending/streaming) or a saved reading rehydrates (done). */
 .roadmap-layer--digest[data-state="idle"] .roadmap-layer-content::before {
   content: 'Generate a reading to see the recap.';
-  color: var(--fg-dim);
+  color: var(--muted);
   font-style: italic;
 }
 
 /* Pending: the digest waits at the top while the layers below generate. */
 .roadmap-layer[data-state="pending"] .roadmap-layer-status {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-style: italic;
 }
 
@@ -582,14 +552,14 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
   font-family: var(--font-structural);
   font-size: 0.95em;
   font-weight: 600;
-  color: var(--fg);
+  color: var(--text);
   margin: 0 0 0.4em;
 }
 
 .roadmap-layer-status {
   font-family: var(--font-structural);
   font-size: 0.8em;
-  color: var(--fg-dim);
+  color: var(--muted);
   margin: 0 0 0.4em;
   min-height: 1.2em;
 }
@@ -615,17 +585,17 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
   font-size: var(--font-size-sm);
   white-space: pre-wrap;
   line-height: 1.6;
-  color: var(--fg);
+  color: var(--text);
   min-height: 1.5em;
 }
 
 .roadmap-layer[data-state="not-available"] .roadmap-layer-content {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-style: italic;
 }
 
 .roadmap-layer[data-state="not-available"] .roadmap-layer-status {
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .roadmap-layer[data-state="failed"] .roadmap-layer-status {
@@ -638,14 +608,14 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
   padding: 0.25em 0.7em;
   margin-top: 0.4em;
   background: var(--bg);
-  color: var(--fg);
-  border: 1px solid var(--fg-dim);
+  color: var(--text);
+  border: 1px solid var(--muted);
   border-radius: 2px;
   cursor: pointer;
 }
 
 .roadmap-layer-retry:hover {
-  background: var(--fg-vdim);
+  background: var(--card-h);
 }
 
 /* =============================================================================
@@ -658,14 +628,14 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
 .roadmap-history-details summary {
   font-family: var(--font-structural);
   font-size: 0.8em;
-  color: var(--fg-dim);
+  color: var(--muted);
   cursor: pointer;
   padding: 0.2em 0;
   user-select: none;
 }
 
 .roadmap-history-details summary:hover {
-  color: var(--fg);
+  color: var(--text);
 }
 
 .roadmap-history-list {
@@ -682,7 +652,7 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
   text-align: left;
   font-family: var(--font-structural);
   font-size: 0.8em;
-  color: var(--fg);
+  color: var(--text);
   background: none;
   border: none;
   padding: 0.3em 0.4em;
@@ -691,25 +661,25 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
 }
 
 .roadmap-history-row:hover {
-  background: var(--fg-vdim);
+  background: var(--card-h);
 }
 
 .roadmap-history-row--selected {
-  background: var(--fg-vdim);
+  background: var(--card-h);
 }
 
 .roadmap-history-marker {
   white-space: pre;
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .roadmap-history-when {
-  color: var(--fg);
+  color: var(--text);
   flex: 0 0 auto;
 }
 
 .roadmap-history-ns {
-  color: var(--fg-dim);
+  color: var(--muted);
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -723,23 +693,23 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
   font-size: var(--font-size-sm);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .roadmap-history-viewing {
   font-family: var(--font-structural);
   font-size: 0.8em;
-  color: var(--fg-dim);
+  color: var(--muted);
   padding: 0.4em 0.5em;
   margin-bottom: 0.8em;
-  border-left: 3px solid var(--fg-dim);
-  background: var(--fg-vdim);
+  border-left: 3px solid var(--muted);
+  background: var(--card-h);
 }
 
 .roadmap-history-view-latest {
   font-family: var(--font-structural);
   font-size: var(--font-size-base);
-  color: var(--fg);
+  color: var(--text);
   background: none;
   border: none;
   padding: 0;
@@ -792,7 +762,7 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
 }
 
 .roadmap-chat-message--assistant {
-  color: var(--fg);
+  color: var(--text);
 }
 
 .roadmap-chat-input-row {
@@ -806,10 +776,10 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
   font-family: var(--font-structural);
   font-size: var(--font-size-sm);
   padding: 0.4em 0.6em;
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--line);
   border-radius: 2px;
   background: var(--bg);
-  color: var(--fg);
+  color: var(--text);
 }
 
 .roadmap-chat-input:focus {
@@ -822,10 +792,10 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
   font-family: var(--font-structural);
   font-size: var(--font-size-sm);
   padding: 0.4em 1em;
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--line);
   border-radius: 2px;
   background: var(--bg);
-  color: var(--fg);
+  color: var(--text);
   cursor: pointer;
 }
 
@@ -836,7 +806,7 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
 
 .roadmap-chat-send:disabled,
 .roadmap-generate-btn:disabled {
-  color: var(--fg-dim);
+  color: var(--muted);
   cursor: not-allowed;
 }
 
@@ -866,7 +836,7 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
     font-size: 0.8em;
   }
 
-  .roadmap-milestone-header {
+  .roadmap-milestone-card .card-header {
     flex-direction: column;
     gap: 0.25em;
     align-items: flex-start;
