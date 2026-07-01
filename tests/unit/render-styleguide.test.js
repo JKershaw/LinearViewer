@@ -91,6 +91,15 @@ test('demos every S2 primitive (LIN-786)', () => {
   }
 });
 
+test('demos the bare status-pill variant used by the project tree (LIN-850)', () => {
+  const html = renderStyleguide();
+  // The bare variant is the box-less inline glyph the LIN-782-locked tree rows
+  // use; the styleguide is its visual-regression baseline, so it must appear.
+  assert.ok(html.includes('status-pill--bare'), 'styleguide must demo the bare variant');
+  // ...carrying the backlog ◌ glyph (not the pill default ○).
+  assert.match(html, /status-pill--backlog status-pill--bare[^>]*>[^<]*<span class="status-pill__char">◌<\/span>/);
+});
+
 test('every primitive is demoed in BOTH themes (LIN-786)', () => {
   const html = renderStyleguide();
   // The primitive grid is rendered once standalone and once inside EACH theme

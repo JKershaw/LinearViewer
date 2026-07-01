@@ -54,16 +54,18 @@ test.describe('Authenticated Dashboard', () => {
 
     // Started issues (local-issue-1, local-issue-4): In Progress section + project
     // section + Recent activity ("created") → 2 x 3 = 6.
-    await expect(page.locator('.state.in-progress')).toHaveCount(6);
+    // LIN-850: tree-row status glyphs now render through the shared status
+    // primitive as the box-less bare variant (`.status-pill--bare.status-pill--<state>`).
+    await expect(page.locator('.status-pill--bare.status-pill--in-progress')).toHaveCount(6);
 
     // Todo issue (local-issue-2): In Progress subtree + project tree + Recent
     // activity ("created") = 3.
-    await expect(page.locator('.state.todo')).toHaveCount(3);
+    await expect(page.locator('.status-pill--bare.status-pill--todo')).toHaveCount(3);
 
     // Completed issue (local-issue-3): project tree + Recent activity. Its
     // completedAt is old (out of window) but its seed-stamped createdAt is recent,
     // so it shows as a "created" row → 2.
-    await expect(page.locator('.state.done')).toHaveCount(2);
+    await expect(page.locator('.status-pill--bare.status-pill--done')).toHaveCount(2);
   });
 
   test('shows text-based navigation bar', async ({ page }) => {

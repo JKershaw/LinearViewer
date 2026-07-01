@@ -53,6 +53,23 @@ test('requires at least one of char, label, dot, or a known state', () => {
   assert.doesNotThrow(() => renderStatusPill({ dot: true }));
 });
 
+// --- LIN-850: bare variant (box-less inline glyph for the project tree) ------
+
+test('the bare variant is the box-less tree-row glyph (state modifier + explicit char + contract attrs)', () => {
+  // Mirrors the render.js tree-row call: state colour, explicit backlog glyph
+  // (◌, NOT the pill default ○), and the data-status / aria-label contract.
+  const html = renderStatusPill({
+    state: 'backlog',
+    char: '◌',
+    variant: 'bare',
+    attrs: 'data-status="backlog" aria-label="Status: Backlog"',
+  });
+  assert.match(html, /^<span class="status-pill status-pill--backlog status-pill--bare" data-status="backlog" aria-label="Status: Backlog">/);
+  // Explicit char survives — the backlog glyph is ◌, not the STATE_GLYPHS ○ default.
+  assert.match(html, /<span class="status-pill__char">◌<\/span>/);
+  assert.doesNotMatch(html, /○/);
+});
+
 // --- LIN-786 (Theme S2): run-status dot extension ---------------------------
 
 test('the dot variant renders a dot marker instead of a glyph', () => {

@@ -870,7 +870,9 @@ a.wordmark:hover {
 .state.done { color: var(--green); }
 .state.in-progress { color: var(--yellow); }
 .state.todo { color: var(--fg-dim); }
-.state.backlog { color: var(--fg-dim); opacity: 0.5; }
+/* Idle/backlog rides the semantic slate idle token (LIN-850), not a magic
+   opacity. --slate-dim is the AA-safe slate text companion. */
+.state.backlog { color: var(--slate-dim); }
 
 /* Issue title - fills remaining space, wraps on overflow */
 .title {
@@ -2616,11 +2618,40 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 .status-pill--in-progress { color: var(--yellow); }
 .status-pill--done { color: var(--green); }
 .status-pill--todo { color: var(--fg-dim); }
-.status-pill--backlog { color: var(--fg-vdim); }
+/* Idle/backlog on the semantic slate idle token (LIN-850) — the AA-safe slate
+   text companion, replacing the too-faint --fg-vdim. */
+.status-pill--backlog { color: var(--slate-dim); }
 .status-pill--failed { color: var(--red); }
 
 /* Neutral, stateless label/tag chip (no state color). */
 .status-pill--tag { color: var(--fg-dim); }
+
+/*
+   Bare variant (LIN-850) — a box-less status pill that renders pixel-identically
+   to the legacy `.state` inline glyph, so the project-tree rows (lib/render.js)
+   route through the shared status primitive WITHOUT gaining the locked-forbidden
+   pill/card chrome. It strips the chip (padding/bg/border/radius/gap) and
+   reproduces `.state` exactly: 0.9em glyph, 0.5ch trailing gutter, 0.85 opacity.
+   The color still comes from the `.status-pill--<state>` modifiers above, so the
+   tree keeps its per-state vocabulary. Box-drawing scaffolding is separate DOM
+   and stays byte-for-byte (LIN-782 lock).
+*/
+.status-pill--bare {
+  padding: 0;
+  gap: 0;
+  background: none;
+  border: none;
+  border-radius: 0;
+  font-size: 0.9em;
+  line-height: inherit;
+  margin-right: 0.5ch;
+  opacity: 0.85;
+  flex-shrink: 0;
+}
+.status-pill--bare .status-pill__char {
+  min-width: 0;
+  text-align: inherit;
+}
 
 /*
    Run-status extension (LIN-786, Theme S2)
