@@ -184,3 +184,59 @@
   align-items: center;
   gap: var(--space-2);
 }
+
+/* =============================================================================
+   Theme S2 primitive + iconography demos (LIN-786)
+   ============================================================================= */
+.sg-primitive-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-3);
+}
+
+.sg-primitive-cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+
+.sg-primitive-tag {
+  font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
+  color: var(--muted);
+}
+
+.sg-primitive-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.sg-primitive-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.sg-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: var(--space-3);
+}
+
+.sg-icon-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 1.25rem;  /* scale the 1em icon up for the reference grid */
+  color: var(--text);
+}
+
+.sg-icon-cell .sg-name {
+  font-size: var(--font-size-sm);
+}

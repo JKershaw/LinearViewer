@@ -72,6 +72,37 @@ test('renders the dark theme side-by-side via the .theme-* hook', () => {
   assert.match(html, /class="sg-theme-panel theme-dark"/);
 });
 
+test('demos every S2 primitive (LIN-786)', () => {
+  const html = renderStyleguide();
+  // Dedicated Primitives + Iconography sections.
+  assert.match(html, /Primitives<\/h3>/);
+  assert.match(html, /Iconography<\/h3>/);
+  // Each primitive class appears at least once.
+  for (const cls of [
+    'status-pill--dot', 'btn btn--primary', 'btn--ghost', 'icon-btn',
+    'tag__name', 'class="chip"', 'accent-bar--running', 'segment-bar__cell',
+    'disclosure__summary', 'surface surface--inset'
+  ]) {
+    assert.ok(html.includes(cls), `styleguide must demo the ${cls} primitive`);
+  }
+  // Every §10 line icon is present.
+  for (const name of ['check', 'caret', 'branch', 'spark', 'error-circle']) {
+    assert.match(html, new RegExp(`icon icon--${name}`), `styleguide must demo the ${name} icon`);
+  }
+});
+
+test('every primitive is demoed in BOTH themes (LIN-786)', () => {
+  const html = renderStyleguide();
+  // The primitive grid is rendered once standalone and once inside EACH theme
+  // panel, so the dark panel must also carry the run-status pill + buttons.
+  const darkStart = html.indexOf('sg-theme-panel theme-dark');
+  assert.notEqual(darkStart, -1);
+  const darkPanel = html.slice(darkStart, html.indexOf('</div>\n      </div>', darkStart) + 1 || html.length);
+  for (const cls of ['status-pill--dot', 'btn--primary', 'segment-bar', 'accent-bar', 'surface--inset']) {
+    assert.ok(darkPanel.includes(cls), `dark theme panel must demo ${cls}`);
+  }
+});
+
 test('the .theme-amber variant is fully removed (LIN-785)', () => {
   const html = renderStyleguide();
   const css = readFileSync(STYLE_CSS, 'utf8');

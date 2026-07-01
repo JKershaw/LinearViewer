@@ -211,7 +211,7 @@
 .guide-code {
   font-family: var(--font-structural);
   font-size: var(--font-size-sm);
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--card-h);
   padding: 0.1rem 0.35rem;
   border-radius: var(--radius-sm);
   border: 1px solid var(--fg-vdim);
@@ -310,7 +310,7 @@
   display: none;
   margin-top: 0.35rem;
   padding: 0.4rem var(--space-2);
-  background: rgba(0, 0, 0, 0.03);
+  background: var(--bg-alt);
   border: 1px solid var(--fg-vdim);
   border-radius: var(--radius-sm);
   font-family: var(--font-structural);

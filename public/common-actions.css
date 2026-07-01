@@ -19,36 +19,37 @@
   text-decoration: none;
 }
 
-/* Green - primary/save actions */
+/* Green - primary/save actions. Fills derive from the status token via
+   color-mix so they rebind under .theme-dark (LIN-786 dark-mode cleanup). */
 .action-btn.save {
   color: var(--green);
-  background: rgba(34, 197, 94, 0.1);
+  background: color-mix(in srgb, var(--green) 12%, transparent);
 }
 
 .action-btn.save:hover {
-  background: rgba(34, 197, 94, 0.2);
+  background: color-mix(in srgb, var(--green) 22%, transparent);
 }
 
 /* Blue - connect/link actions */
 .action-btn.connect {
   color: var(--blue);
-  background: rgba(59, 130, 246, 0.1);
+  background: color-mix(in srgb, var(--blue) 12%, transparent);
 }
 
 .action-btn.connect:hover {
-  background: rgba(59, 130, 246, 0.2);
+  background: color-mix(in srgb, var(--blue) 22%, transparent);
 }
 
 /* Red - destructive actions */
 .action-btn.disconnect,
 .action-btn.logout {
   color: var(--red);
-  background: rgba(239, 68, 68, 0.1);
+  background: color-mix(in srgb, var(--red) 12%, transparent);
 }
 
 .action-btn.disconnect:hover,
 .action-btn.logout:hover {
-  background: rgba(239, 68, 68, 0.2);
+  background: color-mix(in srgb, var(--red) 22%, transparent);
 }
 
 /* =============================================================================
@@ -72,8 +73,13 @@
 }
 
 .token-label-input:focus {
-  outline: none;
   border-color: var(--blue);
+}
+
+/* Suppress the default ring only for non-keyboard focus; keyboard focus keeps
+   the global S1 :focus-visible ring (LIN-786: never kill focus outright). */
+.token-label-input:focus:not(:focus-visible) {
+  outline: none;
 }
 
 .token-label-input::placeholder {
@@ -128,11 +134,11 @@
 /* Red - revoke button */
 .token-revoke {
   color: var(--red);
-  background: rgba(239, 68, 68, 0.1);
+  background: color-mix(in srgb, var(--red) 12%, transparent);
 }
 
 .token-revoke:hover {
-  background: rgba(239, 68, 68, 0.2);
+  background: color-mix(in srgb, var(--red) 22%, transparent);
 }
 
 /* =============================================================================
@@ -196,7 +202,7 @@
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-2);
-  background: rgba(0, 0, 0, 0.03);
+  background: var(--bg-alt);
   border: 1px solid var(--fg-vdim);
   border-radius: var(--radius-sm);
 }
@@ -229,7 +235,7 @@
 .token-usage-hint {
   margin-top: var(--space-3);
   padding: var(--space-2);
-  background: rgba(0, 0, 0, 0.02);
+  background: var(--bg-alt);
   border-radius: var(--radius-sm);
   font-size: var(--font-size-sm);
   color: var(--fg-dim);

@@ -43,12 +43,38 @@ test('variant adds a second modifier (neutral tag chip)', () => {
   assert.match(html, /^<span class="status-pill status-pill--tag">/);
 });
 
-test('requires at least one of char, label, or a known state', () => {
-  assert.throws(() => renderStatusPill({}), /requires at least one of `char`, `label`, or a known `state`/);
-  // An unknown state has no default glyph; with no label/char it is empty → throws.
+test('requires at least one of char, label, dot, or a known state', () => {
+  assert.throws(() => renderStatusPill({}), /requires at least one of `char`, `label`, `dot`, or a known `state`/);
+  // An unknown state has no default glyph; with no label/char/dot it is empty → throws.
   assert.throws(() => renderStatusPill({ state: 'mystery' }), /requires at least one/);
   // …but an unknown state with a label is fine (still gets its modifier class).
   assert.doesNotThrow(() => renderStatusPill({ state: 'mystery', label: 'x' }));
+  // …and a dot alone is a valid marker even without a label (run-status shell).
+  assert.doesNotThrow(() => renderStatusPill({ dot: true }));
+});
+
+// --- LIN-786 (Theme S2): run-status dot extension ---------------------------
+
+test('the dot variant renders a dot marker instead of a glyph', () => {
+  const html = renderStatusPill({ state: 'running', label: 'running', dot: true });
+  assert.match(html, /^<span class="status-pill status-pill--dot status-pill--running">/);
+  assert.match(html, /<span class="status-pill__dot" aria-hidden="true"><\/span>/);
+  // dot wins over a glyph — the two never co-render.
+  assert.doesNotMatch(html, /status-pill__char/);
+  assert.match(html, /<span class="status-pill__label">running<\/span>/);
+});
+
+test('run-status states each add their modifier class', () => {
+  for (const state of ['running', 'error', 'queued']) {
+    const html = renderStatusPill({ state, label: state, dot: true });
+    assert.match(html, new RegExp(`status-pill--${state}`));
+  }
+});
+
+test('dot wins over a char glyph when both are supplied', () => {
+  const html = renderStatusPill({ state: 'done', char: '✓', dot: true, label: 'done' });
+  assert.match(html, /status-pill__dot/);
+  assert.doesNotMatch(html, /status-pill__char/);
 });
 
 test('char and label are escaped (plain text in, like field)', () => {

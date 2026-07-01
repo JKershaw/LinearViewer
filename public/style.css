@@ -107,7 +107,8 @@
   --card-h: var(--bg-alt);      /* card hover surface */
   --raised: var(--bg);          /* raised surface (sits on the page bg) */
   --inset: var(--bg-alt);       /* inset / well surface */
-  --brand: var(--teal);         /* product accent (teal, per LIN-782) */
+  --brand: var(--teal);         /* product accent (teal, per LIN-782) — fill/dot/border */
+  --brand-dim: #0f766e;         /* AA-safe brand text on --card (LIN-786 §11: --teal #0d9488 on #f8f9fa ≈3.6:1 fails AA; darken for TEXT only, leave --brand fills intact) */
   --shadow: var(--shadow-md);   /* default elevation */
 
   /* Status palette — keep --green/--red; add running (--amber) + neutral
@@ -212,6 +213,7 @@
   --raised: var(--bg-muted);
   --inset: var(--bg-alt);
   --brand: var(--teal);
+  --brand-dim: #2dd4bf;      /* AA-safe brand text on dark --card (--teal already ≈8.5:1 here; restated so the token resolves in dark) */
   --shadow: var(--shadow-md);
 
   /* Status palette on dark — raw hues for fills/dots, `-dim` companions are the
@@ -2619,6 +2621,232 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 
 /* Neutral, stateless label/tag chip (no state color). */
 .status-pill--tag { color: var(--fg-dim); }
+
+/*
+   Run-status extension (LIN-786, Theme S2)
+   The autopilot run-status vocabulary on the SAME seam: a leading dot (the
+   bright fill token) + an AA-safe `-dim` label colour. State is dot + label,
+   never colour alone. `done` is shared with the issue-state vocabulary above
+   and keeps its --green text; `running/error/queued` are additive.
+*/
+.status-pill__dot {
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: 50%;
+  background: currentColor;  /* overridden per-state below; --tag falls back to text colour */
+  flex-shrink: 0;
+}
+
+.status-pill--running { color: var(--amber-dim); }
+.status-pill--error   { color: var(--red-dim); }
+.status-pill--queued  { color: var(--slate-dim); }
+
+/* The dot uses the bright fill token (decorative, ≥3:1 non-text), while the
+   label stays on the AA-safe `-dim` text colour above. */
+.status-pill--running .status-pill__dot { background: var(--amber); }
+.status-pill--done    .status-pill__dot { background: var(--green); }
+.status-pill--error   .status-pill__dot { background: var(--red); }
+.status-pill--queued  .status-pill__dot { background: var(--slate); }
+
+/* The running dot pulses to read as "live"; it inherits the global
+   prefers-reduced-motion neutralizer (no new animation machinery). */
+.status-pill--running .status-pill__dot {
+  animation: pulse var(--motion-slow) ease-in-out infinite;
+}
+
+/* =============================================================================
+   Theme S2 Primitives (LIN-786)
+   =============================================================================
+   Theme-owned, page-agnostic primitives composed by LIN-783 (Observation) and
+   reusable anywhere. Every rule reads the semantic token layer ONLY (no raw hex,
+   no page logic). Interactive members inherit the global S1 `:focus-visible`
+   ring (none suppresses it); primary Button + IconButton meet the 40px
+   touch-target floor. Server render helpers live in lib/components/*.js. */
+
+/* --- Button (default / primary / ghost) ------------------------------------ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-height: 32px;
+  padding: var(--space-1) var(--space-3);
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+  color: var(--text);
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn:hover { background: var(--card-h); border-color: var(--border-strong); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Primary: filled brand action. ≥40px touch target (a11y floor §11). */
+.btn--primary {
+  min-height: 40px;
+  padding: var(--space-2) var(--space-4);
+  color: var(--bg);
+  background: var(--brand);
+  border-color: var(--brand);
+}
+.btn--primary:hover {
+  background: color-mix(in srgb, var(--brand) 85%, black);
+  border-color: color-mix(in srgb, var(--brand) 85%, black);
+}
+
+/* Ghost: chromeless until hover (toolbar-dense rows). */
+.btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+}
+.btn--ghost:hover { background: var(--card-h); color: var(--text); border-color: transparent; }
+
+.btn__icon { display: inline-flex; }
+
+/* --- Icon Button ----------------------------------------------------------- */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;   /* §11 touch-target floor */
+  min-height: 40px;
+  padding: var(--space-1);
+  color: var(--muted);
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.icon-btn:hover { color: var(--text); background: var(--card-h); border-color: var(--border-strong); }
+.icon-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.icon-btn--ghost { background: transparent; border-color: transparent; }
+.icon-btn--ghost:hover { background: var(--card-h); border-color: transparent; }
+.icon-btn__icon { display: inline-flex; }
+
+/* --- Icon ------------------------------------------------------------------ */
+.icon {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.125em;  /* optically centre against text */
+  flex-shrink: 0;
+}
+
+/* --- Tag (soft sans label) + Chip (mono data) ------------------------------ */
+.tag {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5ch;
+  padding: 0.1rem var(--space-2);
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  color: var(--text);
+  background: var(--card-h);
+  border-radius: var(--radius-sm);
+}
+.tag__count { font-family: var(--font-structural); color: var(--muted); }
+.tag--brand   { color: var(--brand-dim); background: var(--teal-soft); }
+.tag--running { color: var(--amber-dim); }
+.tag--done    { color: var(--green-dim); }
+.tag--error   { color: var(--red-dim); }
+.tag--queued  { color: var(--slate-dim); }
+
+.chip {
+  display: inline-block;
+  padding: 0.05rem 0.4rem;
+  font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
+  color: var(--text);
+  background: var(--inset);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+}
+
+/* --- Accent Bar (3px status stripe) ---------------------------------------- */
+.accent-bar {
+  display: block;
+  width: 100%;
+  height: 3px;
+  border-radius: var(--radius-sm);
+  background: var(--slate);
+}
+.accent-bar--vertical { width: 3px; height: auto; align-self: stretch; min-height: 1em; }
+
+.accent-bar--running,    .accent-bar--in-progress { background: var(--amber); }
+.accent-bar--done        { background: var(--green); }
+.accent-bar--error,      .accent-bar--failed      { background: var(--red); }
+.accent-bar--queued,     .accent-bar--todo,
+.accent-bar--backlog     { background: var(--slate); }
+
+/* --- Segment Bar (generic equal-cell track) -------------------------------- */
+.segment-bar {
+  display: flex;
+  gap: 2px;
+  width: 100%;
+  height: 0.5rem;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.segment-bar__cell {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  font-family: var(--font-structural);
+  font-size: 0.7em;
+  color: var(--bg);
+  background: var(--faint);
+}
+.segment-bar__cell--running { background: var(--amber); }
+.segment-bar__cell--done    { background: var(--green); }
+.segment-bar__cell--error   { background: var(--red); }
+.segment-bar__cell--queued  { background: var(--slate); }
+.segment-bar__cell--empty   { background: var(--faint); }
+.segment-bar__count { color: inherit; }
+
+/* --- Disclosure (native <details>) ----------------------------------------- */
+.disclosure { border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--card); }
+.disclosure__summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-content);
+  color: var(--text);
+  cursor: pointer;
+  list-style: none;
+}
+.disclosure__summary::-webkit-details-marker { display: none; }
+.disclosure__caret {
+  width: 0;
+  height: 0;
+  border-left: 5px solid var(--muted);
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  transition: transform var(--motion-fast) ease;
+  flex-shrink: 0;
+}
+.disclosure[open] > .disclosure__summary .disclosure__caret { transform: rotate(90deg); }
+.disclosure__body {
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  border-top: 1px solid var(--line-soft);
+  color: var(--text);
+}
+
+/* --- Surface / InsetPanel -------------------------------------------------- */
+.surface {
+  padding: var(--space-3);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+.surface--inset { background: var(--inset); border-color: var(--line-soft); }
+.surface--raised { background: var(--raised); box-shadow: var(--shadow); }
 
 /*
    Badge convergence anchor (LIN-477, Phase B.2)
