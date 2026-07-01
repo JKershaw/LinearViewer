@@ -307,11 +307,12 @@ GET /api/proxy/attachments/{id}
 
 Relays the bytes for an attachment. `{id}` is the opaque handle from an `attachments[].id` field — pass it verbatim as the path segment. The relay decodes the handle, fetches the bytes server-side with the workspace's own credentials, SSRF-guards the upstream request (HTTPS only, exact Linear-host allowlist, no redirects, 10 MB cap), and streams the result back. There is no JSON envelope — a `200` response **is** the raw bytes. Inline base64 is intentionally not offered; fetch on demand instead.
 
+Regardless of the underlying media class, every successful relay is served as a forced download: a neutral `application/octet-stream` content-type, `Content-Disposition: attachment`, and `X-Content-Type-Options: nosniff` (LIN-774 — a deliberate safe-download contract that closes a stored-XSS hole via `image/svg+xml` sniffing/rendering as active markup). The upstream `image/*`/text content-type is used only to admit the bytes past the type-gate below; it is never preserved on the response. Consumers that need to know an attachment's real media type should use the `contentType` field from the attachment's JSON metadata (see `attachments[]` above), not this response's Content-Type header.
+
 | Aspect | Behaviour |
 |--------|-----------|
 | Auth | Same proxy Bearer token as every other endpoint (a `read` scope is sufficient). |
-| Image success | `200` with the raw image bytes and the upstream `image/*` content-type. |
-| File success | `200` with the raw bytes, a text content-type (`text/markdown`, `text/plain`, `application/json`, …; uploaded source is served as `text/plain`), `Content-Disposition: attachment`, and `X-Content-Type-Options: nosniff`. |
+| Success | `200` with the raw bytes, always as a forced download: `Content-Type: application/octet-stream`, `Content-Disposition: attachment`, `X-Content-Type-Options: nosniff`. |
 | Size cap | Responses over 10 MB are rejected with `413`. |
 | Unsupported type | A response that is neither an `image/*` nor an allowlisted text/source file is rejected with `400`. |
 | Upstream miss | A failed upstream fetch (e.g. asset gone) passes the upstream status through (e.g. `404`). |
