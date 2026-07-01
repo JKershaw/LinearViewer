@@ -1,5 +1,7 @@
 # Pipeline Hierarchy: Leaf-Primary Rule
 
+> **Superseded by the Observation view; the Pipeline view was removed in LIN-877.** Kept as design history.
+
 Background notes for **LIN-246** (`lib/pipeline-state.js`). The issue description links here instead of carrying all of this inline.
 
 ## The rule

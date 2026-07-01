@@ -36,7 +36,6 @@ routes/
   workspace.js         Workspace management routes
   dispatch.js          Dispatch queue API (user + consumer endpoints)
   proxy.js             Linear API proxy (token auth, read/write endpoints, cycles, labels, task automation)
-  pipeline.js          Pipeline page and JSON polling routes
   collective.js        Collective experiment (experimental): page, multi-workspace dispatch fan-out, Yap state/say proxy (LIN-450)
   dashboard.js         Autopilot Observation page (first-class, LIN-595): /observation page + sessionId-grouped sessions feed + merged cross-workspace Loop feed, on-demand run-/session-summary, session-context, lazy Linear hydration (LIN-509). /dashboard 302s to /observation; data endpoints keep their /api/dashboard/* paths
   workspace-api.js     Workspace API routes (prompts, recommendations, audit, comments, images)
@@ -68,7 +67,6 @@ lib/
   render-prompts.js    Prompts catalog page renderer
   render-custom-prompts.js  Custom prompts page (/prompts/custom) renderer
   render-dispatch.js   Dispatch page renderer (prompt, queue, tokens, history)
-  render-pipeline.js   Pipeline page renderer (floor view shell)
   render-collective.js Collective page renderer (experimental discussion shell)
   render-observation.js Autopilot Observation page renderer (first-class; mobile-first feed shell + collapsible completed archive, Swipe-modeled; LIN-595)
   render-roadmap.js    Roadmap page renderer (delivery-focused)
@@ -83,7 +81,6 @@ lib/
   render-legal.js      Privacy Policy / Terms of Service renderers
   render-kpis.js       Public /kpis instance stats page renderer
   kpi-stats.js         Instance KPI aggregation (privacy boundary for public /kpis)
-  pipeline-state.js    Pipeline state builder (snapshot assembly)
   pipeline-loops.js    Pipeline loop reconstruction library
   sessions-view.js     Adapts pipeline Loop records into the sessions view
   roadmap.js           Roadmap deterministic layer (velocity, execution order, milestones)
@@ -169,7 +166,6 @@ public/
   prompts.css                   Prompts catalog page
   custom-prompts.css / .js      Custom prompts page
   dispatch.css / dispatch.js    Dispatch page (prompt, queue, tokens, history)
-  pipeline.css / pipeline.js    Pipeline floor view (polling, diffing, overlays)
   collective.css / collective.js  Collective page (setup, transcript poll, say box)
   observation.css / observation.js  Autopilot Observation page (sessionId-grouped sessions poll, status banner, workspace filters, Level-1 active feed + collapsible completed archive, Level-2 session cards with status pill / one-sentence summary / runtime+model / per-worker-run progress bar, Level-3 drill-down: tasks-touched + relationships (session-context) with lazy Linear hydration, per-task worker-session tree with phase/recap/metric-chips, per-node activity log + produced-artifact links + on-demand run-summary next steps; LIN-595)
   roadmap.css / roadmap.js      Roadmap page
@@ -224,7 +220,7 @@ When changing prompt behavior, see **[docs/prompt-change-validation.md](docs/pro
 
 ### View Tiers
 
-Views are surfaced in one of three deliberate tiers (LIN-496). **First-class** (dashboard / observation / swipe / swim / settings) — always-on footer links, no flag. **Experimental** (collective / taskChat / ship / nextRun) — per-user flag (default off) in `lib/feature-defaults.js`, listed in `EXPERIMENTAL_FEATURES` in `lib/render-settings.js`, surfaced **only** via a Settings link when on, and route-gated to redirect to `/settings` when off. (Naming note: the **first-class** "dashboard" is the unprefixed project tree view at `/workspace/:urlKey/`; the separate realtime, cross-workspace *autopilot* dashboard — formerly the experimental `dashboard` flag/view at `/workspace/:urlKey/dashboard`, LIN-509 — was promoted to the first-class **Observation** page at `/workspace/:urlKey/observation` and its flag retired (LIN-595); `/dashboard` now 302s to `/observation`.) **Flagged power-user** (roadmap / dispatch / proxy / pipeline) — per-user flag plus a conditional footer link in `lib/components/footer.js`. `/ship` is a key in-development experiment (radial dependency layout), not a retirement candidate; its radial layout is the protected experiment and its token wiring is LIN-500. Full model + the Step-2 "new canvas/radial concept doesn't fit the section/card/token model" friction note: **[docs/view-tiers.md](docs/view-tiers.md)**.
+Views are surfaced in one of three deliberate tiers (LIN-496). **First-class** (dashboard / observation / swipe / swim / settings) — always-on footer links, no flag. **Experimental** (collective / taskChat / ship / nextRun) — per-user flag (default off) in `lib/feature-defaults.js`, listed in `EXPERIMENTAL_FEATURES` in `lib/render-settings.js`, surfaced **only** via a Settings link when on, and route-gated to redirect to `/settings` when off. (Naming note: the **first-class** "dashboard" is the unprefixed project tree view at `/workspace/:urlKey/`; the separate realtime, cross-workspace *autopilot* dashboard — formerly the experimental `dashboard` flag/view at `/workspace/:urlKey/dashboard`, LIN-509 — was promoted to the first-class **Observation** page at `/workspace/:urlKey/observation` and its flag retired (LIN-595); `/dashboard` now 302s to `/observation`.) **Flagged power-user** (roadmap / dispatch / proxy) — per-user flag plus a conditional footer link in `lib/components/footer.js`. `/ship` is a key in-development experiment (radial dependency layout), not a retirement candidate; its radial layout is the protected experiment and its token wiring is LIN-500. Full model + the Step-2 "new canvas/radial concept doesn't fit the section/card/token model" friction note: **[docs/view-tiers.md](docs/view-tiers.md)**.
 
 ## Code Style
 
