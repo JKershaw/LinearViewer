@@ -1,11 +1,12 @@
 // =============================================================================
-// parseFeedbackImage / sniffRasterType — feedback intake decode + raster guard
+// parseFeedbackImage / sniffRasterType — shared upload decode + raster guard
 // =============================================================================
 //
-// parseFeedbackImage (LIN-636) is the pure decode of the optional screenshot the
-// feedback-submit route forwards to the provider `uploadFile` seam. It accepts a
-// base64 data URL string or an object `{ data, contentType?, filename? }` and
-// returns `{ bytes, contentType, filename }` or null.
+// parseFeedbackImage (LIN-636) is the pure decode of a base64 image destined for
+// the provider `uploadFile` seam, shared by the feedback-submit route and the
+// agent-facing attachment upload route (LIN-891, lib/attachment-upload.js). It
+// accepts a base64 data URL string or an object `{ data, contentType?, filename?
+// }` and returns `{ bytes, contentType, filename }` or null.
 //
 // LIN-682 (security): it must NOT trust the client-declared content type — the
 // bytes are sniffed (`sniffRasterType`) and only raster images (PNG/JPEG/GIF/
@@ -15,7 +16,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { parseFeedbackImage, sniffRasterType } from '../../routes/workspace-api.js';
+import { parseFeedbackImage, sniffRasterType } from '../../lib/attachment-upload.js';
 
 // --- Minimal but valid magic-byte fixtures (≥12 bytes so WEBP's offset-8 check
 // has room). Real raster files always exceed 12 bytes; these mirror the headers.

@@ -1141,6 +1141,47 @@ DELETE /api/proxy/issues/{issueId}/labels/{labelId}
 
 Response: same shape as Add Label (the issue with its remaining `labels` array). When the label was not present: `{ "success": true, "message": "Label not present" }`.
 
+#### Upload Attachment
+
+Attach a base64 raster image to an issue — either as a new comment (default) or appended to the description. This is the agent-facing counterpart of the human feedback widget's image upload: it reuses the same `provider.uploadFile()` primitive and the same raster magic-byte sniffing guard (the declared `contentType` is never trusted), but is a separate Bearer-token route (the feedback widget's own upload path is session-authed and human-only).
+
+```
+POST /api/proxy/issues/{issueId}/attachments
+Content-Type: text/plain
+
+{ "image": "data:image/png;base64,iVBORw0KGgo...", "target": "comment", "body": "Before/after screenshot:" }
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `image` | string or object | Yes | A base64 data URL (`data:image/png;base64,...`) **or** `{ "data": "...", "contentType": "...", "filename": "..." }` carrying raw base64. Bytes are sniffed and only PNG/JPEG/GIF/WEBP are accepted — a mislabeled SVG/HTML payload is rejected with `400` regardless of the declared content type |
+| `target` | string | No | `comment` (default) or `description` |
+| `body` | string | No | Text to place before the markdown image embed (max 50K chars combined with the embed for `comment`; description length cap applies for `description`) |
+
+**Content-Type note:** a real screenshot's base64 encoding easily exceeds the proxy's default 250KB JSON body cap. Send the request with `Content-Type: text/plain` (not `application/json`) and JSON-encode the body yourself — this route accepts any content type up to 14MB, mirroring the feedback widget's own large-body workaround.
+
+The uploaded asset is embedded as markdown (`![](assetUrl)`), so it is immediately discoverable through the existing `attachments[]` array (as an `md:` handle) and readable via `GET /api/proxy/attachments/{id}` — no separate registration call.
+
+`target: "comment"` returns `201`:
+```json
+{
+  "success": true,
+  "comment": {
+    "id": "uuid",
+    "body": "Before/after screenshot:\n\n![](https://uploads.linear.app/....png)",
+    "createdAt": "2026-07-01T12:00:00.000Z",
+    "user": { "name": "Jane Doe" }
+  }
+}
+```
+
+`target: "description"` returns `200` with the same shape as [Update Issue](#update-issue) — the embed is appended to the end of the description (same append semantics as [Append to Description](#append-to-description)):
+```json
+{ "success": true, "issue": { "id": "uuid", "identifier": "LIN-123", "description": "...\n\n![](https://uploads.linear.app/....png)", ... } }
+```
+
+Capability-gated: `422 CAPABILITY_NOT_SUPPORTED` with `capability: "uploadFile"` if the provider can't upload files at all, or `capability: "createComment"` / `capability: "updateIssue"` if it can't write the chosen `target`. A trashed issue is refused with `409`, same as every other write endpoint.
+
 ### Dispatch Endpoints
 
 These endpoints let a consumer (e.g. an autopilot orchestrator) hand a prompt to the workspace's **dispatch runner** — a separate system that polls the queue and runs the prompt as a Claude Code session (locally as `cli`, or via web remote-control) — and then watch it run to completion. Enqueue requires `readWrite`; the watch and list reads are `read`-scope.
