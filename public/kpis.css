@@ -26,11 +26,11 @@
   margin-bottom: var(--space-4);
 }
 
+/* Chrome (border/fill/radius/padding) is owned by `.card`; only the
+   stat-block layout lives here. `.card`'s margin-bottom is neutralised so
+   the grid `gap` alone spaces the cards. */
 .kpi-card {
-  border: 1px solid var(--fg-vdim);
-  border-radius: 4px;
-  background: var(--bg-muted);
-  padding: 0.75rem 0.9rem;
+  margin-bottom: 0;
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
@@ -44,6 +44,7 @@
 }
 
 .kpi-card-label {
+  font-family: var(--font-content);
   color: var(--fg-dim);
   font-size: 0.78rem;
 }
@@ -56,10 +57,11 @@
   margin-bottom: 0.75rem;
 }
 
+/* Chrome (inset fill/radius/padding) is owned by `.section--boxed`; only the
+   grid spacing lives here. The base `.section` margin-bottom is neutralised so
+   the grid `gap` alone spaces the boxes; the wide hero box keeps a margin
+   because it sits above the grid, not inside it. */
 .kpi-chart-box {
-  border: 1px solid var(--fg-vdim);
-  border-radius: 4px;
-  padding: 0.75rem 0.9rem;
   margin-bottom: 0;
 }
 
@@ -153,10 +155,6 @@
   .kpi-cards {
     grid-template-columns: repeat(2, 1fr);
     gap: var(--space-2);
-  }
-
-  .kpi-card {
-    padding: 0.6rem 0.7rem;
   }
 
   .kpi-card-value {
