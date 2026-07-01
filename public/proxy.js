@@ -241,7 +241,7 @@ This will return all available endpoints with examples. Your token scope is: ${s
       t.lastUsedAt ? `used ${formatTimeAgo(t.lastUsedAt)}` : 'never used'
     ].join(' \u00B7 ');
 
-    return `<div class="token-item">
+    return `<div class="surface token-item">
       <div class="token-info">
         <div class="token-label-text">${escapeHtml(t.label)}${scopeBadge}${consumedBadge}${expiryBadge}</div>
         <div class="token-meta">${escapeHtml(meta)}</div>
@@ -254,13 +254,26 @@ This will return all available endpoints with examples. Your token scope is: ${s
     if (!expiresAt) return '';
     const ms = new Date(expiresAt).getTime() - Date.now();
     if (Number.isNaN(ms)) return '';
+    // Canonical run-status dot pill (LIN-854): ok→done, warn→running, expired→error.
+    let state, text;
     if (ms <= 0) {
-      return ' <span class="token-expiry expired">expired</span>';
+      state = 'error';
+      text = 'expired';
+    } else {
+      const days = Math.floor(ms / (24 * 60 * 60 * 1000));
+      state = days <= 7 ? 'running' : 'done';
+      text = days < 1 ? 'expires <1d' : `expires in ${days}d`;
     }
-    const days = Math.floor(ms / (24 * 60 * 60 * 1000));
-    const cls = days <= 7 ? 'warn' : 'ok';
-    const text = days < 1 ? 'expires <1d' : `expires in ${days}d`;
-    return ` <span class="token-expiry ${cls}">${text}</span>`;
+    return ` ${statusDotPill(state, text)}`;
+  }
+
+  // Hand-emits the shipped `.status-pill` dot markup (public/style.css) — the
+  // client can't import the server `renderStatusPill` primitive, so it mirrors
+  // its class contract per the Phase-B seam (swipe.js/swim.js precedent).
+  function statusDotPill(state, label) {
+    return `<span class="status-pill status-pill--dot status-pill--${state}">` +
+      '<span class="status-pill__dot" aria-hidden="true"></span>' +
+      `<span class="status-pill__label">${escapeHtml(String(label))}</span></span>`;
   }
 
   function showTokenModal(token, label, scope) {
@@ -321,12 +334,13 @@ This will return all available endpoints with examples. Your token scope is: ${s
     }
 
     eventsList.innerHTML = events.map(e => {
-      const statusClass = e.status < 300 ? 'status-ok' : e.status < 400 ? 'status-warn' : 'status-error';
+      // Run-status dot pill (LIN-854): ok(2xx)→done, warn(3xx)→running, error(4xx+)→error.
+      const state = e.status < 300 ? 'done' : e.status < 400 ? 'running' : 'error';
       const label = e.tokenLabel ? ` · ${escapeHtml(e.tokenLabel)}` : '';
       return `<div class="proxy-event-item">
         <span class="proxy-event-method">${escapeHtml(e.method)}</span>
         <span class="proxy-event-endpoint">${escapeHtml(e.endpoint)}</span>
-        <span class="proxy-event-status ${statusClass}">${e.status}</span>
+        ${statusDotPill(state, e.status)}
         <span class="proxy-event-meta">${formatTimeAgo(e.timestamp)}${label}</span>
       </div>`;
     }).join('');
