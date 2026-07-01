@@ -262,16 +262,29 @@ itself holding an epic of independent tasks, or mid-task tripping over a blockin
 answer is the same: hand the whole task down to an autopilot of its own, not a single worker step, and
 stand by for what it reports up. The win is **context isolation** — an epic with several tasks becomes
 a coordinator that hands each task to a focused autopilot carrying only *that* task's context, so no
-single session grinds every step of every task through one window.
+single session grinds every step of every task through one window. The discovered shape governs even
+when it cuts against your own launch mode: a run **launched as `stepper`** that discovers the "task" in
+front of it is actually a set or epic **must stop dripping beats and switch to coordinating** — dispatch
+one child autopilot per task (each stepped, per the variant rule below) instead of continuing to
+beat-step across tasks that were never one arc to begin with. Stepping is for a single task's arc; a set
+of tasks is a coordinator's shape no matter what variant woke the session that found it.
 
 The mechanism is the same push substrate as a subscribed orchestrator above, pointed one level up:
 
 - **Dispatch the child** with `POST /api/proxy/autopilot/kickoff`, passing the task as
-  `issueIdentifier`, **your own session id** as `sessionId`, and `subscribe: true`. Your id as
-  `sessionId` makes you the child's up-chain *wake target*; `subscribe: true` declares that edge. The
-  child runs its own research→…→close-out in its own context; its returned `id` is the *child's*
-  session id (for the sub-workers **it** fans out) and stays distinct from the id you passed — you
-  never see or hold the child's prompt body.
+  `issueIdentifier`, **your own session id** as `sessionId`, `subscribe: true`, and a `variant` chosen
+  by what the child *holds*, not by what you were launched as — the same question at every altitude, so
+  it recurses cleanly down the tree:
+  - Child holds **a single concrete task** (one research→…→close-out arc) → `variant: 'stepper'`. This
+    is where beat-stepping's quality win lives.
+  - Child **is itself a set or epic** (it will dispatch its own children in turn) → `variant: 'standard'`;
+    it acts as a sub-orchestrator and steps *its* children, not itself.
+
+  Your id as `sessionId` makes you the child's up-chain *wake target*; `subscribe: true` declares that
+  edge. The child runs its own research→…→close-out (or its own coordination, if dispatched `standard`
+  over a set) in its own context; its returned `id` is the *child's* session id (for the sub-workers
+  **it** fans out) and stays distinct from the id you passed — you never see or hold the child's prompt
+  body.
 - **Then stand by — don't poll.** Because you dispatched it `subscribe: true`, the child's terminal
   (or `[pending]`) boundary wakes *you* automatically, up-chain, exactly the way a subscribed worker's
   outcome reaches you. No watch loop, no long-poll; the liveness probe for a child gone truly silent is
@@ -286,12 +299,15 @@ the last has reported and been judged:
 
 - **An epic, or several independent tasks.** You sit above the set and dispatch one child autopilot per
   task, holding only the cross-task altitude while each child carries its own task's context. You keep
-  task *headers*, not task *detail*; the child holds the detail.
+  task *headers*, not task *detail*; the child holds the detail. Each child holds one concrete task, so
+  each is dispatched `variant: 'stepper'`. If instead one of those "tasks" turns out to be a set/epic in
+  its own right, it is not a stepper child — dispatch it `variant: 'standard'` so it coordinates its own
+  children.
 - **A blocking bug found mid-task.** A run driving one task can hit a bug that blocks it. Rather than
   dropping down to fix it inline — which would leave your altitude — file the bug as its own ticket,
   capture the `blocks`/`blocked-by` relationship so the dependency is legible, and dispatch a child
-  autopilot for it. Stand by for its report, then resume the blocked task once the bug is cleared (or
-  hand back if it can't be).
+  autopilot for it. The bug ticket is itself a single task, so dispatch it `variant: 'stepper'`. Stand by
+  for its report, then resume the blocked task once the bug is cleared (or hand back if it can't be).
 
 Keep it to that. Running children **in parallel** (2A/2B/2C at once, joined on "waits-on"), nesting the
 child's branch under yours on the **Observation** page, and children *talking* to each other or back to
