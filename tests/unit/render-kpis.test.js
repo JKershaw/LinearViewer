@@ -77,6 +77,32 @@ describe('renderKpisPage', () => {
     assert.ok(html.includes('data-section="kpi-cards"'));
   });
 
+  test('stat cards ride on the shared .card primitive alongside kpi-* hooks', () => {
+    const html = renderKpisPage(buildStats());
+
+    // Shared primitive class + KPI hook + value/label spans preserved.
+    assert.ok(html.includes('class="card kpi-card"'), 'stat blocks use the .card primitive');
+    assert.ok(html.includes('<span class="kpi-card-value">'), 'value span hook preserved');
+    assert.ok(html.includes('<span class="kpi-card-label">'), 'label span hook preserved');
+  });
+
+  test('chart boxes ride on the shared boxed .section primitive alongside kpi-* hooks', () => {
+    const html = renderKpisPage(buildStats());
+
+    // Shared primitive classes + KPI hook + tree glyph + unclassed h3 preserved.
+    assert.ok(
+      html.includes('class="section section--boxed kpi-chart-box"'),
+      'chart boxes use the boxed .section primitive'
+    );
+    assert.ok(
+      html.includes('class="section section--boxed kpi-chart-box kpi-chart-wide"'),
+      'the wide hero chart keeps its kpi-chart-wide hook alongside the primitive'
+    );
+    assert.ok(html.includes('<span class="kpi-tree-glyph">├─</span>'), 'tree glyph preserved');
+    // titleClass:'' leaves the h3 unclassed so `.kpi-chart-box h3` still styles it.
+    assert.ok(html.includes('<h3><span><span class="kpi-tree-glyph">'), 'chart h3 stays unclassed');
+  });
+
   test('renders all chart canvases and loads Chart.js + page script', () => {
     const html = renderKpisPage(buildStats());
 

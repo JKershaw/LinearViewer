@@ -22,8 +22,13 @@
     dim: css.getPropertyValue('--fg-dim').trim() || '#666666',
     grid: css.getPropertyValue('--fg-vdim').trim() || '#eeeeee'
   };
+  // Chart labels are machine facts → mono. Read the structural-font token from
+  // the same runtime block as the colors so theming stays token-driven; keep
+  // the literal mono stack as the empty-token fallback.
+  const FONT_MONO = css.getPropertyValue('--font-structural').trim()
+    || "'SF Mono', 'Fira Code', 'Consolas', monospace";
 
-  Chart.defaults.font.family = "'SF Mono', 'Fira Code', 'Consolas', monospace";
+  Chart.defaults.font.family = FONT_MONO;
   Chart.defaults.font.size = 11;
   Chart.defaults.color = COLORS.dim;
   Chart.defaults.maintainAspectRatio = false;
