@@ -191,7 +191,7 @@ test.describe('Pipeline Scenarios', () => {
       const cell = page.locator('.pipeline-cell[data-identifier="TEST-14"]');
       await expect(cell.locator('.cell-id')).toContainText('TEST-14');
       await expect(cell.locator('.cell-stage')).toContainText('impl');
-      await expect(cell.locator('.cell-state')).toHaveClass(/state-running/);
+      await expect(cell.locator('.cell-state')).toHaveClass(/status-pill--running/);
       await expect(cell.locator('.cell-loops')).toContainText('1');
     });
 
@@ -287,7 +287,7 @@ test.describe('Pipeline Scenarios', () => {
       // Find the entry for TEST-14
       const entry = page.locator('.activity-entry:has(.activity-id:text("TEST-14"))');
       await expect(entry).toBeVisible();
-      await expect(entry.locator('.activity-state')).toHaveClass(/state-complete/);
+      await expect(entry.locator('.activity-state')).toHaveClass(/status-pill--done/);
     });
 
     test('completed task stays active when state is started', async ({ page }) => {
@@ -353,7 +353,7 @@ test.describe('Pipeline Scenarios', () => {
 
       const entry = page.locator('.activity-entry:has(.activity-id:text("TEST-14"))');
       await expect(entry).toBeVisible();
-      await expect(entry.locator('.activity-state')).toHaveClass(/state-error/);
+      await expect(entry.locator('.activity-state')).toHaveClass(/status-pill--error/);
     });
 
     test('state API confirms error loop', async ({ page }) => {
@@ -663,7 +663,7 @@ test.describe('Pipeline Scenarios', () => {
       const progressBar = cell.locator('.cell-progress');
       await expect(progressBar).toBeVisible();
 
-      const segments = progressBar.locator('.progress-seg');
+      const segments = progressBar.locator('.segment-bar__cell');
       await expect(segments).toHaveCount(3);
     });
 
@@ -684,12 +684,12 @@ test.describe('Pipeline Scenarios', () => {
       await loadPipelinePage(page);
 
       const cell = page.locator('.pipeline-cell[data-identifier="TEST-14"]');
-      const segments = cell.locator('.cell-progress .progress-seg');
+      const segments = cell.locator('.cell-progress .segment-bar__cell');
       await expect(segments).toHaveCount(2);
 
-      // Segments are rendered newest-first: running, then complete
-      await expect(segments.nth(0)).toHaveClass(/seg-running/);
-      await expect(segments.nth(1)).toHaveClass(/seg-complete/);
+      // Segments are rendered newest-first: running, then complete (done)
+      await expect(segments.nth(0)).toHaveClass(/segment-bar__cell--running/);
+      await expect(segments.nth(1)).toHaveClass(/segment-bar__cell--done/);
     });
   });
 
