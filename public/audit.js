@@ -13,22 +13,12 @@ const auditReport = document.getElementById('audit-report');
 const auditError = document.getElementById('audit-error');
 
 // =============================================================================
-// State
-// =============================================================================
-const sectionState = {};
-
-// =============================================================================
 // Event Handlers
 // =============================================================================
 runAuditBtn.addEventListener('click', runAudit);
 
-// Delegate section toggle clicks
-document.addEventListener('click', (e) => {
-  const header = e.target.closest('.section-header');
-  if (header) {
-    toggleSection(header);
-  }
-});
+// Collapsible domains use native <details> (renderDisclosure primitive), so the
+// browser owns the open/close toggle — no delegated click handler needed.
 
 // =============================================================================
 // Audit Functions
@@ -65,6 +55,102 @@ async function runAudit() {
 }
 
 // =============================================================================
+// Theme primitives (client-side mirrors of lib/components/*.js)
+// =============================================================================
+// The shipped primitives (renderCard/renderField/renderStatusPill/renderTag/
+// renderDisclosure) are server-only ES modules and can't be imported into the
+// browser. These helpers emit the SAME canonical markup + classes, so the
+// client-rendered report inherits the shared theme from public/style.css instead
+// of bespoke audit.css rules — the technique observation.js uses for the
+// run-status pill (LIN-786). Keep in sync with lib/components/*; /styleguide is
+// the visual-regression baseline for every primitive.
+
+const esc = (v) => escapeHtml(String(v ?? ''));
+
+// Default state glyphs — mirrors STATE_GLYPHS in lib/components/status-pill.js.
+const STATE_GLYPHS = {
+  done: '✓',
+  'in-progress': '◐',
+  todo: '○',
+  backlog: '○',
+  failed: '✕',
+};
+
+/** Canonical .status-pill (mirrors renderStatusPill). */
+function statusPill({ state, label, char } = {}) {
+  const glyph = char != null && char !== '' ? char : (state ? STATE_GLYPHS[state] : '');
+  const classes = ['status-pill'];
+  if (state) classes.push(`status-pill--${state}`);
+  const charHtml = glyph ? `<span class="status-pill__char">${esc(glyph)}</span>` : '';
+  const labelHtml = (label != null && label !== '')
+    ? `<span class="status-pill__label">${esc(label)}</span>` : '';
+  return `<span class="${classes.join(' ')}">${charHtml}${labelHtml}</span>`;
+}
+
+/** Canonical .tag with optional mono count (mirrors renderTag). */
+function tag({ label, count, tone } = {}) {
+  const classes = ['tag'];
+  if (tone) classes.push(`tag--${tone}`);
+  const countHtml = (count != null && count !== '')
+    ? `<span class="tag__count">${esc(count)}</span>` : '';
+  return `<span class="${classes.join(' ')}"><span class="tag__name">${esc(label)}</span>${countHtml}</span>`;
+}
+
+/** Canonical .card (mirrors renderCard). Slots (title/meta/body) are raw HTML. */
+function card({ accent, title, meta, body, className } = {}) {
+  const classes = ['card'];
+  if (accent) classes.push('card-accent', `card-accent--${accent}`);
+  if (className) classes.push(className);
+  let header = '';
+  if (title || meta) {
+    const parts = [
+      title ? `<span class="card-title">${title}</span>` : '',
+      meta ? `<span class="card-meta">${meta}</span>` : '',
+    ].join('');
+    header = `<div class="card-header">${parts}</div>`;
+  }
+  return `<div class="${classes.join(' ')}">${header}${body || ''}</div>`;
+}
+
+/** Canonical .field dim-label + value row (mirrors renderField). */
+function field({ label, value, valueHtml, valueClass, className } = {}) {
+  const classes = ['field'];
+  if (className) classes.push(className);
+  const hasHtml = valueHtml != null && valueHtml !== '';
+  const hasText = value != null && value !== '';
+  let valuePart = '';
+  if (hasHtml || hasText) {
+    const valueClasses = ['field-value'];
+    if (valueClass) valueClasses.push(valueClass);
+    const inner = hasHtml ? valueHtml : esc(value);
+    valuePart = `<span class="${valueClasses.join(' ')}">${inner}</span>`;
+  }
+  return `<div class="${classes.join(' ')}"><span class="field-label">${esc(label)}</span>${valuePart}</div>`;
+}
+
+/**
+ * Canonical .disclosure collapsible domain (mirrors renderDisclosure — native
+ * <details>/<summary>, so keyboard + open/close toggle come for free). Rides the
+ * `.report-section` hook class + `data-section` so structure-based E2E selectors
+ * still resolve. `summary` is escaped plain text; `body` is raw HTML.
+ */
+function collapsibleDomain(id, summary, body, open = true) {
+  const openAttr = open ? ' open' : '';
+  return `<details class="disclosure report-section"${openAttr} data-section="${esc(id)}">`
+    + `<summary class="disclosure__summary">`
+    + `<span class="disclosure__caret" aria-hidden="true"></span>`
+    + `<span class="disclosure__label section-header">${esc(summary)}</span>`
+    + `</summary>`
+    + `<div class="disclosure__body">${body}</div>`
+    + `</details>`;
+}
+
+/** A flex-wrapping cluster of tag/pill chips (queue-status, state breakdowns). */
+function chipRow(html) {
+  return `<div class="chip-row">${html}</div>`;
+}
+
+// =============================================================================
 // Rendering Functions
 // =============================================================================
 
@@ -74,11 +160,11 @@ async function runAudit() {
 function renderReport(report) {
   const html = `
     ${renderSummary(report)}
-    ${renderSection('workspace', 'Workspace Structure', renderWorkspaceContent(report.workspace))}
-    ${renderSection('queues', 'Queue Readiness', renderQueuesContent(report.queues))}
-    ${renderSection('health', 'Task Health', renderHealthContent(report.health))}
-    ${renderSection('labels', 'Labels', renderLabelsContent(report.labels))}
-    ${renderSection('projects', 'Projects', renderProjectsContent(report.projectTasks))}
+    ${collapsibleDomain('workspace', 'Workspace Structure', renderWorkspaceContent(report.workspace))}
+    ${collapsibleDomain('queues', 'Queue Readiness', renderQueuesContent(report.queues))}
+    ${collapsibleDomain('health', 'Task Health', renderHealthContent(report.health))}
+    ${collapsibleDomain('labels', 'Labels', renderLabelsContent(report.labels))}
+    ${collapsibleDomain('projects', 'Projects', renderProjectsContent(report.projectTasks))}
     <div class="report-timestamp">
       Report generated: ${new Date(report.timestamp).toLocaleString()}
     </div>
@@ -89,154 +175,100 @@ function renderReport(report) {
 }
 
 /**
- * Renders the summary stats at the top.
+ * Renders the summary stats at the top as accent-coded cards. Health state is
+ * conveyed by the card's left-border accent (card-accent--*), not a colored
+ * number, so the summary reads at the same altitude as the rest of the theme.
  */
 function renderSummary(report) {
   const { health, queues, workspace } = report;
 
-  // Determine readiness color
-  let readinessClass = 'good';
-  if (queues.readinessScore < 100) readinessClass = 'warning';
-  if (queues.readinessScore < 50) readinessClass = 'bad';
+  // Queue readiness → card accent (done/in-progress/failed by score).
+  let readinessAccent = 'done';
+  if (queues.readinessScore < 100) readinessAccent = 'in-progress';
+  if (queues.readinessScore < 50) readinessAccent = 'failed';
 
-  // Determine health color based on issues
+  // Health issues → card accent, scaled against the task total.
   const healthIssues = health.orphans.count + health.unlabeled.count;
-  let healthClass = 'good';
-  if (healthIssues > 0) healthClass = 'warning';
-  if (healthIssues > health.totalTasks * 0.1) healthClass = 'bad';
+  let healthAccent = 'done';
+  if (healthIssues > 0) healthAccent = 'in-progress';
+  if (healthIssues > health.totalTasks * 0.1) healthAccent = 'failed';
+
+  const stat = (value, label, accent) => card({
+    accent,
+    className: 'summary-stat',
+    body: `<span class="stat-value">${esc(value)}</span><span class="stat-label">${esc(label)}</span>`,
+  });
 
   return `
     <div class="report-summary">
-      <div class="summary-stat">
-        <span class="stat-value">${health.totalTasks}</span>
-        <span class="stat-label">Total Tasks</span>
-      </div>
-      <div class="summary-stat">
-        <span class="stat-value">${workspace.projectCount}</span>
-        <span class="stat-label">Projects</span>
-      </div>
-      <div class="summary-stat">
-        <span class="stat-value">${workspace.teamCount}</span>
-        <span class="stat-label">Teams</span>
-      </div>
-      <div class="summary-stat">
-        <span class="stat-value ${readinessClass}">${queues.readinessScore}%</span>
-        <span class="stat-label">Queue Readiness</span>
-      </div>
-      <div class="summary-stat">
-        <span class="stat-value ${healthClass}">${healthIssues}</span>
-        <span class="stat-label">Health Issues</span>
-      </div>
+      ${stat(health.totalTasks, 'Total Tasks')}
+      ${stat(workspace.projectCount, 'Projects')}
+      ${stat(workspace.teamCount, 'Teams')}
+      ${stat(`${queues.readinessScore}%`, 'Queue Readiness', readinessAccent)}
+      ${stat(healthIssues, 'Health Issues', healthAccent)}
     </div>
   `;
 }
 
 /**
- * Renders a collapsible section.
- */
-function renderSection(id, title, content, defaultOpen = true) {
-  const isOpen = sectionState[id] !== undefined ? sectionState[id] : defaultOpen;
-  const toggle = isOpen ? '▼' : '▶';
-  const contentClass = isOpen ? 'section-content' : 'section-content hidden';
-
-  return `
-    <div class="report-section" data-section="${id}">
-      <div class="section-header">
-        <span class="section-toggle">${toggle}</span>
-        <span>${escapeHtml(title)}</span>
-      </div>
-      <div class="${contentClass}">
-        ${content}
-      </div>
-    </div>
-  `;
-}
-
-/**
- * Toggles a section's visibility.
- */
-function toggleSection(header) {
-  const section = header.closest('.report-section');
-  const sectionId = section.dataset.section;
-  const content = section.querySelector('.section-content');
-  const toggle = header.querySelector('.section-toggle');
-
-  const isHidden = content.classList.contains('hidden');
-  content.classList.toggle('hidden');
-  toggle.textContent = isHidden ? '▼' : '▶';
-  sectionState[sectionId] = isHidden;
-}
-
-/**
- * Renders workspace structure content.
+ * Renders workspace structure content (teams as fields, project states as tags).
  */
 function renderWorkspaceContent(workspace) {
-  const teamsHtml = workspace.teams.map(t =>
-    `<li><span class="label">${escapeHtml(t.key)}</span><span class="value">${escapeHtml(t.name)}</span></li>`
-  ).join('');
+  const teamsHtml = workspace.teams.length
+    ? workspace.teams.map(t => field({ label: t.key, value: t.name })).join('')
+    : field({ label: '', value: 'No teams found' });
 
   const projectsByState = Object.entries(workspace.projectsByState)
-    .map(([state, count]) => `<span class="state-item"><span class="state-name">${escapeHtml(state)}</span><span class="state-count">${count}</span></span>`)
+    .map(([state, count]) => tag({ label: state, count }))
     .join('');
 
   return `
     <h4>Teams (${workspace.teamCount})</h4>
-    <ul class="data-list">
-      ${teamsHtml || '<li><span class="value">No teams found</span></li>'}
-    </ul>
+    ${teamsHtml}
 
-    <h4 style="margin-top: 1rem;">Projects (${workspace.projectCount})</h4>
-    <div class="state-breakdown">
-      ${projectsByState || '<span class="state-item"><span class="state-name">None</span></span>'}
-    </div>
+    <h4 class="section-subhead">Projects (${workspace.projectCount})</h4>
+    ${chipRow(projectsByState || tag({ label: 'None' }))}
   `;
 }
 
 /**
- * Renders queue readiness content.
+ * Renders queue readiness content. Each queue is a field led by a status pill;
+ * a missing required queue also carries a red tag.
  */
 function renderQueuesContent(queues) {
   const queueItems = queues.queues.map(q => {
-    let statusIcon, statusClass;
-    if (q.exists) {
-      statusIcon = '✓';
-      statusClass = 'exists';
-    } else if (q.required) {
-      statusIcon = '✗';
-      statusClass = 'missing';
-    } else {
-      statusIcon = '○';
-      statusClass = 'optional';
-    }
+    let state;
+    if (q.exists) state = 'done';
+    else if (q.required) state = 'failed';
+    else state = 'todo';
 
-    const labelInfo = q.matchedLabel ? `→ ${escapeHtml(q.matchedLabel)}` : '';
+    const labelInfo = q.matchedLabel ? `→ ${esc(q.matchedLabel)}` : '';
     const countInfo = q.taskCount > 0 ? `(${q.taskCount} tasks)` : '';
-    const requiredBadge = !q.exists && q.required ? '<span class="queue-required">MISSING</span>' : '';
+    const missingTag = !q.exists && q.required ? tag({ label: 'missing', tone: 'error' }) : '';
 
-    return `
-      <li class="queue-item">
-        <span class="queue-status ${statusClass}">${statusIcon}</span>
-        <span class="queue-name">${escapeHtml(q.name)}</span>
-        <span class="queue-label">${labelInfo}</span>
-        <span class="queue-count">${countInfo}</span>
-        ${requiredBadge}
-      </li>
-    `;
+    const valueHtml = [
+      statusPill({ state }),
+      labelInfo && `<span class="queue-label">${labelInfo}</span>`,
+      countInfo && `<span class="queue-count">${countInfo}</span>`,
+      missingTag,
+    ].filter(Boolean).join(' ');
+
+    return field({ className: 'queue-item', label: q.name, valueHtml });
   }).join('');
 
-  let statusMessage = '';
+  let statusMessage;
   if (queues.isReady) {
-    statusMessage = '<p style="color: var(--green); margin-bottom: 1rem;">All required queues are configured.</p>';
+    statusMessage = `<p class="queue-status-msg ok">${statusPill({ state: 'done', label: 'All required queues are configured' })}</p>`;
   } else {
     const missing = queues.missingRequired.map(q => q.name).join(', ');
-    statusMessage = `<p style="color: var(--red); margin-bottom: 1rem;">Missing required queues: ${escapeHtml(missing)}</p>`;
+    statusMessage = `<p class="queue-status-msg bad">${statusPill({ state: 'failed', label: `Missing required queues: ${missing}` })}</p>`;
   }
 
   return `
     ${statusMessage}
-    <ul class="queue-list">
+    <div class="queue-list">
       ${queueItems}
-    </ul>
+    </div>
   `;
 }
 
@@ -245,16 +277,14 @@ function renderQueuesContent(queues) {
  */
 function renderHealthContent(health) {
   const stateBreakdown = Object.entries(health.byStateType)
-    .map(([type, count]) => `<span class="state-item"><span class="state-name">${escapeHtml(type)}</span><span class="state-count">${count}</span></span>`)
+    .map(([type, count]) => tag({ label: type, count }))
     .join('');
 
   return `
     <h4>Tasks by State Type</h4>
-    <div class="state-breakdown">
-      ${stateBreakdown || '<span class="state-item"><span class="state-name">None</span></span>'}
-    </div>
+    ${chipRow(stateBreakdown || tag({ label: 'None' }))}
 
-    <h4 style="margin-top: 1rem;">Health Issues</h4>
+    <h4 class="section-subhead">Health Issues</h4>
     ${renderHealthIssue('Orphan tasks (no project)', health.orphans)}
     ${renderHealthIssue('Unlabeled tasks', health.unlabeled)}
     ${renderHealthIssue(`Short descriptions (<${health.shortDescription.threshold} chars)`, health.shortDescription)}
@@ -263,15 +293,15 @@ function renderHealthContent(health) {
 }
 
 /**
- * Renders a health issue with count and sample items.
+ * Renders a health issue: a count status pill + label, plus sample items.
  */
 function renderHealthIssue(label, issue) {
-  const countClass = issue.count === 0 ? 'good' : (issue.count > 10 ? 'warning' : 'bad');
+  const state = issue.count === 0 ? 'done' : (issue.count > 10 ? 'in-progress' : 'failed');
 
   let itemsHtml = '';
   if (issue.count > 0 && issue.items && issue.items.length > 0) {
     const items = issue.items.map(item =>
-      `<li><span class="issue-prefix">├─</span><span class="issue-title">${escapeHtml(item.title)}</span></li>`
+      `<li><span class="issue-prefix">├─</span><span class="issue-title">${esc(item.title)}</span></li>`
     ).join('');
 
     const moreCount = issue.count - issue.items.length;
@@ -282,35 +312,29 @@ function renderHealthIssue(label, issue) {
 
   return `
     <div class="health-indicator">
-      <span class="health-count ${countClass}">${issue.count}</span>
-      <span class="health-label">${escapeHtml(label)}</span>
+      ${statusPill({ state, label: String(issue.count) })}
+      <span class="health-label">${esc(label)}</span>
     </div>
     ${itemsHtml}
   `;
 }
 
 /**
- * Renders labels content.
+ * Renders labels content as tags — workflow present/missing are toned, other
+ * labels carry their issue count.
  */
 function renderLabelsContent(labels) {
   const { workflow, other } = labels;
 
-  // Render workflow label (present or missing)
-  const renderWorkflowLabel = (label) => {
-    if (label.exists) {
-      return `<span class="label-tag workflow present badge"><span class="tag-name">${escapeHtml(label.name)}</span><span class="tag-count">(${label.issueCount})</span></span>`;
-    } else {
-      return `<span class="label-tag workflow missing badge"><span class="tag-name">${escapeHtml(label.name)}</span><span class="tag-status">missing</span></span>`;
-    }
-  };
+  const renderWorkflowLabel = (label) => label.exists
+    ? tag({ label: label.name, count: label.issueCount, tone: 'brand' })
+    : tag({ label: label.name, count: 'missing', tone: 'error' });
 
-  // Workflow labels (blocked, bug)
   const workflowLabelsTags = workflow.labels.map(renderWorkflowLabel).join('');
 
-  // Other labels (non-workflow)
-  const otherTags = other.slice(0, 20).map(l =>
-    `<span class="label-tag other badge"><span class="tag-name">${escapeHtml(l.name)}</span><span class="tag-count">(${l.issueCount})</span></span>`
-  ).join('');
+  const otherTags = other.slice(0, 20)
+    .map(l => tag({ label: l.name, count: l.issueCount }))
+    .join('');
 
   const moreOther = other.length > 20
     ? `<span class="more-link">...and ${other.length - 20} more</span>`
@@ -318,33 +342,26 @@ function renderLabelsContent(labels) {
 
   return `
     <h4>Workflow Labels (${workflow.presentCount}/${workflow.totalCount})</h4>
-    <div class="labels-list">
-      ${workflowLabelsTags}
-    </div>
+    ${chipRow(workflowLabelsTags)}
 
-    <h4 style="margin-top: 1rem;">Other Labels (${labels.otherCount})</h4>
-    <div class="labels-list">
-      ${otherTags || '<span style="color: var(--fg-dim)">No other labels</span>'}
-      ${moreOther}
-    </div>
+    <h4 class="section-subhead">Other Labels (${labels.otherCount})</h4>
+    ${chipRow((otherTags || '<span class="empty-note">No other labels</span>') + moreOther)}
   `;
 }
 
 /**
- * Renders projects content.
+ * Renders projects content as fields (name → state · count).
  */
 function renderProjectsContent(projects) {
   if (projects.length === 0) {
-    return '<span style="color: var(--fg-dim)">No projects found</span>';
+    return '<span class="empty-note">No projects found</span>';
   }
 
-  const rows = projects.slice(0, 20).map(p => `
-    <div class="project-row">
-      <span class="project-name">${escapeHtml(p.name)}</span>
-      <span class="project-state">${escapeHtml(p.state)}</span>
-      <span class="project-count">${p.taskCount}</span>
-    </div>
-  `).join('');
+  const rows = projects.slice(0, 20).map(p => field({
+    className: 'project-row',
+    label: p.name,
+    valueHtml: `<span class="project-state">${esc(p.state)}</span><span class="project-count">${esc(p.taskCount)}</span>`,
+  })).join('');
 
   const moreProjects = projects.length > 20
     ? `<span class="more-link">...and ${projects.length - 20} more</span>`

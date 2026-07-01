@@ -111,21 +111,26 @@ test.describe('Operator Dashboard', () => {
       await page.locator('#run-audit').click();
       await expect(page.locator('.audit-report')).toBeVisible({ timeout: 10000 });
 
-      // Get first section header and content
+      // Collapsible domains are native <details> (renderDisclosure primitive):
+      // the header rides `.section-header`/`.disclosure__summary`, the body is
+      // `.disclosure__body`, and the open/closed state is the `open` attribute.
       const firstSection = page.locator('.report-section').first();
-      const header = firstSection.locator('.section-header');
-      const content = firstSection.locator('.section-content');
+      const header = firstSection.locator('.disclosure__summary');
+      const content = firstSection.locator('.disclosure__body');
 
-      // Content should be visible initially
+      // Content should be visible (expanded) initially
+      await expect(firstSection).toHaveAttribute('open', '');
       await expect(content).toBeVisible();
 
       // Click to collapse
       await header.click();
-      await expect(content).toHaveClass(/hidden/);
+      await expect(firstSection).not.toHaveAttribute('open', /.*/);
+      await expect(content).toBeHidden();
 
       // Click to expand
       await header.click();
-      await expect(content).not.toHaveClass(/hidden/);
+      await expect(firstSection).toHaveAttribute('open', '');
+      await expect(content).toBeVisible();
     });
 
     test('shows completion status after audit', async ({ page, localWorkerUrlKey }) => {
