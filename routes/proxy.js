@@ -645,7 +645,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   function denyIfUnsupported(activeProvider, method, req, res, endpoint) {
     if (activeProvider.supports(method)) return false;
     logEvent(req, endpoint, 422);
-    jsonError(res, 422, `This workspace's provider does not support this write`, {
+    jsonError(res, 422, `This workspace's provider does not support this`, {
       code: 'CAPABILITY_NOT_SUPPORTED',
       capability: method,
       provider: activeProvider.name,
@@ -1059,10 +1059,15 @@ GET ${baseUrl}/api/proxy/attachments/{id}
     Images stream back with their image/* content-type; non-image text/source
     files (markdown, text, and common source files) stream back with a text
     content-type plus Content-Disposition: attachment.
-  → SCOPE: handles beginning "md:" (markdown-embedded images AND markdown-linked
-    non-image files) resolve. Handles beginning "att:" (formal attachment
-    entities) are NOT fetchable yet and return
-    422 { "code": "ATTACHMENT_FETCH_NOT_SUPPORTED" } — a later slice adds them.
+  → SCOPE: both handle prefixes resolve. "md:" handles (markdown-embedded images
+    AND markdown-linked non-image files) decode straight to the source URL.
+    "att:" handles (formal attachment entities) resolve the id to a backend URL
+    via the workspace's provider first, then run through the same SSRF-guarded
+    relay. An "att:" URL outside the allowlist returns
+    422 { "code": "ATTACHMENT_HOST_NOT_ALLOWED" } (a Figma/Drive/Slack link is an
+    expected outcome, not a caller error); an id the provider can't resolve is a
+    404; a provider with no attachment capability declines with the generic
+    422 { "code": "CAPABILITY_NOT_SUPPORTED" }.
     A response whose type is neither an image nor an allowlisted text/source file
     is rejected (400), as is an oversized (>10MB) one.
 
@@ -1747,20 +1752,45 @@ One convention across every endpoint, so you can branch on the same fields every
   // type-allowlist (the file-extension gate above is an access filter, not the
   // thing standing between bytes and inline execution).
   //
-  // `att:` formal-attachment handles are NOT byte-resolvable in this slice — the
-  // wire dropped their URL and there is no provider fetch seam yet — so they get
-  // a clean 422 + machine-readable code, intentionally deferred to a follow-up.
-  // Any other shape is a 400. We never silently 500 on the missing capability.
-  // Kept in lockstep with discovery's UPLOAD_HOSTS (lib/proxy-wire.js): every host
-  // discovery can mint a handle for must be relayable here, or discovery would emit
-  // a handle this guard refuses. The GitHub asset hosts are sourced from the SAME
-  // exported set so the two allowlists cannot drift (LIN-771). `linear.app` stays
-  // relay-only (it is an SSRF allow, not a discovery upload host).
+  // Both `md:` and `att:` relay through this SAME host-allowlist — one set, not
+  // a parallel reimplementation that could drift. Any URL outside it is a
+  // clean, machine-readable rejection; we never silently 500 on the missing
+  // capability. Kept in lockstep with discovery's UPLOAD_HOSTS (lib/proxy-
+  // wire.js): every host discovery can mint a handle for must be relayable
+  // here, or discovery would emit a handle this guard refuses. The GitHub
+  // asset hosts are sourced from the SAME exported set so the two allowlists
+  // cannot drift (LIN-771). `linear.app` stays relay-only (it is an SSRF
+  // allow, not a discovery upload host).
   const ATTACHMENT_ALLOWED_HOSTS = new Set([
     'uploads.linear.app', 'cdn.linear.app', 'linear.app',
     ...GITHUB_UPLOAD_HOSTS,
   ]);
   const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024; // 10 MB — matches /api/image
+
+  // Shared SSRF/allowlist guard (LIN-890) — the SAME logic for both the `md:`
+  // and `att:` handle types, so the two paths provably cannot drift into a
+  // parallel reimplementation. Returns `{ ok: true, urlObj }` on success or
+  // `{ ok: false, reason, message }` on failure; `reason` distinguishes
+  // 'host-not-allowed' from the other guard failures so a caller can map it to
+  // a distinct error code where that matters (see the `att:` branch below).
+  function ssrfGuardUrl(url) {
+    if (typeof url !== 'string' || !url.startsWith('https://')) {
+      return { ok: false, reason: 'not-https', message: 'Invalid attachment URL: must be HTTPS' };
+    }
+    let urlObj;
+    try {
+      urlObj = new URL(url);
+    } catch {
+      return { ok: false, reason: 'bad-format', message: 'Invalid attachment URL format' };
+    }
+    if (!ATTACHMENT_ALLOWED_HOSTS.has(urlObj.hostname)) {
+      return { ok: false, reason: 'host-not-allowed', message: 'Invalid attachment URL: must be from Linear' };
+    }
+    if (urlObj.pathname.includes('..')) {
+      return { ok: false, reason: 'path-traversal', message: 'Invalid attachment URL: path traversal not allowed' };
+    }
+    return { ok: true, urlObj };
+  }
 
   router.get('/api/proxy/attachments/:id', proxyLimiter, authenticateProxyToken, async (req, res) => {
     const endpoint = '/api/proxy/attachments/:id';
@@ -1771,70 +1801,114 @@ One convention across every endpoint, so you can branch on the same fields every
       return badRequest.json(res, 'Invalid attachment handle');
     }
 
-    // `att:` formal-attachment byte-resolution is deferred (needs a new
-    // capability-gated provider.fetchAttachment seam). Name the gap; don't 500.
+    let fetchUrl, urlObj, nameHint, isGithubAssetHost, token;
+
     if (decoded.type === 'att') {
-      logEvent(req, endpoint, 422);
-      return jsonError(res, 422, 'Formal attachment byte-resolution is not supported yet', {
-        code: 'ATTACHMENT_FETCH_NOT_SUPPORTED',
-        handleType: 'att',
-      });
+      // `att:` needs an authenticated provider call just to DISCOVER the URL,
+      // before any SSRF check can run — unlike `md:`, whose URL is already
+      // embedded in the handle. Resolve provider/token first, gate on the
+      // capability (422 CAPABILITY_NOT_SUPPORTED for a provider with no
+      // formal-attachment node — GitHub Issues included, since it correctly
+      // never mints `att:` handles), then look up the attachment.
+      const resolved = await resolveProviderAccess(req.proxyUrlKey);
+      if (denyIfUnsupported(resolved.provider, 'fetchAttachment', req, res, endpoint)) return;
+      if (!resolved.token) {
+        return workspaceUnavailable(req, res, endpoint, resolved.reason);
+      }
+      // Never leave this call outside a catch: Express 4 does not auto-forward
+      // an async rejection to error middleware, and this route has no
+      // .catch(next) wrapper — an uncaught throw here hangs the request with
+      // no response instead of erroring cleanly (LIN-890 close-out). The
+      // Linear provider already normalizes its own "Entity not found" case to
+      // null (handled by the check below); this catch is the backstop for
+      // anything else (auth failure, network error, rate limit, an
+      // unnormalized not-found from some other provider).
+      let attachment;
+      try {
+        attachment = await resolved.provider.fetchAttachment(resolved.token, decoded.value);
+      } catch (err) {
+        const status = graphqlErrorStatus(err);
+        logEvent(req, endpoint, status);
+        console.error('Proxy attachment resolve error:', err.message);
+        return jsonError(res, status, 'Failed to resolve attachment', { detail: graphqlErrorDetail(err) });
+      }
+      if (!attachment) {
+        logEvent(req, endpoint, 404);
+        return notFound.json(res, 'Attachment not found');
+      }
+      const guard = ssrfGuardUrl(attachment.url);
+      if (!guard.ok) {
+        // Off-allowlist is an EXPECTED, distinct outcome for `att:` — Linear
+        // attachments can legitimately point at Figma/Drive/Slack etc, not a
+        // caller error — so it gets its own 422, unlike `md:`'s bare 400.
+        if (guard.reason === 'host-not-allowed') {
+          logEvent(req, endpoint, 422);
+          return jsonError(res, 422, 'Attachment host is not in the allowed set', {
+            code: 'ATTACHMENT_HOST_NOT_ALLOWED',
+          });
+        }
+        logEvent(req, endpoint, 400);
+        return badRequest.json(res, guard.message);
+      }
+      urlObj = guard.urlObj;
+      isGithubAssetHost = GITHUB_UPLOAD_HOSTS.includes(urlObj.hostname);
+      token = resolved.token;
+      // The relay's file-type gate needs a filename hint; `att:` handles carry
+      // none (unlike `md:`'s `#name=` fragment), so supply the attachment's own
+      // title — otherwise every non-image formal attachment would 400 as
+      // "unsupported content-type" even after URL resolution succeeds.
+      nameHint = attachment.title || null;
+      fetchUrl = attachment.url;
+    } else {
+      // `md:` handle — decoded.value is the source image URL, already embedded
+      // in the handle. BYTE-IDENTICAL to before LIN-890: the SSRF guard runs
+      // first, and provider/token resolution stays after it — collapsing this
+      // into a shared "resolve provider first" flow would change `md:`'s error
+      // precedence (an SSRF-invalid URL currently 400s regardless of workspace
+      // availability; moving provider resolution earlier would make it 503
+      // first when the workspace is also down).
+      const imageUrl = decoded.value;
+      const guard = ssrfGuardUrl(imageUrl);
+      if (!guard.ok) {
+        logEvent(req, endpoint, 400);
+        return badRequest.json(res, guard.message);
+      }
+      urlObj = guard.urlObj;
+
+      // Resolve the fetch auth BY PROVIDER/HOST (LIN-771). Historically the relay
+      // sent the workspace's Linear bearer token to every asset host — correct for
+      // Linear, but a token-leak hazard for GitHub user-content. We instead key off
+      // the asset host (which uniquely identifies its provider):
+      //   - Linear hosts  → authenticated with the workspace token (unchanged: the
+      //     asset host requires it). Resolved through the shared provider/token seam
+      //     so an unavailable workspace still yields the structured 503 envelope.
+      //   - GitHub asset hosts → public user-content CDNs; fetched WITHOUT any auth
+      //     header so the workspace token is never sent cross-provider. A workspace
+      //     token is therefore not required to relay them.
+      // Known gap, sequenced with S4/S5 (LIN-773/774, relay safety): the signed
+      // `private-user-images.githubusercontent.com` form and the `github.com/
+      // user-attachments/assets/<id>` form 302-redirect to the real bytes, which the
+      // `redirect: 'error'` SSRF guard below rejects (a clean 400, never a 500).
+      // Redirect-safe relaying of those is owned by S5; `user-images.
+      // githubusercontent.com` serves bytes directly and works today.
+      isGithubAssetHost = GITHUB_UPLOAD_HOSTS.includes(urlObj.hostname);
+      const resolved = await resolveProviderAccess(req.proxyUrlKey);
+      if (!isGithubAssetHost && !resolved.token) {
+        return workspaceUnavailable(req, res, endpoint, resolved.reason);
+      }
+      token = resolved.token;
+
+      // Non-image file relay (LIN-750): discovery encodes the filename in a
+      // `#name=<filename>` fragment so we can type extension-less upload bytes.
+      // The fragment is stripped before egress (it must never reach the asset
+      // host); `relayContentTypeFromName` is the sole type-gate and returns null
+      // for anything not on the allowlist.
+      nameHint = new URLSearchParams(urlObj.hash.replace(/^#/, '')).get('name');
+      fetchUrl = imageUrl.split('#')[0];
     }
 
-    // `md:` handle — decoded.value is the source image URL. SSRF-guard it exactly
-    // as /api/image does before any egress.
-    const imageUrl = decoded.value;
-    if (typeof imageUrl !== 'string' || !imageUrl.startsWith('https://')) {
-      logEvent(req, endpoint, 400);
-      return badRequest.json(res, 'Invalid attachment URL: must be HTTPS');
-    }
-    let urlObj;
-    try {
-      urlObj = new URL(imageUrl);
-    } catch {
-      logEvent(req, endpoint, 400);
-      return badRequest.json(res, 'Invalid attachment URL format');
-    }
-    if (!ATTACHMENT_ALLOWED_HOSTS.has(urlObj.hostname)) {
-      logEvent(req, endpoint, 400);
-      return badRequest.json(res, 'Invalid attachment URL: must be from Linear');
-    }
-    if (urlObj.pathname.includes('..')) {
-      logEvent(req, endpoint, 400);
-      return badRequest.json(res, 'Invalid attachment URL: path traversal not allowed');
-    }
-
-    // Resolve the fetch auth BY PROVIDER/HOST (LIN-771). Historically the relay
-    // sent the workspace's Linear bearer token to every asset host — correct for
-    // Linear, but a token-leak hazard for GitHub user-content. We instead key off
-    // the asset host (which uniquely identifies its provider):
-    //   - Linear hosts  → authenticated with the workspace token (unchanged: the
-    //     asset host requires it). Resolved through the shared provider/token seam
-    //     so an unavailable workspace still yields the structured 503 envelope.
-    //   - GitHub asset hosts → public user-content CDNs; fetched WITHOUT any auth
-    //     header so the workspace token is never sent cross-provider. A workspace
-    //     token is therefore not required to relay them.
-    // Known gap, sequenced with S4/S5 (LIN-773/774, relay safety): the signed
-    // `private-user-images.githubusercontent.com` form and the `github.com/
-    // user-attachments/assets/<id>` form 302-redirect to the real bytes, which the
-    // `redirect: 'error'` SSRF guard below rejects (a clean 400, never a 500).
-    // Redirect-safe relaying of those is owned by S5; `user-images.
-    // githubusercontent.com` serves bytes directly and works today.
-    const isGithubAssetHost = GITHUB_UPLOAD_HOSTS.includes(urlObj.hostname);
-    const { token, reason } = await resolveProviderAccess(req.proxyUrlKey);
-    if (!isGithubAssetHost && !token) {
-      return workspaceUnavailable(req, res, endpoint, reason);
-    }
-
-    // Non-image file relay (LIN-750): discovery encodes the filename in a
-    // `#name=<filename>` fragment so we can type extension-less upload bytes.
-    // The fragment is stripped before egress (it must never reach the asset
-    // host); `relayContentTypeFromName` is the sole type-gate and returns null
-    // for anything not on the allowlist.
-    const nameHint = new URLSearchParams(urlObj.hash.replace(/^#/, '')).get('name');
     const typedFromHint = nameHint ? relayContentTypeFromName(nameHint) : null;
     const isFileRelay = !!typedFromHint && !typedFromHint.startsWith('image/');
-    const fetchUrl = imageUrl.split('#')[0];
 
     try {
       // Proxy-aware egress: route through the egress proxy when one is

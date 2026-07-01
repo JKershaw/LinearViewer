@@ -317,13 +317,13 @@ Regardless of the underlying media class, every successful relay is served as a 
 | Unsupported type | A response that is neither an `image/*` nor an allowlisted text/source file is rejected with `400`. |
 | Upstream miss | A failed upstream fetch (e.g. asset gone) passes the upstream status through (e.g. `404`). |
 
-**Handle support:** `md:`-prefixed handles — markdown-embedded images **and** markdown-linked non-image files (`[text](…)`) in descriptions and comment bodies — are resolvable. A `att:`-prefixed handle (a formal Linear attachment entity) is **not byte-resolvable yet** and returns:
+**Handle support:** both handle prefixes are byte-resolvable. `md:`-prefixed handles — markdown-embedded images **and** markdown-linked non-image files (`[text](…)`) in descriptions and comment bodies — decode straight to the source URL. `att:`-prefixed handles (formal Linear attachment entities) resolve the id to its backend URL through a provider-side lookup first, then run through this same SSRF-guarded relay. Formal attachments are often arbitrary external links (Figma, Google Drive, Slack, …) that fall outside the image-host allowlist, so an `att:` handle whose resolved URL isn't allowlisted gets its own distinct code rather than the generic `400`:
 
 ```
-422 { "error": "...", "code": "ATTACHMENT_FETCH_NOT_SUPPORTED", "handleType": "att" }
+422 { "error": "...", "code": "ATTACHMENT_HOST_NOT_ALLOWED" }
 ```
 
-Resolving `att:` bytes needs a provider-side capability that is intentionally deferred to a follow-up slice (formal attachments are often arbitrary external links that fall outside the image SSRF allowlist). Key off the `code` to detect this and skip those attachments for now. An unrecognised handle is a `400`.
+An `att:` id the provider can't resolve is a `404`; a provider with no formal-attachment capability declines with the generic `422 CAPABILITY_NOT_SUPPORTED` (same code every other unsupported-capability response in this API uses). Key off `code` to distinguish these outcomes. An unrecognised handle shape is a `400`.
 
 `team` is the issue's owning team as `{ id, name }`, with a flat `teamId` mirror — pass `teamId` straight to `GET /states/{teamId}` or `GET /labels?teamId=` without a separate `GET /teams` lookup. `priorityLabel` is the human-readable priority name (`Urgent` / `High` / `Medium` / `Low` / `No priority`) corresponding to the numeric `priority` (1–4, 0). Both `team`/`teamId` and `priorityLabel` are also present on list and search results.
 

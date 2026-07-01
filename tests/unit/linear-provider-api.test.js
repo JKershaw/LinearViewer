@@ -27,6 +27,7 @@ import {
   labels,
   cycles,
   cycleDetail,
+  fetchAttachment,
   relations,
   createIssue,
   updateIssue,
@@ -64,6 +65,17 @@ afterEach(() => {
   restore = undefined;
   mock.reset();
 });
+
+// Shapes a thrown error the way graphql-request's real ClientError does for
+// Linear's non-nullable by-id lookups (`cycle(id)`, `attachment(id)`): a
+// top-level GraphQL error rather than `data: { X: null }` (LIN-890
+// close-out — discovered against live Linear, not reproducible from a
+// schema-null stub).
+function notFoundError(entity) {
+  const err = new Error(`Entity not found: ${entity}`);
+  err.response = { errors: [{ message: `Entity not found: ${entity}` }] };
+  return err;
+}
 
 // =============================================================================
 // Source provenance stamping (LIN-561)
@@ -195,6 +207,41 @@ describe('Linear provider API reads (LIN-307)', () => {
 
     stub(async () => ({ cycle: null }));
     assert.strictEqual(await cycleDetail(API_KEY, 'missing'), null);
+  });
+
+  test('cycleDetail: normalizes a thrown "Entity not found" GraphQL error to null (LIN-890 close-out)', async () => {
+    stub(async () => { throw notFoundError('Cycle'); });
+    assert.strictEqual(await cycleDetail(API_KEY, 'bogus'), null);
+  });
+
+  test('cycleDetail: rethrows a non-not-found error unchanged', async () => {
+    const authError = new Error('unauthorized');
+    authError.response = { status: 401, errors: [{ message: 'Authentication required' }] };
+    stub(async () => { throw authError; });
+    await assert.rejects(() => cycleDetail(API_KEY, 'cyc-1'), authError);
+  });
+
+  test('fetchAttachment: returns the attachment by id, or null when the query resolves it schema-null', async () => {
+    const m = stub(async () => ({ attachment: { id: 'att-1', url: 'https://uploads.linear.app/x', title: 'x.png' } }));
+    const found = await fetchAttachment(API_KEY, 'att-1');
+    assert.deepStrictEqual(found, { id: 'att-1', url: 'https://uploads.linear.app/x', title: 'x.png' });
+    assert.deepStrictEqual(m.mock.calls[0].arguments[1], { id: 'att-1' });
+    restore(); restore = undefined;
+
+    stub(async () => ({ attachment: null }));
+    assert.strictEqual(await fetchAttachment(API_KEY, 'missing'), null);
+  });
+
+  test('fetchAttachment: normalizes a thrown "Entity not found" GraphQL error to null (live Linear throws for a missing/deleted attachment, LIN-890 close-out)', async () => {
+    stub(async () => { throw notFoundError('Attachment'); });
+    assert.strictEqual(await fetchAttachment(API_KEY, 'bogus'), null);
+  });
+
+  test('fetchAttachment: rethrows a non-not-found error unchanged, so the route catch (not this null path) handles it', async () => {
+    const rateLimitError = new Error('rate limited');
+    rateLimitError.response = { status: 429, errors: [{ message: 'Too many requests' }] };
+    stub(async () => { throw rateLimitError; });
+    await assert.rejects(() => fetchAttachment(API_KEY, 'att-1'), rateLimitError);
   });
 
   test('relations: wraps both directions in {nodes}, flags trashed', async () => {
