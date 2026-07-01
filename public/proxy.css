@@ -23,12 +23,8 @@
 /* =============================================================================
    Agent Prompt Section
    ============================================================================= */
-.proxy-prompt-box {
-  border: 1px solid var(--fg-vdim);
-  border-radius: 4px;
-  padding: 0.75rem;
-  background: var(--bg);
-}
+/* Box chrome (border/radius/padding/background) now comes from the shared
+   `.surface` primitive (LIN-854); `.proxy-prompt-box` survives as a hook only. */
 
 .proxy-prompt-controls {
   display: flex;
@@ -70,13 +66,11 @@
   color: var(--red);
 }
 
+/* Well chrome (padding/background/border/radius) now comes from
+   `.surface--inset` (LIN-854); only the typographic + behavioural rules remain. */
 .proxy-prompt-output {
   font-family: var(--font-structural);
   font-size: 0.8em;
-  padding: 0.75rem;
-  background: rgba(0, 0, 0, 0.03);
-  border: 1px solid var(--fg-vdim);
-  border-radius: var(--radius-sm);
   white-space: pre-wrap;
   word-break: break-all;
   color: var(--fg-dim);
@@ -90,7 +84,22 @@
   color: var(--fg);
 }
 
-/* Token list: see common-actions.css (.proxy-token-list) */
+/* Token list base: see common-actions.css (.proxy-token-list, .token-item).
+   LIN-854: proxy token rows now also carry the shared `.surface` primitive, so
+   stack them as gapped cards and let the surface own the row's box — drop the
+   legacy in-list divider + vertical padding (page-scoped; leaves dispatch's
+   plain `.token-item` list untouched). */
+.proxy-token-list,
+.proxy-token-list .token-items-extra:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.proxy-token-list .token-item {
+  border-bottom: none;
+  padding: 0;
+}
 
 .proxy-section .line {
   display: flex;
@@ -178,22 +187,8 @@
   white-space: nowrap;
 }
 
-.proxy-event-status {
-  font-family: var(--font-structural);
-  min-width: 3ch;
-}
-
-.proxy-event-status.status-ok {
-  color: var(--green);
-}
-
-.proxy-event-status.status-error {
-  color: var(--red);
-}
-
-.proxy-event-status.status-warn {
-  color: var(--yellow);
-}
+/* Event-log HTTP status now renders as a canonical `.status-pill` dot pill
+   (LIN-854); the bespoke `.proxy-event-status` color rules are retired. */
 
 .proxy-event-meta {
   color: var(--fg-dim);
@@ -281,27 +276,9 @@
 /* =============================================================================
    Token Expiry Badges
    ============================================================================= */
-.token-expiry {
-  font-family: var(--font-structural);
-  font-size: 0.75em;
-  font-weight: 400;
-  padding: 0.05rem 0.35rem;
-  margin-left: 0.4rem;
-  border-radius: var(--radius-sm);
-  background: rgba(0, 0, 0, 0.04);
-  color: var(--fg-dim);
-  vertical-align: middle;
-}
-
-.token-expiry.warn {
-  background: rgba(234, 179, 8, 0.12);
-  color: var(--yellow);
-}
-
-.token-expiry.expired {
-  background: rgba(239, 68, 68, 0.12);
-  color: var(--red);
-}
+/* The token-expiry badge now renders as a canonical `.status-pill` dot pill
+   (LIN-854): ok→done, warn→running, expired→error. Bespoke `.token-expiry`
+   chip styles are retired in favour of the shared primitive. */
 
 /* =============================================================================
    Events Pager
