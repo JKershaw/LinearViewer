@@ -1815,7 +1815,23 @@ One convention across every endpoint, so you can branch on the same fields every
       if (!resolved.token) {
         return workspaceUnavailable(req, res, endpoint, resolved.reason);
       }
-      const attachment = await resolved.provider.fetchAttachment(resolved.token, decoded.value);
+      // Never leave this call outside a catch: Express 4 does not auto-forward
+      // an async rejection to error middleware, and this route has no
+      // .catch(next) wrapper — an uncaught throw here hangs the request with
+      // no response instead of erroring cleanly (LIN-890 close-out). The
+      // Linear provider already normalizes its own "Entity not found" case to
+      // null (handled by the check below); this catch is the backstop for
+      // anything else (auth failure, network error, rate limit, an
+      // unnormalized not-found from some other provider).
+      let attachment;
+      try {
+        attachment = await resolved.provider.fetchAttachment(resolved.token, decoded.value);
+      } catch (err) {
+        const status = graphqlErrorStatus(err);
+        logEvent(req, endpoint, status);
+        console.error('Proxy attachment resolve error:', err.message);
+        return jsonError(res, status, 'Failed to resolve attachment', { detail: graphqlErrorDetail(err) });
+      }
       if (!attachment) {
         logEvent(req, endpoint, 404);
         return notFound.json(res, 'Attachment not found');

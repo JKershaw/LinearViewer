@@ -411,4 +411,28 @@ describe('GET /api/proxy/attachments/:id — att: resolution via provider seam (
     const res = await getAttachment(buildApp({ provider, token: null, reason: 'reauth' }), att('attachment-uuid'));
     assert.equal(res.status, 503);
   });
+
+  // LIN-890 close-out: live Linear throws a GraphQL "Entity not found" error
+  // for a missing/deleted attachment instead of resolving `data.attachment`
+  // to null — and `provider.fetchAttachment(...)` sat outside any catch path
+  // in this route (Express 4 doesn't auto-forward async rejections), so the
+  // request hung with no response. Covers the route's safety-net catch: ANY
+  // thrown error (not just the not-found shape the Linear provider now
+  // normalizes to null itself) must produce a clean response, never a hang.
+  test('a thrown provider error (not a null return) still produces a clean response, not a hang', async () => {
+    const provider = new FakeAttachmentProvider(async () => {
+      throw new Error('Entity not found: Attachment');
+    });
+    const res = await getAttachment(buildApp({ provider }), att('missing-id'));
+    assert.notEqual(res.status, undefined, 'the request must actually receive a response');
+    assert.ok(res.status >= 400, 'a thrown provider error must not resolve as success');
+  });
+
+  test('a thrown auth error from the provider maps to a real status via graphqlErrorStatus, not a hang', async () => {
+    const authError = new Error('unauthorized');
+    authError.response = { status: 401, errors: [{ message: 'Authentication required' }] };
+    const provider = new FakeAttachmentProvider(async () => { throw authError; });
+    const res = await getAttachment(buildApp({ provider }), att('attachment-uuid'));
+    assert.equal(res.status, 401);
+  });
 });
