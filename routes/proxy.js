@@ -2357,6 +2357,11 @@ One convention across every endpoint, so you can branch on the same fields every
   // ceiling and this exception cannot leak to other routes.
   const ATTACHMENT_UPLOAD_BODY_LIMIT = '14mb'; // ~4/3 base64 expansion of MAX_ATTACHMENT_BYTES + JSON overhead
   const attachmentUploadBodyParser = json({ type: () => true, limit: ATTACHMENT_UPLOAD_BODY_LIMIT });
+  // Stand-in for the `![](assetUrl)` markdown before the real assetUrl exists
+  // (it's only returned by uploadFile itself): comfortably covers "![]()" (4
+  // chars) plus a real Linear asset URL, so the pre-upload estimate below never
+  // passes a body that the real embed would then push over the limit.
+  const ATTACHMENT_EMBED_RESERVE = 200;
 
   /**
    * POST /api/proxy/issues/:issueId/attachments (LIN-891)
@@ -2423,6 +2428,30 @@ One convention across every endpoint, so you can branch on the same fields every
       }
 
       if (await refuseIfTrashed(provider, token, issueId, req, res, endpoint)) return;
+
+      // Pre-validate the projected final length BEFORE uploadFile() runs, using
+      // ATTACHMENT_EMBED_RESERVE in place of the not-yet-known assetUrl. This
+      // turns an oversized `body` into a 400 with no side effect, instead of
+      // the upload running unconditionally and only then discovering (via the
+      // post-write check below / inside applyDescriptionEdit) that nothing
+      // could reference it — an orphaned, wasted Linear asset per call.
+      const bodyBudget = body ? body.length + 2 : 0; // "\n\n" separator before the embed
+      if (resolvedTarget === 'description') {
+        const issue = await provider.issueDescription(token, issueId);
+        if (!issue) {
+          logEvent(req, endpoint, 404);
+          return notFound.json(res, 'Issue not found');
+        }
+        const currentLength = (issue.description || '').length;
+        const separator = currentLength > 0 ? 2 : 0;
+        if (currentLength + separator + bodyBudget + ATTACHMENT_EMBED_RESERVE > MAX_DESCRIPTION_LENGTH) {
+          logEvent(req, endpoint, 400);
+          return badRequest.json(res, 'resulting description exceeds maximum length');
+        }
+      } else if (bodyBudget + ATTACHMENT_EMBED_RESERVE > MAX_COMMENT_LENGTH) {
+        logEvent(req, endpoint, 400);
+        return badRequest.json(res, `body exceeds maximum length of ${MAX_COMMENT_LENGTH}`);
+      }
 
       const assetUrl = await provider.uploadFile(token, parsed.bytes, {
         contentType: parsed.contentType,

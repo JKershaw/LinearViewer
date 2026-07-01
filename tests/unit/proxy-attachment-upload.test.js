@@ -245,4 +245,42 @@ describe('POST /api/proxy/issues/:issueId/attachments (LIN-891)', () => {
     assert.equal(status, 400);
     assert.equal(provider.calls.uploadFile.length, 0);
   });
+
+  // Regression for the review-flagged ordering bug: an oversized `body` must be
+  // rejected BEFORE uploadFile() runs, on both targets — otherwise every
+  // rejected request still burns a real (orphaned) Linear upload.
+  test('an oversized body for the "comment" target is rejected with 400 before any upload', async () => {
+    const provider = new FakeUploadProvider();
+    const oversizedBody = 'x'.repeat(50000); // MAX_COMMENT_LENGTH
+    const { status, body } = await postAttachment(buildApp({ provider }), {
+      image: PNG_DATA_URL,
+      body: oversizedBody,
+    });
+    assert.equal(status, 400);
+    assert.match(body.error, /exceeds maximum length/i);
+    assert.equal(provider.calls.uploadFile.length, 0);
+    assert.equal(provider.calls.createComment.length, 0);
+  });
+
+  test('an oversized body for the "description" target is rejected with 400 before any upload', async () => {
+    const provider = new FakeUploadProvider({ description: 'x'.repeat(99900) });
+    const oversizedBody = 'x'.repeat(500); // pushes current description + body + reserve over MAX_DESCRIPTION_LENGTH
+    const { status, body } = await postAttachment(buildApp({ provider }), {
+      image: PNG_DATA_URL,
+      target: 'description',
+      body: oversizedBody,
+    });
+    assert.equal(status, 400);
+    assert.match(body.error, /exceeds maximum length/i);
+    assert.equal(provider.calls.uploadFile.length, 0);
+    assert.equal(provider.calls.updateIssue.length, 0);
+  });
+
+  test('a missing issue for the "description" target is rejected with 404 before any upload', async () => {
+    const provider = new FakeUploadProvider();
+    provider.issueDescription = async () => null;
+    const { status } = await postAttachment(buildApp({ provider }), { image: PNG_DATA_URL, target: 'description' });
+    assert.equal(status, 404);
+    assert.equal(provider.calls.uploadFile.length, 0);
+  });
 });
