@@ -265,8 +265,13 @@ test.describe('Autopilot Observation page (first-class)', () => {
       // Drilling in fires the hydration; the Done state upgrades the card.
       await card.locator('.obs-session-head').first().click();
       await expect(card).toHaveAttribute('data-status', 'done-with-warning');
-      await expect(card.locator('.obs-pill')).toHaveAttribute('data-status', 'done-with-warning');
-      await expect(card.locator('.obs-pill')).toContainText('done ⚠');
+      // done-with-warning migrates onto the theme StatusPill (LIN-783): a `done`
+      // pill (no 5th colour) plus an additive ⚠ warning marker, not a bespoke
+      // .obs-pill state.
+      const pill = card.locator('.obs-session-topline .status-pill').first();
+      await expect(pill).toHaveClass(/status-pill--done/);
+      await expect(pill).toContainText('done');
+      await expect(pill.locator('.status-pill__warn')).toBeVisible();
     });
   });
 });

@@ -317,32 +317,38 @@ main.obs-page[data-url-key]             - page container
   #obs-poll-status                      - live poll status line
   #obs-chips                            - workspace filter chips (group)
     .obs-chip[data-ws].is-on            - one per workspace (data-ws = urlKey); .is-on when shown
+      .obs-chip-dot[data-state]         - workspace health (worst live session status: error>running>done>queued), not on/off
   #obs-active / #obs-active-empty       - active sessions feed (ul) + empty state
   #obs-archive-toggle / #obs-archive-count  - collapsible completed archive header + count
   #obs-archive-body                     - (when open) the completed archive body
     #obs-recent / #obs-recent-empty     - completed sessions feed (ul) + empty state
       li.obs-session[data-session][data-status]  - one autopilot session
         button.obs-session-head         - click to expand/collapse the session
-          .obs-session-topline          - caret + .obs-session-ident + status pill + updated time
-          .obs-pill[data-status]        - bordered text status pill (◐ in progress / ✓ done / ✕ error / ○ stale)
-          .obs-session-name             - bold session/seed title
+          .obs-session-topline          - caret + .obs-session-ident + status pill + updated time (fixed right column)
+          .status-pill.status-pill--{running|done|error|queued}  - theme StatusPill (LIN-783); dot + label. done-with-warning = status-pill--done + a .status-pill__warn ⚠ marker (no 5th colour); stale → status-pill--queued
+          .obs-session-name             - bold session/seed title (omitted when it would only echo the ident)
           .obs-session-summary          - one-sentence session summary (LIN-592)
           .obs-session-meta-line        - labelled runtime / model (+ workspace, task count)
           .obs-progress-row             - per-worker-run progress bar + N/M count
-            .obs-progress > .obs-seg[data-state][data-live]  - progress segments (live segment pulses)
+            .segment-bar.obs-progress > .segment-bar__cell--{running|done|error|queued}[data-live]  - theme SegmentBar cells (live cell pulses)
             .obs-progress-count         - finished/total worker-run count (N/M)
           .obs-summary-gen              - (terminal, uncached) explicit "summarise this session" button
         .obs-session-body               - (when open) status line + Level-3 drill-down
           .obs-tasks > .obs-task        - one block per touched task (seed-first)
             .obs-task-head              - provenance tag + identifier (link when hydrated) + title + live state/labels
             .obs-rels > .obs-rel        - relationship neighborhood (parent/children/blocked by/blocks/related)
-            .obs-worker-tree > li.obs-worker[data-state][data-open]  - worker-session nodes
+            .obs-worker-tree > li.obs-worker[data-state][data-open]  - worker-session nodes on a phase-timeline rail
+              .obs-worker-node[data-state]  - phase-rail status node (✓/◐/✕/○, decorative)
               button.obs-worker-head[data-loop]  - click to expand a worker run
-                .obs-worker-iter        - #iteration marker
                 .obs-worker-phase       - bordered phase tag (research/plan/implement/review…)
-                .obs-chips-metric > .obs-chip-metric  - bordered runtime / tool activity / artifact-count chips
+                .obs-worker-attempt     - "attempt N" (surfaces the run's iteration)
+                .obs-worker-state[data-state]  - textual run state (complete/running/error/queued)
                 .obs-worker-recap       - one-line recap (cached run-summary or agent summary)
-              .obs-worker-body          - (when open) ran activity log + produced-artifact links + next
+                .obs-chips-metric > .obs-chip-metric  - bordered runtime / tool activity / artifact-count chips
+              .obs-worker-body          - (when open) error box + activity log + produced-artifact links + next
+                .obs-error-box          - (error runs) error-as-direction: cause + runtime + view-log link
+                .obs-acts > .obs-act    - activity log rows: tool chips + right-aligned duration column
+                .obs-artifacts > .obs-artifact  - icon-led produced-artifact links
                 .obs-run-gen[data-loop] - (terminal, uncached) explicit "summarise this run" button
 ```
 

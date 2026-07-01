@@ -1,29 +1,38 @@
 /**
- * Observation page styles (LIN-595).
+ * Observation page styles (LIN-595; migrated onto the LIN-782 theme in LIN-783).
  *
  * Mobile-first, CLI/terminal aesthetic — modelled on the retired experimental
  * dashboard / Swipe (single column, touch targets, horizontal-scroll chips)
- * rather than the Pipeline desktop floor. Reuses the shared light-theme
- * variables (--fg, --fg-dim, --fg-vdim, --bg, --bg-muted, green/yellow/red).
+ * rather than the Pipeline desktop floor.
+ *
+ * Theme migration (LIN-783): reads the LIN-785 semantic token layer
+ * (--text/--muted/--faint/--line/--line-soft/--card/--raised/--inset + the
+ * --amber/--slate status hues) and the LIN-786 primitives. Status pills and the
+ * per-run progress bar now emit the canonical `.status-pill` / `.segment-bar`
+ * class API directly from `public/observation.js` (the shared contract with the
+ * server helpers is the CSS class, not the module — cards are client-rendered).
+ * The page-owned patterns the theme does not provide — the phase-timeline rail,
+ * the Activity duration column + tool chips, the Produced icon-links, and the
+ * error-as-direction box — live here. No 5th status colour is introduced:
+ * done-with-warning is a `done` pill plus a ⚠ marker; stale borrows slate.
  *
  * Typography note (LIN-705): this stylesheet is mobile-first and its `rem`
- * sizes are rooted at the 16px browser default (the global mobile `body`
- * font-size reductions in style.css are em/px-based and do NOT reach these
- * `.obs-*` rem sizes). So the base values here ARE the mobile values. They
- * are tiered for a legible small-type floor — micro uppercase labels ~0.72rem,
- * small chips/states ~0.74rem, secondary meta ~0.78rem, body text ~0.82rem,
- * and the session name lifted to 1.05rem for clear card hierarchy.
+ * sizes are rooted at the 16px browser default. The base values here ARE the
+ * mobile values — tiered for a legible small-type floor.
  */
 
 .obs-page {
   max-width: 760px;
   margin: 0 auto;
-  padding: 0 0.6rem;
+  /* Bug 3 (LIN-783): reserve bottom room so the fixed feedback FAB never overlaps
+     the last card. Unconditional — harmless when the flag-gated FAB is off. */
+  padding: 0 0.6rem 6rem;
 }
 
 .obs-header h1 {
   margin: 0.4rem 0 0.3rem;
   font-size: 1.4rem;
+  font-family: var(--font-content);
 }
 
 /* ─── Status banner (the at-a-glance story) ───────────────────────────────── */
@@ -42,7 +51,7 @@
 .obs-poll-status {
   margin-left: auto;
   font-size: 0.8rem;
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 /* ─── Sections ────────────────────────────────────────────────────────────── */
@@ -62,51 +71,59 @@
   align-items: center;
   gap: 0.35rem;
   padding: 0.3rem 0.6rem;
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: 999px;
-  background: var(--bg);
-  color: var(--fg-dim);
-  font: inherit;
+  background: var(--raised);
+  color: var(--muted);
+  font-family: var(--font-content);
   font-size: 0.82rem;
   cursor: pointer;
 }
 
-.obs-chip.is-on { color: var(--fg); border-color: var(--border-strong); }
+.obs-chip.is-on { color: var(--text); border-color: var(--border-strong); }
 
+/* Q6 (LIN-783): the dot reports WORKSPACE HEALTH (worst live status among the
+   workspace's sessions), not the filter's on/off state — that's carried by the
+   `.is-on` class above. State set client-side from the same map the pills use. */
 .obs-chip-dot {
   width: 0.5rem;
   height: 0.5rem;
   border-radius: 50%;
-  background: var(--fg-vdim);
+  background: var(--faint);
+  flex: 0 0 auto;
 }
-
-.obs-chip.is-on .obs-chip-dot { background: var(--green); }
+.obs-chip-dot[data-state="error"]   { background: var(--red); }
+.obs-chip-dot[data-state="running"] { background: var(--amber); }
+.obs-chip-dot[data-state="done"]    { background: var(--green); }
+.obs-chip-dot[data-state="queued"]  { background: var(--slate); }
 
 /* ─── Feed + session cards ────────────────────────────────────────────────── */
 
 .obs-feed { list-style: none; margin: 0; padding: 0; }
 
-.obs-feed-empty { color: var(--fg-dim); font-size: 0.85rem; padding: 0.4rem 0; }
+.obs-feed-empty { color: var(--muted); font-size: 0.85rem; padding: 0.4rem 0; }
 .obs-feed-empty.hidden { display: none; }
 
 .obs-session {
-  border: 1px solid var(--border);
-  /* Coloured left accent bar per status (mockup, LIN-608); status hue set below. */
-  border-left: 4px solid var(--border);
-  border-radius: 6px;
+  border: 1px solid var(--line);
+  /* Coloured left accent stripe per status (mockup); status hue set below. Maps
+     onto the theme's 4-state palette (running=amber, done=green, error=red,
+     stale=slate) — no 5th colour. */
+  border-left: 4px solid var(--line);
+  border-radius: var(--radius-md);
   margin-bottom: 0.5rem;
-  background: var(--bg);
+  background: var(--raised);
   overflow: hidden;
 }
 
 .obs-session.is-open { border-color: var(--border-strong); }
-.obs-session[data-status="in-progress"] { border-left-color: var(--yellow); }
+.obs-session[data-status="in-progress"] { border-left-color: var(--amber); }
 .obs-session[data-status="done"] { border-left-color: var(--green); }
-/* done-with-warning (LIN-749): green success base, warning-tinted to read as
-   "done, but a run errored". */
+/* done-with-warning (LIN-749): green success base — it IS done; the ⚠ marker on
+   the pill carries the "a run errored" caveat, so no separate accent hue. */
 .obs-session[data-status="done-with-warning"] { border-left-color: var(--green); }
 .obs-session[data-status="error"] { border-left-color: var(--red); }
-.obs-session[data-status="stale"] { border-left-color: var(--fg-mid); }
+.obs-session[data-status="stale"] { border-left-color: var(--slate); }
 
 .obs-session-head {
   display: flex;
@@ -120,98 +137,113 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
-  color: var(--fg);
+  color: var(--text);
 }
 
-.obs-session-head:hover { background: var(--bg-muted); }
+.obs-session-head:hover { background: var(--card-h); }
 
-/* Header top line: caret · identifier · status pill · updated time */
+/* Header top line: caret · identifier · status pill · updated time.
+   Bug 2 (LIN-783): the ident is the ONLY flexible cell (it ellipsizes); the pill
+   and time hold a fixed right column, so the timestamp never clips. */
 .obs-session-topline {
   display: flex;
   align-items: center;
   gap: 0.45rem;
 }
 
+.obs-session-caret {
+  flex: 0 0 auto;
+  color: var(--muted);
+  transition: transform var(--motion-fast) ease;
+}
+.obs-session.is-open .obs-session-caret { transform: rotate(90deg); }
+
 .obs-session-ident {
-  font-family: var(--font-mono, monospace);
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-structural);
   font-size: 0.82rem;
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
-/* Bordered text status pill (◐ in progress) — mockup treatment (LIN-608). */
-.obs-pill {
+.obs-session-topline .status-pill { flex: 0 0 auto; }
+
+/* done-with-warning ⚠ marker — additive to the `done` pill, NOT a new pill
+   variant (the primitive owns only 4 states). Amber to read as "caveat". */
+.status-pill__warn {
+  margin-left: 0.1rem;
+  color: var(--amber-dim);
+  font-size: 0.9em;
+}
+
+.obs-session-time {
   flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.12rem 0.5rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font-family: var(--font-mono, monospace);
+  margin-left: auto;
+  padding-left: 0.3rem;
   font-size: 0.78rem;
-  line-height: 1.4;
-  color: var(--fg-dim);
+  color: var(--muted);
   white-space: nowrap;
 }
-.obs-pill[data-status="in-progress"] { color: var(--yellow); border-color: var(--yellow); }
-.obs-pill[data-status="done"] { color: var(--green); border-color: var(--green); }
-/* done-with-warning (LIN-749): green text (it IS done) over a yellow warning
-   border, so the pill reads as success-with-a-caveat at a glance. */
-.obs-pill[data-status="done-with-warning"] { color: var(--green); border-color: var(--yellow); }
-.obs-pill[data-status="error"] { color: var(--red); border-color: var(--red); }
-.obs-pill[data-status="stale"] { color: var(--fg-dim); border-color: var(--border-strong); }
 
 .obs-session-name {
   font-weight: 600;
   font-size: 1.05rem;
   line-height: 1.3;
+  font-family: var(--font-content);
 }
 
-/* Labelled runtime / model meta line (mockup). */
+/* Labelled runtime / model meta line (mockup). Machine facts → mono. */
 .obs-session-meta-line {
   display: flex;
   flex-wrap: wrap;
   gap: 0.25rem 0.9rem;
   font-size: 0.82rem;
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-structural);
 }
-.obs-meta-k { color: var(--fg-dim); }
-.obs-meta-v { color: var(--fg); }
-.obs-meta-ws { color: var(--fg-dim); }
+.obs-meta-k { color: var(--muted); }
+.obs-meta-v { color: var(--text); }
+.obs-meta-ws { color: var(--muted); }
 
 .obs-session-summary {
   font-size: 0.84rem;
-  color: var(--fg-dim);
+  color: var(--muted);
   line-height: 1.35;
+  font-family: var(--font-content);
 }
 .obs-summary-line { display: inline; }
 .obs-summary-status { font-style: italic; }
-.obs-summary-dim { color: var(--fg-dim); }
+.obs-summary-dim { color: var(--muted); }
 /* Most-recent run kind beside "working…" (LIN-631). */
 .obs-summary-kind {
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  color: var(--fg-dim);
-  background: var(--bg-muted);
-  border-radius: 3px;
+  color: var(--muted);
+  background: var(--inset);
+  border-radius: var(--radius-sm);
   padding: 0.08rem 0.36rem;
   margin-left: 0.3rem;
+  font-family: var(--font-structural);
 }
-.obs-summary-pending { color: var(--fg-dim); }
+.obs-summary-pending { color: var(--muted); }
 
 .obs-summary-gen {
   border: 0;
   background: none;
   padding: 0;
   font: inherit;
+  font-family: var(--font-content);
   font-size: 0.82rem;
-  color: var(--yellow);
+  color: var(--brand-dim);
   text-decoration: underline;
   cursor: pointer;
 }
 
-/* Per-worker-run progress bar + N/M count (mockup, LIN-608) */
+/* Per-worker-run progress bar + N/M count (mockup). The track is the canonical
+   `.segment-bar` primitive; the row adds the count column and the live pulse. */
 .obs-progress-row {
   display: flex;
   align-items: center;
@@ -221,81 +253,42 @@
 
 .obs-progress {
   flex: 1 1 auto;
-  display: flex;
-  gap: 2px;
   height: 6px;
 }
 
 .obs-progress-count {
   flex: 0 0 auto;
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-structural);
   font-size: 0.78rem;
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
-.obs-progress-empty {
-  background: var(--fg-vdim);
-  border-radius: 3px;
-  opacity: 0.6;
+/* A live (running/waiting) segment pulses to read as "in flight". Reuses the
+   global `pulse` keyframe; the global prefers-reduced-motion rule neutralizes it. */
+.obs-progress .segment-bar__cell[data-live="1"] {
+  animation: pulse var(--motion-slow) ease-in-out infinite;
 }
-
-.obs-seg {
-  flex: 1 1 auto;
-  min-width: 4px;
-  border-radius: 2px;
-  background: var(--fg-vdim);
-}
-.obs-seg[data-state="complete"] { background: var(--green); }
-.obs-seg[data-state="error"] { background: var(--red); }
-.obs-seg[data-state="running"],
-.obs-seg[data-state="waiting"] { background: var(--yellow); }
-.obs-seg[data-state="queued"] { background: var(--fg-mid); }
-
-.obs-seg[data-live="1"] { animation: obs-pulse 1.3s ease-in-out infinite; }
-
-@keyframes obs-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.35; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .obs-seg[data-live="1"] { animation: none; }
-}
-
-.obs-session-time {
-  flex: 0 0 auto;
-  margin-left: auto;
-  font-size: 0.78rem;
-  color: var(--fg-dim);
-  white-space: nowrap;
-}
-
-.obs-session-caret {
-  flex: 0 0 auto;
-  color: var(--fg-dim);
-  transition: transform 0.12s ease;
-}
-.obs-session.is-open .obs-session-caret { transform: rotate(90deg); }
 
 /* ─── Session body (expanded) ─────────────────────────────────────────────── */
 
 .obs-session-body {
   padding: 0.5rem 0.8rem 0.65rem;
-  border-top: 1px solid var(--border-subtle);
+  border-top: 1px solid var(--line-soft);
   font-size: 0.84rem;
 }
 
 .obs-body-lbl {
-  color: var(--fg-dim);
+  color: var(--muted);
   text-transform: uppercase;
   font-size: 0.72rem;
   letter-spacing: 0.04em;
   margin-right: 0.35rem;
+  font-family: var(--font-structural);
 }
 
 .obs-body-status { margin: 0.3rem 0; }
 
-.obs-dim { color: var(--fg-dim); }
+.obs-dim { color: var(--muted); }
 
 /* ─── Level 3: tasks touched + relationships ──────────────────────────────── */
 
@@ -305,7 +298,7 @@
 .obs-task {
   margin: 0.5rem 0;
   padding-left: 0.55rem;
-  border-left: 2px solid var(--border-subtle);
+  border-left: 2px solid var(--line-soft);
 }
 
 .obs-task-head {
@@ -319,18 +312,19 @@
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--fg-dim);
-  border: 1px solid var(--border);
+  color: var(--muted);
+  border: 1px solid var(--line);
   border-radius: 999px;
   padding: 0.08rem 0.4rem;
+  font-family: var(--font-structural);
 }
-.obs-prov[data-prov="seed"] { color: var(--fg); border-color: var(--border-strong); }
-.obs-prov[data-prov="spun-off"] { color: var(--yellow); }
+.obs-prov[data-prov="seed"] { color: var(--text); border-color: var(--border-strong); }
+.obs-prov[data-prov="spun-off"] { color: var(--amber-dim); }
 
 .obs-task-ident {
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-structural);
   font-size: 0.8rem;
-  color: var(--fg);
+  color: var(--text);
   text-decoration: none;
 }
 a.obs-task-ident:hover { text-decoration: underline; }
@@ -341,25 +335,28 @@ a.obs-task-ident:hover { text-decoration: underline; }
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-family: var(--font-content);
 }
 
 .obs-task-state {
   font-size: 0.74rem;
-  color: var(--fg-dim);
-  background: var(--bg-muted);
-  border-radius: 3px;
+  color: var(--muted);
+  background: var(--inset);
+  border-radius: var(--radius-sm);
   padding: 0.08rem 0.4rem;
+  font-family: var(--font-structural);
 }
-.obs-task-state[data-type="started"] { color: var(--yellow); }
-.obs-task-state[data-type="completed"] { color: var(--green); }
-.obs-task-state[data-type="canceled"] { color: var(--red); }
+.obs-task-state[data-type="started"] { color: var(--amber-dim); }
+.obs-task-state[data-type="completed"] { color: var(--green-dim); }
+.obs-task-state[data-type="canceled"] { color: var(--red-dim); }
 
 .obs-task-label {
   font-size: 0.72rem;
-  color: var(--fg-dim);
-  border: 1px solid var(--border-subtle);
-  border-radius: 3px;
+  color: var(--muted);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
   padding: 0.08rem 0.35rem;
+  font-family: var(--font-structural);
 }
 
 .obs-rels {
@@ -368,49 +365,89 @@ a.obs-task-ident:hover { text-decoration: underline; }
   gap: 0.3rem 0.7rem;
   margin: 0.2rem 0 0.3rem;
   font-size: 0.78rem;
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 .obs-rel-k {
   text-transform: uppercase;
   font-size: 0.68rem;
   letter-spacing: 0.04em;
-  color: var(--fg-dim);
+  color: var(--muted);
   margin-right: 0.2rem;
+  font-family: var(--font-structural);
 }
-.obs-rel-block .obs-rel-k { color: var(--red); }
+.obs-rel-block .obs-rel-k { color: var(--red-dim); }
 
-/* ─── Level 3: worker-session tree ────────────────────────────────────────── */
+/* ─── Level 3: worker-session tree (phase timeline) ───────────────────────── */
 
-.obs-worker-tree { list-style: none; margin: 0.25rem 0 0; padding: 0; }
+.obs-worker-tree { list-style: none; margin: 0.35rem 0 0; padding: 0; }
 .obs-worker-empty { font-size: 0.8rem; margin: 0.2rem 0; }
 
+/* Each run is a timeline row: a status node on a vertical connector rail, then
+   the expandable phase head. The rail is drawn behind the nodes; the nodes carry
+   a card-surface background so they punch through it. */
 .obs-worker {
-  border-top: 1px solid var(--border-subtle);
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.3rem 0;
 }
-.obs-worker:first-child { border-top: 0; }
+.obs-worker::before {
+  content: '';
+  position: absolute;
+  left: 0.5rem;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--line-soft);
+}
+/* Trim the rail so it starts at the first node and ends at the last one. */
+.obs-worker:first-child::before { top: 0.75rem; }
+.obs-worker:last-child::before { bottom: auto; height: 0.75rem; }
+
+.obs-worker-node {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  width: 1rem;
+  height: 1.1rem;
+  line-height: 1.1rem;
+  text-align: center;
+  font-size: 0.82rem;
+  background: var(--raised);
+  color: var(--muted);
+}
+.obs-worker-node[data-state="done"] { color: var(--green); }
+.obs-worker-node[data-state="error"] { color: var(--red); }
+.obs-worker-node[data-state="running"] { color: var(--amber-dim); }
+.obs-worker-node[data-state="queued"] { color: var(--slate-dim); }
+.obs-worker-node[data-live="1"] { animation: pulse var(--motion-slow) ease-in-out infinite; }
 
 .obs-worker-head {
   display: flex;
   align-items: flex-start;
-  gap: 0.45rem;
-  width: 100%;
-  padding: 0.4rem 0;
+  gap: 0.4rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.1rem 0;
   border: 0;
   background: none;
   font: inherit;
   text-align: left;
   cursor: pointer;
-  color: var(--fg);
+  color: var(--text);
 }
-.obs-worker-head:hover { background: var(--bg-muted); }
+.obs-worker-head:hover { background: var(--card-h); }
 
-.obs-worker-icon { flex: 0 0 auto; }
-.obs-worker-icon[data-state="complete"] { color: var(--green); }
-.obs-worker-icon[data-state="error"] { color: var(--red); }
-.obs-worker-icon[data-state="running"],
-.obs-worker-icon[data-state="waiting"] { color: var(--yellow); }
+.obs-worker-caret {
+  flex: 0 0 auto;
+  color: var(--muted);
+  transition: transform var(--motion-fast) ease;
+}
+.obs-worker[data-open="1"] .obs-worker-caret { transform: rotate(90deg); }
 
-.obs-worker-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
+.obs-worker-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; }
 
 .obs-worker-line {
   display: flex;
@@ -418,67 +455,129 @@ a.obs-task-ident:hover { text-decoration: underline; }
   flex-wrap: wrap;
   gap: 0.4rem;
 }
-.obs-worker-iter {
-  font-family: var(--font-mono, monospace);
-  font-size: 0.76rem;
-  color: var(--fg-dim);
-}
 
-/* Bordered box phase tag (RESEARCH / PLAN …) — mockup treatment (LIN-608). */
+/* Bordered box phase tag (RESEARCH / PLAN …) — mockup treatment. */
 .obs-worker-phase {
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-structural);
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--fg-dim);
-  border: 1px solid var(--border);
-  border-radius: 4px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
   padding: 0.1rem 0.45rem;
 }
 
-/* Bordered rounded metric chips (14 call sites …) — mockup treatment (LIN-608). */
-.obs-chips-metric { display: inline-flex; gap: 0.3rem; flex-wrap: wrap; }
+.obs-worker-attempt {
+  font-family: var(--font-structural);
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+
+/* Run state, right-aligned on the phase line (mockup: "done" in green). */
+.obs-worker-state {
+  margin-left: auto;
+  font-family: var(--font-content);
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+.obs-worker-state[data-state="done"] { color: var(--green-dim); }
+.obs-worker-state[data-state="error"] { color: var(--red-dim); }
+.obs-worker-state[data-state="running"] { color: var(--amber-dim); }
+.obs-worker-state[data-state="queued"] { color: var(--slate-dim); }
+
+/* Bordered rounded metric chips (runtime / tools / links) — mockup treatment. */
+.obs-chips-metric { display: inline-flex; gap: 0.3rem; flex-wrap: wrap; margin-top: 0.1rem; }
 .obs-chip-metric {
   font-size: 0.74rem;
-  color: var(--fg-dim);
+  color: var(--muted);
   background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
   padding: 0.1rem 0.45rem;
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-structural);
 }
 
-.obs-worker-recap { font-size: 0.82rem; color: var(--fg-dim); line-height: 1.35; }
+.obs-worker-recap { font-size: 0.82rem; color: var(--muted); line-height: 1.35; font-family: var(--font-content); }
 
-.obs-worker-caret { flex: 0 0 auto; color: var(--fg-dim); transition: transform 0.12s ease; }
-.obs-worker[data-open="1"] .obs-worker-caret { transform: rotate(90deg); }
-
+/* The detail wraps to its own full-width line under the head (the node + head
+   sit in the flex row above it), indented to align under the phase content. */
 .obs-worker-body {
-  padding: 0.15rem 0 0.4rem 1.3rem;
+  flex: 0 0 100%;
+  padding: 0.15rem 0 0.4rem 1.5rem;
   font-size: 0.82rem;
 }
 
 .obs-detail-block { margin: 0.25rem 0; }
-.obs-detail-text { color: var(--fg-dim); }
+.obs-detail-text { color: var(--muted); }
 
-.obs-acts, .obs-artifacts { list-style: none; margin: 0.15rem 0 0; padding: 0; }
+/* Activity log (net-new): tool chips + a right-aligned duration column. */
+.obs-acts { list-style: none; margin: 0.15rem 0 0; padding: 0; }
 .obs-act {
-  font-family: var(--font-mono, monospace);
-  font-size: 0.78rem;
-  color: var(--fg-dim);
-  padding: 0.05rem 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.1rem 0;
 }
+.obs-act-main { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; gap: 0.25rem; }
+.obs-act-dur {
+  flex: 0 0 auto;
+  margin-left: auto;
+  font-family: var(--font-structural);
+  font-size: 0.74rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.obs-act-chip {
+  font-family: var(--font-structural);
+  font-size: 0.72rem;
+  color: var(--muted);
+  background: var(--inset);
+  border-radius: var(--radius-sm);
+  padding: 0.02rem 0.35rem;
+}
+.obs-act-raw { font-family: var(--font-structural); font-size: 0.76rem; color: var(--muted); }
 
-.obs-artifact { color: var(--link, #2563eb); font-size: 0.8rem; word-break: break-all; }
+/* Produced-artifacts (net-new): icon-led links out to the evidence. */
+.obs-artifacts { list-style: none; margin: 0.15rem 0 0; padding: 0; }
 .obs-artifacts li { padding: 0.05rem 0; }
+.obs-artifact {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  color: var(--blue);
+  font-size: 0.8rem;
+  text-decoration: none;
+  word-break: break-all;
+}
+.obs-artifact:hover { text-decoration: underline; }
+.obs-artifact-icon { flex: 0 0 auto; color: var(--muted); }
+
+/* Error-as-direction box (net-new): lead with the cause, show runtime, offer a
+   link to the log. Presentation-only — no retry endpoint, so no dead control. */
+.obs-error-box {
+  margin: 0.3rem 0;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--red);
+  border-left-width: 3px;
+  border-radius: var(--radius-sm);
+  background: var(--inset);
+}
+.obs-error-cause { margin: 0; font-size: 0.82rem; color: var(--text); line-height: 1.35; }
+.obs-error-mark { color: var(--red-dim); font-weight: 600; margin-right: 0.2rem; }
+.obs-error-meta { margin: 0.25rem 0 0; display: flex; flex-wrap: wrap; gap: 0.9rem; font-size: 0.78rem; }
+.obs-error-rt { color: var(--muted); font-family: var(--font-structural); }
+.obs-err-action { color: var(--blue); text-decoration: none; }
+.obs-err-action:hover { text-decoration: underline; }
 
 .obs-run-gen {
   border: 0;
   background: none;
   padding: 0;
   font: inherit;
+  font-family: var(--font-content);
   font-size: 0.8rem;
-  color: var(--yellow);
+  color: var(--brand-dim);
   text-decoration: underline;
   cursor: pointer;
 }
@@ -494,21 +593,22 @@ a.obs-task-ident:hover { text-decoration: underline; }
   border: 0;
   background: none;
   font: inherit;
-  color: var(--fg);
+  color: var(--text);
   cursor: pointer;
 }
 
-.obs-archive-caret { color: var(--fg-dim); transition: transform 0.12s ease; }
+.obs-archive-caret { color: var(--muted); transition: transform var(--motion-fast) ease; }
 .obs-archive-toggle.is-open .obs-archive-caret { transform: rotate(90deg); }
 
-.obs-archive-label { font-weight: 600; }
+.obs-archive-label { font-weight: 600; font-family: var(--font-content); }
 
 .obs-archive-count {
   font-size: 0.78rem;
-  color: var(--fg-dim);
-  background: var(--bg-muted);
+  color: var(--muted);
+  background: var(--inset);
   border-radius: 999px;
   padding: 0.05rem 0.45rem;
+  font-family: var(--font-structural);
 }
 
 .obs-archive-body[hidden] { display: none; }
@@ -518,21 +618,22 @@ a.obs-task-ident:hover { text-decoration: underline; }
   display: block;
   margin: 0.5rem auto 0;
   padding: 0.3rem 0.9rem;
-  border: 1px solid var(--border);
-  border-radius: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
   background: none;
   font: inherit;
+  font-family: var(--font-content);
   font-size: 0.8rem;
-  color: var(--fg-dim);
+  color: var(--muted);
   cursor: pointer;
 }
-.obs-archive-more:hover:not([disabled]) { color: var(--fg); border-color: var(--fg-dim); }
+.obs-archive-more:hover:not([disabled]) { color: var(--text); border-color: var(--border-strong); }
 .obs-archive-more[disabled] { cursor: default; opacity: 0.6; }
 .obs-archive-more[hidden] { display: none; }
 
 /* New-row arrival pulse (shared idiom with pipeline/dashboard). */
 .obs-session.cell-new { animation: obs-cell-new 1.2s ease-out; }
 @keyframes obs-cell-new {
-  0% { background: var(--bg-alt); }
-  100% { background: var(--bg); }
+  0% { background: var(--inset); }
+  100% { background: var(--raised); }
 }
