@@ -139,7 +139,7 @@ body:has(.swim-page) {
   flex-shrink: 0;
   width: 130px;
   padding: 0.4rem 0.6rem;
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-family: var(--font-content);
   font-size: 11px;
   color: var(--fg-dim);
   border-right: 2px solid var(--border);
@@ -203,7 +203,7 @@ body:has(.swim-page) {
   max-width: 200px;
   overflow: hidden;
   transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-family: var(--font-structural);
   font-size: 12px;
 }
 
@@ -220,15 +220,12 @@ body:has(.swim-page) {
 .swim-box.state-unstarted { border-left: 3px solid var(--fg-mid); }
 .swim-box.state-backlog { border-left: 3px solid var(--border); }
 
-/* State indicator in box */
+/* State indicator in box — colors come from the canonical
+   .status-pill--<state> modifiers (public/style.css), mirroring ship.js. */
 .swim-box-state {
   flex-shrink: 0;
   font-size: 13px;
 }
-.swim-box-state.done { color: var(--green); }
-.swim-box-state.in-progress { color: var(--yellow); }
-.swim-box-state.todo { color: var(--fg-dim); }
-.swim-box-state.backlog { color: var(--fg-vdim); }
 
 .swim-box-title {
   flex: 1 1 0;
@@ -239,6 +236,7 @@ body:has(.swim-page) {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   color: var(--fg);
+  font-family: var(--font-content);
   font-size: 12px;
 }
 
@@ -246,19 +244,20 @@ body:has(.swim-page) {
   width: 100%;
   text-align: right;
   color: var(--fg-dim);
+  font-family: var(--font-structural);
   font-size: 9px;
   flex-shrink: 0;
 }
 
 /* Blocked accent — overrides status border */
 .swim-box.blocked {
-  border-left: 3px solid #e67e22;
+  border-left: 3px solid var(--amber);
 }
 
 .swim-box-blocked-label {
   width: 100%;
   font-size: 9px;
-  color: #e67e22;
+  color: var(--amber);
   opacity: 0.8;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -314,8 +313,8 @@ body:has(.swim-page) {
 }
 
 .swim-group-rect {
-  fill: rgba(37, 99, 235, 0.05);
-  stroke: rgba(37, 99, 235, 0.35);
+  fill: color-mix(in srgb, var(--blue) 5%, transparent);
+  stroke: color-mix(in srgb, var(--blue) 35%, transparent);
   stroke-width: 1;
   stroke-dasharray: 4 3;
 }
@@ -323,8 +322,8 @@ body:has(.swim-page) {
 /* Nested groups: a touch more fill + solid border so the layering reads as
    "inside" rather than "another box beside". */
 .swim-group-rect.nested {
-  fill: rgba(37, 99, 235, 0.08);
-  stroke: rgba(37, 99, 235, 0.45);
+  fill: color-mix(in srgb, var(--blue) 8%, transparent);
+  stroke: color-mix(in srgb, var(--blue) 45%, transparent);
   stroke-dasharray: none;
 }
 
@@ -339,9 +338,9 @@ body:has(.swim-page) {
 }
 
 .swim-group-label-text {
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-family: var(--font-structural);
   font-size: 9px;
-  fill: rgba(37, 99, 235, 0.85);
+  fill: var(--blue);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-weight: 600;
@@ -349,7 +348,7 @@ body:has(.swim-page) {
 
 /* Slight emphasis for the parent card within a group */
 .swim-box[data-group-role="parent"] {
-  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.25);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--blue) 25%, transparent);
 }
 
 /* ==========================================================================
@@ -458,7 +457,7 @@ body:has(.swim-page) {
 
 .swim-connector-path {
   fill: none;
-  stroke: #e67e22;
+  stroke: var(--amber);
   stroke-width: 2;
   stroke-dasharray: 5 3;
   opacity: 0.65;
@@ -489,7 +488,7 @@ body:has(.swim-page) {
 /* Chain nodes stay fully visible with a subtle highlight */
 .swim-lanes.swim-chain-active .swim-box.swim-chain-node {
   opacity: 1;
-  box-shadow: 0 0 0 2px #e67e22;
+  box-shadow: 0 0 0 2px var(--amber);
 }
 
 /* Chain links stay fully visible and get bolder */
@@ -710,7 +709,7 @@ body:has(.swim-page) {
 .swim-page[data-orientation="vertical"] .swim-box.state-canceled { border-left: 1px solid var(--border); border-top: 3px solid var(--green); }
 .swim-page[data-orientation="vertical"] .swim-box.state-unstarted { border-left: 1px solid var(--border); border-top: 3px solid var(--fg-mid); }
 .swim-page[data-orientation="vertical"] .swim-box.state-backlog { border-left: 1px solid var(--border); border-top: 3px solid var(--border); }
-.swim-page[data-orientation="vertical"] .swim-box.blocked { border-left: 1px solid var(--border); border-top: 3px solid #e67e22; }
+.swim-page[data-orientation="vertical"] .swim-box.blocked { border-left: 1px solid var(--border); border-top: 3px solid var(--amber); }
 
 /* Compact mode in vertical: full-width chip, ID only (title hidden by base rule) */
 .swim-page[data-orientation="vertical"] .swim-box.compact {
