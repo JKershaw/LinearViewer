@@ -375,6 +375,46 @@ describe('lazy detail rendering (LIN-442)', () => {
 });
 
 // =============================================================================
+// Tree-row status routed through the shared status primitive (LIN-850)
+//
+// The project-tree row status glyph moved off a hand-rolled `.state` span onto
+// the shared `renderStatusPill` bare variant. It must render box-less (no pill
+// chrome — the LIN-782 lock) while preserving the data-status / aria-label
+// contract and the backlog ◌ glyph.
+// =============================================================================
+
+describe('tree-row status primitive (LIN-850)', () => {
+  function tree(issue) {
+    return {
+      project: { id: 'project-1', name: 'Test Project', content: null, url: null },
+      incomplete: [{ issue, children: [], depth: 0 }],
+      completed: [],
+      completedCount: 0
+    };
+  }
+
+  test('status glyph is the bare status-pill, preserving data-status + aria-label', () => {
+    const issue = { id: 'i-started', title: 'A started task', state: { type: 'started' }, labels: { nodes: [] } };
+    const result = renderPage([tree(issue)], [], [], 'Test', { isLanding: true });
+    // Routed through the shared primitive as the box-less bare variant…
+    assert.match(result, /<span class="status-pill status-pill--in-progress status-pill--bare"[^>]*>/);
+    // …carrying the llms.txt selector contract + a11y label…
+    assert.match(result, /status-pill--bare" data-status="in-progress" aria-label="Status: In Progress"/);
+    // …and the state glyph in the char slot.
+    assert.match(result, /status-pill__char">◐<\/span>/);
+    // The legacy hand-rolled `.state` span is gone from tree rows.
+    assert.ok(!result.includes('<span class="state in-progress"'), 'no legacy .state span on tree rows');
+  });
+
+  test('backlog rows keep the ◌ glyph (not the pill default ○)', () => {
+    const issue = { id: 'i-backlog', title: 'A backlog task', state: { type: 'backlog' }, labels: { nodes: [] } };
+    const result = renderPage([tree(issue)], [], [], 'Test', { isLanding: true });
+    assert.match(result, /status-pill--backlog status-pill--bare" data-status="backlog" aria-label="Status: Backlog"/);
+    assert.match(result, /status-pill--bare"[^>]*><span class="status-pill__char">◌<\/span>/);
+  });
+});
+
+// =============================================================================
 // Keyboard-operable expandable rows (LIN-566)
 //
 // The shared `.line.expandable` primitive must be a real control: role=button,
