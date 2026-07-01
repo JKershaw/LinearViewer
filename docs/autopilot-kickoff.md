@@ -24,7 +24,12 @@
 >   ([`autopilot-operating-manual.md`](./autopilot-operating-manual.md)) and is composed into
 >   the guide inline at build time (`buildAutopilotManual()`), between the identity intro and
 >   the four lines. It is the disposition layer — the *why* behind the mechanics — and the same
->   text backs `GET /api/proxy/autopilot/manual`.
+>   text backs `GET /api/proxy/autopilot/manual`. It is also where the **coordinator capability**
+>   lives (LIN-813): any autopilot, following the guide, can dispatch a *child autopilot* for a
+>   whole task (via `POST /api/proxy/autopilot/kickoff` with its own `sessionId` + `subscribe: true`)
+>   and stand by for the child's up-chain report — a **contextual judgment, not a launch-time
+>   variant**. See *Dispatching a child autopilot* in the
+>   [operating manual](./autopilot-operating-manual.md).
 > - **The variant** (`standard` | `stepper`, default `standard`) is an axis orthogonal to the
 >   run mode: `stepper` inserts the beat-stepping disposition section (see
 >   [Stepper variant](#stepper-variant)) between the guide and the snapshot. `standard` is the

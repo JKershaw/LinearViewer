@@ -110,8 +110,25 @@ describe('buildWakeFollowUp — loop-guard / null cases', () => {
     assert.equal(buildWakeFollowUp({ _id: 'parent-S1', sessionId: 'parent-S1', subscribe: true, kind: 'implementation' }, doneFeedback), null);
   });
 
-  test("kind === 'autopilot' → null (the orchestrator is the subscriber, not a subscribed child)", () => {
-    assert.equal(buildWakeFollowUp(subscribedChild({ kind: 'autopilot' }), doneFeedback), null);
+  test("a CHILD autopilot (subscribed, distinct parent sessionId) DOES wake its coordinator (LIN-813)", () => {
+    // An autopilot acting as a coordinator dispatches one task-altitude child
+    // autopilot per task with sessionId = the coordinator's id + subscribe: true;
+    // the child MUST wake the coordinator up-chain when it finishes. This is the
+    // LIN-813 relaxation of the old blanket kind === 'autopilot' exclusion.
+    const childAp = subscribedChild({ id: 'child-ap', kind: 'autopilot', sessionId: 'head-S1' });
+    const wake = buildWakeFollowUp(childAp, doneFeedback);
+    assert.ok(wake, 'a subscribed child autopilot wakes its dispatching coordinator');
+    assert.equal(wake.followUpTo, 'head-S1', 'addressed to the coordinator via the sessionId edge');
+    assert.equal(wake.subscribe, false, 'the wake itself is not subscribed — the loop guard');
+  });
+
+  test("a coordinator's OWN kickoff never falls through — no sessionId, or sessionId === own id (LIN-813)", () => {
+    // A top-level kickoff carries no parent edge → excluded by the sessionId guard.
+    assert.equal(buildWakeFollowUp(subscribedChild({ kind: 'autopilot', sessionId: null }), doneFeedback), null);
+    // A run owner that stamped sessionId === its own id → excluded by the self-skip.
+    assert.equal(buildWakeFollowUp(subscribedChild({ id: 'head-S1', kind: 'autopilot', sessionId: 'head-S1' }), doneFeedback), null);
+    // An UNsubscribed child autopilot → excluded by the subscribe arm.
+    assert.equal(buildWakeFollowUp(subscribedChild({ kind: 'autopilot', subscribe: false }), doneFeedback), null);
   });
 
   test('non-terminal feedback → null', () => {
@@ -211,21 +228,41 @@ describe('addFeedback wake enqueue (effect + once-only)', () => {
     assert.equal(wakeItems(collection, historyCollection).length, 0);
   });
 
-  test('the orchestrator/kickoff (kind:autopilot) never self-enqueues a wake, even if sessioned+subscribed', async () => {
+  test('a top-level kickoff (kind:autopilot, no parent sessionId) never self-enqueues a wake', async () => {
     const { store, collection, historyCollection } = makeStore();
-    // Pathological belt-and-suspenders shape: an autopilot dispatch that somehow
-    // carries subscribe + a sessionId. The kind==='autopilot' guard must still
-    // refuse to wake — the orchestrator is the subscriber, not a subscribed child.
+    // A top-level coordinator/head kickoff carries no parent edge (sessionId
+    // defaults null), so even a terminal outcome produces no wake — there is no one
+    // up-chain to wake.
     const kickoff = await store.addItem(URL_KEY, {
-      prompt: 'orchestrate', kind: 'autopilot', issueIdentifier: 'LIN-1',
-      sessionId: 'some-other-session', subscribe: true
+      prompt: 'orchestrate', kind: 'autopilot', issueIdentifier: 'LIN-1'
     });
     await store.takeItem(kickoff._id, URL_KEY, 'token-a');
 
     await store.addFeedback(kickoff._id, URL_KEY, { message: '[done] run complete' }, 'token-a');
     await drain();
 
-    assert.equal(wakeItems(collection, historyCollection).length, 0, 'autopilot kind produces no wake');
+    assert.equal(wakeItems(collection, historyCollection).length, 0, 'a parent-less kickoff produces no wake');
+  });
+
+  test('a CHILD autopilot (kind:autopilot, subscribed to a distinct coordinator) wakes it exactly once (LIN-813)', async () => {
+    const { store, collection, historyCollection } = makeStore();
+    // The coordinator slice: an autopilot dispatches a task-altitude child autopilot
+    // with its own id as sessionId + subscribe:true. When the child terminates it
+    // must wake the coordinator up-chain — the literal "reports up the chain"
+    // substrate.
+    const childAp = await store.addItem(URL_KEY, {
+      prompt: 'drive LIN-2', kind: 'autopilot', issueIdentifier: 'LIN-2',
+      sessionId: 'head-S1', subscribe: true
+    });
+    await store.takeItem(childAp._id, URL_KEY, 'token-a');
+
+    await store.addFeedback(childAp._id, URL_KEY, { message: '[done] task landed' }, 'token-a');
+    await drain();
+
+    const wakes = wakeItems(collection, historyCollection);
+    assert.equal(wakes.length, 1, 'the child autopilot wakes its coordinator exactly once');
+    assert.equal(wakes[0].followUpTo, 'head-S1', 'addressed up-chain to the coordinator');
+    assert.equal(wakes[0].subscribe, false, 'the wake is not itself subscribed — the loop guard');
   });
 
   test('a plain non-sessioned manual dispatch produces no wake (no subscriber edge)', async () => {

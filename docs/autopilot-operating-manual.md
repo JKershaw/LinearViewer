@@ -247,6 +247,59 @@ terminating emits none, so a one-off watch (or a `followUpTo` nudge) on a suspec
 yours to send. So the rule is now: **flag the fed, hold the subscribed, and keep a poll only for your own
 warm beats and the occasional liveness probe.**
 
+## Dispatching a child autopilot
+
+Most of what you hand down is a *worker* — one scoped step (a plan, an implementation, a review) that
+reports back and finishes. But now and then the thing in front of you isn't a step, it's a whole
+*task* with its own arc — research, plan, build, review, close-out — or a *set* of such tasks. Driving
+every beat of that through your own session would flatten its context into yours and spend your
+altitude on detail that was never yours to hold. When the shape in front of you is a *task among
+tasks* rather than a step, you have a heavier move: dispatch a **child autopilot** and let it drive
+that task's whole arc in its own session, while you stay above it, acting as its **coordinator**.
+
+This is a call you make *from where you sit*, not a mode you were launched in — any run can find
+itself holding an epic of independent tasks, or mid-task tripping over a blocking bug, and in both the
+answer is the same: hand the whole task down to an autopilot of its own, not a single worker step, and
+stand by for what it reports up. The win is **context isolation** — an epic with several tasks becomes
+a coordinator that hands each task to a focused autopilot carrying only *that* task's context, so no
+single session grinds every step of every task through one window.
+
+The mechanism is the same push substrate as a subscribed orchestrator above, pointed one level up:
+
+- **Dispatch the child** with `POST /api/proxy/autopilot/kickoff`, passing the task as
+  `issueIdentifier`, **your own session id** as `sessionId`, and `subscribe: true`. Your id as
+  `sessionId` makes you the child's up-chain *wake target*; `subscribe: true` declares that edge. The
+  child runs its own research→…→close-out in its own context; its returned `id` is the *child's*
+  session id (for the sub-workers **it** fans out) and stays distinct from the id you passed — you
+  never see or hold the child's prompt body.
+- **Then stand by — don't poll.** Because you dispatched it `subscribe: true`, the child's terminal
+  (or `[pending]`) boundary wakes *you* automatically, up-chain, exactly the way a subscribed worker's
+  outcome reaches you. No watch loop, no long-poll; the liveness probe for a child gone truly silent is
+  the only exception, same as any subscribed child.
+- **Judge its report on evidence and advance.** When the wake lands, cross-check the task's real
+  artifact the way you'd check any completion — the child's "done" is still a pointer to *go and look*,
+  never a certificate. A clean complete → the next task; a `[pending]`/`blocked`/`failed`, or evidence
+  that contradicts the claim → re-dispatch, or hand the blocker back to the human if it's theirs.
+
+Two shapes call for this, and both are **serial** for now — one child at a time, dispatched only after
+the last has reported and been judged:
+
+- **An epic, or several independent tasks.** You sit above the set and dispatch one child autopilot per
+  task, holding only the cross-task altitude while each child carries its own task's context. You keep
+  task *headers*, not task *detail*; the child holds the detail.
+- **A blocking bug found mid-task.** A run driving one task can hit a bug that blocks it. Rather than
+  dropping down to fix it inline — which would leave your altitude — file the bug as its own ticket,
+  capture the `blocks`/`blocked-by` relationship so the dependency is legible, and dispatch a child
+  autopilot for it. Stand by for its report, then resume the blocked task once the bug is cleared (or
+  hand back if it can't be).
+
+Keep it to that. Running children **in parallel** (2A/2B/2C at once, joined on "waits-on"), nesting the
+child's branch under yours on the **Observation** page, and children *talking* to each other or back to
+you mid-flight are deliberately **not** built yet — they're filed as LIN-874, LIN-875, and LIN-876.
+Until they land, one child at a time, the child surfaces as its own top-level session, and the only
+conversation is the single up-chain report. Reaching past that isn't initiative — it's building an
+unbuilt feature freehand, which is exactly the drop this seat is here to avoid.
+
 ## The human's edge, and how to hand back
 
 Some moments are the human's, and there your job is to hand over cleanly. What's theirs: anything about
