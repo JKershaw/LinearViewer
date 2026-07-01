@@ -87,11 +87,13 @@ export function localDashboardUrl(urlKey = LOCAL_WORKSPACE_URL_KEY) {
  * both the route default (routes/test.js) and the E2E helper. Shaped to back the
  * dashboard surface: two projects, an in-progress parent with a todo child, a
  * completed issue (→ completed section), and a second in-progress task in the
- * other project. Counts derived from this seed (used by the dashboard spec):
- *   .state.in-progress = 4   (issue-1 + issue-4, each in the In Progress section
+ * other project. Counts derived from this seed (used by the dashboard spec; the
+ * tree-row status glyph renders as `.status-pill--bare.status-pill--<state>`
+ * since LIN-850):
+ *   in-progress = 4   (issue-1 + issue-4, each in the In Progress section
  *                             AND its project section)
- *   .state.todo        = 2   (the child, in both sections)
- *   .state.done        = 1   (issue-3, in the completed section)
+ *   todo        = 2   (the child, in both sections)
+ *   done        = 1   (issue-3, in the completed section)
  *   In Progress lines  = 3   (issue-1, its child issue-2, issue-4)
  * issue-1 carries two comments (Alice, Bob) so the detail surface's comments
  * toggle has something to load through fetchIssueComments.

@@ -80,9 +80,12 @@ test.describe('Landing Page', () => {
     //                Dispatch, Autopilot, Workspace API proxy, Run it yourself,
     //                AI-assisted setup, Customize it, View on GitHub,
     //                Bugs & feature requests, Built by John Kershaw, Harbour OS
-    await expect(page.locator('.state.done')).toHaveCount(2);
-    await expect(page.locator('.state.in-progress')).toHaveCount(0);
-    await expect(page.locator('.state.todo')).toHaveCount(14);
+    // LIN-850: tree-row status glyphs render through the shared status primitive
+    // as the box-less bare variant (`.status-pill--bare.status-pill--<state>`),
+    // replacing the legacy `.state.<state>` spans.
+    await expect(page.locator('.status-pill--bare.status-pill--done')).toHaveCount(2);
+    await expect(page.locator('.status-pill--bare.status-pill--in-progress')).toHaveCount(0);
+    await expect(page.locator('.status-pill--bare.status-pill--todo')).toHaveCount(14);
   });
 
   test('does not show logout link on landing page', async ({ page }) => {
