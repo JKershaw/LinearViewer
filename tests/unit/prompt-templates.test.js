@@ -2210,6 +2210,27 @@ describe('cross-path Attachments section parity (LIN-772)', () => {
   test('the Attachments section is provider-agnostic (no hardcoded Linear)', () => {
     assert.ok(!formatAttachmentsSection(ctxWith).includes('Linear'), 'shared section prose must not hardcode a tracker name');
   });
+
+  test('instructs agents to derive the file extension from metadata contentType and view the saved file (LIN-889)', () => {
+    const section = formatAttachmentsSection(ctxWith);
+    assert.ok(
+      /forced-download/.test(section) && /neutral/.test(section),
+      'names the relay response as a neutral, forced-download signal'
+    );
+    assert.ok(
+      /do NOT use the response'?s? (own )?Content-Type/i.test(section),
+      "tells agents not to trust the relay response's own Content-Type"
+    );
+    assert.ok(
+      /save the fetched bytes to a local file/i.test(section) &&
+        /extension derived from that item'?s? `?contentType`? metadata field/i.test(section),
+      "tells agents to save bytes locally using the item's metadata contentType to pick the extension"
+    );
+    assert.ok(
+      /open\/view the saved local file/i.test(section),
+      'tells agents to open/view the saved file so it is actually perceived'
+    );
+  });
 });
 
 // =============================================================================
