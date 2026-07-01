@@ -59,9 +59,20 @@ function appendMessages(messages) {
     const body = msg.text || '';
     const time = relativeTime(msg.timestamp);
 
+    // Speaker → neutral role StatusPill; body → inset Surface (LIN-861). The old
+    // per-page hook classes ride along as `className` so the E2E selectors and the
+    // IRC label-column / action-time layout rules in collective.css still apply.
+    const nickPill = renderStatusPill({ label: nick, variant: 'tag', className: 'collective-msg-nick' });
+    const bodySurface = renderSurface({
+      body: escapeHtml(body),
+      variant: 'inset',
+      as: 'span',
+      className: 'collective-msg-body',
+    });
+
     li.innerHTML = `
-      <span class="collective-msg-nick">${escapeHtml(nick)}</span>
-      <span class="collective-msg-body">${escapeHtml(body)}</span>
+      ${nickPill}
+      ${bodySurface}
       <span class="collective-msg-time">${escapeHtml(time)}</span>`;
     list.appendChild(li);
     added += 1;

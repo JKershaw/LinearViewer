@@ -116,17 +116,27 @@
   gap: var(--space-1);
 }
 
-.task-chat-msg-who {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  color: var(--fg-dim);
+/* Speaker pill (LIN-861): composes .status-pill chrome. In the flex-column
+   message it must hug its content rather than stretch to full width. The task's
+   turn keeps the in-progress ◐/colour from the pill; the user's "you" pill is
+   re-accented below (2-class specificity beats .status-pill--tag). */
+.task-chat-msg-who.status-pill {
+  align-self: flex-start;
 }
 
 .task-chat-msg-user .task-chat-msg-who {
   color: var(--accent);
 }
 
+/* Body surface (LIN-861): the shared .surface supplies the panel chrome; trim its
+   default --space-3 padding to the tighter chat scale. The text node keeps its
+   mono/pre-wrap treatment so the streaming cursor still reads correctly. */
+.task-chat-msg-surface.surface {
+  padding: var(--space-2);
+}
+
 .task-chat-msg-body {
+  display: block;
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
   color: var(--fg);

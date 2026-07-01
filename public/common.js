@@ -31,6 +31,99 @@ window.escapeHtml = function(str) {
 };
 
 // =============================================================================
+// Theme Primitives (client-side replicas of lib/components/* — LIN-861)
+// =============================================================================
+//
+// The server render helpers in lib/components/* (renderStatusPill / renderSurface
+// / renderTag / renderChip) return HTML strings, but the experimental Collective,
+// Task-chat and Next-run views build their live content in the browser and can't
+// import server modules. These are byte-faithful client replicas of that
+// canonical markup, so those views compose the shared primitives (styled by the
+// shared /style.css rules) instead of hand-rolling divergent chips/panels. Keep
+// them in lock-step with lib/components/*: ONE replica, many consumers, no drift.
+// Text inputs are escaped via window.escapeHtml (plain-text-in contract); `body`
+// / `attrs` are raw (slot convention), exactly like the server helpers.
+
+// Default state glyphs — mirrors STATE_GLYPHS in lib/components/status-pill.js.
+const STATUS_PILL_GLYPHS = {
+  done: '✓',
+  'in-progress': '◐',
+  todo: '○',
+  backlog: '○',
+  failed: '✕',
+};
+
+/**
+ * Client replica of lib/components/status-pill.js `renderStatusPill`.
+ * @global
+ * @returns {string} Status pill HTML.
+ */
+window.renderStatusPill = function renderStatusPill({ state, label, char, dot, variant, className, attrs } = {}) {
+  const has = (v) => v != null && v !== '';
+  const glyph = has(char) ? char : (state ? STATUS_PILL_GLYPHS[state] : undefined);
+  if (!dot && !has(glyph) && !has(label)) {
+    throw new Error('renderStatusPill requires at least one of `char`, `label`, `dot`, or a known `state`.');
+  }
+  const classes = ['status-pill'];
+  if (dot) classes.push('status-pill--dot');
+  if (state) classes.push(`status-pill--${state}`);
+  if (variant) classes.push(`status-pill--${variant}`);
+  if (className) classes.push(className);
+  const attrStr = attrs ? ` ${attrs}` : '';
+  const markerHtml = dot
+    ? '<span class="status-pill__dot" aria-hidden="true"></span>'
+    : (has(glyph) ? `<span class="status-pill__char">${window.escapeHtml(glyph)}</span>` : '');
+  const labelHtml = has(label) ? `<span class="status-pill__label">${window.escapeHtml(label)}</span>` : '';
+  return `<span class="${classes.join(' ')}"${attrStr}>${markerHtml}${labelHtml}</span>`;
+};
+
+/**
+ * Client replica of lib/components/surface.js `renderSurface`. `body` is RAW.
+ * @global
+ * @returns {string} Surface HTML.
+ */
+window.renderSurface = function renderSurface({ body, variant, as = 'div', className, attrs } = {}) {
+  const has = (v) => v != null && v !== '';
+  if (!has(body)) throw new Error('renderSurface requires a `body`.');
+  const tag = window.escapeHtml(as);
+  const classes = ['surface'];
+  if (variant) classes.push(`surface--${variant}`);
+  if (className) classes.push(className);
+  const attrStr = attrs ? ` ${attrs}` : '';
+  return `<${tag} class="${classes.join(' ')}"${attrStr}>${body}</${tag}>`;
+};
+
+/**
+ * Client replica of lib/components/tag.js `renderTag` (soft sans label chip).
+ * @global
+ * @returns {string} Tag HTML.
+ */
+window.renderTag = function renderTag({ label, count, tone, className, attrs } = {}) {
+  const has = (v) => v != null && v !== '';
+  if (!has(label)) throw new Error('renderTag requires a `label`.');
+  const classes = ['tag'];
+  if (tone) classes.push(`tag--${tone}`);
+  if (className) classes.push(className);
+  const attrStr = attrs ? ` ${attrs}` : '';
+  const countHtml = has(count) ? `<span class="tag__count">${window.escapeHtml(String(count))}</span>` : '';
+  return `<span class="${classes.join(' ')}"${attrStr}><span class="tag__name">${window.escapeHtml(label)}</span>${countHtml}</span>`;
+};
+
+/**
+ * Client replica of lib/components/tag.js `renderChip` (hard-edged mono data chip).
+ * @global
+ * @returns {string} Chip HTML.
+ */
+window.renderChip = function renderChip({ label, className, attrs } = {}) {
+  const has = (v) => v != null && v !== '';
+  if (!has(label)) throw new Error('renderChip requires a `label`.');
+  const classes = ['chip'];
+  if (className) classes.push(className);
+  const attrStr = attrs ? ` ${attrs}` : '';
+  return `<code class="${classes.join(' ')}"${attrStr}>${window.escapeHtml(label)}</code>`;
+};
+
+// =============================================================================
 // Markdown Rendering
 // =============================================================================
 

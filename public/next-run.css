@@ -21,7 +21,7 @@
 }
 
 .next-run-warning {
-  color: var(--orange, #b06a00);
+  color: var(--amber);
   font-size: var(--font-size-sm);
   margin: 0 0 var(--space-2);
 }
@@ -39,7 +39,7 @@
 }
 
 .next-run-feedback.error {
-  color: var(--red, #c0392b);
+  color: var(--red);
 }
 
 /* Deterministic intro paragraph above the options (LIN-638). */
@@ -134,9 +134,9 @@
   transform: rotate(90deg);
 }
 
-/* Size chip leans on obs-chip; keep only monospace weight to read as a badge. */
-.next-run-size {
-  font-family: var(--font-mono, monospace);
+/* Size chip → shared .status-pill (LIN-861); it already supplies the mono badge
+   chrome, so keep only the bold weight that reads it as a size estimate. */
+.next-run-size.status-pill {
   font-weight: bold;
 }
 
@@ -158,14 +158,24 @@
   overflow-wrap: anywhere;
 }
 
-.next-run-goal {
+/* Goal / reasoning / refs are each wrapped in an inset .surface (LIN-861); the
+   surface owns the panel chrome + gap, so the inner blocks drop their own
+   bottom-margin and the surfaces carry the inter-block spacing instead. */
+.next-run-goal-surface,
+.next-run-reasoning-surface,
+.next-run-refs-surface {
   margin: 0 0 var(--space-2);
+  padding: var(--space-2);
+}
+
+.next-run-goal {
+  margin: 0;
   white-space: pre-wrap;
   line-height: 1.5;
 }
 
 .next-run-reasoning {
-  margin: 0 0 var(--space-2);
+  margin: 0;
   color: var(--fg-dim);
   font-size: var(--font-size-sm);
   line-height: 1.4;
@@ -173,21 +183,17 @@
 
 /* Referenced tasks rendered at the end of a recommendation (LIN-642). */
 .next-run-refs {
-  margin: 0 0 var(--space-2);
+  margin: 0;
   font-size: var(--font-size-sm);
   line-height: 1.6;
 }
 
-.next-run-ref {
-  display: inline-block;
-  padding: 0.05rem 0.4rem;
+/* Referenced-task ids → shared mono .chip (LIN-861); the chip supplies the
+   padding/border/mono/inset look, so keep only the inter-chip spacing + the
+   smaller badge scale. */
+.next-run-ref.chip {
   margin-right: 0.25rem;
-  font-family: var(--font-mono, monospace);
   font-size: 0.8em;
-  color: var(--fg-dim);
-  background: var(--bg-muted, var(--bg));
-  border: 1px solid var(--border, var(--fg-vdim));
-  border-radius: var(--radius-sm);
 }
 
 .next-run-option-actions {

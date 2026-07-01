@@ -218,16 +218,25 @@
   border-bottom: none;
 }
 
-.collective-msg-nick {
+/* Speaker pill (LIN-861): composes the shared .status-pill chrome, but keeps the
+   IRC label-column look — green nick text, fixed-width column, no shrink. The
+   green overrides .status-pill--tag's --fg-dim (later stylesheet, equal
+   specificity). */
+.collective-msg-nick.status-pill {
   color: var(--green);
   flex-shrink: 0;
   min-width: 7rem;
   font-weight: 500;
 }
 
-.collective-msg-body {
+/* Message body inset (LIN-861): composes .surface--inset, but trimmed to the
+   compact IRC-row scale — the primitive's --space-3 padding and --radius-md would
+   blow out the dense log, so tighten to a subtle inset well. */
+.collective-msg-body.surface {
   color: var(--fg);
   flex: 1;
+  padding: 0.1rem var(--space-2);
+  border-radius: var(--radius-sm);
   white-space: pre-wrap;
   word-break: break-word;
 }
