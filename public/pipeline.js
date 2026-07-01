@@ -55,13 +55,26 @@ const STAGE_LABELS = {
   bug: 'bug'
 };
 
+// `css` (the bespoke `.state-*` colour class) is retained only for the overlay
+// surfaces still out of scope for the theme migration (loop-state / overlay-state,
+// LIN-856). The floor cells + activity rail render through the shared StatusPill
+// vocabulary instead: `pill` selects the canonical `.status-pill--<state>` colour
+// token and `label` is the human/title text. `waiting` has no dedicated pill
+// state, so it maps onto `running` (amber) while keeping its ◑ glyph + "waiting"
+// title.
 const STATE_INDICATORS = {
-  queued: { symbol: '○', css: 'state-queued' },
-  running: { symbol: '◐', css: 'state-running' },
-  waiting: { symbol: '◑', css: 'state-waiting' },
-  complete: { symbol: '✓', css: 'state-complete' },
-  error: { symbol: '✕', css: 'state-error' }
+  queued: { symbol: '○', css: 'state-queued', pill: 'queued', label: 'queued' },
+  running: { symbol: '◐', css: 'state-running', pill: 'running', label: 'running' },
+  waiting: { symbol: '◑', css: 'state-waiting', pill: 'running', label: 'waiting' },
+  complete: { symbol: '✓', css: 'state-complete', pill: 'done', label: 'complete' },
+  error: { symbol: '✕', css: 'state-error', pill: 'error', label: 'error' }
 };
+
+// Queue priority → shared AccentBar state vocabulary (LIN-856): urgent → error
+// (red), high → running (amber; was yellow), medium → queued (slate; was dim).
+// Any other priority (none/low) falls back to the neutral queued stripe — queue
+// entries are queued tasks by definition — so the stripe column stays aligned.
+const QUEUE_PRIORITY_STATE = { 1: 'error', 2: 'running', 3: 'queued' };
 
 function stageLabel(stage) {
   return STAGE_LABELS[stage] || stage || '—';
@@ -71,30 +84,52 @@ function stateIndicator(agentState) {
   return STATE_INDICATORS[agentState] || STATE_INDICATORS.queued;
 }
 
+// Canonical StatusPill markup (LIN-856), hand-mirrored from the server helper
+// (lib/components/status-pill.js) — this browser script can't import it, so the
+// shared contract is the global `.status-pill` CSS class API (same idiom as
+// dispatch.js / observation.js). The `--bare` variant (LIN-850) drops the chip
+// so the glyph renders inline like the prior bespoke markup, while the
+// `status-pill--<state>` modifier supplies the shared colour vocabulary (running
+// is amber, not the old green). `hookClass` (.cell-state / .activity-state) rides
+// alongside as the updateCell() querySelector hook and the E2E/semantic anchor.
+function statePillClass(si, hookClass) {
+  return `${hookClass} status-pill status-pill--bare status-pill--${si.pill}`;
+}
+
+function statePillInner(si) {
+  return `<span class="status-pill__char">${si.symbol}</span>`;
+}
+
 const VALID_HEALTH = new Set(['green', 'amber', 'red']);
 function safeHealth(color) {
   return VALID_HEALTH.has(color) ? color : 'green';
 }
 
-function progressSegClass(loop) {
+// Map a loop → a canonical SegmentBar cell state (LIN-856). The primitive has no
+// waiting/neutral cell, so `blocked`/`waiting`/idle collapse onto `empty` (the
+// faint track colour, matching the old `seg-neutral`).
+function progressSegState(loop) {
   const fs = loop.agentStatus;
-  if (fs === 'completed') return 'seg-complete';
-  if (fs === 'failed') return 'seg-error';
-  if (fs === 'blocked') return 'seg-waiting';
+  if (fs === 'completed') return 'done';
+  if (fs === 'failed') return 'error';
+  if (fs === 'blocked') return 'empty';
   const as = loop.agentState;
-  if (as === 'complete') return 'seg-complete';
-  if (as === 'error') return 'seg-error';
-  if (as === 'waiting') return 'seg-waiting';
-  if (as === 'running') return 'seg-running';
-  return 'seg-neutral';
+  if (as === 'complete') return 'done';
+  if (as === 'error') return 'error';
+  if (as === 'waiting') return 'empty';
+  if (as === 'running') return 'running';
+  return 'empty';
 }
 
+// Per-cell progress track rendered as a canonical SegmentBar (LIN-856; per the
+// observation.js precedent). `.cell-progress` is kept as the ride-along hook so
+// updateCell() still finds and rebuilds the track in place.
 function renderProgressBar(loops) {
   if (!loops || loops.length === 0) return '';
-  const segs = loops.map(l =>
-    `<div class="progress-seg ${progressSegClass(l)}"></div>`
+  const cells = loops.map(l =>
+    `<span class="segment-bar__cell segment-bar__cell--${progressSegState(l)}"></span>`
   ).join('');
-  return `<div class="cell-progress">${segs}</div>`;
+  return `<span class="cell-progress segment-bar">${cells}</span>`;
 }
 
 // ─── Grid cell rendering ────────────────────────────────────────────────────
@@ -126,7 +161,7 @@ function renderCell(task) {
     <div class="cell-title">${escapeHtml(task.title || '')}</div>
     <div class="cell-footer">
       <span class="cell-stage cell-stage-badge badge">${escapeHtml(stageLabel(task.currentStage))}</span>
-      <span class="cell-state ${si.css}">${si.symbol}</span>
+      <span class="${statePillClass(si, 'cell-state')}" title="${si.label}">${statePillInner(si)}</span>
     </div>
     ${renderProgressBar(task.loops)}
   `;
@@ -168,8 +203,9 @@ function updateCell(el, task) {
   if (stageEl) stageEl.textContent = stageLabel(task.currentStage);
   const stateEl = el.querySelector('.cell-state');
   if (stateEl) {
-    stateEl.textContent = si.symbol;
-    stateEl.className = `cell-state ${si.css}`;
+    stateEl.className = statePillClass(si, 'cell-state');
+    stateEl.title = si.label;
+    stateEl.innerHTML = statePillInner(si);
   }
   // Update progress bar
   const existingProgress = el.querySelector('.cell-progress');
@@ -233,9 +269,13 @@ function renderQueue(queueTasks) {
   list.innerHTML = queueTasks.slice(0, 20).map((task, i) => {
     const nextClass = i === 0 ? ' queue-next' : '';
     const prio = task.priority ?? 0;
+    const accentState = QUEUE_PRIORITY_STATE[prio] || 'queued';
     return `<li class="queue-entry${nextClass}" data-identifier="${escapeHtml(task.identifier)}" data-priority="${prio}">
-      <span class="queue-id">${escapeHtml(task.identifier)}</span>
-      <span class="queue-title">${escapeHtml(task.title || '')}</span>
+      <span class="accent-bar accent-bar--vertical accent-bar--${accentState}" aria-hidden="true"></span>
+      <span class="queue-entry-body">
+        <span class="queue-id">${escapeHtml(task.identifier)}</span>
+        <span class="queue-title">${escapeHtml(task.title || '')}</span>
+      </span>
     </li>`;
   }).join('');
 }
@@ -259,7 +299,7 @@ function renderActivity(recentLoops) {
     const si = stateIndicator(loop.agentState);
     const time = relativeTime(loop.resolvedAt || loop.dispatchedAt);
     return `<li class="activity-entry">
-      <span class="activity-state ${si.css}">${si.symbol}</span>
+      <span class="${statePillClass(si, 'activity-state')}" title="${si.label}">${statePillInner(si)}</span>
       <span class="activity-id">${escapeHtml(loop.issueIdentifier || '')}</span>
       <span class="activity-stage">${escapeHtml(stageLabel(loop.stage))}</span>
       <span class="activity-time">${time}</span>
