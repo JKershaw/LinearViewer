@@ -410,7 +410,7 @@ function renderDispatchQueueList(container, items, urlKey) {
     const meta = metaParts.join(' \u00b7 ')
 
     return `
-      <div class="queue-item" data-item-id="${escapeHtml(item.id)}">
+      <div class="card queue-item" data-item-id="${escapeHtml(item.id)}">
         <div class="queue-item-header">
           <span class="queue-item-title">${escapeHtml(title)}</span>
           <button class="queue-item-remove" data-item-id="${escapeHtml(item.id)}" data-url-key="${escapeHtml(urlKey)}">remove</button>
@@ -523,7 +523,7 @@ function renderDispatchTokenList(container, tokens, urlKey) {
       : 'never used'
 
     return `
-      <div class="token-item" data-token-id="${escapeHtml(t.tokenId)}">
+      <div class="card token-item" data-token-id="${escapeHtml(t.tokenId)}">
         <div class="token-info">
           <span class="token-label-text">${escapeHtml(t.label)}</span>
           <div class="token-meta">created ${created} · ${lastUsed}</div>
@@ -719,14 +719,27 @@ function renderDispatchHistoryList(container, items, total, offset, urlKey) {
     return
   }
 
-  const STATUS_INDICATORS = {
-    taken: { symbol: '\u2713', css: 'status-taken' },
-    expired: { symbol: '\u2298', css: 'status-expired' },
-    cancelled: { symbol: '\u2715', css: 'status-cancelled' }
+  // Map each resolved dispatch status onto the shared StatusPill vocabulary
+  // (LIN-853): `state` selects the canonical color token, `char` keeps the
+  // existing per-status glyph. `taken`/`expired`/`cancelled` are the stored
+  // resolutions; `done`/`failed` cover terminal-marker outcomes.
+  const STATUS_PILL = {
+    taken: { state: 'done', char: '\u2713' }, //     \u2713 green
+    done: { state: 'done', char: '\u2713' }, //      \u2713 green
+    failed: { state: 'failed', char: '\u2715' }, //  \u2715 red
+    expired: { state: 'todo', char: '\u2298' }, //   \u2298 dim
+    cancelled: { state: 'failed', char: '\u2715' } // \u2715 red
   }
 
   const itemsHtml = items.map(item => {
-    const st = STATUS_INDICATORS[item.status] || STATUS_INDICATORS.expired
+    const pill = STATUS_PILL[item.status] || STATUS_PILL.expired
+    // Canonical `.status-pill` markup, hand-mirrored from the server helper
+    // lib/components/status-pill.js \u2014 the shared contract is the global CSS
+    // class API, which cards can't reach client-side. `history-status` and
+    // `status-<status>` ride alongside as the existing E2E + semantic hooks.
+    const statusPillHtml = `<span class="history-status status-pill status-pill--${pill.state} status-${escapeHtml(item.status)}">`
+      + `<span class="status-pill__char">${pill.char}</span>`
+      + `<span class="status-pill__label">${escapeHtml(item.status)}</span></span>`
     const issueHtml = item.issueIdentifier
       ? (item.issueUrl
         ? ` <a class="history-issue" href="${escapeHtml(item.issueUrl)}" target="_blank">${escapeHtml(item.issueIdentifier)}</a>`
@@ -750,10 +763,10 @@ function renderDispatchHistoryList(container, items, total, offset, urlKey) {
 
     return `
       <div class="history-item${expandableClass}" data-status="${escapeHtml(item.status)}">
-        <span class="history-status ${st.css}">${st.symbol}</span>
+        ${statusPillHtml}
         <div class="history-info">
           <span class="history-name">${escapeHtml(item.promptName || 'Prompt')}</span>${issueHtml}
-          <div class="history-meta">dispatched ${dispatched} \u00b7 ${escapeHtml(item.status)} ${resolved}${tokenInfo}${repoInfo}${targetInfo}</div>${promptHtml}${feedbackHtml}
+          <div class="history-meta">dispatched ${dispatched} \u00b7 resolved ${resolved}${tokenInfo}${repoInfo}${targetInfo}</div>${promptHtml}${feedbackHtml}
         </div>
       </div>`
   }).join('')

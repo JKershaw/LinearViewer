@@ -189,9 +189,33 @@
   padding: var(--space-1) 0;
 }
 
-/* Queue items reuse .queue-item styles from style.css (shared with navbar panel) */
+/* =============================================================================
+   Themed surfaces (LIN-853)
+   Queue entries and token rows render on the shared Card primitive (.card).
+   .queue-item / .token-item ride alongside as JS + E2E hooks; their base list
+   rules live in shared CSS (style.css / common-actions.css) used by the navbar
+   and settings/proxy pages, so we don't touch those — instead we re-assert the
+   card chrome here (dispatch.css loads last) so shared-rule load order can't
+   defeat it, and route factual meta to the mono --font-structural token.
+   ============================================================================= */
+.queue-list .queue-item.card,
+.token-list .token-item.card {
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-3);
+}
 
-/* Token management: see common-actions.css */
+.queue-list .queue-item.card:last-child,
+.token-list .token-item.card:last-child {
+  margin-bottom: 0;
+}
+
+/* Facts (identifiers, targets, dates) stay mono; human titles/labels stay sans. */
+.queue-list .queue-item-meta,
+.token-list .token-meta {
+  font-family: var(--font-structural);
+}
 
 /* =============================================================================
    Integration Guide
@@ -264,22 +288,12 @@
   border-bottom: none;
 }
 
+/* History status renders as the shared StatusPill (LIN-853); its color + glyph
+   come from .status-pill / .status-pill--<state> in style.css. The
+   .history-status / .status-<status> classes ride alongside as no-style E2E +
+   semantic hooks. */
 .history-status {
   flex-shrink: 0;
-  font-family: var(--font-structural);
-  min-width: 2ch;
-}
-
-.history-status.status-taken {
-  color: var(--green);
-}
-
-.history-status.status-expired {
-  color: var(--fg-dim);
-}
-
-.history-status.status-cancelled {
-  color: var(--red);
 }
 
 .history-info {
