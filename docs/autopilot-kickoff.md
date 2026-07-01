@@ -25,10 +25,13 @@
 >   the guide inline at build time (`buildAutopilotManual()`), between the identity intro and
 >   the four lines. It is the disposition layer — the *why* behind the mechanics — and the same
 >   text backs `GET /api/proxy/autopilot/manual`.
-> - **The variant** (`standard` | `stepper`, default `standard`) is an axis orthogonal to the
->   run mode: `stepper` inserts the beat-stepping disposition section (see
->   [Stepper variant](#stepper-variant)) between the guide and the snapshot. `standard` is the
->   guide as written here.
+> - **The variant** (`standard` | `stepper` | `coordinator`, default `standard`) is an axis
+>   orthogonal to the run mode: `stepper` inserts the beat-stepping disposition section (see
+>   [Stepper variant](#stepper-variant)) between the guide and the snapshot; `coordinator`
+>   inserts the head-dispatches-a-child-autopilot-per-task disposition (see
+>   [Coordinator variant](#coordinator-variant)) at the same position. The variants are mutually
+>   exclusive, so at most one disposition section is inserted. `standard` is the guide as written
+>   here.
 > - **The snapshot** (after the `---`) is *per-dispatch* — assembled at kickoff: the run
 >   mode, the goal (a pinned task for a scoped run, free text, or "walk the stack"), and
 >   the proxy token (injected at dispatch via the +proxy block, never committed). The block
@@ -265,6 +268,51 @@ only — it loses intra-session memory and pays re-orientation cost each beat.
 Launch it via the proxy: `POST /api/proxy/autopilot/kickoff` with `{"variant":"stepper", …}` (or
 preview with `GET …/autopilot/kickoff?variant=stepper`). See the
 [proxy integration guide](./proxy-integration.md#launch-autopilot-fused) for the param tables.
+
+## Coordinator variant
+
+The `coordinator` variant ([LIN-813](https://linear.app/linearviewer/issue/LIN-813)) is the third
+disposition on the same `variant` axis (orthogonal to `mode`, mutually exclusive with `stepper`). A
+`coordinator` kickoff (`variant: 'coordinator'`) inserts one extra disposition section between the
+guide and the snapshot, at the same position the stepper section takes; the four lines, instruments,
+and halt rules above still hold, but the loop Autopilot runs is the coordinator one below. Like the
+stepper it is an **orchestrator** disposition (how Autopilot drives), so it is *not* subject to the
+both-paths parity rule, its text lives in `buildCoordinatorDisposition()` in
+[`autopilot-kickoff.js`](../lib/prompts/autopilot-kickoff.js) gated on `variant` (a `standard` kickoff
+stays byte-identical), and it is deliberately **not** in the shared `autopilot-operating-manual.md`.
+
+Where a `standard` run drives a task's own *steps* and a `stepper` run drives a task's *beats*, a
+`coordinator` run sits **above individual tasks** and dispatches **one task-altitude CHILD autopilot
+per task**. Each child runs its own research→plan→implementation→review→close-out (with beats) in its
+own session/context and **reports back up the chain** — the head holds the cross-task altitude. The
+win is **context isolation**: an epic with N tasks becomes a head that hands each task to a focused
+autopilot carrying only that task's context, so no single session grinds every step of every task
+through one window.
+
+The mechanism is the same push substrate every dispatch uses
+([LIN-826](https://linear.app/linearviewer/issue/LIN-826)):
+
+1. **Orient and pick the next task** under the precedence policy (one task at a time — serial).
+2. **Dispatch a CHILD autopilot** for that task — `POST /api/proxy/autopilot/kickoff` with
+   `{ issueIdentifier, target, sessionId: <the head's OWN session id>, subscribe: true }`. The head's
+   own id as `sessionId` makes it the child's up-chain wake target; `subscribe: true` declares that
+   edge. The child's returned `id` is the *child's* own session id (for the sub-workers **it** fans
+   out) and stays distinct from the parent `sessionId` — the two ids never collide.
+3. **Stand by for the up-chain wake — do not poll.** Because the child is `subscribe: true`, its
+   terminal / `[pending]` boundary wakes the head automatically (the
+   [LIN-826](https://linear.app/linearviewer/issue/LIN-826) auto-enqueue lifted its
+   `kind: 'autopilot'` exclusion for exactly this case). The head just stops and stands by; the
+   ~30-min wedged-session liveness nudge is the only exception, never a standing poll.
+4. **Judge the child's report on evidence**, then advance to the next task (or pause for the human on
+   a blocker / direction question).
+
+Serial only in this first slice. Parallel fan-out / fan-in of children
+([LIN-874](https://linear.app/linearviewer/issue/LIN-874)), nested Observation branches/nodes
+([LIN-875](https://linear.app/linearviewer/issue/LIN-875)), and cross-autopilot messaging
+([LIN-876](https://linear.app/linearviewer/issue/LIN-876)) are deferred follow-ups.
+
+Launch it via the proxy: `POST /api/proxy/autopilot/kickoff` with `{"variant":"coordinator", …}` (or
+preview with `GET …/autopilot/kickoff?variant=coordinator`).
 
 ---
 

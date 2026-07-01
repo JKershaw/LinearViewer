@@ -142,6 +142,66 @@ test('POST kickoff: parks the orchestrator holdable (waitForFollowUps:true) — 
   }
 });
 
+test("POST kickoff: a valid variant 'coordinator' is accepted and dispatches the coordinator disposition (LIN-813)", async () => {
+  const { app, added } = buildApp();
+  const { status, body } = await request(app, '/api/proxy/autopilot/kickoff', {
+    method: 'POST',
+    body: { variant: 'coordinator' },
+  });
+  assert.equal(status, 201);
+  assert.equal(body.variant, 'coordinator');
+  assert.equal(added.length, 1);
+  assert.match(added[0].doc.prompt, /You're running as the COORDINATOR/);
+  // a standard run must NOT carry it.
+  const std = buildApp();
+  await request(std.app, '/api/proxy/autopilot/kickoff', { method: 'POST', body: {} });
+  assert.doesNotMatch(std.added[0].doc.prompt, /You're running as the COORDINATOR/);
+});
+
+test('POST kickoff: sessionId + subscribe are threaded onto the dispatched child item (LIN-813)', async () => {
+  const { app, added } = buildApp();
+  const headId = '11111111-2222-4333-8444-555555555555';
+  // General run (no issueIdentifier) so the threading is exercised without a
+  // resolved workspace — sessionId/subscribe are validated + forwarded regardless.
+  const { status } = await request(app, '/api/proxy/autopilot/kickoff', {
+    method: 'POST',
+    body: { variant: 'coordinator', sessionId: headId, subscribe: true },
+  });
+  assert.equal(status, 201);
+  assert.equal(added.length, 1);
+  // The up-chain edge: the child carries the head's id as its parent sessionId and
+  // is subscribed, so its terminal report wakes the head.
+  assert.equal(added[0].doc.sessionId, headId);
+  assert.equal(added[0].doc.subscribe, true);
+});
+
+test('POST kickoff: a top-level kickoff omitting sessionId/subscribe stays a parent-less head', async () => {
+  const { app, added } = buildApp();
+  await request(app, '/api/proxy/autopilot/kickoff', { method: 'POST', body: {} });
+  assert.equal(added.length, 1);
+  // Defaults: no parent edge, not subscribed — the standard single-head behavior.
+  assert.equal(added[0].doc.sessionId ?? null, null);
+  assert.equal(added[0].doc.subscribe ?? false, false);
+});
+
+test('POST kickoff: an invalid sessionId is a 400; a non-boolean subscribe is a 400', async () => {
+  const bad = buildApp();
+  const r1 = await request(bad.app, '/api/proxy/autopilot/kickoff', {
+    method: 'POST', body: { sessionId: 'not-a-uuid' },
+  });
+  assert.equal(r1.status, 400);
+  assert.match(r1.body.error, /sessionId/);
+  assert.equal(bad.added.length, 0);
+
+  const bad2 = buildApp();
+  const r2 = await request(bad2.app, '/api/proxy/autopilot/kickoff', {
+    method: 'POST', body: { subscribe: 'yes' },
+  });
+  assert.equal(r2.status, 400);
+  assert.match(r2.body.error, /subscribe must be a boolean/);
+  assert.equal(bad2.added.length, 0);
+});
+
 test('GET kickoff preview: ?variant=stepper swaps in the disposition; default omits it', async () => {
   const { app } = buildApp();
   const stepper = await request(app, '/api/proxy/autopilot/kickoff?variant=stepper');

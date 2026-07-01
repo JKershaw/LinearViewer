@@ -1256,10 +1256,11 @@ POST ${baseUrl}/api/proxy/recommend-and-dispatch
   → { "id": "...", "status": "queued", "kind": "plan", "promptName": "plan", "issueIdentifier": "...", "target": "cli", "sessionId": null, "dispatchedAt": "..." }
 
 POST ${baseUrl}/api/proxy/autopilot/kickoff
-  Body: { "goal": "...", "mode": "write|readonly", "variant": "standard|stepper", "issueIdentifier": "LIN-42", "target": "cli|web|dash", "repo": "...", "appendProxyContext": true }
+  Body: { "goal": "...", "mode": "write|readonly", "variant": "standard|stepper|coordinator", "issueIdentifier": "LIN-42", "target": "cli|web|dash", "repo": "...", "appendProxyContext": true, "sessionId": "...", "subscribe": false }
   → Fused launch verb: builds the Autopilot kickoff AND dispatches it in one call — the single verb that actually STARTS a run from a goal (no need to GET the kickoff text and POST it back). The receiving session becomes the Autopilot orchestrator. All fields optional.
   → Omit "issueIdentifier" for a GENERAL run ("goal" focuses the stack walk); pass it for a SCOPED run ("autopilot until THIS task is done") — the project "repo=" is then inherited unless you pass "repo". "mode" defaults to "write" ("readonly" = investigation only).
-  → "variant" defaults to "standard" (the normal orchestrator). "stepper" swaps in the warm single-session, beat-stepping disposition: it decomposes the task's worker prompt into 3–6 ordered beats and drip-feeds them into ONE session over followUpTo+force, judging and challenging each beat before advancing. Orthogonal to "mode" — they compose.
+  → "variant" defaults to "standard" (the normal orchestrator). "stepper" swaps in the warm single-session, beat-stepping disposition: it decomposes the task's worker prompt into 3–6 ordered beats and drip-feeds them into ONE session over followUpTo+force, judging and challenging each beat before advancing. "coordinator" (LIN-813) swaps in the coordinator disposition: a head at user altitude dispatches ONE task-altitude child autopilot per task (this same verb, with the head's "sessionId" + "subscribe": true) and stands by for each child's up-chain report — serial in this slice. Orthogonal to "mode" — they compose.
+  → "sessionId" + "subscribe" (LIN-813) are the coordinator up-chain edge: a head autopilot dispatching a CHILD autopilot passes its OWN session id as "sessionId" (the wake target) with "subscribe": true, so when the child terminates its report is pushed back up to the head instead of the head polling. A top-level kickoff omits both. NOTE the child's own returned "id" (its session id, for ITS sub-workers) stays distinct from the parent "sessionId" you pass in.
   → The stepper kickoff body instructs each beat to carry BOTH "subscribe": true AND "waitForFollowUps": true — the two orthogonal halves of the warm drip (LIN-845). "subscribe" is the up-chain wake (the worker's stop boundary, incl. [pending], wakes the orchestrator); "waitForFollowUps" is the worker-side hold (the worker parks at AWAITING_FOLLOWUP instead of finalizing). Both are needed: with the hold absent the worker finalizes after beat 1, so beat 2's followUpTo+force falls back to a cold claude --resume instead of an in-session warm follow-on.
   → Dispatched as kind:"autopilot", so the returned "id" IS this run's session id. Pass that id as "sessionId" on every worker dispatch the run fans out (the kickoff body also tells the run its own id). The orchestrator itself is launched WITHOUT "waitForFollowUps" (default false) so it finalizes normally and stays free to run its watch loop.
   → The prompt body NEVER returns to you — only the header. The GET twin (GET /api/proxy/autopilot/kickoff?goal=&mode=&variant=) stays a text-only preview/inspect form that does NOT enqueue anything.
@@ -3827,14 +3828,19 @@ One convention across every endpoint, so you can branch on the same fields every
    * never returned to the caller. The GET twin above stays the text-only
    * preview/inspect form.
    *
-   * Body (all optional): { goal?, mode?, variant?, issueIdentifier?, target?, repo?, appendProxyContext? }
+   * Body (all optional): { goal?, mode?, variant?, issueIdentifier?, target?, repo?, appendProxyContext?, sessionId?, subscribe? }
    *   - issueIdentifier present → SCOPED run ("autopilot until THIS task is
    *     done"): the issue's title is resolved for the goal line and its project
    *     `repo=` is inherited (an explicit caller `repo` wins, mirroring /prompt).
    *   - issueIdentifier absent  → GENERAL run; `goal` focuses the stack walk.
    *   - mode: 'write' (default) | 'readonly'.
    *   - variant: 'standard' (default) | 'stepper' (warm beat-stepping disposition,
-   *     LIN-791); orthogonal to mode.
+   *     LIN-791) | 'coordinator' (dispatch one task-altitude child autopilot per
+   *     task, LIN-813); orthogonal to mode.
+   *   - sessionId + subscribe (LIN-813): the coordinator up-chain edge. A head
+   *     autopilot dispatching a CHILD autopilot passes its OWN session id as
+   *     `sessionId` (the wake target) with `subscribe: true`, so the child's
+   *     terminal report wakes the head. A top-level kickoff omits both.
    * Dispatches with kind:'autopilot', so addItem appends the session-id self-ref
    * block and the returned id is the session id (LIN-591/LIN-599).
    */
@@ -3845,7 +3851,7 @@ One convention across every endpoint, so you can branch on the same fields every
     }
 
     try {
-      const { goal, mode, variant, issueIdentifier, target, repo, appendProxyContext } = req.body || {};
+      const { goal, mode, variant, issueIdentifier, target, repo, appendProxyContext, sessionId, subscribe } = req.body || {};
 
       // Validate caller-supplied inputs. (The composed body is server-generated
       // and trusted, so only these raw inputs are checked — same split as the
@@ -3875,6 +3881,19 @@ One convention across every endpoint, so you can branch on the same fields every
       if (issueIdentifier !== undefined && !isValidIssueId(issueIdentifier)) {
         logEvent(req, '/api/proxy/autopilot/kickoff', 400);
         return badRequest.json(res, 'Invalid identifier format');
+      }
+      // Coordinator wiring (LIN-813): a head autopilot dispatches a task-altitude
+      // CHILD autopilot per task, stamping its OWN session id as `sessionId` (the
+      // up-chain wake target) and `subscribe: true` so the child's terminal report
+      // wakes the head. Both are stored + forwarded blindly onto the dispatched item
+      // (same contract as POST /dispatch); validate shape only.
+      if (sessionId !== undefined && sessionId !== null && !UUID_REGEX.test(sessionId)) {
+        logEvent(req, '/api/proxy/autopilot/kickoff', 400);
+        return badRequest.json(res, 'Invalid sessionId format');
+      }
+      if (subscribe !== undefined && typeof subscribe !== 'boolean') {
+        logEvent(req, '/api/proxy/autopilot/kickoff', 400);
+        return badRequest.json(res, 'subscribe must be a boolean');
       }
 
       const baseUrl = `${req.protocol}://${req.get('host')}`;
@@ -3942,7 +3961,17 @@ One convention across every endpoint, so you can branch on the same fields every
         // must stop at a holdable AWAITING_FOLLOWUP point to receive those wakes
         // instead of polling. This inverts the old "free the producer" rule only
         // for the subscribed case; Phase 2 retires that rule in the prose.
-        waitForFollowUps: true
+        waitForFollowUps: true,
+        // Coordinator up-chain edge (LIN-813): when this kickoff is a CHILD
+        // autopilot dispatched by a head, `sessionId` targets the head and
+        // `subscribe: true` routes the child's terminal report back up to it.
+        // A top-level kickoff passes neither, so both default to null/false and
+        // the standard single-head behavior is unchanged. Stored + forwarded
+        // blindly; note `sessionId` here is the PARENT edge — the child's own
+        // `_id` is what addItem stamps into its prompt for its own sub-workers,
+        // so the two ids stay distinct by construction.
+        sessionId: sessionId || null,
+        subscribe: subscribe === true
       });
 
       logEvent(req, '/api/proxy/autopilot/kickoff', 201);

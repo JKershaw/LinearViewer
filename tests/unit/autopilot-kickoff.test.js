@@ -204,7 +204,7 @@ describe('buildAutopilotKickoff (variant axis, LIN-791)', () => {
   const STEPPER_MARKER = "You're running as the STEPPER";
 
   test('AUTOPILOT_VARIANTS enumerates the variants; default is standard', () => {
-    assert.deepStrictEqual(AUTOPILOT_VARIANTS, ['standard', 'stepper']);
+    assert.deepStrictEqual(AUTOPILOT_VARIANTS, ['standard', 'stepper', 'coordinator']);
     assert.strictEqual(AUTOPILOT_VARIANT_DEFAULT, 'standard');
   });
 
@@ -295,5 +295,65 @@ describe('buildAutopilotKickoff (variant axis, LIN-791)', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL, mode: 'readonly', variant: 'stepper' });
     assert.ok(text.includes('READ-ONLY'));
     assert.ok(text.includes(STEPPER_MARKER));
+  });
+});
+
+describe('buildAutopilotKickoff (coordinator variant, LIN-813)', () => {
+  const SEP = '\n\n---\n\n';
+  const COORDINATOR_MARKER = "You're running as the COORDINATOR";
+  const STEPPER_MARKER = "You're running as the STEPPER";
+
+  test('standard output carries NO coordinator disposition markers', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, variant: 'standard' });
+    assert.ok(!text.includes(COORDINATOR_MARKER));
+  });
+
+  test('coordinator inserts exactly one additive section — the standard sections stay byte-identical', () => {
+    const standard = buildAutopilotKickoff({ baseUrl: BASE_URL, variant: 'standard' });
+    const coordinator = buildAutopilotKickoff({ baseUrl: BASE_URL, variant: 'coordinator' });
+
+    const stdSections = standard.split(SEP);
+    const coordSections = coordinator.split(SEP);
+    // coordinator adds exactly one section...
+    assert.strictEqual(coordSections.length, stdSections.length + 1);
+    const added = coordSections.filter(s => s.includes(COORDINATOR_MARKER));
+    assert.strictEqual(added.length, 1);
+    // ...and removing it reconstitutes the standard kickoff EXACTLY.
+    const withoutCoord = coordSections.filter(s => !s.includes(COORDINATOR_MARKER)).join(SEP);
+    assert.strictEqual(withoutCoord, standard);
+    // The two dispositions are mutually exclusive — a coordinator run never carries stepper prose.
+    assert.ok(!coordinator.includes(STEPPER_MARKER));
+  });
+
+  test('coordinator output carries the full disposition (one child AP per task, up-chain wake, serial, follow-ups deferred)', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, variant: 'coordinator' });
+    assert.ok(text.includes(COORDINATOR_MARKER));
+    // dispatches a child autopilot per task via the kickoff verb, not a worker step
+    assert.ok(text.includes('/autopilot/kickoff'));
+    assert.ok(text.includes('CHILD autopilot'));
+    // the up-chain edge: head's own id as sessionId + subscribe:true
+    assert.ok(text.includes('sessionId'));
+    assert.ok(text.includes('subscribe: true'));
+    // stands by for the push, does not poll
+    assert.ok(/stand by/i.test(text));
+    assert.ok(text.includes('[pending]'));
+    // serial-only + deferred follow-ups are named
+    assert.ok(/serial/i.test(text));
+    assert.ok(text.includes('LIN-874'));
+    // context isolation is the stated win
+    assert.ok(/context isolation/i.test(text));
+  });
+
+  test('variant is orthogonal to mode — coordinator composes with readonly', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, mode: 'readonly', variant: 'coordinator' });
+    assert.ok(text.includes('READ-ONLY'));
+    assert.ok(text.includes(COORDINATOR_MARKER));
+  });
+
+  test("omitting variant still equals variant:'standard' (coordinator never leaks into the default)", () => {
+    assert.strictEqual(
+      buildAutopilotKickoff({ baseUrl: BASE_URL }),
+      buildAutopilotKickoff({ baseUrl: BASE_URL, variant: 'standard' })
+    );
   });
 });
