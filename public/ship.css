@@ -57,9 +57,9 @@ body:has(.ship-page) {
   position: absolute;
   /* Top-left, width, height, and padding all set inline by client JS so the
      rect's footprint exactly matches computeShipDimensions() output. */
-  border: 1.5px solid #2c3e50;
+  border: 1.5px solid var(--border-strong);
   border-radius: 4px;
-  background: rgba(44, 62, 80, 0.04);
+  background: var(--inset);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   box-sizing: border-box;
   z-index: 5;
@@ -72,7 +72,7 @@ body:has(.ship-page) {
   transform: translateX(-50%);
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
   font-size: 9px;
-  color: #2c3e50;
+  color: var(--text);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   opacity: 0.6;
@@ -158,13 +158,13 @@ body:has(.ship-page) {
 
 .ship-sector-guide circle {
   fill: none;
-  stroke: rgba(0, 0, 0, 0.16);
+  stroke: var(--line-soft);
   stroke-width: 1;
   stroke-dasharray: 2 4;
 }
 
 .ship-sector-guide line {
-  stroke: rgba(44, 62, 80, 0.45);
+  stroke: var(--line);
   stroke-width: 1.25;
   stroke-dasharray: 6 4;
 }
@@ -176,9 +176,9 @@ body:has(.ship-page) {
   font-weight: 600;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: #2c3e50;
+  color: var(--text);
   background: var(--bg);
-  border: 1px solid rgba(44, 62, 80, 0.25);
+  border: 1px solid var(--line);
   padding: 3px 9px;
   border-radius: var(--radius-sm);
   pointer-events: none;
@@ -209,9 +209,9 @@ body:has(.ship-page) {
   font-weight: 600;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: #2c3e50;
+  color: var(--text);
   background: var(--bg);
-  border: 1px solid rgba(44, 62, 80, 0.25);
+  border: 1px solid var(--line);
   padding: 3px 9px;
   border-radius: var(--radius-sm);
   cursor: pointer;
@@ -220,17 +220,17 @@ body:has(.ship-page) {
 }
 
 .ship-heading-chip:hover {
-  border-color: rgba(44, 62, 80, 0.55);
+  border-color: var(--border-strong);
 }
 
 .ship-heading-chip[data-state="empty"] {
-  color: rgba(44, 62, 80, 0.55);
+  color: var(--muted);
   border-style: dashed;
 }
 
 .ship-heading-picker {
   background: var(--bg);
-  border: 1px solid rgba(44, 62, 80, 0.25);
+  border: 1px solid var(--line);
   border-radius: 4px;
   padding: 10px 12px;
   display: flex;
@@ -250,7 +250,7 @@ body:has(.ship-page) {
   gap: 8px;
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
   font-size: 11px;
-  color: #2c3e50;
+  color: var(--text);
 }
 
 .ship-heading-row-label {
@@ -258,7 +258,7 @@ body:has(.ship-page) {
   letter-spacing: 0.1em;
   text-transform: uppercase;
   font-size: 10px;
-  color: rgba(44, 62, 80, 0.7);
+  color: var(--muted);
 }
 
 .ship-heading-row select {
@@ -266,10 +266,10 @@ body:has(.ship-page) {
   font-family: inherit;
   font-size: 11px;
   padding: 3px 6px;
-  border: 1px solid rgba(44, 62, 80, 0.25);
+  border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--bg);
-  color: #2c3e50;
+  color: var(--text);
 }
 
 .ship-heading-clear {
@@ -277,9 +277,9 @@ body:has(.ship-page) {
   font-size: 10px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: rgba(44, 62, 80, 0.7);
+  color: var(--muted);
   background: none;
-  border: 1px dashed rgba(44, 62, 80, 0.25);
+  border: 1px dashed var(--line);
   border-radius: var(--radius-sm);
   padding: 4px 8px;
   cursor: pointer;
@@ -287,8 +287,8 @@ body:has(.ship-page) {
 }
 
 .ship-heading-clear:hover {
-  color: #2c3e50;
-  border-color: rgba(44, 62, 80, 0.55);
+  color: var(--text);
+  border-color: var(--border-strong);
 }
 
 /* ==========================================================================
@@ -306,7 +306,7 @@ body:has(.ship-page) {
   align-items: center;
   gap: 0;
   background: var(--bg);
-  border: 1px solid rgba(44, 62, 80, 0.25);
+  border: 1px solid var(--line);
   border-radius: 4px;
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
@@ -317,7 +317,7 @@ body:has(.ship-page) {
   font-size: 11px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(44, 62, 80, 0.6);
+  color: var(--muted);
   background: var(--bg);
   border: none;
   padding: 5px 11px;
@@ -326,21 +326,22 @@ body:has(.ship-page) {
 }
 
 .ship-mode-btn + .ship-mode-btn {
-  border-left: 1px solid rgba(44, 62, 80, 0.18);
+  border-left: 1px solid var(--line-soft);
 }
 
 .ship-mode-btn:hover:not(:disabled) {
-  color: #2c3e50;
-  background: rgba(44, 62, 80, 0.04);
+  color: var(--text);
+  background: var(--inset);
 }
 
 .ship-mode-btn.active {
   color: var(--bg);
-  background: #2c3e50;
+  background: var(--brand);
 }
 
 .ship-mode-btn:disabled {
-  color: rgba(44, 62, 80, 0.3);
+  color: var(--muted);
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
@@ -348,7 +349,7 @@ body:has(.ship-page) {
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
   font-size: 9px;
   letter-spacing: 0.06em;
-  color: rgba(44, 62, 80, 0.5);
+  color: var(--muted);
   padding: 0 10px;
   white-space: nowrap;
 }
@@ -357,7 +358,7 @@ body:has(.ship-page) {
 
 /* Compass rose (orientation mode) — diagonals fainter than cardinals. */
 .ship-sector-guide line.ship-compass-diagonal {
-  stroke: rgba(44, 62, 80, 0.22);
+  stroke: var(--line-soft);
   stroke-dasharray: 3 5;
 }
 
@@ -386,7 +387,7 @@ body:has(.ship-page) {
   display: flex;
   align-items: stretch;
   background: var(--bg);
-  border: 1px solid rgba(44, 62, 80, 0.25);
+  border: 1px solid var(--line);
   border-radius: 4px;
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
@@ -396,7 +397,7 @@ body:has(.ship-page) {
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
   font-size: 13px;
   line-height: 1;
-  color: rgba(44, 62, 80, 0.7);
+  color: var(--muted);
   background: var(--bg);
   border: none;
   padding: 6px 11px;
@@ -405,12 +406,12 @@ body:has(.ship-page) {
 }
 
 .ship-zoom-btn + .ship-zoom-btn {
-  border-left: 1px solid rgba(44, 62, 80, 0.18);
+  border-left: 1px solid var(--line-soft);
 }
 
 .ship-zoom-btn:hover {
-  color: #2c3e50;
-  background: rgba(44, 62, 80, 0.04);
+  color: var(--text);
+  background: var(--inset);
 }
 
 .ship-zoom-reset {
