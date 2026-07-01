@@ -215,19 +215,20 @@
 }
 
 /* =============================================================================
-   Report Summary
+   Report Summary — a flex row of accent-coded .card primitives (LIN-858).
+   The card chrome (border/fill/accent) comes from the canonical `.card` rules in
+   style.css; only the layout row + the stat number/label typography live here.
    ============================================================================= */
 .report-summary {
   display: flex;
-  gap: var(--space-5);
+  gap: var(--space-3);
   flex-wrap: wrap;
   margin-bottom: var(--space-5);
-  padding: var(--space-3);
-  background: var(--bg-alt);
-  border-radius: 4px;
 }
 
-.summary-stat {
+.report-summary .summary-stat {
+  flex: 1 1 8rem;
+  margin-bottom: 0;
   display: flex;
   flex-direction: column;
 }
@@ -239,18 +240,6 @@
   color: var(--fg);
 }
 
-.stat-value.good {
-  color: var(--green);
-}
-
-.stat-value.warning {
-  color: var(--yellow);
-}
-
-.stat-value.bad {
-  color: var(--red);
-}
-
 .stat-label {
   font-family: var(--font-content);
   font-size: 0.8em;
@@ -259,110 +248,58 @@
 }
 
 /* =============================================================================
-   Report Sections
+   Report Sections — collapsible domains are `.disclosure` (native <details>);
+   chrome/caret come from the canonical `.disclosure` rules in style.css. The
+   `.report-section` hook only carries inter-domain spacing. The domain heading
+   rides `.disclosure__label` and keeps the `.section-header` hook (its typography
+   comes from `.disclosure__summary`, so no extra rule is needed here).
    ============================================================================= */
 .report-section {
-  margin-bottom: var(--space-5);
+  margin-bottom: var(--space-3);
 }
 
-.section-header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  cursor: pointer;
-  padding: var(--space-2) 0;
+/* Sub-headings inside a domain body. */
+.audit-report h4 {
   font-family: var(--font-content);
+  font-size: var(--font-size-base);
   font-weight: 500;
   color: var(--fg);
+  margin: 0 0 var(--space-2) 0;
 }
 
-.section-header:hover {
-  color: var(--blue);
+.section-subhead {
+  margin-top: var(--space-4) !important;
 }
 
-.section-toggle {
+/* Muted "nothing here" note. */
+.empty-note {
   color: var(--fg-dim);
-  font-size: var(--font-size-sm);
+  font-family: var(--font-content);
+  font-size: 0.9em;
 }
 
-.section-content {
-  padding-left: var(--space-4);
+/* A flex-wrapping cluster of .tag / .status-pill chips. */
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
   margin-top: var(--space-2);
 }
 
-.section-content.hidden {
-  display: none;
-}
-
 /* =============================================================================
-   Data Tables and Lists
+   Queue Readiness — rows are `.field` primitives; the leading marker is a
+   `.status-pill`. Only the trailing label/count spans inside the field value
+   need local typography.
    ============================================================================= */
-.data-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+.queue-status-msg {
+  margin: 0 0 var(--space-3) 0;
 }
 
-.data-list li {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-3);
-  padding: var(--space-1) 0;
-  font-family: var(--font-content);
-  font-size: 0.9em;
-}
-
-.data-list .label {
-  color: var(--fg-dim);
-  min-width: 15ch;
-}
-
-.data-list .value {
-  color: var(--fg);
-}
-
-.data-list .count {
-  color: var(--fg-dim);
-  font-family: var(--font-structural);
-  font-size: var(--font-size-sm);
-}
-
-/* Queue Status List */
-.queue-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.queue-item {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-3);
-  padding: 0.35rem 0;
-  font-family: var(--font-content);
-  font-size: 0.9em;
-}
-
-.queue-status {
-  flex-shrink: 0;
-  width: 1.5ch;
-}
-
-.queue-status.exists {
-  color: var(--green);
-}
-
-.queue-status.missing {
-  color: var(--red);
-}
-
-.queue-status.optional {
-  color: var(--fg-dim);
-}
-
-.queue-name {
-  min-width: 12ch;
-  font-weight: 500;
+.queue-item .field-value {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
 }
 
 .queue-label {
@@ -375,66 +312,9 @@
   font-size: var(--font-size-sm);
 }
 
-.queue-required {
-  color: var(--red);
-  font-size: 0.8em;
-  font-family: var(--font-structural);
-}
-
-/* Labels List */
-.labels-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-top: var(--space-2);
-}
-
-.label-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5ch;
-  padding: 0.2rem var(--space-2);
-  background: var(--card-h);
-  border-radius: var(--radius-sm);
-  font-family: var(--font-content);
-  font-size: var(--font-size-sm);
-}
-
-.label-tag .tag-name {
-  color: var(--fg);
-}
-
-.label-tag .tag-count {
-  color: var(--fg-dim);
-  font-family: var(--font-structural);
-  font-size: var(--font-size-sm);
-}
-
-.label-tag.mapped,
-.label-tag.workflow.present {
-  background: color-mix(in srgb, var(--teal) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--teal) 30%, transparent);
-}
-
-.label-tag.unmapped,
-.label-tag.other {
-  background: var(--card-h);
-}
-
-.label-tag.missing,
-.label-tag.workflow.missing {
-  background: color-mix(in srgb, var(--red) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--red) 30%, transparent);
-}
-
-.label-tag .tag-status {
-  color: var(--red);
-  font-family: var(--font-structural);
-  font-size: var(--font-size-sm);
-  font-style: italic;
-}
-
-/* Issues List (for health problems) */
+/* =============================================================================
+   Issues List (health sample items — a box-drawing tree, not a primitive).
+   ============================================================================= */
 .issues-list {
   list-style: none;
   padding: 0;
@@ -463,11 +343,6 @@
   max-width: 50ch;
 }
 
-.issues-list .issue-meta {
-  color: var(--fg-dim);
-  font-size: 0.9em;
-}
-
 /* More link */
 .more-link {
   color: var(--fg-dim);
@@ -477,29 +352,12 @@
   display: block;
 }
 
-/* Health Indicator */
+/* Health Indicator — a status pill (count) + descriptive label. */
 .health-indicator {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
   padding: 0.2rem 0;
-}
-
-.health-count {
-  font-family: var(--font-structural);
-  font-weight: 600;
-}
-
-.health-count.good {
-  color: var(--green);
-}
-
-.health-count.warning {
-  color: var(--yellow);
-}
-
-.health-count.bad {
-  color: var(--red);
 }
 
 .health-label {
@@ -508,73 +366,27 @@
   font-size: 0.9em;
 }
 
-/* Field Usage Bar */
-.usage-bar-container {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-1) 0;
-}
-
-.usage-label {
-  min-width: 10ch;
-  color: var(--fg-dim);
-  font-family: var(--font-content);
-  font-size: 0.9em;
-}
-
-.usage-bar {
-  flex: 1;
-  max-width: 20ch;
-  height: 0.5rem;
-  background: var(--fg-vdim);
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.usage-bar-fill {
-  height: 100%;
-  background: var(--green);
-  transition: width 0.3s ease;
-}
-
-.usage-bar-fill.low {
-  background: var(--yellow);
-}
-
-.usage-bar-fill.very-low {
-  background: var(--red);
-}
-
-.usage-percent {
-  font-family: var(--font-structural);
-  font-size: var(--font-size-sm);
-  color: var(--fg);
-  min-width: 4ch;
-  text-align: right;
-}
-
-/* Projects Table */
+/* =============================================================================
+   Projects — rows are `.field` primitives; the value holds state + count.
+   ============================================================================= */
 .projects-table {
   margin-top: var(--space-2);
 }
 
-.project-row {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-3);
-  padding: var(--space-1) 0;
-  font-family: var(--font-content);
-  font-size: 0.9em;
-}
-
-.project-name {
+.project-row .field-label {
   flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--fg);
+}
+
+.project-row .field-value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  flex-shrink: 0;
 }
 
 .project-state {
@@ -589,32 +401,6 @@
   font-size: var(--font-size-sm);
   min-width: 5ch;
   text-align: right;
-}
-
-/* State breakdown */
-.state-breakdown {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-4);
-  margin-top: var(--space-2);
-}
-
-.state-item {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
-}
-
-.state-name {
-  color: var(--fg-dim);
-  font-family: var(--font-content);
-  font-size: 0.9em;
-}
-
-.state-count {
-  font-family: var(--font-structural);
-  font-weight: 500;
-  color: var(--fg);
 }
 
 /* Timestamp */
@@ -633,10 +419,10 @@
 @media (max-width: 640px) {
   .report-summary {
     flex-direction: column;
-    gap: var(--space-3);
+    gap: var(--space-2);
   }
 
-  .summary-stat {
+  .report-summary .summary-stat {
     flex-direction: row;
     align-items: baseline;
     gap: var(--space-2);
@@ -644,14 +430,6 @@
 
   .stat-value {
     font-size: 1.2rem;
-  }
-
-  .queue-item {
-    flex-wrap: wrap;
-  }
-
-  .usage-bar {
-    max-width: 15ch;
   }
 
   .project-row {
