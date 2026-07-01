@@ -18,6 +18,13 @@ describe('renderLoginPage — GitHub CTA gating (LIN-541)', () => {
     assert.match(html, /Continue with GitHub/);
   });
 
+  test('GitHub CTA carries a distinct class so it is styled apart from the primary login CTA (LIN-860)', () => {
+    const html = renderLoginPage({ githubEnabled: true });
+    // The GitHub CTA reuses the base .login-button but must also carry the
+    // .login-button-github differentiation hook (filled brand vs. outline).
+    assert.match(html, /class="login-button login-button-github"/);
+  });
+
   test('omits the GitHub button when GitHub OAuth is not enabled', () => {
     const html = renderLoginPage({ githubEnabled: false });
     assert.doesNotMatch(html, /data-testid="login-github"/);

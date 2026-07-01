@@ -1540,7 +1540,8 @@ a.wordmark:hover {
    Login Page (Landing Page CTA)
    =============================================================================
    Shown at the bottom of the landing page for unauthenticated users.
-   Button uses Linear's brand purple color.
+   Primary CTA is a filled brand action (mirrors the primary button idiom); the
+   GitHub CTA is a differentiated outline variant so the two never read alike.
 */
 .login-container {
   text-align: center;
@@ -1556,15 +1557,30 @@ a.wordmark:hover {
 .login-button {
   display: inline-block;
   padding: 0.75rem var(--space-4);
-  background: #5e6ad2;  /* Linear's brand purple */
-  color: white;
+  background: var(--brand);  /* product accent (teal, LIN-860) — no more hard-coded purple */
+  color: var(--bg);
   text-decoration: none;
+  border: 1px solid var(--brand);
   border-radius: 4px;
   font-family: var(--font-content);
 }
 
 .login-button:hover {
-  background: #4e5bc2;
+  background: color-mix(in srgb, var(--brand) 85%, black);
+  border-color: color-mix(in srgb, var(--brand) 85%, black);
+}
+
+/* GitHub CTA — differentiated from the primary brand action: a chromeless
+   outline that sits below the filled Linear CTA so the two never look alike. */
+.login-button-github {
+  background: transparent;
+  color: var(--fg);
+  border-color: var(--border);
+}
+
+.login-button-github:hover {
+  background: var(--card-h);
+  border-color: var(--border-strong);
 }
 
 /* Local-workspace CTA — secondary action below the Linear login button.
