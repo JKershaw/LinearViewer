@@ -3900,6 +3900,17 @@ One convention across every endpoint, so you can branch on the same fields every
         return badRequest.json(res, 'subscribe must be a boolean');
       }
 
+      // Wake-half default (LIN-881): sibling of the plain-`/dispatch` gap. A
+      // coordinator dispatching a CHILD autopilot (LIN-813) stamps its OWN
+      // `sessionId` as the up-chain wake target, but nothing defaulted the WAKE
+      // (`subscribe`) — so the child's terminal report woke nothing unless the
+      // coordinator remembered the flag. Default subscribe ON whenever a
+      // `sessionId` is present, mirroring plain `/dispatch` and
+      // `recommend-and-dispatch`; an explicit value (true OR false) still wins. A
+      // top-level kickoff carries no `sessionId`, so it stays `subscribe:false`
+      // and single-head behavior is unchanged.
+      const subscribeResolved = typeof subscribe === 'boolean' ? subscribe : !!sessionId;
+
       const baseUrl = `${req.protocol}://${req.get('host')}`;
 
       // SCOPED run: resolve the named issue so the goal line can name it and we
@@ -3975,7 +3986,7 @@ One convention across every endpoint, so you can branch on the same fields every
         // addItem stamps into its prompt for its own sub-workers, so the two ids
         // stay distinct by construction.
         sessionId: sessionId || null,
-        subscribe: subscribe === true
+        subscribe: subscribeResolved
       });
 
       logEvent(req, '/api/proxy/autopilot/kickoff', 201);
@@ -4175,6 +4186,21 @@ One convention across every endpoint, so you can branch on the same fields every
         }
       }
 
+      // Wake-half default (LIN-881): `subscribe` is the up-chain wake — the
+      // worker's terminal/`PENDING` boundary enqueues a wake so its head learns
+      // the beat is done and drips the next one. Stepper warm-drip beats carry the
+      // HOLD (`waitForFollowUps:true`) but relied on the agent to hand-set the
+      // WAKE, so an omitted `subscribe` left `PENDING` waking nothing and every
+      // beat boundary deadlocked. Remove that reliance: default subscribe ON
+      // whenever a `sessionId` is present (the up-chain edge exists), exactly as
+      // `recommend-and-dispatch` does — an explicit caller value (true OR false)
+      // still wins. A sessionless dispatch has no head to wake, so it stays off.
+      // (Beats also carry `followUpTo` to resume the warm session; the wake keys
+      // on `sessionId`, not on being a fresh dispatch — a follow-on beat must wake
+      // its head too. The `buildWakeFollowUp` self-skip `childId === sessionId`
+      // still prevents an orchestrator from waking itself.)
+      const subscribeResolved = typeof subscribe === 'boolean' ? subscribe : !!sessionId;
+
       // Auto-append the proxy context (workspace API access + reporting channel) by
       // default, so the worker can both read context and report its result.
       // Opt out with appendProxyContext:false (e.g. a self-contained prompt).
@@ -4222,7 +4248,7 @@ One convention across every endpoint, so you can branch on the same fields every
         sessionId: sessionId || null,
         waitForFollowUps: waitForFollowUps === true,
         queueIfBusy: queueIfBusy === true,
-        subscribe: subscribe === true
+        subscribe: subscribeResolved
       });
 
       logEvent(req, '/api/proxy/dispatch', 201);
