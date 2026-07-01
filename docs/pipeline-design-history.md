@@ -1,5 +1,7 @@
 # Pipeline: Design History
 
+> **Superseded by the Observation view; the Pipeline view was removed in LIN-877.** Kept as design history.
+
 > Background notes for **LIN-243** (Pipeline).
 >
 > The content below is the original three-iteration feasibility review and end-to-end design document. It is preserved verbatim because it records *why* each decision was made — particularly the TTL mismatch discovery in iteration 2 and the case for treating the dispatch history item as the Loop primary key in iteration 3.

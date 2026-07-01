@@ -79,7 +79,6 @@ import { renderDispatchPage } from './lib/render-dispatch.js'
 import { renderSwipePage } from './lib/render-swipe.js'
 import { renderSwimPage } from './lib/render-swim.js'
 import { renderShipPage } from './lib/render-ship.js'
-import { createPipelineRoutes } from './routes/pipeline.js'
 import { createCollectiveRoutes } from './routes/collective.js'
 import { createDashboardRoutes, sessionIsTerminal } from './routes/dashboard.js'
 import { createSessionsFeedCache } from './lib/sessions-feed-cache.js'
@@ -1174,7 +1173,7 @@ async function resolveWorkspaceAccess(urlKey) {
 }
 
 // Thin wrapper preserving the token-only contract for existing callers
-// (pipeline-state.js, routes/pipeline.js, routes/test.js). Unchanged behaviour.
+// (routes/test.js). Unchanged behaviour.
 async function getWorkspaceAccessToken(urlKey) {
   return (await resolveWorkspaceAccess(urlKey)).token;
 }
@@ -1240,9 +1239,6 @@ app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, 
 
 // Mount workspace API routes (audit, prompts, recommendations, comments, images)
 app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore }))
-
-// Mount pipeline routes (page + JSON polling)
-app.use(createPipelineRoutes({ workspaceFromUrl, getWorkspaceAccessToken, dispatchQueueStore, agentStatusStore, getOpenRouterSource, getDeployInfo, handleUnauthorizedError }))
 
 // Mount collective routes (experimental cross-project discussion — LIN-450).
 // yapClient is null when YAP_BASE_URL is unset; the routes degrade gracefully.
