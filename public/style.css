@@ -1540,8 +1540,8 @@ a.wordmark:hover {
    Login Page (Landing Page CTA)
    =============================================================================
    Shown at the bottom of the landing page for unauthenticated users.
-   Primary CTA is a filled brand action (mirrors .btn--primary); the GitHub
-   CTA is a differentiated outline variant so the two actions never read alike.
+   Primary CTA is a filled brand action (mirrors the primary button idiom); the
+   GitHub CTA is a differentiated outline variant so the two never read alike.
 */
 .login-container {
   text-align: center;
