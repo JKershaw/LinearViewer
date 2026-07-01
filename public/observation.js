@@ -80,12 +80,55 @@ const expandedRuns = new Set();            // loopId (worker-node drill-down)
 
 const PROVENANCE_LABEL = { seed: 'seed', descended: 'descended', 'spun-off': 'spun-off' };
 
-// Status strings mirror the server contract (routes/dashboard.js deriveSessionStatus).
-// `done-with-warning` (LIN-749): a terminal session that errored at least once but
-// whose touched task is now Done — green ✓ plus a ⚠ warning glyph.
-const STATUS_ICON = { 'in-progress': '◐', done: '✓', 'done-with-warning': '✓', error: '✕', stale: '○' };
-const STATUS_LABEL = { 'in-progress': 'in progress', done: 'done', 'done-with-warning': 'done ⚠', error: 'error', stale: 'stale' };
-const STATE_ICON = { complete: '✓', error: '✕', running: '◐', waiting: '◌', queued: '○' };
+// ─── Status-vocabulary reconciliation onto the theme's 4-state model (LIN-783) ──
+//
+// The theme's run-status StatusPill/SegmentBar own exactly four colours
+// (running=amber, done=green, error=red, queued=slate). The live page carries
+// five session statuses and five run states, so both are mapped down here — the
+// SINGLE source of truth reused by the pill, the progress bar, and the workspace
+// health dot, so a card and a chip can never disagree. No 5th colour is minted:
+// `done-with-warning` stays a `done` pill plus an additive ⚠ marker, `stale`
+// borrows the inert slate/queued treatment, and non-terminal `waiting` lands in
+// the amber running-family with its own title (never colour-alone vs queued-slate).
+
+// Session status (routes/dashboard.js deriveSessionStatus) → pill variant + label.
+const SESSION_PILL = {
+  'in-progress':       { variant: 'running', label: 'in progress' },
+  done:                { variant: 'done',    label: 'done' },
+  'done-with-warning': { variant: 'done',    label: 'done', warn: true },
+  error:               { variant: 'error',   label: 'error' },
+  stale:               { variant: 'queued',  label: 'stale' },
+};
+
+// Worker-run agentState (effectiveAgentState) → segment cell + phase-node state.
+const RUN_STATE = {
+  queued:   { state: 'queued',  label: 'queued' },
+  running:  { state: 'running', label: 'running',  live: true },
+  waiting:  { state: 'running', label: 'waiting',  live: true },
+  complete: { state: 'done',    label: 'complete' },
+  error:    { state: 'error',   label: 'error' },
+};
+
+// Phase-timeline node glyph per canonical state (decorative — the textual state
+// label sits beside it, so state is never conveyed by glyph/colour alone).
+const NODE_GLYPH = { done: '✓', error: '✕', running: '◐', queued: '○' };
+
+function runState(agentState) {
+  return RUN_STATE[agentState] || { state: 'queued', label: agentState || 'queued' };
+}
+
+// Emit the canonical `.status-pill` run-status markup (LIN-786 primitive) from
+// client JS. The shared contract is the global CSS class API, not the server
+// helper (`lib/components/status-pill.js`), which cards can't reach client-side —
+// the class strings are hand-mirrored here (the tracked Phase-B seam).
+function statusPillHtml(variant, label, { warn = false } = {}) {
+  const warnMark = warn
+    ? `<span class="status-pill__warn" title="a run errored" aria-label="warning">⚠</span>`
+    : '';
+  return `<span class="status-pill status-pill--dot status-pill--${escapeHtml(variant)}">`
+    + `<span class="status-pill__dot" aria-hidden="true"></span>`
+    + `<span class="status-pill__label">${escapeHtml(label)}</span>${warnMark}</span>`;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -155,18 +198,20 @@ function sessionSignature(s) {
 
 function renderProgressBar(s) {
   if (!s.runs.length) {
-    return `<div class="obs-progress-row"><div class="obs-progress obs-progress-empty" aria-label="no worker runs yet"></div></div>`;
+    return `<div class="obs-progress-row"><span class="segment-bar obs-progress" role="img" aria-label="no worker runs yet"><span class="segment-bar__cell segment-bar__cell--empty" title="no worker runs yet"></span></span></div>`;
   }
-  const segs = s.runs.map(r => {
-    const live = r.agentState === 'running' || r.agentState === 'waiting' || r.agentState === 'queued';
-    const title = `${r.issueIdentifier || 'run'}${r.stage ? ' · ' + r.stage : ''} — ${r.agentState}`;
-    return `<span class="obs-seg" data-state="${escapeHtml(r.agentState || '')}"${live ? ' data-live="1"' : ''} title="${escapeHtml(title)}"></span>`;
+  // Canonical SegmentBar cells (LIN-786): one equal cell per worker run, coloured
+  // by the run→4-state map. `data-live` drives the running-cell pulse (page CSS).
+  const cells = s.runs.map(r => {
+    const m = runState(r.agentState);
+    const title = `${r.issueIdentifier || 'run'}${r.stage ? ' · ' + r.stage : ''} — ${m.label}`;
+    return `<span class="segment-bar__cell segment-bar__cell--${m.state}"${m.live ? ' data-live="1"' : ''} title="${escapeHtml(title)}"></span>`;
   }).join('');
   // N/M count beside the bar (mockup): finished worker runs over total (LIN-608).
   const total = s.runCount || s.runs.length;
   const done = s.runs.filter(r => r.agentState === 'complete' || r.agentState === 'error').length;
   return `<div class="obs-progress-row">
-      <div class="obs-progress" aria-label="${s.runCount} worker run${s.runCount === 1 ? '' : 's'}">${segs}</div>
+      <span class="segment-bar obs-progress" role="img" aria-label="${s.runCount} worker run${s.runCount === 1 ? '' : 's'}">${cells}</span>
       <span class="obs-progress-count">${done}/${total}</span>
     </div>`;
 }
@@ -191,10 +236,14 @@ function renderSummaryLine(s) {
 
 function fillSessionHead(li, s) {
   const status = displayStatus(s);
-  const icon = STATUS_ICON[status] || '○';
-  const label = STATUS_LABEL[status] || status || '';
-  const title = s.seedTitle || s.seedIssue || 'autopilot session';
+  const pill = SESSION_PILL[status] || { variant: 'queued', label: status || '' };
   const ident = s.seedIssue || `run ${shortSessionId(s.sessionId)}`;
+  // Bug 1 (LIN-783): the identifier already appears once, on the topline. The
+  // name line must never fall back to the id (that duplicated it when a session
+  // had no seedTitle) — use a neutral placeholder, and drop the name line
+  // entirely if it would only echo the ident.
+  const title = s.seedTitle || (s.seedIssue ? '' : 'autopilot session');
+  const showName = title && title !== ident;
   const runtime = formatRuntime(s.runtime);
 
   // Prominent labelled meta line (mockup): runtime / model, with workspace + task
@@ -205,14 +254,17 @@ function fillSessionHead(li, s) {
   if (s.workspaceName) metaBits.push(`<span class="obs-meta obs-meta-ws">${escapeHtml(s.workspaceName)}</span>`);
   if (s.tasksTouched.length > 1) metaBits.push(`<span class="obs-meta">${s.tasksTouched.length} tasks</span>`);
 
+  // Bug 2 (timestamp clip): the ident is the only flexible cell (it truncates
+  // with an ellipsis); the pill and the time hold a fixed right column, so the
+  // "updated …" stamp never squeezes shut at narrow widths.
   li.querySelector('.obs-session-head').innerHTML = `
     <span class="obs-session-topline">
       <span class="obs-session-caret" aria-hidden="true">▸</span>
       <span class="obs-session-ident">${escapeHtml(String(ident))}</span>
-      <span class="obs-pill" data-status="${escapeHtml(status)}">${escapeHtml(icon)} ${escapeHtml(label)}</span>
+      ${statusPillHtml(pill.variant, pill.label, { warn: pill.warn })}
       <span class="obs-session-time">updated ${escapeHtml(relativeTime(s.lastActivity))}</span>
     </span>
-    <span class="obs-session-name">${escapeHtml(String(title))}</span>
+    ${showName ? `<span class="obs-session-name">${escapeHtml(String(title))}</span>` : ''}
     <span class="obs-session-summary">${renderSummaryLine(s)}</span>
     ${metaBits.length ? `<span class="obs-session-meta-line">${metaBits.join('')}</span>` : ''}
     ${renderProgressBar(s)}`;
@@ -277,7 +329,13 @@ function diffSessionList(listId, emptyId, cardMap, sessions) {
     fillSessionHead(el, s);
     wireSummaryGen(el, s);
     applySessionState(el, s);
-    list.appendChild(el);
+    // Q5 (LIN-783): freeze an expanded (being-read) card's list position. Every
+    // poll otherwise re-appends cards in server order, so a card could jump mid-
+    // read as its activity ranking changes. An already-placed expanded card keeps
+    // its slot; genuinely new cards (and every collapsed card) still order/animate
+    // normally, so `cell-new` and the removal loop above are untouched.
+    const frozen = !isNew && expandedSessions.has(s.sessionId) && el.parentNode === list;
+    if (!frozen) list.appendChild(el);
     if (isNew && !knownSessions.has(s.sessionId) && !REDUCED_MOTION) {
       el.classList.add('cell-new');
       setTimeout(() => el.classList.remove('cell-new'), 1200);
@@ -304,6 +362,34 @@ function renderFeeds() {
   const count = document.getElementById('obs-archive-count');
   if (count) count.textContent = String(Math.max(archiveTotal, recent.length));
   updateLoadMore();
+  updateChipHealth();
+}
+
+// Q6 (LIN-783): a filter chip's dot reports its workspace's HEALTH — the worst
+// live status among that workspace's sessions — not the filter's on/off state
+// (which the chip's own `is-on` class already shows). Derived client-side from
+// the already-merged feed via the SAME session→state map the pills use (single
+// source of truth), so a chip can never disagree with a card. No new fetch.
+const HEALTH_RANK = { error: 3, running: 2, done: 1, queued: 0 };
+
+function updateChipHealth() {
+  const chips = document.getElementById('obs-chips');
+  if (!chips) return;
+  const worst = new Map(); // workspaceUrlKey → pill variant
+  for (const s of sessionIndex.values()) {
+    const variant = (SESSION_PILL[displayStatus(s)] || {}).variant || 'queued';
+    const cur = worst.get(s.workspaceUrlKey);
+    if (cur == null || (HEALTH_RANK[variant] || 0) > (HEALTH_RANK[cur] || 0)) {
+      worst.set(s.workspaceUrlKey, variant);
+    }
+  }
+  for (const chip of chips.querySelectorAll('.obs-chip')) {
+    const dot = chip.querySelector('.obs-chip-dot');
+    if (!dot) continue;
+    const variant = worst.get(chip.dataset.ws);
+    if (variant) { dot.dataset.state = variant; dot.title = `workspace health: ${variant}`; }
+    else { delete dot.dataset.state; dot.title = 'no sessions'; }
+  }
 }
 
 function updateLoadMore() {
@@ -489,52 +575,86 @@ function renderRecapLine(run) {
 }
 
 function renderWorkerNode(run) {
-  const icon = STATE_ICON[run.agentState] || '○';
+  const m = runState(run.agentState);
+  const glyph = NODE_GLYPH[m.state] || '○';
   const expanded = expandedRuns.has(run.loopId);
   const detail = expanded ? renderWorkerDetail(run) : '';
   const loop = escapeHtml(String(run.loopId));
-  return `<li class="obs-worker" data-state="${escapeHtml(run.agentState || '')}"${expanded ? ' data-open="1"' : ''}>
+  // Q2 (LIN-783): surface Harbour's existing per-issue `iteration` as the mockup's
+  // "attempt N" — no third vocabulary term, just a friendlier label for the count.
+  const attempt = run.iteration != null
+    ? `<span class="obs-worker-attempt">attempt ${escapeHtml(String(run.iteration))}</span>` : '';
+  // Phase-timeline rail node: a status glyph anchored on the connector rail. The
+  // run's textual state sits on the right of the phase line, so the node's colour
+  // is never the sole signal.
+  return `<li class="obs-worker" data-state="${escapeHtml(m.state)}"${expanded ? ' data-open="1"' : ''}>
+      <span class="obs-worker-node" data-state="${escapeHtml(m.state)}"${m.live ? ' data-live="1"' : ''} aria-hidden="true">${escapeHtml(glyph)}</span>
       <button type="button" class="obs-worker-head" data-loop="${loop}" aria-expanded="${expanded ? 'true' : 'false'}">
-        <span class="obs-worker-icon" data-state="${escapeHtml(run.agentState || '')}">${escapeHtml(icon)}</span>
+        <span class="obs-worker-caret" aria-hidden="true">▸</span>
         <span class="obs-worker-main">
           <span class="obs-worker-line">
-            ${run.iteration != null ? `<span class="obs-worker-iter">#${run.iteration}</span>` : ''}
             <span class="obs-worker-phase">${escapeHtml(workerPhase(run))}</span>
-            ${renderChips(run)}
+            ${attempt}
+            <span class="obs-worker-state" data-state="${escapeHtml(m.state)}">${escapeHtml(m.label)}</span>
           </span>
           ${renderRecapLine(run)}
+          ${renderChips(run)}
         </span>
-        <span class="obs-worker-caret" aria-hidden="true">▸</span>
       </button>
       ${detail ? `<div class="obs-worker-body">${detail}</div>` : ''}
     </li>`;
 }
 
+// Activity log (net-new pattern): each heartbeat is a row of tool chips with a
+// right-aligned duration column, replacing the old flat mono `ran` list.
 function renderActivityLog(run) {
   const metrics = Array.isArray(run.metrics) ? run.metrics : [];
   if (metrics.length) {
     const lines = metrics.slice(-6).map(m => {
-      const parts = [];
-      if (m.toolCount != null) parts.push(`${m.toolCount} tool${m.toolCount === 1 ? '' : 's'}`);
-      if (m.elapsedSeconds != null) parts.push(formatRuntime({ ms: m.elapsedSeconds * 1000 }));
-      if (m.breakdown) parts.push(Object.entries(m.breakdown).map(([k, v]) => `${k}×${v}`).join(' '));
-      return `<li class="obs-act">${escapeHtml(parts.join(' · ') || m.raw || 'activity')}</li>`;
+      const chips = [];
+      if (m.toolCount != null) chips.push(`<span class="obs-act-chip">${m.toolCount} tool${m.toolCount === 1 ? '' : 's'}</span>`);
+      if (m.breakdown) {
+        for (const [k, v] of Object.entries(m.breakdown)) chips.push(`<span class="obs-act-chip">${escapeHtml(k)}×${escapeHtml(String(v))}</span>`);
+      }
+      const dur = m.elapsedSeconds != null ? formatRuntime({ ms: m.elapsedSeconds * 1000 }) : '';
+      const main = chips.length ? chips.join('') : `<span class="obs-act-raw">${escapeHtml(m.raw || 'activity')}</span>`;
+      return `<li class="obs-act"><span class="obs-act-main">${main}</span>${dur ? `<span class="obs-act-dur">${escapeHtml(dur)}</span>` : ''}</li>`;
     }).join('');
-    return `<div class="obs-detail-block"><span class="obs-body-lbl">ran</span><ul class="obs-acts">${lines}</ul></div>`;
+    return `<div class="obs-detail-block"><span class="obs-body-lbl">activity</span><ul class="obs-acts">${lines}</ul></div>`;
   }
   if (run.agentSummary) {
-    return `<div class="obs-detail-block"><span class="obs-body-lbl">ran</span> <span class="obs-detail-text">${escapeHtml(run.agentSummary)}</span></div>`;
+    return `<div class="obs-detail-block"><span class="obs-body-lbl">activity</span> <span class="obs-detail-text">${escapeHtml(run.agentSummary)}</span></div>`;
   }
-  return `<div class="obs-detail-block obs-dim"><span class="obs-body-lbl">ran</span> no activity recorded</div>`;
+  return `<div class="obs-detail-block obs-dim"><span class="obs-body-lbl">activity</span> no activity recorded</div>`;
 }
 
+// Produced-artifacts list (net-new pattern): icon-led links out to the evidence
+// (branch / PR / file) a run produced.
 function renderArtifacts(run) {
   const arts = Array.isArray(run.producedArtifacts) ? run.producedArtifacts : [];
   if (!arts.length) return '';
   const items = arts.map(a =>
-    `<li><a class="obs-artifact" href="${escapeHtml(a.url)}" target="_blank" rel="noopener">${escapeHtml(a.label || a.url)}</a></li>`
+    `<li><a class="obs-artifact" href="${escapeHtml(a.url)}" target="_blank" rel="noopener"><span class="obs-artifact-icon" aria-hidden="true">↗</span><span class="obs-artifact-label">${escapeHtml(a.label || a.url)}</span></a></li>`
   ).join('');
   return `<div class="obs-detail-block"><span class="obs-body-lbl">produced</span><ul class="obs-artifacts">${items}</ul></div>`;
+}
+
+// Error-as-direction box (net-new pattern): a failed run leads with its cause,
+// shows how long it ran, and offers a "view log" link to the produced evidence
+// (presentation-only — no retry endpoint exists, so no dead control is shown).
+function renderErrorBox(run) {
+  if (run.agentState !== 'error') return '';
+  const rs = runSummaryState.get(run.loopId);
+  const cause = (rs && rs.outcome) || run.agentSummary || 'This run ended with an error.';
+  const rt = formatRuntime(run.runtime);
+  const log = (Array.isArray(run.producedArtifacts) ? run.producedArtifacts : []).find(a => a && a.url);
+  const viewLog = log
+    ? `<a class="obs-err-action" href="${escapeHtml(log.url)}" target="_blank" rel="noopener">view log ↗</a>` : '';
+  const meta = [rt ? `<span class="obs-err-rt">ran ${escapeHtml(rt)}</span>` : '', viewLog].filter(Boolean).join('');
+  return `<div class="obs-error-box" role="note">
+      <p class="obs-error-cause"><span class="obs-error-mark" aria-hidden="true">✕</span> ${escapeHtml(cause)}</p>
+      ${meta ? `<p class="obs-error-meta">${meta}</p>` : ''}
+    </div>`;
 }
 
 function renderNext(run) {
@@ -551,7 +671,7 @@ function renderNext(run) {
 }
 
 function renderWorkerDetail(run) {
-  return `${renderActivityLog(run)}${renderArtifacts(run)}${renderNext(run)}`;
+  return `${renderErrorBox(run)}${renderActivityLog(run)}${renderArtifacts(run)}${renderNext(run)}`;
 }
 
 // ─── Expand / collapse + lazy drill-down loaders ────────────────────────────────
