@@ -18,6 +18,7 @@ import { AuthExchangeError } from '../../lib/providers/interface.js';
 import { createGitHubAuthRoutes } from '../../routes/github-auth.js';
 import { createFakeGitHubClient } from '../../lib/providers/github/fake-client.js';
 import { githubErrorDiagnostic } from '../../lib/errors.js';
+import { getMissingGitHubConfig, isGitHubConfigured } from '../../lib/providers/github/app-auth.js';
 
 // Ephemeral RSA keypair so completeInstallation's App-JWT signing (mintAppJwt)
 // runs for real against a valid PEM — generated, never on disk.
@@ -182,6 +183,48 @@ describe('GitHubProvider auth primitives', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Shared config predicate (LIN-761) — the SINGLE definition of "GitHub configured"
+// consumed by the route guards, the settings add affordance, and the landing hero,
+// so those three consumers can never drift (root cause C).
+// ---------------------------------------------------------------------------
+
+describe('getMissingGitHubConfig / isGitHubConfigured (LIN-761)', () => {
+  const ALL = ['GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET', 'GITHUB_APP_ID', 'GITHUB_APP_PRIVATE_KEY', 'GITHUB_APP_SLUG'];
+  // GITHUB_REDIRECT_URI is optional — it must NOT gate configuration.
+  const SAVE = [...ALL, 'GITHUB_REDIRECT_URI'];
+  let saved;
+  beforeEach(() => {
+    saved = Object.fromEntries(SAVE.map(k => [k, process.env[k]]));
+    for (const k of ALL) process.env[k] = 'set';
+    delete process.env.GITHUB_REDIRECT_URI;
+  });
+  afterEach(() => {
+    for (const k of SAVE) {
+      if (saved[k] === undefined) delete process.env[k];
+      else process.env[k] = saved[k];
+    }
+  });
+
+  test('reports configured when the FULL env set is present (REDIRECT_URI not required)', () => {
+    assert.deepEqual(getMissingGitHubConfig(), []);
+    assert.equal(isGitHubConfigured(), true);
+  });
+
+  test('a partial config (App vars set, GITHUB_CLIENT_ID + SECRET absent) is NOT configured — the exact prod hang class', () => {
+    delete process.env.GITHUB_CLIENT_ID;
+    delete process.env.GITHUB_CLIENT_SECRET;
+    assert.deepEqual(getMissingGitHubConfig(), ['GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET']);
+    assert.equal(isGitHubConfigured(), false);
+  });
+
+  test('a missing App var alone is also NOT configured', () => {
+    delete process.env.GITHUB_APP_SLUG;
+    assert.deepEqual(getMissingGitHubConfig(), ['GITHUB_APP_SLUG']);
+    assert.equal(isGitHubConfigured(), false);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Route harness
 // ---------------------------------------------------------------------------
 
@@ -246,14 +289,18 @@ function makeSession(initial = {}) {
   return session;
 }
 
-// The install flow now gates on the GitHub App config (LIN-703 migration), not
-// the retired OAuth client_id/secret/redirect_uri.
-const ENV = ['GITHUB_APP_ID', 'GITHUB_APP_PRIVATE_KEY', 'GITHUB_APP_SLUG'];
+// The route guards gate on the COMPLETE GitHub config the flow consumes end-to-end
+// (LIN-761): the GITHUB_APP_* install/mint vars AND the OAuth client_id/secret the
+// authorize begin + code exchange need. A partial config no longer sails past to a
+// hanging beginAuth — it returns a clean 503 up front.
+const ENV = ['GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET', 'GITHUB_APP_ID', 'GITHUB_APP_PRIVATE_KEY', 'GITHUB_APP_SLUG'];
 
 describe('GitHub auth routes', () => {
   let saved;
   beforeEach(() => {
     saved = Object.fromEntries(ENV.map(k => [k, process.env[k]]));
+    process.env.GITHUB_CLIENT_ID = 'cid';
+    process.env.GITHUB_CLIENT_SECRET = 'secret';
     process.env.GITHUB_APP_ID = '12345';
     process.env.GITHUB_APP_PRIVATE_KEY = 'test-key';
     process.env.GITHUB_APP_SLUG = 'my-app';
@@ -273,6 +320,49 @@ describe('GitHub auth routes', () => {
     await handler({ query: {}, session: makeSession() }, res);
     assert.equal(res.statusCode, 503);
     assert.match(res.body, /GitHub App Not Configured/);
+  });
+
+  // LIN-761 — partial config (App vars present, OAuth CLIENT_ID absent) used to
+  // sail past the App-only guard and throw in beginAuth INSIDE session.save,
+  // hanging until the platform H12 killed the request at 30s. The complete gate
+  // (getMissingGitHubConfig over the full set) now returns a clean 503 up front.
+  test('GET /auth/github 503s (never hangs) on a partial config: App vars set, GITHUB_CLIENT_ID absent (LIN-761)', async () => {
+    delete process.env.GITHUB_CLIENT_ID;
+    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const handler = getHandler(router, 'get', '/auth/github');
+    const res = makeRes();
+    const session = makeSession();
+    await handler({ query: {}, session }, res);
+    // Clean up-front 503 with the missing var named — NOT a redirect, NOT a hang.
+    assert.equal(res.statusCode, 503);
+    assert.match(res.body, /GitHub App Not Configured/);
+    assert.match(res.body, /GITHUB_CLIENT_ID/);
+    assert.equal(res.redirectedTo, null);
+    // The gate short-circuits before any session mutation.
+    assert.equal(session.oauthState, undefined);
+  });
+
+  // LIN-761 root cause A — defense-in-depth: even with a complete config, a throw
+  // from beginAuth must be caught BEFORE session.save, never escape the async
+  // callback. A provider whose beginAuth throws yields a clean 503, not a hang.
+  test('GET /auth/github is throw-safe out of session.save when beginAuth throws (LIN-761)', async () => {
+    let saveCalled = false;
+    const throwingProvider = {
+      ...fakeProvider(),
+      beginAuth: () => { throw new Error('boom from beginAuth'); },
+    };
+    const router = createGitHubAuthRoutes({ provider: throwingProvider });
+    const handler = getHandler(router, 'get', '/auth/github');
+    const res = makeRes();
+    const session = makeSession();
+    const origSave = session.save;
+    session.save = function (cb) { saveCalled = true; return origSave.call(this, cb); };
+    await handler({ query: {}, session }, res);
+    // A response is always written (503), and the redirect never fires.
+    assert.equal(res.statusCode, 503);
+    assert.equal(res.redirectedTo, null);
+    // The throw was handled before persistence — session.save was never reached.
+    assert.equal(saveCalled, false);
   });
 
   test('GET /auth/github mints state, stores intent server-side, and redirects', async () => {

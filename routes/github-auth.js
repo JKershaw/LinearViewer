@@ -23,6 +23,7 @@ import { Router } from 'express'
 import { getProvider } from '../lib/providers/registry.js'
 import { renderErrorPage, renderGitHubRepoSelectPage } from '../lib/render-pages.js'
 import { githubErrorDiagnostic } from '../lib/errors.js'
+import { getMissingGitHubConfig } from '../lib/providers/github/app-auth.js'
 import {
   upsertWorkspace,
   saveSession,
@@ -31,13 +32,6 @@ import {
   getWorkspaceByUrlKey,
   validateWorkspaceUrlKey,
 } from '../lib/workspace.js'
-
-// GitHub App config the install flow needs (LIN-703 migration): the App's id +
-// private key (to mint the App JWT / installation token) and its slug (to build
-// the installation URL in beginAuth). This replaces the OAuth
-// client_id/secret/redirect_uri the code→token exchange used — the App flow no
-// longer reads them, so the "not configured" guard now gates on the App vars.
-const APP_ENV_VARS = ['GITHUB_APP_ID', 'GITHUB_APP_PRIVATE_KEY', 'GITHUB_APP_SLUG']
 
 // A GitHub issues binding's scope is an `owner/name` repo slug. Validate the
 // shape of the picked repo before writing it as a binding scope.
@@ -75,12 +69,13 @@ function installationExpiryMs(expiresAt) {
 export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
   const router = Router()
 
-  function getMissingAppVars() {
-    return APP_ENV_VARS.filter(v => !process.env[v])
-  }
-
+  // The complete config gate (LIN-761): validate the FULL env set the flow
+  // consumes (getMissingGitHubConfig), not just the GITHUB_APP_* subset. A partial
+  // config — App vars present but GITHUB_CLIENT_ID unset — used to sail past the old
+  // App-only guard and then throw deep in beginAuth, hanging the request; the
+  // complete gate returns a clean 503 up front instead (root cause B).
   function notConfigured(res) {
-    const missing = getMissingAppVars()
+    const missing = getMissingGitHubConfig()
     return res.status(503).send(renderErrorPage(
       'GitHub App Not Configured',
       `GitHub login is not available. Missing environment variables: ${missing.join(', ')}. See .env.example for setup instructions.`
@@ -94,11 +89,26 @@ export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
    * session, never in `state`.
    */
   router.get('/auth/github', async (req, res) => {
-    if (getMissingAppVars().length > 0) return notConfigured(res)
+    if (getMissingGitHubConfig().length > 0) return notConfigured(res)
     if (sessionStore?.cleanup) await sessionStore.cleanup()
 
     const mode = req.query.mode === 'add-source' ? 'add-source' : 'new'
     const state = crypto.randomUUID()
+
+    // Compute the authorize URL BEFORE persisting the session (LIN-761 root cause
+    // A). The old code called beginAuth INSIDE the req.session.save() callback — an
+    // async callback outside Express's middleware chain, so a throw there reached no
+    // error handler and no response was ever written, hanging until the platform
+    // H12 killed the request at 30s. Computing it up front (defended by try/catch)
+    // means any throw surfaces as a clean 503 here and can never escape the callback.
+    let authorizeUrl
+    try {
+      authorizeUrl = provider.beginAuth({ state })
+    } catch (err) {
+      console.error('GitHub beginAuth error:', err)
+      return notConfigured(res)
+    }
+
     req.session.oauthState = state
     // Intent lives server-side in the session, never in `state` (LIN-562). For
     // add-source, also carry the VIEWED workspace's urlKey so the link step binds
@@ -111,7 +121,7 @@ export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
     req.session.oauthIntent = intent
 
     req.session.save(() => {
-      res.redirect(provider.beginAuth({ state }))
+      res.redirect(authorizeUrl)
     })
   })
 
@@ -130,7 +140,7 @@ export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
    * session (`githubPending`) until the user picks a repo (POST .../link).
    */
   router.get('/auth/github/callback', async (req, res) => {
-    if (getMissingAppVars().length > 0) return notConfigured(res)
+    if (getMissingGitHubConfig().length > 0) return notConfigured(res)
 
     // Two inbound shapes (LIN-735): the user-to-server OAuth round-trip returns a
     // `code` (no `installation_id`) — the default entry now that beginAuth is the
