@@ -269,17 +269,21 @@ main.obs-page[data-url-key]             - page container
   #obs-archive-body                     - (when open) the completed archive body
     #obs-recent / #obs-recent-empty     - completed sessions feed (ul) + empty state
       li.obs-session[data-session][data-status]  - one autopilot session
-        button.obs-session-head         - click to expand/collapse the session
-          .obs-session-topline          - caret + .obs-session-ident + status pill + updated time (fixed right column)
+        .obs-session-head               - header container (NOT the toggle; LIN-928)
+          .obs-session-topline          - header cluster: .obs-session-headmain (left) + .obs-session-side (right)
+            .obs-session-headmain > .obs-session-idline  - .obs-session-dot[data-state] + .obs-session-ident (mono, ellipsizes)
+            .obs-session-headmain > .obs-session-name    - bold session/seed title, truncates (omitted when it would only echo the ident)
+            .obs-session-side           - fixed right column: status pill stacked above updated time
           .status-pill.status-pill--{running|done|error|queued}  - theme StatusPill (LIN-783); dot + label. done-with-warning = status-pill--done + a .status-pill__warn ⚠ marker (no 5th colour); stale → status-pill--queued
-          .obs-session-name             - bold session/seed title (omitted when it would only echo the ident)
           .obs-session-summary          - one-sentence session summary (LIN-592)
           .obs-session-meta-line        - labelled runtime / model (+ workspace, task count)
           .obs-progress-row             - per-worker-run progress bar + N/M count
             .segment-bar.obs-progress > .segment-bar__cell--{running|done|error|queued}[data-live]  - theme SegmentBar cells (live cell pulses)
             .obs-progress-count         - finished/total worker-run count (N/M)
           .obs-summary-gen              - (terminal, uncached) explicit "summarise this session" button
-        .obs-session-body               - (when open) status line + Level-3 drill-down
+          button.obs-disc[aria-expanded]  - disclosure control (LIN-928): click to expand/collapse ("Show run detail · N runs" / "Hide run detail")
+        .obs-session-body               - (when open) objective eyebrow + status line + Level-3 drill-down
+          .obs-objective                - session seed goal (design §4.6; id never reprinted)
           .obs-tasks > .obs-task        - one block per touched task (seed-first)
             .obs-task-head              - provenance tag + identifier (link when hydrated) + title + live state/labels
             .obs-rels > .obs-rel        - relationship neighborhood (parent/children/blocked by/blocks/related)

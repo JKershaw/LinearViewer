@@ -213,6 +213,9 @@
 .obs-session[data-status="error"] { border-left-color: var(--red); }
 .obs-session[data-status="stale"] { border-left-color: var(--slate); }
 
+/* The head is a non-interactive container (LIN-928, design §7): the whole header
+   is no longer the toggle, so it carries no pointer cursor / hover affordance —
+   the `.obs-disc` control below owns disclosure. */
 .obs-session-head {
   display: flex;
   flex-direction: column;
@@ -220,31 +223,48 @@
   gap: 0.35rem;
   width: 100%;
   padding: 0.65rem 0.8rem;
-  border: 0;
-  background: none;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
   color: var(--text);
 }
 
-.obs-session-head:hover { background: var(--card-h); }
-
-/* Header top line: caret · identifier · status pill · updated time.
-   Bug 2 (LIN-783): the ident is the ONLY flexible cell (it ellipsizes); the pill
-   and time hold a fixed right column, so the timestamp never clips. */
+/* Header top line (LIN-928, design §4): a growing `headmain` cluster on the left
+   (status dot · mono id, then the truncating title on line 2) and a fixed right
+   column that STACKS the status pill above the relative time. The ident/title
+   are the only flexible cells; the right column is fixed, so the timestamp never
+   clips at narrow widths. */
 .obs-session-topline {
   display: flex;
-  align-items: center;
-  gap: 0.45rem;
+  align-items: flex-start;
+  gap: 0.6rem;
 }
 
-.obs-session-caret {
-  flex: 0 0 auto;
-  color: var(--muted);
-  transition: transform var(--motion-fast) ease;
+.obs-session-headmain {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
 }
-.obs-session.is-open .obs-session-caret { transform: rotate(90deg); }
+
+.obs-session-idline {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+/* Status dot on the header row (design §4) — the theme's 4-state palette, the
+   same mapping the pill/progress/chip-health use, so they can never disagree. */
+.obs-session-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--faint);
+}
+.obs-session-dot[data-state="error"]   { background: var(--red); }
+.obs-session-dot[data-state="running"] { background: var(--amber); }
+.obs-session-dot[data-state="done"]    { background: var(--green); }
+.obs-session-dot[data-state="queued"]  { background: var(--slate); }
 
 .obs-session-ident {
   flex: 0 1 auto;
@@ -257,7 +277,14 @@
   color: var(--muted);
 }
 
-.obs-session-topline .status-pill { flex: 0 0 auto; }
+.obs-session-side {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.2rem;
+}
+.obs-session-side .status-pill { flex: 0 0 auto; }
 
 /* done-with-warning ⚠ marker — additive to the `done` pill, NOT a new pill
    variant (the primitive owns only 4 states). Amber to read as "caveat". */
@@ -269,19 +296,43 @@
 
 .obs-session-time {
   flex: 0 0 auto;
-  margin-left: auto;
-  padding-left: 0.3rem;
   font-size: 0.78rem;
   color: var(--muted);
   white-space: nowrap;
 }
 
+/* Title in the header cluster (design §4): truncates on a single line. The full
+   goal has its complementary home in the expanded detail's `Objective` eyebrow. */
 .obs-session-name {
   font-weight: 600;
-  font-size: 1.05rem;
+  font-size: 0.98rem;
   line-height: 1.3;
   font-family: var(--font-content);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+
+/* Disclosure control (LIN-928, design §7): a dedicated toggle below the meta /
+   progress row — no caret on the header. The show/hide label swaps on the card's
+   `.is-open` class, so the markup itself is expansion-state-agnostic. */
+.obs-disc {
+  align-self: flex-start;
+  margin-top: 0.1rem;
+  padding: 0.15rem 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-family: var(--font-content);
+  font-size: 0.8rem;
+  color: var(--brand-dim);
+  cursor: pointer;
+}
+.obs-disc:hover { text-decoration: underline; }
+.obs-disc-hide { display: none; }
+.obs-session.is-open .obs-disc-show { display: none; }
+.obs-session.is-open .obs-disc-hide { display: inline; }
 
 /* Labelled runtime / model meta line (mockup). Machine facts → mono. */
 .obs-session-meta-line {
@@ -375,6 +426,14 @@
 }
 
 .obs-body-status { margin: 0.3rem 0; }
+
+/* Objective eyebrow (LIN-928, design §4.6): the seed goal in full, leading the
+   detail. Wraps (unlike the truncating header title) and never reprints the id. */
+.obs-objective {
+  margin: 0.15rem 0 0.4rem;
+  line-height: 1.4;
+  font-family: var(--font-content);
+}
 
 .obs-dim { color: var(--muted); }
 
