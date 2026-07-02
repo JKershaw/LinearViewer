@@ -133,6 +133,9 @@
   --motion-fast: 120ms;
   --motion-base: 240ms;
   --motion-slow: 480ms;
+  /* Running-dot pulse cadence (theme spec §7). Distinct from the motion scale
+     above so repointing it never corrupts fast/base/slow. */
+  --motion-pulse: 1.6s;
 }
 
 /* =============================================================================
@@ -2728,7 +2731,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 /* The running dot pulses to read as "live"; it inherits the global
    prefers-reduced-motion neutralizer (no new animation machinery). */
 .status-pill--running .status-pill__dot {
-  animation: pulse var(--motion-slow) ease-in-out infinite;
+  animation: pulse var(--motion-pulse) ease-in-out infinite;
 }
 
 /* =============================================================================
