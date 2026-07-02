@@ -2791,6 +2791,8 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   padding: 0.1rem var(--space-2);
   font-family: var(--font-content);
   font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   color: var(--text);
   background: var(--card-h);
   border-radius: var(--radius-sm);
