@@ -292,6 +292,26 @@ describe('buildAutopilotKickoff (variant axis, LIN-791)', () => {
     assert.ok(!standard.includes('waitForFollowUps: true'));
   });
 
+  test('stepper gates on a SINGLE task up front — a batch coordinates child autopilots, it does not step into the first (LIN-888)', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, variant: 'stepper' });
+    // The up-front single-task gate: stepping is one task's arc; instructions that
+    // name a batch of tasks in sequence must switch to coordinating one child
+    // autopilot per task, not step into the first.
+    assert.ok(text.includes('is this ONE task, or a batch'), 'stepper carries the up-front single-task gate');
+    assert.ok(/single task/i.test(text));
+    assert.ok(text.includes('child autopilot'));         // coordinate, don't step
+    assert.ok(text.includes("variant: 'stepper'"));      // each child is itself stepped
+    // References the manual's mechanism rather than re-describing child dispatch.
+    assert.ok(text.includes('Dispatching a child autopilot'));
+    // Batch handling stays serial — one child at a time.
+    assert.ok(/serial/i.test(text));
+    // The gate is scoped to the stepper section: a standard kickoff never carries it.
+    // (The byte-identical-standard test above is the structural guard; this pins the
+    // gate's distinctive lead specifically to the stepper branch.)
+    const standard = buildAutopilotKickoff({ baseUrl: BASE_URL, variant: 'standard' });
+    assert.ok(!standard.includes('is this ONE task, or a batch'), 'the batch gate must not leak into the standard kickoff');
+  });
+
   test('variant is orthogonal to mode — stepper composes with readonly', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL, mode: 'readonly', variant: 'stepper' });
     assert.ok(text.includes('READ-ONLY'));

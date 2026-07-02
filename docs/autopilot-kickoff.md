@@ -233,7 +233,14 @@ worker prompt — the disposition proved by [LIN-788](https://linear.app/linearv
 and made survivable by [LIN-793](https://linear.app/linearviewer/issue/LIN-793) (don't-reap), now on
 **push rails** ([LIN-843](https://linear.app/linearviewer/issue/LIN-843) /
 [LIN-841](https://linear.app/linearviewer/issue/LIN-841)) — every beat is `subscription: 'everything'` and the
-orchestrator stands by for the up-chain wake instead of hand-rolling a long-poll:
+orchestrator stands by for the up-chain wake instead of hand-rolling a long-poll.
+
+**Up-front gate ([LIN-888](https://linear.app/linearviewer/issue/LIN-888)) — one task, or a batch?**
+Stepping is a *single* task's arc. Before decomposing, the stepper confirms the goal is one task; if
+the launch instructions name **more than one task to complete in sequence** (a batch), it does **not**
+step into the first — it switches to **coordinating**, dispatching one child autopilot per task (each
+`variant: 'stepper'`, **serial** — one at a time), per the manual's *Dispatching a child autopilot*
+rather than re-describing the mechanism. Only a confirmed single task runs the beat loop:
 
 1. **Read** the task's worker prompt (`GET /recommend/{id}` — the un-fused GET returns the body).
 2. **Decompose** it into **3–6 ordered, self-contained beats** that follow the prompt's own
