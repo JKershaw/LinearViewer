@@ -8,9 +8,11 @@
  * without losing input (draft text/priority persist in localStorage; the
  * selected screenshot persists in memory while the page is not reloaded).
  *
- * On submit it captures the current page URL and browser user agent, then POSTs
- * to the existing feedback route (`POST /workspace/:urlKey/api/feedback`) which
- * files a fresh ticket and enqueues a triage follow-up.
+ * The foot offers three explicit actions (LIN-918) — Save, Save + triage, and
+ * Save + autopilot. On submit it captures the current page URL and browser user
+ * agent, then POSTs to the feedback route (`POST /workspace/:urlKey/api/feedback`)
+ * with the chosen `action`; the route always files the ticket first, then branches
+ * on the action (file only / enqueue triage / enqueue a scoped autopilot run).
  *
  * No framework, no build step — matches the repo's vanilla client convention.
  */
@@ -147,7 +149,12 @@
                   hidden>Remove screenshot</button>
           <div class="feedback-status" data-testid="feedback-status" role="status" aria-live="polite"></div>
           <div class="feedback-popup-foot">
-            <button type="button" class="feedback-submit" data-testid="feedback-submit">Send feedback</button>
+            <button type="button" class="feedback-submit" data-testid="feedback-submit"
+                    data-action="save">Save</button>
+            <button type="button" class="feedback-submit feedback-submit-secondary" data-testid="feedback-submit-triage"
+                    data-action="triage">Save + triage</button>
+            <button type="button" class="feedback-submit feedback-submit-secondary" data-testid="feedback-submit-autopilot"
+                    data-action="autopilot">Save + autopilot</button>
           </div>
         </div>
       </div>`;
@@ -159,7 +166,9 @@
     const fileEl = root.querySelector('.feedback-file');
     const removeFileBtn = root.querySelector('.feedback-file-remove');
     const statusEl = root.querySelector('.feedback-status');
-    const submitBtn = root.querySelector('.feedback-submit');
+    // Three action buttons (Save / Save + triage / Save + autopilot); a shared
+    // handler reads each button's data-action (LIN-918).
+    const submitBtns = Array.from(root.querySelectorAll('.feedback-submit'));
     const minBtn = root.querySelector('.feedback-min');
     const closeBtn = root.querySelector('.feedback-close');
 
@@ -237,16 +246,38 @@
       setStatus('Screenshot removed.');
     });
 
-    submitBtn.addEventListener('click', async () => {
+    // Disable/enable all three action buttons together for the duration of a
+    // send, so a second action can't fire mid-flight.
+    function setSubmitting(disabled) {
+      submitBtns.forEach((b) => { b.disabled = disabled; });
+    }
+
+    // Human-readable framing per action, reused for the in-flight and success
+    // status lines. 'save' keeps the plain wording; the others name the follow-up.
+    const SENDING_STATUS = {
+      save: 'Saving…',
+      triage: 'Saving & triaging…',
+      autopilot: 'Saving & starting autopilot…'
+    };
+    const DONE_SUFFIX = {
+      save: '.',
+      triage: ' — triaging.',
+      autopilot: ' — autopilot starting.'
+    };
+
+    // Shared submit handler, parameterized by the chosen action (LIN-918). The
+    // save→create-ticket flow is identical for all three; only the `action` sent
+    // to the route and the status wording differ.
+    async function submit(action) {
       const message = messageEl.value.trim();
       if (!message) {
         setStatus('Please enter some feedback first.', 'error');
         messageEl.focus();
         return;
       }
-      if (submitBtn.disabled) return;
-      submitBtn.disabled = true;
-      setStatus('Sending…');
+      if (submitBtns.some((b) => b.disabled)) return;
+      setSubmitting(true);
+      setStatus(SENDING_STATUS[action] || 'Saving…');
 
       try {
         let image;
@@ -256,17 +287,18 @@
           } catch (readErr) {
             console.error('Failed to read screenshot:', readErr);
             // Drop the unreadable file so the user isn't stuck retrying it
-            // forever — pressing Send again now submits without it, or they
+            // forever — pressing Save again now submits without it, or they
             // can pick a different image.
             clearSelectedFile();
-            setStatus("Couldn't read that image on this device — it's been removed. Pick a different one, or press Send to submit without it.", 'error');
-            submitBtn.disabled = false;
+            setStatus("Couldn't read that image on this device — it's been removed. Pick a different one, or press Save to submit without it.", 'error');
+            setSubmitting(false);
             return;
           }
         }
 
         const payload = {
           message,
+          action,
           priority: parseInt(priorityEl.value, 10) || 0,
           url: window.location.href,
           userAgent: navigator.userAgent
@@ -292,7 +324,8 @@
           clearSelectedFile();
           reflectDraftIndicator();
           const ident = data.issue && (data.issue.identifier || data.issue.id);
-          setStatus(ident ? `Thanks! Filed ${ident}.` : 'Thanks! Your feedback was filed.', 'success');
+          const filed = ident ? `Filed ${ident}` : 'Your feedback was filed';
+          setStatus(`Thanks! ${filed}${DONE_SUFFIX[action] || '.'}`, 'success');
           setTimeout(minimize, 2500);
           return;
         }
@@ -309,8 +342,12 @@
         console.error('Feedback submit failed:', err);
         setStatus('Network error. Your draft is saved — please try again.', 'error');
       } finally {
-        submitBtn.disabled = false;
+        setSubmitting(false);
       }
+    }
+
+    submitBtns.forEach((btn) => {
+      btn.addEventListener('click', () => submit(btn.dataset.action || 'save'));
     });
 
     reflectDraftIndicator();

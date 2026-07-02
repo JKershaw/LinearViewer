@@ -173,6 +173,93 @@ describe('feedback submit (LIN-635)', () => {
     assert.match(prompt, /\/api\/proxy\/brief\/LIN-900/);
   });
 
+  // === Explicit post-create actions (LIN-918) ==============================
+
+  test("action:'save' files only — nothing enqueued even when feedbackTriage is on", async () => {
+    const { provider } = makeFakeProvider();
+    const dispatch = capturingDispatchStore();
+    // Flag ON, but an explicit save must still short-circuit any follow-up.
+    const app = buildApp({
+      provider, dispatchQueueStore: dispatch,
+      proxyTokenStore: fakeProxyTokenStore(), features: { feedbackTriage: true }
+    });
+
+    const { status, body } = await submit(app, 'acme', { message: 'just save this', action: 'save' });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(body.success, true);
+    assert.strictEqual(dispatch.items.length, 0);
+  });
+
+  test("action:'triage' enqueues triage even when the feedbackTriage flag is OFF (decoupled)", async () => {
+    const { provider } = makeFakeProvider();
+    const dispatch = capturingDispatchStore();
+    const proxyTokenStore = fakeProxyTokenStore('rw-tok-triage');
+    // No features → flag defaults off; the explicit action must triage anyway.
+    const app = buildApp({ provider, dispatchQueueStore: dispatch, proxyTokenStore });
+
+    const { status } = await submit(app, 'acme', { message: 'triage me', priority: 3, action: 'triage' });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(dispatch.items.length, 1);
+    assert.strictEqual(dispatch.items[0].item.kind, 'triage');
+    assert.match(dispatch.items[0].item.prompt, /Authorization: Bearer rw-tok-triage/);
+  });
+
+  test("action:'autopilot' enqueues a scoped autopilot run with the feedback-origin brief", async () => {
+    const { provider } = makeFakeProvider();
+    const dispatch = capturingDispatchStore();
+    const proxyTokenStore = fakeProxyTokenStore('rw-tok-auto');
+    // Flag OFF — autopilot is explicit, never flag-gated.
+    const app = buildApp({ provider, dispatchQueueStore: dispatch, proxyTokenStore });
+
+    const { status, body } = await submit(app, 'acme', { message: 'run this end to end', action: 'autopilot' });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(body.success, true);
+
+    // One autopilot dispatch on the same substrate, scoped to the new ticket.
+    assert.strictEqual(dispatch.items.length, 1);
+    const item = dispatch.items[0].item;
+    assert.strictEqual(item.kind, 'autopilot');
+    assert.strictEqual(item.issueIdentifier, 'LIN-900');
+    assert.strictEqual(item.target, 'cli');
+
+    // The kickoff is the scoped Autopilot prompt...
+    assert.match(item.prompt, /You're Autopilot/);
+    assert.match(item.prompt, /run on autopilot until \*\*LIN-900\*\*/);
+    // ...carrying the load-bearing feedback-origin brief...
+    assert.match(item.prompt, /filed directly from the in-app feedback widget/);
+    // ...and the minted readWrite token / proxy access block for the run.
+    assert.strictEqual(proxyTokenStore.calls.length, 1);
+    assert.strictEqual(proxyTokenStore.calls[0].options.scope, 'readWrite');
+    assert.strictEqual(proxyTokenStore.calls[0].options.label, 'feedback-autopilot');
+    assert.match(item.prompt, /Workspace API access/);
+    assert.match(item.prompt, /Authorization: Bearer rw-tok-auto/);
+    assert.match(item.prompt, /\/api\/proxy\/brief\/LIN-900/);
+  });
+
+  test('an unknown action falls back to the legacy plain send (flag-gated triage)', async () => {
+    const { provider } = makeFakeProvider();
+    const dispatch = capturingDispatchStore();
+    // Unknown action + flag OFF → nothing enqueued (legacy default).
+    const app = buildApp({ provider, dispatchQueueStore: dispatch, proxyTokenStore: fakeProxyTokenStore() });
+    const { status } = await submit(app, 'acme', { message: 'hi', action: 'bogus' });
+    assert.strictEqual(status, 201);
+    assert.strictEqual(dispatch.items.length, 0);
+  });
+
+  test('still succeeds when the autopilot enqueue throws (best-effort)', async () => {
+    const { provider } = makeFakeProvider();
+    const failingDispatch = { addItem: async () => { throw new Error('queue down'); } };
+    const app = buildApp({
+      provider, dispatchQueueStore: failingDispatch, proxyTokenStore: fakeProxyTokenStore()
+    });
+    const { status, body } = await submit(app, 'acme', { message: 'hi', action: 'autopilot' });
+    assert.strictEqual(status, 201);
+    assert.strictEqual(body.success, true);
+  });
+
   test('clamps an out-of-range priority to 0', async () => {
     const { provider, calls } = makeFakeProvider();
     const app = buildApp({ provider, dispatchQueueStore: capturingDispatchStore() });

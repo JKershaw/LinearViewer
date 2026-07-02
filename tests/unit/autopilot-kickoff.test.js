@@ -193,6 +193,37 @@ describe('buildAutopilotKickoff (scoped to an issue)', () => {
   });
 });
 
+describe('buildAutopilotKickoff (originNote seam, LIN-918)', () => {
+  const issue = { identifier: 'LIN-918', title: 'Feedback widget actions' };
+  const NOTE = '**Origin — raw feedback:** filed directly from the in-app feedback widget.';
+
+  test('omitting originNote is byte-identical to the default (no drift)', () => {
+    assert.strictEqual(
+      buildAutopilotKickoff({ baseUrl: BASE_URL, issue, originNote: '' }),
+      buildAutopilotKickoff({ baseUrl: BASE_URL, issue })
+    );
+    // Also byte-identical for a general (unscoped) run.
+    assert.strictEqual(
+      buildAutopilotKickoff({ baseUrl: BASE_URL, originNote: '   ' }),
+      buildAutopilotKickoff({ baseUrl: BASE_URL })
+    );
+  });
+
+  test('appends the note to a scoped run without disturbing the pinned goal', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue, originNote: NOTE });
+    assert.ok(text.includes('run on autopilot until **LIN-918**'));
+    assert.ok(text.includes(NOTE));
+    // The note sits inside the goal block, before the snapshot's proxy line.
+    assert.ok(text.indexOf(NOTE) < text.indexOf('**Proxy:** base'));
+  });
+
+  test('appends the note to a general run too', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, goal: 'ship it', originNote: NOTE });
+    assert.ok(text.includes('**Goal from the human:** ship it'));
+    assert.ok(text.includes(NOTE));
+  });
+});
+
 describe('buildAutopilotKickoff (read-only mode)', () => {
   test('restricts the worker to findings-only and names the boundary', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL, mode: 'readonly' });

@@ -40,6 +40,38 @@ test.describe('Feedback widget', () => {
     await expect(page.getByTestId('feedback-file')).toBeVisible()
   })
 
+  // LIN-918: the foot offers three explicit actions, and each posts its own
+  // `action` to the feedback route. The local provider has no team (a real
+  // submit would 422), so we stub the route to a 201 and assert the wiring —
+  // exactly which action the clicked button sends.
+  test('offers save / triage / autopilot actions and posts the chosen action', async ({ page, seedLocal }) => {
+    const { urlKey } = await seedLocal()
+    await enableWidget(page, urlKey)
+
+    await page.getByTestId('feedback-fab').click()
+    await expect(page.getByTestId('feedback-submit')).toBeVisible()
+    await expect(page.getByTestId('feedback-submit-triage')).toBeVisible()
+    await expect(page.getByTestId('feedback-submit-autopilot')).toBeVisible()
+
+    // Capture the posted action and fulfil with a success the widget accepts.
+    let postedAction = null
+    await page.route(`**/workspace/${urlKey}/api/feedback`, async (route) => {
+      const body = JSON.parse(route.request().postData() || '{}')
+      postedAction = body.action
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, issue: { identifier: 'LIN-777' } })
+      })
+    })
+
+    await page.getByTestId('feedback-message').fill('run this end to end')
+    await page.getByTestId('feedback-submit-autopilot').click()
+
+    await expect(page.getByTestId('feedback-status')).toContainText('Filed LIN-777')
+    expect(postedAction).toBe('autopilot')
+  })
+
   test('preserves draft input across minimize and reload', async ({ page, seedLocal }) => {
     const { urlKey } = await seedLocal()
     await enableWidget(page, urlKey)
