@@ -1,12 +1,13 @@
 /**
- * LIN-826 — route-level: POST /api/proxy/recommend-and-dispatch defaults
- * `subscribe:true` for a fresh sessioned worker so the autopilot fan-out
- * subscribes to each worker with no new prompt instruction, while keeping the
- * flag overridable and leaving a non-sessioned dispatch unsubscribed.
+ * LIN-901 — route-level: POST /api/proxy/recommend-and-dispatch subscription is
+ * DECLARED on the edge (LIN-900 §6), never reconstructed from `sessionId`. The old
+ * LIN-826 `subscribe` default-on-when-sessioned is removed: an undeclared edge is
+ * `terminal-only`, whether or not a sessionId is present. An explicit
+ * `subscription: 'everything'` is honoured; any non-enum value is a 400.
  *
- * The default lives in the route (subscribeResolved), not the store, so it must
- * be observed at the dispatch seam. We drive the deterministic verb-override
- * path (kind set → no LLM/OpenRouter), capturing the item handed to addItem.
+ * The default lives in the route (subscriptionResolved), not the store, so it must
+ * be observed at the dispatch seam. We drive the deterministic verb-override path
+ * (kind set → no LLM/OpenRouter), capturing the item handed to addItem.
  *
  * Set NODE_ENV before importing the routes so the test-mode short-circuit
  * (token === 'test-token') and module-level rate-limiter skips apply.
@@ -69,8 +70,8 @@ async function call(app, method, path, body) {
 
 const SESSION_ID = '11111111-2222-3333-4444-555555555555';
 
-describe('LIN-826 — recommend-and-dispatch subscribe default', () => {
-  test('defaults subscribe:true when a sessionId is present (fresh sessioned worker)', async () => {
+describe('LIN-901 — recommend-and-dispatch subscription is declared, not reconstructed (§6)', () => {
+  test('a sessioned worker with NO declared subscription defaults to terminal-only', async () => {
     const captured = {};
     const app = buildApp(captured);
     const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
@@ -82,10 +83,10 @@ describe('LIN-826 — recommend-and-dispatch subscribe default', () => {
     assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
     assert.ok(captured.item, 'verb-override path must dispatch an item');
     assert.equal(captured.item.sessionId, SESSION_ID);
-    assert.equal(captured.item.subscribe, true, 'a sessioned worker subscribes by default');
+    assert.equal(captured.item.subscription, 'terminal-only', 'sessionId no longer implies a subscription (§6 removes the LIN-826 reconstruction)');
   });
 
-  test('does NOT subscribe when there is no sessionId (a non-sessioned dispatch has no parent edge)', async () => {
+  test('a non-sessioned dispatch with no declared subscription defaults to terminal-only', async () => {
     const captured = {};
     const app = buildApp(captured);
     const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
@@ -94,46 +95,46 @@ describe('LIN-826 — recommend-and-dispatch subscribe default', () => {
     });
 
     assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
-    assert.equal(captured.item.subscribe, false, 'no sessionId → no subscribe default');
+    assert.equal(captured.item.subscription, 'terminal-only');
   });
 
-  test('an explicit subscribe:false overrides the sessioned default', async () => {
+  test('an explicit subscription:everything is honoured', async () => {
     const captured = {};
     const app = buildApp(captured);
     const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
       issueIdentifier: 'TEST-1',
       kind: 'implementation',
       sessionId: SESSION_ID,
-      subscribe: false
+      subscription: 'everything'
     });
 
     assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
-    assert.equal(captured.item.subscribe, false, 'explicit subscribe:false wins over the default');
+    assert.equal(captured.item.subscription, 'everything', 'the declared edge is honoured');
   });
 
-  test('an explicit subscribe:true on a non-sessioned dispatch is honoured', async () => {
+  test('an explicit subscription:terminal-only is honoured', async () => {
     const captured = {};
     const app = buildApp(captured);
     const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
       issueIdentifier: 'TEST-1',
       kind: 'implementation',
-      subscribe: true
+      subscription: 'terminal-only'
     });
 
     assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
-    assert.equal(captured.item.subscribe, true, 'explicit subscribe:true wins even without a sessionId');
+    assert.equal(captured.item.subscription, 'terminal-only');
   });
 
-  test('rejects a non-boolean subscribe with 400', async () => {
-    const captured = {};
-    const app = buildApp(captured);
+  test('rejects an invalid subscription value with 400 (hard enum, no legacy boolean)', async () => {
+    const app = buildApp({});
     const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
       issueIdentifier: 'TEST-1',
       kind: 'implementation',
-      subscribe: 'yes'
+      subscription: 'yes'
     });
 
     assert.equal(res.status, 400, `expected 400, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.match(res.body.error, /subscription must be one of/);
   });
 
   test('queueIfBusy is forwarded blindly and never defaulted on this path', async () => {

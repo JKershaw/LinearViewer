@@ -1,13 +1,15 @@
 /**
- * Unit tests for the up-chain wake auto-enqueue (LIN-826).
+ * Unit tests for the up-chain wake auto-enqueue (LIN-826 / LIN-900 §5).
  *
  * Two layers:
  *  - PURE CORE: buildWakeFollowUp(child, feedback) → the parent-addressed wake
- *    follow-up descriptor, or null. Asserts the descriptor shape for a subscribed
- *    + sessioned + terminal child, and EVERY loop-guard null case.
+ *    follow-up descriptor, or null. Asserts the descriptor shape and the §5
+ *    bubbling matrix: terminals + [blocked] ALWAYS bubble (any subscription level);
+ *    [pending] (PENDING-external) bubbles ONLY on an `everything` edge. Plus every
+ *    structural null case (loop guard, self-skip, no parent edge).
  *  - EFFECT: the addFeedback seam in DispatchQueueStore enqueues at most one wake
  *    per child (the durable `wakeEnqueued` once-only guard), and a wake follow-up
- *    never begets another wake (the structural subscribe:false / followUpTo guard).
+ *    never begets another wake (the structural kind:'wake' loop guard, trap #1).
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,13 +17,14 @@ import { buildWakeFollowUp } from '../../lib/dispatch-wake.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 
-// A subscribed worker: edge declared (subscribe), a parent edge (sessionId), a
-// distinct id (not self), an ordinary kind, no followUpTo.
-function subscribedChild(overrides = {}) {
+// A child dispatch: a parent edge (sessionId), a distinct id (not self), an
+// ordinary kind, no followUpTo. `subscription` defaults to 'terminal-only' (the
+// §6 default for an undeclared edge) unless a test overrides it.
+function makeChild(overrides = {}) {
   return {
     id: 'child-1',
     sessionId: 'parent-S1',
-    subscribe: true,
+    subscription: 'terminal-only',
     kind: 'implementation',
     followUpTo: null,
     issueIdentifier: 'LIN-42',
@@ -35,43 +38,70 @@ function subscribedChild(overrides = {}) {
 const doneFeedback = [{ message: 'started' }, { message: '[done] shipped in 40s', timestamp: 't' }];
 
 describe('buildWakeFollowUp — descriptor shape', () => {
-  test('a subscribed + sessioned + terminal child yields the parent-addressed wake', () => {
-    const wake = buildWakeFollowUp(subscribedChild(), doneFeedback);
+  test('a sessioned + terminal child yields the parent-addressed wake', () => {
+    const wake = buildWakeFollowUp(makeChild(), doneFeedback);
     assert.ok(wake, 'expected a descriptor');
     assert.equal(wake.followUpTo, 'parent-S1', 'addressed to the parent via the sessionId edge');
     assert.equal(wake.sessionId, 'parent-S1', 'stays in the same session');
     assert.equal(wake.queueIfBusy, true, 'waits rather than fails if the parent is mid-judgment');
-    assert.equal(wake.subscribe, false, 'a wake is NOT subscribed — this is the structural loop guard');
-    assert.equal(wake.kind, 'wake');
+    assert.equal(wake.subscription, 'terminal-only', 'the emitted wake carries a schema-valid enum');
+    assert.equal(wake.kind, 'wake', 'kind:wake is the structural loop guard');
     assert.equal(typeof wake.prompt, 'string');
     assert.ok(wake.prompt.includes('LIN-42'), 'carries the child identifier');
     assert.ok(wake.prompt.includes('[done] shipped in 40s'), 'carries the terminal outcome');
   });
+});
 
-  test('every wake marker (incl. [blocked] and [pending]) wakes the parent', () => {
-    for (const marker of ['done', 'complete', 'failed', 'aborted', 'blocked', 'pending']) {
-      const wake = buildWakeFollowUp(subscribedChild(), [{ message: `[${marker}] x` }]);
-      assert.ok(wake, `[${marker}] should produce a wake`);
+describe('buildWakeFollowUp — the §5 bubbling matrix', () => {
+  test('terminals + [blocked] ALWAYS bubble on a terminal-only edge', () => {
+    for (const marker of ['done', 'complete', 'failed', 'aborted', 'blocked']) {
+      const wake = buildWakeFollowUp(makeChild({ subscription: 'terminal-only' }), [{ message: `[${marker}] x` }]);
+      assert.ok(wake, `[${marker}] should bubble on a terminal-only edge`);
     }
   });
 
-  test('a [pending] wake is labelled "paused (pending), not done" so the parent never reads it as complete (LIN-843)', () => {
-    const wake = buildWakeFollowUp(subscribedChild(), [{ message: '[pending] beat 1 done, beats 2-4 remain' }]);
-    assert.ok(wake, 'a [pending] child wakes its parent');
+  test('terminals + [blocked] ALSO bubble on an everything edge', () => {
+    for (const marker of ['done', 'complete', 'failed', 'aborted', 'blocked']) {
+      const wake = buildWakeFollowUp(makeChild({ subscription: 'everything' }), [{ message: `[${marker}] x` }]);
+      assert.ok(wake, `[${marker}] should bubble on an everything edge`);
+    }
+  });
+
+  test('an undeclared edge (subscription undefined) is treated as terminal-only — terminals still bubble', () => {
+    // Under §6 an undeclared edge defaults to terminal-only; terminals always bubble.
+    const wake = buildWakeFollowUp(makeChild({ subscription: undefined }), doneFeedback);
+    assert.ok(wake, 'a terminal outcome bubbles even on an undeclared edge');
+  });
+
+  test('[pending] is SILENT on a terminal-only edge (the one row subscription controls)', () => {
+    assert.equal(
+      buildWakeFollowUp(makeChild({ subscription: 'terminal-only' }), [{ message: '[pending] beat 1 done' }]),
+      null,
+      'PENDING-external does not bubble on a terminal-only edge'
+    );
+    assert.equal(
+      buildWakeFollowUp(makeChild({ subscription: undefined }), [{ message: '[pending] beat 1 done' }]),
+      null,
+      'and not on an undeclared (default terminal-only) edge'
+    );
+  });
+
+  test('[pending] BUBBLES on an everything edge, labelled "paused (pending), not done" (LIN-843)', () => {
+    const wake = buildWakeFollowUp(makeChild({ subscription: 'everything' }), [{ message: '[pending] beat 1 done, beats 2-4 remain' }]);
+    assert.ok(wake, 'a [pending] child wakes its parent on an everything edge');
     assert.match(wake.prompt, /paused \(pending\), not done/i, 'the pause is labelled, not presented as a completion');
     assert.ok(!/terminal outcome/i.test(wake.prompt), 'a pause is not described as a terminal outcome');
     assert.ok(wake.prompt.includes('[pending] beat 1 done, beats 2-4 remain'), 'carries the pause detail');
   });
 
-  test('a SUBSCRIBED follow-up (the stepper warm-resume beat) wakes — no followUpTo guard (LIN-843)', () => {
+  test('a stepper warm-resume beat (everything, followUpTo) wakes — no followUpTo guard (LIN-843)', () => {
     // The push-rails stepper resumes its warm worker with followUpTo: ROOT and
-    // declares the up-chain edge with subscribe: true. That beat MUST wake the
-    // orchestrator on every boundary, not just the first fresh beat.
-    const beat = subscribedChild({ id: 'beat-2', followUpTo: 'ROOT', sessionId: 'orchestrator-S1' });
+    // declares the up-chain edge with subscription: 'everything'. That beat MUST
+    // wake the orchestrator on every boundary, incl. [pending], not just the first.
+    const beat = makeChild({ id: 'beat-2', subscription: 'everything', followUpTo: 'ROOT', sessionId: 'orchestrator-S1' });
     const wake = buildWakeFollowUp(beat, [{ message: '[pending] beat 2 done' }]);
     assert.ok(wake, 'a subscribed follow-up beat wakes its orchestrator');
     assert.equal(wake.followUpTo, 'orchestrator-S1', 'addressed to the orchestrator via sessionId, not ROOT');
-    assert.equal(wake.subscribe, false, 'the wake itself is not subscribed — the sole loop guard');
   });
 });
 
@@ -81,59 +111,49 @@ describe('buildWakeFollowUp — loop-guard / null cases', () => {
     assert.equal(buildWakeFollowUp(undefined, doneFeedback), null);
   });
 
-  test('non-subscribed child → null (no edge declared)', () => {
-    assert.equal(buildWakeFollowUp(subscribedChild({ subscribe: false }), doneFeedback), null);
-    assert.equal(buildWakeFollowUp(subscribedChild({ subscribe: undefined }), doneFeedback), null);
+  test('a wake follow-up (kind:wake) → null — a wake cannot beget a wake (trap #1)', () => {
+    // The loop guard is now the structural kind:'wake' field, checked FIRST —
+    // because under §5 terminals always bubble, the old subscribe:false off-state
+    // no longer exists. A wake follow-up is emitted kind:'wake', so feeding ITS
+    // terminal event back through never produces another wake.
+    const wakeItem = { id: 'wake-1', sessionId: 'parent-S1', subscription: 'terminal-only', followUpTo: 'parent-S1', kind: 'wake' };
+    assert.equal(buildWakeFollowUp(wakeItem, doneFeedback), null);
+    // The guard holds even for an `everything` wake and even on a [pending] marker.
+    const everythingWake = { id: 'wake-2', sessionId: 'parent-S1', subscription: 'everything', kind: 'wake' };
+    assert.equal(buildWakeFollowUp(everythingWake, [{ message: '[pending] x' }]), null);
   });
 
   test('no sessionId → null (no parent edge to wake)', () => {
-    assert.equal(buildWakeFollowUp(subscribedChild({ sessionId: null }), doneFeedback), null);
-  });
-
-  test('a wake follow-up (subscribe:false) → null — a wake cannot beget a wake', () => {
-    // Shape a descriptor like the one buildWakeFollowUp emits, then prove that
-    // feeding ITS terminal event back through never produces another wake. The
-    // loop guard rests on the subscribe:false arm alone (LIN-843 removed the
-    // followUpTo arm so subscribed stepper beats can wake), and a wake follow-up
-    // is always subscribe:false — so it is still excluded.
-    const wakeItem = { id: 'wake-1', sessionId: 'parent-S1', subscribe: false, followUpTo: 'parent-S1', kind: 'wake' };
-    assert.equal(buildWakeFollowUp(wakeItem, doneFeedback), null);
-    // A non-subscribed follow-up (a plain liveness nudge) is likewise excluded by
-    // the same subscribe arm — only an explicitly subscribed follow-up wakes.
-    const nudge = { id: 'x', sessionId: 'parent-S1', subscribe: false, followUpTo: 'parent-S1', kind: 'implementation' };
-    assert.equal(buildWakeFollowUp(nudge, doneFeedback), null);
+    assert.equal(buildWakeFollowUp(makeChild({ sessionId: null }), doneFeedback), null);
   });
 
   test('self (id === sessionId) → null — the run owner must not wake itself', () => {
-    assert.equal(buildWakeFollowUp(subscribedChild({ id: 'parent-S1' }), doneFeedback), null);
+    assert.equal(buildWakeFollowUp(makeChild({ id: 'parent-S1' }), doneFeedback), null);
     // also via _id (the history-doc id field)
-    assert.equal(buildWakeFollowUp({ _id: 'parent-S1', sessionId: 'parent-S1', subscribe: true, kind: 'implementation' }, doneFeedback), null);
+    assert.equal(buildWakeFollowUp({ _id: 'parent-S1', sessionId: 'parent-S1', subscription: 'terminal-only', kind: 'implementation' }, doneFeedback), null);
   });
 
-  test("a CHILD autopilot (subscribed, distinct parent sessionId) DOES wake its coordinator (LIN-813)", () => {
+  test('a CHILD autopilot (distinct parent sessionId) DOES wake its coordinator (LIN-813)', () => {
     // An autopilot acting as a coordinator dispatches one task-altitude child
-    // autopilot per task with sessionId = the coordinator's id + subscribe: true;
-    // the child MUST wake the coordinator up-chain when it finishes. This is the
-    // LIN-813 relaxation of the old blanket kind === 'autopilot' exclusion.
-    const childAp = subscribedChild({ id: 'child-ap', kind: 'autopilot', sessionId: 'head-S1' });
+    // autopilot per task with sessionId = the coordinator's id; the child MUST wake
+    // the coordinator up-chain when it finishes. Terminals bubble on any edge.
+    const childAp = makeChild({ id: 'child-ap', kind: 'autopilot', sessionId: 'head-S1' });
     const wake = buildWakeFollowUp(childAp, doneFeedback);
-    assert.ok(wake, 'a subscribed child autopilot wakes its dispatching coordinator');
+    assert.ok(wake, 'a child autopilot wakes its dispatching coordinator');
     assert.equal(wake.followUpTo, 'head-S1', 'addressed to the coordinator via the sessionId edge');
-    assert.equal(wake.subscribe, false, 'the wake itself is not subscribed — the loop guard');
+    assert.equal(wake.kind, 'wake', 'the wake itself is kind:wake — the loop guard');
   });
 
   test("a coordinator's OWN kickoff never falls through — no sessionId, or sessionId === own id (LIN-813)", () => {
     // A top-level kickoff carries no parent edge → excluded by the sessionId guard.
-    assert.equal(buildWakeFollowUp(subscribedChild({ kind: 'autopilot', sessionId: null }), doneFeedback), null);
+    assert.equal(buildWakeFollowUp(makeChild({ kind: 'autopilot', sessionId: null }), doneFeedback), null);
     // A run owner that stamped sessionId === its own id → excluded by the self-skip.
-    assert.equal(buildWakeFollowUp(subscribedChild({ id: 'head-S1', kind: 'autopilot', sessionId: 'head-S1' }), doneFeedback), null);
-    // An UNsubscribed child autopilot → excluded by the subscribe arm.
-    assert.equal(buildWakeFollowUp(subscribedChild({ kind: 'autopilot', subscribe: false }), doneFeedback), null);
+    assert.equal(buildWakeFollowUp(makeChild({ id: 'head-S1', kind: 'autopilot', sessionId: 'head-S1' }), doneFeedback), null);
   });
 
   test('non-terminal feedback → null', () => {
-    assert.equal(buildWakeFollowUp(subscribedChild(), [{ message: 'started' }, { message: '[working] still going' }]), null);
-    assert.equal(buildWakeFollowUp(subscribedChild(), []), null);
+    assert.equal(buildWakeFollowUp(makeChild(), [{ message: 'started' }, { message: '[working] still going' }]), null);
+    assert.equal(buildWakeFollowUp(makeChild(), []), null);
   });
 });
 
@@ -164,7 +184,7 @@ async function takenChild(store, overrides = {}) {
     kind: 'implementation',
     issueIdentifier: 'LIN-42',
     sessionId: 'parent-S1',
-    subscribe: true,
+    subscription: 'everything',
     ...overrides
   });
   await store.takeItem(child._id, URL_KEY, 'token-a');
@@ -172,7 +192,7 @@ async function takenChild(store, overrides = {}) {
 }
 
 describe('addFeedback wake enqueue (effect + once-only)', () => {
-  test('a terminal wake event on a subscribed child enqueues exactly one parent-addressed wake', async () => {
+  test('a terminal wake event on a sessioned child enqueues exactly one parent-addressed wake', async () => {
     const { store, collection, historyCollection } = makeStore();
     const child = await takenChild(store);
 
@@ -185,10 +205,10 @@ describe('addFeedback wake enqueue (effect + once-only)', () => {
     assert.equal(wakes[0].followUpTo, 'parent-S1');
     assert.equal(wakes[0].sessionId, 'parent-S1');
     assert.equal(wakes[0].queueIfBusy, true);
-    assert.equal(wakes[0].subscribe, false);
+    assert.equal(wakes[0].subscription, 'terminal-only', 'the emitted wake carries a schema-valid enum');
   });
 
-  test('a [pending] pause on a subscribed child enqueues exactly one parent wake, labelled paused-not-done (LIN-843)', async () => {
+  test('a [pending] pause on an `everything` child enqueues exactly one parent wake, labelled paused-not-done (LIN-843)', async () => {
     const { store, collection, historyCollection } = makeStore();
     const child = await takenChild(store);
 
@@ -197,9 +217,8 @@ describe('addFeedback wake enqueue (effect + once-only)', () => {
 
     assert.ok(res && res.success);
     const wakes = wakeItems(collection, historyCollection);
-    assert.equal(wakes.length, 1, 'a pause wakes the parent exactly once');
+    assert.equal(wakes.length, 1, 'a pause wakes the parent exactly once on an everything edge');
     assert.equal(wakes[0].followUpTo, 'parent-S1');
-    assert.equal(wakes[0].subscribe, false);
     assert.match(wakes[0].prompt, /paused \(pending\), not done/i, 'the wake says paused, not done');
   });
 
@@ -218,14 +237,30 @@ describe('addFeedback wake enqueue (effect + once-only)', () => {
     assert.equal(childDoc.wakeEnqueued, true);
   });
 
-  test('a non-subscribed child never enqueues a wake', async () => {
+  test('a terminal-only child DOES wake on a terminal (previously-silent edge now wakes, §5)', async () => {
     const { store, collection, historyCollection } = makeStore();
-    const child = await takenChild(store, { subscribe: false });
+    // Under §5, terminals bubble regardless of subscription — a terminal-only
+    // (undeclared-default) edge that was silent under the old boolean now wakes.
+    const child = await takenChild(store, { subscription: 'terminal-only' });
 
     await store.addFeedback(child._id, URL_KEY, { message: '[done] shipped' }, 'token-a');
     await drain();
 
-    assert.equal(wakeItems(collection, historyCollection).length, 0);
+    assert.equal(wakeItems(collection, historyCollection).length, 1, 'a terminal bubbles on a terminal-only edge');
+  });
+
+  test('a terminal-only child does NOT wake on [pending] (the one gated row, §5)', async () => {
+    const { store, collection, historyCollection } = makeStore();
+    const child = await takenChild(store, { subscription: 'terminal-only' });
+
+    await store.addFeedback(child._id, URL_KEY, { message: '[pending] paused' }, 'token-a');
+    await drain();
+
+    assert.equal(wakeItems(collection, historyCollection).length, 0, 'PENDING is silent on a terminal-only edge');
+    // And the guard is NOT burned — a later terminal still wakes once.
+    await store.addFeedback(child._id, URL_KEY, { message: '[done] now done' }, 'token-a');
+    await drain();
+    assert.equal(wakeItems(collection, historyCollection).length, 1, 'the later terminal still bubbles');
   });
 
   test('a top-level kickoff (kind:autopilot, no parent sessionId) never self-enqueues a wake', async () => {
@@ -244,15 +279,14 @@ describe('addFeedback wake enqueue (effect + once-only)', () => {
     assert.equal(wakeItems(collection, historyCollection).length, 0, 'a parent-less kickoff produces no wake');
   });
 
-  test('a CHILD autopilot (kind:autopilot, subscribed to a distinct coordinator) wakes it exactly once (LIN-813)', async () => {
+  test('a CHILD autopilot (kind:autopilot, sessioned to a distinct coordinator) wakes it exactly once (LIN-813)', async () => {
     const { store, collection, historyCollection } = makeStore();
     // The coordinator slice: an autopilot dispatches a task-altitude child autopilot
-    // with its own id as sessionId + subscribe:true. When the child terminates it
-    // must wake the coordinator up-chain — the literal "reports up the chain"
-    // substrate.
+    // with its own id as sessionId + subscription:'everything'. When the child
+    // terminates it must wake the coordinator up-chain.
     const childAp = await store.addItem(URL_KEY, {
       prompt: 'drive LIN-2', kind: 'autopilot', issueIdentifier: 'LIN-2',
-      sessionId: 'head-S1', subscribe: true
+      sessionId: 'head-S1', subscription: 'everything'
     });
     await store.takeItem(childAp._id, URL_KEY, 'token-a');
 
@@ -262,12 +296,12 @@ describe('addFeedback wake enqueue (effect + once-only)', () => {
     const wakes = wakeItems(collection, historyCollection);
     assert.equal(wakes.length, 1, 'the child autopilot wakes its coordinator exactly once');
     assert.equal(wakes[0].followUpTo, 'head-S1', 'addressed up-chain to the coordinator');
-    assert.equal(wakes[0].subscribe, false, 'the wake is not itself subscribed — the loop guard');
+    assert.equal(wakes[0].kind, 'wake', 'the wake is kind:wake — the loop guard');
   });
 
-  test('a plain non-sessioned manual dispatch produces no wake (no subscriber edge)', async () => {
+  test('a plain non-sessioned manual dispatch produces no wake (no parent edge)', async () => {
     const { store, collection, historyCollection } = makeStore();
-    // No sessionId, no subscribe — an ordinary manual dispatch.
+    // No sessionId — an ordinary manual dispatch has no parent to wake.
     const manual = await store.addItem(URL_KEY, { prompt: 'manual job', kind: 'implementation', issueIdentifier: 'LIN-9' });
     await store.takeItem(manual._id, URL_KEY, 'token-a');
 
@@ -294,7 +328,7 @@ describe('addFeedback wake enqueue (effect + once-only)', () => {
     assert.equal(wakeItems(collection, historyCollection).length, 1);
   });
 
-  test('the enqueued wake follow-up itself never produces a second wake (structural loop guard)', async () => {
+  test('the enqueued wake follow-up itself never produces a second wake (structural kind:wake loop guard)', async () => {
     const { store, collection, historyCollection } = makeStore();
     const child = await takenChild(store);
 
@@ -302,6 +336,7 @@ describe('addFeedback wake enqueue (effect + once-only)', () => {
     await drain();
     const [wake] = wakeItems(collection, historyCollection);
     assert.ok(wake, 'a wake was enqueued');
+    assert.equal(wake.kind, 'wake');
 
     // Drive the wake item through the same lifecycle and terminate IT.
     await store.takeItem(wake._id, URL_KEY, 'token-b');

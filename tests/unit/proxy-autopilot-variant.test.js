@@ -142,34 +142,36 @@ test('POST kickoff: parks the orchestrator holdable (waitForFollowUps:true) — 
   }
 });
 
-test('POST kickoff: sessionId + subscribe are threaded onto the dispatched child item (LIN-813)', async () => {
+test('POST kickoff: sessionId + subscription are threaded onto the dispatched child item (LIN-813/§6)', async () => {
   const { app, added } = buildApp();
   const headId = '11111111-2222-4333-8444-555555555555';
   // General run (no issueIdentifier) so the threading is exercised without a
-  // resolved workspace — sessionId/subscribe are validated + forwarded regardless
-  // of variant (this is a guide capability, not a variant).
+  // resolved workspace — sessionId/subscription are validated + forwarded regardless
+  // of variant (this is a guide capability, not a variant). A coordinator declares
+  // subscription:'everything' so the child's PENDING/terminal reports wake it.
   const { status } = await request(app, '/api/proxy/autopilot/kickoff', {
     method: 'POST',
-    body: { sessionId: headId, subscribe: true },
+    body: { sessionId: headId, subscription: 'everything' },
   });
   assert.equal(status, 201);
   assert.equal(added.length, 1);
   // The up-chain edge: the child carries the coordinator's id as its parent
-  // sessionId and is subscribed, so its terminal report wakes the coordinator.
+  // sessionId and a declared 'everything' subscription, so its reports wake the
+  // coordinator.
   assert.equal(added[0].doc.sessionId, headId);
-  assert.equal(added[0].doc.subscribe, true);
+  assert.equal(added[0].doc.subscription, 'everything');
 });
 
-test('POST kickoff: a top-level kickoff omitting sessionId/subscribe stays a parent-less head', async () => {
+test('POST kickoff: a top-level kickoff omitting sessionId/subscription stays a parent-less head (terminal-only)', async () => {
   const { app, added } = buildApp();
   await request(app, '/api/proxy/autopilot/kickoff', { method: 'POST', body: {} });
   assert.equal(added.length, 1);
-  // Defaults: no parent edge, not subscribed — the standard single-head behavior.
+  // Defaults: no parent edge, undeclared subscription → terminal-only (§6).
   assert.equal(added[0].doc.sessionId ?? null, null);
-  assert.equal(added[0].doc.subscribe ?? false, false);
+  assert.equal(added[0].doc.subscription, 'terminal-only');
 });
 
-test('POST kickoff: an invalid sessionId is a 400; a non-boolean subscribe is a 400 (LIN-813)', async () => {
+test('POST kickoff: an invalid sessionId is a 400; an invalid subscription is a 400 (LIN-813/§6)', async () => {
   const bad = buildApp();
   const r1 = await request(bad.app, '/api/proxy/autopilot/kickoff', {
     method: 'POST', body: { sessionId: 'not-a-uuid' },
@@ -180,17 +182,17 @@ test('POST kickoff: an invalid sessionId is a 400; a non-boolean subscribe is a 
 
   const bad2 = buildApp();
   const r2 = await request(bad2.app, '/api/proxy/autopilot/kickoff', {
-    method: 'POST', body: { subscribe: 'yes' },
+    method: 'POST', body: { subscription: 'yes' },
   });
   assert.equal(r2.status, 400);
-  assert.match(r2.body.error, /subscribe must be a boolean/);
+  assert.match(r2.body.error, /subscription must be one of/);
   assert.equal(bad2.added.length, 0);
 });
 
 test("POST kickoff: 'coordinator' is NOT a launch-time variant — it 400s like any unknown variant (LIN-813)", async () => {
   // The coordinator capability lives in the shared guide (operating manual), not in
   // a variant. AUTOPILOT_VARIANTS stays ['standard','stepper']; a coordinator
-  // variant is rejected, and the up-chain edge is carried by sessionId/subscribe.
+  // variant is rejected, and the up-chain edge is carried by sessionId/subscription.
   const { app, added } = buildApp();
   const { status, body } = await request(app, '/api/proxy/autopilot/kickoff', {
     method: 'POST',

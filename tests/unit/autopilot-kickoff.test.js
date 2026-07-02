@@ -250,14 +250,14 @@ describe('buildAutopilotKickoff (variant axis, LIN-791)', () => {
     assert.strictEqual(withoutStepper, standard);
   });
 
-  test('stepper output carries the full disposition (warm beats, ROOT, force, subscribe, push rails, labels, challenge, wrap-up)', () => {
+  test('stepper output carries the full disposition (warm beats, ROOT, force, subscription, push rails, labels, challenge, wrap-up)', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL, variant: 'stepper' });
     assert.ok(text.includes(STEPPER_MARKER));
     assert.ok(text.includes('3–6'));                 // decompose into 3–6 beats
     assert.ok(text.includes('ROOT'));                // beat 1 fresh, captured as ROOT
     assert.ok(text.includes('followUpTo: ROOT'));    // later beats anchor on ROOT
     assert.ok(text.includes('force: true'));         // force on every resume
-    assert.ok(text.includes('subscribe: true'));     // LIN-843: every beat is subscribed (push rails)
+    assert.ok(text.includes("subscription: 'everything'")); // LIN-901: every beat declares the everything edge (push rails, §6)
     assert.ok(text.includes('waitForFollowUps: true')); // LIN-845: every beat asks for the worker-side hold
     assert.ok(text.includes('beat N/M'));            // label every send
     assert.ok(text.includes('PENDING'));             // PENDING wake = clean advance, the push signal
@@ -278,11 +278,12 @@ describe('buildAutopilotKickoff (variant axis, LIN-791)', () => {
       'long-poll is now prohibited, not the mechanism');
   });
 
-  test('beats carry BOTH halves of the warm drip — subscribe (wake) AND waitForFollowUps (hold) (LIN-845)', () => {
+  test('beats carry BOTH halves of the warm drip — subscription:everything (wake) AND waitForFollowUps (hold) (LIN-845)', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL, variant: 'stepper' });
-    // subscribe alone wires only the up-chain wake; without waitForFollowUps the
-    // worker finalizes after beat 1 and beat 2 falls back to a cold `claude --resume`.
-    assert.ok(text.includes('subscribe: true'));
+    // subscription:'everything' alone wires only the up-chain wake; without
+    // waitForFollowUps the worker finalizes after beat 1 and beat 2 falls back to a
+    // cold `claude --resume`.
+    assert.ok(text.includes("subscription: 'everything'"));
     assert.ok(text.includes('waitForFollowUps: true'));
     // The hold parks the worker at AWAITING_FOLLOWUP so the next beat lands in-session.
     assert.ok(text.includes('AWAITING_FOLLOWUP'));

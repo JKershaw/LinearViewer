@@ -16,6 +16,7 @@ import { Router, json } from 'express';
 import rateLimit from 'express-rate-limit';
 import { createDedupeCache, dedupeKey } from '../lib/proxy-dedupe.js';
 import { deriveTerminalStatus, deriveCompletedAt } from '../lib/dispatch-terminal.js';
+import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
 // The entire consumer-API surface — reads (LIN-308), writes + write-guard reads
 // (LIN-309), and the compute-endpoint fetchers — sources through a provider; the
 // route owns no GraphQL. Provider SELECTION for the consumer read + write data
@@ -1270,12 +1271,12 @@ POST ${baseUrl}/api/proxy/recommend-and-dispatch
   → { "id": "...", "status": "queued", "kind": "plan", "promptName": "plan", "issueIdentifier": "...", "target": "cli", "sessionId": null, "dispatchedAt": "..." }
 
 POST ${baseUrl}/api/proxy/autopilot/kickoff
-  Body: { "goal": "...", "mode": "write|readonly", "variant": "standard|stepper", "issueIdentifier": "LIN-42", "target": "cli|web|dash", "repo": "...", "appendProxyContext": true, "sessionId": "...", "subscribe": false }
+  Body: { "goal": "...", "mode": "write|readonly", "variant": "standard|stepper", "issueIdentifier": "LIN-42", "target": "cli|web|dash", "repo": "...", "appendProxyContext": true, "sessionId": "...", "subscription": "terminal-only|everything" }
   → Fused launch verb: builds the Autopilot kickoff AND dispatches it in one call — the single verb that actually STARTS a run from a goal (no need to GET the kickoff text and POST it back). The receiving session becomes the Autopilot orchestrator. All fields optional.
   → Omit "issueIdentifier" for a GENERAL run ("goal" focuses the stack walk); pass it for a SCOPED run ("autopilot until THIS task is done") — the project "repo=" is then inherited unless you pass "repo". "mode" defaults to "write" ("readonly" = investigation only).
   → "variant" defaults to "standard" (the normal orchestrator). "stepper" swaps in the warm single-session, beat-stepping disposition: it decomposes the task's worker prompt into 3–6 ordered beats and drip-feeds them into ONE session over followUpTo+force, judging and challenging each beat before advancing. Orthogonal to "mode" — they compose.
-  → "sessionId" + "subscribe" (LIN-813) are the coordinator up-chain edge — available to ANY autopilot contextually (a guide capability, not a launch-time variant; see the "Dispatching a child autopilot" section of the operating manual). When an autopilot acting as a coordinator dispatches a CHILD autopilot for a whole task, it passes its OWN session id as "sessionId" (the wake target) with "subscribe": true, so when the child terminates its report is pushed back up to the coordinator instead of the coordinator polling. A top-level kickoff omits both. NOTE the child's own returned "id" (its session id, for ITS sub-workers) stays distinct from the parent "sessionId" you pass in.
-  → The stepper kickoff body instructs each beat to carry BOTH "subscribe": true AND "waitForFollowUps": true — the two orthogonal halves of the warm drip (LIN-845). "subscribe" is the up-chain wake (the worker's stop boundary, incl. [pending], wakes the orchestrator); "waitForFollowUps" is the worker-side hold (the worker parks at AWAITING_FOLLOWUP instead of finalizing). Both are needed: with the hold absent the worker finalizes after beat 1, so beat 2's followUpTo+force falls back to a cold claude --resume instead of an in-session warm follow-on.
+  → "sessionId" + "subscription" (LIN-813/LIN-900 §6) are the coordinator up-chain edge — available to ANY autopilot contextually (a guide capability, not a launch-time variant; see the "Dispatching a child autopilot" section of the operating manual). When an autopilot acting as a coordinator dispatches a CHILD autopilot for a whole task, it passes its OWN session id as "sessionId" (the wake target) with "subscription": "everything", so when the child pauses (PENDING) or terminates its report is pushed back up to the coordinator instead of the coordinator polling. A top-level kickoff omits both (undeclared → "terminal-only"). NOTE the child's own returned "id" (its session id, for ITS sub-workers) stays distinct from the parent "sessionId" you pass in.
+  → "subscription" is the §5 bubbling contract: an "everything" edge wakes the parent on EVERY event (incl. PENDING-external — each stepper beat boundary); a "terminal-only" edge (the default) wakes it only on the always-bubbling outcomes DONE/FAILED/BLOCKED. It is DECLARED on the edge (never inferred from "has a sessionId"). The stepper kickoff body instructs each beat to carry BOTH "subscription": "everything" AND "waitForFollowUps": true — the two orthogonal halves of the warm drip (LIN-845). "subscription: everything" is the up-chain wake (the worker's stop boundary, incl. [pending], wakes the orchestrator); "waitForFollowUps" is the worker-side hold (the worker parks at AWAITING_FOLLOWUP instead of finalizing). Both are needed: with the hold absent the worker finalizes after beat 1, so beat 2's followUpTo+force falls back to a cold claude --resume instead of an in-session warm follow-on.
   → Dispatched as kind:"autopilot", so the returned "id" IS this run's session id. Pass that id as "sessionId" on every worker dispatch the run fans out (the kickoff body also tells the run its own id). The orchestrator itself is launched WITHOUT "waitForFollowUps" (default false) so it finalizes normally and stays free to run its watch loop.
   → The prompt body NEVER returns to you — only the header. The GET twin (GET /api/proxy/autopilot/kickoff?goal=&mode=&variant=) stays a text-only preview/inspect form that does NOT enqueue anything.
   → { "id": "...", "sessionId": "...", "status": "queued", "kind": "autopilot", "promptName": "Autopilot (stack walk)", "mode": "write", "variant": "standard", "issueIdentifier": null, "target": "cli", "dispatchedAt": "..." }
@@ -4045,7 +4046,7 @@ One convention across every endpoint, so you can branch on the same fields every
    * never returned to the caller. The GET twin above stays the text-only
    * preview/inspect form.
    *
-   * Body (all optional): { goal?, mode?, variant?, issueIdentifier?, target?, repo?, appendProxyContext?, sessionId?, subscribe? }
+   * Body (all optional): { goal?, mode?, variant?, issueIdentifier?, target?, repo?, appendProxyContext?, sessionId?, subscription? }
    *   - issueIdentifier present → SCOPED run ("autopilot until THIS task is
    *     done"): the issue's title is resolved for the goal line and its project
    *     `repo=` is inherited (an explicit caller `repo` wins, mirroring /prompt).
@@ -4053,13 +4054,13 @@ One convention across every endpoint, so you can branch on the same fields every
    *   - mode: 'write' (default) | 'readonly'.
    *   - variant: 'standard' (default) | 'stepper' (warm beat-stepping disposition,
    *     LIN-791); orthogonal to mode.
-   *   - sessionId + subscribe (LIN-813): the coordinator up-chain edge, a GUIDE
+   *   - sessionId + subscription (LIN-813): the coordinator up-chain edge, a GUIDE
    *     capability available to any autopilot contextually (NOT a launch-time
    *     variant — see the operating manual's "Dispatching a child autopilot"). An
    *     autopilot acting as a coordinator that dispatches a CHILD autopilot for a
    *     whole task passes its OWN session id as `sessionId` (the wake target) with
-   *     `subscribe: true`, so the child's terminal report wakes the coordinator. A
-   *     top-level kickoff omits both.
+   *     `subscription: 'everything'`, so the child's reports wake the coordinator. A
+   *     top-level kickoff omits both (undeclared → 'terminal-only').
    * Dispatches with kind:'autopilot', so addItem appends the session-id self-ref
    * block and the returned id is the session id (LIN-591/LIN-599).
    */
@@ -4070,7 +4071,7 @@ One convention across every endpoint, so you can branch on the same fields every
     }
 
     try {
-      const { goal, mode, variant, issueIdentifier, target, repo, appendProxyContext, sessionId, subscribe } = req.body || {};
+      const { goal, mode, variant, issueIdentifier, target, repo, appendProxyContext, sessionId, subscription } = req.body || {};
 
       // Validate caller-supplied inputs. (The composed body is server-generated
       // and trusted, so only these raw inputs are checked — same split as the
@@ -4103,30 +4104,27 @@ One convention across every endpoint, so you can branch on the same fields every
       }
       // Coordinator up-chain wiring (LIN-813): an autopilot acting as a coordinator
       // dispatches a task-altitude CHILD autopilot for a whole task, stamping its
-      // OWN session id as `sessionId` (the up-chain wake target) and `subscribe:
-      // true` so the child's terminal report wakes it. Both are stored + forwarded
-      // blindly onto the dispatched item (same contract as POST /dispatch); validate
-      // shape only. This is a guide capability, not a variant — any autopilot can
-      // use it contextually.
+      // OWN session id as `sessionId` (the up-chain wake target) and declaring
+      // `subscription: 'everything'` so the child's PENDING/terminal reports wake it.
+      // Both are stored + forwarded blindly onto the dispatched item (same contract
+      // as POST /dispatch); validate shape only. This is a guide capability, not a
+      // variant — any autopilot can use it contextually.
       if (sessionId !== undefined && sessionId !== null && !UUID_REGEX.test(sessionId)) {
         logEvent(req, '/api/proxy/autopilot/kickoff', 400);
         return badRequest.json(res, 'Invalid sessionId format');
       }
-      if (subscribe !== undefined && typeof subscribe !== 'boolean') {
+      if (subscription !== undefined && !isValidSubscription(subscription)) {
         logEvent(req, '/api/proxy/autopilot/kickoff', 400);
-        return badRequest.json(res, 'subscribe must be a boolean');
+        return badRequest.json(res, `subscription must be one of: ${SUBSCRIPTION_LEVELS.join(', ')}`);
       }
 
-      // Wake-half default (LIN-881): sibling of the plain-`/dispatch` gap. A
-      // coordinator dispatching a CHILD autopilot (LIN-813) stamps its OWN
-      // `sessionId` as the up-chain wake target, but nothing defaulted the WAKE
-      // (`subscribe`) — so the child's terminal report woke nothing unless the
-      // coordinator remembered the flag. Default subscribe ON whenever a
-      // `sessionId` is present, mirroring plain `/dispatch` and
-      // `recommend-and-dispatch`; an explicit value (true OR false) still wins. A
-      // top-level kickoff carries no `sessionId`, so it stays `subscribe:false`
-      // and single-head behavior is unchanged.
-      const subscribeResolved = typeof subscribe === 'boolean' ? subscribe : !!sessionId;
+      // Subscription is DECLARED on the edge (LIN-900 §6), never reconstructed from
+      // incidental fields: an undeclared edge is `terminal-only`, full stop. (This
+      // deliberately removes the old `!!sessionId` derivation — §6 forbids inferring
+      // subscription from "has a sessionId". A coordinator that wants every beat
+      // declares `subscription: 'everything'` explicitly; the autopilot prompts are
+      // the sole declarers.)
+      const subscriptionResolved = subscription ?? DEFAULT_SUBSCRIPTION;
 
       const baseUrl = `${req.protocol}://${req.get('host')}`;
 
@@ -4196,14 +4194,14 @@ One convention across every endpoint, so you can branch on the same fields every
         waitForFollowUps: true,
         // Coordinator up-chain edge (LIN-813): when this kickoff is a CHILD
         // autopilot dispatched by a coordinator, `sessionId` targets the coordinator
-        // and `subscribe: true` routes the child's terminal report back up to it. A
-        // top-level kickoff passes neither, so both default to null/false and the
-        // standard single-head behavior is unchanged. Stored + forwarded blindly;
-        // note `sessionId` here is the PARENT edge — the child's own `_id` is what
-        // addItem stamps into its prompt for its own sub-workers, so the two ids
-        // stay distinct by construction.
+        // and a declared `subscription: 'everything'` routes the child's reports back
+        // up to it. A top-level kickoff passes neither, so subscription defaults to
+        // 'terminal-only' and the standard single-head behavior is unchanged. Stored
+        // + forwarded blindly; note `sessionId` here is the PARENT edge — the child's
+        // own `_id` is what addItem stamps into its prompt for its own sub-workers,
+        // so the two ids stay distinct by construction.
         sessionId: sessionId || null,
-        subscribe: subscribeResolved
+        subscription: subscriptionResolved
       });
 
       logEvent(req, '/api/proxy/autopilot/kickoff', 201);
@@ -4261,7 +4259,7 @@ One convention across every endpoint, so you can branch on the same fields every
     }
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo, force, abort, abortTo, sessionId, waitForFollowUps, queueIfBusy, subscribe } = req.body || {};
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo, force, abort, abortTo, sessionId, waitForFollowUps, queueIfBusy, subscription } = req.body || {};
 
       // Abort verb (LIN-743): an abort item cancels/closes an existing session
       // (named by abortTo) instead of running a prompt — it carries no prompt and
@@ -4311,9 +4309,10 @@ One convention across every endpoint, so you can branch on the same fields every
         logEvent(req, '/api/proxy/dispatch', 400);
         return badRequest.json(res, 'queueIfBusy must be a boolean');
       }
-      if (subscribe !== undefined && typeof subscribe !== 'boolean') {
+      // Subscription edge declaration (LIN-900 §6): enum, no legacy boolean.
+      if (subscription !== undefined && !isValidSubscription(subscription)) {
         logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, 'subscribe must be a boolean');
+        return badRequest.json(res, `subscription must be one of: ${SUBSCRIPTION_LEVELS.join(', ')}`);
       }
 
       if (prompt && prompt.length > MAX_PROMPT_LENGTH) {
@@ -4403,20 +4402,16 @@ One convention across every endpoint, so you can branch on the same fields every
         }
       }
 
-      // Wake-half default (LIN-881): `subscribe` is the up-chain wake — the
-      // worker's terminal/`PENDING` boundary enqueues a wake so its head learns
-      // the beat is done and drips the next one. Stepper warm-drip beats carry the
-      // HOLD (`waitForFollowUps:true`) but relied on the agent to hand-set the
-      // WAKE, so an omitted `subscribe` left `PENDING` waking nothing and every
-      // beat boundary deadlocked. Remove that reliance: default subscribe ON
-      // whenever a `sessionId` is present (the up-chain edge exists), exactly as
-      // `recommend-and-dispatch` does — an explicit caller value (true OR false)
-      // still wins. A sessionless dispatch has no head to wake, so it stays off.
-      // (Beats also carry `followUpTo` to resume the warm session; the wake keys
-      // on `sessionId`, not on being a fresh dispatch — a follow-on beat must wake
-      // its head too. The `buildWakeFollowUp` self-skip `childId === sessionId`
-      // still prevents an orchestrator from waking itself.)
-      const subscribeResolved = typeof subscribe === 'boolean' ? subscribe : !!sessionId;
+      // Subscription is DECLARED on the edge (LIN-900 §6), never reconstructed from
+      // incidental fields. An undeclared edge is `terminal-only`. This deliberately
+      // removes the old LIN-881 `!!sessionId` default-on: §6 forbids inferring
+      // subscription from "has a sessionId". A stepper beat that needs its PENDING
+      // to wake its head declares `subscription: 'everything'` explicitly (the
+      // stepper kickoff body does exactly this); a plain sessioned worker correctly
+      // defaults to `terminal-only` and no longer wakes its orchestrator on PENDING.
+      // The `buildWakeFollowUp` self-skip `childId === sessionId` still prevents an
+      // orchestrator from waking itself.
+      const subscriptionResolved = subscription ?? DEFAULT_SUBSCRIPTION;
 
       // Auto-append the proxy context (workspace API access + reporting channel) by
       // default, so the worker can both read context and report its result.
@@ -4465,7 +4460,7 @@ One convention across every endpoint, so you can branch on the same fields every
         sessionId: sessionId || null,
         waitForFollowUps: waitForFollowUps === true,
         queueIfBusy: queueIfBusy === true,
-        subscribe: subscribeResolved
+        subscription: subscriptionResolved
       });
 
       logEvent(req, '/api/proxy/dispatch', 201);
@@ -4512,7 +4507,7 @@ One convention across every endpoint, so you can branch on the same fields every
     }
 
     try {
-      const { issueIdentifier, target, repo, appendProxyContext, noDescend, kind, sessionId, waitForFollowUps, queueIfBusy, subscribe } = req.body || {};
+      const { issueIdentifier, target, repo, appendProxyContext, noDescend, kind, sessionId, waitForFollowUps, queueIfBusy, subscription } = req.body || {};
 
       // Validate caller-supplied inputs. (Only the server-generated prompt skips
       // the dangerous-char/length checks — see the dispatch step below.)
@@ -4540,16 +4535,15 @@ One convention across every endpoint, so you can branch on the same fields every
       }
       // Push-based inter-session comms (LIN-826): stored + forwarded blindly,
       // exactly like waitForFollowUps. queueIfBusy is never defaulted here (it is
-      // Harbour-set only on the auto-enqueued wake follow-up); subscribe defaults
-      // ON for a fresh sessioned worker below so the orchestrator needs no new
-      // prompt instruction — an explicit caller value (incl. false) always wins.
+      // Harbour-set only on the auto-enqueued wake follow-up); subscription is a
+      // declared enum (LIN-900 §6) that defaults to `terminal-only` when omitted.
       if (queueIfBusy !== undefined && typeof queueIfBusy !== 'boolean') {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
         return badRequest.json(res, 'queueIfBusy must be a boolean');
       }
-      if (subscribe !== undefined && typeof subscribe !== 'boolean') {
+      if (subscription !== undefined && !isValidSubscription(subscription)) {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-        return badRequest.json(res, 'subscribe must be a boolean');
+        return badRequest.json(res, `subscription must be one of: ${SUBSCRIPTION_LEVELS.join(', ')}`);
       }
       if (repo !== undefined && (typeof repo !== 'string' || repo.length > MAX_NAME_LENGTH || DANGEROUS_CHARS_REGEX.test(repo))) {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
@@ -4575,13 +4569,13 @@ One convention across every endpoint, so you can branch on the same fields every
         return badRequest.json(res, 'Invalid sessionId format');
       }
 
-      // Resolve the subscribe edge once for both dispatch paths below (LIN-826).
-      // V1 "fresh sessioned worker" = a sessionId is present: recommend-and-dispatch
-      // has no followUpTo/abort verb, so those exclusion arms (sessionId && !followUpTo
-      // && !abort) are always satisfied here. Default ON so the autopilot fan-out
-      // subscribes to each worker with no new prompt instruction; an explicit caller
-      // `subscribe` (true OR false) overrides the default.
-      const subscribeResolved = typeof subscribe === 'boolean' ? subscribe : !!sessionId;
+      // Resolve the subscription edge once for both dispatch paths below (LIN-900
+      // §6): DECLARED on the edge, never reconstructed from `sessionId`. An
+      // undeclared edge is `terminal-only` — the old `!!sessionId` default-on is
+      // removed (§6 forbids inferring subscription from incidental fields). A
+      // caller that wants a worker's every event to wake it declares
+      // `subscription: 'everything'`.
+      const subscriptionResolved = subscription ?? DEFAULT_SUBSCRIPTION;
 
       // Recommendation preconditions — identical to GET /recommend.
       const { token: accessToken, reason } = await resolveWorkspaceAccess(req.proxyUrlKey);
@@ -4656,11 +4650,11 @@ One convention across every endpoint, so you can branch on the same fields every
             // description, with an explicit caller repo winning (LIN-537).
             repo: repo || parseRepoFromDescription(project?.description) || null,
             sessionId: sessionId || null,
-            // Push-comms (LIN-826): subscribe defaults ON for a sessioned worker
-            // so its terminal events wake the orchestrator; queueIfBusy forwarded
-            // blindly. Both stored + forwarded, no Harbour-side semantics.
+            // Push-comms: `subscription` is the declared edge (LIN-900 §6),
+            // `terminal-only` unless the caller declares `everything`; queueIfBusy
+            // forwarded blindly. Both stored + forwarded, no Harbour-side semantics.
             queueIfBusy: queueIfBusy === true,
-            subscribe: subscribeResolved
+            subscription: subscriptionResolved
           });
 
           // Record the override so it can feed heuristic improvement — the
@@ -4796,11 +4790,11 @@ One convention across every endpoint, so you can branch on the same fields every
           sessionId: sessionId || null,
           // Opt-in completion hold (LIN-797), forwarded blindly to the runner.
           waitForFollowUps: waitForFollowUps === true,
-          // Push-comms (LIN-826): subscribe defaults ON for a sessioned worker so
-          // its terminal events wake the orchestrator; queueIfBusy forwarded
-          // blindly. Both stored + forwarded, no Harbour-side semantics.
+          // Push-comms: `subscription` is the declared edge (LIN-900 §6),
+          // `terminal-only` unless the caller declares `everything`; queueIfBusy
+          // forwarded blindly. Both stored + forwarded, no Harbour-side semantics.
           queueIfBusy: queueIfBusy === true,
-          subscribe: subscribeResolved
+          subscription: subscriptionResolved
         });
 
         keepalive.stop();

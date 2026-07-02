@@ -22,6 +22,7 @@ import path from 'path';
 import os from 'os';
 import { spawnClaudeSession } from '../lib/harbour-spawn.js';
 import { isValidDispatchKind, deriveDispatchKind, DISPATCH_KINDS } from '../lib/prompt-templates.js';
+import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
 
 // Directory for Harbour OS dispatch prompt staging files. The OS tmp dir is
 // shared between the Node server and the Harbour OS terminal that reads the
@@ -195,7 +196,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const { workspace } = req;
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo, force, abort, abortTo, sessionId, waitForFollowUps, queueIfBusy, subscribe } = req.body;
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo, force, abort, abortTo, sessionId, waitForFollowUps, queueIfBusy, subscription } = req.body;
 
       // Abort verb (LIN-743): an abort item asks the consumer to cancel/close an
       // existing session (named by abortTo) instead of running a prompt, so it
@@ -245,17 +246,18 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         return badRequest.json(res, 'waitForFollowUps must be a boolean');
       }
 
-      // Push-based inter-session comms (LIN-826). Both are stored + forwarded
-      // blindly, exactly like waitForFollowUps/force — Harbour owns no semantics:
+      // Push-based inter-session comms. Both are stored + forwarded blindly,
+      // exactly like waitForFollowUps/force — Harbour owns no semantics beyond wake:
       //   queueIfBusy  — the runner leaves a busy-target follow-up unclaimed
       //                  rather than failing it (LIN-827 runner path).
-      //   subscribe    — edge declaration: route this child's terminal events
-      //                  back to the dispatching parent as a wake follow-up.
+      //   subscription — edge declaration (LIN-900 §6): enum 'everything'|
+      //                  'terminal-only' governing which of this child's events wake
+      //                  the dispatching parent (§5 matrix). Declared, never inferred.
       if (queueIfBusy !== undefined && typeof queueIfBusy !== 'boolean') {
         return badRequest.json(res, 'queueIfBusy must be a boolean');
       }
-      if (subscribe !== undefined && typeof subscribe !== 'boolean') {
-        return badRequest.json(res, 'subscribe must be a boolean');
+      if (subscription !== undefined && !isValidSubscription(subscription)) {
+        return badRequest.json(res, `subscription must be one of: ${SUBSCRIPTION_LEVELS.join(', ')}`);
       }
 
       // Reject local target from non-localhost requests
@@ -363,7 +365,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         sessionId: sessionId || null,
         waitForFollowUps: waitForFollowUps === true,
         queueIfBusy: queueIfBusy === true,
-        subscribe: subscribe === true
+        subscription: subscription ?? DEFAULT_SUBSCRIPTION
       });
 
       // Spawn a Harbour OS Claude session when target is 'local' (the API value
