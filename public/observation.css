@@ -110,7 +110,7 @@
      onto the theme's 4-state palette (running=amber, done=green, error=red,
      stale=slate) — no 5th colour. */
   border-left: 4px solid var(--line);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   margin-bottom: 0.5rem;
   background: var(--raised);
   overflow: hidden;

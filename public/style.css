@@ -69,10 +69,12 @@
   --space-4: 1.5rem;
   --space-5: 2rem;
 
-  /* Border-radius scale */
-  --radius-sm: 3px;
-  --radius-md: 6px;
-  --radius-lg: 12px;
+  /* Border-radius scale (theme spec §6 sanctioned values 5/8/14/999px; the
+     bespoke 2/7/9px sanctioned radii stay as per-element literals — LIN-863) */
+  --radius-sm: 5px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+  --radius-full: 999px;
 
   /* Elevation / shadow scale */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
@@ -2649,7 +2651,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   color: var(--fg-dim);
   background: var(--bg-alt);
   border: 1px solid var(--border-subtle);
-  border-radius: 10px;
+  border-radius: var(--radius-full);
 }
 
 .status-pill__char {
@@ -2752,7 +2754,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   color: var(--text);
   background: var(--raised);
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   cursor: pointer;
   text-decoration: none;
 }
@@ -2920,7 +2922,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   padding: var(--space-3);
   background: var(--card);
   border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
 }
 .surface--inset { background: var(--inset); border-color: var(--line-soft); }
 .surface--raised { background: var(--raised); box-shadow: var(--shadow); }
