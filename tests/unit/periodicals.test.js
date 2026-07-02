@@ -502,6 +502,40 @@ describe('Recent Headwinds specifics (LIN-542)', () => {
     assert.match(prompt, /do not double-flag|do not re-flag/i);
     assert.match(prompt, /churn/i);
   });
+
+  // LIN-899: hardening after the 07-01 run (LIN-896) missed the autopilot
+  // session-liveness defect cluster. These pin the gaps that made the miss easy
+  // so a future edit can't silently drop them.
+  test('defect-escape means cluster-by-subsystem + fix-forward re-filing, not a raw count', () => {
+    assert.match(prompt, /cluster the defects by subsystem/i);
+    // Reopen isn't the escape signal in a fix-forward repo — adjacent re-filing is.
+    assert.match(prompt, /fix-forward/i);
+    assert.match(prompt, /adjacent/i);
+    // The cluster scan is codebase-wide, not anchored to last run's location.
+    assert.match(prompt, /generalise the cluster scan|generalize the cluster scan/i);
+  });
+
+  test('names the fix-induced-adjacent-bug (whack-a-mole) cross-class pattern', () => {
+    assert.match(prompt, /whack-a-mole/i);
+    assert.match(prompt, /induces the .*next.* bug|fix that induces/i);
+    // Ranked as one headwind by the pattern, not N healthy fast fixes.
+    assert.match(prompt, /one.*headwind|not N healthy fast fixes/i);
+  });
+
+  test('separates north-star alignment from forward delivery (reliability fix = rework)', () => {
+    assert.match(prompt, /alignment is not the same as forward progress/i);
+    assert.match(prompt, /rework, not forward/i);
+  });
+
+  test('has an unproven/watch trajectory + aggregate-before-rank + scan-for-new-headwind guards', () => {
+    // A closed-but-just-shipped mechanism must not default to "eased".
+    assert.match(prompt, /unproven \/ watch|unproven\/watch/i);
+    assert.match(prompt, /too fresh/i);
+    // Aggregate small/closed/concentrated items before ranking.
+    assert.match(prompt, /aggregate before you rank/i);
+    // Trend-diff must not bury a genuinely new headwind with no prior row.
+    assert.match(prompt, /scan explicitly for headwinds that did not exist last run/i);
+  });
 });
 
 describe('Design & Interface Review specifics (LIN-520)', () => {
