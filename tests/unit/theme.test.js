@@ -76,8 +76,32 @@ test('self-hosts Inter and JetBrains Mono via @font-face (no build step)', () =>
   assert.match(STYLE_CSS, /--font-content:\s*'Inter'/);
 });
 
+// LIN-864: the theme's type scale (view title 700, metadata/chips 500, machine-ID
+// mono 600) demands intermediate/heavier weights beyond the base 400. Each must be
+// self-hosted so the browser never synthesizes faux-bold, which degrades the
+// mono=fact / sans=label hierarchy. Every weight declared → matching vendored file.
+const SELF_HOSTED_WEIGHTS = [
+  ['Inter', 400, 'inter-400.woff2'],
+  ['Inter', 500, 'inter-500.woff2'],
+  ['Inter', 600, 'inter-600.woff2'],
+  ['Inter', 700, 'inter-700.woff2'],
+  ['JetBrains Mono', 400, 'jetbrains-mono-400.woff2'],
+  ['JetBrains Mono', 500, 'jetbrains-mono-500.woff2'],
+  ['JetBrains Mono', 600, 'jetbrains-mono-600.woff2'],
+];
+
+test('every type-scale weight is self-hosted via @font-face (no faux-bold)', () => {
+  for (const [family, weight, file] of SELF_HOSTED_WEIGHTS) {
+    // A single @font-face block binding this family + weight to its own woff2 file.
+    const re = new RegExp(
+      `@font-face\\s*\\{[^}]*?font-family:\\s*'${family}'[^}]*?font-weight:\\s*${weight}\\b[^}]*?\\/fonts\\/${file.replace(/[.]/g, '\\$&')}[^}]*?\\}`
+    );
+    assert.match(STYLE_CSS, re, `missing @font-face for ${family} ${weight} → /fonts/${file}`);
+  }
+});
+
 test('the actual font files are vendored', () => {
-  for (const f of ['inter-400.woff2', 'inter-600.woff2', 'jetbrains-mono-400.woff2']) {
+  for (const [, , f] of SELF_HOSTED_WEIGHTS) {
     const bytes = readFileSync(join(__dirname, '../../public/fonts', f));
     assert.ok(bytes.length > 1000, `${f} should be a real woff2`);
     assert.equal(bytes.toString('ascii', 0, 4), 'wOF2', `${f} must be a woff2`);
