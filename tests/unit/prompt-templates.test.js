@@ -1775,6 +1775,53 @@ describe('meta-prompt review close-out gate + cannot-close routing (LIN-474)', (
   });
 });
 
+describe('meta-prompt design shape-fork routing + aiHint discriminators (LIN-878)', () => {
+  const baseArgs = {
+    issueContext: 'CTX', identifier: 'LIN-878',
+    hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
+    hasComments: true, commentCount: 2, aiHints: 'H',
+    actionVocabulary: 'plan, research, design, scoping, spike, implement, review, breakdown',
+    completionSignals: 'S', focusedSubtaskId: null, isTerminal: false, hasOpenChildren: false
+  };
+
+  test('Step 3 carries the guarded design shape-fork branch at the research→plan seam', () => {
+    const p = buildMetaPromptTemplate(baseArgs);
+    assert.ok(/check whether the solution \*shape\* is still contested/i.test(p), 'the shape-fork branch is present');
+    assert.ok(/Recommend `design`/i.test(p), 'it routes to design');
+    assert.ok(/≥2 genuinely viable, materially-different solution shapes/i.test(p), 'it names the ≥2-shapes condition');
+    assert.ok(/settled silently inside planning/i.test(p), 'it names the silent-shape-decision failure mode');
+    // the four explicit over-fire guards
+    assert.ok(/Over-fire guards — do NOT fire `design` when:/i.test(p), 'it lists explicit over-fire guards');
+    assert.ok(/still ungathered — that is `research`/i.test(p), 'guard (a): ungathered → research');
+    assert.ok(/one obvious shape/i.test(p), 'guard (b): one obvious shape → plan/implement');
+    assert.ok(/already committed to an approach, or the work is already built\/landed/i.test(p), 'guard (c): committed/landed → plan/review');
+    assert.ok(/that is `scoping`, not `design`/i.test(p), 'guard (d): requirements ambiguity → scoping');
+    // ordering: the hatch sits at the research→plan seam — before the plan-exists check…
+    assert.ok(p.indexOf('the design hatch') < p.indexOf('check whether a plan exists'),
+      'the shape-fork branch sits before the plan-exists check');
+    // …but AFTER the already-landed guard, so landed work still routes to review first.
+    assert.ok(p.indexOf('check whether the implementation has ALREADY landed') < p.indexOf('the design hatch'),
+      'the already-landed guard retains priority over the design hatch');
+  });
+
+  test('formatAIHintsForMetaPrompt renders whenNot/chooseOver discriminators for design/scoping/spike', () => {
+    const hints = formatAIHintsForMetaPrompt();
+    assert.ok(/\*\*design\*\*/.test(hints), 'design is listed');
+    assert.ok(/When NOT: the shape is already decided/i.test(hints), 'design When NOT rendered');
+    assert.ok(/Choose over: choose `design` over `plan`/i.test(hints), 'design Choose over rendered');
+    assert.ok(/Choose over: choose `scoping` over/i.test(hints), 'scoping Choose over rendered');
+    assert.ok(/Choose over: choose `spike` over `research`/i.test(hints), 'spike Choose over rendered');
+  });
+
+  test('discriminators are additive — only the three tagged kinds emit them (back-compatible)', () => {
+    const hints = formatAIHintsForMetaPrompt();
+    assert.strictEqual((hints.match(/When NOT:/g) || []).length, 3, 'exactly design/scoping/spike emit When NOT');
+    assert.strictEqual((hints.match(/Choose over:/g) || []).length, 3, 'exactly design/scoping/spike emit Choose over');
+    // core kinds still render their situation/goal/workflow untouched
+    assert.ok(/\*\*research\*\*/.test(hints) && /\*\*review\*\*/.test(hints), 'core kinds still present');
+  });
+});
+
 // =============================================================================
 // close-out template + review→close-out ledger handoff (LIN-550)
 // =============================================================================

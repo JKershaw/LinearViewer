@@ -230,6 +230,31 @@ Supersedes LIN-289.`
     }
   },
 
+  // ---- DESIGN-expected (LIN-878): synthetic positive control ----
+  // The mechanism check the real fixtures (LIN-813/748) cannot give on their own: a task whose
+  // requirements are CLEAR and whose knowledge is GATHERED, but with ≥2 genuinely viable,
+  // materially-different solution shapes explicitly on the table and NOT yet chosen — exactly the
+  // shape-fork the Step-3 design hatch keys on. It should route `design`, not `plan`. (Synthetic =
+  // cheap/forgiving pre-check per the ticket; the real bar is the frozen LIN-813/748 fixtures, whose
+  // pre-plan context does NOT surface the fork the way this one deliberately does.)
+  {
+    id: 'design: two viable shapes, fork undecided (synthetic positive control)',
+    expect: ['design'],
+    why: 'Requirements clear + knowledge gathered + ≥2 materially-different shapes named and unchosen → '
+       + 'design, not plan. Proves the hatch CAN fire design when the fork is legible in the context.',
+    issue: {
+      identifier: 'SYN-23', createdAt: '2026-06-01T00:00:00Z', state: todo, labels: [],
+      title: 'Decide how the dispatch queue should guarantee at-most-once delivery',
+      description: `The queue must never hand the same item to two consumers. The constraints are gathered (consumers poll then take; takes can race; items carry a status). Two materially-different shapes are both viable and neither has been chosen:
+
+**Shape A — optimistic claim + compare-and-swap on status:** a take atomically flips \`queued → taken\` and loses the race if the swap fails. Minimal storage change, but correctness rests entirely on the store's CAS semantics.
+
+**Shape B — a lease / visibility-timeout model:** a take grants a time-boxed lease; unacked items become visible again after the lease expires. More moving parts (lease clock, reclaim path) but tolerant of dead consumers.
+
+Both fit the current store. The tradeoff (simplicity vs. crash-tolerance) is real and unresolved — pick the shape before planning the surfaces.`
+    }
+  },
+
   // ---- IMPLEMENT-expected (research here would be over-firing) ----
   {
     id: 'trivial one-liner',
@@ -569,26 +594,39 @@ console.log(`vocab(${VOCAB.size}): ${[...VOCAB].join(', ')}\n`);
 const armName = { A: 'baseline', B: 'candidate' };
 // lp/lpN = loop-repeat: on a `loop` case, how often the model chose the forbidden
 // `avoid` action (i.e. repeated the loop) out of all loop-case runs. Lower is better.
-const mk = () => ({ hit: 0, n: 0, rr: 0, rrN: 0, of: 0, ofN: 0, ov: 0, lp: 0, lpN: 0 });
+//
+// Per-kind recall + over-fire (LIN-878). For each tracked kind K, `kind[K]` holds:
+//   rec/recN = chose K on cases where K ∈ expect   (K is the honest route — recall)
+//   of/ofN   = chose K on cases where K ∉ expect    (K fired where it should not — over-fire)
+// Both are AUTO-DERIVED from each case's `expect` — the same mechanism the old hard-coded
+// research pair used — so design/scoping/spike get recall+over-fire rows for free the moment
+// a fixture lists (or omits) them. `research` is now just the first kind in this map.
+const TRACKED_KINDS = ['research', 'design', 'scoping', 'spike'];
+const mk = () => ({ hit: 0, n: 0, ov: 0, lp: 0, lpN: 0, kind: {} });
+const kslot = (s, k) => (s.kind[k] || (s.kind[k] = { rec: 0, recN: 0, of: 0, ofN: 0 }));
 const stats = { A: mk(), B: mk() };
 
 for (const c of cases) {
   const accept = new Set(c.expect.map(norm));
-  const wantsResearch = accept.has('research');
   const line = [`• ${c.id}  {${c.expect.join(' | ')}}`];
   for (const arm of armList) {
     const res = await Promise.all(Array.from({ length: K }, () => routeOnce(arm, c.issue)));
     const dist = {};
     for (const a of res) dist[a] = (dist[a] || 0) + 1;
     const hits = res.filter(a => accept.has(a)).length;
-    const choseResearch = res.filter(a => a === 'research').length;
     const s = stats[arm];
     s.hit += hits; s.n += K; s.ov += res.filter(isOffVocab).length;
-    if (wantsResearch) { s.rr += choseResearch; s.rrN += K; }
-    // Over-fire = chose research on ANY case where research is not acceptable,
-    // auto-derived from `expect` (this also catches plan-expected cases pulled
-    // into research, which a manual per-fixture flag would miss).
-    else { s.of += choseResearch; s.ofN += K; }
+    // Per-kind recall / over-fire, auto-derived from `expect` (LIN-878). For each
+    // tracked kind, this case is either a recall opportunity (K ∈ expect) or an
+    // over-fire guard (K ∉ expect); tally how often the model chose K in each. This
+    // also catches e.g. plan-expected cases pulled into research, or design firing on
+    // a core task, which a manual per-fixture flag would miss.
+    for (const k of TRACKED_KINDS) {
+      const choseK = res.filter(a => a === k).length;
+      const slot = kslot(s, k);
+      if (accept.has(k)) { slot.rec += choseK; slot.recN += K; }
+      else { slot.of += choseK; slot.ofN += K; }
+    }
     // Loop-repeat: count how often the model chose the forbidden repeat action.
     if (c.loop && c.avoid) { s.lp += res.filter(a => a === norm(c.avoid)).length; s.lpN += K; }
     const distStr = Object.entries(dist).sort((a, b) => b[1] - a[1]).map(([a, n]) => `${a}×${n}`).join(', ');
@@ -611,8 +649,20 @@ const row = (label, sel) => {
   return l;
 };
 console.log(row('routing accuracy', (s, raw) => raw ? s.hit / s.n * 100 : `${s.hit}/${s.n} (${pct(s.hit, s.n)})`));
-console.log(row('research RECALL', (s, raw) => raw ? (s.rrN ? s.rr / s.rrN * 100 : 0) : `${s.rr}/${s.rrN} (${pct(s.rr, s.rrN)})`));
-console.log(row('research OVER-FIRE', (s, raw) => raw ? (s.ofN ? s.of / s.ofN * 100 : 0) : `${s.of}/${s.ofN} (${pct(s.of, s.ofN)})`));
+// Per-kind recall + over-fire (LIN-878). research keeps its historical rows (now just the
+// first tracked kind); design/scoping/spike report alongside it. A kind with no recall
+// opportunities in the loaded case set shows 0/0 — expected until a fixture lists it as a
+// sole `expect` (e.g. the frozen LIN-813 / LIN-748 design fixtures). recall↑ over-fire↓.
+for (const k of TRACKED_KINDS) {
+  console.log(row(`${k} RECALL`, (s, raw) => {
+    const x = s.kind[k] || { rec: 0, recN: 0 };
+    return raw ? (x.recN ? x.rec / x.recN * 100 : 0) : `${x.rec}/${x.recN} (${pct(x.rec, x.recN)})`;
+  }));
+  console.log(row(`${k} OVER-FIRE`, (s, raw) => {
+    const x = s.kind[k] || { of: 0, ofN: 0 };
+    return raw ? (x.ofN ? x.of / x.ofN * 100 : 0) : `${x.of}/${x.ofN} (${pct(x.of, x.ofN)})`;
+  }));
+}
 console.log(row('off-vocabulary', (s, raw) => raw ? s.ov / s.n * 100 : `${s.ov}/${s.n} (${pct(s.ov, s.n)})`));
 console.log(row('loop-REPEAT', (s, raw) => raw ? (s.lpN ? s.lp / s.lpN * 100 : 0) : `${s.lp}/${s.lpN} (${pct(s.lp, s.lpN)})`));
 console.log('\nrecall↑ over-fire↓ off-vocab↓ loop-repeat↓ is better. (Δ shown only in AB mode.)');

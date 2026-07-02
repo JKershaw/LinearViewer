@@ -151,6 +151,17 @@ so the heuristic can be improved — so when you reach for it, leave a one-line 
 yourself overriding the same task repeatedly, that's no longer a verb wobble — it's a task problem, and
 the move is to pull up and flag it, not to keep pinning verbs.
 
+One wrong-verb miss is quieter than the rest, because nothing *refuses* — the engine simply never reaches
+*up* for a richer kind. The tell is **a solution shape decided silently inside planning**: a task with
+several genuinely viable, materially-different approaches goes straight `research → plan → implementation`,
+and the plan quietly picks an architecture that a deliberate `design` pass would have weighed in the open.
+You only notice at the human gate, when the shape turns out wrong and the work is re-done. When you see a
+shape-contested task heading into `plan` with the fork never named — the ticket frames a mechanism, a
+"guide", a "match the mockup", several ways it could be built — that is the moment to pin `design` (the
+same verb override). The engine's bias runs *down* the lifecycle toward the core loop, so the richer kinds
+(`design`, and its siblings `scoping` and `spike`) need you to reach for them; underselecting a design pass
+is as real a miss as refusing a `review`, just harder to see because it looks like normal forward motion.
+
 ### The narrow exception: following up a clean session
 
 Your default is a fresh dispatch — a new session with no memory — and almost everything above assumes
