@@ -158,7 +158,9 @@ test.describe('Autopilot Observation page (first-class)', () => {
       await page.waitForLoadState('networkidle');
       const card = page.locator('.obs-session').filter({ hasText: 'Expandable session' });
       await expect(card).toBeVisible();
-      await card.locator('.obs-session-head').click();
+      // Disclosure is a dedicated control below the meta row now (LIN-928), not
+      // the header itself.
+      await card.locator('.obs-disc').click();
       await expect(card.locator('.obs-session-body')).toBeVisible();
     });
 
@@ -171,7 +173,7 @@ test.describe('Autopilot Observation page (first-class)', () => {
       await page.waitForLoadState('networkidle');
       const card = page.locator('.obs-session').filter({ hasText: 'Drill-down session' });
       await expect(card).toBeVisible();
-      await card.locator('.obs-session-head').click();
+      await card.locator('.obs-disc').click();
       // The Level-3 body renders a per-task block for the seed task, even with no
       // worker runs under it yet.
       const body = card.locator('.obs-session-body');
@@ -205,7 +207,7 @@ test.describe('Autopilot Observation page (first-class)', () => {
       await page.waitForLoadState('networkidle');
       const card = page.locator('.obs-session').filter({ hasText: 'Worker-tree seed' }).first();
       await expect(card).toBeVisible();
-      await card.locator('.obs-session-head').first().click();
+      await card.locator('.obs-disc').first().click();
 
       // The worker tree carries the implementation worker as its own node.
       const worker = card.locator('.obs-worker').filter({ hasText: 'implementation' }).first();
@@ -263,7 +265,7 @@ test.describe('Autopilot Observation page (first-class)', () => {
       await expect(card).toHaveAttribute('data-status', 'error');
 
       // Drilling in fires the hydration; the Done state upgrades the card.
-      await card.locator('.obs-session-head').first().click();
+      await card.locator('.obs-disc').first().click();
       await expect(card).toHaveAttribute('data-status', 'done-with-warning');
       // done-with-warning migrates onto the theme StatusPill (LIN-783): a `done`
       // pill (no 5th colour) plus an additive ⚠ warning marker, not a bespoke

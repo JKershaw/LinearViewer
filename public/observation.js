@@ -254,30 +254,56 @@ function fillSessionHead(li, s) {
   if (s.workspaceName) metaBits.push(`<span class="obs-meta obs-meta-ws">${escapeHtml(s.workspaceName)}</span>`);
   if (s.tasksTouched.length > 1) metaBits.push(`<span class="obs-meta">${s.tasksTouched.length} tasks</span>`);
 
-  // Bug 2 (timestamp clip): the ident is the only flexible cell (it truncates
-  // with an ellipsis); the pill and the time hold a fixed right column, so the
-  // "updated …" stamp never squeezes shut at narrow widths.
+  // Header anatomy (LIN-928, design §4): status dot · mono id on line 1, the
+  // truncating title on line 2 (the growing `headmain` cluster), and a fixed
+  // right column that STACKS the status pill above the relative time. The ident
+  // and title are the only flexible cells (they ellipsize); the right column is
+  // fixed, so the "updated …" stamp never squeezes shut at narrow widths.
   li.querySelector('.obs-session-head').innerHTML = `
-    <span class="obs-session-topline">
-      <span class="obs-session-caret" aria-hidden="true">▸</span>
-      <span class="obs-session-ident">${escapeHtml(String(ident))}</span>
-      ${statusPillHtml(pill.variant, pill.label, { warn: pill.warn })}
-      <span class="obs-session-time">updated ${escapeHtml(relativeTime(s.lastActivity))}</span>
-    </span>
-    ${showName ? `<span class="obs-session-name">${escapeHtml(String(title))}</span>` : ''}
+    <div class="obs-session-topline">
+      <div class="obs-session-headmain">
+        <span class="obs-session-idline">
+          <span class="obs-session-dot" data-state="${escapeHtml(pill.variant)}" aria-hidden="true"></span>
+          <span class="obs-session-ident">${escapeHtml(String(ident))}</span>
+        </span>
+        ${showName ? `<span class="obs-session-name">${escapeHtml(String(title))}</span>` : ''}
+      </div>
+      <div class="obs-session-side">
+        ${statusPillHtml(pill.variant, pill.label, { warn: pill.warn })}
+        <span class="obs-session-time">updated ${escapeHtml(relativeTime(s.lastActivity))}</span>
+      </div>
+    </div>
     <span class="obs-session-summary">${renderSummaryLine(s)}</span>
     ${metaBits.length ? `<span class="obs-session-meta-line">${metaBits.join('')}</span>` : ''}
-    ${renderProgressBar(s)}`;
+    ${renderProgressBar(s)}
+    ${renderDisclosure(s)}`;
+}
+
+// Disclosure control (LIN-928, design §7): the header is no longer the toggle —
+// a dedicated control below the meta/progress row owns expand/collapse, with NO
+// caret on the header. The count is the real number of worker runs the card will
+// render (one node per run in `runsByTask`), not a flattened phase list. The
+// show/hide label swaps via the `.is-open` class (CSS), so this markup is
+// expansion-state-agnostic and re-renders cleanly on every poll.
+function renderDisclosure(s) {
+  const n = s.runs.length;
+  const show = n ? `Show run detail · ${n} run${n === 1 ? '' : 's'}` : 'Show run detail';
+  return `<button type="button" class="obs-disc" aria-expanded="false">`
+    + `<span class="obs-disc-show">${escapeHtml(show)}</span>`
+    + `<span class="obs-disc-hide">Hide run detail</span></button>`;
 }
 
 function makeSessionCard(s) {
   const li = document.createElement('li');
   li.className = 'obs-session';
   li.dataset.session = s.sessionId;
-  const head = document.createElement('button');
-  head.type = 'button';
+  // The head is a plain container, NOT the toggle (LIN-928, design §7). Only the
+  // `.obs-disc` control below the meta row expands/collapses the card. The head's
+  // inner markup is replaced on every poll (innerHTML), so the toggle is bound
+  // once here via delegation on the stable head element rather than on the disc
+  // button itself.
+  const head = document.createElement('div');
   head.className = 'obs-session-head';
-  head.setAttribute('aria-expanded', 'false');
   const body = document.createElement('div');
   body.className = 'obs-session-body';
   body.hidden = true;
@@ -286,7 +312,7 @@ function makeSessionCard(s) {
   head.addEventListener('click', (e) => {
     // Let the inline "summarise" button act without toggling the card.
     if (e.target.closest('.obs-summary-gen')) return;
-    toggleSession(s.sessionId);
+    if (e.target.closest('.obs-disc')) toggleSession(s.sessionId);
   });
   // Delegated Level-3 interactions inside the body (re-rendered on every poll, so
   // per-node listeners would leak — delegate once on the stable body element).
@@ -302,8 +328,9 @@ function makeSessionCard(s) {
 function applySessionState(li, s) {
   li.dataset.status = displayStatus(s);
   const expanded = expandedSessions.has(s.sessionId);
-  const head = li.querySelector('.obs-session-head');
-  head.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+  // The disclosure control (not the head) owns the expanded state (LIN-928).
+  const disc = li.querySelector('.obs-disc');
+  if (disc) disc.setAttribute('aria-expanded', expanded ? 'true' : 'false');
   li.classList.toggle('is-open', expanded);
   const body = li.querySelector('.obs-session-body');
   body.hidden = !expanded;
@@ -416,8 +443,22 @@ function renderSessionBody(body, s) {
   const statusLine = (st && (st.statusLine || st.outcome)) || s.statusLine;
 
   body.innerHTML = `
+    ${renderObjective(s)}
     ${statusLine ? `<p class="obs-body-status"><span class="obs-body-lbl">status</span> ${escapeHtml(statusLine)}</p>` : ''}
     ${renderTasks(s)}`;
+}
+
+// Objective / Related eyebrow block (LIN-928, design §4.6). `Objective` is the
+// session's seed goal (`seedTitle`), stated in full at the top of the detail —
+// the header title truncates, so this is the complementary full-text home for
+// the goal, and it deliberately never reprints the id (design §4 id-once). No
+// session-level `Related` list is synthesised here: `Related` stays aligned with
+// the real per-task relationship rendering (`renderRelationships`, one level
+// down), honouring the session→tasks→worker-runs IA over the mock's flat model.
+function renderObjective(s) {
+  const objective = s.seedTitle && String(s.seedTitle).trim();
+  if (!objective) return '';
+  return `<p class="obs-objective"><span class="obs-body-lbl">objective</span> ${escapeHtml(objective)}</p>`;
 }
 
 // Group a session's worker runs by the task they ran against.
