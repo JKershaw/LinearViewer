@@ -204,6 +204,17 @@ you can't tell them apart, so when there's any chance someone's still in there, 
 one of those and the move is the same — leave it open. The value here is quiet resource hygiene, never
 cleanup for its own sake.
 
+There is exactly **one class where you close on completion rather than at a later orient**: a **child
+autopilot** (see *Dispatching a child autopilot* below) whose terminal report you have **judged**. It is
+the one session where close-when-done doesn't fight any of the guards above — it is not a
+maybe-interactive or human-continued session, no in-session follow-up is expected of it (you dispatch the
+*next* child serially, fresh), and once you've judged its report and advanced there is nothing left in
+that window to resume. So there, and only there, the close is not a *later* act: right after judge-and-advance,
+reap it on the same `abort: true`/`abortTo` wire (naming the **child's** session id). This narrows the
+never-on-completion default for that single case; it does not touch it for **workers**, maybe-interactive
+sessions, or human-continued ones — those still leave open, and a `[pending]`/`blocked`/`failed` child
+(not yet judged-terminal) stays open too.
+
 Two honesties keep this from over-reaching. The window is **bounded**: the session record is reaped a
 short while after it goes terminal, and the close handle dies with it — so a close that's going to
 happen happens at *a* later orient within that window, not an arbitrarily distant one; past it the
@@ -297,6 +308,13 @@ The mechanism is the same push substrate as a subscribed orchestrator above, poi
   artifact the way you'd check any completion — the child's "done" is still a pointer to *go and look*,
   never a certificate. A clean complete → the next task; a `[pending]`/`blocked`/`failed`, or evidence
   that contradicts the claim → re-dispatch, or hand the blocker back to the human if it's theirs.
+- **Then close the spent child.** Once you've judged a child's *terminal* report and advanced, close it:
+  emit an `abort: true` dispatch naming the **child's session id** via `abortTo`, on a poll-eligible
+  target — the same wire the abort/close rides everywhere else (Harbour only emits/forwards it; the
+  runner owns liveness and flips the session terminal-cancelled). Nothing auto-closes on a timer, and you
+  do this only for a *judged-terminal* child — a `[pending]`/`blocked`/`failed` child stays open until it
+  resolves. This is the one place close-on-completion is right (see *Closing a session, once it's truly
+  spent*): a judged-terminal child has no in-session follow-up and the next child is dispatched fresh.
 
 Two shapes call for this, and both are **serial** for now — one child at a time, dispatched only after
 the last has reported and been judged:

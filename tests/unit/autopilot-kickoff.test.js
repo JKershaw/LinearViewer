@@ -96,6 +96,23 @@ describe('buildAutopilotKickoff (shared guide)', () => {
     // The blessed confirmatory follow-up is the resolution for a done posted mid-flight.
     assert.ok(text.includes('confirm CI went green and report the run URL'));
   });
+
+  test('closes a judged-terminal child autopilot on the existing abort wire (LIN-915)', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
+    // The composed prompt inlines the manual, so both surfaces must carry the carve-out:
+    // a judged-terminal *child autopilot* is closed after judge-and-advance on the existing
+    // abort:true/abortTo wire — the one case close-on-completion is right — while workers and
+    // maybe-interactive/human-continued sessions keep the leave-open default.
+    assert.ok(text.includes('one class where you close on completion'),
+      'manual should carve out the single close-on-completion class');
+    assert.ok(text.includes('child autopilot'),
+      'the carve-out must name the child autopilot as that class');
+    assert.ok(text.includes('abortTo'),
+      'the close must reuse the existing abort:true/abortTo wire, not a new path');
+    // The kickoff complete-branch coherence line names the same close.
+    assert.ok(text.includes('abortTo=<child session id>'),
+      'the kickoff advance/complete step should name closing the spent child on the abort wire');
+  });
 });
 
 describe('buildAutopilotKickoff (inline handbook / disposition layer)', () => {
