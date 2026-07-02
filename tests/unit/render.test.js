@@ -11,7 +11,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { renderLabels, renderDisplayLabels, renderPage, renderDetailsContent } from '../../lib/render.js';
-import { PERIODICALS_PROJECT_ID, NO_PROJECT_ID } from '../../lib/tree.js';
+import { PERIODICALS_PROJECT_ID, NO_PROJECT_ID, buildInProgressForest } from '../../lib/tree.js';
 import { testMockPeriodicalsTree } from '../fixtures/mock-data.js';
 // Side-effect import: the Linear provider self-registers on load, so getProvider
 // ('linear') (used by the add-task link) resolves in this unit-test context.
@@ -519,6 +519,48 @@ describe('add-task link guard (LIN-341)', () => {
       urlKey: 'test-workspace'
     });
     assert.ok(!result.includes('data-action="create-task"'), 'periodicals should NOT have add-task link');
+  });
+});
+
+// =============================================================================
+// In-Progress subtask project tag (LIN-903)
+// =============================================================================
+// A parented in-progress subtask with its own, DIFFERENT project stays nested
+// under its parent in the feed and shows that project as an inline tag ("project
+// acts as a tag, not a group"). End-to-end through buildInProgressForest → renderPage.
+
+describe('in-progress subtask project tag (LIN-903)', () => {
+  const projects = [
+    { id: 'proj-1', name: 'Project One', sortOrder: 1 },
+    { id: 'proj-2', name: 'Project Two', sortOrder: 2 }
+  ];
+  const mk = (o) => ({ createdAt: '2020-01-01T00:00:00.000Z', labels: { nodes: [] }, ...o });
+
+  test('nested subtask with a differing project renders its own project as a tag', () => {
+    const parent = mk({ id: 'parent', title: 'Parent', project: { id: 'proj-1' }, state: { name: 'In Progress', type: 'started' } });
+    const child = mk({ id: 'child', title: 'Child', project: { id: 'proj-2' }, parent: { id: 'parent' }, state: { name: 'In Progress', type: 'started' } });
+
+    const trees = buildInProgressForest([parent, child], projects);
+    const result = renderPage([], trees, [], 'Test', { isLanding: true });
+
+    // The child row (depth 1) carries the differing project as an inline tag.
+    const childLine = result.match(/<div class="line[^"]*"[^>]*data-id="child"[^>]*>[\s\S]*?<\/div>/);
+    assert.ok(childLine, 'child row is present');
+    assert.ok(childLine[0].includes('<span class="in-progress-project">(Project Two)</span>'),
+      'nested subtask shows its own project as a tag');
+    assert.strictEqual(childLine[0].includes('data-depth="1"'), true, 'child renders nested at depth 1');
+  });
+
+  test('a subtask sharing the parent project renders no tag', () => {
+    const parent = mk({ id: 'parent', title: 'Parent', project: { id: 'proj-1' }, state: { name: 'In Progress', type: 'started' } });
+    const child = mk({ id: 'child', title: 'Child', project: { id: 'proj-1' }, parent: { id: 'parent' }, state: { name: 'In Progress', type: 'started' } });
+
+    const trees = buildInProgressForest([parent, child], projects);
+    const result = renderPage([], trees, [], 'Test', { isLanding: true });
+
+    const childLine = result.match(/<div class="line[^"]*"[^>]*data-id="child"[^>]*>[\s\S]*?<\/div>/);
+    assert.ok(childLine, 'child row is present');
+    assert.ok(!childLine[0].includes('in-progress-project'), 'same-project subtask has no tag');
   });
 });
 

@@ -168,6 +168,12 @@ describe('buildForest', () => {
       assert.strictEqual(roots[0].children[0].children[0].issue.id, 'c');
     });
 
+    // Deliberate feed-vs-tree divergence (LIN-903): in the MAIN project tree
+    // (buildForest) project is the organizing principle, so a subtask explicitly
+    // assigned to a different project keeps its OWN project group — unchanged here.
+    // The In-Progress / Recent-activity FEEDS take the opposite stance (project as
+    // tag, subtask nested under parent); see buildInProgressForest's LIN-903 test
+    // below. Reversing this main-tree test too is a parked open question (default: no).
     test('subtask with explicit project keeps its own project', () => {
       const parent = createIssue({
         id: 'parent',
@@ -330,7 +336,13 @@ describe('buildInProgressForest', () => {
       assert.strictEqual(result[0].roots[0].children[0].issue.id, 'child');
     });
 
-    test('in-progress subtask with explicit project keeps its own project', () => {
+    // LIN-903 (reverses the original LIN-53 feed decision): in the feeds a subtask
+    // with its own, DIFFERENT project stays nested under its parent — "project acts
+    // as a tag, not a group" — instead of being torn out into its own project group.
+    // Its own project surfaces as a `projectTag` on the node (rendered as an inline
+    // tag). The main-tree buildForest test above deliberately keeps the opposite
+    // (project-as-group) semantics.
+    test('in-progress subtask with explicit project nests under parent + tags its own project', () => {
       const parent = createIssue({
         id: 'parent',
         title: 'Parent',
@@ -347,11 +359,44 @@ describe('buildInProgressForest', () => {
 
       const result = buildInProgressForest([parent, child], projects);
 
-      // Child has explicit project, so both projects appear
-      // (user intentionally assigned subtask to different project)
-      assert.strictEqual(result.length, 2);
-      const projIds = result.map(r => r.projectId).sort();
-      assert.deepStrictEqual(projIds, ['proj-1', 'proj-2']);
+      // Only the parent's project group appears; the child nests under the parent
+      // rather than forming its own proj-2 group.
+      assert.strictEqual(result.length, 1);
+      assert.strictEqual(result[0].projectId, 'proj-1');
+      assert.strictEqual(result[0].roots.length, 1);
+      assert.strictEqual(result[0].roots[0].issue.id, 'parent');
+      assert.strictEqual(result[0].roots[0].children.length, 1);
+
+      // The nested child carries its own (differing) project as a tag for the badge.
+      const childNode = result[0].roots[0].children[0];
+      assert.strictEqual(childNode.issue.id, 'child');
+      assert.strictEqual(childNode.projectTag, 'Project Two');
+    });
+
+    // Guard: a nested subtask whose own project MATCHES the display group gets no
+    // tag (the badge only fires on a genuine difference).
+    test('in-progress subtask sharing the parent project has no projectTag', () => {
+      const parent = createIssue({
+        id: 'parent',
+        title: 'Parent',
+        project: { id: 'proj-1' },
+        state: { name: 'Backlog', type: 'backlog' }
+      });
+      const child = createIssue({
+        id: 'child',
+        title: 'Child',
+        project: { id: 'proj-1' },
+        parent: { id: 'parent' },
+        state: { name: 'In Progress', type: 'started' }
+      });
+
+      const result = buildInProgressForest([parent, child], projects);
+
+      assert.strictEqual(result.length, 1);
+      assert.strictEqual(result[0].projectId, 'proj-1');
+      const childNode = result[0].roots[0].children[0];
+      assert.strictEqual(childNode.issue.id, 'child');
+      assert.strictEqual(childNode.projectTag, null);
     });
   });
 
