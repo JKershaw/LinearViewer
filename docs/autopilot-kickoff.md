@@ -26,7 +26,7 @@
 >   the four lines. It is the disposition layer — the *why* behind the mechanics — and the same
 >   text backs `GET /api/proxy/autopilot/manual`. It is also where the **coordinator capability**
 >   lives (LIN-813): any autopilot, following the guide, can dispatch a *child autopilot* for a
->   whole task (via `POST /api/proxy/autopilot/kickoff` with its own `sessionId` + `subscribe: true`)
+>   whole task (via `POST /api/proxy/autopilot/kickoff` with its own `sessionId` + `subscription: 'everything'`)
 >   and stand by for the child's up-chain report — a **contextual judgment, not a launch-time
 >   variant**. See *Dispatching a child autopilot* in the
 >   [operating manual](./autopilot-operating-manual.md).
@@ -232,7 +232,7 @@ The stepper drives **one warm session** through ordered **beats** instead of one
 worker prompt — the disposition proved by [LIN-788](https://linear.app/linearviewer/issue/LIN-788)
 and made survivable by [LIN-793](https://linear.app/linearviewer/issue/LIN-793) (don't-reap), now on
 **push rails** ([LIN-843](https://linear.app/linearviewer/issue/LIN-843) /
-[LIN-841](https://linear.app/linearviewer/issue/LIN-841)) — every beat is `subscribe: true` and the
+[LIN-841](https://linear.app/linearviewer/issue/LIN-841)) — every beat is `subscription: 'everything'` and the
 orchestrator stands by for the up-chain wake instead of hand-rolling a long-poll:
 
 1. **Read** the task's worker prompt (`GET /recommend/{id}` — the un-fused GET returns the body).
@@ -240,9 +240,9 @@ orchestrator stands by for the up-chain wake instead of hand-rolling a long-poll
    structure, staying within **one kind** (don't chain into review — keep the fresh-eyes boundary).
 3. **Beat 1 is fresh; capture its dispatch id as `ROOT`.** Every later beat resumes that same warm
    session with `followUpTo: ROOT` (always beat-1's id — a stable anchor) **+ `force: true`** **+
-   `subscribe: true`**, `target: web`, `sessionId` = the orchestrator's own id. `subscribe: true` on
+   `subscription: 'everything'`**, `target: web`, `sessionId` = the orchestrator's own id. `subscription: 'everything'` on
    every beat is what declares the up-chain edge that puts the run on push rails.
-4. **Stand by for the push — do not long-poll.** Because every beat is `subscribe: true`, the
+4. **Stand by for the push — do not long-poll.** Because every beat is `subscription: 'everything'`, the
    orchestrator is woken automatically the moment a beat reaches a stop boundary — `done`/`failed`/
    `blocked`, **and** `PENDING` (the holdable beat boundary), which now fires an up-chain wake labelled
    *paused (pending), not done* ([LIN-843](https://linear.app/linearviewer/issue/LIN-843)). So the
@@ -257,7 +257,7 @@ orchestrator stands by for the up-chain wake instead of hand-rolling a long-poll
    reaching a boundary: after ~30 min of zero activity, nudge with a `followUpTo: ROOT` liveness ping,
    then re-dispatch fresh — but don't rebuild that exception into a standing poll.
 5. **Judge *and* challenge** each beat before advancing — interrogate it (real tests? followed the
-   plan? grounded against HEAD?) and send a corrective `followUpTo: ROOT` (also `subscribe: true`) if
+   plan? grounded against HEAD?) and send a corrective `followUpTo: ROOT` (also `subscription: 'everything'`) if
    it's thin; don't rubber-stamp. **Mid-chain `PENDING`** ("my beat's done, later beats remain") is a
    **clean advance**, not a wobble — its wake is the cue to judge and advance; only challenge when
    *this* beat's own work is unproven.

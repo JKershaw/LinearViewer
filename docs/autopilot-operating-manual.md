@@ -229,7 +229,7 @@ session hasn't finalized yet, an open one has.)
   the next beat in and the held worker picks it up in seconds, no cold `--resume`.
 - **An orchestrator that subscribes to its children** — dispatch **with** `waitForFollowUps:true` too,
   and **stand by** after each dispatch instead of watching. Each child runs independently to a terminal
-  outcome, and the subscribe edge then **pushes** that outcome back *up* to the parent as an injected
+  outcome, and the subscription edge then **pushes** that outcome back *up* to the parent as an injected
   follow-up — so a held orchestrator is woken in seconds without ever polling its children. The old
   deadlock trap doesn't apply under push: it assumed a held producer sitting non-terminal while it waited
   to *feed* a worker that was itself waiting — a mutual wait with no terminal, so no watch fired. A
@@ -272,7 +272,7 @@ of tasks is a coordinator's shape no matter what variant woke the session that f
 The mechanism is the same push substrate as a subscribed orchestrator above, pointed one level up:
 
 - **Dispatch the child** with `POST /api/proxy/autopilot/kickoff`, passing the task as
-  `issueIdentifier`, **your own session id** as `sessionId`, `subscribe: true`, and a `variant` chosen
+  `issueIdentifier`, **your own session id** as `sessionId`, `subscription: 'everything'`, and a `variant` chosen
   by what the child *holds*, not by what you were launched as — the same question at every altitude, so
   it recurses cleanly down the tree:
   - Child holds **a single concrete task** (one research→…→close-out arc) → `variant: 'stepper'`. This
@@ -280,12 +280,12 @@ The mechanism is the same push substrate as a subscribed orchestrator above, poi
   - Child **is itself a set or epic** (it will dispatch its own children in turn) → `variant: 'standard'`;
     it acts as a sub-orchestrator and steps *its* children, not itself.
 
-  Your id as `sessionId` makes you the child's up-chain *wake target*; `subscribe: true` declares that
+  Your id as `sessionId` makes you the child's up-chain *wake target*; `subscription: 'everything'` declares that
   edge. The child runs its own research→…→close-out (or its own coordination, if dispatched `standard`
   over a set) in its own context; its returned `id` is the *child's* session id (for the sub-workers
   **it** fans out) and stays distinct from the id you passed — you never see or hold the child's prompt
   body.
-- **Then stand by — don't poll.** Because you dispatched it `subscribe: true`, the child's terminal
+- **Then stand by — don't poll.** Because you dispatched it `subscription: 'everything'`, the child's terminal
   (or `[pending]`) boundary wakes *you* automatically, up-chain, exactly the way a subscribed worker's
   outcome reaches you. No watch loop, no long-poll; the liveness probe for a child gone truly silent is
   the only exception, same as any subscribed child.
