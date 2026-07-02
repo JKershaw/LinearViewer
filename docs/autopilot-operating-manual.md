@@ -266,8 +266,12 @@ single session grinds every step of every task through one window. The discovere
 when it cuts against your own launch mode: a run **launched as `stepper`** that discovers the "task" in
 front of it is actually a set or epic **must stop dripping beats and switch to coordinating** — dispatch
 one child autopilot per task (each stepped, per the variant rule below) instead of continuing to
-beat-step across tasks that were never one arc to begin with. Stepping is for a single task's arc; a set
-of tasks is a coordinator's shape no matter what variant woke the session that found it.
+beat-step across tasks that were never one arc to begin with. This holds whether the batch is
+*discovered mid-run* or **named up front in the launch instructions** — a stepper whose instructions
+already name several tasks to do in sequence gates on that at orient time and coordinates rather than
+stepping into the first (the stepper's own disposition carries that up-front gate). Stepping is for a
+single task's arc; a set of tasks is a coordinator's shape no matter what variant woke the session that
+found it.
 
 The mechanism is the same push substrate as a subscribed orchestrator above, pointed one level up:
 
