@@ -1,20 +1,18 @@
 /**
- * LIN-881 — route-level: the WAKE half of a warm drip must not rely on the agent.
+ * LIN-901 — route-level: subscription is DECLARED on the edge (LIN-900 §6).
  *
- * Stepper warm-drip beats carried the HOLD (`waitForFollowUps:true`) but relied
- * on the orchestrating agent to hand-set the WAKE (`subscribe` + the head's
- * `sessionId`). When `subscribe` was omitted, the beat's terminal/`PENDING`
- * boundary woke nothing up-chain and every beat boundary deadlocked.
+ * §6: "A dispatcher MUST NOT reconstruct subscription intent from incidental
+ * fields (e.g. 'has a sessionId'); it is declared, once, on the edge." So the old
+ * LIN-881 `subscribe` default-on-when-sessioned is REMOVED: an undeclared edge is
+ * always `terminal-only`, regardless of sessionId. A caller that wants a worker's
+ * every event (incl. PENDING-external, each stepper beat) to wake it declares
+ * `subscription: 'everything'` explicitly — the autopilot prompts are the sole
+ * declarers. The value is a hard enum ('everything' | 'terminal-only'); any other
+ * value is a 400 (no legacy boolean).
  *
- * The fix gives the two class members — plain `POST /api/proxy/dispatch` (stepper
- * beats) and `POST /api/proxy/autopilot/kickoff` (coordinator child-autopilot,
- * LIN-813) — the same server-side default `recommend-and-dispatch` already uses:
- * `subscribe` defaults ON whenever a `sessionId` is present, an explicit value
- * (true OR false) still wins, and a sessionless dispatch stays unsubscribed.
- *
- * The default lives in the route (subscribeResolved), so it is observed at the
- * dispatch seam by capturing the item handed to addItem. NODE_ENV=test applies
- * the test-token short-circuit and skips the module-level rate limiter.
+ * The default lives in the route (subscriptionResolved), observed at the dispatch
+ * seam by capturing the item handed to addItem. NODE_ENV=test applies the
+ * test-token short-circuit and skips the module-level rate limiter.
  */
 process.env.NODE_ENV = 'test';
 
@@ -75,8 +73,8 @@ async function call(app, method, path, body) {
 const SESSION_ID = '11111111-2222-3333-4444-555555555555';
 const FOLLOW_UP_ID = '99999999-8888-7777-6666-555555555555';
 
-describe('LIN-881 — plain /dispatch subscribe (wake half) default', () => {
-  test('defaults subscribe:true when a sessionId is present', async () => {
+describe('LIN-901 — plain /dispatch subscription is declared, not reconstructed (§6)', () => {
+  test('a sessioned dispatch with NO declared subscription defaults to terminal-only (no !!sessionId reconstruction)', async () => {
     const captured = {};
     const app = buildApp(captured);
     const res = await call(app, 'post', '/api/proxy/dispatch', {
@@ -85,68 +83,58 @@ describe('LIN-881 — plain /dispatch subscribe (wake half) default', () => {
 
     assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
     assert.equal(captured.item.sessionId, SESSION_ID);
-    assert.equal(captured.item.subscribe, true, 'a sessioned dispatch subscribes by default');
+    assert.equal(captured.item.subscription, 'terminal-only', 'sessionId no longer implies a subscription (§6 removes the LIN-881 reconstruction)');
   });
 
-  test('a warm-drip stepper beat (waitForFollowUps + followUpTo + sessionId) gets the WAKE without hand-setting it', async () => {
+  test('a warm-drip stepper beat DECLARES subscription:everything and it is honoured', async () => {
     const captured = {};
     const app = buildApp(captured);
     const res = await call(app, 'post', '/api/proxy/dispatch', {
       // The exact shape of a live beat: HOLD present, followUpTo resumes the warm
-      // session, sessionId is the head — but the agent omitted `subscribe`.
+      // session, sessionId is the head, and the beat DECLARES the up-chain wake.
       prompt: 'beat 2/4', sessionId: SESSION_ID, followUpTo: FOLLOW_UP_ID,
-      force: true, waitForFollowUps: true
+      force: true, waitForFollowUps: true, subscription: 'everything'
     });
 
     assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
-    assert.equal(captured.item.waitForFollowUps, true, 'hold half still present');
-    assert.equal(captured.item.subscribe, true, 'wake half now defaulted on — this is the LIN-881 regression fix');
+    assert.equal(captured.item.waitForFollowUps, true, 'hold half present');
+    assert.equal(captured.item.subscription, 'everything', 'the declared wake half is honoured — the prompt is the sole declarer');
   });
 
-  test('does NOT subscribe when there is no sessionId (no head to wake)', async () => {
+  test('an explicit subscription:terminal-only is honoured', async () => {
+    const captured = {};
+    const app = buildApp(captured);
+    const res = await call(app, 'post', '/api/proxy/dispatch', {
+      prompt: 'do the thing', sessionId: SESSION_ID, subscription: 'terminal-only'
+    });
+
+    assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.equal(captured.item.subscription, 'terminal-only');
+  });
+
+  test('a non-sessioned dispatch with no declared subscription defaults to terminal-only', async () => {
     const captured = {};
     const app = buildApp(captured);
     const res = await call(app, 'post', '/api/proxy/dispatch', { prompt: 'one-shot' });
 
     assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
-    assert.equal(captured.item.subscribe, false, 'no sessionId → no subscribe default');
+    assert.equal(captured.item.subscription, 'terminal-only');
   });
 
-  test('an explicit subscribe:false overrides the sessioned default', async () => {
-    const captured = {};
-    const app = buildApp(captured);
-    const res = await call(app, 'post', '/api/proxy/dispatch', {
-      prompt: 'do the thing', sessionId: SESSION_ID, subscribe: false
-    });
-
-    assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
-    assert.equal(captured.item.subscribe, false, 'explicit subscribe:false wins over the default');
-  });
-
-  test('an explicit subscribe:true on a non-sessioned dispatch is honoured', async () => {
-    const captured = {};
-    const app = buildApp(captured);
-    const res = await call(app, 'post', '/api/proxy/dispatch', {
-      prompt: 'do the thing', subscribe: true
-    });
-
-    assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
-    assert.equal(captured.item.subscribe, true, 'explicit subscribe:true wins even without a sessionId');
-  });
-
-  test('rejects a non-boolean subscribe with 400', async () => {
-    const captured = {};
-    const app = buildApp(captured);
-    const res = await call(app, 'post', '/api/proxy/dispatch', {
-      prompt: 'do the thing', subscribe: 'yes'
-    });
-
-    assert.equal(res.status, 400, `expected 400, got ${res.status}: ${JSON.stringify(res.body)}`);
+  test('rejects an invalid subscription value with 400 (hard enum, no legacy boolean)', async () => {
+    const app = buildApp({});
+    for (const bad of ['yes', true, 'all', 'none', 1]) {
+      const res = await call(app, 'post', '/api/proxy/dispatch', {
+        prompt: 'do the thing', subscription: bad
+      });
+      assert.equal(res.status, 400, `subscription:${JSON.stringify(bad)} should be 400, got ${res.status}`);
+      assert.match(res.body.error, /subscription must be one of/, 'names the enum in the error');
+    }
   });
 });
 
-describe('LIN-881 — /autopilot/kickoff subscribe (wake half) default', () => {
-  test('a coordinator child-autopilot dispatch (sessionId present) subscribes by default', async () => {
+describe('LIN-901 — /autopilot/kickoff subscription is declared, not reconstructed (§6)', () => {
+  test('a coordinator child-autopilot dispatch (sessionId present, undeclared) defaults to terminal-only', async () => {
     const captured = {};
     const app = buildApp(captured);
     const res = await call(app, 'post', '/api/proxy/autopilot/kickoff', {
@@ -155,26 +143,36 @@ describe('LIN-881 — /autopilot/kickoff subscribe (wake half) default', () => {
 
     assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
     assert.equal(captured.item.sessionId, SESSION_ID);
-    assert.equal(captured.item.subscribe, true, 'child dispatched by a coordinator wakes it by default');
+    assert.equal(captured.item.subscription, 'terminal-only', 'sessionId alone no longer subscribes to everything (§6)');
   });
 
-  test('a top-level kickoff (no sessionId) stays subscribe:false', async () => {
+  test('a coordinator that wants every child event DECLARES subscription:everything', async () => {
+    const captured = {};
+    const app = buildApp(captured);
+    const res = await call(app, 'post', '/api/proxy/autopilot/kickoff', {
+      goal: 'ship LIN-1', sessionId: SESSION_ID, subscription: 'everything'
+    });
+
+    assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.equal(captured.item.subscription, 'everything', 'the coordinator declares the up-chain edge explicitly');
+  });
+
+  test('a top-level kickoff (no sessionId) defaults to terminal-only', async () => {
     const captured = {};
     const app = buildApp(captured);
     const res = await call(app, 'post', '/api/proxy/autopilot/kickoff', { goal: 'walk the stack' });
 
     assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
-    assert.equal(captured.item.subscribe, false, 'no parent edge → single-head behavior unchanged');
+    assert.equal(captured.item.subscription, 'terminal-only', 'single-head behavior unchanged');
   });
 
-  test('an explicit subscribe:false overrides the sessioned default', async () => {
-    const captured = {};
-    const app = buildApp(captured);
+  test('rejects an invalid subscription value with 400', async () => {
+    const app = buildApp({});
     const res = await call(app, 'post', '/api/proxy/autopilot/kickoff', {
-      goal: 'ship LIN-1', sessionId: SESSION_ID, subscribe: false
+      goal: 'ship LIN-1', sessionId: SESSION_ID, subscription: true
     });
 
-    assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
-    assert.equal(captured.item.subscribe, false, 'explicit subscribe:false wins over the default');
+    assert.equal(res.status, 400, `expected 400, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.match(res.body.error, /subscription must be one of/);
   });
 });
