@@ -112,6 +112,20 @@ test('every primitive is demoed in BOTH themes (LIN-786)', () => {
   }
 });
 
+test('the shared .tag primitive is an uppercase micro-label (LIN-862)', () => {
+  const css = readFileSync(STYLE_CSS, 'utf8');
+  // Isolate the base `.tag {}` rule (not .tag__count / .tag--<tone>).
+  const start = css.search(/\.tag\s*\{/);
+  assert.notEqual(start, -1, 'stylesheet must define a base .tag rule');
+  const body = css.slice(start + css.slice(start).indexOf('{') + 1, start + css.slice(start).indexOf('}'));
+  // LIN-748 locked decision + the in-repo micro-label precedent
+  // (.recap-section-title / .context-node-tag / .brief-content h2): uppercase,
+  // 0.05em tracking, on the sans content face (NOT mono, NOT 0.08em).
+  assert.match(body, /text-transform:\s*uppercase/, '.tag must render uppercase (micro-label contract)');
+  assert.match(body, /letter-spacing:\s*0\.05em/, '.tag must use the 0.05em micro-label tracking');
+  assert.match(body, /font-family:\s*var\(--font-content\)/, '.tag stays on the sans content face');
+});
+
 test('the .theme-amber variant is fully removed (LIN-785)', () => {
   const html = renderStyleguide();
   const css = readFileSync(STYLE_CSS, 'utf8');
