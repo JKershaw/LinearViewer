@@ -26,7 +26,7 @@ import { WORK_ISSUE_LABELS } from '../lib/workflow-config.js';
 import { parseRepoFromDescription, buildPromptFilename } from '../lib/prompt-formatters.js';
 import { buildProxyContextPreamble } from '../lib/proxy-preamble.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
-import { isRecommendationEnabled, getRecommendation, getRecommendationStream, streamChat, getModelDisplayName } from '../lib/openrouter.js';
+import { isRecommendationEnabled, getRecommendation, getRecommendationStream, streamChat, getModelDisplayName, AVAILABLE_MODELS } from '../lib/openrouter.js';
 import { resolveRecommendation, armHopSignal } from '../lib/recommend-recurse.js';
 import { sniffRasterType, parseFeedbackImage } from '../lib/attachment-upload.js';
 
@@ -118,6 +118,33 @@ function sendPromptResult(req, res, { json, prompt, identifier, downloadName }) 
  * @param {Object} mockIssue - A canonical or Linear-shaped issue.
  * @returns {{ reasoning: string, prompt: string, identifier: string }}
  */
+/**
+ * Apply a per-request roadmap model override against the already-resolved
+ * workspace default (LIN-819). The roadmap generate endpoint is the only site
+ * that lets a user pick a stronger model for a single generation without
+ * touching the workspace-wide default. Pure/synchronous; two gates only:
+ *   - Free tier is clamped: a free-tier request ALWAYS keeps the workspace
+ *     default (which resolveWorkspaceModel already forced to DEFAULT_MODEL), so
+ *     a body-supplied model can't bill an expensive model against the shared
+ *     free-tier key (LIN-513).
+ *   - Allow-list: only a curated AVAILABLE_MODELS id is honored. An unknown,
+ *     invalid, empty, or non-string value falls back to the workspace default,
+ *     so nothing unchecked ever reaches OpenRouter. The curated select IS the
+ *     validation here (stronger than a format regex; the roadmap selector offers
+ *     no free-text custom id).
+ *
+ * @param {*} requested - Raw `req.body.model` (untrusted).
+ * @param {string} workspaceModel - Model already resolved for this workspace.
+ * @param {boolean} isFreeTier - Whether this request is on the free tier.
+ * @returns {string} The model id to generate with.
+ */
+export function resolveRoadmapModelOverride(requested, workspaceModel, isFreeTier) {
+  if (isFreeTier) return workspaceModel;
+  const id = typeof requested === 'string' ? requested.trim() : '';
+  if (id && AVAILABLE_MODELS.some(m => m.id === id)) return id;
+  return workspaceModel;
+}
+
 export function generateMockRecommendation(mockIssue) {
   const rawLabels = mockIssue.labels;
   const labels = Array.isArray(rawLabels)
@@ -2536,7 +2563,19 @@ ${goal}`
       return null;
     }
 
-    const model = await resolveWorkspaceModel({ urlKey: req.workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
+    const workspaceModel = await resolveWorkspaceModel({ urlKey: req.workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
+
+    // Per-request roadmap model override (LIN-819). A user may pick a stronger
+    // model for just this generation without changing the workspace-wide default
+    // (which feeds ~15 other call sites). The override is ephemeral — never
+    // persisted to workspacePreferencesStore. Two floors are load-bearing:
+    //   1. Free tier stays clamped to the default (forceDefault won it above) so
+    //      a body-supplied model can't bill an arbitrary expensive model against
+    //      the operator's shared key.
+    //   2. Only curated AVAILABLE_MODELS ids are honored — an unknown/invalid id
+    //      is never passed unchecked to OpenRouter; it silently falls back to the
+    //      workspace default, preserving existing behavior.
+    const model = resolveRoadmapModelOverride(req.body?.model, workspaceModel, isFreeTier);
     return { apiKey, model, isFreeTier };
   }
 

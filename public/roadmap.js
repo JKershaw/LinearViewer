@@ -344,6 +344,13 @@
     var body = { northStar: northStar || '' };
     var team = currentTeamParam();
     if (team) body.team = team;
+    // Per-request model override (LIN-819): send the chosen model only when the
+    // user picked a non-default option. Empty value = 'Workspace default', so the
+    // server keeps using resolveWorkspaceModel. Read at request time so a retry
+    // reflects the current selection. The server re-validates against its
+    // allow-list and clamps the free tier — this is a convenience, not trust.
+    var modelSelect = document.getElementById('roadmap-model-select');
+    if (modelSelect && modelSelect.value) body.model = modelSelect.value;
 
     // Raw fetch carve-out: this is a Server-Sent Events stream consumed via
     // readSSEStream(response, …). window.api() parses the body as JSON and would

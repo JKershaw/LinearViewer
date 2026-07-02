@@ -443,6 +443,54 @@ test.describe('Roadmap Pipeline UI', () => {
     await expect(page.locator('[data-layer="gap"]')).toBeVisible();
   });
 
+  // LIN-819: per-request model override selector.
+  test('renders the model selector with a Workspace-default option when AI is configured', async ({ page }) => {
+    await page.goto(ROADMAP_URL);
+    await page.waitForLoadState('networkidle');
+
+    const select = page.locator('.roadmap-model-select');
+    await expect(select).toBeVisible();
+    // Default option keeps the workspace-wide model (empty value).
+    await expect(select.locator('option[value=""]')).toHaveText(/workspace default/i);
+    // At least one curated non-default model is offered.
+    expect(await select.locator('option').count()).toBeGreaterThan(1);
+  });
+
+  test('the model selector is absent when AI is not configured', async ({ page, seedLocal }) => {
+    await seedLocal(workspaceApiLocalSeed, { features: { roadmap: true } });
+    await page.goto(ROADMAP_URL);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('.roadmap-model-select')).toHaveCount(0);
+  });
+
+  test('selecting a model sends it as body.model on generate; default sends none', async ({ page, localWorkerUrlKey }) => {
+    const pageRequest = page.context().request;
+    await pageRequest.put(`/workspace/${localWorkerUrlKey}/api/roadmap/north-star`, {
+      data: { northStar: 'Be the simplest way to ship.' }
+    });
+    await page.goto(ROADMAP_URL);
+    await page.waitForLoadState('networkidle');
+
+    const select = page.locator('.roadmap-model-select');
+    // Pick the first curated (non-default) option.
+    const chosen = await select.locator('option').nth(1).getAttribute('value');
+    await select.selectOption(chosen);
+
+    const [withModel] = await Promise.all([
+      page.waitForRequest(req => req.url().includes('/api/roadmap/generate') && req.method() === 'POST'),
+      page.locator('.roadmap-generate-reading-btn').click()
+    ]);
+    expect(JSON.parse(withModel.postData()).model).toBe(chosen);
+
+    // Reset to Workspace default → no model field on the wire.
+    await select.selectOption('');
+    const [withoutModel] = await Promise.all([
+      page.waitForRequest(req => req.url().includes('/api/roadmap/generate') && req.method() === 'POST'),
+      page.locator('.roadmap-generate-reading-btn').click()
+    ]);
+    expect(JSON.parse(withoutModel.postData())).not.toHaveProperty('model');
+  });
+
   test('idle digest shows a placeholder hint before any reading exists', async ({ page }) => {
     await page.goto(ROADMAP_URL);
     await page.waitForLoadState('networkidle');
