@@ -1602,7 +1602,7 @@ describe('Scale to the task (handwritten path)', () => {
 // LIN-177 S4/S5: Capability-aware prompts (provider.ui threaded into both paths)
 // =============================================================================
 import { generateCustomPrompt } from '../../lib/prompt-templates.js';
-import { resolvePromptUi, applyPromptCapabilities, DEFAULT_PROMPT_UI, formatSubtaskSummary, appendGroundingSections, formatPlanFidelityCheck, formatAttachmentsSection } from '../../lib/prompt-formatters.js';
+import { resolvePromptUi, applyPromptCapabilities, DEFAULT_PROMPT_UI, formatSubtaskSummary, appendGroundingSections, formatPlanFidelityCheck, formatAttachmentsSection, formatAttachmentPerceptionCheck } from '../../lib/prompt-formatters.js';
 import { applyGroundingToRecommendation, formatIssueContext } from '../../lib/openrouter.js';
 import { buildMetaPromptTemplate } from '../../lib/prompts/meta-prompt-template.js';
 
@@ -2304,5 +2304,107 @@ describe('plan-fidelity reconciliation + refactor-equivalence (LIN-698)', () => 
     assert.ok(/reconcile the plan against the research/.test(p), 'meta-prompt must require plan-vs-research reconciliation');
     assert.ok(/research's reasoning wins/.test(p), 'meta-prompt must give the research priority on conflict');
     assert.ok(/characterization test/.test(p), 'meta-prompt must require characterizing old behavior for refactor labels');
+  });
+});
+
+// =============================================================================
+// Attachment-perception discipline (LIN-872). research/plan/review must fetch AND
+// perceive every attachment before making a grounding claim, enumerate them
+// explicitly, and hard-stop + escalate (recommend `blocked`) on an unperceivable
+// one — closing the gap where the shared Attachments section (LIN-772) only says
+// "read any that are relevant." Scoped to research/plan/review only, wired inline
+// (never through the universal appendGroundingSections seam), mirrored in the
+// meta-prompt's Research/Plan/Review quality rules.
+// =============================================================================
+describe('attachment perception discipline (LIN-872)', () => {
+  const attachments = [
+    { id: 'att:abc', title: 'design.png', contentType: 'image/png', kind: 'image' },
+    { id: 'md:def', title: 'spec.md', contentType: null, kind: 'file' }
+  ];
+  const ctxWith = { parent: null, siblings: [], project: null, children: [], comments: [], attachments };
+  const ctxWithout = { parent: null, siblings: [], project: null, children: [], comments: [], attachments: [] };
+
+  const mkIssue = (label) => ({
+    id: `issue-${label}`, identifier: `TEST-AP-${label}`, title: 'T', description: 'd',
+    url: `https://linear.app/test/issue/TEST-AP-${label}`,
+    state: { name: 'Todo', type: 'unstarted' }, labels: [label]
+  });
+
+  for (const label of ['research', 'plan', 'review']) {
+    test(`${label} template requires perceiving every attachment when attachments exist`, () => {
+      const result = generatePrompt(label, mkIssue(label), ctxWith);
+      assert.ok(result.prompt.includes('Perceive Every Attachment Before Grounding'), `${label} must include the attachment-perception check`);
+      assert.ok(/fetch and perceive every/i.test(result.prompt), `${label} must require fetching AND perceiving every attachment`);
+      assert.ok(
+        /never summarize them collectively as "the attachments"/i.test(result.prompt),
+        `${label} must require explicit enumeration, not a collective reference`
+      );
+      assert.ok(/recommend `blocked`/.test(result.prompt), `${label} must recommend blocked as the escalation next action`);
+    });
+
+    test(`${label} template omits the attachment-perception check when there are no attachments`, () => {
+      const result = generatePrompt(label, mkIssue(label), ctxWithout);
+      assert.ok(!result.prompt.includes('Perceive Every Attachment Before Grounding'), `${label} must self-gate to empty with no attachments`);
+    });
+
+    test(`${label} template stays attachment-less byte-identical to a context with no attachments field`, () => {
+      const withEmptyArray = generatePrompt(label, mkIssue(label), ctxWithout).prompt;
+      const withoutField = generatePrompt(label, mkIssue(label), { parent: null, siblings: [], project: null, children: [], comments: [] }).prompt;
+      assert.strictEqual(withEmptyArray, withoutField, `${label} must render identically whether attachments is [] or absent`);
+    });
+  }
+
+  test('an out-of-scope template (bug) does not include the attachment-perception check even with attachments present', () => {
+    const result = generatePrompt('bug', mkIssue('bug'), ctxWith);
+    assert.ok(!result.prompt.includes('Perceive Every Attachment Before Grounding'), 'bug template is out of scope for LIN-872');
+  });
+
+  test('review strengthens Manual Verification to require viewing the spec attachment and the result side-by-side', () => {
+    const withAttachments = generatePrompt('review', mkIssue('review'), ctxWith).prompt;
+    const idx = withAttachments.indexOf('### Manual Verification');
+    assert.ok(idx !== -1, 'Manual Verification section must exist');
+    const section = withAttachments.slice(idx, withAttachments.indexOf('### What CI Did Not Prove'));
+    assert.ok(/side-by-side/.test(section), 'Manual Verification must require side-by-side spec/result viewing');
+
+    const withoutAttachments = generatePrompt('review', mkIssue('review'), ctxWithout).prompt;
+    const idx2 = withoutAttachments.indexOf('### Manual Verification');
+    const section2 = withoutAttachments.slice(idx2, withoutAttachments.indexOf('### What CI Did Not Prove'));
+    assert.ok(!/side-by-side/.test(section2), 'side-by-side sentence must self-gate off when there are no attachments');
+  });
+
+  test('the attachment-perception prose is provider-agnostic (no hardcoded Linear)', () => {
+    assert.ok(!formatAttachmentPerceptionCheck(ctxWith).includes('Linear'), 'shared check prose must not hardcode a tracker name');
+  });
+
+  test('attachment-perception check self-gates to empty for absent / non-array / handle-less input', () => {
+    assert.strictEqual(formatAttachmentPerceptionCheck(), '', 'no context → empty');
+    assert.strictEqual(formatAttachmentPerceptionCheck({}), '', 'no attachments field → empty');
+    assert.strictEqual(formatAttachmentPerceptionCheck({ attachments: null }), '', 'null attachments → empty');
+    assert.strictEqual(formatAttachmentPerceptionCheck({ attachments: [{}, null] }), '', 'entries without an id → empty');
+  });
+
+  test('attachment-perception check is NOT routed through the universal grounding seam (LIN-872 anti-pattern)', () => {
+    const issue = { identifier: 'LIN-700', createdAt: '2026-03-01T00:00:00.000Z', labels: ['implementation'] };
+    const grounding = appendGroundingSections('', issue, ctxWith);
+    assert.ok(
+      !grounding.includes('Perceive Every Attachment Before Grounding'),
+      'attachment-perception check must stay scoped to research/plan/review, not leak into the universal grounding sections'
+    );
+  });
+
+  test('meta-prompt mirrors the attachment-perception discipline for research, plan, and review', () => {
+    const p = buildMetaPromptTemplate({
+      issueContext: 'CTX', identifier: 'LIN-903',
+      hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
+      hasComments: false, commentCount: 0, aiHints: 'H', actionVocabulary: 'research, plan, review',
+      completionSignals: 'S', focusedSubtaskId: null, isTerminal: false, hasOpenChildren: false
+    });
+    assert.ok(/perceiving EVERY one of them/.test(p), 'meta-prompt must require perceiving every attachment');
+    assert.ok(
+      /referring collectively to "the attachments"/.test(p),
+      'meta-prompt must require explicit enumeration, not a collective reference'
+    );
+    assert.ok(/recommend `blocked`/.test(p), 'meta-prompt must pin the blocked escalation for an unperceivable attachment');
+    assert.ok(/side-by-side/.test(p), 'meta-prompt review rule must require viewing spec and result side-by-side');
   });
 });
