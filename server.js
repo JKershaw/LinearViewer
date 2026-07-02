@@ -1543,7 +1543,8 @@ app.get('/workspace/:urlKey/roadmap', workspaceFromUrl, async (req, res) => {
         urlKey: workspace.urlKey,
         openRouterSource,
         workspaces: req.session.workspaces,
-        featureFlags
+        featureFlags,
+        availableModels: AVAILABLE_MODELS
       }
     );
     res.send(html);

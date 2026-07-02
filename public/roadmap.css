@@ -411,6 +411,32 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
 
 .roadmap-pipeline-controls {
   margin: 0.75em 0 1.25em;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6em;
+}
+
+/* Per-request model override (LIN-819). Ephemeral — 'Workspace default' keeps
+   the workspace-wide model; any other choice applies to this reading only. */
+.roadmap-model-select-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  color: var(--muted);
+}
+
+.roadmap-model-select {
+  font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
+  padding: 0.35em 0.5em;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--muted);
+  border-radius: 2px;
+  cursor: pointer;
 }
 
 .roadmap-generate-reading-btn {
