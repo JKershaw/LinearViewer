@@ -21,42 +21,130 @@
  * mobile values — tiered for a legible small-type floor.
  */
 
+/* ─── Observation-local app bar (LIN-927, Strategy 1) ─────────────────────────
+   A bespoke sticky, translucent bar that REPLACES the shared global navbar on
+   this page (the global `renderNavBar` is left untouched). Brand wordmark +
+   workspace chip with a health dot + a `← projects` back affordance. The theme
+   toggle is intentionally absent — it lives in the footer, the one global
+   control, and is not duplicated here. */
+.obs-appbar {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.8rem 1rem 0.7rem;
+  border-bottom: 1px solid var(--line-soft);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  /* Translucent over the page bg; solid --bg fallback for no color-mix support. */
+  background: var(--bg);
+  background: color-mix(in srgb, var(--bg) 86%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+.obs-appbar-brand {
+  font-family: var(--font-content);
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+/* The period takes the product accent (--brand), per the mockup. */
+.obs-appbar-brand-dot { color: var(--brand); }
+
+.obs-appbar-ws {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--raised);
+  color: var(--text);
+  font-family: var(--font-content);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+/* Workspace health dot. Green = healthy default; real per-workspace health
+   wiring is deferred (design Q6 is an open question), so the shell shows the
+   healthy state and leaves the class as the hook. */
+.obs-appbar-ws-dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: var(--green);
+  flex: 0 0 auto;
+}
+
+.obs-appbar-back {
+  margin-left: auto;
+  font-family: var(--font-content);
+  font-size: 0.78rem;
+  color: var(--faint);
+  text-decoration: none;
+}
+.obs-appbar-back:hover { color: var(--text); }
+
 .obs-page {
-  max-width: 760px;
+  max-width: 480px;
   margin: 0 auto;
   /* Bug 3 (LIN-783): reserve bottom room so the fixed feedback FAB never overlaps
      the last card. Unconditional — harmless when the flag-gated FAB is off. */
   padding: 0 0.6rem 6rem;
 }
 
+/* ─── View header — title fused with the live indicator (LIN-927) ───────────── */
+
+.obs-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.7rem;
+  padding: 1.1rem 0 0.75rem;
+}
+
 .obs-header h1 {
-  margin: 0.4rem 0 0.3rem;
+  margin: 0;
   font-size: 1.4rem;
   font-family: var(--font-content);
 }
 
-/* ─── Status banner (the at-a-glance story) ───────────────────────────────── */
-
-.obs-banner {
-  display: flex;
+/* The former poll-status banner is now the pulsing green "● live" indicator that
+   sits beside the title. #obs-banner / #obs-poll-status are preserved so the
+   client `setPollStatus()` keeps driving the text ("● live" / "● disconnected").
+   The top status recap line was removed earlier (LIN-608). */
+.obs-livetag {
+  display: inline-flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 0.5rem 0.75rem;
-  margin-bottom: 0.6rem;
-  font-size: 0.9rem;
+  margin: 0;
 }
-
-/* The top status recap line was removed (LIN-608); only the poll status remains. */
 
 .obs-poll-status {
-  margin-left: auto;
+  font-family: var(--font-content);
   font-size: 0.8rem;
-  color: var(--muted);
+  font-weight: 600;
+  color: var(--green);
+  animation: pulse var(--motion-slow) ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .obs-poll-status { animation: none; }
 }
 
-/* ─── Sections ────────────────────────────────────────────────────────────── */
+/* ─── Sections — flat uppercase eyebrows (LIN-927; boxed framing dropped) ───── */
 
 .obs-section { margin-bottom: 0.8rem; }
+
+/* Eyebrow section labels: uppercase, tracked, faint — the mockup's FILTER /
+   ACTIVE headers with no container panel (theme §8). */
+.obs-eyebrow {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-content);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
 
 .obs-controls { display: flex; flex-direction: column; gap: 0.5rem; }
 
