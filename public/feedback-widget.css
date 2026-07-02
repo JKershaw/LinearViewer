@@ -164,7 +164,9 @@
 
 .feedback-popup-foot {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
+  gap: 6px;
   margin-top: 2px;
 }
 
@@ -183,6 +185,18 @@
   filter: brightness(0.95);
 }
 
+/* Save is the primary; triage/autopilot are secondary (outline) so the foot
+   reads as one primary + two follow-up options (LIN-918). */
+.feedback-submit-secondary {
+  color: var(--blue, #2563eb);
+  background: transparent;
+}
+
+.feedback-submit-secondary:hover {
+  background: var(--blue-bg, rgba(37, 99, 235, 0.08));
+  filter: none;
+}
+
 .feedback-submit:disabled {
   opacity: 0.6;
   cursor: default;
@@ -194,5 +208,14 @@
     left: 8px;
     width: auto;
     bottom: 56px;
+  }
+
+  /* Stack the three actions full-width on narrow screens. */
+  .feedback-popup-foot {
+    flex-direction: column;
+  }
+
+  .feedback-submit {
+    width: 100%;
   }
 }

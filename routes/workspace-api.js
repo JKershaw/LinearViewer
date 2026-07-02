@@ -2068,6 +2068,22 @@ ${goal}`
   const MAX_FEEDBACK_CONTEXT_LENGTH = 2_000; // url / userAgent clamp
   const feedbackBodyParser = json({ type: () => true, limit: FEEDBACK_BODY_LIMIT });
 
+  // The three explicit post-create actions the feedback widget can request
+  // (LIN-918). Anything else (including an omitted action) is the legacy plain
+  // send, which still honours the per-user `feedbackTriage` flag.
+  const FEEDBACK_ACTIONS = new Set(['save', 'triage', 'autopilot']);
+
+  // Feedback-origin brief injected into a feedback → autopilot kickoff (LIN-918).
+  // `buildAutopilotKickoff` pins the goal for a scoped run and ignores `goal`, so
+  // this framing is threaded in via the dedicated `originNote` seam. It tells the
+  // run the ticket is a raw, un-triaged user report whose first job is understanding.
+  const FEEDBACK_AUTOPILOT_ORIGIN_NOTE =
+    '**Origin — raw feedback:** this ticket was filed directly from the in-app feedback widget, ' +
+    'so it is an unfiltered user report, not a triaged or scoped task. Before driving toward a fix, ' +
+    'your first job is to *understand* it: read the report closely, reproduce or ground the problem ' +
+    'against the current code, and work out what is actually being asked. Treat the description as a ' +
+    'starting hypothesis, not a specification.';
+
   // Clamp an incoming priority to Linear's 0-4 scale (0 = none … 4 = low);
   // anything else falls back to 0 ("No priority").
   function normalizeFeedbackPriority(value) {
@@ -2150,9 +2166,59 @@ ${goal}`
     }
   }
 
+  // Best-effort autopilot follow-up after a feedback ticket is filed (LIN-918).
+  // Mirrors `enqueueFeedbackTriage`: it builds a SCOPED autopilot kickoff for the
+  // freshly-created ticket, injects the feedback-origin brief (so the run knows the
+  // ticket came straight from the widget and needs understanding — a scoped kickoff
+  // ignores `goal`, hence the dedicated `originNote` seam), mints a best-effort
+  // readWrite proxy token, and enqueues on the SAME dispatch substrate with
+  // `kind: 'autopilot'`. Non-fatal — a failure here must not fail the submission,
+  // the ticket already exists. Unlike triage this is NOT flag-gated: the user chose
+  // it explicitly in the widget.
+  //
+  // The kickoff assumes a readWrite token is "supplied alongside this prompt (the
+  // +proxy block)", so the minted token + `buildProxyContextPreamble` block is how
+  // the run gets its API access — the same append the triage path makes. (The store
+  // then appends the "Your autopilot session id" block for `kind: 'autopilot'`.)
+  async function enqueueFeedbackAutopilot(workspace, issue, session, baseUrl) {
+    if (!dispatchQueueStore || !issue?.identifier || !baseUrl) return;
+    try {
+      let prompt = buildAutopilotKickoff({
+        baseUrl,
+        issue: { identifier: issue.identifier, title: issue.title },
+        originNote: FEEDBACK_AUTOPILOT_ORIGIN_NOTE
+      });
+
+      if (proxyTokenStore) {
+        try {
+          const minted = await proxyTokenStore.createToken(workspace.urlKey, { scope: 'readWrite', label: 'feedback-autopilot' });
+          if (minted?.token) {
+            prompt += buildProxyContextPreamble({ baseUrl, token: minted.token, issueIdentifier: issue.identifier });
+          }
+        } catch (err) {
+          console.error('Feedback autopilot proxy token mint failed:', err.message);
+        }
+      }
+
+      await dispatchQueueStore.addItem(workspace.urlKey, {
+        prompt,
+        promptName: `Autopilot — ${issue.identifier}`,
+        kind: 'autopilot',
+        issueId: issue.id || null,
+        issueIdentifier: issue.identifier,
+        issueTitle: issue.title || null,
+        issueUrl: issue.url || null,
+        dispatchedBy: session?.linearUserId || null,
+        target: 'cli'
+      });
+    } catch (err) {
+      console.error('Feedback autopilot enqueue failed:', err.message);
+    }
+  }
+
   /**
    * Submit feedback as a new ticket, optionally with an embedded screenshot,
-   * then enqueue a triage follow-up.
+   * then run the widget's chosen post-create action (save / triage / autopilot).
    * @route POST /workspace/:urlKey/api/feedback
    */
   router.post('/workspace/:urlKey/api/feedback', workspaceFromUrl, feedbackBodyParser, async (req, res) => {
@@ -2165,6 +2231,10 @@ ${goal}`
     const token = getWorkspaceCallScope(workspace);
     const { message, title, teamId, projectId, image, url, userAgent } = req.body || {};
     const priority = normalizeFeedbackPriority(req.body?.priority);
+    // Explicit post-create action (LIN-918). Only the three known actions branch;
+    // anything else (including an omitted `action`) is the legacy plain send.
+    const rawAction = typeof req.body?.action === 'string' ? req.body.action : null;
+    const action = FEEDBACK_ACTIONS.has(rawAction) ? rawAction : null;
 
     if (!message || typeof message !== 'string' || !message.trim()) {
       return badRequest.json(res, 'message is required');
@@ -2269,11 +2339,20 @@ ${goal}`
         return jsonError(res, 502, 'Failed to create feedback ticket');
       }
 
-      // Triage follow-up — opt-in (default off, LIN-733) and best-effort, never
-      // fails the submission. Only dispatch when the per-user `feedbackTriage`
-      // flag is on; when it is, the prompt carries the proxy details below.
-      if (getFeatureFlags(req.session).feedbackTriage) {
-        const baseUrl = `${req.protocol}://${req.get('host')}`;
+      // Post-create action (LIN-918) — all branches are best-effort and never
+      // fail the submission (the ticket already exists). An explicit widget
+      // action wins and is DECOUPLED from the `feedbackTriage` flag:
+      //   'save'      → file only, nothing further
+      //   'triage'    → always enqueue triage
+      //   'autopilot' → enqueue a scoped autopilot run carrying the feedback-origin brief
+      // With no explicit action (the legacy plain send) we preserve the old
+      // behaviour: triage only when the per-user `feedbackTriage` flag is on.
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      if (action === 'triage') {
+        await enqueueFeedbackTriage(workspace, result.issue, priority, req.session, baseUrl);
+      } else if (action === 'autopilot') {
+        await enqueueFeedbackAutopilot(workspace, result.issue, req.session, baseUrl);
+      } else if (!action && getFeatureFlags(req.session).feedbackTriage) {
         await enqueueFeedbackTriage(workspace, result.issue, priority, req.session, baseUrl);
       }
 
