@@ -29,13 +29,13 @@ This document states it.
 When a node stops it MUST resolve to exactly one outcome. The sentinel is both the node's
 self-report *and* the input to the bubbling decision (§5).
 
-| Outcome | Meaning | Node lifecycle | Holds receive path? |
+| Outcome | Meaning | Node lifecycle | Arms warm receive? (§8.1) |
 |---|---|---|---|
-| **DONE** | Work completed successfully. | terminate | no — released |
-| **FAILED** | Work ended without completing (error, crash, gave up). | terminate | no — released |
-| **BLOCKED** | Cannot proceed without outside help. | park | no — awaits external nudge |
-| **PENDING-internal** | Waiting on **its own** async work; will self-wake. | stop, not held | no — self-wakes |
-| **PENDING-external** | Waiting on **another session** (a child's result, or the parent's next beat). | stop, held | yes — someone will reach it |
+| **DONE** | Work completed successfully. | terminate | briefly — completion-hold, a *removable* latency optimization |
+| **FAILED** | Work ended without completing (error, crash, gave up). | terminate | briefly — completion-hold, a *removable* latency optimization |
+| **BLOCKED** | Cannot proceed without outside help. | park | yes — to receive the unblocking nudge |
+| **PENDING-internal** | Waiting on **its own** async work; will self-wake. | stop, not held | **no** — busy with its own async |
+| **PENDING-external** | Waiting on **another session** (a child's result, or the parent's next beat). | stop, held | yes — to receive the awaited event |
 
 Two groupings do most of the work:
 
@@ -167,6 +167,21 @@ one outcome that MUST NOT arm it.** This rests on a safety asymmetry:
   PENDING-internal node has its own async in flight; holding a stop-hook long poll would
   misrepresent a busy node as an idle one waiting for input. So it stops without arming and
   relies on self-wake.
+
+The *reason* for arming differs by outcome, and this is where "required mechanism" and
+"removable optimization" part ways:
+
+- **BLOCKED / PENDING-external arm because they are genuinely waiting** — for the unblocking
+  nudge, or the awaited event. This is the warm path doing its core job.
+- **Terminal outcomes (DONE / FAILED) arm only a brief *completion-hold*** — a latency
+  optimization so an immediate follow-up lands warm instead of paying a cold resume. This
+  single *use* is a removal candidate (dropping it just forces a resume on the next
+  follow-up; it does not affect correctness).
+
+The distinction matters for conformance: **the warm-path mechanism itself is REQUIRED** (§8
+mandates both implementations exist) — what is optional is only the completion-hold *use* of
+it on terminal outcomes. A dispatcher may drop the completion-hold and still conform; it may
+not drop the warm path.
 
 ### 8.2 The failsafe
 
