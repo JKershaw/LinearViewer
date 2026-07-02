@@ -54,6 +54,7 @@ import { parseRepoFromDescription } from './lib/prompt-formatters.js'
 import { renderPage, renderErrorPage, renderUpstreamAwareErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
 import { isAuthError } from './lib/errors.js'
 import { renderLandingHero } from './lib/components/landing-hero.js'
+import { isGitHubConfigured } from './lib/providers/github/app-auth.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken } from './lib/token-refresh.js'
 import { UUID_REGEX, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, updateWorkspaceTokens, getWorkspaceToken, getBindingsForWorkspace, getBindingCallScope, getWorkspaceCallScope, linkProvider, unlinkProvider, setActiveProvider, remintActiveCredential } from './lib/workspace.js'
@@ -162,8 +163,11 @@ const landingTrees = landingData.projects
 // The brand hero (LIN-726) that fronts every static-landing render. The GitHub
 // CTA is gated on the GitHub App being configured — read from env at startup,
 // the same lifecycle as the rest of the pre-rendered landing — so the landing
-// never offers a sign-in path that would 503.
-const landingHeroHtml = renderLandingHero({ githubEnabled: !!process.env.GITHUB_CLIENT_ID })
+// never offers a sign-in path that would 503. Uses the SAME shared predicate
+// (isGitHubConfigured) as the /auth/github route guard and the settings add
+// affordance (LIN-761), so the three consumers can never disagree: a CLIENT_ID-only
+// partial config no longer promises a sign-in the flow can't complete.
+const landingHeroHtml = renderLandingHero({ githubEnabled: isGitHubConfigured() })
 
 // =============================================================================
 // Database & Session Setup
@@ -1664,7 +1668,11 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
     workspaceFeatures,
     llmStats,
     providerBindings,
-    providerNotice
+    providerNotice,
+    // Gate the GitHub add affordance on the SAME shared predicate the /auth/github
+    // route guard and landing hero use (LIN-761), so the settings page never offers
+    // an add that would 503/hang on a server where GitHub isn't fully configured.
+    githubEnabled: isGitHubConfigured()
   });
   res.send(html);
 });

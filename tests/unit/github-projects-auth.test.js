@@ -227,12 +227,16 @@ function makeSession(initial = {}) {
   return session;
 }
 
-const ENV = ['GITHUB_APP_ID', 'GITHUB_APP_PRIVATE_KEY', 'GITHUB_APP_SLUG'];
+// The route guards gate on the COMPLETE GitHub config (LIN-761) — the shared App
+// vars plus the OAuth client_id/secret — byte-symmetric with routes/github-auth.js.
+const ENV = ['GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET', 'GITHUB_APP_ID', 'GITHUB_APP_PRIVATE_KEY', 'GITHUB_APP_SLUG'];
 
 describe('GitHub Projects auth routes', () => {
   let saved;
   beforeEach(() => {
     saved = Object.fromEntries(ENV.map(k => [k, process.env[k]]));
+    process.env.GITHUB_CLIENT_ID = 'cid';
+    process.env.GITHUB_CLIENT_SECRET = 'secret';
     process.env.GITHUB_APP_ID = '12345';
     process.env.GITHUB_APP_PRIVATE_KEY = 'test-key';
     process.env.GITHUB_APP_SLUG = 'my-app';
@@ -252,6 +256,42 @@ describe('GitHub Projects auth routes', () => {
     await handler({ query: {}, session: makeSession() }, res);
     assert.equal(res.statusCode, 503);
     assert.match(res.body, /GitHub App Not Configured/);
+  });
+
+  // LIN-761 — partial config (App vars present, GITHUB_CLIENT_ID absent) returns a
+  // clean up-front 503, never hangs in beginAuth. Byte-symmetric with Issues.
+  test('GET /auth/github-projects 503s (never hangs) on a partial config: App vars set, GITHUB_CLIENT_ID absent (LIN-761)', async () => {
+    delete process.env.GITHUB_CLIENT_ID;
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider() });
+    const handler = getHandler(router, 'get', '/auth/github-projects');
+    const res = makeRes();
+    const session = makeSession();
+    await handler({ query: {}, session }, res);
+    assert.equal(res.statusCode, 503);
+    assert.match(res.body, /GitHub App Not Configured/);
+    assert.match(res.body, /GITHUB_CLIENT_ID/);
+    assert.equal(res.redirectedTo, null);
+    assert.equal(session.oauthState, undefined);
+  });
+
+  // LIN-761 root cause A — throw-safe begin: a throw from beginAuth is caught
+  // before session.save, yielding a clean 503 rather than an escaped async throw.
+  test('GET /auth/github-projects is throw-safe out of session.save when beginAuth throws (LIN-761)', async () => {
+    let saveCalled = false;
+    const throwingProvider = {
+      ...fakeProvider(),
+      beginAuth: () => { throw new Error('boom from beginAuth'); },
+    };
+    const router = createGitHubProjectsAuthRoutes({ provider: throwingProvider });
+    const handler = getHandler(router, 'get', '/auth/github-projects');
+    const res = makeRes();
+    const session = makeSession();
+    const origSave = session.save;
+    session.save = function (cb) { saveCalled = true; return origSave.call(this, cb); };
+    await handler({ query: {}, session }, res);
+    assert.equal(res.statusCode, 503);
+    assert.equal(res.redirectedTo, null);
+    assert.equal(saveCalled, false);
   });
 
   test('GET /auth/github-projects mints state, stores intent server-side, and redirects', async () => {

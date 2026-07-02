@@ -147,6 +147,38 @@ describe('renderSettingsPage — Providers section (LIN-634)', () => {
     assert.doesNotMatch(html, /blocked on LIN-560/);
   });
 
+  test('GitHub add affordances default to enabled when githubEnabled is omitted (LIN-761)', () => {
+    // Backward-compatible default: omitting the flag keeps the live add buttons,
+    // so existing callers/output are unchanged.
+    const html = renderSettingsPage('Acme', BASE);
+    assert.match(html, /settings-provider-add-btn/);
+    assert.doesNotMatch(html, /GitHub is not configured on this server/);
+  });
+
+  test('disables BOTH GitHub add affordances with an honest reason when githubEnabled is false (LIN-761)', () => {
+    const html = renderSettingsPage('Acme', { ...BASE, githubEnabled: false });
+    // Both rows still render (data-testid preserved) but as blocked affordances,
+    // not live add buttons — one shared flag gates Issues + Projects, so the honest
+    // reason appears exactly twice (once per GitHub row).
+    assert.match(html, /data-testid="settings-provider-add-github"/);
+    assert.match(html, /data-testid="settings-provider-add-github-projects"/);
+    const reasonCount = (html.match(/GitHub is not configured on this server/g) || []).length;
+    assert.strictEqual(reasonCount, 2);
+    // Each GitHub row uses the blocked presentation, and NEITHER offers a live add
+    // button (the add button only renders on unblocked rows; Linear is separately
+    // blocked on LIN-544, so with GitHub disabled there is no live add button left).
+    assert.doesNotMatch(html, /settings-provider-add-btn/);
+    // Honest reason, not a stale ticket-blocked message.
+    assert.doesNotMatch(html, /blocked on LIN-541/);
+  });
+
+  test('keeps the GitHub add affordances live when githubEnabled is true (LIN-761)', () => {
+    const html = renderSettingsPage('Acme', { ...BASE, githubEnabled: true });
+    assert.match(html, /data-testid="settings-provider-add-github"/);
+    assert.match(html, /settings-provider-add-btn/);
+    assert.doesNotMatch(html, /GitHub is not configured on this server/);
+  });
+
   test('disables the Linear add affordance as a stopgap until per-workspace binding lands (LIN-735/LIN-544)', () => {
     const html = renderSettingsPage('Acme', BASE);
     // The row still renders, but as a blocked affordance naming LIN-544 — not a

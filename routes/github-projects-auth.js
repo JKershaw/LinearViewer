@@ -30,6 +30,7 @@ import crypto from 'crypto'
 import { Router } from 'express'
 import { renderErrorPage, renderGitHubProjectSelectPage } from '../lib/render-pages.js'
 import { githubErrorDiagnostic } from '../lib/errors.js'
+import { getMissingGitHubConfig } from '../lib/providers/github/app-auth.js'
 import {
   upsertWorkspace,
   saveSession,
@@ -38,11 +39,6 @@ import {
   getWorkspaceByUrlKey,
   validateWorkspaceUrlKey,
 } from '../lib/workspace.js'
-
-// The shared GitHub App config the install flow needs (LIN-703): the App's id +
-// private key (to mint the installation token) and its slug (to build the install
-// URL in beginAuth). Same App as Issues — the gate is identical.
-const APP_ENV_VARS = ['GITHUB_APP_ID', 'GITHUB_APP_PRIVATE_KEY', 'GITHUB_APP_SLUG']
 
 // A Projects binding's scope is an `org/projectNumber` board slug: an owner login
 // followed by a NUMERIC board number. Validate the shape before writing it.
@@ -75,12 +71,11 @@ function installationExpiryMs(expiresAt) {
 export function createGitHubProjectsAuthRoutes({ sessionStore, provider } = {}) {
   const router = Router()
 
-  function getMissingAppVars() {
-    return APP_ENV_VARS.filter(v => !process.env[v])
-  }
-
+  // The complete config gate (LIN-761) — byte-symmetric with routes/github-auth.js:
+  // validate the FULL env set the shared App flow consumes, not just GITHUB_APP_*,
+  // so a partial config returns a clean 503 rather than hanging in beginAuth.
   function notConfigured(res) {
-    const missing = getMissingAppVars()
+    const missing = getMissingGitHubConfig()
     return res.status(503).send(renderErrorPage(
       'GitHub App Not Configured',
       `GitHub Projects is not available. Missing environment variables: ${missing.join(', ')}. See .env.example for setup instructions.`
@@ -93,11 +88,23 @@ export function createGitHubProjectsAuthRoutes({ sessionStore, provider } = {}) 
    * the GitHub account container). It lives in the session, never in `state`.
    */
   router.get('/auth/github-projects', async (req, res) => {
-    if (getMissingAppVars().length > 0) return notConfigured(res)
+    if (getMissingGitHubConfig().length > 0) return notConfigured(res)
     if (sessionStore?.cleanup) await sessionStore.cleanup()
 
     const mode = req.query.mode === 'add-source' ? 'add-source' : 'new'
     const state = crypto.randomUUID()
+
+    // Throw-safe begin (LIN-761 root cause A) — compute the authorize URL BEFORE
+    // req.session.save so a throw can't escape the async callback and hang the
+    // request. Byte-symmetric with routes/github-auth.js.
+    let authorizeUrl
+    try {
+      authorizeUrl = provider.beginAuth({ state })
+    } catch (err) {
+      console.error('GitHub Projects beginAuth error:', err)
+      return notConfigured(res)
+    }
+
     req.session.oauthState = state
     const intent = { mode, provider: provider.name }
     if (mode === 'add-source' && validateWorkspaceUrlKey(req.query.workspace)) {
@@ -106,7 +113,7 @@ export function createGitHubProjectsAuthRoutes({ sessionStore, provider } = {}) 
     req.session.oauthIntent = intent
 
     req.session.save(() => {
-      res.redirect(provider.beginAuth({ state }))
+      res.redirect(authorizeUrl)
     })
   })
 
@@ -121,7 +128,7 @@ export function createGitHubProjectsAuthRoutes({ sessionStore, provider } = {}) 
    * `state` stays an opaque CSRF nonce; intent is read from the session.
    */
   router.get('/auth/github-projects/callback', async (req, res) => {
-    if (getMissingAppVars().length > 0) return notConfigured(res)
+    if (getMissingGitHubConfig().length > 0) return notConfigured(res)
 
     const { installation_id: installationId, setup_action: setupAction, code, state, error } = req.query
 
