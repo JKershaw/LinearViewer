@@ -69,6 +69,34 @@ const FIXTURES = [
       + 'comment is the completion recap (envelope helpers adopted across the three route files, PR open, '
       + 'CI green). Work has demonstrably landed but is not yet reviewed → confirm-and-close (review), not '
       + 're-implement. Frozen before the approve + merge comments.'
+  },
+  // ---- DESIGN-expected (LIN-878): the richer-kind recall bar. Sole expect:['design'],
+  // NOT aliased to research, so the per-kind metric can discriminate design from research.
+  {
+    identifier: 'LIN-813', file: 'LIN-813-design-shape-fork.json', keep: 2,
+    expect: ['design'], loop: false, avoid: null,
+    scale: 'real (frozen pre-plan: scope narrowed by John, before the plan comment silently picked the shape)',
+    why: 'REAL LIN-813 shape-fork — THE gold design case (LIN-878). Frozen at keep=2 (the dogfooding '
+      + 'proof + John\'s scope-narrowing comment) — the pre-plan red moment. Knowledge is gathered and scope '
+      + 'is pinned to the first slice (one head AP + one child AP per task), but the SOLUTION SHAPE is still '
+      + 'contested: the next comment (dropped here) is the plan, which silently picked a launch-time '
+      + 'coordinator VARIANT — a choice John reversed twice (PR #718 built→reviewed→CHANGES-REQUESTED→closed '
+      + 'unmerged, rebuilt guide-driven as #719). A deliberate `design` pass weighing coordinator-variant vs '
+      + 'guide-driven would have surfaced that fork before implementation. The honest next action is `design`, '
+      + 'not straight to `plan`. Frozen before the plan/implement/review/close-out trail.'
+  },
+  {
+    identifier: 'LIN-748', file: 'LIN-748-design-theme.json', keep: 2,
+    expect: ['design'], loop: false, avoid: null,
+    scale: 'real (frozen post-research, before "direction locked" — the harder real design case)',
+    why: 'REAL LIN-748 "Theme and Observation page design" (LIN-878). Frozen at keep=2 (bookkeeping + the '
+      + 'research/exploration comment), before comment [2] "Breakdown — direction locked with John" decided '
+      + 'the shape inline. The attachments (theme-design.md, observation-page-design.md, AgentRuns.jsx mockup) '
+      + 'are read but the SHAPE of reconciling mockup-vs-existing is contested (light/dark default, retire '
+      + 'theme-amber, relax the CLI-mono principle) — the deliberate `design` step this task never got, whose '
+      + 'absence let the delivery drift from the intended design (→ rebuild LIN-873 + fidelity follow-ups). '
+      + 'HARDER than LIN-813: the description embeds research findings and a two-track (Task 1/Task 2) framing, '
+      + 'so it can also attract `research`/`breakdown` — a realistic, less-forgiving design fixture on purpose.'
   }
 ];
 
