@@ -1897,6 +1897,106 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
   });
 });
 
+// =============================================================================
+// Ledger proportionality: low-risk changes discharge via post-merge observation
+// (LIN-898). Fix at review-AUTHORING time, not close-out discharge time; the
+// three hard floors (missing-ledger blocks, green-CI-never-discharges, no
+// self-certification) must NOT regress.
+// =============================================================================
+
+describe('ledger proportionality for low-risk changes (LIN-898)', () => {
+  const issue = {
+    id: 'lr-1', identifier: 'LIN-902', title: 'Tweak prompt wording',
+    description: 'work', url: 'https://linear.app/test/issue/LIN-902',
+    labels: [], createdAt: '2026-01-01T00:00:00.000Z'
+  };
+  const context = { parent: null, siblings: [], project: { name: 'P' }, children: [], comments: [] };
+
+  const metaArgs = {
+    issueContext: 'CTX', identifier: 'LIN-902',
+    hasSubtasks: true, subtaskCount: 2, completedCount: 2, inProgressCount: 0, remainingCount: 0,
+    hasComments: true, commentCount: 2, aiHints: 'H',
+    actionVocabulary: 'plan, review, close-out, implementation, bug',
+    completionSignals: 'S', focusedSubtaskId: null, isTerminal: false, hasOpenChildren: true
+  };
+
+  test('review template authors the proportional low-risk lane, keyed on risk surface', () => {
+    const review = generatePrompt('review', issue, context).prompt;
+    // The proportionality principle appears at ledger-AUTHORING time.
+    assert.ok(/\*\*Proportional to risk class\.\*\*/.test(review),
+      'review carries the proportionality principle');
+    assert.ok(/post-merge observation/i.test(review),
+      'low-risk claims discharge via post-merge observation');
+    assert.ok(/prompt-text, docs, or comment-only/i.test(review),
+      'low-risk lane spans prompt-text / docs / comment-only');
+    // Keyed on risk surface, NOT LOC / size / file type (the overfitting guard).
+    assert.ok(/never on lines-of-code, t-shirt size, or literal file type/i.test(review),
+      'lane is keyed on the risk surface, not LOC / size / file type');
+    // Floor retained for risky claims even in the authoring rule.
+    assert.ok(/never lowers the floor for risky claims/i.test(review),
+      'the proportional lane never lowers the floor for risky claims');
+    assert.ok(/self-assessment is never that sign-off/i.test(review),
+      'a reviewer self-assessment is never a human sign-off');
+  });
+
+  test('close-out template discharges a low-risk post-merge-observation item without pre-merge sign-off', () => {
+    const closeout = generatePrompt('close-out', issue, context).prompt;
+    assert.ok(/Proportional to risk class — low-risk post-merge-observation discharge/i.test(closeout),
+      'close-out has the low-risk discharge path');
+    assert.ok(/that routing to normal post-merge observation .* IS its discharge under \(a\)/is.test(closeout),
+      'the routing itself is the discharge under option (a)');
+    assert.ok(/without a pre-merge human sign-off ceremony/i.test(closeout),
+      'no pre-merge human sign-off ceremony for a low-risk item');
+    // Fix is at authoring, never a wave-through at discharge.
+    assert.ok(/never waves a genuine gate item through/i.test(closeout),
+      'the lane never waves a genuine gate item through');
+  });
+
+  test('HARD FLOORS not regressed: green CI never discharges, no self-certification, missing verdict still blocks', () => {
+    const review = generatePrompt('review', issue, context).prompt;
+    const closeout = generatePrompt('close-out', issue, context).prompt;
+    // Floor 1: green CI never discharges a ledger item (unchanged).
+    assert.ok(/Green CI is never evidence for a ledger item/i.test(closeout),
+      'green CI still never discharges a ledger item');
+    // Floor 2: no self-certification — the reviewer's own self-assessment is never the sign-off,
+    // and the low-risk lane explicitly does NOT relax this for risky items.
+    assert.ok(/do NOT accept the reviewer's own "no action needed" self-assessment as the human sign-off/i.test(closeout),
+      'close-out never accepts the reviewer self-assessment as human sign-off (Q3 = NO)');
+    assert.ok(/does NOT touch the two hard floors/i.test(closeout),
+      'the low-risk lane explicitly does not touch the hard floors');
+    // Floor 3: only a task with NO review verdict at all is unauthorized to close (LIN-810, intact).
+    assert.ok(/no review verdict at all is unauthorized to close/i.test(closeout),
+      'a task with no review verdict at all still blocks close');
+    // The proportional lane is narrow: risky surfaces stay hard gate items.
+    assert.ok(/stays a hard gate item/i.test(review),
+      'risky-surface claims stay hard gate items in the review authoring rule');
+  });
+
+  test('BOTH PATHS: the meta-prompt mirrors the proportional lane in Review and Close-out rules', () => {
+    const p = buildMetaPromptTemplate(metaArgs);
+    // Review rule mirror.
+    assert.ok(/make each item PROPORTIONAL to the change's risk class/i.test(p),
+      'meta Review rule carries the proportionality principle');
+    assert.ok(/keying the lane on the risk surface not LOC \/ t-shirt size \/ literal file type/i.test(p),
+      'meta Review rule keys the lane on the risk surface, not LOC / size / file type');
+    // Close-out rule mirror (clause 3a) + retained floors in the meta path.
+    assert.ok(/honour review's PROPORTIONAL lane/i.test(p),
+      'meta Close-out rule honours the proportional lane');
+    assert.ok(/does NOT relax the two floors \(green CI still never discharges; a risky item still needs cited evidence or a human naming the exact precondition — never the reviewer's own self-assessment\)/i.test(p),
+      'meta Close-out rule keeps the two hard floors intact');
+  });
+
+  test('completion signals stay coherent with the proportional lane', () => {
+    const sig = COMPLETION_SIGNALS['close-out'];
+    assert.ok(sig.signals.some(s => /routed to post-merge observation discharges via that routing/i.test(s)),
+      'a checkpoint reflects the low-risk post-merge-observation discharge');
+    assert.ok(sig.signals.some(s => /green CI still never discharges/i.test(s)),
+      'the checkpoint keeps the green-CI floor explicit');
+    assert.ok(/proportional to risk class/i.test(sig.readinessCheck),
+      'the readiness check names the proportionality principle');
+  });
+});
+
 describe('meta-prompt Step 2: bug already investigated (LIN-366)', () => {
   const baseArgs = {
     issueContext: 'CTX', identifier: 'LIN-900',
