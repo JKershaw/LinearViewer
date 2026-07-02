@@ -24,20 +24,27 @@ test.describe('Settings — Providers section (LIN-634)', () => {
     await expect(binding.locator('.provider-active')).toBeVisible()
   })
 
-  test('offers GitHub as a live add source (unblocked, LIN-541)', async ({ page }) => {
+  // The E2E server runs with NO GitHub env configured, so the add affordance is
+  // honestly disabled — not a live button that would 503/hang on click. This is the
+  // end-to-end proof of LIN-761 root cause C (the settings promise must match what
+  // /auth/github can deliver). The live-when-configured path is covered by the
+  // render-settings unit tests (githubEnabled: true).
+  test('disables the GitHub add source with an honest reason when GitHub is unconfigured (LIN-761)', async ({ page }) => {
     const githubAdd = page.locator('[data-testid="settings-provider-add-github"]')
     await expect(githubAdd).toBeVisible()
-    // No longer blocked — a real add button is rendered that POSTs to the add flow.
-    await expect(githubAdd).not.toContainText('blocked')
-    await expect(githubAdd.locator('button')).toHaveCount(1)
+    await expect(githubAdd).toHaveClass(/provider-add-blocked/)
+    await expect(githubAdd).toContainText('not configured on this server')
+    // No live add button — a blocked row carries no form/button.
+    await expect(githubAdd.locator('button')).toHaveCount(0)
   })
 
-  test('offers GitHub Projects as a live add source (unblocked, LIN-560)', async ({ page }) => {
+  test('disables the GitHub Projects add source with an honest reason when GitHub is unconfigured (LIN-761)', async ({ page }) => {
     const projectsAdd = page.locator('[data-testid="settings-provider-add-github-projects"]')
     await expect(projectsAdd).toBeVisible()
-    await expect(projectsAdd).not.toContainText('blocked')
     await expect(projectsAdd).toContainText('GitHub Projects')
-    await expect(projectsAdd.locator('button')).toHaveCount(1)
+    await expect(projectsAdd).toHaveClass(/provider-add-blocked/)
+    await expect(projectsAdd).toContainText('not configured on this server')
+    await expect(projectsAdd.locator('button')).toHaveCount(0)
   })
 
   test('disables the Linear add source as a stopgap (blocked on LIN-544, LIN-735)', async ({ page }) => {
