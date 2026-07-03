@@ -185,6 +185,21 @@ test.describe('Suggested Next Run Page (experimental)', () => {
       await expect(refs.locator('.next-run-ref').first()).toContainText('TEST-');
     });
 
+    test('referenced tasks show their human-readable title, not just the id (LIN-923)', async ({ page }) => {
+      await page.locator('#next-run-generate').click();
+      // The first concrete mock option references TEST-1 ("Parent task in progress").
+      const card = page.locator('.next-run-option:not(.next-run-option-open)').first();
+      await expect(card).toBeVisible({ timeout: 5000 });
+      await card.locator('.next-run-option-head').click();
+
+      const refItem = card.locator('.next-run-ref-item').first();
+      await expect(refItem).toBeVisible();
+      // The identifier chip and the resolved title sit side by side.
+      await expect(refItem.locator('.next-run-ref')).toContainText('TEST-');
+      await expect(refItem.locator('.next-run-ref-title')).not.toBeEmpty();
+      await expect(refItem.locator('.next-run-ref-title')).toContainText('Parent task in progress');
+    });
+
     test('a visible global analysis section appears above the cards (LIN-642)', async ({ page }) => {
       await page.locator('#next-run-generate').click();
 

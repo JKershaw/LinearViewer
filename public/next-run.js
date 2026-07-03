@@ -223,16 +223,28 @@
       }
 
       // Referenced tasks rendered at the end of the recommendation (LIN-642).
-      // Machine-readable identifiers → mono data Chips (LIN-861), shown as a
-      // labelled list so the reader sees exactly which tasks the goal acts on.
-      var refIds = Array.isArray(opt.referencedTaskIds) ? opt.referencedTaskIds : [];
-      if (refIds.length) {
-        var tags = refIds.map(function (id) {
-          return window.renderChip({ label: String(id), className: 'next-run-ref' });
-        }).join(' ');
+      // Each task shows its machine-readable identifier → mono data Chip (LIN-861)
+      // AND its human-readable title (LIN-923), so the reader can tell what the
+      // tasks actually are, not just their opaque ids. Prefer the enriched
+      // `referencedTasks: [{id, title}]`; fall back to bare `referencedTaskIds`
+      // (older responses) with no title text.
+      var refTasks = Array.isArray(opt.referencedTasks)
+        ? opt.referencedTasks
+        : (Array.isArray(opt.referencedTaskIds)
+          ? opt.referencedTaskIds.map(function (id) { return { id: id, title: '' }; })
+          : []);
+      if (refTasks.length) {
+        var items = refTasks.map(function (t) {
+          var chip = window.renderChip({ label: String(t.id), className: 'next-run-ref' });
+          var title = t.title
+            ? '<span class="next-run-ref-title">' + escapeHtml(t.title) + '</span>'
+            : '';
+          return '<li class="next-run-ref-item">' + chip + title + '</li>';
+        }).join('');
         body.insertAdjacentHTML('beforeend', window.renderSurface({
-          body: '<p class="next-run-refs obs-detail-block">' +
-            '<span class="obs-body-lbl">tasks</span> ' + tags + '</p>',
+          body: '<div class="next-run-refs obs-detail-block">' +
+            '<span class="obs-body-lbl">tasks</span>' +
+            '<ul class="next-run-ref-list">' + items + '</ul></div>',
           variant: 'inset',
           className: 'next-run-refs-surface',
         }));
