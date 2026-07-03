@@ -194,10 +194,10 @@
 
 .obs-session {
   border: 1px solid var(--line);
-  /* Coloured left accent stripe per status (mockup); status hue set below. Maps
-     onto the theme's 4-state palette (running=amber, done=green, error=red,
-     stale=slate) — no 5th colour. */
-  border-left: 4px solid var(--line);
+  /* Coloured left accent stripe per status (mockup, design §6.1: 3px); status hue
+     set below. Maps onto the theme's 4-state palette (running=amber, done=green,
+     error=red, stale=slate) — no 5th colour. */
+  border-left: 3px solid var(--line);
   border-radius: var(--radius-lg);
   margin-bottom: 0.5rem;
   background: var(--raised);
@@ -684,6 +684,8 @@ a.obs-task-ident:hover { text-decoration: underline; }
   padding: 0.02rem 0.35rem;
 }
 .obs-act-raw { font-family: var(--font-structural); font-size: 0.76rem; color: var(--muted); }
+/* §6.3: an empty burst ("no tools") reads quietly — no chip fill, dimmed. */
+.obs-act-idle { background: transparent; padding-left: 0; padding-right: 0; color: var(--faint); }
 
 /* Produced-artifacts (net-new): icon-led links out to the evidence. */
 .obs-artifacts { list-style: none; margin: 0.15rem 0 0; padding: 0; }
@@ -699,6 +701,8 @@ a.obs-task-ident:hover { text-decoration: underline; }
 }
 .obs-artifact:hover { text-decoration: underline; }
 .obs-artifact-icon { flex: 0 0 auto; color: var(--muted); }
+/* §6.4: a `pr` artifact shows its handle (e.g. simple-dispatcher #24) in mono. */
+.obs-artifact-handle { font-family: var(--font-structural); }
 
 /* Error-as-direction box (net-new): lead with the cause, show runtime, offer a
    link to the log. Presentation-only — no retry endpoint, so no dead control. */
