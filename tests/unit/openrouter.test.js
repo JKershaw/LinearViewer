@@ -19,6 +19,9 @@ import {
   setLlmCallRecorder,
   setPromptTraceRecorder,
   getModelDisplayName,
+  getPaidEnvKey,
+  hasPaidEnvKey,
+  isRecommendationEnabled,
   DEFAULT_MODEL,
   EPIC_CHILD_THRESHOLD,
   COUSIN_CAP,
@@ -1685,5 +1688,59 @@ describe('getRecommendation abort (LIN-346 gap #2)', () => {
       getRecommendation(ISSUE, CONTEXT, { apiKey: 'test-key', signal: ac.signal }),
       /OpenRouter request timed out/
     );
+  });
+});
+
+// =============================================================================
+// getPaidEnvKey / hasPaidEnvKey (LIN-961)
+// =============================================================================
+// The single normalized reader for the server paid key: it trims, so empty AND
+// whitespace-only OPENROUTER_API_KEY count as unset. Centralizing this predicate
+// is the core fix — it stops a blank value from being classified as a paid `env`
+// key or forwarded to OpenRouter as a bogus auth header.
+describe('getPaidEnvKey / hasPaidEnvKey (LIN-961)', () => {
+  let prev;
+  beforeEach(() => { prev = process.env.OPENROUTER_API_KEY; });
+  afterEach(() => {
+    if (prev === undefined) delete process.env.OPENROUTER_API_KEY;
+    else process.env.OPENROUTER_API_KEY = prev;
+  });
+
+  test('unset → undefined / false', () => {
+    delete process.env.OPENROUTER_API_KEY;
+    assert.strictEqual(getPaidEnvKey(), undefined);
+    assert.strictEqual(hasPaidEnvKey(), false);
+    assert.strictEqual(isRecommendationEnabled(), false);
+  });
+
+  test('empty string → undefined / false (the reported symptom)', () => {
+    process.env.OPENROUTER_API_KEY = '';
+    assert.strictEqual(getPaidEnvKey(), undefined);
+    assert.strictEqual(hasPaidEnvKey(), false);
+    assert.strictEqual(isRecommendationEnabled(), false);
+  });
+
+  test('whitespace-only → undefined / false (never forwarded as auth)', () => {
+    process.env.OPENROUTER_API_KEY = '   \t ';
+    assert.strictEqual(getPaidEnvKey(), undefined);
+    assert.strictEqual(hasPaidEnvKey(), false);
+  });
+
+  test('a real key → returned verbatim (trimmed) / true', () => {
+    process.env.OPENROUTER_API_KEY = 'sk-or-abc123';
+    assert.strictEqual(getPaidEnvKey(), 'sk-or-abc123');
+    assert.strictEqual(hasPaidEnvKey(), true);
+    assert.strictEqual(isRecommendationEnabled(), true);
+  });
+
+  test('surrounding whitespace is trimmed off a real key', () => {
+    process.env.OPENROUTER_API_KEY = '  sk-or-abc123  ';
+    assert.strictEqual(getPaidEnvKey(), 'sk-or-abc123');
+    assert.strictEqual(hasPaidEnvKey(), true);
+  });
+
+  test('isRecommendationEnabled honours a session key regardless of env', () => {
+    delete process.env.OPENROUTER_API_KEY;
+    assert.strictEqual(isRecommendationEnabled('sess_abc'), true);
   });
 });

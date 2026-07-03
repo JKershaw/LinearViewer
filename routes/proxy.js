@@ -41,7 +41,7 @@ import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { applyTrashedSignal, isTrashed } from '../lib/trashed-signal.js';
 import { flattenIssue, neutralizeProject, flattenCycle, flattenRelations, decodeAttachmentHandle, relayContentTypeFromName, GITHUB_UPLOAD_HOSTS, collectIssueAttachments } from '../lib/proxy-wire.js';
 import { createProxyFetch } from '../lib/proxy-fetch.js';
-import { isRecommendationEnabled, getRecommendation } from '../lib/openrouter.js';
+import { isRecommendationEnabled, getRecommendation, getPaidEnvKey } from '../lib/openrouter.js';
 import { resolveRecommendation, describeDescent, armHopSignal } from '../lib/recommend-recurse.js';
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { generateRecap } from '../lib/recap.js';
@@ -73,11 +73,13 @@ import { parseFeedbackImage } from '../lib/attachment-upload.js';
 /**
  * Resolve the OpenRouter credentials for a proxy LLM call, mirroring
  * resolveRoadmapLLM (routes/workspace-api.js). Free tier is used ONLY when there
- * is no token-creator OAuth key (`sessionApiKey`) and no server `OPENROUTER_API_KEY`,
- * but `OPENROUTER_FREE_TIER_KEY` is set. `apiKey` is left undefined on the env-key
- * path so getRecommendation/generateRecap/generateBrief fall back to
- * `process.env.OPENROUTER_API_KEY` exactly as before — paid/OAuth/env behavior is
- * unchanged. Model resolution stays on resolveWorkspaceModel; the returned
+ * is no token-creator OAuth key (`sessionApiKey`) and no *usable* server paid key
+ * (`getPaidEnvKey()` — trims, so empty/whitespace `OPENROUTER_API_KEY` counts as
+ * unset; LIN-961), but `OPENROUTER_FREE_TIER_KEY` is set. On the paid-env path the
+ * trimmed `getPaidEnvKey()` is returned as `apiKey` so a blank/whitespace value can
+ * never be forwarded to OpenRouter as a bogus auth header; for a clean key the
+ * trimmed value equals the raw one, so paid/OAuth/env behavior is unchanged. Model
+ * resolution stays on resolveWorkspaceModel; the returned
  * `isFreeTier` is threaded into resolveWorkspaceModel as `forceDefault` at each
  * billed call site so free-tier requests clamp to DEFAULT_MODEL (LIN-513).
  * @param {string|null|undefined} sessionApiKey - Token-creator's OAuth key, if any.
@@ -85,8 +87,9 @@ import { parseFeedbackImage } from '../lib/attachment-upload.js';
  */
 export function resolveProxyLLM(sessionApiKey) {
   const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
-  const isFreeTier = !sessionApiKey && !process.env.OPENROUTER_API_KEY && !!freeTierKey;
-  const apiKey = sessionApiKey || (isFreeTier ? freeTierKey : undefined);
+  const paidEnvKey = getPaidEnvKey();
+  const isFreeTier = !sessionApiKey && !paidEnvKey && !!freeTierKey;
+  const apiKey = sessionApiKey || (isFreeTier ? freeTierKey : paidEnvKey);
   return { apiKey, isFreeTier };
 }
 
@@ -657,16 +660,19 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   }
 
   /**
-   * Helper to log a proxy event (fire and forget).
+   * Helper to log a proxy event (fire and forget). `note` is an optional
+   * free-text breadcrumb (e.g. the free-tier key-source signal from LIN-961);
+   * it is additive and leaves the numeric `status` untouched.
    */
-  function logEvent(req, endpoint, status) {
+  function logEvent(req, endpoint, status, note = null) {
     proxyEventStore.recordEvent({
       urlKey: req.proxyUrlKey,
       tokenId: req.proxyTokenId,
       tokenLabel: req.proxyTokenLabel,
       method: req.method,
       endpoint,
-      status
+      status,
+      note
     }).catch(err => console.error('Failed to log proxy event:', err));
   }
 
@@ -2930,13 +2936,33 @@ One convention across every endpoint, so you can branch on the same fields every
   // null when the request may proceed, or a { status, body } rejection carrying
   // the standard 429 envelope when the limit is hit. Caller sends it via res or
   // keepalive.send depending on whether the H12 keepalive is already armed.
-  async function chargeFreeTierOrReject(urlKey) {
-    const check = await freeTierStore.tryUse(urlKey);
+  //
+  // This is the once-per-request metered choke point (LIN-961): it is only
+  // reached when resolveProxyLLM already selected free tier, i.e. neither the
+  // token-creator's OAuth key nor a usable paid `OPENROUTER_API_KEY` resolved.
+  // That silent fallback is the bug the operator could not diagnose, so make it
+  // observable HERE (not inside resolveProxyLLM, which runs per descent hop and
+  // would over-log): emit a console.warn + an audited proxy event on EVERY
+  // free-tier metered call — the successful charges too, not only the eventual
+  // 429 — and, when the limit IS hit, name the real cause in the 429 body via
+  // `reason: 'no_paid_key_resolved'` so the message stops pointing only at the
+  // quota. Charging/quota behavior itself is unchanged; the additions are purely
+  // additive breadcrumbs.
+  async function chargeFreeTierOrReject(req, endpoint) {
+    console.warn(
+      `[LIN-961] Proxy ${endpoint} running on FREE TIER — no paid/OAuth key resolved ` +
+      `(workspace ${req.proxyUrlKey}). Set OPENROUTER_API_KEY (non-empty) or connect ` +
+      `OpenRouter to use a paid key.`
+    );
+    logEvent(req, endpoint, 200, 'free-tier fallback: no paid/OAuth key resolved');
+
+    const check = await freeTierStore.tryUse(req.proxyUrlKey);
     if (check.allowed) return null;
     return {
       status: 429,
       body: {
         error: check.reason,
+        reason: 'no_paid_key_resolved',
         freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt }
       }
     };
@@ -3164,7 +3190,7 @@ One convention across every endpoint, so you can branch on the same fields every
       // generation below; charge before it so an exhausted user gets a clean 429.
       // Skipped on the kind-override path (LIN-839): it makes no LLM call.
       if (kind === undefined && isFreeTier && !isTestMode) {
-        const rejection = await chargeFreeTierOrReject(req.proxyUrlKey);
+        const rejection = await chargeFreeTierOrReject(req, '/api/proxy/recommend');
         if (rejection) {
           logEvent(req, '/api/proxy/recommend', 429);
           return res.status(rejection.status).json(rejection.body);
@@ -3435,7 +3461,7 @@ One convention across every endpoint, so you can branch on the same fields every
 
         // Charge one free-tier unit only now that generation is guaranteed.
         if (isFreeTier && !isTestMode) {
-          const rejection = await chargeFreeTierOrReject(req.proxyUrlKey);
+          const rejection = await chargeFreeTierOrReject(req, '/api/proxy/recap');
           if (rejection) {
             keepalive.stop();
             logEvent(req, '/api/proxy/recap', 429);
@@ -3533,7 +3559,7 @@ One convention across every endpoint, so you can branch on the same fields every
       }
 
       if (isFreeTier && !isTestMode) {
-        const rejection = await chargeFreeTierOrReject(req.proxyUrlKey);
+        const rejection = await chargeFreeTierOrReject(req, '/api/proxy/recap');
         if (rejection) {
           logEvent(req, '/api/proxy/recap', 429);
           return res.status(rejection.status).json(rejection.body);
@@ -3707,7 +3733,7 @@ One convention across every endpoint, so you can branch on the same fields every
 
         // Charge one free-tier unit only now that generation is guaranteed.
         if (isFreeTier && !isTestMode) {
-          const rejection = await chargeFreeTierOrReject(req.proxyUrlKey);
+          const rejection = await chargeFreeTierOrReject(req, '/api/proxy/brief');
           if (rejection) {
             keepalive.stop();
             logEvent(req, '/api/proxy/brief', 429);
@@ -3804,7 +3830,7 @@ One convention across every endpoint, so you can branch on the same fields every
       }
 
       if (isFreeTier && !isTestMode) {
-        const rejection = await chargeFreeTierOrReject(req.proxyUrlKey);
+        const rejection = await chargeFreeTierOrReject(req, '/api/proxy/brief');
         if (rejection) {
           logEvent(req, '/api/proxy/brief', 429);
           return res.status(rejection.status).json(rejection.body);
@@ -4739,7 +4765,7 @@ One convention across every endpoint, so you can branch on the same fields every
       // Charge one free-tier unit ONCE per request (not per descent hop). Charge
       // before resolveRecommendation so an exhausted user gets a clean 429.
       if (isFreeTier && !isTestMode) {
-        const rejection = await chargeFreeTierOrReject(req.proxyUrlKey);
+        const rejection = await chargeFreeTierOrReject(req, '/api/proxy/recommend-and-dispatch');
         if (rejection) {
           logEvent(req, '/api/proxy/recommend-and-dispatch', 429);
           return res.status(rejection.status).json(rejection.body);

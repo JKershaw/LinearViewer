@@ -36,6 +36,7 @@ import { deriveTerminalStatus, deriveCompletedAt } from '../lib/dispatch-termina
 import { armKeepalive } from '../lib/http-keepalive.js';
 import { createSessionsFeedCache } from '../lib/sessions-feed-cache.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
+import { hasPaidEnvKey } from '../lib/openrouter.js';
 import {
   generateRunSummary,
   parseRunSummaryResponse,
@@ -664,9 +665,9 @@ export function createDashboardRoutes({
     // Resolve the OpenRouter key: user OAuth → env (via streamChat default) → free tier.
     const sessionApiKey = req.session.openRouterApiKey;
     const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
-    const useFreeTier = !sessionApiKey && !process.env.OPENROUTER_API_KEY && !!freeTierKey;
+    const useFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
 
-    if (!sessionApiKey && !process.env.OPENROUTER_API_KEY && !freeTierKey) {
+    if (!sessionApiKey && !hasPaidEnvKey() && !freeTierKey) {
       return res.status(503).json({ error: 'AI summaries are not configured' });
     }
 
@@ -833,9 +834,9 @@ export function createDashboardRoutes({
     // Resolve the OpenRouter key: user OAuth → env (via streamChat default) → free tier.
     const sessionApiKey = req.session.openRouterApiKey;
     const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
-    const useFreeTier = !sessionApiKey && !process.env.OPENROUTER_API_KEY && !!freeTierKey;
+    const useFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
 
-    if (!sessionApiKey && !process.env.OPENROUTER_API_KEY && !freeTierKey) {
+    if (!sessionApiKey && !hasPaidEnvKey() && !freeTierKey) {
       return res.status(503).json({ error: 'AI summaries are not configured' });
     }
 
