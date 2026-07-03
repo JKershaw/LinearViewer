@@ -32,6 +32,7 @@ surface they serve; a handful of small helpers may not be listed individually.
 server.js              Express server, main entry point, dashboard routes
 routes/
   auth.js              Linear OAuth routes
+  github-auth.js       GitHub App login/binding routes (GET /auth/github, GET /auth/github/callback, POST /auth/github/link; landing + settings add-source entry points share the routes via session `mode`; LIN-541/703)
   openrouter-auth.js   OpenRouter OAuth PKCE routes
   workspace.js         Workspace management routes
   dispatch.js          Dispatch queue API (user + consumer endpoints)
@@ -83,6 +84,9 @@ lib/
   kpi-stats.js         Instance KPI aggregation (privacy boundary for public /kpis)
   pipeline-loops.js    Pipeline loop reconstruction library
   sessions-view.js     Adapts pipeline Loop records into the sessions view
+  observation-sessions-store.js     Durable store for materialized Observation session groups
+  observation-sessions-materializer.js  Materializes sessionId-grouped Observation sessions from Loop records
+  sessions-feed-cache.js  Cache for the merged cross-workspace Observation sessions feed
   roadmap.js           Roadmap deterministic layer (velocity, execution order, milestones)
   ship-layout.js       Ship view layout primitives (pure)
   swim-lanes.js        Swim lane assignment algorithm
@@ -156,6 +160,7 @@ public/
   app.js               Client-side collapse/expand, localStorage persistence
   common.js            Shared client utilities
   common-actions.css   Shared action/button styles
+  feedback-widget.js / feedback-widget.css  Floating feedback widget (save/triage/autopilot actions; wired via render-settings.js + footer.js; LIN-635/704/918)
   llms.txt             AI agent guidance (DOM selectors, navigation patterns)
   marked.min.js        Vendored Markdown renderer
   purify.min.js        Vendored DOMPurify (HTML sanitizer)
@@ -292,6 +297,30 @@ POST /auth/openrouter/disconnect → Remove stored API key
 - API key stored in session alongside Linear workspace tokens
 - Falls back to `OPENROUTER_API_KEY` env var if no OAuth connection
 
+### GitHub App (Installation)
+
+Users can log in with — or add — a GitHub source via a **GitHub App installation** flow
+(migrated from a plain OAuth App; LIN-541/703/761). `routes/github-auth.js` is its own
+multi-step router:
+
+```
+GET  /auth/github           → Redirect to the GitHub App install page (repo picker)
+GET  /auth/github/callback  → Mint an installation token from installation_id, show repo-select page
+POST /auth/github/link      → Write the binding: linkProvider(workspace, 'github', repo, creds)
+```
+
+- **Three-step flow**: install (repo picker) → callback mints an installation token → link writes the provider binding.
+- **Two entry points share the routes**: the landing "Continue with GitHub" (`mode: 'new'`) and the
+  settings "Add a source" (`mode: 'add-source'`). Intent is carried in the **session `mode`**, not the
+  OAuth `state` — both drive the same three routes.
+- App-JWT internals (installation-token mint, user-to-server OAuth exchange) live in
+  `lib/providers/github/app-auth.js`. `getMissingGitHubConfig()` there is the **single config
+  predicate** — an empty result means the flow can be started and completed — and is the shared guard
+  for both the `/auth/github` route and the settings add-source affordance.
+- **Not env vars**: `GITHUB_API_BASE`, `GITHUB_OAUTH_AUTHORIZE_URL`, and `GITHUB_OAUTH_TOKEN_URL` are
+  **hardcoded consts** in `app-auth.js` (the App migration centralized them as literals), not
+  `process.env` reads — do not document them as environment variables.
+
 ### Free Tier (Rate-Limited)
 
 When `OPENROUTER_FREE_TIER_KEY` is set, users without an OpenRouter connection get limited free prompts:
@@ -318,9 +347,18 @@ OPENROUTER_REDIRECT_URI Callback URL for OpenRouter OAuth (optional, defaults to
 OPENROUTER_FREE_TIER_KEY Server-side API key for free tier users (optional, enables rate-limited free prompts)
 FREE_TIER_DAILY_LIMIT   Per-workspace daily free-prompt limit (optional, default 20)
 FREE_TIER_HOURLY_LIMIT  Global hourly free-prompt limit across all workspaces (optional, default 50)
+GITHUB_CLIENT_ID        GitHub App user-to-server OAuth client ID (required for GitHub login/binding)
+GITHUB_CLIENT_SECRET    GitHub App user-to-server OAuth client secret (required for GitHub login/binding)
+GITHUB_APP_ID           GitHub App ID, used to sign the App JWT (required for GitHub login/binding)
+GITHUB_APP_PRIVATE_KEY  GitHub App private key (PEM), used to sign the App JWT (required for GitHub login/binding)
+GITHUB_APP_SLUG         GitHub App slug, used to build the install URL (required for GitHub login/binding)
+GITHUB_REDIRECT_URI     Callback URL for GitHub user-to-server OAuth (optional; falls back to the App's default callback when unset)
+GITHUB_PROJECTS_REDIRECT_URI  Callback URL for the github-projects provider (optional; falls back to GITHUB_REDIRECT_URI)
 YAP_BASE_URL            Yap chat server base URL for the experimental Collective live view (optional, defaults to https://yap.jkershaw.com)
 YAP_PASSWORD            Yap server password (optional, sent as Bearer auth on Yap calls)
 ```
+
+The five `GITHUB_*` required vars are the exact set in `GITHUB_REQUIRED_ENV` (`lib/providers/github/app-auth.js`); `getMissingGitHubConfig()` reports which are unset. `GITHUB_API_BASE`, `GITHUB_OAUTH_AUTHORIZE_URL`, and `GITHUB_OAUTH_TOKEN_URL` are **hardcoded consts**, not environment variables — do not add them here.
 
 ## Linear API
 
