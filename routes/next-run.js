@@ -190,8 +190,12 @@ export function createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspace
       // is fresh; getLatest already returns null on absence/error, and the lib gates
       // staleness, so suggestions degrade cleanly when there is nothing to add (LIN-742).
       const roadmapReport = reportHistoryStore ? await reportHistoryStore.getLatest(workspace.urlKey) : null;
+      // Live workspace north star (LIN-779): the session preference set/read in
+      // routes/workspace-api.js. Always-current intent — threaded so goal options can be
+      // ranked by alignment, not just delivery state. Empty when none → no-north-star path.
+      const northStar = req.session.northStarByWorkspace?.[workspace.urlKey] || '';
       const result = await generateGoalSuggestions(
-        { projects, issues, organizationName, roadmapReport },
+        { projects, issues, organizationName, roadmapReport, northStar },
         { apiKey: apiKeyToUse, model, urlKey: workspace.urlKey }
       );
       res.json(result);

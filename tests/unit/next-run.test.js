@@ -24,6 +24,7 @@ import {
   normalizeSize,
   generateGoalSuggestions,
   resolveRoadmapNarrative,
+  resolveNorthStarSignal,
   ROADMAP_REPORT_MAX_AGE_DAYS,
   CONTINUE_UNTIL_STOPPED_OPTION,
   REQUIRED_SIZES,
@@ -159,6 +160,111 @@ describe('resolveRoadmapNarrative (LIN-742)', () => {
   });
 });
 
+describe('resolveNorthStarSignal (LIN-779)', () => {
+  const NOW = Date.UTC(2026, 5, 27);
+  const iso = daysAgo => new Date(NOW - daysAgo * 86400000).toISOString();
+  const report = (overrides = {}) => ({
+    generatedAt: iso(2),
+    narrative: { northStarReading: 'On course — WIP aligns with intent.', gap: 'Auth flow lags the intent.' },
+    ...overrides,
+  });
+
+  test('returns the live north star with no report (always-current, no age)', () => {
+    const out = resolveNorthStarSignal('Ship a self-serve onboarding.', null, { now: NOW });
+    assert.equal(out.northStar, 'Ship a self-serve onboarding.');
+    assert.equal(out.reading, '');
+    assert.equal(out.gap, '');
+    assert.equal(out.ageDays, null);
+  });
+
+  test('folds reading + gap from a fresh report and dates them', () => {
+    const out = resolveNorthStarSignal('Intent text.', report(), { now: NOW });
+    assert.equal(out.northStar, 'Intent text.');
+    assert.equal(out.reading, 'On course — WIP aligns with intent.');
+    assert.equal(out.gap, 'Auth flow lags the intent.');
+    assert.equal(out.ageDays, 2);
+  });
+
+  test('drops a stale report reading but keeps the live north star', () => {
+    const out = resolveNorthStarSignal('Intent text.', report({ generatedAt: iso(ROADMAP_REPORT_MAX_AGE_DAYS + 1) }), { now: NOW });
+    assert.equal(out.northStar, 'Intent text.');
+    assert.equal(out.reading, '');
+    assert.equal(out.gap, '');
+    assert.equal(out.ageDays, null);
+  });
+
+  test('keeps a report exactly at the freshness boundary', () => {
+    const out = resolveNorthStarSignal('Intent.', report({ generatedAt: iso(ROADMAP_REPORT_MAX_AGE_DAYS) }), { now: NOW });
+    assert.equal(out.ageDays, ROADMAP_REPORT_MAX_AGE_DAYS);
+    assert.equal(out.reading, 'On course — WIP aligns with intent.');
+  });
+
+  test('ignores a future-dated report for the reading/gap but keeps the live text', () => {
+    const out = resolveNorthStarSignal('Intent.', report({ generatedAt: iso(-1) }), { now: NOW });
+    assert.equal(out.northStar, 'Intent.');
+    assert.equal(out.ageDays, null);
+    assert.equal(out.reading, '');
+  });
+
+  test('returns null for an empty / whitespace / non-string north star (path unchanged)', () => {
+    assert.equal(resolveNorthStarSignal('', report(), { now: NOW }), null);
+    assert.equal(resolveNorthStarSignal('   ', report(), { now: NOW }), null);
+    assert.equal(resolveNorthStarSignal(null, report(), { now: NOW }), null);
+    assert.equal(resolveNorthStarSignal(undefined, report(), { now: NOW }), null);
+  });
+
+  test('trims the live north star and tolerates a report with no reading/gap', () => {
+    const out = resolveNorthStarSignal('  Padded intent.  ', report({ narrative: { digest: 'only digest' } }), { now: NOW });
+    assert.equal(out.northStar, 'Padded intent.');
+    assert.equal(out.reading, '');
+    assert.equal(out.gap, '');
+    assert.equal(out.ageDays, null);
+  });
+
+  test('respects a custom maxAgeDays override', () => {
+    assert.equal(resolveNorthStarSignal('Intent.', report({ generatedAt: iso(5) }), { now: NOW, maxAgeDays: 3 }).reading, '');
+    assert.ok(resolveNorthStarSignal('Intent.', report({ generatedAt: iso(5) }), { now: NOW, maxAgeDays: 7 }).reading);
+  });
+});
+
+describe('formatNextRunContext north-star section (LIN-779)', () => {
+  const signal = (overrides = {}) => ({ northStar: 'Ship self-serve onboarding.', reading: '', gap: '', ageDays: null, ...overrides });
+
+  test('renders a standalone North star section with the live intent', () => {
+    const out = formatNextRunContext(MODEL, 'Acme', null, signal());
+    assert.match(out, /North star \(current intent\):/);
+    assert.match(out, /Ship self-serve onboarding\./);
+    // No reading/gap lines when the signal carries none.
+    assert.doesNotMatch(out, /Latest alignment reading/);
+    assert.doesNotMatch(out, /Gap to the north star/);
+  });
+
+  test('renders dated alignment reading + gap when present', () => {
+    const out = formatNextRunContext(MODEL, 'Acme', null, signal({ reading: 'On course.', gap: 'Auth lags.', ageDays: 3 }));
+    assert.match(out, /Latest alignment reading \(3 days ago\): On course\./);
+    assert.match(out, /Gap to the north star \(3 days ago\): Auth lags\./);
+  });
+
+  test('says "today" at age 0 and singularises "1 day ago"', () => {
+    assert.match(formatNextRunContext(MODEL, 'Acme', null, signal({ reading: 'r', ageDays: 0 })), /Latest alignment reading \(today\):/);
+    assert.match(formatNextRunContext(MODEL, 'Acme', null, signal({ gap: 'g', ageDays: 1 })), /Gap to the north star \(1 day ago\):/);
+  });
+
+  test('is a distinct section from the roadmap trajectory analysis (no blur)', () => {
+    const out = formatNextRunContext(MODEL, 'Acme', { text: 'Trajectory prose.', ageDays: 2 }, signal({ reading: 'r', ageDays: 2 }));
+    assert.match(out, /North star \(current intent\):/);
+    assert.match(out, /Roadmap analysis \(generated 2 days ago\):/);
+    // The north-star section appears before the roadmap analysis section.
+    assert.ok(out.indexOf('North star (current intent):') < out.indexOf('Roadmap analysis'));
+  });
+
+  test('the no-north-star output is byte-identical to omitting the argument', () => {
+    const base = formatNextRunContext(MODEL, 'Acme');
+    assert.equal(formatNextRunContext(MODEL, 'Acme', null, null), base);
+    assert.doesNotMatch(base, /North star/);
+  });
+});
+
 describe('formatNextRunContext roadmap section (LIN-742)', () => {
   test('appends a dated Roadmap analysis section when a narrative is supplied', () => {
     const out = formatNextRunContext(MODEL, 'Acme', { text: 'The north star is X.', ageDays: 3 });
@@ -184,6 +290,20 @@ describe('NEXT_RUN_SYSTEM_PROMPT size guidance (LIN-742)', () => {
     assert.match(system, /many small, straightforward, independent tasks/);
     // XL stays reserved for the auto-added open-ended option.
     assert.match(system, /XL[^]*added automatically/);
+  });
+});
+
+describe('NEXT_RUN_SYSTEM_PROMPT alignment ranking (LIN-779)', () => {
+  test('adds an alignment-ranking rule that keeps size coverage and continue-until-stopped verbatim', () => {
+    const system = buildNextRunMessages(MODEL)[0].content;
+    // The new rule references the north-star section and ranking by intent.
+    assert.match(system, /North star \(current intent\)/);
+    assert.match(system, /rank\/order your options by how much each advances that intent/);
+    // It must NOT weaken the S/M/L coverage rule…
+    assert.match(system, /does NOT relax the size-coverage rule/);
+    assert.match(system, /Provide AT LEAST ONE option for each size S, M, and L/);
+    // …nor the continue-until-stopped exclusion rule (kept verbatim).
+    assert.match(system, /Do NOT include a "continue until stopped" \/ open-ended option/);
   });
 });
 
@@ -525,5 +645,72 @@ describe('generateGoalSuggestions return shape (LIN-633)', () => {
       { apiKey: 'test-key' }
     );
     assert.doesNotMatch(result.context, /Roadmap analysis/);
+  });
+
+  test('threads a live north star into the returned context, kept byte-equal to the user message (LIN-779)', async () => {
+    const raw = JSON.stringify({ options: [{ goal: 'g', reasoning: 'r', size: 'M', title: 'T' }] });
+    let sentUserMessage = null;
+    global.fetch = mock.fn(async (_url, opts) => {
+      sentUserMessage = JSON.parse(opts.body).messages.find(m => m.role === 'user').content;
+      return mockStreamResponse(raw);
+    });
+
+    const result = await generateGoalSuggestions(
+      { projects: [], issues: [], organizationName: 'Acme', northStar: 'Ship self-serve onboarding.' },
+      { apiKey: 'test-key' }
+    );
+    // The north-star section is present in the returned context…
+    assert.match(result.context, /North star \(current intent\):/);
+    assert.match(result.context, /Ship self-serve onboarding\./);
+    // …and the displayed context == the context the model was actually given.
+    assert.equal(result.context, sentUserMessage);
+  });
+
+  test('folds a fresh report reading/gap under the north-star section (LIN-779)', async () => {
+    const raw = JSON.stringify({ options: [{ goal: 'g', reasoning: 'r', size: 'M', title: 'T' }] });
+    global.fetch = mock.fn(async () => mockStreamResponse(raw));
+
+    const report = {
+      generatedAt: new Date().toISOString(),
+      narrative: { northStarReading: 'Aligned on onboarding.', gap: 'Billing lags the intent.' },
+    };
+    const result = await generateGoalSuggestions(
+      { projects: [], issues: [], organizationName: 'Acme', northStar: 'Ship self-serve onboarding.', roadmapReport: report },
+      { apiKey: 'test-key' }
+    );
+    assert.match(result.context, /North star \(current intent\):/);
+    assert.match(result.context, /Latest alignment reading \(today\): Aligned on onboarding\./);
+    assert.match(result.context, /Gap to the north star \(today\): Billing lags the intent\./);
+  });
+
+  test('the no-north-star path stays byte-identical and preserves size coverage + continue-until-stopped (LIN-779)', async () => {
+    const raw = JSON.stringify({ options: [{ goal: 'Only M.', reasoning: 'r', size: 'M', title: 'One' }] });
+    global.fetch = mock.fn(async () => mockStreamResponse(raw));
+
+    const withoutNs = await generateGoalSuggestions(
+      { projects: [], issues: [], organizationName: 'Acme' },
+      { apiKey: 'test-key' }
+    );
+    const emptyNs = await generateGoalSuggestions(
+      { projects: [], issues: [], organizationName: 'Acme', northStar: '' },
+      { apiKey: 'test-key' }
+    );
+    // Passing an empty north star changes nothing about the grounding blob.
+    assert.equal(emptyNs.context, withoutNs.context);
+    assert.doesNotMatch(emptyNs.context, /North star/);
+
+    // Size coverage (S/M/L) intact and the continue-until-stopped option still ends the list,
+    // even with a live north star present (alignment ranking is orthogonal to both).
+    const withNs = await generateGoalSuggestions(
+      { projects: [], issues: [], organizationName: 'Acme', northStar: 'Some intent.' },
+      { apiKey: 'test-key' }
+    );
+    const concrete = withNs.options.filter(o => !o.continueUntilStopped);
+    const sizes = new Set(concrete.map(o => o.size));
+    for (const s of REQUIRED_SIZES) assert.ok(sizes.has(s), `missing size ${s}`);
+    const last = withNs.options[withNs.options.length - 1];
+    assert.equal(last.continueUntilStopped, true);
+    assert.equal(last.size, 'XL');
+    assert.equal(last.goal, '');
   });
 });
