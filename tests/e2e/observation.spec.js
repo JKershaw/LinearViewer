@@ -296,4 +296,106 @@ test.describe('Autopilot Observation page (first-class)', () => {
       await expect(pill.locator('.status-pill__warn')).toBeVisible();
     });
   });
+
+  // LIN-933: the indeterminate "livebar" shimmer — the collapsed running-row's
+  // in-flight affordance. It renders ONLY for a live (running) worker run that is
+  // not expanded, and its reduced-motion fallback is a static half-opacity FILL
+  // (not a band frozen mid-sweep). It is decorative + aria-hidden; the run's
+  // "running" state is already conveyed textually by `.obs-worker-state`.
+  test.describe('Running-collapsed livebar shimmer (LIN-933)', () => {
+    // Seed an autopilot session whose implementation worker is RUNNING: dispatch
+    // the worker under an anchor session, then claim it via the consumer take flow.
+    // A taken run with no terminal feedback reconstructs with agentState 'running'
+    // (live) — the exact state the livebar is for. Passing `terminalMarker` posts
+    // that marker so the run instead reconstructs terminal (not live).
+    async function seedSessionWorker(page, { terminalMarker = null } = {}) {
+      const anchor = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+        data: { prompt: 'orchestrate', promptName: 'autopilot', kind: 'autopilot', issueIdentifier: 'LIN-933', issueTitle: 'Livebar seed', target: 'cli' }
+      });
+      expect(anchor.status()).toBe(201);
+      const anchorId = (await anchor.json()).item.id;
+      const worker = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+        data: { prompt: 'implement', promptName: 'implementation', kind: 'implementation', issueIdentifier: 'LIN-934', issueTitle: 'Running worker', target: 'cli', sessionId: anchorId }
+      });
+      expect(worker.status(), `worker seed failed: ${await worker.text()}`).toBe(201);
+      const workerId = (await worker.json()).item.id;
+
+      const tokenResp = await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${URL_KEY}`);
+      const { token } = await tokenResp.json();
+      const take = await page.request.post(`/api/dispatch/take/${workerId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      expect(take.status(), `take failed: ${await take.text()}`).toBe(200);
+      if (terminalMarker) {
+        const fb = await page.request.post(`/api/dispatch/feedback/${workerId}`, {
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          data: { message: terminalMarker }
+        });
+        expect(fb.status(), `feedback failed: ${await fb.text()}`).toBe(200);
+      }
+    }
+
+    // Load the page, drill into the seeded session, and return the (collapsed by
+    // default) implementation worker node.
+    async function openWorker(page, seedOpts) {
+      await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+      await clearRuns(page);
+      await seedSessionWorker(page, seedOpts);
+
+      await page.goto(OBSERVATION_URL);
+      await page.waitForLoadState('networkidle');
+      const card = page.locator('.obs-session').filter({ hasText: 'Livebar seed' }).first();
+      await expect(card).toBeVisible();
+      await card.locator('.obs-disc').first().click();
+      const worker = card.locator('.obs-worker').filter({ hasText: 'implementation' }).first();
+      await expect(worker).toBeVisible();
+      return worker;
+    }
+
+    test('a running, collapsed worker shows an aria-hidden livebar; expanding hides it', async ({ page }) => {
+      const worker = await openWorker(page);
+      const livebar = worker.locator('.livebar');
+      await expect(livebar).toHaveCount(1);
+      // Decorative: the textual `.obs-worker-state` carries the "running" signal.
+      await expect(livebar).toHaveAttribute('aria-hidden', 'true');
+
+      // Expanding the worker row removes the collapsed-only affordance (mockup's
+      // `running && !open`).
+      await worker.locator('.obs-worker-head').click();
+      await expect(worker.locator('.obs-worker-body')).toBeVisible();
+      await expect(worker.locator('.livebar')).toHaveCount(0);
+    });
+
+    test('a terminal (non-live) worker shows no livebar', async ({ page }) => {
+      const worker = await openWorker(page, { terminalMarker: '[done] shipped' });
+      await expect(worker.locator('.obs-worker-state')).toHaveText('complete');
+      await expect(worker.locator('.livebar')).toHaveCount(0);
+    });
+
+    test('reduced motion renders the livebar as a static, full-width, half-opacity fill', async ({ page }) => {
+      // The enforced CI guard (pixel diffs can't reliably prove opacity/width):
+      // under reduced motion the `:after` band must stop animating and become a
+      // solid amber fill spanning the whole track at ~0.5 opacity — beating the
+      // global freezer, which only stalls the animation and can leave the 38%
+      // band frozen off-centre.
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      const worker = await openWorker(page);
+      const livebar = worker.locator('.livebar');
+      await expect(livebar).toHaveCount(1);
+
+      const style = await livebar.evaluate((el) => {
+        const after = getComputedStyle(el, '::after');
+        return {
+          animationName: after.animationName,
+          opacity: after.opacity,
+          afterWidth: parseFloat(after.width),
+          hostWidth: el.clientWidth,
+        };
+      });
+      expect(style.animationName).toBe('none');
+      expect(style.opacity).toBe('0.5');
+      // Full-width fill, not the 38% animated band.
+      expect(style.afterWidth).toBeGreaterThan(style.hostWidth * 0.9);
+    });
+  });
 });

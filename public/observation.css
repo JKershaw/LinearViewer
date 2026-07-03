@@ -638,6 +638,46 @@ a.obs-task-ident:hover { text-decoration: underline; }
 .obs-worker-state[data-state="running"] { color: var(--amber-dim); }
 .obs-worker-state[data-state="queued"] { color: var(--slate-dim); }
 
+/* Indeterminate "livebar" — the collapsed running-row affordance (LIN-933;
+   theme §7/§9, observation-design §5). A 38% amber band sweeps an overflow-
+   clipped track via the shared `shimmer` keyframe (style.css). Rendered only
+   for a running run that is NOT expanded (observation.js:renderWorkerNode);
+   it is decorative + aria-hidden because `.obs-worker-state` already conveys
+   "running" textually (theme §5: colour/motion is never the sole signal). This
+   is the unknown-total in-flight affordance — NOT the always-known-total
+   `.segment-bar`/`.obs-progress` bar, which stays untouched. */
+.livebar {
+  height: 4px;
+  margin-top: 0.25rem;
+  border-radius: var(--radius-sm);
+  background: var(--raised);
+  overflow: hidden;
+  position: relative;
+}
+.livebar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 38%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, var(--amber), transparent);
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+/* §7 reduced-motion: a STATIC half-opacity FILL, not a band frozen mid-sweep.
+   The global freezer (style.css) only neutralizes `animation`, which can leave
+   the 38% band stalled off-centre; this rule additionally forces full width +
+   solid amber at .5 opacity (properties the global rule never touches), so the
+   fallback lands deterministically. */
+@media (prefers-reduced-motion: reduce) {
+  .livebar::after {
+    animation: none;
+    transform: none;
+    width: 100%;
+    background: var(--amber);
+    opacity: 0.5;
+  }
+}
+
 /* Bordered rounded metric chips (runtime / tools / links) — mockup treatment. */
 .obs-chips-metric { display: inline-flex; gap: 0.3rem; flex-wrap: wrap; margin-top: 0.1rem; }
 .obs-chip-metric {
