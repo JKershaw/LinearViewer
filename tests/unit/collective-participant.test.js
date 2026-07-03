@@ -49,6 +49,30 @@ describe('buildCollectiveParticipantPrompt', () => {
     assert.ok(text.includes('docs/collective-session-'));
   });
 
+  test('grounds in the live system first (tracker + git log before docs)', () => {
+    const text = buildCollectiveParticipantPrompt(BASE);
+    assert.ok(/live system first/i.test(text));
+    assert.ok(/live tracker/i.test(text));
+    assert.ok(/git log/i.test(text));
+    // The live-system ordering must come before the docs / meeting-notes step.
+    assert.ok(text.indexOf('live tracker') < text.indexOf('docs/collective-session-'));
+  });
+
+  test('asserts the running system wins over docs on disagreement', () => {
+    const text = buildCollectiveParticipantPrompt(BASE);
+    assert.ok(/the system wins/i.test(text));
+  });
+
+  test('requires verifying the workspace token on the first message', () => {
+    const text = buildCollectiveParticipantPrompt(BASE);
+    assert.ok(/verify it works on your very first message/i.test(text));
+  });
+
+  test('sharpens the discipline to cite real code/tickets by id', () => {
+    const text = buildCollectiveParticipantPrompt(BASE);
+    assert.ok(/cite the real thing by id/i.test(text));
+  });
+
   test('defaults the topic to the June topic', () => {
     const text = buildCollectiveParticipantPrompt(BASE);
     assert.ok(text.includes(DEFAULT_COLLECTIVE_TOPIC));
