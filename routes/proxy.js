@@ -1997,10 +1997,10 @@ One convention across every endpoint, so you can branch on the same fields every
   router.post('/api/proxy/issues', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
       const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey);
-      if (denyIfUnsupported(provider, 'createIssue', req, res, '/api/proxy/issues')) return;
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues', reason);
       }
+      if (denyIfUnsupported(provider, 'createIssue', req, res, '/api/proxy/issues')) return;
 
       const { teamId, title, description, projectId, stateId, assigneeId, priority, parentId, cycleId } = req.body;
 
@@ -2088,10 +2088,10 @@ One convention across every endpoint, so you can branch on the same fields every
   router.patch('/api/proxy/issues/:issueId', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
       const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey);
-      if (denyIfUnsupported(provider, 'updateIssue', req, res, '/api/proxy/issues/:id')) return;
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/:id', reason);
       }
+      if (denyIfUnsupported(provider, 'updateIssue', req, res, '/api/proxy/issues/:id')) return;
 
       const { issueId } = req.params;
       if (!isValidIssueId(issueId)) {
@@ -2180,10 +2180,10 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   async function applyDescriptionEdit(req, res, endpoint, merge) {
     const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey);
-    if (denyIfUnsupported(provider, 'updateIssue', req, res, endpoint)) return;
     if (!token) {
       return workspaceUnavailable(req, res, endpoint, reason);
     }
+    if (denyIfUnsupported(provider, 'updateIssue', req, res, endpoint)) return;
 
     const { issueId } = req.params;
     if (!isValidIssueId(issueId)) {
@@ -2295,10 +2295,10 @@ One convention across every endpoint, so you can branch on the same fields every
   router.post(['/api/proxy/issues/:issueId/comments', '/api/proxy/comments/:issueId'], proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
       const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey);
-      if (denyIfUnsupported(provider, 'createComment', req, res, '/api/proxy/issues/comments')) return;
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/comments', reason);
       }
+      if (denyIfUnsupported(provider, 'createComment', req, res, '/api/proxy/issues/comments')) return;
 
       const { issueId } = req.params;
       if (!isValidIssueId(issueId)) {
@@ -2384,6 +2384,9 @@ One convention across every endpoint, so you can branch on the same fields every
     const endpoint = '/api/proxy/issues/:id/attachments';
     try {
       const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey);
+      if (!token) {
+        return workspaceUnavailable(req, res, endpoint, reason);
+      }
       if (denyIfUnsupported(provider, 'uploadFile', req, res, endpoint)) return;
 
       const { image, target, body } = req.body || {};
@@ -2394,10 +2397,6 @@ One convention across every endpoint, so you can branch on the same fields every
       const resolvedTarget = target || 'comment';
       const writeCapability = resolvedTarget === 'description' ? 'updateIssue' : 'createComment';
       if (denyIfUnsupported(provider, writeCapability, req, res, endpoint)) return;
-
-      if (!token) {
-        return workspaceUnavailable(req, res, endpoint, reason);
-      }
 
       const { issueId } = req.params;
       if (!isValidIssueId(issueId)) {
@@ -2488,10 +2487,10 @@ One convention across every endpoint, so you can branch on the same fields every
   router.post('/api/proxy/issues/:issueId/relations', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
       const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey);
-      if (denyIfUnsupported(provider, 'createRelation', req, res, '/api/proxy/issues/relations')) return;
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/relations', reason);
       }
+      if (denyIfUnsupported(provider, 'createRelation', req, res, '/api/proxy/issues/relations')) return;
 
       const { issueId } = req.params;
       if (!isValidIssueId(issueId)) {
@@ -2537,10 +2536,10 @@ One convention across every endpoint, so you can branch on the same fields every
   router.delete('/api/proxy/issues/:issueId/relations/:relationId', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
       const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey);
-      if (denyIfUnsupported(provider, 'deleteRelation', req, res, '/api/proxy/issues/relations')) return;
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/relations', reason);
       }
+      if (denyIfUnsupported(provider, 'deleteRelation', req, res, '/api/proxy/issues/relations')) return;
 
       const { issueId, relationId } = req.params;
       if (!isValidIssueId(issueId)) {
@@ -2576,10 +2575,10 @@ One convention across every endpoint, so you can branch on the same fields every
   router.post('/api/proxy/issues/:issueId/labels', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
       const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey);
-      if (denyIfUnsupported(provider, 'addLabel', req, res, '/api/proxy/issues/labels')) return;
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/labels', reason);
       }
+      if (denyIfUnsupported(provider, 'addLabel', req, res, '/api/proxy/issues/labels')) return;
 
       const { issueId } = req.params;
       if (!isValidIssueId(issueId)) {
@@ -2636,10 +2635,10 @@ One convention across every endpoint, so you can branch on the same fields every
   router.delete('/api/proxy/issues/:issueId/labels/:labelId', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
       const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey);
-      if (denyIfUnsupported(provider, 'removeLabel', req, res, '/api/proxy/issues/labels')) return;
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/labels', reason);
       }
+      if (denyIfUnsupported(provider, 'removeLabel', req, res, '/api/proxy/issues/labels')) return;
 
       const { issueId, labelId } = req.params;
       if (!isValidIssueId(issueId)) {
