@@ -218,9 +218,9 @@ cleanup for its own sake.
 There is exactly **one class where you close on completion rather than at a later orient**: a **child
 autopilot** (see *Dispatching a child autopilot* below) whose terminal report you have **judged**. It is
 the one session where close-when-done doesn't fight any of the guards above — it is not a
-maybe-interactive or human-continued session, no in-session follow-up is expected of it (you dispatch the
-*next* child serially, fresh), and once you've judged its report and advanced there is nothing left in
-that window to resume. So there, and only there, the close is not a *later* act: right after judge-and-advance,
+maybe-interactive or human-continued session, no in-session follow-up is expected of it (each child is
+its own fresh dispatch, not a warm session you feed beats), and once you've judged its report and
+advanced there is nothing left in that window to resume. So there, and only there, the close is not a *later* act: right after judge-and-advance,
 reap it on the same `abort: true`/`abortTo` wire (naming the **child's** session id). This narrows the
 never-on-completion default for that single case; it does not touch it for **workers**, maybe-interactive
 sessions, or human-continued ones — those still leave open, and a `[pending]`/`blocked`/`failed` child
@@ -343,7 +343,11 @@ The mechanism is the same push substrate as a subscribed orchestrator above, poi
 - **Then stand by — don't poll.** Because you dispatched it `subscription: 'everything'`, the child's terminal
   (or `[pending]`) boundary wakes *you* automatically, up-chain, exactly the way a subscribed worker's
   outcome reaches you. No watch loop, no long-poll; the liveness probe for a child gone truly silent is
-  the only exception, same as any subscribed child.
+  the only exception, same as any subscribed child. With several children live at once, that probe is
+  **per child**: each outstanding child carries its own ~30-minute liveness clock, so a child silent that
+  long with no wake gets a one-line `followUpTo` liveness nudge and a fresh re-dispatch if it can't
+  resume — nudged or failed on its **own** timer, so a single wedged child never freezes the siblings or
+  the batch. Never promote that per-child probe into a standing poll.
 - **Judge its report on evidence and advance.** When the wake lands, cross-check the task's real
   artifact the way you'd check any completion — the child's "done" is still a pointer to *go and look*,
   never a certificate. A clean complete → the next task; a `[pending]`/`blocked`/`failed`, or evidence
@@ -354,27 +358,36 @@ The mechanism is the same push substrate as a subscribed orchestrator above, poi
   runner owns liveness and flips the session terminal-cancelled). Nothing auto-closes on a timer, and you
   do this only for a *judged-terminal* child — a `[pending]`/`blocked`/`failed` child stays open until it
   resolves. This is the one place close-on-completion is right (see *Closing a session, once it's truly
-  spent*): a judged-terminal child has no in-session follow-up and the next child is dispatched fresh.
+  spent*): a judged-terminal child has no in-session follow-up, and because each child is its own fresh
+  dispatch you close each the moment *it* is judged terminal — independent of any sibling still live in
+  the set.
 
-Two shapes call for this, and both are **serial** for now — one child at a time, dispatched only after
-the last has reported and been judged:
+Two shapes call for this. You **fan the independent children out concurrently** and hold the whole live
+set at your altitude — you do **not** wait for one child to report before dispatching the next:
 
 - **An epic, or several independent tasks.** You sit above the set and dispatch one child autopilot per
-  task, holding only the cross-task altitude while each child carries its own task's context. You keep
-  task *headers*, not task *detail*; the child holds the detail. Each child holds one concrete task, so
-  each is dispatched `variant: 'stepper'`. If instead one of those "tasks" turns out to be a set/epic in
-  its own right, it is not a stepper child — dispatch it `variant: 'standard'` so it coordinates its own
-  children.
+  task, holding only the cross-task altitude while each child carries its own task's context. Dispatch
+  every **independent** task's child **up front** — they run in parallel, each an independent up-chain
+  wake edge, and you fan **in** by judging each child's terminal report as its own wake arrives. There is
+  no batch barrier: the substrate already de-couples siblings, so one child's outcome never waits on
+  another's, and a stalled or wedged child never suppresses its siblings' fan-in. Where one task
+  **waits-on** another, capture the `blocks`/`blocked-by` edge from the relations so the dependency is
+  legible, then **hold that child back** and dispatch it only once its blocker's terminal wake has landed
+  and been **judged clean** — a blocker that ends `[failed]`/`blocked` and can't clear is handed back to
+  the human and its dependents stay pending (never dispatched into a known-broken precondition), while the
+  **independent** siblings carry on regardless. You keep task *headers*, not task *detail*; the child
+  holds the detail. Each child holds one concrete task, so each is dispatched `variant: 'stepper'`. If
+  instead one of those "tasks" turns out to be a set/epic in its own right, it is not a stepper child —
+  dispatch it `variant: 'standard'` so it coordinates its own children.
 - **A blocking bug found mid-task.** A run driving one task can hit a bug that blocks it. Rather than
   dropping down to fix it inline — which would leave your altitude — file the bug as its own ticket,
   capture the `blocks`/`blocked-by` relationship so the dependency is legible, and dispatch a child
   autopilot for it. The bug ticket is itself a single task, so dispatch it `variant: 'stepper'`. Stand by
   for its report, then resume the blocked task once the bug is cleared (or hand back if it can't be).
 
-Keep it to that. Running children **in parallel** (2A/2B/2C at once, joined on "waits-on"), nesting the
-child's branch under yours on the **Observation** page, and children *talking* to each other or back to
-you mid-flight are deliberately **not** built yet — they're filed as LIN-874, LIN-875, and LIN-876.
-Until they land, one child at a time, the child surfaces as its own top-level session, and the only
+Keep it to that. Nesting the child's branch under yours on the **Observation** page, and children
+*talking* to each other or back to you mid-flight are deliberately **not** built yet — they're filed as
+LIN-875 and LIN-876. Until they land, each child surfaces as its own top-level session and the only
 conversation is the single up-chain report. Reaching past that isn't initiative — it's building an
 unbuilt feature freehand, which is exactly the drop this seat is here to avoid.
 
