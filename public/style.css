@@ -299,9 +299,13 @@ body {
   50% { opacity: 0.45; }
 }
 
+/* Indeterminate shimmer: a narrow bright band swept across an overflow-clipped
+   track (theme §7 — "38% band sweeping a track, 1.4s"). Consumers clip a ~38%
+   `:after` band and translate it with this keyframe (see `.livebar`, LIN-933);
+   the translateX form (not background-position) is what yields the spec band. */
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% { transform: translateX(-110%); }
+  100% { transform: translateX(360%); }
 }
 
 :focus-visible {

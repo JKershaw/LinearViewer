@@ -641,6 +641,12 @@ function renderWorkerNode(run) {
   // "attempt N" — no third vocabulary term, just a friendlier label for the count.
   const attempt = run.iteration != null
     ? `<span class="obs-worker-attempt">attempt ${escapeHtml(String(run.iteration))}</span>` : '';
+  // Indeterminate "livebar" shimmer (LIN-933): the collapsed running-row's
+  // in-flight affordance (mockup's `running && !open`). Decorative + aria-hidden
+  // — the run's state is already conveyed textually by `.obs-worker-state`. Only
+  // for the unknown-total live state, never the always-known-total progress bar.
+  const livebar = (m.live && !expanded)
+    ? '<div class="livebar" aria-hidden="true"></div>' : '';
   // Phase-timeline rail node: a status glyph anchored on the connector rail. The
   // run's textual state sits on the right of the phase line, so the node's colour
   // is never the sole signal.
@@ -654,6 +660,7 @@ function renderWorkerNode(run) {
             ${attempt}
             <span class="obs-worker-state" data-state="${escapeHtml(m.state)}">${escapeHtml(m.label)}</span>
           </span>
+          ${livebar}
           ${renderRecapLine(run)}
           ${renderChips(run)}
         </span>
