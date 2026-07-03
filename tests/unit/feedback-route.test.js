@@ -139,6 +139,34 @@ describe('feedback submit (LIN-635)', () => {
     assert.strictEqual(dispatch.items.length, 0);
   });
 
+  test('persists a triage-friendly origin marker in the saved description (LIN-947)', async () => {
+    const { provider, calls } = makeFakeProvider();
+    const dispatch = capturingDispatchStore();
+    const app = buildApp({ provider, dispatchQueueStore: dispatch, proxyTokenStore: fakeProxyTokenStore() });
+
+    const { status } = await submit(app, 'acme', {
+      message: 'The swipe view jumps on mobile',
+      url: 'https://app/workspace/acme/swipe',
+      userAgent: 'Mozilla/5.0 (iPhone)'
+    });
+
+    assert.strictEqual(status, 201);
+    const { description } = calls.createIssue[0];
+
+    // The stored ticket announces itself as raw, un-triaged feedback whose
+    // natural next step is triage — the deterministic marker that activates the
+    // meta-prompt's triage routing.
+    assert.match(description, /Origin — raw feedback \(triage first\)/);
+    assert.match(description, /natural next step is \*\*triage\*\*/);
+    assert.match(description, /filed directly from the in-app feedback widget/);
+
+    // ...and it is strictly ADDITIVE — the user message, page, and browser
+    // capture are all still present, unchanged.
+    assert.match(description, /The swipe view jumps on mobile/);
+    assert.match(description, /\/workspace\/acme\/swipe/);
+    assert.match(description, /iPhone/);
+  });
+
   test('enqueues triage with proxy details when feedbackTriage is on (LIN-733)', async () => {
     const { provider } = makeFakeProvider();
     const dispatch = capturingDispatchStore();
