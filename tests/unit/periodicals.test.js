@@ -188,6 +188,40 @@ describe('Test Coverage Gap Review specifics', () => {
     assert.doesNotMatch(prompt, /free-tier-store/);
     assert.doesNotMatch(prompt, /openrouter/i);
   });
+
+  // LIN-701: the remit widened from coverage-only to coverage AND reliability,
+  // with a capability-gated, discovery-style CI/CD instruction. These pins stop
+  // it regressing to a coverage-percentage-only review.
+  test('widens the remit to coverage AND reliability (not coverage alone)', () => {
+    assert.match(prompt, /reliability/i);
+    // The two dimensions are named together as the remit, not coverage solo.
+    assert.match(prompt, /coverage AND reliability/i);
+  });
+
+  test('carries a capability-gated, discovery-style CI/CD reliability instruction', () => {
+    // Reliability is discovered from CI/CD history/output when reachable...
+    assert.match(prompt, /continuous-integration|CI\/CD/i);
+    assert.match(prompt, /reachable/i);
+    assert.match(prompt, /discover/i);
+    // ...and its absence is an explicit, allowed outcome — fall back to coverage-only.
+    assert.match(prompt, /not reachable/i);
+    assert.match(prompt, /coverage-only/i);
+  });
+
+  test('frames reliability signal as discoverable examples, not an exhaustive/structured list', () => {
+    assert.match(prompt, /flaky/i);
+    assert.match(prompt, /re-run|retry/i);
+    // Examples, explicitly not exhaustive, and not an overstated structured surface.
+    assert.match(prompt, /not an exhaustive list/i);
+    assert.match(prompt, /structured/i);
+  });
+
+  test('carves out sibling territory so CI signal is not double-attributed', () => {
+    assert.match(prompt, /Stability Review/);
+    assert.match(prompt, /Recent Headwinds/);
+    assert.match(prompt, /Dependency & Supply-Chain Review/);
+    assert.match(prompt, /double-flag|re-attribute|double-attribute/i);
+  });
 });
 
 describe('Security Review specifics', () => {
