@@ -11,7 +11,7 @@
 ## Navigation
 
 - **Workspace selector**: `workspace: {name}` in nav bar - click to switch
-- **View switcher**: `.nav-views` row in the sticky header - switch between views (observation/swipe/swim/settings + flag-gated roadmap/dispatch/proxy); reachable without scrolling on mobile
+- **View switcher**: `.nav-views` row in the header - switch between views (observation/swipe/swim/settings + flag-gated roadmap/dispatch/proxy); at the top of the page, reachable without scrolling on mobile
 - **Team filter**: `team: {name}` in nav bar - filter issues by team
 - **Expand/collapse**: Click task row or ▶/▼ arrow
 - **Project collapse**: Click project header
@@ -109,7 +109,7 @@ Both In Progress and Projects sections use the same nested structure:
 - `#workspace-options` - workspace dropdown panel
 - `#team-options` - team dropdown panel
 - `[data-team="{id}"]` - team filter option (use "all" for all teams)
-- `.nav-views` - header-level cross-view switcher row (LIN-978); single scrolling row, sticky at the top of every workspace page
+- `.nav-views` - header-level cross-view switcher row (LIN-978); single scrolling row at the top of every workspace page
 - `[data-testid="nav-view-{name}"]` - a view-switcher link by its visible text (e.g. `observation`, `swipe`, `swim`, `settings`, and the flag-gated `roadmap`/`dispatch`/`proxy`); the active view renders as a `<strong class="nav-view-current">` instead of an `<a>`. First-class views always show; power-user views only with their per-user flag; experimental views are never here (Settings-only)
 
 ### Footer Selectors

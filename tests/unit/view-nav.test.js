@@ -136,9 +136,13 @@ test('style.css lays the switcher out as a single non-wrapping scrolling row', (
   assert.match(block, /white-space:\s*nowrap/);
 });
 
-test('style.css gives the nav bar a sticky header treatment (ported from obs-appbar)', () => {
+test('the shared nav is NOT position:sticky (avoids intercepting clicks under it)', () => {
+  // A sticky header overlays scrolled content and steals pointer events from
+  // controls beneath it (it broke ship-orientation), so the shared nav stays in
+  // normal flow. The switcher is reachable at the top without scrolling instead.
   const css = readFileSync(STYLE_CSS, 'utf8');
-  const block = css.slice(css.indexOf('.nav-bar {'), css.indexOf('.nav-filters {'));
-  assert.match(block, /position:\s*sticky/);
-  assert.match(block, /backdrop-filter:\s*blur/);
+  const block = css.slice(css.indexOf('.nav-bar {'), css.indexOf('/* Header-level view switcher'));
+  // A real declaration ends with a semicolon; the explanatory comment mentions
+  // the words `position: sticky` (in backticks, no semicolon) and must not trip.
+  assert.doesNotMatch(block, /position:\s*sticky;/);
 });

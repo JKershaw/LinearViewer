@@ -358,19 +358,15 @@ h1 {
   margin-bottom: var(--space-3);
   flex-wrap: wrap;
   gap: var(--space-2) 2ch;
-  /* Sticky/translucent header treatment (LIN-978), ported from the retired
-     observation `.obs-appbar` so cross-view nav stays reachable from the header
-     while scrolling, on every page — not just observation. Solid --bg fallback
-     for engines without color-mix; translucent + blur where supported. Padded
-     so the translucent band covers content scrolling under it. */
-  position: sticky;
-  top: 0;
-  z-index: 20;
+  /* Header nav carrying the view switcher (LIN-978). It leads every workspace
+     page, so cross-view navigation is reachable from the top without scrolling
+     to the footer (the audit's Finding 1). Deliberately NOT `position: sticky`:
+     a sticky header that overlays scrolled content intercepts pointer events on
+     controls scrolled beneath it (it broke the ship-orientation mode toggle),
+     so the shared nav stays in normal flow. Re-introducing the obs-appbar's
+     sticky/translucent feel globally needs per-interaction scroll-margin work
+     and is deferred. */
   padding: var(--space-2) 0;
-  background: var(--bg);
-  background: color-mix(in srgb, var(--bg) 88%, transparent);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
 }
 
 /* Header-level view switcher (LIN-978). Its own full-width row inside the nav
