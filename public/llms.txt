@@ -331,6 +331,18 @@ main.task-chat-page[data-url-key]      - page container
 - `POST /workspace/{urlKey}/api/task-chat/{issueId}` — SSE stream; body `{ question, history[] }`. Events: `token` (`{ token }`), `done`, `error`. Issue IDs accept identifiers like `LIN-123`.
 - `window.__TASK_CHAT_DATA__` carries `{ urlKey }`.
 
+## Flight Companion (experimental)
+
+The Flight Companion page (`/workspace/{urlKey}/flight-companion`) is a prototype for LIN-751 ("realtime chat with work in flight"). It surfaces a copyable kickoff prompt (`lib/prompts/flight-companion-kickoff.js`) that you paste into a real Claude Code session with a `readWrite` proxy token — the session stands in for the model, its curls are its tools, and it acts as a friendly companion that monitors the dispatch feedback stream (`GET /api/proxy/dispatch?status=taken` + `GET /api/proxy/dispatch/{id}`, NOT the browser-cookie observation endpoints) and proposes actions for your approval before dispatching. Requires the per-user `flightCompanion` feature flag; reached only via a link in Settings. Static stub — the only client behaviour is copy-to-clipboard.
+
+### Flight Companion DOM Structure
+```
+main.flight-companion-page[data-url-key]  - page container
+  #flight-companion-prompt                - the kickoff prompt (pre, copyable)
+  #flight-companion-copy                  - copy-to-clipboard button
+  #flight-companion-copy-feedback         - copy status text
+```
+
 ## Common Workflows
 
 1. **Find in-progress tasks**: Look in "In Progress" section at top (displays as tree with subtasks)
