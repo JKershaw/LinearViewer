@@ -469,6 +469,11 @@ function renderSessionBody(body, s) {
 function renderObjective(s) {
   const objective = s.seedTitle && String(s.seedTitle).trim();
   if (!objective) return '';
+  // Never reprint the id (design §4 id-once): server-side `seedTitle` can fall
+  // back to `seedIssue` (the identifier) when no title exists anywhere, which
+  // would render `objective LIN-744`. Mirror the header's `showName` guard and
+  // drop the objective entirely in that fallback case (LIN-931).
+  if (s.seedIssue && objective === String(s.seedIssue).trim()) return '';
   return `<p class="obs-objective"><span class="obs-body-lbl">objective</span> ${escapeHtml(objective)}</p>`;
 }
 
@@ -1095,5 +1100,5 @@ document.addEventListener('DOMContentLoaded', init);
 // pure presentation helpers so the §6.3/§6.4 fidelity rules can be unit-tested
 // without a DOM. Not part of the page's runtime contract.
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { renderActivityLog, renderArtifacts, classifyArtifact };
+  module.exports = { renderActivityLog, renderArtifacts, classifyArtifact, renderObjective };
 }
