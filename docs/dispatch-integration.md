@@ -206,8 +206,9 @@ entry whose `message` begins with one of these markers (case-insensitive):
 | `[complete]` | `done` | Alias for `[done]` |
 | `[failed]` | `failed` | Work could not be completed |
 | `[aborted]` | `aborted` | Run was abandoned (e.g. no live session to resume) |
+| `[skipped]` | `skipped` | A cascade abort was **refused** because a human is still in the session — terminal-**benign** (the session is still live), NOT a close. See [Cascade close](#cascade-close-closing-a-session-subtree) |
 
-For example, a final feedback `message` of `"[done] Landed the fix in PR #42"` marks the
+`[skipped]` is terminal but **benign and distinct from `[aborted]`**: it means nothing ended, so a watcher must **not** treat it as a failure, must **not** retry it, and it does **not** wake an up-chain parent. For example, a final feedback `message` of `"[done] Landed the fix in PR #42"` marks the
 item `done`. Until such a marker is posted the item reads as `taken`. Watchers (the proxy
 watch/list endpoints and the dashboard Loop feed) read this derived status so they can poll
 a field instead of parsing prose — so always end a run with exactly one terminal marker.
@@ -276,9 +277,10 @@ and is the recommended pattern for any consumer that posts foreman status.
 | `target` | string | Dispatch target: `"cli"` (default), `"web"`, `"dash"`, or `"local"`. See [Target Routing](#target-routing) |
 | `repo` | string | Repository hint (e.g. `"owner/name"`) for the consumer to operate in, or `null` (nullable) |
 | `followUpTo` | string | The `id` of an earlier dispatch whose session this item should resume, or `null`. See [Follow-ups](#follow-ups) (nullable) |
-| `force` | boolean | When `true` on a follow-up, the consumer should **override its active-session guard** and resume even a wedged/sleeping session. Defaults to `false`; only meaningful alongside `followUpTo`. See [Follow-ups](#follow-ups) |
+| `force` | boolean | When `true`, the consumer should **override a runner-side guard**: on a follow-up it resumes even a wedged/sleeping session; on a single abort it force-closes even a human-continued session. Defaults to `false`; meaningful only alongside `followUpTo` **or** a single `abort`, and never with `cascade`. See [Follow-ups](#follow-ups) / [Cascade close](#cascade-close-closing-a-session-subtree) |
 | `abort` | boolean | When `true`, this item asks the consumer to cancel/close an existing session (named by `abortTo`) instead of running a prompt. Defaults to `false`. See [Aborting a session](#aborting-a-session) |
 | `abortTo` | string | The `id` of the dispatch whose session should be aborted, or `null`. Required when `abort` is `true`. See [Aborting a session](#aborting-a-session) (nullable) |
+| `cascade` | boolean | When `true` on an abort, `abortTo` names a subtree **root** and Harbour expands the call into one abort per descendant session. Defaults to `false`; requires `abort`, mutually exclusive with `force`. See [Cascade close](#cascade-close-closing-a-session-subtree) |
 | `sessionId` | string | The `id` of the autopilot dispatch that spawned this worker, or `null`. Groups worker dispatches into one autopilot session (any target). See [Autopilot sessions](#autopilot-sessions) (nullable) |
 | `waitForFollowUps` | boolean | Opt-in completion hold (default `false`). When `true`, the consumer should hold the session open at completion to receive in-session follow-ups instead of finalizing. See [Completion hold](#completion-hold-waitforfollowups). |
 | `workspace.urlKey` | string | Workspace identifier |
@@ -385,6 +387,56 @@ curl -s -X POST "$BASE/api/proxy/dispatch" \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d "{\"abort\": true, \"abortTo\": \"$ORIG\"}"
 ```
+
+### Cascade close (closing a session subtree)
+
+A plain abort closes exactly one session. A **cascade** closes a whole session subtree in
+one call — the root session **plus** every worker and child-autopilot descended from it.
+It is a boolean modifier on an abort:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `cascade` | boolean | No (default `false`) | When `true`, `abortTo` names the **root** session of a subtree. Harbour deterministically walks the descendant `sessionId`-tree and emits one ordinary abort per discovered session. Requires `abort: true`; mutually exclusive with `force`. |
+
+Harbour owns the walk (the lineage lives only in its store); the **consumer** still executes
+each cancel exactly as for a plain single abort. A cascade request returns the expanded set
+rather than a single queued item:
+
+```json
+{ "success": true, "cascade": true,
+  "closed": [ { "id": "<abort-item-id>", "abortTo": "<session-id>", "target": "cli" }, ... ],
+  "count": 3 }
+```
+
+**Rules and constraints:**
+
+- **`abort` is required.** `cascade: true` without `abort: true` is rejected (`400`). The
+  root's own `abortTo` must be a well-formed UUID like any abort.
+- **The emitted aborts are ordinary and plain.** Each carries `abort`/`abortTo` and the
+  inherited `target`, but **no** `prompt`, **no** `sessionId`, and **no** `force` — so a
+  consumer that only understands single aborts handles them unchanged.
+- **Human-continued sessions are skipped, not closed.** When a plain cascade abort targets a
+  session a human has continued, the consumer must **refuse** the cancel and post a distinct
+  terminal-benign marker `[skipped] human-continued session <id> (<phase>).` instead of
+  `[aborted]`. A `[skipped]` is terminal but benign: the session is still live — do **not**
+  retry it, do **not** treat it as `[aborted]`, and do **not** wake an up-chain parent.
+- **`force` is the deliberate override, and only on a single abort.** To close a
+  human-continued session on purpose, send a **single** targeted abort with `force: true`
+  (not a cascade). `force` + `cascade` together is rejected (`400`) — a cascade always emits
+  plain, unforced aborts.
+- **Idempotent.** Aborting an already-terminal/reaped session is a safe no-op; re-issuing a
+  cascade re-emits harmless aborts.
+
+```bash
+# Close a whole autopilot session subtree by its ROOT session id.
+curl -s -X POST "$BASE/api/proxy/dispatch" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d "{\"abort\": true, \"abortTo\": \"$ROOT_SESSION_ID\", \"cascade\": true}"
+```
+
+> **Mechanism only (not yet auto-triggered).** This capability ships available but INERT:
+> no autopilot disposition issues a cascade at end-of-run yet — that end-of-run trigger is a
+> separate, human-gated step. A consumer/operator can call it explicitly today.
 
 ## Autopilot sessions
 
