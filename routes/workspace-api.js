@@ -2073,16 +2073,35 @@ ${goal}`
   // send, which still honours the per-user `feedbackTriage` flag.
   const FEEDBACK_ACTIONS = new Set(['save', 'triage', 'autopilot']);
 
+  // Shared framing core: a widget-filed feedback ticket is a raw, un-triaged user
+  // report, not a scoped task (LIN-918 / LIN-947). Both the persisted description
+  // marker (LIN-947, stored ON the ticket) and the autopilot kickoff note (LIN-918,
+  // injected into a run) build on this one sentence so the "raw feedback" framing
+  // cannot drift apart between the two surfaces.
+  const FEEDBACK_ORIGIN_FRAMING =
+    'this ticket was filed directly from the in-app feedback widget, so it is an ' +
+    'unfiltered user report, not a triaged or scoped task';
+
   // Feedback-origin brief injected into a feedback → autopilot kickoff (LIN-918).
   // `buildAutopilotKickoff` pins the goal for a scoped run and ignores `goal`, so
   // this framing is threaded in via the dedicated `originNote` seam. It tells the
   // run the ticket is a raw, un-triaged user report whose first job is understanding.
   const FEEDBACK_AUTOPILOT_ORIGIN_NOTE =
-    '**Origin — raw feedback:** this ticket was filed directly from the in-app feedback widget, ' +
-    'so it is an unfiltered user report, not a triaged or scoped task. Before driving toward a fix, ' +
+    `**Origin — raw feedback:** ${FEEDBACK_ORIGIN_FRAMING}. Before driving toward a fix, ` +
     'your first job is to *understand* it: read the report closely, reproduce or ground the problem ' +
     'against the current code, and work out what is actually being asked. Treat the description as a ' +
     'starting hypothesis, not a specification.';
+
+  // Persisted origin/triage marker written into every widget-filed feedback
+  // description (LIN-947). Unlike FEEDBACK_AUTOPILOT_ORIGIN_NOTE — which is only
+  // threaded into an autopilot run — this is stored ON the ticket, so the
+  // meta-prompt's next-action scorer sees the "raw, un-triaged" signal and routes
+  // to `triage` (sort intent, confirm priority, scope) instead of skipping ahead
+  // to look-into/research/implement on a report that only looks intentional.
+  const FEEDBACK_ORIGIN_TRIAGE_MARKER =
+    `**Origin — raw feedback (triage first):** ${FEEDBACK_ORIGIN_FRAMING}. ` +
+    'Its natural next step is **triage**: work out what is actually being asked, ' +
+    'confirm the real priority, and scope it before any research or implementation.';
 
   // Clamp an incoming priority to Linear's 0-4 scale (0 = none … 4 = low);
   // anything else falls back to 0 ("No priority").
@@ -2297,6 +2316,13 @@ ${goal}`
         });
         description += `\n\n![](${assetUrl})`;
       }
+
+      // Origin/triage marker (LIN-947) — additive, deterministic, and always
+      // appended last so the stored ticket announces itself as raw, un-triaged
+      // feedback whose natural next step is triage. This is what activates the
+      // meta-prompt's existing triage routing; it does not alter the user
+      // message, capture block, or screenshot above.
+      description += `\n\n---\n${FEEDBACK_ORIGIN_TRIAGE_MARKER}`;
 
       // Title resolution (LIN-643). An explicit title always wins (trimmed to
       // 250). Otherwise: when AI is enabled for this user/workspace, generate a
