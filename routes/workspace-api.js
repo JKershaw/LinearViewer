@@ -26,7 +26,7 @@ import { WORK_ISSUE_LABELS } from '../lib/workflow-config.js';
 import { parseRepoFromDescription, buildPromptFilename } from '../lib/prompt-formatters.js';
 import { buildProxyContextPreamble } from '../lib/proxy-preamble.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
-import { isRecommendationEnabled, getRecommendation, getRecommendationStream, streamChat, getModelDisplayName, AVAILABLE_MODELS } from '../lib/openrouter.js';
+import { isRecommendationEnabled, getRecommendation, getRecommendationStream, streamChat, getModelDisplayName, AVAILABLE_MODELS, getPaidEnvKey, hasPaidEnvKey } from '../lib/openrouter.js';
 import { resolveRecommendation, armHopSignal } from '../lib/recommend-recurse.js';
 import { sniffRasterType, parseFeedbackImage } from '../lib/attachment-upload.js';
 
@@ -698,11 +698,11 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     const mockAi = shouldMockAi(workspace)
     const sessionApiKey = req.session.openRouterApiKey
     const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY
-    const isFreeTier = !sessionApiKey && !process.env.OPENROUTER_API_KEY && !!freeTierKey
+    const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey
     // Free-tier on the AI-mock path is the session flag (CI sets no env key, so
     // `isFreeTier` is always false there); the test-token DATA mock charges its
     // own inside the isTestMode block below, so this is scoped to !isTestMode.
-    const testIsFreeTier = req.session.freeTierEnabled && !sessionApiKey && !process.env.OPENROUTER_API_KEY
+    const testIsFreeTier = req.session.freeTierEnabled && !sessionApiKey && !hasPaidEnvKey()
     const surfaceFreeTier = !isTestMode && (mockAi ? testIsFreeTier : isFreeTier)
     if (!mockAi && !isRecommendationEnabled(sessionApiKey) && !freeTierKey) {
       return jsonError(res, 503, 'AI recommendation feature is not configured. Connect your OpenRouter account or set OPENROUTER_API_KEY.')
@@ -729,7 +729,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         }
 
         // Atomically check free tier limits and record usage in test mode
-        const testIsFreeTier = req.session.freeTierEnabled && !req.session.openRouterApiKey && !process.env.OPENROUTER_API_KEY
+        const testIsFreeTier = req.session.freeTierEnabled && !req.session.openRouterApiKey && !hasPaidEnvKey()
         if (testIsFreeTier) {
           const check = await freeTierStore.tryUse(workspace.urlKey)
           if (!check.allowed) {
@@ -931,8 +931,8 @@ ${goal}`
     const mockAi = shouldMockAi(workspace);
     const sessionApiKey = req.session.openRouterApiKey;
     const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
-    const isFreeTier = !sessionApiKey && !process.env.OPENROUTER_API_KEY && !!freeTierKey;
-    const testIsFreeTier = req.session.freeTierEnabled && !sessionApiKey && !process.env.OPENROUTER_API_KEY;
+    const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
+    const testIsFreeTier = req.session.freeTierEnabled && !sessionApiKey && !hasPaidEnvKey();
     const surfaceFreeTier = !isTestMode && (mockAi ? testIsFreeTier : isFreeTier);
 
     if (!mockAi && !isRecommendationEnabled(sessionApiKey) && !freeTierKey) {
@@ -972,7 +972,7 @@ ${goal}`
       }
 
       // Free tier check in test mode
-      const testIsFreeTier = req.session.freeTierEnabled && !req.session.openRouterApiKey && !process.env.OPENROUTER_API_KEY;
+      const testIsFreeTier = req.session.freeTierEnabled && !req.session.openRouterApiKey && !hasPaidEnvKey();
       if (testIsFreeTier) {
         const check = await freeTierStore.tryUse(workspace.urlKey);
         if (!check.allowed) {
@@ -1534,7 +1534,7 @@ ${goal}`
     const mockAi = shouldMockAi(workspace);
     const sessionApiKey = req.session.openRouterApiKey;
     const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
-    const isFreeTier = !sessionApiKey && !process.env.OPENROUTER_API_KEY && !!freeTierKey;
+    const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
 
     if (!mockAi && !isRecommendationEnabled(sessionApiKey) && !freeTierKey) {
       return jsonError(res, 503, 'AI recap is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.');
@@ -1758,7 +1758,7 @@ ${goal}`
     const mockAi = shouldMockAi(workspace);
     const sessionApiKey = req.session.openRouterApiKey;
     const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
-    const isFreeTier = !sessionApiKey && !process.env.OPENROUTER_API_KEY && !!freeTierKey;
+    const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
 
     if (!mockAi && !isRecommendationEnabled(sessionApiKey) && !freeTierKey) {
       return jsonError(res, 503, 'AI brief is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.');
@@ -2343,8 +2343,8 @@ ${goal}`
         // billed call site (the LIN-513 wiring invariant).
         const sessionApiKey = req.session?.openRouterApiKey;
         const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
-        const isFreeTier = !sessionApiKey && !process.env.OPENROUTER_API_KEY && !!freeTierKey;
-        const aiApiKey = sessionApiKey || process.env.OPENROUTER_API_KEY || freeTierKey || null;
+        const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
+        const aiApiKey = sessionApiKey || getPaidEnvKey() || freeTierKey || null;
         if (aiApiKey) {
           try {
             const model = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
@@ -2661,8 +2661,8 @@ ${goal}`
 
     const sessionApiKey = req.session.openRouterApiKey;
     const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
-    const isFreeTier = !sessionApiKey && !process.env.OPENROUTER_API_KEY && !!freeTierKey;
-    const apiKey = sessionApiKey || process.env.OPENROUTER_API_KEY || freeTierKey;
+    const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
+    const apiKey = sessionApiKey || getPaidEnvKey() || freeTierKey;
     if (!apiKey) {
       jsonError(res, 503, 'AI not configured. Connect OpenRouter or set OPENROUTER_API_KEY.');
       return null;
@@ -3121,8 +3121,8 @@ ${goal}`
 
     const sessionApiKey = req.session.openRouterApiKey;
     const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
-    const isFreeTier = !sessionApiKey && !process.env.OPENROUTER_API_KEY && !!freeTierKey;
-    const apiKeyToUse = sessionApiKey || process.env.OPENROUTER_API_KEY || freeTierKey;
+    const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
+    const apiKeyToUse = sessionApiKey || getPaidEnvKey() || freeTierKey;
     if (!apiKeyToUse) {
       return jsonError(res, 503, 'AI not configured. Connect OpenRouter or set OPENROUTER_API_KEY.');
     }

@@ -20,7 +20,7 @@ import { renderTaskChatPage } from '../lib/render-task-chat.js';
 import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { buildTaskChatMessages } from '../lib/prompts/task-chat-template.js';
-import { streamChat, isRecommendationEnabled } from '../lib/openrouter.js';
+import { streamChat, isRecommendationEnabled, getPaidEnvKey, hasPaidEnvKey } from '../lib/openrouter.js';
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { getWorkspaceCallScope, isValidIssueId } from '../lib/workspace.js';
@@ -188,8 +188,8 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
     const mockAi = shouldMockAi(workspace);
     const sessionApiKey = req.session.openRouterApiKey;
     const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
-    const isFreeTier = !sessionApiKey && !process.env.OPENROUTER_API_KEY && !!freeTierKey;
-    const apiKeyToUse = sessionApiKey || process.env.OPENROUTER_API_KEY || freeTierKey;
+    const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
+    const apiKeyToUse = sessionApiKey || getPaidEnvKey() || freeTierKey;
 
     if (!mockAi && !apiKeyToUse) {
       return res.status(503).json({ error: 'AI is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.' });

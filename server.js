@@ -92,7 +92,7 @@ import { buildSessionCounts } from './lib/sessions-view.js'
 import { renderRoadmapPage } from './lib/render-roadmap.js'
 import { buildRoadmapModel } from './lib/roadmap.js'
 import { renderProxyPage } from './lib/render-proxy.js'
-import { AVAILABLE_MODELS, setLlmCallRecorder, setPromptTraceRecorder } from './lib/openrouter.js'
+import { AVAILABLE_MODELS, setLlmCallRecorder, setPromptTraceRecorder, getPaidEnvKey, hasPaidEnvKey } from './lib/openrouter.js'
 import { resolveWorkspaceModel, getWorkspaceFeatures, isWorkspaceFeatureEnabled, setWorkspaceFeature } from './lib/workspace-preferences.js'
 import { getFeatureFlags, isValidFeatureKey, isValidWorkspaceFeatureKey, WORKSPACE_FEATURES } from './lib/feature-defaults.js'
 
@@ -115,6 +115,15 @@ if (process.env.NODE_ENV !== 'test') {
   if (missingVars.length > 0) {
     console.warn(`Warning: Missing OAuth environment variables: ${missingVars.join(', ')}`);
     console.warn('The app will start, but Linear OAuth login will be unavailable until these are set.');
+  }
+
+  // OPENROUTER_API_KEY foot-gun (LIN-961): a present-but-empty/whitespace value
+  // is silently treated as unset and every proxy LLM call falls back to the free
+  // tier — surfacing later only as a misleading "Daily limit reached" 429. Catch
+  // it at boot rather than at first 429.
+  if (process.env.OPENROUTER_API_KEY !== undefined && !getPaidEnvKey()) {
+    console.warn('Warning: OPENROUTER_API_KEY is set but empty/whitespace — it will be treated as unset.');
+    console.warn('Proxy LLM calls will fall back to the free tier (OPENROUTER_FREE_TIER_KEY) if configured, else fail.');
   }
 }
 
@@ -470,7 +479,12 @@ if (process.env.NODE_ENV === 'test') {
  */
 function getOpenRouterSource(req) {
   if (req.session.openRouterApiKey) return 'oauth';
-  if (process.env.OPENROUTER_API_KEY) return 'env';
+  // hasPaidEnvKey() trims, so a blank/whitespace OPENROUTER_API_KEY is NOT
+  // classified as a paid `env` source (LIN-961). This keeps the operator-facing
+  // status honest: the footer can no longer read a blank key as `env` while the
+  // token-authed proxy path silently runs on the free tier — the exact
+  // divergence that hid this bug.
+  if (hasPaidEnvKey()) return 'env';
   if (process.env.OPENROUTER_FREE_TIER_KEY || req.session.freeTierEnabled) return 'free';
   return null;
 }

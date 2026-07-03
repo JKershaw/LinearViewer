@@ -36,12 +36,37 @@ test('session OAuth key wins — never free tier, even when free-tier key is set
   });
 });
 
-test('env-key path: apiKey is undefined (downstream falls back to OPENROUTER_API_KEY), not free tier', () => {
+test('env-key path: apiKey is the trimmed paid env key (not free tier)', () => {
+  // LIN-961: resolveProxyLLM now returns getPaidEnvKey() explicitly on the env
+  // path (previously left undefined and relied on a downstream fallback). For a
+  // clean key the value is identical, and `options.apiKey || getPaidEnvKey()` in
+  // openrouter.js resolves to the same key either way — but returning it here
+  // means a blank/whitespace value can never be forwarded as a bogus auth header.
   withEnv({ envKey: 'env_yyy', freeKey: undefined }, () => {
-    assert.deepEqual(resolveProxyLLM(null), { apiKey: undefined, isFreeTier: false });
+    assert.deepEqual(resolveProxyLLM(null), { apiKey: 'env_yyy', isFreeTier: false });
   });
   // env key present AND free key present → env still wins, free tier stays off
   withEnv({ envKey: 'env_yyy', freeKey: 'free_xxx' }, () => {
+    assert.deepEqual(resolveProxyLLM(null), { apiKey: 'env_yyy', isFreeTier: false });
+  });
+});
+
+test('LIN-961: empty/whitespace env key is treated as unset (falls to free tier, never forwarded)', () => {
+  // Empty string: the reported symptom — !'' is truthy so the OLD bare check fell
+  // to free tier here too, BUT the apiKey chain used to pass '' through; now the
+  // trimmed read makes both the classification and the key unambiguous.
+  withEnv({ envKey: '', freeKey: 'free_xxx' }, () => {
+    assert.deepEqual(resolveProxyLLM(null), { apiKey: 'free_xxx', isFreeTier: true });
+  });
+  // Whitespace-only: the OLD bare check ( !'  ' === false ) classified this as a
+  // paid env key and forwarded '  ' to OpenRouter → a confusing 401. Now it is
+  // unset → clean free-tier fallback.
+  withEnv({ envKey: '   ', freeKey: 'free_xxx' }, () => {
+    assert.deepEqual(resolveProxyLLM(null), { apiKey: 'free_xxx', isFreeTier: true });
+  });
+  // Whitespace-only with no free key: unset → no key, not free tier (gate 503s),
+  // and critically the whitespace is NOT returned as apiKey.
+  withEnv({ envKey: '   ', freeKey: undefined }, () => {
     assert.deepEqual(resolveProxyLLM(null), { apiKey: undefined, isFreeTier: false });
   });
 });
