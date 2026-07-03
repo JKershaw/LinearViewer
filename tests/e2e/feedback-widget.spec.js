@@ -153,7 +153,76 @@ test.describe('Feedback widget', () => {
     await expect(page.getByTestId('feedback-file')).toHaveValue('')
     await expect(page.getByTestId('feedback-submit')).toBeEnabled()
   })
+
+  // LIN-920: dropping a screenshot onto the drop zone must go through the same
+  // intake path as the native picker — the selected-file chip appears with the
+  // dropped filename and the remove control lights up.
+  test('accepts a screenshot dropped onto the drop zone', async ({ page, seedLocal }) => {
+    const { urlKey } = await seedLocal()
+    await enableWidget(page, urlKey)
+
+    await page.getByTestId('feedback-fab').click()
+    await expect(page.getByTestId('feedback-file-chip')).toBeHidden()
+
+    await dropFileOnZone(page, { name: 'dropped.png', type: 'image/png', bytes: [1, 2, 3] })
+
+    await expect(page.getByTestId('feedback-file-chip')).toBeVisible()
+    await expect(page.getByTestId('feedback-file-name')).toHaveText('dropped.png')
+    await expect(page.getByTestId('feedback-file-remove')).toBeVisible()
+  })
+
+  // LIN-920: a dropped file cannot bypass the picker's 7MB cap — the shared
+  // intake path rejects it with the same error and selects nothing.
+  test('rejects an oversized dropped image with the same cap as the picker', async ({ page, seedLocal }) => {
+    const { urlKey } = await seedLocal()
+    await enableWidget(page, urlKey)
+
+    await page.getByTestId('feedback-fab').click()
+
+    // 7MB + 1 byte — one over MAX_IMAGE_BYTES.
+    await dropFileOnZone(page, { name: 'huge.png', type: 'image/png', size: 7 * 1024 * 1024 + 1 })
+
+    await expect(page.getByTestId('feedback-status')).toContainText('too large')
+    await expect(page.getByTestId('feedback-file-chip')).toBeHidden()
+    await expect(page.getByTestId('feedback-file-remove')).toBeHidden()
+  })
+
+  // LIN-920: pasting an image into the open popup routes through the same intake
+  // path (e.g. right after a screenshot-to-clipboard capture).
+  test('accepts a screenshot pasted into the popup', async ({ page, seedLocal }) => {
+    const { urlKey } = await seedLocal()
+    await enableWidget(page, urlKey)
+
+    await page.getByTestId('feedback-fab').click()
+    await expect(page.getByTestId('feedback-file-chip')).toBeHidden()
+
+    await page.getByTestId('feedback-popup').evaluate((popup) => {
+      const dt = new DataTransfer()
+      dt.items.add(new File([new Uint8Array([1, 2, 3])], 'pasted.png', { type: 'image/png' }))
+      popup.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, clipboardData: dt }))
+    })
+
+    await expect(page.getByTestId('feedback-file-chip')).toBeVisible()
+    await expect(page.getByTestId('feedback-file-name')).toHaveText('pasted.png')
+  })
 })
+
+// Synthesize a drag-and-drop of a single file onto the drop zone. Builds a real
+// DataTransfer + File in the page so the widget's `dragCarriesFiles` / `drop`
+// handlers see the same shape a browser would deliver. Pass `size` to fabricate
+// an oversize file without allocating its bytes, or `bytes` for exact content.
+async function dropFileOnZone(page, { name, type, bytes, size }) {
+  await page.getByTestId('feedback-drop').evaluate((zone, spec) => {
+    const content = spec.size != null
+      ? new Uint8Array(spec.size)
+      : new Uint8Array(spec.bytes || [])
+    const file = new File([content], spec.name, { type: spec.type })
+    const dt = new DataTransfer()
+    dt.items.add(file)
+    zone.dispatchEvent(new DragEvent('dragenter', { bubbles: true, dataTransfer: dt }))
+    zone.dispatchEvent(new DragEvent('drop', { bubbles: true, dataTransfer: dt }))
+  }, { name, type, bytes, size })
+}
 
 // Enable the flag via the footer toggle and land on a reloaded page with the
 // widget mounted.
