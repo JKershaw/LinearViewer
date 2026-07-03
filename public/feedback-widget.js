@@ -8,11 +8,12 @@
  * without losing input (draft text/priority persist in localStorage; the
  * selected screenshot persists in memory while the page is not reloaded).
  *
- * The foot offers three explicit actions (LIN-918) — Save, Save + triage, and
+ * The foot offers two explicit actions (LIN-918, LIN-952) — Save and
  * Save + autopilot. On submit it captures the current page URL and browser user
  * agent, then POSTs to the feedback route (`POST /workspace/:urlKey/api/feedback`)
  * with the chosen `action`; the route always files the ticket first, then branches
- * on the action (file only / enqueue triage / enqueue a scoped autopilot run).
+ * on the action (file only / enqueue a scoped autopilot run). The route still
+ * accepts a `triage` action for other callers — the widget just no longer offers it.
  *
  * No framework, no build step — matches the repo's vanilla client convention.
  */
@@ -155,12 +156,10 @@
           </div>
           <div class="feedback-status" data-testid="feedback-status" role="status" aria-live="polite"></div>
           <div class="feedback-popup-foot">
-            <button type="button" class="feedback-submit" data-testid="feedback-submit"
-                    data-action="save">Save</button>
-            <button type="button" class="feedback-submit feedback-submit-secondary" data-testid="feedback-submit-triage"
-                    data-action="triage">Save + triage</button>
             <button type="button" class="feedback-submit feedback-submit-secondary" data-testid="feedback-submit-autopilot"
                     data-action="autopilot">Save + autopilot</button>
+            <button type="button" class="feedback-submit" data-testid="feedback-submit"
+                    data-action="save">Save</button>
           </div>
         </div>
       </div>`;
@@ -175,8 +174,8 @@
     const fileNameEl = root.querySelector('.feedback-file-name');
     const removeFileBtn = root.querySelector('.feedback-file-remove');
     const statusEl = root.querySelector('.feedback-status');
-    // Three action buttons (Save / Save + triage / Save + autopilot); a shared
-    // handler reads each button's data-action (LIN-918).
+    // Two action buttons (Save / Save + autopilot); a shared handler reads each
+    // button's data-action (LIN-918, LIN-952).
     const submitBtns = Array.from(root.querySelectorAll('.feedback-submit'));
     const minBtn = root.querySelector('.feedback-min');
     const closeBtn = root.querySelector('.feedback-close');
@@ -310,7 +309,7 @@
       setStatus('Screenshot removed.');
     });
 
-    // Disable/enable all three action buttons together for the duration of a
+    // Disable/enable both action buttons together for the duration of a
     // send, so a second action can't fire mid-flight.
     function setSubmitting(disabled) {
       submitBtns.forEach((b) => { b.disabled = disabled; });
@@ -320,17 +319,15 @@
     // status lines. 'save' keeps the plain wording; the others name the follow-up.
     const SENDING_STATUS = {
       save: 'Saving…',
-      triage: 'Saving & triaging…',
       autopilot: 'Saving & starting autopilot…'
     };
     const DONE_SUFFIX = {
       save: '.',
-      triage: ' — triaging.',
       autopilot: ' — autopilot starting.'
     };
 
     // Shared submit handler, parameterized by the chosen action (LIN-918). The
-    // save→create-ticket flow is identical for all three; only the `action` sent
+    // save→create-ticket flow is identical for both; only the `action` sent
     // to the route and the status wording differ.
     async function submit(action) {
       const message = messageEl.value.trim();
