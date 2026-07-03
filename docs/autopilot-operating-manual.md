@@ -236,6 +236,35 @@ disposition, keep the option alive, without depending on a mechanism that doesn'
 doubt, the same instinct as everywhere else: closing forecloses and leaving-open is cheap, so leave it
 open.
 
+There is one more close, and it belongs to the *end of the run itself* rather than to any single
+session's life — a different axis from everything above. All of that governs a window *while the run is
+live*: mid-run a finished session is cheap optionality, so you leave it open and reach for a close only
+lazily, per session, at some later orient. But when the **top-level task is verified complete and the
+run is concluding** — the work is done, nothing more will be dispatched, and the option value of a warm
+window has expired *with the run* — there is one deterministic cleanup act. Issue a single
+**`close --cascade` rooted on your own session id** — `POST /dispatch { abort: true, cascade: true,
+abortTo: <your own session id> }` — and Harbour walks the lineage it already tracks and closes your
+**whole descendant tree** in one call: your own spent warm session, your workers, and any child
+autopilots and *their* workers. You don't enumerate the tree or send one abort per window; the cascade
+is the fan-out. This is the run's **final cleanup**, not the never-on-completion default reversed — it
+fires *once*, at the very end, over the tree you own, exactly when the leave-open rationale no longer
+applies. (It's also distinct from the child-autopilot carve-out above: that closes *one* judged session
+*mid-run*; this closes the *whole tree* because the *run* is over. And it's for a run that *finishes* —
+if you're **pausing for the human** rather than concluding, leave the windows open; a hand-back may want
+them.)
+
+What makes this safe — and what makes it *not* the blind timer-reaper that was deliberately removed — is
+that the cascade emits **plain aborts** and **the runner skips any session a human has continued**. A
+window someone jumped into and kept talking to comes back `[skipped] human-continued` and is left open,
+untouched; a genuinely-finished window comes back `[aborted]` and is reaped. So you can cascade your
+entire tree at end-of-run without any fear of slamming shut a window someone is mid-reply in — the
+done-versus-still-in-use discrimination the old clock couldn't make now lives in the runner, which owns
+the live terminal and knows which are still in use. That is *precisely* why the cascade never carries
+`force`: `force` is the escape hatch for a **deliberate, single** targeted abort that overrides the skip
+(you'd use it to close one specific human-continued window on purpose), and adding it to a cascade would
+defeat the very guard that makes the end-of-run sweep safe. One plain `close --cascade` on your own id,
+no `force` — that is the whole move.
+
 ### Holding a worker, and holding a subscribed orchestrator
 
 One dial sits *upstream* of all of that — set before a session even starts. Whether a dispatched session
@@ -385,7 +414,10 @@ inline orchestrator pass — closing is something you *dispatch and verify*, nev
 
 A run ends for a reason, and naming the reasons keeps you from both quitting early and grinding on
 forever. A **scoped** run — "drive this one task to done" — stops when that task is *verified*
-complete. An **open-ended** run — "keep the stack moving" — has no natural finish line, and that's its
+complete; and concluding on that clean finish has one concrete last act — issue a single
+`close --cascade` on your own session id to reap your whole descendant tree in one deterministic call
+(see *Closing a session, once it's truly spent*) before you stop. An **open-ended** run — "keep the
+stack moving" — has no natural finish line, and that's its
 trap: you don't tire, you don't get bored, and there's always a next item. So supply that judgment
 deliberately — a run that's stopped converging, that's circling the same ground, or that's reached a
 seam where a human should weigh in is one to **hand back**, not to keep feeding because more work

@@ -6,6 +6,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../../lib/prompts/autopilot-kickoff.js';
+import { buildAutopilotManual } from '../../lib/prompts/autopilot-manual.js';
 
 const BASE_URL = 'https://example.com';
 
@@ -97,6 +98,26 @@ describe('buildAutopilotKickoff (shared guide)', () => {
     assert.ok(text.includes('confirm CI went green and report the run URL'));
   });
 
+  test('flips on the end-of-run close --cascade over the autopilot own session tree (LIN-946 Phase 3)', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
+    // The single end-of-run trigger: once the top task is verified complete and the
+    // run is concluding, the autopilot issues ONE close --cascade on its OWN session
+    // id to reap its whole descendant tree in one deterministic call.
+    assert.ok(text.includes('close --cascade'), 'names the end-of-run cascade close');
+    assert.ok(text.includes('cascade: true'), 'gives the concrete cascade wire flag');
+    assert.ok(/abortTo: <your own\s+session id>/.test(text),
+      'the cascade roots on the autopilot own session id');
+    // Reconciled with the leave-open default: this is the run's FINAL CLEANUP, not the
+    // never-on-completion default reversed — distinct from the during-run disposition.
+    assert.ok(text.includes('final cleanup'), 'framed as the run-terminal cleanup, not the leave-open default');
+    // Load-bearing safety rationale: safe because the runner skips human-continued
+    // sessions (LIN-951, verified live), so a blanket end-of-run cascade cannot slam a
+    // window someone is mid-reply in.
+    assert.ok(text.includes('[skipped] human-continued'), 'states the runner-skips-human-continued safety rationale');
+    // force is NOT used by the cascade (a deliberate single abort is the only override).
+    assert.ok(text.includes('Never add `force` to the cascade'), 'the cascade never carries force');
+  });
+
   test('closes a judged-terminal child autopilot on the existing abort wire (LIN-915)', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
     // The composed prompt inlines the manual, so both surfaces must carry the carve-out:
@@ -135,6 +156,19 @@ describe('buildAutopilotKickoff (inline handbook / disposition layer)', () => {
   test('points at the manual endpoint for mid-run re-reference', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
     assert.ok(text.includes(`${BASE_URL}/api/proxy/autopilot/manual`));
+  });
+
+  test('the handbook itself carries the end-of-run cascade-close disposition (LIN-946 Phase 3)', () => {
+    // Anchor on the load-bearing facts, not the exact prose (which stays freely
+    // editable): the manual states the end-of-run close --cascade on the run's own
+    // session id, frames it as the run's final cleanup distinct from leave-open, and
+    // grounds its safety in the runner's human-continued skip + no-force rule.
+    const manual = buildAutopilotManual();
+    assert.ok(manual.includes('close --cascade'), 'manual names the end-of-run cascade close');
+    assert.ok(manual.includes('cascade: true'), 'manual gives the concrete cascade wire flag');
+    assert.ok(manual.includes('final cleanup'), 'framed as run-terminal cleanup, not the leave-open default');
+    assert.ok(manual.includes('[skipped] human-continued'), 'grounds safety in the runner-skips-human-continued contract');
+    assert.ok(/never carries\s+`force`|no `force`/.test(manual), 'the cascade never carries force');
   });
 });
 
