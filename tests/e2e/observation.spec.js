@@ -149,6 +149,26 @@ test.describe('Autopilot Observation page (first-class)', () => {
       await expect(page.locator('#obs-active .obs-session').filter({ hasText: 'Visible session' })).toBeVisible();
     });
 
+    test('the Active eyebrow reflects the live running count, not a static "Active" (LIN-929)', async ({ page }) => {
+      await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+      await clearRuns(page);
+
+      // With nothing running, the eyebrow count is 0 (not a static "Active").
+      await page.goto(OBSERVATION_URL);
+      await page.waitForLoadState('networkidle');
+      await expect(page.locator('#obs-active-count .obs-active-count-n')).toHaveText('0');
+
+      // Seed one in-progress session → the running count reflects it on load.
+      // Drop the 5s sessions-feed cache the first load warmed empty, else it would
+      // serve the pre-seed feed and mask the new session (same reason clearRuns does).
+      await seedQueuedRun(page, { issueIdentifier: 'LIN-906', issueTitle: 'Counting session' });
+      await page.goto(`/test/clear-sessions-feed-cache?urlKey=${URL_KEY}`);
+      await page.goto(OBSERVATION_URL);
+      await page.waitForLoadState('networkidle');
+      await expect(page.locator('#obs-active .obs-session').filter({ hasText: 'Counting session' })).toBeVisible();
+      await expect(page.locator('#obs-active-count .obs-active-count-n')).toHaveText('1');
+    });
+
     test('expanding a session reveals its body', async ({ page }) => {
       await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       await clearRuns(page);

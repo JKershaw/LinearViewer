@@ -146,6 +146,11 @@
   color: var(--faint);
 }
 
+/* Active-section eyebrow live running count (LIN-929) — `Active · N running`.
+   Inherits the eyebrow's faint uppercase weight; the count itself is a machine
+   fact, so it takes the structural (mono) face per the type split. */
+.obs-active-count-n { font-family: var(--font-structural); }
+
 .obs-controls { display: flex; flex-direction: column; gap: 0.5rem; }
 
 .obs-chips {
