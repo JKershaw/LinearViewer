@@ -652,13 +652,23 @@ function renderActivityLog(run) {
   const metrics = Array.isArray(run.metrics) ? run.metrics : [];
   if (metrics.length) {
     const lines = metrics.slice(-6).map(m => {
+      const breakdown = m.breakdown ? Object.entries(m.breakdown) : [];
       const chips = [];
-      if (m.toolCount != null) chips.push(`<span class="obs-act-chip">${m.toolCount} tool${m.toolCount === 1 ? '' : 's'}</span>`);
-      if (m.breakdown) {
-        for (const [k, v] of Object.entries(m.breakdown)) chips.push(`<span class="obs-act-chip">${escapeHtml(k)}×${escapeHtml(String(v))}</span>`);
+      // §6.3: the per-tool chips already sum the burst, so render the breakdown and
+      // drop the redundant per-burst total; fall back to the bare count only when
+      // there is no breakdown to sum it.
+      if (breakdown.length) {
+        for (const [k, v] of breakdown) chips.push(`<span class="obs-act-chip">${escapeHtml(k)}×${escapeHtml(String(v))}</span>`);
+      } else if (m.toolCount) {
+        chips.push(`<span class="obs-act-chip">${m.toolCount} tool${m.toolCount === 1 ? '' : 's'}</span>`);
       }
       const dur = m.elapsedSeconds != null ? formatRuntime({ ms: m.elapsedSeconds * 1000 }) : '';
-      const main = chips.length ? chips.join('') : `<span class="obs-act-raw">${escapeHtml(m.raw || 'activity')}</span>`;
+      // §6.3: an empty burst (a tool heartbeat with zero calls) reads as a quiet
+      // "no tools", never "0 tools"; a non-tool metric keeps its raw line.
+      let main;
+      if (chips.length) main = chips.join('');
+      else if (m.toolCount != null) main = `<span class="obs-act-chip obs-act-idle">no tools</span>`;
+      else main = `<span class="obs-act-raw">${escapeHtml(m.raw || 'activity')}</span>`;
       return `<li class="obs-act"><span class="obs-act-main">${main}</span>${dur ? `<span class="obs-act-dur">${escapeHtml(dur)}</span>` : ''}</li>`;
     }).join('');
     return `<div class="obs-detail-block"><span class="obs-body-lbl">activity</span><ul class="obs-acts">${lines}</ul></div>`;
@@ -669,14 +679,33 @@ function renderActivityLog(run) {
   return `<div class="obs-detail-block obs-dim"><span class="obs-body-lbl">activity</span> no activity recorded</div>`;
 }
 
+// §6.4: split the two artifact variants the telemetry can actually support. A
+// `/pull/N` (or `/-/merge_requests/N`) path segment unambiguously identifies a
+// PR/MR from the URL itself — no guessed `type`, which the telemetry shape
+// (`{url,label}`) does not carry. Everything else is a plain external `link`. The
+// third design variant (`action` — an in-app, brand-coloured control) is NOT
+// representable here: it never appears in produced-artifact telemetry (LIN-866).
+function classifyArtifact(a) {
+  const url = a && a.url ? String(a.url) : '';
+  const m = url.match(/\/([^/]+)\/(?:-\/)?(?:pull|pull-requests|merge_requests)\/(\d+)\b/);
+  if (m) return { pr: true, handle: `${m[1]} #${m[2]}` };
+  return { pr: false };
+}
+
 // Produced-artifacts list (net-new pattern): icon-led links out to the evidence
-// (branch / PR / file) a run produced.
+// (PR / file) a run produced. PRs get a branch glyph + mono handle; other
+// evidence renders as a plain external link (§6.4).
 function renderArtifacts(run) {
   const arts = Array.isArray(run.producedArtifacts) ? run.producedArtifacts : [];
   if (!arts.length) return '';
-  const items = arts.map(a =>
-    `<li><a class="obs-artifact" href="${escapeHtml(a.url)}" target="_blank" rel="noopener"><span class="obs-artifact-icon" aria-hidden="true">↗</span><span class="obs-artifact-label">${escapeHtml(a.label || a.url)}</span></a></li>`
-  ).join('');
+  const items = arts.map(a => {
+    const href = escapeHtml(a.url);
+    const cls = classifyArtifact(a);
+    if (cls.pr) {
+      return `<li><a class="obs-artifact obs-artifact-pr" href="${href}" target="_blank" rel="noopener"><span class="obs-artifact-icon" aria-hidden="true">⎇</span><span class="obs-artifact-label obs-artifact-handle">${escapeHtml(cls.handle)}</span></a></li>`;
+    }
+    return `<li><a class="obs-artifact" href="${href}" target="_blank" rel="noopener"><span class="obs-artifact-icon" aria-hidden="true">↗</span><span class="obs-artifact-label">${escapeHtml(a.label || a.url)}</span></a></li>`;
+  }).join('');
   return `<div class="obs-detail-block"><span class="obs-body-lbl">produced</span><ul class="obs-artifacts">${items}</ul></div>`;
 }
 
@@ -1050,3 +1079,10 @@ window.addEventListener('beforeunload', () => {
 });
 
 document.addEventListener('DOMContentLoaded', init);
+
+// Test-only seam (inert in the browser, where `module` is undefined): expose the
+// pure presentation helpers so the §6.3/§6.4 fidelity rules can be unit-tested
+// without a DOM. Not part of the page's runtime contract.
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { renderActivityLog, renderArtifacts, classifyArtifact };
+}
