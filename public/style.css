@@ -358,6 +358,59 @@ h1 {
   margin-bottom: var(--space-3);
   flex-wrap: wrap;
   gap: var(--space-2) 2ch;
+  /* Sticky/translucent header treatment (LIN-978), ported from the retired
+     observation `.obs-appbar` so cross-view nav stays reachable from the header
+     while scrolling, on every page — not just observation. Solid --bg fallback
+     for engines without color-mix; translucent + blur where supported. Padded
+     so the translucent band covers content scrolling under it. */
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  padding: var(--space-2) 0;
+  background: var(--bg);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+/* Header-level view switcher (LIN-978). Its own full-width row inside the nav
+   (flex-basis:100% forces the wrap), laid out as a SINGLE horizontally-scrolling
+   row — never the old multi-line footer-style wrap the audit flagged. At 390px
+   the row scrolls sideways rather than stacking, keeping cross-view nav to one
+   line. */
+.nav-views {
+  flex: 0 0 100%;
+  display: flex;
+  align-items: baseline;
+  gap: 1.5ch;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  white-space: nowrap;
+  padding-top: var(--space-1);
+  /* Thin scrollbar, unobtrusive on desktop; momentum scroll on touch. */
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.nav-view {
+  color: var(--fg-dim);
+  text-decoration: none;
+  font-size: 0.9em;
+  font-family: var(--font-content);
+  flex: 0 0 auto;
+}
+
+.nav-view:hover {
+  color: var(--fg);
+}
+
+/* Active view — bolded, primary text colour (mirrors the footer-current
+   treatment the switcher replaces). */
+.nav-view-current {
+  color: var(--fg);
+  font-weight: 600;
+  font-family: var(--font-content);
+  flex: 0 0 auto;
 }
 
 .nav-filters {
@@ -1538,6 +1591,12 @@ a.wordmark:hover {
 
   .nav-value {
     max-width: 10ch;
+  }
+
+  /* View switcher stays a single scrolling row at 390px (LIN-978) — tighter
+     gaps, never a multi-line wrap. */
+  .nav-views {
+    gap: 1.25ch;
   }
 }
 

@@ -68,11 +68,13 @@ test.describe('Autopilot Observation page (first-class)', () => {
       expect(page.url()).toContain('/observation');
     });
 
-    test('the footer carries a first-class observation link', async ({ page }) => {
+    test('the header switcher carries a first-class observation link', async ({ page }) => {
+      // The cross-view links were hoisted from the footer into the shared header
+      // nav switcher (LIN-978); observation is a first-class view, always shown.
       await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
-      await expect(page.locator(`.footer-action[href="${OBSERVATION_URL}"]`)).toBeVisible();
+      await expect(page.locator(`.nav-views [data-testid="nav-view-observation"][href="${OBSERVATION_URL}"]`)).toBeVisible();
     });
 
     test('the experimental dashboard toggle is gone from Settings', async ({ page }) => {

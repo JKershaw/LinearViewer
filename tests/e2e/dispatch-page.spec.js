@@ -785,23 +785,23 @@ test.describe('Dispatch Page', () => {
   });
 
   test.describe('Navigation', () => {
-    test('footer shows dispatch link when feature enabled', async ({ page }) => {
+    test('header switcher shows dispatch as current when feature enabled', async ({ page }) => {
       await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true }, urlKey: WS });
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
 
-      // Footer should show dispatch as current page (bold)
-      const dispatchFooter = page.locator('.footer-current:has-text("dispatch")');
-      await expect(dispatchFooter).toBeVisible();
+      // Header switcher (LIN-978) shows dispatch as the current page (bold).
+      const dispatchCurrent = page.locator('.nav-views [data-testid="nav-view-dispatch"].nav-view-current');
+      await expect(dispatchCurrent).toBeVisible();
     });
 
-    test('footer dispatch link works from other pages', async ({ page }) => {
+    test('header dispatch link works from other pages', async ({ page }) => {
       await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true }, urlKey: WS });
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
 
-      // Footer should have dispatch link
-      const dispatchLink = page.locator('.footer-action:has-text("dispatch")');
+      // Header switcher carries the flagged dispatch link (LIN-978).
+      const dispatchLink = page.locator('.nav-views a[data-testid="nav-view-dispatch"]');
       await expect(dispatchLink).toBeVisible();
 
       await dispatchLink.click();
@@ -811,12 +811,12 @@ test.describe('Dispatch Page', () => {
       await expect(page.locator('h1')).toHaveText('Dispatch');
     });
 
-    test('footer does not show dispatch link when feature disabled', async ({ page }) => {
+    test('header does not show dispatch link when feature disabled', async ({ page }) => {
       await seedLocalWorkspace(page, REPO_SEED, { urlKey: WS });
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
 
-      const dispatchLink = page.locator('.footer-action:has-text("dispatch")');
+      const dispatchLink = page.locator('.nav-views [data-testid="nav-view-dispatch"]');
       await expect(dispatchLink).toHaveCount(0);
     });
 
