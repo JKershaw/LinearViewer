@@ -360,6 +360,20 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         }
       }
 
+      // Cascade close (LIN-946): a cascade request is not a single abort — it is a
+      // command Harbour expands into one plain abort per session in abortTo's whole
+      // descendant subtree (the recursive sessionId-tree walk). The store owns the
+      // walk + emission; the runner still executes each cancel and skips
+      // human-continued sessions (LIN-951). INERT: nothing issues a cascade at
+      // end-of-run yet — this is the mechanism the future guide-trigger will call.
+      if (cascade === true) {
+        const result = await dispatchQueueStore.expandCascadeAborts(workspace.urlKey, abortTo, {
+          target: target || 'cli',
+          dispatchedBy: req.session.linearUserId || null
+        });
+        return res.status(201).json({ success: true, cascade: true, ...result });
+      }
+
       // Create dispatch item
       const item = await dispatchQueueStore.addItem(workspace.urlKey, {
         prompt,

@@ -4429,6 +4429,22 @@ One convention across every endpoint, so you can branch on the same fields every
       // orchestrator from waking itself.
       const subscriptionResolved = subscription ?? DEFAULT_SUBSCRIPTION;
 
+      // Cascade close (LIN-946): a cascade request is not a single abort — it is a
+      // command Harbour expands into one plain abort per session in abortTo's whole
+      // descendant subtree (the recursive sessionId-tree walk). The store owns the
+      // walk + emission; the runner still executes each cancel and skips
+      // human-continued sessions (LIN-951). Handled here, before the prompt-context
+      // work below (a cascade carries no prompt). This is the proxy-token twin the
+      // autopilot actually hits. INERT: nothing issues a cascade at end-of-run yet.
+      if (cascade === true) {
+        const result = await dispatchQueueStore.expandCascadeAborts(req.proxyUrlKey, abortTo, {
+          target: target || 'cli',
+          dispatchedBy: req.proxyCreatedBy || null
+        });
+        logEvent(req, '/api/proxy/dispatch', 201);
+        return res.status(201).json({ success: true, cascade: true, ...result });
+      }
+
       // Auto-append the proxy context (workspace API access + reporting channel) by
       // default, so the worker can both read context and report its result.
       // Opt out with appendProxyContext:false (e.g. a self-contained prompt).
