@@ -384,6 +384,17 @@ function renderFeeds() {
   diffSessionList('obs-active', 'obs-active-empty', activeCards, active);
   diffSessionList('obs-recent', 'obs-recent-empty', recentCards, recent);
 
+  // Active-section eyebrow live count (LIN-929): design §3.4/§8 reads
+  // `Active · N running`. N is the number of Active sessions whose pill resolves
+  // to the running variant — the SAME session→pill map the cards and chip-health
+  // dot use (single source of truth), so the eyebrow can never disagree with the
+  // feed below it.
+  const running = active.filter(
+    s => ((SESSION_PILL[displayStatus(s)] || {}).variant) === 'running'
+  ).length;
+  const runningN = document.querySelector('#obs-active-count .obs-active-count-n');
+  if (runningN) runningN.textContent = String(running);
+
   // Count reflects the full server-side archive (LIN-631), not just the pages
   // loaded so far, so the badge stays honest before "load more" is used.
   const count = document.getElementById('obs-archive-count');
