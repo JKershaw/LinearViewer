@@ -124,7 +124,7 @@
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--green);
-  animation: pulse var(--motion-slow) ease-in-out infinite;
+  animation: pulse var(--motion-pulse) ease-in-out infinite;
 }
 @media (prefers-reduced-motion: reduce) {
   .obs-poll-status { animation: none; }
@@ -405,7 +405,7 @@
 /* A live (running/waiting) segment pulses to read as "in flight". Reuses the
    global `pulse` keyframe; the global prefers-reduced-motion rule neutralizes it. */
 .obs-progress .segment-bar__cell[data-live="1"] {
-  animation: pulse var(--motion-slow) ease-in-out infinite;
+  animation: pulse var(--motion-pulse) ease-in-out infinite;
 }
 
 /* ─── Session body (expanded) ─────────────────────────────────────────────── */
@@ -569,7 +569,7 @@ a.obs-task-ident:hover { text-decoration: underline; }
 .obs-worker-node[data-state="error"] { color: var(--red); }
 .obs-worker-node[data-state="running"] { color: var(--amber-dim); }
 .obs-worker-node[data-state="queued"] { color: var(--slate-dim); }
-.obs-worker-node[data-live="1"] { animation: pulse var(--motion-slow) ease-in-out infinite; }
+.obs-worker-node[data-live="1"] { animation: pulse var(--motion-pulse) ease-in-out infinite; }
 
 .obs-worker-head {
   display: flex;
