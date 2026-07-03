@@ -470,6 +470,7 @@ function formatDispatchWatch(item, meta = null) {
     force: item.force === true,
     abort: item.abort === true,
     abortTo: item.abortTo || null,
+    cascade: item.cascade === true,
     sessionId: item.sessionId || null,
     dispatchedAt: item.dispatchedAt,
     // resolvedAt is take/archive time (when the runner claimed the item), NOT
@@ -1247,17 +1248,18 @@ POST ${baseUrl}/api/proxy/agent/status   (alias: /api/proxy/foreman/status — d
 ## Dispatch Endpoints
 
 POST ${baseUrl}/api/proxy/dispatch
-  Body: { "prompt": "...", "promptName": "...", "kind": "implementation", "issueId": "...", "issueIdentifier": "LIN-42", "issueTitle": "...", "issueUrl": "...", "target": "cli|web|dash", "repo": "...", "followUpTo": "...", "force": false, "abort": false, "abortTo": "...", "sessionId": "...", "waitForFollowUps": false, "appendProxyContext": true }
+  Body: { "prompt": "...", "promptName": "...", "kind": "implementation", "issueId": "...", "issueIdentifier": "LIN-42", "issueTitle": "...", "issueUrl": "...", "target": "cli|web|dash", "repo": "...", "followUpTo": "...", "force": false, "abort": false, "abortTo": "...", "cascade": false, "sessionId": "...", "waitForFollowUps": false, "appendProxyContext": true }
   → Queue a prompt for the workspace's dispatch consumer (the runner). Only "prompt" is required; target defaults to "cli". ("local"/Harbour OS is not available to proxy consumers.)
   → "kind" is a stable task classification (research/plan/implementation/review/etc. — the prompt-template keys, plus "custom"). Optional: when omitted it is derived from "promptName", falling back to "custom". Read it instead of inferring the task type from promptName or the prompt body.
   → "followUpTo" (optional) resumes an existing session: pass the "id" of an earlier dispatch and "prompt" becomes a follow-up instruction to that same session. cli/web only, same workspace. The runner owns session liveness — if the session is gone it posts terminal "[failed] no live session to resume". Use sparingly: only when the prior session ran cleanly and naturally suggests the next step (e.g. confirm CI is green, update Linear/git); any wobble → dispatch a fresh session instead.
-  → "force" (optional, default false) is a cli/web follow-up modifier: it overrides the runner's active-session guard so a "followUpTo" can resume a session that is wedged or sleeping in an active phase (Claude infra wobble, long-running sleep) instead of being rejected by the busy-session liveness gate. Setting it asserts the prior process is effectively dead — see LIN-546 for the collision contract it bypasses. Only meaningful with "followUpTo": "force": true without one is rejected (400). The runner reads it as "item.force" off the polled/claimed item. See LIN-559.
+  → "force" (optional, default false) overrides a runner-side guard, so it is meaningful alongside a verb that HAS one — and ONLY such a verb (a bare "force": true on a fresh dispatch is rejected 400 "force requires followUpTo or abort"): (1) with "followUpTo" it bypasses the active-session guard so a follow-up can resume a session wedged or sleeping in an active phase (Claude infra wobble, long-running sleep) — asserting the prior process is effectively dead (see LIN-546); (2) with a single "abort" it is the escape hatch that force-closes even a human-continued session the runner would otherwise skip (see cascade + "[skipped]" below). Mutually exclusive with "cascade" (a cascade emits its own plain, unforced aborts): "force" + "cascade" is rejected (400). The runner reads it as "item.force" off the polled/claimed item. See LIN-559/LIN-946.
   → "abort" (optional, default false) requests an abort/cancel/close of an existing session instead of running a prompt: set "abort": true and "abortTo" to the "id" of the dispatch whose session should be cancelled. "prompt" is NOT required for an abort, and the consumer flips the running session to a terminal cancelled state. The abort item's OWN "target" must be poll-eligible (cli/web/dash) — eligibility is the abort item's target, NOT the substrate of the session being aborted (so you can abort a "dash" session with a "cli" abort item). Mutually exclusive with "followUpTo". See LIN-743.
   → "abortTo" (required when "abort" is true) is the dispatch id (UUID) of the session to abort. Stored + forwarded blindly; the consumer owns session liveness.
+  → "cascade" (optional boolean, default false) is a modifier on an "abort": when true, "abortTo" names the ROOT session of a subtree and Harbour deterministically walks the descendant "sessionId"-tree and emits ONE ordinary abort per discovered session (root + every worker/child-autopilot under it). Requires "abort" (cascade:true without it is rejected 400); mutually exclusive with "force". The response is { "success": true, "cascade": true, "closed": [ { "id", "abortTo", "target" }, ... ], "count": N } instead of a single queued item. The emitted aborts are plain (no "force", no "sessionId"), so the runner cancels each and SKIPS any human-continued session — posting a distinct terminal-benign "[skipped] human-continued session <id> (<phase>)." marker (NOT "[aborted]"): treat it as terminal-benign — the session is still live, do not retry it and do not treat it as a close. Aborting an already-terminal session is a safe no-op. Use "force" on a single targeted abort to override that skip deliberately. See LIN-946/LIN-951.
   → "sessionId" (optional) is the autopilot dispatch id that spawned this worker. Pass it on every worker dispatch the autopilot fans out so the run reconstructs as one session across all touched tasks (incl. epic descent / breakdown spin-offs). UUID, stored + forwarded blindly, ANY target (unlike followUpTo). See LIN-591.
   → "waitForFollowUps" (optional boolean, default false; cli/web only) is the opt-in completion hold: when true the runner holds the session open at completion to receive in-session follow-ups (beats) instead of finalizing. The runner owns the behaviour — this flag is stored + forwarded blindly. Set it for a worker you intend to keep feeding in-session; leave it false (omit) for an orchestrator/sub-orchestrator that must finalize normally and stay free to run its own watch loop. See LIN-795/LIN-797.
   → By default a proxy-context block is appended to the prompt so the worker inherits this workspace's API access. Reporting is handled by the runner's Stop hook, not the prompt. Set "appendProxyContext": false to opt out. EXCEPTION: when "followUpTo" is set the block is NOT appended by default — a follow-up beat resumes a warm session that already received the proxy context on its first beat, so re-appending it is redundant. Pass "appendProxyContext": true to force it back on for a follow-up.
-  → { "id": "...", "status": "queued", "promptName": "...", "kind": "implementation", "issueIdentifier": "...", "target": "cli", "abort": false, "abortTo": null, "sessionId": null, "dispatchedAt": "..." }
+  → { "id": "...", "status": "queued", "promptName": "...", "kind": "implementation", "issueIdentifier": "...", "target": "cli", "abort": false, "abortTo": null, "cascade": false, "sessionId": null, "dispatchedAt": "..." } (a "cascade": true request instead returns { "success": true, "cascade": true, "closed": [...], "count": N })
 
 POST ${baseUrl}/api/proxy/recommend-and-dispatch
   Body: { "issueIdentifier": "LIN-42", "target": "cli|web|dash", "repo": "...", "appendProxyContext": true, "noDescend": false, "kind": "review", "sessionId": "...", "waitForFollowUps": false }
@@ -4258,7 +4260,7 @@ One convention across every endpoint, so you can branch on the same fields every
     }
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo, force, abort, abortTo, sessionId, waitForFollowUps, queueIfBusy, subscription } = req.body || {};
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo, force, abort, abortTo, cascade, sessionId, waitForFollowUps, queueIfBusy, subscription } = req.body || {};
 
       // Abort verb (LIN-743): an abort item cancels/closes an existing session
       // (named by abortTo) instead of running a prompt — it carries no prompt and
@@ -4290,6 +4292,22 @@ One convention across every endpoint, so you can branch on the same fields every
       } else if (abortTo !== undefined && abortTo !== null) {
         logEvent(req, '/api/proxy/dispatch', 400);
         return badRequest.json(res, 'abortTo requires abort to be true');
+      }
+      // Cascade close (LIN-946): a boolean modifier on an abort. When true the
+      // abort's `abortTo` names the ROOT session of a subtree; Harbour expands the
+      // one call into an abort per discovered descendant session (the recursive
+      // sessionId-tree walk lands in a later beat). Like abortTo it is only
+      // meaningful alongside abort — reject cascade:true without it rather than
+      // storing an inert flag (mirroring the abortTo-requires-abort guard above).
+      // Stored + forwarded blindly for now; the walk consumes it, not the runner.
+      // This is the proxy-token twin the autopilot actually hits.
+      if (cascade !== undefined && typeof cascade !== 'boolean') {
+        logEvent(req, '/api/proxy/dispatch', 400);
+        return badRequest.json(res, 'cascade must be a boolean');
+      }
+      if (cascade === true && !isAbort) {
+        logEvent(req, '/api/proxy/dispatch', 400);
+        return badRequest.json(res, 'cascade requires abort to be true');
       }
       // Validate kind if provided; when omitted it is derived from promptName below.
       if (kind !== undefined && !isValidDispatchKind(kind)) {
@@ -4375,19 +4393,29 @@ One convention across every endpoint, so you can branch on the same fields every
         }
       }
 
-      // Force-resume flag (LIN-559): overrides the runner's active-session
-      // liveness guard so a follow-up can resume a wedged/sleeping session. Only
-      // meaningful alongside followUpTo (the human asserts the prior process is
-      // dead — see LIN-546), so reject force:true without it rather than storing
-      // an inert flag. force:false / omitted is always fine. The runner reads
-      // item.force off the polled/claimed item.
+      // Force flag: overrides a runner-side guard, so it is meaningful ONLY
+      // alongside a verb that has one — reject a bare force on a fresh dispatch
+      // rather than storing an inert flag. Two verbs qualify:
+      //   - followUpTo (LIN-559): bypass the active-session liveness guard so a
+      //     follow-up can resume a wedged/sleeping session (LIN-546).
+      //   - a single abort (LIN-946/LIN-951): bypass the runner's human-continued
+      //     skip so a DELIBERATE targeted abort still cancels a human-continued
+      //     session (the escape hatch). A cascade emits its own plain, UNforced
+      //     aborts (those skip), so force is never a cascade concern — reject the
+      //     force+cascade contradiction rather than silently dropping force.
+      // force:false / omitted is always fine. The runner reads item.force off the
+      // polled/claimed item.
       if (force !== undefined && typeof force !== 'boolean') {
         logEvent(req, '/api/proxy/dispatch', 400);
         return badRequest.json(res, 'force must be a boolean');
       }
-      if (force === true && (followUpTo === undefined || followUpTo === null)) {
+      if (force === true && cascade === true) {
         logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, 'force requires followUpTo');
+        return badRequest.json(res, 'force and cascade are mutually exclusive');
+      }
+      if (force === true && !isAbort && (followUpTo === undefined || followUpTo === null)) {
+        logEvent(req, '/api/proxy/dispatch', 400);
+        return badRequest.json(res, 'force requires followUpTo or abort');
       }
 
       // Autopilot session reference (LIN-591): the autopilot dispatchId that
@@ -4411,6 +4439,22 @@ One convention across every endpoint, so you can branch on the same fields every
       // The `buildWakeFollowUp` self-skip `childId === sessionId` still prevents an
       // orchestrator from waking itself.
       const subscriptionResolved = subscription ?? DEFAULT_SUBSCRIPTION;
+
+      // Cascade close (LIN-946): a cascade request is not a single abort — it is a
+      // command Harbour expands into one plain abort per session in abortTo's whole
+      // descendant subtree (the recursive sessionId-tree walk). The store owns the
+      // walk + emission; the runner still executes each cancel and skips
+      // human-continued sessions (LIN-951). Handled here, before the prompt-context
+      // work below (a cascade carries no prompt). This is the proxy-token twin the
+      // autopilot actually hits. INERT: nothing issues a cascade at end-of-run yet.
+      if (cascade === true) {
+        const result = await dispatchQueueStore.expandCascadeAborts(req.proxyUrlKey, abortTo, {
+          target: target || 'cli',
+          dispatchedBy: req.proxyCreatedBy || null
+        });
+        logEvent(req, '/api/proxy/dispatch', 201);
+        return res.status(201).json({ success: true, cascade: true, ...result });
+      }
 
       // Auto-append the proxy context (workspace API access + reporting channel) by
       // default, so the worker can both read context and report its result.
@@ -4456,6 +4500,7 @@ One convention across every endpoint, so you can branch on the same fields every
         force: force === true,
         abort: isAbort,
         abortTo: isAbort ? abortTo : null,
+        cascade: cascade === true,
         sessionId: sessionId || null,
         waitForFollowUps: waitForFollowUps === true,
         queueIfBusy: queueIfBusy === true,
@@ -4473,6 +4518,7 @@ One convention across every endpoint, so you can branch on the same fields every
         target: item.target,
         abort: item.abort === true,
         abortTo: item.abortTo || null,
+        cascade: item.cascade === true,
         sessionId: item.sessionId || null,
         dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt
       });

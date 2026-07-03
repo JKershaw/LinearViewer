@@ -87,6 +87,60 @@ test('abort + abortTo are carried into history (watch + history list)', async ()
   assert.equal(items[0].abortTo, abortTo);
 });
 
+// --- Cascade modifier (LIN-946) -------------------------------------------
+// `cascade` rides alongside abort/abortTo: abortTo names a subtree ROOT and
+// cascade:true marks the abort for Harbour-side subtree expansion (the recursive
+// walk lands in a later beat). Beat 1 is wire acceptance only — the store records
+// and forwards the flag blindly through every seam, exactly like abort/abortTo.
+
+test('addItem persists cascade alongside abort + abortTo', async () => {
+  const store = makeStore();
+  const abortTo = '55555555-5555-4555-8555-555555555555';
+
+  const doc = await store.addItem('acme', { abort: true, abortTo, cascade: true, target: 'cli' });
+
+  assert.equal(doc.abort, true);
+  assert.equal(doc.abortTo, abortTo);
+  assert.equal(doc.cascade, true);
+});
+
+test('addItem defaults cascade to false (plain abort and normal dispatch)', async () => {
+  const store = makeStore();
+  const abortTo = '66666666-6666-4666-8666-666666666666';
+
+  const plainAbort = await store.addItem('acme', { abort: true, abortTo });
+  assert.equal(plainAbort.cascade, false);
+
+  const normal = await store.addItem('acme', { prompt: 'fresh task' });
+  assert.equal(normal.cascade, false);
+});
+
+test('the _formatItem seam (poll/listItems) exposes cascade to the consumer', async () => {
+  const store = makeStore();
+  const abortTo = '77777777-7777-4777-8777-777777777777';
+  await store.addItem('acme', { abort: true, abortTo, cascade: true });
+
+  const items = await store.pollAvailable('acme');
+
+  assert.equal(items.length, 1);
+  assert.equal(items[0].cascade, true);
+});
+
+test('cascade is carried through takeItem and into history', async () => {
+  const store = makeStore();
+  const abortTo = '88888888-8888-4888-8888-888888888888';
+  const created = await store.addItem('acme', { abort: true, abortTo, cascade: true });
+
+  const taken = await store.takeItem(created._id, 'acme');
+  assert.equal(taken.cascade, true);
+
+  const status = await store.getItemStatus('acme', created._id);
+  assert.equal(status.cascade, true);
+
+  const { items } = await store.listHistory('acme');
+  assert.equal(items[0].cascade, true);
+});
+
 test('end-to-end: an abort item references an earlier dispatch by id', async () => {
   const store = makeStore();
 

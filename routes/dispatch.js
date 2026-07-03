@@ -196,7 +196,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const { workspace } = req;
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo, force, abort, abortTo, sessionId, waitForFollowUps, queueIfBusy, subscription } = req.body;
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo, force, abort, abortTo, cascade, sessionId, waitForFollowUps, queueIfBusy, subscription } = req.body;
 
       // Abort verb (LIN-743): an abort item asks the consumer to cancel/close an
       // existing session (named by abortTo) instead of running a prompt, so it
@@ -233,6 +233,20 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         }
       } else if (abortTo !== undefined && abortTo !== null) {
         return badRequest.json(res, 'abortTo requires abort to be true');
+      }
+
+      // Cascade close (LIN-946): a boolean modifier on an abort. When true the
+      // abort's `abortTo` names the ROOT session of a subtree; Harbour expands the
+      // one call into an abort per discovered descendant session (the recursive
+      // sessionId-tree walk lands in a later beat). Like abortTo it is only
+      // meaningful alongside abort — reject cascade:true without it rather than
+      // storing an inert flag (mirroring the abortTo-requires-abort guard above).
+      // Stored + forwarded blindly for now; the walk consumes it, not the runner.
+      if (cascade !== undefined && typeof cascade !== 'boolean') {
+        return badRequest.json(res, 'cascade must be a boolean');
+      }
+      if (cascade === true && !isAbort) {
+        return badRequest.json(res, 'cascade requires abort to be true');
       }
 
       // Validate kind if provided; when omitted it is derived from promptName below.
@@ -323,17 +337,27 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         }
       }
 
-      // Validate the force-resume flag if provided (LIN-559). force overrides the
-      // runner's active-session liveness guard so a follow-up can resume a wedged/
-      // sleeping session. It is only meaningful alongside followUpTo (the human
-      // asserts the prior process is dead — see LIN-546), so reject force:true
-      // without it rather than persisting an inert flag — mirroring the
-      // abortTo-requires-abort guard above. force:false / omitted is always fine.
+      // Validate the force flag if provided. `force` overrides a runner-side
+      // guard, so it is meaningful alongside a verb that HAS such a guard — and
+      // ONLY such a verb, so reject a bare force on a fresh dispatch rather than
+      // persisting an inert flag:
+      //   - followUpTo (LIN-559): bypass the active-session liveness guard so a
+      //     follow-up can resume a wedged/sleeping session (the human asserts the
+      //     prior process is dead — LIN-546).
+      //   - a single abort (LIN-946/LIN-951): bypass the runner's human-continued
+      //     skip so a DELIBERATE targeted abort still cancels a human-continued
+      //     session (the escape hatch). A cascade emits its own plain, UNforced
+      //     aborts (those skip), so force is never a cascade concern — reject the
+      //     force+cascade contradiction rather than silently dropping force.
+      // force:false / omitted is always fine.
       if (force !== undefined && typeof force !== 'boolean') {
         return badRequest.json(res, 'force must be a boolean');
       }
-      if (force === true && (followUpTo === undefined || followUpTo === null)) {
-        return badRequest.json(res, 'force requires followUpTo');
+      if (force === true && cascade === true) {
+        return badRequest.json(res, 'force and cascade are mutually exclusive');
+      }
+      if (force === true && !isAbort && (followUpTo === undefined || followUpTo === null)) {
+        return badRequest.json(res, 'force requires followUpTo or abort');
       }
 
       // Validate autopilot session reference if provided. Unlike followUpTo,
@@ -344,6 +368,20 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         if (!UUID_REGEX.test(sessionId)) {
           return badRequest.json(res, 'Invalid sessionId format');
         }
+      }
+
+      // Cascade close (LIN-946): a cascade request is not a single abort — it is a
+      // command Harbour expands into one plain abort per session in abortTo's whole
+      // descendant subtree (the recursive sessionId-tree walk). The store owns the
+      // walk + emission; the runner still executes each cancel and skips
+      // human-continued sessions (LIN-951). INERT: nothing issues a cascade at
+      // end-of-run yet — this is the mechanism the future guide-trigger will call.
+      if (cascade === true) {
+        const result = await dispatchQueueStore.expandCascadeAborts(workspace.urlKey, abortTo, {
+          target: target || 'cli',
+          dispatchedBy: req.session.linearUserId || null
+        });
+        return res.status(201).json({ success: true, cascade: true, ...result });
       }
 
       // Create dispatch item
@@ -362,6 +400,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         force: force === true,
         abort: isAbort,
         abortTo: isAbort ? abortTo : null,
+        cascade: cascade === true,
         sessionId: sessionId || null,
         waitForFollowUps: waitForFollowUps === true,
         queueIfBusy: queueIfBusy === true,

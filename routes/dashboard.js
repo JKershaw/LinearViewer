@@ -56,8 +56,12 @@ import { hashSession } from '../lib/session-summary-cache.js';
 // the cache (keyed on the immutable run) would serve stale content.
 const TERMINAL_AGENT_STATES = new Set(['complete', 'error']);
 
-// Map a dispatch terminal-feedback marker → a Loop agentState.
-const MARKER_TO_AGENT_STATE = { done: 'complete', failed: 'error', aborted: 'error' };
+// Map a dispatch terminal-feedback marker → a Loop agentState. `skipped`
+// (LIN-946/LIN-951) is terminal-BENIGN → 'complete', NOT 'error': the runner
+// refused a cascade abort into a human-continued session, which is an ended run,
+// not a failed one. Deliberately distinct from `aborted` (→ 'error') so a skip is
+// never rendered as an errored/aborted session.
+const MARKER_TO_AGENT_STATE = { done: 'complete', failed: 'error', aborted: 'error', skipped: 'complete' };
 
 // A non-terminal session whose last activity is older than this is considered
 // "stale" — a worker that died without emitting a terminal marker would otherwise

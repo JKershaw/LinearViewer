@@ -1186,7 +1186,7 @@ Capability-gated: `422 CAPABILITY_NOT_SUPPORTED` with `capability: "uploadFile"`
 
 These endpoints let a consumer (e.g. an autopilot orchestrator) hand a prompt to the workspace's **dispatch runner** — a separate system that polls the queue and runs the prompt as a Claude Code session (locally as `cli`, or via web remote-control) — and then watch it run to completion. Enqueue requires `readWrite`; the watch and list reads are `read`-scope.
 
-The runner reports progress back as **free-form feedback entries** (it owns the return leg via its own lifecycle; you do not poll it to run). Across a normal run the feedback stream carries, in order: phase tags (`[started]`/`[working]`), periodic **heartbeats** with activity telemetry, the session's final **recap** (`(recap 1/2)` …), structured **`[evidence]`** entries (each with a populated `url`), and a terminal **`[done]`** / **`[failed]`** / **`[aborted]`** marker. The watch/list endpoints derive a terminal `status` from that marker, so you can poll a field instead of parsing prose.
+The runner reports progress back as **free-form feedback entries** (it owns the return leg via its own lifecycle; you do not poll it to run). Across a normal run the feedback stream carries, in order: phase tags (`[started]`/`[working]`), periodic **heartbeats** with activity telemetry, the session's final **recap** (`(recap 1/2)` …), structured **`[evidence]`** entries (each with a populated `url`), and a terminal **`[done]`** / **`[failed]`** / **`[aborted]`** marker (or **`[skipped]`** when a cascade abort is refused for a human-continued session — terminal-benign, distinct from `[aborted]`; see LIN-946/LIN-951). The watch/list endpoints derive a terminal `status` from that marker, so you can poll a field instead of parsing prose.
 
 > **Judge from evidence, not self-report.** The recap is the runner's own narration of what it did. Treat it as descriptive detail; confirm completion against the `[evidence]` URLs (PR/CI/commit/issue) and issue-tracker/git state. A `done` status with no corroborating artifact is "claimed, unverified."
 
@@ -1208,7 +1208,9 @@ Content-Type: application/json
 | `target` | string | No | `cli` \| `web` \| `dash` (default `cli`). `local`/Harbour OS is **not** available to proxy consumers |
 | `repo` | string | No | Optional repository hint |
 | `followUpTo` | string (UUID) | No | Resume an existing session: pass the `id` of an earlier dispatch and `prompt` becomes a follow-up instruction to that same session. `cli`/`web` only, same workspace. The runner owns session liveness — if the session is gone it posts a terminal `[failed] no live session to resume`. Use sparingly (see the dispatch guide's [Follow-ups](dispatch-integration.md#follow-ups) section); any wobble → dispatch a fresh session instead |
-| `force` | bool | No | Default `false`. A `cli`/`web` follow-up modifier that **overrides the runner's active-session guard**, letting a `followUpTo` resume a session that is wedged or sleeping in an active phase (Claude infra wobble, long-running sleep) instead of being rejected by the busy-session liveness gate. Setting it asserts the prior process is effectively dead (see LIN-546 for the collision contract it bypasses). **Only meaningful with `followUpTo`** — `force: true` without one is rejected (`400`). The runner reads it as `item.force` off the polled/claimed item. See LIN-559 |
+| `force` | bool | No | Default `false`. **Overrides a runner-side guard**, so it is meaningful only alongside a verb that has one — with `followUpTo` it lets a resume bypass the active-session liveness gate (a session wedged/sleeping in an active phase; asserts the prior process is dead, see LIN-546), and with a single `abort` it force-closes even a human-continued session the runner would otherwise skip. A bare `force: true` on a fresh dispatch is rejected (`400 "force requires followUpTo or abort"`); `force` + `cascade` is rejected (`400`). The runner reads it as `item.force`. See LIN-559/LIN-946 |
+| `abort` / `abortTo` | bool / string (UUID) | No | Cancel/close an existing session instead of running a prompt: `abort: true` + `abortTo` = the `id` of the session to cancel (no `prompt` needed). See the dispatch guide's [Aborting a session](dispatch-integration.md#aborting-a-session) |
+| `cascade` | bool | No | Default `false`. A modifier on an `abort`: when `true`, `abortTo` names a subtree **root** and Harbour expands the call into one plain abort per descendant session, returning `{ success, cascade: true, closed: [...], count }`. Requires `abort`; mutually exclusive with `force`. The runner skips human-continued sessions with a terminal-benign `[skipped]` marker. See the dispatch guide's [Cascade close](dispatch-integration.md#cascade-close-closing-a-session-subtree) and LIN-946/LIN-951 |
 | `sessionId` | string (UUID) | No | The autopilot dispatch id that spawned this worker. Stamp it on every worker an autopilot run fans out so the whole run (incl. epic descent / `breakdown` spin-offs) reconstructs as one session. Stored and forwarded verbatim; unlike `followUpTo` it carries **no target restriction**. See LIN-591 |
 | `appendProxyContext` | bool | No | Default `true`: append a proxy-context block to the prompt so the worker inherits workspace access via this proxy. Set `false` to send the prompt verbatim. **Exception (LIN-805):** when `followUpTo` is set the block is **not** appended by default — a follow-up beat resumes a warm session that already received the proxy context on its first beat, so re-appending it is redundant. Pass `appendProxyContext: true` to force it back on for a follow-up |
 
@@ -1280,7 +1282,7 @@ GET /api/proxy/dispatch/{id}
 GET /api/proxy/dispatch/{id}?wait=50
 ```
 
-Poll this after enqueuing. `status` is terminal (`done`/`failed`/`aborted`) once the runner posts the matching feedback marker; until then it is `queued` or `taken`.
+Poll this after enqueuing. `status` is terminal (`done`/`failed`/`aborted`/`skipped`) once the runner posts the matching feedback marker; until then it is `queued` or `taken`. (`skipped` is terminal-benign — a cascade abort the runner refused because a human is still in that session; see LIN-946/LIN-951.)
 
 **Long-poll with `?wait=Ns` (recommended for waiting).** Without `?wait`, the endpoint returns the current state immediately — a plain short-poll, so you own the waiting (and tend to oversleep). With `?wait=N` (capped at 50s) the server holds the request open and **returns the instant `status` transitions or new feedback arrives**, else returns the current snapshot at the cap so you simply call again. Your watch loop collapses to a no-sleep, no-backoff:
 
@@ -1290,7 +1292,7 @@ while :; do
   body=$(curl -s -H "Authorization: Bearer $TOKEN" \
     "$BASE/api/proxy/dispatch/$ID?wait=50")
   dispatch_status=$(jq -r .status <<<"$body")
-  case "$dispatch_status" in done|failed|aborted) break ;; esac
+  case "$dispatch_status" in done|failed|aborted|skipped) break ;; esac
 done
 ```
 
