@@ -31,7 +31,7 @@ const sandbox = {
   console,
 };
 vm.runInNewContext(src, sandbox, { filename: 'observation.js' });
-const { renderActivityLog, renderArtifacts, classifyArtifact } = sandbox.module.exports;
+const { renderActivityLog, renderArtifacts, classifyArtifact, renderObjective } = sandbox.module.exports;
 
 test.describe('renderActivityLog — §6.3 burst copy', () => {
   test('drops the redundant per-burst total when a breakdown sums it', () => {
@@ -98,5 +98,35 @@ test.describe('classifyArtifact / renderArtifacts — §6.4 typed rendering', ()
 
   test('no artifacts → empty string', () => {
     assert.equal(renderArtifacts({ producedArtifacts: [] }), '');
+  });
+});
+
+test.describe('renderObjective — §4 id-once (LIN-931)', () => {
+  test('renders the objective when seedTitle is a real goal', () => {
+    const html = renderObjective({ seedTitle: 'Ship the observation page', seedIssue: 'LIN-744' });
+    assert.match(html, /obs-objective/);
+    assert.match(html, /Ship the observation page/);
+    assert.doesNotMatch(html, /LIN-744/);
+  });
+
+  test('drops the objective when seedTitle fell back to the seed id', () => {
+    // Server-side seedTitle falls back to seedIssue (the identifier) when no
+    // title exists anywhere; the objective must NOT reprint the id.
+    assert.equal(renderObjective({ seedTitle: 'LIN-744', seedIssue: 'LIN-744' }), '');
+  });
+
+  test('id-equality guard is whitespace-tolerant', () => {
+    assert.equal(renderObjective({ seedTitle: '  LIN-744 ', seedIssue: 'LIN-744' }), '');
+  });
+
+  test('no seedTitle → empty string (unchanged)', () => {
+    assert.equal(renderObjective({ seedIssue: 'LIN-744' }), '');
+    assert.equal(renderObjective({}), '');
+  });
+
+  test('escapes the objective text', () => {
+    const html = renderObjective({ seedTitle: '<script>x</script>', seedIssue: 'LIN-1' });
+    assert.doesNotMatch(html, /<script>/);
+    assert.match(html, /&lt;script&gt;/);
   });
 });
