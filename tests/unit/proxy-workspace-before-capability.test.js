@@ -122,3 +122,37 @@ test('AVAILABLE GitHub workspace + unsupported createRelation still 422 (capabil
   assert.equal(body.code, 'CAPABILITY_NOT_SUPPORTED');
   assert.equal(body.capability, 'createRelation');
 });
+
+// The ninth, out-of-original-list handler discovered at HEAD (the LIN-891
+// attachments upload POST). It had BOTH its capability gates — uploadFile and
+// the target-derived write capability — ahead of the `!token` guard; the fix
+// moved availability first. GitHub declines `uploadFile`, so an unavailable
+// GitHub workspace exercises exactly the same regression (both gates would
+// fire) as the relation handlers above. This is the ledger item that was
+// coverage-only-by-inspection at review time (LIN-677 close-out).
+
+test('unavailable GitHub workspace + attachments upload (unsupported uploadFile) → 503 workspace envelope, not 422 capability', async () => {
+  const { status, body } = await request(
+    buildApp('github', { token: null, reason: 'store_unreachable' }),
+    `/api/proxy/issues/${UUID}/attachments`,
+    { method: 'POST', body: { image: 'data:image/png;base64,iVBORw0KGgo=' } }
+  );
+  assert.equal(status, 503);
+  assert.equal(body.code, 'WORKSPACE_STORE_UNAVAILABLE');
+  assert.equal(body.retryable, true);
+  assert.notEqual(body.code, 'CAPABILITY_NOT_SUPPORTED');
+});
+
+test('AVAILABLE GitHub workspace + attachments upload still 422 on the uploadFile gate (capability wins when reachable)', async () => {
+  // Control: reachable workspace, so the uploadFile capability gate — the FIRST
+  // of the endpoint's two gates, and the one that now sits after availability —
+  // is the correct informative decline.
+  const { status, body } = await request(
+    buildApp('github'),
+    `/api/proxy/issues/${UUID}/attachments`,
+    { method: 'POST', body: { image: 'data:image/png;base64,iVBORw0KGgo=' } }
+  );
+  assert.equal(status, 422);
+  assert.equal(body.code, 'CAPABILITY_NOT_SUPPORTED');
+  assert.equal(body.capability, 'uploadFile');
+});
