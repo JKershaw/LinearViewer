@@ -21,7 +21,7 @@ import { Router } from 'express';
 import { renderNextRunPage } from '../lib/render-next-run.js';
 import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
-import { generateGoalSuggestions, CONTINUE_UNTIL_STOPPED_OPTION, formatNextRunContext, buildNextRunSummary, ensureSizeCoverage } from '../lib/next-run.js';
+import { generateGoalSuggestions, CONTINUE_UNTIL_STOPPED_OPTION, formatNextRunContext, buildNextRunSummary, ensureSizeCoverage, attachReferencedTaskTitles } from '../lib/next-run.js';
 import { buildRoadmapModel } from '../lib/roadmap.js';
 import { isRecommendationEnabled } from '../lib/openrouter.js';
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
@@ -79,7 +79,12 @@ function buildMockResponse() {
   // Guarantee S/M/L exactly as the live generator does, so the mock honours the
   // same contract (the fixtures cover S+M, so this fills the missing L).
   const covered = ensureSizeCoverage(concrete, roadmapModel);
-  const options = [...covered, { ...CONTINUE_UNTIL_STOPPED_OPTION }];
+  // Resolve referenced task ids → titles (LIN-923), mirroring the live generator so
+  // the mock exercises the same enriched shape the client renders.
+  const options = attachReferencedTaskTitles(
+    [...covered, { ...CONTINUE_UNTIL_STOPPED_OPTION }],
+    roadmapModel
+  );
 
   // Build the analysis + context + summary from the same machinery the real
   // generator uses, so the mock panels show representative output (parity).

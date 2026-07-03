@@ -188,12 +188,35 @@
   line-height: 1.6;
 }
 
+/* Referenced tasks now list one per line: mono id chip + human-readable title
+   (LIN-923), so the reader can tell what each task is on the mobile layout. */
+.next-run-ref-list {
+  list-style: none;
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.next-run-ref-item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
 /* Referenced-task ids → shared mono .chip (LIN-861); the chip supplies the
-   padding/border/mono/inset look, so keep only the inter-chip spacing + the
-   smaller badge scale. */
+   padding/border/mono/inset look, so keep only the smaller badge scale and stop
+   it from shrinking when the title wraps beside it. */
 .next-run-ref.chip {
-  margin-right: 0.25rem;
+  flex: none;
   font-size: 0.8em;
+}
+
+/* Human-readable task title (sans, per the mono-facts / sans-labels split). */
+.next-run-ref-title {
+  color: var(--fg);
+  line-height: 1.4;
 }
 
 .next-run-option-actions {

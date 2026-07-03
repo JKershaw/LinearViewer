@@ -20,6 +20,7 @@ import {
   parseGoalSuggestions,
   parseNextRunResponse,
   ensureSizeCoverage,
+  attachReferencedTaskTitles,
   normalizeSize,
   generateGoalSuggestions,
   resolveRoadmapNarrative,
@@ -353,6 +354,39 @@ describe('ensureSizeCoverage (LIN-642)', () => {
   });
 });
 
+describe('attachReferencedTaskTitles (LIN-923)', () => {
+  test('resolves each referenced id to its task title from the execution queue', () => {
+    const opts = [{ title: 'a', goal: 'g', size: 'M', referencedTaskIds: ['LIN-1', 'LIN-2'] }];
+    const out = attachReferencedTaskTitles(opts, RICH_MODEL);
+    assert.deepEqual(out[0].referencedTasks, [
+      { id: 'LIN-1', title: 'Blocker' },
+      { id: 'LIN-2', title: 'Blocked work' },
+    ]);
+    // The machine-readable field is left untouched (LIN-644 diffs it).
+    assert.deepEqual(out[0].referencedTaskIds, ['LIN-1', 'LIN-2']);
+  });
+
+  test('resolves an unknown id to an empty title rather than dropping it', () => {
+    const opts = [{ title: 'a', goal: 'g', size: 'M', referencedTaskIds: ['LIN-999'] }];
+    const out = attachReferencedTaskTitles(opts, RICH_MODEL);
+    assert.deepEqual(out[0].referencedTasks, [{ id: 'LIN-999', title: '' }]);
+  });
+
+  test('yields an empty referencedTasks for an option with no ids', () => {
+    const out = attachReferencedTaskTitles([{ title: 'a', goal: 'g', size: 'M', referencedTaskIds: [] }], RICH_MODEL);
+    assert.deepEqual(out[0].referencedTasks, []);
+    // ...and for a missing field entirely.
+    const out2 = attachReferencedTaskTitles([{ title: 'a', goal: 'g', size: 'M' }], RICH_MODEL);
+    assert.deepEqual(out2[0].referencedTasks, []);
+  });
+
+  test('tolerates a null/garbage model or options without throwing', () => {
+    assert.deepEqual(attachReferencedTaskTitles(null, RICH_MODEL), []);
+    const out = attachReferencedTaskTitles([{ referencedTaskIds: ['LIN-1'] }], null);
+    assert.deepEqual(out[0].referencedTasks, [{ id: 'LIN-1', title: '' }]);
+  });
+});
+
 describe('CONTINUE_UNTIL_STOPPED_OPTION', () => {
   test('is the deterministic empty-goal mapping the generator always appends', () => {
     // The generator appends a copy of this option as the guaranteed last entry, so
@@ -452,6 +486,8 @@ describe('generateGoalSuggestions return shape (LIN-633)', () => {
     );
     const opt = result.options.find(o => o.title === 'T');
     assert.deepEqual(opt.referencedTaskIds, ['LIN-1']);
+    // The surviving id is enriched with its resolved title for display (LIN-923).
+    assert.deepEqual(opt.referencedTasks, [{ id: 'LIN-1', title: 'Real task' }]);
   });
 
   test('folds a fresh roadmap report digest into the returned context (LIN-742)', async () => {
