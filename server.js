@@ -86,6 +86,7 @@ import { createSessionsFeedCache } from './lib/sessions-feed-cache.js'
 import { fetchIssueContext } from './lib/linear.js'
 import { createTaskChatRoutes } from './routes/task-chat.js'
 import { createNextRunRoutes } from './routes/next-run.js'
+import { createFlightCompanionRoutes } from './routes/flight-companion.js'
 import { yapClientFromEnv } from './lib/yap-client.js'
 import { getLoopsForWorkspace } from './lib/pipeline-loops.js'
 import { buildSessionCounts } from './lib/sessions-view.js'
@@ -1273,6 +1274,9 @@ app.use(createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePrefere
 
 // Mount next-run routes (experimental "suggest the next autopilot run" — LIN-603).
 app.use(createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, reportHistoryStore }))
+
+// Mount flight-companion routes (experimental prototype for LIN-751 realtime chat — LIN-922).
+app.use(createFlightCompanionRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo }))
 
 /**
  * Workspace project view - renders the interactive tree view.

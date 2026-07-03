@@ -1,0 +1,48 @@
+/**
+ * Flight Companion page (experimental, LIN-922).
+ * Minimal styling for the prompt-surfacing stub; leans on style.css,
+ * common-actions.css, and observation.css (the .obs-session-body pre block).
+ */
+
+.flight-companion-header {
+  margin-bottom: 1rem;
+}
+
+.flight-companion-subtitle {
+  color: var(--muted);
+  margin-top: 0.25rem;
+}
+
+.flight-companion-experimental {
+  color: var(--muted);
+  margin-bottom: 0.75rem;
+}
+
+.flight-companion-steps {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+  color: var(--text);
+}
+
+.flight-companion-steps li {
+  margin: 0.2rem 0;
+}
+
+.flight-companion-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.flight-companion-feedback {
+  color: var(--muted);
+  font-size: 0.9em;
+}
+
+.flight-companion-prompt {
+  max-height: 60vh;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
