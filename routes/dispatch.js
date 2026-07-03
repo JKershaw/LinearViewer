@@ -196,7 +196,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const { workspace } = req;
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo, force, abort, abortTo, sessionId, waitForFollowUps, queueIfBusy, subscription } = req.body;
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo, force, abort, abortTo, cascade, sessionId, waitForFollowUps, queueIfBusy, subscription } = req.body;
 
       // Abort verb (LIN-743): an abort item asks the consumer to cancel/close an
       // existing session (named by abortTo) instead of running a prompt, so it
@@ -233,6 +233,20 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         }
       } else if (abortTo !== undefined && abortTo !== null) {
         return badRequest.json(res, 'abortTo requires abort to be true');
+      }
+
+      // Cascade close (LIN-946): a boolean modifier on an abort. When true the
+      // abort's `abortTo` names the ROOT session of a subtree; Harbour expands the
+      // one call into an abort per discovered descendant session (the recursive
+      // sessionId-tree walk lands in a later beat). Like abortTo it is only
+      // meaningful alongside abort — reject cascade:true without it rather than
+      // storing an inert flag (mirroring the abortTo-requires-abort guard above).
+      // Stored + forwarded blindly for now; the walk consumes it, not the runner.
+      if (cascade !== undefined && typeof cascade !== 'boolean') {
+        return badRequest.json(res, 'cascade must be a boolean');
+      }
+      if (cascade === true && !isAbort) {
+        return badRequest.json(res, 'cascade requires abort to be true');
       }
 
       // Validate kind if provided; when omitted it is derived from promptName below.
@@ -362,6 +376,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         force: force === true,
         abort: isAbort,
         abortTo: isAbort ? abortTo : null,
+        cascade: cascade === true,
         sessionId: sessionId || null,
         waitForFollowUps: waitForFollowUps === true,
         queueIfBusy: queueIfBusy === true,

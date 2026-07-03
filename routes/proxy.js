@@ -470,6 +470,7 @@ function formatDispatchWatch(item, meta = null) {
     force: item.force === true,
     abort: item.abort === true,
     abortTo: item.abortTo || null,
+    cascade: item.cascade === true,
     sessionId: item.sessionId || null,
     dispatchedAt: item.dispatchedAt,
     // resolvedAt is take/archive time (when the runner claimed the item), NOT
@@ -4258,7 +4259,7 @@ One convention across every endpoint, so you can branch on the same fields every
     }
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo, force, abort, abortTo, sessionId, waitForFollowUps, queueIfBusy, subscription } = req.body || {};
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo, force, abort, abortTo, cascade, sessionId, waitForFollowUps, queueIfBusy, subscription } = req.body || {};
 
       // Abort verb (LIN-743): an abort item cancels/closes an existing session
       // (named by abortTo) instead of running a prompt — it carries no prompt and
@@ -4290,6 +4291,22 @@ One convention across every endpoint, so you can branch on the same fields every
       } else if (abortTo !== undefined && abortTo !== null) {
         logEvent(req, '/api/proxy/dispatch', 400);
         return badRequest.json(res, 'abortTo requires abort to be true');
+      }
+      // Cascade close (LIN-946): a boolean modifier on an abort. When true the
+      // abort's `abortTo` names the ROOT session of a subtree; Harbour expands the
+      // one call into an abort per discovered descendant session (the recursive
+      // sessionId-tree walk lands in a later beat). Like abortTo it is only
+      // meaningful alongside abort — reject cascade:true without it rather than
+      // storing an inert flag (mirroring the abortTo-requires-abort guard above).
+      // Stored + forwarded blindly for now; the walk consumes it, not the runner.
+      // This is the proxy-token twin the autopilot actually hits.
+      if (cascade !== undefined && typeof cascade !== 'boolean') {
+        logEvent(req, '/api/proxy/dispatch', 400);
+        return badRequest.json(res, 'cascade must be a boolean');
+      }
+      if (cascade === true && !isAbort) {
+        logEvent(req, '/api/proxy/dispatch', 400);
+        return badRequest.json(res, 'cascade requires abort to be true');
       }
       // Validate kind if provided; when omitted it is derived from promptName below.
       if (kind !== undefined && !isValidDispatchKind(kind)) {
@@ -4456,6 +4473,7 @@ One convention across every endpoint, so you can branch on the same fields every
         force: force === true,
         abort: isAbort,
         abortTo: isAbort ? abortTo : null,
+        cascade: cascade === true,
         sessionId: sessionId || null,
         waitForFollowUps: waitForFollowUps === true,
         queueIfBusy: queueIfBusy === true,
@@ -4473,6 +4491,7 @@ One convention across every endpoint, so you can branch on the same fields every
         target: item.target,
         abort: item.abort === true,
         abortTo: item.abortTo || null,
+        cascade: item.cascade === true,
         sessionId: item.sessionId || null,
         dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt
       });
