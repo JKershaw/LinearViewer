@@ -142,11 +142,17 @@
           <select id="feedback-priority" class="feedback-priority" data-testid="feedback-priority">
             ${PRIORITIES.map(p => `<option value="${p.value}">${esc(p.label)}</option>`).join('')}
           </select>
-          <label class="feedback-label" for="feedback-file">Screenshot (optional)</label>
-          <input id="feedback-file" class="feedback-file" data-testid="feedback-file"
-                 type="file" accept="image/*">
-          <button type="button" class="feedback-file-remove" data-testid="feedback-file-remove"
-                  hidden>Remove screenshot</button>
+          <span class="feedback-label">Screenshot (optional)</span>
+          <label class="feedback-drop" data-testid="feedback-drop">
+            <input id="feedback-file" class="feedback-file" data-testid="feedback-file"
+                   type="file" accept="image/*">
+            <span class="feedback-drop-hint">Drag &amp; drop or paste an image, or choose a file</span>
+          </label>
+          <div class="feedback-file-chip" data-testid="feedback-file-chip" hidden>
+            <span class="feedback-file-name" data-testid="feedback-file-name"></span>
+            <button type="button" class="feedback-file-remove" data-testid="feedback-file-remove"
+                    hidden>Remove screenshot</button>
+          </div>
           <div class="feedback-status" data-testid="feedback-status" role="status" aria-live="polite"></div>
           <div class="feedback-popup-foot">
             <button type="button" class="feedback-submit" data-testid="feedback-submit"
@@ -164,6 +170,9 @@
     const messageEl = root.querySelector('.feedback-message');
     const priorityEl = root.querySelector('.feedback-priority');
     const fileEl = root.querySelector('.feedback-file');
+    const dropZone = root.querySelector('.feedback-drop');
+    const fileChip = root.querySelector('.feedback-file-chip');
+    const fileNameEl = root.querySelector('.feedback-file-name');
     const removeFileBtn = root.querySelector('.feedback-file-remove');
     const statusEl = root.querySelector('.feedback-status');
     // Three action buttons (Save / Save + triage / Save + autopilot); a shared
@@ -186,10 +195,15 @@
       fab.classList.toggle('feedback-fab-draft', hasDraft);
     }
 
-    // The remove control only exists while a screenshot is selected; it gives
-    // the user the escape hatch a native file input lacks.
+    // The remove control and filename chip only exist while a screenshot is
+    // selected; they give the user the escape hatch and the visible confirmation
+    // a native file input lacks (and that a dropped/pasted file has no other way
+    // to show, since the native input's value can't be set programmatically).
     function reflectFileSelection() {
-      removeFileBtn.hidden = !selectedFile;
+      const has = !!selectedFile;
+      removeFileBtn.hidden = !has;
+      fileChip.hidden = !has;
+      fileNameEl.textContent = has ? selectedFile.name : '';
     }
 
     // Drop the current screenshot and reset the native input. Resetting
@@ -228,9 +242,17 @@
     messageEl.addEventListener('input', () => { persist(); });
     priorityEl.addEventListener('change', () => { persist(); });
 
-    fileEl.addEventListener('change', () => {
-      const file = fileEl.files && fileEl.files[0];
+    // Single intake path for every source of a screenshot — the native file
+    // input, a drag-and-drop, and a clipboard paste all converge here so the
+    // size cap, image-type check, and selected-file handling stay identical and
+    // a dropped/pasted file cannot bypass the picker's validation.
+    function ingestFile(file) {
       if (!file) { clearSelectedFile(); setStatus(''); return; }
+      if (file.type && !file.type.startsWith('image/')) {
+        clearSelectedFile();
+        setStatus('That doesn’t look like an image. Please choose an image file.', 'error');
+        return;
+      }
       if (file.size > MAX_IMAGE_BYTES) {
         clearSelectedFile();
         setStatus('That image is too large (max 7MB). Pick a smaller one or submit without it.', 'error');
@@ -239,6 +261,48 @@
       selectedFile = file;
       reflectFileSelection();
       setStatus('');
+    }
+
+    fileEl.addEventListener('change', () => {
+      ingestFile(fileEl.files && fileEl.files[0]);
+    });
+
+    // Drag-and-drop over the drop zone. Only react when the drag actually
+    // carries files, and keep a visible drag-over state so the target is
+    // discoverable. `preventDefault` on dragover is what makes the element a
+    // valid drop target.
+    const dragCarriesFiles = (e) =>
+      e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files');
+
+    ['dragenter', 'dragover'].forEach((evt) => {
+      dropZone.addEventListener(evt, (e) => {
+        if (!dragCarriesFiles(e)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+        dropZone.classList.add('feedback-drop-over');
+      });
+    });
+    ['dragleave', 'dragend'].forEach((evt) => {
+      dropZone.addEventListener(evt, () => dropZone.classList.remove('feedback-drop-over'));
+    });
+    dropZone.addEventListener('drop', (e) => {
+      if (!dragCarriesFiles(e)) return;
+      e.preventDefault();
+      dropZone.classList.remove('feedback-drop-over');
+      const file = e.dataTransfer.files && e.dataTransfer.files[0];
+      if (file) ingestFile(file);
+    });
+
+    // Clipboard paste of an image anywhere in the open popup (e.g. after a
+    // screenshot-to-clipboard capture) routes through the same intake path.
+    popup.addEventListener('paste', (e) => {
+      const items = (e.clipboardData && e.clipboardData.items) || [];
+      for (const item of items) {
+        if (item.kind === 'file' && item.type && item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) { e.preventDefault(); ingestFile(file); return; }
+        }
+      }
     });
 
     removeFileBtn.addEventListener('click', () => {

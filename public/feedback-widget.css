@@ -132,8 +132,67 @@
   border-color: var(--border-strong, #ccc);
 }
 
+/* Drop zone: a dashed target that wraps the native file input so the whole
+   area is click-to-choose as well as a drag-and-drop / paste surface. */
+.feedback-drop {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px dashed var(--border-strong, #ccc);
+  border-radius: var(--radius-sm, 3px);
+  background: var(--bg-muted, #f8f9fa);
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+/* Active drag-over state — the target lights up so a drop reads as landing. */
+.feedback-drop-over {
+  border-color: var(--blue, #2563eb);
+  border-style: solid;
+  background: var(--blue-bg, rgba(37, 99, 235, 0.08));
+}
+
+.feedback-drop .feedback-file {
+  border: none;
+  background: none;
+  padding: 0;
+}
+
+.feedback-drop-hint {
+  font-size: var(--font-size-sm, 0.85em);
+  color: var(--fg-dim, #666);
+}
+
+/* Selected-file chip: filename + remove control, shown once a screenshot is
+   chosen (from any intake path). */
+.feedback-file-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border: 1px solid var(--border, #ddd);
+  border-radius: var(--radius-sm, 3px);
+  background: var(--bg-muted, #f8f9fa);
+}
+
+.feedback-file-chip[hidden] {
+  display: none;
+}
+
+.feedback-file-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-structural, monospace);
+  font-size: var(--font-size-sm, 0.85em);
+  color: var(--fg, #1a1a1a);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .feedback-file-remove {
-  align-self: flex-start;
+  flex: 0 0 auto;
   font-family: var(--font-structural, monospace);
   font-size: var(--font-size-sm, 0.85em);
   color: var(--red, #cc0000);
