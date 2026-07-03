@@ -97,13 +97,20 @@
 /* ─── View header — title fused with the live indicator (LIN-927) ───────────── */
 
 .obs-header {
+  /* Left-aligned (override the global centered `header`) so the title fuses
+     with the live indicator on the left, matching the LIN-927 mockup. */
+  text-align: left;
+  padding: 1.1rem 0 0.75rem;
+  margin-bottom: 0;
+}
+
+/* The title and the "● live" indicator are baseline-aligned flex items inside
+   the h1 (the indicator rides inside the heading via renderPageHeader's
+   titleHtml, LIN-975). */
+.obs-header h1 {
   display: flex;
   align-items: baseline;
   gap: 0.7rem;
-  padding: 1.1rem 0 0.75rem;
-}
-
-.obs-header h1 {
   margin: 0;
   font-size: 1.4rem;
   font-family: var(--font-content);

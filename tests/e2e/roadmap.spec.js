@@ -50,7 +50,9 @@ test.describe('Roadmap Page', () => {
     await page.waitForLoadState('networkidle');
 
     await expect(page.locator('.roadmap-header')).toBeVisible();
-    await expect(page.locator('.roadmap-page-title')).toContainText('Roadmap');
+    // Title routes through the shared renderPageHeader primitive (LIN-975),
+    // preserved inside the bespoke roadmap header block.
+    await expect(page.locator('.roadmap-header .page-header h1')).toContainText('Roadmap');
     // Time window anchor
     await expect(page.locator('.roadmap-header-meta')).toContainText('last 90 days');
     // Velocity panel (projection-flavored) was removed

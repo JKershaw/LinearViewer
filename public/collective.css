@@ -6,16 +6,8 @@
  * message log polled from Yap.
  */
 
-.collective-header h1 {
-  margin-bottom: var(--space-1);
-}
-
-.collective-subtitle {
-  color: var(--fg-dim);
-  font-size: var(--font-size-sm);
-  margin-top: 0;
-  margin-bottom: var(--space-4);
-}
+/* The page title + subtitle route through renderPageHeader (LIN-975); their
+   look is owned by the canonical `.page-header` / `.page-header__subtitle`. */
 
 .collective-experimental {
   color: var(--fg-dim);

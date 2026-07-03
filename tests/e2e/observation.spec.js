@@ -56,7 +56,9 @@ test.describe('Autopilot Observation page (first-class)', () => {
       await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       await page.goto(OBSERVATION_URL);
       await page.waitForLoadState('networkidle');
-      await expect(page.locator('.obs-header h1')).toHaveText('Observation');
+      // Title routes through the shared renderPageHeader primitive (LIN-975);
+      // the h1 also carries the fused "● live" indicator, so match by substring.
+      await expect(page.locator('.page-header.obs-header h1')).toContainText('Observation');
     });
 
     test('/dashboard 302-redirects to /observation', async ({ page }) => {
