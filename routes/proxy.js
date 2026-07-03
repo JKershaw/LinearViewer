@@ -1346,6 +1346,7 @@ One convention across every endpoint, so you can branch on the same fields every
 500 - Internal server error
 502 - Upstream write was rejected (the create/update did not land)
 503 - Workspace or AI service unavailable
+504 - Upstream provider request timed out or was aborted (mapped from a TimeoutError/AbortError)
 
 ## Notes
 
