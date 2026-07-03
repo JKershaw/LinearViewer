@@ -156,4 +156,42 @@ describe('LIN-438 — POST /api/proxy/recommend-and-dispatch carries the executi
     assert.equal(res.status, 400, `expected 400, got ${res.status}: ${JSON.stringify(res.body)}`);
     assert.match(res.body.error, /model is invalid/);
   });
+
+  // ── Recommendation-derived branch (LIN-438 close-out ledger discharge) ──────
+  // recommend-and-dispatch has TWO addItem sites: the verb-override branch
+  // (kind set, exercised above) and the recommendation-derived branch (no kind →
+  // LLM descent resolves the action, then dispatches). The review's close-out
+  // ledger flagged that the second branch — though byte-identical to the first —
+  // was never test-driven. These tests drive it: with NO `kind`, the test-token
+  // short-circuit in computeRecommendation resolves a started, childless fixture
+  // (TEST-14) to an `implement` action carrying a real prompt, so the descent
+  // terminates on the recommendation-derived addItem seam rather than the
+  // verb-override one.
+  test('an explicit model is forwarded to the dispatch item (recommendation-derived path)', async () => {
+    const captured = {};
+    const app = buildApp(captured);
+    const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
+      issueIdentifier: 'TEST-14', model: MODEL
+    });
+
+    assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.ok(captured.item, 'recommendation-derived path must dispatch an item');
+    // Prove we actually took the descent branch, not the verb-override one: the
+    // recommendation-derived path never carries the caller's kind (there is none)
+    // and stamps the terminal identifier it resolved to.
+    assert.equal(captured.item.issueIdentifier, 'TEST-14');
+    assert.equal(captured.item.model, MODEL);
+  });
+
+  test('an omitted model becomes null (recommendation-derived path)', async () => {
+    const captured = {};
+    const app = buildApp(captured);
+    const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
+      issueIdentifier: 'TEST-14'
+    });
+
+    assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.ok(captured.item, 'recommendation-derived path must dispatch an item');
+    assert.strictEqual(captured.item.model, null);
+  });
 });
