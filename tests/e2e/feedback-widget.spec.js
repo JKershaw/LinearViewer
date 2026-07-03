@@ -40,18 +40,20 @@ test.describe('Feedback widget', () => {
     await expect(page.getByTestId('feedback-file')).toBeVisible()
   })
 
-  // LIN-918: the foot offers three explicit actions, and each posts its own
-  // `action` to the feedback route. The local provider has no team (a real
-  // submit would 422), so we stub the route to a 201 and assert the wiring —
-  // exactly which action the clicked button sends.
-  test('offers save / triage / autopilot actions and posts the chosen action', async ({ page, seedLocal }) => {
+  // LIN-918 / LIN-952: the foot offers two explicit actions (the triage button
+  // was removed in LIN-952), and each posts its own `action` to the feedback
+  // route. The local provider has no team (a real submit would 422), so we stub
+  // the route to a 201 and assert the wiring — exactly which action the clicked
+  // button sends.
+  test('offers save / autopilot actions and posts the chosen action', async ({ page, seedLocal }) => {
     const { urlKey } = await seedLocal()
     await enableWidget(page, urlKey)
 
     await page.getByTestId('feedback-fab').click()
     await expect(page.getByTestId('feedback-submit')).toBeVisible()
-    await expect(page.getByTestId('feedback-submit-triage')).toBeVisible()
     await expect(page.getByTestId('feedback-submit-autopilot')).toBeVisible()
+    // The Save + triage button was removed (LIN-952) — the widget no longer offers it.
+    await expect(page.getByTestId('feedback-submit-triage')).toHaveCount(0)
 
     // Capture the posted action and fulfil with a success the widget accepts.
     let postedAction = null
