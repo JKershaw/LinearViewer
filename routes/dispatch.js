@@ -196,7 +196,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const { workspace } = req;
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo, force, abort, abortTo, cascade, sessionId, waitForFollowUps, queueIfBusy, subscription } = req.body;
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, followUpTo, force, abort, abortTo, cascade, sessionId, waitForFollowUps, queueIfBusy, subscription } = req.body;
 
       // Abort verb (LIN-743): an abort item asks the consumer to cancel/close an
       // existing session (named by abortTo) instead of running a prompt, so it
@@ -302,6 +302,17 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       if (repo && repo.length > MAX_NAME_LENGTH) {
         return badRequest.json(res, `repo exceeds maximum length of ${MAX_NAME_LENGTH}`);
       }
+      // Execution model (LIN-438): validated like `repo` — opaque string, length +
+      // dangerous-chars only. Deliberately NOT validated against a model registry
+      // (openrouter AVAILABLE_MODELS is the generation-model namespace; this is the
+      // consumer's execution-model namespace, which may include models the server
+      // doesn't enumerate). Wire convention is OpenRouter-style provider/model.
+      if (model && typeof model !== 'string') {
+        return badRequest.json(res, 'model must be a string');
+      }
+      if (model && model.length > MAX_NAME_LENGTH) {
+        return badRequest.json(res, `model exceeds maximum length of ${MAX_NAME_LENGTH}`);
+      }
 
       // Reject null bytes and dangerous control characters
       if (prompt && DANGEROUS_CHARS_REGEX.test(prompt)) {
@@ -315,6 +326,9 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       }
       if (repo && DANGEROUS_CHARS_REGEX.test(repo)) {
         return badRequest.json(res, 'repo contains invalid characters');
+      }
+      if (model && DANGEROUS_CHARS_REGEX.test(model)) {
+        return badRequest.json(res, 'model contains invalid characters');
       }
 
       // Validate issueId format if provided
@@ -396,6 +410,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         dispatchedBy: req.session.linearUserId || null,
         target: target || 'cli',
         repo: repo || null,
+        model: model || null,
         followUpTo: followUpTo || null,
         force: force === true,
         abort: isAbort,

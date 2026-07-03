@@ -276,6 +276,7 @@ and is the recommended pattern for any consumer that posts foreman status.
 | `issueUrl` | string | Full URL to the Linear issue (nullable) |
 | `target` | string | Dispatch target: `"cli"` (default), `"web"`, `"dash"`, or `"local"`. See [Target Routing](#target-routing) |
 | `repo` | string | Repository hint (e.g. `"owner/name"`) for the consumer to operate in, or `null` (nullable) |
+| `model` | string | **Execution** model the consumer should use to *run* this prompt (the value it passes to its own CLI, e.g. `claude --model`), or `null`. OpenRouter `provider/model` naming convention (e.g. `"anthropic/claude-opus-4.8"`). Opaque and forwarded blindly; `null` keeps the consumer's current default. See [Execution model](#execution-model-model) (nullable) |
 | `followUpTo` | string | The `id` of an earlier dispatch whose session this item should resume, or `null`. See [Follow-ups](#follow-ups) (nullable) |
 | `force` | boolean | When `true`, the consumer should **override a runner-side guard**: on a follow-up it resumes even a wedged/sleeping session; on a single abort it force-closes even a human-continued session. Defaults to `false`; meaningful only alongside `followUpTo` **or** a single `abort`, and never with `cascade`. See [Follow-ups](#follow-ups) / [Cascade close](#cascade-close-closing-a-session-subtree) |
 | `abort` | boolean | When `true`, this item asks the consumer to cancel/close an existing session (named by `abortTo`) instead of running a prompt. Defaults to `false`. See [Aborting a session](#aborting-a-session) |
@@ -494,6 +495,43 @@ session's role, can choose at dispatch time:
 - **Pairs with the watch.** A held worker stays healthy only if its next beat arrives inside
   its hold budget — keep the long-poll on the dispatch watch live so beats are delivered
   promptly; an unflagged producer instead relies on the ordinary async-wait/watch path.
+
+## Execution model (`model`)
+
+`model` lets a dispatch specify **which model the consumer/runner should use to *run* the
+prompt** — the value it passes to its own agent CLI (e.g. `claude --model`). It is optional
+and nullable; omit it (or send `null`) to keep the consumer's current default (e.g. Opus).
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `model` | string | No | Execution model, OpenRouter `provider/model` convention (e.g. `"anthropic/claude-opus-4.8"`). `null`/omitted ⇒ consumer default. |
+
+**Execution model ≠ generation model.** This is the model that *runs* the dispatched work,
+**not** the server-side model that *writes* prompts (recommendation / recap / brief). They
+live in different namespaces — do not confuse the dispatch `model` with the recommendation
+engine's model list.
+
+- **Wire convention: OpenRouter IDs.** Use `provider/model` identifiers like
+  `anthropic/claude-opus-4.8` or `openai/gpt-5.4-mini` — the same convention the
+  recommendation engine uses internally. This gives the field a documented, consistent shape.
+- **Opaque at the server boundary.** The dispatch store records and forwards `model`
+  verbatim. Validation is deliberately **loose** — a string within the length limit and free
+  of dangerous control characters. The server does **not** enforce a model registry, because
+  consumers may support models the server never enumerates.
+- **Translation lives in the consumer.** OpenRouter-native runners accept these IDs directly
+  (pass-through). Claude Code is the outlier and maps e.g. `anthropic/claude-opus-4.8` →
+  `--model opus` itself. Keep agent-specific translation in the runner so the wire format
+  stays agent-agnostic.
+- **Inert until the runner reads it.** A server-side `model` is a no-op until the (external)
+  consumer reads `item.model` and passes it to its CLI; a `null` value preserves today's
+  default behaviour, so existing runners are unaffected. Context-window variants
+  (e.g. Opus vs Opus 1m) are a consumer-vocabulary concern expressible as distinct IDs — no
+  schema change.
+
+Both dispatch write verbs accept `model`: `POST /api/dispatch` (user/UI) and, on the proxy,
+`POST /api/proxy/dispatch` and `POST /api/proxy/recommend-and-dispatch`. Setting it per task
+is how an orchestrator routes cheaper models where they suffice (e.g. Sonnet for
+implementation, Opus for review).
 
 ## Target Routing
 
