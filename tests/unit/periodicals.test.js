@@ -5,6 +5,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
+import { readFileSync } from 'node:fs';
 import { PERIODICALS, getPeriodicals, buildPeriodicalNodes } from '../../lib/periodicals.js';
 import { PERIODICALS_PROJECT_ID } from '../../lib/tree.js';
 
@@ -659,6 +660,34 @@ describe('Design & Interface Review specifics (LIN-520)', () => {
     assert.doesNotMatch(prompt, /playwright|lighthouse|styleguide\b/i);
     assert.doesNotMatch(prompt, /\/styleguide|set-session|screenshots/i);
   });
+});
+
+// TRANSIENT golden-master parity net (LIN-700, beat 1 — REMOVE BEFORE THE PR).
+// Captures today's exact `generatePrompt()` output for all 11 builders in a
+// frozen fixture and asserts each still matches byte-for-byte. It exists only to
+// de-risk the shared-scaffold refactor: it stays GREEN through the pure
+// extraction (beat 2, proving the 10-of-11 unrelated text is byte-preserved —
+// the gap the token pins cannot see), then reveals exactly the four intended
+// wording diffs in beat 3, after which it is retired (a committed full-prompt
+// snapshot of 11 frequently-tuned strings would break on every future edit, so
+// it is NOT a permanent test — the LIN-700 token pins in the shared loop are).
+describe('LIN-700 golden-master (transient — byte-parity net for the refactor)', () => {
+  const baseline = JSON.parse(
+    readFileSync(new URL('../fixtures/periodicals-golden-master.json', import.meta.url))
+  );
+
+  test('the fixture covers every registered periodical', () => {
+    assert.strictEqual(Object.keys(baseline).length, PERIODICALS.length);
+    for (const t of PERIODICALS) {
+      assert.ok(t.id in baseline, `baseline has ${t.id}`);
+    }
+  });
+
+  for (const template of PERIODICALS) {
+    test(`${template.title} output is byte-identical to its captured baseline`, () => {
+      assert.deepStrictEqual(template.generatePrompt(), baseline[template.id]);
+    });
+  }
 });
 
 describe('buildPeriodicalNodes()', () => {
