@@ -4392,19 +4392,29 @@ One convention across every endpoint, so you can branch on the same fields every
         }
       }
 
-      // Force-resume flag (LIN-559): overrides the runner's active-session
-      // liveness guard so a follow-up can resume a wedged/sleeping session. Only
-      // meaningful alongside followUpTo (the human asserts the prior process is
-      // dead — see LIN-546), so reject force:true without it rather than storing
-      // an inert flag. force:false / omitted is always fine. The runner reads
-      // item.force off the polled/claimed item.
+      // Force flag: overrides a runner-side guard, so it is meaningful ONLY
+      // alongside a verb that has one — reject a bare force on a fresh dispatch
+      // rather than storing an inert flag. Two verbs qualify:
+      //   - followUpTo (LIN-559): bypass the active-session liveness guard so a
+      //     follow-up can resume a wedged/sleeping session (LIN-546).
+      //   - a single abort (LIN-946/LIN-951): bypass the runner's human-continued
+      //     skip so a DELIBERATE targeted abort still cancels a human-continued
+      //     session (the escape hatch). A cascade emits its own plain, UNforced
+      //     aborts (those skip), so force is never a cascade concern — reject the
+      //     force+cascade contradiction rather than silently dropping force.
+      // force:false / omitted is always fine. The runner reads item.force off the
+      // polled/claimed item.
       if (force !== undefined && typeof force !== 'boolean') {
         logEvent(req, '/api/proxy/dispatch', 400);
         return badRequest.json(res, 'force must be a boolean');
       }
-      if (force === true && (followUpTo === undefined || followUpTo === null)) {
+      if (force === true && cascade === true) {
         logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, 'force requires followUpTo');
+        return badRequest.json(res, 'force and cascade are mutually exclusive');
+      }
+      if (force === true && !isAbort && (followUpTo === undefined || followUpTo === null)) {
+        logEvent(req, '/api/proxy/dispatch', 400);
+        return badRequest.json(res, 'force requires followUpTo or abort');
       }
 
       // Autopilot session reference (LIN-591): the autopilot dispatchId that

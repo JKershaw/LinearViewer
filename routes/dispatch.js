@@ -337,17 +337,27 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         }
       }
 
-      // Validate the force-resume flag if provided (LIN-559). force overrides the
-      // runner's active-session liveness guard so a follow-up can resume a wedged/
-      // sleeping session. It is only meaningful alongside followUpTo (the human
-      // asserts the prior process is dead — see LIN-546), so reject force:true
-      // without it rather than persisting an inert flag — mirroring the
-      // abortTo-requires-abort guard above. force:false / omitted is always fine.
+      // Validate the force flag if provided. `force` overrides a runner-side
+      // guard, so it is meaningful alongside a verb that HAS such a guard — and
+      // ONLY such a verb, so reject a bare force on a fresh dispatch rather than
+      // persisting an inert flag:
+      //   - followUpTo (LIN-559): bypass the active-session liveness guard so a
+      //     follow-up can resume a wedged/sleeping session (the human asserts the
+      //     prior process is dead — LIN-546).
+      //   - a single abort (LIN-946/LIN-951): bypass the runner's human-continued
+      //     skip so a DELIBERATE targeted abort still cancels a human-continued
+      //     session (the escape hatch). A cascade emits its own plain, UNforced
+      //     aborts (those skip), so force is never a cascade concern — reject the
+      //     force+cascade contradiction rather than silently dropping force.
+      // force:false / omitted is always fine.
       if (force !== undefined && typeof force !== 'boolean') {
         return badRequest.json(res, 'force must be a boolean');
       }
-      if (force === true && (followUpTo === undefined || followUpTo === null)) {
-        return badRequest.json(res, 'force requires followUpTo');
+      if (force === true && cascade === true) {
+        return badRequest.json(res, 'force and cascade are mutually exclusive');
+      }
+      if (force === true && !isAbort && (followUpTo === undefined || followUpTo === null)) {
+        return badRequest.json(res, 'force requires followUpTo or abort');
       }
 
       // Validate autopilot session reference if provided. Unlike followUpTo,
