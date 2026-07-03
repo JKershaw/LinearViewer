@@ -36,7 +36,8 @@ test.describe('Collective Page (experimental)', () => {
       await page.goto(`/test/set-session?urlKey=${URL_KEY}&${featuresParam({ collective: true })}`);
       await page.goto(COLLECTIVE_URL);
       await page.waitForLoadState('networkidle');
-      await expect(page.locator('.collective-header h1')).toHaveText('Collective');
+      // Title routes through the shared renderPageHeader primitive (LIN-975).
+      await expect(page.locator('.page-header h1')).toHaveText('Collective');
     });
 
     test('toggle lives in the Experimental section and defaults off', async ({ page }) => {

@@ -4,14 +4,8 @@
  * common-actions.css, and observation.css (the .obs-session-body pre block).
  */
 
-.flight-companion-header {
-  margin-bottom: 1rem;
-}
-
-.flight-companion-subtitle {
-  color: var(--muted);
-  margin-top: 0.25rem;
-}
+/* The page title + subtitle route through renderPageHeader (LIN-975); their
+   look is owned by the canonical `.page-header` / `.page-header__subtitle`. */
 
 .flight-companion-experimental {
   color: var(--muted);

@@ -35,7 +35,8 @@ test.describe('Suggested Next Run Page (experimental)', () => {
       await page.goto(`/test/set-session?${featuresParam({ nextRun: true })}&urlKey=${URL_KEY}`);
       await page.goto(PAGE_URL);
       await page.waitForLoadState('networkidle');
-      await expect(page.locator('.next-run-header h1')).toHaveText('Suggested Next Run');
+      // Title routes through the shared renderPageHeader primitive (LIN-975).
+      await expect(page.locator('.page-header h1')).toHaveText('Suggested Next Run');
     });
 
     test('toggle lives in the Experimental section and defaults off', async ({ page }) => {

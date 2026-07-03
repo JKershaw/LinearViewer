@@ -3,15 +3,8 @@
    style.css and the Observation page's obs-* vocabulary (chips, caret/collapse,
    detail blocks) from /observation.css; only page-specific layout is bespoke. */
 
-.next-run-header h1 {
-  margin: 0 0 var(--space-1);
-}
-
-.next-run-subtitle {
-  margin: 0;
-  color: var(--fg-dim);
-  font-size: var(--font-size-sm);
-}
+/* The page title + subtitle route through renderPageHeader (LIN-975); their
+   look is owned by the canonical `.page-header` / `.page-header__subtitle`. */
 
 .next-run-experimental {
   color: var(--fg-dim);

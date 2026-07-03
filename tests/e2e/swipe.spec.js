@@ -20,6 +20,10 @@ test.describe('Swipe Page', () => {
   });
 
   test('renders swipe page with card', async ({ page }) => {
+    // Swipe now carries a page title via the shared renderPageHeader primitive
+    // (LIN-975); previously it had none.
+    await expect(page.locator('.page-header h1')).toHaveText('Swipe');
+
     // Should have a filter dropdown
     await expect(page.locator('.swipe-filter-select')).toBeVisible();
 

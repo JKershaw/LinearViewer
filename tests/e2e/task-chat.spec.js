@@ -34,7 +34,8 @@ test.describe('Task Chat Page (experimental)', () => {
       await page.goto(`/test/set-session?${featuresParam({ taskChat: true })}&urlKey=${URL_KEY}`);
       await page.goto(PAGE_URL);
       await page.waitForLoadState('networkidle');
-      await expect(page.locator('.task-chat-header h1')).toHaveText('Task Chat');
+      // Title routes through the shared renderPageHeader primitive (LIN-975).
+      await expect(page.locator('.page-header h1')).toHaveText('Task Chat');
     });
 
     test('toggle lives in the Experimental section and defaults off', async ({ page }) => {
