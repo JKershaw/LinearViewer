@@ -132,6 +132,34 @@ describe('shared two-stage contract (all periodicals)', () => {
         // The report location is discovered at run time, never hard-coded.
         assert.doesNotMatch(prompt, /save_comment|home issue/i);
       });
+
+      // LIN-700: the Stage-1 scaffold scopes by discovery, not recall. These
+      // four pins lock the four generic wordings across all 11 builders (the
+      // shared helper/vocab renders each once, so the loop covers every one).
+      test('LIN-700: Stage 1 scopes by discovery from three sources, not recall', () => {
+        assert.match(prompt, /from what you discover, not from what a review/i);
+        assert.match(prompt, /prior reports in this series/i);
+        assert.match(prompt, /sibling reviews'? remits and the seams between them/i);
+        assert.match(prompt, /known-issues surfaces/i);
+      });
+
+      test('LIN-700: finding-class lists are framed as examples, not a limit', () => {
+        assert.match(prompt, /examples, not a limit/i);
+        assert.match(prompt, /discover the complete set for this remit/i);
+        assert.match(prompt, /a floor to build on, never a ceiling/i);
+      });
+
+      test('LIN-700: minted task opens with a gap-audit before executing', () => {
+        assert.match(prompt, /Audit the scope before executing/i);
+        assert.match(prompt, /in-remit but unlisted/i);
+        assert.match(prompt, /starting point to extend, not a checklist/i);
+      });
+
+      test('LIN-700: coverage-theater guard — broad in discovery, bounded in output', () => {
+        assert.match(prompt, /broad in discovery but bounded in output/i);
+        assert.match(prompt, /what you examine/i);
+        assert.match(prompt, /stays within its existing bound/i);
+      });
     });
   }
 });
