@@ -328,6 +328,25 @@ test.describe('Suggested Next Run Page (experimental)', () => {
       expect(dispatched).toBe(false);
     });
 
+    // LIN-1002: the goal sent to the autopilot-kickoff endpoint carries the
+    // referenced task id + title, not the prose alone.
+    test('a concrete card dispatches a goal that embeds the referenced task id and title', async ({ page }) => {
+      const card = page.locator('.next-run-option:not(.next-run-option-open)').first();
+      await expect(card).toBeVisible({ timeout: 5000 });
+      await card.locator('.next-run-option-head').click();
+      await card.locator('.next-run-dispatch-toggle').click();
+
+      const autopilotReq = page.waitForRequest(req =>
+        req.url().includes('/api/autopilot-prompt') && req.method() === 'GET');
+      await card.locator('.next-run-dispatch[data-target="cli"]').click();
+
+      const req = await autopilotReq;
+      const goalParam = new URL(req.url()).searchParams.get('goal') || '';
+      expect(goalParam).toContain('Referenced tasks:');
+      expect(goalParam).toContain('TEST-1');
+      expect(goalParam).toContain('Parent task in progress');
+    });
+
     test('the continue-until-stopped option dispatches with no goal', async ({ page }) => {
       const card = page.locator('.next-run-option-open');
       await expect(card).toBeVisible({ timeout: 5000 });
@@ -359,6 +378,28 @@ test.describe('Suggested Next Run Page (experimental)', () => {
       const accept = card.locator('.next-run-accept');
       await expect(accept).toBeVisible();
       expect(await accept.getAttribute('href')).toContain('/dispatch?goal=');
+    });
+
+    // LIN-1002: the dispatched goal must carry the referenced task id + title,
+    // not the prose paragraph alone, so the autopilot gets an unambiguous task
+    // reference. The first concrete mock option references TEST-1 ("Parent task
+    // in progress").
+    test('the dispatched goal embeds the referenced task id and title', async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ nextRun: true })}&urlKey=${URL_KEY}`);
+      await page.goto(PAGE_URL);
+      await page.waitForLoadState('networkidle');
+      await page.locator('#next-run-generate').click();
+
+      const card = page.locator('.next-run-option:not(.next-run-option-open)').first();
+      await expect(card).toBeVisible({ timeout: 5000 });
+      await card.locator('.next-run-option-head').click();
+
+      const href = await card.locator('.next-run-accept').getAttribute('href');
+      const goal = decodeURIComponent(href.split('goal=')[1] || '');
+      // The prose is preserved AND the referenced task is folded in (id + title).
+      expect(goal).toContain('Referenced tasks:');
+      expect(goal).toContain('TEST-1');
+      expect(goal).toContain('Parent task in progress');
     });
   });
 

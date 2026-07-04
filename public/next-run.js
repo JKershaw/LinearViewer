@@ -55,6 +55,37 @@
     return goal ? base + '?goal=' + encodeURIComponent(goal) : base;
   }
 
+  // The referenced tasks carried on an option: prefer the enriched
+  // `referencedTasks: [{id, title}]`, fall back to bare `referencedTaskIds`
+  // (older responses) with no title text, else []. Shared by the card renderer
+  // and the dispatch-goal builder so both read the refs the same way.
+  function referencedTasksOf(opt) {
+    if (!opt) return [];
+    if (Array.isArray(opt.referencedTasks)) return opt.referencedTasks;
+    if (Array.isArray(opt.referencedTaskIds)) {
+      return opt.referencedTaskIds.map(function (id) { return { id: id, title: '' }; });
+    }
+    return [];
+  }
+
+  // Fold the option's referenced tasks (id + title) into its prose goal so the
+  // dispatched payload carries an unambiguous task reference, not prose alone
+  // (LIN-1002). The referenced-task data already rides on the option, so this is
+  // plumbing, not new data generation. Returns the prose unchanged when there are
+  // no referenced tasks (e.g. the open "continue until stopped" option or a goal
+  // with no refs), so the existing goal-less/dispatch paths are untouched.
+  function buildDispatchGoal(opt) {
+    var goal = (opt && opt.goal) || '';
+    var refTasks = referencedTasksOf(opt);
+    if (!goal || !refTasks.length) return goal;
+    var lines = refTasks.map(function (t) {
+      var id = String(t.id || '').trim();
+      return t.title ? id + ' — ' + t.title : id;
+    }).filter(Boolean);
+    if (!lines.length) return goal;
+    return goal + '\n\nReferenced tasks:\n' + lines.map(function (l) { return '- ' + l; }).join('\n');
+  }
+
   // Caret/collapse toggle — replicated from the Observation page's pattern (no
   // observation.js import). Flips `is-open` on the card and unhides its body.
   function toggleCard(li) {
@@ -228,11 +259,7 @@
       // tasks actually are, not just their opaque ids. Prefer the enriched
       // `referencedTasks: [{id, title}]`; fall back to bare `referencedTaskIds`
       // (older responses) with no title text.
-      var refTasks = Array.isArray(opt.referencedTasks)
-        ? opt.referencedTasks
-        : (Array.isArray(opt.referencedTaskIds)
-          ? opt.referencedTaskIds.map(function (id) { return { id: id, title: '' }; })
-          : []);
+      var refTasks = referencedTasksOf(opt);
       if (refTasks.length) {
         var items = refTasks.map(function (t) {
           var chip = window.renderChip({ label: String(t.id), className: 'next-run-ref' });
@@ -253,16 +280,22 @@
       var actions = document.createElement('div');
       actions.className = 'next-run-option-actions';
 
+      // The goal handed to dispatch/autopilot is enriched with the referenced
+      // tasks (id + title) so the autopilot receives an unambiguous task
+      // reference alongside the prose, not prose alone (LIN-1002). The open
+      // option has no goal (and no refs), so it stays an empty open-ended walk.
+      var dispatchGoalText = isOpen ? '' : buildDispatchGoal(opt);
+
       if (data.proxyEnabled) {
         // Proxy on: offer inline dispatch options (parity with projects/swipe).
         // The open option dispatches with no goal (an open-ended stack walk).
-        actions.appendChild(buildDispatchDisclosure(isOpen ? '' : opt.goal));
+        actions.appendChild(buildDispatchDisclosure(dispatchGoalText));
       } else {
         // Proxy off: the kickoff endpoint is unavailable, so keep handing the goal
         // to the dispatch page via ?goal= (its proxy-off receiver, unchanged).
         var acceptLink = document.createElement('a');
         acceptLink.className = 'action-btn save next-run-accept';
-        acceptLink.href = dispatchUrl(isOpen ? '' : opt.goal);
+        acceptLink.href = dispatchUrl(dispatchGoalText);
         acceptLink.textContent = isOpen ? 'start (no goal) →' : 'send to dispatch →';
         actions.appendChild(acceptLink);
       }
