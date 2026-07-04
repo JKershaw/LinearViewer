@@ -25,7 +25,7 @@
 }
 
 .task-chat-warning code {
-  font-family: var(--font-mono);
+  font-family: var(--font-structural);
 }
 
 /* ── Fields ─────────────────────────────────────────────────────────────── */
@@ -39,13 +39,13 @@
 }
 
 .task-chat-label {
-  font-family: var(--font-mono);
+  font-family: var(--font-content);
   color: var(--fg-dim);
   min-width: 4rem;
 }
 
 .task-chat-input {
-  font-family: var(--font-mono);
+  font-family: var(--font-content);
   font-size: var(--font-size-base);
   padding: var(--space-1) var(--space-2);
   border: 1px solid var(--border);
@@ -66,7 +66,7 @@
   justify-content: space-between;
   align-items: baseline;
   margin-bottom: var(--space-2);
-  font-family: var(--font-mono);
+  font-family: var(--font-content);
   font-size: var(--font-size-sm);
 }
 
@@ -76,7 +76,7 @@
 }
 
 .task-chat-reset-btn {
-  font-family: var(--font-mono);
+  font-family: var(--font-content);
   font-size: var(--font-size-sm);
   padding: var(--space-1) var(--space-2);
   border: 1px solid var(--border);
@@ -129,7 +129,7 @@
 
 .task-chat-msg-body {
   display: block;
-  font-family: var(--font-mono);
+  font-family: var(--font-content);
   font-size: var(--font-size-sm);
   color: var(--fg);
   white-space: pre-wrap;
@@ -153,7 +153,7 @@
 
 .task-chat-empty {
   color: var(--fg-vdim);
-  font-family: var(--font-mono);
+  font-family: var(--font-content);
   font-size: var(--font-size-sm);
 }
 

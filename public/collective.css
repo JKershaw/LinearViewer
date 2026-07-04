@@ -25,7 +25,7 @@
 }
 
 .collective-warning code {
-  font-family: var(--font-mono);
+  font-family: var(--font-structural);
 }
 
 /* ── Setup fields ───────────────────────────────────────────────────────── */
@@ -39,7 +39,7 @@
 }
 
 .collective-label {
-  font-family: var(--font-mono);
+  font-family: var(--font-content);
   color: var(--fg-dim);
   min-width: 6.5rem;
   padding-top: var(--space-1);
@@ -57,7 +57,7 @@
   align-items: center;
   gap: var(--space-2);
   cursor: pointer;
-  font-family: var(--font-mono);
+  font-family: var(--font-content);
 }
 
 .collective-ws-name {
@@ -74,13 +74,13 @@
 .collective-empty,
 .collective-transcript-empty {
   color: var(--fg-vdim);
-  font-family: var(--font-mono);
+  font-family: var(--font-content);
   font-size: var(--font-size-sm);
 }
 
 .collective-input,
 .collective-select {
-  font-family: var(--font-mono);
+  font-family: var(--font-content);
   font-size: var(--font-size-base);
   padding: var(--space-1) var(--space-2);
   border: 1px solid var(--border);
@@ -119,13 +119,13 @@
 }
 
 .collective-prompt-label {
-  font-family: var(--font-mono);
+  font-family: var(--font-content);
   font-size: var(--font-size-sm);
   color: var(--fg-dim);
 }
 
 .collective-copy-btn {
-  font-family: var(--font-mono);
+  font-family: var(--font-content);
   font-size: var(--font-size-sm);
   padding: var(--space-1) var(--space-2);
   border: 1px solid var(--border);
@@ -146,13 +146,13 @@
   overflow-y: auto;
   white-space: pre-wrap;
   word-break: break-word;
-  font-family: var(--font-mono);
+  font-family: var(--font-structural);
   font-size: var(--font-size-sm);
   color: var(--fg);
 }
 
 .collective-start-status {
-  font-family: var(--font-mono);
+  font-family: var(--font-content);
   font-size: var(--font-size-sm);
   color: var(--fg-dim);
   align-self: center;
@@ -169,7 +169,7 @@
   justify-content: space-between;
   align-items: baseline;
   margin-bottom: var(--space-2);
-  font-family: var(--font-mono);
+  font-family: var(--font-content);
   font-size: var(--font-size-sm);
 }
 
@@ -200,7 +200,7 @@
   display: flex;
   gap: var(--space-2);
   padding: var(--space-1) var(--space-2);
-  font-family: var(--font-mono);
+  font-family: var(--font-structural);
   font-size: var(--font-size-sm);
   border-bottom: 1px solid var(--border-subtle);
   align-items: baseline;
