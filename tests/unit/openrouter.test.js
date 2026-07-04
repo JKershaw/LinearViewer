@@ -27,6 +27,10 @@ import {
   hasPaidEnvKey,
   isRecommendationEnabled,
   DEFAULT_MODEL,
+  resolveReasoningBudget,
+  isReasoningModel,
+  REASONING_MIN_TOKENS,
+  REASONING_MAX_TOKENS,
   EPIC_CHILD_THRESHOLD,
   COUSIN_CAP,
   SIBLING_CAP,
@@ -1587,6 +1591,148 @@ describe('LLM call recorder (LIN-418)', () => {
     assert.strictEqual(records.length, 1);
     assert.strictEqual(records[0].feature, 'task-chat');
     assert.strictEqual(records[0].cost, 0.00042);
+  });
+});
+
+// ===========================================================================
+// Reasoning-token budget split (LIN-1000)
+//
+// The structural fix for roadmap truncation: an opt-in `reasoning` allocation on
+// the shared streamChat seam, plus the pure budget-split helper. Two things must
+// hold — (1) a caller that does NOT opt in keeps the wire body byte-identical, so
+// every sibling path is provably unaffected; (2) the helper's arithmetic reserves
+// reasoning headroom on top of the prose budget for reasoning models only.
+// ===========================================================================
+describe('isReasoningModel (LIN-1000)', () => {
+  test('the default model and the gpt-5 family are reasoning models', () => {
+    assert.strictEqual(isReasoningModel(DEFAULT_MODEL), true);
+    assert.strictEqual(isReasoningModel('openai/gpt-5.4-mini'), true);
+    assert.strictEqual(isReasoningModel('openai/gpt-5.5'), true);
+    assert.strictEqual(isReasoningModel('openai/o3-mini'), true);
+  });
+
+  test('non-reasoning models and junk are not', () => {
+    assert.strictEqual(isReasoningModel('anthropic/claude-opus-4.8'), false);
+    assert.strictEqual(isReasoningModel('openai/gpt-4o'), false);
+    assert.strictEqual(isReasoningModel(''), false);
+    assert.strictEqual(isReasoningModel(null), false);
+    assert.strictEqual(isReasoningModel(undefined), false);
+  });
+});
+
+describe('resolveReasoningBudget (LIN-1000)', () => {
+  test('a reasoning model splits the budget: reasoning headroom ON TOP of prose', () => {
+    const { reasoning, maxTokens } = resolveReasoningBudget({ model: DEFAULT_MODEL, proseTokens: 3000 });
+    // Prose is protected: max_tokens covers prose PLUS the reserved reasoning.
+    assert.deepStrictEqual(reasoning, { max_tokens: 3000 });
+    assert.strictEqual(maxTokens, 3000 + 3000, 'max_tokens = prose + reasoning');
+  });
+
+  test('the default reasoning reserve is the prose budget clamped to [MIN, MAX]', () => {
+    // Below the floor → clamped up to MIN.
+    const small = resolveReasoningBudget({ model: DEFAULT_MODEL, proseTokens: 400 });
+    assert.strictEqual(small.reasoning.max_tokens, REASONING_MIN_TOKENS);
+    assert.strictEqual(small.maxTokens, 400 + REASONING_MIN_TOKENS);
+
+    // Above the ceiling → clamped down to MAX.
+    const big = resolveReasoningBudget({ model: DEFAULT_MODEL, proseTokens: 16000 });
+    assert.strictEqual(big.reasoning.max_tokens, REASONING_MAX_TOKENS);
+    assert.strictEqual(big.maxTokens, 16000 + REASONING_MAX_TOKENS);
+  });
+
+  test('an explicit reasoningTokens overrides the default reserve', () => {
+    const { reasoning, maxTokens } = resolveReasoningBudget({ model: DEFAULT_MODEL, proseTokens: 3000, reasoningTokens: 500 });
+    assert.deepStrictEqual(reasoning, { max_tokens: 500 });
+    assert.strictEqual(maxTokens, 3500);
+  });
+
+  test('a non-reasoning model is a no-op: no reasoning field, prose budget unchanged', () => {
+    const { reasoning, maxTokens } = resolveReasoningBudget({ model: 'anthropic/claude-opus-4.8', proseTokens: 3000 });
+    assert.strictEqual(reasoning, undefined, 'no reasoning field for a non-reasoning model');
+    assert.strictEqual(maxTokens, 3000, 'max_tokens stays the bare prose budget');
+  });
+});
+
+describe('streamChat reasoning wire body (LIN-1000)', () => {
+  let originalFetch;
+  let savedProxyEnv;
+
+  beforeEach(() => {
+    originalFetch = global.fetch;
+    savedProxyEnv = {
+      HTTPS_PROXY: process.env.HTTPS_PROXY, HTTP_PROXY: process.env.HTTP_PROXY,
+      https_proxy: process.env.https_proxy, http_proxy: process.env.http_proxy
+    };
+    delete process.env.HTTPS_PROXY; delete process.env.HTTP_PROXY;
+    delete process.env.https_proxy; delete process.env.http_proxy;
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    for (const [k, v] of Object.entries(savedProxyEnv)) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+  });
+
+  function mockStreamResponse(pieces) {
+    const enc = new TextEncoder();
+    const blocks = pieces.map(p => `data: ${JSON.stringify({ choices: [{ delta: { content: p }, finish_reason: null }] })}\n\n`);
+    blocks.push(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }] })}\n\n`);
+    blocks.push('data: [DONE]\n\n');
+    return { ok: true, body: (async function* () { for (const b of blocks) yield enc.encode(b); })() };
+  }
+
+  async function captureBody(options) {
+    global.fetch = mock.fn(async () => mockStreamResponse(['ok']));
+    const { streamChat } = await import('../../lib/openrouter.js');
+    await streamChat([{ role: 'user', content: 'hi' }], { apiKey: 'test-key', model: DEFAULT_MODEL, maxTokens: 3000, ...options }, () => {});
+    return global.fetch.mock.calls[0].arguments[1].body;
+  }
+
+  test('WITHOUT a reasoning option the wire body is byte-identical to today', async () => {
+    const body = await captureBody({});
+    // Byte-identical to the pre-LIN-1000 body: a bare max_tokens, no reasoning key.
+    const expected = JSON.stringify({
+      model: DEFAULT_MODEL,
+      messages: [{ role: 'user', content: 'hi' }],
+      temperature: 0.3,
+      max_tokens: 3000,
+      stream: true,
+      usage: { include: true }
+    });
+    assert.strictEqual(body, expected);
+    assert.ok(!/"reasoning"/.test(body), 'omitted ⇒ no reasoning field on the wire');
+  });
+
+  test('WITH a reasoning option the field is spliced into the wire body verbatim', async () => {
+    const body = await captureBody({ reasoning: { max_tokens: 4000 } });
+    const parsed = JSON.parse(body);
+    assert.deepStrictEqual(parsed.reasoning, { max_tokens: 4000 });
+    // The rest of the body is otherwise unchanged.
+    assert.strictEqual(parsed.max_tokens, 3000);
+    assert.deepStrictEqual(parsed.usage, { include: true });
+  });
+
+  test('the helper output threaded into streamChat reproduces the roadmap wire shape', async () => {
+    // This is exactly what the 3 roadmap call sites do: derive {reasoning, maxTokens}
+    // from a prose budget, then pass both to streamChat.
+    const { reasoning, maxTokens } = resolveReasoningBudget({ model: DEFAULT_MODEL, proseTokens: 5000 });
+    const body = await captureBody({ reasoning, maxTokens });
+    const parsed = JSON.parse(body);
+    assert.deepStrictEqual(parsed.reasoning, { max_tokens: 5000 });
+    assert.strictEqual(parsed.max_tokens, 10000, 'prose (5000) + reasoning (5000)');
+  });
+
+  test('streamChatWithTools tool-less final answer carries NO reasoning (delegation unaffected)', async () => {
+    global.fetch = mock.fn(async () => mockStreamResponse(['answer']));
+    const { streamChatWithTools } = await import('../../lib/openrouter.js');
+    await streamChatWithTools(
+      [{ role: 'user', content: 'hi' }],
+      { apiKey: 'test-key', model: DEFAULT_MODEL, maxTokens: 1500, tools: [] },
+      () => {}
+    );
+    const body = global.fetch.mock.calls[0].arguments[1].body;
+    assert.ok(!/"reasoning"/.test(body), 'streamChatWithTools passes no reasoning ⇒ body unchanged');
   });
 });
 
