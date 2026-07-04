@@ -297,11 +297,13 @@ function makeSessionCard(s) {
   const li = document.createElement('li');
   li.className = 'obs-session';
   li.dataset.session = s.sessionId;
-  // The head is a plain container, NOT the toggle (LIN-928, design §7). Only the
-  // `.obs-disc` control below the meta row expands/collapses the card. The head's
-  // inner markup is replaced on every poll (innerHTML), so the toggle is bound
-  // once here via delegation on the stable head element rather than on the disc
-  // button itself.
+  // The whole head is the toggle target (LIN-944), widening the reach of the
+  // `.obs-disc` control so the entire collapsed card face is tappable (a touch
+  // win on mobile). `.obs-disc` stays rendered as the labelled, keyboard-focusable
+  // affordance (LIN-928, design §7) and simply falls through to the same toggle.
+  // The head's inner markup is replaced on every poll (innerHTML), so the toggle
+  // is bound once here via delegation on the stable head element. Scope stops at
+  // the head: body drill-down controls have their own handler below.
   const head = document.createElement('div');
   head.className = 'obs-session-head';
   const body = document.createElement('div');
@@ -310,9 +312,11 @@ function makeSessionCard(s) {
   li.appendChild(head);
   li.appendChild(body);
   head.addEventListener('click', (e) => {
-    // Let the inline "summarise" button act without toggling the card.
-    if (e.target.closest('.obs-summary-gen')) return;
-    if (e.target.closest('.obs-disc')) toggleSession(s.sessionId);
+    // Inline head controls act alone — they must not toggle the card. Exclude any
+    // interactive control except `.obs-disc` (which is the intended affordance).
+    // Today the only such control is `.obs-summary-gen` (also self-stopPropagation).
+    if (e.target.closest('button:not(.obs-disc), a[href]')) return;
+    toggleSession(s.sessionId);
   });
   // Delegated Level-3 interactions inside the body (re-rendered on every poll, so
   // per-node listeners would leak — delegate once on the stable body element).
