@@ -217,3 +217,43 @@
 }
 
 .sess-notfound { font-family: var(--font-content); color: var(--muted); }
+
+/* ── Human follow-up reply box (LIN-1004, Phase 2) ────────────────────────────
+   The page's one interactive surface (rest is a LIN-1003 no-JS snapshot). A
+   textarea→POST that injects a plain human follow-up back into the session. */
+.sess-reply-input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 4.5rem;
+  resize: vertical;
+  padding: 0.5rem 0.6rem;
+  font-family: var(--font-structural);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.sess-reply-input:focus {
+  outline: none;
+  border-color: var(--brand);
+}
+.sess-reply-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+.sess-reply-feedback {
+  font-family: var(--font-structural);
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.sess-reply-feedback.error { color: var(--red); }
+.sess-reply-note {
+  margin: 0.5rem 0 0;
+  font-family: var(--font-content);
+  font-size: 0.8rem;
+  color: var(--muted);
+}

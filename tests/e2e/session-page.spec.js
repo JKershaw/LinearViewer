@@ -219,6 +219,72 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     await expect(page.locator('[data-testid="session-waiting-banner"]')).toHaveCount(0);
   });
 
+  test('the reply box POSTs a plain follow-up (no force) for a waiting session (LIN-1004)', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    await seedBlockedSession(page);
+    const sessionId = await discoverSessionId(page);
+
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
+    await page.waitForLoadState('networkidle');
+
+    // The box renders on a cli session and is tagged non-terminal (waiting → warm).
+    const box = page.locator('[data-testid="session-reply"]');
+    await expect(box).toBeVisible();
+    await expect(box).toHaveAttribute('data-session-terminal', 'false');
+
+    // Capture the outbound dispatch POST to assert the wire shape.
+    const [request] = await Promise.all([
+      page.waitForRequest(r => r.url().includes('/api/dispatch') && r.method() === 'POST'),
+      (async () => {
+        await page.locator('[data-testid="session-reply-input"]').fill('please continue with option A');
+        await page.locator('[data-testid="session-reply-send"]').click();
+      })()
+    ]);
+    const payload = request.postDataJSON();
+    // Additive plain follow-up: followUpTo = the session's own id, cli target,
+    // NO force (warm/waiting), and crucially NO kind:'wake' (no wake collision).
+    expect(payload.followUpTo).toBe(sessionId);
+    expect(payload.target).toBe('cli');
+    expect(payload.force).toBeUndefined();
+    expect(payload.kind).toBeUndefined();
+    expect(payload.prompt).toContain('option A');
+
+    // The UI confirms QUEUED (not delivered) — honest about the async handoff.
+    await expect(page.locator('[data-testid="session-reply-feedback"]')).toContainText('queued');
+  });
+
+  test('the reply box sends force:true for a finalized (terminal) session (LIN-1004)', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    await seedTerminalSessionWithBlockedWorker(page);
+    const sessionId = await discoverSessionId(page);
+
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
+    await page.waitForLoadState('networkidle');
+
+    const box = page.locator('[data-testid="session-reply"]');
+    await expect(box).toBeVisible();
+    // A finished session is terminal → the reply asserts "resume anyway".
+    await expect(box).toHaveAttribute('data-session-terminal', 'true');
+
+    const [request] = await Promise.all([
+      page.waitForRequest(r => r.url().includes('/api/dispatch') && r.method() === 'POST'),
+      (async () => {
+        await page.locator('[data-testid="session-reply-input"]').fill('one more thing');
+        await page.locator('[data-testid="session-reply-send"]').click();
+      })()
+    ]);
+    const payload = request.postDataJSON();
+    expect(payload.followUpTo).toBe(sessionId);
+    expect(payload.target).toBe('cli');
+    expect(payload.force).toBe(true);
+
+    // The server accepts the forced follow-up (force + followUpTo is valid).
+    const resp = await request.response();
+    expect(resp.status()).toBe(201);
+  });
+
   test('an unknown sessionId 404s with a not-found body', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     await clearRuns(page);
