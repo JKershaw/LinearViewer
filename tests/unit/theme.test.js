@@ -76,6 +76,31 @@ test('self-hosts Inter and JetBrains Mono via @font-face (no build step)', () =>
   assert.match(STYLE_CSS, /--font-content:\s*'Inter'/);
 });
 
+// LIN-985 (follow-up to LIN-976/LIN-785): the typography split is `--font-structural`
+// (machine facts) / `--font-content` (human structure). `var(--font-mono)` is only the
+// generic `monospace` fallback token — a `font-family` declaration must never resolve to it
+// (nor to raw `monospace`); each must route through one side of the split. This guards the
+// whole class of enforced public CSS files against regression. (Token *definitions* like
+// `--font-structural: 'JetBrains Mono', …, monospace` and the `--font-mono` fallback itself
+// are not `font-family:` declarations, so they are correctly not matched.)
+const TYPO_ENFORCED_CSS = ['style.css', 'settings.css', 'styleguide.css'];
+
+test('enforced public CSS uses no raw-mono font-family declaration (LIN-985)', () => {
+  for (const file of TYPO_ENFORCED_CSS) {
+    const css = readFileSync(join(__dirname, '../../public', file), 'utf8');
+    assert.doesNotMatch(
+      css,
+      /font-family:\s*var\(--font-mono\)/,
+      `${file}: font-family must route through --font-structural/--font-content, not var(--font-mono)`
+    );
+    assert.doesNotMatch(
+      css,
+      /font-family:\s*monospace\b/,
+      `${file}: font-family must not be raw monospace`
+    );
+  }
+});
+
 // LIN-864: the theme's type scale (view title 700, metadata/chips 500, machine-ID
 // mono 600) demands intermediate/heavier weights beyond the base 400. Each must be
 // self-hosted so the browser never synthesizes faux-bold, which degrades the

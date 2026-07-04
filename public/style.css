@@ -1694,7 +1694,7 @@ a.wordmark:hover {
 
 .local-workspace-name {
   padding: 0.4rem 0.6rem;
-  font-family: var(--font-mono);
+  font-family: var(--font-structural);
   font-size: 0.9em;
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -1899,7 +1899,7 @@ body.is-landing {
   border: 1px solid var(--border);
   border-radius: 4px;
   background: var(--bg-subtle, rgba(0, 0, 0, 0.02));
-  font-family: var(--font-mono);
+  font-family: var(--font-structural);
   font-size: 0.8rem;
   line-height: 1.6;
   color: var(--fg-dim);
@@ -3331,7 +3331,7 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
 }
 
 .context-node-id {
-  font-family: var(--font-mono);
+  font-family: var(--font-structural);
   font-weight: 600;
   font-size: var(--font-size-sm);
 }
