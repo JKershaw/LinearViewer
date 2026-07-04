@@ -81,6 +81,16 @@ describe('db-indexes', () => {
     }
   });
 
+  test('declares the bounded newest-first dispatch-history index (LIN-1030)', () => {
+    // Backs `find({urlKey}).sort({resolvedAt:-1}).limit(n)` in listHistory so the
+    // /api/proxy/dispatch read is a top-N slice, not a whole-history scan+sort.
+    const hasIt = INDEX_SPECS.some(s =>
+      s.collection === 'dispatch-history' &&
+      JSON.stringify(s.keySpec) === JSON.stringify({ urlKey: 1, resolvedAt: -1 })
+    );
+    assert.ok(hasIt, 'dispatch-history must have a {urlKey:1, resolvedAt:-1} index');
+  });
+
   test('unique option is honoured for tokenHash indexes', async () => {
     const db = freshDb();
     await ensureIndexes(db);
