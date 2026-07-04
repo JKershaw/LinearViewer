@@ -151,6 +151,18 @@
   50% { opacity: 0; }
 }
 
+/* Tool breadcrumb (LIN-990): a dim, ↳-marked log line noting a read-only lookup
+   the task made mid-turn. Deliberately quieter than a message bubble — it is
+   provenance, not conversation. */
+.task-chat-tool {
+  font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
+  color: var(--fg-vdim);
+  padding-left: var(--space-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .task-chat-empty {
   color: var(--fg-vdim);
   font-family: var(--font-content);

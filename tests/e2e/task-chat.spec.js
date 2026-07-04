@@ -112,6 +112,27 @@ test.describe('Task Chat Page (experimental)', () => {
       await expect(page.locator('#task-chat-empty')).toBeHidden();
     });
 
+    test('renders a tool breadcrumb and references the looked-up task (LIN-990)', async ({ page }) => {
+      // Behind the taskChat flag, a turn that needs another task's data drives a
+      // (mock) tool hop: a breadcrumb renders and the answer references the other
+      // fixture task, proving tool use end-to-end without a live LLM.
+      await page.locator('#task-chat-id').fill('TEST-1');
+      await page.locator('#task-chat-question').fill('What related work do you depend on?');
+      await page.locator('#task-chat-send').click();
+
+      // Breadcrumb is a dim ↳ log line referencing the fetched task (TEST-2, the
+      // first other fixture task in TEST-1's project).
+      const breadcrumb = page.locator('.task-chat-tool');
+      await expect(breadcrumb).toContainText('looked up TEST-2', { timeout: 5000 });
+
+      // The answer references the looked-up task — tool-derived data surfaced.
+      const answer = page.locator('.task-chat-msg-assistant .task-chat-msg-body');
+      await expect(answer).toContainText('TEST-2', { timeout: 5000 });
+
+      // The breadcrumb is NOT a chat bubble — it sits outside the message list.
+      await expect(page.locator('.task-chat-tool.task-chat-msg')).toHaveCount(0);
+    });
+
     test('reset clears the conversation', async ({ page }) => {
       await page.locator('#task-chat-id').fill('TEST-1');
       await page.locator('#task-chat-question').fill('hello?');

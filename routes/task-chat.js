@@ -20,7 +20,8 @@ import { renderTaskChatPage } from '../lib/render-task-chat.js';
 import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { buildTaskChatMessages } from '../lib/prompts/task-chat-template.js';
-import { streamChat, isRecommendationEnabled, getPaidEnvKey, hasPaidEnvKey } from '../lib/openrouter.js';
+import { streamChat, streamChatWithTools, isToolCapableModel, isRecommendationEnabled, getPaidEnvKey, hasPaidEnvKey } from '../lib/openrouter.js';
+import { createChatToolCatalog } from '../lib/chat-tools.js';
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { getWorkspaceCallScope, isValidIssueId } from '../lib/workspace.js';
@@ -87,11 +88,31 @@ function buildMockTaskContext(issueId) {
 }
 
 /**
+ * Pick a deterministic OTHER fixture task for the mock tool breadcrumb (LIN-990).
+ * The mock AI has no live LLM to decide a lookup, so we simulate one: choose the
+ * first fixture task in the same project (falling back to any other task) that is
+ * not the task being chatted with. This lets e2e prove a tool hop rendered a
+ * breadcrumb and that the answer referenced the fetched task, without a provider.
+ *
+ * @param {Object} context - Resolved task context (issue, project).
+ * @returns {{identifier: string, title: string}|null}
+ */
+function buildMockToolReference(context) {
+  const currentId = context?.issue?.id;
+  const currentProject = context?.project?.id;
+  const candidates = testMockData.issues.filter(i => i.identifier && i.id !== currentId);
+  const pick = candidates.find(i => i.project?.id === currentProject) || candidates[0];
+  return pick ? { identifier: pick.identifier, title: pick.title || '' } : null;
+}
+
+/**
  * A deterministic, first-person mock answer so e2e can exercise the full
  * round-trip (gate → fetch → stream → render) without calling an LLM. Grounded
- * in the resolved context, in the spirit of the real prompt.
+ * in the resolved context, in the spirit of the real prompt. When a `related`
+ * task is supplied (the simulated tool lookup), the answer references it so the
+ * e2e can assert tool-derived data surfaced.
  */
-function buildMockAnswer(context, question) {
+function buildMockAnswer(context, question, related) {
   const issue = context.issue || {};
   const open = (context.children || []).filter(c => c.state?.type !== 'completed' && c.state?.type !== 'canceled');
   const lines = [
@@ -107,6 +128,9 @@ function buildMockAnswer(context, question) {
     lines.push('My description is the best source on what I am.');
   } else {
     lines.push("My history is thin, so there's little for me to draw on.");
+  }
+  if (related) {
+    lines.push(`I looked up ${related.identifier}${related.title ? ` (${related.title})` : ''} to ground that.`);
   }
   return lines.join('\n');
 }
@@ -244,7 +268,15 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
 
     try {
       if (mockAi) {
-        const answer = buildMockAnswer(context, question);
+        // Simulate one read-only tool hop so e2e can prove breadcrumb rendering
+        // and tool-derived data without a live LLM. The `tool` events mirror the
+        // real streamChatWithTools breadcrumb shape ({ phase, name, arguments }).
+        const related = buildMockToolReference(context);
+        if (related) {
+          sendSSE(res, 'tool', { phase: 'call', iteration: 1, name: 'lookup_task', arguments: { issueId: related.identifier } });
+          sendSSE(res, 'tool', { phase: 'result', iteration: 1, name: 'lookup_task', result: `${related.identifier} — ${related.title}` });
+        }
+        const answer = buildMockAnswer(context, question, related);
         sendSSE(res, 'token', { token: answer });
         sendSSE(res, 'done', {});
         return res.end();
@@ -252,17 +284,40 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
 
       const selectedModel = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
       const messages = buildTaskChatMessages(context.issue, context, question.trim(), safeHistory);
-      await streamChat(
-        messages,
-        { apiKey: apiKeyToUse, model: selectedModel, maxTokens: 1500,
-          callMeta: { urlKey: workspace?.urlKey || null, feature: 'task-chat', issueIdentifier: context.issue?.identifier || null } },
-        (type, data) => {
-          sendSSE(res, type, data);
-          if (type === 'done' || type === 'error') {
-            res.end();
-          }
+      const callMeta = { urlKey: workspace?.urlKey || null, feature: 'task-chat', issueIdentifier: context.issue?.identifier || null };
+
+      // Forward every SSE event through untouched (including `tool` breadcrumbs,
+      // which the client renders but never adds to chat history) and close the
+      // stream on the terminal event. Shared by both the tool-calling and the
+      // plain-streaming branches below.
+      const onEvent = (type, data) => {
+        sendSSE(res, type, data);
+        if (type === 'done' || type === 'error') {
+          res.end();
         }
-      );
+      };
+
+      if (isToolCapableModel(selectedModel)) {
+        // Tool-capable model: offer the read-only, workspace-scoped catalog so a
+        // turn can look up related tasks. The whole loop is ONE turn — the single
+        // free-tier tryUse above still covers it; we add no per-hop quota call.
+        const provider = getProviderForWorkspace(workspace);
+        const { tools, executeTool } = createChatToolCatalog({ provider, scope: getWorkspaceCallScope(workspace) });
+        await streamChatWithTools(
+          messages,
+          { apiKey: apiKeyToUse, model: selectedModel, maxTokens: 1500, tools, executeTool, callMeta },
+          onEvent
+        );
+      } else {
+        // Unknown-capability model: degrade to plain streaming with tools OFF.
+        // We do NOT silently swap to a tool-capable model — the user's choice is
+        // honored; free-tier already forces the tool-capable DEFAULT_MODEL.
+        await streamChat(
+          messages,
+          { apiKey: apiKeyToUse, model: selectedModel, maxTokens: 1500, callMeta },
+          onEvent
+        );
+      }
     } catch (error) {
       console.error('Task chat stream error:', error);
       sendSSE(res, 'error', { message: 'Failed to generate a response' });
