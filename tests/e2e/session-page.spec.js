@@ -61,6 +61,36 @@ async function seedSessionWithTranscript(page) {
   expect(done.status(), `done feedback failed: ${await done.text()}`).toBe(200);
 }
 
+// Seed an autopilot session with one worker left in a [blocked] state (paused on
+// a human, never driven to [done]) — the LIN-1005 "waiting on user" case.
+async function seedBlockedSession(page) {
+  const anchor = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+    data: { prompt: 'orchestrate', promptName: 'autopilot', kind: 'autopilot', issueIdentifier: 'LIN-1005', issueTitle: 'Waiting seed', target: 'cli' }
+  });
+  expect(anchor.status(), `anchor seed failed: ${await anchor.text()}`).toBe(201);
+  const anchorId = (await anchor.json()).item.id;
+
+  const worker = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+    data: { prompt: 'implement', promptName: 'implementation', kind: 'implementation', issueIdentifier: 'LIN-1005', issueTitle: 'Waiting worker', target: 'cli', sessionId: anchorId }
+  });
+  expect(worker.status(), `worker seed failed: ${await worker.text()}`).toBe(201);
+  const workerId = (await worker.json()).item.id;
+
+  const tokenResp = await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${URL_KEY}`);
+  const { token } = await tokenResp.json();
+  const take = await page.request.post(`/api/dispatch/take/${workerId}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  expect(take.status(), `take failed: ${await take.text()}`).toBe(200);
+  // A [blocked] feedback marker with no subsequent [done]: the run stays a
+  // pause/wait signal, so the session rolls up to a waiting-on-user state.
+  const blocked = await page.request.post(`/api/dispatch/feedback/${workerId}`, {
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    data: { message: '[blocked] need your decision on the auth flow' }
+  });
+  expect(blocked.status(), `blocked feedback failed: ${await blocked.text()}`).toBe(200);
+}
+
 // Read the sessions feed and return the first session's id.
 async function discoverSessionId(page) {
   const resp = await page.request.get(`/workspace/${URL_KEY}/api/dashboard/sessions`);
@@ -101,6 +131,30 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     // Back-to-feed link points at the observation feed.
     await expect(page.locator('[data-testid="session-back"]'))
       .toHaveAttribute('href', `/workspace/${URL_KEY}/observation`);
+  });
+
+  test('shows the "waiting on you" banner for a [blocked] (paused) session (LIN-1005)', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    await seedBlockedSession(page);
+    const sessionId = await discoverSessionId(page);
+
+    // The feed rolls the session up to a waiting status with the blocked message.
+    const feed = await page.request.get(`/workspace/${URL_KEY}/api/dashboard/sessions`);
+    const body = await feed.json();
+    const s = [...(body.active || []), ...(body.recent || [])].find(x => x.sessionId === sessionId);
+    expect(s.status).toBe('waiting');
+    expect(s.waiting).toBe(true);
+    expect(s.waitingMessage).toContain('need your decision on the auth flow');
+
+    // The session page renders the prominent alert banner + follow-up CTA.
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
+    await page.waitForLoadState('networkidle');
+    const banner = page.locator('[data-testid="session-waiting-banner"]');
+    await expect(banner).toBeVisible();
+    await expect(banner).toContainText('Waiting on you');
+    await expect(page.locator('[data-testid="session-waiting-message"]')).toContainText('need your decision on the auth flow');
+    await expect(page.locator('[data-testid="session-waiting-cta"]')).toContainText('follow-up box');
   });
 
   test('an unknown sessionId 404s with a not-found body', async ({ page }) => {
