@@ -31,7 +31,7 @@
 import { Router } from 'express';
 import { renderObservationPage } from '../lib/render-observation.js';
 import { renderSessionPage } from '../lib/render-session.js';
-import { getLoopsForWorkspace, getSessionsForWorkspace, deriveIssueGraph } from '../lib/pipeline-loops.js';
+import { getLoopsForWorkspace, getSessionsForWorkspace, getSessionsForIssues, deriveIssueGraph } from '../lib/pipeline-loops.js';
 import { buildSessionContextGraph } from '../lib/context-graph.js';
 import { deriveTerminalStatus, deriveCompletedAt, findWakeEvent } from '../lib/dispatch-terminal.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
@@ -610,12 +610,18 @@ export function createDashboardRoutes({
   // Mounted under `workspaceFromUrl` so cookie-session auth + cross-workspace
   // isolation (unknown urlKey → 404) are inherited for free.
   //
-  // Read-only + additive: it sources the session from the NON-lean
-  // `getSessionsForWorkspace(...).find(...)` — the durable
-  // `observationSessionsStore.getSession` point-read is lean and drops
-  // `feedback[]` (pipeline-loops.js: `feedback: lean ? [] : feedback`), so it
-  // cannot supply the transcript. Brief/recap are cache-ONLY reads on load
-  // (never an LLM spend on page load); a miss renders an explicit affordance.
+  // Read-only + additive. The page needs the NON-lean transcript (`feedback[]`),
+  // which the lean `observationSessionsStore.getSession` point-read drops
+  // (pipeline-loops.js: `feedback: lean ? [] : feedback`). The original build read
+  // it from the NON-lean whole-workspace `getSessionsForWorkspace(...).find(...)`,
+  // which transferred every dispatch-history row's full `feedback[]` for the whole
+  // 30-day workspace just to render ONE session — ~147s of history-read on
+  // `linearviewer`, tripping Heroku's 30s H12 (LIN-1021). `loadSessionWithTranscript`
+  // instead learns the session's issue set from tiny `{urlKey,sessionId}`-indexed
+  // projected reads and rebuilds NON-lean over ONLY those issues via
+  // `getSessionsForIssues` (LIN-623), so the read scales with one session, not the
+  // whole workspace. Brief/recap are cache-ONLY reads on load (never an LLM spend on
+  // page load); a miss renders an explicit affordance.
   router.get('/workspace/:urlKey/observation/session/:sessionId', workspaceFromUrl, async (req, res, next) => {
     try {
       const workspace = req.workspace;
@@ -633,9 +639,9 @@ export function createDashboardRoutes({
         return res.status(404).send(renderSessionPage({ session: null, sessionId: '', urlKey: workspace.urlKey }, pageOptions));
       }
 
-      // NON-lean read — the transcript needs `feedback[]`.
-      const sessions = await getSessionsForWorkspace(workspace.urlKey, loopDeps);
-      const session = sessions.find(s => String(s.sessionId) === String(sessionId)) || null;
+      // NON-lean, issue-scoped point-read (LIN-1021) — the transcript needs
+      // `feedback[]`, but scoped to this session's issues, not the whole workspace.
+      const session = await loadSessionWithTranscript(workspace.urlKey, sessionId);
       if (!session) {
         return res.status(404).send(renderSessionPage({ session: null, sessionId, urlKey: workspace.urlKey }, pageOptions));
       }
@@ -682,6 +688,60 @@ export function createDashboardRoutes({
   router.get('/workspace/:urlKey/dashboard', workspaceFromUrl, (req, res) => {
     res.redirect(`/workspace/${encodeURIComponent(req.workspace.urlKey)}/observation`);
   });
+
+  /**
+   * Load ONE reconstructed session WITH its non-lean transcript (`feedback[]`)
+   * without paying for a whole-workspace reconstruction (LIN-1021).
+   *
+   * The page can't use the lean read-model point-read (it drops `feedback[]`),
+   * and the whole-workspace non-lean read transfers every dispatch-history row's
+   * feedback for 30 days (~147s on `linearviewer` → H12). Instead:
+   *
+   *   1. Derive the session's issue set cheaply. A `sessionId`-first session is,
+   *      by `_buildSessions`' grouping, exactly {the root dispatch (id===sessionId)}
+   *      ∪ {dispatches stamped `sessionId===sessionId`}. Both are `{urlKey,sessionId}`-
+   *      indexed reads, and we project to `issueIdentifier` only — a few tiny rows.
+   *   2. Rebuild NON-lean over ONLY those issues via `getSessionsForIssues` (LIN-623,
+   *      issue-scoped/index-backed), which reuses the SAME builders as the live
+   *      reconstruction, so the rebuilt session is faithful (verified: it reproduces
+   *      the whole-workspace build's loop set exactly).
+   *   3. Fall back to the full non-lean reconstruction only when the issue-scoped
+   *      rebuild can't produce the session — a historical inference-grouped session
+   *      (no explicit `sessionId` stamps) or one whose loops carry no `issueIdentifier`.
+   *      Correct-but-slow, and the same degradation the sibling session-summary/
+   *      context paths accept on a point-read miss; the common case never hits it.
+   *
+   * @param {string} urlKey
+   * @param {string} sessionId
+   * @returns {Promise<Object|null>} the non-lean session, or null if not found
+   */
+  async function loadSessionWithTranscript(urlKey, sessionId) {
+    const ids = new Set();
+    // The root/orchestrator dispatch (id===sessionId) carries no self-referential
+    // `sessionId`, so the sessionId-scoped reads below won't surface it — fetch its
+    // own `issueIdentifier` (the seed) directly. Defensive: a store without
+    // getItemStatus (test fakes) just contributes nothing here.
+    const root = typeof dispatchQueueStore.getItemStatus === 'function'
+      ? await Promise.resolve(dispatchQueueStore.getItemStatus(urlKey, sessionId)).catch(() => null)
+      : null;
+    if (root?.issueIdentifier) ids.add(root.issueIdentifier);
+    const projection = { issueIdentifier: 1 };
+    const [live, hist] = await Promise.all([
+      Promise.resolve(dispatchQueueStore.listItems(urlKey, { sessionId, projection })).catch(() => []),
+      Promise.resolve(dispatchQueueStore.listHistory(urlKey, { sessionId, projection })).catch(() => ({ items: [] }))
+    ]);
+    for (const r of (Array.isArray(live) ? live : [])) if (r?.issueIdentifier) ids.add(r.issueIdentifier);
+    for (const r of (hist?.items || [])) if (r?.issueIdentifier) ids.add(r.issueIdentifier);
+
+    if (ids.size) {
+      const rebuilt = await getSessionsForIssues(urlKey, loopDeps, [...ids], { lean: false });
+      const hit = rebuilt.find(s => String(s.sessionId) === String(sessionId)) || null;
+      if (hit) return hit;
+    }
+    // Fallback: historical inference-grouped or no-issue session → full read.
+    const sessions = await getSessionsForWorkspace(urlKey, loopDeps);
+    return sessions.find(s => String(s.sessionId) === String(sessionId)) || null;
+  }
 
   /**
    * Cache-only brief/recap join for the per-session page (LIN-1003). Reduces the
