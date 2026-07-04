@@ -53,7 +53,28 @@ describe('buildTaskChatMessages', () => {
     const [system] = buildTaskChatMessages(SAMPLE_ISSUE, SAMPLE_CONTEXT, 'hi');
     assert.match(system.content, /first person/i);
     assert.match(system.content, /never invent/i);
-    assert.match(system.content, /only source of truth/i);
+  });
+
+  test('system prompt permits tool lookup and no longer forbids retrieval (LIN-990)', () => {
+    const [system] = buildTaskChatMessages(SAMPLE_ISSUE, SAMPLE_CONTEXT, 'hi');
+    // The retrieval-hostile absolutes are gone: no "only source of truth", and no
+    // "derive every claim ONLY from the context" clause that would forbid tools.
+    assert.doesNotMatch(system.content, /only source of truth/i);
+    assert.doesNotMatch(system.content, /only from the context/i);
+    // Lookup is explicitly allowed, and the tool names are surfaced so the model
+    // knows what it can reach.
+    assert.match(system.content, /look .*up|look up|lookup/i);
+    assert.match(system.content, /lookup_task/);
+    assert.match(system.content, /search_tasks/);
+    assert.match(system.content, /get_relations/);
+  });
+
+  test('system prompt keeps faithfulness for fetched data (LIN-990)', () => {
+    const [system] = buildTaskChatMessages(SAMPLE_ISSUE, SAMPLE_CONTEXT, 'hi');
+    // Softened, not abandoned: fetched data must still be cited and never invented.
+    assert.match(system.content, /cite the task/i);
+    assert.match(system.content, /never invent/i);
+    assert.match(system.content, /name the gap/i);
   });
 
   test('system prompt forbids markdown for the terminal surface', () => {

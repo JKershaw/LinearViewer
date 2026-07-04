@@ -21,6 +21,7 @@ import {
   getModelDisplayName,
   formatModelPricing,
   getModelPricingHint,
+  isToolCapableModel,
   AVAILABLE_MODELS,
   getPaidEnvKey,
   hasPaidEnvKey,
@@ -287,6 +288,32 @@ describe('formatModelPricing / getModelPricingHint (LIN-993)', () => {
       assert.strictEqual(typeof m.pricing.completion, 'number', `${m.id} completion rate is a number`);
       assert.ok(m.pricing.prompt >= 0 && m.pricing.completion >= 0, `${m.id} rates are non-negative`);
     }
+  });
+});
+
+describe('isToolCapableModel (LIN-990)', () => {
+  test('returns true for every curated model in AVAILABLE_MODELS', () => {
+    for (const m of AVAILABLE_MODELS) {
+      assert.strictEqual(isToolCapableModel(m.id), true, `${m.id} should be tool-capable`);
+    }
+  });
+
+  test('the DEFAULT_MODEL is tool-capable (free-tier forces it)', () => {
+    assert.strictEqual(isToolCapableModel(DEFAULT_MODEL), true);
+  });
+
+  test('returns false for a custom/uncurated model id (unknown ≠ capable)', () => {
+    assert.strictEqual(isToolCapableModel('some-provider/custom-model-v2'), false);
+    assert.strictEqual(isToolCapableModel('openai/gpt-5.4-mini-typo'), false);
+    assert.strictEqual(isToolCapableModel('gpt-5.4-mini'), false); // provider prefix required
+  });
+
+  test('returns false for falsy or non-string ids', () => {
+    assert.strictEqual(isToolCapableModel(''), false);
+    assert.strictEqual(isToolCapableModel(null), false);
+    assert.strictEqual(isToolCapableModel(undefined), false);
+    assert.strictEqual(isToolCapableModel(123), false);
+    assert.strictEqual(isToolCapableModel({}), false);
   });
 });
 

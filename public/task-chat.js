@@ -91,6 +91,49 @@
     return li.querySelector('.task-chat-msg-body');
   }
 
+  // Human-readable label for a `tool` SSE breadcrumb (LIN-990). Derived from the
+  // streamChatWithTools event shape ({ phase, name, arguments, error }). Returns
+  // '' for phases we don't surface (e.g. 'result') so the caller can skip them.
+  function toolBreadcrumbLabel(data) {
+    if (!data || typeof data !== 'object') return '';
+    var name = data.name || 'tool';
+    var args = data.arguments || {};
+    if (data.phase === 'call') {
+      if (name === 'lookup_task' || name === 'get_relations') {
+        return args.issueId ? 'looked up ' + args.issueId : name;
+      }
+      if (name === 'search_tasks') {
+        return args.query ? 'searched "' + args.query + '"' : name;
+      }
+      return name;
+    }
+    if (data.phase === 'error') {
+      return name + ' failed: ' + (data.error || 'unknown error');
+    }
+    if (data.phase === 'cap') {
+      return 'reached the tool-lookup limit';
+    }
+    return '';
+  }
+
+  // Render a tool breadcrumb into the transcript. Breadcrumbs are surfaced to the
+  // reader but are NOT chat history — they never enter `chatHistory` and are not
+  // assistant content. Inserted BEFORE the (streaming) answer bubble so the log
+  // reads: you → ↳ lookup → the task's answer.
+  function appendToolBreadcrumb(label, beforeLi) {
+    if (!label) return;
+    var li = document.createElement('li');
+    li.className = 'task-chat-tool';
+    li.textContent = '↳ ' + label;
+    if (beforeLi && beforeLi.parentNode === transcript) {
+      transcript.insertBefore(li, beforeLi);
+    } else {
+      transcript.appendChild(li);
+    }
+    setEmptyVisible(false);
+    transcript.scrollTop = transcript.scrollHeight;
+  }
+
   function resetConversation() {
     chatHistory = [];
     activeTask = '';
@@ -129,6 +172,7 @@
 
     var answerEl = appendBubble('assistant', '');
     answerEl.classList.add('task-chat-streaming');
+    var answerLi = answerEl.closest('li'); // tool breadcrumbs insert before this
     var answerText = '';
     setBusy(true);
 
@@ -156,7 +200,11 @@
         });
       }
       return readSSEStream(response, function (type, eventData) {
-        if (type === 'token' || type === 'message') {
+        if (type === 'tool') {
+          // Tool breadcrumb: surface it in the log, but it is NOT assistant
+          // content — do not touch answerText or chatHistory.
+          appendToolBreadcrumb(toolBreadcrumbLabel(eventData), answerLi);
+        } else if (type === 'token' || type === 'message') {
           var text = typeof eventData === 'object' ? (eventData.token || eventData.text || '') : eventData;
           answerText += text;
           answerEl.textContent = answerText;
