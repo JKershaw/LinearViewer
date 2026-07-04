@@ -1577,9 +1577,17 @@ app.get('/workspace/:urlKey/roadmap', workspaceFromUrl, async (req, res) => {
   const teamId = rawTeam && rawTeam !== 'all' && UUID_REGEX.test(rawTeam) ? rawTeam : null;
 
   try {
-    // Fetch raw data — roadmap needs raw issues for velocity/queue calculations
-    const { organizationName, projects, issues } =
-      await getProviderForWorkspace(workspace).fetchProjects(getWorkspaceCallScope(workspace), teamId);
+    // Fetch raw data — roadmap needs raw issues for velocity/queue calculations.
+    // In test mode the mock 'test-token' can't reach real Linear, so honor the
+    // same testMockData arm fetchAndPrepareProjects and the dispatch route use.
+    // LIN-409 migrated the roadmap *e2e* happy-path to a genuine 'local' provider
+    // session and dropped this arm from the route; the visual maker deliberately
+    // stays on the test-token mock fixtures (not local), so without it this route
+    // auth-errors and the roadmap baseline silently captured the landing page.
+    const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
+    const { organizationName, projects, issues } = isTestMode
+      ? testMockData
+      : await getProviderForWorkspace(workspace).fetchProjects(getWorkspaceCallScope(workspace), teamId);
 
     // Build roadmap model from deterministic layer
     const roadmapModel = buildRoadmapModel(projects, issues);
