@@ -10,6 +10,10 @@
   max-width: 900px;
   margin: 0 auto;
   padding: 0 1rem 3rem;
+  /* Belt-and-suspenders guard: long machine facts (UUIDs, transcript URLs) wrap
+     at their source below, but this keeps a stray long token from ever forcing
+     sideways page scroll on a 360px viewport (LIN-1024). */
+  overflow-x: hidden;
 }
 
 .sess-back {
@@ -72,7 +76,9 @@
   color: var(--muted);
   font-family: var(--font-content);
 }
-.sess-v { color: var(--text); }
+/* Flex child holding a machine fact (e.g. the 36-char session-id UUID): allow it
+   to shrink and break so it never overruns the row on a narrow screen. */
+.sess-v { color: var(--text); min-width: 0; overflow-wrap: anywhere; }
 
 .sess-tasks {
   display: flex;
@@ -151,6 +157,23 @@
 }
 
 /* ── Transcript ───────────────────────────────────────────────────────────── */
+/* Contain a long transcript in its own scroll region (LIN-1024) instead of
+   letting it stretch the page — which also keeps the reply box (which sits
+   below it) reachable on mobile. Reuses the repo's established
+   max-height / overflow-y:auto / scrollbar-gutter pattern (~8 uses in
+   style.css/swipe.css). */
+.sess-tx {
+  max-height: 480px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+  padding: 0.1rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--inset);
+}
+/* No trailing divider against the container's bottom edge. */
+.sess-tx-loop:last-child .sess-tx-entry:last-child { border-bottom: none; }
 .sess-tx-loop { margin-bottom: 1rem; }
 .sess-tx-loop-head {
   font-family: var(--font-structural);
@@ -169,7 +192,7 @@
 }
 .sess-tx-time { color: var(--faint, var(--muted)); margin-right: 0.5rem; }
 .sess-tx-msg { color: var(--text); white-space: pre-wrap; }
-.sess-tx-link { color: var(--blue); margin-left: 0.35rem; }
+.sess-tx-link { color: var(--blue); margin-left: 0.35rem; overflow-wrap: anywhere; }
 
 /* ── Task context (brief / recap) ─────────────────────────────────────────── */
 .sess-ctx-issue {
@@ -193,15 +216,21 @@
   margin-bottom: 0.4rem;
 }
 .sess-ctx-kind { font-family: var(--font-content); font-weight: 600; color: var(--text); }
-.sess-ctx-ident { font-family: var(--font-structural); font-size: 0.78rem; color: var(--muted); }
+.sess-ctx-ident { font-family: var(--font-structural); font-size: 0.78rem; color: var(--muted); overflow-wrap: anywhere; }
 .sess-ctx-body {
   font-family: var(--font-structural);
   font-size: 0.8rem;
-  line-height: 1.5;
+  line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
   margin: 0;
   color: var(--text);
+  /* Cap the verbatim brief body per-panel (not per-row) so a long brief scrolls
+     within its own panel and doesn't stretch the page or drag the sibling
+     recap column's height (LIN-1024). */
+  max-height: 360px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 .sess-ctx-meta {
   margin-top: 0.4rem;
@@ -218,7 +247,14 @@
 
 /* Structured recap (LIN-1023): the recap cache stores an object, not a string,
    so it renders as grouped lists rather than a single <pre>. */
-.sess-ctx-recap { display: grid; gap: 0.6rem; }
+/* Recap panel body scrolls independently of the brief (per-panel cap, LIN-1024). */
+.sess-ctx-recap {
+  display: grid;
+  gap: 0.6rem;
+  max-height: 360px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
 .sess-recap-group-head {
   font-family: var(--font-content);
   font-weight: 600;
@@ -234,6 +270,7 @@
   font-size: 0.82rem;
   line-height: 1.4;
   color: var(--text);
+  overflow-wrap: anywhere;
 }
 .sess-recap-tag {
   font-family: var(--font-structural);
@@ -278,7 +315,8 @@
 .sess-reply-actions {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
   margin-top: 0.5rem;
 }
 .sess-reply-feedback {
@@ -292,4 +330,19 @@
   font-family: var(--font-content);
   font-size: 0.8rem;
   color: var(--muted);
+}
+
+/* ── Small-screen polish (LIN-1024) ───────────────────────────────────────────
+   Basic readability/spacing tightening for the reported surface (360px Android
+   Chrome): reclaim horizontal room, keep the waiting banner and reply box
+   comfortable to read and tap. CSS-only; no markup or data-testid changes. */
+@media (max-width: 480px) {
+  .sess-page { padding: 0 0.75rem 2.5rem; }
+  /* The fixed 8rem key column crowds the value on a narrow row — give the
+     machine fact more room while keeping the key/value rhythm. */
+  .sess-k { min-width: 6rem; }
+  .sess-waiting { padding: 0.75rem 0.85rem; }
+  .sess-waiting-msg { line-height: 1.5; }
+  /* A touch more room to read/compose the reply on a phone. */
+  .sess-reply-input { min-height: 5.5rem; }
 }
