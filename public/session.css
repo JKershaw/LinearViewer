@@ -270,6 +270,7 @@
   font-size: 0.82rem;
   line-height: 1.4;
   color: var(--text);
+  overflow-wrap: anywhere;
 }
 .sess-recap-tag {
   font-family: var(--font-structural);
