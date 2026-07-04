@@ -287,6 +287,100 @@ test.describe('Dispatch Page', () => {
     });
   });
 
+  test.describe('Favourite Prompts (LIN-1011)', () => {
+    test.beforeEach(async ({ page }) => {
+      // Seed FIRST so the local session's user exists before clearing, then
+      // clear BOTH lists (favourites survive the recents cap, so both matter).
+      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true }, urlKey: WS });
+      await page.goto('/test/clear-recent-prompts');
+      await page.goto('/test/clear-favorite-prompts');
+    });
+
+    test('starring a recent prompt promotes it into Favourites', async ({ page }) => {
+      await page.request.post(`${API_PREFIX}/api/dispatch/recent-prompts`, {
+        data: { prompt: 'Star me' }
+      });
+      await page.goto(DISPATCH_URL);
+      await page.waitForLoadState('networkidle');
+
+      const star = page.locator('.dispatch-recents-container .queue-recent-star');
+      await expect(star.first()).toBeVisible({ timeout: 5000 });
+      // Not favourited yet: outline star.
+      await expect(star.first()).toHaveText('☆');
+
+      await star.first().click();
+
+      // It now appears in the Favourites list...
+      const favItem = page.locator('.dispatch-favorites-container .queue-favorite-item');
+      await expect(favItem.first()).toBeVisible({ timeout: 5000 });
+      await expect(favItem.first()).toContainText('Star me');
+      // ...and the recent item's star flips to filled.
+      await expect(star.first()).toHaveText('★');
+      await expect(star.first()).toHaveClass(/\bis-favorite\b/);
+    });
+
+    test('a favourite survives the recents roll-off (the core requirement)', async ({ page }) => {
+      await page.request.post(`${API_PREFIX}/api/dispatch/recent-prompts`, {
+        data: { prompt: 'Keep me forever' }
+      });
+      // Favourite it directly via the API (the star click is covered above).
+      await page.request.post(`${API_PREFIX}/api/dispatch/favorite-prompts`, {
+        data: { prompt: 'Keep me forever' }
+      });
+      // Push 12 newer recents so the original rolls off the capped-at-10 Recent window.
+      for (let i = 1; i <= 12; i++) {
+        await page.request.post(`${API_PREFIX}/api/dispatch/recent-prompts`, {
+          data: { prompt: `Filler ${i}` }
+        });
+      }
+
+      await page.goto(DISPATCH_URL);
+      await page.waitForLoadState('networkidle');
+
+      // Gone from Recent (10 fillers), but still present in Favourites.
+      const recentItems = page.locator('.dispatch-recents-container .queue-recent-item');
+      await expect(recentItems).toHaveCount(10, { timeout: 5000 });
+      await expect(page.locator('.dispatch-recents-container')).not.toContainText('Keep me forever');
+
+      const favItem = page.locator('.dispatch-favorites-container .queue-favorite-item');
+      await expect(favItem.first()).toBeVisible();
+      await expect(favItem.first()).toContainText('Keep me forever');
+    });
+
+    test('clicking a favourite fills the textarea', async ({ page }) => {
+      await page.request.post(`${API_PREFIX}/api/dispatch/favorite-prompts`, {
+        data: { prompt: 'Favourite prompt text' }
+      });
+      await page.goto(DISPATCH_URL);
+      await page.waitForLoadState('networkidle');
+
+      const favItem = page.locator('.dispatch-favorites-container .queue-favorite-item');
+      await expect(favItem.first()).toBeVisible({ timeout: 5000 });
+      await favItem.first().click();
+
+      const textarea = page.locator('.dispatch-prompt-input');
+      await expect(textarea).toHaveValue('Favourite prompt text');
+    });
+
+    test('un-starring (✕) removes a favourite', async ({ page }) => {
+      await page.request.post(`${API_PREFIX}/api/dispatch/favorite-prompts`, {
+        data: { prompt: 'Remove me' }
+      });
+      await page.goto(DISPATCH_URL);
+      await page.waitForLoadState('networkidle');
+
+      const favItem = page.locator('.dispatch-favorites-container .queue-favorite-item');
+      await expect(favItem.first()).toBeVisible({ timeout: 5000 });
+
+      await page.locator('.dispatch-favorites-container .queue-favorite-remove').first().click();
+
+      // The favourites list empties out.
+      await expect(favItem).toHaveCount(0, { timeout: 5000 });
+      // And it did NOT get refilled into the textarea by the same click.
+      await expect(page.locator('.dispatch-prompt-input')).toHaveValue('');
+    });
+  });
+
   test.describe('Dispatch Options Disclosure', () => {
     test.beforeEach(async ({ page }) => {
       await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true }, urlKey: WS });
