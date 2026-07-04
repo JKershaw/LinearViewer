@@ -292,6 +292,23 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     }
   });
 
+  // Endpoint to clear favourite custom prompts for testing (LIN-1011).
+  // Mirrors /test/clear-recent-prompts: favourites are stored per session user,
+  // so clear the CURRENT session's user when one exists, else the test-token user.
+  router.get('/test/clear-favorite-prompts', async (req, res) => {
+    try {
+      const userId = req.session.linearUserId || 'test-linear-user-id';
+      const prefs = await userPreferencesStore.getUserPreferences(userId);
+      await userPreferencesStore.saveUserPreferences(userId, {
+        ...prefs,
+        favoriteCustomPrompts: {}
+      });
+      res.send('ok');
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Endpoint to clear custom prompts for testing
   // Optional ?urlKey=<workspace> (default 'test-workspace' for back-compat).
   // The store is partitioned by workspace urlKey and /api/prompts/custom
