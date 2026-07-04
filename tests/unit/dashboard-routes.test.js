@@ -54,7 +54,10 @@ function historyItem(id, identifier) {
   return { id, issueIdentifier: identifier, issueTitle: `Title ${identifier}`, promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken', feedback: [{ message: 'pr opened' }] };
 }
 function agentStatusDone(dispatchId, identifier, ts = NOW_ISO) {
-  return { dispatchId, taskIdentifier: identifier, action: 'implementation', status: 'completed', summary: 'all done', timestamp: ts };
+  // The real agent-status-store maps every row to `id: doc._id` (a UUID); the
+  // issue-scoped getSessionsForIssues read dedups rows by that `id`, so a faithful
+  // fixture MUST carry one or the row is silently dropped (LIN-1022).
+  return { id: `as-${dispatchId}`, dispatchId, taskIdentifier: identifier, action: 'implementation', status: 'completed', summary: 'all done', timestamp: ts };
 }
 // A taken run that the runner finished via a [done] feedback marker but with NO
 // agentStatus 'completed' entry — pipeline-loops alone derives 'running' for this.
@@ -1095,7 +1098,7 @@ describe('session-summary endpoint', () => {
     // latest child is still running returned an empty status line forever (the UI
     // showed a permanent "◐ working…"). It must now fall back to the running
     // child's own agentSummary — deterministically, no LLM call.
-    const runningWorker = { dispatchId: 'w-run', taskIdentifier: 'LIN-801', action: 'implementation', status: 'working', summary: 'Refactoring the parser', timestamp: NOW_ISO };
+    const runningWorker = { id: 'as-w-run', dispatchId: 'w-run', taskIdentifier: 'LIN-801', action: 'implementation', status: 'working', summary: 'Refactoring the parser', timestamp: NOW_ISO };
     const perWorkspace = {
       'ws-a': {
         live: [autopilotLiveItem('sess-live', 'LIN-800')],
@@ -1444,32 +1447,36 @@ describe('GET /observation/session/:sessionId — brief/recap join (LIN-1003)', 
 // sessionId) history/queue read — that unscoped read transferred the whole 30-day
 // workspace's feedback and tripped Heroku's H12. This store fails loud on any such
 // read, so a regression back to getSessionsForWorkspace on the happy path breaks it.
-describe('GET /observation/session/:sessionId — issue-scoped read, no whole-workspace scan (LIN-1021)', () => {
-  function scopedStore(items) {
-    const unscoped = [];
-    const scope = (arr, opts, key) => {
-      if (!opts.issueIdentifier && !opts.sessionId) unscoped.push(key);
-      let r = arr;
-      if (opts.issueIdentifier) r = r.filter(i => i.issueIdentifier === opts.issueIdentifier);
-      if (opts.sessionId) r = r.filter(i => i.sessionId === opts.sessionId);
-      return r;
-    };
-    let getItemStatusCalls = 0;
-    const dispatchQueueStore = {
-      async getItemStatus(_urlKey, id) { getItemStatusCalls++; return [...items.live, ...items.history].find(i => i.id === id) || null; },
-      async listItems(_urlKey, opts = {}) { return scope(items.live, opts, 'listItems'); },
-      async listHistory(_urlKey, opts = {}) { return { items: scope(items.history, opts, 'listHistory') }; }
-    };
-    const agentStatusStore = {
-      async listStatus(_urlKey, opts = {}) {
-        if (!opts.taskIdentifier) unscoped.push('listStatus');
-        const r = (items.agentStatus || []).filter(s => !opts.taskIdentifier || s.taskIdentifier === opts.taskIdentifier);
-        return { items: r };
-      }
-    };
-    return { dispatchQueueStore, agentStatusStore, unscoped, get getItemStatusCalls() { return getItemStatusCalls; } };
-  }
+// A store that fails LOUD (records into `unscoped`) on any read lacking an
+// issueIdentifier / sessionId / taskIdentifier — i.e. a whole-workspace scan.
+// Shared by the LIN-1021 per-session-page test and the LIN-1022 sibling-handler
+// tests below, which all assert the SAME invariant: the happy path is issue-scoped.
+function scopedStore(items) {
+  const unscoped = [];
+  const scope = (arr, opts, key) => {
+    if (!opts.issueIdentifier && !opts.sessionId) unscoped.push(key);
+    let r = arr;
+    if (opts.issueIdentifier) r = r.filter(i => i.issueIdentifier === opts.issueIdentifier);
+    if (opts.sessionId) r = r.filter(i => i.sessionId === opts.sessionId);
+    return r;
+  };
+  let getItemStatusCalls = 0;
+  const dispatchQueueStore = {
+    async getItemStatus(_urlKey, id) { getItemStatusCalls++; return [...items.live, ...items.history].find(i => i.id === id) || null; },
+    async listItems(_urlKey, opts = {}) { return scope(items.live, opts, 'listItems'); },
+    async listHistory(_urlKey, opts = {}) { return { items: scope(items.history, opts, 'listHistory') }; }
+  };
+  const agentStatusStore = {
+    async listStatus(_urlKey, opts = {}) {
+      if (!opts.taskIdentifier) unscoped.push('listStatus');
+      const r = (items.agentStatus || []).filter(s => !opts.taskIdentifier || s.taskIdentifier === opts.taskIdentifier);
+      return { items: r };
+    }
+  };
+  return { dispatchQueueStore, agentStatusStore, unscoped, get getItemStatusCalls() { return getItemStatusCalls; } };
+}
 
+describe('GET /observation/session/:sessionId — issue-scoped read, no whole-workspace scan (LIN-1021)', () => {
   test('renders the transcript via issue-scoped reads only (no unscoped whole-workspace read)', async () => {
     // Root autopilot (LIN-900, no sessionId — only reachable by id) + a worker
     // stamped sessionId, carrying the [done] transcript.
@@ -1544,5 +1551,100 @@ describe('GET /observation/session/:sessionId — issue-scoped read, no whole-wo
     await handler(req, res);
     assert.equal(res.statusCode, 404, 'unknown session 404s');
     assert.ok(stores.unscoped.length > 0, 'the full-read fallback ran (issue-scoping found nothing)');
+  });
+});
+
+// ─── LIN-1022: the sibling :id-keyed handlers are issue-scoped too ─────────────
+//
+// Class check on LIN-1021 (widen the model, don't patch the witness). session-summary,
+// session-context, and run-summary each reconstructed ONE record by id from the whole
+// 30-day workspace (getSessionsForWorkspace / getLoopsForWorkspace) and H12'd at scale —
+// session-summary?cachedOnly=1 fired one such read per Observation card, starving the
+// event loop into mass H12. Each now point-reads via the same issue-scoped path the
+// per-session page uses; the scopedStore fails loud on any whole-workspace read, so a
+// regression back to the old reconstruct-by-id breaks these.
+describe('sibling :id-keyed handlers are issue-scoped, no whole-workspace scan (LIN-1022)', () => {
+  // Terminal session sess-ss (root LIN-950, only reachable by id) + a worker stamped
+  // sessionId carrying LIN-951; both terminal via agentStatusDone.
+  function terminalSessionItems() {
+    return {
+      live: [],
+      history: [autopilotHistoryItem('sess-ss', 'LIN-950'), workerHistoryItem('w-ss', 'LIN-951', 'sess-ss')],
+      agentStatus: [agentStatusDone('sess-ss', 'LIN-950'), agentStatusDone('w-ss', 'LIN-951')]
+    };
+  }
+
+  function makeScopedRouter(stores, extra = {}) {
+    return createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore: stores.dispatchQueueStore,
+      agentStatusStore: stores.agentStatusStore,
+      observationSessionsStore: null,
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
+      briefCacheStore: { async get() { return null; } },
+      recapCacheStore: { async get() { return null; } },
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      fetchWorkspaceIssues: async () => [],
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({}),
+      ...extra
+    });
+  }
+
+  test('session-summary resolves the session via issue-scoped reads only', async () => {
+    const prev = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'test';
+    try {
+      const stores = scopedStore(terminalSessionItems());
+      const router = makeScopedRouter(stores);
+      const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/session-summary/:sessionId');
+      const { req, res } = makeReqRes({ session: ENABLED, workspace: { urlKey: 'ws-a' }, params: { sessionId: 'sess-ss' } });
+      await handler(req, res);
+      assert.equal(res.statusCode, 200, 'summarised the terminal session');
+      assert.equal(res.jsonBody.live, false);
+      assert.match(res.jsonBody.summary.outcome, /sess-ss/);
+      assert.deepEqual(stores.unscoped, [], 'no unscoped (whole-workspace) read on the summary lookup');
+      assert.ok(stores.getItemStatusCalls >= 1, 'the session root is fetched by id (issue derivation)');
+    } finally {
+      process.env.NODE_ENV = prev;
+    }
+  });
+
+  test('session-context resolves the session via issue-scoped reads only', async () => {
+    const stores = scopedStore(terminalSessionItems());
+    const router = makeScopedRouter(stores);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/session-context/:sessionId');
+    const { req, res } = makeReqRes({
+      session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
+      workspace: { urlKey: 'ws-a' },
+      params: { sessionId: 'sess-ss' }
+    });
+    await handler(req, res);
+    assert.equal(res.statusCode, 200, 'built the session context');
+    assert.equal(res.jsonBody.sessionId, 'sess-ss');
+    assert.deepEqual(stores.unscoped, [], 'no unscoped (whole-workspace) read on the context lookup');
+    assert.ok(stores.getItemStatusCalls >= 1, 'the session root is fetched by id (issue derivation)');
+  });
+
+  test('run-summary resolves the run via issue-scoped reads only', async () => {
+    const prev = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'test';
+    try {
+      const stores = scopedStore(terminalSessionItems());
+      const router = makeScopedRouter(stores);
+      // POST → force generation; loopId 'w-ss' is a terminal worker run.
+      const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/run-summary/:loopId');
+      const { req, res } = makeReqRes({ session: ENABLED, workspace: { urlKey: 'ws-a' }, params: { loopId: 'w-ss' } });
+      await handler(req, res);
+      assert.equal(res.statusCode, 200, 'summarised the terminal run');
+      assert.equal(res.jsonBody.loopId, 'w-ss');
+      assert.deepEqual(stores.unscoped, [], 'no unscoped (whole-workspace) read on the run lookup');
+      assert.ok(stores.getItemStatusCalls >= 1, 'the run is resolved to its issue by id');
+    } finally {
+      process.env.NODE_ENV = prev;
+    }
   });
 });
