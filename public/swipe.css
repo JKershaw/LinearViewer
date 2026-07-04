@@ -16,7 +16,7 @@
 .swipe-filter-select {
   width: 100%;
   padding: var(--space-2) 0.75rem;
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-family: var(--font-content);
   font-size: 13px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -107,6 +107,7 @@
 }
 
 .swipe-card-empty {
+  font-family: var(--font-content);
   text-align: center;
   color: var(--fg-dim);
   padding: 3rem var(--space-3);
@@ -128,7 +129,7 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: var(--space-2);
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-family: var(--font-structural);
   font-size: 12px;
 }
 
@@ -159,6 +160,7 @@
 
 /* Card Title */
 .swipe-card-title {
+  font-family: var(--font-content);
   font-size: 20px;
   font-weight: 700;
   line-height: 1.25;
@@ -190,7 +192,7 @@
 }
 
 .swipe-card-meta-label {
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-family: var(--font-content);
   color: var(--fg-dim);
   font-size: 11px;
   text-transform: uppercase;
@@ -199,6 +201,7 @@
 }
 
 .swipe-card-meta-value {
+  font-family: var(--font-content);
   color: var(--fg);
   font-size: 13px;
 }
@@ -222,7 +225,7 @@
   display: inline-block;
   padding: 0.15rem 0.45rem;
   font-size: 11px;
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-family: var(--font-content);
   border: 1px solid var(--border);
   border-radius: 10px;
   color: var(--fg-dim);
@@ -249,7 +252,7 @@
 .swipe-meta-blocked .swipe-card-meta-label { color: var(--fg-dim); }
 
 .swipe-blocking-issue {
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-family: var(--font-structural);
   font-size: 12px;
   color: inherit;
   text-decoration: none;
@@ -286,7 +289,7 @@ a.swipe-blocking-issue:hover {
 .swipe-meta-subtasks .swipe-card-meta-value { display: flex; flex-wrap: wrap; align-items: center; gap: 0.15rem var(--space-2); }
 
 .swipe-relation-issue {
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-family: var(--font-structural);
   font-size: 12px;
   color: inherit;
   text-decoration: none;
@@ -323,7 +326,7 @@ a.swipe-relation-issue:hover {
   gap: 0.4rem;
   padding: 0.45rem 0;
   cursor: pointer;
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-family: var(--font-content);
   font-size: 12px;
   color: var(--fg-dim);
   user-select: none;
@@ -345,6 +348,7 @@ a.swipe-relation-issue:hover {
 }
 
 .swipe-accordion-body {
+  font-family: var(--font-content);
   display: none;
   padding: var(--space-2) 0 0.75rem;
   font-size: 14px;
@@ -363,7 +367,7 @@ a.swipe-relation-issue:hover {
 .swipe-accordion-body ul,
 .swipe-accordion-body ol { margin: 0 0 var(--space-2); padding-left: var(--space-4); }
 .swipe-accordion-body code {
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-family: var(--font-structural);
   font-size: 13px;
   background: var(--bg-muted);
   padding: 0.1rem 0.3rem;
@@ -387,6 +391,7 @@ a.swipe-relation-issue:hover {
 
 /* Comments */
 .swipe-comments-loading {
+  font-family: var(--font-content);
   color: var(--fg-dim);
   font-style: italic;
   padding: var(--space-2) 0;
@@ -407,10 +412,11 @@ a.swipe-relation-issue:hover {
   font-size: 12px;
   color: var(--fg-dim);
   margin-bottom: 0.3rem;
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-family: var(--font-structural);
 }
 
 .swipe-comment-body {
+  font-family: var(--font-content);
   font-size: 14px;
   line-height: 1.5;
 }
@@ -421,7 +427,7 @@ a.swipe-relation-issue:hover {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-family: var(--font-structural);
   font-size: 11px;
   color: var(--fg-dim);
 }
@@ -452,7 +458,7 @@ a.swipe-relation-issue:hover {
   padding-top: 0.4rem;
   border-top: 1px solid var(--fg-vdim);
   font-size: 11px;
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-family: var(--font-content);
 }
 
 .swipe-card-link a {
@@ -470,7 +476,7 @@ a.swipe-relation-issue:hover {
    ========================================================================== */
 
 .swipe-accordion-body .prompt-section {
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-family: var(--font-structural);
 }
 
 /* Cache hint appended to the closed accordion header */
@@ -499,7 +505,7 @@ a.swipe-relation-issue:hover {
   border-radius: 18px;
   background: var(--bg);
   color: var(--fg-dim);
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-family: var(--font-content);
   font-size: 12px;
   cursor: pointer;
   text-align: center;
@@ -578,7 +584,7 @@ a.swipe-relation-issue:hover {
   flex-wrap: wrap;
   gap: 0.3rem;
   padding: 0.4rem 0;
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-family: var(--font-content);
   font-size: 11px;
 }
 
@@ -612,7 +618,7 @@ a.swipe-relation-issue:hover {
   border-radius: var(--radius-sm);
   background: var(--bg);
   color: var(--fg-dim);
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-family: var(--font-content);
   font-size: 10px;
   cursor: pointer;
   transition: background 0.15s;
@@ -702,7 +708,7 @@ body[data-proxy-active="true"] .prompt-section .prompt-proxy-toggle {
 .swipe-prompt-text ul,
 .swipe-prompt-text ol { margin: 0 0 var(--space-2); padding-left: var(--space-4); }
 .swipe-prompt-text code {
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-family: var(--font-structural);
   font-size: 12px;
   background: var(--bg-muted);
   padding: 0.1rem 0.3rem;
@@ -733,7 +739,7 @@ body[data-proxy-active="true"] .prompt-section .prompt-proxy-toggle {
   font-size: 11px;
   color: var(--fg-dim);
   cursor: pointer;
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-family: var(--font-content);
   border-bottom: 1px solid var(--fg-vdim);
   user-select: none;
 }
@@ -757,7 +763,7 @@ body[data-proxy-active="true"] .prompt-section .prompt-proxy-toggle {
 .swipe-reasoning-content ul,
 .swipe-reasoning-content ol { margin: 0 0 0.4rem; padding-left: var(--space-4); }
 .swipe-reasoning-content code {
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-family: var(--font-structural);
   font-size: 11px;
   background: var(--bg-muted);
   padding: 0.1rem 0.3rem;
