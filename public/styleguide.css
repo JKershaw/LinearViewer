@@ -19,7 +19,7 @@
 
 .sg-value {
   display: block;
-  font-family: var(--font-mono);
+  font-family: var(--font-structural);
   font-size: var(--font-size-sm);
   color: var(--fg-dim);
 }

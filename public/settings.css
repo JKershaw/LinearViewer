@@ -224,7 +224,7 @@
 }
 
 .provider-token {
-  font-family: var(--font-mono);
+  font-family: var(--font-structural);
   color: var(--fg-dim);
 }
 
