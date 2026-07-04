@@ -136,13 +136,39 @@ test('style.css lays the switcher out as a single non-wrapping scrolling row', (
   assert.match(block, /white-space:\s*nowrap/);
 });
 
-test('the shared nav is NOT position:sticky (avoids intercepting clicks under it)', () => {
-  // A sticky header overlays scrolled content and steals pointer events from
-  // controls beneath it (it broke ship-orientation), so the shared nav stays in
-  // normal flow. The switcher is reachable at the top without scrolling instead.
+test('the shared nav is pinned (position:sticky) with the click-intercept fix (LIN-984)', () => {
+  // LIN-984 restores the retired obs-appbar sticky/translucent treatment. A
+  // naïve sticky header USED to overlay scrolled content and steal pointer
+  // events from controls beneath it (it broke ship-orientation), so the pinned
+  // header ships ONLY alongside the two-part interception fix:
+  //   1. a z-band (`--z-header`) that keeps the header below page-level fixed
+  //      overlay controls (`--z-header-control`), so those controls win the
+  //      hit-test where they overlap the pinned bar; and
+  //   2. per-interaction `scroll-margin-top` so scrolled content clears the bar.
   const css = readFileSync(STYLE_CSS, 'utf8');
-  const block = css.slice(css.indexOf('.nav-bar {'), css.indexOf('/* Header-level view switcher'));
-  // A real declaration ends with a semicolon; the explanatory comment mentions
-  // the words `position: sticky` (in backticks, no semicolon) and must not trip.
-  assert.doesNotMatch(block, /position:\s*sticky;/);
+  const block = css.slice(css.indexOf('.nav-bar {'), css.indexOf('/* Per-interaction scroll-margin'));
+  assert.match(block, /position:\s*sticky;/);
+  assert.match(block, /top:\s*0;/);
+  assert.match(block, /z-index:\s*var\(--z-header\);/);
+  // Translucent/blur treatment carried over from the obs-appbar.
+  assert.match(block, /backdrop-filter:\s*blur/);
+
+  // The header band must stay strictly below the fixed-overlay-control band, or
+  // the pinned header would swallow clicks on Ship's mode/zoom toggles again.
+  const header = Number(css.match(/--z-header:\s*(\d+);/)[1]);
+  const headerControl = Number(css.match(/--z-header-control:\s*(\d+);/)[1]);
+  assert.ok(header < headerControl, '--z-header must sit below --z-header-control');
+
+  // The per-interaction scroll-margin offset (NOT scroll-padding, which
+  // Playwright's scroll-into-view ignores) must be present for scrolled content.
+  assert.match(css, /scroll-margin-top:\s*7rem;/);
+});
+
+test('Ship fixed overlay controls sit in the header-control band, above the pinned nav (LIN-984)', () => {
+  // The mode/zoom toggles are position:fixed near the top and overlap the pinned
+  // header; they must occupy `--z-header-control` so the translucent nav never
+  // intercepts their clicks (the ship-orientation regression guard's CSS twin).
+  const shipCss = readFileSync(new URL('../../public/ship.css', import.meta.url), 'utf8');
+  const mode = shipCss.slice(shipCss.indexOf('.ship-mode-control {'), shipCss.indexOf('.ship-mode-btn {'));
+  assert.match(mode, /z-index:\s*var\(--z-header-control\);/);
 });

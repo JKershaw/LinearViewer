@@ -83,6 +83,15 @@
 
   /* Z-index scale */
   --z-base: 1;
+  /* Pinned global header band (LIN-984). Sits ABOVE page content and canvas
+     controls (Ship cards top out at 50) so the sticky `.nav-bar` visibly floats
+     over scrolled content, but BELOW transient overlays — `.swim-popover` uses
+     `--z-sticky` (100), so the header must stay under it. `--z-header-control`
+     is one step higher: page-level FIXED toolbars (Ship's mode/zoom controls)
+     that would otherwise be swallowed by the pinned header live here so they
+     always win the hit-test where they overlap the header. */
+  --z-header: 90;
+  --z-header-control: 95;
   --z-sticky: 100;
   --z-overlay: 1000;
   --z-modal: 2000;
@@ -269,7 +278,12 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 html {
-  overflow-x: hidden;
+  /* `clip`, not `hidden` (LIN-984): both clip horizontal overflow identically,
+     but `hidden` establishes a scroll container that pins the sticky `.nav-bar`
+     to this box instead of the viewport (the header then scrolls away). `clip`
+     clips without a scrollport, so the header stays viewport-pinned while the
+     horizontal-overflow guard is preserved. */
+  overflow-x: clip;
   scrollbar-gutter: stable;
 }
 
@@ -284,7 +298,11 @@ body {
   max-width: 120ch;  /* Optimal reading width */
   margin-left: auto;
   margin-right: auto;
-  overflow-x: hidden;
+  /* `clip` not `hidden`: `.nav-bar` is a direct child, and `overflow-x: hidden`
+     here would make the body a scroll container and break the header's
+     `position: sticky` (LIN-984). `clip` preserves the horizontal-overflow
+     guard without establishing a scrollport. */
+  overflow-x: clip;
 }
 
 /* =============================================================================
@@ -358,15 +376,50 @@ h1 {
   margin-bottom: var(--space-3);
   flex-wrap: wrap;
   gap: var(--space-2) 2ch;
-  /* Header nav carrying the view switcher (LIN-978). It leads every workspace
-     page, so cross-view navigation is reachable from the top without scrolling
-     to the footer (the audit's Finding 1). Deliberately NOT `position: sticky`:
-     a sticky header that overlays scrolled content intercepts pointer events on
-     controls scrolled beneath it (it broke the ship-orientation mode toggle),
-     so the shared nav stays in normal flow. Re-introducing the obs-appbar's
-     sticky/translucent feel globally needs per-interaction scroll-margin work
-     and is deferred. */
+  /* Header nav carrying the view switcher (LIN-978), pinned while scrolling
+     (LIN-984 — restores the retired obs-appbar sticky/translucent treatment).
+     It leads every workspace page, so cross-view navigation is reachable from
+     the top without scrolling to the footer (the audit's Finding 1) AND stays
+     reachable after scrolling down.
+
+     The document scrolls (the viewport is the scroll container; see `html`/
+     `body`), so `top: 0` pins the header to the viewport. It sits in the
+     `--z-header` band: above normal-flow page content (scrolled content passes
+     translucently beneath it) but BELOW page-level FIXED overlay controls,
+     which occupy `--z-header-control`. That ordering is the interception fix:
+     Ship's mode/zoom toggles are `position: fixed` near the top, so a pinned
+     header that overlapped them USED to win the hit-test and swallow the click
+     (the ship-orientation 30s timeout that forced the earlier back-out). With
+     the controls one band above the header they stay clickable where they
+     overlap. Scrolled normal-flow content instead clears the header via
+     `scroll-margin-top` (the rule just below) — a per-interaction offset that,
+     unlike `scroll-padding-top` (which Playwright's scroll-into-view ignores),
+     actually lands the target below the pinned bar. */
+  position: sticky;
+  top: 0;
+  z-index: var(--z-header);
   padding: var(--space-2) 0;
+  /* Translucent over the page bg with a blur; solid --bg fallback first for
+     engines without color-mix / backdrop-filter support. */
+  background: var(--bg);
+  background: color-mix(in srgb, var(--bg) 86%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+/* Per-interaction scroll-margin handling (LIN-984). When a control in normal
+   flow is programmatically scrolled to the top of the viewport — an anchor
+   jump, focus scrolling, or Playwright's scroll-into-view before a click — it
+   must land BELOW the pinned header, not under it. `scroll-margin-top` reserves
+   the header's height on the scroll target so scroll-into-view stops short of
+   tucking it beneath the translucent bar. Scoped to interactive / anchorable
+   surfaces (the plausible scroll targets); it only affects scroll alignment, so
+   it is inert at rest and cannot shift layout. Page-level fixed overlays (Ship
+   controls) don't scroll and are handled by the z-band above, not here. The
+   7rem reserve is a generous upper bound on the two-row header (it can wrap to
+   ~3 rows at narrow widths) so a target never lands under the translucent bar. */
+:where(a[id], [id]:target, button, summary, input, select, textarea, label, .card) {
+  scroll-margin-top: 7rem;
 }
 
 /* Header-level view switcher (LIN-978). Its own full-width row inside the nav

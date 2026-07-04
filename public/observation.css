@@ -24,9 +24,9 @@
 /* The bespoke observation app bar (LIN-927 `.obs-appbar*`) was retired in
    LIN-978: observation now uses the shared header nav (`renderNavBar`), which
    carries the tier-gated view switcher. The app bar's sticky/translucent feel
-   was not carried over — a global sticky header intercepts clicks on scrolled
-   content (it broke the ship-orientation toggle), so the shared nav stays in
-   normal flow (see the note on `.nav-bar` in `style.css`). */
+   was restored on the shared `.nav-bar` globally in LIN-984, together with the
+   click-intercept fix that the earlier naïve sticky lacked (see the note on
+   `.nav-bar` in `style.css`). */
 
 .obs-page {
   max-width: 480px;

@@ -301,7 +301,11 @@ body:has(.ship-page) {
   position: fixed;
   top: 68px;
   left: 16px;
-  z-index: 8; /* above heading control (7) */
+  /* Fixed near the viewport top, so it overlaps the pinned shared header
+     (LIN-984). Sits in the `--z-header-control` band — one step above the
+     header's `--z-header` — so the translucent nav never wins the hit-test and
+     swallows the toggle's click (the ship-orientation intercept regression). */
+  z-index: var(--z-header-control);
   display: flex;
   align-items: center;
   gap: 0;
@@ -383,7 +387,7 @@ body:has(.ship-page) {
   position: fixed;
   bottom: 24px;
   left: 16px;
-  z-index: 8; /* same band as the mode control */
+  z-index: var(--z-header-control); /* same band as the mode control (LIN-984) */
   display: flex;
   align-items: stretch;
   background: var(--bg);
