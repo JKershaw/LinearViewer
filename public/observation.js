@@ -178,6 +178,19 @@ function shortSessionId(id) {
   return s.length > 8 ? s.slice(0, 8) : s;
 }
 
+// Per-session page link (LIN-1019). The feed expands sessions in place, but the
+// human follow-up reply box (LIN-1004) lives ONLY on the dedicated session
+// route — so a "waiting on you" card was a dead end with no click-path to reply.
+// Link to the session's OWN workspace: the feed is cross-workspace merged and the
+// :sessionId route 404s a cross-workspace id. Returns '' when either key is
+// missing so the affordance drops out rather than pointing at a broken URL.
+function sessionHref(s) {
+  const ws = s && s.workspaceUrlKey;
+  const id = s && s.sessionId;
+  if (!ws || !id) return '';
+  return `/workspace/${encodeURIComponent(ws)}/observation/session/${encodeURIComponent(id)}`;
+}
+
 function formatRuntime(runtime) {
   const ms = runtime && typeof runtime.ms === 'number' ? runtime.ms : null;
   if (ms == null || ms < 0) return '';
@@ -232,7 +245,11 @@ function renderSummaryLine(s) {
   // deriveSessionStatus ordering (a day-dead session isn't shown as waiting).
   if (s.waiting) {
     const msg = s.waitingMessage ? ` — ${escapeHtml(String(s.waitingMessage))}` : '';
-    return `<span class="obs-summary-line obs-summary-waiting">◐ waiting on you${msg}</span>`;
+    // The direct path out of the dead-end (LIN-1019): a reply CTA straight to the
+    // session page, where the follow-up reply box lives.
+    const href = sessionHref(s);
+    const reply = href ? ` <a class="obs-summary-reply" href="${escapeHtml(href)}">reply →</a>` : '';
+    return `<span class="obs-summary-line obs-summary-waiting">◐ waiting on you${msg}${reply}</span>`;
   }
   if (st && st.statusLine) return `<span class="obs-summary-line obs-summary-status">${escapeHtml(st.statusLine)}</span>`;
   // Live status line served on the feed itself (no per-poll backend fetch).
@@ -282,6 +299,7 @@ function fillSessionHead(li, s) {
       <div class="obs-session-side">
         ${statusPillHtml(pill.variant, pill.label, { warn: pill.warn })}
         <span class="obs-session-time">updated ${escapeHtml(relativeTime(s.lastActivity))}</span>
+        ${sessionHref(s) ? `<a class="obs-session-open" href="${escapeHtml(sessionHref(s))}" aria-label="Open session page">open ↗</a>` : ''}
       </div>
     </div>
     <span class="obs-session-summary">${renderSummaryLine(s)}</span>
