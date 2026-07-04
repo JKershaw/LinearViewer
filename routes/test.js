@@ -36,7 +36,7 @@ import { defaultGitHubProjectsSeed, GITHUB_PROJECTS_WORKSPACE_URL_KEY, GITHUB_PR
  * @param {Function} options.getWorkspaceAccessToken - Function to look up workspace access token
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, taskSnapshotStore, localStore, getWorkspaceAccessToken }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, taskSnapshotStore, savedChatStore, localStore, getWorkspaceAccessToken }) {
   const router = Router();
 
   // ── Mock Yap server (LIN-450) ─────────────────────────────────────────────
@@ -94,7 +94,7 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   //                               a `-wN` suffix the siblings stay second-workspace
   //                               / workspace-N, keeping the default byte-identical.
   router.get('/test/set-session', (req, res) => {
-    const { tokenExpired, noRefreshToken, multiWorkspace, maxWorkspaces, openRouterConnected, freeTierEnabled, features, swimSample, shipSample, patMode } = req.query
+    const { tokenExpired, noRefreshToken, multiWorkspace, maxWorkspaces, openRouterConnected, freeTierEnabled, features, swimSample, shipSample, patMode, noLinearUser } = req.query
     // Per-worker key for the first workspace; same `?urlKey=` interface the
     // teardown endpoints already use, with the identical 'test-workspace' default.
     const singleUrlKey = req.query.urlKey || 'test-workspace'
@@ -154,7 +154,14 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
 
     req.session.workspaces = workspaces
     req.session.activeWorkspaceId = workspaces[0].id
-    req.session.linearUserId = 'test-linear-user-id'
+    // `noLinearUser` simulates a session with no user identity (local/GitHub App
+    // link path), so specs can exercise the "saved chats unavailable" boundary
+    // (LIN-1008). Default sets the id, so existing specs are unchanged.
+    if (noLinearUser) {
+      delete req.session.linearUserId
+    } else {
+      req.session.linearUserId = 'test-linear-user-id'
+    }
 
     // Set or clear OpenRouter API key in session based on flag
     if (openRouterConnected) {
@@ -407,6 +414,17 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     try {
       const urlKey = req.query.urlKey || 'test-workspace'
       if (taskSnapshotStore) await taskSnapshotStore.clear(urlKey)
+      res.send('ok')
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
+
+  // Endpoint to clear saved chats for testing (LIN-1008)
+  router.get('/test/clear-saved-chats', async (req, res) => {
+    try {
+      const urlKey = req.query.urlKey || 'test-workspace'
+      if (savedChatStore) await savedChatStore.clear(urlKey)
       res.send('ok')
     } catch (err) {
       res.status(500).json({ error: err.message })

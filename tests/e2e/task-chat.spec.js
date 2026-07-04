@@ -153,6 +153,88 @@ test.describe('Task Chat Page (experimental)', () => {
     });
   });
 
+  test.describe('Saved chats (LIN-1008)', () => {
+    test.beforeEach(async ({ page }) => {
+      await page.goto(`/test/clear-saved-chats?urlKey=${URL_KEY}`);
+      await page.goto(`/test/set-session?${featuresParam({ taskChat: true })}&urlKey=${URL_KEY}`);
+      await page.goto(PAGE_URL);
+      await page.waitForLoadState('networkidle');
+    });
+
+    async function haveOneTurn(page) {
+      await page.locator('#task-chat-id').fill('TEST-1');
+      await page.locator('#task-chat-question').fill('Where do you stand?');
+      await page.locator('#task-chat-send').click();
+      await expect(page.locator('.task-chat-msg-assistant .task-chat-msg-body'))
+        .toContainText('TEST-1', { timeout: 5000 });
+    }
+
+    test('save → list → open (resume) → delete round-trip', async ({ page }) => {
+      // The Saved chats section is present, and empty to start.
+      await expect(page.locator('[data-testid="task-chat-saved-section"]')).toBeVisible();
+      await expect(page.locator('#task-chat-saved-empty')).toBeVisible();
+      await expect(page.locator('.task-chat-saved-item')).toHaveCount(0);
+
+      // Have a turn, then the save affordance appears; save it.
+      await haveOneTurn(page);
+      const saveBtn = page.locator('[data-testid="task-chat-save"]');
+      await expect(saveBtn).toBeVisible();
+      await saveBtn.click();
+
+      // It lands in the list with its task id and an auto-derived title.
+      const item = page.locator('.task-chat-saved-item');
+      await expect(item).toHaveCount(1, { timeout: 5000 });
+      await expect(item).toContainText('TEST-1');
+      await expect(item.locator('.task-chat-saved-title')).toContainText('Where do you stand?');
+
+      // Reset the live conversation, then OPEN the saved chat → transcript rehydrates.
+      await page.locator('#task-chat-reset').click();
+      await expect(page.locator('.task-chat-msg')).toHaveCount(0);
+      await item.locator('[data-testid="task-chat-saved-open"]').click();
+      await expect(page.locator('.task-chat-msg-user')).toContainText('Where do you stand?', { timeout: 5000 });
+      await expect(page.locator('#task-chat-active-label')).toContainText('TEST-1');
+
+      // RESUME: continue the rehydrated conversation via the unchanged turn path.
+      await page.locator('#task-chat-question').fill('And what is next?');
+      await page.locator('#task-chat-send').click();
+      await expect(page.locator('.task-chat-msg-user')).toHaveCount(2, { timeout: 5000 });
+      await expect(page.locator('.task-chat-msg-assistant')).toHaveCount(2, { timeout: 5000 });
+
+      // DELETE removes it from the list.
+      await item.locator('[data-testid="task-chat-saved-delete"]').click();
+      await expect(page.locator('.task-chat-saved-item')).toHaveCount(0, { timeout: 5000 });
+      await expect(page.locator('#task-chat-saved-empty')).toBeVisible();
+    });
+
+    test('saved chats persist across a reload (durable, not localStorage)', async ({ page }) => {
+      await haveOneTurn(page);
+      await page.locator('[data-testid="task-chat-save"]').click();
+      await expect(page.locator('.task-chat-saved-item')).toHaveCount(1, { timeout: 5000 });
+
+      // A fresh page load re-fetches the list from the server-side store.
+      await page.goto(PAGE_URL);
+      await page.waitForLoadState('networkidle');
+      await expect(page.locator('.task-chat-saved-item')).toHaveCount(1, { timeout: 5000 });
+      await expect(page.locator('.task-chat-saved-item')).toContainText('TEST-1');
+    });
+
+    test('unavailable without a user identity: no save button, explicit notice, 401 endpoint', async ({ page }) => {
+      // A session with the flag on but no linearUserId (local/GitHub-linked path).
+      await page.goto(`/test/set-session?${featuresParam({ taskChat: true })}&noLinearUser=1&urlKey=${URL_KEY}`);
+      await page.goto(PAGE_URL);
+      await page.waitForLoadState('networkidle');
+
+      // The unavailable notice renders; the list and save button do not exist.
+      await expect(page.locator('[data-testid="task-chat-saved-unavailable"]')).toBeVisible();
+      await expect(page.locator('[data-testid="task-chat-saved-list"]')).toHaveCount(0);
+      await expect(page.locator('[data-testid="task-chat-save"]')).toHaveCount(0);
+
+      // The endpoints 401 rather than fabricating an identity.
+      const res = await page.request.get(`${CHAT_API}/saved`);
+      expect(res.status()).toBe(401);
+    });
+  });
+
   test.describe('Chat endpoint', () => {
     test('returns 403 when the feature flag is off', async ({ page }) => {
       await page.goto(`/test/set-session?urlKey=${URL_KEY}`);

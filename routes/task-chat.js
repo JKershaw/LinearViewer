@@ -34,6 +34,20 @@ function sendSSE(res, type, data) {
 }
 
 /**
+ * Sanitize a chat transcript to the durable `{role, content}` shape: only
+ * user/assistant turns with string content survive. Shared by the turn endpoint
+ * (replays client history) and the saved-chat save endpoint (LIN-1008) so a
+ * stored transcript re-hydrates and replays byte-identically through the
+ * unchanged turn route. This is also what keeps tool breadcrumbs / model / cost
+ * out of a saved transcript.
+ */
+function sanitizeHistory(history) {
+  return Array.isArray(history)
+    ? history.filter(h => h && (h.role === 'user' || h.role === 'assistant') && typeof h.content === 'string')
+    : [];
+}
+
+/**
  * Whether the AI layer should be mocked for this request — mirrors
  * `shouldMockAi` in routes/workspace-api.js so e2e specs (and local-provider
  * sessions) stream a deterministic answer without an OpenRouter key.
@@ -142,9 +156,10 @@ function buildMockAnswer(context, question, related) {
  * @param {Object}   deps.workspacePreferencesStore - workspace prefs store (model selection)
  * @param {Function} deps.getOpenRouterSource - (req) → 'oauth'|'env'|'free'|null
  * @param {Function} deps.getDeployInfo       - () → deploy metadata
+ * @param {Object}   deps.savedChatStore       - durable saved-chat store (LIN-1008)
  * @returns {Router}
  */
-export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo }) {
+export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore }) {
   const router = Router();
 
   // ─── HTML page ──────────────────────────────────────────────────────────────
@@ -161,8 +176,12 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
     try {
       const rawTask = typeof req.query.task === 'string' ? req.query.task.trim().slice(0, 64) : '';
       const aiConfigured = isRecommendationEnabled(req.session.openRouterApiKey) || !!process.env.OPENROUTER_FREE_TIER_KEY;
+      // Saved chats require a user identity (linearUserId). When absent (local /
+      // GitHub / anonymous sessions), the feature is unavailable — the page
+      // renders an explicit empty-state and omits the save affordance (LIN-1008).
+      const savedChatsAvailable = !!req.session.linearUserId;
       const html = renderTaskChatPage(
-        { defaultTask: rawTask, aiConfigured },
+        { defaultTask: rawTask, aiConfigured, savedChatsAvailable },
         {
           deployInfo: getDeployInfo(),
           urlKey: workspace.urlKey,
@@ -179,6 +198,100 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
         actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/task-chat`,
       });
       res.status(500).send(html);
+    }
+  });
+
+  // ─── Saved chats (LIN-1008) ──────────────────────────────────────────────────
+  //
+  // Durable, private-per-user transcript CRUD. Every endpoint is gated on the
+  // `taskChat` flag AND a present `linearUserId` (the only accepted identity);
+  // an absent identity returns 401 rather than fabricating a fallback id (mirrors
+  // dispatch recents). These literal `/saved` routes MUST be registered BEFORE
+  // the `/:issueId` turn route below, or Express matches `saved` as an issue id.
+  //
+  // Session-auth only: this is content-bearing and is never wired onto the proxy
+  // token-auth or /kpis surfaces (the prompt-trace privacy boundary).
+
+  /**
+   * Resolve the saved-chat identity for a request, or send the appropriate error
+   * and return null. Shared gate for all four endpoints.
+   */
+  const resolveSavedChatUser = (req, res) => {
+    if (getFeatureFlags(req.session).taskChat !== true) {
+      res.status(403).json({ error: 'Task chat feature is not enabled' });
+      return null;
+    }
+    const linearUserId = req.session.linearUserId;
+    if (!linearUserId) {
+      res.status(401).json({ error: 'Authentication required to use saved chats' });
+      return null;
+    }
+    return linearUserId;
+  };
+
+  // List the current user's saved chats (metadata only, newest-first).
+  router.get('/workspace/:urlKey/api/task-chat/saved', workspaceFromUrl, async (req, res) => {
+    const linearUserId = resolveSavedChatUser(req, res);
+    if (!linearUserId) return;
+    try {
+      const chats = await savedChatStore.list(req.workspace.urlKey, linearUserId);
+      res.json({ chats });
+    } catch (error) {
+      console.error('Saved chat list error:', error);
+      res.status(500).json({ error: 'Failed to list saved chats' });
+    }
+  });
+
+  // Save the current transcript as a new saved chat.
+  router.post('/workspace/:urlKey/api/task-chat/saved', workspaceFromUrl, async (req, res) => {
+    const linearUserId = resolveSavedChatUser(req, res);
+    if (!linearUserId) return;
+
+    const body = req.body || {};
+    const taskIdentifier = typeof body.taskIdentifier === 'string'
+      ? body.taskIdentifier
+      : (typeof body.issueId === 'string' ? body.issueId : '');
+    // Accept `transcript` or `history` (the client sends the same array it
+    // replays); sanitize to the shared `{role, content}` shape either way.
+    const transcript = sanitizeHistory(body.transcript || body.history);
+
+    try {
+      const chat = await savedChatStore.create(req.workspace.urlKey, linearUserId, { taskIdentifier, transcript });
+      res.status(201).json({ chat });
+    } catch (error) {
+      // Validation failures (e.g. empty transcript) are a 400; anything else 500.
+      const isValidation = /required|at least one message/i.test(error.message || '');
+      if (isValidation) return res.status(400).json({ error: error.message });
+      console.error('Saved chat create error:', error);
+      res.status(500).json({ error: 'Failed to save the chat' });
+    }
+  });
+
+  // Full transcript for one saved chat (for re-hydration / resume).
+  router.get('/workspace/:urlKey/api/task-chat/saved/:id', workspaceFromUrl, async (req, res) => {
+    const linearUserId = resolveSavedChatUser(req, res);
+    if (!linearUserId) return;
+    try {
+      const chat = await savedChatStore.get(req.workspace.urlKey, linearUserId, req.params.id);
+      if (!chat) return res.status(404).json({ error: 'Saved chat not found' });
+      res.json({ chat });
+    } catch (error) {
+      console.error('Saved chat get error:', error);
+      res.status(500).json({ error: 'Failed to load the saved chat' });
+    }
+  });
+
+  // Hard-delete a saved chat.
+  router.delete('/workspace/:urlKey/api/task-chat/saved/:id', workspaceFromUrl, async (req, res) => {
+    const linearUserId = resolveSavedChatUser(req, res);
+    if (!linearUserId) return;
+    try {
+      const deleted = await savedChatStore.delete(req.workspace.urlKey, linearUserId, req.params.id);
+      if (!deleted) return res.status(404).json({ error: 'Saved chat not found' });
+      res.json({ ok: true });
+    } catch (error) {
+      console.error('Saved chat delete error:', error);
+      res.status(500).json({ error: 'Failed to delete the saved chat' });
     }
   });
 
@@ -235,9 +348,7 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
     }
 
     // Sanitize history: only user/assistant turns with string content.
-    const safeHistory = Array.isArray(history)
-      ? history.filter(h => h && (h.role === 'user' || h.role === 'assistant') && typeof h.content === 'string')
-      : [];
+    const safeHistory = sanitizeHistory(history);
 
     // Resolve the task's context BEFORE opening the SSE stream so failures return
     // a proper HTTP status (404 for an unknown task, 401 for an expired token).
