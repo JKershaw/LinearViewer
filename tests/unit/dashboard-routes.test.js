@@ -1436,3 +1436,113 @@ describe('GET /observation/session/:sessionId — brief/recap join (LIN-1003)', 
     assert.ok(!html.includes('sess-ctx-panel--present'), 'no present panel when both caches miss');
   });
 });
+
+// ─── LIN-1021: the per-session page is issue-scoped, never a whole-workspace read ──
+//
+// The H12 fix. A well-formed sessionId-first session must render its non-lean
+// transcript WITHOUT the route ever issuing an unscoped (no issueIdentifier / no
+// sessionId) history/queue read — that unscoped read transferred the whole 30-day
+// workspace's feedback and tripped Heroku's H12. This store fails loud on any such
+// read, so a regression back to getSessionsForWorkspace on the happy path breaks it.
+describe('GET /observation/session/:sessionId — issue-scoped read, no whole-workspace scan (LIN-1021)', () => {
+  function scopedStore(items) {
+    const unscoped = [];
+    const scope = (arr, opts, key) => {
+      if (!opts.issueIdentifier && !opts.sessionId) unscoped.push(key);
+      let r = arr;
+      if (opts.issueIdentifier) r = r.filter(i => i.issueIdentifier === opts.issueIdentifier);
+      if (opts.sessionId) r = r.filter(i => i.sessionId === opts.sessionId);
+      return r;
+    };
+    let getItemStatusCalls = 0;
+    const dispatchQueueStore = {
+      async getItemStatus(_urlKey, id) { getItemStatusCalls++; return [...items.live, ...items.history].find(i => i.id === id) || null; },
+      async listItems(_urlKey, opts = {}) { return scope(items.live, opts, 'listItems'); },
+      async listHistory(_urlKey, opts = {}) { return { items: scope(items.history, opts, 'listHistory') }; }
+    };
+    const agentStatusStore = {
+      async listStatus(_urlKey, opts = {}) {
+        if (!opts.taskIdentifier) unscoped.push('listStatus');
+        const r = (items.agentStatus || []).filter(s => !opts.taskIdentifier || s.taskIdentifier === opts.taskIdentifier);
+        return { items: r };
+      }
+    };
+    return { dispatchQueueStore, agentStatusStore, unscoped, get getItemStatusCalls() { return getItemStatusCalls; } };
+  }
+
+  test('renders the transcript via issue-scoped reads only (no unscoped whole-workspace read)', async () => {
+    // Root autopilot (LIN-900, no sessionId — only reachable by id) + a worker
+    // stamped sessionId, carrying the [done] transcript.
+    const stores = scopedStore({
+      live: [],
+      history: [autopilotHistoryItem('sess-ctx', 'LIN-900'), workerHistoryItem('w-ctx', 'LIN-901', 'sess-ctx')],
+      agentStatus: [agentStatusDone('sess-ctx', 'LIN-900'), agentStatusDone('w-ctx', 'LIN-901')]
+    });
+    const router = createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore: stores.dispatchQueueStore,
+      agentStatusStore: stores.agentStatusStore,
+      observationSessionsStore: null,
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
+      briefCacheStore: { async get() { return null; } },
+      recapCacheStore: { async get() { return null; } },
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      fetchWorkspaceIssues: async () => [],
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({})
+    });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/observation/session/:sessionId');
+    const { req, res } = makeReqRes({
+      session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
+      workspace: { urlKey: 'ws-a' },
+      params: { sessionId: 'sess-ctx' }
+    });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200, 'the page rendered');
+    const html = res.sentBody;
+    assert.ok(html.includes('sess-ctx'), 'the session rendered');
+    assert.ok(html.includes('LIN-901'), 'the touched worker task is present (transcript reconstructed)');
+    // The load-bearing LIN-1021 claim: NO unscoped whole-workspace read on the happy path.
+    assert.deepEqual(stores.unscoped, [], 'no unscoped (whole-workspace) history/queue/status read');
+    assert.ok(stores.getItemStatusCalls >= 1, 'the root dispatch is fetched by id (seed issue derivation)');
+  });
+
+  test('an unknown session 404s through the fallback without crashing', async () => {
+    // issue-scoping yields nothing → the safety-net full read runs → still not
+    // found → a clean 404 (never a 500 from the new derivation path).
+    const stores = scopedStore({
+      live: [],
+      history: [autopilotHistoryItem('sess-real', 'LIN-900')],
+      agentStatus: [agentStatusDone('sess-real', 'LIN-900')]
+    });
+    const router = createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore: stores.dispatchQueueStore,
+      agentStatusStore: stores.agentStatusStore,
+      observationSessionsStore: null,
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
+      briefCacheStore: { async get() { return null; } },
+      recapCacheStore: { async get() { return null; } },
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      fetchWorkspaceIssues: async () => [],
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({})
+    });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/observation/session/:sessionId');
+    const { req, res } = makeReqRes({
+      session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
+      workspace: { urlKey: 'ws-a' },
+      params: { sessionId: 'nope-not-a-session' }
+    });
+    await handler(req, res);
+    assert.equal(res.statusCode, 404, 'unknown session 404s');
+    assert.ok(stores.unscoped.length > 0, 'the full-read fallback ran (issue-scoping found nothing)');
+  });
+});
