@@ -529,6 +529,33 @@ describe('GET /api/dashboard/sessions', () => {
     assert.equal(s.waitingMessage, null);
   });
 
+  test('a terminal session with a lingering blocked worker is done, NOT waiting (session-level terminal gate)', async () => {
+    // The SESSION-level precedence gap (LIN-1005 review): the autopilot ANCHOR
+    // finished (agentStatus completed → session terminal), but a SEPARATE worker
+    // loop is still [blocked] with no later [done]. `deriveSessionWaiting` unions
+    // across all loops and would report the worker as waiting; the emitted flag
+    // must be gated on SESSION terminality so a finished session is never waiting.
+    const blockedWorker = {
+      id: 'w-tw', sessionId: 'sess-tw', issueIdentifier: 'LIN-431', issueTitle: 'Worker',
+      promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken',
+      feedback: [{ message: '[blocked] need your decision on the auth flow', timestamp: NOW_ISO }]
+    };
+    const perWorkspace = {
+      'ws-a': { live: [], history: [autopilotHistoryItem('sess-tw', 'LIN-430'), blockedWorker], agentStatus: [agentStatusDone('sess-tw', 'LIN-430')] }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    const s = findSession(res.jsonBody, 'sess-tw');
+    assert.ok(s, 'terminal session is present');
+    assert.equal(s.terminal, true);
+    assert.equal(s.status, 'done', 'terminal status wins');
+    assert.equal(s.waiting, false, 'the emitted waiting flag is gated on session terminality');
+    assert.equal(s.waitingMessage, null, 'no lingering blocked message on a done session');
+  });
+
   test('a non-terminal session idle > 24h is derived stale and bucketed out of Active', async () => {
     // Worker that died without a terminal marker, last seen 2 days ago (Bug 3).
     const OLD_ISO = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();

@@ -451,8 +451,13 @@ export function createDashboardRoutes({
     // Session-level "waiting on user" rollup (LIN-1005): unions any agent-status
     // `blocked` run and any latest `[blocked]`/`[pending]` feedback marker across
     // the session's loops, from the lean-safe pre-derived per-loop facts. Terminal
-    // precedence is enforced by `deriveSessionStatus` (checked after done/error).
-    const { waiting, message: waitingMessage } = deriveSessionWaiting(enriched);
+    // precedence is gated HERE on the emitted flag (not only in `deriveSessionStatus`):
+    // the session anchor can post `[done]` while a worker loop lingers `[blocked]`, so
+    // the raw rollup must be `&&`-gated on session terminality or the flag contradicts
+    // the `done` status ("a finished session is never waiting", LIN-1005 review).
+    const { waiting: rawWaiting, message: rawWaitingMessage } = deriveSessionWaiting(enriched);
+    const waiting = !terminal && rawWaiting;
+    const waitingMessage = waiting ? rawWaitingMessage : null;
 
     // The per-poll feed honours an explicit no-Linear cost contract, so it never
     // looks up the touched task's current state — `taskDone` stays false here.
@@ -644,9 +649,12 @@ export function createDashboardRoutes({
       // Session-level "waiting on user" banner (LIN-1005): the SAME rollup the
       // observation feed uses, computed here over the non-lean session's enriched
       // loops so the page and the feed agree. The banner directs the human to the
-      // Phase 2 follow-up box.
+      // Phase 2 follow-up box. Terminal-gated identically to `buildSessionPayload`
+      // (a finished session is never waiting, even with a lingering blocked worker).
       const enrichedLoops = (Array.isArray(session.loops) ? session.loops : []).map(enrichLoop);
-      const { waiting, message: waitingMessage } = deriveSessionWaiting(enrichedLoops);
+      const { waiting: rawWaiting, message: rawWaitingMessage } = deriveSessionWaiting(enrichedLoops);
+      const waiting = !sessionIsTerminal(session) && rawWaiting;
+      const waitingMessage = waiting ? rawWaitingMessage : null;
 
       const html = renderSessionPage(
         { session, sessionId, issueContext, waiting, waitingMessage, urlKey: workspace.urlKey },

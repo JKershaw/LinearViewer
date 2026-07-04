@@ -91,6 +91,45 @@ async function seedBlockedSession(page) {
   expect(blocked.status(), `blocked feedback failed: ${await blocked.text()}`).toBe(200);
 }
 
+// Seed a FINISHED autopilot session (anchor driven to [done]) that still has a
+// worker left in a [blocked] state — the LIN-1005 session-level terminal-gate
+// case: the session is terminal, so it must NOT surface as waiting even though a
+// child run is still blocked ("a finished session is never waiting").
+async function seedTerminalSessionWithBlockedWorker(page) {
+  const anchor = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+    data: { prompt: 'orchestrate', promptName: 'autopilot', kind: 'autopilot', issueIdentifier: 'LIN-1005', issueTitle: 'Done seed', target: 'cli' }
+  });
+  expect(anchor.status(), `anchor seed failed: ${await anchor.text()}`).toBe(201);
+  const anchorId = (await anchor.json()).item.id;
+
+  const worker = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+    data: { prompt: 'implement', promptName: 'implementation', kind: 'implementation', issueIdentifier: 'LIN-1005', issueTitle: 'Lingering blocked worker', target: 'cli', sessionId: anchorId }
+  });
+  expect(worker.status(), `worker seed failed: ${await worker.text()}`).toBe(201);
+  const workerId = (await worker.json()).item.id;
+
+  const tokenResp = await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${URL_KEY}`);
+  const { token } = await tokenResp.json();
+  const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+
+  // Worker: [blocked] with no [done] — stays a pause/wait signal.
+  const wTake = await page.request.post(`/api/dispatch/take/${workerId}`, { headers: auth });
+  expect(wTake.status(), `worker take failed: ${await wTake.text()}`).toBe(200);
+  const blocked = await page.request.post(`/api/dispatch/feedback/${workerId}`, {
+    headers: auth, data: { message: '[blocked] need your decision on the auth flow' }
+  });
+  expect(blocked.status(), `blocked feedback failed: ${await blocked.text()}`).toBe(200);
+
+  // Anchor: driven to [done] — the session anchor is terminal, so the whole
+  // session is terminal (terminality follows the anchor loop, LIN-592).
+  const aTake = await page.request.post(`/api/dispatch/take/${anchorId}`, { headers: auth });
+  expect(aTake.status(), `anchor take failed: ${await aTake.text()}`).toBe(200);
+  const aDone = await page.request.post(`/api/dispatch/feedback/${anchorId}`, {
+    headers: auth, data: { message: '[done] orchestration complete' }
+  });
+  expect(aDone.status(), `anchor done feedback failed: ${await aDone.text()}`).toBe(200);
+}
+
 // Read the sessions feed and return the first session's id.
 async function discoverSessionId(page) {
   const resp = await page.request.get(`/workspace/${URL_KEY}/api/dashboard/sessions`);
@@ -155,6 +194,29 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     await expect(banner).toContainText('Waiting on you');
     await expect(page.locator('[data-testid="session-waiting-message"]')).toContainText('need your decision on the auth flow');
     await expect(page.locator('[data-testid="session-waiting-cta"]')).toContainText('follow-up box');
+  });
+
+  test('a finished session with a lingering blocked worker is NOT waiting — no banner (LIN-1005 terminal gate)', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    await seedTerminalSessionWithBlockedWorker(page);
+    const sessionId = await discoverSessionId(page);
+
+    // Feed: the session is terminal, so the waiting flag is gated off — the card
+    // reports done with no waiting flag/message even though a worker is [blocked].
+    const feed = await page.request.get(`/workspace/${URL_KEY}/api/dashboard/sessions`);
+    const body = await feed.json();
+    const s = [...(body.active || []), ...(body.recent || [])].find(x => x.sessionId === sessionId);
+    expect(s.terminal).toBe(true);
+    expect(s.status).not.toBe('waiting');
+    expect(s.waiting).toBe(false);
+    expect(s.waitingMessage).toBe(null);
+
+    // Session page: no "waiting on you" banner on a finished session.
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('[data-testid="session-page"]')).toBeVisible();
+    await expect(page.locator('[data-testid="session-waiting-banner"]')).toHaveCount(0);
   });
 
   test('an unknown sessionId 404s with a not-found body', async ({ page }) => {
