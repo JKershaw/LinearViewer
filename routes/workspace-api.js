@@ -26,7 +26,7 @@ import { WORK_ISSUE_LABELS } from '../lib/workflow-config.js';
 import { parseRepoFromDescription, buildPromptFilename } from '../lib/prompt-formatters.js';
 import { buildProxyContextPreamble } from '../lib/proxy-preamble.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
-import { isRecommendationEnabled, getRecommendation, getRecommendationStream, streamChat, getModelDisplayName, AVAILABLE_MODELS, getPaidEnvKey, hasPaidEnvKey } from '../lib/openrouter.js';
+import { isRecommendationEnabled, getRecommendation, getRecommendationStream, streamChat, resolveReasoningBudget, getModelDisplayName, AVAILABLE_MODELS, getPaidEnvKey, hasPaidEnvKey } from '../lib/openrouter.js';
 import { resolveRecommendation, armHopSignal } from '../lib/recommend-recurse.js';
 import { sniffRasterType, parseFeedbackImage } from '../lib/attachment-upload.js';
 
@@ -2708,10 +2708,14 @@ ${goal}`
     sendSSE(res, 'layer-start', { layer });
     let text = '';
     let finishReason = null;
+    // LIN-1000: split the layer budget so hidden reasoning can't starve the
+    // narrative prose. `maxTokens` here is the prose budget; the helper reserves
+    // reasoning headroom on top for reasoning models (a no-op otherwise).
+    const { reasoning, maxTokens: budget } = resolveReasoningBudget({ model, proseTokens: maxTokens });
     try {
       await streamChat(
         messages,
-        { apiKey, model, maxTokens, callMeta: { urlKey: urlKey || null, feature: 'roadmap', issueIdentifier: layer || null } },
+        { apiKey, model, maxTokens: budget, reasoning, callMeta: { urlKey: urlKey || null, feature: 'roadmap', issueIdentifier: layer || null } },
         (type, data) => {
           if (type === 'token') {
             const token = (data && data.token) || '';
@@ -2889,9 +2893,11 @@ ${goal}`
       } else {
         const messages = buildRoadmapOrientationMessages(roadmapModel, northStar);
         let text = '';
+        // LIN-1000: reserve reasoning headroom on top of the orientation prose budget.
+        const { reasoning, maxTokens } = resolveReasoningBudget({ model: llm.model, proseTokens: orientationMaxTokens(candidates.length) });
         await streamChat(
           messages,
-          { apiKey: llm.apiKey, model: llm.model, maxTokens: orientationMaxTokens(candidates.length),
+          { apiKey: llm.apiKey, model: llm.model, maxTokens, reasoning,
             callMeta: { urlKey: req.workspace?.urlKey || null, feature: 'roadmap-orientation' } },
           (type, data) => { if (type === 'token') text += (data && data.token) || ''; }
         );
@@ -3175,9 +3181,11 @@ ${goal}`
     res.flushHeaders();
 
     try {
+      // LIN-1000: reserve reasoning headroom on top of the chat prose budget.
+      const { reasoning, maxTokens } = resolveReasoningBudget({ model: selectedModel, proseTokens: 3000 });
       await streamChat(
         messages,
-        { apiKey: apiKeyToUse, model: selectedModel, maxTokens: 3000,
+        { apiKey: apiKeyToUse, model: selectedModel, maxTokens, reasoning,
           callMeta: { urlKey: req.workspace?.urlKey || null, feature: 'roadmap-chat' } },
         (type, data) => {
           sendSSE(res, type, data);
