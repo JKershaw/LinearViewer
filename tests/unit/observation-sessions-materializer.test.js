@@ -336,6 +336,66 @@ test('LIN-962: resolver is skipped entirely when every loop already has a title'
   assert.equal(consulted, 0, 'no title lookup paid for when nothing is missing');
 });
 
+test('LIN-962: backfillWorkspace enriches title-less loops (AC-3, backfill path)', async () => {
+  const queueCollection = createMockCollection();
+  const historyCollection = createMockCollection();
+  const statusCollection = createMockCollection();
+  const observationCollection = createMockCollection();
+  const dispatchStore = new DispatchQueueStore({ collection: queueCollection, historyCollection });
+  const agentStatusStore = new AgentStatusStore({ collection: statusCollection });
+  const observationSessionsStore = new ObservationSessionsStore({ collection: observationCollection });
+
+  const materializer = createObservationMaterializer({
+    dispatchStore, agentStatusStore, observationSessionsStore,
+    resolveWorkspaceTitles: async () => ({ 'LIN-701': 'Fix the login bug' })
+  });
+
+  seedTitlelessFixture({ historyCollection, statusCollection });
+  await materializer.backfillWorkspace(URL_KEY);
+
+  const { sessions, backfilledAt } = await observationSessionsStore.findByWorkspace(URL_KEY);
+  const s = sessions.find(x => x.sessionId === 'A1');
+  assert.ok(backfilledAt, 'backfill marker set');
+  assert.ok(s, 'session backfilled');
+  assert.equal(s.loops[0].issueTitle, 'Fix the login bug', 'title-less loop enriched on the backfill path too');
+});
+
+test('LIN-962: a PRE-EXISTING persisted title-less session rehydrates on next backfill (AC-3)', async () => {
+  // Models the real historical case: a session was materialized BEFORE the fix
+  // (no resolver, so its loop is title-less and persisted that way). A later
+  // re-materialization — now wired with a resolver — must rehydrate it. This is
+  // exactly the screenshot's `LIN-701` card, and is what "backfill for free" means.
+  const queueCollection = createMockCollection();
+  const historyCollection = createMockCollection();
+  const statusCollection = createMockCollection();
+  const observationCollection = createMockCollection();
+  const dispatchStore = new DispatchQueueStore({ collection: queueCollection, historyCollection });
+  const agentStatusStore = new AgentStatusStore({ collection: statusCollection });
+  const observationSessionsStore = new ObservationSessionsStore({ collection: observationCollection });
+
+  seedTitlelessFixture({ historyCollection, statusCollection });
+
+  // Phase 1: materialize WITHOUT a resolver (the pre-fix world) → persisted title-less.
+  const before = createObservationMaterializer({ dispatchStore, agentStatusStore, observationSessionsStore });
+  await before.backfillWorkspace(URL_KEY);
+  let { sessions } = await observationSessionsStore.findByWorkspace(URL_KEY);
+  assert.equal(sessions.find(x => x.sessionId === 'A1').loops[0].issueTitle, null, 'persisted title-less pre-fix');
+
+  // Phase 2: re-materialize WITH a resolver over the SAME stores → rehydrated.
+  const after = createObservationMaterializer({
+    dispatchStore, agentStatusStore, observationSessionsStore,
+    resolveWorkspaceTitles: async () => ({ 'LIN-701': 'Fix the login bug' })
+  });
+  await after.backfillWorkspace(URL_KEY);
+
+  ({ sessions } = await observationSessionsStore.findByWorkspace(URL_KEY));
+  assert.equal(
+    sessions.find(x => x.sessionId === 'A1').loops[0].issueTitle,
+    'Fix the login bug',
+    'historical title-less session rehydrated on next backfill — no separate migration'
+  );
+});
+
 test('rebuildForWrite for an issue in no session is a no-op (does not throw, writes nothing)', async () => {
   const ctx = setup();
   seedSpanningFixture(ctx);
