@@ -30,6 +30,7 @@
 
 import { Router } from 'express';
 import { renderObservationPage } from '../lib/render-observation.js';
+import { renderSessionPage } from '../lib/render-session.js';
 import { getLoopsForWorkspace, getSessionsForWorkspace, deriveIssueGraph } from '../lib/pipeline-loops.js';
 import { buildSessionContextGraph } from '../lib/context-graph.js';
 import { deriveTerminalStatus, deriveCompletedAt } from '../lib/dispatch-terminal.js';
@@ -297,6 +298,13 @@ export function createDashboardRoutes({
   observationMaterializer = null,
   runSummaryCacheStore,
   sessionSummaryCacheStore,
+  // Brief/recap caches are per-issue (keyed by issue UUID); the per-session page
+  // (LIN-1003) joins them onto a session by distinct loop.issueId. They are NOT
+  // otherwise reachable in this router — the observation feed never reads issue
+  // context — so they are injected here explicitly (default null → the join is
+  // simply skipped, e.g. in tests that don't wire them).
+  briefCacheStore = null,
+  recapCacheStore = null,
   freeTierStore,
   getWorkspaceAccessToken,
   fetchIssueContext,
@@ -522,10 +530,98 @@ export function createDashboardRoutes({
     res.send(html);
   });
 
+  // Dedicated per-session page (LIN-1003, Phase 1 of LIN-950). The Observation
+  // in-feed drill-down promoted to a server-rendered page with its own URL.
+  // Mounted under `workspaceFromUrl` so cookie-session auth + cross-workspace
+  // isolation (unknown urlKey → 404) are inherited for free.
+  //
+  // Read-only + additive: it sources the session from the NON-lean
+  // `getSessionsForWorkspace(...).find(...)` — the durable
+  // `observationSessionsStore.getSession` point-read is lean and drops
+  // `feedback[]` (pipeline-loops.js: `feedback: lean ? [] : feedback`), so it
+  // cannot supply the transcript. Brief/recap are cache-ONLY reads on load
+  // (never an LLM spend on page load); a miss renders an explicit affordance.
+  router.get('/workspace/:urlKey/observation/session/:sessionId', workspaceFromUrl, async (req, res, next) => {
+    try {
+      const workspace = req.workspace;
+      const { sessionId } = req.params;
+
+      const pageOptions = {
+        deployInfo: getDeployInfo(),
+        urlKey: workspace.urlKey,
+        openRouterSource: getOpenRouterSource(req),
+        workspaces: req.session.workspaces,
+        featureFlags: getFeatureFlags(req.session)
+      };
+
+      if (!sessionId) {
+        return res.status(404).send(renderSessionPage({ session: null, sessionId: '', urlKey: workspace.urlKey }, pageOptions));
+      }
+
+      // NON-lean read — the transcript needs `feedback[]`.
+      const sessions = await getSessionsForWorkspace(workspace.urlKey, loopDeps);
+      const session = sessions.find(s => String(s.sessionId) === String(sessionId)) || null;
+      if (!session) {
+        return res.status(404).send(renderSessionPage({ session: null, sessionId, urlKey: workspace.urlKey }, pageOptions));
+      }
+
+      // Brief/recap cache-join over the session's distinct non-null issue UUIDs.
+      // `.get()` is a pure Mongo lookup (no LLM, null on miss); null `issueId`
+      // loops cannot be cache-joined and are skipped best-effort (mirrors the
+      // lazy-hydration discipline). Never call the generating path on load.
+      const issueContext = await joinSessionIssueContext(session, workspace.urlKey);
+
+      const html = renderSessionPage({ session, sessionId, issueContext, urlKey: workspace.urlKey }, pageOptions);
+      res.send(html);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Retired experimental dashboard (LIN-509) → 302 to the first-class page.
   router.get('/workspace/:urlKey/dashboard', workspaceFromUrl, (req, res) => {
     res.redirect(`/workspace/${encodeURIComponent(req.workspace.urlKey)}/observation`);
   });
+
+  /**
+   * Cache-only brief/recap join for the per-session page (LIN-1003). Reduces the
+   * session's loops to distinct non-null issue UUIDs and reads each issue's
+   * cached brief + recap. Pure reads; a store miss (or an unwired store) yields
+   * a null body → the renderer shows an explicit generate affordance.
+   *
+   * @param {Object} session - non-lean reconstructed session
+   * @param {string} urlKey
+   * @returns {Promise<Array<Object>>}
+   */
+  async function joinSessionIssueContext(session, urlKey) {
+    const seen = new Set();
+    const distinct = [];
+    for (const loop of session.loops || []) {
+      const issueId = loop.issueId || null;
+      if (!issueId || seen.has(issueId)) continue; // null → skippable best-effort
+      seen.add(issueId);
+      distinct.push({ issueIdentifier: loop.issueIdentifier || null, issueId });
+    }
+
+    const out = [];
+    for (const d of distinct) {
+      const [brief, recap] = await Promise.all([
+        briefCacheStore ? briefCacheStore.get(urlKey, d.issueId).catch(() => null) : Promise.resolve(null),
+        recapCacheStore ? recapCacheStore.get(urlKey, d.issueId).catch(() => null) : Promise.resolve(null)
+      ]);
+      out.push({
+        issueIdentifier: d.issueIdentifier,
+        issueId: d.issueId,
+        brief: brief?.brief || null,
+        briefModel: brief?.model || null,
+        briefGeneratedAt: brief?.generatedAt || null,
+        recap: recap?.recap || null,
+        recapModel: recap?.model || null,
+        recapGeneratedAt: recap?.generatedAt || null
+      });
+    }
+    return out;
+  }
 
   // ─── Sessions feed (observation poll source; LIN-595) ─────────────────────────
 
