@@ -1,0 +1,230 @@
+/*
+ * Per-session page (LIN-1003, Phase 1).
+ *
+ * Minimal styling for the promoted Observation drill-down page. Leans on the
+ * shared design tokens from style.css (colour, spacing, radius, fonts) and the
+ * typographic split: machine facts (IDs, counts, timestamps, runtimes) take the
+ * structural/mono face via `<code>`; prose/labels take the content/sans face.
+ * Light is the default; the shared `.theme-dark` token overrides carry dark, so
+ * this file references semantic tokens only — no hard-coded colours.
+ */
+
+.sp-page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: var(--space-3) var(--space-3) var(--space-5);
+  font-family: var(--font-content);
+  color: var(--text);
+}
+
+.sp-back {
+  margin: 0 0 var(--space-2);
+  font-size: 0.85rem;
+}
+
+.sp-header h1 {
+  margin: 0 0 var(--space-2);
+}
+
+.sp-title-id,
+.sp-num,
+.sp-run-iter,
+.sp-run-id,
+.sp-tr-run,
+.sp-tr-ts {
+  font-family: var(--font-structural);
+  color: var(--muted);
+}
+
+.sp-title-id {
+  color: var(--text);
+  font-size: 0.8em;
+}
+
+/* ── Overview meta line ─────────────────────────────────────────────────── */
+.sp-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.sp-meta-chip,
+.sp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  padding: 0.2em 0.6em;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: var(--card);
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.sp-meta-chip .sp-num,
+.sp-chip .sp-num {
+  color: var(--text);
+}
+
+.sp-glyph {
+  color: var(--brand);
+}
+
+/* ── Tasks touched ──────────────────────────────────────────────────────── */
+.sp-tasks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.sp-task {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5em;
+}
+
+.sp-task-id {
+  font-family: var(--font-structural);
+  color: var(--brand);
+}
+
+.sp-task-title {
+  color: var(--text);
+}
+
+.sp-seed-tag {
+  font-family: var(--font-content);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.1em 0.45em;
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+
+/* ── Runs ───────────────────────────────────────────────────────────────── */
+.sp-runs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.sp-run {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  background: var(--card);
+}
+
+.sp-run-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5em;
+  margin-bottom: var(--space-2);
+}
+
+.sp-run-kind {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.sp-run-id {
+  color: var(--brand);
+}
+
+.sp-run-title {
+  color: var(--muted);
+}
+
+.sp-telemetry .sp-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.sp-artifacts {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25em;
+  font-size: 0.85rem;
+}
+
+/* ── Transcript ─────────────────────────────────────────────────────────── */
+.sp-transcript {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.sp-tr-group {
+  border-left: 2px solid var(--line);
+  padding-left: var(--space-3);
+}
+
+.sp-tr-grouphead {
+  margin-bottom: var(--space-2);
+}
+
+.sp-tr-run {
+  color: var(--brand);
+}
+
+.sp-tr-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.sp-tr-entry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.6em;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.sp-tr-ts {
+  flex: 0 0 auto;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.sp-tr-msg {
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.sp-tr-link {
+  flex: 0 0 auto;
+}
+
+/* ── Context placeholder (brief/recap — beat 3) ─────────────────────────── */
+.sp-context-placeholder {
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+}
+
+.sp-muted,
+.sp-empty {
+  color: var(--muted);
+}

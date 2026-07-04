@@ -30,6 +30,7 @@
 
 import { Router } from 'express';
 import { renderObservationPage } from '../lib/render-observation.js';
+import { renderSessionPage } from '../lib/render-session.js';
 import { renderPage } from '../lib/components/page.js';
 import { escapeHtml } from '../lib/utils/html.js';
 import { getLoopsForWorkspace, getSessionsForWorkspace, deriveIssueGraph } from '../lib/pipeline-loops.js';
@@ -591,18 +592,20 @@ export function createDashboardRoutes({
       return res.status(404).send(notFound);
     }
 
+    // Cache-only brief/recap join (computed here so beat 3 can render the
+    // panels; never spends an LLM call on load). Passed through to the renderer.
     const briefRecap = await joinBriefRecap(session, workspace.urlKey);
 
-    // Placeholder shell (beat 1). Beat 2 swaps this for renderSessionPage(...).
-    const html = renderPage({
-      title: `Session ${escapeHtml(String(sessionId))}`,
-      content: `<main class="session-page" data-testid="session-page">`
-        + `<p><a href="/workspace/${encodeURIComponent(workspace.urlKey)}/observation">← back to feed</a></p>`
-        + `<h1 data-testid="session-heading">Session ${escapeHtml(String(sessionId))}</h1>`
-        + `<p data-testid="session-placeholder">Session loaded: ${(session.loops || []).length} run(s), `
-        + `${briefRecap.length} issue(s) with cached brief/recap. Full rendering follows.</p>`
-        + `</main>`
-    });
+    const html = renderSessionPage(
+      { session, briefRecap },
+      {
+        urlKey: workspace.urlKey,
+        deployInfo: getDeployInfo(),
+        openRouterSource: getOpenRouterSource(req),
+        workspaces: req.session.workspaces,
+        featureFlags: getFeatureFlags(req.session)
+      }
+    );
     res.send(html);
   });
 
