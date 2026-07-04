@@ -217,11 +217,117 @@
   flex: 0 0 auto;
 }
 
-/* ── Context placeholder (brief/recap — beat 3) ─────────────────────────── */
-.sp-context-placeholder {
-  border: 1px dashed var(--line);
+/* ── Context: brief + recap panels ──────────────────────────────────────── */
+.sp-context {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.sp-ctx {
+  border: 1px solid var(--line);
   border-radius: var(--radius-md);
   padding: var(--space-3);
+  background: var(--card);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.sp-ctx-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5em;
+}
+
+.sp-ctx-id {
+  font-family: var(--font-structural);
+  color: var(--brand);
+}
+
+.sp-ctx-title {
+  color: var(--muted);
+}
+
+.sp-panel-label {
+  font-family: var(--font-content);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-bottom: var(--space-2);
+}
+
+.sp-panel-meta {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-bottom: var(--space-2);
+}
+
+.sp-brief-body {
+  margin: 0;
+  padding: var(--space-2) 0 0;
+  font-family: var(--font-content);
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text);
+  line-height: 1.55;
+}
+
+.sp-recap-group {
+  margin-top: var(--space-2);
+}
+
+.sp-recap-grouplabel {
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 0.25em;
+}
+
+.sp-recap-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35em;
+}
+
+.sp-recap-item {
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.sp-recap-extra {
+  display: block;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.sp-generate {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.sp-generate .sp-muted {
+  margin: 0;
+}
+
+.sp-generate-btn {
+  font-family: var(--font-content);
+  padding: 0.3em 0.9em;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.sp-generate-btn:hover {
+  border-color: var(--brand);
 }
 
 .sp-muted,
