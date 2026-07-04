@@ -31,7 +31,7 @@
 import { Router } from 'express';
 import { renderObservationPage } from '../lib/render-observation.js';
 import { renderSessionPage } from '../lib/render-session.js';
-import { getLoopsForWorkspace, getSessionsForWorkspace, getSessionsForIssues, deriveIssueGraph } from '../lib/pipeline-loops.js';
+import { getLoopsForWorkspace, getLoopsForIssue, getSessionsForWorkspace, getSessionsForIssues, deriveIssueGraph } from '../lib/pipeline-loops.js';
 import { buildSessionContextGraph } from '../lib/context-graph.js';
 import { deriveTerminalStatus, deriveCompletedAt, findWakeEvent } from '../lib/dispatch-terminal.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
@@ -716,6 +716,29 @@ export function createDashboardRoutes({
    * @returns {Promise<Object|null>} the non-lean session, or null if not found
    */
   async function loadSessionWithTranscript(urlKey, sessionId) {
+    const hit = await pointReadSession(urlKey, sessionId);
+    if (hit) return hit;
+    // Fallback: historical inference-grouped or no-issue session → full read.
+    const sessions = await getSessionsForWorkspace(urlKey, loopDeps);
+    return sessions.find(s => String(s.sessionId) === String(sessionId)) || null;
+  }
+
+  /**
+   * Issue-scoped point-read of ONE session by id — steps 1–2 of
+   * loadSessionWithTranscript, WITHOUT the whole-workspace fallback (LIN-1022).
+   *
+   * Extracted so every reconstruct-by-sessionId handler (the per-session page,
+   * session-summary, session-context) shares the one cheap path and each decides
+   * for itself whether to pay the whole-workspace read on a point-read miss. It
+   * returns the NON-lean session (feedback[] intact) built by getSessionsForIssues
+   * — byte-identical to the whole-workspace build, restricted to the issues — or
+   * null when issue-scoping can't produce the session.
+   *
+   * @param {string} urlKey
+   * @param {string} sessionId
+   * @returns {Promise<Object|null>}
+   */
+  async function pointReadSession(urlKey, sessionId) {
     const ids = new Set();
     // The root/orchestrator dispatch (id===sessionId) carries no self-referential
     // `sessionId`, so the sessionId-scoped reads below won't surface it — fetch its
@@ -733,14 +756,36 @@ export function createDashboardRoutes({
     for (const r of (Array.isArray(live) ? live : [])) if (r?.issueIdentifier) ids.add(r.issueIdentifier);
     for (const r of (hist?.items || [])) if (r?.issueIdentifier) ids.add(r.issueIdentifier);
 
-    if (ids.size) {
-      const rebuilt = await getSessionsForIssues(urlKey, loopDeps, [...ids], { lean: false });
-      const hit = rebuilt.find(s => String(s.sessionId) === String(sessionId)) || null;
-      if (hit) return hit;
+    if (!ids.size) return null;
+    const rebuilt = await getSessionsForIssues(urlKey, loopDeps, [...ids], { lean: false });
+    return rebuilt.find(s => String(s.sessionId) === String(sessionId)) || null;
+  }
+
+  /**
+   * Point-read ONE run (Loop) by id (LIN-1022). A loopId IS the dispatch item id
+   * (`_buildLoops` sets `loopId: item.id`), so getItemStatus resolves its issue and
+   * getLoopsForIssue rebuilds that issue's runs issue-scoped/index-backed with the
+   * SAME builders getLoopsForWorkspace runs — byte-identical. Falls back to the
+   * whole-workspace read only when the loop can't be issue-scoped (no getItemStatus
+   * match, or a loopId that isn't a live/historic dispatch id).
+   *
+   * @param {string} urlKey
+   * @param {string} loopId
+   * @returns {Promise<Object|null>} the enriched loop, or null if not found
+   */
+  async function loadRunForSummary(urlKey, loopId) {
+    const item = typeof dispatchQueueStore.getItemStatus === 'function'
+      ? await Promise.resolve(dispatchQueueStore.getItemStatus(urlKey, loopId)).catch(() => null)
+      : null;
+    if (item?.issueIdentifier) {
+      const loops = await getLoopsForIssue(urlKey, item.issueIdentifier, loopDeps);
+      const found = loops.find(l => String(l.loopId) === String(loopId));
+      if (found) return enrichLoop(found);
     }
-    // Fallback: historical inference-grouped or no-issue session → full read.
-    const sessions = await getSessionsForWorkspace(urlKey, loopDeps);
-    return sessions.find(s => String(s.sessionId) === String(sessionId)) || null;
+    // Fallback: loopId not resolvable to an issue → whole-workspace reconstruction.
+    const loops = await getLoopsForWorkspace(urlKey, loopDeps);
+    const found = loops.find(l => String(l.loopId) === String(loopId));
+    return found ? enrichLoop(found) : null;
   }
 
   /**
@@ -881,9 +926,10 @@ export function createDashboardRoutes({
 
     let loop;
     try {
-      const loops = await getLoopsForWorkspace(workspace.urlKey, loopDeps);
-      const found = loops.find(l => String(l.loopId) === String(loopId));
-      loop = found ? enrichLoop(found) : null;
+      // LIN-1022: issue-scoped point-read instead of a non-lean whole-workspace
+      // getLoopsForWorkspace reconstruct-by-loopId (the same H12 class fix as the
+      // session handlers); whole-workspace read is retained as a rare fallback.
+      loop = await loadRunForSummary(workspace.urlKey, loopId);
     } catch (error) {
       console.error('Dashboard run-summary lookup error:', error);
       return res.status(500).json({ error: 'Could not load the run' });
@@ -1042,8 +1088,13 @@ export function createDashboardRoutes({
         session = await observationSessionsStore.getSession(workspace.urlKey, sessionId);
       }
       if (!session) {
-        const sessions = await getSessionsForWorkspace(workspace.urlKey, loopDeps);
-        session = sessions.find(s => String(s.sessionId) === String(sessionId)) || null;
+        // LIN-1022: point-read (issue-scoped getSessionsForIssues) instead of the
+        // whole-workspace reconstruction. The Observation page fires one
+        // session-summary?cachedOnly=1 peek per card, so the old whole-workspace
+        // fallback ran ~N concurrent 30-day reads on a materialized-store miss and
+        // starved the event loop → mass H12. loadSessionWithTranscript keeps the
+        // whole-workspace read only as its own rare last-resort fallback.
+        session = await loadSessionWithTranscript(workspace.urlKey, sessionId);
       }
     } catch (error) {
       console.error('Dashboard session-summary lookup error:', error);
@@ -1153,6 +1204,14 @@ export function createDashboardRoutes({
       let session = null;
       if (observationSessionsStore) {
         session = await observationSessionsStore.getSession(workspace.urlKey, sessionId);
+      }
+      if (!session) {
+        // LIN-1022: try the issue-scoped point-read first (same class fix as
+        // session-summary). A stamped session is reconstructed faithfully without
+        // the issueGraph; only a historical inference-grouped session (no sessionId
+        // stamps) falls through to the issueGraph-enriched whole-workspace read,
+        // which the inference fallback genuinely needs.
+        session = await pointReadSession(workspace.urlKey, sessionId);
       }
       if (!session) {
         const issueGraph = deriveIssueGraph(issues);
