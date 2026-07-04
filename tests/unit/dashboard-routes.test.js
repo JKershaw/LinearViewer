@@ -1647,4 +1647,44 @@ describe('sibling :id-keyed handlers are issue-scoped, no whole-workspace scan (
       process.env.NODE_ENV = prev;
     }
   });
+
+  // The actual prod H12 (LIN-1022): the Observation page fires one session-summary
+  // ?cachedOnly=1 peek per terminal card, INCLUDING cards for stale/expired
+  // sessionIds no longer in the 30-day window. The pre-fix handler paid the whole-
+  // workspace reconstruction (measured 337s on prod) on each such peek merely to 404,
+  // and a page's worth of them starved the event loop into mass H12. A peek must
+  // resolve cheaply or 204 — NEVER the whole-workspace read.
+  test('session-summary cachedOnly peek for a stale/unresolvable session 204s WITHOUT a whole-workspace read', async () => {
+    const stores = scopedStore({ live: [], history: [], agentStatus: [] });
+    const router = makeScopedRouter(stores);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/session-summary/:sessionId');
+    const { req, res } = makeReqRes({ session: ENABLED, workspace: { urlKey: 'ws-a' }, params: { sessionId: 'stale-nonexistent' }, query: { cachedOnly: '1' } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 204, 'peek miss → 204 (client leaves the generate affordance)');
+    assert.deepEqual(stores.unscoped, [], 'NO whole-workspace read paid for a stale peek (the LIN-1022 H12)');
+  });
+
+  test('run-summary cachedOnly peek for a stale/unresolvable loopId 204s WITHOUT a whole-workspace read', async () => {
+    const stores = scopedStore({ live: [], history: [], agentStatus: [] });
+    const router = makeScopedRouter(stores);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/run-summary/:loopId');
+    const { req, res } = makeReqRes({ session: ENABLED, workspace: { urlKey: 'ws-a' }, params: { loopId: 'stale-loop' }, query: { cachedOnly: '1' } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 204, 'peek miss → 204');
+    assert.deepEqual(stores.unscoped, [], 'NO whole-workspace read paid for a stale run peek');
+  });
+
+  // The asymmetry: a NON-peek request (force/POST, or a GET that will spend an LLM
+  // call) still pays the whole-workspace fallback — it is the only path that
+  // reconstructs a genuinely inference-grouped historical session, and it is a
+  // single deliberate request, not a page-load burst.
+  test('a non-peek session-summary miss still pays the whole-workspace fallback (then 404s)', async () => {
+    const stores = scopedStore({ live: [], history: [], agentStatus: [] });
+    const router = makeScopedRouter(stores);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/session-summary/:sessionId');
+    const { req, res } = makeReqRes({ session: ENABLED, workspace: { urlKey: 'ws-a' }, params: { sessionId: 'stale-nonexistent' } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 404, 'non-peek miss → 404');
+    assert.ok(stores.unscoped.length > 0, 'the whole-workspace fallback ran for the non-peek request');
+  });
 });
