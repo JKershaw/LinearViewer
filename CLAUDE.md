@@ -63,6 +63,7 @@ lib/
     github-projects/index.js  GitHub Projects v2 provider — additive sibling to GitHub Issues (own GraphQL client.js + fake-client.js; read-only V1; board Status→canonical heuristic; LIN-560)
   render.js            Dashboard page renderer (tree view, sections)
   render-pages.js      Standalone page renderers (login, error, workspace-not-found)
+  render-landing.js    Bespoke unauthenticated home showcase (LIN-980): Harbour top area (hero + loop) + fake-data glimpses of real surfaces (observation feed, swim board, grounded prompt) + providers strip + distinct Harbour OS section; composes D's shared nav (renderNavBar isLanding); NOT the project-tree renderer. Styles in public/landing.css
   render-audit.js      Operator dashboard page renderer
   render-settings.js   Settings page renderer
   render-prompts.js    Prompts catalog page renderer
@@ -159,6 +160,7 @@ content/
   landing.md           Static projects preview for unauthenticated users
 public/
   style.css            Light theme, mobile-responsive
+  landing.css          Bespoke landing showcase styles (LIN-980); semantic-token-only so it is dark-safe under both .theme-dark and the landing's prefers-color-scheme remap
   app.js               Client-side collapse/expand, localStorage persistence
   common.js            Shared client utilities
   common-actions.css   Shared action/button styles

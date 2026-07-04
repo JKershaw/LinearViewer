@@ -315,79 +315,25 @@ test.describe('Landing Page Interactions', () => {
     await page.evaluate(() => localStorage.clear());
   });
 
+  // LIN-980: the unauthenticated landing is now a bespoke Harbour showcase, NOT
+  // the fake project-tree. The former tree-interaction tests here (collapse /
+  // expand / project-header collapse / details-vs-prompts toggle) exercised a
+  // structure that no longer exists on the landing; the tree's collapse/expand
+  // behaviour is fully covered by the authenticated `Interactive Features`
+  // describe above. The showcase composition itself is covered by
+  // tests/e2e/landing.spec.js. What remains meaningful here: the landing offers
+  // no issue-mutation affordances.
   test('Create task link is NOT visible on landing page', async ({ page }) => {
     await page.reload();
     const createTaskLinks = page.locator('[data-action="create-task"]');
     await expect(createTaskLinks).toHaveCount(0);
   });
 
-  test('collapse and expand work on landing page', async ({ page }) => {
-    // Reload to start with clean localStorage state
+  test('no prompt-generation affordances on the landing', async ({ page }) => {
     await page.reload();
-
-    // Find an expandable issue
-    const issueLine = page.locator('.line.expandable').first();
-
-    // Landing page uses content/landing.md (not mock data) - skip if no expandable issues
-    const count = await issueLine.count();
-    if (count === 0) {
-      test.skip();
-      return;
-    }
-
-    const issueId = await issueLine.getAttribute('data-id');
-    const details = page.locator(`.details[data-details-for="${issueId}"]`);
-
-    // Click to expand
-    await issueLine.click();
-    await expect(details).not.toHaveClass(/hidden/);
-
-    // Click to collapse
-    await issueLine.click();
-    await expect(details).toHaveClass(/hidden/);
-  });
-
-  test('project headers collapse on landing page', async ({ page }) => {
-    await page.reload();
-
-    const projectHeader = page.locator('.project-header').first();
-    const project = page.locator('.project').first();
-    const linesInProject = project.locator('.line');
-
-    // Click to collapse
-    await projectHeader.click();
-    await expect(linesInProject.first()).not.toBeVisible();
-
-    // Click to expand
-    await projectHeader.click();
-    await expect(linesInProject.first()).toBeVisible();
-  });
-
-  test('landing page has Details toggle but no Prompts toggle', async ({ page }) => {
-    await page.reload();
-
-    // Find an expandable issue on landing page
-    const issueLine = page.locator('.line.expandable').first();
-
-    // Skip if no expandable issues on landing page
-    if (await issueLine.count() === 0) {
-      test.skip();
-      return;
-    }
-
-    // Expand the issue
-    await issueLine.click();
-
-    const issueId = await issueLine.getAttribute('data-id');
-    const details = page.locator(`.details[data-details-for="${issueId}"]`);
-
-    // Details toggle should exist
-    const detailsToggle = details.locator('.detail-toggle[data-toggle="details"]');
-    await expect(detailsToggle).toBeVisible();
-
-    // Prompts toggle should NOT exist (landing page has no prompts)
-    const promptsToggle = details.locator('.detail-toggle[data-toggle="prompts"]');
-    await expect(promptsToggle).toHaveCount(0);
+    // The showcase is a static marketing surface — no per-issue prompt toggles.
+    await expect(page.locator('.detail-toggle[data-toggle="prompts"]')).toHaveCount(0);
+    await expect(page.locator('.line.expandable')).toHaveCount(0);
   });
 });
 

@@ -1,190 +1,119 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Landing Page', () => {
+// LIN-980 (UI audit G): the unauthenticated home page is a bespoke Harbour
+// showcase — a Harbour-focused top area, fake-data glimpses of real surfaces
+// (observation feed, swim board, grounded prompt), a providers strip, and a
+// distinct Harbour OS section — composed on D's shared header nav and the shared
+// design system. It is NO LONGER rendered through render.js's project-tree
+// renderer (the old landing was marketing copy dressed as a fake projects tree).
+
+test.describe('Landing Page (bespoke showcase)', () => {
   test.beforeEach(async ({ page }) => {
-    // Clear localStorage to ensure fresh state for each test
     await page.goto('/');
     await page.evaluate(() => localStorage.clear());
   });
 
-  test('renders landing page for unauthenticated users', async ({ page }) => {
+  test('renders the Harbour brand hero as the page heading', async ({ page }) => {
     await page.goto('/');
-
-    // The brand hero is the page heading (LIN-726): lowercase `harbour` wordmark
-    // as the single <h1>, with the anchor mark above it.
     await expect(page.locator('[data-testid="landing-hero"]')).toBeVisible();
     await expect(page.locator('h1.landing-wordmark')).toContainText('harbour');
     await expect(page.locator('.landing-mark svg')).toBeVisible();
+    // Body is flagged is-landing so the landing token remap + grid apply.
+    await expect(page.locator('body')).toHaveClass(/is-landing/);
   });
 
-  test('does not show login or reset in header', async ({ page }) => {
+  test('does NOT render the fake project-tree landing', async ({ page }) => {
     await page.goto('/');
-
-    // Header should not have login or reset links (login is in page content instead)
-    await expect(page.locator('header a.login')).not.toBeVisible();
-    await expect(page.locator('header .reset-view')).not.toBeVisible();
+    // The old landing rendered content/landing.md through the tree renderer.
+    // The showcase replaces it — no project rows on the home page.
+    await expect(page.locator('.project-header')).toHaveCount(0);
+    await expect(page.locator('.project')).toHaveCount(0);
+    await expect(page.locator('.landing-showcase')).toBeVisible();
   });
 
-  test('shows footer with cross-view navigation and GitHub link', async ({ page }) => {
+  test('composes D’s shared header nav (not bespoke chrome)', async ({ page }) => {
     await page.goto('/');
-
-    // Footer should be visible
-    await expect(page.locator('.page-footer')).toBeVisible();
-
-    // projects is current page — shown in bold, not a link
-    await expect(page.locator('.footer-actions strong.footer-current')).toHaveText('projects');
-    // swipe and swim are links
-    await expect(page.locator('.footer-actions a[href="/swipe"]')).toBeVisible();
-    await expect(page.locator('.footer-actions a[href="/swim"]')).toBeVisible();
-
-    // Should show GitHub link (fallback when no Heroku deploy info in test mode)
-    const footerLink = page.locator('.footer-link');
-    await expect(footerLink).toBeVisible();
-    await expect(footerLink).toHaveAttribute('href', 'https://github.com/JKershaw/LinearViewer');
+    // The unauthenticated nav is the SAME shared nav-bar the swipe/swim previews
+    // use, carrying a directly-reachable sign-in action.
+    const nav = page.locator('nav.nav-bar');
+    await expect(nav).toBeVisible();
+    await expect(nav.locator('a.login')).toBeVisible();
+    // The hero header itself carries no login/reset chrome.
+    await expect(page.locator('header.landing-hero a.login')).toHaveCount(0);
+    await expect(page.locator('header .reset-view')).toHaveCount(0);
   });
 
-  test('displays static project preview from landing.md', async ({ page }) => {
+  test('shows the showcase sections', async ({ page }) => {
     await page.goto('/');
-
-    // landing.md defines 6 sections: What Harbour Is, Views, Orchestration,
-    // Self-Host, Source, Harbour OS (LIN-726: Login moved into the hero; a small
-    // Harbour OS section anchors the bottom).
-    await expect(page.locator('.project-header')).toHaveCount(6);
-    await expect(page.locator('.project-header:has-text("What Harbour Is")')).toBeVisible();
-    await expect(page.locator('.project-header:has-text("Views")')).toBeVisible();
-    await expect(page.locator('.project-header:has-text("Orchestration")')).toBeVisible();
-    await expect(page.locator('.project-header:has-text("Self-Host")')).toBeVisible();
-    await expect(page.locator('.project-header:has-text("Source")')).toBeVisible();
-    await expect(page.locator('.project-header:has-text("Harbour OS")')).toBeVisible();
+    for (const id of ['landing-loop', 'landing-observation', 'landing-swim', 'landing-prompt', 'landing-providers', 'landing-os']) {
+      await expect(page.locator(`[data-testid="${id}"]`)).toBeVisible();
+    }
   });
 
-  test('Harbour OS section links to os.harbour.cat', async ({ page }) => {
+  test('observation glimpse renders run-status pills of real surfaces', async ({ page }) => {
     await page.goto('/');
+    const obs = page.locator('[data-testid="landing-observation"]');
+    // Illustrative session feed: running / done / queued run-status pills.
+    await expect(obs.locator('.status-pill--running')).toBeVisible();
+    await expect(obs.locator('.status-pill--done')).toBeVisible();
+    await expect(obs.locator('.status-pill--queued')).toBeVisible();
+    // Per-run progress track is present.
+    await expect(obs.locator('.lx-run').first()).toBeVisible();
+  });
 
-    // The Harbour OS row reveals its os.harbour.cat link on expand (same CLI
-    // tree pattern as the Source links).
-    const osRow = page.locator('.line:has(.title:has-text("Harbour OS"))');
-    await osRow.click();
-    const osLink = page.locator('a[href="https://os.harbour.cat"]');
+  test('Harbour OS is a distinct bottom section linking os.harbour.cat', async ({ page }) => {
+    await page.goto('/');
+    const os = page.locator('[data-testid="landing-os"]');
+    await expect(os).toBeVisible();
+    await expect(os.locator('.lx-section__title')).toHaveText('Harbour OS');
+    const osLink = os.locator('a[href="https://os.harbour.cat"]');
     await expect(osLink).toBeVisible();
   });
 
-  test('displays state indicators correctly', async ({ page }) => {
+  test('footer shows cross-view navigation and the GitHub link', async ({ page }) => {
     await page.goto('/');
-
-    // State counts from landing.md content (LIN-726: the in-progress "Connect
-    // with Linear" row moved into the hero; a todo Harbour OS row was added):
-    // - 2 done (✓): Any backend one cockpit, Grounded prompts two ways
-    // - 0 in-progress (◐)
-    // - 14 todo (○): The control plane, Tree/swipe/swim, Roadmap & ship, Observation,
-    //                Dispatch, Autopilot, Workspace API proxy, Run it yourself,
-    //                AI-assisted setup, Customize it, View on GitHub,
-    //                Bugs & feature requests, Built by John Kershaw, Harbour OS
-    // LIN-850: tree-row status glyphs render through the shared status primitive
-    // as the box-less bare variant (`.status-pill--bare.status-pill--<state>`),
-    // replacing the legacy `.state.<state>` spans.
-    await expect(page.locator('.status-pill--bare.status-pill--done')).toHaveCount(2);
-    await expect(page.locator('.status-pill--bare.status-pill--in-progress')).toHaveCount(0);
-    await expect(page.locator('.status-pill--bare.status-pill--todo')).toHaveCount(14);
+    await expect(page.locator('.page-footer')).toBeVisible();
+    // projects is the current landing view — bold, not a link.
+    await expect(page.locator('.footer-actions strong.footer-current')).toHaveText('projects');
+    await expect(page.locator('.footer-actions a[href="/swipe"]')).toBeVisible();
+    await expect(page.locator('.footer-actions a[href="/swim"]')).toBeVisible();
+    const footerLink = page.locator('.footer-link');
+    await expect(footerLink.first()).toBeVisible();
+    await expect(footerLink.first()).toHaveAttribute('href', 'https://github.com/JKershaw/LinearViewer');
   });
 
-  test('does not show logout link on landing page', async ({ page }) => {
+  test('hero sign-in CTA is a directly reachable link', async ({ page }) => {
     await page.goto('/');
-
-    // Should NOT have logout link (only for authenticated users)
-    await expect(page.locator('a.logout')).not.toBeVisible();
-  });
-
-  test('projects with @collapsed start collapsed by default', async ({ page }) => {
-    await page.goto('/');
-
-    // Self-Host and Source should be collapsed (have ▶ arrow)
-    const selfHostHeader = page.locator('.project-header:has-text("Self-Host")');
-    const sourceHeader = page.locator('.project-header:has-text("Source")');
-
-    await expect(selfHostHeader).toContainText('▶');
-    await expect(sourceHeader).toContainText('▶');
-
-    // What Harbour Is and Views should be expanded (have ▼ arrow)
-    const whatHarbourIsHeader = page.locator('.project-header:has-text("What Harbour Is")');
-    const viewsHeader = page.locator('.project-header:has-text("Views")');
-
-    await expect(whatHarbourIsHeader).toContainText('▼');
-    await expect(viewsHeader).toContainText('▼');
-  });
-
-  test('collapsed projects have hidden content', async ({ page }) => {
-    await page.goto('/');
-
-    // Get the Self-Host project (should be collapsed)
-    const selfHostProject = page.locator('.project[data-default-collapsed="true"]').first();
-    await expect(selfHostProject).toBeVisible();
-
-    // Lines inside collapsed project should not be visible
-    const linesInCollapsed = selfHostProject.locator('.line');
-    await expect(linesInCollapsed.first()).not.toBeVisible();
-  });
-
-  test('collapsed projects can be expanded by clicking header', async ({ page }) => {
-    await page.goto('/');
-
-    // Get the Self-Host project
-    const selfHostProject = page.locator('.project:has(.project-header:has-text("Self-Host"))');
-    const selfHostHeader = selfHostProject.locator('.project-header');
-    const linesInProject = selfHostProject.locator('.line');
-
-    // Should start collapsed
-    await expect(linesInProject.first()).not.toBeVisible();
-
-    // Click to expand
-    await selfHostHeader.click();
-
-    // Lines should now be visible
-    await expect(linesInProject.first()).toBeVisible();
-    await expect(selfHostHeader).toContainText('▼');
-  });
-
-  test('data-default-collapsed attribute is present on collapsed projects', async ({ page }) => {
-    await page.goto('/');
-
-    // Should have 2 projects with data-default-collapsed
-    const collapsedProjects = page.locator('.project[data-default-collapsed="true"]');
-    await expect(collapsedProjects).toHaveCount(2);
-  });
-
-  // LIN-726: sign-in moved into the brand hero. The CTAs are plain <a> links —
-  // always visible and in the tab order — a strictly simpler a11y story than the
-  // old expandable "Connect with Linear" row (LIN-566).
-  test('hero sign-in CTA is a directly reachable link (LIN-726)', async ({ page }) => {
-    await page.goto('/');
-
     const linearCta = page.locator('[data-testid="landing-cta-linear"]');
-    // Visible without any expand step.
     await expect(linearCta).toBeVisible();
     await expect(linearCta).toHaveAttribute('href', '/auth/linear');
-
-    // It's a real, keyboard-focusable link in the tab order.
     await linearCta.focus();
     await expect(linearCta).toBeFocused();
   });
 
-  test('page reload resets to default state', async ({ page }) => {
+  test('does not show a logout link (unauthenticated)', async ({ page }) => {
     await page.goto('/');
+    await expect(page.locator('a.logout')).not.toBeVisible();
+  });
+});
 
-    // Get the Self-Host project and expand it
-    const selfHostProject = page.locator('.project:has(.project-header:has-text("Self-Host"))');
-    const selfHostHeader = selfHostProject.locator('.project-header');
-    const linesInProject = selfHostProject.locator('.line');
+// The landing is dark-safe: it responds to the OS colour scheme via the
+// `@media (prefers-color-scheme: dark) body.is-landing` token remap. This guards
+// the LIN-980 regression where the semantic layer (--text/--card …) was not
+// re-bound for the landing's dark path, leaving section titles near-black on a
+// dark background. We assert the section heading text is LIGHT under dark.
+test.describe('Landing Page (dark scheme)', () => {
+  test.use({ colorScheme: 'dark' });
 
-    // Expand it
-    await selfHostHeader.click();
-    await expect(linesInProject.first()).toBeVisible();
-
-    // Reload the page
-    await page.reload();
-
-    // Should be collapsed again (landing page doesn't persist state)
-    await expect(linesInProject.first()).not.toBeVisible();
-    await expect(selfHostHeader).toContainText('▶');
+  test('section titles remain light on the dark background', async ({ page }) => {
+    await page.goto('/');
+    const title = page.locator('[data-testid="landing-loop"] .lx-section__title');
+    await expect(title).toBeVisible();
+    const luminance = await title.evaluate((el) => {
+      const m = getComputedStyle(el).color.match(/\d+/g).map(Number);
+      // Rec. 601 luma — high ⇒ light text (readable on dark).
+      return 0.299 * m[0] + 0.587 * m[1] + 0.114 * m[2];
+    });
+    expect(luminance).toBeGreaterThan(160);
   });
 });
