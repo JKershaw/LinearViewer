@@ -30,6 +30,7 @@ import { ProxyEventStore } from './lib/proxy-events.js'
 import { AgentStatusStore } from './lib/agent-status-store.js'
 import { ObservationSessionsStore } from './lib/observation-sessions-store.js'
 import { createObservationMaterializer } from './lib/observation-sessions-materializer.js'
+import { createWorkspaceTitleResolver } from './lib/workspace-title-resolver.js'
 import { FreeTierStore } from './lib/free-tier-store.js'
 import { RecapCacheStore } from './lib/recap-cache.js'
 import { BriefCacheStore } from './lib/brief-cache.js'
@@ -285,7 +286,12 @@ const observationSessionsStore = new ObservationSessionsStore({
 const observationMaterializer = createObservationMaterializer({
   dispatchStore: dispatchQueueStore,
   agentStatusStore,
-  observationSessionsStore
+  observationSessionsStore,
+  // LIN-962: resolve real task titles at the read/serve seam so Observation
+  // Level-2 cards whose loops lack `issueTitle` show a title, not a bare
+  // identifier. Off the hot poll path; `resolveWorkspaceTitles` is a hoisted
+  // fn declared below (safe to reference here — invoked only at write time).
+  resolveWorkspaceTitles
 })
 // Shared Observation sessions-feed cache (LIN-617). One process-wide instance,
 // passed to BOTH the dashboard router (which reads it on the /sessions path) and
@@ -1225,6 +1231,24 @@ async function fetchWorkspaceIssues(workspace) {
   const result = issues || [];
   if (memoKey) _workspaceIssuesMemo.set(memoKey, { issues: result, cachedAt: Date.now() });
   return result;
+}
+
+// LIN-962: the off-session title-resolution glue (session scan → latest-expiring-
+// token workspace pick → memoized fetchWorkspaceIssues → {identifier → title} map)
+// lives in lib/workspace-title-resolver.js so its REAL wiring is unit-testable with
+// a fake Linear client (not a reimplementation). Constructed with the real deps
+// here; behaviour is byte-identical to the former inline functions.
+const _workspaceTitleResolver = createWorkspaceTitleResolver({
+  sessionsCollection,
+  fetchWorkspaceIssues,
+  tokenRefreshBufferMs: TOKEN_REFRESH_BUFFER_MS
+});
+
+// Hoisted wrapper so the materializer wiring earlier in source order can reference
+// `resolveWorkspaceTitles` (invoked only at write time, long after this const is
+// assigned during module init).
+function resolveWorkspaceTitles(urlKey) {
+  return _workspaceTitleResolver.resolveWorkspaceTitles(urlKey);
 }
 
 // getWorkspaceOpenRouterKey: resolves the token creator's OpenRouter API key for
