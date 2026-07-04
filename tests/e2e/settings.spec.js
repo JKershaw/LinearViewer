@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js'
-import { footer, settings } from '../helpers.js'
+import { nav, settings } from '../helpers.js'
 
 // Proof-of-pattern spec for LIN-215: brittle `:has-text()` / class / href
 // selectors here are migrated to the stable `data-testid` selectors and page
@@ -19,10 +19,12 @@ test.describe('Settings Page', () => {
     await expect(settings(page).section('ai')).toContainText('AI')
   })
 
-  test('has footer navigation links', async ({ page }) => {
-    await expect(footer(page).getLink('swipe')).toBeVisible()
-    await expect(footer(page).getLink('swim')).toBeVisible()
-    await expect(footer(page).getLink('settings')).toBeVisible()
+  test('has header view-switcher links', async ({ page }) => {
+    // Cross-view links moved from the footer into the shared header switcher
+    // (LIN-978); settings is the current page so it renders as the bold current.
+    await expect(nav(page).getView('swipe')).toBeVisible()
+    await expect(nav(page).getView('swim')).toBeVisible()
+    await expect(nav(page).getView('settings')).toBeVisible()
   })
 
   test('has Account section with logout', async ({ page }) => {

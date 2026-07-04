@@ -358,6 +358,55 @@ h1 {
   margin-bottom: var(--space-3);
   flex-wrap: wrap;
   gap: var(--space-2) 2ch;
+  /* Header nav carrying the view switcher (LIN-978). It leads every workspace
+     page, so cross-view navigation is reachable from the top without scrolling
+     to the footer (the audit's Finding 1). Deliberately NOT `position: sticky`:
+     a sticky header that overlays scrolled content intercepts pointer events on
+     controls scrolled beneath it (it broke the ship-orientation mode toggle),
+     so the shared nav stays in normal flow. Re-introducing the obs-appbar's
+     sticky/translucent feel globally needs per-interaction scroll-margin work
+     and is deferred. */
+  padding: var(--space-2) 0;
+}
+
+/* Header-level view switcher (LIN-978). Its own full-width row inside the nav
+   (flex-basis:100% forces the wrap), laid out as a SINGLE horizontally-scrolling
+   row — never the old multi-line footer-style wrap the audit flagged. At 390px
+   the row scrolls sideways rather than stacking, keeping cross-view nav to one
+   line. */
+.nav-views {
+  flex: 0 0 100%;
+  display: flex;
+  align-items: baseline;
+  gap: 1.5ch;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  white-space: nowrap;
+  padding-top: var(--space-1);
+  /* Thin scrollbar, unobtrusive on desktop; momentum scroll on touch. */
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.nav-view {
+  color: var(--fg-dim);
+  text-decoration: none;
+  font-size: 0.9em;
+  font-family: var(--font-content);
+  flex: 0 0 auto;
+}
+
+.nav-view:hover {
+  color: var(--fg);
+}
+
+/* Active view — bolded, primary text colour (mirrors the footer-current
+   treatment the switcher replaces). */
+.nav-view-current {
+  color: var(--fg);
+  font-weight: 600;
+  font-family: var(--font-content);
+  flex: 0 0 auto;
 }
 
 .nav-filters {
@@ -1538,6 +1587,12 @@ a.wordmark:hover {
 
   .nav-value {
     max-width: 10ch;
+  }
+
+  /* View switcher stays a single scrolling row at 390px (LIN-978) — tighter
+     gaps, never a multi-line wrap. */
+  .nav-views {
+    gap: 1.25ch;
   }
 }
 

@@ -131,19 +131,18 @@ test.describe('Prompts Page', () => {
       await expect(page.locator('.meta-prompt-section .section-header')).toContainText('Meta-Prompt');
     });
 
-    test('has footer with navigation links', async ({ page, localWorkerUrlKey }) => {
+    test('has header nav with view links', async ({ page, localWorkerUrlKey }) => {
       await page.goto(`/workspace/${localWorkerUrlKey}/prompts`);
 
       // Should have footer
       await expect(page.locator('.page-footer')).toBeVisible();
 
-      // Should have settings link with workspace prefix
-      const settingsLink = page.locator(`.footer-action[href="/workspace/${localWorkerUrlKey}/settings"]`);
+      // Cross-view links now live in the shared header switcher (LIN-978).
+      const settingsLink = page.locator(`.nav-views [data-testid="nav-view-settings"][href="/workspace/${localWorkerUrlKey}/settings"]`);
       await expect(settingsLink).toBeVisible();
       await expect(settingsLink).toContainText('settings');
 
-      // Should have swim link with workspace prefix
-      const swimLink = page.locator(`.footer-action[href="/workspace/${localWorkerUrlKey}/swim"]`);
+      const swimLink = page.locator(`.nav-views [data-testid="nav-view-swim"][href="/workspace/${localWorkerUrlKey}/swim"]`);
       await expect(swimLink).toBeVisible();
     });
   });
