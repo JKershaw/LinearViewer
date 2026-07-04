@@ -505,6 +505,31 @@ describe('GET /api/dashboard/sessions', () => {
     assert.match(s.waitingMessage, /awaiting verification/, 'falls back to the blocked run summary');
   });
 
+  test('a [pending] feedback marker does NOT surface waiting — it is a machine handoff, not a human ask (LIN-1025)', async () => {
+    // [pending] (LIN-843) is an agent-to-agent orchestrator handoff, not a request
+    // for user input, so it must never roll up to the "Waiting on you" surface even
+    // though it is a non-terminal wake marker (which still wakes the orchestrator via
+    // the separate WAKE_FEEDBACK_REGEX). Mirrors the [blocked] positive case above.
+    const pendingWorker = {
+      id: 'w-p', sessionId: 'sess-p', issueIdentifier: 'LIN-441', issueTitle: 'Stepper worker',
+      promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken',
+      feedback: [{ message: '[pending] my beat is done, the task is not', timestamp: NOW_ISO }]
+    };
+    const perWorkspace = {
+      'ws-a': { live: [autopilotLiveItem('sess-p', 'LIN-440')], history: [pendingWorker], agentStatus: [] }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    const s = findSession(res.jsonBody, 'sess-p');
+    assert.ok(s, 'the [pending] session is present in the feed');
+    assert.equal(s.waiting, false, '[pending] must not flag human-waiting');
+    assert.notEqual(s.status, 'waiting', '[pending] session is in-progress, not waiting');
+    assert.equal(s.waitingMessage, null, 'no "waiting on you" message for a machine handoff');
+  });
+
   test('a session that emitted [blocked] then finished is done, not waiting (terminal precedence)', async () => {
     // [blocked] is a pause signal, not terminal — but a later [done] wins. The
     // session must report done with no lingering waiting flag.

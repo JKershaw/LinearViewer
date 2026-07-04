@@ -715,6 +715,25 @@ describe('lean projection (LIN-622)', () => {
     }
   });
 
+  test('_buildLoops: a [pending] run is NOT human-waiting — wakeMarker kept, but no waitingMessage (LIN-1025)', () => {
+    // [pending] is an agent-to-agent orchestrator handoff (LIN-843), not a request
+    // for user input. findWakeEvent still returns it (it stays a wake marker for the
+    // orchestrator path), but it is excluded from WAITING_WAKE_MARKERS, so the
+    // human-facing waitingMessage must be null and the run must not be terminal.
+    const pendingFeedback = [
+      { message: '[working] 2 tools/8s · alive', timestamp: '2026-04-10T10:20:00.000Z' },
+      { message: '[pending] my beat is done, task is not', timestamp: '2026-04-10T10:40:00.000Z' }
+    ];
+    const hist = historyItem({ feedback: pendingFeedback });
+    const full = _buildLoops({ historyItems: [hist], now: NOW });
+    const lean = _buildLoops({ historyItems: [hist], now: NOW, lean: true });
+    for (const [label, loop] of [['default', full[0]], ['lean', lean[0]]]) {
+      assert.strictEqual(loop.wakeMarker, 'pending', `${label}: wakeMarker still recorded`);
+      assert.strictEqual(loop.waitingMessage, null, `${label}: [pending] is not human-waiting`);
+      assert.strictEqual(loop.terminalStatus, null, `${label}: not terminal`);
+    }
+  });
+
   test('_buildLoops: a [blocked]-then-[done] run pre-derives a done wakeMarker with no waitingMessage (LIN-1005)', () => {
     // findWakeEvent returns the LAST marker; a later [done] means finished, not
     // waiting — so waitingMessage must be null and the run is terminal.

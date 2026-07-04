@@ -207,7 +207,10 @@ export function deriveSessionStatus({ terminal, stale, hasError, waiting = false
 // The wake markers that roll up to a session-level "waiting on user" state
 // (LIN-1005). Mirrors WAITING_WAKE_MARKERS in pipeline-loops.js — a run whose
 // pre-derived `wakeMarker` is one of these is paused on a human, not finished.
-const WAITING_WAKE_MARKERS = new Set(['blocked', 'pending']);
+// ONLY `[blocked]` qualifies; `[pending]` is excluded (LIN-1025) because it is an
+// agent-to-agent orchestrator handoff (LIN-843), not a request for user input —
+// keep this in parity with the pipeline-loops.js definition.
+const WAITING_WAKE_MARKERS = new Set(['blocked']);
 
 /**
  * Is a single ENRICHED loop (effectiveAgentState applied) waiting on a human?
