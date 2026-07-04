@@ -30,6 +30,8 @@
 
 import { Router } from 'express';
 import { renderObservationPage } from '../lib/render-observation.js';
+import { renderPage } from '../lib/components/page.js';
+import { escapeHtml } from '../lib/utils/html.js';
 import { getLoopsForWorkspace, getSessionsForWorkspace, deriveIssueGraph } from '../lib/pipeline-loops.js';
 import { buildSessionContextGraph } from '../lib/context-graph.js';
 import { deriveTerminalStatus, deriveCompletedAt } from '../lib/dispatch-terminal.js';
@@ -279,6 +281,8 @@ function deriveFeedStatusLine(children) {
  * @param {Object}   [deps.observationMaterializer]    - materializer used to backfill a workspace on a read-miss (LIN-623)
  * @param {Object}   deps.runSummaryCacheStore     - run-summary cache store
  * @param {Object}   deps.sessionSummaryCacheStore - session-summary cache store (LIN-592)
+ * @param {Object}   [deps.briefCacheStore]        - brief cache store; cache-only read for the per-session page (LIN-1003)
+ * @param {Object}   [deps.recapCacheStore]        - recap cache store; cache-only read for the per-session page (LIN-1003)
  * @param {Object}   deps.freeTierStore            - free-tier usage store (rate limit)
  * @param {Function} deps.getWorkspaceAccessToken  - (urlKey) → token (lazy hydration only)
  * @param {Function} deps.fetchIssueContext        - (token, identifier) → issue context (lazy hydration)
@@ -297,6 +301,8 @@ export function createDashboardRoutes({
   observationMaterializer = null,
   runSummaryCacheStore,
   sessionSummaryCacheStore,
+  briefCacheStore = null,
+  recapCacheStore = null,
   freeTierStore,
   getWorkspaceAccessToken,
   fetchIssueContext,
@@ -525,6 +531,79 @@ export function createDashboardRoutes({
   // Retired experimental dashboard (LIN-509) → 302 to the first-class page.
   router.get('/workspace/:urlKey/dashboard', workspaceFromUrl, (req, res) => {
     res.redirect(`/workspace/${encodeURIComponent(req.workspace.urlKey)}/observation`);
+  });
+
+  // ─── Per-session page (LIN-1003) ──────────────────────────────────────────────
+
+  // Cache-only brief/recap join for the per-session page (LIN-1003). Reads the
+  // brief/recap caches for each distinct issue the session touched — a pure Mongo
+  // `.get()` (null on miss); it NEVER calls the generating path, so opening the
+  // page can never auto-spend an LLM call. Loops with a null `issueId` cannot be
+  // cache-joined (the caches key on the issue UUID) and are skipped best-effort,
+  // mirroring the lazy-hydration discipline.
+  async function joinBriefRecap(session, urlKey) {
+    const byId = new Map();
+    for (const loop of (session.loops || [])) {
+      if (!loop.issueId || byId.has(loop.issueId)) continue;
+      byId.set(loop.issueId, {
+        issueId: loop.issueId,
+        issueIdentifier: loop.issueIdentifier || null,
+        issueTitle: loop.issueTitle || null
+      });
+    }
+    const results = [];
+    for (const entry of byId.values()) {
+      const brief = briefCacheStore ? await briefCacheStore.get(urlKey, entry.issueId) : null;
+      const recap = recapCacheStore ? await recapCacheStore.get(urlKey, entry.issueId) : null;
+      results.push({ ...entry, brief, recap });
+    }
+    return results;
+  }
+
+  // Promoted Observation drill-down: one session as a server-rendered HTML page
+  // (LIN-1003). Mounted under `workspaceFromUrl`, so cookie-session auth and
+  // cross-workspace isolation (a urlKey not in the caller's own session → 404)
+  // are inherited. Read-only/additive: the session comes from the NON-lean
+  // workspace read (the lean point-read drops `feedback[]` — no transcript), and
+  // brief/recap are cache-only. Real rendering lands in a later beat; this is the
+  // mount + session-read + 404 skeleton on the shared shell.
+  router.get('/workspace/:urlKey/observation/session/:sessionId', workspaceFromUrl, async (req, res) => {
+    const workspace = req.workspace;
+    const { sessionId } = req.params;
+
+    let session = null;
+    try {
+      // NON-lean read (same call as session-summary/context at :789): keeps
+      // `loop.feedback[]` so the page can render the transcript. Never the lean
+      // `observationSessionsStore.getSession`, which drops feedback.
+      const sessions = await getSessionsForWorkspace(workspace.urlKey, loopDeps);
+      session = sessions.find(s => String(s.sessionId) === String(sessionId)) || null;
+    } catch (error) {
+      console.error('Session page lookup error:', error);
+      return res.status(500).send('Could not load the session');
+    }
+
+    if (!session) {
+      const notFound = renderPage({
+        title: 'Session not found',
+        content: `<main class="session-page"><p>Session <code>${escapeHtml(String(sessionId))}</code> was not found in this workspace.</p><p><a href="/workspace/${encodeURIComponent(workspace.urlKey)}/observation">← back to feed</a></p></main>`
+      });
+      return res.status(404).send(notFound);
+    }
+
+    const briefRecap = await joinBriefRecap(session, workspace.urlKey);
+
+    // Placeholder shell (beat 1). Beat 2 swaps this for renderSessionPage(...).
+    const html = renderPage({
+      title: `Session ${escapeHtml(String(sessionId))}`,
+      content: `<main class="session-page" data-testid="session-page">`
+        + `<p><a href="/workspace/${encodeURIComponent(workspace.urlKey)}/observation">← back to feed</a></p>`
+        + `<h1 data-testid="session-heading">Session ${escapeHtml(String(sessionId))}</h1>`
+        + `<p data-testid="session-placeholder">Session loaded: ${(session.loops || []).length} run(s), `
+        + `${briefRecap.length} issue(s) with cached brief/recap. Full rendering follows.</p>`
+        + `</main>`
+    });
+    res.send(html);
   });
 
   // ─── Sessions feed (observation poll source; LIN-595) ─────────────────────────
