@@ -356,12 +356,16 @@ function diffSessionList(listId, emptyId, cardMap, sessions) {
     fillSessionHead(el, s);
     wireSummaryGen(el, s);
     applySessionState(el, s);
-    // Q5 (LIN-783): freeze an expanded (being-read) card's list position. Every
-    // poll otherwise re-appends cards in server order, so a card could jump mid-
-    // read as its activity ranking changes. An already-placed expanded card keeps
-    // its slot; genuinely new cards (and every collapsed card) still order/animate
-    // normally, so `cell-new` and the removal loop above are untouched.
-    const frozen = !isNew && expandedSessions.has(s.sessionId) && el.parentNode === list;
+    // Q5 (LIN-783): freeze list position while a card is being read. Every poll
+    // otherwise re-appends cards, so a card could jump mid-read as its activity
+    // ranking changes. LIN-964: freeze the WHOLE list — not just the expanded
+    // card — while any card is expanded. Skipping only the expanded card actually
+    // *caused* the reorder: re-appending every other card around it floated the
+    // expanded card to the top on the next poll. Freezing every already-placed
+    // card while `expandedSessions.size > 0` holds the visible order stable;
+    // genuinely new cards still append (and animate) at the end, and the removal
+    // loop above still runs, so a card that ends can still leave.
+    const frozen = !isNew && expandedSessions.size > 0 && el.parentNode === list;
     if (!frozen) list.appendChild(el);
     if (isNew && !knownSessions.has(s.sessionId) && !REDUCED_MOTION) {
       el.classList.add('cell-new');
@@ -1107,5 +1111,11 @@ document.addEventListener('DOMContentLoaded', init);
 // pure presentation helpers so the §6.3/§6.4 fidelity rules can be unit-tested
 // without a DOM. Not part of the page's runtime contract.
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { renderActivityLog, renderArtifacts, classifyArtifact, renderObjective };
+  module.exports = {
+    renderActivityLog, renderArtifacts, classifyArtifact, renderObjective,
+    // LIN-964: expose the card-list ordering seam so the expand-then-poll
+    // stable-order regression can drive the real `diffSessionList` (with the
+    // heavy per-card DOM helpers stubbed) instead of re-porting the logic.
+    diffSessionList, expandedSessions,
+  };
 }
