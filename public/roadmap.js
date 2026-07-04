@@ -476,6 +476,20 @@
       runPipeline(textarea.value, btn);
     });
 
+    // Per-model pricing hint (LIN-993): reflect the selected model's rate under
+    // the selector. Rate rides as data-pricing on each option (never option text);
+    // 'Workspace default' has none, so the hint clears.
+    var modelSelect = document.getElementById('roadmap-model-select');
+    var priceHint = document.getElementById('roadmap-model-price');
+    if (modelSelect && priceHint) {
+      var updatePrice = function() {
+        var opt = modelSelect.options[modelSelect.selectedIndex];
+        priceHint.textContent = (opt && opt.getAttribute('data-pricing')) || '';
+      };
+      modelSelect.addEventListener('change', updatePrice);
+      updatePrice();
+    }
+
     // Load saved report history (LIN-302); show the latest reading on load so
     // a reload no longer loses it.
     loadHistory().then(function(summaries) {
