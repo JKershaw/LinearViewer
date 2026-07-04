@@ -87,6 +87,13 @@
   --z-overlay: 1000;
   --z-modal: 2000;
 
+  /* Sticky shared-header clearance (LIN-984). The reserved height used as the
+     `scroll-margin-top` for interactive controls so scroll-into-view settles
+     them below the pinned `.nav-bar`, and as the offset for page-level fixed
+     controls that must clear the header (e.g. the ship mode toggle). Sized for
+     the tallest wrap of the two-row nav (filters/actions + the views row). */
+  --nav-sticky-h: 6rem;
+
   /* Font-size scale */
   --font-size-sm: 0.85em;
   --font-size-base: 1em;
@@ -360,13 +367,42 @@ h1 {
   gap: var(--space-2) 2ch;
   /* Header nav carrying the view switcher (LIN-978). It leads every workspace
      page, so cross-view navigation is reachable from the top without scrolling
-     to the footer (the audit's Finding 1). Deliberately NOT `position: sticky`:
-     a sticky header that overlays scrolled content intercepts pointer events on
-     controls scrolled beneath it (it broke the ship-orientation mode toggle),
-     so the shared nav stays in normal flow. Re-introducing the obs-appbar's
-     sticky/translucent feel globally needs per-interaction scroll-margin work
-     and is deferred. */
+     to the footer (the audit's Finding 1). Pinned/translucent while scrolling
+     (LIN-984 — the deferred aesthetic follow-up that restores the retired
+     obs-appbar treatment onto the shared header): sticky at the top, a
+     translucent page-bg wash with a backdrop blur, and a hairline underline.
+     The interception hazard that backed this out originally — a pinned header
+     overlays content and swallows pointer events on controls that scroll up
+     beneath it (it broke the ship-orientation mode toggle) — is solved with
+     PER-INTERACTION `scroll-margin-top` on interactive controls (see the
+     `--nav-sticky-h` rule below), NOT `scroll-padding-top` on the container.
+     A sticky element still occupies normal flow, so the layout fallback (the
+     header simply sitting at the top on pages that don't scroll) is intact. */
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
   padding: var(--space-2) 0;
+  /* Solid --bg fallback first, then the translucent wash for browsers with
+     color-mix support; the backdrop blur keeps scrolled content legible under
+     the wash. */
+  background: var(--bg);
+  background: color-mix(in srgb, var(--bg) 86%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+/* Per-interaction clearance for the pinned header (LIN-984). When a control is
+   scrolled into view (a Playwright click's auto-scroll, an in-page anchor jump,
+   a focus-driven scroll), the browser stops it flush at the viewport top —
+   directly under the sticky `.nav-bar`, which then intercepts its pointer
+   events. `scroll-margin-top` reserves the header's height per element so the
+   scroll settles the control BELOW the header, keeping it clickable. This is
+   deliberately on the elements (per-interaction) rather than `scroll-padding-top`
+   on the scroll container, which the retired attempt proved does not fix it.
+   `:where()` keeps specificity at 0 so any page-specific override still wins. */
+:where(a, button, input, select, textarea, summary, label, [role="button"], [tabindex]) {
+  scroll-margin-top: var(--nav-sticky-h);
 }
 
 /* Header-level view switcher (LIN-978). Its own full-width row inside the nav

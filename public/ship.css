@@ -7,6 +7,23 @@ body:has(.ship-page) {
   overflow: hidden; /* the .ship-page itself owns scrolling */
 }
 
+/* The shared header is pinned/translucent globally (LIN-984), but the ship page
+   is a fixed-viewport canvas: `body` has `overflow: hidden` and `.ship-page`
+   owns its own scroll, so NOTHING scrolls under the header here. Pinning it buys
+   nothing and only reintroduces the original hazard — the sticky header's
+   stacking context swallows pointer events on the page's `position: fixed`
+   near-top controls (the ship mode toggle), which `scroll-margin` can't rescue
+   because they never scroll. So the header keeps the normal-flow fallback on
+   ship: static, opaque, no blur → no stacking context, exactly as it behaved
+   before LIN-984. The fixed controls (mode toggle at top:68px) stay clickable
+   and clear of the empty-space drag/pan zone. */
+body:has(.ship-page) .nav-bar {
+  position: static;
+  background: var(--bg);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
 .ship-page {
   position: relative;
   overflow: auto;
@@ -458,4 +475,5 @@ body:has(.ship-page) {
     max-width: 130px;
     font-size: 10px;
   }
+
 }

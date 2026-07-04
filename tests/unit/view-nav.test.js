@@ -136,13 +136,23 @@ test('style.css lays the switcher out as a single non-wrapping scrolling row', (
   assert.match(block, /white-space:\s*nowrap/);
 });
 
-test('the shared nav is NOT position:sticky (avoids intercepting clicks under it)', () => {
-  // A sticky header overlays scrolled content and steals pointer events from
-  // controls beneath it (it broke ship-orientation), so the shared nav stays in
-  // normal flow. The switcher is reachable at the top without scrolling instead.
+test('the shared nav is pinned (sticky/translucent) with the interception fix (LIN-984)', () => {
+  // LIN-984 restored the retired obs-appbar treatment onto the shared header:
+  // the nav pins to the top with a translucent wash. The pointer-interception
+  // hazard that backed this out (a pinned header swallows clicks on controls
+  // scrolled beneath it — it broke ship-orientation) is solved with
+  // PER-INTERACTION `scroll-margin-top` on interactive controls, NOT
+  // `scroll-padding-top` on the scroll container (which the retired attempt
+  // proved does not fix it).
   const css = readFileSync(STYLE_CSS, 'utf8');
   const block = css.slice(css.indexOf('.nav-bar {'), css.indexOf('/* Header-level view switcher'));
-  // A real declaration ends with a semicolon; the explanatory comment mentions
-  // the words `position: sticky` (in backticks, no semicolon) and must not trip.
-  assert.doesNotMatch(block, /position:\s*sticky;/);
+  assert.match(block, /position:\s*sticky;/);
+  assert.match(block, /top:\s*0;/);
+  // Translucent wash + blur — the restored obs-appbar feel.
+  assert.match(block, /color-mix\(in srgb, var\(--bg\)/);
+  assert.match(block, /backdrop-filter:\s*blur/);
+  // The interception fix rides on scroll-margin, keyed off the header clearance,
+  // and explicitly NOT scroll-padding.
+  assert.match(block, /scroll-margin-top:\s*var\(--nav-sticky-h\)/);
+  assert.doesNotMatch(block, /scroll-padding-top:/);
 });
