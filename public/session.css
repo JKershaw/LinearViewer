@@ -216,6 +216,42 @@
   color: var(--muted);
 }
 
+/* Structured recap (LIN-1023): the recap cache stores an object, not a string,
+   so it renders as grouped lists rather than a single <pre>. */
+.sess-ctx-recap { display: grid; gap: 0.6rem; }
+.sess-recap-group-head {
+  font-family: var(--font-content);
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--text);
+  margin-bottom: 0.25rem;
+}
+.sess-recap-icon { color: var(--muted); }
+.sess-recap-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; }
+.sess-recap-item { display: grid; gap: 0.1rem; }
+.sess-recap-what {
+  font-family: var(--font-content);
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--text);
+}
+.sess-recap-tag {
+  font-family: var(--font-structural);
+  font-size: 0.7rem;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm, 4px);
+  padding: 0 0.3rem;
+  margin-left: 0.25rem;
+}
+.sess-recap-sub {
+  font-family: var(--font-structural);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--muted);
+  word-break: break-word;
+}
+
 .sess-notfound { font-family: var(--font-content); color: var(--muted); }
 
 /* ── Human follow-up reply box (LIN-1004, Phase 2) ────────────────────────────

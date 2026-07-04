@@ -153,14 +153,22 @@ describe('render-session: telemetry + model omission', () => {
 });
 
 describe('render-session: brief/recap context branches', () => {
-  test('present brief + recap render their cached bodies', () => {
+  // The recap cache stores a STRUCTURED OBJECT (lib/recap.js), not a Markdown
+  // string like the brief — so the fixture mirrors the real shape.
+  const RECAP_OBJECT = {
+    done: [{ item: 'Wired the auth callback', evidence: 'commit abc123' }],
+    pending: [{ item: 'Add rate limiting', predicted: 'guard the token route' }],
+    deviations: [{ item: 'Token TTL shortened', type: 'scope-change', evidence: 'per review comment' }]
+  };
+
+  test('present brief (string) + recap (object) render their cached bodies', () => {
     const issueContext = [{
       issueIdentifier: 'LIN-900',
       issueId: 'uuid-900',
       brief: 'The current brief body.',
       briefModel: 'openai/gpt-5.4-mini',
       briefGeneratedAt: '2026-07-04T09:00:00.000Z',
-      recap: 'The recap body.',
+      recap: RECAP_OBJECT,
       recapModel: 'openai/gpt-5.4-mini',
       recapGeneratedAt: '2026-07-04T09:01:00.000Z'
     }];
@@ -168,9 +176,42 @@ describe('render-session: brief/recap context branches', () => {
     assert.match(html, /data-testid="session-brief"/);
     assert.match(html, /The current brief body\./);
     assert.match(html, /data-testid="session-recap"/);
-    assert.match(html, /The recap body\./);
+    // The structured recap renders its grouped content, NOT [object Object].
+    assert.match(html, /data-testid="session-recap-body"/);
+    assert.match(html, /Wired the auth callback/);
+    assert.match(html, /Add rate limiting/);
+    assert.match(html, /Token TTL shortened/);
+    assert.match(html, /scope-change/);
     // A present panel does NOT render the miss affordance.
     assert.ok(!html.includes('data-testid="session-brief-generate"'), 'no generate affordance when brief is cached');
+  });
+
+  test('LIN-1023 regression: a structured recap object never renders as [object Object]', () => {
+    const issueContext = [{
+      issueIdentifier: 'LIN-900',
+      issueId: 'uuid-900',
+      brief: null,
+      recap: RECAP_OBJECT,
+      recapModel: 'openai/gpt-5.4-mini',
+      recapGeneratedAt: '2026-07-04T09:01:00.000Z'
+    }];
+    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext });
+    assert.ok(!/\[object Object\]/i.test(html), 'the recap object must not be stringified into the page');
+    // Present panel, not the generate affordance, since the recap IS cached.
+    assert.ok(!html.includes('data-testid="session-recap-generate"'), 'a cached recap is present, not a miss');
+  });
+
+  test('an all-empty recap object is labelled, not silently blank or a [object Object]', () => {
+    const issueContext = [{
+      issueIdentifier: 'LIN-900',
+      issueId: 'uuid-900',
+      brief: null,
+      recap: { done: [], pending: [], deviations: [] },
+      recapGeneratedAt: '2026-07-04T09:01:00.000Z'
+    }];
+    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext });
+    assert.match(html, /data-testid="session-recap-empty"/);
+    assert.ok(!/\[object Object\]/i.test(html), 'no stringified object even when empty');
   });
 
   test('a cache miss renders an explicit generate affordance (never auto-spend)', () => {
