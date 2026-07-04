@@ -187,6 +187,59 @@ describe('render-session: brief/recap context branches', () => {
   });
 });
 
+describe('render-session: human reply box (LIN-1004)', () => {
+  test('renders the reply box + loads the scoped script when canReply', () => {
+    const html = renderSessionPage(
+      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true, replyTarget: 'cli', sessionTerminal: false },
+      {}
+    );
+    assert.match(html, /data-testid="session-reply"/);
+    assert.match(html, /data-testid="session-reply-input"/);
+    assert.match(html, /data-testid="session-reply-send"/);
+    // followUpTo target is the session's own id; target threads through as a data-attr.
+    assert.match(html, /data-testid="session-reply"[^>]*data-session-id="sess-abc"/);
+    assert.match(html, /data-testid="session-reply"[^>]*data-target="cli"/);
+    // The one scoped client script loads only when the box is present.
+    assert.match(html, /<script src="\/session\.js"><\/script>/);
+  });
+
+  test('NO reply box and NO script when canReply is false (dash/local session)', () => {
+    const html = renderSessionPage(
+      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: false },
+      {}
+    );
+    assert.ok(!html.includes('data-testid="session-reply"'), 'no reply box when canReply is false');
+    assert.ok(!html.includes('/session.js'), 'no scoped script when the box is absent');
+  });
+
+  test('a terminal session sends force (data-session-terminal="true") with an honest resume note', () => {
+    const html = renderSessionPage(
+      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true, replyTarget: 'cli', sessionTerminal: true },
+      {}
+    );
+    assert.match(html, /data-testid="session-reply"[^>]*data-session-terminal="true"/);
+    // The note surfaces the possible failed-resume honestly.
+    assert.match(html, /data-testid="session-reply-note"[^>]*>[^<]*no live session to resume/);
+  });
+
+  test('a waiting/non-terminal session omits force (data-session-terminal="false")', () => {
+    const html = renderSessionPage(
+      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true, replyTarget: 'cli', sessionTerminal: false, waiting: true, waitingMessage: 'pick one' },
+      {}
+    );
+    assert.match(html, /data-testid="session-reply"[^>]*data-session-terminal="false"/);
+    assert.match(html, /data-testid="session-reply-note"[^>]*>[^<]*queued into this session/);
+  });
+
+  test('a web-target session threads data-target="web"', () => {
+    const html = renderSessionPage(
+      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true, replyTarget: 'web', sessionTerminal: false },
+      {}
+    );
+    assert.match(html, /data-testid="session-reply"[^>]*data-target="web"/);
+  });
+});
+
 describe('render-session: not-found body', () => {
   test('a null session renders a 404 body, not a crash', () => {
     const html = renderSessionPage({ session: null, sessionId: 'nope', urlKey: 'ws-a' });
