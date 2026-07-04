@@ -129,6 +129,14 @@
   color: var(--fg-dim);
 }
 
+/* Per-model pricing hint (LIN-993): machine facts → structural (mono) font,
+   mirroring .model-id. Point-in-time rates from AVAILABLE_MODELS.pricing. */
+.model-price {
+  font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
+  color: var(--fg-dim);
+}
+
 /* In-content section description (the "Workspace features" note). The page
    header's subtitle moved to the canonical `.page-header__subtitle` (LIN-462);
    this rule survives only for that one in-section paragraph. */

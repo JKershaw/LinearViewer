@@ -6,6 +6,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { renderSettingsPage } from '../../lib/render-settings.js';
+import { AVAILABLE_MODELS } from '../../lib/openrouter.js';
 
 const BASE = { urlKey: 'acme', workspaces: [], currentModel: 'openai/gpt-5.4-mini', availableModels: [] };
 
@@ -53,6 +54,32 @@ describe('renderSettingsPage — AI usage section', () => {
 
   test('does not throw when llmStats is omitted', () => {
     assert.doesNotThrow(() => renderSettingsPage('Acme', BASE));
+  });
+});
+
+describe('renderSettingsPage — model pricing hint (LIN-993)', () => {
+  test('renders a pricing hint line for the current model, not inside option text', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      currentModel: 'openai/gpt-5.4-mini',
+      availableModels: AVAILABLE_MODELS
+    });
+    // Hint host present, showing the selected model's rate.
+    assert.match(html, /pricing:/);
+    assert.match(html, /\$0\.75 in \/ \$4\.50 out per 1M tokens/);
+    // Pricing rides as a data-attribute, never as visible <option> text.
+    assert.match(html, /<option value="openai\/gpt-5\.4-mini"[^>]*data-pricing="[^"]+"[^>]*>GPT-5\.4 Mini<\/option>/);
+    assert.doesNotMatch(html, /<option[^>]*>[^<]*per 1M tokens[^<]*<\/option>/);
+  });
+
+  test('degrades to a placeholder when the current model is a custom/unknown id', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      currentModel: 'some-provider/unknown-model',
+      availableModels: AVAILABLE_MODELS
+    });
+    assert.match(html, /pricing:/);
+    assert.match(html, /unknown \/ custom model/);
   });
 });
 

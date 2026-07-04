@@ -55,6 +55,19 @@ test.describe('Settings Page', () => {
 
     await expect(settings(page).toggle('dispatch')).toContainText('● on')
   })
+
+  test('model pricing hint updates with the selected model (LIN-993)', async ({ page }) => {
+    const price = page.locator('[data-model-price]')
+    const select = page.locator('.model-select')
+    await expect(price).toBeVisible()
+    // Default model → its rate. Pricing lives in the hint, never in option text.
+    await expect(price).toContainText('per 1M tokens')
+    await expect(select.locator('option', { hasText: 'per 1M tokens' })).toHaveCount(0)
+
+    // Switching the selector updates the hint from the option's data-pricing.
+    await select.selectOption('openai/gpt-5.5-pro')
+    await expect(price).toContainText('$30.00 in / $180.00 out per 1M tokens')
+  })
 })
 
 test.describe('Token Management', () => {

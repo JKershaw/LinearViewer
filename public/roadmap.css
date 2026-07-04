@@ -445,6 +445,16 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
   cursor: pointer;
 }
 
+/* Per-model pricing hint (LIN-993): machine facts → structural (mono) font. */
+.roadmap-model-price {
+  font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
+  color: var(--muted);
+}
+.roadmap-model-price:empty {
+  display: none;
+}
+
 .roadmap-generate-reading-btn {
   font-family: var(--font-structural);
   font-size: var(--font-size-sm);

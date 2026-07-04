@@ -19,6 +19,9 @@ import {
   setLlmCallRecorder,
   setPromptTraceRecorder,
   getModelDisplayName,
+  formatModelPricing,
+  getModelPricingHint,
+  AVAILABLE_MODELS,
   getPaidEnvKey,
   hasPaidEnvKey,
   isRecommendationEnabled,
@@ -254,6 +257,36 @@ describe('getModelDisplayName', () => {
     assert.strictEqual(getModelDisplayName(''), getModelDisplayName(DEFAULT_MODEL));
     assert.strictEqual(getModelDisplayName(null), getModelDisplayName(DEFAULT_MODEL));
     assert.strictEqual(getModelDisplayName(undefined), getModelDisplayName(DEFAULT_MODEL));
+  });
+});
+
+describe('formatModelPricing / getModelPricingHint (LIN-993)', () => {
+  test('formats a model rate card as a compact in/out hint', () => {
+    assert.strictEqual(
+      formatModelPricing({ pricing: { prompt: 0.75, completion: 4.5 } }),
+      '$0.75 in / $4.50 out per 1M tokens'
+    );
+  });
+
+  test('returns null when pricing is missing or malformed', () => {
+    assert.strictEqual(formatModelPricing(null), null);
+    assert.strictEqual(formatModelPricing({}), null);
+    assert.strictEqual(formatModelPricing({ pricing: { prompt: 1 } }), null);
+    assert.strictEqual(formatModelPricing({ pricing: { prompt: 'x', completion: 'y' } }), null);
+  });
+
+  test('getModelPricingHint resolves a curated id, null for unknown', () => {
+    assert.strictEqual(getModelPricingHint('openai/gpt-5.4-mini'), '$0.75 in / $4.50 out per 1M tokens');
+    assert.strictEqual(getModelPricingHint('some-provider/unknown-model'), null);
+  });
+
+  test('every curated model carries a well-formed pricing rate', () => {
+    for (const m of AVAILABLE_MODELS) {
+      assert.ok(m.pricing, `model ${m.id} must carry a pricing rate`);
+      assert.strictEqual(typeof m.pricing.prompt, 'number', `${m.id} prompt rate is a number`);
+      assert.strictEqual(typeof m.pricing.completion, 'number', `${m.id} completion rate is a number`);
+      assert.ok(m.pricing.prompt >= 0 && m.pricing.completion >= 0, `${m.id} rates are non-negative`);
+    }
   });
 });
 
