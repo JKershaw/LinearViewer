@@ -990,3 +990,59 @@ describe('Stepper Autopilot sibling button (LIN-836)', () => {
     assert.ok(!html.includes('data-variant="stepper"'), 'no stepper sibling without the proxy flag');
   });
 });
+
+// =============================================================================
+// Per-task Chat deep-link (LIN-1007)
+// =============================================================================
+//
+// A flag-gated navigation affordance in the expanded issue-row detail that deep
+// links to the experimental task-chat page with THIS task preselected via the
+// existing `?task=<identifier>` contract. Strictly gated on
+// `featureFlags.taskChat === true`; off/absent ⇒ nothing renders (the first-class
+// page stays byte-identical for non-flag-holders).
+describe('Per-task Chat deep-link (LIN-1007)', () => {
+  const issue = {
+    id: 'i1', identifier: 'CHT-1', title: 'A task',
+    state: { type: 'started' }, labels: { nodes: [] }
+  };
+  const render = (taskChat, urlKey = 'ws') => renderDetailsContent(issue, {
+    isLanding: false, urlKey, featureFlags: { taskChat }
+  });
+
+  test('taskChat on ⇒ chat link renders with the correct deep-link href', () => {
+    const html = render(true);
+    assert.ok(html.includes('data-testid="issue-chat-link"'), 'chat link present when flag on');
+    assert.ok(html.includes('href="/workspace/ws/task-chat?task=CHT-1"'),
+      'href deep-links to task-chat with the identifier on the ?task= param');
+  });
+
+  test('taskChat off ⇒ nothing renders', () => {
+    assert.ok(!render(false).includes('issue-chat-link'), 'no chat link when flag is false');
+  });
+
+  test('taskChat absent ⇒ nothing renders', () => {
+    const html = renderDetailsContent(issue, { isLanding: false, urlKey: 'ws', featureFlags: {} });
+    assert.ok(!html.includes('issue-chat-link'), 'no chat link when flag is absent');
+  });
+
+  test('both urlKey and identifier are URL-encoded in the href', () => {
+    const spicy = {
+      id: 'i2', identifier: 'A B/1', title: 'Spicy',
+      state: { type: 'started' }, labels: { nodes: [] }
+    };
+    const html = renderDetailsContent(spicy, {
+      isLanding: false, urlKey: 'w s/k', featureFlags: { taskChat: true }
+    });
+    assert.ok(html.includes('href="/workspace/w%20s%2Fk/task-chat?task=A%20B%2F1"'),
+      'urlKey and identifier are percent-encoded, no raw spaces or slashes');
+  });
+
+  test('link falls back to issue.id when no identifier', () => {
+    const noIdent = { id: 'raw-id', title: 'No identifier', state: { type: 'started' }, labels: { nodes: [] } };
+    const html = renderDetailsContent(noIdent, {
+      isLanding: false, urlKey: 'ws', featureFlags: { taskChat: true }
+    });
+    assert.ok(html.includes('href="/workspace/ws/task-chat?task=raw-id"'),
+      'identifier falls back to issue.id (matches the sibling sections)');
+  });
+});
