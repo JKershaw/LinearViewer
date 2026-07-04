@@ -243,6 +243,71 @@ describe('streamChatWithTools (LIN-988)', () => {
     assert.match(toolMsg.content, /\[truncated 80 chars\]/);
   });
 
+  test('short-circuits hop 1 when the model answers with no tool_calls (one LLM call)', async () => {
+    // Hop 1 returns a plain answer and declines tools. The loop must emit that
+    // answer directly and NOT make a second (tools-off) streamChat call (LIN-1009).
+    wireFetch(
+      [toolHopResponse({ toolCalls: [], content: 'Direct answer from hop 1.' })],
+      ['SHOULD-NOT-STREAM'] // a second streamed call here would leak into tokens
+    );
+
+    const executeTool = mock.fn(async () => 'unused');
+    const events = [];
+
+    await streamChatWithTools(
+      [{ role: 'user', content: 'hi' }],
+      { apiKey: 'k', tools: [{ type: 'function', function: { name: 'get_issue' } }], executeTool },
+      (type, data) => events.push({ type, data })
+    );
+
+    // Exactly ONE LLM call was made — the non-streaming hop, no streamed re-call.
+    assert.strictEqual(calls.length, 1);
+    assert.notStrictEqual(calls[0].stream, true);
+    assert.ok(calls[0].tools, 'the single call is the tool-offering hop');
+    assert.ok(!calls.some(b => b.stream === true), 'no second streamed call was made');
+
+    // The executor was never invoked (the model asked for no tools).
+    assert.strictEqual(executeTool.mock.calls.length, 0);
+    assert.ok(events.every(e => e.type !== 'tool'), 'no tool breadcrumbs emitted');
+
+    // The hop-1 answer was emitted verbatim, followed by a terminal done event.
+    const tokens = events.filter(e => e.type === 'token').map(e => e.data.token).join('');
+    assert.strictEqual(tokens, 'Direct answer from hop 1.');
+    const done = events.find(e => e.type === 'done');
+    assert.ok(done, 'emits a terminal done event');
+    assert.strictEqual(done.data.finishReason, 'stop');
+    assert.ok(done.data.usage, 'done carries the hop usage payload');
+  });
+
+  test('does NOT short-circuit a no-tool hop 1 with empty content — streams a real answer', async () => {
+    // Hop 1 declines tools but returns no usable content: fall through to the
+    // streamed final answer rather than emitting an empty blob (LIN-1009 guard).
+    wireFetch(
+      [toolHopResponse({ toolCalls: [], content: '' })],
+      ['real ', 'answer']
+    );
+
+    const executeTool = mock.fn(async () => 'unused');
+    const events = [];
+
+    await streamChatWithTools(
+      [{ role: 'user', content: 'hi' }],
+      { apiKey: 'k', tools: [{ type: 'function', function: { name: 'get_issue' } }], executeTool },
+      (type, data) => events.push({ type, data })
+    );
+
+    // The hop ran, then the tools-off streamed answer was made (two calls).
+    assert.strictEqual(calls.length, 2);
+    assert.notStrictEqual(calls[0].stream, true);
+    const finalBody = calls[calls.length - 1];
+    assert.strictEqual(finalBody.stream, true);
+    assert.strictEqual(finalBody.tools, undefined);
+
+    // The streamed answer reached the client (not the empty hop-1 content).
+    assert.strictEqual(events.filter(e => e.type === 'token').map(e => e.data.token).join(''), 'real answer');
+    assert.ok(events.some(e => e.type === 'done'));
+  });
+
   test('with no tools it degrades to a plain streamed chat (no tool hop)', async () => {
     wireFetch([], ['plain ', 'answer']);
     const events = [];

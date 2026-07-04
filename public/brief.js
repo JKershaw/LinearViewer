@@ -136,7 +136,16 @@
       } else if (data.status === 'stale') {
         applyState(container, renderStale(data), 'stale');
       } else {
-        applyState(container, renderMissing(), 'missing');
+        // Auto-generate on the first open of a missing brief, mirroring the
+        // Context section's populate-on-open behavior (LIN-998). The cheap GET
+        // above already confirmed `missing`, so this is the only branch that
+        // spends an LLM call — `fresh` renders the cache and `stale` keeps its
+        // manual ↻ refresh, so fresh content is never clobbered and we never
+        // re-spend on every reopen. `refresh()` renders generating→fresh/error
+        // and wires its own button, so return before the shared wireRefresh
+        // below to avoid double-wiring the refresh handler.
+        await refresh(container, opts.urlKey, opts.identifier);
+        return;
       }
     } catch (err) {
       applyState(container, renderError(err && err.message), 'error');

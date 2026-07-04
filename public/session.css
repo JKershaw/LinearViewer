@@ -1,0 +1,295 @@
+/* Dedicated per-session page (LIN-1003, Phase 1 of LIN-950).
+ *
+ * A server-rendered snapshot (no client JS). Styling is deliberately minimal —
+ * it reuses the shared token layer (semantic colours + the mono/sans type split)
+ * and only adds the net-new transcript / run / context surfaces. Machine facts
+ * (ids, timestamps, chips, transcript body) take the structural mono face;
+ * human structure (headings, labels) takes the content sans face. */
+
+.sess-page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 1rem 3rem;
+}
+
+.sess-back {
+  display: inline-block;
+  margin: 0.25rem 0 1rem;
+  font-family: var(--font-content);
+  color: var(--muted);
+  text-decoration: none;
+}
+.sess-back:hover { color: var(--text); }
+
+.sess-section { margin-bottom: 1.5rem; }
+.sess-muted { color: var(--muted); font-family: var(--font-content); }
+
+/* ── "Waiting on you" alert banner (LIN-1005) ─────────────────────────────────
+   Prominent, amber running-family (no new status colour). Shown at the top of a
+   session that is paused on a human; directs to the Phase 2 follow-up box. */
+.sess-waiting {
+  margin: 0 0 1.5rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--amber);
+  border-left-width: 4px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--amber) 10%, var(--card));
+}
+.sess-waiting-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-content);
+  font-weight: 600;
+  color: var(--text);
+}
+.sess-waiting-icon { color: var(--amber); }
+.sess-waiting-title { font-size: 1rem; }
+.sess-waiting-msg {
+  margin: 0.5rem 0 0;
+  font-family: var(--font-structural);
+  font-size: 0.9rem;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+.sess-waiting-cta {
+  margin: 0.5rem 0 0;
+  font-family: var(--font-content);
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+/* ── Overview ─────────────────────────────────────────────────────────────── */
+.sess-kv {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.15rem 0;
+  font-family: var(--font-structural);
+  font-size: 0.85rem;
+}
+.sess-k {
+  min-width: 8rem;
+  color: var(--muted);
+  font-family: var(--font-content);
+}
+.sess-v { color: var(--text); }
+
+.sess-tasks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+.sess-task {
+  font-family: var(--font-structural);
+  font-size: 0.8rem;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  background: var(--inset);
+}
+
+/* ── Runs ─────────────────────────────────────────────────────────────────── */
+.sess-runs { list-style: none; margin: 0; padding: 0; }
+.sess-run {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.6rem;
+  background: var(--card-h, transparent);
+}
+.sess-run-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-family: var(--font-structural);
+  font-size: 0.85rem;
+}
+.sess-run-iter { color: var(--muted); }
+.sess-run-ident { color: var(--text); font-weight: 600; }
+.sess-run-kind {
+  color: var(--muted);
+  font-family: var(--font-content);
+  font-size: 0.8rem;
+}
+.sess-run-status {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--green);
+}
+.sess-run-status--live { color: var(--amber); }
+.sess-run-title {
+  font-family: var(--font-content);
+  font-size: 0.85rem;
+  color: var(--text);
+  margin: 0.2rem 0;
+}
+.sess-run-times {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  font-family: var(--font-structural);
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.sess-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+}
+.sess-chip {
+  font-family: var(--font-structural);
+  font-size: 0.72rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--radius-sm);
+  background: var(--inset);
+  color: var(--muted);
+}
+
+/* ── Transcript ───────────────────────────────────────────────────────────── */
+.sess-tx-loop { margin-bottom: 1rem; }
+.sess-tx-loop-head {
+  font-family: var(--font-structural);
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-bottom: 0.3rem;
+}
+.sess-tx-list { list-style: none; margin: 0; padding: 0; }
+.sess-tx-entry {
+  padding: 0.3rem 0;
+  border-bottom: 1px solid var(--line-soft);
+  font-family: var(--font-structural);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  word-break: break-word;
+}
+.sess-tx-time { color: var(--faint, var(--muted)); margin-right: 0.5rem; }
+.sess-tx-msg { color: var(--text); white-space: pre-wrap; }
+.sess-tx-link { color: var(--blue); margin-left: 0.35rem; }
+
+/* ── Task context (brief / recap) ─────────────────────────────────────────── */
+.sess-ctx-issue {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+@media (min-width: 720px) {
+  .sess-ctx-issue { grid-template-columns: 1fr 1fr; }
+}
+.sess-ctx-panel {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 0.6rem 0.75rem;
+}
+.sess-ctx-panel--miss { border-style: dashed; }
+.sess-ctx-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.4rem;
+}
+.sess-ctx-kind { font-family: var(--font-content); font-weight: 600; color: var(--text); }
+.sess-ctx-ident { font-family: var(--font-structural); font-size: 0.78rem; color: var(--muted); }
+.sess-ctx-body {
+  font-family: var(--font-structural);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  color: var(--text);
+}
+.sess-ctx-meta {
+  margin-top: 0.4rem;
+  font-family: var(--font-structural);
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.sess-ctx-miss {
+  margin: 0;
+  font-family: var(--font-content);
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+/* Structured recap (LIN-1023): the recap cache stores an object, not a string,
+   so it renders as grouped lists rather than a single <pre>. */
+.sess-ctx-recap { display: grid; gap: 0.6rem; }
+.sess-recap-group-head {
+  font-family: var(--font-content);
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--text);
+  margin-bottom: 0.25rem;
+}
+.sess-recap-icon { color: var(--muted); }
+.sess-recap-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; }
+.sess-recap-item { display: grid; gap: 0.1rem; }
+.sess-recap-what {
+  font-family: var(--font-content);
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--text);
+}
+.sess-recap-tag {
+  font-family: var(--font-structural);
+  font-size: 0.7rem;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm, 4px);
+  padding: 0 0.3rem;
+  margin-left: 0.25rem;
+}
+.sess-recap-sub {
+  font-family: var(--font-structural);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--muted);
+  word-break: break-word;
+}
+
+.sess-notfound { font-family: var(--font-content); color: var(--muted); }
+
+/* ── Human follow-up reply box (LIN-1004, Phase 2) ────────────────────────────
+   The page's one interactive surface (rest is a LIN-1003 no-JS snapshot). A
+   textarea→POST that injects a plain human follow-up back into the session. */
+.sess-reply-input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 4.5rem;
+  resize: vertical;
+  padding: 0.5rem 0.6rem;
+  font-family: var(--font-structural);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.sess-reply-input:focus {
+  outline: none;
+  border-color: var(--brand);
+}
+.sess-reply-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+.sess-reply-feedback {
+  font-family: var(--font-structural);
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.sess-reply-feedback.error { color: var(--red); }
+.sess-reply-note {
+  margin: 0.5rem 0 0;
+  font-family: var(--font-content);
+  font-size: 0.8rem;
+  color: var(--muted);
+}

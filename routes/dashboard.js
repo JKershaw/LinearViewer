@@ -30,9 +30,10 @@
 
 import { Router } from 'express';
 import { renderObservationPage } from '../lib/render-observation.js';
-import { getLoopsForWorkspace, getSessionsForWorkspace, deriveIssueGraph } from '../lib/pipeline-loops.js';
+import { renderSessionPage } from '../lib/render-session.js';
+import { getLoopsForWorkspace, getLoopsForIssue, getSessionsForWorkspace, getSessionsForIssues, deriveIssueGraph } from '../lib/pipeline-loops.js';
 import { buildSessionContextGraph } from '../lib/context-graph.js';
-import { deriveTerminalStatus, deriveCompletedAt } from '../lib/dispatch-terminal.js';
+import { deriveTerminalStatus, deriveCompletedAt, findWakeEvent } from '../lib/dispatch-terminal.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
 import { createSessionsFeedCache } from '../lib/sessions-feed-cache.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
@@ -169,11 +170,15 @@ export function sessionIsTerminal(session) {
  * The observation session status string — the single contract consumed by the
  * client's icon/label maps and CSS (`public/observation.js` / `observation.css`).
  *
- * Five values: `stale`, `in-progress`, `error`, `done`, and `done-with-warning`
- * (LIN-749). `done-with-warning` is the done/error split's 5th outcome: a
- * terminal session that had at least one errored run but whose touched task is
- * now Done — the autopilot finished the task despite the errors (the LIN-744
- * case: two runs failed to launch iTerm, the third completed the work).
+ * Six values: `stale`, `in-progress`, `waiting`, `error`, `done`, and
+ * `done-with-warning`. `waiting` (LIN-1005) is the session-level "this session
+ * needs you" rollup — a non-terminal session paused on a human (an agent-status
+ * `blocked` run and/or a latest `[blocked]`/`[pending]` feedback marker). It is
+ * deliberately NON-terminal: `[blocked]` stays a pause/wait signal, never a
+ * terminal state, so a genuinely finished session is never shown as waiting.
+ * `done-with-warning` (LIN-749) is the done/error split's 5th outcome: a terminal
+ * session that had at least one errored run but whose touched task is now Done —
+ * the autopilot finished the task despite the errors (the LIN-744 case).
  *
  * `taskDone` is the ONLY task-state input. It is NOT proof the task flipped
  * *during* this run (no start-state baseline is recorded; that precise per-run
@@ -182,18 +187,73 @@ export function sessionIsTerminal(session) {
  * at the terminal boundary, never from the per-poll feed, which honours an
  * explicit no-Linear cost contract and always passes `taskDone=false`. `stale`
  * only ever holds for non-terminal sessions, so its branch is checked first to
- * keep the four pre-existing outcomes byte-identical.
+ * keep the pre-existing outcomes byte-identical; `waiting` is a non-terminal
+ * refinement checked AFTER terminal outcomes (a session that actually finished
+ * wins over any lingering wait signal) and defaults false so existing call sites
+ * that omit it stay byte-identical.
  *
  * Pure; exported for unit tests.
  *
- * @param {{terminal: boolean, stale: boolean, hasError: boolean, taskDone?: boolean}} input
- * @returns {'stale'|'in-progress'|'error'|'done'|'done-with-warning'}
+ * @param {{terminal: boolean, stale: boolean, hasError: boolean, waiting?: boolean, taskDone?: boolean}} input
+ * @returns {'stale'|'in-progress'|'waiting'|'error'|'done'|'done-with-warning'}
  */
-export function deriveSessionStatus({ terminal, stale, hasError, taskDone = false }) {
+export function deriveSessionStatus({ terminal, stale, hasError, waiting = false, taskDone = false }) {
   if (stale) return 'stale';
-  if (!terminal) return 'in-progress';
-  if (hasError) return taskDone ? 'done-with-warning' : 'error';
-  return 'done';
+  if (terminal) return hasError ? (taskDone ? 'done-with-warning' : 'error') : 'done';
+  if (waiting) return 'waiting';
+  return 'in-progress';
+}
+
+// The wake markers that roll up to a session-level "waiting on user" state
+// (LIN-1005). Mirrors WAITING_WAKE_MARKERS in pipeline-loops.js — a run whose
+// pre-derived `wakeMarker` is one of these is paused on a human, not finished.
+const WAITING_WAKE_MARKERS = new Set(['blocked', 'pending']);
+
+/**
+ * Is a single ENRICHED loop (effectiveAgentState applied) waiting on a human?
+ *
+ * Two independent runner channels, unioned (LIN-1005 — neither subsumes the
+ * other): (a) an agent-status `blocked` entry surfaces as `agentState==='waiting'`
+ * (lib/pipeline-loops.js `_deriveAgentState`), and (b) a `[blocked]`/`[pending]`
+ * *feedback* marker, pre-derived at build time as `wakeMarker` so this read is
+ * lean-safe (never touches raw `feedback[]`, which the feed drops). Terminal wins:
+ * a run that actually finished (a terminal feedback marker folded in by
+ * `effectiveAgentState`, or a native complete/error) is never waiting.
+ *
+ * @param {Object} loop - enriched loop (post-`enrichLoop`)
+ * @returns {boolean}
+ */
+function loopIsWaiting(loop) {
+  if (!loop || isTerminalLoop(loop)) return false;
+  if (loop.agentState === 'waiting') return true;
+  // Prefer the build-time `wakeMarker` (present on every reconstructed loop, lean
+  // or not); fall back to scanning raw feedback for loops built elsewhere.
+  const marker = loop.wakeMarker !== undefined
+    ? loop.wakeMarker
+    : (findWakeEvent(loop.feedback)?.marker || null);
+  return marker != null && WAITING_WAKE_MARKERS.has(marker);
+}
+
+/**
+ * Roll a session's ENRICHED loops up to a session-level waiting signal (LIN-1005):
+ * `{ waiting, message }`. `waiting` is true when any loop is waiting on a human;
+ * `message` is the first available blocked/pending text (falling back to the
+ * waiting run's agent summary) so the UI can show the actual message rather than a
+ * manufactured taxonomy. Pure; the single truth shared by the feed payload and the
+ * session-page banner so they can never disagree.
+ *
+ * @param {Array<Object>} enrichedLoops - loops already run through `enrichLoop`
+ * @returns {{waiting: boolean, message: string|null}}
+ */
+function deriveSessionWaiting(enrichedLoops) {
+  let waiting = false;
+  let message = null;
+  for (const l of enrichedLoops) {
+    if (!loopIsWaiting(l)) continue;
+    waiting = true;
+    if (!message) message = l.waitingMessage || l.agentSummary || null;
+  }
+  return { waiting, message };
 }
 
 /**
@@ -297,6 +357,13 @@ export function createDashboardRoutes({
   observationMaterializer = null,
   runSummaryCacheStore,
   sessionSummaryCacheStore,
+  // Brief/recap caches are per-issue (keyed by issue UUID); the per-session page
+  // (LIN-1003) joins them onto a session by distinct loop.issueId. They are NOT
+  // otherwise reachable in this router — the observation feed never reads issue
+  // context — so they are injected here explicitly (default null → the join is
+  // simply skipped, e.g. in tests that don't wire them).
+  briefCacheStore = null,
+  recapCacheStore = null,
   freeTierStore,
   getWorkspaceAccessToken,
   fetchIssueContext,
@@ -381,15 +448,27 @@ export function createDashboardRoutes({
     // mutation — so a later heartbeat advances lastActivity and un-stales it.
     const stale = !terminal && lastActivityMs > 0 && (Date.now() - lastActivityMs) > STALE_AFTER_MS;
 
+    // Session-level "waiting on user" rollup (LIN-1005): unions any agent-status
+    // `blocked` run and any latest `[blocked]`/`[pending]` feedback marker across
+    // the session's loops, from the lean-safe pre-derived per-loop facts. Terminal
+    // precedence is gated HERE on the emitted flag (not only in `deriveSessionStatus`):
+    // the session anchor can post `[done]` while a worker loop lingers `[blocked]`, so
+    // the raw rollup must be `&&`-gated on session terminality or the flag contradicts
+    // the `done` status ("a finished session is never waiting", LIN-1005 review).
+    const { waiting: rawWaiting, message: rawWaitingMessage } = deriveSessionWaiting(enriched);
+    const waiting = !terminal && rawWaiting;
+    const waitingMessage = waiting ? rawWaitingMessage : null;
+
     // The per-poll feed honours an explicit no-Linear cost contract, so it never
     // looks up the touched task's current state — `taskDone` stays false here.
     // The `done-with-warning` upgrade (LIN-749) is applied client-side from the
     // existing drill-down hydration seam; `deriveSessionStatus` owns the status
-    // contract (and its 5th value) in one unit-tested place for both paths.
+    // contract (and its `waiting` value) in one unit-tested place for both paths.
     const status = deriveSessionStatus({
       terminal,
       stale,
-      hasError: enriched.some(l => l.agentState === 'error')
+      hasError: enriched.some(l => l.agentState === 'error'),
+      waiting
     });
 
     // One segment per worker run for the progress bar (state-colored; the live
@@ -435,6 +514,10 @@ export function createDashboardRoutes({
       status,
       terminal,
       stale,
+      // Feed flag (LIN-1005): the client badges/filters waiting sessions and
+      // surfaces the blocked message text. Null message when nothing is waiting.
+      waiting,
+      waitingMessage: waiting ? waitingMessage : null,
       runCount: runs.length,
       runs,
       recentKind: recentRunKind(children),
@@ -522,10 +605,230 @@ export function createDashboardRoutes({
     res.send(html);
   });
 
+  // Dedicated per-session page (LIN-1003, Phase 1 of LIN-950). The Observation
+  // in-feed drill-down promoted to a server-rendered page with its own URL.
+  // Mounted under `workspaceFromUrl` so cookie-session auth + cross-workspace
+  // isolation (unknown urlKey → 404) are inherited for free.
+  //
+  // Read-only + additive. The page needs the NON-lean transcript (`feedback[]`),
+  // which the lean `observationSessionsStore.getSession` point-read drops
+  // (pipeline-loops.js: `feedback: lean ? [] : feedback`). The original build read
+  // it from the NON-lean whole-workspace `getSessionsForWorkspace(...).find(...)`,
+  // which transferred every dispatch-history row's full `feedback[]` for the whole
+  // 30-day workspace just to render ONE session — ~147s of history-read on
+  // `linearviewer`, tripping Heroku's 30s H12 (LIN-1021). `loadSessionWithTranscript`
+  // instead learns the session's issue set from tiny `{urlKey,sessionId}`-indexed
+  // projected reads and rebuilds NON-lean over ONLY those issues via
+  // `getSessionsForIssues` (LIN-623), so the read scales with one session, not the
+  // whole workspace. Brief/recap are cache-ONLY reads on load (never an LLM spend on
+  // page load); a miss renders an explicit affordance.
+  router.get('/workspace/:urlKey/observation/session/:sessionId', workspaceFromUrl, async (req, res, next) => {
+    try {
+      const workspace = req.workspace;
+      const { sessionId } = req.params;
+
+      const pageOptions = {
+        deployInfo: getDeployInfo(),
+        urlKey: workspace.urlKey,
+        openRouterSource: getOpenRouterSource(req),
+        workspaces: req.session.workspaces,
+        featureFlags: getFeatureFlags(req.session)
+      };
+
+      if (!sessionId) {
+        return res.status(404).send(renderSessionPage({ session: null, sessionId: '', urlKey: workspace.urlKey }, pageOptions));
+      }
+
+      // NON-lean, issue-scoped point-read (LIN-1021) — the transcript needs
+      // `feedback[]`, but scoped to this session's issues, not the whole workspace.
+      const session = await loadSessionWithTranscript(workspace.urlKey, sessionId);
+      if (!session) {
+        return res.status(404).send(renderSessionPage({ session: null, sessionId, urlKey: workspace.urlKey }, pageOptions));
+      }
+
+      // Brief/recap cache-join over the session's distinct non-null issue UUIDs.
+      // `.get()` is a pure Mongo lookup (no LLM, null on miss); null `issueId`
+      // loops cannot be cache-joined and are skipped best-effort (mirrors the
+      // lazy-hydration discipline). Never call the generating path on load.
+      const issueContext = await joinSessionIssueContext(session, workspace.urlKey);
+
+      // Session-level "waiting on user" banner (LIN-1005): the SAME rollup the
+      // observation feed uses, computed here over the non-lean session's enriched
+      // loops so the page and the feed agree. The banner directs the human to the
+      // Phase 2 follow-up box. Terminal-gated identically to `buildSessionPayload`
+      // (a finished session is never waiting, even with a lingering blocked worker).
+      const enrichedLoops = (Array.isArray(session.loops) ? session.loops : []).map(enrichLoop);
+      const sessionTerminal = sessionIsTerminal(session);
+      const { waiting: rawWaiting, message: rawWaitingMessage } = deriveSessionWaiting(enrichedLoops);
+      const waiting = !sessionTerminal && rawWaiting;
+      const waitingMessage = waiting ? rawWaitingMessage : null;
+
+      // Phase 2 human reply box (LIN-1004): gated to cli/web sessions (never
+      // dash/local — the dispatch route rejects followUpTo for those anyway). The
+      // reply is a plain follow-up to `session.sessionId` (the root dispatch id);
+      // its `force` is conditional on the session's OWN terminal state (research:
+      // terminal → force to bypass the busy-guard, waiting/warm → omit). Target is
+      // taken from the anchor run so a `web`-dispatched session replies via `web`.
+      const anchorLoop = findAnchorLoop(session) || (session.loops && session.loops[0]) || null;
+      const anchorTarget = (anchorLoop && anchorLoop.target) || null;
+      const canReply = anchorTarget !== 'dash' && anchorTarget !== 'local';
+      const replyTarget = anchorTarget === 'web' ? 'web' : 'cli';
+
+      const html = renderSessionPage(
+        { session, sessionId, issueContext, waiting, waitingMessage, urlKey: workspace.urlKey, canReply, replyTarget, sessionTerminal },
+        pageOptions
+      );
+      res.send(html);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Retired experimental dashboard (LIN-509) → 302 to the first-class page.
   router.get('/workspace/:urlKey/dashboard', workspaceFromUrl, (req, res) => {
     res.redirect(`/workspace/${encodeURIComponent(req.workspace.urlKey)}/observation`);
   });
+
+  /**
+   * Load ONE reconstructed session WITH its non-lean transcript (`feedback[]`)
+   * without paying for a whole-workspace reconstruction (LIN-1021).
+   *
+   * The page can't use the lean read-model point-read (it drops `feedback[]`),
+   * and the whole-workspace non-lean read transfers every dispatch-history row's
+   * feedback for 30 days (~147s on `linearviewer` → H12). Instead:
+   *
+   *   1. Derive the session's issue set cheaply. A `sessionId`-first session is,
+   *      by `_buildSessions`' grouping, exactly {the root dispatch (id===sessionId)}
+   *      ∪ {dispatches stamped `sessionId===sessionId`}. Both are `{urlKey,sessionId}`-
+   *      indexed reads, and we project to `issueIdentifier` only — a few tiny rows.
+   *   2. Rebuild NON-lean over ONLY those issues via `getSessionsForIssues` (LIN-623,
+   *      issue-scoped/index-backed), which reuses the SAME builders as the live
+   *      reconstruction, so the rebuilt session is faithful (verified: it reproduces
+   *      the whole-workspace build's loop set exactly).
+   *   3. Fall back to the full non-lean reconstruction only when the issue-scoped
+   *      rebuild can't produce the session — a historical inference-grouped session
+   *      (no explicit `sessionId` stamps) or one whose loops carry no `issueIdentifier`.
+   *      Correct-but-slow, and the same degradation the sibling session-summary/
+   *      context paths accept on a point-read miss; the common case never hits it.
+   *
+   * @param {string} urlKey
+   * @param {string} sessionId
+   * @returns {Promise<Object|null>} the non-lean session, or null if not found
+   */
+  async function loadSessionWithTranscript(urlKey, sessionId) {
+    const hit = await pointReadSession(urlKey, sessionId);
+    if (hit) return hit;
+    // Fallback: historical inference-grouped or no-issue session → full read.
+    const sessions = await getSessionsForWorkspace(urlKey, loopDeps);
+    return sessions.find(s => String(s.sessionId) === String(sessionId)) || null;
+  }
+
+  /**
+   * Issue-scoped point-read of ONE session by id — steps 1–2 of
+   * loadSessionWithTranscript, WITHOUT the whole-workspace fallback (LIN-1022).
+   *
+   * Extracted so every reconstruct-by-sessionId handler (the per-session page,
+   * session-summary, session-context) shares the one cheap path and each decides
+   * for itself whether to pay the whole-workspace read on a point-read miss. It
+   * returns the NON-lean session (feedback[] intact) built by getSessionsForIssues
+   * — byte-identical to the whole-workspace build, restricted to the issues — or
+   * null when issue-scoping can't produce the session.
+   *
+   * @param {string} urlKey
+   * @param {string} sessionId
+   * @returns {Promise<Object|null>}
+   */
+  async function pointReadSession(urlKey, sessionId) {
+    const ids = new Set();
+    // The root/orchestrator dispatch (id===sessionId) carries no self-referential
+    // `sessionId`, so the sessionId-scoped reads below won't surface it — fetch its
+    // own `issueIdentifier` (the seed) directly. Defensive: a store without
+    // getItemStatus (test fakes) just contributes nothing here.
+    const root = typeof dispatchQueueStore.getItemStatus === 'function'
+      ? await Promise.resolve(dispatchQueueStore.getItemStatus(urlKey, sessionId)).catch(() => null)
+      : null;
+    if (root?.issueIdentifier) ids.add(root.issueIdentifier);
+    const projection = { issueIdentifier: 1 };
+    const [live, hist] = await Promise.all([
+      Promise.resolve(dispatchQueueStore.listItems(urlKey, { sessionId, projection })).catch(() => []),
+      Promise.resolve(dispatchQueueStore.listHistory(urlKey, { sessionId, projection })).catch(() => ({ items: [] }))
+    ]);
+    for (const r of (Array.isArray(live) ? live : [])) if (r?.issueIdentifier) ids.add(r.issueIdentifier);
+    for (const r of (hist?.items || [])) if (r?.issueIdentifier) ids.add(r.issueIdentifier);
+
+    if (!ids.size) return null;
+    const rebuilt = await getSessionsForIssues(urlKey, loopDeps, [...ids], { lean: false });
+    return rebuilt.find(s => String(s.sessionId) === String(sessionId)) || null;
+  }
+
+  /**
+   * Point-read ONE run (Loop) by id (LIN-1022). A loopId IS the dispatch item id
+   * (`_buildLoops` sets `loopId: item.id`), so getItemStatus resolves its issue and
+   * getLoopsForIssue rebuilds that issue's runs issue-scoped/index-backed with the
+   * SAME builders getLoopsForWorkspace runs — byte-identical. Falls back to the
+   * whole-workspace read only when the loop can't be issue-scoped (no getItemStatus
+   * match, or a loopId that isn't a live/historic dispatch id).
+   *
+   * @param {string} urlKey
+   * @param {string} loopId
+   * @returns {Promise<Object|null>} the enriched loop, or null if not found
+   */
+  async function loadRunForSummary(urlKey, loopId, { allowFullScan = true } = {}) {
+    const item = typeof dispatchQueueStore.getItemStatus === 'function'
+      ? await Promise.resolve(dispatchQueueStore.getItemStatus(urlKey, loopId)).catch(() => null)
+      : null;
+    if (item?.issueIdentifier) {
+      const loops = await getLoopsForIssue(urlKey, item.issueIdentifier, loopDeps);
+      const found = loops.find(l => String(l.loopId) === String(loopId));
+      if (found) return enrichLoop(found);
+    }
+    // Whole-workspace fallback (loopId not resolvable to an issue). Skipped on a
+    // cachedOnly peek so a stale/unresolvable loopId never pays the 30-day read.
+    if (!allowFullScan) return null;
+    const loops = await getLoopsForWorkspace(urlKey, loopDeps);
+    const found = loops.find(l => String(l.loopId) === String(loopId));
+    return found ? enrichLoop(found) : null;
+  }
+
+  /**
+   * Cache-only brief/recap join for the per-session page (LIN-1003). Reduces the
+   * session's loops to distinct non-null issue UUIDs and reads each issue's
+   * cached brief + recap. Pure reads; a store miss (or an unwired store) yields
+   * a null body → the renderer shows an explicit generate affordance.
+   *
+   * @param {Object} session - non-lean reconstructed session
+   * @param {string} urlKey
+   * @returns {Promise<Array<Object>>}
+   */
+  async function joinSessionIssueContext(session, urlKey) {
+    const seen = new Set();
+    const distinct = [];
+    for (const loop of session.loops || []) {
+      const issueId = loop.issueId || null;
+      if (!issueId || seen.has(issueId)) continue; // null → skippable best-effort
+      seen.add(issueId);
+      distinct.push({ issueIdentifier: loop.issueIdentifier || null, issueId });
+    }
+
+    const out = [];
+    for (const d of distinct) {
+      const [brief, recap] = await Promise.all([
+        briefCacheStore ? briefCacheStore.get(urlKey, d.issueId).catch(() => null) : Promise.resolve(null),
+        recapCacheStore ? recapCacheStore.get(urlKey, d.issueId).catch(() => null) : Promise.resolve(null)
+      ]);
+      out.push({
+        issueIdentifier: d.issueIdentifier,
+        issueId: d.issueId,
+        brief: brief?.brief || null,
+        briefModel: brief?.model || null,
+        briefGeneratedAt: brief?.generatedAt || null,
+        recap: recap?.recap || null,
+        recapModel: recap?.model || null,
+        recapGeneratedAt: recap?.generatedAt || null
+      });
+    }
+    return out;
+  }
 
   // ─── Sessions feed (observation poll source; LIN-595) ─────────────────────────
 
@@ -623,16 +926,23 @@ export function createDashboardRoutes({
     const { loopId } = req.params;
     if (!loopId) return res.status(400).json({ error: 'loopId is required' });
 
+    const isPeek = !force && (req.query.cachedOnly === '1' || req.query.cachedOnly === 'true');
     let loop;
     try {
-      const loops = await getLoopsForWorkspace(workspace.urlKey, loopDeps);
-      const found = loops.find(l => String(l.loopId) === String(loopId));
-      loop = found ? enrichLoop(found) : null;
+      // LIN-1022: issue-scoped point-read (getItemStatus→getLoopsForIssue) instead of
+      // a non-lean whole-workspace getLoopsForWorkspace reconstruct-by-loopId. The
+      // whole-workspace fallback is skipped on a cachedOnly peek (same H12 guard as
+      // session-summary): a peek with a stale/unresolvable loopId must not pay the
+      // 30-day read.
+      loop = await loadRunForSummary(workspace.urlKey, loopId, { allowFullScan: !isPeek });
     } catch (error) {
       console.error('Dashboard run-summary lookup error:', error);
       return res.status(500).json({ error: 'Could not load the run' });
     }
-    if (!loop) return res.status(404).json({ error: 'Run not found' });
+    if (!loop) {
+      // Peek miss → cheap 204 (mirrors the cache-miss 204 below); else 404.
+      return isPeek ? res.status(204).end() : res.status(404).json({ error: 'Run not found' });
+    }
 
     // Immutability gate: only terminal runs are summarisable/cacheable.
     if (!isTerminalLoop(loop)) {
@@ -776,16 +1086,31 @@ export function createDashboardRoutes({
     const { sessionId } = req.params;
     if (!sessionId) return res.status(400).json({ error: 'sessionId is required' });
 
-    // Find one session by id. Prefer the materialized read-model point-read
-    // (LIN-632) and degrade to the full 30-day workspace reconstruction on a
-    // miss — the same fix as the session-context path, removing a second
-    // reconstruct-by-id antipattern.
+    // Find one session by id: materialized read-model point-read (LIN-632) →
+    // issue-scoped point-read (LIN-1022) → whole-workspace reconstruction.
+    //
+    // The whole-workspace read is gated behind !isPeek. The Observation page fires
+    // one session-summary?cachedOnly=1 PEEK per terminal card — including cards for
+    // stale/expired sessionIds no longer in the 30-day window (getItemStatus NULL,
+    // no scoped rows, absent from the whole-ws build). Paying the 30-day
+    // reconstruction on each such peek — merely to 404 or serve a rollup — is what
+    // fanned into the mass H12 (LIN-1022; measured 337s per whole-ws read on prod).
+    // A peek must resolve CHEAPLY or not at all: on a miss it reports "no cached
+    // summary" (204), exactly the response the client already treats as
+    // "terminal but uncached → leave the affordance". Only a non-peek request
+    // (force/POST generate, or a GET that will actually spend an LLM call) pays the
+    // whole-workspace fallback — single, deliberate, and the only path that
+    // reconstructs a genuinely inference-grouped historical session.
+    const isPeek = !force && (req.query.cachedOnly === '1' || req.query.cachedOnly === 'true');
     let session = null;
     try {
       if (observationSessionsStore) {
         session = await observationSessionsStore.getSession(workspace.urlKey, sessionId);
       }
       if (!session) {
+        session = await pointReadSession(workspace.urlKey, sessionId);
+      }
+      if (!session && !isPeek) {
         const sessions = await getSessionsForWorkspace(workspace.urlKey, loopDeps);
         session = sessions.find(s => String(s.sessionId) === String(sessionId)) || null;
       }
@@ -793,7 +1118,10 @@ export function createDashboardRoutes({
       console.error('Dashboard session-summary lookup error:', error);
       return res.status(500).json({ error: 'Could not load the session' });
     }
-    if (!session) return res.status(404).json({ error: 'Session not found' });
+    if (!session) {
+      // Peek miss → cheap 204 (mirrors the cache-miss 204 below); else 404.
+      return isPeek ? res.status(204).end() : res.status(404).json({ error: 'Session not found' });
+    }
 
     // Live session: cheap proxy statusLine only, no generation, no caching.
     if (!sessionIsTerminal(session)) {
@@ -897,6 +1225,14 @@ export function createDashboardRoutes({
       let session = null;
       if (observationSessionsStore) {
         session = await observationSessionsStore.getSession(workspace.urlKey, sessionId);
+      }
+      if (!session) {
+        // LIN-1022: try the issue-scoped point-read first (same class fix as
+        // session-summary). A stamped session is reconstructed faithfully without
+        // the issueGraph; only a historical inference-grouped session (no sessionId
+        // stamps) falls through to the issueGraph-enriched whole-workspace read,
+        // which the inference fallback genuinely needs.
+        session = await pointReadSession(workspace.urlKey, sessionId);
       }
       if (!session) {
         const issueGraph = deriveIssueGraph(issues);

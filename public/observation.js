@@ -84,7 +84,7 @@ const PROVENANCE_LABEL = { seed: 'seed', descended: 'descended', 'spun-off': 'sp
 //
 // The theme's run-status StatusPill/SegmentBar own exactly four colours
 // (running=amber, done=green, error=red, queued=slate). The live page carries
-// five session statuses and five run states, so both are mapped down here — the
+// six session statuses and five run states, so both are mapped down here — the
 // SINGLE source of truth reused by the pill, the progress bar, and the workspace
 // health dot, so a card and a chip can never disagree. No 5th colour is minted:
 // `done-with-warning` stays a `done` pill plus an additive ⚠ marker, `stale`
@@ -92,8 +92,12 @@ const PROVENANCE_LABEL = { seed: 'seed', descended: 'descended', 'spun-off': 'sp
 // the amber running-family with its own title (never colour-alone vs queued-slate).
 
 // Session status (routes/dashboard.js deriveSessionStatus) → pill variant + label.
+// `waiting` (LIN-1005) lands in the amber running-family with its OWN label — no
+// 5th colour is minted (see the reconciliation note above); the distinct "waiting
+// on you" label carries the meaning, never colour alone (queued is also slate).
 const SESSION_PILL = {
   'in-progress':       { variant: 'running', label: 'in progress' },
+  waiting:             { variant: 'running', label: 'waiting on you' },
   done:                { variant: 'done',    label: 'done' },
   'done-with-warning': { variant: 'done',    label: 'done', warn: true },
   error:               { variant: 'error',   label: 'error' },
@@ -174,6 +178,19 @@ function shortSessionId(id) {
   return s.length > 8 ? s.slice(0, 8) : s;
 }
 
+// Per-session page link (LIN-1019). The feed expands sessions in place, but the
+// human follow-up reply box (LIN-1004) lives ONLY on the dedicated session
+// route — so a "waiting on you" card was a dead end with no click-path to reply.
+// Link to the session's OWN workspace: the feed is cross-workspace merged and the
+// :sessionId route 404s a cross-workspace id. Returns '' when either key is
+// missing so the affordance drops out rather than pointing at a broken URL.
+function sessionHref(s) {
+  const ws = s && s.workspaceUrlKey;
+  const id = s && s.sessionId;
+  if (!ws || !id) return '';
+  return `/workspace/${encodeURIComponent(ws)}/observation/session/${encodeURIComponent(id)}`;
+}
+
 function formatRuntime(runtime) {
   const ms = runtime && typeof runtime.ms === 'number' ? runtime.ms : null;
   if (ms == null || ms < 0) return '';
@@ -223,6 +240,17 @@ function renderSummaryLine(s) {
   // Staleness takes precedence over the "live" status line so a day-dead session is
   // not shown as a live one (Bug 3, LIN-608).
   if (s.stale) return `<span class="obs-summary-line obs-summary-dim">○ idle — no activity for over a day</span>`;
+  // "Waiting on you" (LIN-1005) beats the generic live status line — it is the
+  // "this session needs you" signal — but sits under stale to match the server's
+  // deriveSessionStatus ordering (a day-dead session isn't shown as waiting).
+  if (s.waiting) {
+    const msg = s.waitingMessage ? ` — ${escapeHtml(String(s.waitingMessage))}` : '';
+    // The direct path out of the dead-end (LIN-1019): a reply CTA straight to the
+    // session page, where the follow-up reply box lives.
+    const href = sessionHref(s);
+    const reply = href ? ` <a class="obs-summary-reply" href="${escapeHtml(href)}">reply →</a>` : '';
+    return `<span class="obs-summary-line obs-summary-waiting">◐ waiting on you${msg}${reply}</span>`;
+  }
   if (st && st.statusLine) return `<span class="obs-summary-line obs-summary-status">${escapeHtml(st.statusLine)}</span>`;
   // Live status line served on the feed itself (no per-poll backend fetch).
   if (s.statusLine) return `<span class="obs-summary-line obs-summary-status">${escapeHtml(s.statusLine)}</span>`;
@@ -271,6 +299,7 @@ function fillSessionHead(li, s) {
       <div class="obs-session-side">
         ${statusPillHtml(pill.variant, pill.label, { warn: pill.warn })}
         <span class="obs-session-time">updated ${escapeHtml(relativeTime(s.lastActivity))}</span>
+        ${sessionHref(s) ? `<a class="obs-session-open" href="${escapeHtml(sessionHref(s))}" aria-label="Open session page">open ↗</a>` : ''}
       </div>
     </div>
     <span class="obs-session-summary">${renderSummaryLine(s)}</span>

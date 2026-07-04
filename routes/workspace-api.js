@@ -2836,6 +2836,33 @@ ${goal}`
   }
 
   /**
+   * Per-layer output-token budget for the roadmap generation pipeline (LIN-999).
+   *
+   * Every roadmap prose layer streams through `streamChat`, which sends a bare
+   * `max_tokens` with NO separate reasoning allocation (see lib/openrouter.js).
+   * The roadmap model is a reasoning model in every case: the default
+   * `openai/gpt-5.4-mini` AND the LIN-819 per-generation overrides (GPT-5.5 /
+   * GPT-5.5 Pro) all spend hidden reasoning tokens against `max_tokens` BEFORE
+   * emitting any visible prose. The old per-layer literals (digest 1200, gap
+   * 3000, technical 5000, …) budgeted for prose only, so a full reasoning block
+   * plus the layer's output overran the cap → `finish_reason: 'length'`, which
+   * the client surfaces per-layer as `[output truncated — hit token limit]`
+   * (public/roadmap.js). The smallest budgets (digest at 1200, gap at 3000)
+   * truncated first — the reported symptom.
+   *
+   * The fix is reasoning-aware, not a guessed "much higher" number: every prose
+   * layer is sized to match the floor the recommendation path already uses on
+   * this model family — its `RECOMMENDATION_MAX_TOKENS` (8000, a non-exported
+   * const in lib/openrouter.js), justified there as room for "a full reasoning
+   * block plus a complete prompt". We keep this as an independent roadmap-local
+   * value (not an import) so the two budgets don't silently move together, and
+   * deliberately NOT a change to the shared `streamChat` default, which would
+   * also move recap/brief/next-run/chat. Orientation keeps its own
+   * candidate-count scaling (`orientationMaxTokens`) and is untouched.
+   */
+  const ROADMAP_LAYER_MAX_TOKENS = 8000;
+
+  /**
    * Generate per-task orientation bearings and emit them as ONE structured
    * `orientation` SSE event over the shared generate connection (LIN-300).
    *
@@ -3022,21 +3049,21 @@ ${goal}`
     try {
       // Layer 1 — Technical (hard prerequisite; first unit already reserved).
       const tech = await runLayer({
-        layer: 'technical', layerName: 'technical narrative', maxTokens: 5000, precharged: true,
+        layer: 'technical', layerName: 'technical narrative', maxTokens: ROADMAP_LAYER_MAX_TOKENS, precharged: true,
         mockText: 'Mock technical narrative covering recent delivery.',
         buildMessages: () => buildRoadmapNarrativeMessages(roadmapModel)
       });
       if (tech.ok) {
         // Layer 2 — Product (hard prerequisite; chains from technical).
         const product = await runLayer({
-          layer: 'product', layerName: 'product perspective', maxTokens: 4000,
+          layer: 'product', layerName: 'product perspective', maxTokens: ROADMAP_LAYER_MAX_TOKENS,
           mockText: 'Mock product perspective synthesizing themes from layer 1.',
           buildMessages: () => buildRoadmapProductMessages(roadmapModel, tech.text)
         });
         if (product.ok) {
           // Layer 3a — Trajectory (chains from product; failure is non-fatal).
           const trajectory = await runLayer({
-            layer: 'trajectory', layerName: 'trajectory reading', maxTokens: 4000,
+            layer: 'trajectory', layerName: 'trajectory reading', maxTokens: ROADMAP_LAYER_MAX_TOKENS,
             mockText: 'Mock trajectory at this pace pointing toward simpler onboarding.',
             buildMessages: () => buildRoadmapTrajectoryMessages(roadmapModel, tech.text, product.text)
           });
@@ -3045,7 +3072,7 @@ ${goal}`
           let nsReading = { ok: false, text: '' };
           if (hasNorthStar) {
             nsReading = await runLayer({
-              layer: 'north-star-reading', layerName: 'north-star reading', maxTokens: 5000,
+              layer: 'north-star-reading', layerName: 'north-star reading', maxTokens: ROADMAP_LAYER_MAX_TOKENS,
               mockText: 'Mock north star reading: aligned to stated intent.',
               buildMessages: () => buildRoadmapNorthStarMessages(roadmapModel, northStar, {
                 tech: tech.text, product: product.text
@@ -3057,7 +3084,7 @@ ${goal}`
           let gap = { ok: false, text: '' };
           if (hasNorthStar && trajectory.ok && nsReading.ok) {
             gap = await runLayer({
-              layer: 'gap', layerName: 'gap analysis', maxTokens: 3000,
+              layer: 'gap', layerName: 'gap analysis', maxTokens: ROADMAP_LAYER_MAX_TOKENS,
               mockText: 'Mock gap analysis: trajectory and intent largely agree.',
               buildMessages: () => buildRoadmapGapMessages(northStar, trajectory.text, nsReading.text, roadmapModel)
             });
@@ -3065,7 +3092,7 @@ ${goal}`
 
           // Digest — synthesises everything above (generates last, renders first).
           await runLayer({
-            layer: 'digest', layerName: 'summary', maxTokens: 1200,
+            layer: 'digest', layerName: 'summary', maxTokens: ROADMAP_LAYER_MAX_TOKENS,
             mockText: 'Mock summary: recent work shipped and the work is on track; at this pace it points toward simpler onboarding. The main risk is delivery, and the open decision is for the human.',
             buildMessages: () => buildRoadmapDigestMessages({
               northStar: hasNorthStar ? northStar : '',
@@ -3182,7 +3209,10 @@ ${goal}`
 
     try {
       // LIN-1000: reserve reasoning headroom on top of the chat prose budget.
-      const { reasoning, maxTokens } = resolveReasoningBudget({ model: selectedModel, proseTokens: 3000 });
+      // LIN-999 raised the chat prose cap to ROADMAP_LAYER_MAX_TOKENS; feed that
+      // as the prose budget so the reasoning split sits on top of the new cap
+      // (the documented composition — the split reframes it as the prose budget).
+      const { reasoning, maxTokens } = resolveReasoningBudget({ model: selectedModel, proseTokens: ROADMAP_LAYER_MAX_TOKENS });
       await streamChat(
         messages,
         { apiKey: apiKeyToUse, model: selectedModel, maxTokens, reasoning,

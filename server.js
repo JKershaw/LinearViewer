@@ -39,6 +39,7 @@ import { SessionSummaryCacheStore, hashSession } from './lib/session-summary-cac
 import { generateSessionSummary, childLoops, DEFAULT_SESSION_SUMMARY_MODEL } from './lib/session-summary.js'
 import { ReportHistoryStore } from './lib/report-history-store.js'
 import { TaskSnapshotStore } from './lib/task-snapshot-store.js'
+import { SavedChatStore } from './lib/saved-chat-store.js'
 import { LlmCallLogStore } from './lib/llm-call-log.js'
 import { PromptTraceStore } from './lib/prompt-trace-store.js'
 import { getProvider, getProviderForWorkspace, getAllProviders } from './lib/providers/registry.js'
@@ -387,6 +388,15 @@ const taskSnapshotStore = new TaskSnapshotStore({
   collection: taskSnapshotCollection
 })
 
+// Saved chats (LIN-1008): durable, resumable task-chat transcripts, private per
+// {urlKey, linearUserId}. Content-bearing → session-auth only: deliberately NOT
+// passed to createProxyRoutes / createWorkspaceApiRoutes / kpi-stats below (the
+// prompt-trace privacy boundary), only into the task-chat + test route factories.
+const savedChatsCollection = db.collection('saved-chats')
+const savedChatStore = new SavedChatStore({
+  collection: savedChatsCollection
+})
+
 // LLM call log (LIN-418): per-call metadata (model, provider, tokens, cost, time).
 // Registered as the openrouter client's recorder hook so every LLM call is logged
 // without the client importing the store.
@@ -470,7 +480,7 @@ app.use(session({
 // Test Mode Setup
 // =============================================================================
 if (process.env.NODE_ENV === 'test') {
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, taskSnapshotStore, localStore, getWorkspaceAccessToken }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, taskSnapshotStore, savedChatStore, localStore, getWorkspaceAccessToken }))
 }
 
 // =============================================================================
@@ -1291,10 +1301,10 @@ app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyToke
 // Mount dashboard routes (experimental combined realtime autopilot dashboard — LIN-509).
 // Merges Mongo-only Loop reads across session.workspaces; Linear is hydrated lazily
 // (drill-down only), never fanned out per poll.
-app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, runSummaryCacheStore, sessionSummaryCacheStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo }))
+app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, runSummaryCacheStore, sessionSummaryCacheStore, briefCacheStore, recapCacheStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo }))
 
 // Mount task-chat routes (experimental "talk to a task" conversation).
-app.use(createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo }))
+app.use(createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore }))
 
 // Mount next-run routes (experimental "suggest the next autopilot run" — LIN-603).
 app.use(createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, reportHistoryStore }))

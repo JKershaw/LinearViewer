@@ -626,6 +626,104 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     }
   });
 
+  // =========================================================================
+  // Favourite Custom Prompts API (Session Auth) — LIN-1011
+  //
+  // A durable, user-curated list on top of the rolling recents window: a
+  // starred prompt survives the recents cap instead of rolling off. Mirrors the
+  // recents endpoints (session-auth, linearUserId gate, same validation) plus a
+  // DELETE (un-star) — the one path recents has no equivalent of. The cap is
+  // owned by the store (MAX_FAVORITE_PROMPTS); identity is the exact string, so
+  // a favourite and its recent counterpart stay in sync by value.
+  // =========================================================================
+
+  /**
+   * GET /workspace/:urlKey/api/dispatch/favorite-prompts
+   * Fetch favourite custom prompts for the current user and workspace.
+   */
+  router.get('/workspace/:urlKey/api/dispatch/favorite-prompts', workspaceFromUrl, async (req, res) => {
+    const linearUserId = req.session.linearUserId;
+    if (!linearUserId) {
+      return unauthorized.json(res, 'Authentication required');
+    }
+    if (!userPreferencesStore) {
+      return res.json({ prompts: [] });
+    }
+
+    try {
+      const prompts = await userPreferencesStore.getFavoritePrompts(linearUserId, req.workspace.urlKey);
+      res.json({ prompts });
+    } catch (err) {
+      console.error('Failed to fetch favorite prompts:', err.message);
+      res.json({ prompts: [] });
+    }
+  });
+
+  /**
+   * POST /workspace/:urlKey/api/dispatch/favorite-prompts
+   * Add a custom prompt to the favourites list for the current user and workspace.
+   * Validation is copied verbatim from the recents POST so a favourite and its
+   * recent counterpart accept/reject the same strings (and stay in sync by value).
+   */
+  router.post('/workspace/:urlKey/api/dispatch/favorite-prompts', workspaceFromUrl, async (req, res) => {
+    const linearUserId = req.session.linearUserId;
+    if (!linearUserId) {
+      return unauthorized.json(res, 'Authentication required');
+    }
+    if (!userPreferencesStore) {
+      return jsonError(res, 503, 'Service unavailable');
+    }
+
+    const { prompt: rawPrompt } = req.body;
+    const prompt = typeof rawPrompt === 'string' ? rawPrompt.trim() : rawPrompt;
+    if (!prompt || typeof prompt !== 'string') {
+      return badRequest.json(res, 'prompt is required and must be a string');
+    }
+    if (prompt.length > MAX_CUSTOM_PROMPT_LENGTH) {
+      return badRequest.json(res, `prompt exceeds maximum length of ${MAX_CUSTOM_PROMPT_LENGTH}`);
+    }
+    if (DANGEROUS_CHARS_REGEX.test(prompt)) {
+      return badRequest.json(res, 'prompt contains invalid characters');
+    }
+
+    try {
+      const prompts = await userPreferencesStore.addFavoritePrompt(linearUserId, req.workspace.urlKey, prompt);
+      res.json({ success: true, prompts });
+    } catch (err) {
+      console.error('Failed to save favorite prompt:', err.message);
+      jsonError(res, 500, 'Failed to save favorite prompt');
+    }
+  });
+
+  /**
+   * DELETE /workspace/:urlKey/api/dispatch/favorite-prompts
+   * Remove (un-star) a custom prompt from the favourites list. Prompt comes in
+   * the body `{ prompt }` (or `?prompt=`). Same auth gate as the add path.
+   */
+  router.delete('/workspace/:urlKey/api/dispatch/favorite-prompts', workspaceFromUrl, async (req, res) => {
+    const linearUserId = req.session.linearUserId;
+    if (!linearUserId) {
+      return unauthorized.json(res, 'Authentication required');
+    }
+    if (!userPreferencesStore) {
+      return jsonError(res, 503, 'Service unavailable');
+    }
+
+    const rawPrompt = (req.body && req.body.prompt) ?? req.query.prompt;
+    const prompt = typeof rawPrompt === 'string' ? rawPrompt.trim() : rawPrompt;
+    if (!prompt || typeof prompt !== 'string') {
+      return badRequest.json(res, 'prompt is required and must be a string');
+    }
+
+    try {
+      const prompts = await userPreferencesStore.removeFavoritePrompt(linearUserId, req.workspace.urlKey, prompt);
+      res.json({ success: true, prompts });
+    } catch (err) {
+      console.error('Failed to remove favorite prompt:', err.message);
+      jsonError(res, 500, 'Failed to remove favorite prompt');
+    }
+  });
+
   /**
    * DELETE /workspace/:urlKey/api/dispatch/:itemId
    * Remove a specific item from the queue.

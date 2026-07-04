@@ -38,9 +38,9 @@ routes/
   dispatch.js          Dispatch queue API (user + consumer endpoints)
   proxy.js             Linear API proxy (token auth, read/write endpoints, cycles, labels, task automation)
   collective.js        Collective experiment (experimental): page, multi-workspace dispatch fan-out, Yap state/say proxy (LIN-450)
-  dashboard.js         Autopilot Observation page (first-class, LIN-595): /observation page + sessionId-grouped sessions feed + merged cross-workspace Loop feed, on-demand run-/session-summary, session-context, lazy Linear hydration (LIN-509). /dashboard 302s to /observation; data endpoints keep their /api/dashboard/* paths
+  dashboard.js         Autopilot Observation page (first-class, LIN-595): /observation page + sessionId-grouped sessions feed + merged cross-workspace Loop feed, on-demand run-/session-summary, session-context, lazy Linear hydration (LIN-509). /dashboard 302s to /observation; data endpoints keep their /api/dashboard/* paths. Also the dedicated per-session page GET /observation/session/:sessionId (LIN-1003): server-rendered snapshot via the NON-lean getSessionsForWorkspace read (the lean point-read drops feedback[]) + a cache-only brief/recap join over distinct loop.issueId UUIDs, rendered by lib/render-session.js; 404s an unknown/cross-workspace sessionId
   workspace-api.js     Workspace API routes (prompts, recommendations, audit, comments, images)
-  task-chat.js         Task-chat view (experimental, taskChat flag): per-task conversational page
+  task-chat.js         Task-chat view (experimental, taskChat flag): per-task conversational page + durable saved-chat CRUD under /api/task-chat/saved (LIN-1008): save/list/get/delete gated on the taskChat flag AND req.session.linearUserId (absent → 401, no fabricated id); the literal /saved routes are registered BEFORE /:issueId so Express doesn't misroute `saved` as an issue id; session-auth only
   next-run.js          Suggested-next-run view (experimental, nextRun flag): page + suggest endpoint that generates grounded goal options for the next autopilot run; accept hands the chosen goal to the dispatch launch path (LIN-603)
   test.js              Test-only routes for E2E tests (mock sessions, fixtures)
   legacy-redirects.js  Backward-compatible redirects for old URLs
@@ -70,6 +70,7 @@ lib/
   render-dispatch.js   Dispatch page renderer (prompt, queue, tokens, history)
   render-collective.js Collective page renderer (experimental discussion shell)
   render-observation.js Autopilot Observation page renderer (first-class; mobile-first feed shell + collapsible completed archive, Swipe-modeled; LIN-595)
+  render-session.js    Dedicated per-session page renderer (LIN-1003, Phase 1 of LIN-950): server-rendered snapshot on the shared shell — overview, per-run telemetry/timings, raw link-rich transcript (loop.feedback[]), and cache-joined brief/recap panels (present body OR explicit generate affordance on a miss; never auto-spends an LLM call); telemetry.model rendered only when present. Phase 2 (LIN-1004): renders the human follow-up reply box (renderReplyBox) at the bottom for cli/web sessions, threading data-session-terminal so the scoped session.js sends force only for finalized sessions
   render-roadmap.js    Roadmap page renderer (delivery-focused)
   render-ship.js       Ship page renderer (radial view shell)
   render-swim.js       Swim lanes page renderer
@@ -128,6 +129,7 @@ lib/
   agent-status-store.js  Agent status append-only log storage (Tier C substrate; loop reconstruction; canonical proxy path /agent/status, /foreman/status deprecated alias)
   report-history-store.js  Durable per-workspace roadmap report runs
   task-snapshot-store.js   Append-only task-history archive: full issue-slice snapshots captured (hash-gated) at the proxy recap/brief read seams; durable, per-task count-capped, read-time diffs (LIN-598)
+  saved-chat-store.js  Durable saved task-chat transcripts (LIN-1008): private per {urlKey, linearUserId}, `{role,content}` transcript + auto-derived title, durable/count-capped (no TTL), hard-delete. Composes custom-prompts CRUD + task-snapshot durability + prompt-trace's session-auth-only privacy posture (content-bearing → deliberately NOT wired into proxy/workspace-api/kpis)
   llm-call-log.js      Append-only per-LLM-call metadata log (model, provider, tokens, cost, time; LIN-418)
   prompt-trace-store.js  Prompt trace storage (LIN-578)
   free-tier-store.js   Free tier usage tracking and rate limiting
@@ -172,12 +174,13 @@ public/
   custom-prompts.css / .js      Custom prompts page
   dispatch.css / dispatch.js    Dispatch page (prompt, queue, tokens, history)
   collective.css / collective.js  Collective page (setup, transcript poll, say box)
-  observation.css / observation.js  Autopilot Observation page (sessionId-grouped sessions poll, status banner, workspace filters, Level-1 active feed + collapsible completed archive, Level-2 session cards with status pill / one-sentence summary / runtime+model / per-worker-run progress bar, Level-3 drill-down: tasks-touched + relationships (session-context) with lazy Linear hydration, per-task worker-session tree with phase/recap/metric-chips, per-node activity log + produced-artifact links + on-demand run-summary next steps; LIN-595)
+  observation.css / observation.js  Autopilot Observation page (sessionId-grouped sessions poll, status banner, workspace filters, Level-1 active feed + collapsible completed archive, Level-2 session cards with status pill / one-sentence summary / runtime+model / per-worker-run progress bar, Level-3 drill-down: tasks-touched + relationships (session-context) with lazy Linear hydration, per-task worker-session tree with phase/recap/metric-chips, per-node activity log + produced-artifact links + on-demand run-summary next steps; LIN-595). Every session card header carries a persistent `open ↗` link to the dedicated per-session page (LIN-1019), and a waiting-on-user card additionally carries a `reply →` CTA — both to `/workspace/:urlKey/observation/session/:sessionId` for the session's OWN workspace key (the feed is cross-workspace merged), giving the LIN-1004 reply box a click-path out of the feed's in-place expansion
+  session.css / session.js      Dedicated per-session page (LIN-1003): server-rendered snapshot styling (overview / runs / transcript / brief-recap panels). session.js is the page's ONE scoped client script (LIN-1004): the human follow-up reply box — a self-contained textarea→POST to /api/dispatch with followUpTo=sessionId, target cli/web, and conditional force (terminal session → force:true, waiting/warm → omit); additive to the agent-to-agent wake path
   roadmap.css / roadmap.js      Roadmap page
   ship.css / ship.js            Ship radial view
   swim.css / swim.js            Swim lanes view
   swipe.css / swipe.js          Swipe (mobile) view
-  task-chat.css / task-chat.js  Task-chat view (experimental, taskChat flag)
+  task-chat.css / task-chat.js  Task-chat view (experimental, taskChat flag); includes the saved-chats UI (LIN-1008): save button + Saved chats list with open(resume)/delete, re-hydrating a stored transcript into chatHistory and continuing via the unchanged replay-each-turn send() path
   next-run.css / next-run.js    Suggested-next-run view (experimental, nextRun flag): generate button + goal-option cards
   styleguide.css                Styleguide reference page (LIN-457)
   proxy.css / proxy.js          Proxy token management page
