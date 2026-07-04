@@ -773,7 +773,7 @@ export function createDashboardRoutes({
    * @param {string} loopId
    * @returns {Promise<Object|null>} the enriched loop, or null if not found
    */
-  async function loadRunForSummary(urlKey, loopId) {
+  async function loadRunForSummary(urlKey, loopId, { allowFullScan = true } = {}) {
     const item = typeof dispatchQueueStore.getItemStatus === 'function'
       ? await Promise.resolve(dispatchQueueStore.getItemStatus(urlKey, loopId)).catch(() => null)
       : null;
@@ -782,7 +782,9 @@ export function createDashboardRoutes({
       const found = loops.find(l => String(l.loopId) === String(loopId));
       if (found) return enrichLoop(found);
     }
-    // Fallback: loopId not resolvable to an issue → whole-workspace reconstruction.
+    // Whole-workspace fallback (loopId not resolvable to an issue). Skipped on a
+    // cachedOnly peek so a stale/unresolvable loopId never pays the 30-day read.
+    if (!allowFullScan) return null;
     const loops = await getLoopsForWorkspace(urlKey, loopDeps);
     const found = loops.find(l => String(l.loopId) === String(loopId));
     return found ? enrichLoop(found) : null;
@@ -924,17 +926,23 @@ export function createDashboardRoutes({
     const { loopId } = req.params;
     if (!loopId) return res.status(400).json({ error: 'loopId is required' });
 
+    const isPeek = !force && (req.query.cachedOnly === '1' || req.query.cachedOnly === 'true');
     let loop;
     try {
-      // LIN-1022: issue-scoped point-read instead of a non-lean whole-workspace
-      // getLoopsForWorkspace reconstruct-by-loopId (the same H12 class fix as the
-      // session handlers); whole-workspace read is retained as a rare fallback.
-      loop = await loadRunForSummary(workspace.urlKey, loopId);
+      // LIN-1022: issue-scoped point-read (getItemStatus→getLoopsForIssue) instead of
+      // a non-lean whole-workspace getLoopsForWorkspace reconstruct-by-loopId. The
+      // whole-workspace fallback is skipped on a cachedOnly peek (same H12 guard as
+      // session-summary): a peek with a stale/unresolvable loopId must not pay the
+      // 30-day read.
+      loop = await loadRunForSummary(workspace.urlKey, loopId, { allowFullScan: !isPeek });
     } catch (error) {
       console.error('Dashboard run-summary lookup error:', error);
       return res.status(500).json({ error: 'Could not load the run' });
     }
-    if (!loop) return res.status(404).json({ error: 'Run not found' });
+    if (!loop) {
+      // Peek miss → cheap 204 (mirrors the cache-miss 204 below); else 404.
+      return isPeek ? res.status(204).end() : res.status(404).json({ error: 'Run not found' });
+    }
 
     // Immutability gate: only terminal runs are summarisable/cacheable.
     if (!isTerminalLoop(loop)) {
@@ -1078,29 +1086,42 @@ export function createDashboardRoutes({
     const { sessionId } = req.params;
     if (!sessionId) return res.status(400).json({ error: 'sessionId is required' });
 
-    // Find one session by id. Prefer the materialized read-model point-read
-    // (LIN-632) and degrade to the full 30-day workspace reconstruction on a
-    // miss — the same fix as the session-context path, removing a second
-    // reconstruct-by-id antipattern.
+    // Find one session by id: materialized read-model point-read (LIN-632) →
+    // issue-scoped point-read (LIN-1022) → whole-workspace reconstruction.
+    //
+    // The whole-workspace read is gated behind !isPeek. The Observation page fires
+    // one session-summary?cachedOnly=1 PEEK per terminal card — including cards for
+    // stale/expired sessionIds no longer in the 30-day window (getItemStatus NULL,
+    // no scoped rows, absent from the whole-ws build). Paying the 30-day
+    // reconstruction on each such peek — merely to 404 or serve a rollup — is what
+    // fanned into the mass H12 (LIN-1022; measured 337s per whole-ws read on prod).
+    // A peek must resolve CHEAPLY or not at all: on a miss it reports "no cached
+    // summary" (204), exactly the response the client already treats as
+    // "terminal but uncached → leave the affordance". Only a non-peek request
+    // (force/POST generate, or a GET that will actually spend an LLM call) pays the
+    // whole-workspace fallback — single, deliberate, and the only path that
+    // reconstructs a genuinely inference-grouped historical session.
+    const isPeek = !force && (req.query.cachedOnly === '1' || req.query.cachedOnly === 'true');
     let session = null;
     try {
       if (observationSessionsStore) {
         session = await observationSessionsStore.getSession(workspace.urlKey, sessionId);
       }
       if (!session) {
-        // LIN-1022: point-read (issue-scoped getSessionsForIssues) instead of the
-        // whole-workspace reconstruction. The Observation page fires one
-        // session-summary?cachedOnly=1 peek per card, so the old whole-workspace
-        // fallback ran ~N concurrent 30-day reads on a materialized-store miss and
-        // starved the event loop → mass H12. loadSessionWithTranscript keeps the
-        // whole-workspace read only as its own rare last-resort fallback.
-        session = await loadSessionWithTranscript(workspace.urlKey, sessionId);
+        session = await pointReadSession(workspace.urlKey, sessionId);
+      }
+      if (!session && !isPeek) {
+        const sessions = await getSessionsForWorkspace(workspace.urlKey, loopDeps);
+        session = sessions.find(s => String(s.sessionId) === String(sessionId)) || null;
       }
     } catch (error) {
       console.error('Dashboard session-summary lookup error:', error);
       return res.status(500).json({ error: 'Could not load the session' });
     }
-    if (!session) return res.status(404).json({ error: 'Session not found' });
+    if (!session) {
+      // Peek miss → cheap 204 (mirrors the cache-miss 204 below); else 404.
+      return isPeek ? res.status(204).end() : res.status(404).json({ error: 'Session not found' });
+    }
 
     // Live session: cheap proxy statusLine only, no generation, no caching.
     if (!sessionIsTerminal(session)) {
