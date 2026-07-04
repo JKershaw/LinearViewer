@@ -1,79 +1,73 @@
 #!/usr/bin/env node
 /**
- * scripts/wall-clock-summary.mjs  (LIN-987 v1)
+ * scripts/wall-clock-summary.mjs  (LIN-987)
  *
- * "Where does the time go?" — a read-only wall-clock summary of autopilot work,
- * built entirely from data the workspace API proxy already exposes. No schema
- * change, no new instrumentation: it reconstructs per-step wall-clock from the
- * dispatch history's `dispatchedAt` / `completedAt` / `resolvedAt` timestamps and
- * buckets each step by its `kind` into the lifecycle phases the ticket names —
+ * "Where does the time (and effort) go?" — a read-only wall-clock summary of
+ * autopilot work, built entirely from data the workspace API proxy already
+ * exposes. No schema change, no new instrumentation.
  *
- *   BEFORE the diff  (build the idea → a spec an agent can implement)
- *   THE diff         (kind:'implementation' — the core nugget)
- *   AFTER the diff   (confirmation & paperwork: review / close-out / retro)
- *   ORCHESTRATION    (autopilot / wake / custom — the loop's own overhead)
+ * Three views (analysis lives in lib/wall-clock-summary.js — pure & unit-tested):
+ *   1. LIFECYCLE PHASES — before-the-diff / the-diff / after-the-diff / orchestration.
+ *   2. EFFORT breakdown — onboarding / active tool-work / waiting (tests·CI·builds
+ *      or think-time) / wrap-up. Answers "how much time is spent waiting on things".
+ *   3. SESSIONS — steps sharing a `sessionId` are one autopilot run, rolled up.
  *
- * The phase→bucket map mirrors the PROMPT_TEMPLATES lifecycle vocabulary
- * (lib/prompt-template-defs.js) + the dispatch meta-kinds (lib/prompt-templates.js).
+ * Coverage: the plain dispatch list returns only the ~100 most-recent rows AND
+ * projects away `sessionId`. To widen, this fetches every lifecycle status
+ * (taken/done/failed/aborted/queued), unions + dedupes, then fetches each item's
+ * DETAIL (which carries `sessionId` + the full heartbeat `feedback[]`). Detail
+ * fetches are rate-limited (proxy cap: 60/min) and cached to disk, so the first
+ * run pays ~once and re-runs are instant.
  *
- * Data source & honesty notes (verified against the live proxy for LIN-987):
- *  - `completedAt` is the server's terminal-marker time (lib/dispatch-terminal.js
- *    deriveCompletedAt), NOT the take time. A step with no terminal marker yet has
- *    null completedAt and is reported as OPEN (excluded from duration sums).
- *  - `resolvedAt` is the take/claim time; queue-wait = resolvedAt - dispatchedAt.
- *  - The list endpoint returns the most recent ~100 rows and projects away
- *    `sessionId`, so this v1 groups by `issueIdentifier` (the available unit) and
- *    reports on the retained recent window. Coverage is printed up front.
- *  - Worker/CLI token+cost usage is emitted NOWHERE today (llm-call-log is
- *    server-side only), so this report is wall-clock only. Tokens need a
- *    runner-side emission (see the LIN-987 research notes) before they can appear.
+ * Data honesty (verified against the live proxy for LIN-987):
+ *  - completion time = terminal-marker time (deriveCompletedAt), not `resolvedAt`.
+ *  - `waiting` is a LOWER BOUND — a long single tool inside a heartbeat interval
+ *    reads as active (heartbeats can't see within an interval). See the lib.
+ *  - Worker token/cost is emitted nowhere today, so this is wall-clock only.
  *
  * Usage:
- *   PROXY_TOKEN=xxx node scripts/wall-clock-summary.mjs
- *   node scripts/wall-clock-summary.mjs --token xxx --base https://projects.jkershaw.com/api/proxy
- *   ... --json         emit machine-readable JSON instead of the text report
- *   ... --issue LIN-42 restrict to one issue
+ *   PROXY_TOKEN=xxx node scripts/wall-clock-summary.mjs            # widened, session view
+ *   ... --fast          list-only (recent ~100, no detail fetch, no sessions/effort)
+ *   ... --json          machine-readable JSON
+ *   ... --issue LIN-42  restrict to one issue
+ *   ... --no-cache      ignore the on-disk detail cache
+ *   ... --cache <dir>   detail-cache directory (default: $TMPDIR/harbour-wallclock-cache)
  */
 
-// ─── phase → bucket map (mirrors the template lifecycle + dispatch meta-kinds) ──
-const BUCKET_OF_KIND = {
-  // BEFORE the diff — turning an idea into an implementable spec
-  triage: 'before', research: 'before', scoping: 'before', design: 'before',
-  spike: 'before', context: 'before', plan: 'before', breakdown: 'before',
-  'look-into': 'before', blocked: 'before',
-  // THE diff — the core nugget
-  implementation: 'diff',
-  // AFTER the diff — confirmation & paperwork
-  review: 'after', 'close-out': 'after', retro: 'after',
-  // ORCHESTRATION — the loop's own overhead, not task-phase work
-  autopilot: 'orchestration', wake: 'orchestration', custom: 'orchestration',
-  periodical: 'orchestration',
-};
+import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import {
+  summarizeSteps, groupBySession, median, BUCKET_ORDER,
+} from '../lib/wall-clock-summary.js';
+
 const BUCKET_LABEL = {
   before: 'BEFORE the diff  (idea → spec)',
   diff: 'THE diff         (implementation)',
   after: 'AFTER the diff   (confirm & paperwork)',
   orchestration: 'ORCHESTRATION    (autopilot/wake/custom)',
 };
-const BUCKET_ORDER = ['before', 'diff', 'after', 'orchestration'];
-const bucketOf = (kind) => BUCKET_OF_KIND[kind] || 'orchestration';
+const STATUSES = ['taken', 'done', 'failed', 'aborted', 'queued'];
 
-// ─── tiny arg/format helpers ────────────────────────────────────────────────
+// ─── args ─────────────────────────────────────────────────────────────────
 function parseArgs(argv) {
   const a = { base: process.env.PROXY_BASE || 'https://projects.jkershaw.com/api/proxy',
-              token: process.env.PROXY_TOKEN || '', json: false, issue: null, limit: 100 };
+    token: process.env.PROXY_TOKEN || '', json: false, fast: false, issue: null,
+    cache: join(tmpdir(), 'harbour-wallclock-cache'), noCache: false };
   for (let i = 0; i < argv.length; i++) {
     const v = argv[i];
     if (v === '--json') a.json = true;
+    else if (v === '--fast') a.fast = true;
+    else if (v === '--no-cache') a.noCache = true;
     else if (v === '--token') a.token = argv[++i];
     else if (v === '--base') a.base = argv[++i];
     else if (v === '--issue') a.issue = argv[++i];
-    else if (v === '--limit') a.limit = parseInt(argv[++i], 10);
+    else if (v === '--cache') a.cache = argv[++i];
   }
   return a;
 }
-const ms = (a, b) => { const x = new Date(a).getTime(), y = new Date(b).getTime();
-  return Number.isFinite(x) && Number.isFinite(y) ? y - x : null; };
+
+// ─── format helpers ─────────────────────────────────────────────────────────
 function fmtDur(msVal) {
   if (msVal == null) return '   —   ';
   let s = Math.round(msVal / 1000);
@@ -84,127 +78,145 @@ function fmtDur(msVal) {
   return `${s}s`;
 }
 const pct = (n, d) => (d > 0 ? `${((n / d) * 100).toFixed(1)}%` : '—');
-function median(xs) {
-  if (!xs.length) return null;
-  const s = [...xs].sort((a, b) => a - b), mid = Math.floor(s.length / 2);
-  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
-}
 const pad = (s, n) => String(s).padEnd(n);
 const lpad = (s, n) => String(s).padStart(n);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// ─── fetch dispatch history from the proxy ──────────────────────────────────
-async function fetchItems({ base, token, limit, issue }) {
-  const url = new URL(`${base}/dispatch`);
-  url.searchParams.set('limit', String(limit));
-  if (issue) url.searchParams.set('issueIdentifier', issue);
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-  if (!res.ok) throw new Error(`proxy ${res.status}: ${await res.text()}`);
-  const body = await res.json();
-  return { items: body.items || [], total: body.total ?? null };
+// ─── proxy fetch (widen + detail-enrich, cached + rate-limited) ─────────────
+async function getJson(url, token, tries = 4) {
+  for (let attempt = 0; attempt < tries; attempt++) {
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (res.status === 429) { await sleep(2000 * (attempt + 1)); continue; }
+    if (!res.ok) throw new Error(`proxy ${res.status} on ${url}: ${await res.text()}`);
+    return res.json();
+  }
+  throw new Error(`rate-limited after ${tries} tries: ${url}`);
 }
 
-// ─── aggregate ──────────────────────────────────────────────────────────────
-function summarize(items) {
-  const byBucket = {}, byKind = {}, byIssue = {};
-  const queueWaits = [];
-  let openCount = 0, spanMin = null, spanMax = null;
-
-  for (const it of items) {
-    const kind = it.kind || 'custom';
-    const bucket = bucketOf(kind);
-    const dur = it.completedAt ? ms(it.dispatchedAt, it.completedAt) : null;
-    const qw = it.resolvedAt ? ms(it.dispatchedAt, it.resolvedAt) : null;
-    if (qw != null && qw >= 0) queueWaits.push(qw);
-    if (dur == null) openCount++;
-    if (it.dispatchedAt) {
-      spanMin = spanMin && spanMin < it.dispatchedAt ? spanMin : it.dispatchedAt;
-      const end = it.completedAt || it.dispatchedAt;
-      spanMax = spanMax && spanMax > end ? spanMax : end;
-    }
-
-    const B = (byBucket[bucket] ||= { steps: 0, active: 0, open: 0 });
-    B.steps++; if (dur != null && dur >= 0) B.active += dur; else B.open++;
-
-    const K = (byKind[kind] ||= { steps: 0, active: 0, open: 0, bucket });
-    K.steps++; if (dur != null && dur >= 0) K.active += dur; else K.open++;
-
-    if (it.issueIdentifier) {
-      const I = (byIssue[it.issueIdentifier] ||= { steps: 0, active: 0, kinds: {}, first: null, last: null });
-      I.steps++; if (dur != null && dur >= 0) I.active += dur;
-      I.kinds[kind] = (I.kinds[kind] || 0) + 1;
-      I.first = I.first && I.first < it.dispatchedAt ? I.first : it.dispatchedAt;
-      const end = it.completedAt || it.dispatchedAt;
-      I.last = I.last && I.last > end ? I.last : end;
-    }
+async function enumerateIds({ base, token, issue }) {
+  const ids = new Map(); // id → list-row (has kind/dispatchedAt/completedAt/resolvedAt/status)
+  if (issue) {
+    const body = await getJson(`${base}/dispatch?issueIdentifier=${encodeURIComponent(issue)}&limit=250`, token);
+    for (const it of body.items || []) ids.set(it.id, it);
+    return ids;
   }
-  const totalActive = BUCKET_ORDER.reduce((s, b) => s + (byBucket[b]?.active || 0), 0);
-  return { byBucket, byKind, byIssue, queueWaits, openCount, totalActive,
-           span: { min: spanMin, max: spanMax }, steps: items.length };
+  for (const st of STATUSES) {
+    const body = await getJson(`${base}/dispatch?status=${st}&limit=250`, token);
+    for (const it of body.items || []) if (!ids.has(it.id)) ids.set(it.id, it);
+  }
+  return ids;
+}
+
+async function enrich(ids, { base, token, cache, noCache }) {
+  if (!noCache) mkdirSync(cache, { recursive: true });
+  const out = [];
+  const list = [...ids.values()];
+  let fetched = 0, cached = 0;
+  for (let i = 0; i < list.length; i++) {
+    const row = list[i];
+    const cacheFile = join(cache, `${row.id}.json`);
+    // A terminal item never changes, so its cached detail is reusable; a still-open
+    // (taken/queued) item may have grown feedback, so always re-fetch those.
+    const terminal = row.completedAt || ['done', 'failed', 'aborted'].includes(row.status);
+    let detail = null;
+    if (!noCache && terminal && existsSync(cacheFile)) {
+      try { detail = JSON.parse(readFileSync(cacheFile, 'utf8')); cached++; } catch { detail = null; }
+    }
+    if (!detail) {
+      detail = await getJson(`${base}/dispatch/${row.id}`, token);
+      if (!noCache && terminal) { try { writeFileSync(cacheFile, JSON.stringify(detail)); } catch { /* ignore */ } }
+      fetched++;
+      await sleep(1100); // stay under the 60/min proxy cap
+      if (fetched % 20 === 0) process.stderr.write(`  …enriched ${i + 1}/${list.length}\n`);
+    }
+    // Merge: list-row timestamps + detail's sessionId/feedback.
+    out.push({ ...row, ...detail });
+  }
+  process.stderr.write(`  enriched ${list.length} steps (${fetched} fetched, ${cached} cached)\n`);
+  return out;
 }
 
 // ─── render ─────────────────────────────────────────────────────────────────
-function render(s, meta) {
-  const L = [];
-  L.push('');
-  L.push('  WALL-CLOCK TIME SUMMARY — where does the time go?   (LIN-987 v1)');
-  L.push('  ' + '─'.repeat(66));
-  L.push(`  window: ${s.steps} recent dispatch steps` +
-    (meta.total != null ? ` (of ${meta.total} retained)` : '') +
-    `   ·   ${s.openCount} still open`);
-  if (s.span.min) L.push(`  span:   ${s.span.min.slice(0, 16).replace('T', ' ')} → ${s.span.max.slice(0, 16).replace('T', ' ')} UTC`);
-  L.push(`  active agent wall-clock (sum of completed step durations): ${fmtDur(s.totalActive)}`);
-  L.push('');
-
-  // Phase buckets — the headline
-  L.push('  THE CORE NUGGET — active time by lifecycle phase');
-  L.push('  ' + '─'.repeat(66));
+function renderPhases(L, s) {
+  const total = BUCKET_ORDER.reduce((a, b) => a + (s.byBucket[b]?.wallMs || 0), 0);
+  L.push('  LIFECYCLE PHASES — active wall-clock by phase');
+  L.push('  ' + '─'.repeat(68));
   L.push(`  ${pad('phase', 42)} ${lpad('steps', 6)} ${lpad('active', 9)} ${lpad('share', 8)}`);
   for (const b of BUCKET_ORDER) {
     const B = s.byBucket[b]; if (!B) continue;
-    L.push(`  ${pad(BUCKET_LABEL[b], 42)} ${lpad(B.steps, 6)} ${lpad(fmtDur(B.active), 9)} ${lpad(pct(B.active, s.totalActive), 8)}`);
+    L.push(`  ${pad(BUCKET_LABEL[b], 42)} ${lpad(B.steps, 6)} ${lpad(fmtDur(B.wallMs), 9)} ${lpad(pct(B.wallMs, total), 8)}`);
   }
-  // the pre/diff/post ratio, excluding orchestration
-  const work = ['before', 'diff', 'after'].reduce((a, b) => a + (s.byBucket[b]?.active || 0), 0);
-  const bd = s.byBucket.diff?.active || 0;
-  L.push('  ' + '─'.repeat(66));
-  L.push(`  of task work (excl. orchestration ${fmtDur(s.totalActive - work)}):`);
-  L.push(`    before ${pct(s.byBucket.before?.active || 0, work)}  ·  diff ${pct(bd, work)}  ·  after ${pct(s.byBucket.after?.active || 0, work)}`);
+  const work = ['before', 'diff', 'after'].reduce((a, b) => a + (s.byBucket[b]?.wallMs || 0), 0);
+  L.push('  ' + '─'.repeat(68));
+  L.push(`  of task work (excl. orchestration): before ${pct(s.byBucket.before?.wallMs || 0, work)}` +
+    `  ·  diff ${pct(s.byBucket.diff?.wallMs || 0, work)}  ·  after ${pct(s.byBucket.after?.wallMs || 0, work)}`);
+  L.push('  (orchestration wall-clock OVERLAPS its workers — a live orchestrator/wake step');
+  L.push('   watches while workers run — so its share is concurrency, not additive cost.)');
   L.push('');
+}
 
-  // Per-kind detail
-  L.push('  BY KIND');
-  L.push('  ' + '─'.repeat(66));
-  const kinds = Object.entries(s.byKind).sort((a, b) => b[1].active - a[1].active);
-  L.push(`  ${pad('kind', 18)} ${pad('bucket', 14)} ${lpad('steps', 6)} ${lpad('active', 9)}`);
-  for (const [k, K] of kinds)
-    L.push(`  ${pad(k, 18)} ${pad(K.bucket, 14)} ${lpad(K.steps, 6)} ${lpad(fmtDur(K.active), 9)}`);
+function renderEffort(L, s) {
+  const e = s.workerEffort; // worker steps only — orchestrator watch-idle excluded
+  const known = e.onboardingMs + e.activeMs + e.waitingMs + e.wrapupMs;
+  L.push('  EFFORT INSIDE WORKER STEPS — where the time goes  (heartbeat-decomposed)');
+  L.push('  ' + '─'.repeat(68));
+  const rows = [
+    ['active tool-work', e.activeMs],
+    ['post-heartbeat tail (finalize·CI-wait·quiet)', e.wrapupMs],
+    ['onboarding / prep (project summary)', e.onboardingMs],
+    ['idle gaps (0 tools mid-run)', e.waitingMs],
+  ];
+  L.push(`  ${pad('class', 46)} ${lpad('time', 9)} ${lpad('share', 8)}`);
+  for (const [label, ms] of rows)
+    L.push(`  ${pad(label, 46)} ${lpad(fmtDur(ms), 9)} ${lpad(pct(ms, known), 8)}`);
+  L.push('  ' + '─'.repeat(68));
+  L.push(`  from ${s.workerDecomposed} worker steps with heartbeats  ·  ${s.ciTouchSteps} steps touch CI/tests`);
+  L.push(`  orchestration watch-idle (excluded above): ${fmtDur(s.orchEffort.wrapupMs + s.orchEffort.waitingMs)}` +
+    ` across ${fmtDur(s.orchEffort.activeMs)} active — a wake/orchestrator step is alive`);
+  L.push('  watching, overlapping its workers, so its "tail" is not task finalization.');
+  L.push('  CAVEAT: true test/CI-wait is NOT cleanly separable — a long `npm test` is one');
+  L.push('  completed Bash tool (counts as active); CI-polling lands in the tail. Isolating');
+  L.push('  it needs per-tool duration emission (same instrumentation gap as tokens).');
   L.push('');
+}
 
-  // Queue wait
+function renderSessions(L, sessions) {
+  const real = sessions.filter((x) => !x.solo || x.steps > 1);
+  L.push(`  SESSIONS — autopilot runs grouped by sessionId  (${sessions.length} groups, ${real.length} multi-step)`);
+  L.push('  ' + '─'.repeat(68));
+  L.push(`  ${pad('session', 10)} ${lpad('steps', 5)} ${lpad('active', 8)} ${lpad('calendar', 9)} ${lpad('wait', 7)}  tasks / phases`);
+  for (const s of sessions.slice(0, 15)) {
+    const label = s.solo ? 'solo' : s.sessionId.slice(0, 8);
+    const phases = Object.entries(s.kinds).map(([k, n]) => (n > 1 ? `${k}×${n}` : k)).join(' ');
+    const tasks = s.tasks.length ? s.tasks.join(',') : '—';
+    L.push(`  ${pad(label, 10)} ${lpad(s.steps, 5)} ${lpad(fmtDur(s.activeWallMs), 8)} ${lpad(fmtDur(s.calendarMs), 9)} ${lpad(fmtDur(s.effort.waitingMs), 7)}  ${tasks}  [${phases}]`);
+  }
+  L.push('');
+  L.push('  (active = Σ step wall-clock; calendar = first dispatch → last completion;');
+  L.push('   wait = Σ 0-tool heartbeat stretches in the run. active>calendar ⇒ concurrent workers.)');
+  L.push('');
+}
+
+function render(s, sessions, meta) {
+  const L = [];
+  L.push('');
+  L.push('  WALL-CLOCK & EFFORT SUMMARY — where does the time go?   (LIN-987)');
+  L.push('  ' + '═'.repeat(68));
+  L.push(`  ${s.steps} dispatch steps` + (meta.mode ? ` [${meta.mode}]` : '') +
+    `   ·   ${s.openCount} still open`);
+  if (s.span.min) L.push(`  span: ${s.span.min.slice(0, 16).replace('T', ' ')} → ${s.span.max.slice(0, 16).replace('T', ' ')} UTC`);
+  L.push(`  total active wall-clock: ${fmtDur(s.totalActiveWall)}`);
+  L.push('');
+  renderPhases(L, s);
+  if (!meta.fast) renderEffort(L, s);
+  if (sessions) renderSessions(L, sessions);
   const qwMed = median(s.queueWaits);
   L.push('  QUEUE WAIT (dispatch → take)');
-  L.push('  ' + '─'.repeat(66));
+  L.push('  ' + '─'.repeat(68));
   L.push(`  median ${fmtDur(qwMed)} · max ${fmtDur(s.queueWaits.length ? Math.max(...s.queueWaits) : null)} · n=${s.queueWaits.length}`);
   L.push('');
-
-  // Per-issue lifecycle rollup
-  const issues = Object.entries(s.byIssue).sort((a, b) => b[1].active - a[1].active).slice(0, 12);
-  if (issues.length) {
-    L.push('  BY ISSUE (top 12 by active time)');
-    L.push('  ' + '─'.repeat(66));
-    L.push(`  ${pad('issue', 10)} ${lpad('steps', 5)} ${lpad('active', 9)} ${lpad('calendar', 9)}  phases`);
-    for (const [id, I] of issues) {
-      const cal = ms(I.first, I.last);
-      const phases = Object.entries(I.kinds).map(([k, n]) => (n > 1 ? `${k}×${n}` : k)).join(' ');
-      L.push(`  ${pad(id, 10)} ${lpad(I.steps, 5)} ${lpad(fmtDur(I.active), 9)} ${lpad(fmtDur(cal), 9)}  ${phases}`);
-    }
-    L.push('');
-    L.push('  (active = summed step durations; calendar = first dispatch → last completion,');
-    L.push('   so calendar − active ≈ human/idle gaps between an issue\'s steps.)');
-  }
-  L.push('');
-  L.push('  NOTE: wall-clock only. Worker token/cost usage is not emitted anywhere');
-  L.push('  today (llm-call-log tracks server-side calls only) — see LIN-987 notes.');
+  L.push('  NOTE: wall-clock only — worker token/cost is emitted nowhere today.');
+  L.push('  `waiting` is a lower bound (long tools inside an active interval hide). See LIN-987.');
   L.push('');
   return L.join('\n');
 }
@@ -213,17 +225,41 @@ function render(s, meta) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (!args.token) {
-    console.error('error: set PROXY_TOKEN env var or pass --token <proxy readWrite/read token>');
+    console.error('error: set PROXY_TOKEN env var or pass --token <proxy token>');
     process.exit(2);
   }
-  const { items, total } = await fetchItems(args);
-  const s = summarize(items);
-  if (args.json) {
-    console.log(JSON.stringify({ meta: { total, steps: s.steps, openCount: s.openCount, span: s.span },
-      byBucket: s.byBucket, byKind: s.byKind, byIssue: s.byIssue,
-      queueWaitMedianMs: median(s.queueWaits), totalActiveMs: s.totalActive }, null, 2));
+
+  let items, mode;
+  if (args.fast) {
+    const url = new URL(`${args.base}/dispatch`);
+    url.searchParams.set('limit', '100');
+    if (args.issue) url.searchParams.set('issueIdentifier', args.issue);
+    const body = await getJson(url.toString(), args.token);
+    items = body.items || [];
+    mode = 'fast: recent ~100, no detail';
   } else {
-    console.log(render(s, { total }));
+    process.stderr.write('enumerating dispatch ids across all statuses…\n');
+    const ids = await enumerateIds(args);
+    process.stderr.write(`  ${ids.size} unique steps; enriching with detail (sessionId + heartbeats)…\n`);
+    items = await enrich(ids, args);
+    mode = `widened: ${items.length} steps across all statuses`;
+  }
+
+  const summary = summarizeSteps(items);
+  const sessions = args.fast ? null : groupBySession(items);
+
+  if (args.json) {
+    console.log(JSON.stringify({
+      meta: { mode, steps: summary.steps, openCount: summary.openCount, span: summary.span },
+      byBucket: summary.byBucket, byKind: summary.byKind,
+      effort: summary.effort, workerEffort: summary.workerEffort, orchEffort: summary.orchEffort,
+      queueWaitMedianMs: median(summary.queueWaits), totalActiveWallMs: summary.totalActiveWall,
+      sessions: sessions?.map((s) => ({ sessionId: s.sessionId, solo: s.solo, steps: s.steps,
+        tasks: s.tasks, kinds: s.kinds, activeWallMs: s.activeWallMs, calendarMs: s.calendarMs,
+        waitingMs: s.effort.waitingMs, ciTouchSteps: s.ciTouchSteps })),
+    }, null, 2));
+  } else {
+    console.log(render(summary, sessions, { fast: args.fast, mode }));
   }
 }
 
