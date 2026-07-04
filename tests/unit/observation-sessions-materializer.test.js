@@ -219,6 +219,123 @@ test('precompute hook is opt-in — disabled by default and clearable with a non
   assert.ok(sessions.find(s => s.sessionId === 'S1'));
 });
 
+// ── LIN-962: title enrichment at the read/serve seam ─────────────────────────
+// A dispatch's `issueTitle` is optional (the autopilot anchor hardcodes it null),
+// so a session's loops can be title-less. The materializer resolves a real title
+// from an injected workspace title source before persisting, so the Observation
+// Level-2 card shows a title instead of a bare identifier — and backfill of
+// existing title-less sessions falls out of re-materialization for free.
+
+// Seed a session whose loops carry NO issueTitle (the defect condition).
+function seedTitlelessFixture({ historyCollection, statusCollection }) {
+  historyCollection._docs.push({
+    _id: 'A1', urlKey: URL_KEY, prompt: 'p', promptName: 'autopilot', kind: 'autopilot',
+    issueId: 'id-LIN-701', issueIdentifier: 'LIN-701', issueTitle: null, issueUrl: null,
+    dispatchedAt: new Date(min(0)), sessionId: null, status: 'resolved',
+    resolvedAt: new Date(min(1)), feedback: [{ message: '[done] shipped', url: null, urlLabel: null, timestamp: new Date(min(1)) }],
+    historyExpiresAt: new Date(min(0) + 30 * 24 * 60 * 60 * 1000)
+  });
+  status(statusCollection, { id: 'AS-a1', taskIdentifier: 'LIN-701', tsMs: min(0) + 30 * 1000 });
+}
+
+test('LIN-962: title-less loops resolve a real title from the injected title source', async () => {
+  const queueCollection = createMockCollection();
+  const historyCollection = createMockCollection();
+  const statusCollection = createMockCollection();
+  const observationCollection = createMockCollection();
+  const dispatchStore = new DispatchQueueStore({ collection: queueCollection, historyCollection });
+  const agentStatusStore = new AgentStatusStore({ collection: statusCollection });
+  const observationSessionsStore = new ObservationSessionsStore({ collection: observationCollection });
+
+  const calls = [];
+  const materializer = createObservationMaterializer({
+    dispatchStore, agentStatusStore, observationSessionsStore,
+    resolveWorkspaceTitles: async (urlKey) => { calls.push(urlKey); return { 'LIN-701': 'Fix the login bug' }; }
+  });
+
+  seedTitlelessFixture({ historyCollection, statusCollection });
+  await materializer.rebuildForWrite(URL_KEY, { sessionId: 'A1' });
+
+  const { sessions } = await observationSessionsStore.findByWorkspace(URL_KEY);
+  const s = sessions.find(x => x.sessionId === 'A1');
+  assert.ok(s, 'session materialized');
+  assert.equal(s.loops[0].issueTitle, 'Fix the login bug', 'real title resolved onto the title-less loop');
+  assert.deepEqual(calls, [URL_KEY], 'title source consulted with the workspace urlKey');
+});
+
+test('LIN-962: a Map title source is supported too', async () => {
+  const ctx = setup();
+  const { historyCollection, statusCollection, observationSessionsStore } = ctx;
+  const materializer = createObservationMaterializer({
+    dispatchStore: ctx.dispatchStore, agentStatusStore: ctx.agentStatusStore, observationSessionsStore,
+    resolveWorkspaceTitles: async () => new Map([['LIN-701', 'Titled via Map']])
+  });
+  seedTitlelessFixture({ historyCollection, statusCollection });
+  await materializer.rebuildForWrite(URL_KEY, { sessionId: 'A1' });
+  const { sessions } = await observationSessionsStore.findByWorkspace(URL_KEY);
+  assert.equal(sessions.find(x => x.sessionId === 'A1').loops[0].issueTitle, 'Titled via Map');
+});
+
+test('LIN-962: identifier-only guard preserved — a resolver returning the identifier is refused', async () => {
+  const ctx = setup();
+  const { historyCollection, statusCollection, observationSessionsStore } = ctx;
+  const materializer = createObservationMaterializer({
+    dispatchStore: ctx.dispatchStore, agentStatusStore: ctx.agentStatusStore, observationSessionsStore,
+    // A degenerate source that echoes the identifier back must never be written as a
+    // title, or the card would render `LIN-701 LIN-701`.
+    resolveWorkspaceTitles: async () => ({ 'LIN-701': 'LIN-701' })
+  });
+  seedTitlelessFixture({ historyCollection, statusCollection });
+  await materializer.rebuildForWrite(URL_KEY, { sessionId: 'A1' });
+  const { sessions } = await observationSessionsStore.findByWorkspace(URL_KEY);
+  assert.equal(sessions.find(x => x.sessionId === 'A1').loops[0].issueTitle, null, 'identifier never written back as a title');
+});
+
+test('LIN-962: degrades to identifier-only when title resolution fails (never worse)', async () => {
+  const ctx = setup();
+  const { historyCollection, statusCollection, observationSessionsStore } = ctx;
+  const materializer = createObservationMaterializer({
+    dispatchStore: ctx.dispatchStore, agentStatusStore: ctx.agentStatusStore, observationSessionsStore,
+    resolveWorkspaceTitles: async () => { throw new Error('token expired'); }
+  });
+  seedTitlelessFixture({ historyCollection, statusCollection });
+  await materializer.rebuildForWrite(URL_KEY, { sessionId: 'A1' }); // must not reject
+  const { sessions } = await observationSessionsStore.findByWorkspace(URL_KEY);
+  const s = sessions.find(x => x.sessionId === 'A1');
+  assert.ok(s, 'session still materialized despite title resolution failing');
+  assert.equal(s.loops[0].issueTitle, null, 'loop stays as-built — identifier-only, not corrupted');
+});
+
+test('LIN-962: no resolver wired ⇒ behaviour unchanged (loops left as built)', async () => {
+  const ctx = setup(); // setup() wires NO resolveWorkspaceTitles
+  const { historyCollection, statusCollection, observationSessionsStore, materializer } = ctx;
+  seedTitlelessFixture({ historyCollection, statusCollection });
+  await materializer.rebuildForWrite(URL_KEY, { sessionId: 'A1' });
+  const { sessions } = await observationSessionsStore.findByWorkspace(URL_KEY);
+  assert.equal(sessions.find(x => x.sessionId === 'A1').loops[0].issueTitle, null);
+});
+
+test('LIN-962: resolver is skipped entirely when every loop already has a title', async () => {
+  const queueCollection = createMockCollection();
+  const historyCollection = createMockCollection();
+  const statusCollection = createMockCollection();
+  const observationCollection = createMockCollection();
+  const dispatchStore = new DispatchQueueStore({ collection: queueCollection, historyCollection });
+  const agentStatusStore = new AgentStatusStore({ collection: statusCollection });
+  const observationSessionsStore = new ObservationSessionsStore({ collection: observationCollection });
+
+  let consulted = 0;
+  const materializer = createObservationMaterializer({
+    dispatchStore, agentStatusStore, observationSessionsStore,
+    resolveWorkspaceTitles: async () => { consulted++; return {}; }
+  });
+
+  // seedSpanningFixture's archived rows all carry `${id} title`, so nothing is missing.
+  seedSpanningFixture({ historyCollection, statusCollection });
+  await materializer.rebuildForWrite(URL_KEY, { sessionId: 'S1' });
+  assert.equal(consulted, 0, 'no title lookup paid for when nothing is missing');
+});
+
 test('rebuildForWrite for an issue in no session is a no-op (does not throw, writes nothing)', async () => {
   const ctx = setup();
   seedSpanningFixture(ctx);

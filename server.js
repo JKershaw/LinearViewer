@@ -285,7 +285,12 @@ const observationSessionsStore = new ObservationSessionsStore({
 const observationMaterializer = createObservationMaterializer({
   dispatchStore: dispatchQueueStore,
   agentStatusStore,
-  observationSessionsStore
+  observationSessionsStore,
+  // LIN-962: resolve real task titles at the read/serve seam so Observation
+  // Level-2 cards whose loops lack `issueTitle` show a title, not a bare
+  // identifier. Off the hot poll path; `resolveWorkspaceTitles` is a hoisted
+  // fn declared below (safe to reference here — invoked only at write time).
+  resolveWorkspaceTitles
 })
 // Shared Observation sessions-feed cache (LIN-617). One process-wide instance,
 // passed to BOTH the dashboard router (which reads it on the /sessions path) and
@@ -1225,6 +1230,59 @@ async function fetchWorkspaceIssues(workspace) {
   const result = issues || [];
   if (memoKey) _workspaceIssuesMemo.set(memoKey, { issues: result, cachedAt: Date.now() });
   return result;
+}
+
+// LIN-962: off-session workspace resolver for the observation materializer's title
+// enrichment. The materializer runs on dispatch/status write hooks that carry only
+// a urlKey (no session), but resolving real task titles needs a full workspace
+// object (accessToken + provider). Mirror resolveWorkspaceAccess's session scan but
+// return the whole workspace with the latest-expiring usable token, not just the
+// token. Returns null when no session references the workspace with a live token.
+async function resolveWorkspaceForTitles(urlKey) {
+  if (process.env.NODE_ENV === 'test' && urlKey === 'test-workspace') {
+    return { urlKey, accessToken: 'test-token' };
+  }
+  try {
+    const sessions = await sessionsCollection.find({}).toArray();
+    let best = null;
+    let bestExpiry = 0;
+    for (const s of sessions) {
+      const data = typeof s.session === 'string' ? JSON.parse(s.session) : s.session;
+      const ws = data?.workspaces?.find(w => w.urlKey === urlKey);
+      if (!ws || !ws.accessToken) continue;
+      const expiry = ws.tokenExpiresAt || 0;
+      if (expiry > Date.now() + TOKEN_REFRESH_BUFFER_MS && expiry > bestExpiry) {
+        best = ws;
+        bestExpiry = expiry;
+      }
+    }
+    return best;
+  } catch (err) {
+    console.error('resolveWorkspaceForTitles error:', err?.message || err);
+    return null;
+  }
+}
+
+// LIN-962: build a workspace's { identifier → title } map for the observation
+// materializer's read/serve title enrichment. Reuses the memoized
+// fetchWorkspaceIssues (30s TTL), so frequent re-materialization does not re-hit
+// Linear. Best-effort: any failure yields an empty map and the materializer then
+// degrades to today's identifier-only card (never worse). Hoisted so the
+// materializer wiring above can reference it before this point in source order.
+async function resolveWorkspaceTitles(urlKey) {
+  try {
+    const workspace = await resolveWorkspaceForTitles(urlKey);
+    if (!workspace) return {};
+    const issues = await fetchWorkspaceIssues(workspace);
+    const titles = {};
+    for (const issue of issues || []) {
+      if (issue && issue.identifier && issue.title) titles[issue.identifier] = issue.title;
+    }
+    return titles;
+  } catch (err) {
+    console.error('resolveWorkspaceTitles error:', err?.message || err);
+    return {};
+  }
 }
 
 // getWorkspaceOpenRouterKey: resolves the token creator's OpenRouter API key for
