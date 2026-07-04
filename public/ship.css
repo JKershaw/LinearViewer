@@ -7,6 +7,23 @@ body:has(.ship-page) {
   overflow: hidden; /* the .ship-page itself owns scrolling */
 }
 
+/* The shared header is pinned/translucent globally (LIN-984), but the ship page
+   is a fixed-viewport canvas: `body` has `overflow: hidden` and `.ship-page`
+   owns its own scroll, so NOTHING scrolls under the header here. Pinning it buys
+   nothing and only reintroduces the original hazard — the sticky header's
+   stacking context swallows pointer events on the page's `position: fixed`
+   near-top controls (the ship mode toggle), which `scroll-margin` can't rescue
+   because they never scroll. So the header keeps the normal-flow fallback on
+   ship: static, opaque, no blur → no stacking context, exactly as it behaved
+   before LIN-984. The fixed controls (mode toggle at top:68px) stay clickable
+   and clear of the empty-space drag/pan zone. */
+body:has(.ship-page) .nav-bar {
+  position: static;
+  background: var(--bg);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
 .ship-page {
   position: relative;
   overflow: auto;
@@ -299,14 +316,7 @@ body:has(.ship-page) {
 
 .ship-mode-control {
   position: fixed;
-  /* Clear the pinned shared header (LIN-984). The header is `position: sticky`
-     with a high z-index, so a fixed control that overlapped it would be
-     swallowed (this is exactly what broke the ship-orientation toggle). The
-     control lives OUTSIDE any scroll container, so `scroll-margin` can't help
-     it — it is offset by the header's own footprint from the viewport top:
-     the body's top padding (`--space-5`) + the header clearance
-     (`--nav-sticky-h`) + a small gap. */
-  top: calc(var(--space-5) + var(--nav-sticky-h) + var(--space-1));
+  top: 68px;
   left: 16px;
   z-index: 8; /* above heading control (7) */
   display: flex;
@@ -466,10 +476,4 @@ body:has(.ship-page) {
     font-size: 10px;
   }
 
-  /* Mobile body padding is `--space-3` (not `--space-5`), so the header sits
-     higher — re-derive the mode control's clearance from the smaller pad
-     (LIN-984). */
-  .ship-mode-control {
-    top: calc(var(--space-3) + var(--nav-sticky-h) + var(--space-1));
-  }
 }
