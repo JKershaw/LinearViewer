@@ -419,6 +419,27 @@ test.describe('Swim Flow layout', () => {
     await expect(page.locator('.swim-fcard .swim-box-title').first()).not.toBeEmpty();
   });
 
+  // LIN-977 workstream 4: the grouped flow blocks adopt the shared card/surface
+  // DOM/CSS contract client-side (swim.js emits the canonical primitive classes
+  // alongside its thin swim-specific hooks) so they inherit the token-correct,
+  // theme-aware surface styling instead of the old hand-rolled brand-alpha
+  // literals. This pins that contract so the adoption can't silently regress.
+  test('grouped flow blocks compose the shared card/surface primitives', async ({ page }) => {
+    // Every flow card carries the canonical `.card` contract class...
+    const cards = page.locator('.swim-fcard');
+    expect(await cards.count()).toBeGreaterThan(0);
+    for (const cls of await cards.evaluateAll(els => els.map(el => el.className))) {
+      expect(cls).toContain('card');
+    }
+    // ...and every nested subtask group composes `.surface.surface--inset`.
+    const groups = page.locator('.swim-fgroup');
+    expect(await groups.count()).toBeGreaterThan(0);
+    for (const cls of await groups.evaluateAll(els => els.map(el => el.className))) {
+      expect(cls).toContain('surface');
+      expect(cls).toContain('surface--inset');
+    }
+  });
+
   test('draws orange blocking spines', async ({ page }) => {
     await expect(page.locator('.swim-flow-edges')).toBeAttached();
     await expect(page.locator('.swim-blk-spine').first()).toBeAttached();
