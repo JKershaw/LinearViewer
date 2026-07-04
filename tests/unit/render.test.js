@@ -565,6 +565,68 @@ describe('in-progress subtask project tag (LIN-903)', () => {
 });
 
 // =============================================================================
+// Projects-page section-primitive adoption (LIN-979)
+// =============================================================================
+// Characterization pins for the container/section-primitive adoption pass.
+//
+// ADOPTED: the top-level Projects region is now composed via `renderSection`
+// (was a hand-rolled bare `<section role="region">`). The INTENDED, documented
+// diff is that it now carries the shared `.section` class; the load-bearing
+// contract — the `role="region"` + `aria-label="Projects"` selector that
+// `/llms.txt` (line 32) and consumers depend on — is preserved byte-for-byte.
+//
+// DELIBERATELY NOT ADOPTED: the in-progress and recent-activity regions are
+// bespoke-for-reason — their `.in-progress-header` / `.recent-activity-header`
+// are click-to-collapse controls (app.js), not section headings, and their
+// `.tree` bodies are the collapse targets. `renderSection` models a heading +
+// body, not a collapse control, so a swap would break the collapse wiring and
+// the CSS/JS class hooks. These pins prove they were left intact.
+describe('projects-page section-primitive adoption (LIN-979)', () => {
+  const mk = (o) => ({ createdAt: '2020-01-01T00:00:00.000Z', labels: { nodes: [] }, ...o });
+  const projectTree = {
+    project: { id: 'proj-1', name: 'Test Project', content: null, url: null },
+    incomplete: [{ issue: mk({ id: 'i1', identifier: 'T-1', title: 'One', state: { type: 'started' } }), children: [], depth: 0 }],
+    completed: [],
+    completedCount: 0
+  };
+
+  test('Projects region composes renderSection while preserving the role/aria-label selector contract', () => {
+    const result = renderPage([projectTree], [], [], 'Test', { isLanding: true });
+    // Adopted primitive: the shared `.section` chrome now wraps the region...
+    assert.match(result, /<section class="section" role="region" aria-label="Projects">/,
+      'Projects region is composed via renderSection (carries .section)');
+    // ...and the /llms.txt selector contract is intact (role + aria-label).
+    assert.ok(result.includes('role="region" aria-label="Projects"'),
+      'role="region" aria-label="Projects" preserved for /llms.txt + consumers');
+    // No hand-rolled classless `<section role="region"` remains for Projects.
+    assert.ok(!/<section role="region" aria-label="Projects">/.test(result),
+      'the old hand-rolled bare <section> is gone');
+  });
+
+  test('in-progress and recent-activity regions are left bespoke (collapse controls, not renderSection)', () => {
+    const trees = buildInProgressForest(
+      [mk({ id: 'p', title: 'P', project: { id: 'proj-1' }, state: { name: 'In Progress', type: 'started' } })],
+      [{ id: 'proj-1', name: 'Test Project', sortOrder: 1 }]
+    );
+    const recent = [{ projectName: 'Test Project', roots: [
+      { issue: mk({ id: 'r1', identifier: 'T-2', title: 'Shipped', state: { name: 'Done', type: 'completed' }, completedAt: '2020-02-01T00:00:00.000Z' }), children: [], depth: 0, projectName: 'Test Project' }
+    ] }];
+    const result = renderPage([projectTree], trees, recent, 'Test', { isLanding: true });
+
+    // Deliberately untouched: still hand-rolled <div> regions with collapse
+    // controls + .tree bodies — NOT wrapped in .section.
+    assert.ok(result.includes('<div class="in-progress-section" role="region" aria-label="In Progress Tasks">'),
+      'in-progress region kept as a bespoke collapsible <div>');
+    assert.ok(result.includes('<div class="in-progress-header">'),
+      'in-progress collapse control (header) intact');
+    assert.ok(result.includes('<div class="recent-activity-section" role="region" aria-label="Recent activity">'),
+      'recent-activity region kept as a bespoke collapsible <div>');
+    assert.ok(!/<section class="section"[^>]*aria-label="In Progress Tasks"/.test(result),
+      'in-progress region was NOT force-fitted onto renderSection');
+  });
+});
+
+// =============================================================================
 // Periodicals group rendering (LIN-341)
 // =============================================================================
 
