@@ -1212,3 +1212,105 @@ describe('buildTestSessionSummary', () => {
     assert.match(buildTestSessionSummary({ sessionId: 's' }).outcome, /0 tasks/);
   });
 });
+
+// ─── Per-session page: brief/recap join present-branch (LIN-1003 close-out) ───
+// Discharges the LIN-1003 review ledger item ("What CI Did Not Prove"): the
+// brief/recap cache-join PRESENT branch was proven only at the renderer (the
+// unit test hand-feeds `issueContext`) and the e2e seeds NO cached brief/recap,
+// so in CI the Task-context section only ever rendered the empty/miss path. A
+// keying regression — joining on the human `LIN-` identifier instead of the
+// issue UUID — would silently render every panel as a "miss" with zero test
+// failure. These drive the REAL route handler end-to-end: a session whose worker
+// loop carries an issue UUID, brief/recap caches that hit ONLY for that exact
+// (urlKey, UUID) tuple, and assert the present body renders through the route.
+describe('GET /observation/session/:sessionId — brief/recap join (LIN-1003)', () => {
+  const ISSUE_UUID = '11111111-2222-3333-4444-555555555555';
+
+  // A worker carrying the issue UUID (pipeline-loops copies item.issueId →
+  // loop.issueId, pipeline-loops.js:324) + a [done] marker → terminal session.
+  function workerWithUuid(id, identifier, sessionId, issueId) {
+    return { id, sessionId, issueId, issueIdentifier: identifier, issueTitle: `Title ${identifier}`, promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken', feedback: [{ message: '[done] shipped it', timestamp: NOW_ISO }] };
+  }
+
+  // A cache store that hits ONLY for the exact (urlKey, UUID) tuple and records
+  // the keys it was asked for — so the test pins the join key to the UUID.
+  function recordingCacheStore(payload) {
+    return {
+      calls: [],
+      async get(urlKey, issueId) {
+        this.calls.push({ urlKey, issueId });
+        if (urlKey === 'ws-a' && issueId === ISSUE_UUID) return payload;
+        return null;
+      }
+    };
+  }
+
+  function makeRouterWithCaches({ briefCacheStore, recapCacheStore }) {
+    const perWorkspace = {
+      'ws-a': {
+        live: [],
+        history: [autopilotHistoryItem('sess-ctx', 'LIN-900'), workerWithUuid('w-ctx', 'LIN-901', 'sess-ctx', ISSUE_UUID)],
+        agentStatus: [agentStatusDone('sess-ctx', 'LIN-900'), agentStatusDone('w-ctx', 'LIN-901')]
+      }
+    };
+    const { dispatchQueueStore, agentStatusStore } = makeStores(perWorkspace);
+    return createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore, agentStatusStore,
+      observationSessionsStore: null,
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
+      briefCacheStore, recapCacheStore,
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      fetchWorkspaceIssues: async () => [],
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({})
+    });
+  }
+
+  function driveSessionPage(router) {
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/observation/session/:sessionId');
+    const { req, res } = makeReqRes({
+      session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
+      workspace: { urlKey: 'ws-a' },
+      params: { sessionId: 'sess-ctx' }
+    });
+    return handler(req, res).then(() => res);
+  }
+
+  test('renders the cached brief + recap present body, joined by the issue UUID (not the LIN- identifier)', async () => {
+    const briefCacheStore = recordingCacheStore({ brief: 'CACHED-BRIEF-BODY', model: 'openai/gpt-x', generatedAt: NOW_ISO });
+    const recapCacheStore = recordingCacheStore({ recap: 'CACHED-RECAP-BODY', model: 'openai/gpt-x', generatedAt: NOW_ISO });
+    const router = makeRouterWithCaches({ briefCacheStore, recapCacheStore });
+    const res = await driveSessionPage(router);
+
+    assert.equal(res.statusCode, 200);
+    const html = res.sentBody;
+    assert.ok(html, 'the page rendered');
+    // The load-bearing claim: the join keys on the issue UUID, never the human id.
+    assert.deepEqual(briefCacheStore.calls, [{ urlKey: 'ws-a', issueId: ISSUE_UUID }], 'brief join keyed by (urlKey, issue UUID)');
+    assert.deepEqual(recapCacheStore.calls, [{ urlKey: 'ws-a', issueId: ISSUE_UUID }], 'recap join keyed by (urlKey, issue UUID)');
+    // The PRESENT body rendered through the real route — the exact ledger gap.
+    assert.ok(html.includes('CACHED-BRIEF-BODY'), 'cached brief body rendered on the page');
+    assert.ok(html.includes('CACHED-RECAP-BODY'), 'cached recap body rendered on the page');
+    assert.ok(html.includes('sess-ctx-panel--present'), 'the present-branch panel rendered');
+    assert.ok(!html.includes('session-brief-generate'), 'no cache-miss affordance for a present brief');
+    assert.ok(!html.includes('session-recap-generate'), 'no cache-miss affordance for a present recap');
+  });
+
+  test('a cache miss still keys by the UUID and renders the explicit generate affordance (never an auto-spend)', async () => {
+    const briefCacheStore = { calls: [], async get(urlKey, issueId) { this.calls.push({ urlKey, issueId }); return null; } };
+    const recapCacheStore = { calls: [], async get(urlKey, issueId) { this.calls.push({ urlKey, issueId }); return null; } };
+    const router = makeRouterWithCaches({ briefCacheStore, recapCacheStore });
+    const res = await driveSessionPage(router);
+
+    assert.equal(res.statusCode, 200);
+    const html = res.sentBody;
+    assert.deepEqual(briefCacheStore.calls, [{ urlKey: 'ws-a', issueId: ISSUE_UUID }], 'miss path still keys by the UUID');
+    assert.ok(html.includes('session-brief-generate'), 'cache miss shows the brief generate affordance');
+    assert.ok(html.includes('session-recap-generate'), 'cache miss shows the recap generate affordance');
+    assert.ok(!html.includes('sess-ctx-panel--present'), 'no present panel when both caches miss');
+  });
+});

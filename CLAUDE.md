@@ -38,7 +38,7 @@ routes/
   dispatch.js          Dispatch queue API (user + consumer endpoints)
   proxy.js             Linear API proxy (token auth, read/write endpoints, cycles, labels, task automation)
   collective.js        Collective experiment (experimental): page, multi-workspace dispatch fan-out, Yap state/say proxy (LIN-450)
-  dashboard.js         Autopilot Observation page (first-class, LIN-595): /observation page + sessionId-grouped sessions feed + merged cross-workspace Loop feed, on-demand run-/session-summary, session-context, lazy Linear hydration (LIN-509). /dashboard 302s to /observation; data endpoints keep their /api/dashboard/* paths
+  dashboard.js         Autopilot Observation page (first-class, LIN-595): /observation page + sessionId-grouped sessions feed + merged cross-workspace Loop feed, on-demand run-/session-summary, session-context, lazy Linear hydration (LIN-509). /dashboard 302s to /observation; data endpoints keep their /api/dashboard/* paths. Also the dedicated per-session page GET /observation/session/:sessionId (LIN-1003): server-rendered snapshot via the NON-lean getSessionsForWorkspace read (the lean point-read drops feedback[]) + a cache-only brief/recap join over distinct loop.issueId UUIDs, rendered by lib/render-session.js; 404s an unknown/cross-workspace sessionId
   workspace-api.js     Workspace API routes (prompts, recommendations, audit, comments, images)
   task-chat.js         Task-chat view (experimental, taskChat flag): per-task conversational page
   next-run.js          Suggested-next-run view (experimental, nextRun flag): page + suggest endpoint that generates grounded goal options for the next autopilot run; accept hands the chosen goal to the dispatch launch path (LIN-603)
@@ -70,6 +70,7 @@ lib/
   render-dispatch.js   Dispatch page renderer (prompt, queue, tokens, history)
   render-collective.js Collective page renderer (experimental discussion shell)
   render-observation.js Autopilot Observation page renderer (first-class; mobile-first feed shell + collapsible completed archive, Swipe-modeled; LIN-595)
+  render-session.js    Dedicated per-session page renderer (LIN-1003, Phase 1 of LIN-950): server-rendered snapshot on the shared shell — overview, per-run telemetry/timings, raw link-rich transcript (loop.feedback[]), and cache-joined brief/recap panels (present body OR explicit generate affordance on a miss; never auto-spends an LLM call); telemetry.model rendered only when present
   render-roadmap.js    Roadmap page renderer (delivery-focused)
   render-ship.js       Ship page renderer (radial view shell)
   render-swim.js       Swim lanes page renderer
@@ -173,6 +174,7 @@ public/
   dispatch.css / dispatch.js    Dispatch page (prompt, queue, tokens, history)
   collective.css / collective.js  Collective page (setup, transcript poll, say box)
   observation.css / observation.js  Autopilot Observation page (sessionId-grouped sessions poll, status banner, workspace filters, Level-1 active feed + collapsible completed archive, Level-2 session cards with status pill / one-sentence summary / runtime+model / per-worker-run progress bar, Level-3 drill-down: tasks-touched + relationships (session-context) with lazy Linear hydration, per-task worker-session tree with phase/recap/metric-chips, per-node activity log + produced-artifact links + on-demand run-summary next steps; LIN-595)
+  session.css                   Dedicated per-session page (LIN-1003): server-rendered snapshot styling (overview / runs / transcript / brief-recap panels), no client JS
   roadmap.css / roadmap.js      Roadmap page
   ship.css / ship.js            Ship radial view
   swim.css / swim.js            Swim lanes view
