@@ -178,6 +178,9 @@
   width: 100%;
   padding: 0.65rem 0.8rem;
   color: var(--text);
+  /* The whole head toggles run detail (LIN-944); signal clickability. Inline head
+     controls (e.g. `.obs-summary-gen`) reset their own cursor. */
+  cursor: pointer;
 }
 
 /* Header top line (LIN-928, design §4): a growing `headmain` cluster on the left

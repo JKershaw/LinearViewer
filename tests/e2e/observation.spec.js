@@ -188,6 +188,26 @@ test.describe('Autopilot Observation page (first-class)', () => {
       await expect(card.locator('.obs-session-body')).toBeVisible();
     });
 
+    test('clicking anywhere on the card head toggles the body (LIN-944)', async ({ page }) => {
+      await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+      await clearRuns(page);
+      await seedQueuedRun(page, { issueIdentifier: 'LIN-944', issueTitle: 'Whole-box toggle' });
+
+      await page.goto(OBSERVATION_URL);
+      await page.waitForLoadState('networkidle');
+      const card = page.locator('.obs-session').filter({ hasText: 'Whole-box toggle' });
+      await expect(card).toBeVisible();
+      const body = card.locator('.obs-session-body');
+      await expect(body).toBeHidden();
+      // The whole head is the tap target now (LIN-944) — click the topline, not the
+      // dedicated `.obs-disc` control, and the card still expands.
+      await card.locator('.obs-session-topline').click();
+      await expect(body).toBeVisible();
+      // Clicking the head again collapses it.
+      await card.locator('.obs-session-topline').click();
+      await expect(body).toBeHidden();
+    });
+
     test('the expanded body drills into the tasks the session touched (Level 3)', async ({ page }) => {
       await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       await clearRuns(page);
