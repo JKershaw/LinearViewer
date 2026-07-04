@@ -453,6 +453,109 @@ describe('GET /api/dashboard/sessions', () => {
     assert.equal(s.status, 'error');
   });
 
+  // ── Session-level "waiting on user" rollup (LIN-1005) ────────────────────────
+  test('a [blocked] feedback marker surfaces a session-level waiting state + message', async () => {
+    // Non-terminal session (live autopilot anchor) whose worker posted a
+    // [blocked] feedback marker but no agent-status blocked entry — the
+    // feedback-only channel the fold otherwise misses.
+    const blockedWorker = {
+      id: 'w-b', sessionId: 'sess-b', issueIdentifier: 'LIN-401', issueTitle: 'Blocked worker',
+      promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken',
+      feedback: [{ message: '[blocked] need your decision on the auth flow', timestamp: NOW_ISO }]
+    };
+    const perWorkspace = {
+      'ws-a': { live: [autopilotLiveItem('sess-b', 'LIN-400')], history: [blockedWorker], agentStatus: [] }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    const s = findSession(res.jsonBody, 'sess-b');
+    assert.ok(s, 'waiting session is present');
+    assert.equal(s.terminal, false, 'a [blocked] session is NOT terminal');
+    assert.equal(s.status, 'waiting');
+    assert.equal(s.waiting, true);
+    assert.match(s.waitingMessage, /need your decision on the auth flow/);
+  });
+
+  test('an agent-status blocked run surfaces waiting even without a [blocked] feedback marker', async () => {
+    // The other, independent channel: agentState==='waiting' from an agent-status
+    // `blocked` entry (a close-out blocker awaiting verification, e.g. LIN-874).
+    const blockedWorker = {
+      id: 'w-ab', sessionId: 'sess-ab', issueIdentifier: 'LIN-411', issueTitle: 'Worker',
+      promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken'
+    };
+    const blockedStatus = { dispatchId: 'w-ab', taskIdentifier: 'LIN-411', action: 'implementation', status: 'blocked', summary: 'awaiting verification runs before close', timestamp: NOW_ISO };
+    const perWorkspace = {
+      'ws-a': { live: [autopilotLiveItem('sess-ab', 'LIN-410')], history: [blockedWorker], agentStatus: [blockedStatus] }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    const s = findSession(res.jsonBody, 'sess-ab');
+    assert.ok(s, 'waiting session is present');
+    assert.equal(s.status, 'waiting');
+    assert.equal(s.waiting, true);
+    assert.match(s.waitingMessage, /awaiting verification/, 'falls back to the blocked run summary');
+  });
+
+  test('a session that emitted [blocked] then finished is done, not waiting (terminal precedence)', async () => {
+    // [blocked] is a pause signal, not terminal — but a later [done] wins. The
+    // session must report done with no lingering waiting flag.
+    const worker = {
+      id: 'w-bd', sessionId: 'sess-bd', issueIdentifier: 'LIN-421', issueTitle: 'Worker',
+      promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken',
+      feedback: [
+        { message: '[blocked] waiting on you', timestamp: NOW_ISO },
+        { message: '[done] resolved and shipped', timestamp: NOW_ISO }
+      ]
+    };
+    const perWorkspace = {
+      'ws-a': { live: [], history: [autopilotHistoryItem('sess-bd', 'LIN-420'), worker], agentStatus: [agentStatusDone('sess-bd', 'LIN-420')] }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    const s = findSession(res.jsonBody, 'sess-bd');
+    assert.ok(s, 'terminal session is present');
+    assert.equal(s.terminal, true);
+    assert.equal(s.status, 'done');
+    assert.equal(s.waiting, false);
+    assert.equal(s.waitingMessage, null);
+  });
+
+  test('a terminal session with a lingering blocked worker is done, NOT waiting (session-level terminal gate)', async () => {
+    // The SESSION-level precedence gap (LIN-1005 review): the autopilot ANCHOR
+    // finished (agentStatus completed → session terminal), but a SEPARATE worker
+    // loop is still [blocked] with no later [done]. `deriveSessionWaiting` unions
+    // across all loops and would report the worker as waiting; the emitted flag
+    // must be gated on SESSION terminality so a finished session is never waiting.
+    const blockedWorker = {
+      id: 'w-tw', sessionId: 'sess-tw', issueIdentifier: 'LIN-431', issueTitle: 'Worker',
+      promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken',
+      feedback: [{ message: '[blocked] need your decision on the auth flow', timestamp: NOW_ISO }]
+    };
+    const perWorkspace = {
+      'ws-a': { live: [], history: [autopilotHistoryItem('sess-tw', 'LIN-430'), blockedWorker], agentStatus: [agentStatusDone('sess-tw', 'LIN-430')] }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    const s = findSession(res.jsonBody, 'sess-tw');
+    assert.ok(s, 'terminal session is present');
+    assert.equal(s.terminal, true);
+    assert.equal(s.status, 'done', 'terminal status wins');
+    assert.equal(s.waiting, false, 'the emitted waiting flag is gated on session terminality');
+    assert.equal(s.waitingMessage, null, 'no lingering blocked message on a done session');
+  });
+
   test('a non-terminal session idle > 24h is derived stale and bucketed out of Active', async () => {
     // Worker that died without a terminal marker, last seen 2 days ago (Bug 3).
     const OLD_ISO = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
@@ -833,6 +936,25 @@ describe('deriveSessionStatus', () => {
   test('taskDone defaults to false (the per-poll feed never supplies it)', () => {
     // The cost-contract call site omits taskDone entirely; it must degrade to error.
     assert.equal(deriveSessionStatus({ terminal: true, stale: false, hasError: true }), 'error');
+  });
+
+  // ── waiting (LIN-1005) ──────────────────────────────────────────────────────
+  test('a non-terminal waiting session is waiting', () => {
+    assert.equal(deriveSessionStatus({ terminal: false, stale: false, hasError: false, waiting: true }), 'waiting');
+  });
+
+  test('waiting defaults to false (existing call sites stay in-progress)', () => {
+    assert.equal(deriveSessionStatus({ terminal: false, stale: false, hasError: false }), 'in-progress');
+  });
+
+  test('terminal wins over waiting (a finished session is never waiting)', () => {
+    // [blocked] is non-terminal, but if the session is actually terminal, done wins.
+    assert.equal(deriveSessionStatus({ terminal: true, stale: false, hasError: false, waiting: true }), 'done');
+    assert.equal(deriveSessionStatus({ terminal: true, stale: false, hasError: true, waiting: true }), 'error');
+  });
+
+  test('stale wins over waiting (a day-dead session is not shown as waiting)', () => {
+    assert.equal(deriveSessionStatus({ terminal: false, stale: true, hasError: false, waiting: true }), 'stale');
   });
 });
 

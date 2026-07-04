@@ -312,6 +312,9 @@
 .obs-summary-line { display: inline; }
 .obs-summary-status { font-style: italic; }
 .obs-summary-dim { color: var(--muted); }
+/* "Waiting on you" (LIN-1005): amber running-family, weighted so the
+   needs-you signal reads at a glance without minting a new status colour. */
+.obs-summary-waiting { color: var(--amber); font-weight: 600; }
 /* Most-recent run kind beside "working…" (LIN-631). */
 .obs-summary-kind {
   font-size: 0.72rem;

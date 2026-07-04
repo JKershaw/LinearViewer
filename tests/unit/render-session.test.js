@@ -89,6 +89,44 @@ describe('render-session: tasks + overview', () => {
   });
 });
 
+describe('render-session: waiting banner (LIN-1005)', () => {
+  test('renders the "waiting on you" alert banner with the message + follow-up CTA when waiting', () => {
+    const html = renderSessionPage(
+      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], waiting: true, waitingMessage: 'need your decision on the auth flow' },
+      {}
+    );
+    assert.match(html, /data-testid="session-waiting-banner"/);
+    assert.match(html, /role="alert"/);
+    assert.match(html, /Waiting on you/);
+    assert.match(html, /data-testid="session-waiting-message"[^>]*>need your decision on the auth flow</);
+    // The banner steers the human to the Phase 2 follow-up box.
+    assert.match(html, /data-testid="session-waiting-cta"[^>]*>[^<]*follow-up box/);
+  });
+
+  test('no banner when the session is not waiting', () => {
+    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [] }, {});
+    assert.ok(!html.includes('data-testid="session-waiting-banner"'), 'no banner by default');
+  });
+
+  test('the banner renders without a message when none is available (agent-status-only block)', () => {
+    const html = renderSessionPage(
+      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], waiting: true, waitingMessage: null },
+      {}
+    );
+    assert.match(html, /data-testid="session-waiting-banner"/);
+    assert.ok(!html.includes('data-testid="session-waiting-message"'), 'no message element when message is null');
+  });
+
+  test('the waiting message is HTML-escaped', () => {
+    const html = renderSessionPage(
+      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], waiting: true, waitingMessage: '<script>alert(1)</script>' },
+      {}
+    );
+    assert.ok(!html.includes('<script>alert(1)</script>'), 'raw script must not leak');
+    assert.match(html, /&lt;script&gt;/);
+  });
+});
+
 describe('render-session: telemetry + model omission', () => {
   test('renders telemetry chips (runtime, heartbeats, artifacts)', () => {
     const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [] });

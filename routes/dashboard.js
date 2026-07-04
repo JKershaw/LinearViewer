@@ -33,7 +33,7 @@ import { renderObservationPage } from '../lib/render-observation.js';
 import { renderSessionPage } from '../lib/render-session.js';
 import { getLoopsForWorkspace, getSessionsForWorkspace, deriveIssueGraph } from '../lib/pipeline-loops.js';
 import { buildSessionContextGraph } from '../lib/context-graph.js';
-import { deriveTerminalStatus, deriveCompletedAt } from '../lib/dispatch-terminal.js';
+import { deriveTerminalStatus, deriveCompletedAt, findWakeEvent } from '../lib/dispatch-terminal.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
 import { createSessionsFeedCache } from '../lib/sessions-feed-cache.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
@@ -170,11 +170,15 @@ export function sessionIsTerminal(session) {
  * The observation session status string — the single contract consumed by the
  * client's icon/label maps and CSS (`public/observation.js` / `observation.css`).
  *
- * Five values: `stale`, `in-progress`, `error`, `done`, and `done-with-warning`
- * (LIN-749). `done-with-warning` is the done/error split's 5th outcome: a
- * terminal session that had at least one errored run but whose touched task is
- * now Done — the autopilot finished the task despite the errors (the LIN-744
- * case: two runs failed to launch iTerm, the third completed the work).
+ * Six values: `stale`, `in-progress`, `waiting`, `error`, `done`, and
+ * `done-with-warning`. `waiting` (LIN-1005) is the session-level "this session
+ * needs you" rollup — a non-terminal session paused on a human (an agent-status
+ * `blocked` run and/or a latest `[blocked]`/`[pending]` feedback marker). It is
+ * deliberately NON-terminal: `[blocked]` stays a pause/wait signal, never a
+ * terminal state, so a genuinely finished session is never shown as waiting.
+ * `done-with-warning` (LIN-749) is the done/error split's 5th outcome: a terminal
+ * session that had at least one errored run but whose touched task is now Done —
+ * the autopilot finished the task despite the errors (the LIN-744 case).
  *
  * `taskDone` is the ONLY task-state input. It is NOT proof the task flipped
  * *during* this run (no start-state baseline is recorded; that precise per-run
@@ -183,18 +187,73 @@ export function sessionIsTerminal(session) {
  * at the terminal boundary, never from the per-poll feed, which honours an
  * explicit no-Linear cost contract and always passes `taskDone=false`. `stale`
  * only ever holds for non-terminal sessions, so its branch is checked first to
- * keep the four pre-existing outcomes byte-identical.
+ * keep the pre-existing outcomes byte-identical; `waiting` is a non-terminal
+ * refinement checked AFTER terminal outcomes (a session that actually finished
+ * wins over any lingering wait signal) and defaults false so existing call sites
+ * that omit it stay byte-identical.
  *
  * Pure; exported for unit tests.
  *
- * @param {{terminal: boolean, stale: boolean, hasError: boolean, taskDone?: boolean}} input
- * @returns {'stale'|'in-progress'|'error'|'done'|'done-with-warning'}
+ * @param {{terminal: boolean, stale: boolean, hasError: boolean, waiting?: boolean, taskDone?: boolean}} input
+ * @returns {'stale'|'in-progress'|'waiting'|'error'|'done'|'done-with-warning'}
  */
-export function deriveSessionStatus({ terminal, stale, hasError, taskDone = false }) {
+export function deriveSessionStatus({ terminal, stale, hasError, waiting = false, taskDone = false }) {
   if (stale) return 'stale';
-  if (!terminal) return 'in-progress';
-  if (hasError) return taskDone ? 'done-with-warning' : 'error';
-  return 'done';
+  if (terminal) return hasError ? (taskDone ? 'done-with-warning' : 'error') : 'done';
+  if (waiting) return 'waiting';
+  return 'in-progress';
+}
+
+// The wake markers that roll up to a session-level "waiting on user" state
+// (LIN-1005). Mirrors WAITING_WAKE_MARKERS in pipeline-loops.js — a run whose
+// pre-derived `wakeMarker` is one of these is paused on a human, not finished.
+const WAITING_WAKE_MARKERS = new Set(['blocked', 'pending']);
+
+/**
+ * Is a single ENRICHED loop (effectiveAgentState applied) waiting on a human?
+ *
+ * Two independent runner channels, unioned (LIN-1005 — neither subsumes the
+ * other): (a) an agent-status `blocked` entry surfaces as `agentState==='waiting'`
+ * (lib/pipeline-loops.js `_deriveAgentState`), and (b) a `[blocked]`/`[pending]`
+ * *feedback* marker, pre-derived at build time as `wakeMarker` so this read is
+ * lean-safe (never touches raw `feedback[]`, which the feed drops). Terminal wins:
+ * a run that actually finished (a terminal feedback marker folded in by
+ * `effectiveAgentState`, or a native complete/error) is never waiting.
+ *
+ * @param {Object} loop - enriched loop (post-`enrichLoop`)
+ * @returns {boolean}
+ */
+function loopIsWaiting(loop) {
+  if (!loop || isTerminalLoop(loop)) return false;
+  if (loop.agentState === 'waiting') return true;
+  // Prefer the build-time `wakeMarker` (present on every reconstructed loop, lean
+  // or not); fall back to scanning raw feedback for loops built elsewhere.
+  const marker = loop.wakeMarker !== undefined
+    ? loop.wakeMarker
+    : (findWakeEvent(loop.feedback)?.marker || null);
+  return marker != null && WAITING_WAKE_MARKERS.has(marker);
+}
+
+/**
+ * Roll a session's ENRICHED loops up to a session-level waiting signal (LIN-1005):
+ * `{ waiting, message }`. `waiting` is true when any loop is waiting on a human;
+ * `message` is the first available blocked/pending text (falling back to the
+ * waiting run's agent summary) so the UI can show the actual message rather than a
+ * manufactured taxonomy. Pure; the single truth shared by the feed payload and the
+ * session-page banner so they can never disagree.
+ *
+ * @param {Array<Object>} enrichedLoops - loops already run through `enrichLoop`
+ * @returns {{waiting: boolean, message: string|null}}
+ */
+function deriveSessionWaiting(enrichedLoops) {
+  let waiting = false;
+  let message = null;
+  for (const l of enrichedLoops) {
+    if (!loopIsWaiting(l)) continue;
+    waiting = true;
+    if (!message) message = l.waitingMessage || l.agentSummary || null;
+  }
+  return { waiting, message };
 }
 
 /**
@@ -389,15 +448,27 @@ export function createDashboardRoutes({
     // mutation — so a later heartbeat advances lastActivity and un-stales it.
     const stale = !terminal && lastActivityMs > 0 && (Date.now() - lastActivityMs) > STALE_AFTER_MS;
 
+    // Session-level "waiting on user" rollup (LIN-1005): unions any agent-status
+    // `blocked` run and any latest `[blocked]`/`[pending]` feedback marker across
+    // the session's loops, from the lean-safe pre-derived per-loop facts. Terminal
+    // precedence is gated HERE on the emitted flag (not only in `deriveSessionStatus`):
+    // the session anchor can post `[done]` while a worker loop lingers `[blocked]`, so
+    // the raw rollup must be `&&`-gated on session terminality or the flag contradicts
+    // the `done` status ("a finished session is never waiting", LIN-1005 review).
+    const { waiting: rawWaiting, message: rawWaitingMessage } = deriveSessionWaiting(enriched);
+    const waiting = !terminal && rawWaiting;
+    const waitingMessage = waiting ? rawWaitingMessage : null;
+
     // The per-poll feed honours an explicit no-Linear cost contract, so it never
     // looks up the touched task's current state — `taskDone` stays false here.
     // The `done-with-warning` upgrade (LIN-749) is applied client-side from the
     // existing drill-down hydration seam; `deriveSessionStatus` owns the status
-    // contract (and its 5th value) in one unit-tested place for both paths.
+    // contract (and its `waiting` value) in one unit-tested place for both paths.
     const status = deriveSessionStatus({
       terminal,
       stale,
-      hasError: enriched.some(l => l.agentState === 'error')
+      hasError: enriched.some(l => l.agentState === 'error'),
+      waiting
     });
 
     // One segment per worker run for the progress bar (state-colored; the live
@@ -443,6 +514,10 @@ export function createDashboardRoutes({
       status,
       terminal,
       stale,
+      // Feed flag (LIN-1005): the client badges/filters waiting sessions and
+      // surfaces the blocked message text. Null message when nothing is waiting.
+      waiting,
+      waitingMessage: waiting ? waitingMessage : null,
       runCount: runs.length,
       runs,
       recentKind: recentRunKind(children),
@@ -571,7 +646,20 @@ export function createDashboardRoutes({
       // lazy-hydration discipline). Never call the generating path on load.
       const issueContext = await joinSessionIssueContext(session, workspace.urlKey);
 
-      const html = renderSessionPage({ session, sessionId, issueContext, urlKey: workspace.urlKey }, pageOptions);
+      // Session-level "waiting on user" banner (LIN-1005): the SAME rollup the
+      // observation feed uses, computed here over the non-lean session's enriched
+      // loops so the page and the feed agree. The banner directs the human to the
+      // Phase 2 follow-up box. Terminal-gated identically to `buildSessionPayload`
+      // (a finished session is never waiting, even with a lingering blocked worker).
+      const enrichedLoops = (Array.isArray(session.loops) ? session.loops : []).map(enrichLoop);
+      const { waiting: rawWaiting, message: rawWaitingMessage } = deriveSessionWaiting(enrichedLoops);
+      const waiting = !sessionIsTerminal(session) && rawWaiting;
+      const waitingMessage = waiting ? rawWaitingMessage : null;
+
+      const html = renderSessionPage(
+        { session, sessionId, issueContext, waiting, waitingMessage, urlKey: workspace.urlKey },
+        pageOptions
+      );
       res.send(html);
     } catch (error) {
       next(error);

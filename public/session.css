@@ -24,6 +24,41 @@
 .sess-section { margin-bottom: 1.5rem; }
 .sess-muted { color: var(--muted); font-family: var(--font-content); }
 
+/* ── "Waiting on you" alert banner (LIN-1005) ─────────────────────────────────
+   Prominent, amber running-family (no new status colour). Shown at the top of a
+   session that is paused on a human; directs to the Phase 2 follow-up box. */
+.sess-waiting {
+  margin: 0 0 1.5rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--amber);
+  border-left-width: 4px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--amber) 10%, var(--card));
+}
+.sess-waiting-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-content);
+  font-weight: 600;
+  color: var(--text);
+}
+.sess-waiting-icon { color: var(--amber); }
+.sess-waiting-title { font-size: 1rem; }
+.sess-waiting-msg {
+  margin: 0.5rem 0 0;
+  font-family: var(--font-structural);
+  font-size: 0.9rem;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+.sess-waiting-cta {
+  margin: 0.5rem 0 0;
+  font-family: var(--font-content);
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
 /* ── Overview ─────────────────────────────────────────────────────────────── */
 .sess-kv {
   display: flex;
