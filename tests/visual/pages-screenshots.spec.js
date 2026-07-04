@@ -63,6 +63,16 @@ async function capture(page, path, name, { settleMs = 0 } = {}) {
 // richest, deterministic target; legal + kpis round out the public surface.
 // ---------------------------------------------------------------------------
 test.describe('Static pages', () => {
+  // The unauthenticated home is the bespoke Harbour showcase (LIN-980) — the
+  // richest public surface. Captured in light and dark so the showcase's
+  // dark-safety is provable rather than eyeballed.
+  test('landing', async ({ page }) => {
+    await capture(page, '/', 'landing');
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await capture(page, '/', 'landing-dark');
+    await page.emulateMedia({ colorScheme: 'light' });
+  });
+
   test('styleguide', async ({ page }) => {
     await capture(page, '/styleguide', 'styleguide');
   });

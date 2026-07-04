@@ -53,7 +53,7 @@ import { buildPeriodicalNodes } from './lib/periodicals.js'
 import { parseRepoFromDescription } from './lib/prompt-formatters.js'
 import { renderPage, renderErrorPage, renderUpstreamAwareErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
 import { isAuthError } from './lib/errors.js'
-import { renderLandingHero } from './lib/components/landing-hero.js'
+import { renderLandingPage } from './lib/render-landing.js'
 import { isGitHubConfigured } from './lib/providers/github/app-auth.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken } from './lib/token-refresh.js'
@@ -170,14 +170,10 @@ const landingTrees = landingData.projects
     return { project, incomplete, completed, completedCount }
   })
 
-// The brand hero (LIN-726) that fronts every static-landing render. The GitHub
-// CTA is gated on the GitHub App being configured — read from env at startup,
-// the same lifecycle as the rest of the pre-rendered landing — so the landing
-// never offers a sign-in path that would 503. Uses the SAME shared predicate
-// (isGitHubConfigured) as the /auth/github route guard and the settings add
-// affordance (LIN-761), so the three consumers can never disagree: a CLIENT_ID-only
-// partial config no longer promises a sign-in the flow can't complete.
-const landingHeroHtml = renderLandingHero({ githubEnabled: isGitHubConfigured() })
+// The bespoke landing showcase (LIN-980) owns the brand hero itself; it gates
+// the GitHub CTA on the SAME `isGitHubConfigured()` predicate as the
+// /auth/github route guard and the settings add affordance (LIN-761), threaded
+// per-request at the render call sites below so the three can never disagree.
 
 // =============================================================================
 // Database & Session Setup
@@ -811,7 +807,7 @@ async function handleWorkspaceRemoval(session, workspaceId, res) {
   return new Promise((resolve) => {
     session.destroy((err) => {
       if (err) console.error('Session destroy error:', err);
-      const html = renderPage(landingTrees, [], [], landingData.organizationName, { isLanding: true, deployInfo, heroHtml: landingHeroHtml });
+      const html = renderLandingPage({ deployInfo, githubEnabled: isGitHubConfigured() });
       res.send(html);
       resolve();
     });
@@ -898,8 +894,8 @@ app.get('/', (req, res) => {
   const hasNoAuth = !process.env.LINEAR_ACCESS_TOKEN && oauthEnvVars.some(v => !process.env[v])
   const setupNotice = (isLocalhost && hasNoAuth) ? 'setup' : null
 
-  // Unauthenticated users see the static landing page
-  const html = renderPage(landingTrees, [], [], landingData.organizationName, { isLanding: true, deployInfo, setupNotice, heroHtml: landingHeroHtml })
+  // Unauthenticated users see the bespoke Harbour showcase landing (LIN-980).
+  const html = renderLandingPage({ deployInfo, setupNotice, githubEnabled: isGitHubConfigured() })
   res.send(html)
 })
 

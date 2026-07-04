@@ -1744,8 +1744,14 @@ body.is-landing {
 
 /* Genuine light/dark for the landing only. Remaps the same token values the
    .theme-dark sample uses (style.css top), so the grid, hero, CTAs, and the
-   preview tree all flip together — no switcher, and nothing outside the landing
-   is affected. */
+   showcase (LIN-980) all flip together — no switcher, and nothing outside the
+   landing is affected. Mirrors the FULL `.theme-dark` vocabulary — raw tokens,
+   the LIN-785 semantic layer (--text/--muted/--card/--line …), and the status
+   palette (--amber/--slate/-dim companions) — so token-driven landing CSS is
+   dark-safe here exactly as it is under the global `.theme-dark` toggle. The
+   semantic aliases MUST be re-declared at this scope: they are defined on :root
+   as `var(--fg)` etc. and inherit their light computed value otherwise (the raw
+   `--fg` override alone does not reach them). */
 @media (prefers-color-scheme: dark) {
   body.is-landing {
     --bg: #16181d;
@@ -1765,6 +1771,33 @@ body.is-landing {
     --border: #2c313a;
     --border-strong: #3d4450;
     --border-subtle: rgba(255, 255, 255, 0.12);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
+
+    /* Semantic layer (LIN-785) re-bound for the landing's dark path. */
+    --text: var(--fg);
+    --muted: var(--fg-dim);
+    --faint: var(--fg-vdim);
+    --line: var(--border);
+    --line-soft: var(--border-subtle);
+    --card: var(--bg-muted);
+    --card-h: var(--bg-alt);
+    --raised: var(--bg-muted);
+    --inset: var(--bg-alt);
+    --brand: var(--teal);
+    --brand-dim: #2dd4bf;
+    --shadow: var(--shadow-md);
+
+    /* Status palette on dark — raw hues for fills/dots, `-dim` for text. */
+    --green-dim: #4ade80;
+    --amber: #ffc04d;
+    --amber-dim: #ffd27a;
+    --red-dim: #ff9b9b;
+    --slate: #94a3b8;
+    --slate-dim: #cbd5e1;
+    --focus: #6ea8fe;
+
     background-color: var(--bg);
     color: var(--fg);
   }

@@ -18,11 +18,17 @@ test.describe('Authentication Flow', () => {
     await expect(page.locator('[data-testid="landing-cta-linear"]')).toBeVisible();
   });
 
-  test('unauthenticated users do not see navigation actions', async ({ page }) => {
+  test('unauthenticated users see the shared nav sign-in but no authed chrome', async ({ page }) => {
     await page.goto('/');
 
-    // Navigation actions should not be present on landing page
-    await expect(page.locator('.nav-action')).toHaveCount(0);
+    // LIN-980: the landing composes D's shared header nav (isLanding branch) —
+    // so it DOES carry a sign-in action, but none of the authenticated-only
+    // chrome (workspace/team selectors, reset, logout).
+    await expect(page.locator('nav.nav-bar a.login')).toBeVisible();
+    await expect(page.locator('[data-selector="workspace"]')).toHaveCount(0);
+    await expect(page.locator('[data-selector="team"]')).toHaveCount(0);
+    await expect(page.locator('.reset-view')).toHaveCount(0);
+    await expect(page.locator('a.logout')).toHaveCount(0);
   });
 
   test('login link exists and points to auth endpoint', async ({ page }) => {
