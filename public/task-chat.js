@@ -11,6 +11,7 @@
 
   var data = window.__TASK_CHAT_DATA__ || {};
   var urlKey = data.urlKey || '';
+  var savedChatsAvailable = data.savedChatsAvailable === true;
 
   var idInput = document.getElementById('task-chat-id');
   var questionInput = document.getElementById('task-chat-question');
@@ -19,6 +20,11 @@
   var emptyState = document.getElementById('task-chat-empty');
   var activeLabel = document.getElementById('task-chat-active-label');
   var resetBtn = document.getElementById('task-chat-reset');
+
+  // Saved chats (LIN-1008) — present only when a user identity is available.
+  var saveBtn = document.getElementById('task-chat-save');
+  var savedList = document.getElementById('task-chat-saved-list');
+  var savedEmpty = document.getElementById('task-chat-saved-empty');
 
   if (!idInput || !questionInput || !sendBtn || !transcript) return;
 
@@ -140,7 +146,106 @@
     transcript.innerHTML = '';
     if (activeLabel) activeLabel.textContent = '';
     if (resetBtn) resetBtn.classList.add('hidden');
+    updateSaveVisibility();
     setEmptyVisible(true);
+  }
+
+  // ─── Saved chats (LIN-1008) ─────────────────────────────────────────────────
+
+  // The save button appears once there is a non-empty conversation to save (and
+  // only when saved chats are available at all — no button is rendered otherwise).
+  function updateSaveVisibility() {
+    if (!saveBtn) return;
+    var canSave = savedChatsAvailable && !!activeTask && chatHistory.length > 0;
+    saveBtn.classList.toggle('hidden', !canSave);
+  }
+
+  function renderSavedRows(chats) {
+    if (!savedList) return;
+    savedList.innerHTML = '';
+    var hasChats = Array.isArray(chats) && chats.length > 0;
+    if (savedEmpty) savedEmpty.classList.toggle('hidden', hasChats);
+    if (!hasChats) return;
+
+    chats.forEach(function (chat) {
+      var li = document.createElement('li');
+      li.className = 'task-chat-saved-item';
+      li.setAttribute('data-saved-id', chat.id);
+
+      var meta = chat.taskIdentifier ? chat.taskIdentifier : 'chat';
+      var count = (chat.turnCount || 0) + ' turn' + (chat.turnCount === 1 ? '' : 's');
+      var openBtn = '<button type="button" class="action-btn task-chat-saved-open" data-testid="task-chat-saved-open">open</button>';
+      var delBtn = '<button type="button" class="action-btn task-chat-saved-delete" data-testid="task-chat-saved-delete">delete</button>';
+
+      li.innerHTML =
+        '<span class="task-chat-saved-meta">' + window.escapeHtml(meta) + '</span>' +
+        '<span class="task-chat-saved-title">' + window.escapeHtml(chat.title || 'Saved chat') + '</span>' +
+        '<span class="task-chat-saved-count">' + window.escapeHtml(count) + '</span>' +
+        '<span class="task-chat-saved-actions">' + openBtn + delBtn + '</span>';
+
+      savedList.appendChild(li);
+    });
+  }
+
+  function loadSavedList() {
+    if (!savedChatsAvailable || !savedList) return;
+    window.api('/workspace/' + encodeURIComponent(urlKey) + '/api/task-chat/saved', { on401: false })
+      .then(function (body) { renderSavedRows(body && body.chats); })
+      .catch(function () { /* leave the empty state as-is on error */ });
+  }
+
+  function saveCurrentChat() {
+    if (!savedChatsAvailable || !activeTask || chatHistory.length === 0) return;
+    if (saveBtn) saveBtn.disabled = true;
+    window.api('/workspace/' + encodeURIComponent(urlKey) + '/api/task-chat/saved', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ taskIdentifier: activeTask, transcript: chatHistory }),
+      on401: false,
+      toastOnError: true
+    }).then(function () {
+      loadSavedList();
+      if (typeof window.toast === 'function') window.toast('Chat saved', { type: 'success' });
+    }).catch(function () {
+      /* error surfaced via toastOnError */
+    }).then(function () {
+      if (saveBtn) saveBtn.disabled = false;
+    });
+  }
+
+  // Resume: re-hydrate a saved transcript into the client and continue chatting
+  // through the unchanged replay-each-turn model (there is no live session).
+  function openSavedChat(id) {
+    if (!id) return;
+    window.api('/workspace/' + encodeURIComponent(urlKey) + '/api/task-chat/saved/' + encodeURIComponent(id), { on401: false })
+      .then(function (body) {
+        var chat = body && body.chat;
+        if (!chat) return;
+        chatHistory = (chat.transcript || []).map(function (t) { return { role: t.role, content: t.content }; });
+        activeTask = chat.taskIdentifier || '';
+        idInput.value = activeTask;
+        transcript.innerHTML = '';
+        chatHistory.forEach(function (turn) { appendBubble(turn.role, turn.content); });
+        if (activeLabel) activeLabel.textContent = activeTask ? 'talking to ' + activeTask : '';
+        if (resetBtn) resetBtn.classList.remove('hidden');
+        setEmptyVisible(chatHistory.length === 0);
+        updateSaveVisibility();
+        questionInput.focus();
+      })
+      .catch(function () {
+        if (typeof window.toast === 'function') window.toast('Could not open that chat', { type: 'error' });
+      });
+  }
+
+  function deleteSavedChat(id) {
+    if (!id) return;
+    window.api('/workspace/' + encodeURIComponent(urlKey) + '/api/task-chat/saved/' + encodeURIComponent(id), {
+      method: 'DELETE',
+      on401: false
+    }).then(function () { loadSavedList(); })
+      .catch(function () {
+        if (typeof window.toast === 'function') window.toast('Could not delete that chat', { type: 'error' });
+      });
   }
 
   function setBusy(busy) {
@@ -168,6 +273,7 @@
 
     appendBubble('user', question);
     chatHistory.push({ role: 'user', content: question });
+    updateSaveVisibility();
     questionInput.value = '';
 
     var answerEl = appendBubble('assistant', '');
@@ -236,6 +342,19 @@
 
   sendBtn.addEventListener('click', send);
 
+  if (saveBtn) saveBtn.addEventListener('click', saveCurrentChat);
+
+  // Delegated open/delete on the saved-chat list.
+  if (savedList) {
+    savedList.addEventListener('click', function (e) {
+      var item = e.target.closest ? e.target.closest('.task-chat-saved-item') : null;
+      if (!item) return;
+      var id = item.getAttribute('data-saved-id');
+      if (e.target.classList.contains('task-chat-saved-open')) openSavedChat(id);
+      else if (e.target.classList.contains('task-chat-saved-delete')) deleteSavedChat(id);
+    });
+  }
+
   questionInput.addEventListener('keydown', function (e) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
   });
@@ -244,6 +363,9 @@
   });
 
   if (resetBtn) resetBtn.addEventListener('click', resetConversation);
+
+  // Load the user's saved chats up front (no-op when unavailable).
+  loadSavedList();
 
   // Prefill focus: jump straight to the question when a task is already set.
   if ((idInput.value || '').trim()) questionInput.focus();

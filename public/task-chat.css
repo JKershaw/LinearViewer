@@ -178,3 +178,59 @@
 .hidden {
   display: none !important;
 }
+
+/* Saved chats (LIN-1008): a durable, per-user list of stored transcripts. Each
+   row is a compact machine-fact line (task id + turn count) with a human title
+   and open/delete actions — resume re-hydrates it into the conversation above. */
+.task-chat-convo-head {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.task-chat-saved-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.task-chat-saved-item {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  flex-wrap: wrap;
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.task-chat-saved-meta,
+.task-chat-saved-count {
+  font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
+  color: var(--fg-dim);
+}
+
+.task-chat-saved-title {
+  font-family: var(--font-content);
+  flex: 1 1 12rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-chat-saved-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.task-chat-saved-empty,
+.task-chat-saved-unavailable {
+  color: var(--fg-vdim);
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+}

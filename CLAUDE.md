@@ -40,7 +40,7 @@ routes/
   collective.js        Collective experiment (experimental): page, multi-workspace dispatch fan-out, Yap state/say proxy (LIN-450)
   dashboard.js         Autopilot Observation page (first-class, LIN-595): /observation page + sessionId-grouped sessions feed + merged cross-workspace Loop feed, on-demand run-/session-summary, session-context, lazy Linear hydration (LIN-509). /dashboard 302s to /observation; data endpoints keep their /api/dashboard/* paths. Also the dedicated per-session page GET /observation/session/:sessionId (LIN-1003): server-rendered snapshot via the NON-lean getSessionsForWorkspace read (the lean point-read drops feedback[]) + a cache-only brief/recap join over distinct loop.issueId UUIDs, rendered by lib/render-session.js; 404s an unknown/cross-workspace sessionId
   workspace-api.js     Workspace API routes (prompts, recommendations, audit, comments, images)
-  task-chat.js         Task-chat view (experimental, taskChat flag): per-task conversational page
+  task-chat.js         Task-chat view (experimental, taskChat flag): per-task conversational page + durable saved-chat CRUD under /api/task-chat/saved (LIN-1008): save/list/get/delete gated on the taskChat flag AND req.session.linearUserId (absent → 401, no fabricated id); the literal /saved routes are registered BEFORE /:issueId so Express doesn't misroute `saved` as an issue id; session-auth only
   next-run.js          Suggested-next-run view (experimental, nextRun flag): page + suggest endpoint that generates grounded goal options for the next autopilot run; accept hands the chosen goal to the dispatch launch path (LIN-603)
   test.js              Test-only routes for E2E tests (mock sessions, fixtures)
   legacy-redirects.js  Backward-compatible redirects for old URLs
@@ -129,6 +129,7 @@ lib/
   agent-status-store.js  Agent status append-only log storage (Tier C substrate; loop reconstruction; canonical proxy path /agent/status, /foreman/status deprecated alias)
   report-history-store.js  Durable per-workspace roadmap report runs
   task-snapshot-store.js   Append-only task-history archive: full issue-slice snapshots captured (hash-gated) at the proxy recap/brief read seams; durable, per-task count-capped, read-time diffs (LIN-598)
+  saved-chat-store.js  Durable saved task-chat transcripts (LIN-1008): private per {urlKey, linearUserId}, `{role,content}` transcript + auto-derived title, durable/count-capped (no TTL), hard-delete. Composes custom-prompts CRUD + task-snapshot durability + prompt-trace's session-auth-only privacy posture (content-bearing → deliberately NOT wired into proxy/workspace-api/kpis)
   llm-call-log.js      Append-only per-LLM-call metadata log (model, provider, tokens, cost, time; LIN-418)
   prompt-trace-store.js  Prompt trace storage (LIN-578)
   free-tier-store.js   Free tier usage tracking and rate limiting
@@ -179,7 +180,7 @@ public/
   ship.css / ship.js            Ship radial view
   swim.css / swim.js            Swim lanes view
   swipe.css / swipe.js          Swipe (mobile) view
-  task-chat.css / task-chat.js  Task-chat view (experimental, taskChat flag)
+  task-chat.css / task-chat.js  Task-chat view (experimental, taskChat flag); includes the saved-chats UI (LIN-1008): save button + Saved chats list with open(resume)/delete, re-hydrating a stored transcript into chatHistory and continuing via the unchanged replay-each-turn send() path
   next-run.css / next-run.js    Suggested-next-run view (experimental, nextRun flag): generate button + goal-option cards
   styleguide.css                Styleguide reference page (LIN-457)
   proxy.css / proxy.js          Proxy token management page
