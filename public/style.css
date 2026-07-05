@@ -392,6 +392,21 @@ h1 {
   border-bottom: 1px solid var(--line-soft);
 }
 
+/* Two-row header scaffold (LIN-1058, structural beat). Row 1 groups
+   brand/selectors/actions; the view tab strip (.nav-views, flex-basis:100%)
+   wraps to row 2. Structural scaffolding ONLY — the tab-strip look, active-tab
+   treatment (▸ marker + underline), panel cards, and the responsive `⋯ more`
+   collapse land in the styling pass. Mirrors the prior `.nav-bar` row-1 flex so
+   the intermediate renders as a coherent two-row header, not stacked. */
+.nav-primary-row {
+  flex: 1 1 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-2) 2ch;
+  flex-wrap: wrap;
+}
+
 /* Per-interaction clearance for the pinned header (LIN-984). When a control is
    scrolled into view (a Playwright click's auto-scroll, an in-page anchor jump,
    a focus-driven scroll), the browser stops it flush at the viewport top —
