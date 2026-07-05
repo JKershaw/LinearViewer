@@ -107,6 +107,47 @@ describe('attachments threaded through context fetch (LIN-772)', () => {
 });
 
 // =============================================================================
+// LIN-1067: exact timestamps. ISSUE_DETAIL_QUERY must select the issue-level
+// createdAt/updatedAt and a history connection (createdAt + from/to state), and
+// fetchIssueContext must return those timestamps on the issue plus a normalized,
+// toState-filtered context.stateTransitions. Source-pinned (this path runs real
+// GraphQL the e2e suite mocks away), mirroring the LIN-772/LIN-1066 guardrails.
+// =============================================================================
+describe('exact timestamps threaded through context fetch (LIN-1067)', () => {
+  test('ISSUE_DETAIL_QUERY selects issue-level createdAt and updatedAt', () => {
+    const q = extractQuery(linearSource, 'ISSUE_DETAIL_QUERY');
+    // Anchored to the issue level (before the comments/children connections) so we
+    // are not matching the comment-level createdAt.
+    const issueHead = q.slice(0, q.indexOf('comments'));
+    assert.match(issueHead, /\bcreatedAt\b/, 'must select issue-level createdAt');
+    assert.match(issueHead, /\bupdatedAt\b/, 'must select issue-level updatedAt');
+  });
+
+  test('ISSUE_DETAIL_QUERY selects a state-transition history connection', () => {
+    const q = extractQuery(linearSource, 'ISSUE_DETAIL_QUERY');
+    assert.match(
+      q,
+      /history\(first:\s*\d+\)\s*\{\s*nodes\s*\{\s*createdAt\s+fromState\s*\{\s*name\s*\}\s+toState\s*\{\s*name\s*\}/,
+      'must select history { nodes { createdAt fromState { name } toState { name } } }'
+    );
+  });
+
+  test('fetchIssueContext returns issue createdAt/updatedAt and a toState-filtered stateTransitions', () => {
+    // createdAt/updatedAt land on the returned issue object.
+    assert.match(linearSource, /createdAt:\s*issue\.createdAt/, 'issue.createdAt must be returned');
+    assert.match(linearSource, /updatedAt:\s*issue\.updatedAt/, 'issue.updatedAt must be returned');
+    // history is normalized: filtered to nodes with a toState before being treated
+    // as a transition (Linear history includes non-state edits with null toState).
+    assert.match(
+      linearSource,
+      /issue\.history\?\.nodes[\s\S]*?\.filter\(h => h\?\.toState\?\.name\)/,
+      'must filter history to toState-present nodes'
+    );
+    assert.match(linearSource, /\n\s*stateTransitions,\n/, 'must return stateTransitions as a top-level context field');
+  });
+});
+
+// =============================================================================
 // LIN-773 S4: ancestor attachment provenance. A descendant read must surface a
 // parent's attachments tagged inherited + owner (the LIN-748 rollback cause), via
 // a bounded walk up the parent chain — NOT hardcoded depth-1, and NOT by widening
