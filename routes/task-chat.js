@@ -22,6 +22,7 @@ import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { buildTaskChatMessages } from '../lib/prompts/task-chat-template.js';
 import { streamChat, streamChatWithTools, isToolCapableModel, isRecommendationEnabled, getPaidEnvKey, hasPaidEnvKey } from '../lib/openrouter.js';
 import { createChatToolCatalog, CHAT_TOOL_RESULT_BUDGETS } from '../lib/chat-tools.js';
+import { sessionIsTerminal } from './dashboard.js';
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { getWorkspaceCallScope, isValidIssueId } from '../lib/workspace.js';
@@ -120,6 +121,21 @@ function buildMockToolReference(context) {
 }
 
 /**
+ * Detect a deterministic trigger phrase for simulating the `send_follow_up`
+ * write tool in mock mode (LIN-1073 review: e2e needs to exercise the
+ * breadcrumb for the catalog's one write tool, not just a read lookup, since
+ * that breadcrumb is the tool's only visible safety property).
+ *
+ * @param {string} question
+ * @returns {{sessionId: string, prompt: string}|null}
+ */
+function buildMockFollowUpTrigger(question) {
+  const text = String(question || '').toLowerCase();
+  if (!text.includes('follow up') && !text.includes('follow-up')) return null;
+  return { sessionId: 'mock-session-1', prompt: 'Please post a status update.' };
+}
+
+/**
  * A deterministic, first-person mock answer so e2e can exercise the full
  * round-trip (gate → fetch → stream → render) without calling an LLM. Grounded
  * in the resolved context, in the spirit of the real prompt. When a `related`
@@ -157,9 +173,13 @@ function buildMockAnswer(context, question, related) {
  * @param {Function} deps.getOpenRouterSource - (req) → 'oauth'|'env'|'free'|null
  * @param {Function} deps.getDeployInfo       - () → deploy metadata
  * @param {Object}   deps.savedChatStore       - durable saved-chat store (LIN-1008)
+ * @param {Object}   deps.dispatchQueueStore   - dispatch queue store (LIN-1073): backs the
+ *   session read-model AND the gated `send_follow_up` chat tool's write
+ * @param {Object}   deps.agentStatusStore     - agent status store (LIN-1073): the other dep
+ *   the session read-model needs
  * @returns {Router}
  */
-export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore }) {
+export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore }) {
   const router = Router();
 
   // ─── HTML page ──────────────────────────────────────────────────────────────
@@ -382,8 +402,12 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
         // Simulate one read-only tool hop so e2e can prove breadcrumb rendering
         // and tool-derived data without a live LLM. The `tool` events mirror the
         // real streamChatWithTools breadcrumb shape ({ phase, name, arguments }).
-        const related = buildMockToolReference(context);
-        if (related) {
+        const followUp = buildMockFollowUpTrigger(question);
+        const related = followUp ? null : buildMockToolReference(context);
+        if (followUp) {
+          sendSSE(res, 'tool', { phase: 'call', iteration: 1, name: 'send_follow_up', arguments: followUp });
+          sendSSE(res, 'tool', { phase: 'result', iteration: 1, name: 'send_follow_up', result: `queued a follow-up to session ${followUp.sessionId}` });
+        } else if (related) {
           sendSSE(res, 'tool', { phase: 'call', iteration: 1, name: 'lookup_task', arguments: { issueId: related.identifier } });
           sendSSE(res, 'tool', { phase: 'result', iteration: 1, name: 'lookup_task', result: `${related.identifier} — ${related.title}` });
         }
@@ -419,6 +443,13 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
           recapCacheStore,
           briefCacheStore,
           urlKey: workspace.urlKey,
+          // LIN-1073: session read-model + the gated follow-up write. This is
+          // the ONE deliberate call site that opts into followUpEnabled.
+          dispatchQueueStore,
+          agentStatusStore,
+          sessionIsTerminal,
+          followUpEnabled: true,
+          dispatchedBy: req.session.linearUserId || null,
         });
         await streamChatWithTools(
           messages,
