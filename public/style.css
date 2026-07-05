@@ -583,7 +583,7 @@ a.wordmark:hover {
   background: var(--bg);
   border: 1px solid var(--fg-vdim);
   border-radius: 4px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  box-shadow: var(--shadow-lg);
   z-index: var(--z-overlay);
   overflow: hidden;
 }
