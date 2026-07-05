@@ -127,8 +127,22 @@ describe('exact timestamps threaded through context fetch (LIN-1067)', () => {
     const q = extractQuery(linearSource, 'ISSUE_DETAIL_QUERY');
     assert.match(
       q,
-      /history\(first:\s*\d+\)\s*\{\s*nodes\s*\{\s*createdAt\s+fromState\s*\{\s*name\s*\}\s+toState\s*\{\s*name\s*\}/,
+      /history\(last:\s*\d+\)\s*\{\s*nodes\s*\{\s*createdAt\s+fromState\s*\{\s*name\s*\}\s+toState\s*\{\s*name\s*\}/,
       'must select history { nodes { createdAt fromState { name } toState { name } } }'
+    );
+  });
+
+  // LIN-1074: `last` (not `first`) is load-bearing. Linear's history connection
+  // pages forward from the start of the createdAt ordering by default, so `first: N`
+  // would silently fetch the OLDEST N lifetime history events (every edit type, not
+  // just state changes) instead of the most recent N — breaking get_history's
+  // `latest` shortcut for any issue with more than N lifetime edits, with no error.
+  test('ISSUE_DETAIL_QUERY does NOT use history(first: …) (LIN-1074 regression guard)', () => {
+    const q = extractQuery(linearSource, 'ISSUE_DETAIL_QUERY');
+    assert.doesNotMatch(
+      q,
+      /history\(first:/,
+      'history must page from the end (last) of the createdAt ordering, not the start (first), or recent transitions are silently excluded'
     );
   });
 
