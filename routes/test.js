@@ -36,7 +36,7 @@ import { defaultGitHubProjectsSeed, GITHUB_PROJECTS_WORKSPACE_URL_KEY, GITHUB_PR
  * @param {Function} options.getWorkspaceAccessToken - Function to look up workspace access token
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, taskSnapshotStore, savedChatStore, localStore, getWorkspaceAccessToken }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, taskSnapshotStore, savedChatStore, localStore, getWorkspaceAccessToken }) {
   const router = Router();
 
   // ── Mock Yap server (LIN-450) ─────────────────────────────────────────────
@@ -325,6 +325,31 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     try {
       await customPromptsStore.deleteAll(req.query.urlKey || 'test-workspace');
       res.send('ok');
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Clear all Collective characters for a workspace (LIN-1048). Mirrors
+  // clear-custom-prompts: the store is partitioned by the anchor workspace urlKey.
+  router.get('/test/clear-collective-characters', async (req, res) => {
+    try {
+      if (collectiveCharactersStore) await collectiveCharactersStore.deleteAll(req.query.urlKey || 'test-workspace');
+      res.send('ok');
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Seed one Collective character for a workspace so E2E can exercise the picker
+  // without going through the define-new UI (LIN-1048). Body is a character
+  // record; ?urlKey=<anchor> selects the partition. Defaults to a `custom` kind.
+  router.post('/test/seed-collective-character', async (req, res) => {
+    try {
+      if (!collectiveCharactersStore) return res.status(503).json({ error: 'no collective characters store' });
+      const urlKey = req.query.urlKey || 'test-workspace';
+      const created = await collectiveCharactersStore.createCustom(urlKey, req.body || {});
+      res.json(created);
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
