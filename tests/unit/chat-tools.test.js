@@ -13,6 +13,7 @@ import assert from 'node:assert';
 import { createChatToolCatalog, CHAT_TOOL_SCHEMAS, CHAT_TOOL_RESULT_BUDGETS } from '../../lib/chat-tools.js';
 import { TOOL_RESULT_MAX_CHARS } from '../../lib/openrouter.js';
 import { hashContext } from '../../lib/recap-cache.js';
+import { snapshotFromContext } from '../../lib/task-snapshot-store.js';
 
 // A recording fake of the pass-1 provider read surface. Every method records
 // the scope it was called with so tests can assert workspace-scoping, and
@@ -86,7 +87,8 @@ describe('CHAT_TOOL_SCHEMAS', () => {
   test('exposes the pass-1 + pass-2 read tools', () => {
     const names = CHAT_TOOL_SCHEMAS.map(t => t.function.name).sort();
     assert.deepStrictEqual(names, [
-      'get_brief', 'get_comments', 'get_recap', 'get_relations', 'get_stack', 'lookup_task', 'search_tasks',
+      'get_brief', 'get_children_status', 'get_comments', 'get_recap', 'get_relations',
+      'get_stack', 'lookup_task', 'search_tasks',
     ]);
   });
 
@@ -110,6 +112,8 @@ describe('CHAT_TOOL_SCHEMAS', () => {
     assert.deepStrictEqual(byName.get_stack.parameters.required, []);
     // LIN-1065: get_comments takes one explicitly-named task.
     assert.deepStrictEqual(byName.get_comments.parameters.required, ['issueId']);
+    // LIN-1066: get_children_status rolls up one named parent's children.
+    assert.deepStrictEqual(byName.get_children_status.parameters.required, ['issueId']);
   });
 });
 
@@ -247,6 +251,112 @@ describe('executors — direct provider calls, workspace-scoped', () => {
     await assert.rejects(
       () => executeTool({ name: 'get_comments', arguments: { issueId: 'LIN-99' } }),
       /Task LIN-99 not found/,
+    );
+  });
+
+  // LIN-1066: a canonical context whose children carry the two new query fields
+  // (updatedAt + forward relations) alongside the existing state/inverseRelations.
+  function childrenContextFor(issueId) {
+    return {
+      issue: { id: 'uuid-1', identifier: issueId, title: 'Parent epic' },
+      children: [
+        {
+          id: 'c-1', identifier: 'LIN-201', title: 'Wedged child',
+          state: { name: 'Todo', type: 'unstarted' },
+          updatedAt: '2026-06-01T00:00:00Z',
+          // Blocked by LIN-9 (inverse blocks) + one non-blocks edge that must be dropped.
+          inverseRelations: { nodes: [
+            { type: 'blocks', issue: { id: 'u-9', identifier: 'LIN-9', state: { type: 'started' } } },
+            { type: 'related', issue: { id: 'u-5', identifier: 'LIN-5', state: { type: 'started' } } },
+          ] },
+          // Blocks LIN-300 (forward blocks) + a related edge that must be dropped.
+          relations: { nodes: [
+            { type: 'blocks', relatedIssue: { id: 'u-300', identifier: 'LIN-300', state: { type: 'unstarted' } } },
+            { type: 'related', relatedIssue: { id: 'u-6', identifier: 'LIN-6', state: { type: 'started' } } },
+          ] },
+        },
+        {
+          id: 'c-2', identifier: 'LIN-202', title: 'Free child',
+          state: { name: 'In Progress', type: 'started' },
+          updatedAt: '2026-06-02T00:00:00Z',
+          inverseRelations: { nodes: [] },
+          relations: { nodes: [] },
+        },
+      ],
+    };
+  }
+
+  test('get_children_status returns a compact per-child rollup (LIN-1066)', async () => {
+    const provider = makeFakeProvider({
+      async fetchRecommendationContext(scope, issueId, opts) {
+        this.calls.push({ method: 'fetchRecommendationContext', scope, issueId, opts });
+        return childrenContextFor(issueId);
+      },
+    });
+    const { executeTool } = createChatToolCatalog({ provider, scope: SCOPE });
+
+    const result = await executeTool({ name: 'get_children_status', arguments: { issueId: 'LIN-200' } });
+
+    assert.deepStrictEqual(provider.calls[0], {
+      method: 'fetchRecommendationContext', scope: SCOPE, issueId: 'LIN-200', opts: undefined,
+    });
+    assert.strictEqual(result.identifier, 'LIN-200');
+    assert.strictEqual(result.count, 2);
+    // Compact projection: only the six named fields, blockedBy/blocks reduced to
+    // identifiers and filtered to `blocks`-type edges (the related edges dropped).
+    assert.deepStrictEqual(result.children, [
+      {
+        identifier: 'LIN-201', title: 'Wedged child', state: 'Todo',
+        blockedBy: ['LIN-9'], blocks: ['LIN-300'], lastUpdate: '2026-06-01T00:00:00Z',
+      },
+      {
+        identifier: 'LIN-202', title: 'Free child', state: 'In Progress',
+        blockedBy: [], blocks: [], lastUpdate: '2026-06-02T00:00:00Z',
+      },
+    ]);
+  });
+
+  test('get_children_status handles a parent with no children and rejects a bad/missing id (LIN-1066)', async () => {
+    const provider = makeFakeProvider({
+      async fetchRecommendationContext(scope, issueId) {
+        if (issueId === 'LIN-404') return null;
+        return { issue: { id: 'uuid-1', identifier: issueId } };
+      },
+    });
+    const { executeTool } = createChatToolCatalog({ provider, scope: SCOPE });
+
+    const empty = await executeTool({ name: 'get_children_status', arguments: { issueId: 'LIN-1' } });
+    assert.strictEqual(empty.count, 0);
+    assert.deepStrictEqual(empty.children, []);
+
+    await assert.rejects(
+      () => executeTool({ name: 'get_children_status', arguments: { issueId: 'not a valid id!' } }),
+      /Invalid issue id/,
+    );
+    await assert.rejects(
+      () => executeTool({ name: 'get_children_status', arguments: { issueId: 'LIN-404' } }),
+      /Task LIN-404 not found/,
+    );
+  });
+
+  // The load-bearing shared-surface guard: the two new child fields ride on
+  // context.children but must NOT change the hash/snapshot slices, or every task
+  // resnapshots and recap/brief caches invalidate workspace-wide.
+  test('the new child fields (updatedAt, relations) do not leak into hashContext / snapshotFromContext (LIN-1066)', () => {
+    const withNewFields = childrenContextFor('LIN-200');
+    // The same context with the two new fields stripped from every child.
+    const withoutNewFields = {
+      ...withNewFields,
+      children: withNewFields.children.map(({ updatedAt, relations, ...rest }) => rest),
+    };
+
+    assert.strictEqual(
+      hashContext(withNewFields), hashContext(withoutNewFields),
+      'hashContext must ignore child updatedAt/relations',
+    );
+    assert.deepStrictEqual(
+      snapshotFromContext(withNewFields), snapshotFromContext(withoutNewFields),
+      'snapshotFromContext must ignore child updatedAt/relations',
     );
   });
 
