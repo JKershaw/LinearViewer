@@ -1606,6 +1606,45 @@ a.wordmark:hover {
     display: none;
   }
 
+  /* Mobile-390 view tab strip (LIN-1058). Density fix: keep the first-class four
+     (+ any hoisted active view) inline; collapse the flag-gated/power-user views
+     behind the in-flow `⋯ more` expander. Comfortable 44px tap targets on every
+     link and the toggle. The expander opens as an IN-FLOW card BELOW the strip
+     (flex-wrap lets it drop to its own row) — it displaces content down, never
+     floats over it, and there is no backdrop (LIN-984 safe by construction). */
+  .nav-views {
+    flex-wrap: wrap;      /* let the opened `⋯ more` card drop to its own row */
+    overflow-x: visible;  /* wrap replaces the desktop horizontal-scroll fallback */
+    gap: 0.25ch 1.5ch;
+    align-items: center;
+  }
+
+  /* 44px comfortable tap targets; revealing the toggle (overrides its desktop
+     display:none) and collapsing the overflow group (overrides display:contents). */
+  .nav-view,
+  .nav-more-toggle {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .nav-views-overflow {
+    display: none;
+  }
+
+  /* Re-assert the opened expander AFTER the collapse rule above (equal
+     specificity, later source) so `⋯ more` reveals the in-flow card; the card
+     look (var(--card)/--line/--radius-md/--shadow-lg) comes from the base
+     `.nav-views-overflow--open` rule. */
+  .nav-views-overflow--open {
+    display: flex;
+  }
+
+  .nav-views-overflow--open .nav-view {
+    min-height: 44px;
+    width: 100%;
+  }
+
   header {
     margin-bottom: var(--space-4);
   }
