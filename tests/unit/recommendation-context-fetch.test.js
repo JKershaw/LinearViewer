@@ -143,6 +143,13 @@ describe('exact timestamps threaded through context fetch (LIN-1067)', () => {
       /issue\.history\?\.nodes[\s\S]*?\.filter\(h => h\?\.toState\?\.name\)/,
       'must filter history to toState-present nodes'
     );
+    // Newest-first is load-bearing (get_history's `latest` is transitions[0]) and must
+    // be sorted explicitly, not left to Linear's undocumented connection default order.
+    assert.match(
+      linearSource,
+      /issue\.history\?\.nodes[\s\S]*?\.sort\(\(a, b\) => new Date\(b\.createdAt\) - new Date\(a\.createdAt\)\)/,
+      'must sort stateTransitions newest-first by createdAt'
+    );
     assert.match(linearSource, /\n\s*stateTransitions,\n/, 'must return stateTransitions as a top-level context field');
   });
 });
