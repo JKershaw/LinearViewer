@@ -420,44 +420,98 @@ h1 {
   scroll-margin-top: var(--nav-sticky-h);
 }
 
-/* Header-level view switcher (LIN-978). Its own full-width row inside the nav
-   (flex-basis:100% forces the wrap), laid out as a SINGLE horizontally-scrolling
-   row — never the old multi-line footer-style wrap the audit flagged. At 390px
-   the row scrolls sideways rather than stacking, keeping cross-view nav to one
-   line. */
+/* Header-level view switcher (LIN-978 / LIN-1058 "Confident CLI tab strip").
+   Row 2 of the two-row header: a full-width tab strip, separated from row 1 by a
+   hairline so the nav reads as an intentional object. Laid out as a single
+   non-wrapping row; horizontal-scroll is kept as a graceful FALLBACK (the
+   primary+`⋯ more` overflow split is the real density solution — beat 4). */
 .nav-views {
   flex: 0 0 100%;
   display: flex;
   align-items: baseline;
-  gap: 1.5ch;
+  gap: 2ch;
   flex-wrap: nowrap;
   overflow-x: auto;
   white-space: nowrap;
+  margin-top: var(--space-1);
   padding-top: var(--space-1);
+  border-top: 1px solid var(--line-soft);  /* zone separation from row 1 */
   /* Thin scrollbar, unobtrusive on desktop; momentum scroll on touch. */
   scrollbar-width: thin;
   -webkit-overflow-scrolling: touch;
 }
 
 .nav-view {
-  color: var(--fg-dim);
+  color: var(--muted);
   text-decoration: none;
   font-size: 0.9em;
-  font-family: var(--font-content);
+  font-family: var(--font-content);  /* human label — sans */
   flex: 0 0 auto;
+  padding: var(--space-1) 0;
+  border-bottom: 2px solid transparent;  /* reserve the tab-underline slot */
 }
 
 .nav-view:hover {
-  color: var(--fg);
+  color: var(--text);
+  border-bottom-color: var(--line);
 }
 
-/* Active view — bolded, primary text colour (mirrors the footer-current
-   treatment the switcher replaces). */
+/* Active view — a confident tab, deliberately past bold-only: a brand underline
+   (border-bottom:2px) PLUS a leading ▸ marker in --brand (redundant
+   shape+color+glyph). The marker is a CSS ::before so the markup stays
+   byte-identical to the LIN-978 `<strong.nav-view-current>` contract; the ▸ is
+   the machine-structure accent, so it takes the mono structural face. */
 .nav-view-current {
-  color: var(--fg);
+  color: var(--text);
   font-weight: 600;
-  font-family: var(--font-content);
+  border-bottom-color: var(--brand);
+}
+
+.nav-view-current::before {
+  content: '\25B8';  /* ▸ */
+  color: var(--brand);
+  margin-right: 0.5ch;
+  font-family: var(--font-structural);
+}
+
+/* `⋯ more` overflow (LIN-1058). At desktop the flag-gated links flow inline on
+   the strip (`display:contents`) and the toggle is hidden; the collapse to a
+   `⋯ more` expander happens at narrow widths (beat 4). The expander, when open,
+   is an ELEVATED, IN-FLOW card below the strip — it pushes content down, never
+   floats over it, and has no backdrop (LIN-984 safe by construction). */
+.nav-views-overflow {
+  display: contents;
+}
+
+.nav-more-toggle {
+  display: none;  /* revealed only when the strip collapses (beat 4) */
   flex: 0 0 auto;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: var(--space-1) 0;
+  font-family: var(--font-structural);  /* ⋯ is structural character */
+  font-size: 0.9em;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.nav-more-toggle:hover {
+  color: var(--text);
+}
+
+.nav-views-overflow--open {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  flex-basis: 100%;
+  margin-top: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
 }
 
 .nav-filters {
@@ -704,11 +758,20 @@ a.wordmark:hover {
 /* =============================================================================
    Options Panel (appears below nav bar when selector is expanded)
    ============================================================================= */
+/* Selector dropdown — an ELEVATED, CONTAINED card in NORMAL FLOW (LIN-1058).
+   It opens as an in-flow block below the nav that pushes content down; it never
+   floats over content and has no backdrop/click-catcher (LIN-984 safe). The S1
+   theme-aware --shadow-lg gives it real elevation in both themes; --card/--line/
+   --radius-md keep it on-token. Box-drawing rows stay inside the card. */
 .nav-options-panel {
-  padding: var(--space-2) 0;
+  padding: var(--space-2) var(--space-3);
   margin-left: 3ch;  /* Indent for visual containment */
   margin-bottom: var(--space-2);
-  max-width: 30ch;  /* Keep compact on desktop */
+  max-width: 32ch;  /* Keep compact on desktop */
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
 }
 
 .nav-options-panel.hidden {
@@ -788,9 +851,17 @@ a.wordmark:hover {
    =============================================================================
    Search input below nav bar for filtering issues by keyword.
 */
+/* Search panel — same elevated in-flow card treatment as the selector dropdown
+   (LIN-1058): --card surface, --line border, --radius-md, --shadow-lg; stays in
+   normal flow below the nav, no floating overlay, no backdrop. */
 .search-panel {
-  padding: var(--space-2) 0;
+  padding: var(--space-2) var(--space-3);
   margin-bottom: var(--space-2);
+  max-width: 48ch;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
 }
 
 .search-panel.hidden {
@@ -804,9 +875,10 @@ a.wordmark:hover {
 }
 
 .search-input {
-  font-family: var(--font-structural);
+  font-family: var(--font-structural);  /* the query is machine input — mono */
   font-size: 0.9em;
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
   padding: var(--space-1) var(--space-2);
   color: var(--fg);
   background: var(--bg);
