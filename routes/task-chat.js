@@ -21,7 +21,7 @@ import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { buildTaskChatMessages } from '../lib/prompts/task-chat-template.js';
 import { streamChat, streamChatWithTools, isToolCapableModel, isRecommendationEnabled, getPaidEnvKey, hasPaidEnvKey } from '../lib/openrouter.js';
-import { createChatToolCatalog } from '../lib/chat-tools.js';
+import { createChatToolCatalog, CHAT_TOOL_RESULT_BUDGETS } from '../lib/chat-tools.js';
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { getWorkspaceCallScope, isValidIssueId } from '../lib/workspace.js';
@@ -422,7 +422,12 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
         });
         await streamChatWithTools(
           messages,
-          { apiKey: apiKeyToUse, model: selectedModel, maxTokens: 1500, tools, executeTool, callMeta },
+          {
+            apiKey: apiKeyToUse, model: selectedModel, maxTokens: 1500, tools, executeTool, callMeta,
+            // Additive per-tool budget so get_comments can return full comment
+            // bodies while every other tool keeps the 4000-char default (LIN-1065).
+            toolResultMaxCharsByTool: CHAT_TOOL_RESULT_BUDGETS,
+          },
           onEvent
         );
       } else {

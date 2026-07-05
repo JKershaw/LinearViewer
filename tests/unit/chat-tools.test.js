@@ -10,7 +10,8 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { createChatToolCatalog, CHAT_TOOL_SCHEMAS } from '../../lib/chat-tools.js';
+import { createChatToolCatalog, CHAT_TOOL_SCHEMAS, CHAT_TOOL_RESULT_BUDGETS } from '../../lib/chat-tools.js';
+import { TOOL_RESULT_MAX_CHARS } from '../../lib/openrouter.js';
 import { hashContext } from '../../lib/recap-cache.js';
 
 // A recording fake of the pass-1 provider read surface. Every method records
@@ -85,7 +86,7 @@ describe('CHAT_TOOL_SCHEMAS', () => {
   test('exposes the pass-1 + pass-2 read tools', () => {
     const names = CHAT_TOOL_SCHEMAS.map(t => t.function.name).sort();
     assert.deepStrictEqual(names, [
-      'get_brief', 'get_recap', 'get_relations', 'get_stack', 'lookup_task', 'search_tasks',
+      'get_brief', 'get_comments', 'get_recap', 'get_relations', 'get_stack', 'lookup_task', 'search_tasks',
     ]);
   });
 
@@ -107,6 +108,24 @@ describe('CHAT_TOOL_SCHEMAS', () => {
     assert.deepStrictEqual(byName.get_brief.parameters.required, ['issueId']);
     assert.deepStrictEqual(byName.get_recap.parameters.required, ['issueId']);
     assert.deepStrictEqual(byName.get_stack.parameters.required, []);
+    // LIN-1065: get_comments takes one explicitly-named task.
+    assert.deepStrictEqual(byName.get_comments.parameters.required, ['issueId']);
+  });
+});
+
+describe('CHAT_TOOL_RESULT_BUDGETS (LIN-1065)', () => {
+  test('grants only get_comments a larger-than-default budget', () => {
+    // Additive map: get_comments is the ONLY override, and it is strictly larger
+    // than the global default so full comment bodies survive the tool hop.
+    assert.deepStrictEqual(Object.keys(CHAT_TOOL_RESULT_BUDGETS), ['get_comments']);
+    assert.ok(CHAT_TOOL_RESULT_BUDGETS.get_comments > TOOL_RESULT_MAX_CHARS);
+    assert.ok(CHAT_TOOL_RESULT_BUDGETS.get_comments >= 10000, 'within the recommended ~10-12k range');
+  });
+
+  test('does NOT override any other tool, so they keep the 4000 default', () => {
+    for (const name of ['lookup_task', 'search_tasks', 'get_relations', 'get_brief', 'get_recap', 'get_stack']) {
+      assert.strictEqual(CHAT_TOOL_RESULT_BUDGETS[name], undefined, `${name} must not be overridden`);
+    }
   });
 });
 
@@ -165,6 +184,70 @@ describe('executors — direct provider calls, workspace-scoped', () => {
 
     assert.deepStrictEqual(provider.calls[0], { method: 'relations', scope: SCOPE, issueId: 'LIN-9' });
     assert.strictEqual(result.trashed, false);
+  });
+
+  test('get_comments returns the named task\'s full comment thread as {author, createdAt, body} (LIN-1065)', async () => {
+    const provider = makeFakeProvider({
+      async fetchRecommendationContext(scope, issueId, opts) {
+        this.calls.push({ method: 'fetchRecommendationContext', scope, issueId, opts });
+        return {
+          issue: { id: 'uuid-1', identifier: issueId, title: 'A task' },
+          // Provider already sorts comments oldest-first; shape is {body, createdAt, user}.
+          comments: [
+            { body: 'first note', createdAt: '2026-01-01T00:00:00Z', user: 'Ada' },
+            { body: 'second note', createdAt: '2026-01-02T00:00:00Z', user: 'Grace' },
+          ],
+        };
+      },
+    });
+    const { executeTool } = createChatToolCatalog({ provider, scope: SCOPE });
+
+    const result = await executeTool({ name: 'get_comments', arguments: { issueId: 'LIN-42' } });
+
+    assert.deepStrictEqual(provider.calls[0], {
+      method: 'fetchRecommendationContext', scope: SCOPE, issueId: 'LIN-42', opts: undefined,
+    });
+    assert.strictEqual(result.identifier, 'LIN-42');
+    assert.strictEqual(result.count, 2);
+    assert.deepStrictEqual(result.comments, [
+      { author: 'Ada', createdAt: '2026-01-01T00:00:00Z', body: 'first note' },
+      { author: 'Grace', createdAt: '2026-01-02T00:00:00Z', body: 'second note' },
+    ]);
+  });
+
+  test('get_comments maps a missing comment author to Unknown and handles no comments', async () => {
+    const provider = makeFakeProvider({
+      async fetchRecommendationContext(scope, issueId, opts) {
+        this.calls.push({ method: 'fetchRecommendationContext', scope, issueId, opts });
+        return { issue: { id: 'uuid-1', identifier: issueId }, comments: [{ body: 'x', createdAt: 't' }] };
+      },
+    });
+    const { executeTool } = createChatToolCatalog({ provider, scope: SCOPE });
+
+    const withComment = await executeTool({ name: 'get_comments', arguments: { issueId: 'LIN-7' } });
+    assert.deepStrictEqual(withComment.comments, [{ author: 'Unknown', createdAt: 't', body: 'x' }]);
+
+    // A context with no comments array yields an empty, well-formed result.
+    provider.fetchRecommendationContext = async (scope, issueId) => ({ issue: { id: 'uuid-1', identifier: issueId } });
+    const empty = await executeTool({ name: 'get_comments', arguments: { issueId: 'LIN-8' } });
+    assert.strictEqual(empty.count, 0);
+    assert.deepStrictEqual(empty.comments, []);
+  });
+
+  test('get_comments rejects an invalid id and a missing task', async () => {
+    const provider = makeFakeProvider({
+      async fetchRecommendationContext() { return null; },
+    });
+    const { executeTool } = createChatToolCatalog({ provider, scope: SCOPE });
+
+    await assert.rejects(
+      () => executeTool({ name: 'get_comments', arguments: { issueId: 'not a valid id!' } }),
+      /Invalid issue id/,
+    );
+    await assert.rejects(
+      () => executeTool({ name: 'get_comments', arguments: { issueId: 'LIN-99' } }),
+      /Task LIN-99 not found/,
+    );
   });
 
   test('an executor never accepts a scope/token from the model (scoping is by construction)', async () => {
@@ -403,7 +486,13 @@ describe('read-only invariant', () => {
   test('the catalog exposes no write/mutation tools', () => {
     const names = CHAT_TOOL_SCHEMAS.map(t => t.function.name);
     const writeish = /create|update|delete|add|remove|move|mutat|write|comment|label|assign|close|archive/i;
+    // Read tools are named with an explicit read verb (get_/lookup_/search_).
+    // The heuristic flags nouns like "comment" that also appear in write tool
+    // names; a read-verb prefix means the tool is unambiguously a lookup
+    // (e.g. get_comments reads a thread, it does not post one — LIN-1065).
+    const readVerb = /^(get|lookup|search|list|read|fetch)_/i;
     for (const name of names) {
+      if (readVerb.test(name)) continue;
       assert.ok(!writeish.test(name), `unexpected write-shaped tool: ${name}`);
     }
   });
