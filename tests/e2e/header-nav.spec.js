@@ -60,24 +60,47 @@ test.describe('Header view switcher (LIN-978)', () => {
     }
   });
 
-  test('stays a single row at 390px (does not wrap to multiple lines)', async ({ page, localWorkerUrlKey }) => {
+  test('collapses flag-gated views behind ⋯ more at 390px, first-class four stay inline (LIN-1058)', async ({ page, localWorkerUrlKey }) => {
     await page.setViewportSize({ width: 390, height: 800 });
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
-    const views = nav(page).getView('observation');
-    await expect(views).toBeVisible();
-
-    // Every switcher link must share the same vertical band — i.e. one row. If
-    // the row wrapped, the later links would sit on a lower `y`. Allow a small
-    // tolerance for baseline/line-box rounding.
-    const boxes = await page.locator('.nav-views [data-testid^="nav-view-"]').evaluateAll(els =>
+    // The first-class four stay inline on the strip and share one vertical band.
+    for (const view of ['observation', 'swipe', 'swim', 'settings']) {
+      await expect(nav(page).getView(view)).toBeVisible();
+    }
+    const primaryTops = await page.locator('.nav-views > [data-testid^="nav-view-"]').evaluateAll(els =>
       els.map(el => el.getBoundingClientRect().top)
     );
-    expect(boxes.length).toBeGreaterThanOrEqual(7);
-    const minTop = Math.min(...boxes);
-    const maxTop = Math.max(...boxes);
-    expect(maxTop - minTop).toBeLessThan(4);
+    expect(primaryTops.length).toBe(4); // exactly the first-class four inline (no active hoist on the dashboard)
+    expect(Math.max(...primaryTops) - Math.min(...primaryTops)).toBeLessThan(4);
+
+    // The flag-gated views are collapsed (not visible) until `⋯ more` opens them.
+    for (const view of ['roadmap', 'dispatch', 'proxy']) {
+      await expect(nav(page).getView(view)).not.toBeVisible();
+    }
+    const more = page.locator('[data-testid="nav-more-toggle"]');
+    await expect(more).toBeVisible();
+    await expect(more).toHaveAttribute('aria-expanded', 'false');
+
+    // Opening `⋯ more` reveals the flag-gated views in the in-flow expander.
+    await more.click();
+    await expect(more).toHaveAttribute('aria-expanded', 'true');
+    for (const view of ['roadmap', 'dispatch', 'proxy']) {
+      await expect(nav(page).getView(view)).toBeVisible();
+    }
+  });
+
+  test('every nav view target is a comfortable 44px tap target at 390px', async ({ page, localWorkerUrlKey }) => {
+    await page.setViewportSize({ width: 390, height: 800 });
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
+    await page.waitForLoadState('networkidle');
+
+    // Primary (inline) links + the ⋯ more toggle must all clear 44px.
+    const inlineHeights = await page.locator('.nav-views > [data-testid^="nav-view-"], .nav-more-toggle').evaluateAll(els =>
+      els.map(el => el.getBoundingClientRect().height)
+    );
+    for (const h of inlineHeights) expect(h).toBeGreaterThanOrEqual(44);
   });
 
   test('cross-view nav is reachable at 390px without scrolling the page', async ({ page, localWorkerUrlKey }) => {

@@ -15,7 +15,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-import { getViewNavLinks, renderViewNav } from '../../lib/components/view-nav.js';
+import { getViewNavLinks, renderViewNav, partitionViewLinks } from '../../lib/components/view-nav.js';
 import { renderNavBar } from '../../lib/components/navbar.js';
 import { renderPageFooter } from '../../lib/components/footer.js';
 
@@ -80,6 +80,48 @@ test('renderViewNav marks the active view via key-equality (bare currentPage)', 
 
 test('renderViewNav returns empty string without a urlKey (nothing to navigate to)', () => {
   assert.equal(renderViewNav({ urlKey: null, currentPage: 'swim' }), '');
+});
+
+// --- primary/overflow split + active-hoist (LIN-1058 "Confident CLI tab strip") -
+
+test('partitionViewLinks splits first-class (primary) from flag-gated (overflow)', () => {
+  const links = getViewNavLinks('acme', { roadmap: true, dispatch: true, proxy: true });
+  const { primary, overflow } = partitionViewLinks(links, 'observation');
+  assert.deepEqual(primary.map(l => l.text), ['observation', 'swipe', 'swim', 'settings']);
+  assert.deepEqual(overflow.map(l => l.text), ['roadmap', 'dispatch', 'proxy']);
+});
+
+test('partitionViewLinks HOISTS the active overflow view inline (never hidden)', () => {
+  const links = getViewNavLinks('acme', { roadmap: true, dispatch: true, proxy: true });
+  const { primary, overflow } = partitionViewLinks(links, 'dispatch');
+  // Active flag-gated view is lifted onto the primary strip, after the four.
+  assert.deepEqual(primary.map(l => l.text), ['observation', 'swipe', 'swim', 'settings', 'dispatch']);
+  // …and removed from overflow so it is not rendered twice.
+  assert.deepEqual(overflow.map(l => l.text), ['roadmap', 'proxy']);
+});
+
+test('renderViewNav emits the ⋯ more toggle + in-flow overflow group ONLY when flag-gated views exist', () => {
+  const withFlags = renderViewNav({ urlKey: 'acme', currentPage: 'observation', featureFlags: { dispatch: true } });
+  assert.match(withFlags, /class="nav-more-toggle"[^>]*aria-expanded="false"[^>]*aria-controls="nav-views-overflow"/);
+  assert.match(withFlags, /<div class="nav-views-overflow" id="nav-views-overflow">/);
+  assert.match(withFlags, /data-testid="nav-view-dispatch"/);
+
+  // No flag-gated views → no overflow machinery (first-class four only).
+  const noFlags = renderViewNav({ urlKey: 'acme', currentPage: 'observation', featureFlags: {} });
+  assert.doesNotMatch(noFlags, /nav-more-toggle/);
+  assert.doesNotMatch(noFlags, /nav-views-overflow/);
+});
+
+test('renderViewNav renders the active overflow view as the hoisted current tab (not inside the expander)', () => {
+  const html = renderViewNav({ urlKey: 'acme', currentPage: 'dispatch', featureFlags: { dispatch: true, proxy: true } });
+  // Active dispatch is the bold current marker, hoisted onto the primary strip
+  // BEFORE the overflow group opens.
+  const overflowStart = html.indexOf('nav-views-overflow');
+  const dispatchCurrent = html.indexOf('nav-view-current" data-testid="nav-view-dispatch"');
+  assert.ok(dispatchCurrent !== -1, 'active dispatch renders as the current marker');
+  assert.ok(dispatchCurrent < overflowStart, 'hoisted active tab precedes the overflow group');
+  // proxy remains collapsed in the overflow group as a plain anchor.
+  assert.match(html, /<div class="nav-views-overflow"[^>]*>[\s\S]*data-testid="nav-view-proxy"[\s\S]*<\/div>/);
 });
 
 // --- nav-bar integration ----------------------------------------------------

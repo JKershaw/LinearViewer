@@ -864,6 +864,23 @@ function initNavBar() {
     })
   }
 
+  // "⋯ more" view-overflow expander (LIN-1058). An IN-FLOW disclosure: it
+  // toggles the `.nav-views-overflow` block that sits below the tab strip in
+  // NORMAL FLOW — no floating panel, no backdrop, no click-catcher (LIN-984
+  // safe by construction). Deliberately NOT wired through the selector
+  // dropdown machinery above (no `.nav-dropdown-overlay`, no closeAllSelectors);
+  // it simply flips `aria-expanded` + an `--open` state class the CSS reads.
+  const moreToggle = navBar.querySelector('.nav-more-toggle')
+  const moreOverflow = navBar.querySelector('#nav-views-overflow')
+  if (moreToggle && moreOverflow) {
+    moreToggle.addEventListener('click', (e) => {
+      e.stopPropagation()
+      const isOpen = moreToggle.getAttribute('aria-expanded') === 'true'
+      moreToggle.setAttribute('aria-expanded', isOpen ? 'false' : 'true')
+      moreOverflow.classList.toggle('nav-views-overflow--open', !isOpen)
+    })
+  }
+
   // Team option selection (workspace uses form submission)
   if (teamOptions) {
     teamOptions.addEventListener('click', (e) => {
