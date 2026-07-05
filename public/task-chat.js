@@ -111,6 +111,16 @@
       if (name === 'search_tasks') {
         return args.query ? 'searched "' + args.query + '"' : name;
       }
+      if (name === 'send_follow_up') {
+        // LIN-1073 review: this is the catalog's one WRITE tool — the generic
+        // fallback below would hide a real side effect (a queued dispatch
+        // follow-up) behind an anonymous tool name, so it must always name the
+        // session it targeted and a snippet of what was sent.
+        if (!args.sessionId) return name;
+        var prompt = typeof args.prompt === 'string' ? args.prompt.trim() : '';
+        var snippet = prompt ? ': "' + (prompt.length > 60 ? prompt.slice(0, 60) + '…' : prompt) + '"' : '';
+        return 'sent a follow-up to session ' + args.sessionId + snippet;
+      }
       return name;
     }
     if (data.phase === 'error') {

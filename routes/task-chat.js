@@ -121,6 +121,21 @@ function buildMockToolReference(context) {
 }
 
 /**
+ * Detect a deterministic trigger phrase for simulating the `send_follow_up`
+ * write tool in mock mode (LIN-1073 review: e2e needs to exercise the
+ * breadcrumb for the catalog's one write tool, not just a read lookup, since
+ * that breadcrumb is the tool's only visible safety property).
+ *
+ * @param {string} question
+ * @returns {{sessionId: string, prompt: string}|null}
+ */
+function buildMockFollowUpTrigger(question) {
+  const text = String(question || '').toLowerCase();
+  if (!text.includes('follow up') && !text.includes('follow-up')) return null;
+  return { sessionId: 'mock-session-1', prompt: 'Please post a status update.' };
+}
+
+/**
  * A deterministic, first-person mock answer so e2e can exercise the full
  * round-trip (gate → fetch → stream → render) without calling an LLM. Grounded
  * in the resolved context, in the spirit of the real prompt. When a `related`
@@ -387,8 +402,12 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
         // Simulate one read-only tool hop so e2e can prove breadcrumb rendering
         // and tool-derived data without a live LLM. The `tool` events mirror the
         // real streamChatWithTools breadcrumb shape ({ phase, name, arguments }).
-        const related = buildMockToolReference(context);
-        if (related) {
+        const followUp = buildMockFollowUpTrigger(question);
+        const related = followUp ? null : buildMockToolReference(context);
+        if (followUp) {
+          sendSSE(res, 'tool', { phase: 'call', iteration: 1, name: 'send_follow_up', arguments: followUp });
+          sendSSE(res, 'tool', { phase: 'result', iteration: 1, name: 'send_follow_up', result: `queued a follow-up to session ${followUp.sessionId}` });
+        } else if (related) {
           sendSSE(res, 'tool', { phase: 'call', iteration: 1, name: 'lookup_task', arguments: { issueId: related.identifier } });
           sendSSE(res, 'tool', { phase: 'result', iteration: 1, name: 'lookup_task', result: `${related.identifier} — ${related.title}` });
         }
