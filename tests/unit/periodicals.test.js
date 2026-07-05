@@ -9,17 +9,17 @@ import { PERIODICALS, getPeriodicals, buildPeriodicalNodes } from '../../lib/per
 import { PERIODICALS_PROJECT_ID } from '../../lib/tree.js';
 
 describe('periodicals registry', () => {
-  test('seeds the LIN-354 review set plus Drift & Coherence, Comprehension-Debt, Stability, Dependency & Supply-Chain, Recent Headwinds, and Design & Interface (11 templates)', () => {
-    assert.strictEqual(PERIODICALS.length, 11);
+  test('seeds the LIN-354 review set plus Drift & Coherence, Comprehension-Debt, Stability, Dependency & Supply-Chain, Recent Headwinds, Design & Interface, and Data & Fetch Architecture (12 templates)', () => {
+    assert.strictEqual(PERIODICALS.length, 12);
     assert.strictEqual(getPeriodicals(), PERIODICALS);
   });
 
-  test('contains the nine corrective reviews plus the advisory Stability Review and Recent Headwinds report', () => {
+  test('contains the ten corrective reviews plus the advisory Stability Review and Recent Headwinds report', () => {
     // Assert by id/title/mode rather than position so the registry can grow.
     const byId = Object.fromEntries(PERIODICALS.map(t => [t.id, t]));
 
-    // id -> [title, mode]. The nine code-surface / supply-chain / interface
-    // reviews are 'corrective' (they mint fix-tasks); the Stability Review
+    // id -> [title, mode]. The ten code-surface / supply-chain / interface /
+    // data reviews are 'corrective' (they mint fix-tasks); the Stability Review
     // (LIN-453) and the Recent Headwinds report (LIN-542) are the two 'advisory'
     // entries — trajectory governors that report for a human to act on. The
     // Design & Interface Review (LIN-520) is corrective with an advisory tail:
@@ -35,7 +35,8 @@ describe('periodicals registry', () => {
       'stability-review': ['Stability Review', 'advisory'],
       'dependency-supply-chain': ['Dependency & Supply-Chain Review', 'corrective'],
       'recent-headwinds': ['Recent Headwinds', 'advisory'],
-      'design-review': ['Design & Interface Review', 'corrective']
+      'design-review': ['Design & Interface Review', 'corrective'],
+      'data-fetch-architecture': ['Data & Fetch Architecture', 'corrective']
     };
 
     for (const [id, [title, mode]] of Object.entries(expected)) {
@@ -686,6 +687,60 @@ describe('Design & Interface Review specifics (LIN-520)', () => {
     // route / tool name leaks (capabilities are named conceptually).
     assert.doesNotMatch(prompt, /playwright|lighthouse|styleguide\b/i);
     assert.doesNotMatch(prompt, /\/styleguide|set-session|screenshots/i);
+  });
+});
+
+describe('Data & Fetch Architecture specifics (LIN-1039)', () => {
+  const template = PERIODICALS.find(t => t.id === 'data-fetch-architecture');
+  const prompt = template.generatePrompt();
+
+  test('is the corrective static-cause data/fetch review', () => {
+    assert.strictEqual(template.mode, 'corrective');
+    // Static cause behind performance, read from source not the running app.
+    assert.match(prompt, /how data is organised, where it lives, and how it is fetched/i);
+    assert.match(prompt, /static/i);
+    assert.match(prompt, /cause/i);
+  });
+
+  test('covers the five data/fetch finding classes', () => {
+    // Store-vs-provider boundary: serve what we own vs re-fetch a provider live.
+    assert.match(prompt, /store-vs-provider boundary/i);
+    assert.match(prompt, /re-fetch an external provider/i);
+    // Read discipline: pushdown into the query vs full read then in-memory work.
+    assert.match(prompt, /read discipline/i);
+    assert.match(prompt, /projection, indexing, limiting, and pagination/i);
+    // Derived-fact persistence: materialise at write vs re-derive on read.
+    assert.match(prompt, /read-model \/ derived-fact persistence/i);
+    assert.match(prompt, /materialised at write time/i);
+    // Fetch amplification / N-scaling.
+    assert.match(prompt, /fetch amplification and N-scaling/i);
+    // Cache-layer coherence.
+    assert.match(prompt, /cache coherence/i);
+  });
+
+  test('trend contract: delta framing, first-run baseline, trend ledger', () => {
+    assert.match(prompt, /trend-aware/i);
+    assert.match(prompt, /new, unchanged, improved, worsened, or resolved/i);
+    assert.match(prompt, /point-in-time snapshot/i);
+    assert.match(prompt, /baseline/i);
+    assert.match(prompt, /trend ledger/i);
+  });
+
+  test('names the altitude difference from API Quality, Performance / Scale, and Drift & Coherence', () => {
+    assert.match(prompt, /API Quality Review/);
+    assert.match(prompt, /Performance \/ Scale Review/);
+    assert.match(prompt, /Drift & Coherence Review/);
+    assert.match(prompt, /do not double-flag|do not re-flag/i);
+    // Global-over-local: structural improvement, never a local point patch.
+    assert.match(prompt, /point patch/i);
+    assert.match(prompt, /over-engineering/i);
+  });
+
+  test('stays general: no store/provider source surfaces or counts leak in', () => {
+    // The shared .js guard already runs; reinforce that no concrete module,
+    // store count, or ticket-specific symbol leaks (classes named conceptually).
+    assert.doesNotMatch(prompt, /fetchProjects|local-store|dispatch-store|kpi-stats|session-telemetry/i);
+    assert.doesNotMatch(prompt, /toArray|find\(\)|\.slice\(/);
   });
 });
 
