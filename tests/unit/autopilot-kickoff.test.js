@@ -118,21 +118,26 @@ describe('buildAutopilotKickoff (shared guide)', () => {
     assert.ok(text.includes('Never add `force` to the cascade'), 'the cascade never carries force');
   });
 
-  test('closes a judged-terminal child autopilot on the existing abort wire (LIN-915)', () => {
+  test('closes each session on-done by default, with the judged-terminal child autopilot as one instance (LIN-1071)', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
-    // The composed prompt inlines the manual, so both surfaces must carry the carve-out:
-    // a judged-terminal *child autopilot* is closed after judge-and-advance on the existing
-    // abort:true/abortTo wire — the one case close-on-completion is right — while workers and
-    // maybe-interactive/human-continued sessions keep the leave-open default.
-    assert.ok(text.includes('one class where you close on completion'),
-      'manual should carve out the single close-on-completion class');
+    // The composed prompt inlines the manual, so both surfaces must carry the inverted
+    // default: now that resuming a closed session is reliable, the parent closes each
+    // spent session when it's done rather than leaving it open. The child autopilot is
+    // named as one instance of that general default, not a carve-out from a stricter one.
+    assert.ok(text.includes('close-on-done default'),
+      'manual should name the general close-on-done default');
+    assert.ok(text.includes('resuming a closed session is reliable'),
+      'manual should state the resume-is-reliable premise that unlocked the inversion');
     assert.ok(text.includes('child autopilot'),
-      'the carve-out must name the child autopilot as that class');
+      'the child autopilot must still be named as an instance of the default');
     assert.ok(text.includes('abortTo'),
       'the close must reuse the existing abort:true/abortTo wire, not a new path');
     // The kickoff complete-branch coherence line names the same close.
     assert.ok(text.includes('abortTo=<child session id>'),
       'the kickoff advance/complete step should name closing the spent child on the abort wire');
+    // The human-continued guard is the one hold-out from close-on-done, not removed by it.
+    assert.ok(text.includes('human-continued'),
+      'human-continued sessions should still be the guarded exception to close-on-done');
   });
 });
 
