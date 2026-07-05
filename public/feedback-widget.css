@@ -276,8 +276,8 @@
   filter: brightness(0.95);
 }
 
-/* Save is the primary; autopilot is secondary (outline) so the foot reads as
-   one primary action plus a single follow-up option (LIN-918, LIN-952). */
+/* Save is the primary; triage/autopilot are secondary (outline) so the foot
+   reads as one primary action plus its follow-up options (LIN-918, LIN-1037). */
 .feedback-submit-secondary {
   color: var(--blue, #2563eb);
   background: transparent;
