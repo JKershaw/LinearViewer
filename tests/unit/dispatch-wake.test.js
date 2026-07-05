@@ -7,9 +7,13 @@
  *    bubbling matrix: terminals + [blocked] ALWAYS bubble (any subscription level);
  *    [pending] (PENDING-external) bubbles ONLY on an `everything` edge. Plus every
  *    structural null case (loop guard, self-skip, no parent edge).
- *  - EFFECT: the addFeedback seam in DispatchQueueStore enqueues at most one wake
- *    per child (the durable `wakeEnqueued` once-only guard), and a wake follow-up
- *    never begets another wake (the structural kind:'wake' loop guard, trap #1).
+ *  - EFFECT: the addFeedback seam in DispatchQueueStore resolves the up-chain edge
+ *    from the ROOT subscribed dispatch (walking followUpTo) — NOT the possibly
+ *    repointed / kind:'wake' feedback item (LIN-1059) — fires once per NEW wake
+ *    event (each beat + the terminal), holds a terminal-scoped durable witness
+ *    (`terminalWakeEnqueued`) so a terminal wakes at most once, and a wake
+ *    follow-up never begets another wake (the structural kind:'wake' loop guard,
+ *    trap #1).
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -222,7 +226,7 @@ describe('addFeedback wake enqueue (effect + once-only)', () => {
     assert.match(wakes[0].prompt, /paused \(pending\), not done/i, 'the wake says paused, not done');
   });
 
-  test('once-only: a SECOND wake event after wakeEnqueued:true does NOT enqueue a second wake', async () => {
+  test('terminal-scoped once-only: a SECOND terminal event does NOT enqueue a second wake (LIN-1059)', async () => {
     const { store, collection, historyCollection } = makeStore();
     const child = await takenChild(store);
 
@@ -232,9 +236,11 @@ describe('addFeedback wake enqueue (effect + once-only)', () => {
 
     assert.equal(wakeItems(collection, historyCollection).length, 1, 'still exactly one wake despite a second terminal event');
 
-    // The durable guard is on the child history doc.
+    // The durable terminal witness is on the edge (here == child) history doc — a
+    // terminal-scoped signal ("the parent WAS told the child terminated"), NOT the
+    // old generic one-wake-ever `wakeEnqueued`.
     const childDoc = await store.historyCollection.findOne({ _id: child._id });
-    assert.equal(childDoc.wakeEnqueued, true);
+    assert.equal(childDoc.terminalWakeEnqueued, true);
   });
 
   test('a terminal-only child DOES wake on a terminal (previously-silent edge now wakes, §5)', async () => {
@@ -320,7 +326,7 @@ describe('addFeedback wake enqueue (effect + once-only)', () => {
     assert.equal(wakeItems(collection, historyCollection).length, 0, 'no wake for a heartbeat');
 
     const childDoc = await store.historyCollection.findOne({ _id: child._id });
-    assert.notEqual(childDoc.wakeEnqueued, true, 'guard not set by a non-terminal event');
+    assert.notEqual(childDoc.terminalWakeEnqueued, true, 'terminal witness not set by a non-terminal event');
 
     // A later terminal event still wakes once.
     await store.addFeedback(child._id, URL_KEY, { message: '[done] now done' }, 'token-a');
@@ -344,5 +350,114 @@ describe('addFeedback wake enqueue (effect + once-only)', () => {
     await drain();
 
     assert.equal(wakeItems(collection, historyCollection).length, 1, 'the wake did not beget another wake');
+  });
+});
+
+// ── LIN-1059: edge ownership survives a follow-up repoint ─────────────────────
+//
+// The confirmed failure mode: a subscribed stepper child is resumed via an
+// incoming follow-up, so the runner repoints itemMetadata.itemId onto that
+// follow-up item and ALL later feedback — including the stepper's terminal —
+// lands on it, not on the edge-bearing root dispatch. Under the old
+// `buildWakeFollowUp(doc, …)` seam the terminal was swallowed (the repointed
+// item is kind:'wake' and/or carries the wrong sessionId) and the parent
+// orchestrator hung forever. The fix resolves the edge from the ROOT dispatch.
+describe('addFeedback wake — edge ownership across a follow-up repoint (LIN-1059)', () => {
+  // Build the exact three-item topology from the ticket, in history:
+  //   ROOT stepper dispatch  (kind:autopilot, edge → grandparent, everything)
+  //   grandchild wake item   (kind:wake, followUpTo=ROOT, sessionId=ROOT) ← repoint target
+  // The stepper's session is resumed onto the wake item, so its terminal is
+  // POSTed there. Returns { rootId, repointId }.
+  async function seedRepointTopology(store, { rootSub = 'everything' } = {}) {
+    const GRANDPARENT = 'grandparent-S1';
+    const root = await store.addItem(URL_KEY, {
+      prompt: 'stepper for LIN-1046', kind: 'autopilot', issueIdentifier: 'LIN-1046',
+      sessionId: GRANDPARENT, subscription: rootSub
+    });
+    await store.takeItem(root._id, URL_KEY, 'token-a');
+
+    // A grandchild's wake addressed to the stepper (followUpTo + sessionId = ROOT),
+    // which the runner uses to resume the stepper — the repoint target.
+    const repoint = await store.addItem(URL_KEY, {
+      prompt: 'grandchild wake', kind: 'wake', issueIdentifier: 'LIN-1046',
+      followUpTo: root._id, sessionId: root._id, subscription: 'terminal-only'
+    });
+    await store.takeItem(repoint._id, URL_KEY, 'token-b');
+
+    return { rootId: root._id, repointId: repoint._id, grandparent: GRANDPARENT };
+  }
+
+  // Count only the up-chain wakes addressed to a given parent — the seed grandchild
+  // `kind:'wake'` item (the repoint target) is itself a wake doc, so a raw
+  // wakeItems() count would include it; the real up-chain wakes are the ones
+  // addressed to the grandparent.
+  const wakesTo = (collection, historyCollection, target) =>
+    wakeItems(collection, historyCollection).filter(w => w.followUpTo === target);
+
+  test('the stepper terminal, POSTed to the repointed kind:wake item, wakes the GRANDPARENT via the root edge', async () => {
+    const { store, collection, historyCollection } = makeStore();
+    const { rootId, repointId, grandparent } = await seedRepointTopology(store);
+
+    // The stepper's own terminal lands on the repointed item (post-repoint ownership).
+    await store.addFeedback(repointId, URL_KEY, { message: '[done] LIN-1046 merged 6db03c9' }, 'token-b');
+    await drain();
+
+    const wakes = wakesTo(collection, historyCollection, grandparent);
+    assert.equal(wakes.length, 1, 'the terminal is NOT swallowed — one wake bubbles up-chain');
+    assert.equal(wakes[0].followUpTo, grandparent, 'addressed to the GRANDPARENT (root edge), not the repointed sessionId');
+    assert.equal(wakes[0].sessionId, grandparent);
+    assert.ok(wakes[0].prompt.includes('LIN-1046'), 'carries the stepper child identifier from the root dispatch');
+
+    // The honest terminal witness lands on the EDGE (root) doc, not the repoint item.
+    const rootDoc = await store.historyCollection.findOne({ _id: rootId });
+    assert.equal(rootDoc.terminalWakeEnqueued, true, 'the terminal-delivered witness is on the root edge doc');
+    const repointDoc = await store.historyCollection.findOne({ _id: repointId });
+    assert.notEqual(repointDoc.terminalWakeEnqueued, true, 'not marked on the repointed feedback item');
+  });
+
+  test('pre-repoint vs post-repoint ownership: a beat on the root, then the terminal on the repoint, both reach the grandparent', async () => {
+    const { store, collection, historyCollection } = makeStore();
+    const { rootId, repointId, grandparent } = await seedRepointTopology(store);
+
+    // PRE-repoint: the beat-1 [pending] is posted while ownership is still the root
+    // dispatch — bubbles on the everything edge (the one wake that got through in
+    // the real run).
+    await store.addFeedback(rootId, URL_KEY, { message: '[pending] beat 1/3 done, standing by' }, 'token-a');
+    await drain();
+    assert.equal(wakesTo(collection, historyCollection, grandparent).length, 1, 'the pre-repoint pending beat wakes the grandparent');
+
+    // POST-repoint: the terminal is posted to the repointed item — under the old
+    // code this was silently lost; now it still bubbles to the grandparent.
+    await store.addFeedback(repointId, URL_KEY, { message: '[done] all beats complete' }, 'token-b');
+    await drain();
+    assert.equal(wakesTo(collection, historyCollection, grandparent).length, 2, 'the post-repoint terminal ALSO wakes the grandparent (the fixed edge)');
+  });
+
+  test('an `everything` edge wakes on EVERY beat + the terminal — the once-ever cap is gone (LIN-1059 secondary)', async () => {
+    const { store, collection, historyCollection } = makeStore();
+    // All feedback stays on the root here (no repoint) to isolate the dedup change:
+    // multiple beats plus the terminal must each wake, where the old one-wake-ever
+    // `wakeEnqueued` would have suppressed everything after beat 1.
+    const child = await takenChild(store, { subscription: 'everything' });
+
+    await store.addFeedback(child._id, URL_KEY, { message: '[pending] beat 1 done' }, 'token-a');
+    await store.addFeedback(child._id, URL_KEY, { message: '[pending] beat 2 done' }, 'token-a');
+    await store.addFeedback(child._id, URL_KEY, { message: '[pending] beat 3 done' }, 'token-a');
+    await store.addFeedback(child._id, URL_KEY, { message: '[done] task complete' }, 'token-a');
+    await drain();
+
+    assert.equal(wakeItems(collection, historyCollection).length, 4, 'three beats + the terminal each wake the parent');
+  });
+
+  test('a later non-wake heartbeat never re-fires the last wake event (per-event firing)', async () => {
+    const { store, collection, historyCollection } = makeStore();
+    const child = await takenChild(store, { subscription: 'everything' });
+
+    await store.addFeedback(child._id, URL_KEY, { message: '[pending] beat 1 done' }, 'token-a');
+    await store.addFeedback(child._id, URL_KEY, { message: '[working] still grinding' }, 'token-a');
+    await drain();
+
+    // Only the pending fired; the heartbeat did not re-fire the (still-last) pending.
+    assert.equal(wakeItems(collection, historyCollection).length, 1, 'the heartbeat did not re-fire the earlier pending wake');
   });
 });
