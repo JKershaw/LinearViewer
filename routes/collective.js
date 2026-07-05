@@ -26,6 +26,7 @@ import {
   buildCollectiveParticipantPrompt,
   DEFAULT_COLLECTIVE_CHANNEL,
   DEFAULT_COLLECTIVE_TOPIC,
+  DEFAULT_COLLECTIVE_CHARACTER,
 } from '../lib/prompts/collective-participant.js';
 
 // Substrate is DECIDED (John, 2026-06-13): full Claude Code sessions only.
@@ -162,8 +163,16 @@ export function createCollectiveRoutes({
       return nick;
     };
 
+    // The fan-out iterates over CHARACTERS, not raw workspaces (LIN-1047, seam
+    // for LIN-820). The default roster is exactly one generic Implementer
+    // character per selected workspace — the DEFAULT_COLLECTIVE_CHARACTER, which
+    // makes buildCollectiveParticipantPrompt emit output byte-for-byte identical
+    // to the pre-refactor per-workspace dispatch. No multi-character roster or
+    // selection exists yet; that is a later subtask (LIN-1048+).
+    const participants = selected.map(ws => ({ ws, character: DEFAULT_COLLECTIVE_CHARACTER }));
+
     const dispatched = [];
-    for (const ws of selected) {
+    for (const { ws, character } of participants) {
       const nick = assignNick(ws.name);
 
       // Best-effort: mint a readWrite proxy token so the participant can pull its
@@ -188,6 +197,7 @@ export function createCollectiveRoutes({
         topic,
         proxyBaseUrl: proxyToken ? proxyBaseUrl : null,
         proxyToken,
+        character,
       });
 
       try {
