@@ -376,6 +376,29 @@ describe('isEpicShapedParent', () => {
   });
 });
 
+describe('formatIssueContext timestamps (LIN-1067)', () => {
+  const baseCtx = { parent: null, siblings: [], cousins: [], children: [], comments: [] };
+  const issue = {
+    id: 'i-1', identifier: 'LIN-1', title: 'T', description: 'B',
+    state: { name: 'Todo', type: 'unstarted' }, labels: [],
+  };
+
+  test('renders **Created:** and **Updated:** when the issue carries them', () => {
+    const result = formatIssueContext(
+      { ...issue, createdAt: '2026-04-01T00:00:00Z', updatedAt: '2026-06-15T12:34:56Z' },
+      baseCtx
+    );
+    assert.match(result, /\*\*Created:\*\* 2026-04-01T00:00:00Z/);
+    assert.match(result, /\*\*Updated:\*\* 2026-06-15T12:34:56Z/);
+  });
+
+  test('omits **Updated:** when updatedAt is absent (additive, unchanged for providers without it)', () => {
+    const result = formatIssueContext({ ...issue, createdAt: '2026-04-01T00:00:00Z' }, baseCtx);
+    assert.match(result, /\*\*Created:\*\*/);
+    assert.doesNotMatch(result, /\*\*Updated:\*\*/);
+  });
+});
+
 describe('formatIssueContext siblings', () => {
   const baseIssue = {
     id: 'i-cur',

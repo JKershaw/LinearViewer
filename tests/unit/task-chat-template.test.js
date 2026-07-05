@@ -77,6 +77,18 @@ describe('buildTaskChatMessages', () => {
     assert.match(system.content, /name the gap/i);
   });
 
+  test('system prompt surfaces exact-time tools and flags day-resolution inline dates (LIN-1067)', () => {
+    const [system] = buildTaskChatMessages(SAMPLE_ISSUE, SAMPLE_CONTEXT, 'hi');
+    // Inline comment dates are called out as day-resolution so the model does not
+    // present them as exact times.
+    assert.match(system.content, /day-resolution/i);
+    // Exact comment times come from get_comments; state-transition times from get_history.
+    assert.match(system.content, /get_comments/);
+    assert.match(system.content, /get_history/);
+    // It must steer away from estimating a time it wasn't given.
+    assert.match(system.content, /exact time|ISO/i);
+  });
+
   test('system prompt forbids markdown for the terminal surface', () => {
     const [system] = buildTaskChatMessages(SAMPLE_ISSUE, SAMPLE_CONTEXT, 'hi');
     assert.match(system.content, /Plain text only/i);

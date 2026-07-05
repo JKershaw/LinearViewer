@@ -87,8 +87,8 @@ describe('CHAT_TOOL_SCHEMAS', () => {
   test('exposes the pass-1 + pass-2 read tools', () => {
     const names = CHAT_TOOL_SCHEMAS.map(t => t.function.name).sort();
     assert.deepStrictEqual(names, [
-      'get_brief', 'get_children_status', 'get_comments', 'get_recap', 'get_relations',
-      'get_stack', 'lookup_task', 'search_tasks',
+      'get_brief', 'get_children_status', 'get_comments', 'get_history', 'get_recap',
+      'get_relations', 'get_stack', 'lookup_task', 'search_tasks',
     ]);
   });
 
@@ -114,6 +114,8 @@ describe('CHAT_TOOL_SCHEMAS', () => {
     assert.deepStrictEqual(byName.get_comments.parameters.required, ['issueId']);
     // LIN-1066: get_children_status rolls up one named parent's children.
     assert.deepStrictEqual(byName.get_children_status.parameters.required, ['issueId']);
+    // LIN-1067: get_history reads one named task's state-transition history.
+    assert.deepStrictEqual(byName.get_history.parameters.required, ['issueId']);
   });
 });
 
@@ -127,7 +129,7 @@ describe('CHAT_TOOL_RESULT_BUDGETS (LIN-1065)', () => {
   });
 
   test('does NOT override any other tool, so they keep the 4000 default', () => {
-    for (const name of ['lookup_task', 'search_tasks', 'get_relations', 'get_brief', 'get_recap', 'get_stack']) {
+    for (const name of ['lookup_task', 'search_tasks', 'get_relations', 'get_brief', 'get_recap', 'get_stack', 'get_history']) {
       assert.strictEqual(CHAT_TOOL_RESULT_BUDGETS[name], undefined, `${name} must not be overridden`);
     }
   });
@@ -335,6 +337,63 @@ describe('executors — direct provider calls, workspace-scoped', () => {
     );
     await assert.rejects(
       () => executeTool({ name: 'get_children_status', arguments: { issueId: 'LIN-404' } }),
+      /Task LIN-404 not found/,
+    );
+  });
+
+  test('get_history returns state transitions newest-first with a latest shortcut (LIN-1067)', async () => {
+    const provider = makeFakeProvider({
+      async fetchRecommendationContext(scope, issueId, opts) {
+        this.calls.push({ method: 'fetchRecommendationContext', scope, issueId, opts });
+        // The Linear provider already filters to toState-present nodes and returns
+        // them newest-first; the tool passes that normalized slice straight through.
+        return {
+          issue: { id: 'uuid-1', identifier: issueId, title: 'A task' },
+          stateTransitions: [
+            { createdAt: '2026-06-03T09:00:00Z', fromState: 'In Progress', toState: 'Done' },
+            { createdAt: '2026-06-01T08:00:00Z', fromState: 'Todo', toState: 'In Progress' },
+          ],
+        };
+      },
+    });
+    const { executeTool } = createChatToolCatalog({ provider, scope: SCOPE });
+
+    const result = await executeTool({ name: 'get_history', arguments: { issueId: 'LIN-50' } });
+
+    assert.deepStrictEqual(provider.calls[0], {
+      method: 'fetchRecommendationContext', scope: SCOPE, issueId: 'LIN-50', opts: undefined,
+    });
+    assert.strictEqual(result.identifier, 'LIN-50');
+    assert.strictEqual(result.count, 2);
+    // `latest` is the newest (first) transition, for the common "when did it last move?".
+    assert.deepStrictEqual(result.latest, {
+      createdAt: '2026-06-03T09:00:00Z', fromState: 'In Progress', toState: 'Done',
+    });
+    assert.strictEqual(result.transitions.length, 2);
+  });
+
+  test('get_history handles no history and rejects a bad/missing id (LIN-1067)', async () => {
+    const provider = makeFakeProvider({
+      async fetchRecommendationContext(scope, issueId) {
+        if (issueId === 'LIN-404') return null;
+        // A task with no state history (or a provider that supplies none) → empty list,
+        // null latest, never an error.
+        return { issue: { id: 'uuid-1', identifier: issueId } };
+      },
+    });
+    const { executeTool } = createChatToolCatalog({ provider, scope: SCOPE });
+
+    const empty = await executeTool({ name: 'get_history', arguments: { issueId: 'LIN-1' } });
+    assert.strictEqual(empty.count, 0);
+    assert.strictEqual(empty.latest, null);
+    assert.deepStrictEqual(empty.transitions, []);
+
+    await assert.rejects(
+      () => executeTool({ name: 'get_history', arguments: { issueId: 'not a valid id!' } }),
+      /Invalid issue id/,
+    );
+    await assert.rejects(
+      () => executeTool({ name: 'get_history', arguments: { issueId: 'LIN-404' } }),
       /Task LIN-404 not found/,
     );
   });
