@@ -24,10 +24,48 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createCollectiveRoutes } from '../../routes/collective.js';
+import { CollectiveCharactersStore } from '../../lib/collective-characters-store.js';
 import {
   buildCollectiveParticipantPrompt,
   DEFAULT_COLLECTIVE_CHARACTER,
 } from '../../lib/prompts/collective-participant.js';
+
+// Minimal in-memory mock of the collection surface CollectiveCharactersStore
+// uses (matches on _id / urlKey equality). Lets a regression test drive the REAL
+// store through the route and read it back via store.list(), proving a saved
+// character actually persists (not just that createCustom was invoked).
+function createMockCollection() {
+  const docs = [];
+  const matches = (doc, q) =>
+    (q._id === undefined || doc._id === q._id) &&
+    (q.urlKey === undefined || doc.urlKey === q.urlKey);
+  return {
+    async insertOne(doc) { docs.push(doc); return { insertedId: doc._id }; },
+    async findOne(q) { return docs.find(d => matches(d, q)) || null; },
+    find(q = {}) {
+      const results = docs.filter(d => matches(d, q));
+      return { async toArray() { return results.slice(); } };
+    },
+    async updateOne(q, update) {
+      const doc = docs.find(d => matches(d, q));
+      if (!doc) return { matchedCount: 0, modifiedCount: 0 };
+      Object.assign(doc, update.$set || {});
+      return { matchedCount: 1, modifiedCount: 1 };
+    },
+    async deleteOne(q) {
+      const idx = docs.findIndex(d => matches(d, q));
+      if (idx >= 0) { docs.splice(idx, 1); return { deletedCount: 1 }; }
+      return { deletedCount: 0 };
+    },
+    async deleteMany(q) {
+      let count = 0;
+      for (let i = docs.length - 1; i >= 0; i--) {
+        if (matches(docs[i], q)) { docs.splice(i, 1); count++; }
+      }
+      return { deletedCount: count };
+    },
+  };
+}
 
 const YAP_BASE_URL = 'https://yap.test';
 
@@ -259,16 +297,64 @@ describe('POST /collective/start — persona threading + recent recording (LIN-1
     assert.equal(recents[1].data.workspaceUrlKey, 'bravo');
   });
 
-  test('save:true on a new character persists it as custom before recording recent', async () => {
+  // REGRESSION (LIN-1048): the client (public/collective.js addDefinedCharacter)
+  // stamps every define-new row with a local `pending-N` id and POSTs the whole
+  // object. The route must persist a `save:true` character as custom EVEN WHEN it
+  // carries such an id — the old `if (raw.save && !raw.id)` guard made customs
+  // unreachable from the real UI. The prior version of this test omitted the id,
+  // which is why it stayed green while the UI was broken; it now posts the real
+  // client shape (pending- id present).
+  test('save:true on a new character (real client pending- id) persists it as custom before recording recent', async () => {
     const captured = [];
     const recorded = [];
     const app = buildAppWithStore(captured, recorded);
     await call(app, 'post', START_PATH, {
       channel: '#test-room',
-      characters: [{ workspaceUrlKey: 'alpha', role: 'Skeptic', name: 'My Skeptic', save: true }],
+      characters: [{ id: 'pending-0', workspaceUrlKey: 'alpha', role: 'Skeptic', name: 'My Skeptic', save: true }],
     });
-    assert.ok(recorded.some(r => r.kind === 'custom' && r.data.name === 'My Skeptic'), 'saved as custom');
+    assert.ok(recorded.some(r => r.kind === 'custom' && r.data.name === 'My Skeptic'), 'saved as custom despite pending- id');
     assert.ok(recorded.some(r => r.kind === 'recent'), 'still recorded as recent');
+  });
+
+  // End-to-end persistence proof against the REAL store: the real client payload
+  // must leave a `custom` record visible via store.list() (i.e. it survives a
+  // reload of the picker), not just a transient recent. This is the reviewer's
+  // f694190e repro turned into an assertion.
+  test('real client payload persists a custom visible via store.list (reviewer repro)', async () => {
+    const collection = createMockCollection();
+    const store = new CollectiveCharactersStore({ collection });
+    const captured = [];
+    const app = express();
+    app.use(express.json());
+    app.use(createCollectiveRoutes({
+      dispatchQueueStore: {
+        addItem: async (urlKey, item) => { captured.push({ urlKey, item }); return { _id: `disp-${captured.length}`, ...item }; },
+      },
+      proxyTokenStore: null,
+      collectiveCharactersStore: store,
+      yapClient: { baseUrl: YAP_BASE_URL },
+      getOpenRouterSource: () => null,
+      getDeployInfo: () => ({}),
+      workspaceFromUrl: (req, res, next) => {
+        req.workspace = { urlKey: req.params.urlKey };
+        req.session = { linearUserId: 'u1', features: { collective: true }, workspaces: WORKSPACES };
+        next();
+      },
+    }));
+
+    const res = await call(app, 'post', START_PATH, {
+      channel: '#test-room',
+      characters: [{ id: 'pending-0', workspaceUrlKey: 'alpha', role: 'Skeptic', name: 'My Skeptic', save: true }],
+    });
+    assert.equal(res.status, 201);
+
+    // Anchor = route :urlKey ('alpha'). On reload the picker reads store.list(anchor).
+    const saved = await store.list('alpha');
+    const customs = saved.filter(c => c.kind === 'custom');
+    assert.equal(customs.length, 1, 'exactly one custom persisted from the real client payload');
+    assert.equal(customs[0].name, 'My Skeptic');
+    assert.equal(customs[0].workspaceUrlKey, 'alpha');
+    assert.equal(customs[0].role, 'Skeptic');
   });
 
   test('a character bound to an unconnected workspace is dropped; all-stale → 400', async () => {

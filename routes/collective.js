@@ -242,10 +242,15 @@ export function createCollectiveRoutes({
 
         // Remember this dispatched character for the picker. The store is
         // partitioned by the anchor workspace but the record carries its own repo
-        // binding. A newly-defined character the user opted to save (`save` &&
-        // not already stored) is persisted as `custom` first; every dispatched
-        // character is then recorded as `recent` (recordRecent dedupes against an
-        // existing custom/recent, so a saved character is not double-listed).
+        // binding. A newly-defined character the user opted to save (`save`) is
+        // persisted as `custom` first; every dispatched character is then recorded
+        // as `recent` (recordRecent dedupes against an existing custom/recent, so a
+        // saved character is not double-listed). We do NOT gate on `!raw.id`: the
+        // real client (public/collective.js addDefinedCharacter) assigns every
+        // define-new row a local `pending-N` id, so `!raw.id` would make custom
+        // persistence unreachable from the UI (LIN-1048). Re-saving is idempotent —
+        // createCustom dedupes by identity (repo binding + persona) and promotes a
+        // twin in place — so dropping the guard cannot double-list.
         if (collectiveCharactersStore) {
           const record = {
             workspaceUrlKey: ws.urlKey,
@@ -253,7 +258,7 @@ export function createCollectiveRoutes({
             name: typeof raw.name === 'string' ? raw.name : '',
             ...character,
           };
-          if (raw.save && !raw.id) {
+          if (raw.save) {
             try {
               await collectiveCharactersStore.createCustom(anchorKey, record);
             } catch (saveErr) {
