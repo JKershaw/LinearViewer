@@ -159,7 +159,7 @@ function buildMockAnswer(context, question, related) {
  * @param {Object}   deps.savedChatStore       - durable saved-chat store (LIN-1008)
  * @returns {Router}
  */
-export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore }) {
+export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore }) {
   const router = Router();
 
   // ─── HTML page ──────────────────────────────────────────────────────────────
@@ -413,7 +413,13 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
         // turn can look up related tasks. The whole loop is ONE turn — the single
         // free-tier tryUse above still covers it; we add no per-hop quota call.
         const provider = getProviderForWorkspace(workspace);
-        const { tools, executeTool } = createChatToolCatalog({ provider, scope: getWorkspaceCallScope(workspace) });
+        const { tools, executeTool } = createChatToolCatalog({
+          provider,
+          scope: getWorkspaceCallScope(workspace),
+          recapCacheStore,
+          briefCacheStore,
+          urlKey: workspace.urlKey,
+        });
         await streamChatWithTools(
           messages,
           { apiKey: apiKeyToUse, model: selectedModel, maxTokens: 1500, tools, executeTool, callMeta },

@@ -11,6 +11,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { createChatToolCatalog, CHAT_TOOL_SCHEMAS } from '../../lib/chat-tools.js';
+import { hashContext } from '../../lib/recap-cache.js';
 
 // A recording fake of the pass-1 provider read surface. Every method records
 // the scope it was called with so tests can assert workspace-scoping, and
@@ -31,17 +32,61 @@ function makeFakeProvider(overrides = {}) {
       calls.push({ method: 'relations', scope, issueId });
       return { trashed: false, relations: { nodes: [] }, inverseRelations: { nodes: [] } };
     },
+    // Pass-2 (LIN-1026): the stack tool fetches projects+issues through the
+    // provider. Return a tiny raw-shaped fixture the pipeline can project.
+    async fetchProjects(scope, teamId, opts) {
+      calls.push({ method: 'fetchProjects', scope, teamId, opts });
+      return {
+        projects: [{ id: 'proj-1', name: 'Proj', sortOrder: 1 }],
+        issues: [
+          {
+            id: 'i-1', identifier: 'LIN-1', title: 'In progress task',
+            description: 'First line of body\nsecond line', priority: 1,
+            state: { name: 'In Progress', type: 'started' },
+            project: { id: 'proj-1', name: 'Proj' }, parent: null,
+            labels: { nodes: [] },
+          },
+        ],
+      };
+    },
     ...overrides,
   };
   return provider;
 }
 
+// An in-memory cache store matching the RecapCacheStore/BriefCacheStore get()
+// contract used by the cache-only brief/recap tools. Keyed by (urlKey, issueId).
+function makeFakeCacheStore() {
+  const map = new Map();
+  const k = (workspaceId, issueId) => `${workspaceId}:${issueId}`;
+  return {
+    map,
+    async get(workspaceId, issueId) {
+      return map.get(k(workspaceId, issueId)) || null;
+    },
+    put(workspaceId, issueId, value) {
+      map.set(k(workspaceId, issueId), value);
+    },
+  };
+}
+
 const SCOPE = 'workspace-token-abc';
+const URL_KEY = 'ws-key';
+
+// The canonical context the fake provider returns for any issueId (its issue.id
+// is a fixed 'uuid-1'), and the hash the cache-only tools compute over it. Used
+// to seed the cache stores so a seeded entry reads back as `fresh`.
+const CANONICAL_ID = 'uuid-1';
+function contextFor(issueId) {
+  return { issue: { id: CANONICAL_ID, identifier: issueId, title: 'A task' } };
+}
 
 describe('CHAT_TOOL_SCHEMAS', () => {
-  test('exposes exactly the three pass-1 read tools', () => {
+  test('exposes the pass-1 + pass-2 read tools', () => {
     const names = CHAT_TOOL_SCHEMAS.map(t => t.function.name).sort();
-    assert.deepStrictEqual(names, ['get_relations', 'lookup_task', 'search_tasks']);
+    assert.deepStrictEqual(names, [
+      'get_brief', 'get_recap', 'get_relations', 'get_stack', 'lookup_task', 'search_tasks',
+    ]);
   });
 
   test('every schema is a well-formed OpenAI function tool', () => {
@@ -58,6 +103,10 @@ describe('CHAT_TOOL_SCHEMAS', () => {
     assert.deepStrictEqual(byName.lookup_task.parameters.required, ['issueId']);
     assert.deepStrictEqual(byName.get_relations.parameters.required, ['issueId']);
     assert.deepStrictEqual(byName.search_tasks.parameters.required, ['query']);
+    // Pass-2: brief/recap take an issueId; stack's limit is optional.
+    assert.deepStrictEqual(byName.get_brief.parameters.required, ['issueId']);
+    assert.deepStrictEqual(byName.get_recap.parameters.required, ['issueId']);
+    assert.deepStrictEqual(byName.get_stack.parameters.required, []);
   });
 });
 
@@ -202,6 +251,150 @@ describe('executeTool — error handling', () => {
     await assert.rejects(
       () => executeTool({ name: 'lookup_task', arguments: { issueId: 'LIN-404' } }),
       /Task LIN-404 not found/,
+    );
+  });
+});
+
+describe('pass-2 cache-only reads — get_brief / get_recap (LIN-1026)', () => {
+  // Each twin is exercised against both stores/fields via a small table so the
+  // shared readCachedContext helper is proven for both.
+  const twins = [
+    { name: 'get_brief', field: 'brief', storeName: 'Brief cache' },
+    { name: 'get_recap', field: 'recap', storeName: 'Recap cache' },
+  ];
+
+  function makeCatalog({ store, field } = {}) {
+    const provider = makeFakeProvider();
+    const briefCacheStore = field === 'brief' ? store : makeFakeCacheStore();
+    const recapCacheStore = field === 'recap' ? store : makeFakeCacheStore();
+    const { executeTool } = createChatToolCatalog({
+      provider, scope: SCOPE, briefCacheStore, recapCacheStore, urlKey: URL_KEY,
+    });
+    return { provider, executeTool };
+  }
+
+  for (const twin of twins) {
+    test(`${twin.name} returns 'fresh' with the cached payload when the hash matches`, async () => {
+      const store = makeFakeCacheStore();
+      const inputHash = hashContext(contextFor('LIN-1'));
+      store.put(URL_KEY, CANONICAL_ID, {
+        inputHash, [twin.field]: 'cached body', model: 'openai/x', generatedAt: 'ts',
+      });
+      const { executeTool } = makeCatalog({ store, field: twin.field });
+
+      const result = await executeTool({ name: twin.name, arguments: { issueId: 'LIN-1' } });
+      assert.strictEqual(result.status, 'fresh');
+      assert.strictEqual(result.identifier, 'LIN-1');
+      assert.strictEqual(result[twin.field], 'cached body');
+      assert.strictEqual(result.model, 'openai/x');
+      assert.strictEqual(result.generatedAt, 'ts');
+    });
+
+    test(`${twin.name} returns 'stale' (no body) when the cached hash is outdated`, async () => {
+      const store = makeFakeCacheStore();
+      store.put(URL_KEY, CANONICAL_ID, {
+        inputHash: 'a-different-hash', [twin.field]: 'old body', model: 'm', generatedAt: 'ts',
+      });
+      const { executeTool } = makeCatalog({ store, field: twin.field });
+
+      const result = await executeTool({ name: twin.name, arguments: { issueId: 'LIN-1' } });
+      assert.strictEqual(result.status, 'stale');
+      assert.strictEqual(result.identifier, 'LIN-1');
+      assert.strictEqual(result[twin.field], undefined, 'stale never leaks a body');
+      assert.strictEqual(result.generatedAt, 'ts');
+    });
+
+    test(`${twin.name} returns 'missing' when nothing is cached`, async () => {
+      const { executeTool } = makeCatalog({ store: makeFakeCacheStore(), field: twin.field });
+      const result = await executeTool({ name: twin.name, arguments: { issueId: 'LIN-1' } });
+      assert.strictEqual(result.status, 'missing');
+      assert.strictEqual(result.identifier, 'LIN-1');
+      assert.strictEqual(result[twin.field], undefined);
+    });
+
+    test(`${twin.name} NEVER generates — it only reads the store`, async () => {
+      const { provider, executeTool } = makeCatalog({ store: makeFakeCacheStore(), field: twin.field });
+      await executeTool({ name: twin.name, arguments: { issueId: 'LIN-1' } });
+      // The only provider call is the context fetch; no generate* is invoked.
+      assert.deepStrictEqual(
+        provider.calls.map(c => c.method),
+        ['fetchRecommendationContext'],
+      );
+    });
+
+    test(`${twin.name} validates the id before touching the provider`, async () => {
+      const { provider, executeTool } = makeCatalog({ store: makeFakeCacheStore(), field: twin.field });
+      await assert.rejects(
+        () => executeTool({ name: twin.name, arguments: { issueId: 'bad id!' } }),
+        /Invalid issue id/,
+      );
+      assert.strictEqual(provider.calls.length, 0);
+    });
+
+    test(`${twin.name} fails cleanly as 'not configured' when its cache store is absent`, async () => {
+      const provider = makeFakeProvider();
+      // Construct WITHOUT the stores/urlKey — mirrors a deployment that never wired them.
+      const { executeTool } = createChatToolCatalog({ provider, scope: SCOPE });
+      await assert.rejects(
+        () => executeTool({ name: twin.name, arguments: { issueId: 'LIN-1' } }),
+        new RegExp(`${twin.storeName} is not configured`),
+      );
+      assert.strictEqual(provider.calls.length, 0, 'no provider call on a not-configured store');
+    });
+  }
+
+  test('brief/recap reads are scoped to the bound urlKey, not a model-supplied one', async () => {
+    const store = makeFakeCacheStore();
+    const inputHash = hashContext(contextFor('LIN-1'));
+    store.put(URL_KEY, CANONICAL_ID, { inputHash, brief: 'body' });
+    const provider = makeFakeProvider();
+    const { executeTool } = createChatToolCatalog({
+      provider, scope: SCOPE, briefCacheStore: store, recapCacheStore: makeFakeCacheStore(), urlKey: URL_KEY,
+    });
+    // Model tries to smuggle a different urlKey — ignored; the bound key resolves the hit.
+    const result = await executeTool({ name: 'get_brief', arguments: { issueId: 'LIN-1', urlKey: 'other-ws' } });
+    assert.strictEqual(result.status, 'fresh');
+    assert.strictEqual(result.brief, 'body');
+  });
+});
+
+describe('pass-2 stack tool — get_stack (LIN-1026)', () => {
+  test('fetches projects via the bound scope and returns the digest projection', async () => {
+    const provider = makeFakeProvider();
+    const { executeTool } = createChatToolCatalog({ provider, scope: SCOPE });
+
+    const result = await executeTool({ name: 'get_stack', arguments: {} });
+
+    const fetch = provider.calls.find(c => c.method === 'fetchProjects');
+    assert.ok(fetch, 'fetchProjects was called');
+    assert.strictEqual(fetch.scope, SCOPE, 'bound scope, not a model arg');
+    assert.strictEqual(result.view, 'digest');
+    assert.ok(Array.isArray(result.tasks));
+    assert.ok(result.tasks.length >= 1);
+    const row = result.tasks[0];
+    // Digest shape: headline (not full description), count fields.
+    assert.strictEqual(row.description, undefined);
+    assert.strictEqual(typeof row.headline, 'string');
+    assert.strictEqual(typeof row.children, 'number');
+    assert.strictEqual(typeof result.total, 'number');
+  });
+
+  test('clamps the limit to 1-50 (default 5) — an out-of-range limit is bounded', async () => {
+    const provider = makeFakeProvider();
+    const { executeTool } = createChatToolCatalog({ provider, scope: SCOPE });
+    // Only one task in the fixture, so assert it does not throw and returns <= 50 rows.
+    const big = await executeTool({ name: 'get_stack', arguments: { limit: 999 } });
+    assert.ok(big.tasks.length <= 50);
+    const small = await executeTool({ name: 'get_stack', arguments: { limit: 0 } });
+    assert.ok(small.tasks.length >= 0);
+  });
+
+  test('a provider without fetchProjects yields a clean capability error', async () => {
+    const provider = makeFakeProvider({ fetchProjects: undefined });
+    const { executeTool } = createChatToolCatalog({ provider, scope: SCOPE });
+    await assert.rejects(
+      () => executeTool({ name: 'get_stack', arguments: {} }),
+      /does not support fetchProjects/,
     );
   });
 });

@@ -48,8 +48,8 @@ import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
 import { hashContext } from '../lib/recap-cache.js';
 import { snapshotFromContext } from '../lib/task-snapshot-store.js';
-import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, isTerminalState, isBlocked, NO_PROJECT_ID } from '../lib/tree.js';
-import { flattenTrees, sortIssuesForSwipe, applyBlockingOrder, clusterByParent, computeGraphFeatures, computeOffPageBlockers, buildWhy } from '../lib/render-swipe.js';
+import { isTerminalState, isBlocked } from '../lib/tree.js';
+import { buildTaskStack } from '../lib/task-stack.js';
 import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, getPromptDisplayName, PROMPT_TEMPLATES, DISPATCH_KINDS } from '../lib/prompt-templates.js';
 import { parseRepoFromDescription, buildPromptFilename } from '../lib/prompt-formatters.js';
 import { buildProxyContextPreamble } from '../lib/proxy-preamble.js';
@@ -410,23 +410,6 @@ async function fetchWithTimeout(workFn, ms) {
 
 // Pattern to detect null bytes and dangerous control characters
 const DANGEROUS_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
-
-/** Max length of the deterministic one-line headline in the `/stack` digest view. */
-const STACK_HEADLINE_MAX = 140;
-
-/**
- * Reduce a task description to a single deterministic headline line for the
- * `/stack?view=digest` projection. Takes the first non-empty line and truncates
- * it — no LLM, cheap and exact, so orientation stays light and reproducible.
- * @param {string|null|undefined} description - Full task description
- * @returns {string} One-line headline (possibly empty)
- */
-function toStackHeadline(description) {
-  if (!description || typeof description !== 'string') return '';
-  const firstLine = description.split('\n').map(s => s.trim()).find(s => s.length > 0) || '';
-  if (firstLine.length <= STACK_HEADLINE_MAX) return firstLine;
-  return firstLine.slice(0, STACK_HEADLINE_MAX - 1).trimEnd() + '…';
-}
 
 // The proxy-context preamble (the "Workspace API access" block appended to
 // dispatched prompts) now lives in lib/proxy-preamble.js so non-proxy dispatch
@@ -2720,145 +2703,13 @@ One convention across every endpoint, so you can branch on the same fields every
         ({ projects, issues } = await withTimeout(fetchProjects(accessToken), MULTI_REQUEST_TIMEOUT_MS));
       }
 
-      // Build tree structure
-      const forest = buildForest(issues);
-      if (forest.has(NO_PROJECT_ID)) {
-        projects.push({
-          id: NO_PROJECT_ID,
-          name: 'No Project',
-          content: null,
-          url: null,
-          sortOrder: Number.MAX_SAFE_INTEGER
-        });
-      }
-
-      const inProgressTrees = buildInProgressForest(issues, projects);
-      const recentActivityTrees = buildRecentActivityForest(issues, projects, 1);
-      const trees = projects
-        .sort((a, b) => a.sortOrder - b.sortOrder)
-        .map(project => {
-          const { roots } = forest.get(project.id) || { roots: [] };
-          const { incomplete } = partitionCompleted(roots);
-          return { project, incomplete };
-        });
-
-      // Flatten and deduplicate (same as swipe view)
-      const projectIssues = flattenTrees(trees, 'project');
-      const inProgressIssues = flattenTrees(inProgressTrees, 'in-progress');
-      const recentIssues = flattenTrees(recentActivityTrees, 'recent-activity');
-
-      const seenIds = new Set();
-      const allIssues = [];
-      for (const issue of inProgressIssues) {
-        if (!seenIds.has(issue.id)) { seenIds.add(issue.id); allIssues.push(issue); }
-      }
-      for (const issue of projectIssues) {
-        if (!seenIds.has(issue.id)) { seenIds.add(issue.id); allIssues.push(issue); }
-      }
-      for (const issue of recentIssues) {
-        if (!seenIds.has(issue.id)) { seenIds.add(issue.id); allIssues.push(issue); }
-      }
-
-      // Build parent/child relationships (flat throughout; this is already the
-      // neutral flat wire shape the rest of the API now aligns onto).
-      const cardById = new Map(allIssues.map(i => [i.id, i]));
-      const childrenMap = new Map();
-      for (const issue of allIssues) {
-        if (issue.parentId && cardById.has(issue.parentId)) {
-          const parent = cardById.get(issue.parentId);
-          issue.parentIdentifier = parent.identifier;
-          issue.parentTitle = parent.title;
-          if (!childrenMap.has(issue.parentId)) childrenMap.set(issue.parentId, []);
-          childrenMap.get(issue.parentId).push({
-            id: issue.id,
-            identifier: issue.identifier,
-            title: issue.title,
-            state: { type: issue.stateType }
-          });
-        }
-      }
-      for (const [parentId, children] of childrenMap) {
-        const parent = cardById.get(parentId);
-        if (parent) parent.children = children;
-      }
-
-      // Compute transitive graph features (LIN-391) BEFORE the sort — they are
-      // sort-keys (downstreamUnblocks/criticalPathLen) and also stamped onto the
-      // digest line. Same ordering as the swipe view (renderSwipePage), which
-      // runs the identical pipeline.
-      computeGraphFeatures(allIssues);
-      sortIssuesForSwipe(allIssues);
-      const sortedIssues = clusterByParent(applyBlockingOrder(allIssues));
-
-      // Trim to limit and project to the neutral flat wire shape. Agents assume
-      // `state.name`, `parent.identifier`, `children` (not `subtasks`), so we
-      // expose that shape uniformly here. Internal flat fields remain
-      // available only to this handler.
-      //
-      // `?view=digest` returns a compact, orientation-grade projection: it drops
-      // the (potentially large) full `description` in favour of a deterministic
-      // one-line `headline`, and replaces the `children`/`blocksIds` arrays with
-      // counts. This lets a light orchestrator (Autopilot) get a sense of the
-      // whole stack at a glance without holding every task's full body in
-      // context — then drill into one task's detail (full description / `/brief`)
-      // only for the item it picks. See docs/autopilot-kickoff.md.
-      const sliced = sortedIssues.slice(0, limit);
-      // Off-page blockers (LIN-391): direct blockers pushed beyond the slice that
-      // still shaped a visible line's position. Derived from final post-cluster
-      // positions; no transitive closure stored.
-      const offPageBlockers = computeOffPageBlockers(sortedIssues, limit);
-      const isDigest = req.query.view === 'digest';
-      const tasks = isDigest
-        ? sliced.map(issue => {
-            const heldBy = offPageBlockers.get(issue.id) || [];
-            return {
-              id: issue.id,
-              identifier: issue.identifier,
-              title: issue.title,
-              headline: toStackHeadline(issue.description),
-              priority: issue.priority,
-              state: { name: issue.stateName, type: issue.stateType },
-              labels: issue.labels || [],
-              section: issue.section || null,
-              assignee: issue.assignee || null,
-              project: issue.projectName ? { name: issue.projectName } : null,
-              parent: issue.parentId
-                ? { identifier: issue.parentIdentifier || null }
-                : null,
-              blocks: (issue.blocksIds || []).length,
-              children: (issue.children || []).length,
-              // Explainability (LIN-391): transitive features + compact `why`.
-              downstreamUnblocks: issue.downstreamUnblocks || 0,
-              criticalPathLen: issue.criticalPathLen || 0,
-              ...(heldBy.length > 0 ? { heldBy } : {}),
-              why: buildWhy(issue, heldBy)
-            };
-          })
-        : sliced.map(issue => {
-            const heldBy = offPageBlockers.get(issue.id) || [];
-            return {
-              id: issue.id,
-              identifier: issue.identifier,
-              title: issue.title,
-              description: issue.description,
-              priority: issue.priority,
-              state: { name: issue.stateName, type: issue.stateType },
-              labels: issue.labels || [],
-              project: issue.projectName ? { name: issue.projectName } : null,
-              parent: issue.parentId
-                ? { id: issue.parentId, identifier: issue.parentIdentifier || null, title: issue.parentTitle || null }
-                : null,
-              children: issue.children || [],
-              blocksIds: issue.blocksIds || [],
-              // Same computed scalars as digest, for full/digest consistency (LIN-391).
-              downstreamUnblocks: issue.downstreamUnblocks || 0,
-              criticalPathLen: issue.criticalPathLen || 0,
-              ...(heldBy.length > 0 ? { heldBy } : {})
-            };
-          });
+      // Project the sorted stack via the shared pure pipeline (lib/task-stack.js),
+      // the exact same projection the read-only `get_stack` chat tool drives.
+      const view = req.query.view === 'digest' ? 'digest' : 'full';
+      const { tasks, total, view: resolvedView } = buildTaskStack({ projects, issues, limit, view });
 
       logEvent(req, '/api/proxy/stack', 200);
-      res.json({ tasks, total: sortedIssues.length, view: isDigest ? 'digest' : 'full' });
+      res.json({ tasks, total, view: resolvedView });
     } catch (err) {
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/stack', status);
