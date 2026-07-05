@@ -232,12 +232,15 @@ Prompts (including `retro`) are available on completed/canceled issues too.
 
 ## Collective (experimental)
 
-The Collective page (`/workspace/{urlKey}/collective`) dispatches full Claude Code sessions from several connected workspaces into one Yap chat channel for a watched cross-project discussion. Requires the per-user `collective` feature flag; surfaced only via a link in Settings.
+The Collective page (`/workspace/{urlKey}/collective`) dispatches full Claude Code sessions — one per chosen character (persona) — into one Yap chat channel for a watched cross-project discussion. Each character is bound to a connected workspace/repo. Requires the per-user `collective` feature flag; surfaced only via a link in Settings.
 
 ### Collective DOM Structure
 ```
 main.collective-page[data-url-key]      - page container
-  .collective-ws-check[value]           - workspace checkbox (value = urlKey)
+  .collective-char-check[value]         - character selection checkbox (value = character id)
+  [data-testid=collective-char-repo]    - define-new: connected-repo select
+  [data-testid=collective-char-{role|lens|objective|value|disposition}] - persona inputs
+  [data-testid=collective-char-add]     - add the defined character to the picker
   #collective-channel                   - Yap channel input (random default: #word-word-YYYY-MM-DD)
   #collective-topic                     - discussion topic textarea
   #collective-target                    - dispatch target select (cli | web)

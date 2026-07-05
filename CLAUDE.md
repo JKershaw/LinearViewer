@@ -98,6 +98,7 @@ lib/
   prompt-template-defs.js  Prompt template definitions (14 templates)
   completion-signals.js  Completion signals for prompt assessment
   custom-prompts-store.js  Custom prompt template storage (per workspace)
+  collective-characters-store.js  Collective character (persona) storage (LIN-1048): mirrors custom-prompts-store (Mongo/Mango, UUID, per-anchor-urlKey partition); each record carries its own repo binding (workspaceUrlKey, re-validated at dispatch, NO stored proxy token) + the five persona fields; two kinds — `custom` (capped 20, throw on overflow) and `recent` (auto-recorded per /start dispatch, rolling 10, evict-oldest, never throw); identity = binding+persona, so saving a recent promotes it to custom in place and a dispatched saved character is not double-listed
   prompts/
     meta-prompt-template.js  Meta-prompt for AI recommendation generation
     autopilot-kickoff.js     Autopilot kickoff briefing template
@@ -175,7 +176,7 @@ public/
   prompts.css                   Prompts catalog page
   custom-prompts.css / .js      Custom prompts page
   dispatch.css / dispatch.js    Dispatch page (prompt, queue, tokens, history)
-  collective.css / collective.js  Collective page (setup, transcript poll, say box)
+  collective.css / collective.js  Collective page (character picker, transcript poll, say box). The setup step is a character picker (LIN-1048): select saved custom + recent characters, or define a new one (pick a connected repo + fill the five persona fields + name, optionally save); /start posts `characters` (not `workspaceUrlKeys`) and view-prompt threads the selected character so preview matches dispatch
   observation.css / observation.js  Autopilot Observation page (sessionId-grouped sessions poll, status banner, workspace filters, Level-1 active feed + collapsible completed archive, Level-2 session cards with status pill / one-sentence summary / runtime+model / per-worker-run progress bar, Level-3 drill-down: tasks-touched + relationships (session-context) with lazy Linear hydration, per-task worker-session tree with phase/recap/metric-chips, per-node activity log + produced-artifact links + on-demand run-summary next steps; LIN-595). Every session card header carries a persistent `open ↗` link to the dedicated per-session page (LIN-1019), and a waiting-on-user card additionally carries a `reply →` CTA — both to `/workspace/:urlKey/observation/session/:sessionId` for the session's OWN workspace key (the feed is cross-workspace merged), giving the LIN-1004 reply box a click-path out of the feed's in-place expansion
   session.css / session.js      Dedicated per-session page (LIN-1003): server-rendered snapshot styling (overview / runs / transcript / brief-recap panels). session.js is the page's ONE scoped client script (LIN-1004): the human follow-up reply box — a self-contained textarea→POST to /api/dispatch with followUpTo=sessionId, target cli/web, and conditional force (terminal session → force:true, waiting/warm → omit); additive to the agent-to-agent wake path
   roadmap.css / roadmap.js      Roadmap page
@@ -445,9 +446,10 @@ Consumer endpoints are Bearer-token authenticated and fall into three groups: **
 
 ## Collective (experimental, LIN-450)
 
-A rough-draft experiment, **gated behind a per-user `collective` feature flag and surfaced only via a link in Settings**. It automates the manual cross-project discussion written up in `docs/collective-session-2026-06-12.md`: pick a subset of your connected workspaces, name a [Yap](https://github.com/jkershaw/yap) channel, and start — the page fans `buildCollectiveParticipantPrompt(...)` out to each selected workspace's **unchanged** dispatch route (`dispatchQueueStore.addItem`), then renders the live channel and lets you inject input via a thin server-side Yap proxy.
+A rough-draft experiment, **gated behind a per-user `collective` feature flag and surfaced only via a link in Settings**. It automates the manual cross-project discussion written up in `docs/collective-session-2026-06-12.md`: choose a roster of characters (personas, each bound to a connected repo), name a [Yap](https://github.com/jkershaw/yap) channel, and start — the page fans `buildCollectiveParticipantPrompt(...)` out to each character's bound workspace's **unchanged** dispatch route (`dispatchQueueStore.addItem`), then renders the live channel and lets you inject input via a thin server-side Yap proxy.
 
-- **Substrate:** dispatch `target` is `cli`/`web` only (full Claude Code sessions); `dash`/`local` are rejected. Each selected workspace must have a live consumer draining its queue.
+- **Character selection (LIN-1048):** the picker lists saved `custom` + auto-recorded `recent` characters and offers a define-new affordance (pick a connected repo + fill the five persona fields `role/lens/objective/value/disposition` + name, optionally save). `POST /start` accepts a `characters` list (superseding `workspaceUrlKeys`); each character's `workspaceUrlKey` repo binding is re-validated against `session.workspaces` (stale bindings dropped, empty-set → 400) and every dispatched character is recorded as `recent`. Persistence is `lib/collective-characters-store.js`; a character with no persona fields collapses to the byte-identical default Implementer. `POST /preview` threads the selected `character` so preview matches dispatch.
+- **Substrate:** dispatch `target` is `cli`/`web` only (full Claude Code sessions); `dash`/`local` are rejected. Each character's bound workspace must have a live consumer draining its queue.
 - **Channel name** is the single shared contract across the participant prompt, the fan-out, and the `state`/`say` endpoints — normalized once via `normalizeYapChannel`. The page seeds a fresh friendly default per load via `randomChannelName()` (`#word-word-YYYY-MM-DD`).
 - **Side-effect policy is prompt-only:** participants may carry a `readWrite` proxy token (best-effort minted per fan-out), but the participant prompt requires asking John in-channel before any Linear write / ticket / mutation. There is no deterministic write-lock — a named, accepted V1 gap.
 - **Yap** is ephemeral (200-msg ring buffer, unauthenticated nicks); poll/history return the body in a `text` field, normalized by the `state` endpoint. `YAP_BASE_URL` defaults to `https://yap.jkershaw.com` (override per env; optional `YAP_PASSWORD`), so the live view works out of the box. `lib/yap-client.js` uses the proxy-aware fetch (`createProxyFetch`), so Yap calls route through the same egress proxy as Linear calls when one is configured.
@@ -456,8 +458,8 @@ A rough-draft experiment, **gated behind a per-user `collective` feature flag an
 
 Endpoints (session auth, workspace-anchored but operating over `session.workspaces`):
 - `GET  /workspace/:urlKey/collective` — page (redirects to settings when the flag is off)
-- `POST /workspace/:urlKey/collective/start` — multi-workspace dispatch fan-out
-- `POST /workspace/:urlKey/collective/preview` — build the participant prompt (view & copy, no dispatch)
+- `POST /workspace/:urlKey/collective/start` — character-roster dispatch fan-out (`characters` list; records recents)
+- `POST /workspace/:urlKey/collective/preview` — build the participant prompt for the selected `character` (view & copy, no dispatch)
 - `GET  /workspace/:urlKey/api/collective/state` — JSON poll fronting `yap.poll`
 - `POST /workspace/:urlKey/api/collective/say` — inject human input via `yap.say`
 

@@ -1,12 +1,15 @@
 /**
- * Fan-out equivalence anchor for POST /collective/start (LIN-1047, beat 3).
+ * Fan-out equivalence anchor for POST /collective/start (LIN-1047 beat 3;
+ * request shape migrated to `characters` in LIN-1048).
  *
- * Beat 3 re-expresses the /collective/start dispatch loop so it iterates over
- * CHARACTERS rather than raw workspaces, seeding one generic
- * DEFAULT_COLLECTIVE_CHARACTER per selected workspace with no roster. That is a
- * behaviour-preserving refactor: the dispatched set must be byte-for-byte what
- * HEAD produced. This test is the compatibility anchor — it drives the real
- * router with a spy dispatch store and asserts the dispatched payloads.
+ * The /collective/start dispatch loop iterates over CHARACTERS rather than raw
+ * workspaces. LIN-1048 migrates the wire contract from `workspaceUrlKeys` to a
+ * `characters` list — but a character carrying NO persona fields still collapses
+ * (via the route's pickCharacterFields → the builder's merge over
+ * DEFAULT_COLLECTIVE_CHARACTER) to the generic Implementer, so the dispatched set
+ * stays byte-for-byte what HEAD produced. This test is the compatibility anchor —
+ * it drives the real router with a spy dispatch store, posts the new `characters`
+ * shape with empty personas, and asserts the dispatched payloads are unchanged.
  *
  * The proof that the default character is a true no-op: each captured prompt
  * equals buildCollectiveParticipantPrompt(...) called for the same participant
@@ -93,7 +96,11 @@ describe('POST /collective/start — character fan-out equivalence (LIN-1047)', 
     const app = buildApp(captured);
     const res = await call(app, 'post', START_PATH, {
       channel: '#test-room',
-      workspaceUrlKeys: ['alpha', 'bravo', 'charlie'],
+      characters: [
+        { workspaceUrlKey: 'alpha' },
+        { workspaceUrlKey: 'bravo' },
+        { workspaceUrlKey: 'charlie' },
+      ],
       target: 'web',
       topic: 'test topic',
     });
@@ -113,7 +120,11 @@ describe('POST /collective/start — character fan-out equivalence (LIN-1047)', 
     const app = buildApp(captured);
     const res = await call(app, 'post', START_PATH, {
       channel: '#test-room',
-      workspaceUrlKeys: ['alpha', 'bravo', 'charlie'],
+      characters: [
+        { workspaceUrlKey: 'alpha' },
+        { workspaceUrlKey: 'bravo' },
+        { workspaceUrlKey: 'charlie' },
+      ],
       target: 'web',
       topic: 'test topic',
     });
@@ -154,7 +165,7 @@ describe('POST /collective/start — character fan-out equivalence (LIN-1047)', 
     const app = buildApp(captured);
     await call(app, 'post', START_PATH, {
       channel: '#test-room',
-      workspaceUrlKeys: ['alpha'],
+      characters: [{ workspaceUrlKey: 'alpha' }],
       target: 'cli',
     });
 
@@ -171,9 +182,103 @@ describe('POST /collective/start — character fan-out equivalence (LIN-1047)', 
     const app = buildApp(captured);
     const res = await call(app, 'post', START_PATH, {
       channel: '#test-room',
-      workspaceUrlKeys: ['alpha', 'bravo', 'charlie'],
+      characters: [
+        { workspaceUrlKey: 'alpha' },
+        { workspaceUrlKey: 'bravo' },
+        { workspaceUrlKey: 'charlie' },
+      ],
     });
     const nicks = res.body.dispatched.map(d => d.nick);
     assert.equal(new Set(nicks).size, nicks.length, 'nicks must be distinct across the fan-out');
+  });
+});
+
+describe('POST /collective/start — persona threading + recent recording (LIN-1048)', () => {
+  function buildAppWithStore(captured, recorded) {
+    const app = express();
+    app.use(express.json());
+    app.use(createCollectiveRoutes({
+      dispatchQueueStore: {
+        addItem: async (urlKey, item) => {
+          captured.push({ urlKey, item });
+          return { _id: `disp-${captured.length}`, ...item };
+        },
+      },
+      proxyTokenStore: null,
+      collectiveCharactersStore: {
+        list: async () => [],
+        createCustom: async (urlKey, data) => { recorded.push({ kind: 'custom', urlKey, data }); return { id: 'c1', ...data }; },
+        recordRecent: async (urlKey, data) => { recorded.push({ kind: 'recent', urlKey, data }); return { id: 'r1', ...data }; },
+      },
+      yapClient: { baseUrl: YAP_BASE_URL },
+      getOpenRouterSource: () => null,
+      getDeployInfo: () => ({}),
+      workspaceFromUrl: (req, res, next) => {
+        req.workspace = { urlKey: req.params.urlKey };
+        req.session = { linearUserId: 'u1', features: { collective: true }, workspaces: WORKSPACES };
+        next();
+      },
+    }));
+    return app;
+  }
+
+  test('a filled-in character prepends its persona block (and threads value)', async () => {
+    const captured = [];
+    const app = buildAppWithStore(captured, []);
+    const res = await call(app, 'post', START_PATH, {
+      channel: '#test-room',
+      characters: [{
+        workspaceUrlKey: 'alpha',
+        role: 'Skeptic',
+        lens: 'what could go wrong',
+        objective: 'find the flaw',
+        value: 'healthy doubt',        // the fifth field must survive the roster
+        disposition: 'probing',
+      }],
+    });
+    assert.equal(res.status, 201);
+    assert.equal(captured.length, 1);
+    const prompt = captured[0].item.prompt;
+    assert.ok(prompt.includes('## Your character: Skeptic'), 'persona block present');
+    assert.ok(prompt.includes('healthy doubt'), 'value field is threaded into the persona block');
+  });
+
+  test('records a recent per dispatched character (the load-bearing write path)', async () => {
+    const captured = [];
+    const recorded = [];
+    const app = buildAppWithStore(captured, recorded);
+    await call(app, 'post', START_PATH, {
+      channel: '#test-room',
+      characters: [{ workspaceUrlKey: 'alpha', role: 'Skeptic' }, { workspaceUrlKey: 'bravo', role: 'Builder' }],
+    });
+    const recents = recorded.filter(r => r.kind === 'recent');
+    assert.equal(recents.length, 2, 'one recordRecent per dispatched character');
+    // Partitioned under the ANCHOR workspace, carrying the bound repo key.
+    assert.equal(recents[0].urlKey, 'alpha'); // anchor = route :urlKey
+    assert.equal(recents[0].data.workspaceUrlKey, 'alpha');
+    assert.equal(recents[1].data.workspaceUrlKey, 'bravo');
+  });
+
+  test('save:true on a new character persists it as custom before recording recent', async () => {
+    const captured = [];
+    const recorded = [];
+    const app = buildAppWithStore(captured, recorded);
+    await call(app, 'post', START_PATH, {
+      channel: '#test-room',
+      characters: [{ workspaceUrlKey: 'alpha', role: 'Skeptic', name: 'My Skeptic', save: true }],
+    });
+    assert.ok(recorded.some(r => r.kind === 'custom' && r.data.name === 'My Skeptic'), 'saved as custom');
+    assert.ok(recorded.some(r => r.kind === 'recent'), 'still recorded as recent');
+  });
+
+  test('a character bound to an unconnected workspace is dropped; all-stale → 400', async () => {
+    const captured = [];
+    const app = buildAppWithStore(captured, []);
+    const res = await call(app, 'post', START_PATH, {
+      channel: '#test-room',
+      characters: [{ workspaceUrlKey: 'ghost', role: 'Nobody' }],
+    });
+    assert.equal(res.status, 400);
+    assert.equal(captured.length, 0);
   });
 });

@@ -6,7 +6,7 @@ import { test, expect } from '../fixtures/test-base.js';
 // the live state/say endpoints return 503 — asserted below.
 
 // Bound per-test from the per-worker key (LIN-628) so the session, nav, the
-// start fan-out's workspaceUrlKeys, and the say/state proxy calls all address
+// start fan-out's character repo bindings, and the say/state proxy calls all address
 // this worker's partition. Playwright workers are separate processes, so these
 // module-scoped lets are per-worker state.
 let URL_KEY;
@@ -71,11 +71,19 @@ test.describe('Collective Page (experimental)', () => {
       await page.waitForLoadState('networkidle');
     });
 
-    test('lists connected workspaces as checkboxes', async ({ page }) => {
-      const checks = page.locator('.collective-ws-check');
-      expect(await checks.count()).toBe(2);
-      await expect(page.locator('.collective-ws-row:has-text("Test Workspace")')).toBeVisible();
-      await expect(page.locator('.collective-ws-row:has-text("Second Workspace")')).toBeVisible();
+    test('offers a define-new character form grounded in the connected workspaces', async ({ page }) => {
+      // The character picker replaced the raw workspace checkboxes (LIN-1048):
+      // a new character is bound to a connected repo via the repo select.
+      const repo = page.locator('[data-testid="collective-char-repo"]');
+      await expect(repo).toBeVisible();
+      const repoOptions = await repo.locator('option').allTextContents();
+      expect(repoOptions).toContain('Test Workspace');
+      expect(repoOptions).toContain('Second Workspace');
+      // All five persona fields (value included) plus the add control are present.
+      for (const f of ['role', 'lens', 'objective', 'value', 'disposition']) {
+        await expect(page.locator(`[data-testid="collective-char-${f}"]`)).toBeVisible();
+      }
+      await expect(page.locator('[data-testid="collective-char-add"]')).toBeVisible();
     });
 
     test('has channel, topic, target, and start controls', async ({ page }) => {
@@ -123,11 +131,24 @@ test.describe('Collective Page (experimental)', () => {
   });
 
   test.describe('Start fan-out', () => {
-    test('dispatches a participant prompt to each selected workspace', async ({ page, secondWorkerUrlKey }) => {
+    test.beforeEach(async ({ page }) => {
+      // Characters persist per anchor workspace — clear so recents from a prior
+      // run don't leak into a fresh assertion.
+      await page.request.get(`/test/clear-collective-characters?urlKey=${URL_KEY}`);
+    });
+
+    test('dispatches a participant prompt for each selected character', async ({ page, secondWorkerUrlKey }) => {
       await page.goto(`/test/set-session?multiWorkspace=true&urlKey=${URL_KEY}&${featuresParam({ collective: true })}`);
 
       const res = await page.request.post(`${API_PREFIX}/collective/start`, {
-        data: { workspaceUrlKeys: [URL_KEY, secondWorkerUrlKey], channel: '#Collective', target: 'cli' },
+        data: {
+          characters: [
+            { workspaceUrlKey: URL_KEY, role: 'Skeptic' },
+            { workspaceUrlKey: secondWorkerUrlKey },
+          ],
+          channel: '#Collective',
+          target: 'cli',
+        },
       });
       expect(res.status()).toBe(201);
       const body = await res.json();
@@ -144,10 +165,51 @@ test.describe('Collective Page (experimental)', () => {
       expect(item).toBeTruthy();
     });
 
-    test('rejects an unconnected workspace in the selection', async ({ page }) => {
+    test('records a recent character that then appears in the picker on reload', async ({ page }) => {
+      await page.goto(`/test/set-session?multiWorkspace=true&urlKey=${URL_KEY}&${featuresParam({ collective: true })}`);
+
+      const res = await page.request.post(`${API_PREFIX}/collective/start`, {
+        data: {
+          characters: [{ workspaceUrlKey: URL_KEY, role: 'Archivist', name: 'The Archivist' }],
+          channel: '#Collective',
+          target: 'cli',
+        },
+      });
+      expect(res.status()).toBe(201);
+
+      await page.goto(COLLECTIVE_URL);
+      await page.waitForLoadState('networkidle');
+      // The dispatched character was recorded as `recent` and now lists in the picker.
+      const row = page.locator('[data-testid="collective-character"]:has-text("The Archivist")');
+      await expect(row).toBeVisible();
+      await expect(row).toHaveAttribute('data-kind', 'recent');
+    });
+
+    test('define a character in the UI, then start dispatches it', async ({ page }) => {
+      await page.goto(`/test/set-session?multiWorkspace=true&urlKey=${URL_KEY}&${featuresParam({ collective: true })}`);
+      await page.goto(COLLECTIVE_URL);
+      await page.waitForLoadState('networkidle');
+
+      await page.locator('[data-testid="collective-char-name"]').fill('UI Skeptic');
+      await page.locator('[data-testid="collective-char-role"]').fill('Skeptic');
+      await page.locator('[data-testid="collective-char-add"]').click();
+
+      // The defined character appears as a selected row.
+      await expect(page.locator('[data-testid="collective-character"]:has-text("UI Skeptic")')).toBeVisible();
+
+      const startResp = page.waitForResponse(r => r.url().includes('/collective/start') && r.request().method() === 'POST');
+      await page.locator('#collective-start').click();
+      const res = await startResp;
+      expect(res.status()).toBe(201);
+      const body = await res.json();
+      expect(body.dispatched.length).toBeGreaterThanOrEqual(1);
+      expect(body.dispatched.every(d => d.ok)).toBe(true);
+    });
+
+    test('rejects a character bound to an unconnected workspace', async ({ page }) => {
       await page.goto(`/test/set-session?urlKey=${URL_KEY}&${featuresParam({ collective: true })}`);
       const res = await page.request.post(`${API_PREFIX}/collective/start`, {
-        data: { workspaceUrlKeys: ['nope-workspace'], target: 'cli' },
+        data: { characters: [{ workspaceUrlKey: 'nope-workspace' }], target: 'cli' },
       });
       expect(res.status()).toBe(400);
     });
@@ -155,7 +217,7 @@ test.describe('Collective Page (experimental)', () => {
     test('rejects the dash target', async ({ page }) => {
       await page.goto(`/test/set-session?urlKey=${URL_KEY}&${featuresParam({ collective: true })}`);
       const res = await page.request.post(`${API_PREFIX}/collective/start`, {
-        data: { workspaceUrlKeys: [URL_KEY], target: 'dash' },
+        data: { characters: [{ workspaceUrlKey: URL_KEY }], target: 'dash' },
       });
       expect(res.status()).toBe(400);
     });

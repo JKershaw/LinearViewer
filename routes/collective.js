@@ -26,7 +26,7 @@ import {
   buildCollectiveParticipantPrompt,
   DEFAULT_COLLECTIVE_CHANNEL,
   DEFAULT_COLLECTIVE_TOPIC,
-  DEFAULT_COLLECTIVE_CHARACTER,
+  CHARACTER_FIELDS,
 } from '../lib/prompts/collective-participant.js';
 
 // Substrate is DECIDED (John, 2026-06-13): full Claude Code sessions only.
@@ -43,6 +43,24 @@ const MAX_SAY_LENGTH = 2000;
 const MAX_NICK_LENGTH = 32;
 
 /**
+ * Pull the five persona fields off a client-supplied character, trimmed, omitting
+ * any that are empty/missing. An empty result ({}) merges over
+ * DEFAULT_COLLECTIVE_CHARACTER in buildCollectiveParticipantPrompt to reproduce
+ * the byte-identical default participant — so a character with no persona fields
+ * is exactly the pre-LIN-1048 default fan-out. Never trust extra client keys
+ * (name/save/id/workspaceUrlKey) into the persona overlay.
+ */
+function pickCharacterFields(character = {}) {
+  const out = {};
+  for (const f of CHARACTER_FIELDS) {
+    if (typeof character[f] === 'string' && character[f].trim()) {
+      out[f] = character[f].trim();
+    }
+  }
+  return out;
+}
+
+/**
  * @param {Object} deps
  * @param {Function} deps.workspaceFromUrl      - middleware: session + req.workspace
  * @param {Object}   deps.dispatchQueueStore    - dispatch store (addItem)
@@ -56,6 +74,7 @@ export function createCollectiveRoutes({
   workspaceFromUrl,
   dispatchQueueStore,
   proxyTokenStore,
+  collectiveCharactersStore,
   yapClient,
   getOpenRouterSource,
   getDeployInfo,
@@ -64,7 +83,7 @@ export function createCollectiveRoutes({
 
   // ─── HTML page ──────────────────────────────────────────────────────────────
 
-  router.get('/workspace/:urlKey/collective', workspaceFromUrl, (req, res) => {
+  router.get('/workspace/:urlKey/collective', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
     const featureFlags = getFeatureFlags(req.session);
 
@@ -74,9 +93,15 @@ export function createCollectiveRoutes({
     }
 
     try {
+      // Saved custom + auto-recorded recent characters for this anchor workspace.
+      const characters = collectiveCharactersStore
+        ? await collectiveCharactersStore.list(workspace.urlKey)
+        : [];
+
       const html = renderCollectivePage(
         {
           workspaces: (req.session.workspaces || []).map(w => ({ urlKey: w.urlKey, name: w.name })),
+          characters,
           // A fresh, friendly channel suggestion per page load (words + date),
           // so each new discussion lands in its own channel by default.
           defaultChannel: randomChannelName(),
@@ -110,7 +135,7 @@ export function createCollectiveRoutes({
       return res.status(403).json({ error: 'Collective feature is not enabled' });
     }
 
-    const { channel: rawChannel, workspaceUrlKeys, target: rawTarget, topic: rawTopic } = req.body || {};
+    const { channel: rawChannel, characters: rawCharacters, target: rawTarget, topic: rawTopic } = req.body || {};
 
     const channel = normalizeYapChannel(rawChannel || DEFAULT_COLLECTIVE_CHANNEL);
     if (!channel) {
@@ -122,22 +147,27 @@ export function createCollectiveRoutes({
       return res.status(400).json({ error: `target must be one of: ${COLLECTIVE_TARGETS.join(', ')}` });
     }
 
-    if (!Array.isArray(workspaceUrlKeys) || workspaceUrlKeys.length === 0) {
-      return res.status(400).json({ error: 'Select at least one workspace' });
+    if (!Array.isArray(rawCharacters) || rawCharacters.length === 0) {
+      return res.status(400).json({ error: 'Select at least one character' });
     }
 
-    // Resolve the selected subset against session.workspaces — never trust the
-    // route key to bound the fan-out, and never dispatch to a workspace the user
-    // isn't connected to.
+    // Each character carries its own repo binding (workspaceUrlKey). Resolve that
+    // binding against session.workspaces — never trust the client, and never
+    // dispatch to a workspace the user isn't connected to. A character whose bound
+    // workspace is no longer connected (a stale binding) is dropped silently; the
+    // 400 stays only when NONE of the characters resolve to a connected workspace.
     const connected = req.session.workspaces || [];
     const byKey = new Map(connected.map(w => [w.urlKey, w]));
-    const selected = workspaceUrlKeys
-      .filter((k, i) => typeof k === 'string' && workspaceUrlKeys.indexOf(k) === i) // dedupe
-      .map(k => byKey.get(k))
-      .filter(Boolean);
+    const roster = [];
+    for (const c of rawCharacters) {
+      if (!c || typeof c !== 'object') continue;
+      const ws = byKey.get(c.workspaceUrlKey);
+      if (!ws) continue; // stale repo binding — drop
+      roster.push({ ws, character: pickCharacterFields(c), raw: c });
+    }
 
-    if (selected.length === 0) {
-      return res.status(400).json({ error: 'None of the selected workspaces are connected to this session' });
+    if (roster.length === 0) {
+      return res.status(400).json({ error: 'None of the selected characters are bound to a connected workspace' });
     }
 
     const topic = (typeof rawTopic === 'string' && rawTopic.trim())
@@ -163,16 +193,16 @@ export function createCollectiveRoutes({
       return nick;
     };
 
-    // The fan-out iterates over CHARACTERS, not raw workspaces (LIN-1047, seam
-    // for LIN-820). The default roster is exactly one generic Implementer
-    // character per selected workspace — the DEFAULT_COLLECTIVE_CHARACTER, which
-    // makes buildCollectiveParticipantPrompt emit output byte-for-byte identical
-    // to the pre-refactor per-workspace dispatch. No multi-character roster or
-    // selection exists yet; that is a later subtask (LIN-1048+).
-    const participants = selected.map(ws => ({ ws, character: DEFAULT_COLLECTIVE_CHARACTER }));
+    // The fan-out iterates over CHARACTERS (LIN-1048): the caller supplies a
+    // roster of personas, each bound to a connected workspace. A character with
+    // no persona fields collapses (via pickCharacterFields → the builder's merge)
+    // to the byte-identical DEFAULT_COLLECTIVE_CHARACTER participant, so the
+    // default fan-out is unchanged; a filled-in character prepends its persona
+    // block. `anchorKey` is the workspace the picker/store live under.
+    const anchorKey = req.workspace.urlKey;
 
     const dispatched = [];
-    for (const { ws, character } of participants) {
+    for (const { ws, character, raw } of roster) {
       const nick = assignNick(ws.name);
 
       // Best-effort: mint a readWrite proxy token so the participant can pull its
@@ -209,6 +239,31 @@ export function createCollectiveRoutes({
           dispatchedBy: req.session.linearUserId || null,
         });
         dispatched.push({ urlKey: ws.urlKey, name: ws.name, nick, id: item._id, ok: true });
+
+        // Remember this dispatched character for the picker. The store is
+        // partitioned by the anchor workspace but the record carries its own repo
+        // binding. A newly-defined character the user opted to save (`save` &&
+        // not already stored) is persisted as `custom` first; every dispatched
+        // character is then recorded as `recent` (recordRecent dedupes against an
+        // existing custom/recent, so a saved character is not double-listed).
+        if (collectiveCharactersStore) {
+          const record = {
+            workspaceUrlKey: ws.urlKey,
+            workspaceName: ws.name,
+            name: typeof raw.name === 'string' ? raw.name : '',
+            ...character,
+          };
+          if (raw.save && !raw.id) {
+            try {
+              await collectiveCharactersStore.createCustom(anchorKey, record);
+            } catch (saveErr) {
+              // A full custom store (or bad input) must not block the dispatch —
+              // the participant is already queued. Surface it in logs only.
+              console.error(`Collective: save custom character failed for ${anchorKey}:`, saveErr.message);
+            }
+          }
+          await collectiveCharactersStore.recordRecent(anchorKey, record);
+        }
       } catch (err) {
         console.error(`Collective: dispatch failed for ${ws.urlKey}:`, err.message);
         dispatched.push({ urlKey: ws.urlKey, name: ws.name, nick, ok: false, error: 'dispatch failed' });
@@ -230,7 +285,7 @@ export function createCollectiveRoutes({
       return res.status(403).json({ error: 'Collective feature is not enabled' });
     }
 
-    const { channel: rawChannel, topic: rawTopic, nick: rawNick } = req.body || {};
+    const { channel: rawChannel, topic: rawTopic, nick: rawNick, character: rawCharacter } = req.body || {};
     const channel = normalizeYapChannel(rawChannel || DEFAULT_COLLECTIVE_CHANNEL);
     if (!channel) {
       return res.status(400).json({ error: 'A valid channel name is required' });
@@ -245,6 +300,13 @@ export function createCollectiveRoutes({
       ? nickFromWorkspaceName(rawNick)
       : nickFromWorkspaceName(req.session.workspaces?.[0]?.name || 'your-project');
 
+    // Thread the selected character so preview matches dispatch (LIN-1048): an
+    // empty/absent character collapses to the default participant, exactly as
+    // /start does. Omitting this is the preview/dispatch-divergence bug.
+    const character = (rawCharacter && typeof rawCharacter === 'object')
+      ? pickCharacterFields(rawCharacter)
+      : null;
+
     const prompt = buildCollectiveParticipantPrompt({
       channel,
       nick: sampleNick,
@@ -253,6 +315,7 @@ export function createCollectiveRoutes({
       topic,
       proxyBaseUrl: `${req.protocol}://${req.get('host')}`,
       proxyToken: 'YOUR_READWRITE_PROXY_TOKEN', // placeholder — real token minted at dispatch
+      character,
     });
 
     res.json({ channel, topic, nick: sampleNick, prompt });

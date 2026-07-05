@@ -36,12 +36,47 @@ describe('renderCollectivePage', () => {
     assert.ok(html.includes('/collective.js'));
   });
 
-  test('renders a checkbox per connected workspace', () => {
+  test('offers a define-new character form grounded in each connected workspace', () => {
     const html = render();
+    // The repo picker binds a new character to a connected workspace/repo.
+    assert.ok(html.includes('data-testid="collective-char-repo"'));
     assert.ok(html.includes('value="ws-a"'));
     assert.ok(html.includes('value="ws-b"'));
     assert.ok(html.includes('Project A'));
     assert.ok(html.includes('Project B'));
+    // All five persona fields are offered (value included, not just four).
+    for (const f of ['role', 'lens', 'objective', 'value', 'disposition']) {
+      assert.ok(html.includes(`data-testid="collective-char-${f}"`), `persona field ${f} input present`);
+    }
+    assert.ok(html.includes('data-testid="collective-char-add"'));
+  });
+
+  test('lists saved custom + recent characters as selectable rows', () => {
+    const html = render({
+      characters: [
+        { id: 'c1', name: 'Skeptic', workspaceName: 'Project A', kind: 'custom', role: 'Skeptic' },
+        { id: 'r1', name: 'Builder', workspaceName: 'Project B', kind: 'recent', role: 'Builder' },
+      ],
+    });
+    assert.ok(html.includes('class="collective-char-check" value="c1"'));
+    assert.ok(html.includes('class="collective-char-check" value="r1"'));
+    assert.ok(html.includes('Skeptic'));
+    assert.ok(html.includes('Builder'));
+    // Both kinds are labelled so the picker distinguishes them.
+    assert.ok(/data-kind="custom"/.test(html));
+    assert.ok(/data-kind="recent"/.test(html));
+  });
+
+  test('embeds saved characters in __COLLECTIVE_DATA__ for the client', () => {
+    const html = render({ characters: [{ id: 'c1', name: 'Skeptic', workspaceUrlKey: 'ws-a' }] });
+    assert.ok(html.includes('"characters"'));
+    assert.ok(html.includes('"id":"c1"'));
+  });
+
+  test('shows the no-connected-workspaces empty state instead of a define form', () => {
+    const html = render({ workspaces: [] });
+    assert.ok(html.includes('No connected workspaces.'));
+    assert.ok(!html.includes('data-testid="collective-char-repo"'));
   });
 
   test('embeds config in __COLLECTIVE_DATA__', () => {

@@ -1,9 +1,11 @@
 /**
- * Collective Page Client-Side Logic (LIN-450, V1).
+ * Collective Page Client-Side Logic (LIN-450, V1; character picker LIN-1048).
  *
- * - Hydration of config from window.__COLLECTIVE_DATA__
- * - Start a discussion: collect selected workspaces + channel + topic + target,
- *   POST to /collective/start (multi-workspace dispatch fan-out)
+ * - Hydration of config from window.__COLLECTIVE_DATA__ (incl. saved characters)
+ * - Start a discussion: collect selected characters + channel + topic + target,
+ *   POST to /collective/start (character fan-out)
+ * - Define a new character: repo + five persona fields + name (+ save), added to
+ *   the picker as a selectable row
  * - Live transcript: visibility-gated 5s poll of /api/collective/state, rendered
  *   incrementally by Yap cursor (copied from the pipeline poll pattern)
  * - Inject human input: POST to /api/collective/say
@@ -19,6 +21,74 @@ let activeChannel = null;
 
 const POLL_MS = 5000;
 const seenIds = new Set();
+
+// Characters defined in-page this session (not yet persisted). Keyed by a local
+// `pending-N` id so a checked row maps back to the full persona object.
+const pendingById = new Map();
+let pendingSeq = 0;
+
+// ─── Character selection ──────────────────────────────────────────────────────
+
+// Resolve a checked row's id to its full character object — either a stored
+// character from the embedded config or an in-page pending one.
+function characterById(id) {
+  if (pendingById.has(id)) return pendingById.get(id);
+  return (collectiveData?.characters || []).find(c => c.id === id) || null;
+}
+
+function selectedCharacters() {
+  const checks = Array.from(document.querySelectorAll('.collective-char-check:checked'));
+  return checks.map(c => characterById(c.value)).filter(Boolean);
+}
+
+// Build a character from the define-new form and add it to the picker as a
+// checked (selected) row so the next start includes it.
+function addDefinedCharacter() {
+  const repo = document.getElementById('collective-char-repo');
+  if (!repo || !repo.value) {
+    setStartStatus('Pick a repo to ground the character in.', true);
+    return;
+  }
+  const workspaceUrlKey = repo.value;
+  const workspaceName = repo.selectedOptions[0]?.dataset.name || '';
+  const name = (document.getElementById('collective-char-name')?.value || '').trim();
+  const save = !!document.getElementById('collective-char-save')?.checked;
+
+  const persona = {};
+  document.querySelectorAll('.collective-char-persona').forEach(inp => {
+    const v = (inp.value || '').trim();
+    if (v) persona[inp.dataset.field] = v;
+  });
+
+  const id = `pending-${pendingSeq++}`;
+  pendingById.set(id, { id, workspaceUrlKey, workspaceName, name, save, ...persona });
+
+  const list = document.getElementById('collective-char-list');
+  if (list) {
+    list.querySelector('.collective-char-none')?.remove();
+    const label = document.createElement('label');
+    label.className = 'collective-char-row';
+    label.dataset.testid = 'collective-character';
+    label.dataset.kind = save ? 'custom' : 'recent';
+    // value is a controlled `pending-N` token; user strings go in via textContent.
+    label.innerHTML = '<input type="checkbox" class="collective-char-check" checked>'
+      + '<span class="collective-char-name"></span>'
+      + '<span class="collective-char-repo"></span>'
+      + '<span class="collective-char-kind">new</span>';
+    label.querySelector('.collective-char-check').value = id;
+    label.querySelector('.collective-char-name').textContent = name || persona.role || 'Implementer';
+    label.querySelector('.collective-char-repo').textContent = workspaceName;
+    list.appendChild(label);
+  }
+
+  // Reset the form for the next character.
+  const nameEl = document.getElementById('collective-char-name');
+  if (nameEl) nameEl.value = '';
+  document.querySelectorAll('.collective-char-persona').forEach(inp => { inp.value = ''; });
+  const saveEl = document.getElementById('collective-char-save');
+  if (saveEl) saveEl.checked = false;
+  setStartStatus('');
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -155,10 +225,9 @@ async function startDiscussion() {
   const urlKey = collectiveData?.urlKey;
   if (!urlKey) return;
 
-  const checks = Array.from(document.querySelectorAll('.collective-ws-check:checked'));
-  const workspaceUrlKeys = checks.map(c => c.value);
-  if (workspaceUrlKeys.length === 0) {
-    setStartStatus('Select at least one workspace.', true);
+  const characters = selectedCharacters();
+  if (characters.length === 0) {
+    setStartStatus('Select or define at least one character.', true);
     return;
   }
 
@@ -176,7 +245,7 @@ async function startDiscussion() {
     const data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/collective/start`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ workspaceUrlKeys, channel, topic, target }),
+      body: JSON.stringify({ characters, channel, topic, target }),
     });
 
     const ok = (data.dispatched || []).filter(d => d.ok);
@@ -208,12 +277,17 @@ async function viewPrompt() {
   const pre = document.getElementById('collective-prompt-preview');
   const btn = document.getElementById('collective-view-prompt');
 
+  // Thread the first selected character so the preview matches what that
+  // participant will actually be dispatched (LIN-1048). None selected → the
+  // server builds the default participant preview, as before.
+  const character = selectedCharacters()[0] || null;
+
   if (btn) { btn.disabled = true; btn.textContent = 'loading…'; }
   try {
     const data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/collective/preview`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ channel, topic }),
+      body: JSON.stringify({ channel, topic, character }),
     });
     if (pre) pre.textContent = data.prompt || '';
     if (wrap) wrap.classList.remove('hidden');
@@ -283,6 +357,7 @@ function init() {
   }
 
   document.getElementById('collective-start')?.addEventListener('click', startDiscussion);
+  document.getElementById('collective-char-add')?.addEventListener('click', addDefinedCharacter);
   document.getElementById('collective-view-prompt')?.addEventListener('click', viewPrompt);
   document.getElementById('collective-prompt-copy')?.addEventListener('click', copyPrompt);
   document.getElementById('collective-say-btn')?.addEventListener('click', sayMessage);
