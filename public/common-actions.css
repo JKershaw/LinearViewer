@@ -160,7 +160,7 @@
   background: var(--bg);
   border: 1px solid var(--fg-vdim);
   border-radius: 4px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-lg);
   z-index: var(--z-overlay);
   padding: var(--space-3);
   font-family: var(--font-content);
@@ -272,7 +272,7 @@
   border: 1px solid var(--fg-vdim);
   border-left: 3px solid var(--fg-dim);
   border-radius: 4px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-lg);
   font-family: var(--font-content);
   font-size: 0.9em;
   color: var(--fg);

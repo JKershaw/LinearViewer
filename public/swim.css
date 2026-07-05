@@ -363,7 +363,7 @@ body:has(.swim-page) {
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--bg);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--shadow-lg);
   padding: var(--space-3);
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
 }
@@ -930,11 +930,12 @@ body:has(.swim-page) {
 }
 .swim-fc-who { color: var(--slate-dim); }
 .swim-fc-prio { font-weight: 700; }
-/* Priority hue: urgent → red, high/medium → amber (no distinct orange token;
-   both collapse to the AA amber text token), low → muted. All theme-aware. */
+/* Priority hue heat ordering: urgent → red, high → amber, medium → yellow,
+   low → muted. All theme-aware tokens (no distinct orange token exists, so
+   medium uses yellow to stay distinct from high without colliding with urgent). */
 .swim-fc-prio.p1 { color: var(--red-dim); }
 .swim-fc-prio.p2 { color: var(--amber-dim); }
-.swim-fc-prio.p3 { color: var(--amber-dim); }
+.swim-fc-prio.p3 { color: var(--yellow); }
 .swim-fc-prio.p4 { color: var(--muted); }
 .swim-fc-due { color: var(--slate-dim); }
 .swim-fc-lbl { color: var(--slate-dim); background: var(--card); border-radius: var(--radius-sm); padding: 1px 6px; }
