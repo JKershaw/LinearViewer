@@ -24,6 +24,7 @@ import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { normalizeYapChannel, nickFromWorkspaceName, randomChannelName } from '../lib/yap-client.js';
 import {
   buildCollectiveParticipantPrompt,
+  buildCollectiveFacilitatorPrompt,
   DEFAULT_COLLECTIVE_CHANNEL,
   DEFAULT_COLLECTIVE_TOPIC,
   CHARACTER_FIELDS,
@@ -135,7 +136,15 @@ export function createCollectiveRoutes({
       return res.status(403).json({ error: 'Collective feature is not enabled' });
     }
 
-    const { channel: rawChannel, characters: rawCharacters, target: rawTarget, topic: rawTopic } = req.body || {};
+    const {
+      channel: rawChannel,
+      characters: rawCharacters,
+      target: rawTarget,
+      topic: rawTopic,
+      facilitator: rawFacilitator,
+      objective: rawObjective,
+      exitCondition: rawExitCondition,
+    } = req.body || {};
 
     const channel = normalizeYapChannel(rawChannel || DEFAULT_COLLECTIVE_CHANNEL);
     if (!channel) {
@@ -201,9 +210,46 @@ export function createCollectiveRoutes({
     // block. `anchorKey` is the workspace the picker/store live under.
     const anchorKey = req.workspace.urlKey;
 
-    const dispatched = [];
-    for (const { ws, character, raw } of roster) {
+    // Facilitator designation is OPT-IN (LIN-1049): a `facilitator` body field
+    // naming a bound workspaceUrlKey promotes that seat to the facilitator prompt;
+    // unset → today's leaderless room is unchanged. `objective`/`exitCondition`
+    // are optional overrides threaded only to the facilitator.
+    const facilitatorKey = (typeof rawFacilitator === 'string' && rawFacilitator.trim())
+      ? rawFacilitator.trim()
+      : null;
+    const facilitatorObjective = (typeof rawObjective === 'string' && rawObjective.trim())
+      ? rawObjective.trim().slice(0, 500)
+      : null;
+    const facilitatorExitCondition = (typeof rawExitCondition === 'string' && rawExitCondition.trim())
+      ? rawExitCondition.trim().slice(0, 2000)
+      : null;
+
+    // Pre-pass (LIN-1049): assign every nick and designate the facilitator BEFORE
+    // any prompt is built, so each prompt can name the whole room. The first
+    // roster entry bound to `facilitatorKey` wins (a workspaceUrlKey may appear
+    // more than once); at most one facilitator.
+    let facilitatorAssigned = false;
+    const entries = roster.map(({ ws, character, raw }) => {
       const nick = assignNick(ws.name);
+      const isFacilitator = !facilitatorAssigned && facilitatorKey !== null && ws.urlKey === facilitatorKey;
+      if (isFacilitator) facilitatorAssigned = true;
+      return { ws, character, raw, nick, isFacilitator };
+    });
+
+    // Build the shared roster ONCE and pass the SAME array to every builder call
+    // (LIN-1049). Objective/value are left to the builder's fallback when a seat's
+    // persona omits them, keeping the default source of truth in one place. The
+    // self line is derived per-participant from `nick`, so no per-seat mutation.
+    const rosterLines = entries.map(({ ws, character, raw, nick, isFacilitator }) => ({
+      name: (typeof raw.name === 'string' && raw.name.trim()) ? raw.name.trim() : ws.name,
+      nick,
+      objective: character.objective,
+      value: character.value,
+      isFacilitator,
+    }));
+
+    const dispatched = [];
+    for (const { ws, character, raw, nick, isFacilitator } of entries) {
 
       // Best-effort: mint a readWrite proxy token so the participant can pull its
       // own workspace's Linear context (and act ONLY when John approves in
@@ -219,7 +265,7 @@ export function createCollectiveRoutes({
         }
       }
 
-      const prompt = buildCollectiveParticipantPrompt({
+      const buildArgs = {
         channel,
         nick,
         yapBaseUrl,
@@ -228,12 +274,22 @@ export function createCollectiveRoutes({
         proxyBaseUrl: proxyToken ? proxyBaseUrl : null,
         proxyToken,
         character,
-      });
+        roster: rosterLines,
+      };
+      // The designated seat gets the DISTINCT facilitator prompt (LIN-1049);
+      // everyone else the participant prompt. Both share the roster block.
+      const prompt = isFacilitator
+        ? buildCollectiveFacilitatorPrompt({
+            ...buildArgs,
+            objective: facilitatorObjective,
+            exitCondition: facilitatorExitCondition,
+          })
+        : buildCollectiveParticipantPrompt(buildArgs);
 
       try {
         const item = await dispatchQueueStore.addItem(ws.urlKey, {
           prompt,
-          promptName: 'collective-participant',
+          promptName: isFacilitator ? 'collective-facilitator' : 'collective-participant',
           kind: 'custom',
           target,
           dispatchedBy: req.session.linearUserId || null,

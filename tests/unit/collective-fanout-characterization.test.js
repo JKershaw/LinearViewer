@@ -153,7 +153,7 @@ describe('POST /collective/start — character fan-out equivalence (LIN-1047)', 
     assert.equal(res.body.target, 'web');
   });
 
-  test('each dispatched prompt is byte-identical to the default-character build (the no-op proof)', async () => {
+  test('each dispatched prompt is byte-identical to the default-character build WITH the roster (LIN-1049)', async () => {
     const captured = [];
     const app = buildApp(captured);
     const res = await call(app, 'post', START_PATH, {
@@ -170,6 +170,18 @@ describe('POST /collective/start — character fan-out equivalence (LIN-1047)', 
     assert.equal(res.status, 201);
     const yapPassword = process.env.YAP_PASSWORD || null;
 
+    // The route now threads a shared roster to every builder (LIN-1049). Rebuild
+    // that same roster from the response nicks + selected workspaces so the
+    // expected prompt matches what /start produced — empty personas fall through
+    // to the builder's objective/value defaults, no facilitator, no persona block.
+    const rosterLines = res.body.dispatched.map((d) => ({
+      name: WORKSPACES.find((w) => w.urlKey === d.urlKey).name,
+      nick: d.nick,
+      objective: undefined,
+      value: undefined,
+      isFacilitator: false,
+    }));
+
     captured.forEach(({ item }, i) => {
       // Nick the route assigned to this participant (from the response, so we
       // never re-implement the dedupe logic).
@@ -182,6 +194,7 @@ describe('POST /collective/start — character fan-out equivalence (LIN-1047)', 
         topic: res.body.topic,
         proxyBaseUrl: null,
         proxyToken: null,
+        roster: rosterLines,
       };
       const withDefaultCharacter = buildCollectiveParticipantPrompt({
         ...args,
@@ -189,13 +202,42 @@ describe('POST /collective/start — character fan-out equivalence (LIN-1047)', 
       });
       const withoutCharacter = buildCollectiveParticipantPrompt(args);
 
-      // The seam's default must equal the pre-refactor (no-character) build...
+      // The seam's default character is still a no-op on top of the roster build...
       assert.equal(withDefaultCharacter, withoutCharacter, `participant ${i}: default character is not a no-op`);
       // ...and the actual dispatched prompt must equal it byte-for-byte.
-      assert.equal(item.prompt, withoutCharacter, `participant ${i}: dispatched prompt drifted from HEAD`);
-      // No persona block leaks into the default fan-out.
+      assert.equal(item.prompt, withoutCharacter, `participant ${i}: dispatched prompt drifted from expected`);
+      // The roster pre-brief is present (≥2 participants), but NO persona block
+      // leaks into the default fan-out.
+      assert.ok(item.prompt.includes("## Who's in the room"), `participant ${i}: roster pre-brief missing`);
       assert.ok(!item.prompt.includes('## Your character'), `participant ${i}: unexpected persona block`);
     });
+  });
+
+  test('a solo (1-character) fan-out emits NO roster block — byte-identical to HEAD (LIN-1049)', async () => {
+    const captured = [];
+    const app = buildApp(captured);
+    const res = await call(app, 'post', START_PATH, {
+      channel: '#test-room',
+      characters: [{ workspaceUrlKey: 'alpha' }],
+      target: 'web',
+      topic: 'test topic',
+    });
+
+    assert.equal(res.status, 201);
+    assert.equal(captured.length, 1);
+    const { item } = captured[0];
+    // Below the ≥2 emission threshold → the pre-LIN-1049 body verbatim.
+    assert.ok(!item.prompt.includes("## Who's in the room"), 'solo fan-out must not emit a roster');
+    const expected = buildCollectiveParticipantPrompt({
+      channel: res.body.channel,
+      nick: res.body.dispatched[0].nick,
+      yapBaseUrl: YAP_BASE_URL,
+      yapPassword: process.env.YAP_PASSWORD || null,
+      topic: res.body.topic,
+      proxyBaseUrl: null,
+      proxyToken: null,
+    });
+    assert.equal(item.prompt, expected, 'solo dispatched prompt drifted from HEAD');
   });
 
   test('the dispatched item shape (promptName / kind / target / dispatchedBy) is unchanged', async () => {
@@ -366,5 +408,80 @@ describe('POST /collective/start — persona threading + recent recording (LIN-1
     });
     assert.equal(res.status, 400);
     assert.equal(captured.length, 0);
+  });
+});
+
+describe('POST /collective/start — facilitator designation threading (LIN-1049)', () => {
+  test('no facilitator field → every seat is a participant (leaderless room unchanged)', async () => {
+    const captured = [];
+    const app = buildApp(captured);
+    await call(app, 'post', START_PATH, {
+      channel: '#test-room',
+      characters: [{ workspaceUrlKey: 'alpha' }, { workspaceUrlKey: 'bravo' }],
+    });
+    assert.equal(captured.length, 2);
+    assert.ok(captured.every(({ item }) => item.promptName === 'collective-participant'));
+    assert.ok(captured.every(({ item }) => !item.prompt.includes('## You are the facilitator')));
+  });
+
+  test('facilitator=<workspaceUrlKey> promotes exactly that seat to the facilitator prompt', async () => {
+    const captured = [];
+    const app = buildApp(captured);
+    const res = await call(app, 'post', START_PATH, {
+      channel: '#test-room',
+      characters: [
+        { workspaceUrlKey: 'alpha' },
+        { workspaceUrlKey: 'bravo' },
+        { workspaceUrlKey: 'charlie' },
+      ],
+      facilitator: 'bravo',
+      objective: 'settle the parser question',
+      exitCondition: 'DONE when John says stop',
+    });
+    assert.equal(res.status, 201);
+    assert.equal(captured.length, 3);
+
+    const bravo = captured.find((c) => c.urlKey === 'bravo');
+    const others = captured.filter((c) => c.urlKey !== 'bravo');
+
+    // Exactly the designated seat is the facilitator.
+    assert.equal(bravo.item.promptName, 'collective-facilitator');
+    assert.ok(bravo.item.prompt.includes('## You are the facilitator'));
+    assert.ok(bravo.item.prompt.includes('settle the parser question'), 'objective override threaded');
+    assert.ok(bravo.item.prompt.includes('DONE when John says stop'), 'exitCondition override threaded');
+
+    assert.equal(others.length, 2);
+    assert.ok(others.every(({ item }) => item.promptName === 'collective-participant'));
+    assert.ok(others.every(({ item }) => !item.prompt.includes('## You are the facilitator')));
+  });
+
+  test('the SAME roster (with the chair marked) is threaded to every seat', async () => {
+    const captured = [];
+    const app = buildApp(captured);
+    const res = await call(app, 'post', START_PATH, {
+      channel: '#test-room',
+      characters: [{ workspaceUrlKey: 'alpha' }, { workspaceUrlKey: 'bravo' }],
+      facilitator: 'alpha',
+    });
+    assert.equal(res.status, 201);
+    // Every prompt carries the roster, and the chair (alpha) is marked in all of
+    // them — the array is shared, not per-seat rebuilt.
+    const alphaNick = res.body.dispatched.find((d) => d.urlKey === 'alpha').nick;
+    for (const { item } of captured) {
+      assert.ok(item.prompt.includes("## Who's in the room"), 'roster present in every prompt');
+      const chairLine = item.prompt.split('\n').find((l) => l.includes(`posts as \`${alphaNick}\``));
+      assert.ok(chairLine.includes('(chair)'), 'the chair is marked in every roster');
+    }
+  });
+
+  test('an unmatched facilitator key falls back to a fully leaderless room', async () => {
+    const captured = [];
+    const app = buildApp(captured);
+    await call(app, 'post', START_PATH, {
+      channel: '#test-room',
+      characters: [{ workspaceUrlKey: 'alpha' }, { workspaceUrlKey: 'bravo' }],
+      facilitator: 'ghost',
+    });
+    assert.ok(captured.every(({ item }) => item.promptName === 'collective-participant'));
   });
 });
