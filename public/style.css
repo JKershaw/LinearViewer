@@ -514,6 +514,18 @@ h1 {
   box-shadow: var(--shadow-lg);
 }
 
+/* Neutralize a persisted open state above the mobile breakpoint (LIN-1058). The
+   `⋯ more` toggle only exists at ≤640px, so a `--open` class set on mobile can
+   survive a resize past 640px where the toggle is `display:none` and can't
+   re-close it — the card would then override the desktop `display:contents` and
+   render as a stuck-open panel. Forcing `display:contents` here re-inlines the
+   views (and, generating no box, drops the card's background/border/shadow). */
+@media (min-width: 641px) {
+  .nav-views-overflow--open {
+    display: contents;
+  }
+}
+
 .nav-filters {
   display: flex;
   align-items: baseline;
@@ -1554,6 +1566,17 @@ a.wordmark:hover {
 
 /* Tablets and large phones */
 @media (max-width: 640px) {
+  /* Mobile sticky-header clearance (LIN-1058). The two-row header is taller at
+     ≤640px — this PR's 44px tap targets grow the view-strip row, so the pinned
+     header measures ~122px vs the desktop ~93px. The base `--nav-sticky-h: 6rem`
+     (96px) under-shoots, leaving auto-scrolled/anchored/focused controls ~26px
+     tucked under the header (a partial mobile regression of the LIN-984 clearance
+     that `scroll-margin-top: var(--nav-sticky-h)` provides). Bump the token here
+     so mobile clearance ≥ the real 122px header; the desktop value is untouched. */
+  :root {
+    --nav-sticky-h: 7.75rem;  /* 124px ≥ measured 122px mobile header */
+  }
+
   body {
     padding: var(--space-3);
     font-size: 14px;
