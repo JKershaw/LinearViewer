@@ -22,6 +22,7 @@ import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { buildTaskChatMessages } from '../lib/prompts/task-chat-template.js';
 import { streamChat, streamChatWithTools, isToolCapableModel, isRecommendationEnabled, getPaidEnvKey, hasPaidEnvKey } from '../lib/openrouter.js';
 import { createChatToolCatalog, CHAT_TOOL_RESULT_BUDGETS } from '../lib/chat-tools.js';
+import { sessionIsTerminal } from './dashboard.js';
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { getWorkspaceCallScope, isValidIssueId } from '../lib/workspace.js';
@@ -157,9 +158,13 @@ function buildMockAnswer(context, question, related) {
  * @param {Function} deps.getOpenRouterSource - (req) → 'oauth'|'env'|'free'|null
  * @param {Function} deps.getDeployInfo       - () → deploy metadata
  * @param {Object}   deps.savedChatStore       - durable saved-chat store (LIN-1008)
+ * @param {Object}   deps.dispatchQueueStore   - dispatch queue store (LIN-1073): backs the
+ *   session read-model AND the gated `send_follow_up` chat tool's write
+ * @param {Object}   deps.agentStatusStore     - agent status store (LIN-1073): the other dep
+ *   the session read-model needs
  * @returns {Router}
  */
-export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore }) {
+export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore }) {
   const router = Router();
 
   // ─── HTML page ──────────────────────────────────────────────────────────────
@@ -419,6 +424,13 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
           recapCacheStore,
           briefCacheStore,
           urlKey: workspace.urlKey,
+          // LIN-1073: session read-model + the gated follow-up write. This is
+          // the ONE deliberate call site that opts into followUpEnabled.
+          dispatchQueueStore,
+          agentStatusStore,
+          sessionIsTerminal,
+          followUpEnabled: true,
+          dispatchedBy: req.session.linearUserId || null,
         });
         await streamChatWithTools(
           messages,

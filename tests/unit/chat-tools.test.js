@@ -10,7 +10,7 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { createChatToolCatalog, CHAT_TOOL_SCHEMAS, CHAT_TOOL_RESULT_BUDGETS } from '../../lib/chat-tools.js';
+import { createChatToolCatalog, CHAT_TOOL_SCHEMAS, CHAT_TOOL_RESULT_BUDGETS, FOLLOW_UP_TOOL_SCHEMA } from '../../lib/chat-tools.js';
 import { TOOL_RESULT_MAX_CHARS } from '../../lib/openrouter.js';
 import { hashContext } from '../../lib/recap-cache.js';
 import { snapshotFromContext } from '../../lib/task-snapshot-store.js';
@@ -84,11 +84,12 @@ function contextFor(issueId) {
 }
 
 describe('CHAT_TOOL_SCHEMAS', () => {
-  test('exposes the pass-1 + pass-2 read tools', () => {
+  test('exposes the pass-1 + pass-2 + pass-3 read tools', () => {
     const names = CHAT_TOOL_SCHEMAS.map(t => t.function.name).sort();
     assert.deepStrictEqual(names, [
       'get_brief', 'get_children_status', 'get_comments', 'get_history', 'get_recap',
-      'get_relations', 'get_stack', 'lookup_task', 'search_tasks',
+      'get_relations', 'get_session', 'get_stack', 'list_task_sessions', 'lookup_task',
+      'search_tasks',
     ]);
   });
 
@@ -116,20 +117,24 @@ describe('CHAT_TOOL_SCHEMAS', () => {
     assert.deepStrictEqual(byName.get_children_status.parameters.required, ['issueId']);
     // LIN-1067: get_history reads one named task's state-transition history.
     assert.deepStrictEqual(byName.get_history.parameters.required, ['issueId']);
+    // LIN-1073: session reads over a different substrate (the sessions read-model).
+    assert.deepStrictEqual(byName.list_task_sessions.parameters.required, ['issueId']);
+    assert.deepStrictEqual(byName.get_session.parameters.required, ['sessionId']);
   });
 });
 
-describe('CHAT_TOOL_RESULT_BUDGETS (LIN-1065)', () => {
-  test('grants only get_comments a larger-than-default budget', () => {
-    // Additive map: get_comments is the ONLY override, and it is strictly larger
-    // than the global default so full comment bodies survive the tool hop.
-    assert.deepStrictEqual(Object.keys(CHAT_TOOL_RESULT_BUDGETS), ['get_comments']);
+describe('CHAT_TOOL_RESULT_BUDGETS (LIN-1065, LIN-1073)', () => {
+  test('grants only get_comments and get_session a larger-than-default budget', () => {
+    // Additive map: get_comments and get_session (full transcript, LIN-1073) are
+    // the ONLY overrides, each strictly larger than the global default.
+    assert.deepStrictEqual(Object.keys(CHAT_TOOL_RESULT_BUDGETS).sort(), ['get_comments', 'get_session']);
     assert.ok(CHAT_TOOL_RESULT_BUDGETS.get_comments > TOOL_RESULT_MAX_CHARS);
     assert.ok(CHAT_TOOL_RESULT_BUDGETS.get_comments >= 10000, 'within the recommended ~10-12k range');
+    assert.ok(CHAT_TOOL_RESULT_BUDGETS.get_session > TOOL_RESULT_MAX_CHARS);
   });
 
   test('does NOT override any other tool, so they keep the 4000 default', () => {
-    for (const name of ['lookup_task', 'search_tasks', 'get_relations', 'get_brief', 'get_recap', 'get_stack', 'get_history']) {
+    for (const name of ['lookup_task', 'search_tasks', 'get_relations', 'get_brief', 'get_recap', 'get_stack', 'get_history', 'list_task_sessions']) {
       assert.strictEqual(CHAT_TOOL_RESULT_BUDGETS[name], undefined, `${name} must not be overridden`);
     }
   });
@@ -651,6 +656,266 @@ describe('pass-2 stack tool — get_stack (LIN-1026)', () => {
   });
 });
 
+// ─── Pass-3 (LIN-1073): session read-model tools + the gated follow-up write ──
+
+// A recording fake of the sessions read-model's two store deps. Mirrors
+// `makeMockStores` in tests/unit/pipeline-loops.test.js (dispatchStore.listItems/
+// listHistory + agentStatusStore.listStatus) so `list_task_sessions`/`get_session`
+// exercise the SAME real reconstruction (`getSessionsForIssues`/
+// `getSessionsForWorkspace`) the executors call directly, not a stubbed shortcut.
+function makeMockSessionStores({ history = [] } = {}) {
+  return {
+    dispatchQueueStore: {
+      async listItems(urlKey, options) {
+        const id = options?.issueIdentifier;
+        return id ? [] : [];
+      },
+      async listHistory(urlKey, options) {
+        const id = options?.issueIdentifier;
+        const items = id ? history.filter(x => x.issueIdentifier === id) : history;
+        return { items, total: items.length };
+      },
+    },
+    agentStatusStore: {
+      async listStatus() {
+        return { items: [], total: 0 };
+      },
+    },
+  };
+}
+
+// Timestamps relative to "now" (like pipeline-loops.test.js's recentHistoryStore) —
+// getSessionsForIssues/getSessionsForWorkspace apply a rolling 30-day lookback,
+// so a fixed past date would silently fall outside the window.
+const T_DISPATCHED = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+const T_WORKING = new Date(Date.now() - 40 * 60 * 1000).toISOString();
+const T_DONE = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+
+function sessionHistoryItem(overrides = {}) {
+  return {
+    id: 'hist-1',
+    promptName: 'implementation',
+    prompt: 'prompt body',
+    issueId: 'uuid-500',
+    issueIdentifier: 'LIN-500',
+    issueTitle: 'A task',
+    issueUrl: 'https://linear.app/x/issue/LIN-500',
+    workspace: { urlKey: URL_KEY },
+    dispatchedAt: T_DISPATCHED,
+    dispatchedBy: 'user-1',
+    target: 'cli',
+    repo: null,
+    status: 'taken',
+    resolvedAt: T_DONE,
+    feedback: [],
+    ...overrides,
+  };
+}
+
+// Two fixture sessions across two tasks: a TERMINAL session on LIN-500 (cli
+// target), and a RUNNING session on LIN-501 (web target) — enough to exercise
+// terminal/running derivation and cli/web target derivation.
+function twoSessionHistory() {
+  return [
+    sessionHistoryItem({
+      id: 'sess-done', kind: 'autopilot', issueIdentifier: 'LIN-500', target: 'cli',
+      feedback: [{ message: '[done] Task completed in 8s', timestamp: T_DONE }],
+    }),
+    sessionHistoryItem({
+      id: 'w-done', sessionId: 'sess-done', issueIdentifier: 'LIN-500', target: 'cli',
+      feedback: [
+        { message: '[working] 2 tools/5s · alive', timestamp: T_WORKING, url: 'https://x/1', urlLabel: 'PR' },
+        { message: '[done] Task completed in 8s', timestamp: T_DONE },
+      ],
+    }),
+    sessionHistoryItem({
+      id: 'sess-run', kind: 'autopilot', issueIdentifier: 'LIN-501', target: 'web',
+      resolvedAt: null, feedback: [{ message: '[working] 1 tools/3s · alive', timestamp: T_WORKING }],
+    }),
+  ];
+}
+
+describe('pass-3 session reads — list_task_sessions / get_session (LIN-1073)', () => {
+  function makeCatalog(history) {
+    const provider = makeFakeProvider();
+    const stores = makeMockSessionStores({ history });
+    const { executeTool } = createChatToolCatalog({
+      provider, scope: SCOPE, urlKey: URL_KEY,
+      dispatchQueueStore: stores.dispatchQueueStore, agentStatusStore: stores.agentStatusStore,
+      sessionIsTerminal: (session) => (session.loops || []).some(l => l.terminalStatus === 'done'),
+    });
+    return executeTool;
+  }
+
+  test('list_task_sessions returns compact rows for the named task only', async () => {
+    const executeTool = makeCatalog(twoSessionHistory());
+    const result = await executeTool({ name: 'list_task_sessions', arguments: { issueId: 'LIN-500' } });
+    assert.strictEqual(result.issueId, 'LIN-500');
+    assert.strictEqual(result.count, 1);
+    assert.strictEqual(result.sessions[0].sessionId, 'sess-done');
+    assert.strictEqual(result.sessions[0].terminal, true);
+    assert.strictEqual(result.sessions[0].runCount, 2);
+  });
+
+  test('list_task_sessions reflects a still-running session as non-terminal', async () => {
+    const executeTool = makeCatalog(twoSessionHistory());
+    const result = await executeTool({ name: 'list_task_sessions', arguments: { issueId: 'LIN-501' } });
+    assert.strictEqual(result.count, 1);
+    assert.strictEqual(result.sessions[0].terminal, false);
+  });
+
+  test('list_task_sessions rejects a malformed id and fails cleanly when stores are absent', async () => {
+    const provider = makeFakeProvider();
+    const { executeTool } = createChatToolCatalog({ provider, scope: SCOPE, urlKey: URL_KEY });
+    await assert.rejects(
+      () => executeTool({ name: 'list_task_sessions', arguments: { issueId: 'bad id!' } }),
+      /Invalid issue id/,
+    );
+    await assert.rejects(
+      () => executeTool({ name: 'list_task_sessions', arguments: { issueId: 'LIN-1' } }),
+      /Session data is not configured/,
+    );
+  });
+
+  test('get_session returns status/telemetry/transcript for the named session, from the WHOLE workspace', async () => {
+    const executeTool = makeCatalog(twoSessionHistory());
+    const result = await executeTool({ name: 'get_session', arguments: { sessionId: 'sess-done' } });
+    assert.strictEqual(result.sessionId, 'sess-done');
+    assert.strictEqual(result.terminal, true);
+    assert.ok(result.telemetry);
+    assert.strictEqual(result.runs.length, 2);
+    const workerRun = result.runs.find(r => r.kind !== 'autopilot' && r.terminalStatus === 'done');
+    assert.ok(workerRun, 'expected the worker run');
+    assert.ok(Array.isArray(workerRun.transcript));
+    assert.deepStrictEqual(workerRun.transcript[0], {
+      message: '[working] 2 tools/5s · alive', timestamp: T_WORKING, url: 'https://x/1', urlLabel: 'PR',
+    });
+  });
+
+  test('get_session rejects a missing sessionId and an unknown session', async () => {
+    const executeTool = makeCatalog(twoSessionHistory());
+    await assert.rejects(
+      () => executeTool({ name: 'get_session', arguments: {} }),
+      /non-empty "sessionId"/,
+    );
+    await assert.rejects(
+      () => executeTool({ name: 'get_session', arguments: { sessionId: 'no-such-session' } }),
+      /Session no-such-session not found/,
+    );
+  });
+
+  test('get_session omits `terminal` (rather than throwing) when sessionIsTerminal is not injected', async () => {
+    const provider = makeFakeProvider();
+    const stores = makeMockSessionStores({ history: twoSessionHistory() });
+    const { executeTool } = createChatToolCatalog({
+      provider, scope: SCOPE, urlKey: URL_KEY,
+      dispatchQueueStore: stores.dispatchQueueStore, agentStatusStore: stores.agentStatusStore,
+    });
+    const result = await executeTool({ name: 'get_session', arguments: { sessionId: 'sess-done' } });
+    assert.strictEqual(result.terminal, null);
+  });
+});
+
+describe('pass-3 write tool — send_follow_up (LIN-1073)', () => {
+  function makeFakeDispatchQueueStore(history) {
+    const calls = [];
+    const stores = makeMockSessionStores({ history });
+    return {
+      ...stores.dispatchQueueStore,
+      calls,
+      async addItem(urlKey, item) {
+        calls.push({ urlKey, item });
+        return { _id: 'queued-item-1', urlKey, ...item };
+      },
+    };
+  }
+
+  function makeCatalog({ history, followUpEnabled = true, dispatchedBy = null } = {}) {
+    const provider = makeFakeProvider();
+    const dispatchQueueStore = makeFakeDispatchQueueStore(history);
+    const { tools, executeTool } = createChatToolCatalog({
+      provider, scope: SCOPE, urlKey: URL_KEY,
+      dispatchQueueStore, agentStatusStore: { async listStatus() { return { items: [], total: 0 }; } },
+      sessionIsTerminal: (session) => (session.loops || []).some(l => l.terminalStatus === 'done'),
+      followUpEnabled, dispatchedBy,
+    });
+    return { tools, executeTool, dispatchQueueStore };
+  }
+
+  test('is absent from tools unless followUpEnabled is true', () => {
+    const { tools: withoutFlag } = makeCatalog({ history: twoSessionHistory(), followUpEnabled: false });
+    assert.strictEqual(withoutFlag, CHAT_TOOL_SCHEMAS, 'reference-equal to the base read-only catalog');
+    assert.ok(!withoutFlag.some(t => t.function.name === 'send_follow_up'));
+
+    const { tools: withFlag } = makeCatalog({ history: twoSessionHistory(), followUpEnabled: true });
+    assert.ok(withFlag.some(t => t.function.name === 'send_follow_up'));
+    assert.ok(!CHAT_TOOL_SCHEMAS.some(t => t.function.name === 'send_follow_up'), 'never leaks into the base catalog');
+  });
+
+  test('refuses to run when followUpEnabled is false, even if invoked directly', async () => {
+    const { executeTool } = makeCatalog({ history: twoSessionHistory(), followUpEnabled: false });
+    await assert.rejects(
+      () => executeTool({ name: 'send_follow_up', arguments: { sessionId: 'sess-run', prompt: 'keep going' } }),
+      /not enabled/,
+    );
+  });
+
+  test('a terminal session gets force:true and the anchor\'s cli target', async () => {
+    const { executeTool, dispatchQueueStore } = makeCatalog({ history: twoSessionHistory(), dispatchedBy: 'user-42' });
+    const result = await executeTool({ name: 'send_follow_up', arguments: { sessionId: 'sess-done', prompt: 'ship it' } });
+    assert.deepStrictEqual(result, { queued: true, itemId: 'queued-item-1', sessionId: 'sess-done', target: 'cli', force: true });
+    assert.strictEqual(dispatchQueueStore.calls.length, 1);
+    assert.deepStrictEqual(dispatchQueueStore.calls[0], {
+      urlKey: URL_KEY,
+      item: { prompt: 'ship it', followUpTo: 'sess-done', target: 'cli', force: true, dispatchedBy: 'user-42' },
+    });
+  });
+
+  test('a running session gets force:false and the anchor\'s web target — the model never supplies force/target', async () => {
+    const { executeTool, dispatchQueueStore } = makeCatalog({ history: twoSessionHistory() });
+    const result = await executeTool({
+      name: 'send_follow_up',
+      // A confused/malicious model tries to smuggle force/target — ignored.
+      arguments: { sessionId: 'sess-run', prompt: 'what are you doing?', force: true, target: 'dash' },
+    });
+    assert.deepStrictEqual(result, { queued: true, itemId: 'queued-item-1', sessionId: 'sess-run', target: 'web', force: false });
+    assert.strictEqual(dispatchQueueStore.calls[0].item.target, 'web');
+    assert.strictEqual(dispatchQueueStore.calls[0].item.force, false);
+  });
+
+  test('rejects a session whose anchor target is dash/local', async () => {
+    const history = [
+      ...twoSessionHistory(),
+      sessionHistoryItem({
+        id: 'sess-dash', kind: 'autopilot', issueIdentifier: 'LIN-502', target: 'dash',
+        feedback: [{ message: '[working] 1 tools/2s · alive', timestamp: '2026-04-11T11:05:00.000Z' }],
+      }),
+    ];
+    const { executeTool } = makeCatalog({ history });
+    await assert.rejects(
+      () => executeTool({ name: 'send_follow_up', arguments: { sessionId: 'sess-dash', prompt: 'hi' } }),
+      /dash\/local targets are not supported/,
+    );
+  });
+
+  test('rejects an unknown session and empty sessionId/prompt before touching the store', async () => {
+    const { executeTool, dispatchQueueStore } = makeCatalog({ history: twoSessionHistory() });
+    await assert.rejects(
+      () => executeTool({ name: 'send_follow_up', arguments: { sessionId: 'no-such', prompt: 'hi' } }),
+      /Session no-such not found/,
+    );
+    await assert.rejects(
+      () => executeTool({ name: 'send_follow_up', arguments: { sessionId: '', prompt: 'hi' } }),
+      /non-empty "sessionId"/,
+    );
+    await assert.rejects(
+      () => executeTool({ name: 'send_follow_up', arguments: { sessionId: 'sess-run', prompt: '  ' } }),
+      /non-empty "prompt"/,
+    );
+    assert.strictEqual(dispatchQueueStore.calls.length, 0);
+  });
+});
+
 describe('read-only invariant', () => {
   test('the catalog exposes no write/mutation tools', () => {
     const names = CHAT_TOOL_SCHEMAS.map(t => t.function.name);
@@ -664,5 +929,10 @@ describe('read-only invariant', () => {
       if (readVerb.test(name)) continue;
       assert.ok(!writeish.test(name), `unexpected write-shaped tool: ${name}`);
     }
+  });
+
+  test('send_follow_up (LIN-1073) is the sole, deliberate exception — kept out of CHAT_TOOL_SCHEMAS', () => {
+    assert.strictEqual(FOLLOW_UP_TOOL_SCHEMA.function.name, 'send_follow_up');
+    assert.ok(!CHAT_TOOL_SCHEMAS.includes(FOLLOW_UP_TOOL_SCHEMA));
   });
 });
