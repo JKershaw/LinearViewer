@@ -243,6 +243,85 @@ describe('streamChatWithTools (LIN-988)', () => {
     assert.match(toolMsg.content, /\[truncated 80 chars\]/);
   });
 
+  test('applies a per-tool budget ONLY to the named tool; others keep the global budget (LIN-1065)', async () => {
+    // One hop requests two tools at once: a normal tool and get_comments. Both
+    // executors return the SAME over-4000 payload. The per-tool override gives
+    // get_comments a 12000 budget, so its result is NOT clipped, while the normal
+    // tool is still clipped at the global 4000 default — byte-unchanged behavior.
+    wireFetch(
+      [
+        toolHopResponse({ toolCalls: [
+          makeToolCall('c1', 'lookup_task', { issueId: 'LIN-1' }),
+          makeToolCall('c2', 'get_comments', { issueId: 'LIN-1' }),
+        ] }),
+        toolHopResponse({ toolCalls: [] }),
+      ],
+      ['ok']
+    );
+
+    const payload = 'q'.repeat(8000); // between the 4000 default and the 12000 override
+    const executeTool = mock.fn(async () => payload);
+
+    await streamChatWithTools(
+      [{ role: 'user', content: 'go' }],
+      {
+        apiKey: 'k',
+        tools: [
+          { type: 'function', function: { name: 'lookup_task' } },
+          { type: 'function', function: { name: 'get_comments' } },
+        ],
+        executeTool,
+        toolResultMaxCharsByTool: { get_comments: 12000 },
+      },
+      () => {}
+    );
+
+    // The appended tool messages are on the FINAL streamed request.
+    const finalBody = calls[calls.length - 1];
+    const toolMsgs = Object.fromEntries(
+      finalBody.messages.filter(m => m.role === 'tool').map(m => [m.name, m.content])
+    );
+
+    // Normal tool: still clipped at the unchanged global 4000 budget.
+    assert.ok(toolMsgs.lookup_task.length < payload.length, 'lookup_task result is clipped');
+    assert.match(toolMsgs.lookup_task, /\[truncated 4000 chars\]/);
+
+    // get_comments: its 12000 budget covers the 8000-char payload → returned whole.
+    assert.strictEqual(toolMsgs.get_comments, payload);
+    assert.doesNotMatch(toolMsgs.get_comments, /truncated/);
+  });
+
+  test('a per-tool budget still clips when its OWN larger budget is exceeded (LIN-1065)', async () => {
+    // get_comments gets 12000, but a 15000-char payload still clips — at 12000,
+    // not the global 4000. Proves the override is a real budget, not "no limit".
+    wireFetch(
+      [
+        toolHopResponse({ toolCalls: [makeToolCall('c1', 'get_comments', { issueId: 'LIN-1' })] }),
+        toolHopResponse({ toolCalls: [] }),
+      ],
+      ['ok']
+    );
+
+    const payload = 'w'.repeat(15000);
+    const executeTool = mock.fn(async () => payload);
+
+    await streamChatWithTools(
+      [{ role: 'user', content: 'go' }],
+      {
+        apiKey: 'k',
+        tools: [{ type: 'function', function: { name: 'get_comments' } }],
+        executeTool,
+        toolResultMaxCharsByTool: { get_comments: 12000 },
+      },
+      () => {}
+    );
+
+    const finalBody = calls[calls.length - 1];
+    const toolMsg = finalBody.messages.find(m => m.role === 'tool');
+    assert.match(toolMsg.content, /\[truncated 3000 chars\]/); // 15000 - 12000
+    assert.ok(toolMsg.content.startsWith('w'.repeat(12000)));
+  });
+
   test('short-circuits hop 1 when the model answers with no tool_calls (one LLM call)', async () => {
     // Hop 1 returns a plain answer and declines tools. The loop must emit that
     // answer directly and NOT make a second (tools-off) streamChat call (LIN-1009).
