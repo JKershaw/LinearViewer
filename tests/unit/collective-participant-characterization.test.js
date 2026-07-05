@@ -25,7 +25,10 @@ import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { buildCollectiveParticipantPrompt } from '../../lib/prompts/collective-participant.js';
+import {
+  buildCollectiveParticipantPrompt,
+  DEFAULT_COLLECTIVE_CHARACTER,
+} from '../../lib/prompts/collective-participant.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixture = (name) =>
@@ -93,5 +96,66 @@ describe('buildCollectiveParticipantPrompt — HEAD characterization (LIN-1047)'
   test('yapPassword drives the Bearer auth note in the with-token snapshot', () => {
     const snap = fixture('with-token.txt');
     assert.ok(snap.includes('Authorization: Bearer s3cr3t'));
+  });
+});
+
+describe('buildCollectiveParticipantPrompt — persona seam (LIN-1047, beat 2)', () => {
+  const DEFAULT_INPUT = { ...SHARED, yapBaseUrl: 'https://yap.example.com/' };
+
+  test('passing the DEFAULT character explicitly is byte-identical to the no-token snapshot', () => {
+    const text = buildCollectiveParticipantPrompt({
+      ...DEFAULT_INPUT,
+      character: DEFAULT_COLLECTIVE_CHARACTER,
+    });
+    assert.strictEqual(text, fixture('default-no-token.txt'));
+  });
+
+  test('a partial character that merges to the default is still byte-identical', () => {
+    // Only role supplied; the rest fall back to the default → effective character
+    // equals the default → no persona block, output unchanged.
+    const text = buildCollectiveParticipantPrompt({
+      ...DEFAULT_INPUT,
+      character: { role: DEFAULT_COLLECTIVE_CHARACTER.role },
+    });
+    assert.strictEqual(text, fixture('default-no-token.txt'));
+  });
+
+  test('character: null (the default) is byte-identical to omitting it entirely', () => {
+    const withNull = buildCollectiveParticipantPrompt({ ...DEFAULT_INPUT, character: null });
+    const omitted = buildCollectiveParticipantPrompt(DEFAULT_INPUT);
+    assert.strictEqual(withNull, omitted);
+    assert.strictEqual(withNull, fixture('default-no-token.txt'));
+  });
+
+  test('the default path emits NO persona block', () => {
+    const text = buildCollectiveParticipantPrompt(DEFAULT_INPUT);
+    assert.ok(!text.includes('## Your character'));
+  });
+
+  test('a non-default character prepends a persona block that carries its fields', () => {
+    const character = {
+      role: 'Skeptic',
+      lens: 'what could go wrong',
+      objective: 'stress-test the plan',
+      value: 'hard questions early',
+      disposition: 'refute before agreeing',
+    };
+    const text = buildCollectiveParticipantPrompt({ ...DEFAULT_INPUT, character });
+    assert.ok(text.includes('## Your character: Skeptic'));
+    assert.ok(text.includes('what could go wrong'));
+    assert.ok(text.includes('stress-test the plan'));
+    assert.ok(text.includes('hard questions early'));
+    assert.ok(text.includes('refute before agreeing'));
+    // The persona block sits after the intro, before the venue (Yap) block.
+    assert.ok(text.indexOf('## Your character: Skeptic') < text.indexOf('## The venue: Yap'));
+  });
+
+  test('a non-default character does not disturb the grounding/discipline body', () => {
+    const character = { ...DEFAULT_COLLECTIVE_CHARACTER, role: 'Skeptic' };
+    const text = buildCollectiveParticipantPrompt({ ...DEFAULT_INPUT, character });
+    // The whole default body is still present verbatim as a suffix once the
+    // persona block is stripped off the front.
+    const snap = fixture('default-no-token.txt');
+    assert.ok(text.endsWith(snap.slice(snap.indexOf('## The venue: Yap'))));
   });
 });
