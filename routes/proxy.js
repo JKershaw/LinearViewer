@@ -17,6 +17,7 @@ import rateLimit from 'express-rate-limit';
 import { createDedupeCache, dedupeKey } from '../lib/proxy-dedupe.js';
 import { deriveTerminalStatus, deriveCompletedAt } from '../lib/dispatch-terminal.js';
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
+import { validateOpaqueDispatchField } from '../lib/dispatch-validation.js';
 // The entire consumer-API surface — reads (LIN-308), writes + write-guard reads
 // (LIN-309), and the compute-endpoint fetchers — sources through a provider; the
 // route owns no GraphQL. Provider SELECTION for the consumer read + write data
@@ -1237,9 +1238,10 @@ POST ${baseUrl}/api/proxy/agent/status   (alias: /api/proxy/foreman/status — d
 ## Dispatch Endpoints
 
 POST ${baseUrl}/api/proxy/dispatch
-  Body: { "prompt": "...", "promptName": "...", "kind": "implementation", "issueId": "...", "issueIdentifier": "LIN-42", "issueTitle": "...", "issueUrl": "...", "target": "cli|web|dash", "repo": "...", "model": "anthropic/claude-opus-4.8", "followUpTo": "...", "force": false, "abort": false, "abortTo": "...", "cascade": false, "sessionId": "...", "waitForFollowUps": false, "appendProxyContext": true }
+  Body: { "prompt": "...", "promptName": "...", "kind": "implementation", "issueId": "...", "issueIdentifier": "LIN-42", "issueTitle": "...", "issueUrl": "...", "target": "cli|web|dash", "repo": "...", "model": "anthropic/claude-opus-4.8", "harness": "opencode", "followUpTo": "...", "force": false, "abort": false, "abortTo": "...", "cascade": false, "sessionId": "...", "waitForFollowUps": false, "appendProxyContext": true }
   → Queue a prompt for the workspace's dispatch consumer (the runner). Only "prompt" is required; target defaults to "cli". ("local"/Harbour OS is not available to proxy consumers.)
   → "model" (optional) is the EXECUTION model the runner should use to RUN this prompt — the value it passes to its own CLI (e.g. "claude --model") — NOT the server-side generation model that WRITES prompts. Use the OpenRouter naming convention: "provider/model" IDs like "anthropic/claude-opus-4.8" or "openai/gpt-5.4-mini". Treated as an opaque string (length + safety validated, no registry check) and forwarded blindly; translating it to the agent's own flag is the runner's job (Claude Code maps "anthropic/claude-opus-4.8" → "--model opus"; OpenRouter-native runners pass it through). Omit it (or null) to keep the consumer's current default (e.g. Opus). See LIN-438.
+  → "harness" (optional) is the EXECUTION harness the runner should use to RUN this prompt — e.g. "claude-code" (the default) or "opencode". Like "model" it is an opaque string (length + safety validated, no registry check) and forwarded blindly; the runner owns its own harness registry and defaulting. Combine with "model" to run a specific OpenRouter-backed model through a non-default harness (e.g. "harness": "opencode", "model": "openai/gpt-5.4-mini"). Omit it (or null) to keep the consumer's own default/precedence chain — Harbour does not interpose a per-workspace default here. See LIN-1084.
   → "kind" is a stable task classification (research/plan/implementation/review/etc. — the prompt-template keys, plus "custom"). Optional: when omitted it is derived from "promptName", falling back to "custom". Read it instead of inferring the task type from promptName or the prompt body.
   → "followUpTo" (optional) resumes an existing session: pass the "id" of an earlier dispatch and "prompt" becomes a follow-up instruction to that same session. cli/web only, same workspace. The runner owns session liveness — if the session is gone it posts terminal "[failed] no live session to resume". Use sparingly: only when the prior session ran cleanly and naturally suggests the next step (e.g. confirm CI is green, update Linear/git); any wobble → dispatch a fresh session instead.
   → "force" (optional, default false) overrides a runner-side guard, so it is meaningful alongside a verb that HAS one — and ONLY such a verb (a bare "force": true on a fresh dispatch is rejected 400 "force requires followUpTo or abort"): (1) with "followUpTo" it bypasses the active-session guard so a follow-up can resume a session wedged or sleeping in an active phase (Claude infra wobble, long-running sleep) — asserting the prior process is effectively dead (see LIN-546); (2) with a single "abort" it is the escape hatch that force-closes even a human-continued session the runner would otherwise skip (see cascade + "[skipped]" below). Mutually exclusive with "cascade" (a cascade emits its own plain, unforced aborts): "force" + "cascade" is rejected (400). The runner reads it as "item.force" off the polled/claimed item. See LIN-559/LIN-946.
@@ -1252,9 +1254,10 @@ POST ${baseUrl}/api/proxy/dispatch
   → { "id": "...", "status": "queued", "promptName": "...", "kind": "implementation", "issueIdentifier": "...", "target": "cli", "abort": false, "abortTo": null, "cascade": false, "sessionId": null, "dispatchedAt": "..." } (a "cascade": true request instead returns { "success": true, "cascade": true, "closed": [...], "count": N })
 
 POST ${baseUrl}/api/proxy/recommend-and-dispatch
-  Body: { "issueIdentifier": "LIN-42", "target": "cli|web|dash", "repo": "...", "model": "anthropic/claude-opus-4.8", "appendProxyContext": true, "noDescend": false, "kind": "review", "sessionId": "...", "waitForFollowUps": false }
+  Body: { "issueIdentifier": "LIN-42", "target": "cli|web|dash", "repo": "...", "model": "anthropic/claude-opus-4.8", "harness": "opencode", "appendProxyContext": true, "noDescend": false, "kind": "review", "sessionId": "...", "waitForFollowUps": false }
   → Fused verb: runs /recommend and forwards the recommended prompt straight into a dispatch, server-side. "issueIdentifier" is required; target defaults to "cli".
   → "model" (optional) is threaded onto the dispatched item, same meaning as on POST /dispatch — the EXECUTION model the runner passes to its own CLI (OpenRouter "provider/model" convention, e.g. "anthropic/claude-opus-4.8"), opaque and forwarded blindly. Set it to route a cheaper/pricier model per task (e.g. Sonnet for implementation, Opus for review); omit to keep the consumer default. See LIN-438.
+  → "harness" (optional) is threaded onto the dispatched item, same meaning as on POST /dispatch — the EXECUTION harness the runner should use (e.g. "opencode"), opaque and forwarded blindly. Combine with "model" to pick a specific OpenRouter-backed model for a non-default harness; omit to keep the consumer's own default. See LIN-1084.
   → "sessionId" (optional) is the autopilot dispatch id driving this run; stamp it on every fan-out so the whole multi-task run reconstructs as one session. UUID, any target. See LIN-591.
   → The prompt body NEVER returns to you — you only get the task header. This keeps the prompt out of your context (the point of the verb); learn what was chosen from "kind"/"promptName", then watch the item via GET /dispatch/{id}.
   → "kind" is derived from the recommendation's own action signal (falling back to "custom") — no need to read the prompt to classify the task.
@@ -1269,7 +1272,7 @@ POST ${baseUrl}/api/proxy/autopilot/kickoff
   → Omit "issueIdentifier" for a GENERAL run ("goal" focuses the stack walk); pass it for a SCOPED run ("autopilot until THIS task is done") — the project "repo=" is then inherited unless you pass "repo". "mode" defaults to "write" ("readonly" = investigation only).
   → "variant" defaults to "standard" (the normal orchestrator). "stepper" swaps in the warm single-session, beat-stepping disposition: it decomposes the task's worker prompt into 3–6 ordered beats and drip-feeds them into ONE session over followUpTo+force, judging and challenging each beat before advancing. Orthogonal to "mode" — they compose.
   → "sessionId" + "subscription" (LIN-813/LIN-900 §6) are the coordinator up-chain edge — available to ANY autopilot contextually (a guide capability, not a launch-time variant; see the "Dispatching a child autopilot" section of the operating manual). When an autopilot acting as a coordinator dispatches a CHILD autopilot for a whole task, it passes its OWN session id as "sessionId" (the wake target) with "subscription": "everything", so when the child pauses (PENDING) or terminates its report is pushed back up to the coordinator instead of the coordinator polling. A top-level kickoff omits both (undeclared → "terminal-only"). NOTE the child's own returned "id" (its session id, for ITS sub-workers) stays distinct from the parent "sessionId" you pass in.
-  → "subscription" is the §5 bubbling contract: an "everything" edge wakes the parent on EVERY event (incl. PENDING-external — each stepper beat boundary); a "terminal-only" edge (the default) wakes it only on the always-bubbling outcomes DONE/FAILED/BLOCKED. It is DECLARED on the edge (never inferred from "has a sessionId"). The stepper kickoff body instructs each beat to carry BOTH "subscription": "everything" AND "waitForFollowUps": true — the two orthogonal halves of the warm drip (LIN-845). "subscription: everything" is the up-chain wake (the worker's stop boundary, incl. [pending], wakes the orchestrator); "waitForFollowUps" is the worker-side hold (the worker parks at AWAITING_FOLLOWUP instead of finalizing). Both are needed: with the hold absent the worker finalizes after beat 1, so beat 2's followUpTo+force falls back to a cold claude --resume instead of an in-session warm follow-on.
+  → "subscription" is the §5 bubbling contract: an "everything" edge wakes the parent on EVERY event (incl. PENDING-external — each stepper beat boundary); a "terminal-only" edge (the default) wakes it only on the always-bubbling outcomes DONE/FAILED/BLOCKED. It is DECLARED on the edge (never inferred from "has a sessionId"). The stepper kickoff body instructs each beat to carry BOTH "subscription": "everything" AND "waitForFollowUps": true — the two orthogonal halves of the warm drip (LIN-845). "subscription: everything" is the up-chain wake (the worker's stop boundary, incl. [pending], wakes the orchestrator); "waitForFollowUps" is the worker-side hold (the worker parks at AWAITING_FOLLOWUP instead of finalizing). Both are needed: with the hold absent the worker finalizes after beat 1, so beat 2's followUpTo+force falls back to a cold resume via the runner's own mechanism instead of an in-session warm follow-on.
   → Dispatched as kind:"autopilot", so the returned "id" IS this run's session id. Pass that id as "sessionId" on every worker dispatch the run fans out (the kickoff body also tells the run its own id). The orchestrator itself is launched WITHOUT "waitForFollowUps" (default false) so it finalizes normally and stays free to run its watch loop.
   → The prompt body NEVER returns to you — only the header. The GET twin (GET /api/proxy/autopilot/kickoff?goal=&mode=&variant=) stays a text-only preview/inspect form that does NOT enqueue anything.
   → { "id": "...", "sessionId": "...", "status": "queued", "kind": "autopilot", "promptName": "Autopilot (stack walk)", "mode": "write", "variant": "standard", "issueIdentifier": null, "target": "cli", "dispatchedAt": "..." }
@@ -4139,7 +4142,7 @@ One convention across every endpoint, so you can branch on the same fields every
     }
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, followUpTo, force, abort, abortTo, cascade, sessionId, waitForFollowUps, queueIfBusy, subscription } = req.body || {};
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, harness, followUpTo, force, abort, abortTo, cascade, sessionId, waitForFollowUps, queueIfBusy, subscription } = req.body || {};
 
       // Abort verb (LIN-743): an abort item cancels/closes an existing session
       // (named by abortTo) instead of running a prompt — it carries no prompt and
@@ -4235,17 +4238,19 @@ One convention across every endpoint, so you can branch on the same fields every
         logEvent(req, '/api/proxy/dispatch', 400);
         return badRequest.json(res, `repo exceeds maximum length of ${MAX_NAME_LENGTH}`);
       }
-      // Execution model (LIN-438): opaque string, validated like `repo` (length +
-      // dangerous-chars only). NOT checked against openrouter AVAILABLE_MODELS —
-      // that is the generation-model namespace; this is the consumer's execution
-      // model (OpenRouter-style provider/model wire convention).
-      if (model !== undefined && model !== null && typeof model !== 'string') {
+      // Execution model + harness (LIN-438, LIN-1084): opaque strings, validated
+      // via the shared helper (type/length/dangerous-chars only — NOT checked
+      // against openrouter AVAILABLE_MODELS, which is the generation-model
+      // namespace; these are the consumer's execution-model/harness fields).
+      const modelValidationError = validateOpaqueDispatchField(model, 'model', { maxLength: MAX_NAME_LENGTH });
+      if (modelValidationError) {
         logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, 'model must be a string');
+        return badRequest.json(res, modelValidationError.error);
       }
-      if (model && model.length > MAX_NAME_LENGTH) {
+      const harnessValidationError = validateOpaqueDispatchField(harness, 'harness', { maxLength: MAX_NAME_LENGTH });
+      if (harnessValidationError) {
         logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, `model exceeds maximum length of ${MAX_NAME_LENGTH}`);
+        return badRequest.json(res, harnessValidationError.error);
       }
 
       if (prompt && DANGEROUS_CHARS_REGEX.test(prompt)) {
@@ -4259,10 +4264,6 @@ One convention across every endpoint, so you can branch on the same fields every
       if (issueTitle && DANGEROUS_CHARS_REGEX.test(issueTitle)) {
         logEvent(req, '/api/proxy/dispatch', 400);
         return badRequest.json(res, 'issueTitle contains invalid characters');
-      }
-      if (model && DANGEROUS_CHARS_REGEX.test(model)) {
-        logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, 'model contains invalid characters');
       }
       if (repo && DANGEROUS_CHARS_REGEX.test(repo)) {
         logEvent(req, '/api/proxy/dispatch', 400);
@@ -4392,6 +4393,7 @@ One convention across every endpoint, so you can branch on the same fields every
         target: target || 'cli',
         repo: repo || null,
         model: model || null,
+        harness: harness || null,
         followUpTo: followUpTo || null,
         force: force === true,
         abort: isAbort,
@@ -4448,7 +4450,7 @@ One convention across every endpoint, so you can branch on the same fields every
     }
 
     try {
-      const { issueIdentifier, target, repo, model, appendProxyContext, noDescend, kind, sessionId, waitForFollowUps, queueIfBusy, subscription } = req.body || {};
+      const { issueIdentifier, target, repo, model, harness, appendProxyContext, noDescend, kind, sessionId, waitForFollowUps, queueIfBusy, subscription } = req.body || {};
 
       // Validate caller-supplied inputs. (Only the server-generated prompt skips
       // the dangerous-char/length checks — see the dispatch step below.)
@@ -4490,12 +4492,18 @@ One convention across every endpoint, so you can branch on the same fields every
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
         return badRequest.json(res, 'repo is invalid');
       }
-      // Execution model (LIN-438): opaque string, validated like `repo` (length +
-      // dangerous-chars). NOT a generation-model registry check — this is the
-      // consumer's execution model (OpenRouter-style provider/model wire value).
-      if (model !== undefined && model !== null && (typeof model !== 'string' || model.length > MAX_NAME_LENGTH || DANGEROUS_CHARS_REGEX.test(model))) {
+      // Execution model + harness (LIN-438, LIN-1084): opaque strings, validated
+      // via the shared helper (length + dangerous-chars). NOT a generation-model
+      // registry check — these are the consumer's execution-model/harness fields.
+      const recommendModelValidationError = validateOpaqueDispatchField(model, 'model', { maxLength: MAX_NAME_LENGTH });
+      if (recommendModelValidationError) {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-        return badRequest.json(res, 'model is invalid');
+        return badRequest.json(res, recommendModelValidationError.error);
+      }
+      const recommendHarnessValidationError = validateOpaqueDispatchField(harness, 'harness', { maxLength: MAX_NAME_LENGTH });
+      if (recommendHarnessValidationError) {
+        logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
+        return badRequest.json(res, recommendHarnessValidationError.error);
       }
       // Optional verb override (LIN-573). When present, the caller pins the step
       // and the server still writes the body — "autopilot picks the verb, never
@@ -4597,9 +4605,11 @@ One convention across every endpoint, so you can branch on the same fields every
             // Mirror /prompt's repo resolution: project `repo=` from the
             // description, with an explicit caller repo winning (LIN-537).
             repo: repo || parseRepoFromDescription(project?.description) || null,
-            // Execution model the runner passes to its CLI (LIN-438); opaque,
-            // forwarded blindly. null preserves the consumer default.
+            // Execution model + harness the runner passes to its CLI (LIN-438,
+            // LIN-1084); opaque, forwarded blindly. null preserves the consumer
+            // default.
             model: model || null,
+            harness: harness || null,
             sessionId: sessionId || null,
             // Push-comms: `subscription` is the declared edge (LIN-900 §6),
             // `terminal-only` unless the caller declares `everything`; queueIfBusy
@@ -4738,9 +4748,11 @@ One convention across every endpoint, so you can branch on the same fields every
           // is functional execution context (working directory), so this fused
           // verb must propagate it, not just the display header fields (LIN-537).
           repo: repo || rec.repo || null,
-          // Execution model the runner passes to its CLI (LIN-438); opaque,
-          // forwarded blindly. null preserves the consumer default.
+          // Execution model + harness the runner passes to its CLI (LIN-438,
+          // LIN-1084); opaque, forwarded blindly. null preserves the consumer
+          // default.
           model: model || null,
+          harness: harness || null,
           sessionId: sessionId || null,
           // Opt-in completion hold (LIN-797), forwarded blindly to the runner.
           waitForFollowUps: waitForFollowUps === true,

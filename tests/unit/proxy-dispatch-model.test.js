@@ -69,6 +69,7 @@ async function call(app, method, path, body) {
 }
 
 const MODEL = 'anthropic/claude-opus-4.8';
+const HARNESS = 'opencode';
 
 describe('LIN-438 — POST /api/proxy/dispatch carries the execution model', () => {
   test('an explicit model is forwarded to the dispatch item verbatim', async () => {
@@ -154,7 +155,10 @@ describe('LIN-438 — POST /api/proxy/recommend-and-dispatch carries the executi
     });
 
     assert.equal(res.status, 400, `expected 400, got ${res.status}: ${JSON.stringify(res.body)}`);
-    assert.match(res.body.error, /model is invalid/);
+    // Routed through the shared validateOpaqueDispatchField helper (LIN-1084),
+    // so the message now matches POST /dispatch's specific over-length wording
+    // rather than the old generic "model is invalid".
+    assert.match(res.body.error, /model exceeds maximum length/);
   });
 
   // ── Recommendation-derived branch (LIN-438 close-out ledger discharge) ──────
@@ -193,5 +197,143 @@ describe('LIN-438 — POST /api/proxy/recommend-and-dispatch carries the executi
     assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
     assert.ok(captured.item, 'recommendation-derived path must dispatch an item');
     assert.strictEqual(captured.item.model, null);
+  });
+});
+
+describe('LIN-1084 — POST /api/proxy/dispatch carries the execution harness', () => {
+  test('an explicit harness is forwarded to the dispatch item verbatim', async () => {
+    const captured = {};
+    const app = buildApp(captured);
+    const res = await call(app, 'post', '/api/proxy/dispatch', { prompt: 'run me', harness: HARNESS });
+
+    assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.equal(captured.item.harness, HARNESS);
+  });
+
+  test('an omitted harness becomes null (consumer default preserved)', async () => {
+    const captured = {};
+    const app = buildApp(captured);
+    const res = await call(app, 'post', '/api/proxy/dispatch', { prompt: 'run me' });
+
+    assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.strictEqual(captured.item.harness, null);
+  });
+
+  test('a non-string harness is rejected with 400', async () => {
+    const app = buildApp({});
+    const res = await call(app, 'post', '/api/proxy/dispatch', { prompt: 'run me', harness: 123 });
+
+    assert.equal(res.status, 400, `expected 400, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.match(res.body.error, /harness must be a string/);
+  });
+
+  test('an over-length harness is rejected with 400', async () => {
+    const app = buildApp({});
+    const res = await call(app, 'post', '/api/proxy/dispatch', { prompt: 'run me', harness: 'x'.repeat(1001) });
+
+    assert.equal(res.status, 400, `expected 400, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.match(res.body.error, /harness exceeds maximum length/);
+  });
+
+  test('a harness with dangerous control characters is rejected with 400', async () => {
+    const app = buildApp({});
+    const res = await call(app, 'post', '/api/proxy/dispatch', { prompt: 'run me', harness: 'opencode\x00' });
+
+    assert.equal(res.status, 400, `expected 400, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.match(res.body.error, /harness contains invalid characters/);
+  });
+
+  test('model and harness are forwarded together', async () => {
+    const captured = {};
+    const app = buildApp(captured);
+    const res = await call(app, 'post', '/api/proxy/dispatch', { prompt: 'run me', model: MODEL, harness: HARNESS });
+
+    assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.equal(captured.item.model, MODEL);
+    assert.equal(captured.item.harness, HARNESS);
+  });
+});
+
+describe('LIN-1084 — POST /api/proxy/recommend-and-dispatch carries the execution harness', () => {
+  test('an explicit harness is forwarded to the dispatch item (verb-override path)', async () => {
+    const captured = {};
+    const app = buildApp(captured);
+    const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
+      issueIdentifier: 'TEST-1', kind: 'implementation', harness: HARNESS
+    });
+
+    assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.ok(captured.item, 'verb-override path must dispatch an item');
+    assert.equal(captured.item.harness, HARNESS);
+  });
+
+  test('an omitted harness becomes null', async () => {
+    const captured = {};
+    const app = buildApp(captured);
+    const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
+      issueIdentifier: 'TEST-1', kind: 'implementation'
+    });
+
+    assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.strictEqual(captured.item.harness, null);
+  });
+
+  test('an invalid harness is rejected with 400', async () => {
+    const app = buildApp({});
+    const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
+      issueIdentifier: 'TEST-1', kind: 'implementation', harness: 'x'.repeat(1001)
+    });
+
+    assert.equal(res.status, 400, `expected 400, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.match(res.body.error, /harness exceeds maximum length/);
+  });
+
+  test('an explicit harness is forwarded to the dispatch item (recommendation-derived path)', async () => {
+    const captured = {};
+    const app = buildApp(captured);
+    const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
+      issueIdentifier: 'TEST-14', harness: HARNESS
+    });
+
+    assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.ok(captured.item, 'recommendation-derived path must dispatch an item');
+    assert.equal(captured.item.issueIdentifier, 'TEST-14');
+    assert.equal(captured.item.harness, HARNESS);
+  });
+
+  test('an omitted harness becomes null (recommendation-derived path)', async () => {
+    const captured = {};
+    const app = buildApp(captured);
+    const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
+      issueIdentifier: 'TEST-14'
+    });
+
+    assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.ok(captured.item, 'recommendation-derived path must dispatch an item');
+    assert.strictEqual(captured.item.harness, null);
+  });
+});
+
+describe('LIN-1084 — model:0 validation divergence is fixed on both endpoints', () => {
+  // Beat-2 planning found routes/proxy.js rejected `model: 0` (a falsy
+  // non-string) while routes/dispatch.js silently accepted it as absent. Both
+  // proxy endpoints now route through the same shared validator as
+  // routes/dispatch.js, so all three should reject `model: 0` identically.
+  test('POST /api/proxy/dispatch rejects model: 0', async () => {
+    const app = buildApp({});
+    const res = await call(app, 'post', '/api/proxy/dispatch', { prompt: 'run me', model: 0 });
+
+    assert.equal(res.status, 400, `expected 400, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.match(res.body.error, /model must be a string/);
+  });
+
+  test('POST /api/proxy/recommend-and-dispatch rejects model: 0', async () => {
+    const app = buildApp({});
+    const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
+      issueIdentifier: 'TEST-1', kind: 'implementation', model: 0
+    });
+
+    assert.equal(res.status, 400, `expected 400, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.match(res.body.error, /model must be a string/);
   });
 });
