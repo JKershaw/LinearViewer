@@ -431,6 +431,89 @@ const DISPATCH_MODEL_SUGGESTIONS = [
   'openai/gpt-5.5-pro'
 ];
 
+// =============================================================================
+// Live OpenRouter model catalog (LIN-1111 Session 2)
+// =============================================================================
+//
+// Supplements DISPATCH_MODEL_SUGGESTIONS with the full live catalog fetched
+// from GET /workspace/:urlKey/api/openrouter/models (routes/workspace-api.js),
+// itself backed by the SAME cache module (lib/openrouter-catalog.js) the
+// Settings server-render path calls directly — one source of truth for both
+// surfaces (never a fourth duplicated list). Fetched once per page load
+// (module-scoped promise cache), regardless of how many dispatch-exec-controls
+// instances render on the page. Never blocks the initial render: a control
+// renders immediately with the static suggestions, and the datalist is
+// enriched in place once the fetch resolves (or left as-is on failure).
+let _dispatchModelCatalogPromise = null;
+let _dispatchModelCatalog = null;
+
+/**
+ * Best-effort urlKey extraction from the current page path (every dispatch-exec
+ * surface lives under `/workspace/:urlKey/...`), so the catalog fetch needs no
+ * wiring at any of the four call sites.
+ */
+function inferWorkspaceUrlKeyFromLocation() {
+  const match = window.location.pathname.match(/^\/workspace\/([^/]+)\//);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+/**
+ * De-duped `<option>` markup for catalog ids not already in DISPATCH_MODEL_SUGGESTIONS.
+ */
+function buildCatalogModelOptionsHtml(models) {
+  if (!Array.isArray(models) || !models.length) return '';
+  const seen = new Set(DISPATCH_MODEL_SUGGESTIONS);
+  const parts = [];
+  for (const m of models) {
+    if (!m || typeof m.id !== 'string' || !m.id || seen.has(m.id)) continue;
+    seen.add(m.id);
+    parts.push(`<option value="${window.escapeHtml(m.id)}"></option>`);
+  }
+  return parts.join('');
+}
+
+/**
+ * Append the live catalog's options to every dispatch-exec model datalist
+ * already in the page. Called once, after the first (and only) catalog fetch
+ * resolves — any control rendered AFTER that point gets the catalog inlined
+ * directly by renderDispatchExecControls instead, so a given datalist is never
+ * populated by both paths.
+ */
+function applyDispatchModelCatalogToPage(models) {
+  const optionsHtml = buildCatalogModelOptionsHtml(models);
+  if (!optionsHtml) return;
+  document.querySelectorAll('.dispatch-exec-model-datalist').forEach(dl => {
+    dl.insertAdjacentHTML('beforeend', optionsHtml);
+  });
+}
+
+/**
+ * Fetch the live OpenRouter model catalog for a workspace, once per page load.
+ * Non-fatal: a fetch failure resolves to `[]` and the page just keeps the
+ * static suggestions. Safe to call repeatedly (e.g. once per rendered
+ * control) — subsequent calls reuse the same in-flight/resolved promise.
+ * @global
+ * @param {string} [urlKey] - Defaults to the urlKey inferred from the current page path.
+ * @returns {Promise<Array<{id: string, name: string}>>}
+ */
+window.fetchDispatchModelCatalog = function fetchDispatchModelCatalog(urlKey) {
+  if (_dispatchModelCatalogPromise) return _dispatchModelCatalogPromise;
+  const key = urlKey || inferWorkspaceUrlKeyFromLocation();
+  if (!key) return Promise.resolve([]);
+
+  _dispatchModelCatalogPromise = window.api(`/workspace/${encodeURIComponent(key)}/api/openrouter/models`, { on401: false })
+    .then(result => {
+      _dispatchModelCatalog = Array.isArray(result?.models) ? result.models : [];
+      applyDispatchModelCatalogToPage(_dispatchModelCatalog);
+      return _dispatchModelCatalog;
+    })
+    .catch(() => {
+      _dispatchModelCatalog = [];
+      return _dispatchModelCatalog;
+    });
+  return _dispatchModelCatalogPromise;
+};
+
 /**
  * Renders the shared dispatch-time model/harness control markup: a harness
  * select-or-custom pair plus a free-text model input, scoped under one
@@ -454,9 +537,14 @@ window.renderDispatchExecControls = function renderDispatchExecControls(idPrefix
     .map(h => `<option value="${window.escapeHtml(h)}"${h === preselectedHarness ? ' selected' : ''}>${window.escapeHtml(h)}</option>`)
     .join('');
   const modelListId = `dispatch-exec-model-list-${prefix}`;
-  const modelOptionsHtml = DISPATCH_MODEL_SUGGESTIONS
+  const staticModelOptionsHtml = DISPATCH_MODEL_SUGGESTIONS
     .map(m => `<option value="${window.escapeHtml(m)}"></option>`)
     .join('');
+  // If the catalog already resolved (a prior control on this page kicked off
+  // the fetch), inline it now; otherwise kick off the fetch — it will patch
+  // this datalist (via applyDispatchModelCatalogToPage) once it resolves.
+  const catalogModelOptionsHtml = _dispatchModelCatalog ? buildCatalogModelOptionsHtml(_dispatchModelCatalog) : '';
+  if (!_dispatchModelCatalog) window.fetchDispatchModelCatalog();
   return `<span class="dispatch-exec-controls" data-exec-prefix="${prefix}">
     <select class="dispatch-exec-harness-select" aria-label="Harness">
       <option value="">&mdash;</option>
@@ -465,7 +553,7 @@ window.renderDispatchExecControls = function renderDispatchExecControls(idPrefix
     <span class="dispatch-exec-or">or</span>
     <input type="text" class="dispatch-exec-harness-custom" maxlength="200" placeholder="${window.escapeHtml(harnessPlaceholder)}" aria-label="Custom harness">
     <input type="text" class="dispatch-exec-model" maxlength="200" list="${modelListId}" placeholder="${window.escapeHtml(modelPlaceholder)}" aria-label="Model">
-    <datalist id="${modelListId}">${modelOptionsHtml}</datalist>
+    <datalist id="${modelListId}" class="dispatch-exec-model-datalist">${staticModelOptionsHtml}${catalogModelOptionsHtml}</datalist>
   </span>`;
 };
 

@@ -68,6 +68,20 @@ test.describe('Dispatch defaults settings', () => {
     await expect(page.locator('input[name="defaultModel"]')).toHaveAttribute('list', 'dispatch-model-suggestions');
   });
 
+  test('the live OpenRouter catalog is merged into the shared datalist (LIN-1111 Session 2)', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.waitForLoadState('networkidle');
+
+    // Local-provider sessions are mock-gated (routes/workspace-api.js
+    // shouldMockAi), so the settings render path resolves the deterministic
+    // MOCK_CATALOG_MODELS instead of a live OpenRouter call.
+    const datalist = page.locator('#dispatch-model-suggestions');
+    await expect(datalist.locator('option[value="mock-provider/catalog-model-one"]')).toHaveCount(1);
+    await expect(datalist.locator('option[value="mock-provider/catalog-model-two"]')).toHaveCount(1);
+    // Still lists the curated suggestions — supplement, not replace.
+    await expect(datalist.locator('option[value="openai/gpt-5.4-mini"]')).toHaveCount(1);
+  });
+
   test('saving the workspace-wide default persists across reloads', async ({ page, localWorkerUrlKey }) => {
     await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
