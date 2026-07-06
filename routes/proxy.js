@@ -44,7 +44,7 @@ import { flattenIssue, neutralizeProject, flattenCycle, flattenRelations, decode
 import { createProxyFetch } from '../lib/proxy-fetch.js';
 import { isRecommendationEnabled, getRecommendation, getPaidEnvKey } from '../lib/openrouter.js';
 import { resolveRecommendation, describeDescent, armHopSignal } from '../lib/recommend-recurse.js';
-import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
+import { resolveWorkspaceModel, resolveDispatchDefaults } from '../lib/workspace-preferences.js';
 import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
 import { hashContext } from '../lib/recap-cache.js';
@@ -4381,10 +4381,28 @@ One convention across every endpoint, so you can branch on the same fields every
         });
       }
 
+      // Resolve blank incoming model/harness against the workspace's
+      // dispatchDefaults (LIN-1099, mirroring routes/dispatch.js's LIN-1094
+      // wiring): per-kind override -> workspace-wide default -> null. Each
+      // field resolves independently, and the lookup is skipped entirely when
+      // no store is wired or both fields are already set.
+      const effectiveKind = kind || deriveDispatchKind(promptName);
+      let resolvedModel = model || null;
+      let resolvedHarness = harness || null;
+      if ((!model || !harness) && workspacePreferencesStore) {
+        const defaults = await resolveDispatchDefaults({
+          urlKey: req.proxyUrlKey,
+          kind: effectiveKind,
+          store: workspacePreferencesStore
+        });
+        if (!model) resolvedModel = defaults.model;
+        if (!harness) resolvedHarness = defaults.harness;
+      }
+
       const item = await dispatchQueueStore.addItem(req.proxyUrlKey, {
         prompt: finalPrompt,
         promptName: promptName || 'Prompt',
-        kind: kind || deriveDispatchKind(promptName),
+        kind: effectiveKind,
         issueId: issueId || null,
         issueIdentifier: issueIdentifier || null,
         issueTitle: issueTitle || null,
@@ -4392,8 +4410,8 @@ One convention across every endpoint, so you can branch on the same fields every
         dispatchedBy: req.proxyCreatedBy || null,
         target: target || 'cli',
         repo: repo || null,
-        model: model || null,
-        harness: harness || null,
+        model: resolvedModel,
+        harness: resolvedHarness,
         followUpTo: followUpTo || null,
         force: force === true,
         abort: isAbort,
@@ -4591,6 +4609,21 @@ One convention across every endpoint, so you can branch on the same fields every
           });
         }
 
+        // Resolve blank incoming model/harness against the workspace's
+        // dispatchDefaults (LIN-1099, mirroring routes/dispatch.js's LIN-1094
+        // wiring). `kind` is already guaranteed set on this verb-override branch.
+        let resolvedModel = model || null;
+        let resolvedHarness = harness || null;
+        if ((!model || !harness) && workspacePreferencesStore) {
+          const defaults = await resolveDispatchDefaults({
+            urlKey: req.proxyUrlKey,
+            kind,
+            store: workspacePreferencesStore
+          });
+          if (!model) resolvedModel = defaults.model;
+          if (!harness) resolvedHarness = defaults.harness;
+        }
+
         try {
           const item = await dispatchQueueStore.addItem(req.proxyUrlKey, {
             prompt: finalPrompt,
@@ -4608,8 +4641,8 @@ One convention across every endpoint, so you can branch on the same fields every
             // Execution model + harness the runner passes to its CLI (LIN-438,
             // LIN-1084); opaque, forwarded blindly. null preserves the consumer
             // default.
-            model: model || null,
-            harness: harness || null,
+            model: resolvedModel,
+            harness: resolvedHarness,
             sessionId: sessionId || null,
             // Push-comms: `subscription` is the declared edge (LIN-900 §6),
             // `terminal-only` unless the caller declares `everything`; queueIfBusy
@@ -4733,10 +4766,27 @@ One convention across every endpoint, so you can branch on the same fields every
         // recommendedAction → deriveDispatchKind → BOTH the stored item's kind
         // and the response kind (same value); falls back to 'custom' when the
         // action can't be parsed.
+        const effectiveKind = deriveDispatchKind(rec.recommendedAction);
+
+        // Resolve blank incoming model/harness against the workspace's
+        // dispatchDefaults (LIN-1099, mirroring routes/dispatch.js's LIN-1094
+        // wiring).
+        let resolvedModel = model || null;
+        let resolvedHarness = harness || null;
+        if ((!model || !harness) && workspacePreferencesStore) {
+          const defaults = await resolveDispatchDefaults({
+            urlKey: req.proxyUrlKey,
+            kind: effectiveKind,
+            store: workspacePreferencesStore
+          });
+          if (!model) resolvedModel = defaults.model;
+          if (!harness) resolvedHarness = defaults.harness;
+        }
+
         const item = await dispatchQueueStore.addItem(req.proxyUrlKey, {
           prompt: finalPrompt,
           promptName: rec.recommendedAction || 'Prompt',
-          kind: deriveDispatchKind(rec.recommendedAction),
+          kind: effectiveKind,
           issueId: null,
           issueIdentifier: terminalIdentifier,
           issueTitle: null,
@@ -4751,8 +4801,8 @@ One convention across every endpoint, so you can branch on the same fields every
           // Execution model + harness the runner passes to its CLI (LIN-438,
           // LIN-1084); opaque, forwarded blindly. null preserves the consumer
           // default.
-          model: model || null,
-          harness: harness || null,
+          model: resolvedModel,
+          harness: resolvedHarness,
           sessionId: sessionId || null,
           // Opt-in completion hold (LIN-797), forwarded blindly to the runner.
           waitForFollowUps: waitForFollowUps === true,
