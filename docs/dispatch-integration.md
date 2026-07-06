@@ -277,6 +277,7 @@ and is the recommended pattern for any consumer that posts foreman status.
 | `target` | string | Dispatch target: `"cli"` (default), `"web"`, `"dash"`, or `"local"`. See [Target Routing](#target-routing) |
 | `repo` | string | Repository hint (e.g. `"owner/name"`) for the consumer to operate in, or `null` (nullable) |
 | `model` | string | **Execution** model the consumer should use to *run* this prompt (the value it passes to its own CLI, e.g. `claude --model`), or `null`. OpenRouter `provider/model` naming convention (e.g. `"anthropic/claude-opus-4.8"`). Opaque and forwarded blindly; `null` keeps the consumer's current default. See [Execution model](#execution-model-model) (nullable) |
+| `harness` | string | **Execution** harness the consumer should use to *run* this prompt (e.g. `"claude-code"`, `"opencode"`), or `null`. Opaque and forwarded blindly; `null` keeps the consumer's own default. See [Harness](#harness-harness) (nullable) |
 | `followUpTo` | string | The `id` of an earlier dispatch whose session this item should resume, or `null`. See [Follow-ups](#follow-ups) (nullable) |
 | `force` | boolean | When `true`, the consumer should **override a runner-side guard**: on a follow-up it resumes even a wedged/sleeping session; on a single abort it force-closes even a human-continued session. Defaults to `false`; meaningful only alongside `followUpTo` **or** a single `abort`, and never with `cascade`. See [Follow-ups](#follow-ups) / [Cascade close](#cascade-close-closing-a-session-subtree) |
 | `abort` | boolean | When `true`, this item asks the consumer to cancel/close an existing session (named by `abortTo`) instead of running a prompt. Defaults to `false`. See [Aborting a session](#aborting-a-session) |
@@ -532,6 +533,46 @@ Both dispatch write verbs accept `model`: `POST /api/dispatch` (user/UI) and, on
 `POST /api/proxy/dispatch` and `POST /api/proxy/recommend-and-dispatch`. Setting it per task
 is how an orchestrator routes cheaper models where they suffice (e.g. Sonnet for
 implementation, Opus for review).
+
+## Harness (`harness`)
+
+`harness` lets a dispatch specify **which harness the consumer/runner should use to *run* the
+prompt** — e.g. `"claude-code"` (the default in Simple Dispatcher today) or `"opencode"`
+(which can run any OpenRouter-backed model). It is optional and nullable; omit it (or send
+`null`) to keep the consumer's own default.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `harness` | string | No | Execution harness, e.g. `"claude-code"`, `"opencode"`. `null`/omitted ⇒ consumer default. |
+
+- **Opaque at the server boundary, same rigor as `model`.** The dispatch store records and
+  forwards `harness` verbatim. Validation is the same loose opaque-string check used for
+  `model` — a string within the length limit and free of dangerous control characters — via
+  the shared `validateOpaqueDispatchField` helper both fields route through. The server does
+  **not** enforce a harness registry; the consumer owns which harnesses it actually supports.
+- **Pairs with `model`.** A harness typically determines which models are even reachable —
+  e.g. `harness: "opencode"` combined with `model: "openrouter/<provider-model>"` runs a
+  specific OpenRouter-backed model through the OpenCode harness instead of the default
+  Claude Code harness:
+  ```json
+  {
+    "prompt": "...",
+    "harness": "opencode",
+    "model": "openrouter/anthropic/claude-opus-4.8"
+  }
+  ```
+- **No Harbour-side default tier.** Harbour does **not** interpose a per-workspace or
+  global default for `harness` (or `model`) — the dispatch payload value is the *only*
+  Harbour-side input. Omitting the field forwards `null`, and the consumer's own
+  payload → per-workspace-default → global-default precedence chain resolves it from there.
+  This keeps the two systems' defaulting logic from silently diverging: Harbour is a thin
+  pass-through, and the consumer owns resolution.
+- **Inert until the runner reads it.** A server-side `harness` is a no-op until the (external)
+  consumer reads `item.harness` and routes the prompt accordingly; a `null` value preserves
+  today's default behaviour, so existing runners are unaffected.
+
+Both dispatch write verbs accept `harness`, mirroring `model`: `POST /api/dispatch` (user/UI)
+and, on the proxy, `POST /api/proxy/dispatch` and `POST /api/proxy/recommend-and-dispatch`.
 
 ## Target Routing
 
