@@ -480,7 +480,7 @@ test.describe('Dispatch Queue', () => {
     expect(body.model).toBe('anthropic/claude-opus-4.8');
   });
 
-  test('blank exec controls omit model/harness from the dispatch payload', async ({ page }) => {
+  test('untouched exec controls send the pre-selected claude-code harness and omit model (LIN-1111)', async ({ page }) => {
     const promptContainer = await revealPrompt(page);
     await openDispatchOptions(promptContainer);
 
@@ -491,6 +491,22 @@ test.describe('Dispatch Queue', () => {
     const req = await dispatchReq;
     const body = JSON.parse(req.postData() || '{}');
     expect(body.model == null).toBe(true);
+    expect(body.harness).toBe('claude-code');
+  });
+
+  test('explicitly selecting the blank harness option still sends null (LIN-1111)', async ({ page }) => {
+    const promptContainer = await revealPrompt(page);
+    await openDispatchOptions(promptContainer);
+
+    const controls = promptContainer.locator('.dispatch-exec-controls');
+    await controls.locator('.dispatch-exec-harness-select').selectOption('');
+
+    const dispatchReq = page.waitForRequest(req =>
+      req.url().includes('/api/dispatch') && req.method() === 'POST');
+    await promptContainer.locator('.prompt-dispatch[data-target="cli"]').click();
+
+    const req = await dispatchReq;
+    const body = JSON.parse(req.postData() || '{}');
     expect(body.harness == null).toBe(true);
   });
 });

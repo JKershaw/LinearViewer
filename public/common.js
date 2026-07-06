@@ -409,6 +409,28 @@ window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
 // suggestion list is UI-only, not a registry.
 const DISPATCH_HARNESS_SUGGESTIONS = ['claude-code', 'opencode'];
 
+// UI-only default (LIN-1111): the harness select below pre-selects this value
+// so a user dispatching without touching the control explicitly sends
+// 'claude-code' instead of blank. This is purely client-side — it does not
+// touch routes/dispatch.js resolution or the null-passthrough contract for
+// consumers who bypass this UI (proxy/API omitting harness still means
+// "apply your own default" on the server).
+const DEFAULT_HARNESS = 'claude-code';
+
+// Small, distinctly-named recommended-models list for the dispatch-EXECUTION
+// model inputs (LIN-1111) — deliberately separate from AVAILABLE_MODELS in
+// lib/openrouter.js, which recommends models for the unrelated Workspace AI
+// Model selector (the model that WRITES prompts, not the one a dispatched
+// agent executes with). Rendered as <datalist> suggestions, not hard options,
+// so free text is still accepted and blank still resolves to null.
+const DISPATCH_MODEL_SUGGESTIONS = [
+  'anthropic/claude-sonnet-4.6',
+  'anthropic/claude-opus-4.8',
+  'openai/gpt-5.4-mini',
+  'openai/gpt-5.5',
+  'openai/gpt-5.5-pro'
+];
+
 /**
  * Renders the shared dispatch-time model/harness control markup: a harness
  * select-or-custom pair plus a free-text model input, scoped under one
@@ -419,13 +441,21 @@ const DISPATCH_HARNESS_SUGGESTIONS = ['claude-code', 'opencode'];
  * @param {Object} [opts]
  * @param {string} [opts.modelPlaceholder] - Placeholder for the model input (UX-only resolved-default hint, LIN-1096)
  * @param {string} [opts.harnessPlaceholder] - Placeholder for the harness custom input (UX-only resolved-default hint)
+ * @param {string} [opts.harnessDefault] - The workspace's actual resolved default harness, when the caller knows it (LIN-1111; only the Dispatch page threads this today, via data-default-harness). When given and it matches a known suggestion, it wins over the static DEFAULT_HARNESS so a configured non-Claude default (e.g. 'opencode') still pre-selects correctly instead of being silently shadowed. When given but NOT a known suggestion (a custom harness string), nothing is pre-selected — a `<select>` can't represent an arbitrary value, and auto-filling the custom text input would turn an untouched field into an explicit submission, defeating the point of leaving it blank.
  * @returns {string} HTML for the control pair
  */
 window.renderDispatchExecControls = function renderDispatchExecControls(idPrefix, opts = {}) {
-  const { modelPlaceholder = 'model', harnessPlaceholder = 'harness' } = opts;
+  const { modelPlaceholder = 'model', harnessPlaceholder = 'harness', harnessDefault } = opts;
   const prefix = window.escapeHtml(idPrefix || '');
+  const preselectedHarness = harnessDefault === undefined
+    ? DEFAULT_HARNESS
+    : (DISPATCH_HARNESS_SUGGESTIONS.includes(harnessDefault) ? harnessDefault : '');
   const optionsHtml = DISPATCH_HARNESS_SUGGESTIONS
-    .map(h => `<option value="${window.escapeHtml(h)}">${window.escapeHtml(h)}</option>`)
+    .map(h => `<option value="${window.escapeHtml(h)}"${h === preselectedHarness ? ' selected' : ''}>${window.escapeHtml(h)}</option>`)
+    .join('');
+  const modelListId = `dispatch-exec-model-list-${prefix}`;
+  const modelOptionsHtml = DISPATCH_MODEL_SUGGESTIONS
+    .map(m => `<option value="${window.escapeHtml(m)}"></option>`)
     .join('');
   return `<span class="dispatch-exec-controls" data-exec-prefix="${prefix}">
     <select class="dispatch-exec-harness-select" aria-label="Harness">
@@ -434,7 +464,8 @@ window.renderDispatchExecControls = function renderDispatchExecControls(idPrefix
     </select>
     <span class="dispatch-exec-or">or</span>
     <input type="text" class="dispatch-exec-harness-custom" maxlength="200" placeholder="${window.escapeHtml(harnessPlaceholder)}" aria-label="Custom harness">
-    <input type="text" class="dispatch-exec-model" maxlength="200" placeholder="${window.escapeHtml(modelPlaceholder)}" aria-label="Model">
+    <input type="text" class="dispatch-exec-model" maxlength="200" list="${modelListId}" placeholder="${window.escapeHtml(modelPlaceholder)}" aria-label="Model">
+    <datalist id="${modelListId}">${modelOptionsHtml}</datalist>
   </span>`;
 };
 
@@ -442,9 +473,12 @@ window.renderDispatchExecControls = function renderDispatchExecControls(idPrefix
  * Reads the current `{model, harness}` values back out of a container holding
  * a `.dispatch-exec-controls` block (or that block itself). A custom harness
  * value wins over the select (mirrors the settings page's dispatch-defaults
- * precedence, LIN-1095). Blank fields resolve to `null`, never `''`, so
- * `window.dispatchPrompt` omits them and the consumer's own default
- * resolution applies (LIN-1094).
+ * precedence, LIN-1095). The harness select pre-selects `claude-code`
+ * (LIN-1111), so an untouched control now reads back `harness: 'claude-code'`
+ * rather than null — pick the blank "—" option to still send null explicitly.
+ * The model field has no such default (only suggestions), so a blank model
+ * still resolves to `null`, and `window.dispatchPrompt` omits it so the
+ * consumer's own default resolution applies (LIN-1094).
  * @global
  * @param {Element|null} [scopeEl]
  * @returns {{model: string|null, harness: string|null}}

@@ -313,6 +313,56 @@ describe('renderSettingsPage — Dispatch defaults section (LIN-1095)', () => {
     assert.match(row, /name="kind__implementation__Model"[^>]*value=""/);
   });
 
+  describe('claude-code default + model suggestions (LIN-1111)', () => {
+    test('the workspace-wide row pre-selects claude-code when no harness is configured', () => {
+      const html = renderSettingsPage('Acme', BASE);
+      const rowStart = html.indexOf('data-testid="dispatch-default-row-default"');
+      const row = html.slice(rowStart, rowStart + 1200);
+      assert.match(row, /<option value="claude-code" selected>/);
+      assert.doesNotMatch(row, /<option value=""[^>]* selected>/);
+    });
+
+    test('an explicitly configured non-default workspace harness still wins over the pre-select', () => {
+      const html = renderSettingsPage('Acme', { ...BASE, dispatchDefaults: { harness: 'opencode' } });
+      const rowStart = html.indexOf('data-testid="dispatch-default-row-default"');
+      const row = html.slice(rowStart, rowStart + 1200);
+      assert.match(row, /<option value="opencode" selected>/);
+      assert.doesNotMatch(row, /<option value="claude-code" selected>/);
+    });
+
+    test('per-kind override rows do NOT pre-select claude-code when blank (blank must keep meaning "inherit")', () => {
+      const html = renderSettingsPage('Acme', BASE);
+      const rowStart = html.indexOf('data-testid="dispatch-default-row-implementation"');
+      const row = html.slice(rowStart, rowStart + 1200);
+      assert.doesNotMatch(row, /<option value="claude-code" selected>/);
+      assert.match(row, /<option value=""[^>]* selected>/);
+    });
+
+    test('renders a shared recommended-models datalist referenced by every model input', () => {
+      const html = renderSettingsPage('Acme', BASE);
+      assert.match(html, /<datalist id="dispatch-model-suggestions">/);
+      assert.match(html, /name="defaultModel"[^>]*list="dispatch-model-suggestions"/);
+      assert.match(html, /name="kind__implementation__Model"[^>]*list="dispatch-model-suggestions"/);
+    });
+  });
+
+  describe('per-type overrides progressive disclosure (LIN-1111)', () => {
+    test('collapses the 15 per-kind rows behind a closed <details> when none are configured', () => {
+      const html = renderSettingsPage('Acme', BASE);
+      const detailsIdx = html.indexOf('<details class="dispatch-kind-overrides">');
+      assert.ok(detailsIdx > -1, 'expected a closed <details class="dispatch-kind-overrides">');
+      assert.match(html, /data-testid="dispatch-kind-overrides-toggle"/);
+    });
+
+    test('auto-expands the <details> when at least one per-kind override is configured', () => {
+      const html = renderSettingsPage('Acme', {
+        ...BASE,
+        dispatchDefaults: { byKind: { implementation: { harness: 'claude-code' } } }
+      });
+      assert.match(html, /<details class="dispatch-kind-overrides" open>/);
+    });
+  });
+
   test('escapes a validation error message when dispatchDefaultsError is set', () => {
     const html = renderSettingsPage('Acme', { ...BASE, dispatchDefaultsError: 'invalid-field' });
     assert.match(html, /1000 characters or less/);

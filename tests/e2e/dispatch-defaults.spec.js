@@ -33,12 +33,39 @@ test.describe('Dispatch defaults settings', () => {
     const aiSection = page.locator('.settings-section', { has: page.locator('.settings-header:text-is("AI")') });
     await expect(aiSection.locator('[data-testid="settings-section-dispatch-defaults"]')).toHaveCount(0);
 
-    // Workspace-wide row plus spot-checked per-kind rows (bug is easy to miss —
-    // LIN-1094/this ticket's own count correction — and close-out is the newest kind).
+    // Workspace-wide row is visible up front; per-kind rows (bug is easy to
+    // miss — LIN-1094/this ticket's own count correction — and close-out is
+    // the newest kind) live behind the collapsed progressive-disclosure
+    // toggle (LIN-1111), so expand it first.
     await expect(section.locator('[data-testid="dispatch-default-row-default"]')).toBeVisible();
+    await page.locator('[data-testid="dispatch-kind-overrides-toggle"]').click();
     await expect(section.locator('[data-testid="dispatch-default-row-bug"]')).toBeVisible();
     await expect(section.locator('[data-testid="dispatch-default-row-implementation"]')).toBeVisible();
     await expect(section.locator('[data-testid="dispatch-default-row-close-out"]')).toBeVisible();
+  });
+
+  test('the 15 per-kind rows are collapsed behind a closed toggle until expanded (LIN-1111)', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.waitForLoadState('networkidle');
+
+    const details = page.locator('details.dispatch-kind-overrides');
+    const bugRow = page.locator('[data-testid="dispatch-default-row-bug"]');
+    await expect(details).not.toHaveJSProperty('open', true);
+    await expect(bugRow).not.toBeVisible();
+
+    await page.locator('[data-testid="dispatch-kind-overrides-toggle"]').click();
+    await expect(details).toHaveJSProperty('open', true);
+    await expect(bugRow).toBeVisible();
+  });
+
+  test('model inputs offer recommended suggestions via a shared datalist (LIN-1111)', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.waitForLoadState('networkidle');
+
+    const datalist = page.locator('#dispatch-model-suggestions');
+    await expect(datalist).toHaveCount(1);
+    await expect(datalist.locator('option')).not.toHaveCount(0);
+    await expect(page.locator('input[name="defaultModel"]')).toHaveAttribute('list', 'dispatch-model-suggestions');
   });
 
   test('saving the workspace-wide default persists across reloads', async ({ page, localWorkerUrlKey }) => {
@@ -63,6 +90,9 @@ test.describe('Dispatch defaults settings', () => {
     await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
 
+    // Per-kind rows live behind the collapsed progressive-disclosure toggle
+    // (LIN-1111) until expanded.
+    await page.locator('[data-testid="dispatch-kind-overrides-toggle"]').click();
     const row = page.locator('[data-testid="dispatch-default-row-implementation"]');
     await row.locator('input.dispatch-model-input').fill('anthropic/claude-sonnet-5');
     await row.locator('input.harness-input').fill('my-custom-harness');
@@ -81,6 +111,36 @@ test.describe('Dispatch defaults settings', () => {
     const reloadedRow = page.locator('[data-testid="dispatch-default-row-implementation"]');
     await expect(reloadedRow.locator('input.dispatch-model-input')).toHaveValue('anthropic/claude-sonnet-5');
     await expect(reloadedRow.locator('input.harness-input')).toHaveValue('my-custom-harness');
+  });
+
+  test('the workspace-wide harness select pre-selects claude-code when unconfigured (LIN-1111)', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('select[name="defaultHarnessSelect"]')).toHaveValue('claude-code');
+  });
+
+  test('per-kind override rows leave their harness select blank (inherit) even though the workspace-wide row pre-selects claude-code (LIN-1111)', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.waitForLoadState('networkidle');
+    const row = page.locator('[data-testid="dispatch-default-row-implementation"]');
+    await expect(row.locator('select.harness-select')).toHaveValue('');
+  });
+
+  test('saving a per-kind-only change also persists the pre-selected claude-code workspace default (LIN-1111, expected consequence of the shared form)', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.waitForLoadState('networkidle');
+
+    await page.locator('[data-testid="dispatch-kind-overrides-toggle"]').click();
+    const row = page.locator('[data-testid="dispatch-default-row-implementation"]');
+    await row.locator('input.dispatch-model-input').fill('anthropic/claude-sonnet-5');
+    await page.locator('.dispatch-defaults-submit button[type="submit"]').click();
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('select[name="defaultHarnessSelect"]')).toHaveValue('claude-code');
+
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('select[name="defaultHarnessSelect"]')).toHaveValue('claude-code');
   });
 
   test('rejects an oversized field and does not persist it', async ({ page, localWorkerUrlKey }) => {
