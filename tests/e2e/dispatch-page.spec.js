@@ -507,7 +507,7 @@ test.describe('Dispatch Page', () => {
       expect(item.model).toBe('openrouter/anthropic/claude-opus-4.8');
     });
 
-    test('leaving both fields blank sends null for model and harness', async ({ page }) => {
+    test('leaving both fields untouched sends the pre-selected claude-code harness and null model (LIN-1111)', async ({ page }) => {
       await page.locator('.dispatch-prompt-input').fill('Blank exec controls test');
       const dispatchBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
       await dispatchBtn.click();
@@ -516,8 +516,21 @@ test.describe('Dispatch Page', () => {
       const listResponse = await page.request.get(`${API_PREFIX}/api/dispatch`);
       const { items } = await listResponse.json();
       const item = items.find(i => i.prompt === 'Blank exec controls test');
-      expect(item.harness).toBeNull();
+      expect(item.harness).toBe('claude-code');
       expect(item.model).toBeNull();
+    });
+
+    test('explicitly selecting the blank harness option still sends null (LIN-1111)', async ({ page }) => {
+      await page.locator('.dispatch-prompt-input').fill('Explicit blank harness test');
+      await page.locator('.dispatch-exec-harness-select').selectOption('');
+      const dispatchBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
+      await dispatchBtn.click();
+      await expect(dispatchBtn).toHaveText('dispatched!');
+
+      const listResponse = await page.request.get(`${API_PREFIX}/api/dispatch`);
+      const { items } = await listResponse.json();
+      const item = items.find(i => i.prompt === 'Explicit blank harness test');
+      expect(item.harness).toBeNull();
     });
 
     test('a custom harness value wins over the select', async ({ page }) => {

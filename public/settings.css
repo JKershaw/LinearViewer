@@ -219,6 +219,21 @@
   display: block;
 }
 
+/* Progressive disclosure for the 15 per-kind override rows (LIN-1111) —
+   collapsed by default (auto-expanded server-side when a row already has an
+   override, see renderDispatchDefaultsSection), so the common case of "just
+   set the workspace default" isn't buried under 15 rarely-touched rows. */
+.dispatch-kind-overrides-summary {
+  cursor: pointer;
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  color: var(--fg);
+}
+
+.dispatch-kind-overrides .children {
+  margin-top: var(--space-2);
+}
+
 .dispatch-defaults-submit {
   margin-top: var(--space-3);
 }
