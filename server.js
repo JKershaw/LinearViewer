@@ -100,6 +100,8 @@ import { renderProxyPage } from './lib/render-proxy.js'
 import { AVAILABLE_MODELS, setLlmCallRecorder, setPromptTraceRecorder, getPaidEnvKey, hasPaidEnvKey } from './lib/openrouter.js'
 import { resolveWorkspaceModel, getWorkspaceFeatures, isWorkspaceFeatureEnabled, setWorkspaceFeature } from './lib/workspace-preferences.js'
 import { getFeatureFlags, isValidFeatureKey, isValidWorkspaceFeatureKey, WORKSPACE_FEATURES } from './lib/feature-defaults.js'
+import { PROMPT_TEMPLATES } from './lib/prompt-template-defs.js'
+import { validateOpaqueDispatchField, MAX_NAME_LENGTH } from './lib/dispatch-validation.js'
 
 // =============================================================================
 // Environment Variable Validation
@@ -1731,6 +1733,16 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
   }));
   const providerNotice = providerNoticeFromQuery(req.query);
 
+  // Dispatch model/harness defaults (LIN-1095): the model/harness dispatched
+  // agents execute WITH, distinct from currentModel above (which writes
+  // prompts). Own read of workspacePreferencesStore — currentModel/
+  // workspaceFeatures above already read it via their own established helpers
+  // (resolveWorkspaceModel/getWorkspaceFeatures, used at ~20 other call sites),
+  // so this stays a separate, targeted read rather than reshaping those.
+  const dispatchDefaultsPrefs = await workspacePreferencesStore.getWorkspacePreferences(workspace.urlKey);
+  const dispatchDefaults = dispatchDefaultsPrefs.dispatchDefaults || {};
+  const dispatchDefaultsError = req.query.dispatchDefaultsError || null;
+
   const html = renderSettingsPage(workspace.name || 'Workspace', {
     openRouterConnected: !!(openRouterSource === 'oauth' || openRouterSource === 'env'),
     openRouterSource,
@@ -1745,6 +1757,8 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
     llmStats,
     providerBindings,
     providerNotice,
+    dispatchDefaults,
+    dispatchDefaultsError,
     // Gate the GitHub add affordance on the SAME shared predicate the /auth/github
     // route guard and landing hero use (LIN-761), so the settings page never offers
     // an add that would 503/hang on a server where GitHub isn't fully configured.
@@ -1923,6 +1937,82 @@ app.post('/workspace/:urlKey/settings/model', workspaceFromUrl, async (req, res)
   }
 
   res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
+});
+
+/**
+ * Save workspace-wide + per-prompt-type dispatch model/harness defaults (LIN-1095).
+ * Distinct from /settings/model above: that selects the model used to WRITE
+ * prompts; this selects the model/harness dispatched agents EXECUTE with,
+ * consumed at dispatch time via resolveDispatchDefaults() (LIN-1094). Both
+ * fields stay opaque strings (no registry), validated with the same shared
+ * validateOpaqueDispatchField() the dispatch/proxy routes use (LIN-1084).
+ * Persists via the same read-merge-write discipline as /settings/model so
+ * dispatchDefaults never clobbers modelId/features.
+ */
+app.post('/workspace/:urlKey/settings/dispatch-defaults', workspaceFromUrl, async (req, res) => {
+  const workspace = req.workspace;
+  const settingsUrl = `/workspace/${encodeURIComponent(workspace.urlKey)}/settings`;
+
+  const readField = (key) => (req.body[key] || '').trim() || undefined;
+  const readHarness = (selectKey, customKey) => {
+    const custom = (req.body[customKey] || '').trim();
+    const select = (req.body[selectKey] || '').trim();
+    return custom || select || undefined;
+  };
+
+  let hasFieldError = false;
+  const validate = (value, name) => {
+    if (validateOpaqueDispatchField(value, name, { maxLength: MAX_NAME_LENGTH })) {
+      hasFieldError = true;
+    }
+  };
+
+  const model = readField('defaultModel');
+  const harness = readHarness('defaultHarnessSelect', 'defaultHarnessCustom');
+  validate(model, 'model');
+  validate(harness, 'harness');
+
+  // byKind is scoped to live PROMPT_TEMPLATES keys only, both by only ever
+  // reading these specific field names (any other posted field is simply
+  // never looked at) and defensively at read time in resolveDispatchDefaults.
+  const byKind = {};
+  for (const kind of Object.keys(PROMPT_TEMPLATES)) {
+    const kindModel = readField(`kind__${kind}__Model`);
+    const kindHarness = readHarness(`kind__${kind}__HarnessSelect`, `kind__${kind}__HarnessCustom`);
+    validate(kindModel, 'model');
+    validate(kindHarness, 'harness');
+    if (kindModel || kindHarness) {
+      byKind[kind] = {};
+      if (kindModel) byKind[kind].model = kindModel;
+      if (kindHarness) byKind[kind].harness = kindHarness;
+    }
+  }
+
+  if (hasFieldError) {
+    return res.redirect(`${settingsUrl}?dispatchDefaultsError=invalid-field`);
+  }
+
+  const dispatchDefaults = {};
+  if (model) dispatchDefaults.model = model;
+  if (harness) dispatchDefaults.harness = harness;
+  if (Object.keys(byKind).length) dispatchDefaults.byKind = byKind;
+
+  try {
+    const existingPrefs = await workspacePreferencesStore.getWorkspacePreferences(workspace.urlKey);
+    const ok = await workspacePreferencesStore.saveWorkspacePreferences(workspace.urlKey, {
+      ...existingPrefs,
+      dispatchDefaults
+    });
+    if (!ok) throw new Error('saveWorkspacePreferences returned false');
+  } catch (err) {
+    console.error('Failed to save workspace dispatch defaults:', err);
+    return res.status(500).send(renderErrorPage('Settings Error', 'Failed to save dispatch defaults. Please try again.', {
+      action: 'Back to settings',
+      actionUrl: settingsUrl
+    }));
+  }
+
+  res.redirect(settingsUrl);
 });
 
 /**
