@@ -23,6 +23,7 @@ import os from 'os';
 import { spawnClaudeSession } from '../lib/harbour-spawn.js';
 import { isValidDispatchKind, deriveDispatchKind, DISPATCH_KINDS } from '../lib/prompt-templates.js';
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
+import { validateOpaqueDispatchField } from '../lib/dispatch-validation.js';
 
 // Directory for Harbour OS dispatch prompt staging files. The OS tmp dir is
 // shared between the Node server and the Harbour OS terminal that reads the
@@ -196,7 +197,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const { workspace } = req;
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, followUpTo, force, abort, abortTo, cascade, sessionId, waitForFollowUps, queueIfBusy, subscription } = req.body;
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, harness, followUpTo, force, abort, abortTo, cascade, sessionId, waitForFollowUps, queueIfBusy, subscription } = req.body;
 
       // Abort verb (LIN-743): an abort item asks the consumer to cancel/close an
       // existing session (named by abortTo) instead of running a prompt, so it
@@ -302,16 +303,19 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       if (repo && repo.length > MAX_NAME_LENGTH) {
         return badRequest.json(res, `repo exceeds maximum length of ${MAX_NAME_LENGTH}`);
       }
-      // Execution model (LIN-438): validated like `repo` — opaque string, length +
-      // dangerous-chars only. Deliberately NOT validated against a model registry
-      // (openrouter AVAILABLE_MODELS is the generation-model namespace; this is the
-      // consumer's execution-model namespace, which may include models the server
-      // doesn't enumerate). Wire convention is OpenRouter-style provider/model.
-      if (model && typeof model !== 'string') {
-        return badRequest.json(res, 'model must be a string');
+      // Execution model + harness (LIN-438, LIN-1084): opaque strings, validated
+      // via the shared helper (type/length/dangerous-chars only). Deliberately
+      // NOT validated against a model registry (openrouter AVAILABLE_MODELS is
+      // the generation-model namespace; these are the consumer's execution-model/
+      // harness namespace, which may include values the server doesn't enumerate).
+      // Wire convention for `model` is OpenRouter-style provider/model.
+      const modelValidationError = validateOpaqueDispatchField(model, 'model', { maxLength: MAX_NAME_LENGTH });
+      if (modelValidationError) {
+        return badRequest.json(res, modelValidationError.error);
       }
-      if (model && model.length > MAX_NAME_LENGTH) {
-        return badRequest.json(res, `model exceeds maximum length of ${MAX_NAME_LENGTH}`);
+      const harnessValidationError = validateOpaqueDispatchField(harness, 'harness', { maxLength: MAX_NAME_LENGTH });
+      if (harnessValidationError) {
+        return badRequest.json(res, harnessValidationError.error);
       }
 
       // Reject null bytes and dangerous control characters
@@ -326,9 +330,6 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       }
       if (repo && DANGEROUS_CHARS_REGEX.test(repo)) {
         return badRequest.json(res, 'repo contains invalid characters');
-      }
-      if (model && DANGEROUS_CHARS_REGEX.test(model)) {
-        return badRequest.json(res, 'model contains invalid characters');
       }
 
       // Validate issueId format if provided
@@ -411,6 +412,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         target: target || 'cli',
         repo: repo || null,
         model: model || null,
+        harness: harness || null,
         followUpTo: followUpTo || null,
         force: force === true,
         abort: isAbort,

@@ -61,6 +61,7 @@ async function call(app, method, path, body) {
 
 const PATH = '/workspace/acme/api/dispatch';
 const MODEL = 'anthropic/claude-opus-4.8';
+const HARNESS = 'opencode';
 
 describe('LIN-438 — user-facing /api/dispatch carries the execution model', () => {
   test('an explicit model is forwarded to the dispatch item', async () => {
@@ -103,5 +104,79 @@ describe('LIN-438 — user-facing /api/dispatch carries the execution model', ()
 
     assert.equal(res.status, 400, `expected 400, got ${res.status}: ${JSON.stringify(res.body)}`);
     assert.match(res.body.error, /model contains invalid characters/);
+  });
+
+  // Beat-2 planning found this router previously accepted `model: 0` silently
+  // as absent (`if (model && ...)` short-circuits on a falsy value), while
+  // routes/proxy.js rejected it. Now routed through the shared validator, so
+  // this falsy-non-string case is rejected here too.
+  test('model: 0 (a falsy non-string) is rejected with 400 — the fixed divergence', async () => {
+    const app = buildApp({});
+    const res = await call(app, 'post', PATH, { prompt: 'run me', model: 0 });
+
+    assert.equal(res.status, 400, `expected 400, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.match(res.body.error, /model must be a string/);
+  });
+});
+
+describe('LIN-1084 — user-facing /api/dispatch carries the execution harness', () => {
+  test('an explicit harness is forwarded to the dispatch item', async () => {
+    const captured = {};
+    const app = buildApp(captured);
+    const res = await call(app, 'post', PATH, { prompt: 'run me', harness: HARNESS });
+
+    assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.equal(captured.item.harness, HARNESS);
+  });
+
+  test('an omitted harness becomes null', async () => {
+    const captured = {};
+    const app = buildApp(captured);
+    const res = await call(app, 'post', PATH, { prompt: 'run me' });
+
+    assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.strictEqual(captured.item.harness, null);
+  });
+
+  test('a non-string harness is rejected with 400', async () => {
+    const app = buildApp({});
+    const res = await call(app, 'post', PATH, { prompt: 'run me', harness: 42 });
+
+    assert.equal(res.status, 400, `expected 400, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.match(res.body.error, /harness must be a string/);
+  });
+
+  test('an over-length harness is rejected with 400', async () => {
+    const app = buildApp({});
+    const res = await call(app, 'post', PATH, { prompt: 'run me', harness: 'x'.repeat(1001) });
+
+    assert.equal(res.status, 400, `expected 400, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.match(res.body.error, /harness exceeds maximum length/);
+  });
+
+  test('a harness with dangerous control characters is rejected with 400', async () => {
+    const app = buildApp({});
+    const res = await call(app, 'post', PATH, { prompt: 'run me', harness: 'opencode\x00' });
+
+    assert.equal(res.status, 400, `expected 400, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.match(res.body.error, /harness contains invalid characters/);
+  });
+
+  test('harness: 0 (a falsy non-string) is rejected with 400', async () => {
+    const app = buildApp({});
+    const res = await call(app, 'post', PATH, { prompt: 'run me', harness: 0 });
+
+    assert.equal(res.status, 400, `expected 400, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.match(res.body.error, /harness must be a string/);
+  });
+
+  test('model and harness are forwarded together', async () => {
+    const captured = {};
+    const app = buildApp(captured);
+    const res = await call(app, 'post', PATH, { prompt: 'run me', model: MODEL, harness: HARNESS });
+
+    assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.equal(captured.item.model, MODEL);
+    assert.equal(captured.item.harness, HARNESS);
   });
 });
