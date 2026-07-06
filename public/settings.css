@@ -154,6 +154,76 @@
 }
 
 /* =============================================================================
+   Dispatch defaults (LIN-1095)
+
+   The workspace-wide row + ~15 per-prompt-type override rows are structurally
+   identical to the model selector (select + "or" + custom input) and reuse
+   .model-or, but use their OWN control classes rather than .model-select/
+   .model-input — those are strict single-element selectors elsewhere
+   (e.g. tests/e2e/settings.spec.js's model pricing test), and this section
+   renders 16 of these controls on the same page.
+   ============================================================================= */
+.dispatch-default-row {
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.dispatch-default-row .field-label {
+  min-width: 14ch;
+}
+
+.harness-select,
+.dispatch-model-input {
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--fg-vdim);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.harness-select {
+  min-width: 12ch;
+}
+
+.harness-input {
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--fg-vdim);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+  min-width: 12ch;
+}
+
+.harness-select:focus,
+.harness-input:focus,
+.dispatch-model-input:focus {
+  outline: none;
+  border-color: var(--blue);
+}
+
+.harness-input::placeholder,
+.dispatch-model-input::placeholder {
+  color: var(--fg-dim);
+}
+
+.dispatch-model-input {
+  min-width: 20ch;
+  flex: 1 1 20ch;
+}
+
+.dispatch-defaults-form {
+  display: block;
+}
+
+.dispatch-defaults-submit {
+  margin-top: var(--space-3);
+}
+
+/* =============================================================================
    Feature Toggles
    ============================================================================= */
 .feature-toggle {
@@ -286,6 +356,12 @@
 
   .model-select,
   .model-input {
+    min-width: 100%;
+  }
+
+  .harness-select,
+  .harness-input,
+  .dispatch-model-input {
     min-width: 100%;
   }
 

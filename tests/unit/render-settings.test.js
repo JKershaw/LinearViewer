@@ -7,6 +7,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { renderSettingsPage } from '../../lib/render-settings.js';
 import { AVAILABLE_MODELS } from '../../lib/openrouter.js';
+import { PROMPT_TEMPLATES } from '../../lib/prompt-template-defs.js';
 
 const BASE = { urlKey: 'acme', workspaces: [], currentModel: 'openai/gpt-5.4-mini', availableModels: [] };
 
@@ -244,5 +245,94 @@ describe('renderSettingsPage — Providers section (LIN-634)', () => {
     const bindingRow = html.slice(html.indexOf('settings-provider-binding'));
     const rowEnd = bindingRow.indexOf('</div>\n          </div>');
     assert.doesNotMatch(bindingRow.slice(0, rowEnd > 0 ? rowEnd : 600), /data-feature=/);
+  });
+});
+
+describe('renderSettingsPage — Dispatch defaults section (LIN-1095)', () => {
+  test('always renders the section header as a sibling of the AI section', () => {
+    const html = renderSettingsPage('Acme', BASE);
+    assert.match(html, /data-testid="settings-section-dispatch-defaults"/);
+    assert.match(html, />Dispatch defaults</);
+    // Two independent <section> blocks, not one nested inside the other.
+    const aiIdx = html.indexOf('data-testid="settings-section-ai"');
+    const ddIdx = html.indexOf('data-testid="settings-section-dispatch-defaults"');
+    const aiSectionEnd = html.indexOf('</section>', aiIdx);
+    assert.ok(aiIdx > -1 && ddIdx > -1 && aiSectionEnd > -1);
+    assert.ok(ddIdx > aiSectionEnd, 'dispatch-defaults section must not be nested inside the AI section');
+  });
+
+  test('renders one row for the workspace-wide default plus one per live PROMPT_TEMPLATES key', () => {
+    const html = renderSettingsPage('Acme', BASE);
+    assert.match(html, /data-testid="dispatch-default-row-default"/);
+    for (const kind of Object.keys(PROMPT_TEMPLATES)) {
+      assert.match(html, new RegExp(`data-testid="dispatch-default-row-${kind}"`), `missing row for kind "${kind}"`);
+    }
+    // 15 live keys today (LIN-1095's own correction: `bug` is easy to omit).
+    assert.ok('bug' in PROMPT_TEMPLATES);
+    assert.equal(Object.keys(PROMPT_TEMPLATES).length, 15);
+  });
+
+  test('populates the workspace-wide row from dispatchDefaults.model/harness', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      dispatchDefaults: { model: 'anthropic/claude-opus-4.8', harness: 'opencode' }
+    });
+    assert.match(html, /name="defaultModel"[^>]*value="anthropic\/claude-opus-4\.8"/);
+    assert.match(html, /name="defaultHarnessSelect"[^>]*>[\s\S]*?<option value="opencode" selected>/);
+  });
+
+  test('a custom (non-suggested) harness value renders in the custom text input, not the select', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      dispatchDefaults: { harness: 'my-bespoke-harness' }
+    });
+    assert.match(html, /name="defaultHarnessCustom"[^>]*value="my-bespoke-harness"/);
+    assert.doesNotMatch(html, /<option value="my-bespoke-harness"/);
+  });
+
+  test('populates a per-kind override row from dispatchDefaults.byKind', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      dispatchDefaults: {
+        byKind: { implementation: { model: 'anthropic/claude-sonnet-5', harness: 'claude-code' } }
+      }
+    });
+    const rowStart = html.indexOf('data-testid="dispatch-default-row-implementation"');
+    const row = html.slice(rowStart, rowStart + 1200);
+    assert.match(row, /name="kind__implementation__Model"[^>]*value="anthropic\/claude-sonnet-5"/);
+    assert.match(row, /<option value="claude-code" selected>/);
+  });
+
+  test('a kind with no override renders blank (inherits workspace default)', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      dispatchDefaults: { model: 'anthropic/claude-opus-4.8', byKind: {} }
+    });
+    const rowStart = html.indexOf('data-testid="dispatch-default-row-implementation"');
+    const row = html.slice(rowStart, rowStart + 1200);
+    assert.match(row, /name="kind__implementation__Model"[^>]*value=""/);
+  });
+
+  test('escapes a validation error message when dispatchDefaultsError is set', () => {
+    const html = renderSettingsPage('Acme', { ...BASE, dispatchDefaultsError: 'invalid-field' });
+    assert.match(html, /1000 characters or less/);
+  });
+
+  test('does not render an error line when dispatchDefaultsError is absent', () => {
+    const html = renderSettingsPage('Acme', BASE);
+    const ddIdx = html.indexOf('data-testid="settings-section-dispatch-defaults"');
+    const section = html.slice(ddIdx, ddIdx + 400);
+    assert.doesNotMatch(section, /settings-value error/);
+  });
+
+  test('the section submits through a single form to the dispatch-defaults route', () => {
+    const html = renderSettingsPage('Acme', BASE);
+    const formCount = (html.match(/class="settings-form dispatch-defaults-form"/g) || []).length;
+    assert.equal(formCount, 1);
+    assert.match(html, /action="\/workspace\/acme\/settings\/dispatch-defaults" method="POST"/);
+  });
+
+  test('does not throw when dispatchDefaults is omitted', () => {
+    assert.doesNotThrow(() => renderSettingsPage('Acme', BASE));
   });
 });
