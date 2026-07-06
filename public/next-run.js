@@ -126,10 +126,13 @@
         t.target + '" data-goal="' + safeGoal + '">' + escapeHtml(t.label) + '</button>';
     }).join('');
 
+    // Shared model/harness exec controls (LIN-1096) — window.renderDispatchExecControls, common.js.
+    var execControlsHtml = window.renderDispatchExecControls(panelId + '-exec');
+
     wrap.innerHTML =
       '<button type="button" class="dispatch-disclosure disclosure-toggle next-run-dispatch-toggle" ' +
       'aria-expanded="false" aria-haspopup="true" aria-controls="' + panelId + '">Dispatch ▾</button>' +
-      '<span class="prompt-options hidden" id="' + panelId + '">' + btns + '</span>';
+      '<span class="prompt-options hidden" id="' + panelId + '">' + execControlsHtml + btns + '</span>';
     return wrap;
   }
 
@@ -147,6 +150,8 @@
     var target = btn.getAttribute('data-target') || 'cli';
     var goal = btn.getAttribute('data-goal') || '';
     var original = btn.textContent;
+    // Exec controls (LIN-1096) live inside this button's own dispatch options panel.
+    var exec = window.readDispatchExecControls(btn.closest('.prompt-options'));
     btn.disabled = true;
     btn.textContent = 'sending…';
     var query = goal ? '?goal=' + encodeURIComponent(goal) : '';
@@ -160,7 +165,9 @@
               promptName: kickoff.promptName || 'Autopilot',
               kind: kickoff.kind || 'autopilot',
               issueless: true,
-              target: target
+              target: target,
+              model: exec.model,
+              harness: exec.harness
             });
           });
       })

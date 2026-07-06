@@ -561,18 +561,34 @@ prompt** — e.g. `"claude-code"` (the default in Simple Dispatcher today) or `"
     "model": "openrouter/anthropic/claude-opus-4.8"
   }
   ```
-- **No Harbour-side default tier.** Harbour does **not** interpose a per-workspace or
-  global default for `harness` (or `model`) — the dispatch payload value is the *only*
-  Harbour-side input. Omitting the field forwards `null`, and the consumer's own
-  payload → per-workspace-default → global-default precedence chain resolves it from there.
-  This keeps the two systems' defaulting logic from silently diverging: Harbour is a thin
-  pass-through, and the consumer owns resolution.
+- **Harbour-side default tier (LIN-1094).** Harbour resolves a blank incoming `model`/
+  `harness` against workspace-configured dispatch defaults (Settings → Dispatch defaults)
+  before the item ever reaches the queue: a per-prompt-`kind` override wins, then the
+  workspace-wide default, then `null` — each field resolved independently. With no defaults
+  configured this is byte-identical to the prior pass-through behaviour. The consumer's own
+  payload → per-workspace-default → global-default precedence chain still applies on top of
+  whatever value Harbour hands it (including `null`) — the two tiers compose rather than
+  conflict.
 - **Inert until the runner reads it.** A server-side `harness` is a no-op until the (external)
   consumer reads `item.harness` and routes the prompt accordingly; a `null` value preserves
   today's default behaviour, so existing runners are unaffected.
 
 Both dispatch write verbs accept `harness`, mirroring `model`: `POST /api/dispatch` (user/UI)
 and, on the proxy, `POST /api/proxy/dispatch` and `POST /api/proxy/recommend-and-dispatch`.
+
+## Dispatch-time UI (model/harness)
+
+Every user-facing surface that can dispatch a prompt exposes the same `model`/`harness`
+controls (LIN-1096) — a harness select-or-custom pair plus a free-text model input — so a
+one-off override doesn't require a trip through Settings first: the Dispatch page, the
+dashboard tree's per-task Dispatch disclosure, the shared prompt-compose section (Swipe),
+and the Suggested-next-run accept flow. Leaving both fields blank omits them from the
+payload entirely, so the Harbour-side default tier above (and then the consumer's own
+defaulting) applies exactly as if the fields were never shown. Where a workspace-wide
+default is already resolved server-side (currently: the Dispatch page), the controls'
+placeholder text names it, so blank visibly means "inherit" rather than "no opinion". The
+session follow-up reply box and Collective's fan-out carry no dedicated control — they
+inherit the same server-side default resolution automatically.
 
 ## Target Routing
 

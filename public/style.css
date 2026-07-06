@@ -2332,6 +2332,60 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   cursor: not-allowed;
 }
 
+/* =============================================================================
+   Dispatch Execution Controls (model/harness) — LIN-1096
+
+   Shared across every dispatch-time surface (Dispatch page, dashboard tree,
+   prompt-compose section, Suggested-next-run) via window.renderDispatchExecControls
+   (public/common.js) — this is the one stylesheet all four surfaces load.
+   Mirrors the settings page's dispatch-defaults control shape (settings.css,
+   LIN-1095) with its own class names, since settings.css isn't loaded here.
+   ============================================================================= */
+.dispatch-exec-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+}
+
+.dispatch-exec-harness-select,
+.dispatch-exec-harness-custom,
+.dispatch-exec-model {
+  font-family: var(--font-content);
+  font-size: 0.8em;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid var(--fg-vdim);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.dispatch-exec-harness-select,
+.dispatch-exec-harness-custom {
+  min-width: 9ch;
+}
+
+.dispatch-exec-model {
+  min-width: 12ch;
+}
+
+.dispatch-exec-or {
+  color: var(--fg-dim);
+  font-size: 0.75em;
+}
+
+.dispatch-exec-harness-select:focus,
+.dispatch-exec-harness-custom:focus,
+.dispatch-exec-model:focus {
+  outline: none;
+  border-color: var(--blue);
+}
+
+.dispatch-exec-harness-custom::placeholder,
+.dispatch-exec-model::placeholder {
+  color: var(--fg-dim);
+}
+
 /* Prompt text - monospace, preserves formatting */
 .prompt-text {
   font-family: var(--font-structural);

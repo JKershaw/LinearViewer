@@ -98,7 +98,7 @@ import { renderRoadmapPage } from './lib/render-roadmap.js'
 import { buildRoadmapModel } from './lib/roadmap.js'
 import { renderProxyPage } from './lib/render-proxy.js'
 import { AVAILABLE_MODELS, setLlmCallRecorder, setPromptTraceRecorder, getPaidEnvKey, hasPaidEnvKey } from './lib/openrouter.js'
-import { resolveWorkspaceModel, getWorkspaceFeatures, isWorkspaceFeatureEnabled, setWorkspaceFeature } from './lib/workspace-preferences.js'
+import { resolveWorkspaceModel, getWorkspaceFeatures, isWorkspaceFeatureEnabled, setWorkspaceFeature, resolveDispatchDefaults } from './lib/workspace-preferences.js'
 import { getFeatureFlags, isValidFeatureKey, isValidWorkspaceFeatureKey, WORKSPACE_FEATURES } from './lib/feature-defaults.js'
 import { PROMPT_TEMPLATES } from './lib/prompt-template-defs.js'
 import { validateOpaqueDispatchField, MAX_NAME_LENGTH } from './lib/dispatch-validation.js'
@@ -1843,6 +1843,16 @@ app.get('/workspace/:urlKey/dispatch', workspaceFromUrl, async (req, res) => {
 
   const isLocalhost = ['localhost', '127.0.0.1'].some(h => req.get('host')?.startsWith(h));
 
+  // Workspace-wide dispatch defaults (LIN-1094), used only for the model/harness
+  // placeholder nicety (LIN-1096) — non-load-bearing, so a failed read just
+  // leaves the controls with generic placeholders.
+  let dispatchDefaults = { model: null, harness: null };
+  try {
+    dispatchDefaults = await resolveDispatchDefaults({ urlKey: workspace.urlKey, store: workspacePreferencesStore });
+  } catch (e) {
+    // Non-fatal
+  }
+
   const html = renderDispatchPage(workspace.name || 'Workspace', {
     deployInfo,
     urlKey: workspace.urlKey,
@@ -1850,7 +1860,8 @@ app.get('/workspace/:urlKey/dispatch', workspaceFromUrl, async (req, res) => {
     workspaces: req.session.workspaces,
     featureFlags,
     projectRepos,
-    isLocalhost
+    isLocalhost,
+    dispatchDefaults
   });
   res.send(html);
 });

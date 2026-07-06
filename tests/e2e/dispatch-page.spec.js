@@ -474,6 +474,68 @@ test.describe('Dispatch Page', () => {
     });
   });
 
+  test.describe('Model/Harness Exec Controls (LIN-1096)', () => {
+    test.beforeEach(async ({ page }) => {
+      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true }, urlKey: WS });
+      await page.goto(`/test/clear-dispatch-queue?urlKey=${WS}`);
+      await page.goto(DISPATCH_URL);
+      await page.waitForLoadState('networkidle');
+      await page.locator('.dispatch-toggle').click();
+    });
+
+    test('exec controls render in the Send Prompt section', async ({ page }) => {
+      const controls = page.locator('.dispatch-exec-controls');
+      await expect(controls).toBeVisible();
+      await expect(controls.locator('.dispatch-exec-harness-select')).toBeVisible();
+      await expect(controls.locator('.dispatch-exec-harness-custom')).toBeVisible();
+      await expect(controls.locator('.dispatch-exec-model')).toBeVisible();
+    });
+
+    test('dispatching with a selected harness and typed model sends both fields', async ({ page }) => {
+      await page.locator('.dispatch-prompt-input').fill('Exec controls test');
+      await page.locator('.dispatch-exec-harness-select').selectOption('opencode');
+      await page.locator('.dispatch-exec-model').fill('openrouter/anthropic/claude-opus-4.8');
+
+      const dispatchBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
+      await dispatchBtn.click();
+      await expect(dispatchBtn).toHaveText('dispatched!');
+
+      const listResponse = await page.request.get(`${API_PREFIX}/api/dispatch`);
+      const { items } = await listResponse.json();
+      const item = items.find(i => i.prompt === 'Exec controls test');
+      expect(item.harness).toBe('opencode');
+      expect(item.model).toBe('openrouter/anthropic/claude-opus-4.8');
+    });
+
+    test('leaving both fields blank sends null for model and harness', async ({ page }) => {
+      await page.locator('.dispatch-prompt-input').fill('Blank exec controls test');
+      const dispatchBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
+      await dispatchBtn.click();
+      await expect(dispatchBtn).toHaveText('dispatched!');
+
+      const listResponse = await page.request.get(`${API_PREFIX}/api/dispatch`);
+      const { items } = await listResponse.json();
+      const item = items.find(i => i.prompt === 'Blank exec controls test');
+      expect(item.harness).toBeNull();
+      expect(item.model).toBeNull();
+    });
+
+    test('a custom harness value wins over the select', async ({ page }) => {
+      await page.locator('.dispatch-prompt-input').fill('Custom harness wins');
+      await page.locator('.dispatch-exec-harness-select').selectOption('claude-code');
+      await page.locator('.dispatch-exec-harness-custom').fill('my-custom-harness');
+
+      const dispatchBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
+      await dispatchBtn.click();
+      await expect(dispatchBtn).toHaveText('dispatched!');
+
+      const listResponse = await page.request.get(`${API_PREFIX}/api/dispatch`);
+      const { items } = await listResponse.json();
+      const item = items.find(i => i.prompt === 'Custom harness wins');
+      expect(item.harness).toBe('my-custom-harness');
+    });
+  });
+
   test.describe('Queue List', () => {
     test.beforeEach(async ({ page }) => {
       await page.goto(`/test/clear-dispatch-queue?urlKey=${WS}`);

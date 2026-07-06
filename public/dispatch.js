@@ -140,7 +140,7 @@ async function refreshDispatchPromptLists(favoritesContainer, recentsContainer, 
 /**
  * Dispatch a custom prompt and update UI feedback
  */
-async function dispatchPageCustomPrompt({ urlKey, prompt, target, repo, kind, promptName, btn, textarea, feedbackEl, recentsContainer }) {
+async function dispatchPageCustomPrompt({ urlKey, prompt, target, repo, kind, promptName, btn, textarea, feedbackEl, recentsContainer, execScope }) {
   const originalText = btn.textContent
   btn.textContent = 'sending...'
   btn.disabled = true
@@ -154,6 +154,8 @@ async function dispatchPageCustomPrompt({ urlKey, prompt, target, repo, kind, pr
       ? await maybeAppendProxyBlock(prompt, urlKey)
       : prompt
 
+    const { model, harness } = window.readDispatchExecControls(execScope)
+
     // Custom prompts are not anchored to a Linear issue — opt out of the
     // issue-link contract explicitly. A loaded Autopilot kickoff carries an
     // explicit kind ('autopilot') and name so it's tagged as the meta-loop.
@@ -164,7 +166,9 @@ async function dispatchPageCustomPrompt({ urlKey, prompt, target, repo, kind, pr
       kind: kind || undefined,
       target,
       repo: repo || undefined,
-      issueless: true
+      issueless: true,
+      model,
+      harness
     })
 
     btn.textContent = 'dispatched!'
@@ -235,6 +239,19 @@ function initDispatchPagePrompt() {
   const feedbackEl = section.querySelector('.dispatch-prompt-feedback')
   const repoSelect = section.querySelector('.dispatch-repo-select')
   const goalInput = section.querySelector('.dispatch-autopilot-goal')
+
+  // Inject the shared model/harness exec controls (LIN-1096) into the
+  // server-rendered placeholder container, using the resolved workspace
+  // default (if any) as a UX-only placeholder hint (LIN-1094).
+  const execContainer = section.querySelector('.dispatch-exec-controls-container')
+  if (execContainer) {
+    const defaultModel = execContainer.dataset.defaultModel || ''
+    const defaultHarness = execContainer.dataset.defaultHarness || ''
+    execContainer.innerHTML = window.renderDispatchExecControls('dispatch-page', {
+      modelPlaceholder: defaultModel ? `model (default: ${defaultModel})` : 'model',
+      harnessPlaceholder: defaultHarness ? `harness (default: ${defaultHarness})` : 'harness'
+    })
+  }
 
   // Load favourites + recent prompts (favourite membership drives the ⭐ state
   // on recent items, so render them as a pair) — LIN-1011.
@@ -379,7 +396,7 @@ function initDispatchPagePrompt() {
       // A loaded Autopilot kickoff sets these; hand-typed prompts leave them undefined.
       const kind = textarea.dataset.kind || undefined
       const promptName = textarea.dataset.promptName || undefined
-      await dispatchPageCustomPrompt({ urlKey, prompt, target, repo, kind, promptName, btn, textarea, feedbackEl, recentsContainer })
+      await dispatchPageCustomPrompt({ urlKey, prompt, target, repo, kind, promptName, btn, textarea, feedbackEl, recentsContainer, execScope: execContainer })
       return
     }
 
