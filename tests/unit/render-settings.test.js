@@ -344,6 +344,39 @@ describe('renderSettingsPage — Dispatch defaults section (LIN-1095)', () => {
       assert.match(html, /name="defaultModel"[^>]*list="dispatch-model-suggestions"/);
       assert.match(html, /name="kind__implementation__Model"[^>]*list="dispatch-model-suggestions"/);
     });
+
+    test('with no dispatchModelCatalog, the datalist is unchanged (static suggestions only)', () => {
+      const html = renderSettingsPage('Acme', BASE);
+      const start = html.indexOf('<datalist id="dispatch-model-suggestions">');
+      const end = html.indexOf('</datalist>', start);
+      const datalist = html.slice(start, end);
+      assert.equal((datalist.match(/<option/g) || []).length, 5);
+    });
+
+    test('LIN-1111 Session 2: merges the live OpenRouter catalog into the shared model datalist', () => {
+      const html = renderSettingsPage('Acme', {
+        ...BASE,
+        dispatchModelCatalog: [{ id: 'mock-provider/catalog-model-one', name: 'Catalog Model One' }]
+      });
+      const start = html.indexOf('<datalist id="dispatch-model-suggestions">');
+      const end = html.indexOf('</datalist>', start);
+      const datalist = html.slice(start, end);
+      assert.match(datalist, /<option value="mock-provider\/catalog-model-one">/);
+      // Still lists every curated suggestion too — supplement, not replace.
+      assert.match(datalist, /<option value="openai\/gpt-5\.4-mini">/);
+    });
+
+    test('LIN-1111 Session 2: de-dupes a catalog entry that collides with a curated suggestion', () => {
+      const html = renderSettingsPage('Acme', {
+        ...BASE,
+        dispatchModelCatalog: [{ id: 'openai/gpt-5.4-mini', name: 'duplicate of a curated suggestion' }]
+      });
+      const start = html.indexOf('<datalist id="dispatch-model-suggestions">');
+      const end = html.indexOf('</datalist>', start);
+      const datalist = html.slice(start, end);
+      const occurrences = datalist.split('openai/gpt-5.4-mini').length - 1;
+      assert.equal(occurrences, 1);
+    });
   });
 
   describe('per-type overrides progressive disclosure (LIN-1111)', () => {

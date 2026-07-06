@@ -67,7 +67,8 @@ import { createOpenRouterAuthRoutes } from './routes/openrouter-auth.js'
 import { createDispatchRoutes } from './routes/dispatch.js'
 import { createProxyRoutes } from './routes/proxy.js'
 import { createTestRoutes } from './routes/test.js'
-import { createWorkspaceApiRoutes } from './routes/workspace-api.js'
+import { createWorkspaceApiRoutes, shouldMockAi } from './routes/workspace-api.js'
+import { getModelCatalog } from './lib/openrouter-catalog.js'
 import { createLegacyRedirects } from './routes/legacy-redirects.js'
 import { testMockTeams, testMockData } from './tests/fixtures/mock-data.js'
 import { swimSampleData } from './tests/fixtures/swim-sample-data.js'
@@ -1743,6 +1744,15 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
   const dispatchDefaults = dispatchDefaultsPrefs.dispatchDefaults || {};
   const dispatchDefaultsError = req.query.dispatchDefaultsError || null;
 
+  // Live OpenRouter model catalog (LIN-1111 Session 2): the same cache module
+  // the dispatch-time client controls fetch via /api/openrouter/models, called
+  // here directly since Settings renders server-side. Supplements (never
+  // replaces) the static DISPATCH_MODEL_SUGGESTIONS datalist in
+  // renderDispatchDefaultsSection. Mocked in tests via the same predicate that
+  // gates the AI recommendation mock, so this never makes a live network call
+  // during automated test runs.
+  const dispatchModelCatalog = await getModelCatalog({ mock: shouldMockAi(workspace) });
+
   const html = renderSettingsPage(workspace.name || 'Workspace', {
     openRouterConnected: !!(openRouterSource === 'oauth' || openRouterSource === 'env'),
     openRouterSource,
@@ -1759,6 +1769,7 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
     providerNotice,
     dispatchDefaults,
     dispatchDefaultsError,
+    dispatchModelCatalog,
     // Gate the GitHub add affordance on the SAME shared predicate the /auth/github
     // route guard and landing hero use (LIN-761), so the settings page never offers
     // an add that would 503/hang on a server where GitHub isn't fully configured.

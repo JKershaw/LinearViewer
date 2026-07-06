@@ -491,6 +491,18 @@ test.describe('Dispatch Page', () => {
       await expect(controls.locator('.dispatch-exec-model')).toBeVisible();
     });
 
+    test('the live OpenRouter catalog enriches the model datalist after load (LIN-1111 Session 2)', async ({ page }) => {
+      // Local-provider sessions are mock-gated (routes/workspace-api.js
+      // shouldMockAi), so window.fetchDispatchModelCatalog resolves the
+      // deterministic MOCK_CATALOG_MODELS from GET .../api/openrouter/models
+      // instead of a live OpenRouter call.
+      const datalist = page.locator('.dispatch-exec-model-datalist');
+      await expect(datalist.locator('option[value="mock-provider/catalog-model-one"]')).toHaveCount(1);
+      await expect(datalist.locator('option[value="mock-provider/catalog-model-two"]')).toHaveCount(1);
+      // Still lists the curated suggestions — supplement, not replace.
+      await expect(datalist.locator('option[value="openai/gpt-5.4-mini"]')).toHaveCount(1);
+    });
+
     test('dispatching with a selected harness and typed model sends both fields', async ({ page }) => {
       await page.locator('.dispatch-prompt-input').fill('Exec controls test');
       await page.locator('.dispatch-exec-harness-select').selectOption('opencode');

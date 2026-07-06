@@ -27,6 +27,7 @@ import { parseRepoFromDescription, buildPromptFilename } from '../lib/prompt-for
 import { buildProxyContextPreamble } from '../lib/proxy-preamble.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { isRecommendationEnabled, getRecommendation, getRecommendationStream, streamChat, resolveReasoningBudget, getModelDisplayName, AVAILABLE_MODELS, getPaidEnvKey, hasPaidEnvKey } from '../lib/openrouter.js';
+import { getModelCatalog } from '../lib/openrouter-catalog.js';
 import { resolveRecommendation, armHopSignal } from '../lib/recommend-recurse.js';
 import { sniffRasterType, parseFeedbackImage } from '../lib/attachment-upload.js';
 
@@ -75,7 +76,7 @@ import { testMockTeams, testMockData } from '../tests/fixtures/mock-data.js';
  * @param {Object} workspace - req.workspace (carries provider + accessToken)
  * @returns {boolean}
  */
-function shouldMockAi(workspace) {
+export function shouldMockAi(workspace) {
   return process.env.NODE_ENV === 'test' &&
     (workspace?.accessToken === 'test-token' || workspace?.provider === 'local');
 }
@@ -2392,6 +2393,27 @@ ${goal}`
   // ===========================================================================
   // Custom Prompts API
   // ===========================================================================
+
+  /**
+   * Live OpenRouter model catalog (LIN-1111 Session 2) — the JSON source the
+   * client-rendered dispatch-exec-controls (public/common.js) fetch once per
+   * page load to supplement the static DISPATCH_MODEL_SUGGESTIONS datalist
+   * with the full live catalog. Same underlying cache module
+   * (lib/openrouter-catalog.js) the Settings server-render path calls
+   * directly, so both surfaces share one source of truth (never a fourth
+   * duplicated list). Never 500s: a catalog fetch failure resolves to `[]`
+   * upstream, so this always returns 200 with whatever's available.
+   * @route GET /workspace/:urlKey/api/openrouter/models
+   */
+  router.get('/workspace/:urlKey/api/openrouter/models', workspaceFromUrl, async (req, res) => {
+    try {
+      const models = await getModelCatalog({ mock: shouldMockAi(req.workspace) });
+      res.json({ models });
+    } catch (error) {
+      console.error('OpenRouter model catalog endpoint error:', error);
+      res.json({ models: [] });
+    }
+  });
 
   /**
    * List all custom prompts for the workspace.

@@ -52,6 +52,7 @@ lib/
   graph-features.js    Network-free blocking-graph / critical-path primitives (shared by swipe + frontier ranking)
   context-graph.js     Network-free relationship-neighborhood builder for the Context section (blockers/blocked/parent/children/related; LIN-572)
   openrouter.js        OpenRouter API client for AI recommendations
+  openrouter-catalog.js  Live OpenRouter model catalog (LIN-1111): in-process TTL-cached wrapper over GET /api/v1/models, mocked in tests via the same `shouldMockAi` predicate that gates the AI recommendation mock; supplements (never replaces) the static DISPATCH_MODEL_SUGGESTIONS datalists in public/common.js + lib/render-settings.js, consumed server-side by Settings and client-side via GET /workspace/:urlKey/api/openrouter/models (routes/workspace-api.js) — one shared source of truth for both surfaces
   providers/           Provider abstraction (decouples views from Linear specifics)
     interface.js       Provider interface contract
     registry.js        Provider registry
