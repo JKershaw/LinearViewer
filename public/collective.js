@@ -6,6 +6,10 @@
  *   POST to /collective/start (character fan-out)
  * - Define a new character: repo + five persona fields + name (+ save), added to
  *   the picker as a selectable row
+ * - Launch a preset meeting (LIN-1050): expand a built-in/custom preset's
+ *   repo-agnostic roster against one chosen repo, replace the character picker
+ *   with it (chair seat placed first — see launchPreset), and thread the
+ *   preset's objective/exitCondition/defaultTopic into the SAME start flow
  * - Live transcript: visibility-gated 5s poll of /api/collective/state, rendered
  *   incrementally by Yap cursor (copied from the pipeline poll pattern)
  * - Inject human input: POST to /api/collective/say
@@ -27,6 +31,12 @@ const seenIds = new Set();
 const pendingById = new Map();
 let pendingSeq = 0;
 
+// Active preset launch context (LIN-1050): set by launchPreset(), read by
+// startDiscussion() to thread facilitator/objective/exitCondition into the
+// SAME /start POST — there is no second dispatch path. null when no preset is
+// active (the pre-LIN-1050 manual-character flow is byte-identical).
+let activePreset = null;
+
 // ─── Character selection ──────────────────────────────────────────────────────
 
 // Resolve a checked row's id to its full character object — either a stored
@@ -44,6 +54,11 @@ function selectedCharacters() {
 // Build a character from the define-new form and add it to the picker as a
 // checked (selected) row so the next start includes it.
 function addDefinedCharacter() {
+  // A manual add customizes beyond the preset, so drop any active preset
+  // context — otherwise a stale facilitator/objective could get threaded into
+  // a roster the user is now hand-assembling.
+  activePreset = null;
+
   const repo = document.getElementById('collective-char-repo');
   if (!repo || !repo.value) {
     setStartStatus('Pick a repo to ground the character in.', true);
@@ -88,6 +103,86 @@ function addDefinedCharacter() {
   const saveEl = document.getElementById('collective-char-save');
   if (saveEl) saveEl.checked = false;
   setStartStatus('');
+}
+
+// ─── Preset launch (LIN-1050) ─────────────────────────────────────────────────
+
+function presetById(id) {
+  return (collectiveData?.presets || []).find(p => p.id === id) || null;
+}
+
+// Expand a preset's repo-agnostic roster against ONE chosen repo (the resolved
+// design: a single repo backs the whole roster, not a per-seat binding),
+// replace the character picker with the expanded roster, and remember the
+// preset's meeting fields so startDiscussion() threads them into the SAME
+// /start POST. A preset launch is a full swap of the picker, not an add-on —
+// mixing an arbitrary hand-picked roster with a preset's would reopen the
+// facilitator-ambiguity/>4-seat problems the preset exists to avoid.
+//
+// Facilitator-ordering fix (load-bearing, not cosmetic — LIN-1050 plan beat
+// 3 §7): /start designates the facilitator as the FIRST characters[] entry
+// whose workspaceUrlKey matches the `facilitator` body field. Every expanded
+// seat here shares the SAME repoKey, so array order is the only
+// disambiguator — the facilitator seat is inserted into the picker BEFORE
+// every other seat.
+function launchPreset(preset, repoKey) {
+  if (!preset || !Array.isArray(preset.roster) || preset.roster.length === 0) {
+    setStartStatus('That preset has no roster to launch.', true);
+    return;
+  }
+  if (!repoKey) {
+    setStartStatus('Pick a repo to launch this preset into.', true);
+    return;
+  }
+  const repoSelect = document.getElementById('collective-preset-repo');
+  const opt = Array.from(repoSelect?.options || []).find(o => o.value === repoKey);
+  const workspaceName = opt?.dataset.name || '';
+
+  // Full swap: clear whatever the picker currently holds (stored + pending).
+  pendingById.clear();
+  const list = document.getElementById('collective-char-list');
+  if (list) list.innerHTML = '';
+
+  const facilitatorSeat = preset.roster.find(s => s.isFacilitator);
+  const restSeats = preset.roster.filter(s => !s.isFacilitator);
+  const orderedSeats = facilitatorSeat ? [facilitatorSeat, ...restSeats] : restSeats;
+
+  orderedSeats.forEach((seat, i) => {
+    const id = `preset-${preset.id}-${i}`;
+    const { isFacilitator, ...persona } = seat;
+    pendingById.set(id, { id, workspaceUrlKey: repoKey, workspaceName, ...persona });
+
+    if (list) {
+      const label = document.createElement('label');
+      label.className = 'collective-char-row';
+      label.dataset.testid = 'collective-character';
+      label.dataset.kind = 'preset';
+      // value is a controlled `preset-<id>-N` token; user strings go in via textContent.
+      label.innerHTML = '<input type="checkbox" class="collective-char-check" checked>'
+        + '<span class="collective-char-name"></span>'
+        + '<span class="collective-char-repo"></span>'
+        + '<span class="collective-char-kind"></span>';
+      label.querySelector('.collective-char-check').value = id;
+      label.querySelector('.collective-char-name').textContent = seat.name || seat.role || 'Implementer';
+      label.querySelector('.collective-char-repo').textContent = workspaceName;
+      label.querySelector('.collective-char-kind').textContent = isFacilitator ? 'chair' : 'preset';
+      list.appendChild(label);
+    }
+  });
+
+  // The chair seat is always bound to the same chosen repo, so `facilitator`
+  // names that repo — combined with the ordering above, /start's "first match
+  // wins" pre-pass resolves to exactly the marked seat.
+  activePreset = {
+    facilitator: facilitatorSeat ? repoKey : null,
+    objective: preset.objective || null,
+    exitCondition: preset.exitCondition || null,
+  };
+
+  const topicEl = document.getElementById('collective-topic');
+  if (topicEl && preset.defaultTopic) topicEl.value = preset.defaultTopic;
+
+  setStartStatus(`Loaded "${preset.name}" (${orderedSeats.length} seat${orderedSeats.length === 1 ? '' : 's'}) — review and start when ready.`);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -239,13 +334,23 @@ async function startDiscussion() {
   if (btn) { btn.disabled = true; btn.textContent = 'dispatching…'; }
   setStartStatus('');
 
+  // A launched preset's meeting fields ride the SAME POST — no second dispatch
+  // path (LIN-1050). Omitted entirely when no preset is active, so the manual
+  // character flow's request body is byte-identical to pre-LIN-1050.
+  const body = { characters, channel, topic, target };
+  if (activePreset) {
+    if (activePreset.facilitator) body.facilitator = activePreset.facilitator;
+    if (activePreset.objective) body.objective = activePreset.objective;
+    if (activePreset.exitCondition) body.exitCondition = activePreset.exitCondition;
+  }
+
   try {
     // Default on401 (→ /logout) matches the prior manual redirect. Server
     // errors throw with .body; the catch surfaces data.error inline as before.
     const data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/collective/start`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ characters, channel, topic, target }),
+      body: JSON.stringify(body),
     });
 
     const ok = (data.dispatched || []).filter(d => d.ok);
@@ -358,6 +463,13 @@ function init() {
 
   document.getElementById('collective-start')?.addEventListener('click', startDiscussion);
   document.getElementById('collective-char-add')?.addEventListener('click', addDefinedCharacter);
+  document.getElementById('collective-preset-list')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('.collective-preset-launch');
+    if (!btn) return;
+    const preset = presetById(btn.dataset.presetId);
+    const repoKey = document.getElementById('collective-preset-repo')?.value || '';
+    launchPreset(preset, repoKey);
+  });
   document.getElementById('collective-view-prompt')?.addEventListener('click', viewPrompt);
   document.getElementById('collective-prompt-copy')?.addEventListener('click', copyPrompt);
   document.getElementById('collective-say-btn')?.addEventListener('click', sayMessage);

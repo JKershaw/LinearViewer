@@ -131,3 +131,80 @@ describe('renderCollectivePage', () => {
     assert.ok(html.includes('id="collective-say-btn"'));
   });
 });
+
+describe('renderCollectivePage — preset picker (LIN-1050)', () => {
+  const BUILTIN_PRESET = {
+    id: 'builtin:standup',
+    kind: 'builtin',
+    name: 'Standup',
+    objective: 'surface status',
+    exitCondition: 'everyone reported',
+    defaultTopic: 'status check',
+    roster: [
+      { name: 'Standup Chair', role: 'Standup Chair', lens: 'l', objective: 'o', value: 'v', disposition: 'd', isFacilitator: true },
+      { name: 'Progress reporter', role: 'Progress reporter', lens: 'l', objective: 'o', value: 'v', disposition: 'd' },
+    ],
+  };
+  const CUSTOM_PRESET = {
+    id: 'custom-1',
+    kind: 'custom',
+    name: 'My Custom Meeting',
+    objective: 'obj',
+    exitCondition: 'exit',
+    defaultTopic: 'topic',
+    roster: [
+      { name: 'Chair', role: 'r', lens: 'l', objective: 'o', value: 'v', disposition: 'd', isFacilitator: true },
+    ],
+  };
+
+  test('lists built-in presets as launchable rows', () => {
+    const html = render({ presets: [BUILTIN_PRESET] });
+    assert.ok(html.includes('data-testid="collective-preset"'));
+    assert.ok(html.includes('data-preset-id="builtin:standup"'));
+    assert.ok(html.includes('data-kind="builtin"'));
+    assert.ok(html.includes('Standup'));
+    assert.ok(html.includes('Standup Chair'));
+    assert.ok(html.includes('Progress reporter'));
+    assert.ok(html.includes('data-testid="collective-preset-launch"'));
+  });
+
+  test('lists custom presets alongside built-ins', () => {
+    const html = render({ presets: [BUILTIN_PRESET, CUSTOM_PRESET] });
+    assert.ok(html.includes('data-preset-id="builtin:standup"'));
+    assert.ok(html.includes('data-preset-id="custom-1"'));
+    assert.ok(html.includes('My Custom Meeting'));
+    assert.ok(html.includes('data-kind="custom"'));
+  });
+
+  test('shows the seat count and chair name in the preset meta', () => {
+    const html = render({ presets: [BUILTIN_PRESET] });
+    assert.ok(html.includes('2 seats'));
+    assert.ok(/chair: Standup Chair/.test(html));
+  });
+
+  test('offers a single repo select for binding the whole roster (not per-seat)', () => {
+    const html = render({ presets: [BUILTIN_PRESET] });
+    assert.ok(html.includes('data-testid="collective-preset-repo"'));
+    // Exactly one repo select for presets — not one per seat.
+    const matches = html.match(/data-testid="collective-preset-repo"/g) || [];
+    assert.equal(matches.length, 1);
+    assert.ok(html.includes('value="ws-a"'));
+    assert.ok(html.includes('value="ws-b"'));
+  });
+
+  test('shows an empty note and no repo select when there are no connected workspaces', () => {
+    const html = render({ presets: [BUILTIN_PRESET], workspaces: [] });
+    assert.ok(!html.includes('data-testid="collective-preset-repo"'));
+  });
+
+  test('embeds presets in __COLLECTIVE_DATA__ for the client', () => {
+    const html = render({ presets: [BUILTIN_PRESET] });
+    assert.ok(html.includes('"presets"'));
+    assert.ok(html.includes('"id":"builtin:standup"'));
+  });
+
+  test('shows a none-available note when presets is empty', () => {
+    const html = render({ presets: [] });
+    assert.ok(html.includes('collective-preset-none'));
+  });
+});

@@ -102,6 +102,62 @@
   border-top: 1px dashed var(--border);
 }
 
+/* ── Preset picker (LIN-1050) ─────────────────────────────────────────────
+   Mirrors the character-row picker above: a compact list of built-in +
+   custom preset meetings, each launchable via one click, plus a single
+   repo select that binds the WHOLE roster (not per-seat) for the launch. */
+
+.collective-field .collective-preset-body {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.collective-preset-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.collective-preset-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  font-family: var(--font-content);
+}
+
+.collective-preset-name {
+  color: var(--fg);
+  min-width: 8rem;
+}
+
+.collective-preset-meta {
+  color: var(--fg-dim);
+  font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
+}
+
+.collective-preset-seats {
+  color: var(--fg-vdim);
+  font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
+  flex: 1;
+  min-width: 12rem;
+}
+
+.collective-preset-launch {
+  margin-left: auto;
+}
+
+.collective-preset-none {
+  color: var(--fg-vdim);
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  margin: 0;
+}
+
 .collective-persona-field {
   display: flex;
   align-items: center;
