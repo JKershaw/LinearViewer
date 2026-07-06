@@ -36,7 +36,7 @@ import { defaultGitHubProjectsSeed, GITHUB_PROJECTS_WORKSPACE_URL_KEY, GITHUB_PR
  * @param {Function} options.getWorkspaceAccessToken - Function to look up workspace access token
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, taskSnapshotStore, savedChatStore, localStore, getWorkspaceAccessToken }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, taskSnapshotStore, savedChatStore, localStore, getWorkspaceAccessToken }) {
   const router = Router();
 
   // ── Mock Yap server (LIN-450) ─────────────────────────────────────────────
@@ -349,6 +349,31 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       if (!collectiveCharactersStore) return res.status(503).json({ error: 'no collective characters store' });
       const urlKey = req.query.urlKey || 'test-workspace';
       const created = await collectiveCharactersStore.createCustom(urlKey, req.body || {});
+      res.json(created);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Clear all custom Collective presets for a workspace (LIN-1050). Mirrors
+  // clear-collective-characters; never touches BUILTIN_PRESETS (not rows here).
+  router.get('/test/clear-collective-presets', async (req, res) => {
+    try {
+      if (collectivePresetsStore) await collectivePresetsStore.deleteAll(req.query.urlKey || 'test-workspace');
+      res.send('ok');
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Seed one custom Collective preset for a workspace so E2E can exercise the
+  // picker without going through a save flow (LIN-1050). Body is a preset
+  // record; ?urlKey=<anchor> selects the partition.
+  router.post('/test/seed-collective-preset', async (req, res) => {
+    try {
+      if (!collectivePresetsStore) return res.status(503).json({ error: 'no collective presets store' });
+      const urlKey = req.query.urlKey || 'test-workspace';
+      const created = await collectivePresetsStore.createCustom(urlKey, req.body || {});
       res.json(created);
     } catch (err) {
       res.status(500).json({ error: err.message });

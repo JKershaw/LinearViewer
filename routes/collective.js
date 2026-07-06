@@ -22,6 +22,7 @@ import { renderCollectivePage } from '../lib/render-collective.js';
 import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { normalizeYapChannel, nickFromWorkspaceName, randomChannelName } from '../lib/yap-client.js';
+import { jsonError, notFound } from '../lib/errors.js';
 import {
   buildCollectiveParticipantPrompt,
   buildCollectiveFacilitatorPrompt,
@@ -66,6 +67,7 @@ function pickCharacterFields(character = {}) {
  * @param {Function} deps.workspaceFromUrl      - middleware: session + req.workspace
  * @param {Object}   deps.dispatchQueueStore    - dispatch store (addItem)
  * @param {Object}   [deps.proxyTokenStore]     - proxy token store (mint readWrite per participant)
+ * @param {Object}   [deps.collectivePresetsStore] - preset meetings store (LIN-1050; built-in + custom list/get/createCustom/delete)
  * @param {Object|null} deps.yapClient          - Yap HTTP client (null when YAP_BASE_URL unset)
  * @param {Function} deps.getOpenRouterSource   - (req) → 'oauth'|'env'|'free'|null
  * @param {Function} deps.getDeployInfo         - () → deploy metadata
@@ -76,6 +78,7 @@ export function createCollectiveRoutes({
   dispatchQueueStore,
   proxyTokenStore,
   collectiveCharactersStore,
+  collectivePresetsStore,
   yapClient,
   getOpenRouterSource,
   getDeployInfo,
@@ -99,10 +102,18 @@ export function createCollectiveRoutes({
         ? await collectiveCharactersStore.list(workspace.urlKey)
         : [];
 
+      // Built-in + custom preset meetings for this anchor workspace (LIN-1050).
+      // Not yet consumed by the renderer — wiring the picker UI is the next beat;
+      // this only gets the data there.
+      const presets = collectivePresetsStore
+        ? await collectivePresetsStore.list(workspace.urlKey)
+        : [];
+
       const html = renderCollectivePage(
         {
           workspaces: (req.session.workspaces || []).map(w => ({ urlKey: w.urlKey, name: w.name })),
           characters,
+          presets,
           // A fresh, friendly channel suggestion per page load (words + date),
           // so each new discussion lands in its own channel by default.
           defaultChannel: randomChannelName(),
@@ -332,6 +343,57 @@ export function createCollectiveRoutes({
     }
 
     res.status(201).json({ channel, topic, target, dispatched });
+  });
+
+  // ─── Presets: custom preset meeting CRUD (LIN-1050, S4) ──────────────────────
+  // Backend-only for this ticket — no picker/authoring UI yet (that's a later
+  // beat, and a dedicated "save as preset" form has no named consumer in the
+  // ticket text). These routes exist so the store is usable end-to-end and so
+  // a future feature (e.g. LIN-1051) can save a generated meeting as a preset.
+  // Presets are repo-agnostic by design (beat 1) — no repo/workspace-binding
+  // validation belongs here; that happens only at LAUNCH time (client-side,
+  // reusing /start's existing session.workspaces re-validation).
+
+  router.post('/workspace/:urlKey/collective/presets', workspaceFromUrl, async (req, res) => {
+    const featureFlags = getFeatureFlags(req.session);
+    if (featureFlags.collective !== true) {
+      return jsonError(res, 403, 'Collective feature is not enabled');
+    }
+    if (!collectivePresetsStore) {
+      return jsonError(res, 503, 'Preset storage is not configured');
+    }
+
+    try {
+      const preset = await collectivePresetsStore.createCustom(req.workspace.urlKey, req.body || {});
+      res.status(201).json({ preset });
+    } catch (error) {
+      console.error('Collective preset create error:', error.message);
+      const status = /required|non-empty|between 1 and|exactly one facilitator|repo-agnostic|characters or less|maximum of/.test(error.message)
+        ? 400
+        : 500;
+      jsonError(res, status, error.message || 'Failed to create preset');
+    }
+  });
+
+  router.delete('/workspace/:urlKey/collective/presets/:presetId', workspaceFromUrl, async (req, res) => {
+    const featureFlags = getFeatureFlags(req.session);
+    if (featureFlags.collective !== true) {
+      return jsonError(res, 403, 'Collective feature is not enabled');
+    }
+    if (!collectivePresetsStore) {
+      return jsonError(res, 503, 'Preset storage is not configured');
+    }
+
+    try {
+      const deleted = await collectivePresetsStore.delete(req.workspace.urlKey, req.params.presetId);
+      if (!deleted) {
+        return notFound.json(res, 'Preset not found');
+      }
+      res.json({ ok: true });
+    } catch (error) {
+      console.error('Collective preset delete error:', error.message);
+      jsonError(res, 500, 'Failed to delete preset');
+    }
   });
 
   // ─── Preview: build the participant prompt without dispatching ───────────────

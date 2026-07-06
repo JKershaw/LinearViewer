@@ -24,6 +24,7 @@ import { WorkspacePreferencesStore } from './lib/workspace-preferences.js'
 import { DispatchQueueStore } from './lib/dispatch-store.js'
 import { CustomPromptsStore } from './lib/custom-prompts-store.js'
 import { CollectiveCharactersStore } from './lib/collective-characters-store.js'
+import { CollectivePresetsStore } from './lib/collective-presets-store.js'
 import { DispatchTokenStore } from './lib/dispatch-tokens.js'
 import { HarbourFeedbackTokenStore } from './lib/harbour-feedback-tokens.js'
 import { ProxyTokenStore } from './lib/proxy-tokens.js'
@@ -226,6 +227,15 @@ const customPromptsStore = new CustomPromptsStore({
 const collectiveCharactersCollection = db.collection('collective-characters')
 const collectiveCharactersStore = new CollectiveCharactersStore({
   collection: collectiveCharactersCollection
+})
+
+// Collective preset meetings (LIN-1050, S4). Custom rows only — the 6 built-in
+// seed presets are frozen module constants (lib/collective-preset-defs.js), not
+// rows in this collection. Partitioned by the anchor workspace urlKey, mirrors
+// the collective characters store shape minus its recent/auto-record half.
+const collectivePresetsCollection = db.collection('collective-presets')
+const collectivePresetsStore = new CollectivePresetsStore({
+  collection: collectivePresetsCollection
 })
 
 // Local provider backing store (LIN-356). One scope-partitioned collection
@@ -485,7 +495,7 @@ app.use(session({
 // Test Mode Setup
 // =============================================================================
 if (process.env.NODE_ENV === 'test') {
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, taskSnapshotStore, savedChatStore, localStore, getWorkspaceAccessToken }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, taskSnapshotStore, savedChatStore, localStore, getWorkspaceAccessToken }))
 }
 
 // =============================================================================
@@ -1301,7 +1311,7 @@ app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRoute
 // Mount collective routes (experimental cross-project discussion — LIN-450).
 // yapClient is null when YAP_BASE_URL is unset; the routes degrade gracefully.
 const yapClient = yapClientFromEnv()
-app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyTokenStore, collectiveCharactersStore, yapClient, getOpenRouterSource, getDeployInfo }))
+app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyTokenStore, collectiveCharactersStore, collectivePresetsStore, yapClient, getOpenRouterSource, getDeployInfo }))
 
 // Mount dashboard routes (experimental combined realtime autopilot dashboard — LIN-509).
 // Merges Mongo-only Loop reads across session.workspaces; Linear is hydrated lazily

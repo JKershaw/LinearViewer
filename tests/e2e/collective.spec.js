@@ -223,6 +223,114 @@ test.describe('Collective Page (experimental)', () => {
     });
   });
 
+  test.describe('Preset meetings (LIN-1050)', () => {
+    test.beforeEach(async ({ page }) => {
+      // Built-ins are always present (frozen constants, not DB rows) — only
+      // custom presets/characters need clearing so a prior run's rows don't leak.
+      // Also clear the dispatch queue: the per-worker urlKey is stable across
+      // runs, so a facilitator/participant item dispatched by an earlier test
+      // (this file's own Start-fan-out block, or a prior run against a
+      // file-backed store) would otherwise inflate the queue-shape assertion.
+      await page.request.get(`/test/clear-collective-presets?urlKey=${URL_KEY}`);
+      await page.request.get(`/test/clear-collective-characters?urlKey=${URL_KEY}`);
+      await page.request.get(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
+    });
+
+    test('lists the 6 built-in presets in the picker', async ({ page }) => {
+      await page.goto(`/test/set-session?multiWorkspace=true&urlKey=${URL_KEY}&${featuresParam({ collective: true })}`);
+      await page.goto(COLLECTIVE_URL);
+      await page.waitForLoadState('networkidle');
+
+      await expect(page.locator('[data-testid="collective-preset"]')).toHaveCount(6);
+      await expect(page.locator('[data-testid="collective-preset"][data-preset-id="builtin:standup"]')).toBeVisible();
+      await expect(page.locator('[data-testid="collective-preset-repo"]')).toBeVisible();
+    });
+
+    test('launching a built-in preset replaces the picker with its roster, chair seat first', async ({ page }) => {
+      await page.goto(`/test/set-session?multiWorkspace=true&urlKey=${URL_KEY}&${featuresParam({ collective: true })}`);
+      await page.goto(COLLECTIVE_URL);
+      await page.waitForLoadState('networkidle');
+
+      await page.locator('[data-testid="collective-preset-repo"]').selectOption(URL_KEY);
+      await page.locator('[data-testid="collective-preset"][data-preset-id="builtin:standup"] [data-testid="collective-preset-launch"]').click();
+
+      // Standup = 1 chair + 3 voices = 4 seats (the picker is fully swapped, not
+      // added to — beat 3's resolved design).
+      const rows = page.locator('[data-testid="collective-character"]');
+      await expect(rows).toHaveCount(4);
+      await expect(rows.first()).toContainText('Standup Chair');
+      await expect(rows.first().locator('.collective-char-kind')).toHaveText('chair');
+
+      // The preset's default topic is loaded into the topic field.
+      await expect(page.locator('#collective-topic')).toHaveValue(/blocking the next step/);
+    });
+
+    test('launching then starting a preset dispatches its full roster with exactly one facilitator prompt', async ({ page }) => {
+      await page.goto(`/test/set-session?multiWorkspace=true&urlKey=${URL_KEY}&${featuresParam({ collective: true })}`);
+      await page.goto(COLLECTIVE_URL);
+      await page.waitForLoadState('networkidle');
+
+      // Bind the whole roster to THIS worker's own workspace, so its dispatch
+      // queue (fetched below via API_PREFIX) receives every seat's item.
+      await page.locator('[data-testid="collective-preset-repo"]').selectOption(URL_KEY);
+      await page.locator('[data-testid="collective-preset"][data-preset-id="builtin:standup"] [data-testid="collective-preset-launch"]').click();
+      await expect(page.locator('[data-testid="collective-character"]')).toHaveCount(4);
+
+      const startResp = page.waitForResponse(r => r.url().includes('/collective/start') && r.request().method() === 'POST');
+      await page.locator('#collective-start').click();
+      const res = await startResp;
+      expect(res.status()).toBe(201);
+      const body = await res.json();
+      expect(body.dispatched).toHaveLength(4);
+      expect(body.dispatched.every(d => d.ok)).toBe(true);
+
+      // The facilitator-ordering fix (LIN-1050 beat 3): every seat shares the
+      // SAME repo, so /start's "first matching entry wins" rule only produces
+      // the correct chair if the client reordered the facilitator seat first.
+      // Confirm the dispatched fan-out reflects exactly that: one facilitator
+      // prompt (naming the preset's designated chair), three plain participants.
+      const queue = await (await page.request.get(`${API_PREFIX}/api/dispatch`)).json();
+      const facilitatorItems = queue.items.filter(i => i.promptName === 'collective-facilitator');
+      const participantItems = queue.items.filter(i => i.promptName === 'collective-participant');
+      expect(facilitatorItems).toHaveLength(1);
+      expect(participantItems.length).toBeGreaterThanOrEqual(3);
+      expect(facilitatorItems[0].prompt).toContain('Standup Chair');
+      expect(facilitatorItems[0].prompt).toContain('surface each project');
+    });
+
+    test('a saved custom preset lists and launches the same way as a built-in', async ({ page }) => {
+      const seedRes = await page.request.post(`/test/seed-collective-preset?urlKey=${URL_KEY}`, {
+        data: {
+          name: 'E2E Test Meeting',
+          objective: 'test the custom preset launch path',
+          exitCondition: 'the e2e test passes',
+          defaultTopic: 'custom preset topic',
+          roster: [
+            { name: 'Custom Chair', role: 'r', lens: 'l', objective: 'o', value: 'v', disposition: 'd', isFacilitator: true },
+            { name: 'Custom Voice', role: 'r2', lens: 'l2', objective: 'o2', value: 'v2', disposition: 'd2' },
+          ],
+        },
+      });
+      expect(seedRes.status()).toBe(200);
+
+      await page.goto(`/test/set-session?multiWorkspace=true&urlKey=${URL_KEY}&${featuresParam({ collective: true })}`);
+      await page.goto(COLLECTIVE_URL);
+      await page.waitForLoadState('networkidle');
+
+      const customRow = page.locator('[data-testid="collective-preset"]:has-text("E2E Test Meeting")');
+      await expect(customRow).toBeVisible();
+      await expect(customRow).toHaveAttribute('data-kind', 'custom');
+
+      await page.locator('[data-testid="collective-preset-repo"]').selectOption(URL_KEY);
+      await customRow.locator('[data-testid="collective-preset-launch"]').click();
+
+      const rows = page.locator('[data-testid="collective-character"]');
+      await expect(rows).toHaveCount(2);
+      await expect(rows.first()).toContainText('Custom Chair');
+      await expect(page.locator('#collective-topic')).toHaveValue('custom preset topic');
+    });
+  });
+
   test.describe('Yap proxy endpoints (mock Yap)', () => {
     // YAP_BASE_URL points at the in-process mock Yap (routes/test.js), so the
     // poll/say plumbing round-trips deterministically without real egress.
