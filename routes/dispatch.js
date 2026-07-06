@@ -24,6 +24,7 @@ import { spawnClaudeSession } from '../lib/harbour-spawn.js';
 import { isValidDispatchKind, deriveDispatchKind, DISPATCH_KINDS } from '../lib/prompt-templates.js';
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
 import { validateOpaqueDispatchField } from '../lib/dispatch-validation.js';
+import { resolveDispatchDefaults } from '../lib/workspace-preferences.js';
 
 // Directory for Harbour OS dispatch prompt staging files. The OS tmp dir is
 // shared between the Node server and the Harbour OS terminal that reads the
@@ -103,9 +104,11 @@ const DANGEROUS_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
  * @param {Function} options.workspaceFromUrl - Middleware to validate workspace
  * @param {Object} options.userPreferencesStore - User preferences store for recent prompts
  * @param {Object} [options.harbourFeedbackTokenStore] - Short-TTL feedback token store for Harbour OS dispatches
+ * @param {Object} [options.workspacePreferencesStore] - Workspace preferences store, used to
+ *   resolve dispatchDefaults (model/harness) for blank incoming values (LIN-1094)
  * @returns {Router} Express router with dispatch routes
  */
-export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore }) {
+export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore }) {
   const router = Router();
 
   // =========================================================================
@@ -399,11 +402,33 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         return res.status(201).json({ success: true, cascade: true, ...result });
       }
 
+      // Effective prompt kind, shared between the stored item and the
+      // dispatchDefaults resolution below (so both agree on the same kind).
+      const effectiveKind = kind || deriveDispatchKind(promptName);
+
+      // Resolve blank incoming model/harness against the workspace's
+      // dispatchDefaults (LIN-1094): per-kind override -> workspace-wide
+      // default -> null. Each field resolves independently, and the lookup
+      // is skipped entirely (falling straight to the existing null
+      // passthrough) when no store is wired or both fields are already set —
+      // so with no defaults configured this is byte-identical to before.
+      let resolvedModel = model || null;
+      let resolvedHarness = harness || null;
+      if ((!model || !harness) && workspacePreferencesStore) {
+        const defaults = await resolveDispatchDefaults({
+          urlKey: workspace.urlKey,
+          kind: effectiveKind,
+          store: workspacePreferencesStore
+        });
+        if (!model) resolvedModel = defaults.model;
+        if (!harness) resolvedHarness = defaults.harness;
+      }
+
       // Create dispatch item
       const item = await dispatchQueueStore.addItem(workspace.urlKey, {
         prompt,
         promptName: promptName || 'Prompt',
-        kind: kind || deriveDispatchKind(promptName),
+        kind: effectiveKind,
         issueId: issueId || null,
         issueIdentifier: issueIdentifier || null,
         issueTitle: issueTitle || null,
@@ -411,8 +436,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         dispatchedBy: req.session.linearUserId || null,
         target: target || 'cli',
         repo: repo || null,
-        model: model || null,
-        harness: harness || null,
+        model: resolvedModel,
+        harness: resolvedHarness,
         followUpTo: followUpTo || null,
         force: force === true,
         abort: isAbort,
