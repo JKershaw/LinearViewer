@@ -301,6 +301,29 @@ test.describe('Suggested Next Run Page (experimental)', () => {
       await expect(cli).toHaveText('dispatched!', { timeout: 5000 });
     });
 
+    // LIN-1096: the shared model/harness exec controls live inside the same
+    // dispatch options panel as the per-target buttons.
+    test('exec controls appear in the dispatch panel and flow through to the dispatched item', async ({ page }) => {
+      const card = page.locator('.next-run-option:not(.next-run-option-open)').first();
+      await expect(card).toBeVisible({ timeout: 5000 });
+      await card.locator('.next-run-option-head').click();
+      await card.locator('.next-run-dispatch-toggle').click();
+
+      const controls = card.locator('.dispatch-exec-controls');
+      await expect(controls).toBeVisible();
+      await controls.locator('.dispatch-exec-harness-select').selectOption('claude-code');
+      await controls.locator('.dispatch-exec-model').fill('anthropic/claude-opus-4.8');
+
+      const dispatchReq = page.waitForRequest(req =>
+        req.url().includes('/api/dispatch') && req.method() === 'POST');
+      await card.locator('.next-run-dispatch[data-target="cli"]').click();
+
+      const req = await dispatchReq;
+      const body = JSON.parse(req.postData() || '{}');
+      expect(body.harness).toBe('claude-code');
+      expect(body.model).toBe('anthropic/claude-opus-4.8');
+    });
+
     test('a failed proxy-token mint surfaces as failure, not a bare dispatch (LIN-645)', async ({ page }) => {
       // Trip the token mint as a rate limiter would. The kickoff must NOT be
       // dispatched without its promised proxy block.

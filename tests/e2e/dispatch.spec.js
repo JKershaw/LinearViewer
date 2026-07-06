@@ -457,6 +457,42 @@ test.describe('Dispatch Queue', () => {
     // The panel stays open after dispatch so the button feedback remains visible.
     await expect(promptContainer.locator('.disclosure-toggle')).toHaveAttribute('aria-expanded', 'true');
   });
+
+  // LIN-1096: the shared model/harness exec controls are injected into every
+  // dispatch options panel on the dashboard tree.
+  test('exec controls appear in the dispatch panel and flow through to the dispatched item', async ({ page }) => {
+    const promptContainer = await revealPrompt(page);
+    await openDispatchOptions(promptContainer);
+
+    const controls = promptContainer.locator('.dispatch-exec-controls');
+    await expect(controls).toBeVisible();
+
+    await controls.locator('.dispatch-exec-harness-select').selectOption('claude-code');
+    await controls.locator('.dispatch-exec-model').fill('anthropic/claude-opus-4.8');
+
+    const dispatchReq = page.waitForRequest(req =>
+      req.url().includes('/api/dispatch') && req.method() === 'POST');
+    await promptContainer.locator('.prompt-dispatch[data-target="cli"]').click();
+
+    const req = await dispatchReq;
+    const body = JSON.parse(req.postData() || '{}');
+    expect(body.harness).toBe('claude-code');
+    expect(body.model).toBe('anthropic/claude-opus-4.8');
+  });
+
+  test('blank exec controls omit model/harness from the dispatch payload', async ({ page }) => {
+    const promptContainer = await revealPrompt(page);
+    await openDispatchOptions(promptContainer);
+
+    const dispatchReq = page.waitForRequest(req =>
+      req.url().includes('/api/dispatch') && req.method() === 'POST');
+    await promptContainer.locator('.prompt-dispatch[data-target="cli"]').click();
+
+    const req = await dispatchReq;
+    const body = JSON.parse(req.postData() || '{}');
+    expect(body.model == null).toBe(true);
+    expect(body.harness == null).toBe(true);
+  });
 });
 
 test.describe('Dispatch API', () => {

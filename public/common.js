@@ -341,12 +341,14 @@ window.api = async function api(url, opts = {}) {
  * @param {string} [opts.target='cli']       'cli' | 'web' | 'dash' | 'local'
  * @param {string} [opts.repo]
  * @param {string} [opts.kind]               Explicit dispatch kind (e.g. 'autopilot'); omit to derive from promptName
+ * @param {string} [opts.model]              Execution model (opaque string, LIN-1084); blank/omitted inherits the consumer's own default (LIN-1094)
+ * @param {string} [opts.harness]            Execution harness (opaque string, LIN-1084); blank/omitted inherits the consumer's own default (LIN-1094)
  * @returns {Promise<Object>} Parsed JSON response body
  * @throws {Error} on missing required args or a non-ok response. The thrown
  *                 error carries `.status` so callers can branch (e.g. 401).
  */
 window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
-  const { urlKey, prompt, issue, issueless = false, promptName = 'Prompt', target = 'cli', repo, kind } = opts;
+  const { urlKey, prompt, issue, issueless = false, promptName = 'Prompt', target = 'cli', repo, kind, model, harness } = opts;
 
   if (!urlKey) throw new Error('dispatchPrompt: urlKey is required');
   if (!prompt) throw new Error('dispatchPrompt: prompt is required');
@@ -368,6 +370,11 @@ window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
     if (issue.url) payload.issueUrl = issue.url;
   }
   if (repo) payload.repo = repo;
+  // Blank/omitted model+harness stay off the payload entirely (not sent as
+  // empty strings) so the consumer's own default resolution still applies
+  // (LIN-1094) — never send a value that overrides a real default with "".
+  if (model) payload.model = model;
+  if (harness) payload.harness = harness;
 
   // on401:false — dispatch surfaces (swipe etc.) branch on err.status rather
   // than redirecting, so the 401 is thrown like any other error.
@@ -384,6 +391,75 @@ window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
   }
 
   return result;
+};
+
+// =============================================================================
+// Dispatch Execution Controls (model/harness) — LIN-1096
+// =============================================================================
+//
+// Every dispatch-time UI surface (Dispatch page, dashboard tree, the shared
+// prompt-compose section, Suggested-next-run) needs the same harness
+// select-or-custom + model text input pair feeding into window.dispatchPrompt's
+// `model`/`harness` fields. Factored once here (the client choke point every
+// surface already loads) instead of tripling the markup and read logic across
+// public/dispatch.js, app.js, prompt-section.js and next-run.js. Mirrors the
+// settings page's dispatch-defaults control shape (public/settings.css,
+// LIN-1095) with its own class names, since settings.css isn't loaded on these
+// surfaces. Harness stays an opaque string everywhere (LIN-1084/LIN-438) — this
+// suggestion list is UI-only, not a registry.
+const DISPATCH_HARNESS_SUGGESTIONS = ['claude-code', 'opencode'];
+
+/**
+ * Renders the shared dispatch-time model/harness control markup: a harness
+ * select-or-custom pair plus a free-text model input, scoped under one
+ * `idPrefix` so multiple instances can coexist on a page. Read the chosen
+ * values back with `window.readDispatchExecControls`.
+ * @global
+ * @param {string} idPrefix - Unique prefix distinguishing this instance (e.g. an issue id)
+ * @param {Object} [opts]
+ * @param {string} [opts.modelPlaceholder] - Placeholder for the model input (UX-only resolved-default hint, LIN-1096)
+ * @param {string} [opts.harnessPlaceholder] - Placeholder for the harness custom input (UX-only resolved-default hint)
+ * @returns {string} HTML for the control pair
+ */
+window.renderDispatchExecControls = function renderDispatchExecControls(idPrefix, opts = {}) {
+  const { modelPlaceholder = 'model', harnessPlaceholder = 'harness' } = opts;
+  const prefix = window.escapeHtml(idPrefix || '');
+  const optionsHtml = DISPATCH_HARNESS_SUGGESTIONS
+    .map(h => `<option value="${window.escapeHtml(h)}">${window.escapeHtml(h)}</option>`)
+    .join('');
+  return `<span class="dispatch-exec-controls" data-exec-prefix="${prefix}">
+    <select class="dispatch-exec-harness-select" aria-label="Harness">
+      <option value="">&mdash;</option>
+      ${optionsHtml}
+    </select>
+    <span class="dispatch-exec-or">or</span>
+    <input type="text" class="dispatch-exec-harness-custom" maxlength="200" placeholder="${window.escapeHtml(harnessPlaceholder)}" aria-label="Custom harness">
+    <input type="text" class="dispatch-exec-model" maxlength="200" placeholder="${window.escapeHtml(modelPlaceholder)}" aria-label="Model">
+  </span>`;
+};
+
+/**
+ * Reads the current `{model, harness}` values back out of a container holding
+ * a `.dispatch-exec-controls` block (or that block itself). A custom harness
+ * value wins over the select (mirrors the settings page's dispatch-defaults
+ * precedence, LIN-1095). Blank fields resolve to `null`, never `''`, so
+ * `window.dispatchPrompt` omits them and the consumer's own default
+ * resolution applies (LIN-1094).
+ * @global
+ * @param {Element|null} [scopeEl]
+ * @returns {{model: string|null, harness: string|null}}
+ */
+window.readDispatchExecControls = function readDispatchExecControls(scopeEl) {
+  const scope = scopeEl && (scopeEl.matches && scopeEl.matches('.dispatch-exec-controls')
+    ? scopeEl
+    : scopeEl.querySelector && scopeEl.querySelector('.dispatch-exec-controls'));
+  if (!scope) return { model: null, harness: null };
+  const select = scope.querySelector('.dispatch-exec-harness-select');
+  const custom = scope.querySelector('.dispatch-exec-harness-custom');
+  const modelInput = scope.querySelector('.dispatch-exec-model');
+  const harness = (custom && custom.value.trim()) || (select && select.value) || '';
+  const model = modelInput ? modelInput.value.trim() : '';
+  return { model: model || null, harness: harness || null };
 };
 
 // =============================================================================
