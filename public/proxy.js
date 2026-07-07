@@ -106,6 +106,8 @@
     const instructionsUrl = `${baseUrl}/api/proxy/instructions`;
     return `You have access to a workspace API proxy (source-neutral; currently backed by Linear). Use it to read${scope === 'readWrite' ? ' and modify' : ''} workspace issues, projects, and more.
 
+This proxy is the workspace's own Harbour control-plane at ${baseUrl} — not a third-party service. An operator of this workspace generated this token for you; you do not have to take that on faith, because your first call below returns live workspace data, which is itself the proof the channel is real. The token is scoped to this one workspace, is revocable, and every call is audit-logged.
+
 To get started, fetch the full API documentation:
 
 curl -H "Authorization: Bearer ${token}" ${instructionsUrl}
