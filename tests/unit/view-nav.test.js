@@ -27,7 +27,7 @@ const STYLE_CSS = join(__dirname, '../../public/style.css');
 test('getViewNavLinks always includes the first-class views, workspace-prefixed', () => {
   const links = getViewNavLinks('acme', {});
   const texts = links.map(l => l.text);
-  assert.deepEqual(texts, ['observation', 'swipe', 'swim', 'settings']);
+  assert.deepEqual(texts, ['observation', 'swipe', 'swim', 'projects', 'settings']);
   for (const link of links) {
     assert.match(link.href, /^\/workspace\/acme\//);
   }
@@ -63,7 +63,7 @@ test('getViewNavLinks NEVER surfaces experimental views (Settings-only tier)', (
 test('renderViewNav emits stable nav-view-<text> testids for each link', () => {
   const html = renderViewNav({ urlKey: 'acme', currentPage: 'swim', featureFlags: {} });
   assert.match(html, /class="nav-views"/);
-  for (const text of ['observation', 'swipe', 'swim', 'settings']) {
+  for (const text of ['observation', 'swipe', 'swim', 'projects', 'settings']) {
     assert.match(html, new RegExp(`data-testid="nav-view-${text}"`));
   }
 });
@@ -87,15 +87,15 @@ test('renderViewNav returns empty string without a urlKey (nothing to navigate t
 test('partitionViewLinks splits first-class (primary) from flag-gated (overflow)', () => {
   const links = getViewNavLinks('acme', { roadmap: true, dispatch: true, proxy: true });
   const { primary, overflow } = partitionViewLinks(links, 'observation');
-  assert.deepEqual(primary.map(l => l.text), ['observation', 'swipe', 'swim', 'settings']);
+  assert.deepEqual(primary.map(l => l.text), ['observation', 'swipe', 'swim', 'projects', 'settings']);
   assert.deepEqual(overflow.map(l => l.text), ['roadmap', 'dispatch', 'proxy']);
 });
 
 test('partitionViewLinks HOISTS the active overflow view inline (never hidden)', () => {
   const links = getViewNavLinks('acme', { roadmap: true, dispatch: true, proxy: true });
   const { primary, overflow } = partitionViewLinks(links, 'dispatch');
-  // Active flag-gated view is lifted onto the primary strip, after the four.
-  assert.deepEqual(primary.map(l => l.text), ['observation', 'swipe', 'swim', 'settings', 'dispatch']);
+  // Active flag-gated view is lifted onto the primary strip, after the five.
+  assert.deepEqual(primary.map(l => l.text), ['observation', 'swipe', 'swim', 'projects', 'settings', 'dispatch']);
   // …and removed from overflow so it is not rendered twice.
   assert.deepEqual(overflow.map(l => l.text), ['roadmap', 'proxy']);
 });
@@ -135,6 +135,7 @@ test('renderNavBar carries the view switcher on authenticated workspace pages', 
   });
   assert.match(html, /class="nav-views"/);
   assert.match(html, /data-testid="nav-view-observation"/);
+  assert.match(html, /data-testid="nav-view-projects"/);
   assert.match(html, /data-testid="nav-view-settings"/);
   // Flagged power-user view is present when its flag is on.
   assert.match(html, /data-testid="nav-view-dispatch"/);

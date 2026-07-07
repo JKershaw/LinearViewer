@@ -164,7 +164,7 @@ test.describe('Roadmap Page', () => {
     await page.waitForLoadState('networkidle');
 
     // Should have a link back to projects
-    const projectsLink = page.locator('a:has-text("projects")');
+    const projectsLink = page.locator('[data-testid="nav-view-projects"]');
     await expect(projectsLink).toBeVisible();
   });
 

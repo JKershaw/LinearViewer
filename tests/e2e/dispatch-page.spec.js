@@ -1006,7 +1006,7 @@ test.describe('Dispatch Page', () => {
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
 
-      const projectsLink = page.locator('.nav-action:has-text("projects")');
+      const projectsLink = page.locator('[data-testid="nav-view-projects"]');
       await expect(projectsLink).toBeVisible();
     });
   });
