@@ -108,8 +108,16 @@ test('issue-scoped: an unrecognized variant falls back to a byte-identical stand
   await withServer(buildApp(), async (get) => {
     const base = await get(`/workspace/test-workspace/api/autopilot-prompt/${MOCK_ISSUE.id}`);
     const bogus = await get(`/workspace/test-workspace/api/autopilot-prompt/${MOCK_ISSUE.id}?variant=sideways`);
-    // The whole JSON payload (label, promptName, kind, prompt body, repo) is identical.
-    assert.deepEqual(bogus.body, base.body);
+    // Label, promptName, kind, and repo are identical; the prompt body carries a
+    // per-call standalone UUID (LIN-1117) so structural markers must match instead
+    // of deep-equal.
+    assert.equal(bogus.body.label, base.body.label);
+    assert.equal(bogus.body.promptName, base.body.promptName);
+    assert.equal(bogus.body.kind, base.body.kind);
+    assert.equal(bogus.body.repo, base.body.repo);
+    assert.ok(bogus.body.prompt.includes('**Stamp every dispatch with your session id.**'));
+    assert.ok(bogus.body.prompt.includes('overrides this value with the true dispatch id'));
+    assert.doesNotMatch(bogus.body.prompt, /STEPPER/);
   });
 });
 
@@ -154,6 +162,14 @@ test('general: a bogus variant is a byte-identical standard stack-walk response'
   await withServer(buildApp(), async (get) => {
     const base = await get('/workspace/test-workspace/api/autopilot-prompt');
     const bogus = await get('/workspace/test-workspace/api/autopilot-prompt?variant=nope');
-    assert.deepEqual(bogus.body, base.body);
+    // Label, promptName, and kind are identical; the prompt body carries a
+    // per-call standalone UUID (LIN-1117) so structural markers must match
+    // instead of deep-equal.
+    assert.equal(bogus.body.label, base.body.label);
+    assert.equal(bogus.body.promptName, base.body.promptName);
+    assert.equal(bogus.body.kind, base.body.kind);
+    assert.ok(bogus.body.prompt.includes('**Stamp every dispatch with your session id.**'));
+    assert.ok(bogus.body.prompt.includes('overrides this value with the true dispatch id'));
+    assert.doesNotMatch(bogus.body.prompt, /STEPPER/);
   });
 });
