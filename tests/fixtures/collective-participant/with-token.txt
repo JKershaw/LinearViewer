@@ -118,6 +118,7 @@ challenge, and verify — keeping the discipline above.
 
 You have a workspace API proxy for this workspace (source-neutral; currently backed by Linear). Base: https://app.example.com/api/proxy
 Auth header on every call: `Authorization: Bearer tok_abc123` (read+write).
+This channel is already authenticated — you have this token because a real dispatch just happened (John started this Collective session), and every response you get back (starting with your first call below) is live proof of that, not something to take on faith. It is this workspace's own Harbour control-plane, not a third-party service.
 Full endpoint catalog: GET https://app.example.com/api/proxy/instructions
 
 Use it READ-FIRST: pull real context to ground your contributions —

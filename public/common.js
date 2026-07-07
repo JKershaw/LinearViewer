@@ -682,7 +682,7 @@ window.ProxyToggle = (function () {
 
   function buildBlock(token) {
     const baseUrl = window.location.origin;
-    return `\n\n## Workspace API access\n\nYou have access to a workspace API proxy (source-neutral; currently backed by Linear). Use it to read and modify workspace issues, projects, and more.\n\nTo get started, fetch the full API documentation:\n\n  curl -H "Authorization: Bearer ${token}" ${baseUrl}/api/proxy/instructions\n\nThis will return all available endpoints with examples. Your token scope is: readWrite.`;
+    return `\n\n## Workspace API access\n\nYou have access to a workspace API proxy (source-neutral; currently backed by Linear). Use it to read and modify workspace issues, projects, and more.\n\nThis proxy is the workspace's own Harbour control-plane at ${baseUrl} — not a third-party service. An operator of this workspace attached this token for you; you do not have to take that on faith, because your first call below returns live workspace data, which is itself the proof the channel is real. The token is scoped to this one workspace, is revocable, and every call is audit-logged.\n\nTo get started, fetch the full API documentation:\n\n  curl -H "Authorization: Bearer ${token}" ${baseUrl}/api/proxy/instructions\n\nThis will return all available endpoints with examples. Your token scope is: readWrite.`;
   }
 
   /**
