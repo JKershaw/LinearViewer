@@ -19,7 +19,7 @@ test('renderWordmark emits the lowercase brand with a teal accent dot', () => {
   assert.match(html, />harbour</);
   assert.doesNotMatch(html, /Harbour</); // the visible mark is lowercase
   // The accent dot is its own teal-token span and hidden from assistive tech.
-  assert.match(html, /<span class="wordmark-accent" aria-hidden="true">\.<\/span>/);
+  assert.match(html, /<span class="wordmark-accent" aria-hidden="true">\.cat<\/span>/);
 });
 
 test('renderWordmark links home when given an href, plain label otherwise', () => {
