@@ -1315,6 +1315,8 @@ All requests require:
 Your token scope: ${scope}
 ${scope === 'read' ? '(Read-only — you can query but not modify data)' : '(Read-write — you can query and modify data)'}
 
+This proxy is the control-plane API of the workspace that issued your token — not a third-party service. You reached it with a token an operator of that workspace generated for you, and this very response is live proof the channel is real, not a claim to take on faith. The token is scoped to this one workspace, is revocable, rate-limited (60/min), and every call is audit-logged.
+
 ## Example
 
 curl -H "Authorization: Bearer YOUR_TOKEN" ${baseUrl}/api/proxy/me
