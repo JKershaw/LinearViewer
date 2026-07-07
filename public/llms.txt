@@ -11,6 +11,7 @@
 ## Navigation
 
 - **Workspace selector**: `workspace: {name}` in nav bar - click to switch
+- **View switcher**: `.nav-views` row in the header - switch between views (observation/swipe/swim/settings + flag-gated roadmap/dispatch/proxy); at the top of the page, reachable without scrolling on mobile
 - **Team filter**: `team: {name}` in nav bar - filter issues by team
 - **Expand/collapse**: Click task row or ▶/▼ arrow
 - **Project collapse**: Click project header
@@ -108,11 +109,13 @@ Both In Progress and Projects sections use the same nested structure:
 - `#workspace-options` - workspace dropdown panel
 - `#team-options` - team dropdown panel
 - `[data-team="{id}"]` - team filter option (use "all" for all teams)
+- `.nav-views` - header-level cross-view switcher row (LIN-978); single scrolling row at the top of every workspace page
+- `[data-testid="nav-view-{name}"]` - a view-switcher link by its visible text (e.g. `observation`, `swipe`, `swim`, `settings`, and the flag-gated `roadmap`/`dispatch`/`proxy`); the active view renders as a `<strong class="nav-view-current">` instead of an `<a>`. First-class views always show; power-user views only with their per-user flag; experimental views are never here (Settings-only)
 
 ### Footer Selectors
 - `.page-footer` - footer container
-- `.footer-actions` - container for action links (authenticated pages only)
-- `.footer-action` - action link (reset, audit)
+- `.footer-actions` - container for the `reset` action (authenticated pages only; the cross-view links moved to the header `.nav-views` switcher in LIN-978)
+- `.footer-action` - action link (reset)
 - `.reset-view` - reset button (in footer)
 - `.footer-deploy` - deploy information container
 - `.footer-link` - link within deploy info (commit hash or GitHub repo)
@@ -229,12 +232,15 @@ Prompts (including `retro`) are available on completed/canceled issues too.
 
 ## Collective (experimental)
 
-The Collective page (`/workspace/{urlKey}/collective`) dispatches full Claude Code sessions from several connected workspaces into one Yap chat channel for a watched cross-project discussion. Requires the per-user `collective` feature flag; surfaced only via a link in Settings.
+The Collective page (`/workspace/{urlKey}/collective`) dispatches full Claude Code sessions — one per chosen character (persona) — into one Yap chat channel for a watched cross-project discussion. Each character is bound to a connected workspace/repo. Requires the per-user `collective` feature flag; surfaced only via a link in Settings.
 
 ### Collective DOM Structure
 ```
 main.collective-page[data-url-key]      - page container
-  .collective-ws-check[value]           - workspace checkbox (value = urlKey)
+  .collective-char-check[value]         - character selection checkbox (value = character id)
+  [data-testid=collective-char-repo]    - define-new: connected-repo select
+  [data-testid=collective-char-{role|lens|objective|value|disposition}] - persona inputs
+  [data-testid=collective-char-add]     - add the defined character to the picker
   #collective-channel                   - Yap channel input (random default: #word-word-YYYY-MM-DD)
   #collective-topic                     - discussion topic textarea
   #collective-target                    - dispatch target select (cli | web)
@@ -254,7 +260,7 @@ main.collective-page[data-url-key]      - page container
 
 ## Autopilot Observation (first-class)
 
-The Autopilot Observation page (`/workspace/{urlKey}/observation`) is a realtime, mobile-first feed of autopilot **sessions** merged across ALL connected workspaces. First-class: a footer link, no feature flag (it superseded the retired experimental `dashboard` flag/view; `/workspace/{urlKey}/dashboard` now 302-redirects here). NOTE: distinct from the first-class project tree view (the "dashboard" at `/workspace/{urlKey}/`). A **session** is the LIN-591 reconstructed `sessionId` spine — an autopilot orchestrator dispatch plus every worker it spawned across the seed/epic's descended + spun-off tasks — NOT a per-task grouping. The live feed reads Mongo only (no Linear calls per poll, no LLM per poll). Session terminality follows the anchor autopilot loop (a `[done]`/`[failed]`/… feedback marker, lib/dispatch-terminal.js, folds in), so finished sessions leave the Active feed for the collapsible Completed archive.
+The Autopilot Observation page (`/workspace/{urlKey}/observation`) is a realtime, mobile-first feed of autopilot **sessions** merged across ALL connected workspaces. First-class: a header view-switcher link (`.nav-views`, LIN-978), no feature flag (it superseded the retired experimental `dashboard` flag/view; `/workspace/{urlKey}/dashboard` now 302-redirects here). NOTE: distinct from the first-class project tree view (the "dashboard" at `/workspace/{urlKey}/`). A **session** is the LIN-591 reconstructed `sessionId` spine — an autopilot orchestrator dispatch plus every worker it spawned across the seed/epic's descended + spun-off tasks — NOT a per-task grouping. The live feed reads Mongo only (no Linear calls per poll, no LLM per poll). Session terminality follows the anchor autopilot loop (a `[done]`/`[failed]`/… feedback marker, lib/dispatch-terminal.js, folds in), so finished sessions leave the Active feed for the collapsible Completed archive.
 
 ### Autopilot Observation DOM Structure
 ```
@@ -361,4 +367,4 @@ main.flight-companion-page[data-url-key]  - page container
 - Logout requires re-authentication via Linear OAuth
 - Expand/collapse state persists in localStorage (reset restores defaults)
 - Team filter selection persists in localStorage across sessions
-- Landing page shows static demo data for unauthenticated users
+- Landing page (`/`, unauthenticated) is a bespoke Harbour showcase — a brand hero, fake-data glimpses of real surfaces (observation feed, swim board, grounded prompt), a providers strip, and a distinct Harbour OS section. It is NOT the project-tree renderer; section blocks carry `[data-testid="landing-{loop,observation,swim,prompt,providers,os}"]`. The `/swipe` and `/swim` unauthenticated previews still render sample tree data.

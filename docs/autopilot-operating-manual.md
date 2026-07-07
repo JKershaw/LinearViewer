@@ -196,62 +196,68 @@ silence forever.)
 
 ### Closing a session, once it's truly spent
 
-The follow-up above is *why* you don't slam a window shut the moment its task lands: a finished session
-is cheap optionality — a near-term beat may resume it, or a later worker's blocker may want to reach
-back into the research that already answered it. So your default with a dispatched window is to **leave
-it open**. Nothing closes it on a timer; that reaper was deliberately removed, because a clock can't
-tell a *finished* session from a *finished-but-still-in-use* one, and it kept closing windows people
-were mid-reply to. That discrimination — done versus still-needed — is exactly the one a timer can't
-make and you can, so the close decision sits at your altitude, never on a clock.
+The follow-up above is *why* you don't slam a window shut before you know it's actually spent: closing
+is only ever safe once a session is truly finished, not merely quiet. But once it *is* finished, there's
+no reason to let it sit — resuming a closed session is reliable now, so a near-term beat or a later
+worker's blocker can still reach back into it after you've closed it. That's what changed: closing no
+longer bets away the optionality a finished window used to hold. So your default with a dispatched
+window is now to **close it once it's done**, on the same wire the follow-up rides — an `abort: true`
+dispatch naming the session via `abortTo` — rather than leaving it open indefinitely. Nothing closes it
+on a timer; that reaper was deliberately removed, because a clock can't tell a *finished* session from a
+*finished-but-still-in-use* one, and it kept closing windows people were mid-reply to. That
+discrimination — done versus still-needed — is exactly the one a timer can't make and you can, so the
+close decision sits at your altitude, never on a clock.
 
-Which makes closing an **explicit, evidence-based act**, and a rare one. You have the same wire the
+Which makes closing an **explicit, evidence-based act**, not a blind reflex. You have the same wire the
 follow-up rides — an `abort: true` dispatch naming the original session via `abortTo` — and on a
-genuinely-done session it reaps the window cleanly and leaves the honest phase intact. But reach for it
-**lazily**: never on completion, but at some *later* orient, and only when the session is spent on every
-axis at once — its task **verified-complete**, its **dependents resolved**, **no foreseeable follow-up**
-that would want to resume it, and **not a maybe-interactive one**. That last guard is the whole reason
-the timer failed: a human-continued session reads as done from the outside just like a real finish, and
-you can't tell them apart, so when there's any chance someone's still in there, you leave it. Miss any
-one of those and the move is the same — leave it open. The value here is quiet resource hygiene, never
-cleanup for its own sake.
+genuinely-done session it reaps the window cleanly and leaves the honest phase intact. Reach for it as
+soon as the session is spent on every axis at once — its task **verified-complete**, its **dependents
+resolved**, **no foreseeable follow-up** that would want to resume it *in-band* right now, and **not a
+maybe-interactive one**. That last guard is the one hold-out from the close-on-done default: a
+human-continued session reads as done from the outside just like a real finish, and you can't tell them
+apart, so when there's any chance someone's still in there, you leave it open. Miss any one of the other
+axes and the move is the same — leave it open until they're met, then close. The value here is quiet
+resource hygiene, done promptly rather than deferred — never cleanup for its own sake, and never a race
+to close before the axes are actually satisfied.
 
-There is exactly **one class where you close on completion rather than at a later orient**: a **child
-autopilot** (see *Dispatching a child autopilot* below) whose terminal report you have **judged**. It is
-the one session where close-when-done doesn't fight any of the guards above — it is not a
-maybe-interactive or human-continued session, no in-session follow-up is expected of it (each child is
-its own fresh dispatch, not a warm session you feed beats), and once you've judged its report and
-advanced there is nothing left in that window to resume. So there, and only there, the close is not a *later* act: right after judge-and-advance,
-reap it on the same `abort: true`/`abortTo` wire (naming the **child's** session id). This narrows the
-never-on-completion default for that single case; it does not touch it for **workers**, maybe-interactive
-sessions, or human-continued ones — those still leave open, and a `[pending]`/`blocked`/`failed` child
-(not yet judged-terminal) stays open too.
+The **child autopilot** case (see *Dispatching a child autopilot* below) is now one instance of that
+general **close-on-done default**, not a carve-out from a stricter one: a child autopilot whose terminal
+report you have **judged** is closed right after judge-and-advance, on the `abort: true`/`abortTo` wire
+(naming the **child's** session id) — it is not a maybe-interactive or human-continued session, no
+in-session follow-up is expected of it (each child is its own fresh dispatch, not a warm session you feed
+beats), and once you've judged its report and advanced there is nothing left in that window to resume
+from. The same default now applies to **workers** too: once a worker's task is verified-complete, its
+dependents resolved and no follow-up foreseeable, close it on the same wire rather than leaving it open.
+It still does not touch maybe-interactive or human-continued sessions — those still leave open until the
+guard clears — and a `[pending]`/`blocked`/`failed` child (not yet judged-terminal) stays open too.
 
-Two honesties keep this from over-reaching. The window is **bounded**: the session record is reaped a
-short while after it goes terminal, and the close handle dies with it — so a close that's going to
-happen happens at *a* later orient within that window, not an arbitrarily distant one; past it the
-window simply orphans, and that's an acceptable end, not a failure to chase. And don't let the
-keep-research-open rationale promise what isn't built — routing a later worker's question back into an
-earlier session is the *intent* behind leaving it open, not a capability you can lean on today. Set the
-disposition, keep the option alive, without depending on a mechanism that doesn't exist yet. When in
-doubt, the same instinct as everywhere else: closing forecloses and leaving-open is cheap, so leave it
-open.
+Two honesties keep this from over-reaching. First, closing doesn't foreclose what it used to: resuming a
+closed session is reliable, so a later worker's question can still route back into an earlier one even
+after you've closed it — the keep-it-open-for-optionality rationale is gone because the optionality
+survives the close. That's the premise the whole default rests on, and it's confirmed, not assumed.
+Second, close-on-done is still gated on real evidence, not on the clock — there's no timer forcing an
+early close and none rescuing a late one, so if the four axes aren't genuinely met yet, the move is still
+to leave it open rather than close speculatively. When in doubt about whether they're met, the same
+instinct as everywhere else applies to the *uncertain* case: leave it open until the evidence is in, then
+close.
 
 There is one more close, and it belongs to the *end of the run itself* rather than to any single
-session's life — a different axis from everything above. All of that governs a window *while the run is
-live*: mid-run a finished session is cheap optionality, so you leave it open and reach for a close only
-lazily, per session, at some later orient. But when the **top-level task is verified complete and the
-run is concluding** — the work is done, nothing more will be dispatched, and the option value of a warm
-window has expired *with the run* — there is one deterministic cleanup act. Issue a single
+session's life — a different axis from everything above. Close-on-done should mean most windows are
+already reaped by the time the run concludes — but "should" isn't "are": a straggler can still be
+sitting open (a worker whose axes hadn't quite cleared, a child autopilot judged in the same beat the run
+ended). So when the **top-level task is verified complete and the run is concluding** — the work is
+done, nothing more will be dispatched — there is one deterministic cleanup act. Issue a single
 **`close --cascade` rooted on your own session id** — `POST /dispatch { abort: true, cascade: true,
 abortTo: <your own session id> }` — and Harbour walks the lineage it already tracks and closes your
 **whole descendant tree** in one call: your own spent warm session, your workers, and any child
 autopilots and *their* workers. You don't enumerate the tree or send one abort per window; the cascade
-is the fan-out. This is the run's **final cleanup**, not the never-on-completion default reversed — it
-fires *once*, at the very end, over the tree you own, exactly when the leave-open rationale no longer
-applies. (It's also distinct from the child-autopilot carve-out above: that closes *one* judged session
-*mid-run*; this closes the *whole tree* because the *run* is over. And it's for a run that *finishes* —
-if you're **pausing for the human** rather than concluding, leave the windows open; a hand-back may want
-them.)
+is the fan-out. This is the run's **final cleanup**, a cheap, idempotent sweep for whatever's still open
+rather than the primary mechanism — it fires *once*, at the very end, over the tree you own, and costs
+nothing extra when close-on-done already did its job. (It's also distinct from the per-session
+close-on-done default above: that closes *one* session as soon as *its own* axes clear, whenever that
+happens to be, *mid-run*; this closes the *whole remaining tree* in one pass because the *run* is over.
+And it's for a run that *finishes* — if you're **pausing for the human** rather than concluding, leave
+the windows open; a hand-back may want them.)
 
 What makes this safe — and what makes it *not* the blind timer-reaper that was deliberately removed — is
 that the cascade emits **plain aborts** and **the runner skips any session a human has continued**. A

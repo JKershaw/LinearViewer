@@ -80,19 +80,24 @@ test.describe('Authenticated Dashboard', () => {
     await expect(page.locator('.nav-bar .nav-action[href="/audit"]')).not.toBeVisible();
   });
 
-  test('shows footer with reset, all navigation links, and deploy info', async ({ page, localWorkerUrlKey }) => {
+  test('shows footer with reset and deploy info, and header nav with view links', async ({ page, localWorkerUrlKey }) => {
     // Footer should be visible
     await expect(page.locator('.page-footer')).toBeVisible();
 
-    // Should have reset link in footer
+    // Reset (a client action, not a view link) stays in the footer
     await expect(page.locator('.footer-action.reset-view')).toBeVisible();
 
-    // Should have all navigation links with workspace prefix (dashboard has no "current page" so all are links)
-    await expect(page.locator(`.footer-action[href="/workspace/${localWorkerUrlKey}/settings"]`)).toBeVisible();
-    await expect(page.locator(`.footer-action[href="/workspace/${localWorkerUrlKey}/swim"]`)).toBeVisible();
+    // Cross-view links were hoisted into the shared header switcher (LIN-978);
+    // the dashboard has no "current" view so all are links.
+    await expect(page.locator(`.nav-views [data-testid="nav-view-settings"][href="/workspace/${localWorkerUrlKey}/settings"]`)).toBeVisible();
+    await expect(page.locator(`.nav-views [data-testid="nav-view-swim"][href="/workspace/${localWorkerUrlKey}/swim"]`)).toBeVisible();
+
+    // The footer no longer carries any view links.
+    await expect(page.locator('.footer-actions [data-testid^="footer-link-"]')).toHaveCount(0);
 
     // Should NOT have any bold current page indicator on dashboard
     await expect(page.locator('.footer-current')).not.toBeVisible();
+    await expect(page.locator('.nav-view-current')).not.toBeVisible();
 
     // Should have deploy info section with GitHub link (fallback in test mode)
     await expect(page.locator('.footer-deploy')).toBeVisible();

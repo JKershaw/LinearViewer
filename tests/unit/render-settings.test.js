@@ -6,6 +6,8 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { renderSettingsPage } from '../../lib/render-settings.js';
+import { AVAILABLE_MODELS } from '../../lib/openrouter.js';
+import { PROMPT_TEMPLATES } from '../../lib/prompt-template-defs.js';
 
 const BASE = { urlKey: 'acme', workspaces: [], currentModel: 'openai/gpt-5.4-mini', availableModels: [] };
 
@@ -53,6 +55,32 @@ describe('renderSettingsPage — AI usage section', () => {
 
   test('does not throw when llmStats is omitted', () => {
     assert.doesNotThrow(() => renderSettingsPage('Acme', BASE));
+  });
+});
+
+describe('renderSettingsPage — model pricing hint (LIN-993)', () => {
+  test('renders a pricing hint line for the current model, not inside option text', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      currentModel: 'openai/gpt-5.4-mini',
+      availableModels: AVAILABLE_MODELS
+    });
+    // Hint host present, showing the selected model's rate.
+    assert.match(html, /pricing:/);
+    assert.match(html, /\$0\.75 in \/ \$4\.50 out per 1M tokens/);
+    // Pricing rides as a data-attribute, never as visible <option> text.
+    assert.match(html, /<option value="openai\/gpt-5\.4-mini"[^>]*data-pricing="[^"]+"[^>]*>GPT-5\.4 Mini<\/option>/);
+    assert.doesNotMatch(html, /<option[^>]*>[^<]*per 1M tokens[^<]*<\/option>/);
+  });
+
+  test('degrades to a placeholder when the current model is a custom/unknown id', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      currentModel: 'some-provider/unknown-model',
+      availableModels: AVAILABLE_MODELS
+    });
+    assert.match(html, /pricing:/);
+    assert.match(html, /unknown \/ custom model/);
   });
 });
 
@@ -217,5 +245,177 @@ describe('renderSettingsPage — Providers section (LIN-634)', () => {
     const bindingRow = html.slice(html.indexOf('settings-provider-binding'));
     const rowEnd = bindingRow.indexOf('</div>\n          </div>');
     assert.doesNotMatch(bindingRow.slice(0, rowEnd > 0 ? rowEnd : 600), /data-feature=/);
+  });
+});
+
+describe('renderSettingsPage — Dispatch defaults section (LIN-1095)', () => {
+  test('always renders the section header as a sibling of the AI section', () => {
+    const html = renderSettingsPage('Acme', BASE);
+    assert.match(html, /data-testid="settings-section-dispatch-defaults"/);
+    assert.match(html, />Dispatch defaults</);
+    // Two independent <section> blocks, not one nested inside the other.
+    const aiIdx = html.indexOf('data-testid="settings-section-ai"');
+    const ddIdx = html.indexOf('data-testid="settings-section-dispatch-defaults"');
+    const aiSectionEnd = html.indexOf('</section>', aiIdx);
+    assert.ok(aiIdx > -1 && ddIdx > -1 && aiSectionEnd > -1);
+    assert.ok(ddIdx > aiSectionEnd, 'dispatch-defaults section must not be nested inside the AI section');
+  });
+
+  test('renders one row for the workspace-wide default plus one per live PROMPT_TEMPLATES key', () => {
+    const html = renderSettingsPage('Acme', BASE);
+    assert.match(html, /data-testid="dispatch-default-row-default"/);
+    for (const kind of Object.keys(PROMPT_TEMPLATES)) {
+      assert.match(html, new RegExp(`data-testid="dispatch-default-row-${kind}"`), `missing row for kind "${kind}"`);
+    }
+    // 15 live keys today (LIN-1095's own correction: `bug` is easy to omit).
+    assert.ok('bug' in PROMPT_TEMPLATES);
+    assert.equal(Object.keys(PROMPT_TEMPLATES).length, 15);
+  });
+
+  test('populates the workspace-wide row from dispatchDefaults.model/harness', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      dispatchDefaults: { model: 'anthropic/claude-opus-4.8', harness: 'opencode' }
+    });
+    assert.match(html, /name="defaultModel"[^>]*value="anthropic\/claude-opus-4\.8"/);
+    assert.match(html, /name="defaultHarnessSelect"[^>]*>[\s\S]*?<option value="opencode" selected>/);
+  });
+
+  test('a custom (non-suggested) harness value renders in the custom text input, not the select', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      dispatchDefaults: { harness: 'my-bespoke-harness' }
+    });
+    assert.match(html, /name="defaultHarnessCustom"[^>]*value="my-bespoke-harness"/);
+    assert.doesNotMatch(html, /<option value="my-bespoke-harness"/);
+  });
+
+  test('populates a per-kind override row from dispatchDefaults.byKind', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      dispatchDefaults: {
+        byKind: { implementation: { model: 'anthropic/claude-sonnet-5', harness: 'claude-code' } }
+      }
+    });
+    const rowStart = html.indexOf('data-testid="dispatch-default-row-implementation"');
+    const row = html.slice(rowStart, rowStart + 1200);
+    assert.match(row, /name="kind__implementation__Model"[^>]*value="anthropic\/claude-sonnet-5"/);
+    assert.match(row, /<option value="claude-code" selected>/);
+  });
+
+  test('a kind with no override renders blank (inherits workspace default)', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      dispatchDefaults: { model: 'anthropic/claude-opus-4.8', byKind: {} }
+    });
+    const rowStart = html.indexOf('data-testid="dispatch-default-row-implementation"');
+    const row = html.slice(rowStart, rowStart + 1200);
+    assert.match(row, /name="kind__implementation__Model"[^>]*value=""/);
+  });
+
+  describe('claude-code default + model suggestions (LIN-1111)', () => {
+    test('the workspace-wide row pre-selects claude-code when no harness is configured', () => {
+      const html = renderSettingsPage('Acme', BASE);
+      const rowStart = html.indexOf('data-testid="dispatch-default-row-default"');
+      const row = html.slice(rowStart, rowStart + 1200);
+      assert.match(row, /<option value="claude-code" selected>/);
+      assert.doesNotMatch(row, /<option value=""[^>]* selected>/);
+    });
+
+    test('an explicitly configured non-default workspace harness still wins over the pre-select', () => {
+      const html = renderSettingsPage('Acme', { ...BASE, dispatchDefaults: { harness: 'opencode' } });
+      const rowStart = html.indexOf('data-testid="dispatch-default-row-default"');
+      const row = html.slice(rowStart, rowStart + 1200);
+      assert.match(row, /<option value="opencode" selected>/);
+      assert.doesNotMatch(row, /<option value="claude-code" selected>/);
+    });
+
+    test('per-kind override rows do NOT pre-select claude-code when blank (blank must keep meaning "inherit")', () => {
+      const html = renderSettingsPage('Acme', BASE);
+      const rowStart = html.indexOf('data-testid="dispatch-default-row-implementation"');
+      const row = html.slice(rowStart, rowStart + 1200);
+      assert.doesNotMatch(row, /<option value="claude-code" selected>/);
+      assert.match(row, /<option value=""[^>]* selected>/);
+    });
+
+    test('renders a shared recommended-models datalist referenced by every model input', () => {
+      const html = renderSettingsPage('Acme', BASE);
+      assert.match(html, /<datalist id="dispatch-model-suggestions">/);
+      assert.match(html, /name="defaultModel"[^>]*list="dispatch-model-suggestions"/);
+      assert.match(html, /name="kind__implementation__Model"[^>]*list="dispatch-model-suggestions"/);
+    });
+
+    test('with no dispatchModelCatalog, the datalist is unchanged (static suggestions only)', () => {
+      const html = renderSettingsPage('Acme', BASE);
+      const start = html.indexOf('<datalist id="dispatch-model-suggestions">');
+      const end = html.indexOf('</datalist>', start);
+      const datalist = html.slice(start, end);
+      assert.equal((datalist.match(/<option/g) || []).length, 5);
+    });
+
+    test('LIN-1111 Session 2: merges the live OpenRouter catalog into the shared model datalist', () => {
+      const html = renderSettingsPage('Acme', {
+        ...BASE,
+        dispatchModelCatalog: [{ id: 'mock-provider/catalog-model-one', name: 'Catalog Model One' }]
+      });
+      const start = html.indexOf('<datalist id="dispatch-model-suggestions">');
+      const end = html.indexOf('</datalist>', start);
+      const datalist = html.slice(start, end);
+      assert.match(datalist, /<option value="mock-provider\/catalog-model-one">/);
+      // Still lists every curated suggestion too — supplement, not replace.
+      assert.match(datalist, /<option value="openai\/gpt-5\.4-mini">/);
+    });
+
+    test('LIN-1111 Session 2: de-dupes a catalog entry that collides with a curated suggestion', () => {
+      const html = renderSettingsPage('Acme', {
+        ...BASE,
+        dispatchModelCatalog: [{ id: 'openai/gpt-5.4-mini', name: 'duplicate of a curated suggestion' }]
+      });
+      const start = html.indexOf('<datalist id="dispatch-model-suggestions">');
+      const end = html.indexOf('</datalist>', start);
+      const datalist = html.slice(start, end);
+      const occurrences = datalist.split('openai/gpt-5.4-mini').length - 1;
+      assert.equal(occurrences, 1);
+    });
+  });
+
+  describe('per-type overrides progressive disclosure (LIN-1111)', () => {
+    test('collapses the 15 per-kind rows behind a closed <details> when none are configured', () => {
+      const html = renderSettingsPage('Acme', BASE);
+      const detailsIdx = html.indexOf('<details class="dispatch-kind-overrides">');
+      assert.ok(detailsIdx > -1, 'expected a closed <details class="dispatch-kind-overrides">');
+      assert.match(html, /data-testid="dispatch-kind-overrides-toggle"/);
+    });
+
+    test('auto-expands the <details> when at least one per-kind override is configured', () => {
+      const html = renderSettingsPage('Acme', {
+        ...BASE,
+        dispatchDefaults: { byKind: { implementation: { harness: 'claude-code' } } }
+      });
+      assert.match(html, /<details class="dispatch-kind-overrides" open>/);
+    });
+  });
+
+  test('escapes a validation error message when dispatchDefaultsError is set', () => {
+    const html = renderSettingsPage('Acme', { ...BASE, dispatchDefaultsError: 'invalid-field' });
+    assert.match(html, /1000 characters or less/);
+  });
+
+  test('does not render an error line when dispatchDefaultsError is absent', () => {
+    const html = renderSettingsPage('Acme', BASE);
+    const ddIdx = html.indexOf('data-testid="settings-section-dispatch-defaults"');
+    const section = html.slice(ddIdx, ddIdx + 400);
+    assert.doesNotMatch(section, /settings-value error/);
+  });
+
+  test('the section submits through a single form to the dispatch-defaults route', () => {
+    const html = renderSettingsPage('Acme', BASE);
+    const formCount = (html.match(/class="settings-form dispatch-defaults-form"/g) || []).length;
+    assert.equal(formCount, 1);
+    assert.match(html, /action="\/workspace\/acme\/settings\/dispatch-defaults" method="POST"/);
+  });
+
+  test('does not throw when dispatchDefaults is omitted', () => {
+    assert.doesNotThrow(() => renderSettingsPage('Acme', BASE));
   });
 });

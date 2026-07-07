@@ -23,6 +23,8 @@ import { UserPreferencesStore, VALID_THEMES, setThemeCookie } from './lib/user-p
 import { WorkspacePreferencesStore } from './lib/workspace-preferences.js'
 import { DispatchQueueStore } from './lib/dispatch-store.js'
 import { CustomPromptsStore } from './lib/custom-prompts-store.js'
+import { CollectiveCharactersStore } from './lib/collective-characters-store.js'
+import { CollectivePresetsStore } from './lib/collective-presets-store.js'
 import { DispatchTokenStore } from './lib/dispatch-tokens.js'
 import { HarbourFeedbackTokenStore } from './lib/harbour-feedback-tokens.js'
 import { ProxyTokenStore } from './lib/proxy-tokens.js'
@@ -30,6 +32,7 @@ import { ProxyEventStore } from './lib/proxy-events.js'
 import { AgentStatusStore } from './lib/agent-status-store.js'
 import { ObservationSessionsStore } from './lib/observation-sessions-store.js'
 import { createObservationMaterializer } from './lib/observation-sessions-materializer.js'
+import { createWorkspaceTitleResolver } from './lib/workspace-title-resolver.js'
 import { FreeTierStore } from './lib/free-tier-store.js'
 import { RecapCacheStore } from './lib/recap-cache.js'
 import { BriefCacheStore } from './lib/brief-cache.js'
@@ -38,6 +41,7 @@ import { SessionSummaryCacheStore, hashSession } from './lib/session-summary-cac
 import { generateSessionSummary, childLoops, DEFAULT_SESSION_SUMMARY_MODEL } from './lib/session-summary.js'
 import { ReportHistoryStore } from './lib/report-history-store.js'
 import { TaskSnapshotStore } from './lib/task-snapshot-store.js'
+import { SavedChatStore } from './lib/saved-chat-store.js'
 import { LlmCallLogStore } from './lib/llm-call-log.js'
 import { PromptTraceStore } from './lib/prompt-trace-store.js'
 import { getProvider, getProviderForWorkspace, getAllProviders } from './lib/providers/registry.js'
@@ -53,7 +57,7 @@ import { buildPeriodicalNodes } from './lib/periodicals.js'
 import { parseRepoFromDescription } from './lib/prompt-formatters.js'
 import { renderPage, renderErrorPage, renderUpstreamAwareErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
 import { isAuthError } from './lib/errors.js'
-import { renderLandingHero } from './lib/components/landing-hero.js'
+import { renderLandingPage } from './lib/render-landing.js'
 import { isGitHubConfigured } from './lib/providers/github/app-auth.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken } from './lib/token-refresh.js'
@@ -63,7 +67,8 @@ import { createOpenRouterAuthRoutes } from './routes/openrouter-auth.js'
 import { createDispatchRoutes } from './routes/dispatch.js'
 import { createProxyRoutes } from './routes/proxy.js'
 import { createTestRoutes } from './routes/test.js'
-import { createWorkspaceApiRoutes } from './routes/workspace-api.js'
+import { createWorkspaceApiRoutes, shouldMockAi } from './routes/workspace-api.js'
+import { getModelCatalog } from './lib/openrouter-catalog.js'
 import { createLegacyRedirects } from './routes/legacy-redirects.js'
 import { testMockTeams, testMockData } from './tests/fixtures/mock-data.js'
 import { swimSampleData } from './tests/fixtures/swim-sample-data.js'
@@ -94,8 +99,10 @@ import { renderRoadmapPage } from './lib/render-roadmap.js'
 import { buildRoadmapModel } from './lib/roadmap.js'
 import { renderProxyPage } from './lib/render-proxy.js'
 import { AVAILABLE_MODELS, setLlmCallRecorder, setPromptTraceRecorder, getPaidEnvKey, hasPaidEnvKey } from './lib/openrouter.js'
-import { resolveWorkspaceModel, getWorkspaceFeatures, isWorkspaceFeatureEnabled, setWorkspaceFeature } from './lib/workspace-preferences.js'
+import { resolveWorkspaceModel, getWorkspaceFeatures, isWorkspaceFeatureEnabled, setWorkspaceFeature, resolveDispatchDefaults } from './lib/workspace-preferences.js'
 import { getFeatureFlags, isValidFeatureKey, isValidWorkspaceFeatureKey, WORKSPACE_FEATURES } from './lib/feature-defaults.js'
+import { PROMPT_TEMPLATES } from './lib/prompt-template-defs.js'
+import { validateOpaqueDispatchField, MAX_NAME_LENGTH } from './lib/dispatch-validation.js'
 
 // =============================================================================
 // Environment Variable Validation
@@ -170,14 +177,10 @@ const landingTrees = landingData.projects
     return { project, incomplete, completed, completedCount }
   })
 
-// The brand hero (LIN-726) that fronts every static-landing render. The GitHub
-// CTA is gated on the GitHub App being configured — read from env at startup,
-// the same lifecycle as the rest of the pre-rendered landing — so the landing
-// never offers a sign-in path that would 503. Uses the SAME shared predicate
-// (isGitHubConfigured) as the /auth/github route guard and the settings add
-// affordance (LIN-761), so the three consumers can never disagree: a CLIENT_ID-only
-// partial config no longer promises a sign-in the flow can't complete.
-const landingHeroHtml = renderLandingHero({ githubEnabled: isGitHubConfigured() })
+// The bespoke landing showcase (LIN-980) owns the brand hero itself; it gates
+// the GitHub CTA on the SAME `isGitHubConfigured()` predicate as the
+// /auth/github route guard and the settings add affordance (LIN-761), threaded
+// per-request at the render call sites below so the three can never disagree.
 
 // =============================================================================
 // Database & Session Setup
@@ -219,6 +222,23 @@ const workspacePreferencesStore = new WorkspacePreferencesStore({
 const customPromptsCollection = db.collection('custom-prompts')
 const customPromptsStore = new CustomPromptsStore({
   collection: customPromptsCollection
+})
+
+// Collective characters (personas the user picks for the experimental Collective
+// discussion, LIN-1048). Partitioned by the anchor workspace urlKey; each record
+// carries its own repo binding. Mirrors the custom-prompts store shape.
+const collectiveCharactersCollection = db.collection('collective-characters')
+const collectiveCharactersStore = new CollectiveCharactersStore({
+  collection: collectiveCharactersCollection
+})
+
+// Collective preset meetings (LIN-1050, S4). Custom rows only — the 6 built-in
+// seed presets are frozen module constants (lib/collective-preset-defs.js), not
+// rows in this collection. Partitioned by the anchor workspace urlKey, mirrors
+// the collective characters store shape minus its recent/auto-record half.
+const collectivePresetsCollection = db.collection('collective-presets')
+const collectivePresetsStore = new CollectivePresetsStore({
+  collection: collectivePresetsCollection
 })
 
 // Local provider backing store (LIN-356). One scope-partitioned collection
@@ -285,7 +305,12 @@ const observationSessionsStore = new ObservationSessionsStore({
 const observationMaterializer = createObservationMaterializer({
   dispatchStore: dispatchQueueStore,
   agentStatusStore,
-  observationSessionsStore
+  observationSessionsStore,
+  // LIN-962: resolve real task titles at the read/serve seam so Observation
+  // Level-2 cards whose loops lack `issueTitle` show a title, not a bare
+  // identifier. Off the hot poll path; `resolveWorkspaceTitles` is a hoisted
+  // fn declared below (safe to reference here — invoked only at write time).
+  resolveWorkspaceTitles
 })
 // Shared Observation sessions-feed cache (LIN-617). One process-wide instance,
 // passed to BOTH the dashboard router (which reads it on the /sessions path) and
@@ -381,6 +406,15 @@ const taskSnapshotStore = new TaskSnapshotStore({
   collection: taskSnapshotCollection
 })
 
+// Saved chats (LIN-1008): durable, resumable task-chat transcripts, private per
+// {urlKey, linearUserId}. Content-bearing → session-auth only: deliberately NOT
+// passed to createProxyRoutes / createWorkspaceApiRoutes / kpi-stats below (the
+// prompt-trace privacy boundary), only into the task-chat + test route factories.
+const savedChatsCollection = db.collection('saved-chats')
+const savedChatStore = new SavedChatStore({
+  collection: savedChatsCollection
+})
+
 // LLM call log (LIN-418): per-call metadata (model, provider, tokens, cost, time).
 // Registered as the openrouter client's recorder hook so every LLM call is logged
 // without the client importing the store.
@@ -464,7 +498,7 @@ app.use(session({
 // Test Mode Setup
 // =============================================================================
 if (process.env.NODE_ENV === 'test') {
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, taskSnapshotStore, localStore, getWorkspaceAccessToken }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, taskSnapshotStore, savedChatStore, localStore, getWorkspaceAccessToken }))
 }
 
 // =============================================================================
@@ -811,7 +845,7 @@ async function handleWorkspaceRemoval(session, workspaceId, res) {
   return new Promise((resolve) => {
     session.destroy((err) => {
       if (err) console.error('Session destroy error:', err);
-      const html = renderPage(landingTrees, [], [], landingData.organizationName, { isLanding: true, deployInfo, heroHtml: landingHeroHtml });
+      const html = renderLandingPage({ deployInfo, githubEnabled: isGitHubConfigured() });
       res.send(html);
       resolve();
     });
@@ -898,8 +932,8 @@ app.get('/', (req, res) => {
   const hasNoAuth = !process.env.LINEAR_ACCESS_TOKEN && oauthEnvVars.some(v => !process.env[v])
   const setupNotice = (isLocalhost && hasNoAuth) ? 'setup' : null
 
-  // Unauthenticated users see the static landing page
-  const html = renderPage(landingTrees, [], [], landingData.organizationName, { isLanding: true, deployInfo, setupNotice, heroHtml: landingHeroHtml })
+  // Unauthenticated users see the bespoke Harbour showcase landing (LIN-980).
+  const html = renderLandingPage({ deployInfo, setupNotice, githubEnabled: isGitHubConfigured() })
   res.send(html)
 })
 
@@ -1114,7 +1148,7 @@ function workspaceFromUrl(req, res, next) {
 }
 
 // Mount dispatch routes (requires workspaceFromUrl middleware)
-app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore }))
+app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore }))
 
 // Mount proxy routes
 // resolveWorkspaceAccess: looks up a workspace access token from active sessions
@@ -1227,6 +1261,24 @@ async function fetchWorkspaceIssues(workspace) {
   return result;
 }
 
+// LIN-962: the off-session title-resolution glue (session scan → latest-expiring-
+// token workspace pick → memoized fetchWorkspaceIssues → {identifier → title} map)
+// lives in lib/workspace-title-resolver.js so its REAL wiring is unit-testable with
+// a fake Linear client (not a reimplementation). Constructed with the real deps
+// here; behaviour is byte-identical to the former inline functions.
+const _workspaceTitleResolver = createWorkspaceTitleResolver({
+  sessionsCollection,
+  fetchWorkspaceIssues,
+  tokenRefreshBufferMs: TOKEN_REFRESH_BUFFER_MS
+});
+
+// Hoisted wrapper so the materializer wiring earlier in source order can reference
+// `resolveWorkspaceTitles` (invoked only at write time, long after this const is
+// assigned during module init).
+function resolveWorkspaceTitles(urlKey) {
+  return _workspaceTitleResolver.resolveWorkspaceTitles(urlKey);
+}
+
 // getWorkspaceOpenRouterKey: resolves the token creator's OpenRouter API key for
 // proxy consumers. The key is read directly from the durable per-user preferences
 // store (LIN-498), keyed by the token creator's linearUserId — the single source
@@ -1262,15 +1314,15 @@ app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRoute
 // Mount collective routes (experimental cross-project discussion — LIN-450).
 // yapClient is null when YAP_BASE_URL is unset; the routes degrade gracefully.
 const yapClient = yapClientFromEnv()
-app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyTokenStore, yapClient, getOpenRouterSource, getDeployInfo }))
+app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyTokenStore, collectiveCharactersStore, collectivePresetsStore, yapClient, getOpenRouterSource, getDeployInfo }))
 
 // Mount dashboard routes (experimental combined realtime autopilot dashboard — LIN-509).
 // Merges Mongo-only Loop reads across session.workspaces; Linear is hydrated lazily
 // (drill-down only), never fanned out per poll.
-app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, runSummaryCacheStore, sessionSummaryCacheStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo }))
+app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, runSummaryCacheStore, sessionSummaryCacheStore, briefCacheStore, recapCacheStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo }))
 
 // Mount task-chat routes (experimental "talk to a task" conversation).
-app.use(createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo }))
+app.use(createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore }))
 
 // Mount next-run routes (experimental "suggest the next autopilot run" — LIN-603).
 app.use(createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, reportHistoryStore }))
@@ -1547,9 +1599,17 @@ app.get('/workspace/:urlKey/roadmap', workspaceFromUrl, async (req, res) => {
   const teamId = rawTeam && rawTeam !== 'all' && UUID_REGEX.test(rawTeam) ? rawTeam : null;
 
   try {
-    // Fetch raw data — roadmap needs raw issues for velocity/queue calculations
-    const { organizationName, projects, issues } =
-      await getProviderForWorkspace(workspace).fetchProjects(getWorkspaceCallScope(workspace), teamId);
+    // Fetch raw data — roadmap needs raw issues for velocity/queue calculations.
+    // In test mode the mock 'test-token' can't reach real Linear, so honor the
+    // same testMockData arm fetchAndPrepareProjects and the dispatch route use.
+    // LIN-409 migrated the roadmap *e2e* happy-path to a genuine 'local' provider
+    // session and dropped this arm from the route; the visual maker deliberately
+    // stays on the test-token mock fixtures (not local), so without it this route
+    // auth-errors and the roadmap baseline silently captured the landing page.
+    const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
+    const { organizationName, projects, issues } = isTestMode
+      ? testMockData
+      : await getProviderForWorkspace(workspace).fetchProjects(getWorkspaceCallScope(workspace), teamId);
 
     // Build roadmap model from deterministic layer
     const roadmapModel = buildRoadmapModel(projects, issues);
@@ -1674,6 +1734,25 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
   }));
   const providerNotice = providerNoticeFromQuery(req.query);
 
+  // Dispatch model/harness defaults (LIN-1095): the model/harness dispatched
+  // agents execute WITH, distinct from currentModel above (which writes
+  // prompts). Own read of workspacePreferencesStore — currentModel/
+  // workspaceFeatures above already read it via their own established helpers
+  // (resolveWorkspaceModel/getWorkspaceFeatures, used at ~20 other call sites),
+  // so this stays a separate, targeted read rather than reshaping those.
+  const dispatchDefaultsPrefs = await workspacePreferencesStore.getWorkspacePreferences(workspace.urlKey);
+  const dispatchDefaults = dispatchDefaultsPrefs.dispatchDefaults || {};
+  const dispatchDefaultsError = req.query.dispatchDefaultsError || null;
+
+  // Live OpenRouter model catalog (LIN-1111 Session 2): the same cache module
+  // the dispatch-time client controls fetch via /api/openrouter/models, called
+  // here directly since Settings renders server-side. Supplements (never
+  // replaces) the static DISPATCH_MODEL_SUGGESTIONS datalist in
+  // renderDispatchDefaultsSection. Mocked in tests via the same predicate that
+  // gates the AI recommendation mock, so this never makes a live network call
+  // during automated test runs.
+  const dispatchModelCatalog = await getModelCatalog({ mock: shouldMockAi(workspace) });
+
   const html = renderSettingsPage(workspace.name || 'Workspace', {
     openRouterConnected: !!(openRouterSource === 'oauth' || openRouterSource === 'env'),
     openRouterSource,
@@ -1688,6 +1767,9 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
     llmStats,
     providerBindings,
     providerNotice,
+    dispatchDefaults,
+    dispatchDefaultsError,
+    dispatchModelCatalog,
     // Gate the GitHub add affordance on the SAME shared predicate the /auth/github
     // route guard and landing hero use (LIN-761), so the settings page never offers
     // an add that would 503/hang on a server where GitHub isn't fully configured.
@@ -1772,6 +1854,16 @@ app.get('/workspace/:urlKey/dispatch', workspaceFromUrl, async (req, res) => {
 
   const isLocalhost = ['localhost', '127.0.0.1'].some(h => req.get('host')?.startsWith(h));
 
+  // Workspace-wide dispatch defaults (LIN-1094), used only for the model/harness
+  // placeholder nicety (LIN-1096) — non-load-bearing, so a failed read just
+  // leaves the controls with generic placeholders.
+  let dispatchDefaults = { model: null, harness: null };
+  try {
+    dispatchDefaults = await resolveDispatchDefaults({ urlKey: workspace.urlKey, store: workspacePreferencesStore });
+  } catch (e) {
+    // Non-fatal
+  }
+
   const html = renderDispatchPage(workspace.name || 'Workspace', {
     deployInfo,
     urlKey: workspace.urlKey,
@@ -1779,7 +1871,8 @@ app.get('/workspace/:urlKey/dispatch', workspaceFromUrl, async (req, res) => {
     workspaces: req.session.workspaces,
     featureFlags,
     projectRepos,
-    isLocalhost
+    isLocalhost,
+    dispatchDefaults
   });
   res.send(html);
 });
@@ -1866,6 +1959,82 @@ app.post('/workspace/:urlKey/settings/model', workspaceFromUrl, async (req, res)
   }
 
   res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
+});
+
+/**
+ * Save workspace-wide + per-prompt-type dispatch model/harness defaults (LIN-1095).
+ * Distinct from /settings/model above: that selects the model used to WRITE
+ * prompts; this selects the model/harness dispatched agents EXECUTE with,
+ * consumed at dispatch time via resolveDispatchDefaults() (LIN-1094). Both
+ * fields stay opaque strings (no registry), validated with the same shared
+ * validateOpaqueDispatchField() the dispatch/proxy routes use (LIN-1084).
+ * Persists via the same read-merge-write discipline as /settings/model so
+ * dispatchDefaults never clobbers modelId/features.
+ */
+app.post('/workspace/:urlKey/settings/dispatch-defaults', workspaceFromUrl, async (req, res) => {
+  const workspace = req.workspace;
+  const settingsUrl = `/workspace/${encodeURIComponent(workspace.urlKey)}/settings`;
+
+  const readField = (key) => (req.body[key] || '').trim() || undefined;
+  const readHarness = (selectKey, customKey) => {
+    const custom = (req.body[customKey] || '').trim();
+    const select = (req.body[selectKey] || '').trim();
+    return custom || select || undefined;
+  };
+
+  let hasFieldError = false;
+  const validate = (value, name) => {
+    if (validateOpaqueDispatchField(value, name, { maxLength: MAX_NAME_LENGTH })) {
+      hasFieldError = true;
+    }
+  };
+
+  const model = readField('defaultModel');
+  const harness = readHarness('defaultHarnessSelect', 'defaultHarnessCustom');
+  validate(model, 'model');
+  validate(harness, 'harness');
+
+  // byKind is scoped to live PROMPT_TEMPLATES keys only, both by only ever
+  // reading these specific field names (any other posted field is simply
+  // never looked at) and defensively at read time in resolveDispatchDefaults.
+  const byKind = {};
+  for (const kind of Object.keys(PROMPT_TEMPLATES)) {
+    const kindModel = readField(`kind__${kind}__Model`);
+    const kindHarness = readHarness(`kind__${kind}__HarnessSelect`, `kind__${kind}__HarnessCustom`);
+    validate(kindModel, 'model');
+    validate(kindHarness, 'harness');
+    if (kindModel || kindHarness) {
+      byKind[kind] = {};
+      if (kindModel) byKind[kind].model = kindModel;
+      if (kindHarness) byKind[kind].harness = kindHarness;
+    }
+  }
+
+  if (hasFieldError) {
+    return res.redirect(`${settingsUrl}?dispatchDefaultsError=invalid-field`);
+  }
+
+  const dispatchDefaults = {};
+  if (model) dispatchDefaults.model = model;
+  if (harness) dispatchDefaults.harness = harness;
+  if (Object.keys(byKind).length) dispatchDefaults.byKind = byKind;
+
+  try {
+    const existingPrefs = await workspacePreferencesStore.getWorkspacePreferences(workspace.urlKey);
+    const ok = await workspacePreferencesStore.saveWorkspacePreferences(workspace.urlKey, {
+      ...existingPrefs,
+      dispatchDefaults
+    });
+    if (!ok) throw new Error('saveWorkspacePreferences returned false');
+  } catch (err) {
+    console.error('Failed to save workspace dispatch defaults:', err);
+    return res.status(500).send(renderErrorPage('Settings Error', 'Failed to save dispatch defaults. Please try again.', {
+      action: 'Back to settings',
+      actionUrl: settingsUrl
+    }));
+  }
+
+  res.redirect(settingsUrl);
 });
 
 /**

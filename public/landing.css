@@ -1,0 +1,432 @@
+/**
+ * Landing Showcase (LIN-980, UI audit G)
+ * =============================================================================
+ * Styles for the bespoke unauthenticated home page (lib/render-landing.js).
+ * Loaded AFTER /style.css, so it inherits the full token system, the shared
+ * `body.is-landing` teal-grid background + light/dark remap, and the landing
+ * hero/nav/footer chrome. This file adds ONLY the showcase composition.
+ *
+ * Dark-safe rule: every colour is a semantic token (--text/--muted/--card/
+ * --line/--brand/--amber/--green/--slate …). No raw hex — the same declarations
+ * flip correctly under both `.theme-dark` and the landing's
+ * `@media (prefers-color-scheme: dark)` remap. Type rides the shared split:
+ * --font-structural (mono) for machine facts / eyebrows / terminals,
+ * --font-content (sans) for headings and prose.
+ * Mobile-first: single column by default, multi-column at ≥760px.
+ */
+
+.landing-showcase {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 0 var(--space-4) var(--space-5);
+}
+
+/* ---- Section scaffold ---------------------------------------------------- */
+.lx-section {
+  margin: 4.5rem 0;
+}
+
+.lx-section__head {
+  max-width: 56ch;
+  margin-bottom: var(--space-4);
+}
+
+.lx-eyebrow {
+  font-family: var(--font-structural);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--brand-dim);
+  margin: 0 0 var(--space-2);
+}
+
+.lx-section__title {
+  font-family: var(--font-content);
+  font-size: 1.7rem;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin: 0;
+}
+
+.lx-section__lede {
+  font-family: var(--font-content);
+  font-size: 1.02rem;
+  line-height: 1.6;
+  color: var(--muted);
+  margin: var(--space-3) 0 0;
+}
+
+/* ---- The loop (four steps) ----------------------------------------------- */
+.lx-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+
+.lx-step {
+  padding: var(--space-4);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+}
+
+.lx-step__n {
+  font-family: var(--font-structural);
+  font-size: 0.8rem;
+  color: var(--brand);
+  letter-spacing: 0.08em;
+}
+
+.lx-step__title {
+  font-family: var(--font-content);
+  font-size: 1.08rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: var(--space-2) 0 var(--space-1);
+}
+
+.lx-step__body {
+  font-family: var(--font-content);
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--muted);
+  margin: 0;
+}
+
+/* ---- Glimpse frame (shared) ---------------------------------------------- */
+.lx-glimpse {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+/* ---- Observation feed glimpse -------------------------------------------- */
+.lx-obs {
+  padding: var(--space-3);
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+
+.lx-session {
+  padding: var(--space-3);
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.lx-session__head {
+  display: flex;
+  align-items: center;
+  gap: 0.75ch;
+  margin-bottom: var(--space-2);
+}
+
+.lx-session__id {
+  font-family: var(--font-structural);
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin-left: auto;
+}
+
+.lx-session__summary {
+  font-family: var(--font-content);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--text);
+  margin: 0 0 var(--space-3);
+}
+
+/* Per-run progress track — done runs are filled brand, the active run pulses,
+   pending runs sit as faint outlines. State by fill + label, never colour only. */
+.lx-session__runs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: var(--space-3);
+}
+
+.lx-run {
+  flex: 1;
+  min-width: 0;
+  padding: 0.25rem 0.4rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: transparent;
+  text-align: center;
+}
+
+.lx-run__label {
+  font-family: var(--font-structural);
+  font-size: 0.66rem;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.lx-run--done {
+  background: var(--brand);
+  border-color: var(--brand);
+}
+.lx-run--done .lx-run__label {
+  color: var(--bg);
+}
+
+.lx-run--active {
+  border-color: var(--amber);
+  background: color-mix(in srgb, var(--amber) 18%, transparent);
+}
+.lx-run--active .lx-run__label {
+  color: var(--amber-dim);
+}
+
+.lx-session__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.lx-meta {
+  font-family: var(--font-structural);
+  font-size: 0.8rem;
+  color: var(--text);
+}
+
+.lx-meta__k {
+  color: var(--muted);
+  margin-right: 0.4ch;
+}
+
+/* ---- Swim board glimpse -------------------------------------------------- */
+.lx-swim {
+  padding: var(--space-3);
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+
+.lx-swim-lane {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--raised);
+  padding: var(--space-2);
+}
+
+.lx-swim-lane__name {
+  font-family: var(--font-structural);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0 0.25rem var(--space-2);
+  border-bottom: 1px solid var(--line-soft);
+  margin-bottom: var(--space-2);
+}
+
+.lx-swim-task {
+  padding: 0.5rem 0.4rem;
+  border-radius: var(--radius-sm);
+}
+.lx-swim-task + .lx-swim-task {
+  margin-top: 0.35rem;
+}
+
+.lx-swim-task__top {
+  display: flex;
+  align-items: center;
+  gap: 0.25ch;
+}
+
+.lx-swim-task__id {
+  font-family: var(--font-structural);
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.lx-swim-task__title {
+  font-family: var(--font-content);
+  font-size: 0.9rem;
+  color: var(--text);
+  margin-top: 0.15rem;
+}
+
+.lx-swim-block {
+  display: inline-block;
+  margin-top: 0.25rem;
+  font-family: var(--font-structural);
+  font-size: 0.72rem;
+  color: var(--amber-dim);
+}
+
+/* ---- Terminal glimpse (grounded prompt + Harbour OS) --------------------- */
+.lx-terminal {
+  padding: 0;
+}
+
+.lx-terminal__bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5ch;
+  padding: 0.5rem 0.75rem;
+  background: var(--card-h);
+  border-bottom: 1px solid var(--line);
+}
+
+.lx-terminal__dot {
+  width: 0.6em;
+  height: 0.6em;
+  border-radius: 50%;
+  background: var(--faint);
+}
+
+.lx-terminal__name {
+  font-family: var(--font-structural);
+  font-size: 0.74rem;
+  color: var(--muted);
+  margin-left: 0.5ch;
+}
+
+.lx-terminal__body {
+  margin: 0;
+  padding: var(--space-3);
+  font-family: var(--font-structural);
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
+}
+
+.lx-c-dim { color: var(--muted); }
+.lx-c-key { color: var(--brand); }
+.lx-c-path { color: var(--amber-dim); }
+
+/* ---- Providers strip ----------------------------------------------------- */
+.lx-provider-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.lx-provider {
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.lx-provider__name {
+  font-family: var(--font-structural);
+  font-size: 0.92rem;
+  color: var(--text);
+}
+
+.lx-provider__note {
+  font-family: var(--font-content);
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+/* ---- Harbour OS section (distinct bottom band) --------------------------- */
+.lx-os {
+  margin-top: 5.5rem;
+  margin-bottom: 3rem;
+}
+
+.lx-os__inner {
+  padding: var(--space-5) var(--space-4);
+  border: 1px solid var(--brand);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(180deg, var(--teal-soft), transparent 60%),
+    var(--card);
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+  align-items: center;
+}
+
+.lx-os__lead {
+  max-width: 52ch;
+}
+
+.lx-eyebrow--os {
+  color: var(--brand);
+}
+
+.lx-os__cta {
+  display: inline-block;
+  margin-top: var(--space-4);
+  padding: 0.7rem 1.4rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--brand);
+  background: var(--brand);
+  color: var(--bg);
+  text-decoration: none;
+  font-family: var(--font-content);
+  font-weight: 500;
+}
+
+.lx-os__cta:hover {
+  background: color-mix(in srgb, var(--brand) 85%, black);
+  border-color: color-mix(in srgb, var(--brand) 85%, black);
+}
+
+.lx-os__glimpse {
+  background: var(--raised);
+}
+
+/* ---- Desktop: multi-column where it earns its keep ----------------------- */
+@media (min-width: 760px) {
+  .landing-showcase {
+    padding-left: var(--space-5);
+    padding-right: var(--space-5);
+  }
+
+  .lx-steps {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-4);
+  }
+
+  .lx-obs {
+    grid-template-columns: repeat(3, 1fr);
+    align-items: start;
+  }
+
+  .lx-swim {
+    grid-template-columns: repeat(3, 1fr);
+    align-items: start;
+  }
+
+  .lx-provider-list {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .lx-section__title {
+    font-size: 2rem;
+  }
+
+  .lx-os__inner {
+    grid-template-columns: 1fr 1fr;
+    padding: 3rem;
+  }
+}
+
+@media (min-width: 1040px) {
+  .lx-steps {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}

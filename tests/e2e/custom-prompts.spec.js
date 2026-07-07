@@ -543,6 +543,43 @@ test.describe('Custom Prompts on Swipe Page', () => {
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
   });
 
+  // LIN-1096: the shared model/harness exec controls live inside the same
+  // dispatch options panel on the swipe prompt-compose section.
+  test('exec controls appear in the swipe dispatch panel and flow through to the dispatched item', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, { features: { dispatch: true } });
+
+    const createRes = await page.request.post(`/workspace/${localWorkerUrlKey}/api/prompts/custom`, {
+      data: { name: 'Swipe Exec Controls', template: 'Analyze: {{title}}' }
+    });
+    const { prompt } = await createRes.json();
+
+    await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
+    await page.waitForLoadState('networkidle');
+
+    await openPromptsAccordion(page);
+    await page.locator('.swipe-prompt-btn-more').click();
+    await page.locator(`.swipe-prompt-btn[data-prompt="custom:${prompt.id}"]`).click();
+
+    const section = page.locator('.prompt-section');
+    await expect(section).toHaveAttribute('data-phase', 'fresh', { timeout: 10000 });
+
+    await section.locator('.disclosure-toggle').click();
+    const controls = section.locator('.dispatch-exec-controls');
+    await expect(controls).toBeVisible();
+
+    await controls.locator('.dispatch-exec-harness-custom').fill('opencode');
+    await controls.locator('.dispatch-exec-model').fill('openrouter/anthropic/claude-opus-4.8');
+
+    const dispatchReq = page.waitForRequest(req =>
+      req.url().includes('/api/dispatch') && req.method() === 'POST');
+    await section.locator('.swipe-prompt-dispatch[data-target="cli"]').click();
+
+    const req = await dispatchReq;
+    const body = JSON.parse(req.postData() || '{}');
+    expect(body.harness).toBe('opencode');
+    expect(body.model).toBe('openrouter/anthropic/claude-opus-4.8');
+  });
+
   test('no custom prompt buttons when none exist on swipe page', async ({ page, localWorkerUrlKey }) => {
     await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
     await page.waitForLoadState('networkidle');

@@ -136,20 +136,26 @@
   color: var(--red);
 }
 
-.dispatch-recents-container .queue-recents-label {
+.dispatch-recents-container .queue-recents-label,
+.dispatch-favorites-container .queue-recents-label {
   font-size: 0.8em;
   color: var(--fg-dim);
   margin-top: var(--space-1);
 }
 
-.dispatch-recents-container .queue-recents-list {
+.dispatch-recents-container .queue-recents-list,
+.dispatch-favorites-container .queue-recents-list {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
   margin-top: var(--space-1);
 }
 
-.dispatch-recents-container .queue-recent-item {
+.dispatch-recents-container .queue-recent-item,
+.dispatch-favorites-container .queue-favorite-item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
   background: none;
   border: 1px solid var(--fg-vdim);
   border-radius: var(--radius-sm);
@@ -163,8 +169,39 @@
   word-break: break-word;
 }
 
-.dispatch-recents-container .queue-recent-item:hover {
+.dispatch-recents-container .queue-recent-item:hover,
+.dispatch-favorites-container .queue-favorite-item:hover {
   border-color: var(--blue);
+  color: var(--blue);
+}
+
+.queue-recent-text {
+  flex: 1;
+  min-width: 0;
+}
+
+/* LIN-1011: ⭐ favourite toggle on recent items + ✕ un-star on favourites.
+   Small inline glyph controls in the ✓/◐/○ indicator vocabulary; a filled
+   ★ = favourited, outline ☆ = not. Reset button chrome so they read as glyphs. */
+.queue-recent-star,
+.queue-favorite-remove {
+  flex: 0 0 auto;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: var(--font-structural);
+  font-size: 1em;
+  line-height: 1;
+  color: var(--fg-vdim);
+}
+
+.queue-recent-star.is-favorite {
+  color: var(--amber-dim);
+}
+
+.queue-recent-star:hover,
+.queue-favorite-remove:hover {
   color: var(--blue);
 }
 

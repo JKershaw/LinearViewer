@@ -26,7 +26,8 @@ import { WORK_ISSUE_LABELS } from '../lib/workflow-config.js';
 import { parseRepoFromDescription, buildPromptFilename } from '../lib/prompt-formatters.js';
 import { buildProxyContextPreamble } from '../lib/proxy-preamble.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
-import { isRecommendationEnabled, getRecommendation, getRecommendationStream, streamChat, getModelDisplayName, AVAILABLE_MODELS, getPaidEnvKey, hasPaidEnvKey } from '../lib/openrouter.js';
+import { isRecommendationEnabled, getRecommendation, getRecommendationStream, streamChat, resolveReasoningBudget, getModelDisplayName, AVAILABLE_MODELS, getPaidEnvKey, hasPaidEnvKey } from '../lib/openrouter.js';
+import { getModelCatalog } from '../lib/openrouter-catalog.js';
 import { resolveRecommendation, armHopSignal } from '../lib/recommend-recurse.js';
 import { sniffRasterType, parseFeedbackImage } from '../lib/attachment-upload.js';
 
@@ -75,7 +76,7 @@ import { testMockTeams, testMockData } from '../tests/fixtures/mock-data.js';
  * @param {Object} workspace - req.workspace (carries provider + accessToken)
  * @returns {boolean}
  */
-function shouldMockAi(workspace) {
+export function shouldMockAi(workspace) {
   return process.env.NODE_ENV === 'test' &&
     (workspace?.accessToken === 'test-token' || workspace?.provider === 'local');
 }
@@ -545,7 +546,8 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
           baseUrl,
           issue: { identifier, title: mockIssue.title },
           mode,
-          variant
+          variant,
+          standalone: true
         })
         return sendPromptResult(req, res, {
           identifier,
@@ -566,7 +568,8 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         baseUrl,
         issue: { identifier: issue.identifier, title: issue.title },
         mode,
-        variant
+        variant,
+        standalone: true
       })
       sendPromptResult(req, res, {
         identifier: issue.identifier,
@@ -616,7 +619,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     const baseUrl = `${req.protocol}://${req.get('host')}`
 
     try {
-      const prompt = buildAutopilotKickoff({ baseUrl, goal, mode, variant })
+      const prompt = buildAutopilotKickoff({ baseUrl, goal, mode, variant, standalone: true })
       sendPromptResult(req, res, {
         identifier: '',
         downloadName: stepper ? 'autopilot-stepper' : 'autopilot',
@@ -2394,6 +2397,27 @@ ${goal}`
   // ===========================================================================
 
   /**
+   * Live OpenRouter model catalog (LIN-1111 Session 2) — the JSON source the
+   * client-rendered dispatch-exec-controls (public/common.js) fetch once per
+   * page load to supplement the static DISPATCH_MODEL_SUGGESTIONS datalist
+   * with the full live catalog. Same underlying cache module
+   * (lib/openrouter-catalog.js) the Settings server-render path calls
+   * directly, so both surfaces share one source of truth (never a fourth
+   * duplicated list). Never 500s: a catalog fetch failure resolves to `[]`
+   * upstream, so this always returns 200 with whatever's available.
+   * @route GET /workspace/:urlKey/api/openrouter/models
+   */
+  router.get('/workspace/:urlKey/api/openrouter/models', workspaceFromUrl, async (req, res) => {
+    try {
+      const models = await getModelCatalog({ mock: shouldMockAi(req.workspace) });
+      res.json({ models });
+    } catch (error) {
+      console.error('OpenRouter model catalog endpoint error:', error);
+      res.json({ models: [] });
+    }
+  });
+
+  /**
    * List all custom prompts for the workspace.
    * @route GET /workspace/:urlKey/api/prompts/custom
    */
@@ -2708,10 +2732,14 @@ ${goal}`
     sendSSE(res, 'layer-start', { layer });
     let text = '';
     let finishReason = null;
+    // LIN-1000: split the layer budget so hidden reasoning can't starve the
+    // narrative prose. `maxTokens` here is the prose budget; the helper reserves
+    // reasoning headroom on top for reasoning models (a no-op otherwise).
+    const { reasoning, maxTokens: budget } = resolveReasoningBudget({ model, proseTokens: maxTokens });
     try {
       await streamChat(
         messages,
-        { apiKey, model, maxTokens, callMeta: { urlKey: urlKey || null, feature: 'roadmap', issueIdentifier: layer || null } },
+        { apiKey, model, maxTokens: budget, reasoning, callMeta: { urlKey: urlKey || null, feature: 'roadmap', issueIdentifier: layer || null } },
         (type, data) => {
           if (type === 'token') {
             const token = (data && data.token) || '';
@@ -2832,6 +2860,33 @@ ${goal}`
   }
 
   /**
+   * Per-layer output-token budget for the roadmap generation pipeline (LIN-999).
+   *
+   * Every roadmap prose layer streams through `streamChat`, which sends a bare
+   * `max_tokens` with NO separate reasoning allocation (see lib/openrouter.js).
+   * The roadmap model is a reasoning model in every case: the default
+   * `openai/gpt-5.4-mini` AND the LIN-819 per-generation overrides (GPT-5.5 /
+   * GPT-5.5 Pro) all spend hidden reasoning tokens against `max_tokens` BEFORE
+   * emitting any visible prose. The old per-layer literals (digest 1200, gap
+   * 3000, technical 5000, …) budgeted for prose only, so a full reasoning block
+   * plus the layer's output overran the cap → `finish_reason: 'length'`, which
+   * the client surfaces per-layer as `[output truncated — hit token limit]`
+   * (public/roadmap.js). The smallest budgets (digest at 1200, gap at 3000)
+   * truncated first — the reported symptom.
+   *
+   * The fix is reasoning-aware, not a guessed "much higher" number: every prose
+   * layer is sized to match the floor the recommendation path already uses on
+   * this model family — its `RECOMMENDATION_MAX_TOKENS` (8000, a non-exported
+   * const in lib/openrouter.js), justified there as room for "a full reasoning
+   * block plus a complete prompt". We keep this as an independent roadmap-local
+   * value (not an import) so the two budgets don't silently move together, and
+   * deliberately NOT a change to the shared `streamChat` default, which would
+   * also move recap/brief/next-run/chat. Orientation keeps its own
+   * candidate-count scaling (`orientationMaxTokens`) and is untouched.
+   */
+  const ROADMAP_LAYER_MAX_TOKENS = 8000;
+
+  /**
    * Generate per-task orientation bearings and emit them as ONE structured
    * `orientation` SSE event over the shared generate connection (LIN-300).
    *
@@ -2889,9 +2944,11 @@ ${goal}`
       } else {
         const messages = buildRoadmapOrientationMessages(roadmapModel, northStar);
         let text = '';
+        // LIN-1000: reserve reasoning headroom on top of the orientation prose budget.
+        const { reasoning, maxTokens } = resolveReasoningBudget({ model: llm.model, proseTokens: orientationMaxTokens(candidates.length) });
         await streamChat(
           messages,
-          { apiKey: llm.apiKey, model: llm.model, maxTokens: orientationMaxTokens(candidates.length),
+          { apiKey: llm.apiKey, model: llm.model, maxTokens, reasoning,
             callMeta: { urlKey: req.workspace?.urlKey || null, feature: 'roadmap-orientation' } },
           (type, data) => { if (type === 'token') text += (data && data.token) || ''; }
         );
@@ -3016,21 +3073,21 @@ ${goal}`
     try {
       // Layer 1 — Technical (hard prerequisite; first unit already reserved).
       const tech = await runLayer({
-        layer: 'technical', layerName: 'technical narrative', maxTokens: 5000, precharged: true,
+        layer: 'technical', layerName: 'technical narrative', maxTokens: ROADMAP_LAYER_MAX_TOKENS, precharged: true,
         mockText: 'Mock technical narrative covering recent delivery.',
         buildMessages: () => buildRoadmapNarrativeMessages(roadmapModel)
       });
       if (tech.ok) {
         // Layer 2 — Product (hard prerequisite; chains from technical).
         const product = await runLayer({
-          layer: 'product', layerName: 'product perspective', maxTokens: 4000,
+          layer: 'product', layerName: 'product perspective', maxTokens: ROADMAP_LAYER_MAX_TOKENS,
           mockText: 'Mock product perspective synthesizing themes from layer 1.',
           buildMessages: () => buildRoadmapProductMessages(roadmapModel, tech.text)
         });
         if (product.ok) {
           // Layer 3a — Trajectory (chains from product; failure is non-fatal).
           const trajectory = await runLayer({
-            layer: 'trajectory', layerName: 'trajectory reading', maxTokens: 4000,
+            layer: 'trajectory', layerName: 'trajectory reading', maxTokens: ROADMAP_LAYER_MAX_TOKENS,
             mockText: 'Mock trajectory at this pace pointing toward simpler onboarding.',
             buildMessages: () => buildRoadmapTrajectoryMessages(roadmapModel, tech.text, product.text)
           });
@@ -3039,7 +3096,7 @@ ${goal}`
           let nsReading = { ok: false, text: '' };
           if (hasNorthStar) {
             nsReading = await runLayer({
-              layer: 'north-star-reading', layerName: 'north-star reading', maxTokens: 5000,
+              layer: 'north-star-reading', layerName: 'north-star reading', maxTokens: ROADMAP_LAYER_MAX_TOKENS,
               mockText: 'Mock north star reading: aligned to stated intent.',
               buildMessages: () => buildRoadmapNorthStarMessages(roadmapModel, northStar, {
                 tech: tech.text, product: product.text
@@ -3051,7 +3108,7 @@ ${goal}`
           let gap = { ok: false, text: '' };
           if (hasNorthStar && trajectory.ok && nsReading.ok) {
             gap = await runLayer({
-              layer: 'gap', layerName: 'gap analysis', maxTokens: 3000,
+              layer: 'gap', layerName: 'gap analysis', maxTokens: ROADMAP_LAYER_MAX_TOKENS,
               mockText: 'Mock gap analysis: trajectory and intent largely agree.',
               buildMessages: () => buildRoadmapGapMessages(northStar, trajectory.text, nsReading.text, roadmapModel)
             });
@@ -3059,7 +3116,7 @@ ${goal}`
 
           // Digest — synthesises everything above (generates last, renders first).
           await runLayer({
-            layer: 'digest', layerName: 'summary', maxTokens: 1200,
+            layer: 'digest', layerName: 'summary', maxTokens: ROADMAP_LAYER_MAX_TOKENS,
             mockText: 'Mock summary: recent work shipped and the work is on track; at this pace it points toward simpler onboarding. The main risk is delivery, and the open decision is for the human.',
             buildMessages: () => buildRoadmapDigestMessages({
               northStar: hasNorthStar ? northStar : '',
@@ -3175,9 +3232,14 @@ ${goal}`
     res.flushHeaders();
 
     try {
+      // LIN-1000: reserve reasoning headroom on top of the chat prose budget.
+      // LIN-999 raised the chat prose cap to ROADMAP_LAYER_MAX_TOKENS; feed that
+      // as the prose budget so the reasoning split sits on top of the new cap
+      // (the documented composition — the split reframes it as the prose budget).
+      const { reasoning, maxTokens } = resolveReasoningBudget({ model: selectedModel, proseTokens: ROADMAP_LAYER_MAX_TOKENS });
       await streamChat(
         messages,
-        { apiKey: apiKeyToUse, model: selectedModel, maxTokens: 3000,
+        { apiKey: apiKeyToUse, model: selectedModel, maxTokens, reasoning,
           callMeta: { urlKey: req.workspace?.urlKey || null, feature: 'roadmap-chat' } },
         (type, data) => {
           sendSSE(res, type, data);

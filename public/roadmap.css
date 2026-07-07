@@ -87,15 +87,21 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
    Page Header
    ============================================================================= */
 .roadmap-header {
-  /* Override the global `header { text-align: center }` so the roadmap
-     heading aligns with the rest of the page content. */
   text-align: left;
   margin: 0 0 var(--space-4) 0;
   padding-bottom: var(--space-3);
   border-bottom: 1px solid var(--line);
 }
 
-.roadmap-page-title {
+/* The title routes through renderPageHeader (LIN-975). Override the global
+   centered `header` + its bottom margin so the primitive sits left-aligned and
+   tight against the meta line, preserving the roadmap's bespoke header block. */
+.roadmap-page-header {
+  text-align: left;
+  margin-bottom: 0;
+}
+
+.roadmap-page-header h1 {
   font-family: var(--font-content);
   font-size: 1.4em;
   font-weight: 700;
@@ -437,6 +443,16 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
   border: 1px solid var(--muted);
   border-radius: 2px;
   cursor: pointer;
+}
+
+/* Per-model pricing hint (LIN-993): machine facts → structural (mono) font. */
+.roadmap-model-price {
+  font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
+  color: var(--muted);
+}
+.roadmap-model-price:empty {
+  display: none;
 }
 
 .roadmap-generate-reading-btn {

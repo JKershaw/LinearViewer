@@ -34,9 +34,29 @@ function formatPromptHtml(text) {
 }
 
 /**
- * Render recent custom prompts into a container element
+ * Fetch the current favourite prompts as a Set of exact strings (LIN-1011).
+ * Used to reflect the ⭐ toggle state on Recent items. Non-fatal: an empty Set
+ * on failure just renders every star as un-favourited.
  */
-async function renderDispatchRecentPrompts(container, urlKey) {
+async function fetchFavoritePromptSet(urlKey) {
+  try {
+    // on401:false — the recents render owns the 401→/logout redirect; this
+    // companion fetch must not double-bounce.
+    const data = await api(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/favorite-prompts`, { on401: false })
+    return new Set((data && data.prompts) || [])
+  } catch (e) {
+    return new Set()
+  }
+}
+
+/**
+ * Render recent custom prompts into a container element.
+ *
+ * Each item carries a ⭐ toggle (LIN-1011) reflecting whether that exact string
+ * is already favourited. The favourite set is fetched here when not supplied so
+ * existing single-arg callers (e.g. the post-dispatch refresh) keep working.
+ */
+async function renderDispatchRecentPrompts(container, urlKey, favoriteSet = null) {
   if (!container) return
 
   try {
@@ -48,11 +68,17 @@ async function renderDispatchRecentPrompts(container, urlKey) {
       return
     }
 
+    const favorites = favoriteSet || await fetchFavoritePromptSet(urlKey)
+
     container.innerHTML = `
       <div class="queue-recents-label">Recent:</div>
       <div class="queue-recents-list">
         ${prompts.map(p => {
-          return `<button class="queue-recent-item" data-prompt="${escapeHtml(p)}">${formatPromptHtml(p)}</button>`
+          const isFav = favorites.has(p)
+          // The star sits INSIDE the recent item; the delegated handler matches
+          // it first and returns early so a star click doesn't also refill.
+          const star = `<button class="queue-recent-star${isFav ? ' is-favorite' : ''}" data-prompt="${escapeHtml(p)}" title="${isFav ? 'Remove from favourites' : 'Save to favourites'}" aria-label="${isFav ? 'Remove from favourites' : 'Save to favourites'}" aria-pressed="${isFav}">${isFav ? '★' : '☆'}</button>`
+          return `<button class="queue-recent-item" data-prompt="${escapeHtml(p)}">${star}<span class="queue-recent-text">${formatPromptHtml(p)}</span></button>`
         }).join('')}
       </div>
     `
@@ -62,9 +88,59 @@ async function renderDispatchRecentPrompts(container, urlKey) {
 }
 
 /**
+ * Render the durable favourites list into a container element (LIN-1011).
+ *
+ * A curated list that survives the recents roll-off. Each item refills the
+ * textarea on click (like a recent item) and carries a ✕ un-star affordance.
+ * The list is fetched here when not supplied.
+ */
+async function renderDispatchFavoritePrompts(container, urlKey, prompts = null) {
+  if (!container) return
+
+  try {
+    if (!prompts) {
+      // on401:false — the recents render owns the redirect on this page.
+      const data = await api(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/favorite-prompts`, { on401: false })
+      prompts = (data && data.prompts) || []
+    }
+    if (!prompts || prompts.length === 0) {
+      container.innerHTML = ''
+      return
+    }
+
+    container.innerHTML = `
+      <div class="queue-recents-label">Favourites:</div>
+      <div class="queue-recents-list">
+        ${prompts.map(p => {
+          // The ✕ sits INSIDE the favourite item; the delegated handler matches
+          // it first and returns early so a remove click doesn't also refill.
+          const remove = `<button class="queue-favorite-remove" data-prompt="${escapeHtml(p)}" title="Remove from favourites" aria-label="Remove from favourites">✕</button>`
+          return `<button class="queue-favorite-item" data-prompt="${escapeHtml(p)}">${remove}<span class="queue-recent-text">${formatPromptHtml(p)}</span></button>`
+        }).join('')}
+      </div>
+    `
+  } catch (e) {
+    // Non-fatal: just don't show favourites
+  }
+}
+
+/**
+ * Refresh both the Favourites and Recent lists together (LIN-1011).
+ *
+ * Favourite membership drives the ⭐ state on Recent items, so the two lists
+ * must re-render as a pair after any favourite mutation. Fetches the favourite
+ * set once and threads it into the recents render to avoid a double fetch.
+ */
+async function refreshDispatchPromptLists(favoritesContainer, recentsContainer, urlKey) {
+  const favoriteSet = await fetchFavoritePromptSet(urlKey)
+  await renderDispatchFavoritePrompts(favoritesContainer, urlKey, [...favoriteSet])
+  await renderDispatchRecentPrompts(recentsContainer, urlKey, favoriteSet)
+}
+
+/**
  * Dispatch a custom prompt and update UI feedback
  */
-async function dispatchPageCustomPrompt({ urlKey, prompt, target, repo, kind, promptName, btn, textarea, feedbackEl, recentsContainer }) {
+async function dispatchPageCustomPrompt({ urlKey, prompt, target, repo, kind, promptName, btn, textarea, feedbackEl, recentsContainer, execScope }) {
   const originalText = btn.textContent
   btn.textContent = 'sending...'
   btn.disabled = true
@@ -78,6 +154,8 @@ async function dispatchPageCustomPrompt({ urlKey, prompt, target, repo, kind, pr
       ? await maybeAppendProxyBlock(prompt, urlKey)
       : prompt
 
+    const { model, harness } = window.readDispatchExecControls(execScope)
+
     // Custom prompts are not anchored to a Linear issue — opt out of the
     // issue-link contract explicitly. A loaded Autopilot kickoff carries an
     // explicit kind ('autopilot') and name so it's tagged as the meta-loop.
@@ -88,7 +166,9 @@ async function dispatchPageCustomPrompt({ urlKey, prompt, target, repo, kind, pr
       kind: kind || undefined,
       target,
       repo: repo || undefined,
-      issueless: true
+      issueless: true,
+      model,
+      harness
     })
 
     btn.textContent = 'dispatched!'
@@ -155,12 +235,28 @@ function initDispatchPagePrompt() {
   const urlKey = textarea.dataset.urlKey
   const section = textarea.closest('.dispatch-section')
   const recentsContainer = section.querySelector('.dispatch-recents-container')
+  const favoritesContainer = section.querySelector('.dispatch-favorites-container')
   const feedbackEl = section.querySelector('.dispatch-prompt-feedback')
   const repoSelect = section.querySelector('.dispatch-repo-select')
   const goalInput = section.querySelector('.dispatch-autopilot-goal')
 
-  // Load recent prompts
-  renderDispatchRecentPrompts(recentsContainer, urlKey)
+  // Inject the shared model/harness exec controls (LIN-1096) into the
+  // server-rendered placeholder container, using the resolved workspace
+  // default (if any) as a UX-only placeholder hint (LIN-1094).
+  const execContainer = section.querySelector('.dispatch-exec-controls-container')
+  if (execContainer) {
+    const defaultModel = execContainer.dataset.defaultModel || ''
+    const defaultHarness = execContainer.dataset.defaultHarness || ''
+    execContainer.innerHTML = window.renderDispatchExecControls('dispatch-page', {
+      modelPlaceholder: defaultModel ? `model (default: ${defaultModel})` : 'model',
+      harnessPlaceholder: defaultHarness ? `harness (default: ${defaultHarness})` : 'harness',
+      harnessDefault: defaultHarness || undefined
+    })
+  }
+
+  // Load favourites + recent prompts (favourite membership drives the ⭐ state
+  // on recent items, so render them as a pair) — LIN-1011.
+  refreshDispatchPromptLists(favoritesContainer, recentsContainer, urlKey)
 
   // Prefill the goal from ?goal= so the experimental "next run" page can hand off
   // a chosen goal paragraph to the existing launch path (LIN-603). Empty/absent
@@ -301,7 +397,69 @@ function initDispatchPagePrompt() {
       // A loaded Autopilot kickoff sets these; hand-typed prompts leave them undefined.
       const kind = textarea.dataset.kind || undefined
       const promptName = textarea.dataset.promptName || undefined
-      await dispatchPageCustomPrompt({ urlKey, prompt, target, repo, kind, promptName, btn, textarea, feedbackEl, recentsContainer })
+      await dispatchPageCustomPrompt({ urlKey, prompt, target, repo, kind, promptName, btn, textarea, feedbackEl, recentsContainer, execScope: execContainer })
+      return
+    }
+
+    // LIN-1011: favourite ⭐ toggle on a recent item. Matched BEFORE the parent
+    // recent-item refill so a star click toggles the favourite instead of
+    // refilling the textarea. Toggle by current state, then re-render both lists.
+    const star = e.target.closest('.queue-recent-star')
+    if (star) {
+      e.preventDefault()
+      e.stopPropagation()
+      const prompt = star.dataset.prompt
+      if (prompt) {
+        const isFav = star.classList.contains('is-favorite')
+        try {
+          await api(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/favorite-prompts`, {
+            method: isFav ? 'DELETE' : 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt }),
+            on401: false
+          })
+        } catch (err) {
+          // Best-effort; a failed toggle just leaves the lists as they were.
+        }
+        await refreshDispatchPromptLists(favoritesContainer, recentsContainer, urlKey)
+      }
+      return
+    }
+
+    // LIN-1011: ✕ un-star on a favourite item. Matched BEFORE the parent
+    // favourite-item refill so a remove click doesn't also refill the textarea.
+    const favRemove = e.target.closest('.queue-favorite-remove')
+    if (favRemove) {
+      e.preventDefault()
+      e.stopPropagation()
+      const prompt = favRemove.dataset.prompt
+      if (prompt) {
+        try {
+          await api(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/favorite-prompts`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt }),
+            on401: false
+          })
+        } catch (err) {
+          // Best-effort
+        }
+        await refreshDispatchPromptLists(favoritesContainer, recentsContainer, urlKey)
+      }
+      return
+    }
+
+    // LIN-1011: clicking a favourite refills the textarea (same as a recent
+    // item). The input listener strips dataset.kind, so it behaves as a
+    // hand-typed custom prompt — correct for scope A.
+    const favItem = e.target.closest('.dispatch-favorites-container .queue-favorite-item')
+    if (favItem) {
+      e.preventDefault()
+      const prompt = favItem.dataset.prompt
+      if (prompt) {
+        textarea.value = prompt
+        textarea.focus()
+      }
       return
     }
 

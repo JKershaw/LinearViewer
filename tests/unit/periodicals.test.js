@@ -9,21 +9,24 @@ import { PERIODICALS, getPeriodicals, buildPeriodicalNodes } from '../../lib/per
 import { PERIODICALS_PROJECT_ID } from '../../lib/tree.js';
 
 describe('periodicals registry', () => {
-  test('seeds the LIN-354 review set plus Drift & Coherence, Comprehension-Debt, Stability, Dependency & Supply-Chain, Recent Headwinds, and Design & Interface (11 templates)', () => {
-    assert.strictEqual(PERIODICALS.length, 11);
+  test('seeds the LIN-354 review set plus Drift & Coherence, Comprehension-Debt, Stability, Dependency & Supply-Chain, Recent Headwinds, Design & Interface, Performance / Scale, and Data & Fetch Architecture (13 templates)', () => {
+    assert.strictEqual(PERIODICALS.length, 13);
     assert.strictEqual(getPeriodicals(), PERIODICALS);
   });
 
-  test('contains the nine corrective reviews plus the advisory Stability Review and Recent Headwinds report', () => {
+  test('contains the ten corrective reviews plus the advisory Stability Review and Recent Headwinds report', () => {
     // Assert by id/title/mode rather than position so the registry can grow.
     const byId = Object.fromEntries(PERIODICALS.map(t => [t.id, t]));
 
-    // id -> [title, mode]. The nine code-surface / supply-chain / interface
-    // reviews are 'corrective' (they mint fix-tasks); the Stability Review
-    // (LIN-453) and the Recent Headwinds report (LIN-542) are the two 'advisory'
-    // entries — trajectory governors that report for a human to act on. The
-    // Design & Interface Review (LIN-520) is corrective with an advisory tail:
-    // it mints fix-tasks for objective breakage only.
+    // id -> [title, mode]. The code-surface / supply-chain / interface /
+    // performance / data reviews are 'corrective' (they mint fix-tasks); the
+    // Stability Review (LIN-453) and the Recent Headwinds report (LIN-542) are
+    // the two 'advisory' entries — trajectory governors that report for a human
+    // to act on. The Design & Interface Review (LIN-520) is corrective with an
+    // advisory tail: it mints fix-tasks for objective breakage only. The
+    // Performance / Scale Review (LIN-1038) is corrective at the measured-symptom
+    // altitude; the Data & Fetch Architecture review (LIN-1039) is corrective at
+    // the static-cause altitude behind it.
     const expected = {
       'documentation-review': ['Documentation Review', 'corrective'],
       'test-coverage-gap': ['Test Coverage Gap Review', 'corrective'],
@@ -35,7 +38,9 @@ describe('periodicals registry', () => {
       'stability-review': ['Stability Review', 'advisory'],
       'dependency-supply-chain': ['Dependency & Supply-Chain Review', 'corrective'],
       'recent-headwinds': ['Recent Headwinds', 'advisory'],
-      'design-review': ['Design & Interface Review', 'corrective']
+      'design-review': ['Design & Interface Review', 'corrective'],
+      'performance-scale': ['Performance / Scale Review', 'corrective'],
+      'data-fetch-architecture': ['Data & Fetch Architecture', 'corrective']
     };
 
     for (const [id, [title, mode]] of Object.entries(expected)) {
@@ -134,7 +139,7 @@ describe('shared two-stage contract (all periodicals)', () => {
       });
 
       // LIN-700: the Stage-1 scaffold scopes by discovery, not recall. These
-      // four pins lock the four generic wordings across all 11 builders (the
+      // four pins lock the four generic wordings across all 12 builders (the
       // shared helper/vocab renders each once, so the loop covers every one).
       test('LIN-700: Stage 1 scopes by discovery from three sources, not recall', () => {
         assert.match(prompt, /from what you discover, not from what a review/i);
@@ -686,6 +691,124 @@ describe('Design & Interface Review specifics (LIN-520)', () => {
     // route / tool name leaks (capabilities are named conceptually).
     assert.doesNotMatch(prompt, /playwright|lighthouse|styleguide\b/i);
     assert.doesNotMatch(prompt, /\/styleguide|set-session|screenshots/i);
+  });
+});
+
+describe('Performance / Scale Review specifics (LIN-1038)', () => {
+  const template = PERIODICALS.find(t => t.id === 'performance-scale');
+  const prompt = template.generatePrompt();
+
+  test('is a corrective, measured-symptom review whose evidence is real numbers', () => {
+    assert.strictEqual(template.mode, 'corrective');
+    // Measured runtime behaviour, at the symptom altitude ("here is the number").
+    assert.match(prompt, /measured runtime behaviour/i);
+    assert.match(prompt, /measured-symptom/i);
+    assert.match(prompt, /here is the number/i);
+    // Evidence is the running app, not source reasoning.
+    assert.match(prompt, /running app/i);
+    assert.match(prompt, /read real numbers|real numbers/i);
+  });
+
+  test('covers the four finding classes and measures toward the timeout ceiling', () => {
+    assert.match(prompt, /page \/ endpoint latency/i);
+    assert.match(prompt, /cost per heuristic/i);
+    assert.match(prompt, /scale across vectors/i);
+    // Provider / datastore call cost on the hot path.
+    assert.match(prompt, /provider and datastore call cost/i);
+    // The platform request-timeout ceiling is the thing to measure toward.
+    assert.match(prompt, /request-timeout ceiling/i);
+    // Super-linear growth is the tell for a heuristic bottleneck.
+    assert.match(prompt, /super-linearly|super-linear/i);
+  });
+
+  test('anti-over-optimisation is load-bearing: only real bottlenecks, clean is valid', () => {
+    assert.match(prompt, /anti-over-optimisation/i);
+    assert.match(prompt, /speculative micro-optimisation/i);
+    assert.match(prompt, /over-engineering/i);
+    // A clean "nothing near the ceiling" is an explicit, valid outcome.
+    assert.match(prompt, /clean result/i);
+    assert.match(prompt, /nothing near the ceiling/i);
+  });
+
+  test('names the altitude seam vs Data & Fetch (cause), Reliability, Stability, Observability', () => {
+    // This review owns the measured symptom; Data & Fetch owns the static cause.
+    assert.match(prompt, /measured symptom/i);
+    assert.match(prompt, /Data & Fetch/);
+    assert.match(prompt, /\bcause\b/i);
+    assert.match(prompt, /Reliability/);
+    assert.match(prompt, /Stability/);
+    assert.match(prompt, /Observability/);
+    assert.match(prompt, /do not double-flag|do not re-flag/i);
+    // Global-over-local: a structural floor, not a point patch.
+    assert.match(prompt, /structural floor/i);
+  });
+
+  test('trend-aware: delta framing, first-run baseline, trend ledger', () => {
+    assert.match(prompt, /trend-aware/i);
+    assert.match(prompt, /new, unchanged, improved, worsened, or resolved/i);
+    assert.match(prompt, /point-in-time snapshot/i);
+    assert.match(prompt, /baseline/i);
+    assert.match(prompt, /trend ledger/i);
+  });
+
+  test('stays general: no repo-specific perf symbols or platform literals leak in', () => {
+    // The concrete baseline is discovered at run time, never baked into the template.
+    assert.doesNotMatch(prompt, /computeGraphFeatures|buildForest|listHistory/);
+    assert.doesNotMatch(prompt, /\bH12\b|Heroku|ISSUE_FIELDS_FRAGMENT/);
+  });
+});
+
+describe('Data & Fetch Architecture specifics (LIN-1039)', () => {
+  const template = PERIODICALS.find(t => t.id === 'data-fetch-architecture');
+  const prompt = template.generatePrompt();
+
+  test('is the corrective static-cause data/fetch review', () => {
+    assert.strictEqual(template.mode, 'corrective');
+    // Static cause behind performance, read from source not the running app.
+    assert.match(prompt, /how data is organised, where it lives, and how it is fetched/i);
+    assert.match(prompt, /static/i);
+    assert.match(prompt, /cause/i);
+  });
+
+  test('covers the five data/fetch finding classes', () => {
+    // Store-vs-provider boundary: serve what we own vs re-fetch a provider live.
+    assert.match(prompt, /store-vs-provider boundary/i);
+    assert.match(prompt, /re-fetch an external provider/i);
+    // Read discipline: pushdown into the query vs full read then in-memory work.
+    assert.match(prompt, /read discipline/i);
+    assert.match(prompt, /projection, indexing, limiting, and pagination/i);
+    // Derived-fact persistence: materialise at write vs re-derive on read.
+    assert.match(prompt, /read-model \/ derived-fact persistence/i);
+    assert.match(prompt, /materialised at write time/i);
+    // Fetch amplification / N-scaling.
+    assert.match(prompt, /fetch amplification and N-scaling/i);
+    // Cache-layer coherence.
+    assert.match(prompt, /cache coherence/i);
+  });
+
+  test('trend contract: delta framing, first-run baseline, trend ledger', () => {
+    assert.match(prompt, /trend-aware/i);
+    assert.match(prompt, /new, unchanged, improved, worsened, or resolved/i);
+    assert.match(prompt, /point-in-time snapshot/i);
+    assert.match(prompt, /baseline/i);
+    assert.match(prompt, /trend ledger/i);
+  });
+
+  test('names the altitude difference from API Quality, Performance / Scale, and Drift & Coherence', () => {
+    assert.match(prompt, /API Quality Review/);
+    assert.match(prompt, /Performance \/ Scale Review/);
+    assert.match(prompt, /Drift & Coherence Review/);
+    assert.match(prompt, /do not double-flag|do not re-flag/i);
+    // Global-over-local: structural improvement, never a local point patch.
+    assert.match(prompt, /point patch/i);
+    assert.match(prompt, /over-engineering/i);
+  });
+
+  test('stays general: no store/provider source surfaces or counts leak in', () => {
+    // The shared .js guard already runs; reinforce that no concrete module,
+    // store count, or ticket-specific symbol leaks (classes named conceptually).
+    assert.doesNotMatch(prompt, /fetchProjects|local-store|dispatch-store|kpi-stats|session-telemetry/i);
+    assert.doesNotMatch(prompt, /toArray|find\(\)|\.slice\(/);
   });
 });
 

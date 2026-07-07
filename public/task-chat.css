@@ -6,16 +6,8 @@
  * the streamed conversation between "you" and the task.
  */
 
-.task-chat-header h1 {
-  margin-bottom: var(--space-1);
-}
-
-.task-chat-subtitle {
-  color: var(--fg-dim);
-  font-size: var(--font-size-sm);
-  margin-top: 0;
-  margin-bottom: var(--space-4);
-}
+/* The page title + subtitle route through renderPageHeader (LIN-975); their
+   look is owned by the canonical `.page-header` / `.page-header__subtitle`. */
 
 .task-chat-experimental {
   color: var(--fg-dim);
@@ -33,7 +25,7 @@
 }
 
 .task-chat-warning code {
-  font-family: var(--font-mono);
+  font-family: var(--font-structural);
 }
 
 /* ── Fields ─────────────────────────────────────────────────────────────── */
@@ -47,13 +39,13 @@
 }
 
 .task-chat-label {
-  font-family: var(--font-mono);
+  font-family: var(--font-content);
   color: var(--fg-dim);
   min-width: 4rem;
 }
 
 .task-chat-input {
-  font-family: var(--font-mono);
+  font-family: var(--font-content);
   font-size: var(--font-size-base);
   padding: var(--space-1) var(--space-2);
   border: 1px solid var(--border);
@@ -74,7 +66,7 @@
   justify-content: space-between;
   align-items: baseline;
   margin-bottom: var(--space-2);
-  font-family: var(--font-mono);
+  font-family: var(--font-content);
   font-size: var(--font-size-sm);
 }
 
@@ -84,7 +76,7 @@
 }
 
 .task-chat-reset-btn {
-  font-family: var(--font-mono);
+  font-family: var(--font-content);
   font-size: var(--font-size-sm);
   padding: var(--space-1) var(--space-2);
   border: 1px solid var(--border);
@@ -137,7 +129,7 @@
 
 .task-chat-msg-body {
   display: block;
-  font-family: var(--font-mono);
+  font-family: var(--font-content);
   font-size: var(--font-size-sm);
   color: var(--fg);
   white-space: pre-wrap;
@@ -159,9 +151,21 @@
   50% { opacity: 0; }
 }
 
+/* Tool breadcrumb (LIN-990): a dim, ↳-marked log line noting a read-only lookup
+   the task made mid-turn. Deliberately quieter than a message bubble — it is
+   provenance, not conversation. */
+.task-chat-tool {
+  font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
+  color: var(--fg-vdim);
+  padding-left: var(--space-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .task-chat-empty {
   color: var(--fg-vdim);
-  font-family: var(--font-mono);
+  font-family: var(--font-content);
   font-size: var(--font-size-sm);
 }
 
@@ -173,4 +177,60 @@
 
 .hidden {
   display: none !important;
+}
+
+/* Saved chats (LIN-1008): a durable, per-user list of stored transcripts. Each
+   row is a compact machine-fact line (task id + turn count) with a human title
+   and open/delete actions — resume re-hydrates it into the conversation above. */
+.task-chat-convo-head {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.task-chat-saved-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.task-chat-saved-item {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  flex-wrap: wrap;
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.task-chat-saved-meta,
+.task-chat-saved-count {
+  font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
+  color: var(--fg-dim);
+}
+
+.task-chat-saved-title {
+  font-family: var(--font-content);
+  flex: 1 1 12rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-chat-saved-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.task-chat-saved-empty,
+.task-chat-saved-unavailable {
+  color: var(--fg-vdim);
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
 }

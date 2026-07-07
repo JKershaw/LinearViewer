@@ -17,6 +17,7 @@ import rateLimit from 'express-rate-limit';
 import { createDedupeCache, dedupeKey } from '../lib/proxy-dedupe.js';
 import { deriveTerminalStatus, deriveCompletedAt } from '../lib/dispatch-terminal.js';
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
+import { validateOpaqueDispatchField } from '../lib/dispatch-validation.js';
 // The entire consumer-API surface — reads (LIN-308), writes + write-guard reads
 // (LIN-309), and the compute-endpoint fetchers — sources through a provider; the
 // route owns no GraphQL. Provider SELECTION for the consumer read + write data
@@ -43,13 +44,13 @@ import { flattenIssue, neutralizeProject, flattenCycle, flattenRelations, decode
 import { createProxyFetch } from '../lib/proxy-fetch.js';
 import { isRecommendationEnabled, getRecommendation, getPaidEnvKey } from '../lib/openrouter.js';
 import { resolveRecommendation, describeDescent, armHopSignal } from '../lib/recommend-recurse.js';
-import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
+import { resolveWorkspaceModel, resolveDispatchDefaults } from '../lib/workspace-preferences.js';
 import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
 import { hashContext } from '../lib/recap-cache.js';
 import { snapshotFromContext } from '../lib/task-snapshot-store.js';
-import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, isTerminalState, isBlocked, NO_PROJECT_ID } from '../lib/tree.js';
-import { flattenTrees, sortIssuesForSwipe, applyBlockingOrder, clusterByParent, computeGraphFeatures, computeOffPageBlockers, buildWhy } from '../lib/render-swipe.js';
+import { isTerminalState, isBlocked } from '../lib/tree.js';
+import { buildTaskStack } from '../lib/task-stack.js';
 import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, getPromptDisplayName, PROMPT_TEMPLATES, DISPATCH_KINDS } from '../lib/prompt-templates.js';
 import { parseRepoFromDescription, buildPromptFilename } from '../lib/prompt-formatters.js';
 import { buildProxyContextPreamble } from '../lib/proxy-preamble.js';
@@ -410,23 +411,6 @@ async function fetchWithTimeout(workFn, ms) {
 
 // Pattern to detect null bytes and dangerous control characters
 const DANGEROUS_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
-
-/** Max length of the deterministic one-line headline in the `/stack` digest view. */
-const STACK_HEADLINE_MAX = 140;
-
-/**
- * Reduce a task description to a single deterministic headline line for the
- * `/stack?view=digest` projection. Takes the first non-empty line and truncates
- * it — no LLM, cheap and exact, so orientation stays light and reproducible.
- * @param {string|null|undefined} description - Full task description
- * @returns {string} One-line headline (possibly empty)
- */
-function toStackHeadline(description) {
-  if (!description || typeof description !== 'string') return '';
-  const firstLine = description.split('\n').map(s => s.trim()).find(s => s.length > 0) || '';
-  if (firstLine.length <= STACK_HEADLINE_MAX) return firstLine;
-  return firstLine.slice(0, STACK_HEADLINE_MAX - 1).trimEnd() + '…';
-}
 
 // The proxy-context preamble (the "Workspace API access" block appended to
 // dispatched prompts) now lives in lib/proxy-preamble.js so non-proxy dispatch
@@ -1254,8 +1238,10 @@ POST ${baseUrl}/api/proxy/agent/status   (alias: /api/proxy/foreman/status — d
 ## Dispatch Endpoints
 
 POST ${baseUrl}/api/proxy/dispatch
-  Body: { "prompt": "...", "promptName": "...", "kind": "implementation", "issueId": "...", "issueIdentifier": "LIN-42", "issueTitle": "...", "issueUrl": "...", "target": "cli|web|dash", "repo": "...", "followUpTo": "...", "force": false, "abort": false, "abortTo": "...", "cascade": false, "sessionId": "...", "waitForFollowUps": false, "appendProxyContext": true }
+  Body: { "prompt": "...", "promptName": "...", "kind": "implementation", "issueId": "...", "issueIdentifier": "LIN-42", "issueTitle": "...", "issueUrl": "...", "target": "cli|web|dash", "repo": "...", "model": "anthropic/claude-opus-4.8", "harness": "opencode", "followUpTo": "...", "force": false, "abort": false, "abortTo": "...", "cascade": false, "sessionId": "...", "waitForFollowUps": false, "appendProxyContext": true }
   → Queue a prompt for the workspace's dispatch consumer (the runner). Only "prompt" is required; target defaults to "cli". ("local"/Harbour OS is not available to proxy consumers.)
+  → "model" (optional) is the EXECUTION model the runner should use to RUN this prompt — the value it passes to its own CLI (e.g. "claude --model") — NOT the server-side generation model that WRITES prompts. Use the OpenRouter naming convention: "provider/model" IDs like "anthropic/claude-opus-4.8" or "openai/gpt-5.4-mini". Treated as an opaque string (length + safety validated, no registry check) and forwarded blindly; translating it to the agent's own flag is the runner's job (Claude Code maps "anthropic/claude-opus-4.8" → "--model opus"; OpenRouter-native runners pass it through). Omit it (or null) to keep the consumer's current default (e.g. Opus). See LIN-438.
+  → "harness" (optional) is the EXECUTION harness the runner should use to RUN this prompt — e.g. "claude-code" (the default) or "opencode". Like "model" it is an opaque string (length + safety validated, no registry check) and forwarded blindly; the runner owns its own harness registry and defaulting. Combine with "model" to run a specific OpenRouter-backed model through a non-default harness (e.g. "harness": "opencode", "model": "openai/gpt-5.4-mini"). Omit it (or null) to keep the consumer's own default/precedence chain — Harbour does not interpose a per-workspace default here. See LIN-1084.
   → "kind" is a stable task classification (research/plan/implementation/review/etc. — the prompt-template keys, plus "custom"). Optional: when omitted it is derived from "promptName", falling back to "custom". Read it instead of inferring the task type from promptName or the prompt body.
   → "followUpTo" (optional) resumes an existing session: pass the "id" of an earlier dispatch and "prompt" becomes a follow-up instruction to that same session. cli/web only, same workspace. The runner owns session liveness — if the session is gone it posts terminal "[failed] no live session to resume". Use sparingly: only when the prior session ran cleanly and naturally suggests the next step (e.g. confirm CI is green, update Linear/git); any wobble → dispatch a fresh session instead.
   → "force" (optional, default false) overrides a runner-side guard, so it is meaningful alongside a verb that HAS one — and ONLY such a verb (a bare "force": true on a fresh dispatch is rejected 400 "force requires followUpTo or abort"): (1) with "followUpTo" it bypasses the active-session guard so a follow-up can resume a session wedged or sleeping in an active phase (Claude infra wobble, long-running sleep) — asserting the prior process is effectively dead (see LIN-546); (2) with a single "abort" it is the escape hatch that force-closes even a human-continued session the runner would otherwise skip (see cascade + "[skipped]" below). Mutually exclusive with "cascade" (a cascade emits its own plain, unforced aborts): "force" + "cascade" is rejected (400). The runner reads it as "item.force" off the polled/claimed item. See LIN-559/LIN-946.
@@ -1268,8 +1254,10 @@ POST ${baseUrl}/api/proxy/dispatch
   → { "id": "...", "status": "queued", "promptName": "...", "kind": "implementation", "issueIdentifier": "...", "target": "cli", "abort": false, "abortTo": null, "cascade": false, "sessionId": null, "dispatchedAt": "..." } (a "cascade": true request instead returns { "success": true, "cascade": true, "closed": [...], "count": N })
 
 POST ${baseUrl}/api/proxy/recommend-and-dispatch
-  Body: { "issueIdentifier": "LIN-42", "target": "cli|web|dash", "repo": "...", "appendProxyContext": true, "noDescend": false, "kind": "review", "sessionId": "...", "waitForFollowUps": false }
+  Body: { "issueIdentifier": "LIN-42", "target": "cli|web|dash", "repo": "...", "model": "anthropic/claude-opus-4.8", "harness": "opencode", "appendProxyContext": true, "noDescend": false, "kind": "review", "sessionId": "...", "waitForFollowUps": false }
   → Fused verb: runs /recommend and forwards the recommended prompt straight into a dispatch, server-side. "issueIdentifier" is required; target defaults to "cli".
+  → "model" (optional) is threaded onto the dispatched item, same meaning as on POST /dispatch — the EXECUTION model the runner passes to its own CLI (OpenRouter "provider/model" convention, e.g. "anthropic/claude-opus-4.8"), opaque and forwarded blindly. Set it to route a cheaper/pricier model per task (e.g. Sonnet for implementation, Opus for review); omit to keep the consumer default. See LIN-438.
+  → "harness" (optional) is threaded onto the dispatched item, same meaning as on POST /dispatch — the EXECUTION harness the runner should use (e.g. "opencode"), opaque and forwarded blindly. Combine with "model" to pick a specific OpenRouter-backed model for a non-default harness; omit to keep the consumer's own default. See LIN-1084.
   → "sessionId" (optional) is the autopilot dispatch id driving this run; stamp it on every fan-out so the whole multi-task run reconstructs as one session. UUID, any target. See LIN-591.
   → The prompt body NEVER returns to you — you only get the task header. This keeps the prompt out of your context (the point of the verb); learn what was chosen from "kind"/"promptName", then watch the item via GET /dispatch/{id}.
   → "kind" is derived from the recommendation's own action signal (falling back to "custom") — no need to read the prompt to classify the task.
@@ -1284,7 +1272,7 @@ POST ${baseUrl}/api/proxy/autopilot/kickoff
   → Omit "issueIdentifier" for a GENERAL run ("goal" focuses the stack walk); pass it for a SCOPED run ("autopilot until THIS task is done") — the project "repo=" is then inherited unless you pass "repo". "mode" defaults to "write" ("readonly" = investigation only).
   → "variant" defaults to "standard" (the normal orchestrator). "stepper" swaps in the warm single-session, beat-stepping disposition: it decomposes the task's worker prompt into 3–6 ordered beats and drip-feeds them into ONE session over followUpTo+force, judging and challenging each beat before advancing. Orthogonal to "mode" — they compose.
   → "sessionId" + "subscription" (LIN-813/LIN-900 §6) are the coordinator up-chain edge — available to ANY autopilot contextually (a guide capability, not a launch-time variant; see the "Dispatching a child autopilot" section of the operating manual). When an autopilot acting as a coordinator dispatches a CHILD autopilot for a whole task, it passes its OWN session id as "sessionId" (the wake target) with "subscription": "everything", so when the child pauses (PENDING) or terminates its report is pushed back up to the coordinator instead of the coordinator polling. A top-level kickoff omits both (undeclared → "terminal-only"). NOTE the child's own returned "id" (its session id, for ITS sub-workers) stays distinct from the parent "sessionId" you pass in.
-  → "subscription" is the §5 bubbling contract: an "everything" edge wakes the parent on EVERY event (incl. PENDING-external — each stepper beat boundary); a "terminal-only" edge (the default) wakes it only on the always-bubbling outcomes DONE/FAILED/BLOCKED. It is DECLARED on the edge (never inferred from "has a sessionId"). The stepper kickoff body instructs each beat to carry BOTH "subscription": "everything" AND "waitForFollowUps": true — the two orthogonal halves of the warm drip (LIN-845). "subscription: everything" is the up-chain wake (the worker's stop boundary, incl. [pending], wakes the orchestrator); "waitForFollowUps" is the worker-side hold (the worker parks at AWAITING_FOLLOWUP instead of finalizing). Both are needed: with the hold absent the worker finalizes after beat 1, so beat 2's followUpTo+force falls back to a cold claude --resume instead of an in-session warm follow-on.
+  → "subscription" is the §5 bubbling contract: an "everything" edge wakes the parent on EVERY event (incl. PENDING-external — each stepper beat boundary); a "terminal-only" edge (the default) wakes it only on the always-bubbling outcomes DONE/FAILED/BLOCKED. It is DECLARED on the edge (never inferred from "has a sessionId"). The stepper kickoff body instructs each beat to carry BOTH "subscription": "everything" AND "waitForFollowUps": true — the two orthogonal halves of the warm drip (LIN-845). "subscription: everything" is the up-chain wake (the worker's stop boundary, incl. [pending], wakes the orchestrator); "waitForFollowUps" is the worker-side hold (the worker parks at AWAITING_FOLLOWUP instead of finalizing). Both are needed: with the hold absent the worker finalizes after beat 1, so beat 2's followUpTo+force falls back to a cold resume via the runner's own mechanism instead of an in-session warm follow-on.
   → Dispatched as kind:"autopilot", so the returned "id" IS this run's session id. Pass that id as "sessionId" on every worker dispatch the run fans out (the kickoff body also tells the run its own id). The orchestrator itself is launched WITHOUT "waitForFollowUps" (default false) so it finalizes normally and stays free to run its watch loop.
   → The prompt body NEVER returns to you — only the header. The GET twin (GET /api/proxy/autopilot/kickoff?goal=&mode=&variant=) stays a text-only preview/inspect form that does NOT enqueue anything.
   → { "id": "...", "sessionId": "...", "status": "queued", "kind": "autopilot", "promptName": "Autopilot (stack walk)", "mode": "write", "variant": "standard", "issueIdentifier": null, "target": "cli", "dispatchedAt": "..." }
@@ -1354,6 +1342,7 @@ One convention across every endpoint, so you can branch on the same fields every
 500 - Internal server error
 502 - Upstream write was rejected (the create/update did not land)
 503 - Workspace or AI service unavailable
+504 - Upstream provider request timed out or was aborted (mapped from a TimeoutError/AbortError)
 
 ## Notes
 
@@ -2718,145 +2707,13 @@ One convention across every endpoint, so you can branch on the same fields every
         ({ projects, issues } = await withTimeout(fetchProjects(accessToken), MULTI_REQUEST_TIMEOUT_MS));
       }
 
-      // Build tree structure
-      const forest = buildForest(issues);
-      if (forest.has(NO_PROJECT_ID)) {
-        projects.push({
-          id: NO_PROJECT_ID,
-          name: 'No Project',
-          content: null,
-          url: null,
-          sortOrder: Number.MAX_SAFE_INTEGER
-        });
-      }
-
-      const inProgressTrees = buildInProgressForest(issues, projects);
-      const recentActivityTrees = buildRecentActivityForest(issues, projects, 1);
-      const trees = projects
-        .sort((a, b) => a.sortOrder - b.sortOrder)
-        .map(project => {
-          const { roots } = forest.get(project.id) || { roots: [] };
-          const { incomplete } = partitionCompleted(roots);
-          return { project, incomplete };
-        });
-
-      // Flatten and deduplicate (same as swipe view)
-      const projectIssues = flattenTrees(trees, 'project');
-      const inProgressIssues = flattenTrees(inProgressTrees, 'in-progress');
-      const recentIssues = flattenTrees(recentActivityTrees, 'recent-activity');
-
-      const seenIds = new Set();
-      const allIssues = [];
-      for (const issue of inProgressIssues) {
-        if (!seenIds.has(issue.id)) { seenIds.add(issue.id); allIssues.push(issue); }
-      }
-      for (const issue of projectIssues) {
-        if (!seenIds.has(issue.id)) { seenIds.add(issue.id); allIssues.push(issue); }
-      }
-      for (const issue of recentIssues) {
-        if (!seenIds.has(issue.id)) { seenIds.add(issue.id); allIssues.push(issue); }
-      }
-
-      // Build parent/child relationships (flat throughout; this is already the
-      // neutral flat wire shape the rest of the API now aligns onto).
-      const cardById = new Map(allIssues.map(i => [i.id, i]));
-      const childrenMap = new Map();
-      for (const issue of allIssues) {
-        if (issue.parentId && cardById.has(issue.parentId)) {
-          const parent = cardById.get(issue.parentId);
-          issue.parentIdentifier = parent.identifier;
-          issue.parentTitle = parent.title;
-          if (!childrenMap.has(issue.parentId)) childrenMap.set(issue.parentId, []);
-          childrenMap.get(issue.parentId).push({
-            id: issue.id,
-            identifier: issue.identifier,
-            title: issue.title,
-            state: { type: issue.stateType }
-          });
-        }
-      }
-      for (const [parentId, children] of childrenMap) {
-        const parent = cardById.get(parentId);
-        if (parent) parent.children = children;
-      }
-
-      // Compute transitive graph features (LIN-391) BEFORE the sort — they are
-      // sort-keys (downstreamUnblocks/criticalPathLen) and also stamped onto the
-      // digest line. Same ordering as the swipe view (renderSwipePage), which
-      // runs the identical pipeline.
-      computeGraphFeatures(allIssues);
-      sortIssuesForSwipe(allIssues);
-      const sortedIssues = clusterByParent(applyBlockingOrder(allIssues));
-
-      // Trim to limit and project to the neutral flat wire shape. Agents assume
-      // `state.name`, `parent.identifier`, `children` (not `subtasks`), so we
-      // expose that shape uniformly here. Internal flat fields remain
-      // available only to this handler.
-      //
-      // `?view=digest` returns a compact, orientation-grade projection: it drops
-      // the (potentially large) full `description` in favour of a deterministic
-      // one-line `headline`, and replaces the `children`/`blocksIds` arrays with
-      // counts. This lets a light orchestrator (Autopilot) get a sense of the
-      // whole stack at a glance without holding every task's full body in
-      // context — then drill into one task's detail (full description / `/brief`)
-      // only for the item it picks. See docs/autopilot-kickoff.md.
-      const sliced = sortedIssues.slice(0, limit);
-      // Off-page blockers (LIN-391): direct blockers pushed beyond the slice that
-      // still shaped a visible line's position. Derived from final post-cluster
-      // positions; no transitive closure stored.
-      const offPageBlockers = computeOffPageBlockers(sortedIssues, limit);
-      const isDigest = req.query.view === 'digest';
-      const tasks = isDigest
-        ? sliced.map(issue => {
-            const heldBy = offPageBlockers.get(issue.id) || [];
-            return {
-              id: issue.id,
-              identifier: issue.identifier,
-              title: issue.title,
-              headline: toStackHeadline(issue.description),
-              priority: issue.priority,
-              state: { name: issue.stateName, type: issue.stateType },
-              labels: issue.labels || [],
-              section: issue.section || null,
-              assignee: issue.assignee || null,
-              project: issue.projectName ? { name: issue.projectName } : null,
-              parent: issue.parentId
-                ? { identifier: issue.parentIdentifier || null }
-                : null,
-              blocks: (issue.blocksIds || []).length,
-              children: (issue.children || []).length,
-              // Explainability (LIN-391): transitive features + compact `why`.
-              downstreamUnblocks: issue.downstreamUnblocks || 0,
-              criticalPathLen: issue.criticalPathLen || 0,
-              ...(heldBy.length > 0 ? { heldBy } : {}),
-              why: buildWhy(issue, heldBy)
-            };
-          })
-        : sliced.map(issue => {
-            const heldBy = offPageBlockers.get(issue.id) || [];
-            return {
-              id: issue.id,
-              identifier: issue.identifier,
-              title: issue.title,
-              description: issue.description,
-              priority: issue.priority,
-              state: { name: issue.stateName, type: issue.stateType },
-              labels: issue.labels || [],
-              project: issue.projectName ? { name: issue.projectName } : null,
-              parent: issue.parentId
-                ? { id: issue.parentId, identifier: issue.parentIdentifier || null, title: issue.parentTitle || null }
-                : null,
-              children: issue.children || [],
-              blocksIds: issue.blocksIds || [],
-              // Same computed scalars as digest, for full/digest consistency (LIN-391).
-              downstreamUnblocks: issue.downstreamUnblocks || 0,
-              criticalPathLen: issue.criticalPathLen || 0,
-              ...(heldBy.length > 0 ? { heldBy } : {})
-            };
-          });
+      // Project the sorted stack via the shared pure pipeline (lib/task-stack.js),
+      // the exact same projection the read-only `get_stack` chat tool drives.
+      const view = req.query.view === 'digest' ? 'digest' : 'full';
+      const { tasks, total, view: resolvedView } = buildTaskStack({ projects, issues, limit, view });
 
       logEvent(req, '/api/proxy/stack', 200);
-      res.json({ tasks, total: sortedIssues.length, view: isDigest ? 'digest' : 'full' });
+      res.json({ tasks, total, view: resolvedView });
     } catch (err) {
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/stack', status);
@@ -4058,7 +3915,7 @@ One convention across every endpoint, so you can branch on the same fields every
 
     logEvent(req, '/api/proxy/autopilot/kickoff', 200);
 
-    const kickoff = buildAutopilotKickoff({ baseUrl, goal, mode, variant });
+    const kickoff = buildAutopilotKickoff({ baseUrl, goal, mode, variant, standalone: true });
     res.type('text/plain').send(kickoff);
   });
 
@@ -4286,7 +4143,7 @@ One convention across every endpoint, so you can branch on the same fields every
     }
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo, force, abort, abortTo, cascade, sessionId, waitForFollowUps, queueIfBusy, subscription } = req.body || {};
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, harness, followUpTo, force, abort, abortTo, cascade, sessionId, waitForFollowUps, queueIfBusy, subscription } = req.body || {};
 
       // Abort verb (LIN-743): an abort item cancels/closes an existing session
       // (named by abortTo) instead of running a prompt — it carries no prompt and
@@ -4381,6 +4238,20 @@ One convention across every endpoint, so you can branch on the same fields every
       if (repo && repo.length > MAX_NAME_LENGTH) {
         logEvent(req, '/api/proxy/dispatch', 400);
         return badRequest.json(res, `repo exceeds maximum length of ${MAX_NAME_LENGTH}`);
+      }
+      // Execution model + harness (LIN-438, LIN-1084): opaque strings, validated
+      // via the shared helper (type/length/dangerous-chars only — NOT checked
+      // against openrouter AVAILABLE_MODELS, which is the generation-model
+      // namespace; these are the consumer's execution-model/harness fields).
+      const modelValidationError = validateOpaqueDispatchField(model, 'model', { maxLength: MAX_NAME_LENGTH });
+      if (modelValidationError) {
+        logEvent(req, '/api/proxy/dispatch', 400);
+        return badRequest.json(res, modelValidationError.error);
+      }
+      const harnessValidationError = validateOpaqueDispatchField(harness, 'harness', { maxLength: MAX_NAME_LENGTH });
+      if (harnessValidationError) {
+        logEvent(req, '/api/proxy/dispatch', 400);
+        return badRequest.json(res, harnessValidationError.error);
       }
 
       if (prompt && DANGEROUS_CHARS_REGEX.test(prompt)) {
@@ -4511,10 +4382,28 @@ One convention across every endpoint, so you can branch on the same fields every
         });
       }
 
+      // Resolve blank incoming model/harness against the workspace's
+      // dispatchDefaults (LIN-1099, mirroring routes/dispatch.js's LIN-1094
+      // wiring): per-kind override -> workspace-wide default -> null. Each
+      // field resolves independently, and the lookup is skipped entirely when
+      // no store is wired or both fields are already set.
+      const effectiveKind = kind || deriveDispatchKind(promptName);
+      let resolvedModel = model || null;
+      let resolvedHarness = harness || null;
+      if ((!model || !harness) && workspacePreferencesStore) {
+        const defaults = await resolveDispatchDefaults({
+          urlKey: req.proxyUrlKey,
+          kind: effectiveKind,
+          store: workspacePreferencesStore
+        });
+        if (!model) resolvedModel = defaults.model;
+        if (!harness) resolvedHarness = defaults.harness;
+      }
+
       const item = await dispatchQueueStore.addItem(req.proxyUrlKey, {
         prompt: finalPrompt,
         promptName: promptName || 'Prompt',
-        kind: kind || deriveDispatchKind(promptName),
+        kind: effectiveKind,
         issueId: issueId || null,
         issueIdentifier: issueIdentifier || null,
         issueTitle: issueTitle || null,
@@ -4522,6 +4411,8 @@ One convention across every endpoint, so you can branch on the same fields every
         dispatchedBy: req.proxyCreatedBy || null,
         target: target || 'cli',
         repo: repo || null,
+        model: resolvedModel,
+        harness: resolvedHarness,
         followUpTo: followUpTo || null,
         force: force === true,
         abort: isAbort,
@@ -4578,7 +4469,7 @@ One convention across every endpoint, so you can branch on the same fields every
     }
 
     try {
-      const { issueIdentifier, target, repo, appendProxyContext, noDescend, kind, sessionId, waitForFollowUps, queueIfBusy, subscription } = req.body || {};
+      const { issueIdentifier, target, repo, model, harness, appendProxyContext, noDescend, kind, sessionId, waitForFollowUps, queueIfBusy, subscription } = req.body || {};
 
       // Validate caller-supplied inputs. (Only the server-generated prompt skips
       // the dangerous-char/length checks — see the dispatch step below.)
@@ -4619,6 +4510,19 @@ One convention across every endpoint, so you can branch on the same fields every
       if (repo !== undefined && (typeof repo !== 'string' || repo.length > MAX_NAME_LENGTH || DANGEROUS_CHARS_REGEX.test(repo))) {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
         return badRequest.json(res, 'repo is invalid');
+      }
+      // Execution model + harness (LIN-438, LIN-1084): opaque strings, validated
+      // via the shared helper (length + dangerous-chars). NOT a generation-model
+      // registry check — these are the consumer's execution-model/harness fields.
+      const recommendModelValidationError = validateOpaqueDispatchField(model, 'model', { maxLength: MAX_NAME_LENGTH });
+      if (recommendModelValidationError) {
+        logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
+        return badRequest.json(res, recommendModelValidationError.error);
+      }
+      const recommendHarnessValidationError = validateOpaqueDispatchField(harness, 'harness', { maxLength: MAX_NAME_LENGTH });
+      if (recommendHarnessValidationError) {
+        logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
+        return badRequest.json(res, recommendHarnessValidationError.error);
       }
       // Optional verb override (LIN-573). When present, the caller pins the step
       // and the server still writes the body — "autopilot picks the verb, never
@@ -4706,6 +4610,21 @@ One convention across every endpoint, so you can branch on the same fields every
           });
         }
 
+        // Resolve blank incoming model/harness against the workspace's
+        // dispatchDefaults (LIN-1099, mirroring routes/dispatch.js's LIN-1094
+        // wiring). `kind` is already guaranteed set on this verb-override branch.
+        let resolvedModel = model || null;
+        let resolvedHarness = harness || null;
+        if ((!model || !harness) && workspacePreferencesStore) {
+          const defaults = await resolveDispatchDefaults({
+            urlKey: req.proxyUrlKey,
+            kind,
+            store: workspacePreferencesStore
+          });
+          if (!model) resolvedModel = defaults.model;
+          if (!harness) resolvedHarness = defaults.harness;
+        }
+
         try {
           const item = await dispatchQueueStore.addItem(req.proxyUrlKey, {
             prompt: finalPrompt,
@@ -4720,6 +4639,11 @@ One convention across every endpoint, so you can branch on the same fields every
             // Mirror /prompt's repo resolution: project `repo=` from the
             // description, with an explicit caller repo winning (LIN-537).
             repo: repo || parseRepoFromDescription(project?.description) || null,
+            // Execution model + harness the runner passes to its CLI (LIN-438,
+            // LIN-1084); opaque, forwarded blindly. null preserves the consumer
+            // default.
+            model: resolvedModel,
+            harness: resolvedHarness,
             sessionId: sessionId || null,
             // Push-comms: `subscription` is the declared edge (LIN-900 §6),
             // `terminal-only` unless the caller declares `everything`; queueIfBusy
@@ -4843,10 +4767,27 @@ One convention across every endpoint, so you can branch on the same fields every
         // recommendedAction → deriveDispatchKind → BOTH the stored item's kind
         // and the response kind (same value); falls back to 'custom' when the
         // action can't be parsed.
+        const effectiveKind = deriveDispatchKind(rec.recommendedAction);
+
+        // Resolve blank incoming model/harness against the workspace's
+        // dispatchDefaults (LIN-1099, mirroring routes/dispatch.js's LIN-1094
+        // wiring).
+        let resolvedModel = model || null;
+        let resolvedHarness = harness || null;
+        if ((!model || !harness) && workspacePreferencesStore) {
+          const defaults = await resolveDispatchDefaults({
+            urlKey: req.proxyUrlKey,
+            kind: effectiveKind,
+            store: workspacePreferencesStore
+          });
+          if (!model) resolvedModel = defaults.model;
+          if (!harness) resolvedHarness = defaults.harness;
+        }
+
         const item = await dispatchQueueStore.addItem(req.proxyUrlKey, {
           prompt: finalPrompt,
           promptName: rec.recommendedAction || 'Prompt',
-          kind: deriveDispatchKind(rec.recommendedAction),
+          kind: effectiveKind,
           issueId: null,
           issueIdentifier: terminalIdentifier,
           issueTitle: null,
@@ -4858,6 +4799,11 @@ One convention across every endpoint, so you can branch on the same fields every
           // is functional execution context (working directory), so this fused
           // verb must propagate it, not just the display header fields (LIN-537).
           repo: repo || rec.repo || null,
+          // Execution model + harness the runner passes to its CLI (LIN-438,
+          // LIN-1084); opaque, forwarded blindly. null preserves the consumer
+          // default.
+          model: resolvedModel,
+          harness: resolvedHarness,
           sessionId: sessionId || null,
           // Opt-in completion hold (LIN-797), forwarded blindly to the runner.
           waitForFollowUps: waitForFollowUps === true,

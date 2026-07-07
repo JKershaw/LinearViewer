@@ -457,6 +457,58 @@ test.describe('Dispatch Queue', () => {
     // The panel stays open after dispatch so the button feedback remains visible.
     await expect(promptContainer.locator('.disclosure-toggle')).toHaveAttribute('aria-expanded', 'true');
   });
+
+  // LIN-1096: the shared model/harness exec controls are injected into every
+  // dispatch options panel on the dashboard tree.
+  test('exec controls appear in the dispatch panel and flow through to the dispatched item', async ({ page }) => {
+    const promptContainer = await revealPrompt(page);
+    await openDispatchOptions(promptContainer);
+
+    const controls = promptContainer.locator('.dispatch-exec-controls');
+    await expect(controls).toBeVisible();
+
+    await controls.locator('.dispatch-exec-harness-select').selectOption('claude-code');
+    await controls.locator('.dispatch-exec-model').fill('anthropic/claude-opus-4.8');
+
+    const dispatchReq = page.waitForRequest(req =>
+      req.url().includes('/api/dispatch') && req.method() === 'POST');
+    await promptContainer.locator('.prompt-dispatch[data-target="cli"]').click();
+
+    const req = await dispatchReq;
+    const body = JSON.parse(req.postData() || '{}');
+    expect(body.harness).toBe('claude-code');
+    expect(body.model).toBe('anthropic/claude-opus-4.8');
+  });
+
+  test('untouched exec controls send the pre-selected claude-code harness and omit model (LIN-1111)', async ({ page }) => {
+    const promptContainer = await revealPrompt(page);
+    await openDispatchOptions(promptContainer);
+
+    const dispatchReq = page.waitForRequest(req =>
+      req.url().includes('/api/dispatch') && req.method() === 'POST');
+    await promptContainer.locator('.prompt-dispatch[data-target="cli"]').click();
+
+    const req = await dispatchReq;
+    const body = JSON.parse(req.postData() || '{}');
+    expect(body.model == null).toBe(true);
+    expect(body.harness).toBe('claude-code');
+  });
+
+  test('explicitly selecting the blank harness option still sends null (LIN-1111)', async ({ page }) => {
+    const promptContainer = await revealPrompt(page);
+    await openDispatchOptions(promptContainer);
+
+    const controls = promptContainer.locator('.dispatch-exec-controls');
+    await controls.locator('.dispatch-exec-harness-select').selectOption('');
+
+    const dispatchReq = page.waitForRequest(req =>
+      req.url().includes('/api/dispatch') && req.method() === 'POST');
+    await promptContainer.locator('.prompt-dispatch[data-target="cli"]').click();
+
+    const req = await dispatchReq;
+    const body = JSON.parse(req.postData() || '{}');
+    expect(body.harness == null).toBe(true);
+  });
 });
 
 test.describe('Dispatch API', () => {
@@ -1434,6 +1486,97 @@ test.describe('Recent Prompts API', () => {
       data: {}
     });
     expect(missingResponse.status()).toBe(400);
+  });
+});
+
+test.describe('Favorite Prompts API', () => {
+  test.beforeEach(async ({ request }) => {
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
+    await request.get(`/test/clear-favorite-prompts?urlKey=${URL_KEY}`);
+  });
+
+  test('GET favorite-prompts returns empty array initially', async ({ request }) => {
+    const response = await request.get(`${API_PREFIX}/api/dispatch/favorite-prompts`);
+    expect(response.status()).toBe(200);
+    const data = await response.json();
+    expect(data.prompts).toEqual([]);
+  });
+
+  test('POST favorite-prompts adds and GET retrieves', async ({ request }) => {
+    const postResponse = await request.post(`${API_PREFIX}/api/dispatch/favorite-prompts`, {
+      data: { prompt: 'My favourite prompt' }
+    });
+    expect(postResponse.status()).toBe(200);
+    const postData = await postResponse.json();
+    expect(postData.success).toBe(true);
+    expect(postData.prompts).toEqual(['My favourite prompt']);
+
+    const getResponse = await request.get(`${API_PREFIX}/api/dispatch/favorite-prompts`);
+    const getData = await getResponse.json();
+    expect(getData.prompts).toEqual(['My favourite prompt']);
+  });
+
+  test('favourites are deduplicated and most-recent-first', async ({ request }) => {
+    await request.post(`${API_PREFIX}/api/dispatch/favorite-prompts`, { data: { prompt: 'First' } });
+    await request.post(`${API_PREFIX}/api/dispatch/favorite-prompts`, { data: { prompt: 'Second' } });
+    await request.post(`${API_PREFIX}/api/dispatch/favorite-prompts`, { data: { prompt: 'First' } });
+
+    const response = await request.get(`${API_PREFIX}/api/dispatch/favorite-prompts`);
+    const data = await response.json();
+    expect(data.prompts).toEqual(['First', 'Second']);
+  });
+
+  test('DELETE favorite-prompts removes a favourite (un-star)', async ({ request }) => {
+    await request.post(`${API_PREFIX}/api/dispatch/favorite-prompts`, { data: { prompt: 'Keep' } });
+    await request.post(`${API_PREFIX}/api/dispatch/favorite-prompts`, { data: { prompt: 'Drop' } });
+
+    const delResponse = await request.delete(`${API_PREFIX}/api/dispatch/favorite-prompts`, {
+      data: { prompt: 'Drop' }
+    });
+    expect(delResponse.status()).toBe(200);
+    const delData = await delResponse.json();
+    expect(delData.success).toBe(true);
+    expect(delData.prompts).toEqual(['Keep']);
+
+    const getResponse = await request.get(`${API_PREFIX}/api/dispatch/favorite-prompts`);
+    const getData = await getResponse.json();
+    expect(getData.prompts).toEqual(['Keep']);
+  });
+
+  test('favourites limited to 25', async ({ request }) => {
+    // 26 sequential writes to prove the cap drops the oldest; give it headroom
+    // over the default 30s since each HTTP write is a full round trip.
+    test.setTimeout(90_000);
+    for (let i = 1; i <= 26; i++) {
+      await request.post(`${API_PREFIX}/api/dispatch/favorite-prompts`, { data: { prompt: `Fav ${i}` } });
+    }
+    const response = await request.get(`${API_PREFIX}/api/dispatch/favorite-prompts`);
+    const data = await response.json();
+    expect(data.prompts.length).toBe(25);
+    expect(data.prompts[0]).toBe('Fav 26');
+    expect(data.prompts[24]).toBe('Fav 2');
+  });
+
+  test('POST favorite-prompts validates input', async ({ request }) => {
+    const emptyResponse = await request.post(`${API_PREFIX}/api/dispatch/favorite-prompts`, {
+      data: { prompt: '' }
+    });
+    expect(emptyResponse.status()).toBe(400);
+
+    const missingResponse = await request.post(`${API_PREFIX}/api/dispatch/favorite-prompts`, {
+      data: {}
+    });
+    expect(missingResponse.status()).toBe(400);
+
+    const tooLongResponse = await request.post(`${API_PREFIX}/api/dispatch/favorite-prompts`, {
+      data: { prompt: 'x'.repeat(10001) }
+    });
+    expect(tooLongResponse.status()).toBe(400);
+
+    const dangerousResponse = await request.post(`${API_PREFIX}/api/dispatch/favorite-prompts`, {
+      data: { prompt: 'bad\x00char' }
+    });
+    expect(dangerousResponse.status()).toBe(400);
   });
 });
 

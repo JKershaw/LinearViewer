@@ -287,6 +287,100 @@ test.describe('Dispatch Page', () => {
     });
   });
 
+  test.describe('Favourite Prompts (LIN-1011)', () => {
+    test.beforeEach(async ({ page }) => {
+      // Seed FIRST so the local session's user exists before clearing, then
+      // clear BOTH lists (favourites survive the recents cap, so both matter).
+      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true }, urlKey: WS });
+      await page.goto('/test/clear-recent-prompts');
+      await page.goto('/test/clear-favorite-prompts');
+    });
+
+    test('starring a recent prompt promotes it into Favourites', async ({ page }) => {
+      await page.request.post(`${API_PREFIX}/api/dispatch/recent-prompts`, {
+        data: { prompt: 'Star me' }
+      });
+      await page.goto(DISPATCH_URL);
+      await page.waitForLoadState('networkidle');
+
+      const star = page.locator('.dispatch-recents-container .queue-recent-star');
+      await expect(star.first()).toBeVisible({ timeout: 5000 });
+      // Not favourited yet: outline star.
+      await expect(star.first()).toHaveText('☆');
+
+      await star.first().click();
+
+      // It now appears in the Favourites list...
+      const favItem = page.locator('.dispatch-favorites-container .queue-favorite-item');
+      await expect(favItem.first()).toBeVisible({ timeout: 5000 });
+      await expect(favItem.first()).toContainText('Star me');
+      // ...and the recent item's star flips to filled.
+      await expect(star.first()).toHaveText('★');
+      await expect(star.first()).toHaveClass(/\bis-favorite\b/);
+    });
+
+    test('a favourite survives the recents roll-off (the core requirement)', async ({ page }) => {
+      await page.request.post(`${API_PREFIX}/api/dispatch/recent-prompts`, {
+        data: { prompt: 'Keep me forever' }
+      });
+      // Favourite it directly via the API (the star click is covered above).
+      await page.request.post(`${API_PREFIX}/api/dispatch/favorite-prompts`, {
+        data: { prompt: 'Keep me forever' }
+      });
+      // Push 12 newer recents so the original rolls off the capped-at-10 Recent window.
+      for (let i = 1; i <= 12; i++) {
+        await page.request.post(`${API_PREFIX}/api/dispatch/recent-prompts`, {
+          data: { prompt: `Filler ${i}` }
+        });
+      }
+
+      await page.goto(DISPATCH_URL);
+      await page.waitForLoadState('networkidle');
+
+      // Gone from Recent (10 fillers), but still present in Favourites.
+      const recentItems = page.locator('.dispatch-recents-container .queue-recent-item');
+      await expect(recentItems).toHaveCount(10, { timeout: 5000 });
+      await expect(page.locator('.dispatch-recents-container')).not.toContainText('Keep me forever');
+
+      const favItem = page.locator('.dispatch-favorites-container .queue-favorite-item');
+      await expect(favItem.first()).toBeVisible();
+      await expect(favItem.first()).toContainText('Keep me forever');
+    });
+
+    test('clicking a favourite fills the textarea', async ({ page }) => {
+      await page.request.post(`${API_PREFIX}/api/dispatch/favorite-prompts`, {
+        data: { prompt: 'Favourite prompt text' }
+      });
+      await page.goto(DISPATCH_URL);
+      await page.waitForLoadState('networkidle');
+
+      const favItem = page.locator('.dispatch-favorites-container .queue-favorite-item');
+      await expect(favItem.first()).toBeVisible({ timeout: 5000 });
+      await favItem.first().click();
+
+      const textarea = page.locator('.dispatch-prompt-input');
+      await expect(textarea).toHaveValue('Favourite prompt text');
+    });
+
+    test('un-starring (✕) removes a favourite', async ({ page }) => {
+      await page.request.post(`${API_PREFIX}/api/dispatch/favorite-prompts`, {
+        data: { prompt: 'Remove me' }
+      });
+      await page.goto(DISPATCH_URL);
+      await page.waitForLoadState('networkidle');
+
+      const favItem = page.locator('.dispatch-favorites-container .queue-favorite-item');
+      await expect(favItem.first()).toBeVisible({ timeout: 5000 });
+
+      await page.locator('.dispatch-favorites-container .queue-favorite-remove').first().click();
+
+      // The favourites list empties out.
+      await expect(favItem).toHaveCount(0, { timeout: 5000 });
+      // And it did NOT get refilled into the textarea by the same click.
+      await expect(page.locator('.dispatch-prompt-input')).toHaveValue('');
+    });
+  });
+
   test.describe('Dispatch Options Disclosure', () => {
     test.beforeEach(async ({ page }) => {
       await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true }, urlKey: WS });
@@ -377,6 +471,93 @@ test.describe('Dispatch Page', () => {
       const customItem = items.find(i => i.prompt === 'Dispatch from inside the panel');
       expect(customItem).toBeDefined();
       expect(customItem.target).toBe('cli');
+    });
+  });
+
+  test.describe('Model/Harness Exec Controls (LIN-1096)', () => {
+    test.beforeEach(async ({ page }) => {
+      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true }, urlKey: WS });
+      await page.goto(`/test/clear-dispatch-queue?urlKey=${WS}`);
+      await page.goto(DISPATCH_URL);
+      await page.waitForLoadState('networkidle');
+      await page.locator('.dispatch-toggle').click();
+    });
+
+    test('exec controls render in the Send Prompt section', async ({ page }) => {
+      const controls = page.locator('.dispatch-exec-controls');
+      await expect(controls).toBeVisible();
+      await expect(controls.locator('.dispatch-exec-harness-select')).toBeVisible();
+      await expect(controls.locator('.dispatch-exec-harness-custom')).toBeVisible();
+      await expect(controls.locator('.dispatch-exec-model')).toBeVisible();
+    });
+
+    test('the live OpenRouter catalog enriches the model datalist after load (LIN-1111 Session 2)', async ({ page }) => {
+      // Local-provider sessions are mock-gated (routes/workspace-api.js
+      // shouldMockAi), so window.fetchDispatchModelCatalog resolves the
+      // deterministic MOCK_CATALOG_MODELS from GET .../api/openrouter/models
+      // instead of a live OpenRouter call.
+      const datalist = page.locator('.dispatch-exec-model-datalist');
+      await expect(datalist.locator('option[value="mock-provider/catalog-model-one"]')).toHaveCount(1);
+      await expect(datalist.locator('option[value="mock-provider/catalog-model-two"]')).toHaveCount(1);
+      // Still lists the curated suggestions — supplement, not replace.
+      await expect(datalist.locator('option[value="openai/gpt-5.4-mini"]')).toHaveCount(1);
+    });
+
+    test('dispatching with a selected harness and typed model sends both fields', async ({ page }) => {
+      await page.locator('.dispatch-prompt-input').fill('Exec controls test');
+      await page.locator('.dispatch-exec-harness-select').selectOption('opencode');
+      await page.locator('.dispatch-exec-model').fill('openrouter/anthropic/claude-opus-4.8');
+
+      const dispatchBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
+      await dispatchBtn.click();
+      await expect(dispatchBtn).toHaveText('dispatched!');
+
+      const listResponse = await page.request.get(`${API_PREFIX}/api/dispatch`);
+      const { items } = await listResponse.json();
+      const item = items.find(i => i.prompt === 'Exec controls test');
+      expect(item.harness).toBe('opencode');
+      expect(item.model).toBe('openrouter/anthropic/claude-opus-4.8');
+    });
+
+    test('leaving both fields untouched sends the pre-selected claude-code harness and null model (LIN-1111)', async ({ page }) => {
+      await page.locator('.dispatch-prompt-input').fill('Blank exec controls test');
+      const dispatchBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
+      await dispatchBtn.click();
+      await expect(dispatchBtn).toHaveText('dispatched!');
+
+      const listResponse = await page.request.get(`${API_PREFIX}/api/dispatch`);
+      const { items } = await listResponse.json();
+      const item = items.find(i => i.prompt === 'Blank exec controls test');
+      expect(item.harness).toBe('claude-code');
+      expect(item.model).toBeNull();
+    });
+
+    test('explicitly selecting the blank harness option still sends null (LIN-1111)', async ({ page }) => {
+      await page.locator('.dispatch-prompt-input').fill('Explicit blank harness test');
+      await page.locator('.dispatch-exec-harness-select').selectOption('');
+      const dispatchBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
+      await dispatchBtn.click();
+      await expect(dispatchBtn).toHaveText('dispatched!');
+
+      const listResponse = await page.request.get(`${API_PREFIX}/api/dispatch`);
+      const { items } = await listResponse.json();
+      const item = items.find(i => i.prompt === 'Explicit blank harness test');
+      expect(item.harness).toBeNull();
+    });
+
+    test('a custom harness value wins over the select', async ({ page }) => {
+      await page.locator('.dispatch-prompt-input').fill('Custom harness wins');
+      await page.locator('.dispatch-exec-harness-select').selectOption('claude-code');
+      await page.locator('.dispatch-exec-harness-custom').fill('my-custom-harness');
+
+      const dispatchBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
+      await dispatchBtn.click();
+      await expect(dispatchBtn).toHaveText('dispatched!');
+
+      const listResponse = await page.request.get(`${API_PREFIX}/api/dispatch`);
+      const { items } = await listResponse.json();
+      const item = items.find(i => i.prompt === 'Custom harness wins');
+      expect(item.harness).toBe('my-custom-harness');
     });
   });
 
@@ -785,23 +966,23 @@ test.describe('Dispatch Page', () => {
   });
 
   test.describe('Navigation', () => {
-    test('footer shows dispatch link when feature enabled', async ({ page }) => {
+    test('header switcher shows dispatch as current when feature enabled', async ({ page }) => {
       await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true }, urlKey: WS });
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
 
-      // Footer should show dispatch as current page (bold)
-      const dispatchFooter = page.locator('.footer-current:has-text("dispatch")');
-      await expect(dispatchFooter).toBeVisible();
+      // Header switcher (LIN-978) shows dispatch as the current page (bold).
+      const dispatchCurrent = page.locator('.nav-views [data-testid="nav-view-dispatch"].nav-view-current');
+      await expect(dispatchCurrent).toBeVisible();
     });
 
-    test('footer dispatch link works from other pages', async ({ page }) => {
+    test('header dispatch link works from other pages', async ({ page }) => {
       await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true }, urlKey: WS });
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
 
-      // Footer should have dispatch link
-      const dispatchLink = page.locator('.footer-action:has-text("dispatch")');
+      // Header switcher carries the flagged dispatch link (LIN-978).
+      const dispatchLink = page.locator('.nav-views a[data-testid="nav-view-dispatch"]');
       await expect(dispatchLink).toBeVisible();
 
       await dispatchLink.click();
@@ -811,12 +992,12 @@ test.describe('Dispatch Page', () => {
       await expect(page.locator('h1')).toHaveText('Dispatch');
     });
 
-    test('footer does not show dispatch link when feature disabled', async ({ page }) => {
+    test('header does not show dispatch link when feature disabled', async ({ page }) => {
       await seedLocalWorkspace(page, REPO_SEED, { urlKey: WS });
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
 
-      const dispatchLink = page.locator('.footer-action:has-text("dispatch")');
+      const dispatchLink = page.locator('.nav-views [data-testid="nav-view-dispatch"]');
       await expect(dispatchLink).toHaveCount(0);
     });
 

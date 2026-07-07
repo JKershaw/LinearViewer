@@ -83,6 +83,13 @@ export const SELECTORS = {
     link: (name) => `[data-testid="footer-link-${name}"]`,
     aiStatus: '[data-testid="footer-ai-status"]',
   },
+  nav: {
+    /**
+     * Header view-switcher link by its visible text, e.g. 'swipe', 'settings'
+     * (LIN-978). The cross-view links moved here from the footer.
+     */
+    view: (name) => `.nav-views [data-testid="nav-view-${name}"]`,
+  },
   settings: {
     /** Settings card by slug: ai | ai-usage | workflow | workspace-features | experimental | account. */
     section: (name) => `[data-testid="settings-section-${name}"]`,
@@ -104,6 +111,17 @@ export function footer(page) {
   return {
     getLink: (name) => page.locator(SELECTORS.footer.link(name)),
     aiStatus: () => page.locator(SELECTORS.footer.aiStatus),
+  }
+}
+
+/**
+ * Header nav page object — the shared view switcher (LIN-978).
+ * @param {import('@playwright/test').Page} page
+ */
+export function nav(page) {
+  return {
+    /** Header view-switcher link by visible text, e.g. 'swim', 'settings'. */
+    getView: (name) => page.locator(SELECTORS.nav.view(name)),
   }
 }
 

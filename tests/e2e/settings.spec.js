@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js'
-import { footer, settings } from '../helpers.js'
+import { nav, settings } from '../helpers.js'
 
 // Proof-of-pattern spec for LIN-215: brittle `:has-text()` / class / href
 // selectors here are migrated to the stable `data-testid` selectors and page
@@ -19,10 +19,12 @@ test.describe('Settings Page', () => {
     await expect(settings(page).section('ai')).toContainText('AI')
   })
 
-  test('has footer navigation links', async ({ page }) => {
-    await expect(footer(page).getLink('swipe')).toBeVisible()
-    await expect(footer(page).getLink('swim')).toBeVisible()
-    await expect(footer(page).getLink('settings')).toBeVisible()
+  test('has header view-switcher links', async ({ page }) => {
+    // Cross-view links moved from the footer into the shared header switcher
+    // (LIN-978); settings is the current page so it renders as the bold current.
+    await expect(nav(page).getView('swipe')).toBeVisible()
+    await expect(nav(page).getView('swim')).toBeVisible()
+    await expect(nav(page).getView('settings')).toBeVisible()
   })
 
   test('has Account section with logout', async ({ page }) => {
@@ -52,6 +54,19 @@ test.describe('Settings Page', () => {
     await page.waitForLoadState('networkidle')
 
     await expect(settings(page).toggle('dispatch')).toContainText('● on')
+  })
+
+  test('model pricing hint updates with the selected model (LIN-993)', async ({ page }) => {
+    const price = page.locator('[data-model-price]')
+    const select = page.locator('.model-select')
+    await expect(price).toBeVisible()
+    // Default model → its rate. Pricing lives in the hint, never in option text.
+    await expect(price).toContainText('per 1M tokens')
+    await expect(select.locator('option', { hasText: 'per 1M tokens' })).toHaveCount(0)
+
+    // Switching the selector updates the hint from the option's data-pricing.
+    await select.selectOption('openai/gpt-5.5-pro')
+    await expect(price).toContainText('$30.00 in / $180.00 out per 1M tokens')
   })
 })
 

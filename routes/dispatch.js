@@ -23,6 +23,8 @@ import os from 'os';
 import { spawnClaudeSession } from '../lib/harbour-spawn.js';
 import { isValidDispatchKind, deriveDispatchKind, DISPATCH_KINDS } from '../lib/prompt-templates.js';
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
+import { validateOpaqueDispatchField } from '../lib/dispatch-validation.js';
+import { resolveDispatchDefaults } from '../lib/workspace-preferences.js';
 
 // Directory for Harbour OS dispatch prompt staging files. The OS tmp dir is
 // shared between the Node server and the Harbour OS terminal that reads the
@@ -102,9 +104,11 @@ const DANGEROUS_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
  * @param {Function} options.workspaceFromUrl - Middleware to validate workspace
  * @param {Object} options.userPreferencesStore - User preferences store for recent prompts
  * @param {Object} [options.harbourFeedbackTokenStore] - Short-TTL feedback token store for Harbour OS dispatches
+ * @param {Object} [options.workspacePreferencesStore] - Workspace preferences store, used to
+ *   resolve dispatchDefaults (model/harness) for blank incoming values (LIN-1094)
  * @returns {Router} Express router with dispatch routes
  */
-export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore }) {
+export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore }) {
   const router = Router();
 
   // =========================================================================
@@ -196,7 +200,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const { workspace } = req;
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, followUpTo, force, abort, abortTo, cascade, sessionId, waitForFollowUps, queueIfBusy, subscription } = req.body;
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, harness, followUpTo, force, abort, abortTo, cascade, sessionId, waitForFollowUps, queueIfBusy, subscription } = req.body;
 
       // Abort verb (LIN-743): an abort item asks the consumer to cancel/close an
       // existing session (named by abortTo) instead of running a prompt, so it
@@ -302,6 +306,20 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       if (repo && repo.length > MAX_NAME_LENGTH) {
         return badRequest.json(res, `repo exceeds maximum length of ${MAX_NAME_LENGTH}`);
       }
+      // Execution model + harness (LIN-438, LIN-1084): opaque strings, validated
+      // via the shared helper (type/length/dangerous-chars only). Deliberately
+      // NOT validated against a model registry (openrouter AVAILABLE_MODELS is
+      // the generation-model namespace; these are the consumer's execution-model/
+      // harness namespace, which may include values the server doesn't enumerate).
+      // Wire convention for `model` is OpenRouter-style provider/model.
+      const modelValidationError = validateOpaqueDispatchField(model, 'model', { maxLength: MAX_NAME_LENGTH });
+      if (modelValidationError) {
+        return badRequest.json(res, modelValidationError.error);
+      }
+      const harnessValidationError = validateOpaqueDispatchField(harness, 'harness', { maxLength: MAX_NAME_LENGTH });
+      if (harnessValidationError) {
+        return badRequest.json(res, harnessValidationError.error);
+      }
 
       // Reject null bytes and dangerous control characters
       if (prompt && DANGEROUS_CHARS_REGEX.test(prompt)) {
@@ -384,11 +402,33 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         return res.status(201).json({ success: true, cascade: true, ...result });
       }
 
+      // Effective prompt kind, shared between the stored item and the
+      // dispatchDefaults resolution below (so both agree on the same kind).
+      const effectiveKind = kind || deriveDispatchKind(promptName);
+
+      // Resolve blank incoming model/harness against the workspace's
+      // dispatchDefaults (LIN-1094): per-kind override -> workspace-wide
+      // default -> null. Each field resolves independently, and the lookup
+      // is skipped entirely (falling straight to the existing null
+      // passthrough) when no store is wired or both fields are already set —
+      // so with no defaults configured this is byte-identical to before.
+      let resolvedModel = model || null;
+      let resolvedHarness = harness || null;
+      if ((!model || !harness) && workspacePreferencesStore) {
+        const defaults = await resolveDispatchDefaults({
+          urlKey: workspace.urlKey,
+          kind: effectiveKind,
+          store: workspacePreferencesStore
+        });
+        if (!model) resolvedModel = defaults.model;
+        if (!harness) resolvedHarness = defaults.harness;
+      }
+
       // Create dispatch item
       const item = await dispatchQueueStore.addItem(workspace.urlKey, {
         prompt,
         promptName: promptName || 'Prompt',
-        kind: kind || deriveDispatchKind(promptName),
+        kind: effectiveKind,
         issueId: issueId || null,
         issueIdentifier: issueIdentifier || null,
         issueTitle: issueTitle || null,
@@ -396,6 +436,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         dispatchedBy: req.session.linearUserId || null,
         target: target || 'cli',
         repo: repo || null,
+        model: resolvedModel,
+        harness: resolvedHarness,
         followUpTo: followUpTo || null,
         force: force === true,
         abort: isAbort,
@@ -608,6 +650,104 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     } catch (err) {
       console.error('Failed to save recent prompt:', err.message);
       jsonError(res, 500, 'Failed to save recent prompt');
+    }
+  });
+
+  // =========================================================================
+  // Favourite Custom Prompts API (Session Auth) — LIN-1011
+  //
+  // A durable, user-curated list on top of the rolling recents window: a
+  // starred prompt survives the recents cap instead of rolling off. Mirrors the
+  // recents endpoints (session-auth, linearUserId gate, same validation) plus a
+  // DELETE (un-star) — the one path recents has no equivalent of. The cap is
+  // owned by the store (MAX_FAVORITE_PROMPTS); identity is the exact string, so
+  // a favourite and its recent counterpart stay in sync by value.
+  // =========================================================================
+
+  /**
+   * GET /workspace/:urlKey/api/dispatch/favorite-prompts
+   * Fetch favourite custom prompts for the current user and workspace.
+   */
+  router.get('/workspace/:urlKey/api/dispatch/favorite-prompts', workspaceFromUrl, async (req, res) => {
+    const linearUserId = req.session.linearUserId;
+    if (!linearUserId) {
+      return unauthorized.json(res, 'Authentication required');
+    }
+    if (!userPreferencesStore) {
+      return res.json({ prompts: [] });
+    }
+
+    try {
+      const prompts = await userPreferencesStore.getFavoritePrompts(linearUserId, req.workspace.urlKey);
+      res.json({ prompts });
+    } catch (err) {
+      console.error('Failed to fetch favorite prompts:', err.message);
+      res.json({ prompts: [] });
+    }
+  });
+
+  /**
+   * POST /workspace/:urlKey/api/dispatch/favorite-prompts
+   * Add a custom prompt to the favourites list for the current user and workspace.
+   * Validation is copied verbatim from the recents POST so a favourite and its
+   * recent counterpart accept/reject the same strings (and stay in sync by value).
+   */
+  router.post('/workspace/:urlKey/api/dispatch/favorite-prompts', workspaceFromUrl, async (req, res) => {
+    const linearUserId = req.session.linearUserId;
+    if (!linearUserId) {
+      return unauthorized.json(res, 'Authentication required');
+    }
+    if (!userPreferencesStore) {
+      return jsonError(res, 503, 'Service unavailable');
+    }
+
+    const { prompt: rawPrompt } = req.body;
+    const prompt = typeof rawPrompt === 'string' ? rawPrompt.trim() : rawPrompt;
+    if (!prompt || typeof prompt !== 'string') {
+      return badRequest.json(res, 'prompt is required and must be a string');
+    }
+    if (prompt.length > MAX_CUSTOM_PROMPT_LENGTH) {
+      return badRequest.json(res, `prompt exceeds maximum length of ${MAX_CUSTOM_PROMPT_LENGTH}`);
+    }
+    if (DANGEROUS_CHARS_REGEX.test(prompt)) {
+      return badRequest.json(res, 'prompt contains invalid characters');
+    }
+
+    try {
+      const prompts = await userPreferencesStore.addFavoritePrompt(linearUserId, req.workspace.urlKey, prompt);
+      res.json({ success: true, prompts });
+    } catch (err) {
+      console.error('Failed to save favorite prompt:', err.message);
+      jsonError(res, 500, 'Failed to save favorite prompt');
+    }
+  });
+
+  /**
+   * DELETE /workspace/:urlKey/api/dispatch/favorite-prompts
+   * Remove (un-star) a custom prompt from the favourites list. Prompt comes in
+   * the body `{ prompt }` (or `?prompt=`). Same auth gate as the add path.
+   */
+  router.delete('/workspace/:urlKey/api/dispatch/favorite-prompts', workspaceFromUrl, async (req, res) => {
+    const linearUserId = req.session.linearUserId;
+    if (!linearUserId) {
+      return unauthorized.json(res, 'Authentication required');
+    }
+    if (!userPreferencesStore) {
+      return jsonError(res, 503, 'Service unavailable');
+    }
+
+    const rawPrompt = (req.body && req.body.prompt) ?? req.query.prompt;
+    const prompt = typeof rawPrompt === 'string' ? rawPrompt.trim() : rawPrompt;
+    if (!prompt || typeof prompt !== 'string') {
+      return badRequest.json(res, 'prompt is required and must be a string');
+    }
+
+    try {
+      const prompts = await userPreferencesStore.removeFavoritePrompt(linearUserId, req.workspace.urlKey, prompt);
+      res.json({ success: true, prompts });
+    } catch (err) {
+      console.error('Failed to remove favorite prompt:', err.message);
+      jsonError(res, 500, 'Failed to remove favorite prompt');
     }
   });
 

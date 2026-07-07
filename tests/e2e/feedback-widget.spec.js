@@ -40,20 +40,18 @@ test.describe('Feedback widget', () => {
     await expect(page.getByTestId('feedback-file')).toBeVisible()
   })
 
-  // LIN-918 / LIN-952: the foot offers two explicit actions (the triage button
-  // was removed in LIN-952), and each posts its own `action` to the feedback
-  // route. The local provider has no team (a real submit would 422), so we stub
-  // the route to a 201 and assert the wiring — exactly which action the clicked
-  // button sends.
-  test('offers save / autopilot actions and posts the chosen action', async ({ page, seedLocal }) => {
+  // LIN-918 / LIN-1037: the foot offers three explicit actions (Save + triage was
+  // restored in LIN-1037), and each posts its own `action` to the feedback route.
+  // The local provider has no team (a real submit would 422), so we stub the route
+  // to a 201 and assert the wiring — exactly which action the clicked button sends.
+  test('offers save / triage / autopilot actions and posts the chosen action', async ({ page, seedLocal }) => {
     const { urlKey } = await seedLocal()
     await enableWidget(page, urlKey)
 
     await page.getByTestId('feedback-fab').click()
     await expect(page.getByTestId('feedback-submit')).toBeVisible()
+    await expect(page.getByTestId('feedback-submit-triage')).toBeVisible()
     await expect(page.getByTestId('feedback-submit-autopilot')).toBeVisible()
-    // The Save + triage button was removed (LIN-952) — the widget no longer offers it.
-    await expect(page.getByTestId('feedback-submit-triage')).toHaveCount(0)
 
     // Capture the posted action and fulfil with a success the widget accepts.
     let postedAction = null
@@ -67,11 +65,12 @@ test.describe('Feedback widget', () => {
       })
     })
 
-    await page.getByTestId('feedback-message').fill('run this end to end')
-    await page.getByTestId('feedback-submit-autopilot').click()
+    // Save + triage posts action:'triage' (triage-and-park, not autopilot).
+    await page.getByTestId('feedback-message').fill('please triage and park this')
+    await page.getByTestId('feedback-submit-triage').click()
 
     await expect(page.getByTestId('feedback-status')).toContainText('Filed LIN-777')
-    expect(postedAction).toBe('autopilot')
+    expect(postedAction).toBe('triage')
   })
 
   test('preserves draft input across minimize and reload', async ({ page, seedLocal }) => {

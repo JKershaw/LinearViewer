@@ -20,6 +20,10 @@ test.describe('Swipe Page', () => {
   });
 
   test('renders swipe page with card', async ({ page }) => {
+    // Swipe now carries a page title via the shared renderPageHeader primitive
+    // (LIN-975); previously it had none.
+    await expect(page.locator('.page-header h1')).toHaveText('Swipe');
+
     // Should have a filter dropdown
     await expect(page.locator('.swipe-filter-select')).toBeVisible();
 
@@ -138,18 +142,18 @@ test.describe('Swipe Page', () => {
     }
   });
 
-  test('swipe link appears in footer', async ({ page }) => {
-    // The current page should show "swipe" as bold (current page)
-    await expect(page.locator('.footer-current:has-text("swipe")')).toBeVisible();
+  test('swipe shows as current in the header switcher', async ({ page }) => {
+    // The current page shows "swipe" as bold in the header nav (LIN-978).
+    await expect(page.locator('.nav-views [data-testid="nav-view-swipe"].nav-view-current')).toBeVisible();
   });
 
-  test('swipe link appears in dashboard footer', async ({ page, localWorkerUrlKey }) => {
+  test('swipe link appears in the header switcher on the dashboard', async ({ page, localWorkerUrlKey }) => {
     // Navigate to main dashboard
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
-    // Footer should have swipe link
-    await expect(page.locator('.footer-action[href*="/swipe"]')).toBeVisible();
+    // Header switcher (LIN-978) carries the swipe link.
+    await expect(page.locator('.nav-views a[data-testid="nav-view-swipe"]')).toBeVisible();
   });
 
   test('shows blocking relationship rows on cards', async ({ page }) => {

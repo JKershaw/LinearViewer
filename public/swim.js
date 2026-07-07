@@ -9,6 +9,14 @@
 // Lane Assignment (client-side copy of lib/swim-lanes.js algorithm)
 // =============================================================================
 
+// Read a semantic CSS color token from :root so SVG attributes (which can't use
+// var()) stay theme-aware — mirrors public/kpis.js. Resolved at draw time so the
+// value reflects whichever theme (.theme-dark or not) is active on render.
+function swimTokenColor(name, fallback) {
+  var v = getComputedStyle(document.documentElement).getPropertyValue(name);
+  return (v && v.trim()) || fallback;
+}
+
 // Terminal states are non-actionable; mirrored from lib/tree.js (no shared import in public/).
 var TERMINAL_STATES = ['completed', 'canceled', 'duplicate'];
 function isTerminalState(stateType) {
@@ -918,7 +926,7 @@ function flowCard(issue, model, isHeader) {
   if (issue.description) {
     desc = '<div class="swim-fc-desc">' + escapeHtml(issue.description) + '</div>';
   }
-  return '<div class="swim-box swim-fcard' + headerClass + goalClass + ' ' + stateClass(issue.stateType) +
+  return '<div class="swim-box swim-fcard card' + headerClass + goalClass + ' ' + stateClass(issue.stateType) +
     '" data-issue-id="' + escapeHtml(issue.id) + '">' +
     '<div class="swim-fc-row">' + stateIndicator(issue.stateType) +
       '<span class="swim-box-id">' + escapeHtml(issue.identifier || '') + '</span>' +
@@ -967,7 +975,7 @@ function renderFlow(issues, settings) {
   function renderNode(id, seg, depth) {
     var kids = sortIds(model.childrenOf[id].filter(function(c) { return bandOf[c] === seg; }));
     if (kids.length) {
-      var h = '<div class="swim-fgroup" data-depth="' + Math.min(depth, 4) + '">';
+      var h = '<div class="swim-fgroup surface surface--inset" data-depth="' + Math.min(depth, 4) + '">';
       h += flowCard(model.byId[id], model, true);
       h += '<div class="swim-fgroup-kids">';
       for (var i = 0; i < kids.length; i++) h += renderNode(kids[i], seg, depth + 1);
@@ -1733,7 +1741,7 @@ function drawBlockingConnectors(lanes, blockedByMap) {
   marker.setAttribute('orient', 'auto');
   var arrowPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
   arrowPath.setAttribute('d', 'M0,1 L7,4 L0,7 Z');
-  arrowPath.setAttribute('fill', '#e67e22');
+  arrowPath.setAttribute('fill', swimTokenColor('--amber', '#e67e22'));
   arrowPath.setAttribute('opacity', '0.7');
   marker.appendChild(arrowPath);
   defs.appendChild(marker);
@@ -1749,7 +1757,7 @@ function drawBlockingConnectors(lanes, blockedByMap) {
   greyMarker.setAttribute('orient', 'auto');
   var greyArrowPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
   greyArrowPath.setAttribute('d', 'M0,1 L7,4 L0,7 Z');
-  greyArrowPath.setAttribute('fill', '#bbb');
+  greyArrowPath.setAttribute('fill', swimTokenColor('--fg-mid', '#bbb'));
   greyArrowPath.setAttribute('opacity', '0.6');
   greyMarker.appendChild(greyArrowPath);
   defs.appendChild(greyMarker);
@@ -2118,7 +2126,7 @@ function drawBlockingConnectorsVertical(lanes, blockedByMap) {
   marker.setAttribute('orient', 'auto');
   var arrowPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
   arrowPath.setAttribute('d', 'M0,1 L7,4 L0,7 Z');
-  arrowPath.setAttribute('fill', '#e67e22');
+  arrowPath.setAttribute('fill', swimTokenColor('--amber', '#e67e22'));
   arrowPath.setAttribute('opacity', '0.7');
   marker.appendChild(arrowPath);
   defs.appendChild(marker);
@@ -2133,7 +2141,7 @@ function drawBlockingConnectorsVertical(lanes, blockedByMap) {
   greyMarker.setAttribute('orient', 'auto');
   var greyArrowPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
   greyArrowPath.setAttribute('d', 'M0,1 L7,4 L0,7 Z');
-  greyArrowPath.setAttribute('fill', '#bbb');
+  greyArrowPath.setAttribute('fill', swimTokenColor('--fg-mid', '#bbb'));
   greyArrowPath.setAttribute('opacity', '0.6');
   greyMarker.appendChild(greyArrowPath);
   defs.appendChild(greyMarker);

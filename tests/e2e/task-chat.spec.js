@@ -34,7 +34,8 @@ test.describe('Task Chat Page (experimental)', () => {
       await page.goto(`/test/set-session?${featuresParam({ taskChat: true })}&urlKey=${URL_KEY}`);
       await page.goto(PAGE_URL);
       await page.waitForLoadState('networkidle');
-      await expect(page.locator('.task-chat-header h1')).toHaveText('Task Chat');
+      // Title routes through the shared renderPageHeader primitive (LIN-975).
+      await expect(page.locator('.page-header h1')).toHaveText('Task Chat');
     });
 
     test('toggle lives in the Experimental section and defaults off', async ({ page }) => {
@@ -111,6 +112,40 @@ test.describe('Task Chat Page (experimental)', () => {
       await expect(page.locator('#task-chat-empty')).toBeHidden();
     });
 
+    test('renders a tool breadcrumb and references the looked-up task (LIN-990)', async ({ page }) => {
+      // Behind the taskChat flag, a turn that needs another task's data drives a
+      // (mock) tool hop: a breadcrumb renders and the answer references the other
+      // fixture task, proving tool use end-to-end without a live LLM.
+      await page.locator('#task-chat-id').fill('TEST-1');
+      await page.locator('#task-chat-question').fill('What related work do you depend on?');
+      await page.locator('#task-chat-send').click();
+
+      // Breadcrumb is a dim ↳ log line referencing the fetched task (TEST-2, the
+      // first other fixture task in TEST-1's project).
+      const breadcrumb = page.locator('.task-chat-tool');
+      await expect(breadcrumb).toContainText('looked up TEST-2', { timeout: 5000 });
+
+      // The answer references the looked-up task — tool-derived data surfaced.
+      const answer = page.locator('.task-chat-msg-assistant .task-chat-msg-body');
+      await expect(answer).toContainText('TEST-2', { timeout: 5000 });
+
+      // The breadcrumb is NOT a chat bubble — it sits outside the message list.
+      await expect(page.locator('.task-chat-tool.task-chat-msg')).toHaveCount(0);
+    });
+
+    test('renders a session-specific breadcrumb for the send_follow_up write tool (LIN-1073)', async ({ page }) => {
+      // Review gap: the write tool's ONLY visible safety property is the
+      // breadcrumb naming which session it sent a follow-up to — a generic
+      // "↳ send_follow_up" would hide the side effect from the reader.
+      await page.locator('#task-chat-id').fill('TEST-1');
+      await page.locator('#task-chat-question').fill('Please send a follow-up to unwedge this.');
+      await page.locator('#task-chat-send').click();
+
+      const breadcrumb = page.locator('.task-chat-tool');
+      await expect(breadcrumb).toContainText('sent a follow-up to session mock-session-1', { timeout: 5000 });
+      await expect(breadcrumb).toContainText('Please post a status update');
+    });
+
     test('reset clears the conversation', async ({ page }) => {
       await page.locator('#task-chat-id').fill('TEST-1');
       await page.locator('#task-chat-question').fill('hello?');
@@ -128,6 +163,88 @@ test.describe('Task Chat Page (experimental)', () => {
       await page.locator('#task-chat-send').click();
       await expect(page.locator('.task-chat-msg-assistant .task-chat-msg-body'))
         .toContainText('error', { timeout: 5000 });
+    });
+  });
+
+  test.describe('Saved chats (LIN-1008)', () => {
+    test.beforeEach(async ({ page }) => {
+      await page.goto(`/test/clear-saved-chats?urlKey=${URL_KEY}`);
+      await page.goto(`/test/set-session?${featuresParam({ taskChat: true })}&urlKey=${URL_KEY}`);
+      await page.goto(PAGE_URL);
+      await page.waitForLoadState('networkidle');
+    });
+
+    async function haveOneTurn(page) {
+      await page.locator('#task-chat-id').fill('TEST-1');
+      await page.locator('#task-chat-question').fill('Where do you stand?');
+      await page.locator('#task-chat-send').click();
+      await expect(page.locator('.task-chat-msg-assistant .task-chat-msg-body'))
+        .toContainText('TEST-1', { timeout: 5000 });
+    }
+
+    test('save → list → open (resume) → delete round-trip', async ({ page }) => {
+      // The Saved chats section is present, and empty to start.
+      await expect(page.locator('[data-testid="task-chat-saved-section"]')).toBeVisible();
+      await expect(page.locator('#task-chat-saved-empty')).toBeVisible();
+      await expect(page.locator('.task-chat-saved-item')).toHaveCount(0);
+
+      // Have a turn, then the save affordance appears; save it.
+      await haveOneTurn(page);
+      const saveBtn = page.locator('[data-testid="task-chat-save"]');
+      await expect(saveBtn).toBeVisible();
+      await saveBtn.click();
+
+      // It lands in the list with its task id and an auto-derived title.
+      const item = page.locator('.task-chat-saved-item');
+      await expect(item).toHaveCount(1, { timeout: 5000 });
+      await expect(item).toContainText('TEST-1');
+      await expect(item.locator('.task-chat-saved-title')).toContainText('Where do you stand?');
+
+      // Reset the live conversation, then OPEN the saved chat → transcript rehydrates.
+      await page.locator('#task-chat-reset').click();
+      await expect(page.locator('.task-chat-msg')).toHaveCount(0);
+      await item.locator('[data-testid="task-chat-saved-open"]').click();
+      await expect(page.locator('.task-chat-msg-user')).toContainText('Where do you stand?', { timeout: 5000 });
+      await expect(page.locator('#task-chat-active-label')).toContainText('TEST-1');
+
+      // RESUME: continue the rehydrated conversation via the unchanged turn path.
+      await page.locator('#task-chat-question').fill('And what is next?');
+      await page.locator('#task-chat-send').click();
+      await expect(page.locator('.task-chat-msg-user')).toHaveCount(2, { timeout: 5000 });
+      await expect(page.locator('.task-chat-msg-assistant')).toHaveCount(2, { timeout: 5000 });
+
+      // DELETE removes it from the list.
+      await item.locator('[data-testid="task-chat-saved-delete"]').click();
+      await expect(page.locator('.task-chat-saved-item')).toHaveCount(0, { timeout: 5000 });
+      await expect(page.locator('#task-chat-saved-empty')).toBeVisible();
+    });
+
+    test('saved chats persist across a reload (durable, not localStorage)', async ({ page }) => {
+      await haveOneTurn(page);
+      await page.locator('[data-testid="task-chat-save"]').click();
+      await expect(page.locator('.task-chat-saved-item')).toHaveCount(1, { timeout: 5000 });
+
+      // A fresh page load re-fetches the list from the server-side store.
+      await page.goto(PAGE_URL);
+      await page.waitForLoadState('networkidle');
+      await expect(page.locator('.task-chat-saved-item')).toHaveCount(1, { timeout: 5000 });
+      await expect(page.locator('.task-chat-saved-item')).toContainText('TEST-1');
+    });
+
+    test('unavailable without a user identity: no save button, explicit notice, 401 endpoint', async ({ page }) => {
+      // A session with the flag on but no linearUserId (local/GitHub-linked path).
+      await page.goto(`/test/set-session?${featuresParam({ taskChat: true })}&noLinearUser=1&urlKey=${URL_KEY}`);
+      await page.goto(PAGE_URL);
+      await page.waitForLoadState('networkidle');
+
+      // The unavailable notice renders; the list and save button do not exist.
+      await expect(page.locator('[data-testid="task-chat-saved-unavailable"]')).toBeVisible();
+      await expect(page.locator('[data-testid="task-chat-saved-list"]')).toHaveCount(0);
+      await expect(page.locator('[data-testid="task-chat-save"]')).toHaveCount(0);
+
+      // The endpoints 401 rather than fabricating an identity.
+      const res = await page.request.get(`${CHAT_API}/saved`);
+      expect(res.status()).toBe(401);
     });
   });
 

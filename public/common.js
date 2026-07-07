@@ -341,12 +341,14 @@ window.api = async function api(url, opts = {}) {
  * @param {string} [opts.target='cli']       'cli' | 'web' | 'dash' | 'local'
  * @param {string} [opts.repo]
  * @param {string} [opts.kind]               Explicit dispatch kind (e.g. 'autopilot'); omit to derive from promptName
+ * @param {string} [opts.model]              Execution model (opaque string, LIN-1084); blank/omitted inherits the consumer's own default (LIN-1094)
+ * @param {string} [opts.harness]            Execution harness (opaque string, LIN-1084); blank/omitted inherits the consumer's own default (LIN-1094)
  * @returns {Promise<Object>} Parsed JSON response body
  * @throws {Error} on missing required args or a non-ok response. The thrown
  *                 error carries `.status` so callers can branch (e.g. 401).
  */
 window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
-  const { urlKey, prompt, issue, issueless = false, promptName = 'Prompt', target = 'cli', repo, kind } = opts;
+  const { urlKey, prompt, issue, issueless = false, promptName = 'Prompt', target = 'cli', repo, kind, model, harness } = opts;
 
   if (!urlKey) throw new Error('dispatchPrompt: urlKey is required');
   if (!prompt) throw new Error('dispatchPrompt: prompt is required');
@@ -368,6 +370,11 @@ window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
     if (issue.url) payload.issueUrl = issue.url;
   }
   if (repo) payload.repo = repo;
+  // Blank/omitted model+harness stay off the payload entirely (not sent as
+  // empty strings) so the consumer's own default resolution still applies
+  // (LIN-1094) — never send a value that overrides a real default with "".
+  if (model) payload.model = model;
+  if (harness) payload.harness = harness;
 
   // on401:false — dispatch surfaces (swipe etc.) branch on err.status rather
   // than redirecting, so the 401 is thrown like any other error.
@@ -384,6 +391,197 @@ window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
   }
 
   return result;
+};
+
+// =============================================================================
+// Dispatch Execution Controls (model/harness) — LIN-1096
+// =============================================================================
+//
+// Every dispatch-time UI surface (Dispatch page, dashboard tree, the shared
+// prompt-compose section, Suggested-next-run) needs the same harness
+// select-or-custom + model text input pair feeding into window.dispatchPrompt's
+// `model`/`harness` fields. Factored once here (the client choke point every
+// surface already loads) instead of tripling the markup and read logic across
+// public/dispatch.js, app.js, prompt-section.js and next-run.js. Mirrors the
+// settings page's dispatch-defaults control shape (public/settings.css,
+// LIN-1095) with its own class names, since settings.css isn't loaded on these
+// surfaces. Harness stays an opaque string everywhere (LIN-1084/LIN-438) — this
+// suggestion list is UI-only, not a registry.
+const DISPATCH_HARNESS_SUGGESTIONS = ['claude-code', 'opencode'];
+
+// UI-only default (LIN-1111): the harness select below pre-selects this value
+// so a user dispatching without touching the control explicitly sends
+// 'claude-code' instead of blank. This is purely client-side — it does not
+// touch routes/dispatch.js resolution or the null-passthrough contract for
+// consumers who bypass this UI (proxy/API omitting harness still means
+// "apply your own default" on the server).
+const DEFAULT_HARNESS = 'claude-code';
+
+// Small, distinctly-named recommended-models list for the dispatch-EXECUTION
+// model inputs (LIN-1111) — deliberately separate from AVAILABLE_MODELS in
+// lib/openrouter.js, which recommends models for the unrelated Workspace AI
+// Model selector (the model that WRITES prompts, not the one a dispatched
+// agent executes with). Rendered as <datalist> suggestions, not hard options,
+// so free text is still accepted and blank still resolves to null.
+const DISPATCH_MODEL_SUGGESTIONS = [
+  'anthropic/claude-sonnet-4.6',
+  'anthropic/claude-opus-4.8',
+  'openai/gpt-5.4-mini',
+  'openai/gpt-5.5',
+  'openai/gpt-5.5-pro'
+];
+
+// =============================================================================
+// Live OpenRouter model catalog (LIN-1111 Session 2)
+// =============================================================================
+//
+// Supplements DISPATCH_MODEL_SUGGESTIONS with the full live catalog fetched
+// from GET /workspace/:urlKey/api/openrouter/models (routes/workspace-api.js),
+// itself backed by the SAME cache module (lib/openrouter-catalog.js) the
+// Settings server-render path calls directly — one source of truth for both
+// surfaces (never a fourth duplicated list). Fetched once per page load
+// (module-scoped promise cache), regardless of how many dispatch-exec-controls
+// instances render on the page. Never blocks the initial render: a control
+// renders immediately with the static suggestions, and the datalist is
+// enriched in place once the fetch resolves (or left as-is on failure).
+let _dispatchModelCatalogPromise = null;
+let _dispatchModelCatalog = null;
+
+/**
+ * Best-effort urlKey extraction from the current page path (every dispatch-exec
+ * surface lives under `/workspace/:urlKey/...`), so the catalog fetch needs no
+ * wiring at any of the four call sites.
+ */
+function inferWorkspaceUrlKeyFromLocation() {
+  const match = window.location.pathname.match(/^\/workspace\/([^/]+)\//);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+/**
+ * De-duped `<option>` markup for catalog ids not already in DISPATCH_MODEL_SUGGESTIONS.
+ */
+function buildCatalogModelOptionsHtml(models) {
+  if (!Array.isArray(models) || !models.length) return '';
+  const seen = new Set(DISPATCH_MODEL_SUGGESTIONS);
+  const parts = [];
+  for (const m of models) {
+    if (!m || typeof m.id !== 'string' || !m.id || seen.has(m.id)) continue;
+    seen.add(m.id);
+    parts.push(`<option value="${window.escapeHtml(m.id)}"></option>`);
+  }
+  return parts.join('');
+}
+
+/**
+ * Append the live catalog's options to every dispatch-exec model datalist
+ * already in the page. Called once, after the first (and only) catalog fetch
+ * resolves — any control rendered AFTER that point gets the catalog inlined
+ * directly by renderDispatchExecControls instead, so a given datalist is never
+ * populated by both paths.
+ */
+function applyDispatchModelCatalogToPage(models) {
+  const optionsHtml = buildCatalogModelOptionsHtml(models);
+  if (!optionsHtml) return;
+  document.querySelectorAll('.dispatch-exec-model-datalist').forEach(dl => {
+    dl.insertAdjacentHTML('beforeend', optionsHtml);
+  });
+}
+
+/**
+ * Fetch the live OpenRouter model catalog for a workspace, once per page load.
+ * Non-fatal: a fetch failure resolves to `[]` and the page just keeps the
+ * static suggestions. Safe to call repeatedly (e.g. once per rendered
+ * control) — subsequent calls reuse the same in-flight/resolved promise.
+ * @global
+ * @param {string} [urlKey] - Defaults to the urlKey inferred from the current page path.
+ * @returns {Promise<Array<{id: string, name: string}>>}
+ */
+window.fetchDispatchModelCatalog = function fetchDispatchModelCatalog(urlKey) {
+  if (_dispatchModelCatalogPromise) return _dispatchModelCatalogPromise;
+  const key = urlKey || inferWorkspaceUrlKeyFromLocation();
+  if (!key) return Promise.resolve([]);
+
+  _dispatchModelCatalogPromise = window.api(`/workspace/${encodeURIComponent(key)}/api/openrouter/models`, { on401: false })
+    .then(result => {
+      _dispatchModelCatalog = Array.isArray(result?.models) ? result.models : [];
+      applyDispatchModelCatalogToPage(_dispatchModelCatalog);
+      return _dispatchModelCatalog;
+    })
+    .catch(() => {
+      _dispatchModelCatalog = [];
+      return _dispatchModelCatalog;
+    });
+  return _dispatchModelCatalogPromise;
+};
+
+/**
+ * Renders the shared dispatch-time model/harness control markup: a harness
+ * select-or-custom pair plus a free-text model input, scoped under one
+ * `idPrefix` so multiple instances can coexist on a page. Read the chosen
+ * values back with `window.readDispatchExecControls`.
+ * @global
+ * @param {string} idPrefix - Unique prefix distinguishing this instance (e.g. an issue id)
+ * @param {Object} [opts]
+ * @param {string} [opts.modelPlaceholder] - Placeholder for the model input (UX-only resolved-default hint, LIN-1096)
+ * @param {string} [opts.harnessPlaceholder] - Placeholder for the harness custom input (UX-only resolved-default hint)
+ * @param {string} [opts.harnessDefault] - The workspace's actual resolved default harness, when the caller knows it (LIN-1111; only the Dispatch page threads this today, via data-default-harness). When given and it matches a known suggestion, it wins over the static DEFAULT_HARNESS so a configured non-Claude default (e.g. 'opencode') still pre-selects correctly instead of being silently shadowed. When given but NOT a known suggestion (a custom harness string), nothing is pre-selected — a `<select>` can't represent an arbitrary value, and auto-filling the custom text input would turn an untouched field into an explicit submission, defeating the point of leaving it blank.
+ * @returns {string} HTML for the control pair
+ */
+window.renderDispatchExecControls = function renderDispatchExecControls(idPrefix, opts = {}) {
+  const { modelPlaceholder = 'model', harnessPlaceholder = 'harness', harnessDefault } = opts;
+  const prefix = window.escapeHtml(idPrefix || '');
+  const preselectedHarness = harnessDefault === undefined
+    ? DEFAULT_HARNESS
+    : (DISPATCH_HARNESS_SUGGESTIONS.includes(harnessDefault) ? harnessDefault : '');
+  const optionsHtml = DISPATCH_HARNESS_SUGGESTIONS
+    .map(h => `<option value="${window.escapeHtml(h)}"${h === preselectedHarness ? ' selected' : ''}>${window.escapeHtml(h)}</option>`)
+    .join('');
+  const modelListId = `dispatch-exec-model-list-${prefix}`;
+  const staticModelOptionsHtml = DISPATCH_MODEL_SUGGESTIONS
+    .map(m => `<option value="${window.escapeHtml(m)}"></option>`)
+    .join('');
+  // If the catalog already resolved (a prior control on this page kicked off
+  // the fetch), inline it now; otherwise kick off the fetch — it will patch
+  // this datalist (via applyDispatchModelCatalogToPage) once it resolves.
+  const catalogModelOptionsHtml = _dispatchModelCatalog ? buildCatalogModelOptionsHtml(_dispatchModelCatalog) : '';
+  if (!_dispatchModelCatalog) window.fetchDispatchModelCatalog();
+  return `<span class="dispatch-exec-controls" data-exec-prefix="${prefix}">
+    <select class="dispatch-exec-harness-select" aria-label="Harness">
+      <option value="">&mdash;</option>
+      ${optionsHtml}
+    </select>
+    <span class="dispatch-exec-or">or</span>
+    <input type="text" class="dispatch-exec-harness-custom" maxlength="200" placeholder="${window.escapeHtml(harnessPlaceholder)}" aria-label="Custom harness">
+    <input type="text" class="dispatch-exec-model" maxlength="200" list="${modelListId}" placeholder="${window.escapeHtml(modelPlaceholder)}" aria-label="Model">
+    <datalist id="${modelListId}" class="dispatch-exec-model-datalist">${staticModelOptionsHtml}${catalogModelOptionsHtml}</datalist>
+  </span>`;
+};
+
+/**
+ * Reads the current `{model, harness}` values back out of a container holding
+ * a `.dispatch-exec-controls` block (or that block itself). A custom harness
+ * value wins over the select (mirrors the settings page's dispatch-defaults
+ * precedence, LIN-1095). The harness select pre-selects `claude-code`
+ * (LIN-1111), so an untouched control now reads back `harness: 'claude-code'`
+ * rather than null — pick the blank "—" option to still send null explicitly.
+ * The model field has no such default (only suggestions), so a blank model
+ * still resolves to `null`, and `window.dispatchPrompt` omits it so the
+ * consumer's own default resolution applies (LIN-1094).
+ * @global
+ * @param {Element|null} [scopeEl]
+ * @returns {{model: string|null, harness: string|null}}
+ */
+window.readDispatchExecControls = function readDispatchExecControls(scopeEl) {
+  const scope = scopeEl && (scopeEl.matches && scopeEl.matches('.dispatch-exec-controls')
+    ? scopeEl
+    : scopeEl.querySelector && scopeEl.querySelector('.dispatch-exec-controls'));
+  if (!scope) return { model: null, harness: null };
+  const select = scope.querySelector('.dispatch-exec-harness-select');
+  const custom = scope.querySelector('.dispatch-exec-harness-custom');
+  const modelInput = scope.querySelector('.dispatch-exec-model');
+  const harness = (custom && custom.value.trim()) || (select && select.value) || '';
+  const model = modelInput ? modelInput.value.trim() : '';
+  return { model: model || null, harness: harness || null };
 };
 
 // =============================================================================
@@ -861,6 +1059,23 @@ function initNavBar() {
     teamToggle.addEventListener('click', (e) => {
       e.stopPropagation()
       toggleSelector(teamToggle, teamOptions, 'team')
+    })
+  }
+
+  // "⋯ more" view-overflow expander (LIN-1058). An IN-FLOW disclosure: it
+  // toggles the `.nav-views-overflow` block that sits below the tab strip in
+  // NORMAL FLOW — no floating panel, no backdrop, no click-catcher (LIN-984
+  // safe by construction). Deliberately NOT wired through the selector
+  // dropdown machinery above (no `.nav-dropdown-overlay`, no closeAllSelectors);
+  // it simply flips `aria-expanded` + an `--open` state class the CSS reads.
+  const moreToggle = navBar.querySelector('.nav-more-toggle')
+  const moreOverflow = navBar.querySelector('#nav-views-overflow')
+  if (moreToggle && moreOverflow) {
+    moreToggle.addEventListener('click', (e) => {
+      e.stopPropagation()
+      const isOpen = moreToggle.getAttribute('aria-expanded') === 'true'
+      moreToggle.setAttribute('aria-expanded', isOpen ? 'false' : 'true')
+      moreOverflow.classList.toggle('nav-views-overflow--open', !isOpen)
     })
   }
 

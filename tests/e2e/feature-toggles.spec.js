@@ -200,14 +200,15 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('.settings-header:text-is("Dispatch")')).toHaveCount(0);
   });
 
-  test('dispatch link visible in footer when dispatch on', async ({ page, seedLocal, localWorkerUrlKey }) => {
+  test('dispatch link visible in header switcher when dispatch on', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(workspaceApiLocalSeed, { features: { dispatch: true } });
 
     await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
 
-    // Dispatch link should appear in footer
-    await expect(page.locator('footer a[href*="/dispatch"]')).toBeVisible();
+    // The dispatch link now lives in the header view switcher (LIN-978), gated
+    // on the same per-user flag it always was.
+    await expect(page.locator('.nav-views [data-testid="nav-view-dispatch"]')).toBeVisible();
   });
 
   // =========================================================================
@@ -428,13 +429,15 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('a[href*="/proxy"]')).toHaveCount(0);
   });
 
-  test('proxy footer link visible when proxy is on', async ({ page, seedLocal, localWorkerUrlKey }) => {
+  test('proxy header nav link visible when proxy is on', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(workspaceApiLocalSeed, { features: { proxy: true } });
 
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
-    await expect(page.locator('.footer-actions a:has-text("proxy")')).toBeVisible();
+    // The flagged power-user proxy link now lives in the header view switcher
+    // (LIN-978), gated on the same per-user flag it always was.
+    await expect(page.locator('.nav-views [data-testid="nav-view-proxy"]')).toBeVisible();
   });
 
   test('proxy page redirects to settings when proxy is off', async ({ page, localWorkerUrlKey }) => {

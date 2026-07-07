@@ -38,9 +38,9 @@ routes/
   dispatch.js          Dispatch queue API (user + consumer endpoints)
   proxy.js             Linear API proxy (token auth, read/write endpoints, cycles, labels, task automation)
   collective.js        Collective experiment (experimental): page, multi-workspace dispatch fan-out, Yap state/say proxy (LIN-450)
-  dashboard.js         Autopilot Observation page (first-class, LIN-595): /observation page + sessionId-grouped sessions feed + merged cross-workspace Loop feed, on-demand run-/session-summary, session-context, lazy Linear hydration (LIN-509). /dashboard 302s to /observation; data endpoints keep their /api/dashboard/* paths
+  dashboard.js         Autopilot Observation page (first-class, LIN-595): /observation page + sessionId-grouped sessions feed + merged cross-workspace Loop feed, on-demand run-/session-summary, session-context, lazy Linear hydration (LIN-509). /dashboard 302s to /observation; data endpoints keep their /api/dashboard/* paths. Also the dedicated per-session page GET /observation/session/:sessionId (LIN-1003): server-rendered snapshot via the NON-lean getSessionsForWorkspace read (the lean point-read drops feedback[]) + a cache-only brief/recap join over distinct loop.issueId UUIDs, rendered by lib/render-session.js; 404s an unknown/cross-workspace sessionId
   workspace-api.js     Workspace API routes (prompts, recommendations, audit, comments, images)
-  task-chat.js         Task-chat view (experimental, taskChat flag): per-task conversational page
+  task-chat.js         Task-chat view (experimental, taskChat flag): per-task conversational page + durable saved-chat CRUD under /api/task-chat/saved (LIN-1008): save/list/get/delete gated on the taskChat flag AND req.session.linearUserId (absent → 401, no fabricated id); the literal /saved routes are registered BEFORE /:issueId so Express doesn't misroute `saved` as an issue id; session-auth only
   next-run.js          Suggested-next-run view (experimental, nextRun flag): page + suggest endpoint that generates grounded goal options for the next autopilot run; accept hands the chosen goal to the dispatch launch path (LIN-603)
   test.js              Test-only routes for E2E tests (mock sessions, fixtures)
   legacy-redirects.js  Backward-compatible redirects for old URLs
@@ -52,6 +52,7 @@ lib/
   graph-features.js    Network-free blocking-graph / critical-path primitives (shared by swipe + frontier ranking)
   context-graph.js     Network-free relationship-neighborhood builder for the Context section (blockers/blocked/parent/children/related; LIN-572)
   openrouter.js        OpenRouter API client for AI recommendations
+  openrouter-catalog.js  Live OpenRouter model catalog (LIN-1111): in-process TTL-cached wrapper over GET /api/v1/models, mocked in tests via the same `shouldMockAi` predicate that gates the AI recommendation mock; supplements (never replaces) the static DISPATCH_MODEL_SUGGESTIONS datalists in public/common.js + lib/render-settings.js, consumed server-side by Settings and client-side via GET /workspace/:urlKey/api/openrouter/models (routes/workspace-api.js) — one shared source of truth for both surfaces
   providers/           Provider abstraction (decouples views from Linear specifics)
     interface.js       Provider interface contract
     registry.js        Provider registry
@@ -63,6 +64,7 @@ lib/
     github-projects/index.js  GitHub Projects v2 provider — additive sibling to GitHub Issues (own GraphQL client.js + fake-client.js; read-only V1; board Status→canonical heuristic; LIN-560)
   render.js            Dashboard page renderer (tree view, sections)
   render-pages.js      Standalone page renderers (login, error, workspace-not-found)
+  render-landing.js    Bespoke unauthenticated home showcase (LIN-980): Harbour top area (hero + loop) + fake-data glimpses of real surfaces (observation feed, swim board, grounded prompt) + providers strip + distinct Harbour OS section; composes D's shared nav (renderNavBar isLanding); NOT the project-tree renderer. Styles in public/landing.css
   render-audit.js      Operator dashboard page renderer
   render-settings.js   Settings page renderer
   render-prompts.js    Prompts catalog page renderer
@@ -70,6 +72,7 @@ lib/
   render-dispatch.js   Dispatch page renderer (prompt, queue, tokens, history)
   render-collective.js Collective page renderer (experimental discussion shell)
   render-observation.js Autopilot Observation page renderer (first-class; mobile-first feed shell + collapsible completed archive, Swipe-modeled; LIN-595)
+  render-session.js    Dedicated per-session page renderer (LIN-1003, Phase 1 of LIN-950): server-rendered snapshot on the shared shell — overview, per-run telemetry/timings, raw link-rich transcript (loop.feedback[]), and cache-joined brief/recap panels (present body OR explicit generate affordance on a miss; never auto-spends an LLM call); telemetry.model rendered only when present. Phase 2 (LIN-1004): renders the human follow-up reply box (renderReplyBox) at the bottom for cli/web sessions, threading data-session-terminal so the scoped session.js sends force only for finalized sessions
   render-roadmap.js    Roadmap page renderer (delivery-focused)
   render-ship.js       Ship page renderer (radial view shell)
   render-swim.js       Swim lanes page renderer
@@ -96,6 +99,7 @@ lib/
   prompt-template-defs.js  Prompt template definitions (14 templates)
   completion-signals.js  Completion signals for prompt assessment
   custom-prompts-store.js  Custom prompt template storage (per workspace)
+  collective-characters-store.js  Collective character (persona) storage (LIN-1048): mirrors custom-prompts-store (Mongo/Mango, UUID, per-anchor-urlKey partition); each record carries its own repo binding (workspaceUrlKey, re-validated at dispatch, NO stored proxy token) + the five persona fields; two kinds — `custom` (capped 20, throw on overflow) and `recent` (auto-recorded per /start dispatch, rolling 10, evict-oldest, never throw); identity = binding+persona, so saving a recent promotes it to custom in place and a dispatched saved character is not double-listed
   prompts/
     meta-prompt-template.js  Meta-prompt for AI recommendation generation
     autopilot-kickoff.js     Autopilot kickoff briefing template
@@ -128,6 +132,7 @@ lib/
   agent-status-store.js  Agent status append-only log storage (Tier C substrate; loop reconstruction; canonical proxy path /agent/status, /foreman/status deprecated alias)
   report-history-store.js  Durable per-workspace roadmap report runs
   task-snapshot-store.js   Append-only task-history archive: full issue-slice snapshots captured (hash-gated) at the proxy recap/brief read seams; durable, per-task count-capped, read-time diffs (LIN-598)
+  saved-chat-store.js  Durable saved task-chat transcripts (LIN-1008): private per {urlKey, linearUserId}, `{role,content}` transcript + auto-derived title, durable/count-capped (no TTL), hard-delete. Composes custom-prompts CRUD + task-snapshot durability + prompt-trace's session-auth-only privacy posture (content-bearing → deliberately NOT wired into proxy/workspace-api/kpis)
   llm-call-log.js      Append-only per-LLM-call metadata log (model, provider, tokens, cost, time; LIN-418)
   prompt-trace-store.js  Prompt trace storage (LIN-578)
   free-tier-store.js   Free tier usage tracking and rate limiting
@@ -157,6 +162,7 @@ content/
   landing.md           Static projects preview for unauthenticated users
 public/
   style.css            Light theme, mobile-responsive
+  landing.css          Bespoke landing showcase styles (LIN-980); semantic-token-only so it is dark-safe under both .theme-dark and the landing's prefers-color-scheme remap
   app.js               Client-side collapse/expand, localStorage persistence
   common.js            Shared client utilities
   common-actions.css   Shared action/button styles
@@ -171,13 +177,14 @@ public/
   prompts.css                   Prompts catalog page
   custom-prompts.css / .js      Custom prompts page
   dispatch.css / dispatch.js    Dispatch page (prompt, queue, tokens, history)
-  collective.css / collective.js  Collective page (setup, transcript poll, say box)
-  observation.css / observation.js  Autopilot Observation page (sessionId-grouped sessions poll, status banner, workspace filters, Level-1 active feed + collapsible completed archive, Level-2 session cards with status pill / one-sentence summary / runtime+model / per-worker-run progress bar, Level-3 drill-down: tasks-touched + relationships (session-context) with lazy Linear hydration, per-task worker-session tree with phase/recap/metric-chips, per-node activity log + produced-artifact links + on-demand run-summary next steps; LIN-595)
+  collective.css / collective.js  Collective page (character picker, transcript poll, say box). The setup step is a character picker (LIN-1048): select saved custom + recent characters, or define a new one (pick a connected repo + fill the five persona fields + name, optionally save); /start posts `characters` (not `workspaceUrlKeys`) and view-prompt threads the selected character so preview matches dispatch
+  observation.css / observation.js  Autopilot Observation page (sessionId-grouped sessions poll, status banner, workspace filters, Level-1 active feed + collapsible completed archive, Level-2 session cards with status pill / one-sentence summary / runtime+model / per-worker-run progress bar, Level-3 drill-down: tasks-touched + relationships (session-context) with lazy Linear hydration, per-task worker-session tree with phase/recap/metric-chips, per-node activity log + produced-artifact links + on-demand run-summary next steps; LIN-595). Every session card header carries a persistent `open ↗` link to the dedicated per-session page (LIN-1019), and a waiting-on-user card additionally carries a `reply →` CTA — both to `/workspace/:urlKey/observation/session/:sessionId` for the session's OWN workspace key (the feed is cross-workspace merged), giving the LIN-1004 reply box a click-path out of the feed's in-place expansion
+  session.css / session.js      Dedicated per-session page (LIN-1003): server-rendered snapshot styling (overview / runs / transcript / brief-recap panels). session.js is the page's ONE scoped client script (LIN-1004): the human follow-up reply box — a self-contained textarea→POST to /api/dispatch with followUpTo=sessionId, target cli/web, and conditional force (terminal session → force:true, waiting/warm → omit); additive to the agent-to-agent wake path
   roadmap.css / roadmap.js      Roadmap page
   ship.css / ship.js            Ship radial view
   swim.css / swim.js            Swim lanes view
   swipe.css / swipe.js          Swipe (mobile) view
-  task-chat.css / task-chat.js  Task-chat view (experimental, taskChat flag)
+  task-chat.css / task-chat.js  Task-chat view (experimental, taskChat flag); includes the saved-chats UI (LIN-1008): save button + Saved chats list with open(resume)/delete, re-hydrating a stored transcript into chatHistory and continuing via the unchanged replay-each-turn send() path
   next-run.css / next-run.js    Suggested-next-run view (experimental, nextRun flag): generate button + goal-option cards
   styleguide.css                Styleguide reference page (LIN-457)
   proxy.css / proxy.js          Proxy token management page
@@ -440,9 +447,10 @@ Consumer endpoints are Bearer-token authenticated and fall into three groups: **
 
 ## Collective (experimental, LIN-450)
 
-A rough-draft experiment, **gated behind a per-user `collective` feature flag and surfaced only via a link in Settings**. It automates the manual cross-project discussion written up in `docs/collective-session-2026-06-12.md`: pick a subset of your connected workspaces, name a [Yap](https://github.com/jkershaw/yap) channel, and start — the page fans `buildCollectiveParticipantPrompt(...)` out to each selected workspace's **unchanged** dispatch route (`dispatchQueueStore.addItem`), then renders the live channel and lets you inject input via a thin server-side Yap proxy.
+A rough-draft experiment, **gated behind a per-user `collective` feature flag and surfaced only via a link in Settings**. It automates the manual cross-project discussion written up in `docs/collective-session-2026-06-12.md`: choose a roster of characters (personas, each bound to a connected repo), name a [Yap](https://github.com/jkershaw/yap) channel, and start — the page fans `buildCollectiveParticipantPrompt(...)` out to each character's bound workspace's **unchanged** dispatch route (`dispatchQueueStore.addItem`), then renders the live channel and lets you inject input via a thin server-side Yap proxy.
 
-- **Substrate:** dispatch `target` is `cli`/`web` only (full Claude Code sessions); `dash`/`local` are rejected. Each selected workspace must have a live consumer draining its queue.
+- **Character selection (LIN-1048):** the picker lists saved `custom` + auto-recorded `recent` characters and offers a define-new affordance (pick a connected repo + fill the five persona fields `role/lens/objective/value/disposition` + name, optionally save). `POST /start` accepts a `characters` list (superseding `workspaceUrlKeys`); each character's `workspaceUrlKey` repo binding is re-validated against `session.workspaces` (stale bindings dropped, empty-set → 400) and every dispatched character is recorded as `recent`. Persistence is `lib/collective-characters-store.js`; a character with no persona fields collapses to the byte-identical default Implementer. `POST /preview` threads the selected `character` so preview matches dispatch.
+- **Substrate:** dispatch `target` is `cli`/`web` only (full Claude Code sessions); `dash`/`local` are rejected. Each character's bound workspace must have a live consumer draining its queue.
 - **Channel name** is the single shared contract across the participant prompt, the fan-out, and the `state`/`say` endpoints — normalized once via `normalizeYapChannel`. The page seeds a fresh friendly default per load via `randomChannelName()` (`#word-word-YYYY-MM-DD`).
 - **Side-effect policy is prompt-only:** participants may carry a `readWrite` proxy token (best-effort minted per fan-out), but the participant prompt requires asking John in-channel before any Linear write / ticket / mutation. There is no deterministic write-lock — a named, accepted V1 gap.
 - **Yap** is ephemeral (200-msg ring buffer, unauthenticated nicks); poll/history return the body in a `text` field, normalized by the `state` endpoint. `YAP_BASE_URL` defaults to `https://yap.jkershaw.com` (override per env; optional `YAP_PASSWORD`), so the live view works out of the box. `lib/yap-client.js` uses the proxy-aware fetch (`createProxyFetch`), so Yap calls route through the same egress proxy as Linear calls when one is configured.
@@ -451,8 +459,8 @@ A rough-draft experiment, **gated behind a per-user `collective` feature flag an
 
 Endpoints (session auth, workspace-anchored but operating over `session.workspaces`):
 - `GET  /workspace/:urlKey/collective` — page (redirects to settings when the flag is off)
-- `POST /workspace/:urlKey/collective/start` — multi-workspace dispatch fan-out
-- `POST /workspace/:urlKey/collective/preview` — build the participant prompt (view & copy, no dispatch)
+- `POST /workspace/:urlKey/collective/start` — character-roster dispatch fan-out (`characters` list; records recents)
+- `POST /workspace/:urlKey/collective/preview` — build the participant prompt for the selected `character` (view & copy, no dispatch)
 - `GET  /workspace/:urlKey/api/collective/state` — JSON poll fronting `yap.poll`
 - `POST /workspace/:urlKey/api/collective/say` — inject human input via `yap.say`
 

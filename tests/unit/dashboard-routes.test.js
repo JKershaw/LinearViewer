@@ -54,7 +54,10 @@ function historyItem(id, identifier) {
   return { id, issueIdentifier: identifier, issueTitle: `Title ${identifier}`, promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken', feedback: [{ message: 'pr opened' }] };
 }
 function agentStatusDone(dispatchId, identifier, ts = NOW_ISO) {
-  return { dispatchId, taskIdentifier: identifier, action: 'implementation', status: 'completed', summary: 'all done', timestamp: ts };
+  // The real agent-status-store maps every row to `id: doc._id` (a UUID); the
+  // issue-scoped getSessionsForIssues read dedups rows by that `id`, so a faithful
+  // fixture MUST carry one or the row is silently dropped (LIN-1022).
+  return { id: `as-${dispatchId}`, dispatchId, taskIdentifier: identifier, action: 'implementation', status: 'completed', summary: 'all done', timestamp: ts };
 }
 // A taken run that the runner finished via a [done] feedback marker but with NO
 // agentStatus 'completed' entry — pipeline-loops alone derives 'running' for this.
@@ -453,6 +456,134 @@ describe('GET /api/dashboard/sessions', () => {
     assert.equal(s.status, 'error');
   });
 
+  // ── Session-level "waiting on user" rollup (LIN-1005) ────────────────────────
+  test('a [blocked] feedback marker surfaces a session-level waiting state + message', async () => {
+    // Non-terminal session (live autopilot anchor) whose worker posted a
+    // [blocked] feedback marker but no agent-status blocked entry — the
+    // feedback-only channel the fold otherwise misses.
+    const blockedWorker = {
+      id: 'w-b', sessionId: 'sess-b', issueIdentifier: 'LIN-401', issueTitle: 'Blocked worker',
+      promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken',
+      feedback: [{ message: '[blocked] need your decision on the auth flow', timestamp: NOW_ISO }]
+    };
+    const perWorkspace = {
+      'ws-a': { live: [autopilotLiveItem('sess-b', 'LIN-400')], history: [blockedWorker], agentStatus: [] }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    const s = findSession(res.jsonBody, 'sess-b');
+    assert.ok(s, 'waiting session is present');
+    assert.equal(s.terminal, false, 'a [blocked] session is NOT terminal');
+    assert.equal(s.status, 'waiting');
+    assert.equal(s.waiting, true);
+    assert.match(s.waitingMessage, /need your decision on the auth flow/);
+  });
+
+  test('an agent-status blocked run surfaces waiting even without a [blocked] feedback marker', async () => {
+    // The other, independent channel: agentState==='waiting' from an agent-status
+    // `blocked` entry (a close-out blocker awaiting verification, e.g. LIN-874).
+    const blockedWorker = {
+      id: 'w-ab', sessionId: 'sess-ab', issueIdentifier: 'LIN-411', issueTitle: 'Worker',
+      promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken'
+    };
+    const blockedStatus = { dispatchId: 'w-ab', taskIdentifier: 'LIN-411', action: 'implementation', status: 'blocked', summary: 'awaiting verification runs before close', timestamp: NOW_ISO };
+    const perWorkspace = {
+      'ws-a': { live: [autopilotLiveItem('sess-ab', 'LIN-410')], history: [blockedWorker], agentStatus: [blockedStatus] }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    const s = findSession(res.jsonBody, 'sess-ab');
+    assert.ok(s, 'waiting session is present');
+    assert.equal(s.status, 'waiting');
+    assert.equal(s.waiting, true);
+    assert.match(s.waitingMessage, /awaiting verification/, 'falls back to the blocked run summary');
+  });
+
+  test('a [pending] feedback marker does NOT surface waiting — it is a machine handoff, not a human ask (LIN-1025)', async () => {
+    // [pending] (LIN-843) is an agent-to-agent orchestrator handoff, not a request
+    // for user input, so it must never roll up to the "Waiting on you" surface even
+    // though it is a non-terminal wake marker (which still wakes the orchestrator via
+    // the separate WAKE_FEEDBACK_REGEX). Mirrors the [blocked] positive case above.
+    const pendingWorker = {
+      id: 'w-p', sessionId: 'sess-p', issueIdentifier: 'LIN-441', issueTitle: 'Stepper worker',
+      promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken',
+      feedback: [{ message: '[pending] my beat is done, the task is not', timestamp: NOW_ISO }]
+    };
+    const perWorkspace = {
+      'ws-a': { live: [autopilotLiveItem('sess-p', 'LIN-440')], history: [pendingWorker], agentStatus: [] }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    const s = findSession(res.jsonBody, 'sess-p');
+    assert.ok(s, 'the [pending] session is present in the feed');
+    assert.equal(s.waiting, false, '[pending] must not flag human-waiting');
+    assert.notEqual(s.status, 'waiting', '[pending] session is in-progress, not waiting');
+    assert.equal(s.waitingMessage, null, 'no "waiting on you" message for a machine handoff');
+  });
+
+  test('a session that emitted [blocked] then finished is done, not waiting (terminal precedence)', async () => {
+    // [blocked] is a pause signal, not terminal — but a later [done] wins. The
+    // session must report done with no lingering waiting flag.
+    const worker = {
+      id: 'w-bd', sessionId: 'sess-bd', issueIdentifier: 'LIN-421', issueTitle: 'Worker',
+      promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken',
+      feedback: [
+        { message: '[blocked] waiting on you', timestamp: NOW_ISO },
+        { message: '[done] resolved and shipped', timestamp: NOW_ISO }
+      ]
+    };
+    const perWorkspace = {
+      'ws-a': { live: [], history: [autopilotHistoryItem('sess-bd', 'LIN-420'), worker], agentStatus: [agentStatusDone('sess-bd', 'LIN-420')] }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    const s = findSession(res.jsonBody, 'sess-bd');
+    assert.ok(s, 'terminal session is present');
+    assert.equal(s.terminal, true);
+    assert.equal(s.status, 'done');
+    assert.equal(s.waiting, false);
+    assert.equal(s.waitingMessage, null);
+  });
+
+  test('a terminal session with a lingering blocked worker is done, NOT waiting (session-level terminal gate)', async () => {
+    // The SESSION-level precedence gap (LIN-1005 review): the autopilot ANCHOR
+    // finished (agentStatus completed → session terminal), but a SEPARATE worker
+    // loop is still [blocked] with no later [done]. `deriveSessionWaiting` unions
+    // across all loops and would report the worker as waiting; the emitted flag
+    // must be gated on SESSION terminality so a finished session is never waiting.
+    const blockedWorker = {
+      id: 'w-tw', sessionId: 'sess-tw', issueIdentifier: 'LIN-431', issueTitle: 'Worker',
+      promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken',
+      feedback: [{ message: '[blocked] need your decision on the auth flow', timestamp: NOW_ISO }]
+    };
+    const perWorkspace = {
+      'ws-a': { live: [], history: [autopilotHistoryItem('sess-tw', 'LIN-430'), blockedWorker], agentStatus: [agentStatusDone('sess-tw', 'LIN-430')] }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    const s = findSession(res.jsonBody, 'sess-tw');
+    assert.ok(s, 'terminal session is present');
+    assert.equal(s.terminal, true);
+    assert.equal(s.status, 'done', 'terminal status wins');
+    assert.equal(s.waiting, false, 'the emitted waiting flag is gated on session terminality');
+    assert.equal(s.waitingMessage, null, 'no lingering blocked message on a done session');
+  });
+
   test('a non-terminal session idle > 24h is derived stale and bucketed out of Active', async () => {
     // Worker that died without a terminal marker, last seen 2 days ago (Bug 3).
     const OLD_ISO = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
@@ -834,6 +965,25 @@ describe('deriveSessionStatus', () => {
     // The cost-contract call site omits taskDone entirely; it must degrade to error.
     assert.equal(deriveSessionStatus({ terminal: true, stale: false, hasError: true }), 'error');
   });
+
+  // ── waiting (LIN-1005) ──────────────────────────────────────────────────────
+  test('a non-terminal waiting session is waiting', () => {
+    assert.equal(deriveSessionStatus({ terminal: false, stale: false, hasError: false, waiting: true }), 'waiting');
+  });
+
+  test('waiting defaults to false (existing call sites stay in-progress)', () => {
+    assert.equal(deriveSessionStatus({ terminal: false, stale: false, hasError: false }), 'in-progress');
+  });
+
+  test('terminal wins over waiting (a finished session is never waiting)', () => {
+    // [blocked] is non-terminal, but if the session is actually terminal, done wins.
+    assert.equal(deriveSessionStatus({ terminal: true, stale: false, hasError: false, waiting: true }), 'done');
+    assert.equal(deriveSessionStatus({ terminal: true, stale: false, hasError: true, waiting: true }), 'error');
+  });
+
+  test('stale wins over waiting (a day-dead session is not shown as waiting)', () => {
+    assert.equal(deriveSessionStatus({ terminal: false, stale: true, hasError: false, waiting: true }), 'stale');
+  });
 });
 
 // ─── session-summary ─────────────────────────────────────────────────────────
@@ -973,7 +1123,7 @@ describe('session-summary endpoint', () => {
     // latest child is still running returned an empty status line forever (the UI
     // showed a permanent "◐ working…"). It must now fall back to the running
     // child's own agentSummary — deterministically, no LLM call.
-    const runningWorker = { dispatchId: 'w-run', taskIdentifier: 'LIN-801', action: 'implementation', status: 'working', summary: 'Refactoring the parser', timestamp: NOW_ISO };
+    const runningWorker = { id: 'as-w-run', dispatchId: 'w-run', taskIdentifier: 'LIN-801', action: 'implementation', status: 'working', summary: 'Refactoring the parser', timestamp: NOW_ISO };
     const perWorkspace = {
       'ws-a': {
         live: [autopilotLiveItem('sess-live', 'LIN-800')],
@@ -1210,5 +1360,356 @@ describe('buildTestSessionSummary', () => {
   test('handles a single task and a missing task list', () => {
     assert.match(buildTestSessionSummary({ sessionId: 's', tasksTouched: ['LIN-1'] }).outcome, /1 task\b/);
     assert.match(buildTestSessionSummary({ sessionId: 's' }).outcome, /0 tasks/);
+  });
+});
+
+// ─── Per-session page: brief/recap join present-branch (LIN-1003 close-out) ───
+// Discharges the LIN-1003 review ledger item ("What CI Did Not Prove"): the
+// brief/recap cache-join PRESENT branch was proven only at the renderer (the
+// unit test hand-feeds `issueContext`) and the e2e seeds NO cached brief/recap,
+// so in CI the Task-context section only ever rendered the empty/miss path. A
+// keying regression — joining on the human `LIN-` identifier instead of the
+// issue UUID — would silently render every panel as a "miss" with zero test
+// failure. These drive the REAL route handler end-to-end: a session whose worker
+// loop carries an issue UUID, brief/recap caches that hit ONLY for that exact
+// (urlKey, UUID) tuple, and assert the present body renders through the route.
+describe('GET /observation/session/:sessionId — brief/recap join (LIN-1003)', () => {
+  const ISSUE_UUID = '11111111-2222-3333-4444-555555555555';
+
+  // A worker carrying the issue UUID (pipeline-loops copies item.issueId →
+  // loop.issueId, pipeline-loops.js:324) + a [done] marker → terminal session.
+  function workerWithUuid(id, identifier, sessionId, issueId) {
+    return { id, sessionId, issueId, issueIdentifier: identifier, issueTitle: `Title ${identifier}`, promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken', feedback: [{ message: '[done] shipped it', timestamp: NOW_ISO }] };
+  }
+
+  // A cache store that hits ONLY for the exact (urlKey, UUID) tuple and records
+  // the keys it was asked for — so the test pins the join key to the UUID.
+  function recordingCacheStore(payload) {
+    return {
+      calls: [],
+      async get(urlKey, issueId) {
+        this.calls.push({ urlKey, issueId });
+        if (urlKey === 'ws-a' && issueId === ISSUE_UUID) return payload;
+        return null;
+      }
+    };
+  }
+
+  function makeRouterWithCaches({ briefCacheStore, recapCacheStore }) {
+    const perWorkspace = {
+      'ws-a': {
+        live: [],
+        history: [autopilotHistoryItem('sess-ctx', 'LIN-900'), workerWithUuid('w-ctx', 'LIN-901', 'sess-ctx', ISSUE_UUID)],
+        agentStatus: [agentStatusDone('sess-ctx', 'LIN-900'), agentStatusDone('w-ctx', 'LIN-901')]
+      }
+    };
+    const { dispatchQueueStore, agentStatusStore } = makeStores(perWorkspace);
+    return createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore, agentStatusStore,
+      observationSessionsStore: null,
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
+      briefCacheStore, recapCacheStore,
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      fetchWorkspaceIssues: async () => [],
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({})
+    });
+  }
+
+  function driveSessionPage(router) {
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/observation/session/:sessionId');
+    const { req, res } = makeReqRes({
+      session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
+      workspace: { urlKey: 'ws-a' },
+      params: { sessionId: 'sess-ctx' }
+    });
+    return handler(req, res).then(() => res);
+  }
+
+  test('renders the cached brief + recap present body, joined by the issue UUID (not the LIN- identifier)', async () => {
+    const briefCacheStore = recordingCacheStore({ brief: 'CACHED-BRIEF-BODY', model: 'openai/gpt-x', generatedAt: NOW_ISO });
+    const recapCacheStore = recordingCacheStore({ recap: 'CACHED-RECAP-BODY', model: 'openai/gpt-x', generatedAt: NOW_ISO });
+    const router = makeRouterWithCaches({ briefCacheStore, recapCacheStore });
+    const res = await driveSessionPage(router);
+
+    assert.equal(res.statusCode, 200);
+    const html = res.sentBody;
+    assert.ok(html, 'the page rendered');
+    // The load-bearing claim: the join keys on the issue UUID, never the human id.
+    assert.deepEqual(briefCacheStore.calls, [{ urlKey: 'ws-a', issueId: ISSUE_UUID }], 'brief join keyed by (urlKey, issue UUID)');
+    assert.deepEqual(recapCacheStore.calls, [{ urlKey: 'ws-a', issueId: ISSUE_UUID }], 'recap join keyed by (urlKey, issue UUID)');
+    // The PRESENT body rendered through the real route — the exact ledger gap.
+    assert.ok(html.includes('CACHED-BRIEF-BODY'), 'cached brief body rendered on the page');
+    assert.ok(html.includes('CACHED-RECAP-BODY'), 'cached recap body rendered on the page');
+    assert.ok(html.includes('sess-ctx-panel--present'), 'the present-branch panel rendered');
+    assert.ok(!html.includes('session-brief-generate'), 'no cache-miss affordance for a present brief');
+    assert.ok(!html.includes('session-recap-generate'), 'no cache-miss affordance for a present recap');
+  });
+
+  test('a cache miss still keys by the UUID and renders the explicit generate affordance (never an auto-spend)', async () => {
+    const briefCacheStore = { calls: [], async get(urlKey, issueId) { this.calls.push({ urlKey, issueId }); return null; } };
+    const recapCacheStore = { calls: [], async get(urlKey, issueId) { this.calls.push({ urlKey, issueId }); return null; } };
+    const router = makeRouterWithCaches({ briefCacheStore, recapCacheStore });
+    const res = await driveSessionPage(router);
+
+    assert.equal(res.statusCode, 200);
+    const html = res.sentBody;
+    assert.deepEqual(briefCacheStore.calls, [{ urlKey: 'ws-a', issueId: ISSUE_UUID }], 'miss path still keys by the UUID');
+    assert.ok(html.includes('session-brief-generate'), 'cache miss shows the brief generate affordance');
+    assert.ok(html.includes('session-recap-generate'), 'cache miss shows the recap generate affordance');
+    assert.ok(!html.includes('sess-ctx-panel--present'), 'no present panel when both caches miss');
+  });
+});
+
+// ─── LIN-1021: the per-session page is issue-scoped, never a whole-workspace read ──
+//
+// The H12 fix. A well-formed sessionId-first session must render its non-lean
+// transcript WITHOUT the route ever issuing an unscoped (no issueIdentifier / no
+// sessionId) history/queue read — that unscoped read transferred the whole 30-day
+// workspace's feedback and tripped Heroku's H12. This store fails loud on any such
+// read, so a regression back to getSessionsForWorkspace on the happy path breaks it.
+// A store that fails LOUD (records into `unscoped`) on any read lacking an
+// issueIdentifier / sessionId / taskIdentifier — i.e. a whole-workspace scan.
+// Shared by the LIN-1021 per-session-page test and the LIN-1022 sibling-handler
+// tests below, which all assert the SAME invariant: the happy path is issue-scoped.
+function scopedStore(items) {
+  const unscoped = [];
+  const scope = (arr, opts, key) => {
+    if (!opts.issueIdentifier && !opts.sessionId) unscoped.push(key);
+    let r = arr;
+    if (opts.issueIdentifier) r = r.filter(i => i.issueIdentifier === opts.issueIdentifier);
+    if (opts.sessionId) r = r.filter(i => i.sessionId === opts.sessionId);
+    return r;
+  };
+  let getItemStatusCalls = 0;
+  const dispatchQueueStore = {
+    async getItemStatus(_urlKey, id) { getItemStatusCalls++; return [...items.live, ...items.history].find(i => i.id === id) || null; },
+    async listItems(_urlKey, opts = {}) { return scope(items.live, opts, 'listItems'); },
+    async listHistory(_urlKey, opts = {}) { return { items: scope(items.history, opts, 'listHistory') }; }
+  };
+  const agentStatusStore = {
+    async listStatus(_urlKey, opts = {}) {
+      if (!opts.taskIdentifier) unscoped.push('listStatus');
+      const r = (items.agentStatus || []).filter(s => !opts.taskIdentifier || s.taskIdentifier === opts.taskIdentifier);
+      return { items: r };
+    }
+  };
+  return { dispatchQueueStore, agentStatusStore, unscoped, get getItemStatusCalls() { return getItemStatusCalls; } };
+}
+
+describe('GET /observation/session/:sessionId — issue-scoped read, no whole-workspace scan (LIN-1021)', () => {
+  test('renders the transcript via issue-scoped reads only (no unscoped whole-workspace read)', async () => {
+    // Root autopilot (LIN-900, no sessionId — only reachable by id) + a worker
+    // stamped sessionId, carrying the [done] transcript.
+    const stores = scopedStore({
+      live: [],
+      history: [autopilotHistoryItem('sess-ctx', 'LIN-900'), workerHistoryItem('w-ctx', 'LIN-901', 'sess-ctx')],
+      agentStatus: [agentStatusDone('sess-ctx', 'LIN-900'), agentStatusDone('w-ctx', 'LIN-901')]
+    });
+    const router = createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore: stores.dispatchQueueStore,
+      agentStatusStore: stores.agentStatusStore,
+      observationSessionsStore: null,
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
+      briefCacheStore: { async get() { return null; } },
+      recapCacheStore: { async get() { return null; } },
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      fetchWorkspaceIssues: async () => [],
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({})
+    });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/observation/session/:sessionId');
+    const { req, res } = makeReqRes({
+      session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
+      workspace: { urlKey: 'ws-a' },
+      params: { sessionId: 'sess-ctx' }
+    });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200, 'the page rendered');
+    const html = res.sentBody;
+    assert.ok(html.includes('sess-ctx'), 'the session rendered');
+    assert.ok(html.includes('LIN-901'), 'the touched worker task is present (transcript reconstructed)');
+    // The load-bearing LIN-1021 claim: NO unscoped whole-workspace read on the happy path.
+    assert.deepEqual(stores.unscoped, [], 'no unscoped (whole-workspace) history/queue/status read');
+    assert.ok(stores.getItemStatusCalls >= 1, 'the root dispatch is fetched by id (seed issue derivation)');
+  });
+
+  test('an unknown session 404s through the fallback without crashing', async () => {
+    // issue-scoping yields nothing → the safety-net full read runs → still not
+    // found → a clean 404 (never a 500 from the new derivation path).
+    const stores = scopedStore({
+      live: [],
+      history: [autopilotHistoryItem('sess-real', 'LIN-900')],
+      agentStatus: [agentStatusDone('sess-real', 'LIN-900')]
+    });
+    const router = createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore: stores.dispatchQueueStore,
+      agentStatusStore: stores.agentStatusStore,
+      observationSessionsStore: null,
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
+      briefCacheStore: { async get() { return null; } },
+      recapCacheStore: { async get() { return null; } },
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      fetchWorkspaceIssues: async () => [],
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({})
+    });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/observation/session/:sessionId');
+    const { req, res } = makeReqRes({
+      session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
+      workspace: { urlKey: 'ws-a' },
+      params: { sessionId: 'nope-not-a-session' }
+    });
+    await handler(req, res);
+    assert.equal(res.statusCode, 404, 'unknown session 404s');
+    assert.ok(stores.unscoped.length > 0, 'the full-read fallback ran (issue-scoping found nothing)');
+  });
+});
+
+// ─── LIN-1022: the sibling :id-keyed handlers are issue-scoped too ─────────────
+//
+// Class check on LIN-1021 (widen the model, don't patch the witness). session-summary,
+// session-context, and run-summary each reconstructed ONE record by id from the whole
+// 30-day workspace (getSessionsForWorkspace / getLoopsForWorkspace) and H12'd at scale —
+// session-summary?cachedOnly=1 fired one such read per Observation card, starving the
+// event loop into mass H12. Each now point-reads via the same issue-scoped path the
+// per-session page uses; the scopedStore fails loud on any whole-workspace read, so a
+// regression back to the old reconstruct-by-id breaks these.
+describe('sibling :id-keyed handlers are issue-scoped, no whole-workspace scan (LIN-1022)', () => {
+  // Terminal session sess-ss (root LIN-950, only reachable by id) + a worker stamped
+  // sessionId carrying LIN-951; both terminal via agentStatusDone.
+  function terminalSessionItems() {
+    return {
+      live: [],
+      history: [autopilotHistoryItem('sess-ss', 'LIN-950'), workerHistoryItem('w-ss', 'LIN-951', 'sess-ss')],
+      agentStatus: [agentStatusDone('sess-ss', 'LIN-950'), agentStatusDone('w-ss', 'LIN-951')]
+    };
+  }
+
+  function makeScopedRouter(stores, extra = {}) {
+    return createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore: stores.dispatchQueueStore,
+      agentStatusStore: stores.agentStatusStore,
+      observationSessionsStore: null,
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
+      briefCacheStore: { async get() { return null; } },
+      recapCacheStore: { async get() { return null; } },
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      fetchWorkspaceIssues: async () => [],
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({}),
+      ...extra
+    });
+  }
+
+  test('session-summary resolves the session via issue-scoped reads only', async () => {
+    const prev = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'test';
+    try {
+      const stores = scopedStore(terminalSessionItems());
+      const router = makeScopedRouter(stores);
+      const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/session-summary/:sessionId');
+      const { req, res } = makeReqRes({ session: ENABLED, workspace: { urlKey: 'ws-a' }, params: { sessionId: 'sess-ss' } });
+      await handler(req, res);
+      assert.equal(res.statusCode, 200, 'summarised the terminal session');
+      assert.equal(res.jsonBody.live, false);
+      assert.match(res.jsonBody.summary.outcome, /sess-ss/);
+      assert.deepEqual(stores.unscoped, [], 'no unscoped (whole-workspace) read on the summary lookup');
+      assert.ok(stores.getItemStatusCalls >= 1, 'the session root is fetched by id (issue derivation)');
+    } finally {
+      process.env.NODE_ENV = prev;
+    }
+  });
+
+  test('session-context resolves the session via issue-scoped reads only', async () => {
+    const stores = scopedStore(terminalSessionItems());
+    const router = makeScopedRouter(stores);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/session-context/:sessionId');
+    const { req, res } = makeReqRes({
+      session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
+      workspace: { urlKey: 'ws-a' },
+      params: { sessionId: 'sess-ss' }
+    });
+    await handler(req, res);
+    assert.equal(res.statusCode, 200, 'built the session context');
+    assert.equal(res.jsonBody.sessionId, 'sess-ss');
+    assert.deepEqual(stores.unscoped, [], 'no unscoped (whole-workspace) read on the context lookup');
+    assert.ok(stores.getItemStatusCalls >= 1, 'the session root is fetched by id (issue derivation)');
+  });
+
+  test('run-summary resolves the run via issue-scoped reads only', async () => {
+    const prev = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'test';
+    try {
+      const stores = scopedStore(terminalSessionItems());
+      const router = makeScopedRouter(stores);
+      // POST → force generation; loopId 'w-ss' is a terminal worker run.
+      const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/run-summary/:loopId');
+      const { req, res } = makeReqRes({ session: ENABLED, workspace: { urlKey: 'ws-a' }, params: { loopId: 'w-ss' } });
+      await handler(req, res);
+      assert.equal(res.statusCode, 200, 'summarised the terminal run');
+      assert.equal(res.jsonBody.loopId, 'w-ss');
+      assert.deepEqual(stores.unscoped, [], 'no unscoped (whole-workspace) read on the run lookup');
+      assert.ok(stores.getItemStatusCalls >= 1, 'the run is resolved to its issue by id');
+    } finally {
+      process.env.NODE_ENV = prev;
+    }
+  });
+
+  // The actual prod H12 (LIN-1022): the Observation page fires one session-summary
+  // ?cachedOnly=1 peek per terminal card, INCLUDING cards for stale/expired
+  // sessionIds no longer in the 30-day window. The pre-fix handler paid the whole-
+  // workspace reconstruction (measured 337s on prod) on each such peek merely to 404,
+  // and a page's worth of them starved the event loop into mass H12. A peek must
+  // resolve cheaply or 204 — NEVER the whole-workspace read.
+  test('session-summary cachedOnly peek for a stale/unresolvable session 204s WITHOUT a whole-workspace read', async () => {
+    const stores = scopedStore({ live: [], history: [], agentStatus: [] });
+    const router = makeScopedRouter(stores);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/session-summary/:sessionId');
+    const { req, res } = makeReqRes({ session: ENABLED, workspace: { urlKey: 'ws-a' }, params: { sessionId: 'stale-nonexistent' }, query: { cachedOnly: '1' } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 204, 'peek miss → 204 (client leaves the generate affordance)');
+    assert.deepEqual(stores.unscoped, [], 'NO whole-workspace read paid for a stale peek (the LIN-1022 H12)');
+  });
+
+  test('run-summary cachedOnly peek for a stale/unresolvable loopId 204s WITHOUT a whole-workspace read', async () => {
+    const stores = scopedStore({ live: [], history: [], agentStatus: [] });
+    const router = makeScopedRouter(stores);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/run-summary/:loopId');
+    const { req, res } = makeReqRes({ session: ENABLED, workspace: { urlKey: 'ws-a' }, params: { loopId: 'stale-loop' }, query: { cachedOnly: '1' } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 204, 'peek miss → 204');
+    assert.deepEqual(stores.unscoped, [], 'NO whole-workspace read paid for a stale run peek');
+  });
+
+  // The asymmetry: a NON-peek request (force/POST, or a GET that will spend an LLM
+  // call) still pays the whole-workspace fallback — it is the only path that
+  // reconstructs a genuinely inference-grouped historical session, and it is a
+  // single deliberate request, not a page-load burst.
+  test('a non-peek session-summary miss still pays the whole-workspace fallback (then 404s)', async () => {
+    const stores = scopedStore({ live: [], history: [], agentStatus: [] });
+    const router = makeScopedRouter(stores);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/session-summary/:sessionId');
+    const { req, res } = makeReqRes({ session: ENABLED, workspace: { urlKey: 'ws-a' }, params: { sessionId: 'stale-nonexistent' } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 404, 'non-peek miss → 404');
+    assert.ok(stores.unscoped.length > 0, 'the whole-workspace fallback ran for the non-peek request');
   });
 });

@@ -52,7 +52,7 @@ function buildApp(captured) {
       }
     },
     workspaceFromUrl: (req, res, next) => next(),
-    workspacePreferencesStore: {},
+    workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
     freeTierStore: { tryUse: async () => ({ allowed: true }) }
   }));
   return app;

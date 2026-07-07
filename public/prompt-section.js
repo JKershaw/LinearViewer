@@ -112,7 +112,7 @@
   }
 
   function renderActionCluster(opts) {
-    const { dispatchEnabled, proxyEnabled, isLocalhost } = opts;
+    const { dispatchEnabled, proxyEnabled, isLocalhost, issue } = opts;
     let html = '';
     html += '<button class="swipe-prompt-copy" data-action="copy">copy</button>';
     html += '<button class="swipe-prompt-download" data-action="download" title="Download prompt as a .md file">download</button>';
@@ -132,6 +132,8 @@
       // handleDispatch from inside the panel.
       html += '<button class="swipe-prompt-dispatch-toggle disclosure-toggle" aria-expanded="false" aria-haspopup="true">Dispatch ▾</button>';
       html += '<div class="swipe-prompt-options hidden">';
+      // Shared model/harness exec controls (LIN-1096) — window.renderDispatchExecControls, common.js.
+      html += window.renderDispatchExecControls(`swipe-${issue && issue.id}`);
       html += '<button class="swipe-prompt-dispatch" data-action="dispatch" data-target="cli">cli</button>';
       html += '<button class="swipe-prompt-dispatch" data-action="dispatch" data-target="web">web</button>';
       html += '<button class="swipe-prompt-dispatch" data-action="dispatch" data-target="dash">dash</button>';
@@ -529,6 +531,8 @@
         // Append the proxy block (if +proxy is on) inside the try so a failed
         // token mint surfaces as "err" instead of dispatching a bare prompt.
         const prompt = await window.ProxyToggle.maybeAppend(raw, opts.urlKey);
+        // Exec controls (LIN-1096) live inside this button's own dispatch options panel.
+        const { model, harness } = window.readDispatchExecControls(btn.closest('.swipe-prompt-options'));
         // `issue` is the full card object (id/identifier/title/url) \u2014 passing it
         // through is what ties Swipe-dispatched sessions back to their task.
         await window.dispatchPrompt({
@@ -537,7 +541,9 @@
           promptName: (state.result && state.result.name) || 'Prompt',
           kind: (state.result && state.result.kind) || undefined,
           issue,
-          target
+          target,
+          model,
+          harness
         });
         btn.textContent = '\u2713';
       } catch {

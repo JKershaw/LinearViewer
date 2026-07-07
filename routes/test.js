@@ -36,7 +36,7 @@ import { defaultGitHubProjectsSeed, GITHUB_PROJECTS_WORKSPACE_URL_KEY, GITHUB_PR
  * @param {Function} options.getWorkspaceAccessToken - Function to look up workspace access token
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, taskSnapshotStore, localStore, getWorkspaceAccessToken }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, taskSnapshotStore, savedChatStore, localStore, getWorkspaceAccessToken }) {
   const router = Router();
 
   // ── Mock Yap server (LIN-450) ─────────────────────────────────────────────
@@ -94,7 +94,7 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   //                               a `-wN` suffix the siblings stay second-workspace
   //                               / workspace-N, keeping the default byte-identical.
   router.get('/test/set-session', (req, res) => {
-    const { tokenExpired, noRefreshToken, multiWorkspace, maxWorkspaces, openRouterConnected, freeTierEnabled, features, swimSample, shipSample, patMode } = req.query
+    const { tokenExpired, noRefreshToken, multiWorkspace, maxWorkspaces, openRouterConnected, freeTierEnabled, features, swimSample, shipSample, patMode, noLinearUser } = req.query
     // Per-worker key for the first workspace; same `?urlKey=` interface the
     // teardown endpoints already use, with the identical 'test-workspace' default.
     const singleUrlKey = req.query.urlKey || 'test-workspace'
@@ -154,7 +154,14 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
 
     req.session.workspaces = workspaces
     req.session.activeWorkspaceId = workspaces[0].id
-    req.session.linearUserId = 'test-linear-user-id'
+    // `noLinearUser` simulates a session with no user identity (local/GitHub App
+    // link path), so specs can exercise the "saved chats unavailable" boundary
+    // (LIN-1008). Default sets the id, so existing specs are unchanged.
+    if (noLinearUser) {
+      delete req.session.linearUserId
+    } else {
+      req.session.linearUserId = 'test-linear-user-id'
+    }
 
     // Set or clear OpenRouter API key in session based on flag
     if (openRouterConnected) {
@@ -292,6 +299,23 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     }
   });
 
+  // Endpoint to clear favourite custom prompts for testing (LIN-1011).
+  // Mirrors /test/clear-recent-prompts: favourites are stored per session user,
+  // so clear the CURRENT session's user when one exists, else the test-token user.
+  router.get('/test/clear-favorite-prompts', async (req, res) => {
+    try {
+      const userId = req.session.linearUserId || 'test-linear-user-id';
+      const prefs = await userPreferencesStore.getUserPreferences(userId);
+      await userPreferencesStore.saveUserPreferences(userId, {
+        ...prefs,
+        favoriteCustomPrompts: {}
+      });
+      res.send('ok');
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Endpoint to clear custom prompts for testing
   // Optional ?urlKey=<workspace> (default 'test-workspace' for back-compat).
   // The store is partitioned by workspace urlKey and /api/prompts/custom
@@ -301,6 +325,56 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     try {
       await customPromptsStore.deleteAll(req.query.urlKey || 'test-workspace');
       res.send('ok');
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Clear all Collective characters for a workspace (LIN-1048). Mirrors
+  // clear-custom-prompts: the store is partitioned by the anchor workspace urlKey.
+  router.get('/test/clear-collective-characters', async (req, res) => {
+    try {
+      if (collectiveCharactersStore) await collectiveCharactersStore.deleteAll(req.query.urlKey || 'test-workspace');
+      res.send('ok');
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Seed one Collective character for a workspace so E2E can exercise the picker
+  // without going through the define-new UI (LIN-1048). Body is a character
+  // record; ?urlKey=<anchor> selects the partition. Defaults to a `custom` kind.
+  router.post('/test/seed-collective-character', async (req, res) => {
+    try {
+      if (!collectiveCharactersStore) return res.status(503).json({ error: 'no collective characters store' });
+      const urlKey = req.query.urlKey || 'test-workspace';
+      const created = await collectiveCharactersStore.createCustom(urlKey, req.body || {});
+      res.json(created);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Clear all custom Collective presets for a workspace (LIN-1050). Mirrors
+  // clear-collective-characters; never touches BUILTIN_PRESETS (not rows here).
+  router.get('/test/clear-collective-presets', async (req, res) => {
+    try {
+      if (collectivePresetsStore) await collectivePresetsStore.deleteAll(req.query.urlKey || 'test-workspace');
+      res.send('ok');
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Seed one custom Collective preset for a workspace so E2E can exercise the
+  // picker without going through a save flow (LIN-1050). Body is a preset
+  // record; ?urlKey=<anchor> selects the partition.
+  router.post('/test/seed-collective-preset', async (req, res) => {
+    try {
+      if (!collectivePresetsStore) return res.status(503).json({ error: 'no collective presets store' });
+      const urlKey = req.query.urlKey || 'test-workspace';
+      const created = await collectivePresetsStore.createCustom(urlKey, req.body || {});
+      res.json(created);
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -407,6 +481,17 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     try {
       const urlKey = req.query.urlKey || 'test-workspace'
       if (taskSnapshotStore) await taskSnapshotStore.clear(urlKey)
+      res.send('ok')
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
+
+  // Endpoint to clear saved chats for testing (LIN-1008)
+  router.get('/test/clear-saved-chats', async (req, res) => {
+    try {
+      const urlKey = req.query.urlKey || 'test-workspace'
+      if (savedChatStore) await savedChatStore.clear(urlKey)
       res.send('ok')
     } catch (err) {
       res.status(500).json({ error: err.message })

@@ -50,7 +50,9 @@ test.describe('Roadmap Page', () => {
     await page.waitForLoadState('networkidle');
 
     await expect(page.locator('.roadmap-header')).toBeVisible();
-    await expect(page.locator('.roadmap-page-title')).toContainText('Roadmap');
+    // Title routes through the shared renderPageHeader primitive (LIN-975),
+    // preserved inside the bespoke roadmap header block.
+    await expect(page.locator('.roadmap-header .page-header h1')).toContainText('Roadmap');
     // Time window anchor
     await expect(page.locator('.roadmap-header-meta')).toContainText('last 90 days');
     // Velocity panel (projection-flavored) was removed
@@ -180,6 +182,40 @@ test.describe('Roadmap Page', () => {
     expect(roadmapData.velocity).toHaveProperty('tasksPerWeek');
     expect(roadmapData.velocity).toHaveProperty('pointsPerWeek');
     expect(roadmapData.velocity).toHaveProperty('trend');
+  });
+});
+
+// =============================================================================
+// LIN-1034: regression guard for the roadmap `test-token` → `testMockData` arm.
+//
+// The happy-path specs above run on a genuine `provider: 'local'` session, so
+// none of them exercise the `NODE_ENV==='test' && accessToken==='test-token'`
+// `testMockData` arm the /roadmap route (server.js) still carries for the
+// non-asserting visual maker (tests/visual/pages-screenshots.spec.js). LIN-390
+// once pruned that arm as "dead code"; with no CI assertion consuming it, the
+// roadmap visual baseline silently regressed to capturing the landing page
+// (surfaced by LIN-1033, which re-added the arm). This asserting smoke makes the
+// arm a genuinely-consumed, CI-protected path: it drives /roadmap over a
+// `test-token` session and asserts a roadmap-only marker renders. If the arm is
+// pruned again the test-token session can't reach real Linear, the route
+// auth-errors and falls through to landing — and this test fails, instead of the
+// regression going silent.
+// =============================================================================
+test.describe('Roadmap test-token arm (LIN-1034 regression guard)', () => {
+  test('renders the real Roadmap page over a test-token session, not the landing fallback', async ({ page }) => {
+    // Linear test-token session (accessToken: 'test-token') → the /roadmap
+    // testMockData arm. The same seam the visual maker rides, but asserting.
+    await page.goto(`/test/set-session?features=${FEATURES}&urlKey=${URL_KEY}`);
+    await page.goto(`/workspace/${URL_KEY}/roadmap`);
+    await page.waitForLoadState('networkidle');
+
+    // Roadmap-only markers, both already emitted by lib/render-roadmap.js and
+    // absent on the landing/login fallback.
+    await expect(page.locator('.roadmap-page')).toBeVisible();
+    await expect(page.locator('.roadmap-ship-log .roadmap-section-heading'))
+      .toContainText('Recently shipped');
+    // And prove the negative directly: we did not fall through to landing.
+    await expect(page.locator('[data-testid="landing-hero"]')).toHaveCount(0);
   });
 });
 

@@ -56,7 +56,9 @@ test.describe('Autopilot Observation page (first-class)', () => {
       await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       await page.goto(OBSERVATION_URL);
       await page.waitForLoadState('networkidle');
-      await expect(page.locator('.obs-header h1')).toHaveText('Observation');
+      // Title routes through the shared renderPageHeader primitive (LIN-975);
+      // the h1 also carries the fused "● live" indicator, so match by substring.
+      await expect(page.locator('.page-header.obs-header h1')).toContainText('Observation');
     });
 
     test('/dashboard 302-redirects to /observation', async ({ page }) => {
@@ -66,11 +68,13 @@ test.describe('Autopilot Observation page (first-class)', () => {
       expect(page.url()).toContain('/observation');
     });
 
-    test('the footer carries a first-class observation link', async ({ page }) => {
+    test('the header switcher carries a first-class observation link', async ({ page }) => {
+      // The cross-view links were hoisted from the footer into the shared header
+      // nav switcher (LIN-978); observation is a first-class view, always shown.
       await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
-      await expect(page.locator(`.footer-action[href="${OBSERVATION_URL}"]`)).toBeVisible();
+      await expect(page.locator(`.nav-views [data-testid="nav-view-observation"][href="${OBSERVATION_URL}"]`)).toBeVisible();
     });
 
     test('the experimental dashboard toggle is gone from Settings', async ({ page }) => {
@@ -182,6 +186,26 @@ test.describe('Autopilot Observation page (first-class)', () => {
       // the header itself.
       await card.locator('.obs-disc').click();
       await expect(card.locator('.obs-session-body')).toBeVisible();
+    });
+
+    test('clicking anywhere on the card head toggles the body (LIN-944)', async ({ page }) => {
+      await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+      await clearRuns(page);
+      await seedQueuedRun(page, { issueIdentifier: 'LIN-944', issueTitle: 'Whole-box toggle' });
+
+      await page.goto(OBSERVATION_URL);
+      await page.waitForLoadState('networkidle');
+      const card = page.locator('.obs-session').filter({ hasText: 'Whole-box toggle' });
+      await expect(card).toBeVisible();
+      const body = card.locator('.obs-session-body');
+      await expect(body).toBeHidden();
+      // The whole head is the tap target now (LIN-944) — click the topline, not the
+      // dedicated `.obs-disc` control, and the card still expands.
+      await card.locator('.obs-session-topline').click();
+      await expect(body).toBeVisible();
+      // Clicking the head again collapses it.
+      await card.locator('.obs-session-topline').click();
+      await expect(body).toBeHidden();
     });
 
     test('the expanded body drills into the tasks the session touched (Level 3)', async ({ page }) => {
@@ -396,6 +420,61 @@ test.describe('Autopilot Observation page (first-class)', () => {
       expect(style.opacity).toBe('0.5');
       // Full-width fill, not the 38% animated band.
       expect(style.afterWidth).toBeGreaterThan(style.hostWidth * 0.9);
+    });
+  });
+
+  // LIN-1019: the feed must offer a click-path to the per-session page, where the
+  // human follow-up reply box (LIN-1004) lives. A "waiting on you" card (LIN-1005)
+  // without that link is a dead end. The header carries a persistent `open ↗`
+  // anchor; a waiting card additionally carries a `reply →` CTA. Both point at
+  // /workspace/:urlKey/observation/session/:sessionId for the session's OWN key.
+  test.describe('per-session page link (LIN-1019)', () => {
+    // Drive a run to a non-terminal [blocked] wake marker so the session rolls up
+    // to the session-level "waiting on user" state (LIN-1005).
+    async function seedWaitingRun(page, { issueIdentifier, issueTitle }) {
+      const item = await seedQueuedRun(page, { issueIdentifier, issueTitle });
+      const tokenResp = await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${URL_KEY}`);
+      const { token } = await tokenResp.json();
+      const take = await page.request.post(`/api/dispatch/take/${item.id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      expect(take.status(), `take failed: ${await take.text()}`).toBe(200);
+      const fb = await page.request.post(`/api/dispatch/feedback/${item.id}`, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        data: { message: '[blocked] need a decision from you' }
+      });
+      expect(fb.status(), `feedback failed: ${await fb.text()}`).toBe(200);
+    }
+
+    test('a waiting card links to the per-session page via both the header and a reply CTA', async ({ page }) => {
+      await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+      await clearRuns(page);
+      await seedWaitingRun(page, { issueIdentifier: 'LIN-1019', issueTitle: 'Reply-me session' });
+
+      await page.goto(OBSERVATION_URL);
+      await page.waitForLoadState('networkidle');
+
+      const card = page.locator('.obs-session').filter({ hasText: 'Reply-me session' }).first();
+      await expect(card).toBeVisible();
+      await expect(card).toHaveAttribute('data-status', 'waiting');
+
+      // Both affordances resolve to the same session route, and the href carries
+      // this session's OWN workspace key (the feed is cross-workspace merged).
+      const sessionPathRe = new RegExp(`/workspace/${URL_KEY}/observation/session/[^"']+$`);
+      const open = card.locator('.obs-session-open');
+      await expect(open).toBeVisible();
+      await expect(open).toHaveAttribute('href', sessionPathRe);
+
+      const reply = card.locator('.obs-summary-reply');
+      await expect(reply).toBeVisible();
+      await expect(reply).toHaveAttribute('href', sessionPathRe);
+
+      // The link actually lands on the dedicated session page — and that page is
+      // the one that renders the reply box (LIN-1004).
+      await reply.click();
+      await page.waitForLoadState('networkidle');
+      expect(page.url()).toMatch(sessionPathRe);
+      await expect(page.locator('[data-testid="session-reply"]')).toBeVisible();
     });
   });
 });
