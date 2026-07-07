@@ -1283,8 +1283,11 @@ test.describe('Proxy API - Dispatch', () => {
     expect(item.prompt).toContain('/api/proxy/instructions');
     // Starting context is the distilled brief, not the raw issue dump (LIN-260).
     expect(item.prompt).toContain('/api/proxy/brief/LIN-288');
-    // The embedded token lets the worker authenticate back to the proxy.
-    expect(item.prompt).toContain(`Bearer ${writeToken}`);
+    // LIN-376: the caller's own standing token is NEVER replayed into the prompt.
+    // The worker gets a fresh single-use bootstrap and exchanges it for a working
+    // token at POST /api/proxy/token.
+    expect(item.prompt).not.toContain(writeToken);
+    expect(item.prompt).toContain('/api/proxy/token');
     // Reporting is the runner's Stop hook, not the prompt — but the evidence
     // discipline for the final summary is still taught at source.
     expect(item.prompt).toContain('evidence');

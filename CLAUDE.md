@@ -431,6 +431,7 @@ The proxy allows authenticated users to generate secure tokens for external AI a
 - Token-based authentication (Bearer tokens with SHA-256 hashing)
 - Read/write scope separation (`read` for queries, `readWrite` for mutations)
 - Single-use token support (consumed after first request)
+- Single-use **bootstrap** tokens for handoffs (LIN-376): every token embedded in a dispatched prompt, page copy, +proxy block, or Collective message is a single-use, exchange-only bootstrap (`kind: 'bootstrap'` in `lib/proxy-tokens.js`). It authenticates ONLY `POST /api/proxy/token`, which atomically consumes it and returns a multi-use working token; `validateToken` rejects a bootstrap on every data endpoint. The durable prompt (queue/history/log/clipboard, readable via `GET /api/proxy/dispatch/:id/prompt`) therefore carries a credential that is inert the instant the agent exchanges it, and the dispatch endpoints no longer replay the caller's own standing token. The one seam is the exchange endpoint; every handoff generator (`buildProxyContextPreamble`, `buildLinearAccessBlock`, `buildAgentPrompt`, `buildBlock`, `/instructions`) leads with the exchange step.
 - Event audit logging (30-day TTL)
 - Rate limiting (60 requests/minute per IP)
 - Workspace isolation (tokens are scoped to a single workspace)

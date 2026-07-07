@@ -82,6 +82,36 @@ Response:
 
 Pass `"singleUse": true` when creating a token. The token is consumed after its first successful request and cannot be used again.
 
+### Bootstrap Tokens (single-use, exchange-only)
+
+A token handed to a worker inside a **dispatched prompt, page copy, or channel message** is a
+single-use **bootstrap** token, not a working token. It authenticates exactly one operation —
+the exchange — and is rejected on every data endpoint. Before its first real call the worker
+exchanges it for a multi-use working token:
+
+```
+POST /api/proxy/token
+Authorization: Bearer YOUR_BOOTSTRAP_TOKEN
+```
+
+Response:
+
+```json
+{ "token": "<WORKING_TOKEN>", "scope": "readWrite", "expiresAt": "2026-07-09T12:00:00.000Z" }
+```
+
+Use `<WORKING_TOKEN>` as the Bearer on every subsequent call. The bootstrap is spent by the
+exchange (a second exchange returns `401`) and can never call a data endpoint itself, so the
+durable prompt — which is persisted in the dispatch queue/history and is readable via
+`GET /api/proxy/dispatch/{id}/prompt` — only ever carries an already-spent credential. This is
+what lets a leaked prompt leak nothing usable. A workspace operator can mint a bootstrap via
+`POST /workspace/:urlKey/api/proxy/tokens` with `"bootstrap": true`.
+
+> **Note for existing consumers:** every dispatched prompt now leads with this exchange step. If
+> your harness passes the prompt to an LLM agent (the common case), no code change is needed — the
+> agent follows the exchange instruction in the prompt. Only a consumer that programmatically
+> extracts and reuses the embedded token must add the one-call exchange.
+
 ### Using the Token
 
 Include the token in the `Authorization` header:

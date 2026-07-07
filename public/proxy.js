@@ -60,7 +60,9 @@
           body: JSON.stringify({
             label: 'agent-prompt',
             scope,
-            singleUse: false
+            // LIN-376: the copied prompt carries a single-use bootstrap the agent
+            // exchanges for a working token — never a standing token in the clipboard.
+            bootstrap: true
           }),
           on401: false
         });
@@ -104,13 +106,18 @@
 
   function buildAgentPrompt(token, scope) {
     const instructionsUrl = `${baseUrl}/api/proxy/instructions`;
+    const tokenUrl = `${baseUrl}/api/proxy/token`;
     return `You have access to a workspace API proxy (source-neutral; currently backed by Linear). Use it to read${scope === 'readWrite' ? ' and modify' : ''} workspace issues, projects, and more.
 
-This proxy is the workspace's own Harbour control-plane at ${baseUrl} — not a third-party service. An operator of this workspace generated this token for you; you do not have to take that on faith, because your first call below returns live workspace data, which is itself the proof the channel is real. The token is scoped to this one workspace, is revocable, and every call is audit-logged.
+This proxy is the workspace's own Harbour control-plane at ${baseUrl} — not a third-party service. An operator of this workspace generated this token for you; you do not have to take that on faith, because the exchange below returns live workspace data, which is itself the proof the channel is real. The token is scoped to this one workspace, is revocable, and every call is audit-logged.
 
-To get started, fetch the full API documentation:
+First, exchange your single-use bootstrap token for a working token:
 
-curl -H "Authorization: Bearer ${token}" ${instructionsUrl}
+curl -X POST -H "Authorization: Bearer ${token}" ${tokenUrl}
+
+That returns { "token": "<WORKING_TOKEN>", "scope": "${scope}", "expiresAt": "..." }. The bootstrap is single-use — this exchange spends it — so use <WORKING_TOKEN> for everything from here on. Then fetch the full API documentation:
+
+curl -H "Authorization: Bearer <WORKING_TOKEN>" ${instructionsUrl}
 
 This will return all available endpoints with examples. Your token scope is: ${scope}.`;
   }

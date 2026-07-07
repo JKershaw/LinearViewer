@@ -28,7 +28,10 @@ function buildApp(captured) {
     proxyTokenStore: {
       validateToken: async () => ({
         tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'readWrite', createdBy: 'u1'
-      })
+      }),
+      // LIN-376: the dispatch path mints a single-use bootstrap to embed in the
+      // preamble instead of replaying the caller's token.
+      createToken: async () => ({ token: 'bootstrap-xyz', kind: 'bootstrap', scope: 'readWrite' })
     },
     proxyEventStore: { recordEvent: async () => {} },
     resolveWorkspaceAccess: async () => ({ token: 'test-token', reason: 'ok' }),
