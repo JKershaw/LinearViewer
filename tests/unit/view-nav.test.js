@@ -106,7 +106,7 @@ test('renderViewNav emits the ⋯ more toggle + in-flow overflow group ONLY when
   assert.match(withFlags, /<div class="nav-views-overflow" id="nav-views-overflow">/);
   assert.match(withFlags, /data-testid="nav-view-dispatch"/);
 
-  // No flag-gated views → no overflow machinery (first-class four only).
+  // No flag-gated views → no overflow machinery (first-class five only).
   const noFlags = renderViewNav({ urlKey: 'acme', currentPage: 'observation', featureFlags: {} });
   assert.doesNotMatch(noFlags, /nav-more-toggle/);
   assert.doesNotMatch(noFlags, /nav-views-overflow/);

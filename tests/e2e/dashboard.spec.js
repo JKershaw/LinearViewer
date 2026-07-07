@@ -87,17 +87,19 @@ test.describe('Authenticated Dashboard', () => {
     // Reset (a client action, not a view link) stays in the footer
     await expect(page.locator('.footer-action.reset-view')).toBeVisible();
 
-    // Cross-view links were hoisted into the shared header switcher (LIN-978);
-    // the dashboard has no "current" view so all are links.
+    // Cross-view links were hoisted into the shared header switcher (LIN-978).
     await expect(page.locator(`.nav-views [data-testid="nav-view-settings"][href="/workspace/${localWorkerUrlKey}/settings"]`)).toBeVisible();
     await expect(page.locator(`.nav-views [data-testid="nav-view-swim"][href="/workspace/${localWorkerUrlKey}/swim"]`)).toBeVisible();
 
     // The footer no longer carries any view links.
     await expect(page.locator('.footer-actions [data-testid^="footer-link-"]')).toHaveCount(0);
 
-    // Should NOT have any bold current page indicator on dashboard
+    // No bold current page indicator in the footer. In the header, the dashboard
+    // route IS the projects view (LIN-1088), so its tab — and only its tab —
+    // carries the "current" state; the other view links stay plain anchors.
     await expect(page.locator('.footer-current')).not.toBeVisible();
-    await expect(page.locator('.nav-view-current')).not.toBeVisible();
+    await expect(page.locator('.nav-view-current')).toHaveCount(1);
+    await expect(page.locator('[data-testid="nav-view-projects"].nav-view-current')).toBeVisible();
 
     // Should have deploy info section with GitHub link (fallback in test mode)
     await expect(page.locator('.footer-deploy')).toBeVisible();
