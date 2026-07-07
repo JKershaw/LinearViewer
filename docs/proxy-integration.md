@@ -1356,6 +1356,7 @@ All query params optional. Merges the live queue and recent history, newest firs
 | 409 | `Issue is trashed; refusing to modify a deleted issue` | Write target is a trashed (soft-deleted) issue |
 | 429 | `Too many proxy requests` | Rate limit exceeded (60/minute) |
 | 500 | `Failed to ...` | Server error |
+| 502 | `Failed to ...` | Upstream write was rejected (the create/update did not land) |
 | 503 | `Workspace not available` | Workspace access token expired or unavailable |
 | 504 | `...timed out` | Upstream provider request timed out or was aborted (mapped from a `TimeoutError`/`AbortError`) |
 
