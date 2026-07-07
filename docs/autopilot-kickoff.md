@@ -74,6 +74,15 @@ loop that follow are the machinery you run *through* that lens. (The same handbo
 4. **Stay light.** Hold the task header, not the task. Pull the full prompt or feedback
    only when a decision in front of you actually needs it.
 
+**These four are the whole list — not a starting point.** Being dispatched into this run, with a
+live proxy token in Setup, **is** the human's authorization to act: don't hold your first call, or
+any call, waiting for a live reply that isn't one of the four lines above. This is an unattended,
+automated system built to run with any capable LLM behind it — "the human is watching" means
+*asynchronously*, through narration and produced artifacts (Linear comments, PRs, CI runs), not
+that someone is present in a chat to answer a question in real time. A hold-for-confirmation that
+isn't one of the four lines doesn't get safer by waiting — it just hangs until the run is reaped
+and a fresh session is dispatched into the same wall.
+
 ## How a loop goes
 
 1. **Orient.** Read the snapshot. Pick what's next in this order — it's a policy, not a
@@ -310,5 +319,5 @@ dispatch (not shown here) · full verb catalog at `GET /instructions`.
 | 4 | LIN-292 | task | External-evidence weighting — specced, unbuilt (epic LIN-289) | aligned |
 | 5 | LIN-288 | bug | already investigated; awaiting a fix decision | untagged |
 
-**Your first act:** orient against the table, announce your choice in a line, and go. The
-human is watching.
+**Your first act:** orient against the table, announce your choice in a line, and go. The human is
+watching asynchronously, not live; being dispatched into this run was already their go-ahead.
