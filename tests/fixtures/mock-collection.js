@@ -2,9 +2,15 @@
  * Minimal in-memory mock of the MongoDB/MangoDB collection surface, shared by
  * store unit tests. Supports the operators the local-store relies on:
  * insertOne, findOne, find().toArray(), updateOne ($set + upsert), deleteOne,
- * deleteMany, findOneAndDelete. Query matching is top-level field equality, plus
- * a `{ $gt: value }` operator (used by the dispatch store's expiresAt filter) —
- * enough for the scope/kind/_id/identifier/parentId filters the stores use.
+ * deleteMany, findOneAndDelete, countDocuments. Query matching is top-level field
+ * equality, plus a `{ $gt: value }` operator (used by the dispatch store's
+ * expiresAt filter) — enough for the scope/kind/_id/identifier/parentId filters
+ * the stores use.
+ *
+ * `find()` returns a chainable cursor supporting `.sort()/.skip()/.limit()`
+ * before `.toArray()`, applied in Mongo's documented order (sort → skip → limit →
+ * projection). This mirrors the real driver closely enough for the bounded
+ * history read (LIN-1030) to be exercised in unit tests.
  */
 export function createMockCollection() {
   const docs = [];
@@ -45,22 +51,55 @@ export function createMockCollection() {
     },
 
     find(query, options = {}) {
-      let results = docs.filter(d => matches(d, query)).map(d => ({ ...d }));
-      // Honour exclusion projections (`{ field: 0 }`) — the only form the stores
-      // use (the lean feed's `{ prompt: 0 }`, LIN-623). Mirrors MangoDB/Mongo so
-      // projection-pushdown tests see fields actually dropped.
       const projection = options && options.projection;
-      if (projection) {
-        const excluded = Object.keys(projection).filter(k => projection[k] === 0);
-        if (excluded.length) {
-          results = results.map(d => {
-            const copy = { ...d };
-            for (const k of excluded) delete copy[k];
-            return copy;
-          });
+      let sortSpec = null;
+      let skipN = 0;
+      let limitN = null;
+      const cursor = {
+        sort(spec) { sortSpec = spec; return cursor; },
+        skip(n) { skipN = n; return cursor; },
+        limit(n) { limitN = n === 0 ? null : Math.abs(n); return cursor; },
+        async toArray() {
+          let results = docs.filter(d => matches(d, query)).map(d => ({ ...d }));
+          // Sort → skip → limit → projection, matching the driver's documented order.
+          if (sortSpec) {
+            const entries = Object.entries(sortSpec);
+            results.sort((a, b) => {
+              for (const [field, dir] of entries) {
+                const av = a[field];
+                const bv = b[field];
+                let cmp = 0;
+                if (av instanceof Date && bv instanceof Date) cmp = av.getTime() - bv.getTime();
+                else if (av < bv) cmp = -1;
+                else if (av > bv) cmp = 1;
+                if (cmp !== 0) return dir === 1 ? cmp : -cmp;
+              }
+              return 0;
+            });
+          }
+          if (skipN) results = results.slice(skipN);
+          if (limitN != null) results = results.slice(0, limitN);
+          // Honour exclusion projections (`{ field: 0 }`) — the only form the stores
+          // use (the lean feed's `{ prompt: 0 }`, LIN-623). Mirrors MangoDB/Mongo so
+          // projection-pushdown tests see fields actually dropped.
+          if (projection) {
+            const excluded = Object.keys(projection).filter(k => projection[k] === 0);
+            if (excluded.length) {
+              results = results.map(d => {
+                const copy = { ...d };
+                for (const k of excluded) delete copy[k];
+                return copy;
+              });
+            }
+          }
+          return results;
         }
-      }
-      return { async toArray() { return results; } };
+      };
+      return cursor;
+    },
+
+    async countDocuments(query = {}) {
+      return docs.filter(d => matches(d, query)).length;
     },
 
     async updateOne(query, update, opts = {}) {
