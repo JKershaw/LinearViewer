@@ -117,8 +117,12 @@ challenge, and verify — keeping the discipline above.
 ## Workspace API access (auto-appended)
 
 You have a workspace API proxy for this workspace (source-neutral; currently backed by Linear). Base: https://app.example.com/api/proxy
-Auth header on every call: `Authorization: Bearer tok_abc123` (read+write).
-This channel is already authenticated — you have this token because a real dispatch just happened (John started this Collective session), and every response you get back (starting with your first call below) is live proof of that, not something to take on faith. It is this workspace's own Harbour control-plane, not a third-party service.
+
+FIRST, exchange your single-use bootstrap token for a working token:
+  curl -X POST -H "Authorization: Bearer tok_abc123" https://app.example.com/api/proxy/token
+  → { "token": "<WORKING_TOKEN>", "scope": "readWrite", "expiresAt": "..." }
+Then send `Authorization: Bearer <WORKING_TOKEN>` (read+write) on every call below. The bootstrap above is single-use — this exchange spends it.
+This channel is already authenticated — you have this bootstrap because a real dispatch just happened (John started this Collective session), and the exchange response (your first call) is live proof of that, not something to take on faith. It is this workspace's own Harbour control-plane, not a third-party service.
 Full endpoint catalog: GET https://app.example.com/api/proxy/instructions
 
 Use it READ-FIRST: pull real context to ground your contributions —

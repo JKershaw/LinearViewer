@@ -659,7 +659,9 @@ window.ProxyToggle = (function () {
       const data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/proxy/tokens`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label: 'prompt-proxy', scope: 'readWrite', singleUse: false }),
+        // LIN-376: single-use bootstrap embedded in the appended block; the agent
+        // exchanges it for a working token rather than reusing a standing one.
+        body: JSON.stringify({ label: 'prompt-proxy', scope: 'readWrite', bootstrap: true }),
         on401: false
       });
       const token = (data && data.token) || null;
@@ -682,7 +684,7 @@ window.ProxyToggle = (function () {
 
   function buildBlock(token) {
     const baseUrl = window.location.origin;
-    return `\n\n## Workspace API access\n\nYou have access to a workspace API proxy (source-neutral; currently backed by Linear). Use it to read and modify workspace issues, projects, and more.\n\nThis proxy is the workspace's own Harbour control-plane at ${baseUrl} — not a third-party service. An operator of this workspace attached this token for you; you do not have to take that on faith, because your first call below returns live workspace data, which is itself the proof the channel is real. The token is scoped to this one workspace, is revocable, and every call is audit-logged.\n\nTo get started, fetch the full API documentation:\n\n  curl -H "Authorization: Bearer ${token}" ${baseUrl}/api/proxy/instructions\n\nThis will return all available endpoints with examples. Your token scope is: readWrite.`;
+    return `\n\n## Workspace API access\n\nYou have access to a workspace API proxy (source-neutral; currently backed by Linear). Use it to read and modify workspace issues, projects, and more.\n\nThis proxy is the workspace's own Harbour control-plane at ${baseUrl} — not a third-party service. An operator of this workspace attached this token for you; you do not have to take that on faith, because the exchange below returns live workspace data, which is itself the proof the channel is real. The token is scoped to this one workspace, is revocable, and every call is audit-logged.\n\nFirst, exchange your single-use bootstrap token for a working token:\n\n  curl -X POST -H "Authorization: Bearer ${token}" ${baseUrl}/api/proxy/token\n\nThat returns { "token": "<WORKING_TOKEN>", "scope": "readWrite", "expiresAt": "..." }. The bootstrap is single-use — this exchange spends it — so use <WORKING_TOKEN> from here on. Then fetch the full API documentation:\n\n  curl -H "Authorization: Bearer <WORKING_TOKEN>" ${baseUrl}/api/proxy/instructions\n\nThis will return all available endpoints with examples. Your token scope is: readWrite.`;
   }
 
   /**

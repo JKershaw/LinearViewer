@@ -171,6 +171,80 @@ describe('ProxyTokenStore', () => {
     });
   });
 
+  describe('bootstrap tokens (LIN-376)', () => {
+    test('bootstrap token is forced single-use even without the flag', async () => {
+      const result = await store.createToken('workspace-1', { kind: 'bootstrap' });
+      assert.strictEqual(result.kind, 'bootstrap');
+      assert.strictEqual(result.singleUse, true);
+    });
+
+    test('bootstrap token is rejected by validateToken (never hits data endpoints)', async () => {
+      const result = await store.createToken('workspace-1', { kind: 'bootstrap', scope: 'readWrite' });
+      const validated = await store.validateToken(result.token);
+      assert.strictEqual(validated, null, 'A bootstrap must not authenticate a data endpoint');
+    });
+
+    test('rejecting a bootstrap at validateToken does not consume it', async () => {
+      const result = await store.createToken('workspace-1', { kind: 'bootstrap', scope: 'readWrite' });
+      // A failed data-endpoint attempt must not burn the bootstrap.
+      await store.validateToken(result.token);
+      const exchanged = await store.exchangeBootstrapToken(result.token);
+      assert.ok(exchanged, 'Bootstrap should still be exchangeable after a rejected validate');
+    });
+
+    test('exchange mints a standard, multi-use working token in the same workspace + scope', async () => {
+      const boot = await store.createToken('workspace-1', { kind: 'bootstrap', scope: 'readWrite' });
+      const working = await store.exchangeBootstrapToken(boot.token);
+      assert.ok(working, 'Exchange should succeed');
+      assert.strictEqual(working.kind, 'standard');
+      assert.strictEqual(working.scope, 'readWrite');
+      assert.strictEqual(working.urlKey, 'workspace-1');
+      assert.notStrictEqual(working.token, boot.token, 'Working token must be a different secret');
+
+      // The working token authenticates data endpoints, repeatedly.
+      const first = await store.validateToken(working.token);
+      assert.ok(first && first.scope === 'readWrite');
+      const second = await store.validateToken(working.token);
+      assert.ok(second, 'Working token is multi-use');
+    });
+
+    test('exchange consumes the bootstrap (second exchange fails)', async () => {
+      const boot = await store.createToken('workspace-1', { kind: 'bootstrap' });
+      const first = await store.exchangeBootstrapToken(boot.token);
+      assert.ok(first, 'First exchange should succeed');
+      const second = await store.exchangeBootstrapToken(boot.token);
+      assert.strictEqual(second, null, 'Second exchange should fail (consumed)');
+    });
+
+    test('exchange rejects a standard (non-bootstrap) token', async () => {
+      const standard = await store.createToken('workspace-1', { scope: 'readWrite' });
+      const result = await store.exchangeBootstrapToken(standard.token);
+      assert.strictEqual(result, null, 'Only bootstrap tokens are exchangeable');
+    });
+
+    test('exchange rejects an expired bootstrap', async () => {
+      const boot = await store.createToken('workspace-1', { kind: 'bootstrap', ttl: 1 });
+      const docs = collection._docs();
+      docs[0].expiresAt = new Date(Date.now() - 60 * 1000);
+      const result = await store.exchangeBootstrapToken(boot.token);
+      assert.strictEqual(result, null, 'Expired bootstrap should not exchange');
+    });
+
+    test('exchange honors an explicit working-token ttl', async () => {
+      const boot = await store.createToken('workspace-1', { kind: 'bootstrap', scope: 'readWrite' });
+      const working = await store.exchangeBootstrapToken(boot.token, { ttl: 60 * 60 });
+      const hours = (new Date(working.expiresAt).getTime() - Date.now()) / (60 * 60 * 1000);
+      assert.ok(hours > 0.9 && hours < 1.1, `Working TTL should be ~1h, got ${hours.toFixed(2)}`);
+    });
+
+    test('invalid kind throws', async () => {
+      await assert.rejects(
+        () => store.createToken('workspace-1', { kind: 'admin' }),
+        /kind must be/
+      );
+    });
+  });
+
   describe('token expiry', () => {
     test('expired token is rejected', async () => {
       // Create a token with a 1-second TTL, then manually set it to past

@@ -25,6 +25,7 @@ import { renderDetailsContent } from '../lib/render.js';
 import { WORK_ISSUE_LABELS } from '../lib/workflow-config.js';
 import { parseRepoFromDescription, buildPromptFilename } from '../lib/prompt-formatters.js';
 import { buildProxyContextPreamble } from '../lib/proxy-preamble.js';
+import { BOOTSTRAP_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { isRecommendationEnabled, getRecommendation, getRecommendationStream, streamChat, resolveReasoningBudget, getModelDisplayName, AVAILABLE_MODELS, getPaidEnvKey, hasPaidEnvKey } from '../lib/openrouter.js';
 import { getModelCatalog } from '../lib/openrouter-catalog.js';
@@ -2158,12 +2159,14 @@ ${goal}`
       if (!prompt) return;
 
       // Always append the workspace API proxy details to the triage prompt
-      // (LIN-733). Mint a fresh readWrite token for this dispatch; if minting is
-      // unavailable or fails, fall back to dispatching without the block rather
-      // than dropping the triage entirely (best-effort, like the enqueue itself).
+      // (LIN-733). Mint a fresh single-use BOOTSTRAP token for this dispatch
+      // (LIN-376) — never a standing readWrite token — which the run exchanges at
+      // POST /api/proxy/token for a working token. If minting is unavailable or
+      // fails, fall back to dispatching without the block rather than dropping the
+      // triage entirely (best-effort, like the enqueue itself).
       if (proxyTokenStore && baseUrl) {
         try {
-          const minted = await proxyTokenStore.createToken(workspace.urlKey, { scope: 'readWrite', label: 'feedback-triage' });
+          const minted = await proxyTokenStore.createToken(workspace.urlKey, { kind: 'bootstrap', scope: 'readWrite', label: 'feedback-triage', ttl: BOOTSTRAP_TOKEN_TTL_SECONDS });
           if (minted?.token) {
             prompt += buildProxyContextPreamble({ baseUrl, token: minted.token, issueIdentifier: issue.identifier });
           }
@@ -2213,7 +2216,8 @@ ${goal}`
 
       if (proxyTokenStore) {
         try {
-          const minted = await proxyTokenStore.createToken(workspace.urlKey, { scope: 'readWrite', label: 'feedback-autopilot' });
+          // LIN-376: single-use bootstrap, exchanged by the run for a working token.
+          const minted = await proxyTokenStore.createToken(workspace.urlKey, { kind: 'bootstrap', scope: 'readWrite', label: 'feedback-autopilot', ttl: BOOTSTRAP_TOKEN_TTL_SECONDS });
           if (minted?.token) {
             prompt += buildProxyContextPreamble({ baseUrl, token: minted.token, issueIdentifier: issue.identifier });
           }

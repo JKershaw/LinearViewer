@@ -22,6 +22,7 @@ import { renderCollectivePage } from '../lib/render-collective.js';
 import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { normalizeYapChannel, nickFromWorkspaceName, randomChannelName } from '../lib/yap-client.js';
+import { BOOTSTRAP_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
 import { jsonError, notFound } from '../lib/errors.js';
 import {
   buildCollectiveParticipantPrompt,
@@ -262,14 +263,16 @@ export function createCollectiveRoutes({
     const dispatched = [];
     for (const { ws, character, raw, nick, isFacilitator } of entries) {
 
-      // Best-effort: mint a readWrite proxy token so the participant can pull its
-      // own workspace's Linear context (and act ONLY when John approves in
-      // channel). If the store is absent or minting fails, dispatch without it —
-      // the discussion still works; the participant just lacks Linear access.
+      // Best-effort: mint a single-use BOOTSTRAP proxy token (LIN-376) so the
+      // participant can exchange it for a working token and pull its own
+      // workspace's Linear context (and act ONLY when John approves in channel).
+      // Never a standing readWrite token in the prompt. If the store is absent or
+      // minting fails, dispatch without it — the discussion still works; the
+      // participant just lacks Linear access.
       let proxyToken = null;
       if (proxyTokenStore) {
         try {
-          const minted = await proxyTokenStore.createToken(ws.urlKey, { scope: 'readWrite', label: 'collective' });
+          const minted = await proxyTokenStore.createToken(ws.urlKey, { kind: 'bootstrap', scope: 'readWrite', label: 'collective', ttl: BOOTSTRAP_TOKEN_TTL_SECONDS });
           proxyToken = minted?.token || null;
         } catch (err) {
           console.error(`Collective: proxy token mint failed for ${ws.urlKey}:`, err.message);
