@@ -59,9 +59,8 @@ test.describe('Prompts Page', () => {
       await page.goto(`/workspace/${localWorkerUrlKey}/prompts`);
 
       // Should have link back to workspace projects page
-      const projectsLink = page.locator(`.nav-action[href="/workspace/${localWorkerUrlKey}/"]`);
+      const projectsLink = page.locator('[data-testid="nav-view-projects"]');
       await expect(projectsLink).toBeVisible();
-      await expect(projectsLink).toContainText('projects');
     });
 
     test('does not have logout link in navbar', async ({ page, localWorkerUrlKey }) => {

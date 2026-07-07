@@ -60,19 +60,20 @@ test.describe('Header view switcher (LIN-978)', () => {
     }
   });
 
-  test('collapses flag-gated views behind ⋯ more at 390px, first-class four stay inline (LIN-1058)', async ({ page, localWorkerUrlKey }) => {
+  test('collapses flag-gated views behind ⋯ more at 390px, first-class five stay inline (LIN-1058)', async ({ page, localWorkerUrlKey }) => {
     await page.setViewportSize({ width: 390, height: 800 });
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
-    // The first-class four stay inline on the strip and share one vertical band.
-    for (const view of ['observation', 'swipe', 'swim', 'settings']) {
+    // The first-class five (LIN-1088 added projects) stay inline on the strip
+    // and share one vertical band.
+    for (const view of ['observation', 'swipe', 'swim', 'projects', 'settings']) {
       await expect(nav(page).getView(view)).toBeVisible();
     }
     const primaryTops = await page.locator('.nav-views > [data-testid^="nav-view-"]').evaluateAll(els =>
       els.map(el => el.getBoundingClientRect().top)
     );
-    expect(primaryTops.length).toBe(4); // exactly the first-class four inline (no active hoist on the dashboard)
+    expect(primaryTops.length).toBe(5); // exactly the first-class five inline (dashboard hoists no extra tab; projects IS the dashboard's current tab)
     expect(Math.max(...primaryTops) - Math.min(...primaryTops)).toBeLessThan(4);
 
     // The flag-gated views are collapsed (not visible) until `⋯ more` opens them.
