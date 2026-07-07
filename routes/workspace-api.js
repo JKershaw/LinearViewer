@@ -546,7 +546,8 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
           baseUrl,
           issue: { identifier, title: mockIssue.title },
           mode,
-          variant
+          variant,
+          standalone: true
         })
         return sendPromptResult(req, res, {
           identifier,
@@ -567,7 +568,8 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         baseUrl,
         issue: { identifier: issue.identifier, title: issue.title },
         mode,
-        variant
+        variant,
+        standalone: true
       })
       sendPromptResult(req, res, {
         identifier: issue.identifier,
@@ -617,7 +619,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     const baseUrl = `${req.protocol}://${req.get('host')}`
 
     try {
-      const prompt = buildAutopilotKickoff({ baseUrl, goal, mode, variant })
+      const prompt = buildAutopilotKickoff({ baseUrl, goal, mode, variant, standalone: true })
       sendPromptResult(req, res, {
         identifier: '',
         downloadName: stepper ? 'autopilot-stepper' : 'autopilot',

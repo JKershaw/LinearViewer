@@ -3914,7 +3914,7 @@ One convention across every endpoint, so you can branch on the same fields every
 
     logEvent(req, '/api/proxy/autopilot/kickoff', 200);
 
-    const kickoff = buildAutopilotKickoff({ baseUrl, goal, mode, variant });
+    const kickoff = buildAutopilotKickoff({ baseUrl, goal, mode, variant, standalone: true });
     res.type('text/plain').send(kickoff);
   });
 

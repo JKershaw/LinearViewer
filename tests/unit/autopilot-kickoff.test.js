@@ -405,3 +405,80 @@ describe('buildAutopilotKickoff (variant axis, LIN-791)', () => {
     assert.ok(text.includes(STEPPER_MARKER));
   });
 });
+
+describe('buildAutopilotKickoff (standalone mode, LIN-1117)', () => {
+  const UUID_PATTERN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/;
+
+  test('standalone: true inlines a UUID session id in the Setup bullet', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, standalone: true });
+    assert.ok(text.includes('Your session id is `'));
+    assert.ok(UUID_PATTERN.test(text), 'must contain a valid UUID');
+    // The override clause bridges the standalone-copy path to the dispatch path.
+    assert.ok(text.includes('overrides this value with the true dispatch id'));
+  });
+
+  test('standalone: true generates a fresh UUID on each call', () => {
+    const t1 = buildAutopilotKickoff({ baseUrl: BASE_URL, standalone: true });
+    const t2 = buildAutopilotKickoff({ baseUrl: BASE_URL, standalone: true });
+    assert.notStrictEqual(t1, t2);
+  });
+
+  test('standalone: false (default) keeps the byte-identical dispatched contract', () => {
+    const defaultText = buildAutopilotKickoff({ baseUrl: BASE_URL });
+    const explicitText = buildAutopilotKickoff({ baseUrl: BASE_URL, standalone: false });
+    assert.strictEqual(explicitText, defaultText);
+  });
+
+  test('standalone replaces push-wake instructions with poll-based completion', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, standalone: true });
+    assert.ok(text.includes('Poll for completion'));
+    assert.ok(text.includes('?wait=50'));
+    assert.ok(text.includes('holds open for up to ~50s'));
+    // Push-wake dependency must be removed from step 3.
+    assert.ok(!text.includes('Stand by for the wake — don\'t poll'));
+    // The "Your instruments" section still references the poll mechanism
+    // (it is shared prose), but the step-3 push-wake instruction is gone.
+  });
+
+  test('standalone keeps waitForFollowUps and wedged-session ceiling', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, standalone: true });
+    assert.ok(text.includes('followUpTo'));
+    assert.ok(text.includes('30 min'));
+    assert.ok(text.includes('liveness'));
+  });
+
+  test('standalone never mentions "Your autopilot session id" block reference', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, standalone: true });
+    // The old reference to the end-of-prompt block is replaced by the inline UUID.
+    assert.ok(!text.includes('block at the very end of this prompt'));
+    // But the dispatch override clause references it as a fallback.
+    assert.ok(!text.includes('### Your autopilot session id'));
+  });
+
+  test('standalone mode is orthogonal to variant — stepper composes with standalone', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, variant: 'stepper', standalone: true });
+    // The stepper marker is present.
+    assert.ok(text.includes("You're running as the STEPPER"));
+    // The standalone Setup inline UUID is present.
+    assert.ok(text.includes('Your session id is `'));
+    assert.ok(UUID_PATTERN.test(text));
+    // Stepper standalone: beat 3 drops subscription, beat 4 polls, hard rules drop subscription.
+    assert.ok(text.includes('Poll for completion'));
+    assert.ok(text.includes('?wait=50'));
+    // The stepper disposition (beats + hard rules) must not reference
+    // subscription — the manual's shared prose may still mention it.
+    const afterStepper = text.split("You're running as the STEPPER")[1];
+    const stepperSection = afterStepper.split('**Hard rules')[0];
+    assert.ok(!stepperSection.includes("subscription: 'everything'"));
+    // But waitForFollowUps is kept.
+    assert.ok(text.includes('waitForFollowUps: true'));
+  });
+
+  test('standalone mode is orthogonal to mode — readonly composes with standalone', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, mode: 'readonly', standalone: true });
+    assert.ok(text.includes('READ-ONLY'));
+    assert.ok(text.includes('Your session id is `'));
+    assert.ok(UUID_PATTERN.test(text));
+    assert.ok(text.includes('Poll for completion'));
+  });
+});
