@@ -424,12 +424,15 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       const urlKey = req.query.urlKey || 'test-workspace'
       const label = req.query.label || 'test-proxy-token'
       const scope = req.query.scope || 'read'
+      // LIN-376: allow minting a single-use bootstrap for the exchange round-trip spec.
+      const kind = req.query.kind === 'bootstrap' ? 'bootstrap' : 'standard'
       const result = await proxyTokenStore.createToken(urlKey, {
         label,
         scope,
+        kind,
         singleUse: req.query.singleUse === 'true'
       })
-      res.json({ tokenId: result.tokenId, token: result.token, scope: result.scope })
+      res.json({ tokenId: result.tokenId, token: result.token, scope: result.scope, kind: result.kind })
     } catch (err) {
       res.status(500).json({ error: err.message })
     }
