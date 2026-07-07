@@ -139,6 +139,27 @@ describe('buildAutopilotKickoff (shared guide)', () => {
     assert.ok(text.includes('human-continued'),
       'human-continued sessions should still be the guarded exception to close-on-done');
   });
+
+  test('coordinates a child set as PARALLEL fan-out / fan-in with per-child liveness (LIN-874)', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
+    // The inlined manual now describes parallel fan-out, not serial dispatch:
+    // independent children go out up front and fan in as each terminal wake arrives.
+    assert.ok(/fan the independent children out concurrently/i.test(text),
+      'the manual dispatches independent children concurrently, not one after the last');
+    assert.ok(text.includes('up front'), 'independent children are dispatched up front');
+    // The waits-on join: a dependent child is held until its blocker is judged clean.
+    assert.ok(/waits-on/i.test(text), 'a waits-on child is gated on its blocker');
+    assert.ok(/judged clean/i.test(text), 'the blocker must be judged clean before the dependent dispatches');
+    // Child-set liveness: each outstanding child carries its OWN ~30-min clock so a
+    // wedged one is nudged/failed without freezing the siblings or the batch.
+    assert.ok(/own ~30-minute liveness clock/i.test(text),
+      'each outstanding child carries its own liveness clock at child-set level');
+    assert.ok(/never freezes the siblings/i.test(text),
+      'a wedged child must not freeze the siblings or the batch');
+    // The serial batch language, and LIN-874 as a deferred item, are both gone.
+    assert.ok(!/both are \*\*serial\*\* for now/i.test(text), 'the serial coordinator gate is removed');
+    assert.ok(!text.includes('LIN-874'), 'LIN-874 is no longer listed as an unbuilt/deferred item');
+  });
 });
 
 describe('buildAutopilotKickoff (inline handbook / disposition layer)', () => {
@@ -379,19 +400,26 @@ describe('buildAutopilotKickoff (variant axis, LIN-791)', () => {
     assert.ok(!standard.includes('waitForFollowUps: true'));
   });
 
-  test('stepper gates on a SINGLE task up front — a batch coordinates child autopilots, it does not step into the first (LIN-888)', () => {
+  test('stepper gates on a SINGLE task up front — a batch coordinates child autopilots in PARALLEL, it does not step into the first (LIN-888 / LIN-874)', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL, variant: 'stepper' });
     // The up-front single-task gate: stepping is one task's arc; instructions that
-    // name a batch of tasks in sequence must switch to coordinating one child
-    // autopilot per task, not step into the first.
+    // name a batch of tasks must switch to coordinating one child autopilot per task,
+    // not step into the first.
     assert.ok(text.includes('is this ONE task, or a batch'), 'stepper carries the up-front single-task gate');
     assert.ok(/single task/i.test(text));
     assert.ok(text.includes('child autopilot'));         // coordinate, don't step
     assert.ok(text.includes("variant: 'stepper'"));      // each child is itself stepped
     // References the manual's mechanism rather than re-describing child dispatch.
     assert.ok(text.includes('Dispatching a child autopilot'));
-    // Batch handling stays serial — one child at a time.
-    assert.ok(/serial/i.test(text));
+    // LIN-874: batch handling is parallel fan-out / fan-in, not serial. Independent
+    // children dispatch concurrently, a waits-on child is gated on its blocker's
+    // terminal wake, and one stalled child never blocks its siblings or the batch.
+    assert.ok(/concurrent/i.test(text), 'independent children fan out concurrently, not serially');
+    assert.ok(/waits-on/i.test(text), 'a waits-on child is held back until its blocker is judged clean');
+    assert.ok(/never blocks its siblings or the batch/i.test(text), 'one stalled child does not block its siblings or the batch');
+    // The old serial batch-gate language is replaced, not layered on top of.
+    assert.ok(!/serial/i.test(text), 'the serial batch-gate wording is removed, not retained');
+    assert.ok(!/one at a time/i.test(text), 'the "one child at a time" wording is removed');
     // The gate is scoped to the stepper section: a standard kickoff never carries it.
     // (The byte-identical-standard test above is the structural guard; this pins the
     // gate's distinctive lead specifically to the stepper branch.)
