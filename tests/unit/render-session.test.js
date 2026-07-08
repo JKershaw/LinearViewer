@@ -52,25 +52,26 @@ function fixtureSession(overrides = {}) {
 }
 
 describe('render-session: transcript', () => {
-  test('renders each feedback entry with message + evidence link', () => {
+  test('embeds per-run transcript data as JSON for client-side rendering', () => {
     const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [] });
-    assert.match(html, /data-testid="session-transcript"/);
-    // Two feedback entries in loop-1 + one in loop-2 = 3 entries.
-    const entries = html.match(/data-testid="session-transcript-entry"/g) || [];
-    assert.equal(entries.length, 3, 'all three feedback entries render');
-    assert.match(html, /\[started\] session/);
-    assert.match(html, /\[evidence\] opened PR/);
-    // The link-rich entry renders its url + label.
-    assert.match(html, /data-testid="session-transcript-link"[^>]*href="https:\/\/example\.com\/pr\/1"/);
-    assert.match(html, />PR #1<\/a>/);
+    assert.match(html, /data-testid="session-run-transcript"/);
+    const txContainers = html.match(/data-testid="session-run-transcript"/g) || [];
+    assert.equal(txContainers.length, 2, 'two run transcript containers');
+    // Feedback data is HTML-escaped JSON in a data attribute.
+    assert.match(html, /data-feedback="[^"]*\[started\] session[^"]*"/);
+    assert.match(html, /data-feedback="[^"]*\[evidence\] opened PR[^"]*"/);
+    assert.match(html, /data-feedback="[^"]*example\.com\/pr\/1[^"]*"/);
+    assert.match(html, /data-feedback="[^"]*PR #1[^"]*"/);
   });
 
-  test('a session with no feedback shows an empty-transcript note, not a crash', () => {
+  test('a session with no feedback does not emit a transcript container', () => {
     const session = fixtureSession({
       loops: [{ loopId: 'l', issueIdentifier: 'LIN-900', issueId: 'u', iteration: 1, feedback: [], telemetry: null }]
     });
     const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
-    assert.match(html, /data-testid="session-transcript-empty"/);
+    // No feedback → no transcript container — the run body is empty.
+    assert.ok(!html.includes('data-testid="session-run-transcript"'));
+    assert.ok(!html.includes('data-testid="session-run-body"'));
   });
 });
 
@@ -229,7 +230,7 @@ describe('render-session: brief/recap context branches', () => {
 });
 
 describe('render-session: human reply box (LIN-1004)', () => {
-  test('renders the reply box + loads the scoped script when canReply', () => {
+  test('renders the reply box + loads scripts when canReply', () => {
     const html = renderSessionPage(
       { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true, replyTarget: 'cli', sessionTerminal: false },
       {}
@@ -237,20 +238,23 @@ describe('render-session: human reply box (LIN-1004)', () => {
     assert.match(html, /data-testid="session-reply"/);
     assert.match(html, /data-testid="session-reply-input"/);
     assert.match(html, /data-testid="session-reply-send"/);
-    // followUpTo target is the session's own id; target threads through as a data-attr.
     assert.match(html, /data-testid="session-reply"[^>]*data-session-id="sess-abc"/);
     assert.match(html, /data-testid="session-reply"[^>]*data-target="cli"/);
-    // The one scoped client script loads only when the box is present.
+    // Scripts always load (transcripts, widgets, expand/collapse, reply).
     assert.match(html, /<script src="\/session\.js"><\/script>/);
   });
 
-  test('NO reply box and NO script when canReply is false (dash/local session)', () => {
+  test('NO reply box when canReply is false (scripts still loaded for transcripts + widgets)', () => {
     const html = renderSessionPage(
       { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: false },
       {}
     );
     assert.ok(!html.includes('data-testid="session-reply"'), 'no reply box when canReply is false');
-    assert.ok(!html.includes('/session.js'), 'no scoped script when the box is absent');
+    // Scripts are always loaded — they handle transcripts, context widgets, and expand/collapse.
+    assert.match(html, /script src="\/common\.js/);
+    assert.match(html, /script src="\/session\.js/);
+    // NO inline reply boxes when canReply is false.
+    assert.ok(!html.includes('data-testid="session-inline-reply"'));
   });
 
   test('a terminal session sends force (data-session-terminal="true") with an honest resume note', () => {
@@ -288,6 +292,88 @@ describe('render-session: not-found body', () => {
     assert.match(html, /Session not found/);
     // Still has the back link so the user can return to the feed.
     assert.match(html, /data-testid="session-back"/);
+  });
+});
+
+describe('render-session: per-run expand/collapse + inline reply (LIN-1133)', () => {
+  test('each run card has a toggle with aria-expanded="false"', () => {
+    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [] });
+    // Each run head is a button with the toggle testid.
+    assert.match(html, /data-testid="session-run-toggle"[^>]*role="button"/);
+    assert.match(html, /data-testid="session-run-toggle"[^>]*aria-expanded="false"/);
+    // Toggle icon present.
+    assert.match(html, /▸/);
+  });
+
+  test('each run card has a run body container for transcript + inline reply', () => {
+    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true });
+    assert.match(html, /data-testid="session-run-body"/);
+    // Two runs = two body containers.
+    const bodies = html.match(/data-testid="session-run-body"/g) || [];
+    assert.equal(bodies.length, 2);
+  });
+
+  test('per-run inline reply box emits with correct data attributes when canReply', () => {
+    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true });
+    // Two inline reply boxes.
+    assert.match(html, /data-testid="session-inline-reply"/);
+    const ireplies = html.match(/data-testid="session-inline-reply"/g) || [];
+    assert.equal(ireplies.length, 2);
+    // First inline reply is scoped to loop-1, terminal = done.
+    assert.match(html, /data-testid="session-inline-reply"[^>]*data-loop-id="loop-1"/);
+    assert.match(html, /data-testid="session-inline-reply"[^>]*data-terminal="true"/);
+    // Has textarea and send button.
+    assert.match(html, /data-testid="session-inline-reply-send"/);
+    // Uses the visible-button class sess-reply-send.
+    assert.match(html, /action-btn sess-reply-send/);
+  });
+
+  test('no inline reply boxes when canReply is false', () => {
+    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: false });
+    assert.ok(!html.includes('data-testid="session-inline-reply"'));
+  });
+
+  test('a non-terminal run sets data-terminal="false"', () => {
+    const session = fixtureSession();
+    session.loops[0].terminalStatus = null; // running
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [], canReply: true });
+    assert.match(html, /data-testid="session-inline-reply"[^>]*data-loop-id="loop-1"[^>]*data-terminal="false"/);
+  });
+
+  test('recipes are always loaded (common.js, marked, purify, brief, recap, session)', () => {
+    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: false });
+    // Scripts load in order.
+    assert.match(html, /script src="\/common\.js"/);
+    assert.match(html, /script src="\/purify\.min\.js"/);
+    assert.match(html, /script src="\/marked\.min\.js"/);
+    assert.match(html, /script src="\/brief\.js"/);
+    assert.match(html, /script src="\/recap\.js"/);
+    assert.match(html, /script src="\/session\.js"/);
+  });
+
+  test('global reply box is still rendered as fallback when canReply', () => {
+    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true });
+    assert.match(html, /data-testid="session-reply"/);
+    assert.match(html, /data-testid="session-reply-input"/);
+  });
+
+  test('context panels carry widget data attributes for BriefSection/RecapSection', () => {
+    const issueContext = [{
+      issueIdentifier: 'LIN-900', issueId: 'uuid-900',
+      brief: 'A brief body.', briefModel: 'openai/gpt-5.4-mini', briefGeneratedAt: '2026-07-04T09:00:00.000Z',
+      recap: null
+    }];
+    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext });
+    // Brief panel has brief-section class + widget data attributes.
+    assert.match(html, /data-testid="session-brief"/);
+    assert.match(html, /brief-section/);
+    assert.match(html, /data-testid="session-brief"[^>]*data-url-key="ws-a"/);
+    assert.match(html, /data-testid="session-brief"[^>]*data-identifier="LIN-900"/);
+    // Recap panel (cache miss) also has widget data attributes.
+    assert.match(html, /data-testid="session-recap"/);
+    assert.match(html, /recap-section/);
+    assert.match(html, /data-testid="session-recap"[^>]*data-url-key="ws-a"/);
+    assert.match(html, /data-testid="session-recap"[^>]*data-identifier="LIN-900"/);
   });
 });
 
